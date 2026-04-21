@@ -40,8 +40,8 @@ import json
 import logging
 from typing import Any, Callable, Optional
 
-from vaara.pipeline import InterceptionPipeline
 from vaara.integrations.langchain import _json_safe
+from vaara.pipeline import InterceptionPipeline
 
 logger = logging.getLogger(__name__)
 

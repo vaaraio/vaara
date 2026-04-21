@@ -31,7 +31,7 @@ Issues = "https://github.com/vaaraio/vaara/issues"
 PyPI = "https://pypi.org/project/vaara/"
 
 [project.optional-dependencies]
-dev = ["pytest>=7.0", "pytest-cov"]
+dev = ["pytest>=7.0", "pytest-cov", "ruff>=0.6.0"]
 export = ["cryptography>=41.0"]
 
 [project.scripts]
@@ -42,3 +42,14 @@ where = ["src"]
 
 [tool.pytest.ini_options]
 testpaths = ["tests"]
+
+[tool.ruff]
+line-length = 100
+target-version = "py310"
+
+[tool.ruff.lint]
+select = ["E", "F", "W"]
+ignore = ["E501", "E701", "E702"]
+
+[tool.ruff.lint.per-file-ignores]
+"**/__init__.py" = ["F401"]

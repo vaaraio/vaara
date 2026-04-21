@@ -1,17 +1,17 @@
 """Tests for the action taxonomy module."""
 
 import pytest
+
 from vaara.taxonomy.actions import (
+    BUILTIN_ACTIONS,
+    UNKNOWN_ACTION,
     ActionCategory,
     ActionRegistry,
     ActionRequest,
     ActionType,
     BlastRadius,
-    BUILTIN_ACTIONS,
     Reversibility,
-    RegulatoryDomain,
     UrgencyClass,
-    UNKNOWN_ACTION,
     create_default_registry,
 )
 

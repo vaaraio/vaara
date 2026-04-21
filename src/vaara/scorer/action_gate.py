@@ -20,12 +20,10 @@ import json
 import re
 from collections import Counter
 from dataclasses import dataclass
-from pathlib import Path
 from typing import Optional
 
 import joblib
 import numpy as np
-
 
 ERROR_PATTERNS = re.compile(
     r"traceback|exception|error:|not found|no such file|permission denied|"
