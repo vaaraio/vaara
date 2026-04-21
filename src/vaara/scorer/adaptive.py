@@ -459,6 +459,46 @@ DEFAULT_EXPERTS = [
 ]
 
 
+# Category prefix table for the novel-cluster sequence detector.
+# The scorer sees action names as strings so this duplicates the taxonomy's
+# category split without importing it (keeps scorer decoupled from registry).
+_CATEGORY_PREFIX = {
+    "tx.": "financial",
+    "vault.": "financial",
+    "data.": "data",
+    "comm.": "communication",
+    "infra.": "infrastructure",
+    "id.": "identity",
+    "gov.": "governance",
+    "phy.": "physical",
+}
+
+
+# Actions that raise the novel-cluster signal when they co-occur across
+# different categories within the sliding window. Deliberately limited to
+# the most dangerous members of each category — a legitimate workflow can
+# touch data.read and infra.scale without tripping it, but one that strings
+# data.export + infra.deploy + id.grant_permission together flags as a
+# novel multi-domain pattern even if it doesn't match BUILTIN_SEQUENCES.
+_HIGH_RISK_ACTIONS = frozenset({
+    "tx.sign", "tx.transfer", "tx.swap",
+    "data.delete", "data.export",
+    "id.grant_permission", "id.create_key", "id.revoke",
+    "infra.terminate", "infra.config_change", "infra.deploy",
+    "gov.vote", "gov.execute_proposal",
+    "phy.safety_override", "phy.actuator",
+    "comm.post_public",
+})
+
+
+def _category_of(tool_name: str) -> str:
+    """Best-effort category from the tool name prefix."""
+    for prefix, category in _CATEGORY_PREFIX.items():
+        if tool_name.startswith(prefix):
+            return category
+    return "unknown"
+
+
 class AdaptiveScorer:
     """Adaptive risk scorer with conformal guarantees.
 
@@ -470,7 +510,7 @@ class AdaptiveScorer:
 
     def __init__(
         self,
-        threshold_allow: float = 0.3,
+        threshold_allow: float = 0.4,
         threshold_deny: float = 0.7,
         alpha: float = 0.10,
         mwu_eta: float = 0.1,
@@ -478,6 +518,7 @@ class AdaptiveScorer:
         burst_window_seconds: float = 60.0,
         burst_threshold: int = 10,
         max_tracked_agents: int = 10_000,
+        pre_seed_calibration: bool = True,
     ) -> None:
         """
         Args:
@@ -494,6 +535,12 @@ class AdaptiveScorer:
                 (e.g. "agent-${user_input}") can otherwise exhaust
                 memory — ~37KB per profile × unbounded agents. 10K is
                 generous for real deployments; tune up for enterprise.
+            pre_seed_calibration: If True (default), seed the conformal
+                calibrator with 50 synthetic benign prior pairs so the
+                interval starts at ~±0.19 instead of the ±0.3 cold-start
+                fallback. Real outcomes overwrite the prior within the
+                rolling window as traffic arrives. Set False when
+                measuring calibration growth from zero.
         """
         if threshold_allow >= threshold_deny:
             raise ValueError(
@@ -512,6 +559,8 @@ class AdaptiveScorer:
 
         # Conformal calibrator
         self._conformal = ConformalCalibrator(alpha=alpha)
+        if pre_seed_calibration:
+            self._seed_conformal_prior()
 
         # Sequence patterns
         self._sequences = list(sequence_patterns or BUILTIN_SEQUENCES)
@@ -539,6 +588,27 @@ class AdaptiveScorer:
         # recent_actions while record_action appends to it). Using an
         # RLock lets nested calls inside the scorer re-enter safely.
         self._lock = threading.RLock()
+
+    def _seed_conformal_prior(self) -> None:
+        """Seed the calibrator with 50 synthetic benign (predicted, actual) pairs.
+
+        A just-constructed scorer has zero residuals, so predict_interval()
+        returns the ±0.3 conservative fallback until ~30 real outcomes are
+        reported. In that window even low-risk actions land above
+        threshold_allow and escalate — honest but useless at first-deploy
+        time.
+
+        The prior residuals here span 0.10–0.19 (predicted ≈ 0.15–0.24,
+        actual = 0.05). The 90th-percentile quantile with 50 samples lands
+        at ~0.19, so the starting interval is ±0.19 instead of ±0.3. Real
+        traffic then overwrites the prior within max_calibration=2000
+        reports without any explicit migration. Operators who want the
+        strict cold-start behaviour pass pre_seed_calibration=False.
+        """
+        for i in range(50):
+            predicted = 0.15 + (i % 10) * 0.01
+            actual = 0.05
+            self._conformal.add_calibration_point(predicted, actual)
 
     # ── Scorer Backend Protocol ───────────────────────────────────
 
@@ -746,7 +816,16 @@ class AdaptiveScorer:
         return min(1.0, max(0.0, risk))
 
     def _sequence_signal(self, agent_id: str, current_tool: str) -> float:
-        """Detect dangerous action sequences in recent history."""
+        """Detect dangerous action sequences in recent history.
+
+        Runs two layers: (1) exact match against BUILTIN_SEQUENCES, and
+        (2) a generic "novel multi-domain cluster" fallback that fires
+        when no known pattern matches but the recent window contains
+        high-risk actions spanning multiple categories. The fallback
+        catches attacks that don't fit a pre-enumerated template
+        (e.g., data.export → infra.deploy → gov.vote) without producing
+        false positives on single-category legitimate workflows.
+        """
         profile = self._agents.get(agent_id)
         if profile is None:
             return 0.0
@@ -777,6 +856,31 @@ class AdaptiveScorer:
                 # Transition out of matched state — clear so the next
                 # trip gets logged again.
                 self._seq_match_state.pop(key, None)
+
+        # Fallback: novel high-risk cluster across categories. Only
+        # activates when no builtin pattern fired, the current action
+        # is itself high-risk, and at least one prior action in the
+        # recent window is high-risk in a DIFFERENT category. Two
+        # categories is the floor — a lone high-risk action repeating
+        # itself is covered by burst detection, not sequence risk.
+        if max_boost == 0.0 and current_tool in _HIGH_RISK_ACTIONS:
+            window = recent_names[-10:]
+            high_risk_categories = {
+                _category_of(name) for name in window
+                if name in _HIGH_RISK_ACTIONS
+            }
+            if len(high_risk_categories) >= 2:
+                novel_key = (agent_id, "_novel_cluster")
+                if not self._seq_match_state.get(novel_key, False):
+                    logger.warning(
+                        "Novel high-risk multi-domain cluster for agent %s: "
+                        "categories=%s",
+                        agent_id, sorted(high_risk_categories),
+                    )
+                    self._seq_match_state[novel_key] = True
+                max_boost = 0.25
+            else:
+                self._seq_match_state.pop((agent_id, "_novel_cluster"), None)
 
         return min(1.0, max_boost)
 

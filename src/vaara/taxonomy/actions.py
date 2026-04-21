@@ -206,7 +206,14 @@ class ActionRegistry:
     def classify(self, tool_name: str, parameters: Optional[dict] = None) -> ActionType:
         """Classify a tool call into an action type.
 
-        Falls back to UNKNOWN if no mapping exists.
+        Resolution order:
+          1. Exact mapping (map_tool / auto-mapped builtin).
+          2. Longest prefix match from registered mappings.
+          3. Keyword heuristic over the built-in taxonomy — catches
+             framework tools with names like "send_slack_alert" or
+             "delete_customer_row" that the user never explicitly
+             mapped. Better than UNKNOWN for the common case.
+          4. UNKNOWN_ACTION as a last resort.
         """
         with self._lock:
             if tool_name in self._tool_mappings:
@@ -215,6 +222,13 @@ class ActionRegistry:
             for prefix in sorted(self._tool_mappings, key=len, reverse=True):
                 if tool_name.startswith(prefix):
                     return self._types[self._tool_mappings[prefix]]
+            # Keyword heuristic — only resolves to built-in action types
+            # that are actually registered in this registry. A custom
+            # registry without the default builtins falls through to
+            # UNKNOWN rather than returning a type it doesn't know.
+            guessed = _heuristic_classify(tool_name)
+            if guessed and guessed in self._types:
+                return self._types[guessed]
             return UNKNOWN_ACTION
 
     def get(self, name: str) -> Optional[ActionType]:
@@ -225,6 +239,91 @@ class ActionRegistry:
     def all_types(self) -> dict[str, ActionType]:
         with self._lock:
             return dict(self._types)
+
+
+# ── Heuristic keyword classification ───────────────────────────────────────
+
+# Keyword → built-in action-type name. Scanned (in order) against a
+# lowercased, non-alphanumeric-stripped tool name when explicit mapping
+# and prefix matching both miss. This is the "LangChain @tool with a
+# custom name" path: a tool called "send_slack_alert" shouldn't fall to
+# UNKNOWN just because the user didn't call map_tool(). The table
+# deliberately covers the clear cases only — ambiguous names still fall
+# to UNKNOWN (better than miscategorising a finance tool as comms).
+# Order matters: more specific keywords come first so "delete_email"
+# matches data.delete before comm.send_email's "email".
+_HEURISTIC_KEYWORDS: tuple[tuple[str, str], ...] = (
+    # Financial
+    ("transfer", "tx.transfer"),
+    ("withdraw", "tx.transfer"),
+    ("swap", "tx.swap"),
+    ("approve_token", "tx.approve"),
+    ("sign_tx", "tx.sign"),
+    ("sign_transaction", "tx.sign"),
+    ("rebalance", "vault.rebalance"),
+    # Data
+    ("delete", "data.delete"),
+    ("drop_table", "data.delete"),
+    ("export", "data.export"),
+    ("download", "data.export"),
+    ("upload", "data.export"),
+    ("write_file", "data.write"),
+    ("write", "data.write"),
+    ("save", "data.write"),
+    ("read_file", "data.read"),
+    ("read", "data.read"),
+    ("fetch", "data.read"),
+    ("query", "data.read"),
+    ("search", "data.read"),
+    # Communication
+    ("email", "comm.send_email"),
+    ("slack", "comm.send_email"),
+    ("post", "comm.post_public"),
+    ("tweet", "comm.post_public"),
+    ("publish", "comm.post_public"),
+    ("api_call", "comm.api_call"),
+    ("http", "comm.api_call"),
+    ("request", "comm.api_call"),
+    # Infrastructure
+    ("deploy", "infra.deploy"),
+    ("terminate", "infra.terminate"),
+    ("kill", "infra.terminate"),
+    ("scale", "infra.scale"),
+    ("config", "infra.config_change"),
+    ("settings", "infra.config_change"),
+    # Identity
+    ("grant_permission", "id.grant_permission"),
+    ("grant_role", "id.grant_permission"),
+    ("grant", "id.grant_permission"),
+    ("create_key", "id.create_key"),
+    ("api_key", "id.create_key"),
+    ("revoke", "id.revoke"),
+    # Governance
+    ("execute_proposal", "gov.execute_proposal"),
+    ("vote", "gov.vote"),
+    # Physical
+    ("safety_override", "phy.safety_override"),
+    ("actuator", "phy.actuator"),
+)
+
+
+def _heuristic_classify(tool_name: str) -> Optional[str]:
+    """Return the best-guess action_type name for an unmapped tool, or None.
+
+    Normalises by lowercasing and keeping only [a-z0-9_]. A tool called
+    "SendSlackMessage" normalises to "sendslackmessage" and matches the
+    "slack" keyword. The first keyword in _HEURISTIC_KEYWORDS that appears
+    as a substring wins — order matters for overlapping keywords.
+    """
+    if not tool_name:
+        return None
+    normalized = "".join(
+        c if c.isalnum() or c == "_" else "_" for c in tool_name.lower()
+    )
+    for keyword, action_type_name in _HEURISTIC_KEYWORDS:
+        if keyword in normalized:
+            return action_type_name
+    return None
 
 
 # ── Sentinel for unclassified actions ───────────────────────────────────────

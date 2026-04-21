@@ -214,11 +214,30 @@ class InterceptionPipeline:
         scorer: Optional[AdaptiveScorer] = None,
         trail: Optional[AuditTrail] = None,
         compliance: Optional[ComplianceEngine] = None,
+        enforce: bool = True,
     ) -> None:
+        """
+        Args:
+            registry: Action taxonomy registry. Defaults to the built-in
+                set covering tx.*, data.*, id.*, etc.
+            scorer: Risk scorer. Defaults to AdaptiveScorer().
+            trail: Audit trail sink. Defaults to in-memory AuditTrail().
+            compliance: Compliance reporter. Defaults to ComplianceEngine().
+            enforce: When True (default), intercept() honours the scorer's
+                allow/deny/escalate decision. When False, the pipeline
+                runs in SHADOW MODE: every intercept still classifies,
+                scores, and writes the real decision to the audit trail,
+                but the returned InterceptionResult.allowed is always
+                True so the caller's agent keeps running. Shadow mode
+                lets operators drop Vaara in front of an existing agent,
+                collect evidence of what would have been blocked, and
+                flip enforce=True only after reviewing the audit.
+        """
         self.registry = registry or create_default_registry()
         self.scorer = scorer or AdaptiveScorer()
         self.trail = trail or AuditTrail()
         self.compliance = compliance or ComplianceEngine()
+        self._enforce = enforce
 
         # Track action_id → (predicted_risk, signals) for outcome feedback.
         # OrderedDict + bounded FIFO eviction — see _MAX_PENDING_OUTCOMES.
@@ -502,6 +521,22 @@ class InterceptionPipeline:
             else:
                 self._metrics.escalated += 1
 
+        # Shadow mode: the audit trail keeps the true decision but the
+        # caller always receives allowed=True so the agent keeps running.
+        # This is how operators pilot Vaara in front of an existing agent
+        # without blocking any tool calls — they review what the audit
+        # says WOULD have been blocked, then flip enforce=True once
+        # comfortable. Logging the divergence makes the "what did Vaara
+        # pretend-block last week" question answerable from logs alone.
+        effective_allowed = allowed
+        if not self._enforce:
+            effective_allowed = True
+            if not allowed:
+                logger.info(
+                    "Shadow mode: %s/%s decision=%s but returning allowed=True",
+                    agent_id, tool_name, decision_str,
+                )
+
         logger.info(
             "Intercepted %s/%s: %s (risk=%.3f [%.3f,%.3f], %.1fms)",
             agent_id, tool_name, decision_str,
@@ -509,7 +544,7 @@ class InterceptionPipeline:
         )
 
         return InterceptionResult(
-            allowed=allowed,
+            allowed=effective_allowed,
             action_id=action_id,
             decision=decision_str,
             risk_score=point_estimate,
@@ -770,6 +805,7 @@ class InterceptionPipeline:
             "trail_skeleton_records": self.trail.skeleton_records,
             "pending_outcomes": len(self._pending_outcomes),
             "registered_action_types": len(self.registry.all_types),
+            "enforce": self._enforce,
             "metrics": self.metrics().to_dict(),
         }
 
