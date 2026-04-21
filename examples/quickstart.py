@@ -1,5 +1,6 @@
-from vaara import Pipeline
 from rich import print
+
+from vaara import Pipeline
 
 pipeline = Pipeline()
 

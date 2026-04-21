@@ -27,10 +27,9 @@ from typing import Any, Optional
 import numpy as np
 
 from vaara.scorer.action_gate import (
-    GateDecision,
+    classify_cmd,
     clean_text,
     extract_commands,
-    classify_cmd,
 )
 from vaara.scorer.adaptive import Decision, RiskAssessment
 
@@ -41,7 +40,6 @@ _DEFAULT_BUNDLE = Path.home() / ".vaara" / "cache" / "mc_dropout_gate_bundle.job
 
 
 def _build_model(in_dim: int, hidden1: int, hidden2: int, dropout: float):
-    import torch
     import torch.nn as nn
 
     class MCDropoutGate(nn.Module):
@@ -123,9 +121,8 @@ class MCDropoutGateScorer:
 
     def _featurize(self, history_pairs, proposed_text):
         """Reproduce the training-time feature vector (30 behavioral + 24 NLP)."""
-        from collections import Counter
-
         import re
+        from collections import Counter
 
         ERROR = re.compile(
             r"traceback|exception|error:|not found|no such file|permission denied|"

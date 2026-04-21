@@ -1,9 +1,11 @@
 """Regulator-facing demo — Article 14 action gate in action."""
 import time
-from vaara import Pipeline
+
 from rich.console import Console
 from rich.panel import Panel
 from rich.text import Text
+
+from vaara import Pipeline
 
 console = Console()
 pipeline = Pipeline()

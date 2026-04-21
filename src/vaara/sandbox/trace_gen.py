@@ -49,15 +49,13 @@ from __future__ import annotations
 
 import json
 import random
-import time
 from dataclasses import dataclass, field
 from pathlib import Path
 from typing import Optional
 
 from vaara._sanitize import strict_json_dumps
 from vaara.pipeline import InterceptionPipeline
-from vaara.taxonomy.actions import ActionType, create_default_registry
-
+from vaara.taxonomy.actions import create_default_registry
 
 # ── Agent archetypes ─────────────────────────────────────────────────────
 

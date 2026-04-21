@@ -4,6 +4,7 @@ import tempfile
 from pathlib import Path
 
 import pytest
+
 from vaara.audit.sqlite_backend import SQLiteAuditBackend
 from vaara.audit.trail import AuditTrail, EventType
 from vaara.taxonomy.actions import (
@@ -139,7 +140,7 @@ class TestSQLiteBackend:
     def test_export_jsonl(self, db_path, sample_action_type):
         with SQLiteAuditBackend(db_path) as backend:
             trail = AuditTrail(on_record=backend.write_record)
-            for i in range(3):
+            for _i in range(3):
                 req = ActionRequest(
                     agent_id="agent", tool_name="tx.transfer",
                     action_type=sample_action_type,

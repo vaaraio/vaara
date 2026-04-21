@@ -66,14 +66,13 @@ import logging
 import math
 import os
 import sys
-from dataclasses import asdict, dataclass
+from dataclasses import dataclass
 from pathlib import Path
 from typing import Any, Optional
 
 from vaara import __version__ as _VAARA_VERSION
 from vaara.audit.sqlite_backend import SQLiteAuditBackend
 from vaara.pipeline import InterceptionPipeline
-from vaara.taxonomy.actions import create_default_registry
 
 logger = logging.getLogger(__name__)
 
@@ -355,7 +354,7 @@ class VaaraMCPServer:
                 return self._error_response(req_id, -32601, f"Method not found: {method}")
         except _InvalidParams as e:
             return self._error_response(req_id, -32602, str(e))
-        except Exception as e:
+        except Exception:
             logger.exception("Error handling %s", method)
             # Don't leak internal exception messages (Python tracebacks,
             # attribute errors) to the client — emit a generic message.

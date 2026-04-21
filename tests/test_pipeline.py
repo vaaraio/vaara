@@ -1,6 +1,7 @@
 """Tests for the interception pipeline — end-to-end integration."""
 
 import pytest
+
 from vaara.pipeline import InterceptionPipeline
 from vaara.taxonomy.actions import (
     ActionCategory,

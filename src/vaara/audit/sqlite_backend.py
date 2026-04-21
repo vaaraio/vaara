@@ -631,8 +631,9 @@ class SQLiteAuditBackend:
 
     def create_api_key(self, name: str, role: "Role") -> str:
         """Create a new API key with the given role. Returns the plaintext key (shown once)."""
-        from vaara.auth import Role as _Role
         import uuid as _uuid
+
+        from vaara.auth import Role as _Role
         plaintext = generate_api_key()
         key_id = str(_uuid.uuid4())
         key_hash = _hash_key(plaintext)

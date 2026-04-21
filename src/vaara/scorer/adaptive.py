@@ -33,15 +33,6 @@ from dataclasses import dataclass, field
 from enum import Enum
 from typing import Any, Optional
 
-from vaara.taxonomy.actions import (
-    ActionCategory,
-    ActionRequest,
-    ActionType,
-    BlastRadius,
-    Reversibility,
-    UrgencyClass,
-)
-
 logger = logging.getLogger(__name__)
 
 

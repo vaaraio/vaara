@@ -1,13 +1,11 @@
 """Tests for the adaptive risk scorer."""
 
-import pytest
 from vaara.scorer.adaptive import (
+    BUILTIN_SEQUENCES,
     AdaptiveScorer,
     ConformalCalibrator,
-    Decision,
     MWUExperts,
     SequencePattern,
-    BUILTIN_SEQUENCES,
 )
 
 

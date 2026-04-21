@@ -97,7 +97,7 @@ def _cmd_keygen(args: argparse.Namespace) -> int:
     )
     fingerprint = hashlib.sha256(raw_pub).hexdigest()[:32]
 
-    print(f"Generated Ed25519 keypair (evaluation/demo use only)")
+    print("Generated Ed25519 keypair (evaluation/demo use only)")
     print(f"  private key: {out}        (0600)")
     print(f"  public key:  {pub_out}")
     print(f"  fingerprint: {fingerprint}")
@@ -164,7 +164,7 @@ def _cmd_trail_verify(args: argparse.Namespace) -> int:
     result = verify_signed(Path(args.zip).expanduser(), public_key=pubkey)
 
     if result.manifest:
-        print(f"Manifest:")
+        print("Manifest:")
         print(f"  schema:       {result.manifest.get('schema_version')}")
         print(f"  records:      {result.manifest.get('record_count')}")
         print(f"  fingerprint:  {result.manifest.get('signer_pubkey_fingerprint')}")

@@ -13,10 +13,9 @@ from cryptography.hazmat.primitives import serialization
 from cryptography.hazmat.primitives.asymmetric.ed25519 import Ed25519PrivateKey
 
 from vaara.audit.export import export_signed
-from vaara.audit.verify import verify_signed
 from vaara.audit.trail import AuditTrail
+from vaara.audit.verify import verify_signed
 from vaara.taxonomy.actions import ActionRequest, create_default_registry
-
 
 _REGISTRY = create_default_registry()
 _TX_TRANSFER = _REGISTRY.get("tx.transfer")

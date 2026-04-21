@@ -5,11 +5,12 @@ import tempfile
 from pathlib import Path
 
 import pytest
+
 from vaara.audit.trail import (
+    EU_AI_ACT_MAPPINGS,
     AuditRecord,
     AuditTrail,
     EventType,
-    EU_AI_ACT_MAPPINGS,
 )
 from vaara.taxonomy.actions import (
     ActionCategory,
@@ -464,7 +465,7 @@ class TestRegulatoryMappings:
         assert EventType.OUTCOME_RECORDED in EU_AI_ACT_MAPPINGS
 
     def test_all_mappings_have_required_fields(self):
-        for event_type, articles in EU_AI_ACT_MAPPINGS.items():
+        for _event_type, articles in EU_AI_ACT_MAPPINGS.items():
             for article in articles:
                 assert article.domain == RegulatoryDomain.EU_AI_ACT
                 assert article.article  # Non-empty

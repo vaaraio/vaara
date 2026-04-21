@@ -31,13 +31,12 @@ Requires: crewai >= 0.30 (not a hard dependency — imported at runtime)
 from __future__ import annotations
 
 import logging
-from typing import Any, Optional
+from typing import Any
 
-from vaara.pipeline import InterceptionPipeline
 from vaara.integrations.langchain import (
     ToolExecutionBlocked,
-    ToolExecutionEscalated,
 )
+from vaara.pipeline import InterceptionPipeline
 
 logger = logging.getLogger(__name__)
 
@@ -132,7 +131,7 @@ class VaaraCrewGovernance:
 
         max_risk = max(a["risk_score"] for a in assessments) if assessments else 0.0
         any_blocked = any(a["decision"] == "deny" for a in assessments)
-        any_escalated = any(a["decision"] == "escalate" for a in assessments)
+        any(a["decision"] == "escalate" for a in assessments)
 
         return {
             "task_allowed": not any_blocked,
