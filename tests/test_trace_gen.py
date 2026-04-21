@@ -3,14 +3,11 @@
 import tempfile
 from pathlib import Path
 
-import pytest
-
 from vaara.pipeline import InterceptionPipeline
 from vaara.sandbox.trace_gen import (
     ADVERSARIAL_ARCHETYPE,
     BENIGN_ARCHETYPE,
     CARELESS_ARCHETYPE,
-    AgentArchetype,
     SyntheticTrace,
     TraceGenerator,
     TraceStep,
@@ -40,7 +37,7 @@ class TestTraceGenerator:
         t1 = gen1.generate(n_traces=5)
         t2 = gen2.generate(n_traces=5)
         assert len(t1) == len(t2)
-        for a, b in zip(t1, t2):
+        for a, b in zip(t1, t2, strict=False):
             assert a.agent_id == b.agent_id
             assert len(a.steps) == len(b.steps)
 
@@ -52,7 +49,7 @@ class TestTraceGenerator:
         # At least some traces should differ
         different = any(
             a.agent_id != b.agent_id or len(a.steps) != len(b.steps)
-            for a, b in zip(t1, t2)
+            for a, b in zip(t1, t2, strict=False)
         )
         assert different
 

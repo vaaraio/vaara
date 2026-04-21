@@ -4,30 +4,31 @@ These tests verify the integration logic WITHOUT requiring the actual
 frameworks installed — they test Vaara's side of the contract.
 """
 
-import pytest
 from uuid import uuid4
 
-from vaara.pipeline import InterceptionPipeline, InterceptionResult
-from vaara.taxonomy.actions import (
-    ActionType,
-    ActionCategory,
-    Reversibility,
-    BlastRadius,
-)
+import pytest
+
+from vaara.integrations.crewai import VaaraCrewGovernance
 from vaara.integrations.langchain import (
-    VaaraCallbackHandler,
     ToolExecutionBlocked,
     ToolExecutionEscalated,
+    VaaraCallbackHandler,
     VaaraInterceptionError,
     vaara_wrap_tool,
 )
 from vaara.integrations.openai_agents import (
-    vaara_wrap_function,
     ToolCallBlocked,
     ToolCallEscalated,
     VaaraToolGuardrail,
+    vaara_wrap_function,
 )
-from vaara.integrations.crewai import VaaraCrewGovernance
+from vaara.pipeline import InterceptionPipeline, InterceptionResult
+from vaara.taxonomy.actions import (
+    ActionCategory,
+    ActionType,
+    BlastRadius,
+    Reversibility,
+)
 
 
 def _fake_result(decision: str, allowed: bool, action_id: str = "act-test") -> InterceptionResult:

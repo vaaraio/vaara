@@ -1,13 +1,13 @@
 """Tests for the compliance engine."""
 
 import pytest
+
 from vaara.audit.trail import AuditTrail, EventType
 from vaara.compliance.engine import (
+    DORA_REQUIREMENTS,
+    EU_AI_ACT_REQUIREMENTS,
     ComplianceEngine,
     EvidenceStatus,
-    EvidenceStrength,
-    EU_AI_ACT_REQUIREMENTS,
-    DORA_REQUIREMENTS,
 )
 from vaara.taxonomy.actions import (
     ActionCategory,
@@ -155,7 +155,6 @@ class TestComplianceEngine:
 
     def test_staleness_detection(self, engine, trail):
         # Add old evidence
-        import time as t
         at = ActionType(
             "data.read", ActionCategory.DATA, Reversibility.FULLY,
             BlastRadius.SELF,

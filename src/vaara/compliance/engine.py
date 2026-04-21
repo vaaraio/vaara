@@ -26,6 +26,7 @@ EU AI Act enforcement for high-risk systems: August 2, 2026.
 
 from __future__ import annotations
 
+import logging
 import threading
 import time
 from dataclasses import dataclass, field
@@ -34,8 +35,6 @@ from typing import Any, Optional
 
 from vaara.audit.trail import AuditTrail, EventType
 from vaara.taxonomy.actions import RegulatoryDomain
-
-import logging
 
 logger = logging.getLogger(__name__)
 
@@ -305,7 +304,7 @@ class ConformityReport:
         """
         ts = time.strftime("%Y-%m-%d %H:%M UTC", time.gmtime(self.generated_at))
         lines = [
-            f"ARTICLE-LEVEL EVIDENCE REPORT",
+            "ARTICLE-LEVEL EVIDENCE REPORT",
             f"System: {self.system_name} v{self.system_version}",
             f"Generated: {ts}",
             f"Overall Evidence Status: {self.overall_status.value.upper()}",

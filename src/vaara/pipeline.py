@@ -41,7 +41,7 @@ from typing import Any, Optional
 from vaara._sanitize import json_safe
 from vaara.audit.trail import AuditTrail
 from vaara.compliance.engine import ComplianceEngine, ConformityReport
-from vaara.scorer.adaptive import AdaptiveScorer, Decision
+from vaara.scorer.adaptive import AdaptiveScorer
 from vaara.taxonomy.actions import (
     ActionRegistry,
     ActionRequest,
