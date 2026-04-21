@@ -1,0 +1,74 @@
+[
+  {
+    "label": "tx.transfer",
+    "n": 10000,
+    "mean_ms": 0.1243,
+    "p50_ms": 0.1176,
+    "p95_ms": 0.136,
+    "p99_ms": 0.1767,
+    "p999_ms": 0.2996,
+    "min_ms": 0.1054,
+    "max_ms": 18.8652,
+    "throughput_per_sec": 8046.1
+  },
+  {
+    "label": "tx.swap",
+    "n": 10000,
+    "mean_ms": 0.1257,
+    "p50_ms": 0.1168,
+    "p95_ms": 0.1306,
+    "p99_ms": 0.1449,
+    "p999_ms": 0.3054,
+    "min_ms": 0.1071,
+    "max_ms": 39.2968,
+    "throughput_per_sec": 7955.8
+  },
+  {
+    "label": "data.read",
+    "n": 10000,
+    "mean_ms": 0.1473,
+    "p50_ms": 0.1331,
+    "p95_ms": 0.1487,
+    "p99_ms": 0.1677,
+    "p999_ms": 0.334,
+    "min_ms": 0.1188,
+    "max_ms": 71.1617,
+    "throughput_per_sec": 6789.7
+  },
+  {
+    "label": "unknown.tool",
+    "n": 10000,
+    "mean_ms": 0.1433,
+    "p50_ms": 0.132,
+    "p95_ms": 0.1451,
+    "p99_ms": 0.158,
+    "p999_ms": 0.3234,
+    "min_ms": 0.1221,
+    "max_ms": 90.0739,
+    "throughput_per_sec": 6980.7
+  },
+  {
+    "label": "first_call_after_init",
+    "n": 50,
+    "mean_ms": 0.1205,
+    "p50_ms": 0.118,
+    "p95_ms": 0.1326,
+    "p99_ms": 0.1492,
+    "p999_ms": 0.1616,
+    "min_ms": 0.1152,
+    "max_ms": 0.1629,
+    "throughput_per_sec": 8298.0
+  },
+  {
+    "label": "pipeline_construction",
+    "n": 50,
+    "mean_ms": 0.013,
+    "p50_ms": 0.0128,
+    "p95_ms": 0.0138,
+    "p99_ms": 0.0159,
+    "p999_ms": 0.0171,
+    "min_ms": 0.0127,
+    "max_ms": 0.0173,
+    "throughput_per_sec": 76740.8
+  }
+]
