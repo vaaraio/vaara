@@ -27,7 +27,7 @@ jobs:
           python-version: '3.12'
 
       - name: Install build tooling
-        run: pip install build
+        run: pip install --require-hashes -r .github/requirements-build.txt
 
       - name: Build sdist and wheel
         run: python -m build
