@@ -16,6 +16,8 @@
 
 Adaptive AI agent execution layer. Sits between agents and actions, scores risk in real time, and produces evidence artefacts that support EU AI Act Article 14 human-oversight and Article 12 logging obligations.
 
+Article-by-article evidence mapping: [COMPLIANCE.md](COMPLIANCE.md).
+
 > Vaara is a tool that helps deployers assemble evidence for their own
 > conformity work. It does not itself conduct conformity assessments,
 > certify compliance, or constitute legal advice. Deployers remain
@@ -186,6 +188,9 @@ for article in report.articles:
   monitoring)
 - DORA: Articles 10, 12, 13 (ICT risk management, incident detection,
   incident response)
+
+Full article-by-article mapping, evidence types, CLI handoff flow, and
+what the deployer still owns: [COMPLIANCE.md](COMPLIANCE.md).
 
 The audit trail is hash-chained (SHA-256) and tamper-evident, which
 supports Article 12(1) record-keeping obligations when configured with
