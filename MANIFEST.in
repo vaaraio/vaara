@@ -1,0 +1,4 @@
+include LICENSE
+include README.md
+recursive-include src/vaara *.py
+recursive-include docs *.md

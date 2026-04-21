@@ -1,0 +1,360 @@
+"""Action taxonomy for AI agent execution layer.
+
+Classifies every action an AI agent can take by:
+- Category (financial, data, communication, infrastructure, identity, governance, physical)
+- Reversibility (fully, partially, irreversible)
+- Blast radius (self, local, shared, global)
+
+Each action type carries regulatory-domain tags (EU AI Act, GDPR, DORA,
+NIS2, MiFID II, HIPAA, SOC 2, product liability) so audit records can be
+mapped article-by-article at runtime.
+"""
+
+from __future__ import annotations
+
+import logging
+import threading
+from dataclasses import dataclass, field
+from enum import Enum
+from typing import Optional
+
+logger = logging.getLogger(__name__)
+
+
+class ActionCategory(str, Enum):
+    """Top-level action category."""
+    FINANCIAL = "financial"
+    DATA = "data"
+    COMMUNICATION = "communication"
+    INFRASTRUCTURE = "infrastructure"
+    IDENTITY = "identity"
+    GOVERNANCE = "governance"
+    PHYSICAL = "physical"
+    UNKNOWN = "unknown"
+
+
+class Reversibility(str, Enum):
+    """How reversible is the action's effect?"""
+    FULLY = "fully_reversible"
+    PARTIALLY = "partially_reversible"
+    IRREVERSIBLE = "irreversible"
+
+
+class BlastRadius(str, Enum):
+    """How many entities are affected?"""
+    SELF = "self"           # Only the agent itself
+    LOCAL = "local"         # Agent + immediate counterparty
+    SHARED = "shared"       # Multiple users / shared state
+    GLOBAL = "global"       # Public / broadcast / on-chain
+
+
+class UrgencyClass(str, Enum):
+    """Can the action wait for human review?"""
+    DEFERRABLE = "deferrable"       # Can wait hours/days
+    TIMELY = "timely"               # Should happen within minutes
+    IMMEDIATE = "immediate"         # Time-critical, blocking on review costs money
+    IRREVOCABLE = "irrevocable"     # Once started, cannot be stopped
+
+
+# ── Regulatory relevance flags ──────────────────────────────────────────────
+
+class RegulatoryDomain(str, Enum):
+    """Which regulatory frameworks potentially apply."""
+    EU_AI_ACT = "eu_ai_act"
+    GDPR = "gdpr"
+    MIFID2 = "mifid2"
+    DORA = "dora"
+    NIS2 = "nis2"
+    PRODUCT_LIABILITY = "product_liability"
+    SOC2 = "soc2"
+    HIPAA = "hipaa"
+    NONE = "none"
+
+
+# ── Action classification ───────────────────────────────────────────────────
+
+@dataclass(frozen=True)
+class ActionType:
+    """Immutable classification of an action type.
+
+    Each registered action type carries its risk metadata so the scorer
+    and compliance engine can use it without re-deriving.
+    """
+    name: str
+    category: ActionCategory
+    reversibility: Reversibility
+    blast_radius: BlastRadius
+    urgency: UrgencyClass = UrgencyClass.DEFERRABLE
+    regulatory_domains: frozenset[RegulatoryDomain] = field(default_factory=frozenset)
+    description: str = ""
+
+    @property
+    def base_risk_score(self) -> float:
+        """Heuristic base risk from static metadata, 0.0 to 1.0.
+
+        This is the floor — the adaptive scorer adds learned adjustments.
+        """
+        rev_score = {
+            Reversibility.FULLY: 0.1,
+            Reversibility.PARTIALLY: 0.4,
+            Reversibility.IRREVERSIBLE: 0.8,
+        }[self.reversibility]
+
+        blast_score = {
+            BlastRadius.SELF: 0.0,
+            BlastRadius.LOCAL: 0.1,
+            BlastRadius.SHARED: 0.3,
+            BlastRadius.GLOBAL: 0.5,
+        }[self.blast_radius]
+
+        urgency_score = {
+            UrgencyClass.DEFERRABLE: 0.0,
+            UrgencyClass.TIMELY: 0.1,
+            UrgencyClass.IMMEDIATE: 0.2,
+            UrgencyClass.IRREVOCABLE: 0.3,
+        }[self.urgency]
+
+        return min(1.0, (rev_score + blast_score + urgency_score) / 1.6)
+
+
+# ── Action request envelope ────────────────────────────────────────────────
+
+@dataclass
+class ActionRequest:
+    """Envelope for an action an agent wants to execute.
+
+    This is the unit that passes through the interception pipeline:
+    taxonomy → scorer → policy engine → audit logger → execute or block.
+    """
+    agent_id: str
+    tool_name: str
+    action_type: ActionType
+    parameters: dict = field(default_factory=dict)
+    context: dict = field(default_factory=dict)
+    confidence: Optional[float] = None  # Agent's self-reported confidence
+    session_id: str = ""
+    parent_action_id: Optional[str] = None  # For action chains
+    sequence_position: int = 0  # Position in current action sequence
+    timestamp_utc: str = ""
+
+    def to_policy_context(self) -> dict:
+        """Convert to a plain dict of policy-evaluation fields.
+
+        Extra keys from ``context`` are merged first so the core fields
+        (agent_id, tool_name, base_risk_score, etc.) cannot be overridden
+        by caller-supplied context — otherwise a caller could spoof its
+        own identity or risk metadata to the scorer.
+        """
+        return {
+            **self.context,
+            "agent_id": self.agent_id,
+            "tool_name": self.tool_name,
+            "action_type": self.action_type.category.value,
+            "reversibility": self.action_type.reversibility.value,
+            "blast_radius": self.action_type.blast_radius.value,
+            "urgency": self.action_type.urgency.value,
+            "base_risk_score": self.action_type.base_risk_score,
+            "agent_confidence": self.confidence,
+            "session_id": self.session_id,
+            "parent_action_id": self.parent_action_id,
+            "sequence_position": self.sequence_position,
+            "parameters": self.parameters,
+        }
+
+
+# ── Built-in action type registry ──────────────────────────────────────────
+
+class ActionRegistry:
+    """Registry of known action types with their risk metadata.
+
+    Extensible — users register domain-specific action types at startup.
+    """
+
+    def __init__(self) -> None:
+        self._types: dict[str, ActionType] = {}
+        self._tool_mappings: dict[str, str] = {}  # tool_name → action_type name
+        # Plugins (custom domain packs) can call register / map_tool
+        # from different threads during application startup, and classify()
+        # runs on every intercepted action. A lock keeps the two dicts
+        # internally consistent without serializing hot-path classify()
+        # beyond dict lookups. Under free-threaded 3.13t dict mutation
+        # during iteration is no longer implicitly safe, so the lock
+        # guards both mutation and the prefix iteration in classify().
+        self._lock = threading.RLock()
+
+    def register(self, action_type: ActionType) -> None:
+        """Register an action type. Silently replaces an existing type
+        with the same name but logs a warning so plugins with clashing
+        taxonomies are visible at startup instead of failing mysteriously
+        later."""
+        with self._lock:
+            if action_type.name in self._types and self._types[action_type.name] is not action_type:
+                logger.warning(
+                    "ActionRegistry: replacing action type %r "
+                    "(previous %r was registered; new one wins)",
+                    action_type.name, self._types[action_type.name],
+                )
+            self._types[action_type.name] = action_type
+
+    def map_tool(self, tool_name: str, action_type_name: str) -> None:
+        """Map a framework tool name to a registered action type."""
+        with self._lock:
+            if action_type_name not in self._types:
+                raise KeyError(f"Action type '{action_type_name}' not registered")
+            self._tool_mappings[tool_name] = action_type_name
+
+    def classify(self, tool_name: str, parameters: Optional[dict] = None) -> ActionType:
+        """Classify a tool call into an action type.
+
+        Falls back to UNKNOWN if no mapping exists.
+        """
+        with self._lock:
+            if tool_name in self._tool_mappings:
+                return self._types[self._tool_mappings[tool_name]]
+            # Try prefix matching for namespaced tools (e.g., "fs.write" → "fs")
+            for prefix in sorted(self._tool_mappings, key=len, reverse=True):
+                if tool_name.startswith(prefix):
+                    return self._types[self._tool_mappings[prefix]]
+            return UNKNOWN_ACTION
+
+    def get(self, name: str) -> Optional[ActionType]:
+        with self._lock:
+            return self._types.get(name)
+
+    @property
+    def all_types(self) -> dict[str, ActionType]:
+        with self._lock:
+            return dict(self._types)
+
+
+# ── Sentinel for unclassified actions ───────────────────────────────────────
+
+UNKNOWN_ACTION = ActionType(
+    name="unknown",
+    category=ActionCategory.UNKNOWN,
+    reversibility=Reversibility.PARTIALLY,
+    blast_radius=BlastRadius.LOCAL,
+    urgency=UrgencyClass.DEFERRABLE,
+    description="Unclassified action — treated as medium risk by default",
+)
+
+
+# ── Default action types ───────────────────────────────────────────────────
+
+BUILTIN_ACTIONS = [
+    # Financial
+    ActionType("tx.sign", ActionCategory.FINANCIAL, Reversibility.IRREVERSIBLE,
+               BlastRadius.SHARED, UrgencyClass.IRREVOCABLE,
+               frozenset({RegulatoryDomain.MIFID2, RegulatoryDomain.DORA}),
+               "Sign and broadcast a blockchain transaction"),
+    ActionType("tx.transfer", ActionCategory.FINANCIAL, Reversibility.IRREVERSIBLE,
+               BlastRadius.SHARED, UrgencyClass.IRREVOCABLE,
+               frozenset({RegulatoryDomain.MIFID2, RegulatoryDomain.DORA}),
+               "Transfer funds between accounts"),
+    ActionType("tx.approve", ActionCategory.FINANCIAL, Reversibility.PARTIALLY,
+               BlastRadius.SHARED, UrgencyClass.TIMELY,
+               frozenset({RegulatoryDomain.MIFID2}),
+               "Approve token spending allowance"),
+    ActionType("tx.swap", ActionCategory.FINANCIAL, Reversibility.IRREVERSIBLE,
+               BlastRadius.SHARED, UrgencyClass.IMMEDIATE,
+               frozenset({RegulatoryDomain.MIFID2, RegulatoryDomain.DORA}),
+               "Execute a token swap on DEX"),
+    ActionType("vault.rebalance", ActionCategory.FINANCIAL, Reversibility.PARTIALLY,
+               BlastRadius.SHARED, UrgencyClass.TIMELY,
+               frozenset({RegulatoryDomain.MIFID2, RegulatoryDomain.EU_AI_ACT}),
+               "Rebalance vault allocation weights"),
+
+    # Data
+    ActionType("data.read", ActionCategory.DATA, Reversibility.FULLY,
+               BlastRadius.SELF, UrgencyClass.DEFERRABLE,
+               frozenset({RegulatoryDomain.GDPR}),
+               "Read data from storage"),
+    ActionType("data.write", ActionCategory.DATA, Reversibility.PARTIALLY,
+               BlastRadius.LOCAL, UrgencyClass.DEFERRABLE,
+               frozenset({RegulatoryDomain.GDPR}),
+               "Write data to storage"),
+    ActionType("data.delete", ActionCategory.DATA, Reversibility.IRREVERSIBLE,
+               BlastRadius.SHARED, UrgencyClass.DEFERRABLE,
+               frozenset({RegulatoryDomain.GDPR}),
+               "Delete data permanently"),
+    ActionType("data.export", ActionCategory.DATA, Reversibility.IRREVERSIBLE,
+               BlastRadius.GLOBAL, UrgencyClass.DEFERRABLE,
+               frozenset({RegulatoryDomain.GDPR, RegulatoryDomain.HIPAA}),
+               "Export data to external system"),
+
+    # Communication
+    ActionType("comm.send_email", ActionCategory.COMMUNICATION, Reversibility.IRREVERSIBLE,
+               BlastRadius.LOCAL, UrgencyClass.TIMELY,
+               frozenset(), "Send an email"),
+    ActionType("comm.post_public", ActionCategory.COMMUNICATION, Reversibility.IRREVERSIBLE,
+               BlastRadius.GLOBAL, UrgencyClass.DEFERRABLE,
+               frozenset(), "Post to public channel (social, forum)"),
+    ActionType("comm.api_call", ActionCategory.COMMUNICATION, Reversibility.PARTIALLY,
+               BlastRadius.LOCAL, UrgencyClass.TIMELY,
+               frozenset(), "Call external API"),
+
+    # Infrastructure
+    ActionType("infra.deploy", ActionCategory.INFRASTRUCTURE, Reversibility.PARTIALLY,
+               BlastRadius.SHARED, UrgencyClass.TIMELY,
+               frozenset({RegulatoryDomain.NIS2}),
+               "Deploy code or configuration"),
+    ActionType("infra.config_change", ActionCategory.INFRASTRUCTURE, Reversibility.PARTIALLY,
+               BlastRadius.SHARED, UrgencyClass.DEFERRABLE,
+               frozenset({RegulatoryDomain.NIS2}),
+               "Modify system configuration"),
+    ActionType("infra.scale", ActionCategory.INFRASTRUCTURE, Reversibility.FULLY,
+               BlastRadius.SHARED, UrgencyClass.TIMELY,
+               frozenset(), "Scale resources up or down"),
+    ActionType("infra.terminate", ActionCategory.INFRASTRUCTURE, Reversibility.IRREVERSIBLE,
+               BlastRadius.SHARED, UrgencyClass.IMMEDIATE,
+               frozenset({RegulatoryDomain.NIS2}),
+               "Terminate process or resource"),
+
+    # Identity
+    ActionType("id.grant_permission", ActionCategory.IDENTITY, Reversibility.PARTIALLY,
+               BlastRadius.SHARED, UrgencyClass.DEFERRABLE,
+               frozenset({RegulatoryDomain.SOC2}),
+               "Grant permissions or roles"),
+    ActionType("id.create_key", ActionCategory.IDENTITY, Reversibility.PARTIALLY,
+               BlastRadius.LOCAL, UrgencyClass.DEFERRABLE,
+               frozenset({RegulatoryDomain.SOC2}),
+               "Create API key or credential"),
+    ActionType("id.revoke", ActionCategory.IDENTITY, Reversibility.PARTIALLY,
+               BlastRadius.SHARED, UrgencyClass.IMMEDIATE,
+               frozenset({RegulatoryDomain.SOC2}),
+               "Revoke access or credential"),
+
+    # Governance
+    ActionType("gov.vote", ActionCategory.GOVERNANCE, Reversibility.IRREVERSIBLE,
+               BlastRadius.GLOBAL, UrgencyClass.TIMELY,
+               frozenset({RegulatoryDomain.EU_AI_ACT}),
+               "Cast governance vote"),
+    ActionType("gov.execute_proposal", ActionCategory.GOVERNANCE, Reversibility.IRREVERSIBLE,
+               BlastRadius.GLOBAL, UrgencyClass.IRREVOCABLE,
+               frozenset({RegulatoryDomain.EU_AI_ACT}),
+               "Execute approved governance proposal"),
+
+    # Physical / IoT
+    ActionType("phy.actuator", ActionCategory.PHYSICAL, Reversibility.IRREVERSIBLE,
+               BlastRadius.LOCAL, UrgencyClass.IMMEDIATE,
+               frozenset({RegulatoryDomain.PRODUCT_LIABILITY}),
+               "Control physical actuator"),
+    ActionType("phy.safety_override", ActionCategory.PHYSICAL, Reversibility.IRREVERSIBLE,
+               BlastRadius.SHARED, UrgencyClass.IRREVOCABLE,
+               frozenset({RegulatoryDomain.PRODUCT_LIABILITY, RegulatoryDomain.EU_AI_ACT}),
+               "Override safety system"),
+]
+
+
+def create_default_registry() -> ActionRegistry:
+    """Create registry with all built-in action types.
+
+    Each builtin action type is also auto-mapped as a tool name,
+    so classify("data.read") returns the data.read ActionType without
+    needing an explicit map_tool() call.
+    """
+    registry = ActionRegistry()
+    for action_type in BUILTIN_ACTIONS:
+        registry.register(action_type)
+        registry.map_tool(action_type.name, action_type.name)
+    return registry

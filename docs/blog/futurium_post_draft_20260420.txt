@@ -1,0 +1,53 @@
+Title: Article 14 at runtime — why oversight of agentic AI has to be evidenced per action, not per model
+
+Tags: discussion, ai regulation, agentic ai, ai infrastructures, Trustworthy AI
+
+---
+
+Most discussions of Article 14 I have read so far, here and in adjacent forums, still treat human oversight as a deployment-time property. A box is ticked when the model is validated, a dashboard is installed, a playbook is written. That framing fits classifiers. It does not fit agents.
+
+Agentic systems do not act at deployment time. They act at runtime, tool call by tool call. A model that passed every pre-deployment check can still cause loss, exfiltrate data, or degrade a regulated process through a sequence of individually innocuous actions. Article 14 obliges deployers to enable effective oversight while the system is in use. For agents, that obligation only bites at the granularity of the action.
+
+What follows is an argument for why the current model-level governance stack does not satisfy Article 14 for agentic deployments, a sketch of what a runtime action-governance layer has to provide mechanically to close the gap, and a pointer to one open-source implementation deployers can study or extend.
+
+**Why model-level audits fall short**
+
+Consider an agent with permissions to call `read_data`, `export_data` and `delete_data`. Each of those calls, in isolation, passes any reasonable pre-deployment safety evaluation. In sequence they are a textbook exfiltration pattern. No static risk label attached to the model catches this. Only runtime inspection of the action stream does.
+
+Most current AI governance tooling treats the model as the unit of analysis. That is the right unit for classifiers that ingest a document and emit a label. It is the wrong unit for agents that call tools, invoke sub-agents, write files, transfer funds or modify infrastructure. The risk unit there is the action. A model with strong benchmark scores and thorough red-team coverage can still issue `rm -rf /` through a prompt injection or a misclassified instruction, because pre-deployment evaluation cannot enumerate the action space the agent will actually traverse in production.
+
+Oversight also has to be effective, not merely present. A log file nobody reads, a dashboard that aggregates to monthly averages, a review queue that flags every event. None of those satisfies a plain reading of Article 14. The AI Act does not prescribe a technical architecture for oversight. But its obligations do constrain the shape of any architecture that can satisfy them.
+
+**What Article 14 implies, mechanically**
+
+Reading Articles 9, 12, 13 and 14 together as a deployer's checklist, a runtime governance layer has to carry a small number of properties. I set them out in the order a deployer would have to justify them to a Notified Body.
+
+**A per-action decision.** For every consequential action an agent attempts, the system has to produce a decision (permitted, routed to human review, or denied) with a recorded reason. Aggregates do not satisfy Article 14's oversight obligations at the individual-action level.
+
+**A calibrated confidence rather than a point estimate.** Risk scores are only useful to an overseer if they come with uncertainty. A 0.4 risk with a [0.35, 0.45] interval is very different from a 0.4 risk with a [0.15, 0.85] interval. The deployer needs the second number to decide how conservatively to route. Conformal prediction is one distribution-free way to produce it. Bootstrap intervals, Bayesian posteriors and quantile regression are others.
+
+**A logging artefact that supports record-keeping.** Article 12 requires automatic logging of events relevant to risk. In practice this means append-only, tamper-evident records linking the action, the agent identity, the decision and the evidence the decision was based on. Hash-chained logs (SHA-256 linking) are the mechanically simple way to get tamper-evidence without a trusted third party.
+
+**An online adaptation path.** Deployed systems drift. Tool inventories change, user behaviour shifts under adversarial probing. Article 9 requires ongoing risk management, so the governance layer's own calibration has to update as outcomes accumulate, or its risk estimates become miscalibrated. There are well-studied algorithms for this (multiplicative-weight updates for expert combination, FACI for adaptive conformal alpha). The specific mechanism matters less than the property: coverage guarantees that hold as the distribution shifts.
+
+These properties are not exhaustive of Article 14. They are necessary. A tool that provides them produces evidence a deployer can assemble into a conformity case. It does not conduct the conformity assessment. That remains the deployer's and, where applicable, the Notified Body's responsibility. The distinction between *evidence* and *verdict* is where a lot of current AI governance tooling is quietly blurred.
+
+**A reference implementation**
+
+To keep the argument concrete, a pointer to an implementation. Over the last months I have been building Vaara (vaara.io, Apache-2.0), a Python SDK that sits in-process between an agent and its tools. Every action the agent attempts routes through one intercept() call which returns an allow, escalate or deny decision, a risk score, a conformal interval on that score and a recorded reason. Five expert signals (taxonomy base, agent history, sequence pattern, burst detection, confidence gap) are combined online using multiplicative-weight updates, and the decision is read off the upper bound of the interval, so the system is conservative by construction. The audit trail uses SHA-256 hash chaining over an append-only SQLite store in WAL mode. Evidence is mapped to specific articles of the AI Act (9, 11–15, 61) and DORA (10, 12, 13). Framework integrations ship for LangChain, CrewAI, the OpenAI Agents SDK and as an MCP server for developer tooling.
+
+Two caveats. The compliance report Vaara emits is a structured, article-by-article evidence map. It is not a conformity verdict. The deployer still owns the conformity decision and, for high-risk systems, engages a Notified Body. And this is only the action-gating primitive. It does not replace model-level red-teaming, data governance or impact assessments. Those still have to happen at the model level. The runtime layer is complementary, not a replacement.
+
+The repository at github.com/vaaraio/vaara includes a formal specification covering the MWU regret bound and the conformal coverage guarantee. A two-page enterprise summary is attached to this post.
+
+**Open questions**
+
+I would value pushback, particularly from members working on deployer-side conformance.
+
+For agentic systems you have deployed or advised on, how are you evidencing continuous Article 14 oversight today? What is actually being logged, at what granularity, and what are Notified Bodies asking to see — per-action, per-session, or daily aggregates? This is the single largest uncertainty I keep hearing back from deployers.
+
+Is anyone aware of harmonised standards work at CEN/CENELEC or ETSI that specifically addresses runtime action-level governance as distinct from model-level audits? My reading is that the current standards pipeline is still model-centric. I would be happy to be corrected.
+
+And beyond Article 14 itself: the same runtime gate primitive looks applicable to DORA ICT incident response, MiFID II algorithmic trading oversight and on-chain risk scoring. Is there appetite in this group for a cross-regulation mapping exercise on that primitive?
+
+I would rather this post serve as the start of a conversation than a broadcast. Corrections and counter-examples especially welcome.
