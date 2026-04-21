@@ -143,10 +143,15 @@ class TestSequenceInsertion:
 
 class TestPreCalibration:
     def test_pre_calibrate_updates_scorer(self):
+        from vaara.scorer.adaptive import AdaptiveScorer
         gen = TraceGenerator(seed=42)
         traces = gen.generate(n_traces=10)
 
-        pipeline = InterceptionPipeline()
+        # Opt out of the default synthetic prior so this test can measure
+        # calibration growth from a true zero baseline.
+        pipeline = InterceptionPipeline(
+            scorer=AdaptiveScorer(pre_seed_calibration=False)
+        )
         assert pipeline.scorer.calibration_size == 0
         assert pipeline.scorer.mwu_update_count == 0
 
@@ -160,10 +165,13 @@ class TestPreCalibration:
 
     def test_pre_calibrate_achieves_calibration(self):
         """With enough traces, the scorer should become calibrated."""
+        from vaara.scorer.adaptive import AdaptiveScorer
         gen = TraceGenerator(seed=42)
         traces = gen.generate(n_traces=50)
 
-        pipeline = InterceptionPipeline()
+        pipeline = InterceptionPipeline(
+            scorer=AdaptiveScorer(pre_seed_calibration=False)
+        )
         stats = gen.pre_calibrate(pipeline, traces)
 
         assert stats["is_calibrated"] is True
