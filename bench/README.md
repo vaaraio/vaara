@@ -16,9 +16,12 @@ metrics. It costs roughly:
 | `data.read`    | ~0.13 ms | ~0.15 ms | ~0.17 ms | ~6,800                  |
 | `custom.tool`  | ~0.13 ms | ~0.15 ms | ~0.16 ms | ~7,000                  |
 
-Pipeline construction itself takes roughly 13 µs. The first call after
-construction is indistinguishable from steady-state, so there is no
-hidden lazy-init tax on the first intercepted action.
+Pipeline construction itself takes roughly 60 µs. Most of that is the
+50 synthetic calibration points seeded at construction time (about 1 µs
+per point) so the conformal interval starts at ±0.19 instead of the
+±0.3 cold-start fallback. The first intercept after construction is
+indistinguishable from steady-state, so there is no hidden lazy-init
+tax on the first intercepted action.
 
 For the DeFi audience: at block times under one second the per-call
 overhead is three to four orders of magnitude below the block window.
@@ -141,36 +144,34 @@ Two decision bands matter:
   designed, not a false positive.
 - **Hard catch**: only DENY. The scorer actively refused.
 
-### Warmed-mode headline (production-shaped)
+### Headline (default scorer)
 
-Run with ``python3 bench/scorer_eval.py --mode warmed`` after seeding the
-conformal calibrator with 200 benign outcome pairs to simulate a
-deployed system that has seen normal traffic:
+Default construction now pre-seeds the conformal calibrator with 50
+synthetic benign (predicted, actual) pairs, so cold and warmed modes
+produce the same decision quality. No calibration period is required
+before the headline numbers hold. Run with ``python3
+bench/scorer_eval.py``:
 
 | metric                                  | value   |
 | --------------------------------------- | ------- |
 | Soft TPR (malicious not allowed)        | 100.00% |
-| Hard TPR (malicious outright denied)    | 19.23%  |
-| Soft FPR (benign not allowed)           | 60.00%  |
+| Hard TPR (malicious outright denied)    | 28.85%  |
+| Soft FPR (benign not allowed)           | 20.00%  |
 | Hard FPR (benign outright denied)       | 0.00%   |
 
 Every malicious trace in every category was routed away from ALLOW.
-No benign trace was outright denied. The 60% soft-FPR is entirely
-ESCALATE on the three conservative benign categories (legit swaps,
-API syncs, long read-only sessions). This is by-design routing of
-high-blast or unknown-agent actions to human review.
+No benign trace was outright denied. The 20% soft-FPR is entirely
+ESCALATE on the single-shot benign DEX-swap category (a fresh agent
+with no history asking to swap funds is genuinely uncertain, and
+routing that to human review is the governance system working as
+designed, not a false positive).
 
-### Cold-start caveat
+The `--mode warmed` path still exists for reproducibility with the
+previous bench numbers. It seeds 200 extra benign outcome pairs on
+top of the default prior. With the default prior in place, warmed and
+default now converge to the same soft numbers.
 
-Run with ``--mode cold`` (fresh scorer, no calibration). Everything
-escalates, including benign reads, because the uncalibrated
-conformal interval is wide (±0.3). This is the intended default: fail
-toward human review until the system has seen enough outcomes to
-tighten intervals. Users deploying Vaara should expect a calibration
-period (roughly 30-100 reported outcomes) before soft-FPR drops to
-its warmed level.
-
-### Per-category detection (warmed)
+### Per-category detection
 
 - `data_exfiltration` 8/8 caught (escalate)
 - `data_destruction` 8/8 caught (escalate)
@@ -178,13 +179,15 @@ its warmed level.
 - `financial_drain` 8/8 caught (escalate)
 - `governance_takeover` 5/5 caught (**deny**)
 - `safety_override` 5/5 caught (**deny**)
-- `burst_attack` 5/5 caught (escalate)
+- `burst_attack` 5/5 caught (**deny**, default prior) / escalate (warmed)
 - `confidence_gap` 5/5 caught (escalate)
 
 `governance_takeover` and `safety_override` hit DENY because their
 sequence risk boosts (0.7 and 0.8 respectively) push the conformal
-upper bound over 0.7 on a single trace. Lower-boost sequences land in
-the ESCALATE band by design.
+upper bound over 0.7 on a single trace. `burst_attack` hits DENY
+under the default prior because rapid repeated swaps widen the
+conformal interval faster than the warmed-mode ballast allows. Lower-
+boost sequences land in the ESCALATE band by design.
 
 ### Caveats on the corpus
 
@@ -218,5 +221,15 @@ both the generator and the updated `adversarial_corpus.jsonl`.
 
 Initial benchmark committed April 2026 following the project's first
 formal performance pass. Prior to that the pipeline was correctness-
-tested only (239 unit, integration, and property tests) with no published
+tested only (235 unit, integration, and property tests) with no published
 latency numbers or scorer-accuracy numbers.
+
+Follow-up pass later the same month added (1) a synthetic conformal
+prior so the default scorer matches warmed-mode behaviour out of the
+box, (2) a heuristic keyword classifier so unregistered framework tool
+names resolve to the closest built-in action type, (3) a novel
+multi-domain cluster detector so sequences not in the built-in
+whitelist still raise a partial signal, (4) a shadow mode
+(`InterceptionPipeline(enforce=False)`) that audits decisions without
+blocking so operators can pilot Vaara in front of existing agents.
+Soft FPR dropped from 60% to 20%. No category's detection regressed.

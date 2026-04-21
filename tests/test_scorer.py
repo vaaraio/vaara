@@ -154,7 +154,7 @@ class TestAdaptiveScorer:
         assert scorer.mwu_weights != initial_weights
 
     def test_status_snapshot(self):
-        scorer = AdaptiveScorer()
+        scorer = AdaptiveScorer(pre_seed_calibration=False)
         status = scorer.status()
         assert "calibrated" in status
         assert "mwu_weights" in status
