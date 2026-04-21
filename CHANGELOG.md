@@ -4,6 +4,18 @@ All notable changes to this project are documented here.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/)
 and this project follows [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [0.4.3] - 2026-04-21
+
+### Added
+- Sigstore-signed release workflow with PyPI trusted publishing and PEP 740 attestations
+- CodeQL SAST workflow
+- OpenSSF Best Practices (Passing) badge
+- CONTRIBUTING.md
+
+### Changed
+- Scorecard workflow pinned to peeled commit SHAs, with `workflow_dispatch` trigger added
+- SECURITY.md restructured for OpenSSF Scorecard Security-Policy check
+
 ## [0.4.2] - 2026-04-20
 
 ### Added
