@@ -18,6 +18,8 @@ Adaptive AI agent execution layer. Sits between agents and actions, scores risk 
 
 Article-by-article evidence mapping: [COMPLIANCE.md](COMPLIANCE.md).
 
+Position paper on the European Commission's AI Alliance platform: [Article 14 at runtime](https://futurium.ec.europa.eu/en/apply-ai-alliance/community-content/article-14-runtime-why-oversight-agentic-ai-has-be-evidenced-action-not-model).
+
 > Vaara is a tool that helps deployers assemble evidence for their own
 > conformity work. It does not itself conduct conformity assessments,
 > certify compliance, or constitute legal advice. Deployers remain
