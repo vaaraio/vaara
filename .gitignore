@@ -12,3 +12,4 @@ build/
 venv/
 .env
 .DS_Store
+docs/blog/
