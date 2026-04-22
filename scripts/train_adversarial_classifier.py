@@ -270,8 +270,11 @@ def run(args) -> int:
         })
         try:
             feature_imps += model.feature_importances_
-        except Exception:
-            pass
+        except (AttributeError, ValueError) as exc:
+            # Some XGBoost configurations don't expose feature_importances_
+            # (e.g., very early stopping with zero trees). Non-fatal — we
+            # just lose the importance aggregate for that fold.
+            print(f"[fold {fi}] feature_importances unavailable: {exc}", flush=True)
         print(f"[fold {fi}] acc={fold_metrics[-1]['acc']:.3f} n_test={len(te)}", flush=True)
 
     classifier_acc = float((y_pred_oof == y).mean())
