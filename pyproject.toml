@@ -36,6 +36,7 @@ export = ["cryptography>=41.0"]
 
 [project.scripts]
 vaara = "vaara.cli:main"
+vaara-audit = "vaara.audit_cli:main"
 
 [tool.setuptools.packages.find]
 where = ["src"]
