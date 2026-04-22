@@ -23,6 +23,9 @@ Evaluated via 5-fold stratified CV. Baseline = current Vaara scorer's
 ALLOW-leakage on the same folds. Reports accuracy, precision, recall,
 F1 per category, and the top 20 feature importances.
 
+Prerequisite:
+    pip install -e ".[dev]"  (to make ``from vaara import Pipeline`` work)
+
 Usage:
     python scripts/train_adversarial_classifier.py
     python scripts/train_adversarial_classifier.py --json-out results.json
@@ -34,10 +37,10 @@ import json
 import re
 from collections import Counter, defaultdict
 from pathlib import Path
-from typing import Any
+from typing import Any, Optional
 
 import numpy as np
-from sklearn.metrics import classification_report, confusion_matrix
+from sklearn.metrics import balanced_accuracy_score, classification_report, confusion_matrix
 from sklearn.model_selection import StratifiedKFold
 
 import xgboost as xgb
@@ -108,15 +111,20 @@ def load_corpus() -> list[dict]:
     return entries
 
 
-def build_features(entries: list[dict]) -> tuple[np.ndarray, list[str]]:
-    # Collect param-key vocabulary
+def fit_vocabulary(entries: list[dict]) -> dict:
+    """Fit token vocabulary on training-only entries.
+
+    Returns a dict with ``top_keys`` and ``top_ngrams`` that ``build_features``
+    uses as the transform schema. Separating fit and transform closes the
+    pre-refactor feature-leakage bug where vocabulary was chosen using the
+    full corpus (including test-fold tokens).
+    """
     param_keys: Counter = Counter()
     for e in entries:
         for k in (e.get("parameters") or {}).keys():
             param_keys[k] += 1
     top_keys = [k for k, _ in param_keys.most_common(80)]
 
-    # Collect tool_name char n-grams
     ngram_counts: Counter = Counter()
     for e in entries:
         tn = e.get("tool_name", "").lower()
@@ -124,6 +132,22 @@ def build_features(entries: list[dict]) -> tuple[np.ndarray, list[str]]:
             for i in range(len(tn) - n + 1):
                 ngram_counts[tn[i : i + n]] += 1
     top_ngrams = [g for g, c in ngram_counts.most_common(120) if c >= 3]
+    return {"top_keys": top_keys, "top_ngrams": top_ngrams}
+
+
+def build_features(
+    entries: list[dict], vocab: Optional[dict] = None
+) -> tuple[np.ndarray, list[str], dict]:
+    """Transform entries to a feature matrix using ``vocab``.
+
+    If ``vocab`` is None, fits vocabulary on these entries first. Pass a
+    training-fitted vocab when transforming held-out entries to avoid
+    leakage. Returns (X, feature_names, vocab).
+    """
+    if vocab is None:
+        vocab = fit_vocabulary(entries)
+    top_keys = vocab["top_keys"]
+    top_ngrams = vocab["top_ngrams"]
 
     feature_names: list[str] = []
     feature_names += [f"ngram__{g}" for g in top_ngrams]
@@ -182,7 +206,7 @@ def build_features(entries: list[dict]) -> tuple[np.ndarray, list[str]]:
         col += 1
         X[i, col] = float(re.search(r"--force|--recursive|-rf\b", blob) is not None)
         col += 1
-    return X, feature_names
+    return X, feature_names, vocab
 
 
 def build_labels(entries: list[dict]) -> tuple[np.ndarray, list[str]]:
@@ -201,7 +225,14 @@ def build_labels(entries: list[dict]) -> tuple[np.ndarray, list[str]]:
 
 # ── Baseline: run current Vaara scorer on entries ─────────────────────
 
-def baseline_predictions(entries: list[dict]) -> np.ndarray:
+def baseline_predictions(entries: list[dict], best_effort: bool = False) -> np.ndarray:
+    """Run the current Vaara scorer on every entry and return malicious flags.
+
+    Raises on ``Pipeline.intercept`` failures by default. Pass
+    ``best_effort=True`` to log each failure and continue with a sentinel
+    prediction (treated as non-malicious, but logged so it isn't conflated
+    with a legitimate ALLOW).
+    """
     from vaara import Pipeline
 
     pipe = Pipeline()
@@ -214,10 +245,19 @@ def baseline_predictions(entries: list[dict]) -> np.ndarray:
                 parameters=e.get("parameters", {}),
                 context=e.get("context", {}),
             )
-            decision = str(getattr(r, "decision", "")).lower()
-            preds[i] = int(decision in ("deny", "escalate"))
-        except Exception:
+        except (AttributeError, KeyError, TypeError, ValueError) as exc:
+            if not best_effort:
+                raise
+            print(
+                f"[baseline] intercept failed id={e.get('id')} "
+                f"agent={e.get('agent_id')} tool={e.get('tool_name')}: "
+                f"{type(exc).__name__}: {exc}",
+                flush=True,
+            )
             preds[i] = 0
+            continue
+        decision = str(getattr(r, "decision", "")).lower()
+        preds[i] = int(decision in ("deny", "escalate"))
     return preds
 
 
@@ -227,9 +267,8 @@ def run(args) -> int:
     entries = load_corpus()
     print(f"[corpus] {len(entries)} entries", flush=True)
 
-    X, feat_names = build_features(entries)
     y, cats = build_labels(entries)
-    print(f"[features] {X.shape[1]} dims, positive rate={y.mean():.3f}", flush=True)
+    print(f"[corpus] positive rate={y.mean():.3f}", flush=True)
 
     print("[baseline] running current scorer on full corpus...", flush=True)
     y_base = baseline_predictions(entries)
@@ -243,9 +282,25 @@ def run(args) -> int:
     fold_metrics = []
     y_pred_oof = np.zeros_like(y)
     y_prob_oof = np.zeros(len(y), dtype=np.float32)
-    feature_imps = np.zeros(len(feat_names), dtype=np.float32)
+    feature_imps_accum: np.ndarray = None  # type: ignore
+    feat_names_ref: list[str] = []
 
-    for fi, (tr, te) in enumerate(skf.split(X, strat_key)):
+    # Index-based splits only: entries are split by index; features are
+    # fit per-fold on training entries to prevent vocabulary leakage.
+    entries_arr = np.array(entries, dtype=object)
+    dummy_X = np.zeros(len(entries), dtype=np.float32)
+    for fi, (tr, te) in enumerate(skf.split(dummy_X, strat_key)):
+        train_entries = list(entries_arr[tr])
+        test_entries = list(entries_arr[te])
+        vocab = fit_vocabulary(train_entries)
+        X_tr, feat_names, _ = build_features(train_entries, vocab=vocab)
+        X_te, _, _ = build_features(test_entries, vocab=vocab)
+        if feature_imps_accum is None:
+            feature_imps_accum = np.zeros(len(feat_names), dtype=np.float32)
+            feat_names_ref = feat_names
+        # If the fitted vocabulary differs in size across folds (train
+        # distribution changes), pad/truncate the importance accumulator
+        # to the reference size on a best-effort basis.
         model = xgb.XGBClassifier(
             n_estimators=200,
             max_depth=4,
@@ -258,8 +313,8 @@ def run(args) -> int:
             n_jobs=-1,
             verbosity=0,
         )
-        model.fit(X[tr], y[tr])
-        prob = model.predict_proba(X[te])[:, 1]
+        model.fit(X_tr, y[tr])
+        prob = model.predict_proba(X_te)[:, 1]
         pred = (prob >= 0.5).astype(np.int32)
         y_pred_oof[te] = pred
         y_prob_oof[te] = prob
@@ -269,11 +324,10 @@ def run(args) -> int:
             "n_test": int(len(te)),
         })
         try:
-            feature_imps += model.feature_importances_
+            imp = model.feature_importances_
+            if len(imp) == len(feature_imps_accum):
+                feature_imps_accum += imp
         except (AttributeError, ValueError) as exc:
-            # Some XGBoost configurations don't expose feature_importances_
-            # (e.g., very early stopping with zero trees). Non-fatal — we
-            # just lose the importance aggregate for that fold.
             print(f"[fold {fi}] feature_importances unavailable: {exc}", flush=True)
         print(f"[fold {fi}] acc={fold_metrics[-1]['acc']:.3f} n_test={len(te)}", flush=True)
 
@@ -307,21 +361,27 @@ def run(args) -> int:
     print(classification_report(y, y_pred_oof, digits=3))
 
     # Top-20 feature importances (averaged across folds)
-    feature_imps = feature_imps / max(len(fold_metrics), 1)
+    feature_imps = feature_imps_accum / max(len(fold_metrics), 1)
     top_idx = np.argsort(-feature_imps)[:20]
     print("=== Top-20 feature importances ===")
     for idx in top_idx:
         if feature_imps[idx] > 0:
-            print(f"  {feature_imps[idx]:8.4f}  {feat_names[idx]}")
+            print(f"  {feature_imps[idx]:8.4f}  {feat_names_ref[idx]}")
+
+    baseline_bal = float(balanced_accuracy_score(y, y_base))
+    classifier_bal = float(balanced_accuracy_score(y, y_pred_oof))
+    print(f"\n[balanced accuracy] baseline={baseline_bal:.3f} classifier={classifier_bal:.3f} delta={classifier_bal-baseline_bal:+.3f}")
 
     if args.json_out:
         out = {
             "n_entries": len(entries),
-            "n_features": X.shape[1],
+            "n_features": len(feat_names_ref),
             "positive_rate": float(y.mean()),
             "baseline_acc": baseline_acc,
             "classifier_oof_acc": classifier_acc,
             "classifier_minus_baseline": classifier_acc - baseline_acc,
+            "baseline_balanced_acc": baseline_bal,
+            "classifier_balanced_acc": classifier_bal,
             "folds": fold_metrics,
             "per_category": {
                 c: {
@@ -332,15 +392,17 @@ def run(args) -> int:
                 for c, m in per_cat.items()
             },
             "top_features": [
-                {"feature": feat_names[i], "importance": float(feature_imps[i])}
+                {"feature": feat_names_ref[i], "importance": float(feature_imps[i])}
                 for i in top_idx if feature_imps[i] > 0
             ],
         }
         Path(args.json_out).write_text(json.dumps(out, indent=2))
         print(f"\n[out] {args.json_out}")
 
-    # Exit 0 if classifier beats baseline on accuracy, else 1
-    return 0 if classifier_acc > baseline_acc else 1
+    # Use BALANCED accuracy for the pass/fail gate. Raw accuracy can be
+    # gamed on an imbalanced corpus (200 malicious vs 50 benign) by a
+    # trivial class-dominant predictor.
+    return 0 if classifier_bal > baseline_bal else 1
 
 
 def main():

@@ -96,9 +96,17 @@ Corpus expansion was the explicit "broader framework coverage, auditor verificat
 
 ### POC classifier results (5-fold stratified CV on 200 adversarial + 50 benign)
 
-| Metric | Baseline (current scorer) | Trained classifier | Delta |
+Feature vocabulary is fit on the training fold only (no vocabulary leakage to the test fold). Pass/fail gate uses **balanced accuracy** because raw accuracy is gameable on a 4:1 imbalanced corpus.
+
+| Metric | Baseline | Classifier | Delta |
 |---|---|---|---|
-| Overall accuracy | 42.4% | **75.6%** | +33.2pp |
+| Raw accuracy (imbalanced) | 42.4% | 75.6% | +33.2pp |
+| **Balanced accuracy (real gate)** | **0.535** | **0.525** | **-0.010** |
+
+Per-category raw accuracy (classifier learns strong adversarial signal):
+
+| Category | Baseline | Classifier | Delta |
+|---|---|---|---|
 | privilege_escalation | 8% | 88% | +80pp |
 | ssrf_via_tools | 0% | 92% | +92pp |
 | credential_exfil | 24% | 92% | +68pp |
@@ -107,14 +115,14 @@ Corpus expansion was the explicit "broader framework coverage, auditor verificat
 | data_exfil | 44% | 88% | +44pp |
 | jailbreak | 52% | 96% | +44pp |
 | destructive_actions | 80% | 84% | +4pp |
-| benign_control | 72% | **14%** | -58pp |
+| benign_control | 72% | 14% | -58pp |
 
-**Read:** the classifier learns real signal on adversarial categories (interpretable top features: URL schemes, injection-context flags, credential substrings, parameter-key presence). On benign_control it over-predicts malicious because 50 benign is too few to calibrate the negative class. Fix for integration-readiness: 300-500+ balanced benign examples.
+**Honest read:** the classifier learns strong adversarial signal (interpretable top features: URL schemes, injection-context flags, credential substrings, parameter-key presence) but over-predicts malicious on benign_control because 50 benign is too few to calibrate the negative class. On balanced accuracy — the metric that isn't gamed by class imbalance — the classifier does NOT yet beat the heuristic baseline. Integration-readiness requires 300-500+ balanced benign examples AND decision-threshold calibration.
 
-Classifier output (`classifier_results.json`) is kept in-repo as a versioned baseline. Not integrated into the live scorer yet — pending benign-class expansion and threshold calibration.
+Classifier output (`classifier_results.json`) is a generated artifact, gitignored. Regenerate locally with the command below. Not integrated into the live scorer — pending benign-class expansion and threshold calibration that clears balanced-accuracy gate.
 
 Training is CPU-only and runs in seconds:
 
-```
+```bash
 python scripts/train_adversarial_classifier.py --json-out tests/adversarial/classifier_results.json
 ```
