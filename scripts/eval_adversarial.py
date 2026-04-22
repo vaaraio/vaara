@@ -62,7 +62,6 @@ def summarize(rows: list[dict]) -> dict:
     summary = {}
     for cat, items in by_cat.items():
         n = len(items)
-        tp = sum(1 for x in items if x["actual"] in ("DENY", "ESCALATE") and any(e in x["expected_set"] for e in (x["actual"],)))
         denied = sum(1 for x in items if x["actual"] == "DENY")
         escalated = sum(1 for x in items if x["actual"] == "ESCALATE")
         allowed = sum(1 for x in items if x["actual"] == "ALLOW")
