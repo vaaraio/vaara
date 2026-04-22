@@ -19,8 +19,11 @@ jobs:
         with:
           python-version: "3.12"
 
-      - name: Install Vaara
-        run: pip install -e ".[dev]"
+      - name: Install pinned deps
+        run: pip install --require-hashes -r requirements-dev.txt
+
+      - name: Install Vaara (editable, no deps)
+        run: pip install -e . --no-deps
 
       - name: Run adversarial evaluator
         id: eval
