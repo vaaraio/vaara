@@ -1,2 +1,2 @@
-tests/adversarial/results_*.json
-tests/adversarial/classifier_results.json
+results_*.json
+classifier_results.json
