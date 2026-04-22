@@ -1,0 +1,334 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<title>Vaara — Runtime Action Governance for AI Agents</title>
+<style>
+  @page {
+    size: A4;
+    margin: 18mm 16mm 16mm 16mm;
+    @top-left {
+      content: "Vaara — Enterprise Brief";
+      font-family: "Inter", "Helvetica", "Arial", sans-serif;
+      font-size: 8.5pt;
+      color: #64748b;
+      letter-spacing: 0.08em;
+      text-transform: uppercase;
+    }
+    @top-right {
+      content: "v0.4.2 · 2026-04-20";
+      font-family: "Inter", "Helvetica", "Arial", sans-serif;
+      font-size: 8.5pt;
+      color: #64748b;
+    }
+    @bottom-right {
+      content: "Page " counter(page) " of " counter(pages);
+      font-family: "Inter", "Helvetica", "Arial", sans-serif;
+      font-size: 8.5pt;
+      color: #94a3b8;
+    }
+    @bottom-left {
+      content: "vaara.io  ·  pypi.org/project/vaara";
+      font-family: "Inter", "Helvetica", "Arial", sans-serif;
+      font-size: 8.5pt;
+      color: #94a3b8;
+    }
+  }
+
+  html, body {
+    font-family: "Source Serif Pro", "Georgia", "Times New Roman", serif;
+    font-size: 10.5pt;
+    line-height: 1.45;
+    color: #0f172a;
+  }
+
+  h1, h2, h3, h4, .sans {
+    font-family: "Inter", "Helvetica", "Arial", sans-serif;
+    color: #0f172a;
+  }
+
+  h1 {
+    font-size: 22pt;
+    font-weight: 700;
+    letter-spacing: -0.01em;
+    margin: 0 0 4pt 0;
+    line-height: 1.15;
+  }
+
+  .tagline {
+    font-family: "Inter", sans-serif;
+    font-size: 11pt;
+    color: #334155;
+    font-weight: 400;
+    margin-bottom: 18pt;
+    border-bottom: 1.5pt solid #0f172a;
+    padding-bottom: 10pt;
+  }
+
+  h2 {
+    font-size: 12pt;
+    font-weight: 600;
+    margin: 14pt 0 6pt 0;
+    color: #1e293b;
+    letter-spacing: 0.02em;
+    text-transform: uppercase;
+    font-variant-numeric: tabular-nums;
+  }
+
+  h2::before {
+    content: "";
+    display: inline-block;
+    width: 14pt;
+    height: 2.5pt;
+    background: #0f172a;
+    vertical-align: middle;
+    margin-right: 6pt;
+    position: relative;
+    top: -2pt;
+  }
+
+  p { margin: 4pt 0 8pt 0; }
+
+  .lede {
+    font-size: 11.5pt;
+    line-height: 1.5;
+    color: #1e293b;
+  }
+
+  .grid {
+    display: grid;
+    grid-template-columns: 1fr 1fr;
+    gap: 10pt;
+    margin: 6pt 0;
+  }
+
+  .callout {
+    border-left: 3pt solid #0f172a;
+    background: #f8fafc;
+    padding: 8pt 10pt;
+    margin: 6pt 0 8pt 0;
+    font-family: "Inter", sans-serif;
+    font-size: 9.5pt;
+    line-height: 1.4;
+  }
+
+  .callout .label {
+    font-size: 8pt;
+    letter-spacing: 0.12em;
+    text-transform: uppercase;
+    color: #64748b;
+    font-weight: 600;
+    display: block;
+    margin-bottom: 3pt;
+  }
+
+  .callout .value {
+    font-size: 14pt;
+    font-weight: 700;
+    color: #0f172a;
+    display: block;
+    margin-bottom: 2pt;
+  }
+
+  pre {
+    font-family: "JetBrains Mono", "Menlo", "Consolas", monospace;
+    font-size: 8.5pt;
+    line-height: 1.4;
+    background: #0f172a;
+    color: #e2e8f0;
+    padding: 10pt 12pt;
+    border-radius: 2pt;
+    margin: 6pt 0 8pt 0;
+    white-space: pre-wrap;
+    word-break: break-word;
+  }
+
+  code {
+    font-family: "JetBrains Mono", "Menlo", monospace;
+    font-size: 9.5pt;
+    background: #f1f5f9;
+    padding: 0 3pt;
+    border-radius: 2pt;
+  }
+
+  ul {
+    margin: 4pt 0 8pt 0;
+    padding-left: 14pt;
+  }
+  ul li { margin: 2pt 0; }
+
+  table {
+    border-collapse: collapse;
+    width: 100%;
+    font-family: "Inter", sans-serif;
+    font-size: 9.5pt;
+    margin: 6pt 0 8pt 0;
+  }
+  th, td {
+    text-align: left;
+    padding: 5pt 8pt;
+    border-bottom: 0.5pt solid #cbd5e1;
+  }
+  th {
+    background: #f1f5f9;
+    font-weight: 600;
+    font-size: 8.5pt;
+    letter-spacing: 0.05em;
+    text-transform: uppercase;
+    color: #334155;
+  }
+
+  .badges {
+    margin: 6pt 0 10pt 0;
+  }
+  .badge {
+    display: inline-block;
+    font-family: "Inter", sans-serif;
+    font-size: 8pt;
+    font-weight: 600;
+    letter-spacing: 0.04em;
+    padding: 3pt 7pt;
+    border: 0.8pt solid #475569;
+    color: #1e293b;
+    margin: 0 3pt 3pt 0;
+    border-radius: 2pt;
+  }
+
+  .footer-cta {
+    margin-top: 16pt;
+    padding: 10pt 12pt;
+    border: 1pt solid #0f172a;
+    background: #0f172a;
+    color: #f8fafc;
+    font-family: "Inter", sans-serif;
+    font-size: 10pt;
+  }
+  .footer-cta .big {
+    font-size: 12pt;
+    font-weight: 700;
+    display: block;
+    margin-bottom: 3pt;
+    font-family: "JetBrains Mono", monospace;
+    color: #fef3c7;
+  }
+
+  .small { font-size: 8.5pt; color: #64748b; font-family: "Inter", sans-serif; }
+
+  .hero-row {
+    display: grid;
+    grid-template-columns: 1fr 1fr;
+    gap: 10pt;
+    margin-bottom: 10pt;
+  }
+</style>
+</head>
+<body>
+
+<h1>Vaara</h1>
+<div class="tagline">Runtime action governance for AI agents — an in-process policy backend for the EU AI Act era.</div>
+
+<p class="lede">
+AI governance tools audit <strong>models</strong>. Vaara governs <strong>actions</strong>.
+A model is scored once at deployment. An agent keeps acting at runtime and modifies regulated state through every tool call. Individual actions may be
+safe, but <em>sequences</em> can be catastrophic. Vaara is the in-process gate that
+classifies, scores, decides, and audits every one of them.
+</p>
+
+<div class="hero-row">
+  <div class="callout">
+    <span class="label">EU AI Act: most high-risk provisions apply</span>
+    <span class="value">2 August 2026</span>
+    <span class="small">Article 14 requires effective human oversight of high-risk AI systems. Article 12 requires automatic event logging. Article 26 places compliance on the deployer, not just the model vendor.</span>
+  </div>
+  <div class="callout">
+    <span class="label">Penalty exposure under Article 99</span>
+    <span class="value">€35M &nbsp;·&nbsp; 7%</span>
+    <span class="small">Top tier, up to €35M or 7% of global annual turnover for the most serious violations. Up to €15M or 3% for failures under Articles 9–15 (risk management, logging, oversight).</span>
+  </div>
+</div>
+
+<h2>The Primitive</h2>
+<p>
+Every agent action hits one function. It classifies the action, scores it with a
+distribution-free confidence interval, decides <code>allow</code> / <code>escalate</code> / <code>deny</code>,
+and writes every step to a hash-chained audit trail. Outcome feedback flows back
+so the scorer adapts online, no retraining loop, no threshold tuning.
+</p>
+
+<pre>from vaara.pipeline import InterceptionPipeline
+
+pipeline = InterceptionPipeline()
+
+result = pipeline.intercept(
+    agent_id="treasury-bot",
+    tool_name="tx.transfer",
+    parameters={"to": "0xabc", "amount": 1000},
+)
+
+if result.allowed:
+    execute_transfer(...)
+    pipeline.report_outcome(result.action_id, outcome_severity=0.0)
+else:
+    handle_intervention(result)   # decision: "deny" | "escalate"
+                                   # risk_interval: (lower, upper)</pre>
+
+<h2>Framework Integrations (ship with 0.4.2)</h2>
+<div class="badges">
+  <span class="badge">LangChain · LangGraph</span>
+  <span class="badge">CrewAI</span>
+  <span class="badge">OpenAI Agents SDK</span>
+  <span class="badge">MCP Server</span>
+</div>
+
+<h2>Regulatory Coverage</h2>
+<p class="small">Every action type carries regulatory-domain tags. Audit records auto-map to the specific articles they satisfy.</p>
+<div class="badges">
+  <span class="badge">EU AI Act</span>
+  <span class="badge">GDPR</span>
+  <span class="badge">DORA</span>
+  <span class="badge">NIS2</span>
+  <span class="badge">MiFID II</span>
+  <span class="badge">HIPAA</span>
+  <span class="badge">SOC 2</span>
+  <span class="badge">Product Liability</span>
+</div>
+
+<h2>Why Library, Not SaaS</h2>
+<p>
+Runtime gates cannot sit behind a network call. If the only thing stopping a
+risky action is a round-trip to another vendor's service, the action either
+happens before the answer arrives, or the agent stalls on latency. Vaara runs
+in-process in the same Python process that calls the tool. The audit trail is
+local and portable. Export and sign the trail before handing it to the regulator.
+</p>
+
+<h2>Deployment Profile</h2>
+<table>
+  <tr>
+    <th>Property</th>
+    <th>Value</th>
+  </tr>
+  <tr><td>Runtime dependencies</td><td>Zero</td></tr>
+  <tr><td>Python</td><td>3.10, 3.11, 3.12, 3.13</td></tr>
+  <tr><td>Licence</td><td>Apache-2.0</td></tr>
+  <tr><td>Install</td><td><code>pip install vaara</code></td></tr>
+  <tr><td>Audit trail</td><td>In-memory (default), optional SQLite backend</td></tr>
+  <tr><td>Tamper evidence</td><td>SHA-256 hash chain, verifiable offline</td></tr>
+  <tr><td>Scorer adaptation</td><td>Multiplicative Weight Update, online, no retraining</td></tr>
+  <tr><td>Uncertainty quantification</td><td>Conformal prediction, distribution-free coverage</td></tr>
+</table>
+
+<h2>Who This Is For</h2>
+<ul>
+  <li><strong>Regulated deployers.</strong> Organisations in financial services and healthcare, alongside public-sector AI programmes and critical-infrastructure operators building internal agents.</li>
+  <li><strong>Platform teams</strong> standardising agent governance across multiple product lines using LangChain / CrewAI / OpenAI Agents SDK.</li>
+  <li><strong>Compliance & audit functions</strong> needing evidential artefacts, not dashboards, for Article 14 oversight and Article 12 logging obligations.</li>
+</ul>
+
+<div class="footer-cta">
+  <span class="big">pip install vaara</span>
+  Five minutes to a working gate. Source-available (Apache-2.0). Paid support, tuning, and custom regulatory mappings available for enterprise engagements.
+</div>
+
+</body>
+</html>
