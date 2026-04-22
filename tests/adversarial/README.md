@@ -88,3 +88,33 @@ If the scorer evolves (e.g., a new category becomes `ESCALATE` instead of `DENY`
 ## Citations
 
 Corpus expansion was the explicit "broader framework coverage, auditor verification tooling, larger adversarial corpus" milestone called out in the 2026-04-22 LTFF proposal. Publishing per-category FP/TP on this v1 (and its v2 expansion) is the measurable credibility upgrade for future grant applications.
+
+
+## Benign controls + classifier
+
+`benign_control.jsonl` (50 entries) carries negative-class samples with `expected: "ALLOW"`. Used as the other half of a binary classifier training set in `scripts/train_adversarial_classifier.py`.
+
+### POC classifier results (5-fold stratified CV on 200 adversarial + 50 benign)
+
+| Metric | Baseline (current scorer) | Trained classifier | Delta |
+|---|---|---|---|
+| Overall accuracy | 42.4% | **75.6%** | +33.2pp |
+| privilege_escalation | 8% | 88% | +80pp |
+| ssrf_via_tools | 0% | 92% | +92pp |
+| credential_exfil | 24% | 92% | +68pp |
+| tool_misuse | 28% | 88% | +60pp |
+| prompt_injection | 44% | 100% | +56pp |
+| data_exfil | 44% | 88% | +44pp |
+| jailbreak | 52% | 96% | +44pp |
+| destructive_actions | 80% | 84% | +4pp |
+| benign_control | 72% | **14%** | -58pp |
+
+**Read:** the classifier learns real signal on adversarial categories (interpretable top features: URL schemes, injection-context flags, credential substrings, parameter-key presence). On benign_control it over-predicts malicious because 50 benign is too few to calibrate the negative class. Fix for integration-readiness: 300-500+ balanced benign examples.
+
+Classifier output (`classifier_results.json`) is kept in-repo as a versioned baseline. Not integrated into the live scorer yet — pending benign-class expansion and threshold calibration.
+
+Training is CPU-only and runs in seconds:
+
+```
+python scripts/train_adversarial_classifier.py --json-out tests/adversarial/classifier_results.json
+```
