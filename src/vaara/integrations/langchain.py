@@ -33,6 +33,7 @@ Requires: langchain-core >= 0.2 (not a hard dependency — imported at runtime)
 
 from __future__ import annotations
 
+import functools
 import logging
 import threading
 from collections import OrderedDict
@@ -415,6 +416,8 @@ def vaara_wrap_tool(
     # layers of interception that MWU-weight and outcome-report twice.
     # Stamping wrappers first guarantees any concurrent re-read of
     # tool._run sees an already-marked wrapper and short-circuits.
+    wrapped_run = functools.wraps(original_run)(wrapped_run) if original_run is not None else wrapped_run
+    wrapped_arun = functools.wraps(original_arun)(wrapped_arun) if original_arun is not None else wrapped_arun
     wrapped_run._vaara_wrapped = True  # type: ignore[attr-defined]
     wrapped_arun._vaara_wrapped = True  # type: ignore[attr-defined]
 
