@@ -315,3 +315,6 @@ typing-extensions==4.15.0 \
 exceptiongroup==1.3.1 \
     --hash=sha256:a7a39a3bd276781e98394987d3a5701d0c4edffb633bb7a5144577f82c773598
     # via hypothesis (required on Python < 3.11)
+tomli==2.4.1 \
+    --hash=sha256:136443dbd7e1dee43c68ac2694fde36b2849865fa258d39bf822c10e8068eac5
+    # via pytest (required on Python < 3.11)
