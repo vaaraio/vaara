@@ -1,0 +1,67 @@
+name: Adversarial Corpus Eval
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+    branches: [main]
+
+permissions: read-all
+
+jobs:
+  eval:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@de0fac2e4500dabe0009e67214ff5f5447ce83dd  # v6.0.2
+
+      - name: Set up Python 3.12
+        uses: actions/setup-python@a309ff8b426b58ec0e2a45f0f869d46889d02405  # v6.2.0
+        with:
+          python-version: "3.12"
+
+      - name: Install Vaara
+        run: pip install -e ".[dev]"
+
+      - name: Run adversarial evaluator
+        id: eval
+        run: |
+          python scripts/eval_adversarial.py --corpus-dir tests/adversarial
+          LATEST=$(ls -t tests/adversarial/results_*.json 2>/dev/null | head -1)
+          if [ -z "$LATEST" ]; then
+            echo "No results file produced"
+            exit 1
+          fi
+          echo "results_file=$LATEST" >> "$GITHUB_OUTPUT"
+          cp "$LATEST" /tmp/adversarial_results.json
+
+      - name: Summary to job output
+        run: |
+          python - <<'PYEOF' >> "$GITHUB_STEP_SUMMARY"
+          import json, os
+          from pathlib import Path
+          d = json.loads(Path(os.environ["RESULTS_FILE"]).read_text())
+          s = d.get("summary", {})
+          print("## Adversarial Corpus Eval")
+          print()
+          print(f"Corpus: **{d['n_entries']}** entries across **{len(s)}** categories.")
+          print()
+          print("| Category | n | Deny | Esc | Allow | Allow-leakage | Mean risk |")
+          print("|---|---|---|---|---|---|---|")
+          for cat in sorted(s):
+              c = s[cat]
+              print(
+                  f"| `{cat}` | {c['n']} | {c['denied']} | {c['escalated']} "
+                  f"| {c['allowed']} | {c['allow_leakage_rate']*100:.1f}% "
+                  f"| {c['mean_risk']:.3f} |"
+              )
+          PYEOF
+        env:
+          RESULTS_FILE: ${{ steps.eval.outputs.results_file }}
+
+      - name: Upload results artifact
+        uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a  # v7.0.1
+        with:
+          name: adversarial-eval-results
+          path: /tmp/adversarial_results.json
+          if-no-files-found: error
+          retention-days: 30
