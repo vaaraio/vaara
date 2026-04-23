@@ -52,7 +52,8 @@ def heuristic_preds(entries, pipe):
     return np.array(p)
 
 def main():
-    import random, re as _re
+    import random
+    import re as _re
     rng = random.Random(42)
     all_seeds = load_dir(SEEDS_DIR)
     benign = [e for e in all_seeds if e.get("category") == "benign_control"]
@@ -65,7 +66,7 @@ def main():
     seed_ids = sorted({e["id"] for e in adv_seeds})
     rng.shuffle(seed_ids)
     test_seed_ids = set(seed_ids[:50])
-    def parent_id(vid): 
+    def parent_id(vid):
         m = _re.match(r"^(.*?)-v\d+$", vid)
         return m.group(1) if m else vid
     adv_train = [e for e in adv_seeds if e["id"] not in test_seed_ids]

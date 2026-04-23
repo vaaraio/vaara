@@ -24,7 +24,7 @@ from __future__ import annotations
 import json
 import re
 from pathlib import Path
-from typing import Any, Optional
+from typing import Optional
 
 _URL_SCHEMES = ("http", "https", "file", "dict", "gopher", "data", "ftp")
 _IP_PATTERNS = [
