@@ -1,0 +1,124 @@
+{
+  "notes": "v0.5.0 held-out test. Train=150 adv seeds + 1455 adv variants + 477 benign entries. Test=50 held-out adv seeds + 490 variants + 60 benign. No by-seed leakage.",
+  "model": "XGBoost (n_estimators=200, max_depth=6, lr=0.1)",
+  "feature_extractor": "regex + n-gram vocab (see scripts/classifier_vs_heuristic.py)",
+  "train_set": {
+    "n": 2082,
+    "adv_seeds": 150,
+    "adv_variants": 1455,
+    "benign": 477
+  },
+  "test_set": {
+    "n": 600,
+    "adv_seeds": 50,
+    "adv_variants": 490,
+    "benign": 60
+  },
+  "threshold_sweep": [
+    {
+      "threshold": 0.3,
+      "attack_recall": 0.956,
+      "benign_fpr": 0.733,
+      "balanced_acc": 0.611
+    },
+    {
+      "threshold": 0.5,
+      "attack_recall": 0.902,
+      "benign_fpr": 0.6,
+      "balanced_acc": 0.651
+    },
+    {
+      "threshold": 0.7,
+      "attack_recall": 0.741,
+      "benign_fpr": 0.283,
+      "balanced_acc": 0.729
+    },
+    {
+      "threshold": 0.8,
+      "attack_recall": 0.607,
+      "benign_fpr": 0.133,
+      "balanced_acc": 0.737,
+      "default": true
+    },
+    {
+      "threshold": 0.9,
+      "attack_recall": 0.404,
+      "benign_fpr": 0.067,
+      "balanced_acc": 0.669
+    }
+  ],
+  "per_category_threshold_0.8": {
+    "benign_control": {
+      "n": 60,
+      "heur_acc": 0.75,
+      "clf_acc": 0.4,
+      "delta": -0.35
+    },
+    "credential_exfil": {
+      "n": 77,
+      "heur_acc": 0.403,
+      "clf_acc": 0.844,
+      "delta": 0.442
+    },
+    "data_exfil": {
+      "n": 77,
+      "heur_acc": 0.455,
+      "clf_acc": 0.779,
+      "delta": 0.325
+    },
+    "destructive_actions": {
+      "n": 87,
+      "heur_acc": 0.552,
+      "clf_acc": 0.977,
+      "delta": 0.425
+    },
+    "jailbreak": {
+      "n": 11,
+      "heur_acc": 0.909,
+      "clf_acc": 0.909,
+      "delta": 0.0
+    },
+    "privilege_escalation": {
+      "n": 74,
+      "heur_acc": 0.189,
+      "clf_acc": 0.77,
+      "delta": 0.581
+    },
+    "prompt_injection": {
+      "n": 64,
+      "heur_acc": 0.688,
+      "clf_acc": 1.0,
+      "delta": 0.312
+    },
+    "ssrf_via_tools": {
+      "n": 98,
+      "heur_acc": 0.214,
+      "clf_acc": 1.0,
+      "delta": 0.786
+    },
+    "tool_misuse": {
+      "n": 52,
+      "heur_acc": 0.192,
+      "clf_acc": 0.923,
+      "delta": 0.731
+    }
+  },
+  "overall_at_threshold_0.8": {
+    "heuristic_balanced_acc": 0.572,
+    "classifier_balanced_acc": 0.651,
+    "delta": 0.079
+  },
+  "latency_us": {
+    "mean": 140,
+    "p50": 133,
+    "p99": 210,
+    "max": 6562,
+    "n_samples": 1995
+  },
+  "live_dogfood_174_prompts": {
+    "notes": "Qwen2.5-3B agent on MI300X, 174 prompts (100 adv, 74 benign), classifier threshold=0.8",
+    "attack_recall": 0.7,
+    "benign_fpr": 0.51,
+    "parse_failures": 8
+  }
+}
