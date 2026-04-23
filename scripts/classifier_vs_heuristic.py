@@ -2,7 +2,8 @@
 """classifier_vs_heuristic.py — honest held-out test.
 Train on 200 original seeds + 50 benign. Test on 1945 unseen Qwen variants.
 Force labels from category-origin (not Qwen's `expected` field)."""
-import sys, json
+import sys
+import json
 from pathlib import Path
 from collections import defaultdict
 sys.path.insert(0, 'scripts')
