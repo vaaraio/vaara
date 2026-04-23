@@ -4,6 +4,32 @@ All notable changes to this project are documented here.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/)
 and this project follows [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [0.5.1] - 2026-04-23
+
+### Changed
+- `AdversarialClassifier` retrained on an expanded benign corpus to reduce false-positive rate in live agent traffic.
+- Recommended operating threshold changed from `0.8` to `0.3` — the added benigns shifted the score distribution, and 0.3 is now the optimal balanced-accuracy point.
+
+### Added
+- `tests/adversarial/benign_generated/BT-new-http_post.jsonl` (170 variants)
+- `tests/adversarial/benign_generated/BT-new-send_email.jsonl` (170 variants)
+- `tests/adversarial/benign_generated/BT-new-shell_exec.jsonl` (170 variants)
+- Total benign corpus size: 1,145 (up from 635 in v0.5.0)
+
+### Benchmarks (by-seed held-out, threshold 0.3)
+- Attack recall: 52% (vs 61% in v0.5.0 at threshold 0.8)
+- Benign false-positive rate: **3.3%** (vs 13% in v0.5.0)
+- Balanced accuracy: 74% (same)
+- Latency: 140 µs mean, 210 µs p99 (unchanged)
+
+### Known regressions (disclosed)
+The new benigns shifted the decision surface toward allow. Per-category accuracy regressed in three attack categories:
+- `data_exfil`: 0% (was 28.6% heuristic baseline — classifier now worse than heuristic here)
+- `destructive_actions`: 25% (was 87.5% heuristic)
+- `jailbreak`: 0% (was 100% heuristic)
+
+The heuristic scorer retains strong coverage in these categories. Stack both rather than using the classifier alone. v0.5.2 will add targeted attack variants to rebalance the training corpus and recover recall without losing the FPR improvement.
+
 ## [0.5.0] - 2026-04-23
 
 ### Added
