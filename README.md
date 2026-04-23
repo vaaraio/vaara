@@ -45,7 +45,15 @@ Vaara catches this. It learns which risk signals predict bad outcomes, adapts it
 pip install vaara
 ```
 
-Python 3.10+. Zero runtime dependencies.
+Python 3.10+. Zero runtime dependencies for the default install.
+
+For the optional ML adversarial classifier (XGBoost-based, ships with a 295 KB pre-trained bundle):
+
+```bash
+pip install vaara[ml]
+```
+
+This pulls in `xgboost`, `scikit-learn`, `joblib`, and `numpy`. See the Adversarial Classifier section below.
 
 ## Quick Start
 
@@ -71,6 +79,45 @@ else:
     # result.decision is "deny" or "escalate"
     # result.risk_score and result.risk_interval available
 ```
+
+## Adversarial Classifier (optional)
+
+Vaara 0.5.0 ships an opt-in XGBoost classifier trained on 200 hand-crafted adversarial seeds across 8 attack categories plus 1945 LLM-generated variants and 635 benign variants. Install with `pip install vaara[ml]`.
+
+```python
+from vaara.adversarial_classifier import AdversarialClassifier
+
+clf = AdversarialClassifier()  # loads bundled model, threshold=0.8 default
+
+# Score a proposed tool call
+prob = clf.score(
+    tool_name="http_get",
+    parameters={"url": "http://169.254.169.254/latest/meta-data/"},
+    context={},
+)  # -> 0.99 for SSRF to cloud metadata
+
+if clf.is_malicious("http_get", {"url": "https://api.github.com/user"}, {}):
+    # threshold-based decision using the bundle's default_threshold
+    ...
+```
+
+### Numbers (by-seed held-out test, no leakage)
+
+At threshold 0.8 on 600 held-out test entries (50 adversarial seeds + their variants, never seen in training):
+
+| | Attack recall | Benign FPR | Balanced acc |
+|---|---|---|---|
+| Heuristic (default) | 44% | 25% | 50% |
+| Classifier @ 0.8 | 61% | 13% | 74% |
+
+Latency: 140 µs mean, 210 µs p99 (commodity CPU, no GPU at inference).
+
+### Caveats
+
+- Classifier over-triggers on legitimate uses of powerful tools (http_post, send_email, shell_exec). Live dogfood on an end-to-end LangChain-style agent loop with Qwen-generated prompts showed FPR around 50%, higher than the 13% held-out figure.
+- Recommended: ship with `decision="escalate"` (send to human-in-loop), not `decision="deny"`.
+- Threshold is configurable per call. See `AdversarialClassifier(threshold=0.7)` for the higher-recall / higher-FPR operating point.
+- Reproduce: `python scripts/classifier_vs_heuristic.py` (requires `vaara[ml]`, MI300X optional).
 
 ## How It Works
 
