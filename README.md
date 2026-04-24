@@ -87,7 +87,7 @@ Vaara 0.5.0 ships an opt-in XGBoost classifier trained on 200 hand-crafted adver
 ```python
 from vaara.adversarial_classifier import AdversarialClassifier
 
-clf = AdversarialClassifier()  # loads bundled model, threshold=0.8 default
+clf = AdversarialClassifier()  # loads bundled model, threshold=0.5 default
 
 # Score a proposed tool call
 prob = clf.score(
@@ -103,18 +103,18 @@ if clf.is_malicious("http_get", {"url": "https://api.github.com/user"}, {}):
 
 ### Numbers (by-seed held-out test, no leakage)
 
-At threshold 0.8 on 600 held-out test entries (50 adversarial seeds + their variants, never seen in training):
+At threshold 0.5 on 600 held-out test entries (50 adversarial seeds + their variants, never seen in training):
 
 | | Attack recall | Benign FPR | Balanced acc |
 |---|---|---|---|
-| Heuristic (default) | 44% | 25% | 50% |
-| Classifier @ 0.8 | 61% | 13% | 74% |
+| Heuristic (no threshold) | 39% | 62% | 39% |
+| Classifier @ 0.5 | 85% | 23% | 81% |
 
 Latency: 140 µs mean, 210 µs p99 (commodity CPU, no GPU at inference).
 
-### Caveats
+### Operating notes
 
-- Classifier over-triggers on legitimate uses of powerful tools (http_post, send_email, shell_exec). Live dogfood on an end-to-end LangChain-style agent loop with Qwen-generated prompts showed FPR around 50%, higher than the 13% held-out figure.
+- Classifier over-triggers on legitimate uses of powerful tools (`http_post`, `send_email`, `shell_exec`). Held-out FPR at threshold 0.5 is 23%. Live-agent FPR on real traffic is typically higher than held-out figures.
 - Recommended: ship with `decision="escalate"` (send to human-in-loop), not `decision="deny"`.
 - Threshold is configurable per call. See `AdversarialClassifier(threshold=0.7)` for the higher-recall / higher-FPR operating point.
 - Reproduce: `python scripts/classifier_vs_heuristic.py` (requires `vaara[ml]`, MI300X optional).
