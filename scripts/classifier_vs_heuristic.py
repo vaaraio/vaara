@@ -16,7 +16,7 @@ import train_adversarial_classifier as T
 from vaara import Pipeline
 
 SEEDS_DIR = Path("tests/adversarial")
-VARIANTS_DIR = Path("tests/adversarial/generated_by_category")
+VARIANTS_DIR = Path("tests/adversarial/generated")
 
 def load_dir(d, force_malicious=None):
     out = []
@@ -27,7 +27,7 @@ def load_dir(d, force_malicious=None):
             if not line.strip(): continue
             try:
                 e = json.loads(line)
-                e["category"] = cat
+                e.setdefault("category", cat)
                 if not isinstance(e.get("context"), dict):
                     e["context"] = {"original_task": str(e.get("context", ""))}
                 if not isinstance(e.get("parameters"), dict):
@@ -131,11 +131,11 @@ def main():
     import joblib
     feature_names = T.build_features(train[:1], vocab)[1]
     bundle = {
-        "version": "1.0",
+        "version": "1.1",
         "model": clf,
         "vocab": vocab,
         "feature_names": feature_names,
-        "default_threshold": 0.8,
+        "default_threshold": 0.5,
         "train_stats": {"n_train": len(train), "n_test": len(test)},
     }
     out = Path("src/vaara/data/adversarial_classifier_v1.joblib")

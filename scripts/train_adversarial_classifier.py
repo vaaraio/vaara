@@ -79,9 +79,9 @@ _SQL_PATTERNS = [
 _SHELL_PATTERNS = [
     ("shell_rm", re.compile(r"\brm\s+-rf\b")),
     ("shell_dd", re.compile(r"\bdd\s+if=")),
-    ("shell_curl_sh", re.compile(r"curl\s+[^|]+\s*\|\s*(sh|bash)")),
-    ("shell_nc", re.compile(r"\bnc\s+[^\s]+\s+\d+.*-e\b")),
-    ("shell_chmod_777", re.compile(r"chmod\s+(-R\s+)?777")),
+    ("shell_pipe_sh", re.compile(r"\|\s*(sh|bash|zsh)\b")),
+    ("shell_curl_pipe", re.compile(r"\bcurl\b[^|]*\|\s*(sh|bash)")),
+    ("shell_fork_bomb", re.compile(r":\(\)\s*\{\s*:\|")),
 ]
 
 
@@ -101,7 +101,7 @@ def _param_blob(entry: dict) -> str:
 
 def load_corpus() -> list[dict]:
     entries: list[dict] = []
-    for fp in sorted(CORPUS_DIR.glob("*.jsonl")):
+    for fp in sorted(CORPUS_DIR.rglob("*.jsonl")):
         with fp.open() as f:
             for line in f:
                 line = line.strip()
