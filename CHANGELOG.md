@@ -4,6 +4,48 @@ All notable changes to this project are documented here.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/)
 and this project follows [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [0.5.2] - 2026-04-24
+
+### Fixed
+- `AdversarialClassifier` bundle in v0.5.0 and v0.5.1 scored unreliably because of two pipeline bugs. Both now fixed, bundle rebuilt with `version: 1.1`.
+  - **Feature-name drift between trainer and runtime.** `scripts/train_adversarial_classifier.py` and `src/vaara/adversarial_classifier.py` each defined their own `_SHELL_PATTERNS`. Only 2 of 5 overlapped. The model learned columns whose regexes did not match the features the runtime built at inference time, silently inverting scores on `shell_exec` traffic.
+  - **Silent zero-variant training.** `scripts/classifier_vs_heuristic.py` pointed `VARIANTS_DIR` at `tests/adversarial/generated_by_category/`, which never existed. The script loaded zero attack variants and trained only on 250 seeds + 1,145 benigns. Class balance on `http_post`, `send_email`, `shell_exec` was skewed heavily benign. With the right path, training now loads all 1,945 attack variants and produces 2,740 train / 600 test entries.
+
+### Added
+- `_STATIC_FEATURES` constant plus load-time schema-drift check in `src/vaara/adversarial_classifier.py`. A bundle whose `feature_names` tail diverges from the runtime static feature list now raises `ValueError` at construction time, pinpointing the first differing index. This class of bug is no longer shippable without failing loud.
+
+### Changed
+- Default threshold: `0.3` (v0.5.1) → `0.5`. Balanced accuracy peaks at 0.5 on the rebuilt bundle. The v0.5.1 claim of "52% recall, 3.3% FPR at threshold 0.3" was itself a recordkeeping error: the bundle saved `0.8`, not `0.3`, and those numbers were measured at 0.8.
+- `scripts/train_adversarial_classifier.py` `load_corpus` now uses `rglob` to recurse into `tests/adversarial/generated/` and `benign_generated/` automatically.
+- The `data_exfil` and `destructive_actions` regressions disclosed in v0.5.1 were artifacts of the broken bundle. The rebuilt classifier in v0.5.2 beats the heuristic in both: `destructive_actions` +40.2, `data_exfil` +24.7.
+- Bundle format `version` bumped 1.0 → 1.1.
+
+### Benchmarks (by-seed held-out, threshold 0.5)
+- Attack recall: **85.2%**
+- Benign false-positive rate: **23.3%**
+- Balanced accuracy: **80.9%**
+- Classifier beats heuristic by **+42.0 balanced-accuracy points** overall.
+- Wins over heuristic on 8 of 9 attack categories: `ssrf_via_tools` +76.5, `tool_misuse` +73.1, `privilege_escalation` +58.1, `destructive_actions` +40.2, `credential_exfil` +39.0, `benign_control` +38.3, `prompt_injection` +26.6, `data_exfil` +24.7.
+
+### Threshold sweep
+
+| threshold | attack recall | benign FPR | balanced accuracy |
+|-----------|---------------|------------|-------------------|
+| 0.3 | 92.0% | 38.3% | 76.9% |
+| **0.5** | **85.2%** | **23.3%** | **80.9%** |
+| 0.7 | 61.5% | 8.3% | 76.6% |
+| 0.8 | 47.2% | 3.3% | 71.9% |
+| 0.9 | 32.6% | 0.0% | 66.3% |
+
+Use `ESCALATE`, not `DENY`, at threshold 0.5 on mixed-intent tool traffic. 23% FPR is a reviewer queue, not a blast door.
+
+### Known regressions
+- `jailbreak`: classifier scores 0% on 11 held-out examples, down from heuristic 90.9%. Stack the heuristic rather than using the classifier alone on this category. v0.5.3 will widen jailbreak variant coverage.
+- Legit `read_file` on low-signal paths (e.g. `README.md`) still trips the gate at threshold 0.5. Benign `read_file` is under-represented in training. v0.5.3.
+
+### Recovery note
+v0.5.1 remains on PyPI but ships a broken classifier. Upgrade to 0.5.2 to get the fixed bundle. The heuristic-only path (`pip install vaara`, no `[ml]` extras) was unaffected in both releases.
+
 ## [0.5.1] - 2026-04-23
 
 ### Changed

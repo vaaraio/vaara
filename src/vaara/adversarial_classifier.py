@@ -62,6 +62,8 @@ _SHELL_PATTERNS = [
 
 _DEFAULT_BUNDLE = Path(__file__).parent / "data" / "adversarial_classifier_v1.joblib"
 
+_STATIC_FEATURES = [f"ip__{n}" for n,_ in _IP_PATTERNS] + [f"cred__{n}" for n,_ in _CRED_PATTERNS] + [f"sql__{n}" for n,_ in _SQL_PATTERNS] + [f"shell__{n}" for n,_ in _SHELL_PATTERNS] + [f"scheme__{s}" for s in _URL_SCHEMES] + ["ctx_source_injected", "param_blob_len", "has_wildcard_star", "has_all_keyword", "has_recursive_flag"]
+
 
 def _param_blob(entry: dict) -> str:
     try:
@@ -139,6 +141,10 @@ class AdversarialClassifier:
         self._vocab = bundle["vocab"]
         self.threshold: float = threshold if threshold is not None else bundle["default_threshold"]
         self.bundle_version: str = bundle.get("version", "unknown")
+        tail = (bundle.get("feature_names") or [])[-len(_STATIC_FEATURES):]
+        if tail != _STATIC_FEATURES:
+            diff = next((i for i, (a, b) in enumerate(zip(_STATIC_FEATURES, tail)) if a != b), -1)
+            raise ValueError(f"bundle feature schema drift at static-feature index {diff}: runtime={_STATIC_FEATURES[diff] if diff>=0 else '?'!r} bundle={tail[diff] if diff>=0 else '?'!r} (len runtime={len(_STATIC_FEATURES)} bundle={len(tail)})")
 
     def score(self, tool_name: str, parameters: Optional[dict] = None, context: Optional[dict] = None) -> float:
         """Return adversarial probability in [0, 1]."""
@@ -147,7 +153,7 @@ class AdversarialClassifier:
         return float(self._model.predict_proba(X)[0, 1])
 
     def is_malicious(self, tool_name: str, parameters: Optional[dict] = None, context: Optional[dict] = None, threshold: Optional[float] = None) -> bool:
-        """Return True if score >= threshold (default: bundle's default_threshold, 0.8)."""
+        """Return True if score >= threshold (default: bundle's default_threshold)."""
         th = threshold if threshold is not None else self.threshold
         return self.score(tool_name, parameters, context) >= th
 
