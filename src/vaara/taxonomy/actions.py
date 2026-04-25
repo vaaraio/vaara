@@ -45,7 +45,7 @@ class BlastRadius(str, Enum):
     SELF = "self"           # Only the agent itself
     LOCAL = "local"         # Agent + immediate counterparty
     SHARED = "shared"       # Multiple users / shared state
-    GLOBAL = "global"       # Public / broadcast / on-chain
+    GLOBAL = "global"       # Public / broadcast / wide reach
 
 
 class UrgencyClass(str, Enum):
