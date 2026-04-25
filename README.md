@@ -1,7 +1,7 @@
 <p align="center">
   <picture>
     <source media="(prefers-color-scheme: dark)" srcset="docs/vaara-wordmark-dark.png">
-    <img src="docs/vaara-wordmark-light.png" alt="Vaara — Built to see over the noise" width="900">
+    <img src="docs/vaara-wordmark-light.png" alt="Vaara, built to see over the noise" width="900">
   </picture>
 </p>
 
@@ -35,7 +35,7 @@ Position paper on the European Commission's AI Alliance platform: [Article 14 at
 
 AI governance tools audit **models**. Vaara governs **actions**.
 
-Models are scored once at deployment. Agents act continuously at runtime -- calling tools, moving money, modifying infrastructure. Individual actions may be safe, but *sequences* can be catastrophic. `read_data` + `export_data` + `delete_data` is a data exfiltration pattern where each step alone is benign.
+Models are scored once at deployment. Agents act continuously at runtime, calling tools and modifying infrastructure. Individual actions may be safe, but *sequences* can be catastrophic. `read_data` + `export_data` + `delete_data` is a data exfiltration pattern where each step alone is benign.
 
 Vaara catches this. It learns which risk signals predict bad outcomes, adapts its scoring online, and wraps every estimate in a distribution-free confidence interval. No retraining. No manual threshold tuning.
 
@@ -117,7 +117,7 @@ Latency: 140 µs mean, 210 µs p99 (commodity CPU, no GPU at inference).
 - Classifier over-triggers on legitimate uses of powerful tools (`http_post`, `send_email`, `shell_exec`). Held-out FPR at threshold 0.5 is 23%. Live-agent FPR on real traffic is typically higher than held-out figures.
 - Recommended: ship with `decision="escalate"` (send to human-in-loop), not `decision="deny"`.
 - Threshold is configurable per call. See `AdversarialClassifier(threshold=0.7)` for the higher-recall / higher-FPR operating point.
-- Reproduce: `python scripts/classifier_vs_heuristic.py` (requires `vaara[ml]`, MI300X optional).
+- Reproduce: `python scripts/classifier_vs_heuristic.py` (requires `vaara[ml]`).
 
 ## How It Works
 
@@ -148,9 +148,9 @@ No distributional assumptions. No model retraining. The decision uses the **uppe
 ### Decisions
 
 ```
-ALLOW     — upper bound < 0.3 (configurable)
-ESCALATE  — between 0.3 and 0.7 → route to human
-DENY      — upper bound > 0.7
+ALLOW     : upper bound < 0.3 (configurable)
+ESCALATE  : between 0.3 and 0.7, route to human
+DENY      : upper bound > 0.7
 ```
 
 Cold start is maximally cautious: wide intervals route most actions through human review. As outcomes accumulate, intervals tighten and the system becomes autonomous.
@@ -214,7 +214,7 @@ Add to Claude Code settings:
 
 Vaara collects and maps evidence artefacts to specific article references
 in the EU AI Act and DORA. The output is evidence, not a conformity
-verdict — the deployer, with a Notified Body where applicable, owns the
+verdict. The deployer, with a Notified Body where applicable, owns the
 conformity decision.
 
 ```python
@@ -286,7 +286,9 @@ report_outcome()  ->  closes feedback loop, MWU learns
 ## Persistence
 
 ```python
+from vaara.audit.trail import AuditTrail
 from vaara.audit.sqlite_backend import SQLiteAuditBackend
+from vaara.pipeline import InterceptionPipeline
 
 backend = SQLiteAuditBackend("audit.db")
 trail = AuditTrail(on_record=backend.write_record)
