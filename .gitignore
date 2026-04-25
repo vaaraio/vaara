@@ -13,3 +13,5 @@ venv/
 .env
 .DS_Store
 docs/blog/
+docs/grant/
+dist_verify/
