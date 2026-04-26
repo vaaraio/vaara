@@ -199,6 +199,15 @@ Honest about the edges:
 - The Article 11 technical documentation requirement is checked as a
   presence flag only. Drafting the Annex IV file is outside Vaara's
   scope and will stay that way.
+- The `AdversarialClassifier` (v0.5.3, opt-in via `vaara[ml]`) was
+  retrained on a corpus that includes 1,500 LLM-generated jailbreak
+  variants. The distribution-shift gap between LLM-generated and
+  hand-curated held-out recall has not been measured separately in
+  v0.5.3. Hand-curated regression numbers in the CHANGELOG indicate
+  transfer is happening, but a formal split is owed in v0.6.
+- v0.5.3 does not yet quote an adaptive-attacker (PAIR-style)
+  attack-success-rate. Iterative attacker capability is a known limit
+  and a calibration figure is planned for v0.6.
 
 ## Questions
 

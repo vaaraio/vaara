@@ -170,7 +170,11 @@ def build_features(
     for i, e in enumerate(entries):
         tn = e.get("tool_name", "").lower()
         params = e.get("parameters") or {}
+        if not isinstance(params, dict):
+            params = {"_raw": str(params)}
         ctx = e.get("context") or {}
+        if not isinstance(ctx, dict):
+            ctx = {"original_task": str(ctx)}
         blob = _param_blob(e)
 
         col = 0
@@ -271,7 +275,7 @@ def run(args) -> int:
     print(f"[corpus] positive rate={y.mean():.3f}", flush=True)
 
     print("[baseline] running current scorer on full corpus...", flush=True)
-    y_base = baseline_predictions(entries)
+    y_base = baseline_predictions(entries, best_effort=True)
     baseline_acc = float((y_base == y).mean())
     print(f"[baseline] accuracy vs ground-truth-malicious label: {baseline_acc:.3f}", flush=True)
 

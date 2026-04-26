@@ -6,7 +6,7 @@ and writes a hash-chained audit trail suitable for EU AI Act Article 14
 oversight.
 """
 
-__version__ = "0.5.2"
+__version__ = "0.5.3"
 
 from vaara.pipeline import InterceptionPipeline, InterceptionResult
 
