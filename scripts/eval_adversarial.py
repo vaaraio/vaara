@@ -41,17 +41,37 @@ def load_corpus(corpus_dir: Path, only_category: str | None) -> list[dict]:
     return entries
 
 
-def decide(entry: dict, pipe: Pipeline) -> dict:
+def decide(entry: dict, pipe: Pipeline, classifier=None) -> dict:
+    """Run heuristic pipeline; optionally stack with AdversarialClassifier.
+
+    Stacking rule (per v0.5.2 CHANGELOG recommendation):
+        - heuristic DENY  → keep DENY
+        - heuristic ESCALATE → keep ESCALATE
+        - heuristic ALLOW + classifier prob ≥ threshold → ESCALATE
+        - heuristic ALLOW + classifier prob <  threshold → ALLOW
+    """
     result = pipe.intercept(
         agent_id=entry.get("agent_id", "adv"),
         tool_name=entry["tool_name"],
         parameters=entry.get("parameters", {}),
         context=entry.get("context", {}),
     )
-    # Pipeline decision object: .decision enum-like + .risk float
     decision_str = getattr(result, "decision", None)
     decision_str = str(decision_str).upper() if decision_str is not None else "UNKNOWN"
     risk = float(getattr(result, "risk_score", 0.0) or 0.0)
+
+    if classifier is not None and decision_str == "ALLOW":
+        try:
+            prob = classifier.score(
+                tool_name=entry["tool_name"],
+                parameters=entry.get("parameters", {}),
+                context=entry.get("context", {}),
+            )
+            if prob >= classifier.threshold:
+                decision_str = "ESCALATE"
+                risk = max(risk, prob)
+        except Exception:
+            pass
     return {"decision": decision_str, "risk": risk}
 
 
@@ -84,6 +104,13 @@ def main():
     ap.add_argument("--corpus-dir", default="tests/adversarial")
     ap.add_argument("--only-category", default=None)
     ap.add_argument("--out", default=None)
+    ap.add_argument(
+        "--with-classifier",
+        action="store_true",
+        help="Stack AdversarialClassifier on top of the heuristic pipeline. "
+             "Requires vaara[ml] extras. Heuristic DENY/ESCALATE are preserved; "
+             "heuristic ALLOW is upgraded to ESCALATE when classifier prob >= threshold.",
+    )
     args = ap.parse_args()
 
     corpus_dir = Path(args.corpus_dir)
@@ -93,10 +120,20 @@ def main():
     print(f"[corpus] {len(entries)} entries across {len({e['category'] for e in entries})} categories")
 
     pipe = Pipeline()
+    classifier = None
+    if args.with_classifier:
+        try:
+            from vaara.adversarial_classifier import AdversarialClassifier
+            classifier = AdversarialClassifier()
+            print(f"[classifier] engaged: bundle v{classifier.bundle_version}, threshold={classifier.threshold}")
+        except ImportError as exc:
+            raise SystemExit(f"--with-classifier needs vaara[ml]: {exc}")
+    else:
+        print("[classifier] disabled (heuristic only). Pass --with-classifier for stacked eval.")
     rows = []
     for entry in entries:
         try:
-            out = decide(entry, pipe)
+            out = decide(entry, pipe, classifier=classifier)
         except Exception as exc:
             out = {"decision": f"ERROR:{type(exc).__name__}", "risk": 0.0}
         expected = entry.get("expected", "DENY")
