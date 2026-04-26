@@ -61,17 +61,14 @@ def decide(entry: dict, pipe: Pipeline, classifier=None) -> dict:
     risk = float(getattr(result, "risk_score", 0.0) or 0.0)
 
     if classifier is not None and decision_str == "ALLOW":
-        try:
-            prob = classifier.score(
-                tool_name=entry["tool_name"],
-                parameters=entry.get("parameters", {}),
-                context=entry.get("context", {}),
-            )
-            if prob >= classifier.threshold:
-                decision_str = "ESCALATE"
-                risk = max(risk, prob)
-        except Exception:
-            pass
+        prob = classifier.score(
+            tool_name=entry["tool_name"],
+            parameters=entry.get("parameters", {}),
+            context=entry.get("context", {}),
+        )
+        if prob >= classifier.threshold:
+            decision_str = "ESCALATE"
+            risk = max(risk, prob)
     return {"decision": decision_str, "risk": risk}
 
 

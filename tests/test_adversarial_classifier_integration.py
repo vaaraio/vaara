@@ -14,15 +14,20 @@ import importlib.util
 
 import pytest
 
-pytestmark = pytest.mark.skipif(
-    importlib.util.find_spec("xgboost") is None
-    or importlib.util.find_spec("joblib") is None,
+HAS_ML = (
+    importlib.util.find_spec("xgboost") is not None
+    and importlib.util.find_spec("joblib") is not None
+)
+ml_required = pytest.mark.skipif(
+    not HAS_ML,
     reason="AdversarialClassifier requires vaara[ml] extras (xgboost, joblib)",
 )
 
 
 @pytest.fixture(scope="module")
 def classifier():
+    if not HAS_ML:
+        pytest.skip("AdversarialClassifier requires vaara[ml] extras")
     from vaara.adversarial_classifier import AdversarialClassifier
     return AdversarialClassifier()
 
@@ -95,12 +100,13 @@ def test_is_malicious_helper_matches_score(classifier):
     assert classifier.is_malicious(**args) == (p >= classifier.threshold)
 
 
-def test_pipeline_intercept_runs_without_classifier(classifier):
+def test_pipeline_intercept_runs_without_classifier():
     """Pipeline.intercept() runs cleanly without engaging the classifier.
 
     Backwards-compatibility: heuristic-only is the default and must not
-    require the classifier. Also confirms the classifier import did not
-    monkey-patch the default Pipeline behaviour.
+    require the classifier. This test deliberately does NOT take the
+    ``classifier`` fixture so it runs even when ``vaara[ml]`` extras
+    are absent (the default install).
     """
     from vaara import Pipeline
     pipe = Pipeline()

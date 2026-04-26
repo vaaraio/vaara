@@ -93,9 +93,36 @@ def _normalize_str(s: Any) -> str:
     return str(s)
 
 
+def _coerce_params(p: Any) -> dict:
+    """Return a dict view of an entry's ``parameters`` field.
+
+    Some corpus entries (present since v0.5.0) have a string-typed
+    ``parameters``. Wrap those as ``{"_raw": str(p)}`` so every consumer
+    of params can rely on dict semantics without crashing.
+    """
+    if not p:
+        return {}
+    if isinstance(p, dict):
+        return p
+    return {"_raw": str(p)}
+
+
+def _coerce_context(c: Any) -> dict:
+    """Return a dict view of an entry's ``context`` field.
+
+    Some corpus entries have a string-typed ``context`` whose contents
+    are the original_task. Wrap those as ``{"original_task": str(c)}``.
+    """
+    if not c:
+        return {}
+    if isinstance(c, dict):
+        return c
+    return {"original_task": str(c)}
+
+
 def _param_blob(entry: dict) -> str:
-    parts = [_normalize_str(entry.get("parameters"))]
-    parts.append(_normalize_str(entry.get("context")))
+    parts = [_normalize_str(_coerce_params(entry.get("parameters")))]
+    parts.append(_normalize_str(_coerce_context(entry.get("context"))))
     return " ".join(parts)
 
 
@@ -121,7 +148,7 @@ def fit_vocabulary(entries: list[dict]) -> dict:
     """
     param_keys: Counter = Counter()
     for e in entries:
-        for k in (e.get("parameters") or {}).keys():
+        for k in _coerce_params(e.get("parameters")).keys():
             param_keys[k] += 1
     top_keys = [k for k, _ in param_keys.most_common(80)]
 
@@ -169,12 +196,8 @@ def build_features(
     X = np.zeros((n, len(feature_names)), dtype=np.float32)
     for i, e in enumerate(entries):
         tn = e.get("tool_name", "").lower()
-        params = e.get("parameters") or {}
-        if not isinstance(params, dict):
-            params = {"_raw": str(params)}
-        ctx = e.get("context") or {}
-        if not isinstance(ctx, dict):
-            ctx = {"original_task": str(ctx)}
+        params = _coerce_params(e.get("parameters"))
+        ctx = _coerce_context(e.get("context"))
         blob = _param_blob(e)
 
         col = 0
