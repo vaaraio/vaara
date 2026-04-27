@@ -3,8 +3,9 @@
 from __future__ import annotations
 
 import json
+from enum import Enum
 from pathlib import Path
-from typing import Union
+from typing import TypeVar, Union
 
 from vaara.taxonomy.actions import (
     ActionCategory,
@@ -22,6 +23,8 @@ from vaara.policy.schema import (
     SequencePattern,
     Thresholds,
 )
+
+EnumT = TypeVar("EnumT", bound=Enum)
 
 
 def from_dict(data: dict) -> Policy:
@@ -137,7 +140,7 @@ def from_dict(data: dict) -> Policy:
     )
 
 
-def _coerce_enum(value, enum_cls, path: str):
+def _coerce_enum(value: object, enum_cls: type[EnumT], path: str) -> EnumT:
     """Convert a string value to an enum member, or raise PolicyError."""
     if value is None:
         raise PolicyError(f"{path}: required field missing")
@@ -148,7 +151,7 @@ def _coerce_enum(value, enum_cls, path: str):
         raise PolicyError(f"{path}: {value!r} is not one of [{valid}]") from None
 
 
-def _require_mapping(value, path: str) -> dict:
+def _require_mapping(value: object, path: str) -> dict:
     """Return value as a dict, or raise PolicyError. None becomes empty dict."""
     if value is None:
         return {}
@@ -159,7 +162,7 @@ def _require_mapping(value, path: str) -> dict:
     return value
 
 
-def _require_sequence(value, path: str) -> list:
+def _require_sequence(value: object, path: str) -> list:
     """Return value as a list, or raise PolicyError.
 
     Strings are rejected explicitly: tuple("abc") would silently produce
@@ -205,7 +208,7 @@ def from_json(source: Union[str, Path, dict]) -> Policy:
 def from_yaml(source: Union[str, Path]) -> Policy:
     """Load a policy from a YAML file path or YAML string. Requires `vaara[yaml]`."""
     try:
-        import yaml  # type: ignore[import-not-found]
+        import yaml  # type: ignore[import-untyped]
     except ImportError as e:
         raise ImportError(
             "from_yaml requires the [yaml] extra. "

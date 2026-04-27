@@ -18,6 +18,7 @@ and this project follows [Semantic Versioning](https://semver.org/spec/v2.0.0.ht
 - **`[yaml]` optional extra in `pyproject.toml`** (`pyyaml>=6.0`). Core `dependencies = []` preserved.
 - **`examples/policies/minimal.json` and `full.yaml`** as reference policies.
 - **COMPLIANCE.md gains "EU AI Act Annex IV evidence sections"** (maps Vaara contribution per §1–§9; direct fill on §3, §5, §9; contributes on §2, §4, §6, §7; out of scope for §1, §8) **and "CEN-CENELEC harmonised standards alignment"** (per-standard table for ISO/IEC 42001, prEN 18286, prEN 18228, ISO/IEC 42006, prEN ISO/IEC 24970, prEN 18229-1, prEN ISO/IEC 12792).
+- **`scripts/lint_full.sh` pre-push lint sweep** — chains `ruff` (style + correctness), `bandit` (security), `mypy` (types — strict on `vaara.policy`, lenient on legacy modules), and `pytest`. Documented in CONTRIBUTING.md. Catches CodeRabbit-class findings before they hit a PR review round-trip. New dev extras: `bandit>=1.7.5`, `mypy>=1.8`. Bandit configured in `pyproject.toml` to skip B608 across `audit/sqlite_backend.py` (all f-string SQL there interpolates only internally-controlled tenant clauses, not user input). Two `# nosec` annotations document the remaining trusted-bundle and synthetic-trace-RNG sites.
 
 ### Changed
 - **Audit DB schema v2 → v3.** Migration `_MIGRATIONS[2]` adds four nullable transparency columns to `audit_records`. Pre-v0.6 records get NULL for the new columns; their stored `record_hash` is preserved (NOT re-hashed on load), so chain verification of historical records continues to work.
