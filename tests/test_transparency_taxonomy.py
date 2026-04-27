@@ -30,7 +30,7 @@ def _record(event_type: EventType, **kwargs) -> AuditRecord:
 # ── Default classification ─────────────────────────────────────────────────
 
 def test_defaults_cover_every_event_type() -> None:
-    for event_type in EventType:
+    for event_type in list(EventType):
         assert event_type in TRANSPARENCY_DEFAULTS
         d = TRANSPARENCY_DEFAULTS[event_type]
         for axis in ("system_operation", "data_usage", "decision_making"):
@@ -107,8 +107,7 @@ def test_compute_hash_excludes_transparency_fields() -> None:
 
 def test_write_and_load_persists_transparency(tmp_path: Path) -> None:
     db = tmp_path / "audit.db"
-    backend = SQLiteAuditBackend(db)
-    try:
+    with SQLiteAuditBackend(db) as backend:
         rec = _record(
             EventType.DECISION_MADE,
             record_id="r-persist",
@@ -124,8 +123,6 @@ def test_write_and_load_persists_transparency(tmp_path: Path) -> None:
         assert lr.system_operation == "decision_threshold"
         assert lr.decision_making == "threshold_match"
         assert lr.limitations == "custom_limit"
-    finally:
-        backend.close()
 
 
 def test_migration_from_v2_to_v3(tmp_path: Path) -> None:
@@ -159,8 +156,7 @@ def test_migration_from_v2_to_v3(tmp_path: Path) -> None:
     conn.commit()
     conn.close()
 
-    backend = SQLiteAuditBackend(db)
-    try:
+    with SQLiteAuditBackend(db) as backend:
         loaded = backend.query_by_action("old-act")
         assert len(loaded) == 1
         old = loaded[0]
@@ -169,5 +165,3 @@ def test_migration_from_v2_to_v3(tmp_path: Path) -> None:
         assert old.data_usage is None
         assert old.decision_making is None
         assert old.limitations is None
-    finally:
-        backend.close()
