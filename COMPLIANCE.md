@@ -303,9 +303,28 @@ Honest about the edges:
   full-stack benign FPR comes from heuristic ESCALATEs, not classifier
   upgrades. Detailed breakdown: `tests/adversarial/stack_ablation_v0_5_3.json`.
   Reproducible via `scripts/eval_stack_ablation.py`.
-- v0.5.3 does not yet quote an adaptive-attacker (PAIR-style)
-  attack-success-rate. Iterative attacker capability is a known limit
-  and a calibration figure is planned for v0.6.
+- **Adaptive-attacker calibration (v0.6 measurement of v0.5.3 stack).**
+  PAIR (Chao et al. 2023) iterative attacker against the full Vaara
+  stack:
+  - Attacker + judge model: Qwen2.5-32B-Instruct (Apache 2.0)
+  - Seed corpus: 25 hand-curated jailbreak entries (`tests/adversarial/jailbreak.jsonl`)
+  - Max iterations per seed: 5
+  - Total LLM calls: 125 attacker iterations across 25 seeds, plus
+    judge confirmations on heuristic-ALLOW outcomes
+  - **ASR: 0.0% (0/25)**. Across 125 candidate prompts, Vaara
+    escalated 124 and allowed 1; the judge ruled the allowed candidate
+    not a successful jailbreak.
+
+  Reading: Vaara stack catches DAN-roleplay, "hypothetical scenario",
+  and "security drill" -style jailbreak attempts at this attacker
+  capability level. NOT a claim of impervence to all adaptive attackers
+  — a stronger attacker model (70B+), longer iteration budgets, or
+  different strategies (multi-turn drift, language-switch, obfuscation)
+  might produce non-zero ASR. v0.7 follow-up: re-run with 70B+ attacker
+  + judge if a compliance audience requires the harder calibration.
+
+  Detailed per-seed breakdown: `tests/adversarial/pair_v0_5_3.json`.
+  Reproducible via `scripts/eval_pair_attack.py`.
 
 ## Questions
 
