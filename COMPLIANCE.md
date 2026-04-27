@@ -265,12 +265,36 @@ Honest about the edges:
 - The Article 11 technical documentation requirement is checked as a
   presence flag only. Drafting the Annex IV file is outside Vaara's
   scope and will stay that way.
-- The `AdversarialClassifier` (v0.5.3, opt-in via `vaara[ml]`) was
-  retrained on a corpus that includes 1,500 LLM-generated jailbreak
-  variants. The distribution-shift gap between LLM-generated and
-  hand-curated held-out recall has not been measured separately in
-  v0.5.3. Hand-curated regression numbers in the CHANGELOG indicate
-  transfer is happening, but a formal split is owed in v0.6.
+- **Distribution-shift split (v0.6 measurement of v0.5.3 stack).** The
+  `AdversarialClassifier` (opt-in via `vaara[ml]`) was retrained on a
+  corpus that mixes hand-curated and LLM-generated entries. v0.6
+  measures the per-source full-stack performance:
+
+  | Source                                | Attack recall | Benign FPR |
+  |---------------------------------------|--------------:|-----------:|
+  | Hand-curated (held-out, 250 entries)  |        97.1% |      70.0% |
+  | LLM-generated (in-sample, 5,705)      |        95.2% |      87.5% |
+
+  Reading: full-stack = heuristic `ESCALATE`/`DENY` preserved + classifier
+  upgrades on heuristic `ALLOW`. Hand-curated entries are held-out (not
+  in classifier training). LLM-generated entries WERE in training, so
+  their numbers are in-sample fit, not generalization.
+
+  The 1.9pp recall gap (97.1% > 95.2%) is small but goes against the
+  expected direction. The 18pp benign-FPR gap (70.0% < 87.5%) is the
+  dominant distribution-shift signal: the stack is much more confused
+  about LLM-generated benigns than hand-curated ones.
+
+  Note on FPR vs CHANGELOG headline: the CHANGELOG quotes "global benign
+  FPR 21.0%" which is classifier-alone 5-fold CV OOF. The full-stack
+  numbers above are dominated by the heuristic — most benign escalations
+  come from the heuristic `ESCALATE` branch, not from classifier upgrades
+  on heuristic-`ALLOW`ed entries.
+
+  Detailed per-source/per-class breakdown: `tests/adversarial/distribution_shift_v0_5_3.json`.
+  Reproducible via `scripts/eval_distribution_shift.py`. A proper OOF
+  split for the LLM-generated portion (re-running held-out per fold) is
+  a v0.7 follow-up if the gap demands it.
 - v0.5.3 does not yet quote an adaptive-attacker (PAIR-style)
   attack-success-rate. Iterative attacker capability is a known limit
   and a calibration figure is planned for v0.6.
