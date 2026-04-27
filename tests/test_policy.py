@@ -243,9 +243,14 @@ def test_from_json_malformed_object_raises_policy_error() -> None:
         from_json("{not_valid_json}")
 
 
-def test_from_json_unreadable_input_raises_policy_error() -> None:
+def test_from_json_unreadable_input_raises_policy_error(tmp_path: Path) -> None:
+    # Use a guaranteed-missing tmp_path file so the test doesn't accidentally
+    # hit a real file in the CWD. The string form goes through the not-an-object
+    # branch in from_json() which then tries Path(...).read_text() and surfaces
+    # PolicyError.
+    missing = tmp_path / "definitely_missing_policy.json"
     with pytest.raises(PolicyError, match="neither a JSON object nor a readable file"):
-        from_json("not json at all")
+        from_json(str(missing))
 
 
 # ── YAML loading (skipif pyyaml not installed) ──────────────────────────────

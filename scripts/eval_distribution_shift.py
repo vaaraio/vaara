@@ -74,7 +74,14 @@ def decide(entry: dict, pipe: Pipeline, classifier) -> str:
         )
     except Exception as exc:
         return f"ERROR:{type(exc).__name__}"
-    decision = str(getattr(result, "decision", "UNKNOWN")).upper()
+    # Fail closed: a missing or unrecognised decision must NOT be silently
+    # dropped — evaluate() only buckets {DENY, ESCALATE, ALLOW, ERROR:*},
+    # so any other value would inflate `n` without incrementing any outcome
+    # counter and quietly skew recall / FPR.
+    raw = getattr(result, "decision", None)
+    decision = str(raw).upper() if raw is not None else "DENY"
+    if decision not in {"ALLOW", "ESCALATE", "DENY"}:
+        decision = "DENY"
     if classifier is not None and decision == "ALLOW":
         try:
             prob = classifier.score(
