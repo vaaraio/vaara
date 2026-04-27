@@ -183,7 +183,7 @@ def _cmd_trail_purge(args: argparse.Namespace) -> int:
     """Delete audit records older than --retention-days. EU AI Act Article 12(2)."""
     from vaara.audit.sqlite_backend import SQLiteAuditBackend
 
-    db_path = Path(args.db)
+    db_path = Path(args.db).expanduser()
     if not db_path.exists():
         print(f"audit DB not found: {db_path}", file=sys.stderr)
         return 1

@@ -24,7 +24,7 @@ and this project follows [Semantic Versioning](https://semver.org/spec/v2.0.0.ht
 - **COMPLIANCE.md "Current limits"** replaced placeholder bullets with v0.6 measurement results:
   - **Distribution-shift split.** Hand-curated (held-out, 250): attack recall 97.1% / benign FPR 70.0%. LLM-generated (in-sample, 5,705): attack recall 95.2% / benign FPR 87.5%. The 18pp benign-FPR gap is the dominant distribution-shift signal.
   - **Stack composition.** `heuristic_only` recall 35% / 63%. `classifier_only` recall 94% / 86%. `full_stack` recall 97% / 98%. Layers not redundant — heuristic catches a small set of attacks the classifier misses (justifies the ensemble). Most full-stack benign FPR comes from heuristic ESCALATEs, not classifier upgrades.
-  - **PAIR adaptive-attacker calibration.** Qwen2.5-32B-Instruct as both attacker and judge, 25 hand-curated jailbreak seeds, max 5 iterations: **ASR 0.0% (0/25)**. NOT a claim of impervence to all adaptive attackers — stronger attacker (70B+), longer iteration budgets, or alternate strategies (multi-turn drift, language-switch, obfuscation) might produce non-zero ASR.
+  - **PAIR adaptive-attacker calibration.** Qwen2.5-32B-Instruct as both attacker and judge, 25 hand-curated jailbreak seeds, max 5 iterations: **ASR 0.0% (0/25)**. NOT a claim of imperviousness to all adaptive attackers — stronger attacker (70B+), longer iteration budgets, or alternate strategies (multi-turn drift, language-switch, obfuscation) might produce non-zero ASR.
 
 ### Deferred to v0.7+
 - **prEN ISO/IEC 24970 field-alias layer** — pending public final of the standard. Will land when 24970 publishes.

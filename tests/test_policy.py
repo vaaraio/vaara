@@ -161,6 +161,69 @@ def test_empty_sequence_pattern_rejected() -> None:
         from_dict(bad)
 
 
+# ── Strict-shape validation (CodeRabbit #2 / #3) ─────────────────────────────
+
+def test_action_classes_must_be_mapping_not_list() -> None:
+    bad = {**MINIMAL_POLICY, "action_classes": []}
+    with pytest.raises(PolicyError, match=r"action_classes: must be a mapping"):
+        from_dict(bad)
+
+
+def test_thresholds_must_be_mapping_not_list() -> None:
+    bad = {**MINIMAL_POLICY, "thresholds": []}
+    with pytest.raises(PolicyError, match=r"thresholds: must be a mapping"):
+        from_dict(bad)
+
+
+def test_escalation_must_be_mapping_not_list() -> None:
+    bad = {**MINIMAL_POLICY, "escalation": []}
+    with pytest.raises(PolicyError, match=r"escalation: must be a mapping"):
+        from_dict(bad)
+
+
+def test_sequence_pattern_string_rejected_not_silently_split() -> None:
+    """`pattern: "abc"` must raise, not silently become ('a','b','c')."""
+    bad = {**MINIMAL_POLICY, "sequences": {
+        "x": {"pattern": "abc", "risk_boost": 0.1, "window_seconds": 60},
+    }}
+    with pytest.raises(PolicyError, match=r"sequences.x.pattern: must be a list"):
+        from_dict(bad)
+
+
+def test_per_action_threshold_override_validated_at_load_time() -> None:
+    """Override `{escalate: 0.9, deny: 0.2}` must fail at load, not on query."""
+    bad = {**MINIMAL_POLICY, "thresholds": {
+        "default": {"escalate": 0.55, "deny": 0.85},
+        "fs.write_file": {"escalate": 0.9, "deny": 0.2},
+    }}
+    with pytest.raises(PolicyError, match=r"thresholds.fs.write_file"):
+        from_dict(bad)
+
+
+def test_per_action_partial_override_validated_against_default() -> None:
+    """Override `{deny: 0.1}` is invalid because default escalate=0.55 > 0.1."""
+    bad = {**MINIMAL_POLICY, "thresholds": {
+        "default": {"escalate": 0.55, "deny": 0.85},
+        "fs.write_file": {"deny": 0.1},
+    }}
+    with pytest.raises(PolicyError, match=r"thresholds.fs.write_file"):
+        from_dict(bad)
+
+
+# ── Policy is a frozen value object (CodeRabbit #6) ──────────────────────────
+
+def test_policy_thresholds_overrides_are_immutable() -> None:
+    p = from_dict(FULL_POLICY)
+    with pytest.raises(TypeError):
+        p.thresholds_overrides["fs.write_file"]["escalate"] = 0.99  # type: ignore[index]
+
+
+def test_policy_action_classes_are_immutable() -> None:
+    p = from_dict(FULL_POLICY)
+    with pytest.raises(TypeError):
+        del p.action_classes["fs.write_file"]  # type: ignore[attr-defined]
+
+
 # ── JSON loading ─────────────────────────────────────────────────────────────
 
 def test_from_json_string() -> None:

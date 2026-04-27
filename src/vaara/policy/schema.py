@@ -1,11 +1,15 @@
 """Vaara policy dataclasses.
 
 All types are frozen so a loaded Policy is a value object — passing it
-around the pipeline is safe without defensive copying.
+around the pipeline is safe without defensive copying. Mapping fields
+on Policy are wrapped in MappingProxyType in __post_init__ so callers
+cannot mutate them in place either.
 """
 
 from __future__ import annotations
 
+import types
+from collections.abc import Mapping
 from dataclasses import dataclass
 
 from vaara.taxonomy.actions import (
@@ -81,11 +85,28 @@ class Policy:
     """Loaded, validated Vaara policy."""
     version: str
     domains: tuple[RegulatoryDomain, ...]
-    action_classes: dict[str, ActionClassDef]
+    action_classes: Mapping[str, ActionClassDef]
     thresholds_default: Thresholds
-    thresholds_overrides: dict[str, dict[str, float]]
+    thresholds_overrides: Mapping[str, Mapping[str, float]]
     sequences: tuple[SequencePattern, ...]
     escalation_routes: tuple[EscalationRoute, ...]
+
+    def __post_init__(self) -> None:
+        # Wrap mapping fields so callers cannot mutate Policy in place.
+        # Nested override dicts are wrapped too so
+        # `policy.thresholds_overrides["x"]["escalate"] = 0.9` raises.
+        object.__setattr__(
+            self, "action_classes",
+            types.MappingProxyType(dict(self.action_classes)),
+        )
+        nested_frozen = {
+            k: types.MappingProxyType(dict(v))
+            for k, v in self.thresholds_overrides.items()
+        }
+        object.__setattr__(
+            self, "thresholds_overrides",
+            types.MappingProxyType(nested_frozen),
+        )
 
     def threshold_for(self, action_class_name: str) -> Thresholds:
         """Resolve thresholds for a given action class, with override fallback.

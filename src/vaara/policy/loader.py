@@ -40,60 +40,91 @@ def from_dict(data: dict) -> Policy:
 
     domains = tuple(
         _coerce_enum(d, RegulatoryDomain, f"domains[{i}]")
-        for i, d in enumerate(data.get("domains") or [])
+        for i, d in enumerate(_require_sequence(data.get("domains"), "domains"))
     )
 
     action_classes: dict[str, ActionClassDef] = {}
-    for name, raw in (data.get("action_classes") or {}).items():
-        if not isinstance(raw, dict):
-            raise PolicyError(f"action_classes.{name}: must be a mapping")
+    for name, raw in _require_mapping(data.get("action_classes"), "action_classes").items():
+        raw_dict = _require_mapping(raw, f"action_classes.{name}")
         action_classes[name] = ActionClassDef(
             name=name,
             category=_coerce_enum(
-                raw.get("category"), ActionCategory, f"action_classes.{name}.category"
+                raw_dict.get("category"), ActionCategory, f"action_classes.{name}.category"
             ),
             reversibility=_coerce_enum(
-                raw.get("reversibility"), Reversibility, f"action_classes.{name}.reversibility"
+                raw_dict.get("reversibility"), Reversibility, f"action_classes.{name}.reversibility"
             ),
             blast_radius=_coerce_enum(
-                raw.get("blast_radius"), BlastRadius, f"action_classes.{name}.blast_radius"
+                raw_dict.get("blast_radius"), BlastRadius, f"action_classes.{name}.blast_radius"
             ),
             urgency=_coerce_enum(
-                raw.get("urgency"), UrgencyClass, f"action_classes.{name}.urgency"
+                raw_dict.get("urgency"), UrgencyClass, f"action_classes.{name}.urgency"
             ),
-            regulatory=tuple(raw.get("regulatory") or ()),
+            regulatory=tuple(_require_sequence(
+                raw_dict.get("regulatory"), f"action_classes.{name}.regulatory"
+            )),
         )
 
-    thr_block = data.get("thresholds") or {}
-    default_block = thr_block.get("default") or {"escalate": 0.55, "deny": 0.85}
+    thr_block = _require_mapping(data.get("thresholds"), "thresholds")
+    default_block = _require_mapping(thr_block.get("default"), "thresholds.default")
+    if not default_block:
+        default_block = {"escalate": 0.55, "deny": 0.85}
     thresholds_default = Thresholds(
         escalate=float(default_block.get("escalate", 0.55)),
         deny=float(default_block.get("deny", 0.85)),
     )
-    thresholds_overrides = {
-        k: {kk: float(vv) for kk, vv in (v or {}).items()}
-        for k, v in thr_block.items()
-        if k != "default"
-    }
+    thresholds_overrides: dict[str, dict[str, float]] = {}
+    for key, value in thr_block.items():
+        if key == "default":
+            continue
+        override = _require_mapping(value, f"thresholds.{key}")
+        thresholds_overrides[key] = {kk: float(vv) for kk, vv in override.items()}
+        # Validate the merged-with-default thresholds upfront so a bad override
+        # doesn't sit dormant until threshold_for() is queried.
+        try:
+            Thresholds(
+                escalate=thresholds_overrides[key].get(
+                    "escalate", thresholds_default.escalate
+                ),
+                deny=thresholds_overrides[key].get(
+                    "deny", thresholds_default.deny
+                ),
+            )
+        except PolicyError as e:
+            raise PolicyError(f"thresholds.{key}: {e}") from None
 
-    sequences = tuple(
-        SequencePattern(
+    sequences_block = _require_mapping(data.get("sequences"), "sequences")
+    sequences_list: list[SequencePattern] = []
+    for name, raw in sequences_block.items():
+        raw_dict = _require_mapping(raw, f"sequences.{name}")
+        pattern_seq = _require_sequence(
+            raw_dict.get("pattern"), f"sequences.{name}.pattern"
+        )
+        sequences_list.append(SequencePattern(
             name=name,
-            pattern=tuple(raw.get("pattern") or ()),
-            risk_boost=float(raw.get("risk_boost", 0.0)),
-            window_seconds=int(raw.get("window_seconds", 60)),
-            regulatory=tuple(raw.get("regulatory") or ()),
-        )
-        for name, raw in (data.get("sequences") or {}).items()
-    )
+            pattern=tuple(pattern_seq),
+            risk_boost=float(raw_dict.get("risk_boost", 0.0)),
+            window_seconds=int(raw_dict.get("window_seconds", 60)),
+            regulatory=tuple(_require_sequence(
+                raw_dict.get("regulatory"), f"sequences.{name}.regulatory"
+            )),
+        ))
+    sequences = tuple(sequences_list)
 
-    escalation_routes = tuple(
-        EscalationRoute(
-            operator_group=raw.get("operator_group") or raw.get("default") or "on_call",
-            if_articles=tuple(raw.get("if") or ()),
-        )
-        for raw in (data.get("escalation", {}).get("routes") or [])
+    escalation_block = _require_mapping(data.get("escalation"), "escalation")
+    routes_seq = _require_sequence(
+        escalation_block.get("routes"), "escalation.routes"
     )
+    escalation_routes_list: list[EscalationRoute] = []
+    for i, raw in enumerate(routes_seq):
+        raw_dict = _require_mapping(raw, f"escalation.routes[{i}]")
+        escalation_routes_list.append(EscalationRoute(
+            operator_group=raw_dict.get("operator_group") or raw_dict.get("default") or "on_call",
+            if_articles=tuple(_require_sequence(
+                raw_dict.get("if"), f"escalation.routes[{i}].if"
+            )),
+        ))
+    escalation_routes = tuple(escalation_routes_list)
 
     return Policy(
         version=version,
@@ -115,6 +146,33 @@ def _coerce_enum(value, enum_cls, path: str):
     except ValueError:
         valid = ", ".join(repr(m.value) for m in enum_cls)
         raise PolicyError(f"{path}: {value!r} is not one of [{valid}]") from None
+
+
+def _require_mapping(value, path: str) -> dict:
+    """Return value as a dict, or raise PolicyError. None becomes empty dict."""
+    if value is None:
+        return {}
+    if not isinstance(value, dict):
+        raise PolicyError(
+            f"{path}: must be a mapping, got {type(value).__name__}"
+        )
+    return value
+
+
+def _require_sequence(value, path: str) -> list:
+    """Return value as a list, or raise PolicyError.
+
+    Strings are rejected explicitly: tuple("abc") would silently produce
+    ('a','b','c') and a malformed `pattern: "abc"` should not become three
+    one-character pattern entries.
+    """
+    if value is None:
+        return []
+    if isinstance(value, (str, bytes)) or not isinstance(value, (list, tuple)):
+        raise PolicyError(
+            f"{path}: must be a list, got {type(value).__name__}"
+        )
+    return list(value)
 
 
 def from_json(source: Union[str, Path, dict]) -> Policy:

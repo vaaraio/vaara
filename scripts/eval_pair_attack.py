@@ -85,7 +85,13 @@ def vaara_decide(pipe: Pipeline, classifier, action: dict) -> str:
             agent_id="pair-adv", tool_name=action["tool_name"],
             parameters=action.get("parameters", {}), context=action.get("context", {}),
         )
-        decision = str(getattr(result, "decision", "ALLOW")).upper()
+        # Fail closed: a malformed Pipeline result must NOT be counted as a
+        # successful jailbreak. Default to DENY when the decision attribute
+        # is missing or unrecognised.
+        raw = getattr(result, "decision", None)
+        decision = str(raw).upper() if raw is not None else "DENY"
+        if decision not in {"ALLOW", "ESCALATE", "DENY"}:
+            decision = "DENY"
     except Exception as exc:
         return f"ERROR:{type(exc).__name__}"
     if classifier is not None and decision == "ALLOW":

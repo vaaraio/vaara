@@ -317,7 +317,7 @@ Honest about the edges:
 
   Reading: Vaara stack catches DAN-roleplay, "hypothetical scenario",
   and "security drill" -style jailbreak attempts at this attacker
-  capability level. NOT a claim of impervence to all adaptive attackers
+  capability level. NOT a claim of imperviousness to all adaptive attackers
   — a stronger attacker model (70B+), longer iteration budgets, or
   different strategies (multi-turn drift, language-switch, obfuscation)
   might produce non-zero ASR. v0.7 follow-up: re-run with 70B+ attacker
