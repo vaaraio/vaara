@@ -1,0 +1,5 @@
+# CODEOWNERS — auto-assigns reviewers on PRs that touch matching paths.
+# Single-maintainer for now; this still surfaces "code ownership defined"
+# in the GitHub UI and gives forks / external contributors a clear target.
+
+* @vaaraio
