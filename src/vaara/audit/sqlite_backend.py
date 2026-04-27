@@ -32,7 +32,7 @@ from vaara.auth import APIKey, Role, _hash_key, generate_api_key
 
 logger = logging.getLogger(__name__)
 
-SCHEMA_VERSION = 2
+SCHEMA_VERSION = 3
 
 
 def _scrub_nonfinite(obj: Any) -> Any:
@@ -75,7 +75,13 @@ CREATE TABLE IF NOT EXISTS audit_records (
     previous_hash TEXT NOT NULL DEFAULT '',
     record_hash   TEXT NOT NULL DEFAULT '',
     seq           INTEGER NOT NULL,
-    tenant_id     TEXT NOT NULL DEFAULT ''
+    tenant_id     TEXT NOT NULL DEFAULT '',
+    -- v0.6 schema v3: prEN ISO/IEC 12792 transparency taxonomy.
+    -- Nullable so pre-v0.6 records (migrated via _MIGRATIONS[2]) stay valid.
+    system_operation TEXT,
+    data_usage       TEXT,
+    decision_making  TEXT,
+    limitations      TEXT
 );
 
 CREATE INDEX IF NOT EXISTS idx_action_id   ON audit_records(action_id);
@@ -123,6 +129,16 @@ _MIGRATIONS: dict[int, str] = {
         created_at   REAL NOT NULL,
         last_used_at REAL
     );
+    """,
+    # v2 → v3: prEN ISO/IEC 12792 transparency taxonomy (item 1, v0.6).
+    # Nullable columns. Pre-v0.6 records get NULL — their stored
+    # record_hash is preserved (NOT re-hashed on load), so chain
+    # verification of historical records continues to work.
+    2: """
+    ALTER TABLE audit_records ADD COLUMN system_operation TEXT;
+    ALTER TABLE audit_records ADD COLUMN data_usage       TEXT;
+    ALTER TABLE audit_records ADD COLUMN decision_making  TEXT;
+    ALTER TABLE audit_records ADD COLUMN limitations      TEXT;
     """,
 }
 
@@ -271,11 +287,12 @@ class SQLiteAuditBackend:
                 """INSERT INTO audit_records
                    (record_id, action_id, event_type, timestamp, agent_id,
                     tool_name, data, regulatory, previous_hash, record_hash, seq,
-                    tenant_id)
+                    tenant_id,
+                    system_operation, data_usage, decision_making, limitations)
                    VALUES (
                      ?, ?, ?, ?, ?, ?, ?, ?, ?, ?,
                      COALESCE((SELECT MAX(seq) FROM audit_records), -1) + 1,
-                     ?
+                     ?, ?, ?, ?, ?
                    )""",
                 (
                     record.record_id,
@@ -289,6 +306,10 @@ class SQLiteAuditBackend:
                     record.previous_hash,
                     record.record_hash,
                     self._tenant_id,
+                    record.system_operation,
+                    record.data_usage,
+                    record.decision_making,
+                    record.limitations,
                 ),
             )
 
@@ -582,10 +603,29 @@ class SQLiteAuditBackend:
     # ── Internal ──────────────────────────────────────────────────
 
     def _row_to_record(self, row: tuple) -> AuditRecord:
-        """Convert a database row to an AuditRecord, applying GDPR redactions."""
+        """Convert a database row to an AuditRecord, applying GDPR redactions.
+
+        Column layout (schema v3):
+          row[0..9]  record_id, action_id, event_type, timestamp, agent_id,
+                     tool_name, data, regulatory, previous_hash, record_hash
+          row[10]    seq
+          row[11]    tenant_id
+          row[12..15] system_operation, data_usage, decision_making, limitations
+
+        Pre-v0.6 records (migrated from schema v2) carry NULL for the
+        transparency-taxonomy columns. Their original record_hash was
+        computed without those fields and stays valid — we do NOT
+        re-hash on load.
+        """
         agent_id = row[4]
         if self._redaction_cache and agent_id in self._redaction_cache:
             agent_id = self._redaction_cache[agent_id]
+        # Defensive indexing: rows from older queries may not include
+        # the v3 columns. Use a guard so loading old DBs still works.
+        sys_op = row[12] if len(row) > 12 else None
+        data_use = row[13] if len(row) > 13 else None
+        dec_mk = row[14] if len(row) > 14 else None
+        lims = row[15] if len(row) > 15 else None
         return AuditRecord(
             record_id=row[0],
             action_id=row[1],
@@ -597,6 +637,10 @@ class SQLiteAuditBackend:
             regulatory_articles=json.loads(row[7]),
             previous_hash=row[8],
             record_hash=row[9],
+            system_operation=sys_op,
+            data_usage=data_use,
+            decision_making=dec_mk,
+            limitations=lims,
         )
 
     # ── Backup ────────────────────────────────────────────────────

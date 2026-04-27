@@ -172,6 +172,66 @@ DORA_MAPPINGS: dict[EventType, list[RegulatoryArticle]] = {
 }
 
 
+# ── Transparency taxonomy (prEN ISO/IEC 12792 four-axis) ─────────────────
+#
+# v0.6 alignment with WG4's transparency taxonomy. Four axes per record:
+# - system_operation: how the AI system worked at this event
+# - data_usage:       what data was consumed
+# - decision_making:  how the conclusion was reached
+# - limitations:      known constraints (often None per-event; system-level)
+#
+# Defaults are filled by AuditRecord.__post_init__ from event_type. Callers
+# may override per-record by passing explicit values at construction time.
+
+TRANSPARENCY_DEFAULTS: dict[EventType, dict[str, str]] = {
+    EventType.ACTION_REQUESTED: {
+        "system_operation": "logging_intake",
+        "data_usage": "tool_args+context",
+        "decision_making": "n/a",
+    },
+    EventType.RISK_SCORED: {
+        "system_operation": "scoring",
+        "data_usage": "tool_args+history+policy",
+        "decision_making": "heuristic_score",
+    },
+    EventType.DECISION_MADE: {
+        "system_operation": "decision_threshold",
+        "data_usage": "risk_score+thresholds",
+        "decision_making": "threshold_match",
+    },
+    EventType.ACTION_EXECUTED: {
+        "system_operation": "execution",
+        "data_usage": "decision",
+        "decision_making": "prior_decision",
+    },
+    EventType.ACTION_BLOCKED: {
+        "system_operation": "blocking",
+        "data_usage": "risk_score+thresholds",
+        "decision_making": "threshold_match",
+    },
+    EventType.ESCALATION_SENT: {
+        "system_operation": "escalation",
+        "data_usage": "risk_score+context",
+        "decision_making": "threshold_or_classifier_upgrade",
+    },
+    EventType.ESCALATION_RESOLVED: {
+        "system_operation": "human_oversight",
+        "data_usage": "operator_response",
+        "decision_making": "human_decision",
+    },
+    EventType.OUTCOME_RECORDED: {
+        "system_operation": "outcome_capture",
+        "data_usage": "execution_result",
+        "decision_making": "n/a",
+    },
+    EventType.POLICY_OVERRIDE: {
+        "system_operation": "manual_override",
+        "data_usage": "operator_decision",
+        "decision_making": "human_decision",
+    },
+}
+
+
 # ── Audit Record ──────────────────────────────────────────────────────────
 
 @dataclass
@@ -192,6 +252,30 @@ class AuditRecord:
     regulatory_articles: list[dict] = field(default_factory=list)
     previous_hash: str = ""     # Hash chain — empty for first record
     record_hash: str = ""       # SHA-256 of this record's content
+    # v0.6: prEN ISO/IEC 12792 four-axis transparency tagging.
+    # Defaults fill from TRANSPARENCY_DEFAULTS by event_type if None.
+    system_operation: Optional[str] = None
+    data_usage: Optional[str] = None
+    decision_making: Optional[str] = None
+    limitations: Optional[str] = None
+
+    def __post_init__(self) -> None:
+        # Loaded-from-DB records carry a non-empty record_hash. Skip
+        # default-fill for those — pre-v0.6 records on disk were written
+        # before transparency tagging existed, and inventing defaults at
+        # load time would falsely claim a classification the record did
+        # not have.
+        if self.record_hash:
+            return
+        defaults = TRANSPARENCY_DEFAULTS.get(self.event_type, {})
+        if self.system_operation is None:
+            self.system_operation = defaults.get("system_operation")
+        if self.data_usage is None:
+            self.data_usage = defaults.get("data_usage")
+        if self.decision_making is None:
+            self.decision_making = defaults.get("decision_making")
+        # 'limitations' stays None unless explicitly set — system-level
+        # constraints are recorded out-of-band, not per event.
 
     def compute_hash(self) -> str:
         """Compute deterministic hash of this record's content.
@@ -218,6 +302,14 @@ class AuditRecord:
             "regulatory_articles": self.regulatory_articles,
             "previous_hash": self.previous_hash,
         }
+        # NOTE on transparency taxonomy (v0.6):
+        # The four prEN ISO/IEC 12792 fields (system_operation, data_usage,
+        # decision_making, limitations) are NOT included in the hash. They
+        # are metadata annotations — not tamper-evident. This preserves
+        # backward compatibility with pre-v0.6 records on disk: re-hashing
+        # an old record after the schema bump produces the same hash as
+        # before. v0.7+ may add a separate signed-bundle mechanism if a
+        # compliance team requires tamper-evident transparency tagging.
         canonical = json.dumps(
             content, sort_keys=True, separators=(",", ":"), allow_nan=False
         )
