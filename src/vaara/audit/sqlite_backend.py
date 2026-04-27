@@ -627,6 +627,69 @@ class SQLiteAuditBackend:
             row = self._conn.execute("PRAGMA wal_checkpoint(FULL)").fetchone()
         return (row[1], row[2]) if row else (0, 0)
 
+    def purge_older_than(
+        self, retention_seconds: int, *, dry_run: bool = False,
+    ) -> int:
+        """Delete audit records older than ``retention_seconds`` from now.
+
+        Article 12(2) of the EU AI Act lets the deployer set the retention
+        period in accordance with the intended purpose and applicable law.
+        Vaara does not pick the policy. This method enforces it.
+
+        HASH-CHAIN IMPACT — surviving records still reference deleted
+        predecessors via ``previous_hash``, so ``vaara trail verify`` will
+        report a chain break at the retention boundary. The intended
+        workflow is to export a signed handoff zip BEFORE purging, archive
+        the zip externally for long-tail audit history, then purge the
+        live DB. The signed zip remains self-consistent forever; the live
+        DB chain has a documented seam at the retention boundary. See
+        research/severable_bundles_sketch.md for the v0.7+ design that
+        eliminates the seam.
+
+        Tenant-scoped — when ``tenant_id`` is set on this backend instance,
+        only that tenant's records are subject to purging.
+
+        Args:
+            retention_seconds: Records with ``timestamp < now - retention_seconds``
+                are deleted. Must be > 0.
+            dry_run: If True, return the count that would be deleted without
+                modifying the database.
+
+        Returns:
+            Number of records deleted (or that would be deleted in dry_run mode).
+        """
+        if not isinstance(retention_seconds, int) or retention_seconds <= 0:
+            raise ValueError(
+                f"retention_seconds must be a positive int, got {retention_seconds!r}"
+            )
+
+        cutoff = time.time() - retention_seconds
+        t_clause, t_params = self._tenant_clause()
+
+        with self._lock:
+            if dry_run:
+                row = self._conn.execute(
+                    f"SELECT COUNT(*) FROM audit_records "
+                    f"WHERE timestamp < ? AND {t_clause}",
+                    [cutoff] + t_params,
+                ).fetchone()
+                count = row[0]
+            else:
+                cursor = self._conn.execute(
+                    f"DELETE FROM audit_records "
+                    f"WHERE timestamp < ? AND {t_clause}",
+                    [cutoff] + t_params,
+                )
+                count = cursor.rowcount
+
+        if count > 0:
+            verb = "Would purge" if dry_run else "Purged"
+            logger.info(
+                "%s %d audit records older than %d seconds (cutoff: %.3f)",
+                verb, count, retention_seconds, cutoff,
+            )
+        return count
+
     # ── API Key management ────────────────────────────────────────
 
     def create_api_key(self, name: str, role: "Role") -> str:

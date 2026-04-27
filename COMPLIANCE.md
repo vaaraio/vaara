@@ -182,8 +182,19 @@ problem:
   tampered with before reaching Vaara. Run Vaara inside a trust
   boundary you control.
 - **Retention policy.** Article 12(2) allows log retention periods set
-  in accordance with the intended purpose and applicable law. Vaara
-  does not purge on your behalf. Wire a retention job to your policy.
+  in accordance with the intended purpose and applicable law. The
+  deployer picks the period. Vaara enforces it via
+  `vaara trail purge --db PATH --retention-days N` (or
+  `SQLiteAuditBackend.purge_older_than(seconds)` from Python). A
+  `--dry-run` flag reports the count without modifying the DB.
+
+  **Hash-chain seam at the retention boundary.** Surviving records
+  still reference deleted predecessors via `previous_hash`, so
+  `vaara trail verify` will report a chain break at the boundary.
+  Intended workflow: export a signed handoff zip BEFORE purging,
+  archive the zip externally for long-tail audit history, then purge
+  the live DB. The signed zip remains self-consistent forever; the
+  live DB chain has a documented seam at the retention boundary.
 
 ## Current limits
 
