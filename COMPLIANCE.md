@@ -52,6 +52,30 @@ Vaara produces is the feedstock a deployer uses to satisfy 26(1)
 26(5) ("monitor operation"), and 26(6) ("keep logs"). Deployer conduct
 outside the Vaara pipeline is not in scope.
 
+## EU AI Act Annex IV evidence sections
+
+Annex IV defines nine technical documentation sections required under
+Article 11. Vaara fills three of those sections directly, contributes
+to four, and stays out of two.
+
+| Annex IV section | What it asks for | Vaara contribution |
+|---|---|---|
+| §1 General description | Purpose, intended use, versions, provider info | Out of scope. Provider supplies. |
+| §2 Elements and development process | Architecture, datasets, training choices | Contributes a description of the runtime governance layer. Vaara docs and configuration are an Annex IV §2 input. |
+| §3 Monitoring, functioning and control | How the system is monitored at runtime | **Direct fill.** Hash-chained audit trail, per-action risk score and reason, decision records. |
+| §4 Performance metrics appropriateness | Metric choice and justification | Contributes runtime metrics: allow / deny / escalation rate, score distribution, calibration window. |
+| §5 Risk management system per Article 9 | Risk identification, assessment, mitigation | **Direct fill.** `RISK_SCORED`, `ACTION_BLOCKED`, `DECISION_MADE` events with article tags. |
+| §6 Relevant changes during lifecycle | Versioned change history of the system | Contributes the timestamped audit trail showing runtime config and threshold changes. Provider tracks model and code changes separately. |
+| §7 List of harmonised standards applied | Named CEN-CENELEC standards | Vaara aligns with several JTC21 drafts (see next section). Once those finalize, deployers list them here. |
+| §8 Copy of EU declaration of conformity | The DoC document itself | Out of scope. Provider drafts and signs. |
+| §9 Post-market performance evaluation system | Mechanism for monitoring AI performance after deployment | **Direct fill.** `OUTCOME_RECORDED` events tied back to `action_id`, feeding the adaptive scorer. |
+
+Direct-fill sections (§3, §5, §9) are populated automatically by the
+`vaara trail export` handoff zip plus the `run_compliance_assessment`
+report. Contributing sections (§2, §4, §6, §7) need a deployer to
+combine Vaara output with their own provider-side documentation.
+Out-of-scope sections (§1, §8) are the deployer's or provider's domain.
+
 ## DORA Article Mapping
 
 Relevant for financial entities only. The default `ComplianceEngine`
@@ -62,6 +86,37 @@ also ships with a DORA bundle:
 | **10(1)** | ICT Risk Management -- Protection and Prevention | `ACTION_BLOCKED` and `DECISION_MADE` records. |
 | **12(1)** | ICT Incident Detection | `ACTION_REQUESTED` and `ACTION_BLOCKED` records, with risk score and reason. |
 | **13(1)** | ICT Incident Response and Learning | `OUTCOME_RECORDED` events close the loop and feed the adaptive scorer. |
+
+## CEN-CENELEC harmonised standards alignment
+
+The harmonised standards under EU AI Act Article 40 are being drafted
+by CEN-CENELEC JTC21. Most are still in draft or public-consultation
+phase. The table below maps Vaara's current state to the relevant
+JTC21 work items so deployers can track alignment as standards
+finalize. Status as of April 2026.
+
+| Standard | WG | Status | Vaara alignment |
+|---|---|---|---|
+| **ISO/IEC 42001** AI Management System | WG2 | Final ballot for European adoption | Vaara is a tool that fits inside an Article 17 / 42001 AIMS. Vaara does not implement the AIMS itself. |
+| **prEN 18286** European AI QMS for Regulatory Purposes | WG2 | Public consultation closed 22 Jan 2026 | Vaara feeds Article 72 ongoing-surveillance obligations and supports Annex VI / Annex VII evidence requirements. The QMS is the deployer's. |
+| **prEN 18228** European AI Risk Management Standard | WG2 | Drafting | Vaara contributes the ongoing-monitoring signal called for in the AI Act risk-category integration sections. |
+| **ISO/IEC 42006** Requirements for AI Management System Auditors | WG2 | DIS Stage 40 | Vaara's hash-chained trail is the artefact 42006-qualified auditors examine for surveillance evidence. |
+| **prEN ISO/IEC 24970** AI System Logging | WG3 | Stage 30.2 (comment resolution) | Vaara aligns with the tamper-resistance, decision-factor logging, and audit-system integration requirements. Field-level alignment pending the published version. |
+| **prEN 18229-1** Trustworthiness Framework Pt 1 (logging, transparency, human oversight) | WG4 | Public enquiry | Implements AI Act Articles 12-14, which Vaara already maps to in the article table above. Field-level alignment pending the published version. |
+| **prEN ISO/IEC 12792** Transparency Taxonomy of AI Systems | WG4 | Stage 40 (final vote) | Per-action audit records can be tagged against the four-axis model (System Operation, Data Usage, Decision Making, Limitations). v0.6 will add explicit taxonomy tagging. |
+
+**What "alignment" means here.** Most of these standards have not
+published. The mapping above is pre-compliance positioning: Vaara is
+built so that when the finals drop, the gap to certified alignment is
+small. It is not a claim of certified compliance. Once a standard
+publishes, expect a v0.6 or v0.7 alignment audit and an updated entry
+in this table.
+
+**What the deployer does with this table.** When listing harmonised
+standards applied (Annex IV §7), the deployer cites the published
+ones. Where Vaara's runtime behaviour aligns with a draft, that is
+useful context for an auditor or notified body but not a substitute
+for the published version.
 
 ## What Vaara produces
 
