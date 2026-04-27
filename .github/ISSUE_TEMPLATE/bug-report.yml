@@ -1,0 +1,63 @@
+name: Bug report
+description: Something Vaara does that it shouldn't, or doesn't that it should.
+labels: ["bug"]
+body:
+  - type: markdown
+    attributes:
+      value: |
+        Thanks for taking the time. The fields below help us reproduce
+        the issue without a back-and-forth.
+  - type: input
+    id: vaara-version
+    attributes:
+      label: Vaara version
+      description: Output of `python -c "import vaara; print(vaara.__version__)"`
+      placeholder: "0.6.0"
+    validations:
+      required: true
+  - type: input
+    id: python-version
+    attributes:
+      label: Python version
+      placeholder: "3.12.3"
+    validations:
+      required: true
+  - type: dropdown
+    id: install-source
+    attributes:
+      label: How was Vaara installed?
+      options:
+        - "pip install vaara (PyPI)"
+        - "pip install vaara[ml]"
+        - "pip install vaara[yaml]"
+        - "pip install -e . (editable, from source)"
+        - "Other"
+    validations:
+      required: true
+  - type: textarea
+    id: what-happened
+    attributes:
+      label: What happened?
+      description: What did you do, what did you expect, what did you see instead.
+      placeholder: |
+        I called Pipeline.intercept() with X.
+        I expected DENY because of Y.
+        I got ALLOW.
+    validations:
+      required: true
+  - type: textarea
+    id: reproducer
+    attributes:
+      label: Minimal reproducer
+      description: A short Python snippet or shell sequence that triggers the bug.
+      render: python
+    validations:
+      required: false
+  - type: textarea
+    id: traceback
+    attributes:
+      label: Traceback or relevant log output
+      description: Paste the full traceback if there is one.
+      render: text
+    validations:
+      required: false
