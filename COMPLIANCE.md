@@ -52,6 +52,30 @@ Vaara produces is the feedstock a deployer uses to satisfy 26(1)
 26(5) ("monitor operation"), and 26(6) ("keep logs"). Deployer conduct
 outside the Vaara pipeline is not in scope.
 
+## EU AI Act Annex IV evidence sections
+
+Annex IV defines nine technical documentation sections required under
+Article 11. Vaara fills three of those sections directly, contributes
+to four, and stays out of two.
+
+| Annex IV section | What it asks for | Vaara contribution |
+|---|---|---|
+| §1 General description | Purpose, intended use, versions, provider info | Out of scope. Provider supplies. |
+| §2 Elements and development process | Architecture, datasets, training choices | Contributes a description of the runtime governance layer. Vaara docs and configuration are an Annex IV §2 input. |
+| §3 Monitoring, functioning and control | How the system is monitored at runtime | **Direct fill.** Hash-chained audit trail, per-action risk score and reason, decision records. |
+| §4 Performance metrics appropriateness | Metric choice and justification | Contributes runtime metrics: allow / deny / escalation rate, score distribution, calibration window. |
+| §5 Risk management system per Article 9 | Risk identification, assessment, mitigation | **Direct fill.** `RISK_SCORED`, `ACTION_BLOCKED`, `DECISION_MADE` events with article tags. |
+| §6 Relevant changes during lifecycle | Versioned change history of the system | Contributes the timestamped audit trail showing runtime config and threshold changes. Provider tracks model and code changes separately. |
+| §7 List of harmonised standards applied | Named CEN-CENELEC standards | Vaara aligns with several JTC21 drafts (see next section). Once those finalize, deployers list them here. |
+| §8 Copy of EU declaration of conformity | The DoC document itself | Out of scope. Provider drafts and signs. |
+| §9 Post-market performance evaluation system | Mechanism for monitoring AI performance after deployment | **Direct fill.** `OUTCOME_RECORDED` events tied back to `action_id`, feeding the adaptive scorer. |
+
+Direct-fill sections (§3, §5, §9) are populated automatically by the
+`vaara trail export` handoff zip plus the `run_compliance_assessment`
+report. Contributing sections (§2, §4, §6, §7) need a deployer to
+combine Vaara output with their own provider-side documentation.
+Out-of-scope sections (§1, §8) are the deployer's or provider's domain.
+
 ## DORA Article Mapping
 
 Relevant for financial entities only. The default `ComplianceEngine`
@@ -62,6 +86,37 @@ also ships with a DORA bundle:
 | **10(1)** | ICT Risk Management -- Protection and Prevention | `ACTION_BLOCKED` and `DECISION_MADE` records. |
 | **12(1)** | ICT Incident Detection | `ACTION_REQUESTED` and `ACTION_BLOCKED` records, with risk score and reason. |
 | **13(1)** | ICT Incident Response and Learning | `OUTCOME_RECORDED` events close the loop and feed the adaptive scorer. |
+
+## CEN-CENELEC harmonised standards alignment
+
+The harmonised standards under EU AI Act Article 40 are being drafted
+by CEN-CENELEC JTC21. Most are still in draft or public-consultation
+phase. The table below maps Vaara's current state to the relevant
+JTC21 work items so deployers can track alignment as standards
+finalize. Status as of April 2026.
+
+| Standard | WG | Status | Vaara alignment |
+|---|---|---|---|
+| **ISO/IEC 42001** AI Management System | WG2 | Final ballot for European adoption | Vaara is a tool that fits inside an Article 17 / 42001 AIMS. Vaara does not implement the AIMS itself. |
+| **prEN 18286** European AI QMS for Regulatory Purposes | WG2 | Public consultation closed 22 Jan 2026 | Vaara feeds Article 72 ongoing-surveillance obligations and supports Annex VI / Annex VII evidence requirements. The QMS is the deployer's. |
+| **prEN 18228** European AI Risk Management Standard | WG2 | Drafting | Vaara contributes the ongoing-monitoring signal called for in the AI Act risk-category integration sections. |
+| **ISO/IEC 42006** Requirements for AI Management System Auditors | WG2 | DIS Stage 40 | Vaara's hash-chained trail is the artefact 42006-qualified auditors examine for surveillance evidence. |
+| **prEN ISO/IEC 24970** AI System Logging | WG3 | Stage 30.2 (comment resolution) | Vaara aligns with the tamper-resistance, decision-factor logging, and audit-system integration requirements. Field-level alignment pending the published version. |
+| **prEN 18229-1** Trustworthiness Framework Pt 1 (logging, transparency, human oversight) | WG4 | Public enquiry | Implements AI Act Articles 12-14, which Vaara already maps to in the article table above. Field-level alignment pending the published version. |
+| **prEN ISO/IEC 12792** Transparency Taxonomy of AI Systems | WG4 | Stage 40 (final vote) | v0.6 ships per-action audit records tagged against the four-axis model (System Operation, Data Usage, Decision Making, Limitations) via four optional `AuditRecord` fields. Default classification heuristic by event type; per-record override available. NOT tamper-evident in v0.6 — fields are metadata annotations excluded from `record_hash` so pre-v0.6 chains stay valid. |
+
+**What "alignment" means here.** Most of these standards have not
+published. The mapping above is pre-compliance positioning: Vaara is
+built so that when the finals drop, the gap to certified alignment is
+small. It is not a claim of certified compliance. Once a standard
+publishes, expect a v0.6 or v0.7 alignment audit and an updated entry
+in this table.
+
+**What the deployer does with this table.** When listing harmonised
+standards applied (Annex IV §7), the deployer cites the published
+ones. Where Vaara's runtime behaviour aligns with a draft, that is
+useful context for an auditor or notified body but not a substitute
+for the published version.
 
 ## What Vaara produces
 
@@ -182,8 +237,19 @@ problem:
   tampered with before reaching Vaara. Run Vaara inside a trust
   boundary you control.
 - **Retention policy.** Article 12(2) allows log retention periods set
-  in accordance with the intended purpose and applicable law. Vaara
-  does not purge on your behalf. Wire a retention job to your policy.
+  in accordance with the intended purpose and applicable law. The
+  deployer picks the period. Vaara enforces it via
+  `vaara trail purge --db PATH --retention-days N` (or
+  `SQLiteAuditBackend.purge_older_than(seconds)` from Python). A
+  `--dry-run` flag reports the count without modifying the DB.
+
+  **Hash-chain seam at the retention boundary.** Surviving records
+  still reference deleted predecessors via `previous_hash`, so
+  `vaara trail verify` will report a chain break at the boundary.
+  Intended workflow: export a signed handoff zip BEFORE purging,
+  archive the zip externally for long-tail audit history, then purge
+  the live DB. The signed zip remains self-consistent forever; the
+  live DB chain has a documented seam at the retention boundary.
 
 ## Current limits
 
@@ -199,15 +265,66 @@ Honest about the edges:
 - The Article 11 technical documentation requirement is checked as a
   presence flag only. Drafting the Annex IV file is outside Vaara's
   scope and will stay that way.
-- The `AdversarialClassifier` (v0.5.3, opt-in via `vaara[ml]`) was
-  retrained on a corpus that includes 1,500 LLM-generated jailbreak
-  variants. The distribution-shift gap between LLM-generated and
-  hand-curated held-out recall has not been measured separately in
-  v0.5.3. Hand-curated regression numbers in the CHANGELOG indicate
-  transfer is happening, but a formal split is owed in v0.6.
-- v0.5.3 does not yet quote an adaptive-attacker (PAIR-style)
-  attack-success-rate. Iterative attacker capability is a known limit
-  and a calibration figure is planned for v0.6.
+- **Distribution-shift split (v0.6 measurement of v0.5.3 stack).** The
+  `AdversarialClassifier` (opt-in via `vaara[ml]`) was retrained on a
+  corpus that mixes hand-curated and LLM-generated entries. v0.6
+  measures the per-source full-stack performance:
+
+  | Source                                | Attack recall | Benign FPR |
+  |---------------------------------------|--------------:|-----------:|
+  | Hand-curated (held-out, 250 entries)  |        97.1% |      70.0% |
+  | LLM-generated (in-sample, 5,705)      |        95.2% |      87.5% |
+
+  Reading: full-stack = heuristic `ESCALATE`/`DENY` preserved + classifier
+  upgrades on heuristic `ALLOW`. Hand-curated entries are held-out (not
+  in classifier training). LLM-generated entries WERE in training, so
+  their numbers are in-sample fit, not generalization.
+
+  The 1.9pp recall gap (97.1% > 95.2%) is small but goes against the
+  expected direction. The 18pp benign-FPR gap (70.0% < 87.5%) is the
+  dominant distribution-shift signal: the stack is much more confused
+  about LLM-generated benigns than hand-curated ones.
+
+  Note on FPR vs CHANGELOG headline: the CHANGELOG quotes "global benign
+  FPR 21.0%" which is classifier-alone 5-fold CV OOF. The full-stack
+  numbers above are dominated by the heuristic — most benign escalations
+  come from the heuristic `ESCALATE` branch, not from classifier upgrades
+  on heuristic-`ALLOW`ed entries.
+
+  Detailed per-source/per-class breakdown: `tests/adversarial/distribution_shift_v0_5_3.json`.
+  Reproducible via `scripts/eval_distribution_shift.py`. A proper OOF
+  split for the LLM-generated portion (re-running held-out per fold) is
+  a v0.7 follow-up if the gap demands it.
+- **Stack composition (v0.6 measurement).** The full-stack numbers above
+  decompose into independent layer contributions. `heuristic_only` recall
+  is 35% / 63% (hand-curated / LLM-generated); `classifier_only` recall
+  is 94% / 86%. Layers are not redundant — heuristic catches a small set
+  of attacks the classifier misses, justifying the ensemble. Most of the
+  full-stack benign FPR comes from heuristic ESCALATEs, not classifier
+  upgrades. Detailed breakdown: `tests/adversarial/stack_ablation_v0_5_3.json`.
+  Reproducible via `scripts/eval_stack_ablation.py`.
+- **Adaptive-attacker calibration (v0.6 measurement of v0.5.3 stack).**
+  PAIR (Chao et al. 2023) iterative attacker against the full Vaara
+  stack:
+  - Attacker + judge model: Qwen2.5-32B-Instruct (Apache 2.0)
+  - Seed corpus: 25 hand-curated jailbreak entries (`tests/adversarial/jailbreak.jsonl`)
+  - Max iterations per seed: 5
+  - Total LLM calls: 125 attacker iterations across 25 seeds, plus
+    judge confirmations on heuristic-ALLOW outcomes
+  - **ASR: 0.0% (0/25)**. Across 125 candidate prompts, Vaara
+    escalated 124 and allowed 1; the judge ruled the allowed candidate
+    not a successful jailbreak.
+
+  Reading: Vaara stack catches DAN-roleplay, "hypothetical scenario",
+  and "security drill" -style jailbreak attempts at this attacker
+  capability level. NOT a claim of imperviousness to all adaptive attackers
+  — a stronger attacker model (70B+), longer iteration budgets, or
+  different strategies (multi-turn drift, language-switch, obfuscation)
+  might produce non-zero ASR. v0.7 follow-up: re-run with 70B+ attacker
+  + judge if a compliance audience requires the harder calibration.
+
+  Detailed per-seed breakdown: `tests/adversarial/pair_v0_5_3.json`.
+  Reproducible via `scripts/eval_pair_attack.py`.
 
 ## Questions
 

@@ -17,6 +17,19 @@ Thanks for considering a contribution.
 - **Public interface changes.** If you change the public API, update `docs/formal_specification.md` and `CHANGELOG.md` in the same PR.
 - **Security-sensitive changes.** Follow `SECURITY.md` for private disclosure of vulnerabilities.
 
+## Pre-push lint sweep
+
+Before pushing, run the full lint sweep from the repo root:
+
+```bash
+pip install -e '.[dev]'   # one-time setup
+scripts/lint_full.sh
+```
+
+The script chains four checks: `ruff` (style + correctness), `bandit` (security), `mypy` (types — strict on `vaara.policy`, lenient elsewhere while legacy modules are migrated), and `pytest`. Total runtime ~10s. CI runs the same gates, so a green local sweep should mean a green PR.
+
+New modules under `src/vaara/` are expected to type-check cleanly. As legacy modules get cleaned up, add them to the strict mypy block in `pyproject.toml` so the typing floor only ratchets upward.
+
 ## Licensing
 
 By contributing you agree that your contributions will be licensed under the Apache License 2.0, the same license that covers the project (see `LICENSE`).

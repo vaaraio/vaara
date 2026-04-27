@@ -15,3 +15,5 @@ venv/
 docs/blog/
 docs/grant/
 dist_verify/
+research/
+.claude/
