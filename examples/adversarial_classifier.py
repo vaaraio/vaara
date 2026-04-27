@@ -8,9 +8,9 @@ Demonstrates three tool-call scenarios:
 2. Credential exfiltration via email (should score high)
 3. Legit GitHub issue creation (lower score, but still a known classifier blind spot)
 
-Ship note: default threshold is 0.8. On production agent traffic with mixed-intent
+Ship note: default threshold is 0.55. On production agent traffic with mixed-intent
 use of http_post / send_email / shell_exec, consider decision="escalate" rather
-than "deny" — the classifier has a real FPR on legit uses of powerful tools.
+than "deny", since the classifier has a real FPR on legit uses of powerful tools.
 """
 from vaara.adversarial_classifier import AdversarialClassifier
 
