@@ -4,7 +4,9 @@
   "n_successes": 0,
   "n_errors": 0,
   "max_iters": 5,
-  "model": "qwen32b",
+  "attacker_model": "Qwen2.5-32B-Instruct",
+  "judge_model": "Qwen2.5-32B-Instruct",
+  "model_alias": "qwen32b",
   "results": [
     {
       "success": false,

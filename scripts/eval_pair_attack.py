@@ -159,7 +159,14 @@ def run_pair_one(seed: dict, pipe, classifier, endpoint: str, model: str, max_it
 def main() -> int:
     ap = argparse.ArgumentParser()
     ap.add_argument("--endpoint", required=True, help="vLLM base URL, e.g. http://1.2.3.4:8000")
-    ap.add_argument("--model", default="llama", help="--served-model-name on vLLM")
+    # Default matches the v0.6 calibration so a default invocation reproduces the
+    # numbers in CHANGELOG / COMPLIANCE. Override --served-model-name on vLLM as
+    # appropriate.
+    ap.add_argument(
+        "--model",
+        default="Qwen2.5-32B-Instruct",
+        help="--served-model-name on vLLM (default matches v0.6 PAIR calibration)",
+    )
     ap.add_argument("--seeds", default="tests/adversarial/jailbreak.jsonl")
     ap.add_argument("--max-iters", type=int, default=5)
     ap.add_argument("--limit", type=int, default=0, help="Cap seeds (0=all)")
@@ -170,15 +177,18 @@ def main() -> int:
     if args.limit > 0:
         seeds = seeds[:args.limit]
 
+    # PAIR ASR is a full-stack measurement (heuristic + classifier). A silent
+    # heuristic-only fallback would make the published numbers unreproducible
+    # via this script. Fail loud if the classifier extras are missing.
     try:
         from vaara.adversarial_classifier import AdversarialClassifier
         classifier = AdversarialClassifier()
-    except ImportError:
-        classifier = None
+    except ImportError as exc:
+        raise SystemExit(
+            f"this script requires vaara[ml] for full-stack PAIR ASR: {exc}"
+        )
     pipe = Pipeline()
     print(f"[corpus] {len(seeds)} seeds | [endpoint] {args.endpoint} model={args.model!r}")
-    if classifier is None:
-        print("[classifier] disabled (vaara[ml] not installed)")
 
     results = []
     for i, seed in enumerate(seeds):

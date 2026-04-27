@@ -26,6 +26,8 @@ from vaara.policy.schema import (
 
 EnumT = TypeVar("EnumT", bound=Enum)
 
+_ALLOWED_THRESHOLD_KEYS = frozenset({"escalate", "deny"})
+
 
 def from_dict(data: dict) -> Policy:
     """Validate and convert a policy dict into a Policy instance.
@@ -70,6 +72,7 @@ def from_dict(data: dict) -> Policy:
 
     thr_block = _require_mapping(data.get("thresholds"), "thresholds")
     default_block = _require_mapping(thr_block.get("default"), "thresholds.default")
+    _reject_unknown_keys(default_block, _ALLOWED_THRESHOLD_KEYS, "thresholds.default")
     if not default_block:
         default_block = {"escalate": 0.55, "deny": 0.85}
     thresholds_default = Thresholds(
@@ -81,6 +84,7 @@ def from_dict(data: dict) -> Policy:
         if key == "default":
             continue
         override = _require_mapping(value, f"thresholds.{key}")
+        _reject_unknown_keys(override, _ALLOWED_THRESHOLD_KEYS, f"thresholds.{key}")
         thresholds_overrides[key] = {kk: float(vv) for kk, vv in override.items()}
         # Validate the merged-with-default thresholds upfront so a bad override
         # doesn't sit dormant until threshold_for() is queried.
@@ -162,6 +166,21 @@ def _require_mapping(value: object, path: str) -> dict:
     return value
 
 
+def _reject_unknown_keys(
+    mapping: dict, allowed: frozenset[str], path: str
+) -> None:
+    """Raise PolicyError on the first unknown key in mapping.
+
+    Catches typos like `deni` for `deny` that would otherwise float-coerce
+    cleanly and then silently fall back to the default at query time.
+    """
+    extras = sorted(set(mapping) - allowed)
+    if extras:
+        raise PolicyError(
+            f"{path}: unknown key(s) {extras!r}, allowed: {sorted(allowed)!r}"
+        )
+
+
 def _require_sequence(value: object, path: str) -> list:
     """Return value as a list, or raise PolicyError.
 
@@ -178,24 +197,48 @@ def _require_sequence(value: object, path: str) -> list:
     return list(value)
 
 
+def _read_policy_text(path: Path, *, fallback_msg: str | None = None) -> str:
+    """Read a policy file as utf-8 text, normalising every OS error to PolicyError.
+
+    FileNotFoundError, IsADirectoryError, PermissionError, UnicodeDecodeError,
+    and the catch-all OSError all surface as PolicyError so callers don't have
+    to guard against OS-specific exception types around a public loader API.
+    fallback_msg overrides the default "policy file not found" framing for
+    the str-treated-as-path branch where a missing file means the input was
+    neither inline content nor a readable path.
+    """
+    try:
+        return path.read_text(encoding="utf-8")
+    except FileNotFoundError as e:
+        if fallback_msg is not None:
+            raise PolicyError(fallback_msg) from None
+        raise PolicyError(f"policy file not found: {path}") from e
+    except IsADirectoryError as e:
+        raise PolicyError(f"policy path is a directory, not a file: {path}") from e
+    except PermissionError as e:
+        raise PolicyError(f"policy file not readable (permissions): {path}") from e
+    except UnicodeDecodeError as e:
+        raise PolicyError(f"policy file is not valid utf-8: {path}: {e}") from e
+    except OSError as e:
+        raise PolicyError(f"policy file unreadable: {path}: {e}") from e
+
+
 def from_json(source: Union[str, Path, dict]) -> Policy:
     """Load a policy from a JSON string, JSON file path, or already-parsed dict."""
     if isinstance(source, dict):
         return from_dict(source)
     if isinstance(source, Path):
-        try:
-            text = source.read_text(encoding="utf-8")
-        except FileNotFoundError as e:
-            raise PolicyError(f"policy file not found: {source}") from e
+        text = _read_policy_text(source)
     elif isinstance(source, str) and not source.lstrip().startswith("{"):
-        # Treat as path. If it isn't a path either, surface as PolicyError
-        # so callers don't have to guard against FileNotFoundError separately.
-        try:
-            text = Path(source).read_text(encoding="utf-8")
-        except FileNotFoundError:
-            raise PolicyError(
+        # Treat as path. If unreadable for any reason (missing, dir, perms,
+        # bad utf-8), surface as PolicyError so callers don't have to guard
+        # against OS-specific error types around a public API.
+        text = _read_policy_text(
+            Path(source),
+            fallback_msg=(
                 f"input is neither a JSON object nor a readable file path: {source!r}"
-            ) from None
+            ),
+        )
     else:
         text = source
     try:
@@ -216,9 +259,9 @@ def from_yaml(source: Union[str, Path]) -> Policy:
         ) from e
 
     if isinstance(source, Path):
-        text = source.read_text(encoding="utf-8")
+        text = _read_policy_text(source)
     elif isinstance(source, str) and "\n" not in source and Path(source).is_file():
-        text = Path(source).read_text(encoding="utf-8")
+        text = _read_policy_text(Path(source))
     else:
         text = source
 

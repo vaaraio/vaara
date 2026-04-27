@@ -196,7 +196,11 @@ def _cmd_trail_purge(args: argparse.Namespace) -> int:
         return 2
 
     retention_seconds = args.retention_days * 86400
-    backend = SQLiteAuditBackend(db_path)
+    # --all-tenants means tenant_id="" which routes to _tenant_clause() == "1=1",
+    # i.e. purge across all records regardless of tenant_id. --tenant TID scopes
+    # to that tenant only via parameterised "tenant_id = ?".
+    tenant_scope = "" if args.all_tenants else args.tenant
+    backend = SQLiteAuditBackend(db_path, tenant_id=tenant_scope)
     try:
         count = backend.purge_older_than(retention_seconds, dry_run=args.dry_run)
     finally:
@@ -270,6 +274,19 @@ def build_parser() -> argparse.ArgumentParser:
         "--dry-run",
         action="store_true",
         help="Report the count without modifying the DB",
+    )
+    # Tenant scoping is required: a shared multi-tenant audit DB must not be
+    # silently purged across all tenants. Operator picks --tenant TID for a
+    # single tenant or --all-tenants explicitly.
+    scope = pp.add_mutually_exclusive_group(required=True)
+    scope.add_argument(
+        "--tenant",
+        help="Restrict purge to records with this tenant_id",
+    )
+    scope.add_argument(
+        "--all-tenants",
+        action="store_true",
+        help="Purge across all tenants in this DB. Use only on single-tenant deployments or after deliberate review.",
     )
     pp.set_defaults(func=_cmd_trail_purge)
 

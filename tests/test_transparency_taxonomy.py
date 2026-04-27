@@ -165,3 +165,53 @@ def test_migration_from_v2_to_v3(tmp_path: Path) -> None:
         assert old.data_usage is None
         assert old.decision_making is None
         assert old.limitations is None
+
+
+def test_migration_v2_to_v3_is_idempotent_on_partial_pre_existing_columns(tmp_path: Path) -> None:
+    """A DB that already has SOME of the v3 columns (pre-applied) must finish
+    cleanly when re-opened. Simulates a partial migration that previously left
+    schema_version stuck at v2.
+    """
+    db = tmp_path / "partial.db"
+    conn = sqlite3.connect(str(db))
+    conn.executescript(
+        """
+        CREATE TABLE audit_meta (key TEXT PRIMARY KEY, value TEXT NOT NULL);
+        INSERT INTO audit_meta (key, value) VALUES ('schema_version', '2');
+        CREATE TABLE audit_records (
+            record_id     TEXT PRIMARY KEY,
+            action_id     TEXT NOT NULL,
+            event_type    TEXT NOT NULL,
+            timestamp     REAL NOT NULL,
+            agent_id      TEXT NOT NULL,
+            tool_name     TEXT NOT NULL,
+            data          TEXT NOT NULL DEFAULT '{}',
+            regulatory    TEXT NOT NULL DEFAULT '[]',
+            previous_hash TEXT NOT NULL DEFAULT '',
+            record_hash   TEXT NOT NULL DEFAULT '',
+            seq           INTEGER NOT NULL,
+            tenant_id     TEXT NOT NULL DEFAULT '',
+            system_operation TEXT,
+            data_usage       TEXT
+        );
+        """
+    )
+    conn.commit()
+    conn.close()
+
+    # Open under current backend — first two ALTER TABLE statements would
+    # raise "duplicate column" but the migration runner must swallow only
+    # those and complete the remaining two columns without leaking errors.
+    with SQLiteAuditBackend(db) as backend:
+        backend.write_record(AuditRecord(
+            record_id="r-after-migration",
+            action_id="a-x",
+            event_type=EventType.ACTION_REQUESTED,
+            timestamp=time.time(),
+            agent_id="ag",
+            tool_name="t",
+        ))
+        loaded = backend.query_by_action("a-x")
+        assert len(loaded) == 1
+        # All four transparency columns now exist on the table — the write
+        # would have failed otherwise.

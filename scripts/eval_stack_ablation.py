@@ -67,9 +67,12 @@ def expected_class(entry: dict) -> str:
 
 def heuristic_only(entry: dict, pipe: Pipeline) -> str:
     """AdaptiveScorer-only via pipe.intercept (no classifier upgrade)."""
+    # Per-entry agent_id keeps sequence/agent-history state isolated across
+    # samples (parallel to the same fix in eval_distribution_shift.py).
+    agent_id = entry.get("agent_id") or f"adv-{entry.get('id', id(entry))}"
     try:
         result = pipe.intercept(
-            agent_id=entry.get("agent_id", "adv"),
+            agent_id=agent_id,
             tool_name=entry["tool_name"],
             parameters=entry.get("parameters", {}),
             context=entry.get("context", {}),
@@ -92,14 +95,18 @@ def classifier_only(entry: dict, classifier) -> str:
         return f"ERROR:{type(exc).__name__}"
 
 
-def full_stack(entry: dict, pipe: Pipeline, classifier) -> str:
-    """Heuristic + classifier upgrade rule."""
-    h = heuristic_only(entry, pipe)
-    if h == "ALLOW":
-        c = classifier_only(entry, classifier)
-        if c == "ESCALATE":
-            return "ESCALATE"
-    return h
+def full_stack(heuristic_result: str, classifier_result: str) -> str:
+    """Heuristic + classifier upgrade rule.
+
+    Takes the precomputed per-config decisions instead of re-running
+    pipe.intercept(). Re-running would advance sequence / agent-history state
+    on the second pass and make `heuristic_only` and `full_stack` not
+    directly comparable (the published v0.6 ablation table assumes one
+    intercept call per entry).
+    """
+    if heuristic_result == "ALLOW" and classifier_result == "ESCALATE":
+        return "ESCALATE"
+    return heuristic_result
 
 
 def metric(decision: str, expected_cls: str) -> str:
@@ -118,10 +125,15 @@ def evaluate(entries, pipe, classifier) -> dict:
     for e in entries:
         src = e["_source"]
         cls = expected_class(e)
+        # Compute each pipeline path exactly once per entry. full_stack is
+        # derived from the two decisions; running pipe.intercept() a second
+        # time would advance sequence/agent-history state.
+        h = heuristic_only(e, pipe)
+        c = classifier_only(e, classifier)
         for config_name, decision in (
-            ("heuristic_only", heuristic_only(e, pipe)),
-            ("classifier_only", classifier_only(e, classifier)),
-            ("full_stack", full_stack(e, pipe, classifier)),
+            ("heuristic_only", h),
+            ("classifier_only", c),
+            ("full_stack", full_stack(h, c)),
         ):
             if decision.startswith("ERROR:"):
                 counts[config_name][f"{src}/{cls}"]["err"] += 1
@@ -167,9 +179,9 @@ def main() -> int:
 
     try:
         from vaara.adversarial_classifier import AdversarialClassifier
+        classifier = AdversarialClassifier()
     except ImportError as exc:
         raise SystemExit(f"this script needs vaara[ml]: {exc}")
-    classifier = AdversarialClassifier()
     print(f"[classifier] bundle v{classifier.bundle_version}, threshold={classifier.threshold}")
 
     pipe = Pipeline()

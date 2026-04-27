@@ -210,6 +210,44 @@ def test_per_action_partial_override_validated_against_default() -> None:
         from_dict(bad)
 
 
+# ── Strict-shape validation (round-5: unknown threshold keys + read errors) ──
+
+def test_unknown_threshold_default_key_rejected() -> None:
+    """A typo like `deni` for `deny` must fail at load, not silently default."""
+    bad = {**MINIMAL_POLICY, "thresholds": {"default": {"escalate": 0.55, "deni": 0.85}}}
+    with pytest.raises(PolicyError, match=r"thresholds.default: unknown key"):
+        from_dict(bad)
+
+
+def test_unknown_per_action_threshold_key_rejected() -> None:
+    bad = {**MINIMAL_POLICY, "thresholds": {
+        "default": {"escalate": 0.55, "deny": 0.85},
+        "fs.write": {"denial": 0.5},
+    }}
+    with pytest.raises(PolicyError, match=r"thresholds.fs.write: unknown key"):
+        from_dict(bad)
+
+
+def test_from_json_directory_path_raises_policy_error(tmp_path: Path) -> None:
+    """A directory path (not a file) must surface as PolicyError, not IsADirectoryError."""
+    with pytest.raises(PolicyError, match="is a directory"):
+        from_json(str(tmp_path))
+
+
+def test_from_json_path_object_directory_raises_policy_error(tmp_path: Path) -> None:
+    """Path-typed input pointing at a directory normalises to PolicyError too."""
+    with pytest.raises(PolicyError, match="is a directory"):
+        from_json(tmp_path)
+
+
+def test_from_json_invalid_utf8_raises_policy_error(tmp_path: Path) -> None:
+    """A binary garbage file must surface as PolicyError, not UnicodeDecodeError."""
+    f = tmp_path / "bad.json"
+    f.write_bytes(b"\xff\xfe\xfd\xfc invalid utf-8")
+    with pytest.raises(PolicyError, match=r"not valid utf-8|unreadable"):
+        from_json(f)
+
+
 # ── Policy is a frozen value object (CodeRabbit #6) ──────────────────────────
 
 def test_policy_thresholds_overrides_are_immutable() -> None:

@@ -65,9 +65,14 @@ def load_source(corpus_root: Path, *, source: str) -> list[dict]:
 
 def decide(entry: dict, pipe: Pipeline, classifier) -> str:
     """Run the full Vaara stack. Returns DENY / ESCALATE / ALLOW / ERROR:..."""
+    # Per-entry agent_id keeps sequence/agent-history state isolated across
+    # samples. Falling back to a constant ("adv" for everything) would let
+    # earlier entries influence later decisions and turn the corpus
+    # measurement into an order-dependent transcript.
+    agent_id = entry.get("agent_id") or f"adv-{entry.get('id', id(entry))}"
     try:
         result = pipe.intercept(
-            agent_id=entry.get("agent_id", "adv"),
+            agent_id=agent_id,
             tool_name=entry["tool_name"],
             parameters=entry.get("parameters", {}),
             context=entry.get("context", {}),

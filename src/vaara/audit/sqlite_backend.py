@@ -227,33 +227,43 @@ class SQLiteAuditBackend:
                 self._run_migrations(stored, SCHEMA_VERSION)
 
     def _run_migrations(self, from_version: int, to_version: int) -> None:
-        """Apply incremental schema migrations from_version up to to_version."""
+        """Apply incremental schema migrations from_version up to to_version.
+
+        Each statement runs individually because SQLite doesn't support
+        transactional DDL for ALTER TABLE. We swallow OperationalError ONLY
+        when the message indicates an already-applied statement (duplicate
+        column / table already exists), which keeps re-runs after a partial
+        migration idempotent. Any other error propagates so schema_version
+        stays at the LAST successfully completed version — the next open
+        retries cleanly without falsely advertising a half-migrated DB.
+        """
         for v in range(from_version, to_version):
             sql = _MIGRATIONS.get(v)
-            if sql:
-                logger.info(
-                    "Migrating audit DB schema v%d → v%d at %s",
-                    v, v + 1, self._db_path,
-                )
-                # SQLite doesn't support transactional DDL for all statements
-                # (e.g. ALTER TABLE). Execute each statement individually so
-                # errors are reported at the failing statement, not the batch.
-                for stmt in [s.strip() for s in sql.split(";") if s.strip()]:
-                    try:
-                        self._conn.execute(stmt)
-                    except Exception as exc:
-                        # Some statements may fail if already applied (e.g.
-                        # duplicate column from a partial migration). Log and
-                        # continue — idempotency is more important than hard
-                        # failure on a re-run.
+            if not sql:
+                continue
+            logger.info(
+                "Migrating audit DB schema v%d → v%d at %s",
+                v, v + 1, self._db_path,
+            )
+            for stmt in [s.strip() for s in sql.split(";") if s.strip()]:
+                try:
+                    self._conn.execute(stmt)
+                except sqlite3.OperationalError as exc:
+                    msg = str(exc).lower()
+                    if "duplicate column" in msg or "already exists" in msg:
                         logger.warning(
-                            "Migration v%d stmt skipped (%s: %s): %.80s",
-                            v, type(exc).__name__, exc, stmt,
+                            "Migration v%d stmt already applied, skipping: %.80s",
+                            v, stmt,
                         )
-        self._conn.execute(
-            "UPDATE audit_meta SET value=? WHERE key='schema_version'",
-            (str(to_version),),
-        )
+                        continue
+                    raise
+            # Bump schema_version per-migration, not once at the end. If
+            # v→v+1 succeeds but v+1→v+2 fails, the DB ends up correctly
+            # marked at v+1 instead of stuck at the original from_version.
+            self._conn.execute(
+                "UPDATE audit_meta SET value=? WHERE key='schema_version'",
+                (str(v + 1),),
+            )
         logger.info("Audit DB schema migrated to v%d", to_version)
 
     def _get_max_seq(self) -> int:
