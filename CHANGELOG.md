@@ -4,6 +4,37 @@ All notable changes to this project are documented here.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/)
 and this project follows [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [0.6.0] - 2026-04-27
+
+**Theme: standards alignment + legibility.** v0.5.x was the capability axis (jailbreak coverage closed, classifier rebalanced). v0.6 is the legibility axis: policies become readable, audit records become standards-aligned, adversarial numbers become honest, architecture contribution becomes documented.
+
+### Added
+- **`vaara.policy` package — JSON-native policy loader plus optional YAML via `vaara[yaml]` extra.** Frozen dataclasses for action classes, threshold curves, sequence patterns, and escalation routes. Hand-rolled validation with field-path error messages. Reuses existing `vaara.taxonomy.actions` enums verbatim. Threshold partial-overrides supported (set just `deny`, inherit default `escalate`). Implements Sketch A from the v0.6 DSL design exploration; embedded Python DSL (Sketch B) and standalone DSL (Sketch C) stay deferred to v0.7+ pending external pull.
+- **`vaara trail purge --db PATH --retention-days N [--dry-run]` CLI subcommand** plus `SQLiteAuditBackend.purge_older_than(seconds, *, dry_run=False)` Python API. Article 12(2) retention enforcement. Tenant-scoped. Hash-chain integrity: surviving records still reference deleted predecessors via `previous_hash`, so `vaara trail verify` reports a chain break at the retention boundary. Intended workflow: export a signed handoff zip BEFORE purging, archive externally, then purge. The signed zip remains self-consistent forever; the live DB chain has a documented seam.
+- **prEN ISO/IEC 12792 four-axis transparency taxonomy on `AuditRecord`.** Four optional fields (`system_operation`, `data_usage`, `decision_making`, `limitations`) with default-classification heuristic per `EventType`. Per-record override via construction kwargs. NOT tamper-evident in v0.6 — fields are metadata annotations excluded from `record_hash` so pre-v0.6 chains stay valid. v0.7+ may add a separate signing mechanism if compliance requires.
+- **`scripts/eval_distribution_shift.py`** — runs the full Vaara stack against the adversarial corpus with per-source tagging (hand-curated vs LLM-generated). Reports recall and FPR per source/class.
+- **`scripts/eval_stack_ablation.py`** — runs three configurations (heuristic-only, classifier-only, full-stack) against the same corpus. Quantifies the independent contribution of each layer.
+- **`scripts/eval_pair_attack.py`** — PAIR (Chao et al. 2023) iterative adaptive attacker. Uses an OpenAI-compatible vLLM endpoint for both attacker and judge roles. Zero new runtime deps (uses `urllib.request`).
+- **`[yaml]` optional extra in `pyproject.toml`** (`pyyaml>=6.0`). Core `dependencies = []` preserved.
+- **`examples/policies/minimal.json` and `full.yaml`** as reference policies.
+- **COMPLIANCE.md gains "EU AI Act Annex IV evidence sections"** (maps Vaara contribution per §1–§9; direct fill on §3, §5, §9; contributes on §2, §4, §6, §7; out of scope for §1, §8) **and "CEN-CENELEC harmonised standards alignment"** (per-standard table for ISO/IEC 42001, prEN 18286, prEN 18228, ISO/IEC 42006, prEN ISO/IEC 24970, prEN 18229-1, prEN ISO/IEC 12792).
+
+### Changed
+- **Audit DB schema v2 → v3.** Migration `_MIGRATIONS[2]` adds four nullable transparency columns to `audit_records`. Pre-v0.6 records get NULL for the new columns; their stored `record_hash` is preserved (NOT re-hashed on load), so chain verification of historical records continues to work.
+- **COMPLIANCE.md "Current limits"** replaced placeholder bullets with v0.6 measurement results:
+  - **Distribution-shift split.** Hand-curated (held-out, 250): attack recall 97.1% / benign FPR 70.0%. LLM-generated (in-sample, 5,705): attack recall 95.2% / benign FPR 87.5%. The 18pp benign-FPR gap is the dominant distribution-shift signal.
+  - **Stack composition.** `heuristic_only` recall 35% / 63%. `classifier_only` recall 94% / 86%. `full_stack` recall 97% / 98%. Layers not redundant — heuristic catches a small set of attacks the classifier misses (justifies the ensemble). Most full-stack benign FPR comes from heuristic ESCALATEs, not classifier upgrades.
+  - **PAIR adaptive-attacker calibration.** Qwen2.5-32B-Instruct as both attacker and judge, 25 hand-curated jailbreak seeds, max 5 iterations: **ASR 0.0% (0/25)**. NOT a claim of impervence to all adaptive attackers — stronger attacker (70B+), longer iteration budgets, or alternate strategies (multi-turn drift, language-switch, obfuscation) might produce non-zero ASR.
+
+### Deferred to v0.7+
+- **prEN ISO/IEC 24970 field-alias layer** — pending public final of the standard. Will land when 24970 publishes.
+- **DORA mapping refinement** — pending deployer-side signal. Conservative defaults shipped in v0.5.3 stay until a financial deployer's input refines them.
+
+### Reproducible artifacts
+- `tests/adversarial/distribution_shift_v0_5_3.json`
+- `tests/adversarial/stack_ablation_v0_5_3.json`
+- `tests/adversarial/pair_v0_5_3.json`
+
 ## [0.5.3] - 2026-04-26
 
 ### Fixed
