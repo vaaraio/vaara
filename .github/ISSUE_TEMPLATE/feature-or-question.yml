@@ -1,0 +1,48 @@
+name: Feature request or question
+description: Suggest a capability, ask about an integration, raise a design question.
+labels: ["enhancement"]
+body:
+  - type: textarea
+    id: context
+    attributes:
+      label: What are you trying to do?
+      description: |
+        A short paragraph on the goal, not just the feature. We want to
+        understand the underlying need so the answer might be "use X
+        differently" rather than a new feature.
+    validations:
+      required: true
+  - type: textarea
+    id: current-behavior
+    attributes:
+      label: What does Vaara do today?
+      description: |
+        Either: "I tried X and it does Y, but I want Z" or "I couldn't
+        find a way to do this in the current API/CLI."
+    validations:
+      required: false
+  - type: textarea
+    id: proposal
+    attributes:
+      label: Proposed shape (optional)
+      description: |
+        If you have a concrete idea for an API, CLI flag, policy field,
+        or integration, describe it. Pseudocode is fine. Don't worry
+        about getting it exactly right.
+      render: markdown
+    validations:
+      required: false
+  - type: dropdown
+    id: regulatory-context
+    attributes:
+      label: Regulatory context
+      description: Is this driven by a specific compliance obligation?
+      options:
+        - "Not regulatory"
+        - "EU AI Act"
+        - "DORA"
+        - "ISO/IEC 42001"
+        - "GDPR / data protection"
+        - "Other (mention in description)"
+    validations:
+      required: false
