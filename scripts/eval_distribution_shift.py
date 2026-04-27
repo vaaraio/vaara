@@ -160,9 +160,9 @@ def main() -> int:
 
     try:
         from vaara.adversarial_classifier import AdversarialClassifier
+        classifier = AdversarialClassifier()
     except ImportError as exc:
         raise SystemExit(f"this script needs vaara[ml]: {exc}")
-    classifier = AdversarialClassifier()
     print(f"[classifier] bundle v{classifier.bundle_version}, threshold={classifier.threshold}")
 
     pipe = Pipeline()

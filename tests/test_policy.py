@@ -250,15 +250,17 @@ def test_from_json_unreadable_input_raises_policy_error() -> None:
 
 # ── YAML loading (skipif pyyaml not installed) ──────────────────────────────
 
-yaml = pytest.importorskip("yaml")
-
+# importorskip is per-test, not module-level — otherwise a missing pyyaml
+# would skip the JSON / validation / immutability tests above too.
 
 def test_from_yaml_string() -> None:
+    yaml = pytest.importorskip("yaml")
     p = from_yaml(yaml.safe_dump(FULL_POLICY))
     assert "fs.write_file" in p.action_classes
 
 
 def test_from_yaml_path(tmp_path: Path) -> None:
+    yaml = pytest.importorskip("yaml")
     f = tmp_path / "p.yaml"
     f.write_text(yaml.safe_dump(MINIMAL_POLICY))
     p = from_yaml(f)
