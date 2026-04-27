@@ -1,0 +1,136 @@
+{
+  "rows": [
+    {
+      "config": "heuristic_only",
+      "key": "hand_curated/attack",
+      "tp": 72,
+      "fn": 132,
+      "fp": 0,
+      "tn": 0,
+      "err": 0,
+      "metric": "recall",
+      "value": 0.35294117647058826
+    },
+    {
+      "config": "heuristic_only",
+      "key": "hand_curated/benign",
+      "tp": 0,
+      "fn": 0,
+      "fp": 12,
+      "tn": 34,
+      "err": 0,
+      "metric": "FPR",
+      "value": 0.2608695652173913
+    },
+    {
+      "config": "heuristic_only",
+      "key": "llm_generated/attack",
+      "tp": 2012,
+      "fn": 1181,
+      "fp": 0,
+      "tn": 0,
+      "err": 49,
+      "metric": "recall",
+      "value": 0.6301284058878798
+    },
+    {
+      "config": "heuristic_only",
+      "key": "llm_generated/benign",
+      "tp": 0,
+      "fn": 0,
+      "fp": 1644,
+      "tn": 794,
+      "err": 25,
+      "metric": "FPR",
+      "value": 0.6743232157506153
+    },
+    {
+      "config": "classifier_only",
+      "key": "hand_curated/attack",
+      "tp": 192,
+      "fn": 12,
+      "fp": 0,
+      "tn": 0,
+      "err": 0,
+      "metric": "recall",
+      "value": 0.9411764705882353
+    },
+    {
+      "config": "classifier_only",
+      "key": "hand_curated/benign",
+      "tp": 0,
+      "fn": 0,
+      "fp": 28,
+      "tn": 18,
+      "err": 0,
+      "metric": "FPR",
+      "value": 0.6086956521739131
+    },
+    {
+      "config": "classifier_only",
+      "key": "llm_generated/attack",
+      "tp": 2802,
+      "fn": 440,
+      "fp": 0,
+      "tn": 0,
+      "err": 0,
+      "metric": "recall",
+      "value": 0.8642813078346699
+    },
+    {
+      "config": "classifier_only",
+      "key": "llm_generated/benign",
+      "tp": 0,
+      "fn": 0,
+      "fp": 1122,
+      "tn": 1341,
+      "err": 0,
+      "metric": "FPR",
+      "value": 0.45554202192448234
+    },
+    {
+      "config": "full_stack",
+      "key": "hand_curated/attack",
+      "tp": 198,
+      "fn": 6,
+      "fp": 0,
+      "tn": 0,
+      "err": 0,
+      "metric": "recall",
+      "value": 0.9705882352941176
+    },
+    {
+      "config": "full_stack",
+      "key": "hand_curated/benign",
+      "tp": 0,
+      "fn": 0,
+      "fp": 32,
+      "tn": 14,
+      "err": 0,
+      "metric": "FPR",
+      "value": 0.6956521739130435
+    },
+    {
+      "config": "full_stack",
+      "key": "llm_generated/attack",
+      "tp": 3116,
+      "fn": 77,
+      "fp": 0,
+      "tn": 0,
+      "err": 49,
+      "metric": "recall",
+      "value": 0.9758847478860007
+    },
+    {
+      "config": "full_stack",
+      "key": "llm_generated/benign",
+      "tp": 0,
+      "fn": 0,
+      "fp": 2225,
+      "tn": 213,
+      "err": 25,
+      "metric": "FPR",
+      "value": 0.9126333059885152
+    }
+  ]
+}
