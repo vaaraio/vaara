@@ -198,7 +198,7 @@ class TraceGenerator:
     ) -> None:
         self._archetypes = archetypes or DEFAULT_ARCHETYPES
         self._archetype_weights = archetype_weights or [0.6, 0.3, 0.1]
-        self._rng = random.Random(seed)
+        self._rng = random.Random(seed)  # nosec B311 - synthetic-trace sampling, not security-sensitive
         # Get all registered action names for validation
         registry = create_default_registry()
         self._known_actions = set(registry.all_types.keys())

@@ -88,7 +88,10 @@ class MCDropoutGateScorer:
                 "weights_only=False — ensure bundle is from a trusted source.",
                 path,
             )
-            bundle = torch.load(str(path), map_location="cpu", weights_only=False)
+            # Trusted-bundle fallback after weights_only=True already failed
+            # (bundle contains sklearn objects). The logger.warning above
+            # tells the operator to ensure provenance.
+            bundle = torch.load(str(path), map_location="cpu", weights_only=False)  # nosec B614
         self._in_dim = int(bundle["in_dim"])
         self._q_hat = float(bundle["q_hat"])
         self._mc_samples = int(bundle["mc_samples"])

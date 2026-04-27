@@ -1,0 +1,71 @@
+# Vaara policy — comprehensive example.
+# Loaded via vaara.policy.from_yaml() (requires the [yaml] extra).
+# JSON Schema lives at docs/policy_schema.json.
+
+version: "0.1"
+domains: [eu_ai_act, dora]
+
+# Action-class taxonomy. Each tool name classifies into one entry here.
+# Enum values mirror vaara.taxonomy.actions:
+#   category:      financial | data | communication | infrastructure | identity | governance | physical | unknown
+#   reversibility: fully_reversible | partially_reversible | irreversible
+#   blast_radius:  self | local | shared | global
+#   urgency:       deferrable | timely | immediate | irrevocable
+action_classes:
+  fs.write_file:
+    category: data
+    reversibility: partially_reversible
+    blast_radius: local
+    urgency: timely
+    regulatory: ["aiact:9", "aiact:12"]
+
+  tx.sign:
+    category: financial
+    reversibility: irreversible
+    blast_radius: shared
+    urgency: irrevocable
+    regulatory: ["aiact:14", "dora:10"]
+
+  email.send:
+    category: communication
+    reversibility: irreversible
+    blast_radius: global
+    urgency: timely
+    regulatory: ["aiact:13"]
+
+# Risk-score thresholds. Below escalate = allow. Above deny = deny.
+# Per-action-class entries override the default. Partial overrides supported:
+# `fs.write_file` below tightens `deny` while inheriting the default `escalate`.
+thresholds:
+  default:
+    escalate: 0.55
+    deny: 0.85
+  fs.write_file:
+    deny: 0.75
+  tx.sign:
+    escalate: 0.40
+    deny: 0.65
+
+# Sequence patterns. If matched in the sliding window, risk gets boosted.
+sequences:
+  data_exfiltration:
+    pattern: [read_data, export_data, delete_data]
+    risk_boost: 0.4
+    window_seconds: 300
+    regulatory: ["aiact:9(2)(a)"]
+
+  config_then_signal:
+    pattern: [config.write, tx.sign]
+    risk_boost: 0.3
+    window_seconds: 60
+    regulatory: ["aiact:14"]
+
+# Escalation routing. First matching route wins. The entry with no `if`
+# is the default fallback. If none defined, "on_call" is the implicit fallback.
+escalation:
+  routes:
+    - if: ["aiact:14"]
+      operator_group: ai_oversight_team
+    - if: ["dora:10"]
+      operator_group: ict_risk_team
+    - default: on_call

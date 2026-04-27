@@ -179,6 +179,48 @@ def _cmd_trail_verify(args: argparse.Namespace) -> int:
     return 1
 
 
+def _cmd_trail_purge(args: argparse.Namespace) -> int:
+    """Delete audit records older than --retention-days. EU AI Act Article 12(2)."""
+    from vaara.audit.sqlite_backend import SQLiteAuditBackend
+
+    db_path = Path(args.db).expanduser()
+    if not db_path.exists():
+        print(f"audit DB not found: {db_path}", file=sys.stderr)
+        return 1
+
+    if args.retention_days <= 0:
+        print(
+            f"--retention-days must be > 0, got {args.retention_days}",
+            file=sys.stderr,
+        )
+        return 2
+
+    retention_seconds = args.retention_days * 86400
+    # --all-tenants means tenant_id="" which routes to _tenant_clause() == "1=1",
+    # i.e. purge across all records regardless of tenant_id. --tenant TID scopes
+    # to that tenant only via parameterised "tenant_id = ?".
+    tenant_scope = "" if args.all_tenants else args.tenant
+    backend = SQLiteAuditBackend(db_path, tenant_id=tenant_scope)
+    try:
+        count = backend.purge_older_than(retention_seconds, dry_run=args.dry_run)
+    finally:
+        backend.close()
+
+    if args.dry_run:
+        print(f"Would purge {count} record(s) older than {args.retention_days} day(s).")
+        print("Run without --dry-run to apply.")
+    else:
+        print(f"Purged {count} record(s) older than {args.retention_days} day(s).")
+        if count > 0:
+            print(
+                "Note: hash chain has a seam at the retention boundary. "
+                "Run 'vaara trail export' BEFORE future purges to preserve "
+                "audit history in a signed zip.",
+                file=sys.stderr,
+            )
+    return 0
+
+
 def build_parser() -> argparse.ArgumentParser:
     p = argparse.ArgumentParser(prog="vaara", description="Vaara AI Agent Execution Layer")
     sub = p.add_subparsers(dest="cmd", required=True)
@@ -216,6 +258,37 @@ def build_parser() -> argparse.ArgumentParser:
         help="Path to Ed25519 public key (PEM). If omitted, uses signer_pubkey.pem from inside the zip.",
     )
     pv.set_defaults(func=_cmd_trail_verify)
+
+    pp = tsub.add_parser(
+        "purge",
+        help="Delete audit records older than the retention period (Article 12(2))",
+    )
+    pp.add_argument("--db", required=True, help="Path to the audit SQLite DB")
+    pp.add_argument(
+        "--retention-days",
+        required=True,
+        type=int,
+        help="Records older than this many days are deleted",
+    )
+    pp.add_argument(
+        "--dry-run",
+        action="store_true",
+        help="Report the count without modifying the DB",
+    )
+    # Tenant scoping is required: a shared multi-tenant audit DB must not be
+    # silently purged across all tenants. Operator picks --tenant TID for a
+    # single tenant or --all-tenants explicitly.
+    scope = pp.add_mutually_exclusive_group(required=True)
+    scope.add_argument(
+        "--tenant",
+        help="Restrict purge to records with this tenant_id",
+    )
+    scope.add_argument(
+        "--all-tenants",
+        action="store_true",
+        help="Purge across all tenants in this DB. Use only on single-tenant deployments or after deliberate review.",
+    )
+    pp.set_defaults(func=_cmd_trail_purge)
 
     return p
 

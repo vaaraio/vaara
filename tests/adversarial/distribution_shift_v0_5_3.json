@@ -1,0 +1,44 @@
+{
+  "buckets": [
+    {
+      "key": "hand_curated/attack",
+      "n": 204,
+      "deny": 0,
+      "escalate": 198,
+      "allow": 6,
+      "error": 0,
+      "metric": "recall",
+      "value": 0.9705882352941176
+    },
+    {
+      "key": "hand_curated/benign",
+      "n": 46,
+      "deny": 0,
+      "escalate": 32,
+      "allow": 14,
+      "error": 0,
+      "metric": "FPR",
+      "value": 0.6956521739130435
+    },
+    {
+      "key": "llm_generated/attack",
+      "n": 3242,
+      "deny": 0,
+      "escalate": 3087,
+      "allow": 106,
+      "error": 49,
+      "metric": "recall",
+      "value": 0.9521900061690315
+    },
+    {
+      "key": "llm_generated/benign",
+      "n": 2463,
+      "deny": 0,
+      "escalate": 2154,
+      "allow": 284,
+      "error": 25,
+      "metric": "FPR",
+      "value": 0.8745432399512789
+    }
+  ]
+}
