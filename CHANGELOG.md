@@ -4,6 +4,20 @@ All notable changes to this project are documented here.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/)
 and this project follows [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [0.6.1] - 2026-04-27
+
+**Theme: documentation sync to PyPI.** v0.6.0 shipped the functional changes (policy DSL, retention purge, transparency taxonomy, distribution-shift / stack-ablation / PAIR evals, lint sweep) but the README, library docstring, example file headers, and PyPI tagline stayed at the v0.5.0 framing. PyPI's package page kept publishing pre-rebalance numbers and the wrong default threshold. v0.6.1 ships only the documentation cleanup so new PyPI installs see the current state.
+
+### Changed
+- `README.md`: replaced the "Numbers" section with the v0.6 distribution-shift table (97.1% recall / 70.0% FPR hand-curated held-out; 95.2% / 87.5% LLM-generated in-sample) plus PAIR ASR 0.0% (0/25). Threshold default 0.5 -> 0.55, corpus description updated to the 5,955-entry rebalanced corpus, threshold-direction note corrected (recall drops as threshold rises). PR #44.
+- `src/vaara/adversarial_classifier.py`: rewrote the module docstring. Removed all version-bound numbers; readers now point at README + COMPLIANCE so the docstring does not go stale on every release. PR #44.
+- `examples/adversarial_classifier.py`: ship-note threshold 0.8 -> 0.55. PR #44.
+- `scripts/classifier_vs_heuristic.py`: clarified the script is the v0.5.0 historical reproducer, not the current production training path. PR #44.
+- `pyproject.toml`: rephrased description for cleaner PyPI tagline rendering. PR #45.
+
+### Note
+No functional code changes. v0.6.0 users are on the same code; v0.6.1 only refreshes documentation surfaces visible to new PyPI installs and to anyone reading the package source.
+
 ## [0.6.0] - 2026-04-27
 
 **Theme: standards alignment + legibility.** v0.5.x was the capability axis (jailbreak coverage closed, classifier rebalanced). v0.6 is the legibility axis: policies become readable, audit records become standards-aligned, adversarial numbers become honest, architecture contribution becomes documented.
