@@ -295,6 +295,14 @@ Honest about the edges:
   Reproducible via `scripts/eval_distribution_shift.py`. A proper OOF
   split for the LLM-generated portion (re-running held-out per fold) is
   a v0.7 follow-up if the gap demands it.
+- **Stack composition (v0.6 measurement).** The full-stack numbers above
+  decompose into independent layer contributions. `heuristic_only` recall
+  is 35% / 63% (hand-curated / LLM-generated); `classifier_only` recall
+  is 94% / 86%. Layers are not redundant — heuristic catches a small set
+  of attacks the classifier misses, justifying the ensemble. Most of the
+  full-stack benign FPR comes from heuristic ESCALATEs, not classifier
+  upgrades. Detailed breakdown: `tests/adversarial/stack_ablation_v0_5_3.json`.
+  Reproducible via `scripts/eval_stack_ablation.py`.
 - v0.5.3 does not yet quote an adaptive-attacker (PAIR-style)
   attack-success-rate. Iterative attacker capability is a known limit
   and a calibration figure is planned for v0.6.
