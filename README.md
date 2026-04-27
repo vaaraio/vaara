@@ -82,12 +82,12 @@ else:
 
 ## Adversarial Classifier (optional)
 
-Vaara 0.5.0 ships an opt-in XGBoost classifier trained on 200 hand-crafted adversarial seeds across 8 attack categories plus 1945 LLM-generated variants and 635 benign variants. Install with `pip install vaara[ml]`.
+Vaara ships an opt-in XGBoost classifier trained on a 5,955-entry corpus (3,422 attack across 8 categories, 2,533 benign), spanning hand-curated seeds and LLM-generated variants. Install with `pip install vaara[ml]`.
 
 ```python
 from vaara.adversarial_classifier import AdversarialClassifier
 
-clf = AdversarialClassifier()  # loads bundled model, threshold=0.5 default
+clf = AdversarialClassifier()  # loads bundled model, threshold=0.55 default
 
 # Score a proposed tool call
 prob = clf.score(
@@ -101,23 +101,28 @@ if clf.is_malicious("http_get", {"url": "https://api.github.com/user"}, {}):
     ...
 ```
 
-### Numbers (by-seed held-out test, no leakage)
+### Numbers (v0.6, full Vaara stack)
 
-At threshold 0.5 on 600 held-out test entries (50 adversarial seeds + their variants, never seen in training):
+Distribution-shift split, threshold 0.55:
 
-| | Attack recall | Benign FPR | Balanced acc |
-|---|---|---|---|
-| Heuristic (no threshold) | 39% | 62% | 39% |
-| Classifier @ 0.5 | 85% | 23% | 81% |
+| Source                                | Attack recall | Benign FPR |
+|---------------------------------------|--------------:|-----------:|
+| Hand-curated (held-out, 250)          |        97.1% |      70.0% |
+| LLM-generated (in-sample, 5,705)      |        95.2% |      87.5% |
+
+Held-out is the generalization signal; in-sample is fit. Most full-stack benign FPR comes from heuristic ESCALATEs (human review), not denials — by design.
+
+**PAIR adaptive-attacker calibration:** Qwen2.5-32B-Instruct as both attacker and judge, 25 hand-curated jailbreak seeds, 5-iteration budget — **ASR 0.0% (0/25)**. Not a claim of imperviousness against stronger attackers (70B+) or alternate strategies.
 
 Latency: 140 µs mean, 210 µs p99 (commodity CPU, no GPU at inference).
 
+Full per-source / per-class breakdown: [COMPLIANCE.md](COMPLIANCE.md). Reproducers: `scripts/eval_distribution_shift.py`, `scripts/eval_stack_ablation.py`, `scripts/eval_pair_attack.py`.
+
 ### Operating notes
 
-- Classifier over-triggers on legitimate uses of powerful tools (`http_post`, `send_email`, `shell_exec`). Held-out FPR at threshold 0.5 is 23%. Live-agent FPR on real traffic is typically higher than held-out figures.
+- Classifier over-triggers on legitimate uses of powerful tools (`http_post`, `send_email`, `shell_exec`). At threshold 0.55, classifier-alone benign FPR is 21% (5-fold CV OOF). Full stack escalates rather than denies — see COMPLIANCE.md for per-source breakdown.
 - Recommended: ship with `decision="escalate"` (send to human-in-loop), not `decision="deny"`.
-- Threshold is configurable per call. See `AdversarialClassifier(threshold=0.7)` for the higher-recall / higher-FPR operating point.
-- Reproduce: `python scripts/classifier_vs_heuristic.py` (requires `vaara[ml]`).
+- Threshold is configurable per call. `AdversarialClassifier(threshold=0.50)` is the higher-recall / higher-FPR operating point; `threshold=0.65` reduces FPR at the cost of recall. See CHANGELOG v0.5.3 sweep table.
 
 ## How It Works
 
