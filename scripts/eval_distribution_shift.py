@@ -96,13 +96,26 @@ def decide(entry: dict, pipe: Pipeline, classifier) -> str:
     return decision
 
 
+_VALID_EXPECTED = {"ALLOW", "DENY", "ESCALATE"}
+
+
 def expected_category(entry: dict) -> str:
-    """Return 'attack' or 'benign' from entry expected field."""
-    expected = entry.get("expected", "DENY")
+    """Return 'attack' or 'benign' from entry expected field.
+
+    Raises ValueError on missing or invalid expected — silently coercing bad
+    fixture data would skew recall / FPR without anyone noticing.
+    """
+    if "expected" not in entry:
+        raise ValueError(f"entry {entry.get('id', '?')!r}: missing required 'expected' field")
+    expected = entry["expected"]
     if isinstance(expected, list):
         expected_set = {str(x).upper() for x in expected}
     else:
         expected_set = {str(expected).upper()}
+    if not expected_set or not expected_set.issubset(_VALID_EXPECTED):
+        raise ValueError(
+            f"entry {entry.get('id', '?')!r}: invalid expected value(s) {sorted(expected_set)}"
+        )
     return "benign" if expected_set == {"ALLOW"} else "attack"
 
 
@@ -130,6 +143,12 @@ def evaluate(entries: list[dict], pipe: Pipeline, classifier) -> dict:
 
 def report(buckets: dict, *, json_out: Path | None) -> None:
     """Print recall/FPR per source/class. Optionally write JSON."""
+    total_errors = sum(c["error"] for c in buckets.values())
+    if total_errors:
+        raise SystemExit(
+            f"aborting: {total_errors} ERROR outcome(s) in buckets — "
+            "fix runtime/corpus issues before publishing metrics"
+        )
     print("\n=== Distribution-shift split ===")
     print(f"{'source/class':<28} {'n':>6} {'deny':>6} {'esc':>6} {'allow':>6} {'err':>5} {'metric':>20}")
     rows = []
@@ -162,8 +181,8 @@ def main() -> int:
     args = ap.parse_args()
 
     corpus_root = Path(args.corpus_root)
-    if not corpus_root.exists():
-        raise SystemExit(f"corpus root not found: {corpus_root}")
+    if not corpus_root.is_dir():
+        raise SystemExit(f"corpus root directory not found: {corpus_root}")
 
     try:
         from vaara.adversarial_classifier import AdversarialClassifier
@@ -179,6 +198,8 @@ def main() -> int:
         loaded = load_source(corpus_root, source=source)
         print(f"[corpus] {source}: {len(loaded)} entries")
         entries.extend(loaded)
+    if not entries:
+        raise SystemExit(f"no JSONL entries found under: {corpus_root}")
 
     buckets = evaluate(entries, pipe, classifier)
     report(buckets, json_out=Path(args.out) if args.out else None)
