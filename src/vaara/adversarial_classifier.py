@@ -1,12 +1,14 @@
-"""Adversarial tool-call classifier — opt-in ML scorer for v0.5.0.
+"""Adversarial tool-call classifier (opt-in ML scorer).
 
-Ships with a pre-trained XGBoost model (~300 KB bundle) trained on:
-    - 200 hand-crafted adversarial seeds across 8 attack categories
-    - 1945 LLM-generated variants on MI300X (Qwen2.5-3B)
-    - 487 benign variants for class balance
+Ships with a pre-trained XGBoost model (~300 KB bundle) trained on a
+5,955-entry corpus (3,422 attack across 8 categories, 2,533 benign),
+spanning hand-curated seeds and LLM-generated variants. Default
+threshold 0.55.
 
-Held-out test (by-seed, no leakage): 61% attack recall, 13% benign FPR at threshold 0.8.
-Compare to shipped heuristic: 44% recall, 25% FPR.
+Headline numbers and methodology live in README.md "Adversarial Classifier"
+section. Per-source breakdown and adaptive-attacker calibration live in
+COMPLIANCE.md. Numbers intentionally not duplicated here so this docstring
+does not go stale on every release.
 
 Usage:
     pip install vaara[ml]
