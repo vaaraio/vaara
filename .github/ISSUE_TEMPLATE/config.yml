@@ -1,0 +1,8 @@
+blank_issues_enabled: false
+contact_links:
+  - name: Security vulnerability (private disclosure)
+    url: https://github.com/vaaraio/vaara/security/advisories/new
+    about: Do not open a public issue for security reports. Use private advisory disclosure per SECURITY.md.
+  - name: Compliance / regulator-facing question
+    url: mailto:hello@vaara.io
+    about: For deployer-facing questions about EU AI Act / DORA / ISO 42001 mapping, email rather than open a public issue.
