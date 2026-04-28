@@ -16,7 +16,16 @@
 
 Vaara intercepts agent tool calls, scores each one with a conformal risk interval, and writes a hash-chained audit record. Online learning across five expert signals via Multiplicative Weight Update. Distribution-free conformal coverage on the score.
 
-For broader agent governance (zero-trust identity, capability-based access control, multi-language SDKs) see Microsoft's [Agent Governance Toolkit](https://github.com/microsoft/agent-governance-toolkit). Vaara is narrower.
+For broader agent governance (zero-trust identity, capability-based access control, multi-language SDKs) see Microsoft's [Agent Governance Toolkit](https://github.com/microsoft/agent-governance-toolkit).
+
+## Numbers
+
+- 5,955-entry adversarial corpus (3,422 attack across 8 categories, 2,533 benign)
+- 97.1% attack recall on held-out distribution-shift split, threshold 0.55
+- PAIR adaptive-attacker calibration: ASR 0/25 against Qwen2.5-32B
+- 140 µs / 210 µs p99 inference latency, commodity CPU
+- Distribution-free conformal coverage on the score
+- MWU regret bound O(sqrt(T log N))
 
 ## Install
 
