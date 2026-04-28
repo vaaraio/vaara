@@ -250,3 +250,5 @@ The system never silently degrades to "allow everything."
 6. European Parliament. (2022). Regulation (EU) 2022/2554 (DORA). *Official Journal of the European Union*.
 
 7. Microsoft. (2026). Agent Governance Toolkit. https://github.com/microsoft/agent-governance-toolkit.
+
+8. Nannini, L., Smith, A. L., Maggini, M. J., Panai, E., Feliciano, S., Tiulkanov, A., Maran, E., Gealy, J., & Bisconti Lucidi, P. (2026). AI Agents Under EU Law: A Compliance Architecture for AI Providers. *arXiv preprint arXiv:2604.04604*.
