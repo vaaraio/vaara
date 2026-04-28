@@ -16,7 +16,7 @@
 
 Vaara intercepts agent tool calls, scores each one with a conformal risk interval, and writes a hash-chained audit record. Online learning across five expert signals via Multiplicative Weight Update. Distribution-free conformal coverage on the score.
 
-For broader agent governance (zero-trust identity, capability-based access control, multi-language SDKs) see Microsoft's [Agent Governance Toolkit](https://github.com/microsoft/agent-governance-toolkit). Vaara is narrower.
+For broader agent governance (zero-trust identity, capability-based access control, multi-language SDKs) see Microsoft's [Agent Governance Toolkit](https://github.com/microsoft/agent-governance-toolkit).
 
 ## Install
 
