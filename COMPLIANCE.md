@@ -118,6 +118,21 @@ ones. Where Vaara's runtime behaviour aligns with a draft, that is
 useful context for an auditor or notified body but not a substitute
 for the published version.
 
+**Independent legal-architecture analysis.** Nannini et al. (2026),
+*AI Agents Under EU Law: A Compliance Architecture for AI Providers*
+(arXiv:2604.04604), proposes a twelve-layer compliance architecture
+across the AI Act essential requirements, M/613 harmonised standards
+(prEN 18286, 18228, 18229-1/2, 18282, 18284, 18283), GPAI obligations,
+and parallel instruments. Section 6.4 (Emergent behavioural drift)
+identifies an open infrastructure gap: *"providers cannot currently
+acquire the evaluation infrastructure necessary to demonstrate
+conformity for behavioral drift in multi-agent systems, because that
+infrastructure does not yet exist in published form"* (footnote 19).
+Vaara implements pieces of that infrastructure: hash-chained
+operational-state versioning, distribution-free conformal interval
+over a behavioral metric, and MWU-bounded online policy update with
+regret guarantee O(sqrt(T log N)) (see [docs/formal_specification.md](docs/formal_specification.md)).
+
 ## What Vaara produces
 
 Three artefact classes, all tied to a single `action_id`:
