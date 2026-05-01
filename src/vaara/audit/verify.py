@@ -17,7 +17,7 @@ from pathlib import Path
 from typing import TYPE_CHECKING, Optional, Union
 
 try:
-    from cryptography.exceptions import InvalidSignature
+    from cryptography.exceptions import InvalidSignature, UnsupportedAlgorithm
     from cryptography.hazmat.primitives import serialization
     from cryptography.hazmat.primitives.asymmetric.ed25519 import Ed25519PublicKey
     _HAS_CRYPTO = True
@@ -67,7 +67,14 @@ def _load_public_key(
         raise TypeError(
             f"public_key must be a Path, str, bytes, or Ed25519PublicKey — got {type(key).__name__}"
         )
-    loaded = serialization.load_pem_public_key(bytes(key))
+    try:
+        loaded = serialization.load_pem_public_key(bytes(key))
+    except (ValueError, UnsupportedAlgorithm) as e:
+        # cryptography 47.0+ may raise UnsupportedAlgorithm where 46.x raised
+        # ValueError; collapse both to ValueError so callers see one shape.
+        # This matters when the embedded signer_pubkey.pem in a zip is
+        # malformed or uses an unsupported algorithm (untrusted input).
+        raise ValueError(f"public_key could not be parsed as a PEM public key: {e}") from e
     if not isinstance(loaded, Ed25519PublicKey):
         raise ValueError("public_key must be an Ed25519 public key")
     return loaded

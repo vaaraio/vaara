@@ -29,6 +29,7 @@ from pathlib import Path
 from typing import TYPE_CHECKING, Union
 
 try:
+    from cryptography.exceptions import UnsupportedAlgorithm
     from cryptography.hazmat.primitives import serialization
     from cryptography.hazmat.primitives.asymmetric.ed25519 import (
         Ed25519PrivateKey,
@@ -81,7 +82,12 @@ def _load_private_key(
         raise TypeError(
             f"signer_key must be a Path, str, bytes, or Ed25519PrivateKey — got {type(key).__name__}"
         )
-    loaded = serialization.load_pem_private_key(bytes(key), password=None)
+    try:
+        loaded = serialization.load_pem_private_key(bytes(key), password=None)
+    except (ValueError, UnsupportedAlgorithm) as e:
+        # cryptography 47.0+ may raise UnsupportedAlgorithm where 46.x raised
+        # ValueError; collapse both to ValueError so callers see one shape.
+        raise ValueError(f"signer_key could not be parsed as a PEM private key: {e}") from e
     if not isinstance(loaded, Ed25519PrivateKey):
         raise ValueError("signer_key must be an Ed25519 private key")
     return loaded
