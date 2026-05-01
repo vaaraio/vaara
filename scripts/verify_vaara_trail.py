@@ -29,7 +29,7 @@ import zipfile
 from pathlib import Path
 
 try:
-    from cryptography.exceptions import InvalidSignature
+    from cryptography.exceptions import InvalidSignature, UnsupportedAlgorithm
     from cryptography.hazmat.primitives import serialization
     from cryptography.hazmat.primitives.asymmetric.ed25519 import Ed25519PublicKey
 except ImportError:
@@ -45,7 +45,13 @@ REQUIRED_FILES = {"trail.jsonl", "manifest.json", "trail.sig"}
 
 
 def _load_pubkey(data: bytes) -> Ed25519PublicKey:
-    loaded = serialization.load_pem_public_key(data)
+    try:
+        loaded = serialization.load_pem_public_key(data)
+    except (ValueError, UnsupportedAlgorithm) as e:
+        # cryptography 47.0+ may raise UnsupportedAlgorithm where 46.x raised
+        # ValueError; the embedded signer_pubkey.pem inside a zip is
+        # untrusted input, so we collapse to ValueError with a clear message.
+        raise ValueError(f"public key could not be parsed: {e}") from e
     if not isinstance(loaded, Ed25519PublicKey):
         raise ValueError("public key is not Ed25519")
     return loaded

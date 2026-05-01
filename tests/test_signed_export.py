@@ -226,3 +226,53 @@ def test_verify_missing_crypto_raises_install_hint(tmp_path, monkeypatch):
     bogus.write_bytes(b"doesnt matter, crypto check fires first")
     with pytest.raises(ImportError, match=r"vaara\[export\]"):
         verify_mod.verify_signed(bogus)
+
+
+# ── Key-loading robustness across cryptography 46/47 ──────────────────────
+# cryptography 47.0 may raise UnsupportedAlgorithm where 46.x raised
+# ValueError for some unsupported PEM inputs. Our key-loading helpers
+# collapse both into ValueError so callers see one shape.
+
+def test_export_rejects_garbage_signer_pem(tmp_path):
+    trail = _make_trail()
+    with pytest.raises(ValueError, match="could not be parsed"):
+        export_signed(trail, out_path=tmp_path / "x.zip", signer_key=b"-----BEGIN PRIVATE KEY-----\nnot pem\n-----END PRIVATE KEY-----\n")
+
+
+def test_export_rejects_non_ed25519_signer_key(tmp_path):
+    from cryptography.hazmat.primitives.asymmetric import rsa
+
+    rsa_key = rsa.generate_private_key(public_exponent=65537, key_size=2048)
+    rsa_pem = rsa_key.private_bytes(
+        encoding=serialization.Encoding.PEM,
+        format=serialization.PrivateFormat.PKCS8,
+        encryption_algorithm=serialization.NoEncryption(),
+    )
+    trail = _make_trail()
+    with pytest.raises(ValueError, match="Ed25519 private key"):
+        export_signed(trail, out_path=tmp_path / "x.zip", signer_key=rsa_pem)
+
+
+def test_verify_rejects_garbage_public_key(tmp_path):
+    trail = _make_trail()
+    priv, _ = _pem_keys(tmp_path)
+    out = tmp_path / "trail.zip"
+    export_signed(trail, out_path=out, signer_key=priv)
+    with pytest.raises(ValueError, match="could not be parsed"):
+        verify_signed(out, public_key=b"-----BEGIN PUBLIC KEY-----\nnot pem\n-----END PUBLIC KEY-----\n")
+
+
+def test_verify_rejects_non_ed25519_public_key(tmp_path):
+    from cryptography.hazmat.primitives.asymmetric import rsa
+
+    rsa_key = rsa.generate_private_key(public_exponent=65537, key_size=2048)
+    rsa_pub_pem = rsa_key.public_key().public_bytes(
+        encoding=serialization.Encoding.PEM,
+        format=serialization.PublicFormat.SubjectPublicKeyInfo,
+    )
+    trail = _make_trail()
+    priv, _ = _pem_keys(tmp_path)
+    out = tmp_path / "trail.zip"
+    export_signed(trail, out_path=out, signer_key=priv)
+    with pytest.raises(ValueError, match="Ed25519 public key"):
+        verify_signed(out, public_key=rsa_pub_pem)
