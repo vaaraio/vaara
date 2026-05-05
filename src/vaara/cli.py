@@ -12,6 +12,9 @@ Subcommands:
     vaara trail verify --zip PATH [--pubkey PATH]
         Verify a signed trail zip.
 
+    vaara trail export-prov --trail PATH --out PATH [--action-id ID] [--no-chain]
+        Export the trail (or one action's slice) as W3C PROV-JSON.
+
     vaara version
         Print the installed Vaara version.
 
@@ -179,6 +182,42 @@ def _cmd_trail_verify(args: argparse.Namespace) -> int:
     return 1
 
 
+def _cmd_trail_export_prov(args: argparse.Namespace) -> int:
+    """Export the trail as W3C PROV-JSON (no signing, no extra deps)."""
+    from vaara.audit.prov_export import write_prov_json
+    from vaara.audit.trail import AuditRecord
+
+    trail_path = Path(args.trail).expanduser()
+    if not trail_path.exists():
+        print(f"trail JSONL not found: {trail_path}", file=sys.stderr)
+        return 2
+
+    records: list[AuditRecord] = []
+    with open(trail_path, "r", encoding="utf-8") as f:
+        for lineno, raw in enumerate(f, start=1):
+            line = raw.strip()
+            if not line:
+                continue
+            try:
+                records.append(AuditRecord.from_dict(json.loads(line)))
+            except (json.JSONDecodeError, TypeError, ValueError, KeyError) as exc:
+                print(
+                    f"invalid trail JSONL at line {lineno}: {exc}",
+                    file=sys.stderr,
+                )
+                return 2
+
+    out = Path(args.out).expanduser()
+    n = write_prov_json(
+        records, out,
+        action_id=args.action_id,
+        include_chain=not args.no_chain,
+    )
+    scope = f"action {args.action_id}" if args.action_id else "full trail"
+    print(f"Exported {n} records ({scope}) to PROV-JSON: {out}")
+    return 0
+
+
 def _cmd_trail_purge(args: argparse.Namespace) -> int:
     """Delete audit records older than --retention-days. EU AI Act Article 12(2)."""
     from vaara.audit.sqlite_backend import SQLiteAuditBackend
@@ -258,6 +297,22 @@ def build_parser() -> argparse.ArgumentParser:
         help="Path to Ed25519 public key (PEM). If omitted, uses signer_pubkey.pem from inside the zip.",
     )
     pv.set_defaults(func=_cmd_trail_verify)
+
+    pep = tsub.add_parser(
+        "export-prov",
+        help="Export the trail as W3C PROV-JSON (no signing, zero extra deps)",
+    )
+    pep.add_argument("--trail", required=True, help="Path to trail JSONL file")
+    pep.add_argument("--out", required=True, help="Path to write the PROV-JSON output")
+    pep.add_argument(
+        "--action-id", default=None,
+        help="If given, emit only that action's bundle",
+    )
+    pep.add_argument(
+        "--no-chain", action="store_true",
+        help="Omit the audit-record chain layer",
+    )
+    pep.set_defaults(func=_cmd_trail_export_prov)
 
     pp = tsub.add_parser(
         "purge",
