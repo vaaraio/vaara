@@ -59,6 +59,7 @@ else:
 
 - [docs/formal_specification.md](docs/formal_specification.md): math. MWU regret bound O(sqrt(T log N)), conformal coverage guarantees, security properties.
 - [COMPLIANCE.md](COMPLIANCE.md): Article-level evidence mapping for EU AI Act (Articles 9, 11 to 15, 61) and DORA (Articles 10, 12, 13). Eval numbers, threshold sweeps, PAIR adversarial calibration.
+- [Article 14 runtime: why oversight of agentic AI has to be evidenced as action, not model](https://futurium.ec.europa.eu/ga/apply-ai-alliance/community-content/article-14-runtime-why-oversight-agentic-ai-has-be-evidenced-action-not-model): why this exists. Posted on the EU Apply AI Alliance Futurium.
 - `src/vaara/integrations/`: LangChain, OpenAI Agents SDK, CrewAI, MCP server.
 - `src/vaara/audit/`: hash-chain trail, SQLite backend, append-only WAL.
 - `src/vaara/sandbox/`: synthetic-trace cold-start calibration.
