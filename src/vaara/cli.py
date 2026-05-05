@@ -194,11 +194,18 @@ def _cmd_trail_export_prov(args: argparse.Namespace) -> int:
 
     records: list[AuditRecord] = []
     with open(trail_path, "r", encoding="utf-8") as f:
-        for line in f:
-            line = line.strip()
+        for lineno, raw in enumerate(f, start=1):
+            line = raw.strip()
             if not line:
                 continue
-            records.append(AuditRecord.from_dict(json.loads(line)))
+            try:
+                records.append(AuditRecord.from_dict(json.loads(line)))
+            except (json.JSONDecodeError, TypeError, ValueError, KeyError) as exc:
+                print(
+                    f"invalid trail JSONL at line {lineno}: {exc}",
+                    file=sys.stderr,
+                )
+                return 2
 
     out = Path(args.out).expanduser()
     n = write_prov_json(

@@ -4,10 +4,12 @@ All notable changes to this project are documented here.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/)
 and this project follows [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
-## [Unreleased]
+## [0.6.2] - 2026-05-05
+
+**Theme: standards-track lineage.** v0.6.2 adds W3C PROV-DM as a second standards-track audit format alongside the JTC21-bound trajectory of v0.6.0. The audit record schema and event lifecycle are unchanged. Vaara now also emits PROV-JSON, so any PROV-aware consumer can ingest a trail without a Vaara-specific adapter.
 
 ### Added
-- **W3C PROV-DM audit-trail export.** New module `vaara.audit.prov_export` and CLI subcommand `vaara trail export-prov --trail PATH --out PATH [--action-id ID] [--no-chain]`. Emits PROV-JSON (W3C Submission, 2013) so any PROV-aware consumer can ingest a Vaara trail without a bespoke adapter. Two layers: per-action bundles (lifecycle as Activities, request/score/decision/outcome as Entities, AI agent + Vaara pipeline + human reviewer as Agents) and an audit-record chain layer (each record as a `prov:Bundle`-typed Entity, consecutive records linked via `wasDerivedFrom`/`prov:Revision`). Regulatory articles surface as `aiact:satisfies` and `dora:satisfies` attributes on the Activity that generated them. Zero new runtime deps. Standards-track lineage independent of CEN-CENELEC JTC21. The audit format becomes legible to the broader W3C provenance tooling community while Vaara's hash chain remains the cryptographic-integrity layer.
+- **W3C PROV-DM audit-trail export.** New module `vaara.audit.prov_export` and CLI subcommand `vaara trail export-prov --trail PATH --out PATH [--action-id ID] [--no-chain]`. Emits PROV-JSON (W3C Submission, 2013). Two layers: per-action bundles (lifecycle as Activities, request/score/decision/outcome as Entities, AI agent + Vaara pipeline + human reviewer as Agents) and an audit-record chain layer (each record as a `prov:Bundle`-typed Entity, consecutive records linked via `wasDerivedFrom`/`prov:Revision`). Regulatory articles surface as `aiact:satisfies` and `dora:satisfies` attributes on the Activity that generated them. Decision and outcome entity IDs are scoped by `record_id` so multi-override lifecycles preserve every prior decision. Chain edges are derived from `previous_hash` (not iteration order) so filtered slices and equal-timestamp records never assert false lineage. Cryptographic chain verification stays Vaara's job (`vaara trail verify`). Zero new runtime deps.
 
 ## [0.6.1] - 2026-04-27
 

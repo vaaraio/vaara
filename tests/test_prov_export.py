@@ -106,8 +106,8 @@ def test_agents_include_pipeline_caller_and_operator() -> None:
 
 def test_entities_emitted_per_event() -> None:
     entities = audit_to_prov_json(_full_lifecycle_records())["bundle"]["vaara:action/act-1"]["entity"]
-    for ent in ("vaara:request/act-1", "vaara:score/act-1", "vaara:decision/act-1/v1",
-                "vaara:operatorResponse/act-1", "vaara:outcome/act-1"):
+    for ent in ("vaara:request/act-1", "vaara:score/act-1", "vaara:decision/act-1/r3",
+                "vaara:operatorResponse/act-1/r5", "vaara:outcome/act-1/r6"):
         assert ent in entities
     assert entities["vaara:score/act-1"]["vaara:riskScore"] == 0.62
     assert entities["vaara:score/act-1"]["vaara:conformalInterval"] == [0.55, 0.69]
@@ -161,11 +161,48 @@ def test_policy_override_emits_revision_relation() -> None:
         record_hash="h-ov", previous_hash="h3",
     ))
     bundle = audit_to_prov_json(base)["bundle"]["vaara:action/act-1"]
-    assert "vaara:decision/act-1/v2" in bundle["entity"]
+    assert "vaara:decision/act-1/r-ov" in bundle["entity"]
     rev = next(iter(bundle["wasDerivedFrom"].values()))
-    assert rev["prov:generatedEntity"] == "vaara:decision/act-1/v2"
-    assert rev["prov:usedEntity"] == "vaara:decision/act-1/v1"
+    assert rev["prov:generatedEntity"] == "vaara:decision/act-1/r-ov"
+    assert rev["prov:usedEntity"] == "vaara:decision/act-1/r3"
     assert rev["prov:type"] == "prov:Revision"
+
+
+def test_two_policy_overrides_keep_distinct_entities_and_chained_revisions() -> None:
+    """Each override produces a distinct decision entity and revises the
+    immediately prior decision, not the original one."""
+    base = _full_lifecycle_records()[:3]
+    base.append(_record(
+        EventType.POLICY_OVERRIDE, record_id="r-ov1", timestamp=1700000010.0,
+        data={"override_reason": "first override", "overrider": "operator-jane",
+              "original_decision": "escalate", "new_decision": "deny"},
+        record_hash="h-ov1", previous_hash="h3",
+    ))
+    base.append(_record(
+        EventType.POLICY_OVERRIDE, record_id="r-ov2", timestamp=1700000011.0,
+        data={"override_reason": "second override", "overrider": "operator-jane",
+              "original_decision": "deny", "new_decision": "allow"},
+        record_hash="h-ov2", previous_hash="h-ov1",
+    ))
+    bundle = audit_to_prov_json(base)["bundle"]["vaara:action/act-1"]
+    assert "vaara:decision/act-1/r-ov1" in bundle["entity"]
+    assert "vaara:decision/act-1/r-ov2" in bundle["entity"]
+    pairs = {v["prov:generatedEntity"]: v["prov:usedEntity"]
+             for v in bundle["wasDerivedFrom"].values()}
+    assert pairs["vaara:decision/act-1/r-ov1"] == "vaara:decision/act-1/r3"
+    assert pairs["vaara:decision/act-1/r-ov2"] == "vaara:decision/act-1/r-ov1"
+
+
+def test_chain_layer_uses_previous_hash_not_iteration_order() -> None:
+    """Filtered slice must not fabricate edges across non-adjacent records."""
+    records = _full_lifecycle_records()
+    sliced = [records[0], records[2], records[5]]  # r1, r3, r6
+    doc = audit_to_prov_json(sliced)
+    chain = doc["bundle"]["vaara:auditChain"]
+    rels = chain.get("wasDerivedFrom", {})
+    # r3.previous_hash=h2 and r6.previous_hash=h5 — neither is in the slice.
+    # No edges should be emitted.
+    assert rels == {}
 
 
 def test_write_prov_json_round_trips(tmp_path: Path) -> None:
@@ -185,3 +222,23 @@ def test_iso_timestamp_format() -> None:
     assert activity["prov:startTime"] == time.strftime(
         "%Y-%m-%dT%H:%M:%SZ", time.gmtime(1700000000.0)
     )
+
+
+def test_cli_rejects_malformed_jsonl(tmp_path: Path, capsys) -> None:
+    """A bad line returns exit code 2 with line context, no traceback."""
+    from vaara.cli import main
+
+    valid = json.dumps({
+        "record_id": "r1", "action_id": "a1",
+        "event_type": "action_requested", "timestamp": 1.0,
+        "agent_id": "ag", "tool_name": "t", "data": {},
+        "regulatory_articles": [], "previous_hash": "", "record_hash": "h1",
+    })
+    bad = tmp_path / "bad.jsonl"
+    bad.write_text(valid + "\nNOT JSON\n", encoding="utf-8")
+    out = tmp_path / "out.prov.json"
+    rc = main(["trail", "export-prov", "--trail", str(bad), "--out", str(out)])
+    assert rc == 2
+    err = capsys.readouterr().err
+    assert "invalid trail JSONL at line 2" in err
+    assert not out.exists()

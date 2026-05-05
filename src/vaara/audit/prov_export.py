@@ -80,22 +80,22 @@ def _entity_for(rec: AuditRecord, action_id: str) -> tuple[Optional[str], dict]:
         return f"vaara:score/{action_id}", attrs
     if et in (EventType.DECISION_MADE, EventType.ACTION_BLOCKED):
         default_dec = "deny" if et == EventType.ACTION_BLOCKED else "allow"
-        return f"vaara:decision/{action_id}/v1", {
+        return f"vaara:decision/{action_id}/{rec.record_id}", {
             "vaara:decisionValue": data.get("decision", default_dec),
             "vaara:reason": data.get("reason", ""),
             "vaara:riskScore": data.get("risk_score"),
         }
     if et == EventType.ESCALATION_RESOLVED:
-        return f"vaara:operatorResponse/{action_id}", {
+        return f"vaara:operatorResponse/{action_id}/{rec.record_id}", {
             "vaara:responseValue": data.get("resolution", ""),
             "vaara:justification": data.get("justification", ""),
         }
     if et == EventType.OUTCOME_RECORDED:
-        return f"vaara:outcome/{action_id}", {
+        return f"vaara:outcome/{action_id}/{rec.record_id}", {
             "vaara:outcomeSeverity": data.get("outcome_severity"),
         }
     if et == EventType.POLICY_OVERRIDE:
-        return f"vaara:decision/{action_id}/v2", {
+        return f"vaara:decision/{action_id}/{rec.record_id}", {
             "vaara:decisionValue": data.get("new_decision", ""),
             "vaara:reason": data.get("override_reason", ""),
         }
@@ -170,6 +170,7 @@ def _per_action_bundle(records: list[AuditRecord]) -> dict[str, Any]:
                     "prov:usedEntity": last_decision,
                     "prov:type": "prov:Revision",
                 }
+                last_decision = ent_id
 
         if rec.event_type == EventType.RISK_SCORED:
             used[rid("u")] = {
@@ -199,13 +200,14 @@ def _per_action_bundle(records: list[AuditRecord]) -> dict[str, Any]:
 def _chain_layer(records: list[AuditRecord]) -> tuple[dict, dict]:
     """Build the per-record audit chain.
 
-    Each record becomes a Bundle-typed Entity carrying its hash; consecutive
-    records are linked via ``wasDerivedFrom`` (PROV ``Revision``).
+    Each record becomes a Bundle-typed Entity carrying its hash. Edges are
+    derived from ``previous_hash`` rather than iteration order so a filtered
+    or partially loaded slice never asserts false lineage. Records whose
+    ``previous_hash`` is empty or missing from the slice produce no edge.
     """
     entities: dict[str, dict] = {}
     rels: dict[str, dict] = {}
-    prev_id: Optional[str] = None
-    counter = 0
+    by_hash: dict[str, str] = {}
     for rec in records:
         ent_id = f"vaara:auditRecord/{rec.record_id}"
         entities[ent_id] = {
@@ -215,14 +217,17 @@ def _chain_layer(records: list[AuditRecord]) -> tuple[dict, dict]:
             "vaara:recordHash": rec.record_hash,
             "vaara:previousHash": rec.previous_hash,
         }
-        if prev_id is not None:
+        if rec.record_hash:
+            by_hash[rec.record_hash] = ent_id
+    counter = 0
+    for rec in records:
+        if rec.previous_hash and rec.previous_hash in by_hash:
             counter += 1
             rels[f"_:chain{counter}"] = {
-                "prov:generatedEntity": ent_id,
-                "prov:usedEntity": f"vaara:auditRecord/{prev_id}",
+                "prov:generatedEntity": f"vaara:auditRecord/{rec.record_id}",
+                "prov:usedEntity": by_hash[rec.previous_hash],
                 "prov:type": "prov:Revision",
             }
-        prev_id = rec.record_id
     return entities, rels
 
 
@@ -263,9 +268,7 @@ def audit_to_prov_json(
         doc["bundle"] = bundles
 
     if include_chain:
-        chain_entities, chain_rels = _chain_layer(
-            sorted(rec_list, key=lambda r: r.timestamp)
-        )
+        chain_entities, chain_rels = _chain_layer(rec_list)
         if chain_entities:
             chain_bundle: dict[str, Any] = {"entity": chain_entities}
             if chain_rels:
