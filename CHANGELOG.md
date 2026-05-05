@@ -4,6 +4,11 @@ All notable changes to this project are documented here.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/)
 and this project follows [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [Unreleased]
+
+### Added
+- **W3C PROV-DM audit-trail export.** New module `vaara.audit.prov_export` and CLI subcommand `vaara trail export-prov --trail PATH --out PATH [--action-id ID] [--no-chain]`. Emits PROV-JSON (W3C Submission, 2013) so any PROV-aware consumer can ingest a Vaara trail without a bespoke adapter. Two layers: per-action bundles (lifecycle as Activities, request/score/decision/outcome as Entities, AI agent + Vaara pipeline + human reviewer as Agents) and an audit-record chain layer (each record as a `prov:Bundle`-typed Entity, consecutive records linked via `wasDerivedFrom`/`prov:Revision`). Regulatory articles surface as `aiact:satisfies` and `dora:satisfies` attributes on the Activity that generated them. Zero new runtime deps. Standards-track lineage independent of CEN-CENELEC JTC21. The audit format becomes legible to the broader W3C provenance tooling community while Vaara's hash chain remains the cryptographic-integrity layer.
+
 ## [0.6.1] - 2026-04-27
 
 **Theme: documentation sync to PyPI.** v0.6.0 shipped the functional changes (policy DSL, retention purge, transparency taxonomy, distribution-shift / stack-ablation / PAIR evals, lint sweep) but the README, library docstring, example file headers, and PyPI tagline stayed at the v0.5.0 framing. PyPI's package page kept publishing pre-rebalance numbers and the wrong default threshold. v0.6.1 ships only the documentation cleanup so new PyPI installs see the current state.
