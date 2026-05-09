@@ -94,6 +94,8 @@ class RiskAssessment:
     threshold_deny: float          # Score above this → deny (between = escalate)
     sequence_risk: float           # Contribution from temporal patterns
     calibration_size: int          # How many calibration points we have
+    effective_alpha: float = 0.10  # FACI-adapted alpha for the bucket used
+    bucket_category: Optional[str] = None  # Mondrian bucket; None = marginal
     evaluation_ms: float = 0.0
     explanation: str = ""
 
@@ -138,6 +140,8 @@ class RiskAssessment:
                 "signals": self.signals,
                 "sequence_risk": self.sequence_risk,
                 "calibration_size": self.calibration_size,
+                "effective_alpha": self.effective_alpha,
+                "bucket_category": self.bucket_category,
             },
             "evaluation_ms": self.evaluation_ms,
             "error": None,
@@ -757,9 +761,11 @@ class AdaptiveScorer:
 
         # Conformal interval. Marginal by default; per-category when
         # mondrian_categories was passed to __init__.
+        bucket = self._calib_category(tool_name)
         lower, upper = self._conformal.predict_interval(
-            point_estimate, category=self._calib_category(tool_name),
+            point_estimate, category=bucket,
         )
+        eff_alpha = self._conformal.effective_alpha_for(bucket)
 
         # Decision uses the UPPER bound — conservative by design.
         # If the worst-case (within 1-alpha confidence) is safe, allow it.
@@ -805,6 +811,8 @@ class AdaptiveScorer:
             threshold_deny=self._threshold_deny,
             sequence_risk=signals.get("sequence_pattern", 0.0),
             calibration_size=self._conformal.calibration_size,
+            effective_alpha=eff_alpha,
+            bucket_category=bucket,
             evaluation_ms=elapsed_ms,
             explanation=explanation,
         )
@@ -856,8 +864,9 @@ class AdaptiveScorer:
             seq_logger.setLevel(prev_level)
 
         point_estimate = self._mwu.predict(signals)
+        bucket = self._calib_category(tool_name)
         lower, upper = self._conformal.predict_interval(
-            point_estimate, category=self._calib_category(tool_name),
+            point_estimate, category=bucket,
         )
         if upper < self._threshold_allow:
             decision = Decision.ALLOW
@@ -871,6 +880,9 @@ class AdaptiveScorer:
             "raw_result": {
                 "point_estimate": point_estimate,
                 "conformal_interval": [lower, upper],
+                "calibration_size": self._conformal.calibration_size,
+                "effective_alpha": self._conformal.effective_alpha_for(bucket),
+                "bucket_category": bucket,
             },
         }
 

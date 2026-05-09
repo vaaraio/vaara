@@ -437,6 +437,21 @@ class InterceptionPipeline:
         if not isinstance(signals, dict):
             signals = {}
 
+        # Conformal context: effective alpha (FACI-adapted) and bucket
+        # category (Mondrian per-category bucket, None when marginal). Both
+        # are coerced defensively so a buggy backend cannot poison the audit
+        # trail with NaN/inf or non-string category labels.
+        eff_alpha_raw = raw.get("effective_alpha", 0.10)
+        try:
+            effective_alpha = float(eff_alpha_raw)
+        except (TypeError, ValueError):
+            effective_alpha = 0.10
+        if not _math.isfinite(effective_alpha):
+            effective_alpha = 0.10
+        effective_alpha = max(0.0, min(1.0, effective_alpha))
+        bucket_raw = raw.get("bucket_category")
+        bucket_category = bucket_raw if isinstance(bucket_raw, str) and bucket_raw else None
+
         # 5. Record risk scoring in audit
         self.trail.record_risk_scored(
             action_id=action_id,
@@ -448,6 +463,8 @@ class InterceptionPipeline:
                 "conformal_upper": interval[1],
                 "signals": signals,
                 "calibration_size": raw.get("calibration_size", 0),
+                "effective_alpha": effective_alpha,
+                "bucket_category": bucket_category,
             },
             regulatory_domains=action_type.regulatory_domains,
         )
