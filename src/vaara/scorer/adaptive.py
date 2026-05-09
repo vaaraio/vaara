@@ -297,60 +297,127 @@ class MWUExperts:
 class ConformalCalibrator:
     """Split conformal prediction for risk score intervals.
 
-    Maintains a calibration set of (predicted_risk, actual_outcome) pairs.
-    Produces prediction intervals that contain the true risk with
-    probability >= 1 - alpha, with no distributional assumptions.
+    Maintains calibration sets of (predicted_risk, actual_outcome) pairs and
+    produces prediction intervals that contain the true risk with probability
+    >= 1 - alpha, with no distributional assumptions.
 
-    Uses FACI-style adaptive alpha when enough data is available:
-    the effective alpha tracks coverage errors online, tightening when
-    the interval misses and loosening when it's too conservative.
+    FACI-style adaptive alpha runs once enough data is available: the
+    effective alpha tracks coverage errors online, tightening when the
+    interval misses and loosening when it stays conservative.
+
+    Mondrian (class-conditional) mode is opt-in via the ``category`` argument
+    on ``add_calibration_point`` and ``predict_interval``. Each distinct
+    category string gets its own residual deque, FACI alpha, and conformal
+    quantile, so a per-category coverage guarantee holds independently. Calls
+    without ``category`` all land in a single shared bucket and behaviour is
+    identical to marginal split conformal, so existing call sites do not need
+    to change.
 
     Reference:
     - Vovk, Gammerman & Shafer (2005), "Algorithmic Learning in a Random World"
     - Gibbs & Candes (2021), "Adaptive Conformal Inference Under Distribution Shift"
+    - Vovk (2012), "Conditional validity of inductive conformal predictors"
+      (Mondrian conformal prediction)
     """
+
+    _DEFAULT_BUCKET = "__default__"
 
     def __init__(
         self,
         alpha: float = 0.10,        # Target miscoverage rate (10%)
         min_calibration: int = 30,   # Min points before conformal kicks in
-        max_calibration: int = 2000, # Rolling window size
+        max_calibration: int = 2000, # Rolling window size per bucket
         gamma: float = 0.005,        # FACI step size for adaptive alpha
     ) -> None:
         self._alpha = alpha
-        self._alpha_t = alpha         # Adaptive alpha (FACI)
         self._min_calibration = min_calibration
         self._max_calibration = max_calibration
         self._gamma = gamma
-        # Calibration residuals: |predicted - actual|
-        self._residuals: deque[float] = deque(maxlen=max_calibration)
+        # Per-bucket residuals and adaptive alphas. Marginal-only callers
+        # (no category arg) all land in _DEFAULT_BUCKET, preserving the
+        # pre-Mondrian behaviour exactly. The dicts grow lazily as new
+        # categories appear, so an unused Mondrian mode pays only one dict
+        # lookup per call relative to the old single-deque implementation.
+        self._residuals: dict[str, deque[float]] = {}
+        self._alpha_t: dict[str, float] = {}
         # Lock guards _residuals and _alpha_t. AdaptiveScorer wraps all
         # calls with its own RLock, but ConformalCalibrator can be shared
         # or accessed directly (e.g. in free-threaded Python 3.13+).
         self._lock = threading.Lock()
 
+    @staticmethod
+    def _bucket_key(category: Optional[str]) -> str:
+        return category if category else ConformalCalibrator._DEFAULT_BUCKET
+
+    def _ensure_bucket_locked(self, key: str) -> deque[float]:
+        bucket = self._residuals.get(key)
+        if bucket is None:
+            bucket = deque(maxlen=self._max_calibration)
+            self._residuals[key] = bucket
+            self._alpha_t[key] = self._alpha
+        return bucket
+
     @property
     def calibration_size(self) -> int:
+        """Total residuals across all category buckets.
+
+        For per-category counts use ``calibration_size_for(category)``.
+        """
         with self._lock:
-            return len(self._residuals)
+            return sum(len(b) for b in self._residuals.values())
 
     @property
     def is_calibrated(self) -> bool:
-        with self._lock:
-            return len(self._residuals) >= self._min_calibration
+        """True when the default (marginal) bucket has reached min_calibration.
+
+        For per-category readiness use ``is_calibrated_for(category)``.
+        """
+        return self.calibration_size_for(None) >= self._min_calibration
 
     @property
     def effective_alpha(self) -> float:
-        with self._lock:
-            return self._alpha_t
+        """Effective FACI-adapted alpha for the default bucket.
 
-    def add_calibration_point(self, predicted: float, actual: float) -> None:
+        For per-category alpha use ``effective_alpha_for(category)``.
+        """
+        return self.effective_alpha_for(None)
+
+    def calibration_size_for(self, category: Optional[str]) -> int:
+        """Residual count in the named bucket (default bucket if None)."""
+        key = self._bucket_key(category)
+        with self._lock:
+            return len(self._residuals.get(key, ()))
+
+    def is_calibrated_for(self, category: Optional[str]) -> bool:
+        """True when the named bucket has reached min_calibration."""
+        return self.calibration_size_for(category) >= self._min_calibration
+
+    def effective_alpha_for(self, category: Optional[str]) -> float:
+        """Effective FACI-adapted alpha for the named bucket.
+
+        Returns the configured alpha when the bucket has not yet been touched.
+        """
+        key = self._bucket_key(category)
+        with self._lock:
+            return self._alpha_t.get(key, self._alpha)
+
+    def add_calibration_point(
+        self,
+        predicted: float,
+        actual: float,
+        category: Optional[str] = None,
+    ) -> None:
         """Add a (predicted, actual) pair to the calibration set.
 
         Called by the audit trail when action outcomes are known.
-        Non-finite inputs are dropped — one NaN in the residual deque
-        poisons every future quantile (sorted() of NaN is
-        implementation-defined and breaks coverage guarantees).
+        Non-finite inputs are dropped: one NaN in the residual deque poisons
+        every future quantile (``sorted()`` of NaN is implementation-defined
+        and breaks coverage guarantees).
+
+        When ``category`` is provided, the residual lands in a per-category
+        bucket maintained independently. When omitted, the residual goes to
+        the default bucket and behaviour matches pre-Mondrian split conformal
+        exactly.
         """
         try:
             predicted_f = float(predicted)
@@ -360,46 +427,61 @@ class ConformalCalibrator:
         if not (math.isfinite(predicted_f) and math.isfinite(actual_f)):
             return
         residual = abs(predicted_f - actual_f)
+        key = self._bucket_key(category)
         with self._lock:
-            self._residuals.append(residual)
-            # FACI adaptive alpha update
-            if len(self._residuals) >= self._min_calibration:
-                # err_t = 1 if actual was outside the interval we would have produced
-                quantile = self._get_quantile_locked()
+            bucket = self._ensure_bucket_locked(key)
+            bucket.append(residual)
+            if len(bucket) >= self._min_calibration:
+                # FACI adaptive alpha update, scoped to this bucket so the
+                # default bucket's alpha trajectory cannot be perturbed by
+                # outcomes routed to a per-category bucket (and vice versa).
+                quantile = self._get_quantile_locked(key)
                 covered = residual <= quantile
                 err_t = 0.0 if covered else 1.0
-                # alpha_t+1 = alpha_t + gamma * (alpha - err_t)
-                self._alpha_t = self._alpha_t + self._gamma * (self._alpha - err_t)
-                self._alpha_t = min(0.5, max(0.001, self._alpha_t))
+                alpha_t = self._alpha_t[key] + self._gamma * (self._alpha - err_t)
+                self._alpha_t[key] = min(0.5, max(0.001, alpha_t))
 
-    def _get_quantile_locked(self) -> float:
-        """Conformal quantile — caller must hold self._lock."""
-        if not self._residuals:
+    def _get_quantile_locked(self, key: str) -> float:
+        """Conformal quantile for the named bucket. Caller must hold ``self._lock``."""
+        bucket = self._residuals.get(key)
+        if not bucket:
             return 1.0
-        sorted_residuals = sorted(self._residuals)
+        sorted_residuals = sorted(bucket)
         n = len(sorted_residuals)
+        alpha_t = self._alpha_t.get(key, self._alpha)
         # Quantile level: ceil((1 - alpha)(n + 1)) / n
-        level = math.ceil((1 - self._alpha_t) * (n + 1)) / n
+        level = math.ceil((1 - alpha_t) * (n + 1)) / n
         level = min(1.0, level)
         idx = min(int(level * n), n - 1)
         return sorted_residuals[idx]
 
-    def _get_quantile(self) -> float:
-        """Conformal quantile from calibration residuals."""
+    def _get_quantile(self, category: Optional[str] = None) -> float:
+        """Conformal quantile from the named bucket's residuals."""
+        key = self._bucket_key(category)
         with self._lock:
-            return self._get_quantile_locked()
+            return self._get_quantile_locked(key)
 
-    def predict_interval(self, point_estimate: float) -> tuple[float, float]:
+    def predict_interval(
+        self,
+        point_estimate: float,
+        category: Optional[str] = None,
+    ) -> tuple[float, float]:
         """Produce a conformal prediction interval around the point estimate.
 
-        Returns (lower, upper) where true risk is in [lower, upper]
-        with probability >= 1 - alpha.
+        Returns ``(lower, upper)`` where the true risk is in ``[lower, upper]``
+        with probability >= 1 - alpha for the named category bucket.
+
+        When ``category`` is omitted the default bucket is used and behaviour
+        matches pre-Mondrian split conformal exactly. When the named bucket
+        has fewer than ``min_calibration`` residuals, returns the conservative
+        ``[point - 0.3, point + 0.3]`` fallback (clamped to [0, 1]).
         """
+        key = self._bucket_key(category)
         with self._lock:
-            if len(self._residuals) < self._min_calibration:
-                # Not enough data — return conservative interval
+            bucket = self._residuals.get(key)
+            if not bucket or len(bucket) < self._min_calibration:
                 return (max(0.0, point_estimate - 0.3), min(1.0, point_estimate + 0.3))
-            q = self._get_quantile_locked()
+            q = self._get_quantile_locked(key)
         lower = max(0.0, point_estimate - q)
         upper = min(1.0, point_estimate + q)
         return (lower, upper)
@@ -519,6 +601,7 @@ class AdaptiveScorer:
         burst_threshold: int = 10,
         max_tracked_agents: int = 10_000,
         pre_seed_calibration: bool = True,
+        mondrian_categories: bool = False,
     ) -> None:
         """
         Args:
@@ -541,6 +624,13 @@ class AdaptiveScorer:
                 fallback. Real outcomes overwrite the prior within the
                 rolling window as traffic arrives. Set False when
                 measuring calibration growth from zero.
+            mondrian_categories: If True, route each action's category
+                (derived from tool_name prefix via _category_of) through
+                to the conformal calibrator so coverage holds per-category
+                rather than only marginally. Default False keeps the
+                pre-Mondrian marginal behaviour. The default seed prior
+                always lands in the default bucket regardless of this
+                flag — synthetic benign pairs have no real category.
         """
         if threshold_allow >= threshold_deny:
             raise ValueError(
@@ -553,6 +643,7 @@ class AdaptiveScorer:
         self._burst_window = burst_window_seconds
         self._burst_threshold = burst_threshold
         self._max_tracked_agents = max_tracked_agents
+        self._mondrian = mondrian_categories
 
         # MWU expert system
         self._mwu = MWUExperts(DEFAULT_EXPERTS, eta=mwu_eta)
@@ -610,6 +701,18 @@ class AdaptiveScorer:
             actual = 0.05
             self._conformal.add_calibration_point(predicted, actual)
 
+    def _calib_category(self, tool_name: str) -> Optional[str]:
+        """Category to route through to the calibrator for this action.
+
+        Returns None when Mondrian mode is off so the calibrator stays in
+        its default (marginal) bucket. When on, returns the same category
+        string the sequence detector uses, so per-bucket coverage holds
+        over the same partition the rest of the scorer reasons about.
+        """
+        if not self._mondrian:
+            return None
+        return _category_of(tool_name)
+
     # ── Scorer Backend Protocol ───────────────────────────────────
 
     @property
@@ -652,8 +755,11 @@ class AdaptiveScorer:
         # MWU-weighted combination
         point_estimate = self._mwu.predict(signals)
 
-        # Conformal interval
-        lower, upper = self._conformal.predict_interval(point_estimate)
+        # Conformal interval. Marginal by default; per-category when
+        # mondrian_categories was passed to __init__.
+        lower, upper = self._conformal.predict_interval(
+            point_estimate, category=self._calib_category(tool_name),
+        )
 
         # Decision uses the UPPER bound — conservative by design.
         # If the worst-case (within 1-alpha confidence) is safe, allow it.
@@ -750,7 +856,9 @@ class AdaptiveScorer:
             seq_logger.setLevel(prev_level)
 
         point_estimate = self._mwu.predict(signals)
-        lower, upper = self._conformal.predict_interval(point_estimate)
+        lower, upper = self._conformal.predict_interval(
+            point_estimate, category=self._calib_category(tool_name),
+        )
         if upper < self._threshold_allow:
             decision = Decision.ALLOW
         elif upper > self._threshold_deny:
@@ -1014,8 +1122,14 @@ class AdaptiveScorer:
             # Update MWU expert weights
             self._mwu.update(signals, actual_outcome)
 
-            # Update conformal calibration set
-            self._conformal.add_calibration_point(predicted_risk, actual_outcome)
+            # Update conformal calibration set. Routes to the per-category
+            # bucket when Mondrian mode is on; otherwise to the default
+            # bucket, which leaves marginal-mode behaviour bit-for-bit
+            # identical to pre-Mondrian.
+            self._conformal.add_calibration_point(
+                predicted_risk, actual_outcome,
+                category=self._calib_category(tool_name),
+            )
 
             # Update agent profile ONLY if the agent is still tracked.
             # A late outcome for an LRU-evicted agent must not resurrect
