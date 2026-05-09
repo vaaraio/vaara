@@ -4,6 +4,23 @@ All notable changes to this project are documented here.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/)
 and this project follows [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [0.7.0] - 2026-05-10
+
+**Theme: class-conditional conformal calibration.** v0.7.0 adds Mondrian per-category conformal prediction on top of the marginal split conformal that has shipped since v0.5.x. The same coverage guarantee now holds independently per action category, so a 90% headline can no longer hide a 60% miss rate on `credential_exfil` behind a 99% pass rate on `benign_control`. Eval surfaces the per-category breakdown. PROV-DM exports surface the calibration context an external auditor needs to read each interval honestly.
+
+### Added
+- **Mondrian per-category conformal calibration in `ConformalCalibrator`.** Optional `category` argument on `add_calibration_point` and `predict_interval` routes residuals to a per-category bucket. Each bucket carries its own residual deque, FACI alpha trajectory, and conformal quantile, so a per-category coverage guarantee holds independently. New helpers: `calibration_size_for(category)`, `is_calibrated_for(category)`, `effective_alpha_for(category)`. Calls without a `category` argument land in a single shared bucket and behaviour is identical bit-for-bit to marginal split conformal. Reference: Vovk (2012), "Conditional validity of inductive conformal predictors". PR #60.
+- **`AdaptiveScorer.mondrian_categories` constructor flag.** When set to `True`, each action's category (derived from the `tool_name` prefix via `_category_of`) routes through to the calibrator at all three call sites: `evaluate`, `dry_run_evaluate`, `record_outcome`. Default `False` preserves the marginal contract for existing callers. The 50-pair seed prior continues to populate the default bucket regardless, so a fresh Mondrian-mode scorer falls back to the conservative `point ± 0.3` interval per untouched bucket. PR #61.
+- **`scripts/eval_adversarial.py --mondrian` flag.** Constructs `Pipeline(scorer=AdaptiveScorer(mondrian_categories=True))` so the adversarial corpus can be evaluated under both regimes for direct comparison. PR #61.
+- **Empirical conformal coverage in `scripts/eval_adversarial.py`.** Per-category and overall: `coverage` (fraction of entries where `lower <= true_risk <= upper`) and `mean_interval_width` (mean of `upper - lower`). Per-entry rows now also carry `lower`, `upper`, and `actual_risk`. Result JSON gains an `overall` block alongside the existing `summary`. Eval-only change. PR #59.
+- **Conformal calibration context in PROV-DM exports.** W3C PROV-JSON score Entities now surface `vaara:calibrationSize`, `vaara:effectiveAlpha`, and (in Mondrian mode) `vaara:bucketCategory`. An external auditor can now distinguish a wide interval from a cold calibrator, from FACI alpha drift, or from genuine uncertainty without re-running Vaara. `RiskAssessment` dataclass gains `effective_alpha` and `bucket_category` fields. `Pipeline` writes them through to the audit trail with defensive coercion. Pre-enrichment audit records produce identical PROV output (attributes are omitted when source data is missing or `None`). PR #62.
+
+### Changed
+- `vaara.scorer.adaptive.RiskAssessment` adds two optional fields: `effective_alpha: float = 0.10` and `bucket_category: Optional[str] = None`. Existing constructors that do not pass them keep working unchanged. PR #62.
+
+### Note
+Backwards-compatible release. All four PRs are additive. Mondrian is opt-in via `mondrian_categories=True`, and PROV enrichment fields are omitted when their source data is missing.
+
 ## [0.6.2] - 2026-05-05
 
 **Theme: standards-track lineage.** v0.6.2 adds W3C PROV-DM as a second standards-track audit format alongside the JTC21-bound trajectory of v0.6.0. The audit record schema and event lifecycle are unchanged. Vaara now also emits PROV-JSON, so any PROV-aware consumer can ingest a trail without a Vaara-specific adapter.
