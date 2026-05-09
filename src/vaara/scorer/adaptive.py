@@ -601,6 +601,7 @@ class AdaptiveScorer:
         burst_threshold: int = 10,
         max_tracked_agents: int = 10_000,
         pre_seed_calibration: bool = True,
+        mondrian_categories: bool = False,
     ) -> None:
         """
         Args:
@@ -623,6 +624,13 @@ class AdaptiveScorer:
                 fallback. Real outcomes overwrite the prior within the
                 rolling window as traffic arrives. Set False when
                 measuring calibration growth from zero.
+            mondrian_categories: If True, route each action's category
+                (derived from tool_name prefix via _category_of) through
+                to the conformal calibrator so coverage holds per-category
+                rather than only marginally. Default False keeps the
+                pre-Mondrian marginal behaviour. The default seed prior
+                always lands in the default bucket regardless of this
+                flag — synthetic benign pairs have no real category.
         """
         if threshold_allow >= threshold_deny:
             raise ValueError(
@@ -635,6 +643,7 @@ class AdaptiveScorer:
         self._burst_window = burst_window_seconds
         self._burst_threshold = burst_threshold
         self._max_tracked_agents = max_tracked_agents
+        self._mondrian = mondrian_categories
 
         # MWU expert system
         self._mwu = MWUExperts(DEFAULT_EXPERTS, eta=mwu_eta)
@@ -692,6 +701,18 @@ class AdaptiveScorer:
             actual = 0.05
             self._conformal.add_calibration_point(predicted, actual)
 
+    def _calib_category(self, tool_name: str) -> Optional[str]:
+        """Category to route through to the calibrator for this action.
+
+        Returns None when Mondrian mode is off so the calibrator stays in
+        its default (marginal) bucket. When on, returns the same category
+        string the sequence detector uses, so per-bucket coverage holds
+        over the same partition the rest of the scorer reasons about.
+        """
+        if not self._mondrian:
+            return None
+        return _category_of(tool_name)
+
     # ── Scorer Backend Protocol ───────────────────────────────────
 
     @property
@@ -734,8 +755,11 @@ class AdaptiveScorer:
         # MWU-weighted combination
         point_estimate = self._mwu.predict(signals)
 
-        # Conformal interval
-        lower, upper = self._conformal.predict_interval(point_estimate)
+        # Conformal interval. Marginal by default; per-category when
+        # mondrian_categories was passed to __init__.
+        lower, upper = self._conformal.predict_interval(
+            point_estimate, category=self._calib_category(tool_name),
+        )
 
         # Decision uses the UPPER bound — conservative by design.
         # If the worst-case (within 1-alpha confidence) is safe, allow it.
@@ -832,7 +856,9 @@ class AdaptiveScorer:
             seq_logger.setLevel(prev_level)
 
         point_estimate = self._mwu.predict(signals)
-        lower, upper = self._conformal.predict_interval(point_estimate)
+        lower, upper = self._conformal.predict_interval(
+            point_estimate, category=self._calib_category(tool_name),
+        )
         if upper < self._threshold_allow:
             decision = Decision.ALLOW
         elif upper > self._threshold_deny:
@@ -1096,8 +1122,14 @@ class AdaptiveScorer:
             # Update MWU expert weights
             self._mwu.update(signals, actual_outcome)
 
-            # Update conformal calibration set
-            self._conformal.add_calibration_point(predicted_risk, actual_outcome)
+            # Update conformal calibration set. Routes to the per-category
+            # bucket when Mondrian mode is on; otherwise to the default
+            # bucket, which leaves marginal-mode behaviour bit-for-bit
+            # identical to pre-Mondrian.
+            self._conformal.add_calibration_point(
+                predicted_risk, actual_outcome,
+                category=self._calib_category(tool_name),
+            )
 
             # Update agent profile ONLY if the agent is still tracked.
             # A late outcome for an LRU-evicted agent must not resurrect
