@@ -77,6 +77,21 @@ def _entity_for(rec: AuditRecord, action_id: str) -> tuple[Optional[str], dict]:
             attrs["vaara:conformalInterval"] = [
                 data["conformal_lower"], data["conformal_upper"],
             ]
+        # Conformal calibration context. Surfacing these on the score Entity
+        # lets an external auditor distinguish a wide interval from a cold
+        # calibrator (low calibration_size) versus one from genuine high
+        # uncertainty (large effective_alpha after FACI drift), and tells
+        # them which Mondrian bucket produced the interval when in
+        # class-conditional mode.
+        cal_size = data.get("calibration_size")
+        if cal_size is not None:
+            attrs["vaara:calibrationSize"] = cal_size
+        eff_alpha = data.get("effective_alpha")
+        if eff_alpha is not None:
+            attrs["vaara:effectiveAlpha"] = eff_alpha
+        bucket = data.get("bucket_category")
+        if bucket:
+            attrs["vaara:bucketCategory"] = bucket
         return f"vaara:score/{action_id}", attrs
     if et in (EventType.DECISION_MADE, EventType.ACTION_BLOCKED):
         default_dec = "deny" if et == EventType.ACTION_BLOCKED else "allow"

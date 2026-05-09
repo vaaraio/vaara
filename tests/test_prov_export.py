@@ -224,6 +224,60 @@ def test_iso_timestamp_format() -> None:
     )
 
 
+def _score_entity_with(extra_data: dict) -> dict:
+    """Run the exporter on a single RISK_SCORED record and return the score Entity."""
+    base = {"point_estimate": 0.62, "conformal_lower": 0.55, "conformal_upper": 0.69}
+    rec = _record(
+        EventType.RISK_SCORED, record_id="r1", timestamp=1700000000.0,
+        data={**base, **extra_data},
+    )
+    doc = audit_to_prov_json([rec])
+    return doc["bundle"]["vaara:action/act-1"]["entity"]["vaara:score/act-1"]
+
+
+def test_score_entity_carries_calibration_size() -> None:
+    ent = _score_entity_with({"calibration_size": 1234})
+    assert ent["vaara:calibrationSize"] == 1234
+
+
+def test_score_entity_carries_effective_alpha() -> None:
+    ent = _score_entity_with({"effective_alpha": 0.0875})
+    assert ent["vaara:effectiveAlpha"] == 0.0875
+
+
+def test_score_entity_carries_bucket_category_when_mondrian() -> None:
+    ent = _score_entity_with({"bucket_category": "financial"})
+    assert ent["vaara:bucketCategory"] == "financial"
+
+
+def test_score_entity_omits_bucket_category_when_marginal() -> None:
+    # bucket_category=None is the marginal-mode marker; should not surface
+    ent = _score_entity_with({"bucket_category": None})
+    assert "vaara:bucketCategory" not in ent
+
+
+def test_score_entity_omits_calibration_context_when_data_missing() -> None:
+    # Pre-enrichment audit records (or any record produced without the
+    # extended fields) must not surface synthetic attributes.
+    ent = _score_entity_with({})
+    assert "vaara:calibrationSize" not in ent
+    assert "vaara:effectiveAlpha" not in ent
+    assert "vaara:bucketCategory" not in ent
+
+
+def test_score_entity_full_enrichment_round_trip() -> None:
+    ent = _score_entity_with({
+        "calibration_size": 250,
+        "effective_alpha": 0.10,
+        "bucket_category": "data",
+    })
+    assert ent["vaara:riskScore"] == 0.62
+    assert ent["vaara:conformalInterval"] == [0.55, 0.69]
+    assert ent["vaara:calibrationSize"] == 250
+    assert ent["vaara:effectiveAlpha"] == 0.10
+    assert ent["vaara:bucketCategory"] == "data"
+
+
 def test_cli_rejects_malformed_jsonl(tmp_path: Path, capsys) -> None:
     """A bad line returns exit code 2 with line context, no traceback."""
     from vaara.cli import main
