@@ -175,6 +175,14 @@ def main():
              "Requires vaara[ml] extras. Heuristic DENY/ESCALATE are preserved; "
              "heuristic ALLOW is upgraded to ESCALATE when classifier prob >= threshold.",
     )
+    ap.add_argument(
+        "--mondrian",
+        action="store_true",
+        help="Run the AdaptiveScorer in Mondrian (class-conditional) conformal "
+             "mode so coverage holds per action category instead of only "
+             "marginally. Run with and without to compare per-category coverage "
+             "and surface class-conditional miscoverage.",
+    )
     args = ap.parse_args()
 
     corpus_dir = Path(args.corpus_dir)
@@ -183,7 +191,13 @@ def main():
         raise SystemExit(f"No entries found under {corpus_dir}")
     print(f"[corpus] {len(entries)} entries across {len({e['category'] for e in entries})} categories")
 
-    pipe = Pipeline()
+    if args.mondrian:
+        from vaara.scorer.adaptive import AdaptiveScorer
+        pipe = Pipeline(scorer=AdaptiveScorer(mondrian_categories=True))
+        print("[scorer] AdaptiveScorer in Mondrian (class-conditional) mode")
+    else:
+        pipe = Pipeline()
+        print("[scorer] AdaptiveScorer in marginal mode (default)")
     classifier = None
     if args.with_classifier:
         try:

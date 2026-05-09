@@ -40,7 +40,10 @@ Each line in the per-category JSONL is one attack:
 ```
 python scripts/eval_adversarial.py
 python scripts/eval_adversarial.py --only-category credential_exfil
+python scripts/eval_adversarial.py --mondrian
 ```
+
+`--mondrian` switches the AdaptiveScorer into class-conditional conformal mode where each action category gets its own residual deque and FACI alpha. Run with and without to surface class-conditional miscoverage that the marginal headline number can hide.
 
 Outputs a JSON result file under `tests/adversarial/results_<UTC>.json` and prints a per-category summary:
 
