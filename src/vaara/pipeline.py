@@ -215,6 +215,7 @@ class InterceptionPipeline:
         trail: Optional[AuditTrail] = None,
         compliance: Optional[ComplianceEngine] = None,
         enforce: bool = True,
+        review_queue: Optional[Any] = None,
     ) -> None:
         """
         Args:
@@ -232,12 +233,19 @@ class InterceptionPipeline:
                 lets operators drop Vaara in front of an existing agent,
                 collect evidence of what would have been blocked, and
                 flip enforce=True only after reviewing the audit.
+            review_queue: Optional ``ReviewQueue`` (see
+                ``vaara.audit.review_queue``). When supplied, every
+                ``escalate`` decision is enqueued for operator review
+                with its conformal interval and signals. Default ``None``
+                preserves prior behaviour — pipeline writes the
+                ``ESCALATION_SENT`` audit record only.
         """
         self.registry = registry or create_default_registry()
         self.scorer = scorer or AdaptiveScorer()
         self.trail = trail or AuditTrail()
         self.compliance = compliance or ComplianceEngine()
         self._enforce = enforce
+        self._review_queue = review_queue
 
         # Track action_id → (predicted_risk, signals) for outcome feedback.
         # OrderedDict + bounded FIFO eviction — see _MAX_PENDING_OUTCOMES.
@@ -519,6 +527,34 @@ class InterceptionPipeline:
                 escalation_target="human_reviewer",
                 risk_score=point_estimate,
             )
+            # Enqueue for operator review when a queue is wired in.
+            # The conformal interval is what makes Article 14 oversight
+            # substantive rather than cosmetic (see COMPLIANCE.md).
+            # Queue write failure must not crash the intercept path —
+            # the action is already gated by the ``escalate`` decision
+            # and the ESCALATION_SENT audit record. Log and continue.
+            if self._review_queue is not None:
+                try:
+                    self._review_queue.enqueue(
+                        action_id=action_id,
+                        agent_id=agent_id,
+                        tool_name=tool_name,
+                        risk_score=point_estimate,
+                        conformal_lower=interval[0],
+                        conformal_upper=interval[1],
+                        action_type=action_type.name,
+                        bucket_category=bucket_category,
+                        reason=reason,
+                        parameters=safe_params,
+                        context=safe_context,
+                        signals=signals,
+                    )
+                except Exception:
+                    logger.exception(
+                        "review_queue enqueue failed for action_id=%s; "
+                        "escalation audit record stands",
+                        action_id,
+                    )
 
         # 9. Store for outcome feedback with bounded FIFO eviction
         with self._pending_outcomes_lock:
