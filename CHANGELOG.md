@@ -6,6 +6,8 @@ and this project follows [Semantic Versioning](https://semver.org/spec/v2.0.0.ht
 
 ## [Unreleased]
 
+## [0.9.0] - 2026-05-14
+
 **Theme: policy artifact validate + test framework.** v0.9.0 ships the
 two CLI surfaces that turn the YAML / JSON policy from "a config file
 the pipeline loads" into a policy-as-code artifact that compliance
