@@ -6,6 +6,8 @@ and this project follows [Semantic Versioning](https://semver.org/spec/v2.0.0.ht
 
 ## [Unreleased]
 
+## [0.8.0] - 2026-05-14
+
 **Theme: Article 73 serious-incident export (interim).** Adds the export
 surface a provider needs to satisfy EU AI Act Article 73 reporting
 obligations. The Commission template promised by Article 73 paragraph 7
