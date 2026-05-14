@@ -42,6 +42,58 @@ Backwards-compatible. Pure addition. The `AuditRecord` schema is
 unchanged. Severity is an incident-level concept, not a per-event
 concept, so no `AuditRecord` column was added.
 
+---
+
+**Theme: human-in-the-loop review queue (Article 14).** Adds the
+storage layer and operator surface that turn an `escalate` decision
+into a substantive Article 14(4)(d) override path. The pipeline
+already wrote `ESCALATION_SENT` for every escalated action; with a
+queue wired in, those actions now wait in a queryable place with
+their conformal interval, get claimed by an operator, and produce an
+`ESCALATION_RESOLVED` audit record when resolved.
+
+### Added
+- **`vaara.audit.review_queue` module.** `ReviewQueue` is a
+  SQLite-backed queue in its own DB file, separate from the audit DB
+  (which keeps its append-only invariant clean). Statuses:
+  `pending → claimed → resolved` happy path, `pending → expired`
+  stale path. Resolutions: `allow`, `deny`, `abstain`. `enqueue`
+  records each item with the conformal interval, risk signals,
+  bucket category, and request parameters/context as JSON; the
+  interval is what makes Article 14 oversight substantive rather
+  than cosmetic (see `COMPLIANCE.md`). `claim` is optimistic —
+  concurrent claim races resolve with one winner and
+  `InvalidTransitionError` for the loser. `resolve` accepts an
+  optional `trail` and writes `ESCALATION_RESOLVED` so the Article
+  14(4)(d) evidence row lands on the hash chain. `expire_stale`
+  marks pending items past a timeout; claimed items are left alone
+  since they are under active review.
+- **`InterceptionPipeline(review_queue=...)`.** Optional constructor
+  parameter. When supplied, every `escalate` decision is enqueued
+  alongside the existing `ESCALATION_SENT` audit record. Default
+  `None` preserves prior behaviour bit-for-bit. Queue write failure
+  logs and continues — the action is already gated by the escalate
+  verdict and the audit record stands.
+- **`vaara review` CLI.** Subcommands `list`, `show`, `claim`,
+  `resolve`, `expire`. `resolve --audit-db PATH` writes the
+  `ESCALATION_RESOLVED` record into an audit DB at that path so a
+  single operator command produces both the queue terminal state
+  and the Article 14(4)(d) hash-chain evidence.
+- **`tests/test_review_queue.py`** covers schema round trip,
+  pending-only and cross-status listing, agent-id filter, claim
+  race semantics, resolve from `pending` and from `claimed`,
+  unknown-resolution rejection, terminal-state guard, trail
+  write-through, expire-stale with `dry_run`, claimed-items-left-alone,
+  positive-timeout guard, counts partitioning, file-backed
+  persistence, oversized-blob capping, pipeline enqueue-on-escalate
+  end-to-end, no-enqueue-on-allow, and CLI smoke for each
+  subcommand including `resolve --audit-db` writing the audit row.
+
+### Note
+Backwards-compatible. Pure addition. No existing schemas migrate;
+the queue lives in its own DB file with its own `review_queue_meta`
+schema-version row.
+
 ## [0.7.0] - 2026-05-10
 
 **Theme: class-conditional conformal calibration.** v0.7.0 adds Mondrian per-category conformal prediction on top of the marginal split conformal that has shipped since v0.5.x. The same coverage guarantee now holds independently per action category, so a 90% headline can no longer hide a 60% miss rate on `credential_exfil` behind a 99% pass rate on `benign_control`. Eval surfaces the per-category breakdown. PROV-DM exports surface the calibration context an external auditor needs to read each interval honestly.
