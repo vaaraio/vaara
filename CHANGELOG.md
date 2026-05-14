@@ -4,6 +4,44 @@ All notable changes to this project are documented here.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/)
 and this project follows [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [Unreleased]
+
+**Theme: Article 73 serious-incident export (interim).** Adds the export
+surface a provider needs to satisfy EU AI Act Article 73 reporting
+obligations. The Commission template promised by Article 73 paragraph 7
+has not published, so the format is explicitly INTERIM. When the template
+publishes, the schema_version bumps and new fields land additively.
+
+### Added
+- **`vaara.audit.incident_export` module.** `build_incident_report()` and
+  `write_incident_report()` produce a standalone JSON document covering
+  the fields Article 73 paragraphs 1 to 7 reference. Schema version
+  `vaara-incident/1.0`. Reporting deadline is derived from the Article
+  3(49) sub-category: general 15 days, death of a person 10 days,
+  Article 3(49)(b) widespread or serious 2 days. Trigger record must have
+  `event_type` in `{outcome_recorded, action_blocked, policy_override}`.
+  Other event types describe normal operation and are rejected at
+  build time.
+  Paragraph 5 incomplete-initial plus complete-follow-up workflow is
+  supported via `report_status` and `previous_report_id`. Audit records
+  are referenced by `record_id` as evidence. The report does not
+  duplicate their content. Pair with `vaara trail export-prov` for
+  the full evidence bundle.
+- **`vaara trail export-incident` CLI subcommand.** Reads a trail JSONL
+  plus an operator-supplied incident metadata JSON, writes the report
+  to the output path. Picks the most recent trigger-eligible record by
+  default; explicit `--trigger-record-id ID` overrides. No external
+  template dependency, zero new runtime deps.
+- **`tests/test_incident_export.py`** covers schema shape, deadline
+  mapping per Article 3(49) sub-category, trigger-event validation,
+  causal-link and reporter-role validation, initial-versus-complete
+  report sequencing, and end-to-end trail-to-report flow.
+
+### Note
+Backwards-compatible. Pure addition. The `AuditRecord` schema is
+unchanged. Severity is an incident-level concept, not a per-event
+concept, so no `AuditRecord` column was added.
+
 ## [0.7.0] - 2026-05-10
 
 **Theme: class-conditional conformal calibration.** v0.7.0 adds Mondrian per-category conformal prediction on top of the marginal split conformal that has shipped since v0.5.x. The same coverage guarantee now holds independently per action category, so a 90% headline can no longer hide a 60% miss rate on `credential_exfil` behind a 99% pass rate on `benign_control`. Eval surfaces the per-category breakdown. PROV-DM exports surface the calibration context an external auditor needs to read each interval honestly.
