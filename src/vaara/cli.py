@@ -15,6 +15,13 @@ Subcommands:
     vaara trail export-prov --trail PATH --out PATH [--action-id ID] [--no-chain]
         Export the trail (or one action's slice) as W3C PROV-JSON.
 
+    vaara trail export-incident --trail PATH --incident-meta PATH --out PATH \
+                                 [--trigger-record-id ID]
+        Export an EU AI Act Article 73 serious-incident report (INTERIM
+        format pending the Commission template). Operator metadata
+        (severity, ai_system, reporter, recipient, ...) is supplied via a
+        JSON file; trigger and evidence records come from the trail.
+
     vaara version
         Print the installed Vaara version.
 
@@ -218,6 +225,65 @@ def _cmd_trail_export_prov(args: argparse.Namespace) -> int:
     return 0
 
 
+def _cmd_trail_export_incident(args: argparse.Namespace) -> int:
+    """Export an Article 73 serious-incident report from a trail JSONL."""
+    from vaara.audit.incident_export import (
+        build_from_trail,
+        write_incident_report,
+    )
+    from vaara.audit.trail import AuditRecord
+
+    trail_path = Path(args.trail).expanduser()
+    if not trail_path.exists():
+        print(f"trail JSONL not found: {trail_path}", file=sys.stderr)
+        return 2
+
+    meta_path = Path(args.incident_meta).expanduser()
+    if not meta_path.exists():
+        print(f"incident-meta JSON not found: {meta_path}", file=sys.stderr)
+        return 2
+    try:
+        with open(meta_path, "r", encoding="utf-8") as f:
+            incident_meta = json.load(f)
+    except (json.JSONDecodeError, OSError) as exc:
+        print(f"failed to read incident-meta: {exc}", file=sys.stderr)
+        return 2
+
+    records: list[AuditRecord] = []
+    with open(trail_path, "r", encoding="utf-8") as f:
+        for lineno, raw in enumerate(f, start=1):
+            line = raw.strip()
+            if not line:
+                continue
+            try:
+                records.append(AuditRecord.from_dict(json.loads(line)))
+            except (json.JSONDecodeError, TypeError, ValueError, KeyError) as exc:
+                print(
+                    f"invalid trail JSONL at line {lineno}: {exc}",
+                    file=sys.stderr,
+                )
+                return 2
+
+    try:
+        report = build_from_trail(
+            records,
+            incident_meta=incident_meta,
+            trigger_record_id=args.trigger_record_id,
+        )
+    except (ValueError, KeyError) as exc:
+        print(f"failed to build incident report: {exc}", file=sys.stderr)
+        return 2
+
+    out = Path(args.out).expanduser()
+    write_incident_report(report, out)
+    print(
+        f"Exported Article 73 incident report ({report['report_status']}, "
+        f"deadline {report['regulation']['reporting_deadline_days']} days) "
+        f"to {out}"
+    )
+    return 0
+
+
 def _cmd_trail_purge(args: argparse.Namespace) -> int:
     """Delete audit records older than --retention-days. EU AI Act Article 12(2)."""
     from vaara.audit.sqlite_backend import SQLiteAuditBackend
@@ -313,6 +379,27 @@ def build_parser() -> argparse.ArgumentParser:
         help="Omit the audit-record chain layer",
     )
     pep.set_defaults(func=_cmd_trail_export_prov)
+
+    pei = tsub.add_parser(
+        "export-incident",
+        help="Export an EU AI Act Article 73 serious-incident report (INTERIM)",
+    )
+    pei.add_argument("--trail", required=True, help="Path to trail JSONL file")
+    pei.add_argument(
+        "--incident-meta",
+        required=True,
+        help="Path to JSON file with operator-supplied incident metadata "
+             "(severity, ai_system, causal_link, reporter, recipient, ...)",
+    )
+    pei.add_argument("--out", required=True, help="Path to write the incident report JSON")
+    pei.add_argument(
+        "--trigger-record-id",
+        default=None,
+        help="record_id of the audit event that triggered the report. "
+             "If omitted, the most recent outcome_recorded / action_blocked / "
+             "policy_override event in the trail is used.",
+    )
+    pei.set_defaults(func=_cmd_trail_export_incident)
 
     pp = tsub.add_parser(
         "purge",
