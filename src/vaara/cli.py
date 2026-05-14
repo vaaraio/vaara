@@ -22,6 +22,29 @@ Subcommands:
         (severity, ai_system, reporter, recipient, ...) is supplied via a
         JSON file; trigger and evidence records come from the trail.
 
+    vaara review list --db PATH [--status {pending,claimed,resolved,expired}]
+                       [--limit N] [--agent-id ID]
+        Human-in-the-loop review queue. Lists pending escalations by
+        default with their conformal intervals (EU AI Act Article 14).
+
+    vaara review show --db PATH --queue-id ID
+        Print the full queue item as JSON.
+
+    vaara review claim --db PATH --queue-id ID --reviewer NAME
+        Mark a pending item as claimed by ``reviewer`` (optimistic).
+
+    vaara review resolve --db PATH --queue-id ID --reviewer NAME \
+                          --resolution {allow,deny,abstain} \
+                          [--justification TEXT]
+        Mark a pending or claimed item as resolved. The ``allow`` and
+        ``deny`` resolutions are operator decisions overriding the
+        pipeline's ``escalate`` verdict; ``abstain`` leaves
+        ``escalate`` as final.
+
+    vaara review expire --db PATH --timeout-seconds N [--dry-run]
+        Mark pending items older than ``timeout-seconds`` as expired.
+        Claimed items are left alone.
+
     vaara version
         Print the installed Vaara version.
 
@@ -37,6 +60,7 @@ import json
 import os
 import stat
 import sys
+import time
 from pathlib import Path
 
 from vaara import __version__
@@ -326,6 +350,121 @@ def _cmd_trail_purge(args: argparse.Namespace) -> int:
     return 0
 
 
+def _open_review_queue(db_arg: str):
+    from vaara.audit.review_queue import ReviewQueue
+    db_path = Path(db_arg).expanduser()
+    return ReviewQueue(db_path)
+
+
+def _format_review_row(item) -> str:
+    half = (item.conformal_upper - item.conformal_lower) / 2.0
+    age = max(0.0, time.time() - item.enqueued_at)
+    return (
+        f"{item.queue_id[:8]}  {item.status:8s}  "
+        f"score={item.risk_score:.3f}  "
+        f"[{item.conformal_lower:.3f},{item.conformal_upper:.3f}] "
+        f"±{half:.3f}  age={int(age)}s  "
+        f"{item.agent_id}  {item.tool_name}"
+    )
+
+
+def _cmd_review_list(args: argparse.Namespace) -> int:
+    status = args.status if args.status != "any" else None
+    with _open_review_queue(args.db) as q:
+        items = q.list_items(
+            status=status, limit=args.limit, agent_id=args.agent_id,
+        )
+        counts = q.counts()
+    if not items:
+        print(f"No items match (status={status!r}). counts={counts}")
+        return 0
+    print(f"queue items (status={status!r}, n={len(items)}, counts={counts}):")
+    for item in items:
+        print("  " + _format_review_row(item))
+    return 0
+
+
+def _cmd_review_show(args: argparse.Namespace) -> int:
+    from vaara.audit.review_queue import ItemNotFoundError
+    with _open_review_queue(args.db) as q:
+        try:
+            item = q.get(args.queue_id)
+        except ItemNotFoundError as exc:
+            print(f"not found: {exc}", file=sys.stderr)
+            return 2
+    print(json.dumps(item.to_dict(), indent=2, sort_keys=False))
+    return 0
+
+
+def _cmd_review_claim(args: argparse.Namespace) -> int:
+    from vaara.audit.review_queue import (
+        InvalidTransitionError, ItemNotFoundError,
+    )
+    with _open_review_queue(args.db) as q:
+        try:
+            item = q.claim(args.queue_id, reviewer=args.reviewer)
+        except (InvalidTransitionError, ItemNotFoundError) as exc:
+            print(f"claim failed: {exc}", file=sys.stderr)
+            return 2
+    print(f"claimed {item.queue_id} by {item.claimed_by} at "
+          f"{int(item.claimed_at or 0)}")
+    return 0
+
+
+def _cmd_review_resolve(args: argparse.Namespace) -> int:
+    from vaara.audit.review_queue import (
+        InvalidTransitionError, ItemNotFoundError,
+    )
+    trail = None
+    backend = None
+    if args.audit_db:
+        from vaara.audit.sqlite_backend import SQLiteAuditBackend
+        from vaara.audit.trail import AuditTrail
+        backend = SQLiteAuditBackend(Path(args.audit_db).expanduser())
+        trail = AuditTrail(on_record=backend.write_record)
+    try:
+        with _open_review_queue(args.db) as q:
+            try:
+                item = q.resolve(
+                    args.queue_id,
+                    reviewer=args.reviewer,
+                    resolution=args.resolution,
+                    justification=args.justification or "",
+                    trail=trail,
+                )
+            except (InvalidTransitionError, ItemNotFoundError) as exc:
+                print(f"resolve failed: {exc}", file=sys.stderr)
+                return 2
+            except ValueError as exc:
+                print(f"resolve failed: {exc}", file=sys.stderr)
+                return 2
+    finally:
+        if backend is not None:
+            backend.close()
+    print(
+        f"resolved {item.queue_id} resolution={item.resolution} "
+        f"reviewer={item.resolved_by}"
+    )
+    if trail is not None:
+        print("Wrote ESCALATION_RESOLVED to audit trail (Article 14(4)(d)).")
+    return 0
+
+
+def _cmd_review_expire(args: argparse.Namespace) -> int:
+    with _open_review_queue(args.db) as q:
+        try:
+            n = q.expire_stale(
+                timeout_seconds=args.timeout_seconds, dry_run=args.dry_run,
+            )
+        except ValueError as exc:
+            print(f"expire failed: {exc}", file=sys.stderr)
+            return 2
+    verb = "Would expire" if args.dry_run else "Expired"
+    print(f"{verb} {n} pending item(s) older than "
+          f"{args.timeout_seconds} second(s).")
+    return 0
+
+
 def build_parser() -> argparse.ArgumentParser:
     p = argparse.ArgumentParser(prog="vaara", description="Vaara AI Agent Execution Layer")
     sub = p.add_subparsers(dest="cmd", required=True)
@@ -431,6 +570,71 @@ def build_parser() -> argparse.ArgumentParser:
         help="Purge across all tenants in this DB. Use only on single-tenant deployments or after deliberate review.",
     )
     pp.set_defaults(func=_cmd_trail_purge)
+
+    pr = sub.add_parser(
+        "review",
+        help="Human-in-the-loop review queue (EU AI Act Article 14)",
+    )
+    rsub = pr.add_subparsers(dest="review_cmd", required=True)
+
+    rl = rsub.add_parser("list", help="List queue items (default: pending)")
+    rl.add_argument("--db", required=True, help="Path to the review queue DB")
+    rl.add_argument(
+        "--status", default="pending",
+        choices=["pending", "claimed", "resolved", "expired", "any"],
+        help="Filter by status. ``any`` lists across all statuses.",
+    )
+    rl.add_argument("--limit", type=int, default=50, help="Max rows (cap 1000)")
+    rl.add_argument("--agent-id", default=None, help="Restrict to one agent_id")
+    rl.set_defaults(func=_cmd_review_list)
+
+    rsh = rsub.add_parser("show", help="Print one queue item as JSON")
+    rsh.add_argument("--db", required=True, help="Path to the review queue DB")
+    rsh.add_argument("--queue-id", required=True, help="queue_id to show")
+    rsh.set_defaults(func=_cmd_review_show)
+
+    rc = rsub.add_parser("claim", help="Claim a pending item")
+    rc.add_argument("--db", required=True, help="Path to the review queue DB")
+    rc.add_argument("--queue-id", required=True, help="queue_id to claim")
+    rc.add_argument("--reviewer", required=True, help="Operator identifier")
+    rc.set_defaults(func=_cmd_review_claim)
+
+    rr = rsub.add_parser(
+        "resolve", help="Resolve a pending or claimed item",
+    )
+    rr.add_argument("--db", required=True, help="Path to the review queue DB")
+    rr.add_argument("--queue-id", required=True, help="queue_id to resolve")
+    rr.add_argument("--reviewer", required=True, help="Operator identifier")
+    rr.add_argument(
+        "--resolution", required=True,
+        choices=["allow", "deny", "abstain"],
+        help="``allow`` or ``deny`` override the escalate verdict; "
+             "``abstain`` leaves escalate as final.",
+    )
+    rr.add_argument(
+        "--justification", default="",
+        help="Free-text justification (capped 8192 chars)",
+    )
+    rr.add_argument(
+        "--audit-db", default=None,
+        help="If supplied, also write an ESCALATION_RESOLVED record to "
+             "the audit DB at this path (Article 14(4)(d) evidence).",
+    )
+    rr.set_defaults(func=_cmd_review_resolve)
+
+    re_ = rsub.add_parser(
+        "expire", help="Expire stale pending items past a timeout",
+    )
+    re_.add_argument("--db", required=True, help="Path to the review queue DB")
+    re_.add_argument(
+        "--timeout-seconds", required=True, type=float,
+        help="Pending items older than this are marked expired",
+    )
+    re_.add_argument(
+        "--dry-run", action="store_true",
+        help="Report the count without modifying the DB",
+    )
+    re_.set_defaults(func=_cmd_review_expire)
 
     return p
 
