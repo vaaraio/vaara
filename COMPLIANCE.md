@@ -35,6 +35,7 @@ types that populate evidence for it. The list matches the default
 | **14(4)(d)** | Human Oversight -- Override Capability | `ESCALATION_RESOLVED` and `POLICY_OVERRIDE` events prove a human can decide not to proceed or can override Vaara's decision. |
 | **15(1)** | Accuracy, Robustness and Cybersecurity | `OUTCOME_RECORDED` events feed the adaptive scorer. Recency is tracked (default weekly calibration window). |
 | **61(1)** | Post-Market Monitoring | `OUTCOME_RECORDED` events form the post-market signal, tied back to the original action via `action_id`. |
+| **73(1-7)** | Serious-Incident Reporting | `vaara trail export-incident` builds a standalone JSON report referencing the trigger audit record by `record_id`. INTERIM format pending the Commission template promised by paragraph 7. Reporting deadline is derived from the Article 3(49) sub-category (general 15 days, death 10 days, Article 3(49)(b) widespread or serious 2 days). |
 
 ### Article 14 in particular
 
