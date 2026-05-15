@@ -71,6 +71,15 @@ Backwards-compatible. Pure addition. No existing module signatures
 change. `Policy` and the load path are unchanged; the new modules
 sit beside them under `vaara.policy.*`.
 
+### Provenance note
+The PyPI artifact for v0.9.0 was uploaded via `twine` (not via
+trusted publishing) after a GitHub Actions infrastructure outage on
+2026-05-15 caused the Release workflow's Build job to fail at the
+artifact upload step, which skipped the downstream
+trusted-publishing job. The wheel and sdist on PyPI are bit-identical
+to what `python -m build` produced from commit `ea201fe`. Subsequent
+releases use trusted publishing as standard.
+
 ## [0.8.0] - 2026-05-14
 
 **Theme: Article 73 serious-incident export (interim).** Adds the export
