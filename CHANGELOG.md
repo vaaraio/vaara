@@ -6,6 +6,71 @@ and this project follows [Semantic Versioning](https://semver.org/spec/v2.0.0.ht
 
 ## [Unreleased]
 
+## [0.9.0] - 2026-05-14
+
+**Theme: policy artifact validate + test framework.** v0.9.0 ships the
+two CLI surfaces that turn the YAML / JSON policy from "a config file
+the pipeline loads" into a policy-as-code artifact that compliance
+teams can validate and test in CI, independently from the agent code
+it governs.
+
+### Added
+- **`vaara.policy.validate` module.** `validate(Policy)` returns a
+  `ValidationReport` with structured `PolicyIssue` records (level,
+  code, path, message). Semantic warnings emitted: empty
+  `action_classes`, threshold bands narrower than 0.05 (default and
+  per-class merged), threshold overrides targeting an action class
+  not declared, sequence-pattern steps that do not name a declared
+  action class, escalation routes whose `if_articles` overlap no
+  emitted regulatory tag, missing default escalation route.
+  `validate_source(source, fmt="auto")` combines load and check so a
+  single call yields `(policy, report)` or `(None,
+  report-with-error)`. Stable JSON shape via `ValidationReport.to_dict()`.
+- **`vaara.policy.test_cases` module — Conftest analog for Vaara
+  policies.** `evaluate(policy, action_class, risk_score,
+  matched_sequences=())` is the underlying primitive: applies any
+  matched sequence pattern boosts (capped at 1.0), resolves the
+  merged threshold for the action class, returns
+  `EvaluationResult(verdict, boosted_risk, route)`. `PolicyTestCase`
+  captures the inputs plus an expected verdict and (for
+  `escalate`) an expected operator route. `run_test_cases(policy,
+  cases)` runs the list, captures evaluation errors as failed cases
+  rather than raising, and returns `PolicyTestResult` rows. The
+  evaluator validates inputs at the boundary (risk score in `[0,1]`,
+  action class declared, matched sequences known).
+- **`vaara.policy.test_cases_io` module.** `load_test_cases(path)`
+  reads a YAML or JSON cases document and returns a list of
+  `PolicyTestCase`. Document shape mirrors typical OPA / Conftest
+  test files: a top-level `cases:` list with `action_class`,
+  `risk_score`, optional `matched_sequences`, and an `expect:` block
+  carrying `verdict` and optional `route`.
+- **`vaara policy validate POLICY_PATH [--json]`** and **`vaara
+  policy test POLICY_PATH --cases CASES_PATH [--json]`** CLI
+  subcommands. Both honour standard CI exit codes: validate returns
+  1 on parse errors (warnings do not flip), test returns 1 on any
+  failed case (and 2 if the policy itself fails to parse).
+- **`examples/policies/test_cases.yaml`** — six worked test cases
+  exercising thresholds, sequence-pattern boost, default and
+  article-matched escalation routes against
+  `examples/policies/full.yaml`.
+- **48 new tests** (`tests/test_policy_validate.py`,
+  `tests/test_policy_test_cases.py`,
+  `tests/test_policy_test_cases_io.py`, `tests/test_policy_cli.py`)
+  covering report shape, every warning code, evaluator edges
+  (threshold-equal-escalate, boost cap at 1.0, unknown action class,
+  unknown sequence, out-of-range risk), case-construction validation
+  (bad verdict, route without escalate), YAML and JSON case files,
+  the worked example end-to-end, and CLI smoke for each subcommand
+  including `--json`. Full suite 472 / 472 pass.
+- **COMPLIANCE.md** gains a *Policy artifact review* subsection under
+  Article 14 documenting both CLI surfaces as the path to reviewing
+  the policy artifact independently from the agent code.
+
+### Note
+Backwards-compatible. Pure addition. No existing module signatures
+change. `Policy` and the load path are unchanged; the new modules
+sit beside them under `vaara.policy.*`.
+
 ## [0.8.0] - 2026-05-14
 
 **Theme: Article 73 serious-incident export (interim).** Adds the export
