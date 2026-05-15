@@ -45,6 +45,33 @@ whether the model is confident. A conformal interval of [0.58, 0.62]
 versus [0.2, 0.95] tells them whether to trust the number. Vaara
 surfaces both on every escalation.
 
+### Policy artifact review
+
+The Vaara policy is a declarative YAML / JSON document loaded via
+`vaara.policy.from_yaml()` or `from_json()`. As of v0.9, two CLI
+surfaces let a compliance team review the policy artifact
+independently from the agent code that uses it:
+
+- `vaara policy validate POLICY_PATH` runs structured semantic checks
+  (parse errors plus warnings for narrow threshold bands, dangling
+  per-class overrides, unreachable escalation routes, sequence steps
+  not naming a declared action class, missing default escalation
+  route). Exit code 0 if no errors; warnings print without flipping
+  the exit code.
+- `vaara policy test POLICY_PATH --cases CASES_PATH` runs a YAML/JSON
+  cases file against the policy (Conftest analog for Vaara). Each
+  case names an action class, a risk score, any sequence patterns to
+  treat as matched, and an expected verdict and route. Exit code 0
+  if every case passes.
+
+Both commands carry a `--json` flag so CI pipelines can consume the
+output directly. The policy document and its cases file live in the
+deployer's source-control tree, version-controlled and diffable,
+alongside any other policy-as-code artifacts (Rego, Cedar, Casbin)
+used in the same governance stack. Worked example at
+`examples/policies/test_cases.yaml` exercises
+`examples/policies/full.yaml`.
+
 ### Article 26 (deployer obligations)
 
 Article 26 obligations sit on the deployer, not on Vaara. The evidence

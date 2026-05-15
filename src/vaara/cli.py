@@ -45,6 +45,19 @@ Subcommands:
         Mark pending items older than ``timeout-seconds`` as expired.
         Claimed items are left alone.
 
+    vaara policy validate POLICY_PATH [--json]
+        Load a YAML/JSON policy and run semantic checks. Exit 0 if no
+        errors. Warnings (narrow threshold bands, dangling overrides,
+        unreachable escalation routes, missing default route, sequence
+        steps not naming a declared action class) print without
+        flipping the exit code.
+
+    vaara policy test POLICY_PATH --cases CASES_PATH [--json]
+        Run a YAML/JSON cases file against a policy (Conftest analog).
+        Each case names an action_class, a risk_score, optional
+        matched_sequences, and an expected verdict / route. Exit 0 if
+        every case passes.
+
     vaara version
         Print the installed Vaara version.
 
@@ -465,6 +478,78 @@ def _cmd_review_expire(args: argparse.Namespace) -> int:
     return 0
 
 
+def _render_validation_report(report, *, source_label: str, as_json: bool) -> str:
+    if as_json:
+        return json.dumps(report.to_dict(), indent=2)
+    if not report.issues:
+        return f"{source_label}: ok (no issues)"
+    lines = [
+        f"  [{i.level.value}] {i.code}"
+        f"{(' at ' + i.path) if i.path else ''}: {i.message}"
+        for i in report.issues
+    ]
+    header = (
+        f"{source_label}: {len(report.errors)} error(s), "
+        f"{len(report.warnings)} warning(s)"
+    )
+    return header + "\n" + "\n".join(lines)
+
+
+def _cmd_policy_validate(args: argparse.Namespace) -> int:
+    from vaara.policy.validate import validate_source
+
+    policy_path = Path(args.policy).expanduser()
+    _policy, report = validate_source(policy_path)
+    print(_render_validation_report(
+        report, source_label=str(policy_path), as_json=args.json,
+    ))
+    return 0 if report.ok else 1
+
+
+def _render_test_results(results, *, as_json: bool) -> str:
+    if as_json:
+        return json.dumps({
+            "total": len(results),
+            "passed": sum(1 for r in results if r.passed),
+            "failed": sum(1 for r in results if not r.passed),
+            "results": [r.to_dict() for r in results],
+        }, indent=2)
+    lines = []
+    for r in results:
+        mark = "PASS" if r.passed else "FAIL"
+        suffix = "" if r.passed else f" — {r.diagnostic}"
+        lines.append(f"  [{mark}] {r.case.name}{suffix}")
+    failed = sum(1 for r in results if not r.passed)
+    header = f"{len(results)} case(s), {len(results) - failed} passed, {failed} failed"
+    return header + "\n" + "\n".join(lines)
+
+
+def _cmd_policy_test(args: argparse.Namespace) -> int:
+    from vaara.policy.test_cases import run_test_cases
+    from vaara.policy.test_cases_io import load_test_cases
+    from vaara.policy.validate import validate_source
+
+    policy_path = Path(args.policy).expanduser()
+    cases_path = Path(args.cases).expanduser()
+
+    policy, report = validate_source(policy_path)
+    if policy is None:
+        print(_render_validation_report(
+            report, source_label=str(policy_path), as_json=args.json,
+        ), file=sys.stderr)
+        return 2
+
+    try:
+        cases = load_test_cases(cases_path)
+    except Exception as e:
+        print(f"failed to load cases from {cases_path}: {e}", file=sys.stderr)
+        return 2
+
+    results = run_test_cases(policy, cases)
+    print(_render_test_results(results, as_json=args.json))
+    return 0 if all(r.passed for r in results) else 1
+
+
 def build_parser() -> argparse.ArgumentParser:
     p = argparse.ArgumentParser(prog="vaara", description="Vaara AI Agent Execution Layer")
     sub = p.add_subparsers(dest="cmd", required=True)
@@ -635,6 +720,38 @@ def build_parser() -> argparse.ArgumentParser:
         help="Report the count without modifying the DB",
     )
     re_.set_defaults(func=_cmd_review_expire)
+
+    pp_policy = sub.add_parser(
+        "policy",
+        help="Policy artifact commands (validate, test)",
+    )
+    psub = pp_policy.add_subparsers(dest="policy_cmd", required=True)
+
+    pvalid = psub.add_parser(
+        "validate",
+        help="Load a policy and report parse errors plus semantic warnings",
+    )
+    pvalid.add_argument("policy", help="Path to a YAML or JSON policy file")
+    pvalid.add_argument(
+        "--json", action="store_true",
+        help="Emit the report as JSON (stable shape for CI)",
+    )
+    pvalid.set_defaults(func=_cmd_policy_validate)
+
+    ptest = psub.add_parser(
+        "test",
+        help="Run a YAML/JSON cases file against a policy (Conftest analog)",
+    )
+    ptest.add_argument("policy", help="Path to a YAML or JSON policy file")
+    ptest.add_argument(
+        "--cases", required=True,
+        help="Path to a YAML or JSON file containing a 'cases:' list",
+    )
+    ptest.add_argument(
+        "--json", action="store_true",
+        help="Emit results as JSON (stable shape for CI)",
+    )
+    ptest.set_defaults(func=_cmd_policy_test)
 
     return p
 
