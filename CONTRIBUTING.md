@@ -17,6 +17,16 @@ Thanks for considering a contribution.
 - **Public interface changes.** If you change the public API, update `docs/formal_specification.md` and `CHANGELOG.md` in the same PR.
 - **Security-sensitive changes.** Follow `SECURITY.md` for private disclosure of vulnerabilities.
 
+## Git hooks (one-time setup)
+
+After cloning, point Git at the repo's tracked hooks:
+
+```bash
+git config core.hooksPath .githooks
+```
+
+The pre-commit hook blocks accidental commits of internal-only files (`.tape` recordings, `research/`, `.regwatch/`, private analytical docs). To override for a legitimate case, use `git commit --no-verify`.
+
 ## Pre-push lint sweep
 
 Before pushing, run the full lint sweep from the repo root:
