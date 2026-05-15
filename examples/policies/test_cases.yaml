@@ -1,0 +1,58 @@
+# Worked example: test cases for `examples/policies/full.yaml`.
+# Run with:
+#     vaara policy test examples/policies/full.yaml --cases examples/policies/test_cases.yaml
+# Compliance teams can author and version-control these files independently
+# from agent code (EU AI Act Article 14 — independently-reviewable policy
+# artifact). Exit code is 0 iff every case passes.
+
+cases:
+  # Baseline allow — risk below the escalate threshold.
+  - name: fs.write_file low risk allows
+    action_class: fs.write_file
+    risk_score: 0.30
+    expect:
+      verdict: allow
+
+  # Default escalate threshold (0.55) reached, no per-class override on escalate.
+  # fs.write_file does NOT declare aiact:14 so escalation falls through to default.
+  - name: fs.write_file mid risk escalates to default route
+    action_class: fs.write_file
+    risk_score: 0.60
+    expect:
+      verdict: escalate
+      route: on_call
+
+  # Per-class override tightens deny to 0.75 (default is 0.85).
+  - name: fs.write_file deny via tighter override
+    action_class: fs.write_file
+    risk_score: 0.80
+    expect:
+      verdict: deny
+
+  # tx.sign override is stricter: escalate=0.40, deny=0.65.
+  # Its regulatory tags include aiact:14 so the first escalation route wins.
+  - name: tx.sign escalates to ai_oversight_team on aiact 14 match
+    action_class: tx.sign
+    risk_score: 0.50
+    expect:
+      verdict: escalate
+      route: ai_oversight_team
+
+  # Sequence boost pushes a sub-escalate score over deny:
+  #   0.40 (risk) + 0.30 (config_then_signal boost) = 0.70 >= 0.65 deny override.
+  - name: tx.sign deny after config_then_signal sequence boost
+    action_class: tx.sign
+    risk_score: 0.40
+    matched_sequences: [config_then_signal]
+    expect:
+      verdict: deny
+
+  # email.send uses default thresholds (escalate 0.55, deny 0.85).
+  # Its only regulatory tag is aiact:13 — no escalation route matches that,
+  # so escalations fall through to the default 'on_call' route.
+  - name: email.send escalates to on_call when no specific route matches
+    action_class: email.send
+    risk_score: 0.70
+    expect:
+      verdict: escalate
+      route: on_call

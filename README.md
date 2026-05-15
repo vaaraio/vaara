@@ -62,6 +62,7 @@ else:
 - [Article 14 runtime: why oversight of agentic AI has to be evidenced as action, not model](https://futurium.ec.europa.eu/ga/apply-ai-alliance/community-content/article-14-runtime-why-oversight-agentic-ai-has-be-evidenced-action-not-model): why this exists. Posted on the EU Apply AI Alliance Futurium.
 - `src/vaara/integrations/`: LangChain, OpenAI Agents SDK, CrewAI, MCP server.
 - `src/vaara/audit/`: hash-chain trail, SQLite backend, append-only WAL.
+- `src/vaara/policy/`: declarative YAML / JSON policy schema with `vaara policy validate` (semantic checks) and `vaara policy test` (Conftest-style cases-file runner) for reviewing the policy artifact in CI independently from agent code.
 - `src/vaara/sandbox/`: synthetic-trace cold-start calibration.
 
 > Vaara helps deployers assemble evidence for their own conformity work. It does not certify compliance or constitute legal advice. Deployers own their obligations under the EU AI Act and other applicable law.
