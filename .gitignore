@@ -17,3 +17,8 @@ docs/grant/
 dist_verify/
 research/
 .claude/
+
+# Private / internal — never publish
+*.tape
+.regwatch/
+scripts/regwatch*

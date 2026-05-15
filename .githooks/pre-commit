@@ -1,0 +1,28 @@
+#!/usr/bin/env bash
+# pre-commit — block accidental commits of internal/private files.
+# Activate once per clone: git config core.hooksPath .githooks
+set -euo pipefail
+
+staged=$(git diff --cached --name-only --diff-filter=ACMR)
+[ -z "$staged" ] && exit 0
+
+block=()
+while IFS= read -r f; do
+  [ -z "$f" ] && continue
+  case "$f" in
+    *.tape)                  block+=("$f — VHS recording, not for institutional repo");;
+    .regwatch/*)             block+=("$f — private regulatory inbox");;
+    scripts/regwatch*)       block+=("$f — private regwatch tooling");;
+    research/*)              block+=("$f — research/ is internal");;
+    docs/blog/*|docs/grant/*) block+=("$f — internal drafts directory");;
+    *whole_picture*|*cold_read*) block+=("$f — private analytical doc pattern");;
+  esac
+done <<< "$staged"
+
+if [ ${#block[@]} -gt 0 ]; then
+  printf '\npre-commit: BLOCKED — staged files match internal/private patterns:\n' >&2
+  printf '  - %s\n' "${block[@]}" >&2
+  printf '\nIf this file is genuinely intended for the public repo and the pattern is wrong,\n' >&2
+  printf 'edit .githooks/pre-commit. Conscious bypass: git commit --no-verify\n\n' >&2
+  exit 1
+fi
