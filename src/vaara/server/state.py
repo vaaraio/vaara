@@ -1,4 +1,4 @@
-"""Server state container — scorer + audit trail singletons."""
+"""Server state container — scorer + audit trail + policy controller singletons."""
 
 from __future__ import annotations
 
@@ -7,6 +7,7 @@ from dataclasses import dataclass, field
 from typing import Optional
 
 from vaara.audit.trail import AuditTrail
+from vaara.policy.controller import PolicyController
 from vaara.scorer.adaptive import AdaptiveScorer
 
 
@@ -25,9 +26,13 @@ class ServerState:
         self,
         scorer: Optional[AdaptiveScorer] = None,
         audit: Optional[AuditTrail] = None,
+        policy_controller: Optional[PolicyController] = None,
     ) -> None:
         self.scorer = scorer or AdaptiveScorer()
         self.audit = audit or AuditTrail()
+        self.policy_controller = policy_controller
+        if policy_controller is not None:
+            policy_controller.add_listener(self.scorer.apply_policy)
         self._lock = threading.Lock()
         # action_id → info captured at score time so outcome reports can
         # feed the MWU update without the client having to resend context.

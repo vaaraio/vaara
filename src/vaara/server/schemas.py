@@ -161,3 +161,53 @@ class ErrorBody(BaseModel):
 
 class ErrorResponse(BaseModel):
     error: ErrorBody
+
+
+class DetectInjectionRequest(BaseModel):
+    model_config = ConfigDict(extra="forbid")
+
+    text: str = Field(max_length=100_000)
+    threshold: Optional[float] = Field(default=None, ge=0, le=1)
+
+
+class DetectInjectionResponse(BaseModel):
+    detected: bool
+    score: float = Field(ge=0, le=1)
+    threshold: float = Field(ge=0, le=1)
+    bundle_version: str
+    backend: str
+
+
+class DetectPIIRequest(BaseModel):
+    model_config = ConfigDict(extra="forbid")
+
+    text: str = Field(max_length=100_000)
+
+
+class DetectPIIFinding(BaseModel):
+    category: str
+    value: str
+    offset: int
+    length: int
+
+
+class DetectPIIResponse(BaseModel):
+    detected: bool
+    categories: list[str]
+    findings: list[DetectPIIFinding]
+
+
+class PolicyReloadRequest(BaseModel):
+    model_config = ConfigDict(extra="forbid")
+
+    path: Optional[str] = Field(default=None, max_length=4096)
+    body: Optional[dict[str, Any]] = None
+    format: Optional[Literal["json", "yaml"]] = None
+
+
+class PolicyReloadResponse(BaseModel):
+    version: int
+    thresholds_default: dict[str, float]
+    sequence_count: int
+    action_class_count: int
+    escalation_route_count: int
