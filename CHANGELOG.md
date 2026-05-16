@@ -42,15 +42,15 @@ rebuttable-presumption hook), transposition deadline 9 December 2026.
   statistics over Vaara's per-action conformal prediction intervals
   alongside the standard binomial CI. Carries the same non-parametric
   coverage guarantee with no distributional assumption.
-  Standard OVERT verifiers ignore the extension; Vaara-aware
+  Standard OVERT verifiers ignore the extension. Vaara-aware
   verifiers cross-check it against the per-action receipts.
 - **vaara-bench-v1.** Versioned adversarial-detection benchmark with
   frozen corpus (`bench/adversarial_corpus.jsonl`, SHA-256
   `7a3219776e1c93a5127ab3b63832d73ba75f32fa044cabdbaa4e5d7088b33ff2`),
   frozen methodology (`bench/scorer_eval.py`), and frozen headline
   numbers under v0.11.0 (soft TPR 100%, soft FPR 20%, hard TPR
-  28.85%, hard FPR 0%). Spec doc at `bench/vaara-bench-v1.md`;
-  machine-readable results at `bench/vaara-bench-v1-results.json`.
+  28.85%, hard FPR 0%). Spec doc at `bench/vaara-bench-v1.md`.
+  Machine-readable results at `bench/vaara-bench-v1-results.json`.
   Apache-2.0 licensed.
 - 18 new tests in `tests/test_attestation_s3p.py` covering
   Clopper-Pearson against textbook values, the k=0 and k=n
@@ -100,7 +100,7 @@ statement in COMPLIANCE.md.
   request commitments per Annex B.4 and SHA-256 encoder-identity
   derivation. IEEE-754 floats are rejected at the canonical-encoding
   boundary per Protocol Profile 1.0 numeric rules. Vaara operates as
-  the **Arbiter** in OVERT terms; external Independent Attestation
+  the **Arbiter** in OVERT terms. External Independent Attestation
   Providers promote AAL-3 emission to AAL-4 by attaching Phase 3
   notary signatures and transparency-log inclusion proofs. Public API:
   `BaseEnvelope`, `emit_base_envelope`, `verify_base_envelope`,
@@ -118,7 +118,7 @@ statement in COMPLIANCE.md.
   3(45), not a qualified trust service under Article 3(16)) and a
   position statement relative to OVERT 1.0 (Glacis Technologies). Vaara
   is structurally independent of the agent it governs and maps to
-  OVERT AAL-3 operator-controlled attestation; reaching AAL-4 requires
+  OVERT AAL-3 operator-controlled attestation. Reaching AAL-4 requires
   pairing Vaara with an external Independent Attestation Provider. The
   design admits an external IAP layer without internal change.
 
@@ -127,7 +127,7 @@ statement in COMPLIANCE.md.
 **Theme: Vaara as the kernel others build around.** v0.10.0 ships the
 network-callable surface, the auditor-facing evidence artefact, and the
 offline-verifiable receipt pair. Each of the three pieces is additive
-and backward-compatible; together they reposition Vaara from a Python
+and backward-compatible. Together they reposition Vaara from a Python
 library to a runtime kernel that control planes, audit consumers, and
 orchestration frameworks reference. The HTTP contract at
 `docs/openapi.yaml` is versioned `/v1/` independently of the project
@@ -139,13 +139,13 @@ version, following the OPA pattern.
   contract in `docs/openapi.yaml`. Endpoints: `POST /v1/score`,
   `POST /v1/score/outcome`, `POST /v1/audit/events`,
   `GET /v1/audit/actions/{action_id}/chain`, `POST /v1/audit/verify`,
-  `GET /v1/server`, `GET /v1/health`. The spec is authoritative; the
+  `GET /v1/server`, `GET /v1/health`. The spec is authoritative. The
   reference server in `src/vaara/server/` is a FastAPI implementation
   suitable for local development and modest production loads.
 - **`vaara serve`** CLI subcommand.
 - **OpenAPI 3.1 contract at `docs/openapi.yaml`.** Stable v1 surface,
   intended as the integration point for control planes, orchestration
-  frameworks, and audit consumers. Vaara defines the interface; the
+  frameworks, and audit consumers. Vaara defines the interface. The
   vendors call it.
 - 11 new HTTP server tests (`tests/test_server.py`).
 - **Auditor-facing evidence report rendering.** New module
@@ -193,7 +193,7 @@ it governs.
   `validate_source(source, fmt="auto")` combines load and check so a
   single call yields `(policy, report)` or `(None,
   report-with-error)`. Stable JSON shape via `ValidationReport.to_dict()`.
-- **`vaara.policy.test_cases` module — Conftest analog for Vaara
+- **`vaara.policy.test_cases` module - Conftest analog for Vaara
   policies.** `evaluate(policy, action_class, risk_score,
   matched_sequences=())` is the underlying primitive: applies any
   matched sequence pattern boosts (capped at 1.0), resolves the
@@ -216,7 +216,7 @@ it governs.
   subcommands. Both honour standard CI exit codes: validate returns
   1 on parse errors (warnings do not flip), test returns 1 on any
   failed case (and 2 if the policy itself fails to parse).
-- **`examples/policies/test_cases.yaml`** — six worked test cases
+- **`examples/policies/test_cases.yaml`** - six worked test cases
   exercising thresholds, sequence-pattern boost, default and
   article-matched escalation routes against
   `examples/policies/full.yaml`.
@@ -235,7 +235,7 @@ it governs.
 
 ### Note
 Backwards-compatible. Pure addition. No existing module signatures
-change. `Policy` and the load path are unchanged; the new modules
+change. `Policy` and the load path are unchanged. The new modules
 sit beside them under `vaara.policy.*`.
 
 ### Provenance note
@@ -273,7 +273,7 @@ publishes, the schema_version bumps and new fields land additively.
 - **`vaara trail export-incident` CLI subcommand.** Reads a trail JSONL
   plus an operator-supplied incident metadata JSON, writes the report
   to the output path. Picks the most recent trigger-eligible record by
-  default; explicit `--trigger-record-id ID` overrides. No external
+  default. Explicit `--trigger-record-id ID` overrides. No external
   template dependency, zero new runtime deps.
 - **`tests/test_incident_export.py`** covers schema shape, deadline
   mapping per Article 3(49) sub-category, trigger-event validation,
@@ -290,7 +290,7 @@ concept, so no `AuditRecord` column was added.
 **Theme: human-in-the-loop review queue (Article 14).** Adds the
 storage layer and operator surface that turn an `escalate` decision
 into a substantive Article 14(4)(d) override path. The pipeline
-already wrote `ESCALATION_SENT` for every escalated action; with a
+already wrote `ESCALATION_SENT` for every escalated action. With a
 queue wired in, those actions now wait in a queryable place with
 their conformal interval, get claimed by an operator, and produce an
 `ESCALATION_RESOLVED` audit record when resolved.
@@ -302,20 +302,20 @@ their conformal interval, get claimed by an operator, and produce an
   `pending → claimed → resolved` happy path, `pending → expired`
   stale path. Resolutions: `allow`, `deny`, `abstain`. `enqueue`
   records each item with the conformal interval, risk signals,
-  bucket category, and request parameters/context as JSON; the
+  bucket category, and request parameters/context as JSON. The
   interval is what makes Article 14 oversight substantive rather
-  than cosmetic (see `COMPLIANCE.md`). `claim` is optimistic —
+  than cosmetic (see `COMPLIANCE.md`). `claim` is optimistic -
   concurrent claim races resolve with one winner and
   `InvalidTransitionError` for the loser. `resolve` accepts an
   optional `trail` and writes `ESCALATION_RESOLVED` so the Article
   14(4)(d) evidence row lands on the hash chain. `expire_stale`
-  marks pending items past a timeout; claimed items are left alone
+  marks pending items past a timeout. Claimed items are left alone
   since they are under active review.
 - **`InterceptionPipeline(review_queue=...)`.** Optional constructor
   parameter. When supplied, every `escalate` decision is enqueued
   alongside the existing `ESCALATION_SENT` audit record. Default
   `None` preserves prior behaviour bit-for-bit. Queue write failure
-  logs and continues — the action is already gated by the escalate
+  logs and continues - the action is already gated by the escalate
   verdict and the audit record stands.
 - **`vaara review` CLI.** Subcommands `list`, `show`, `claim`,
   `resolve`, `expire`. `resolve --audit-db PATH` writes the
@@ -333,8 +333,8 @@ their conformal interval, get claimed by an operator, and produce an
   subcommand including `resolve --audit-db` writing the audit row.
 
 ### Note
-Backwards-compatible. Pure addition. No existing schemas migrate;
-the queue lives in its own DB file with its own `review_queue_meta`
+Backwards-compatible. Pure addition. No existing schemas migrate.
+The queue lives in its own DB file with its own `review_queue_meta`
 schema-version row.
 
 ## [0.7.0] - 2026-05-10
@@ -366,41 +366,41 @@ Backwards-compatible release. All four PRs are additive. Mondrian is opt-in via 
 **Theme: documentation sync to PyPI.** v0.6.0 shipped the functional changes (policy DSL, retention purge, transparency taxonomy, distribution-shift / stack-ablation / PAIR evals, lint sweep) but the README, library docstring, example file headers, and PyPI tagline stayed at the v0.5.0 framing. PyPI's package page kept publishing pre-rebalance numbers and the wrong default threshold. v0.6.1 ships only the documentation cleanup so new PyPI installs see the current state.
 
 ### Changed
-- `README.md`: replaced the "Numbers" section with the v0.6 distribution-shift table (97.1% recall / 70.0% FPR hand-curated held-out; 95.2% / 87.5% LLM-generated in-sample) plus PAIR ASR 0.0% (0/25). Threshold default 0.5 -> 0.55, corpus description updated to the 5,955-entry rebalanced corpus, threshold-direction note corrected (recall drops as threshold rises). PR #44.
-- `src/vaara/adversarial_classifier.py`: rewrote the module docstring. Removed all version-bound numbers; readers now point at README + COMPLIANCE so the docstring does not go stale on every release. PR #44.
+- `README.md`: replaced the "Numbers" section with the v0.6 distribution-shift table (97.1% recall / 70.0% FPR hand-curated held-out. 95.2% / 87.5% LLM-generated in-sample) plus PAIR ASR 0.0% (0/25). Threshold default 0.5 -> 0.55, corpus description updated to the 5,955-entry rebalanced corpus, threshold-direction note corrected (recall drops as threshold rises). PR #44.
+- `src/vaara/adversarial_classifier.py`: rewrote the module docstring. Removed all version-bound numbers. Readers now point at README + COMPLIANCE so the docstring does not go stale on every release. PR #44.
 - `examples/adversarial_classifier.py`: ship-note threshold 0.8 -> 0.55. PR #44.
 - `scripts/classifier_vs_heuristic.py`: clarified the script is the v0.5.0 historical reproducer, not the current production training path. PR #44.
 - `pyproject.toml`: rephrased description for cleaner PyPI tagline rendering. PR #45.
 
 ### Note
-No functional code changes. v0.6.0 users are on the same code; v0.6.1 only refreshes documentation surfaces visible to new PyPI installs and to anyone reading the package source.
+No functional code changes. v0.6.0 users are on the same code. V0.6.1 only refreshes documentation surfaces visible to new PyPI installs and to anyone reading the package source.
 
 ## [0.6.0] - 2026-04-27
 
 **Theme: standards alignment + legibility.** v0.5.x was the capability axis (jailbreak coverage closed, classifier rebalanced). v0.6 is the legibility axis: policies become readable, audit records become standards-aligned, adversarial numbers become honest, architecture contribution becomes documented.
 
 ### Added
-- **`vaara.policy` package — JSON-native policy loader plus optional YAML via `vaara[yaml]` extra.** Frozen dataclasses for action classes, threshold curves, sequence patterns, and escalation routes. Hand-rolled validation with field-path error messages. Reuses existing `vaara.taxonomy.actions` enums verbatim. Threshold partial-overrides supported (set just `deny`, inherit default `escalate`). Implements Sketch A from the v0.6 DSL design exploration; embedded Python DSL (Sketch B) and standalone DSL (Sketch C) stay deferred to v0.7+ pending external pull.
-- **`vaara trail purge --db PATH --retention-days N (--tenant TID | --all-tenants) [--dry-run]` CLI subcommand** plus `SQLiteAuditBackend.purge_older_than(seconds, *, dry_run=False)` Python API. Article 12(2) retention enforcement. Tenant scoping is required: pick `--tenant TID` for a single tenant or `--all-tenants` explicitly, so a shared multi-tenant audit DB can never be silently purged across all tenants. Hash-chain integrity: surviving records still reference deleted predecessors via `previous_hash`, leaving a documented seam at the retention boundary that subsequent loads expose as a hash mismatch. Intended workflow: export a signed handoff zip BEFORE purging, archive externally, then purge. The signed zip remains self-consistent forever; the live DB chain has the seam.
-- **prEN ISO/IEC 12792 four-axis transparency taxonomy on `AuditRecord`.** Four optional fields (`system_operation`, `data_usage`, `decision_making`, `limitations`) with default-classification heuristic per `EventType`. Per-record override via construction kwargs. NOT tamper-evident in v0.6 — fields are metadata annotations excluded from `record_hash` so pre-v0.6 chains stay valid. v0.7+ may add a separate signing mechanism if compliance requires.
-- **`scripts/eval_distribution_shift.py`** — runs the full Vaara stack against the adversarial corpus with per-source tagging (hand-curated vs LLM-generated). Reports recall and FPR per source/class.
-- **`scripts/eval_stack_ablation.py`** — runs three configurations (heuristic-only, classifier-only, full-stack) against the same corpus. Quantifies the independent contribution of each layer.
-- **`scripts/eval_pair_attack.py`** — PAIR (Chao et al. 2023) iterative adaptive attacker. Uses an OpenAI-compatible vLLM endpoint for both attacker and judge roles. Zero new runtime deps (uses `urllib.request`).
+- **`vaara.policy` package - JSON-native policy loader plus optional YAML via `vaara[yaml]` extra.** Frozen dataclasses for action classes, threshold curves, sequence patterns, and escalation routes. Hand-rolled validation with field-path error messages. Reuses existing `vaara.taxonomy.actions` enums verbatim. Threshold partial-overrides supported (set just `deny`, inherit default `escalate`). Implements Sketch A from the v0.6 DSL design exploration. Embedded Python DSL (Sketch B) and standalone DSL (Sketch C) stay deferred to v0.7+ pending external pull.
+- **`vaara trail purge --db PATH --retention-days N (--tenant TID | --all-tenants) [--dry-run]` CLI subcommand** plus `SQLiteAuditBackend.purge_older_than(seconds, *, dry_run=False)` Python API. Article 12(2) retention enforcement. Tenant scoping is required: pick `--tenant TID` for a single tenant or `--all-tenants` explicitly, so a shared multi-tenant audit DB can never be silently purged across all tenants. Hash-chain integrity: surviving records still reference deleted predecessors via `previous_hash`, leaving a documented seam at the retention boundary that subsequent loads expose as a hash mismatch. Intended workflow: export a signed handoff zip BEFORE purging, archive externally, then purge. The signed zip remains self-consistent forever. The live DB chain has the seam.
+- **prEN ISO/IEC 12792 four-axis transparency taxonomy on `AuditRecord`.** Four optional fields (`system_operation`, `data_usage`, `decision_making`, `limitations`) with default-classification heuristic per `EventType`. Per-record override via construction kwargs. NOT tamper-evident in v0.6 - fields are metadata annotations excluded from `record_hash` so pre-v0.6 chains stay valid. v0.7+ may add a separate signing mechanism if compliance requires.
+- **`scripts/eval_distribution_shift.py`** - runs the full Vaara stack against the adversarial corpus with per-source tagging (hand-curated vs LLM-generated). Reports recall and FPR per source/class.
+- **`scripts/eval_stack_ablation.py`** - runs three configurations (heuristic-only, classifier-only, full-stack) against the same corpus. Quantifies the independent contribution of each layer.
+- **`scripts/eval_pair_attack.py`** - PAIR (Chao et al. 2023) iterative adaptive attacker. Uses an OpenAI-compatible vLLM endpoint for both attacker and judge roles. Zero new runtime deps (uses `urllib.request`).
 - **`[yaml]` optional extra in `pyproject.toml`** (`pyyaml>=6.0`). Core `dependencies = []` preserved.
 - **`examples/policies/minimal.json` and `full.yaml`** as reference policies.
-- **COMPLIANCE.md gains "EU AI Act Annex IV evidence sections"** (maps Vaara contribution per §1–§9; direct fill on §3, §5, §9; contributes on §2, §4, §6, §7; out of scope for §1, §8) **and "CEN-CENELEC harmonised standards alignment"** (per-standard table for ISO/IEC 42001, prEN 18286, prEN 18228, ISO/IEC 42006, prEN ISO/IEC 24970, prEN 18229-1, prEN ISO/IEC 12792).
-- **`scripts/lint_full.sh` pre-push lint sweep** — chains `ruff` (style + correctness), `bandit` (security), `mypy` (types — strict on `vaara.policy`, lenient on legacy modules), and `pytest`. Documented in CONTRIBUTING.md. Catches CodeRabbit-class findings before they hit a PR review round-trip. New dev extras: `bandit>=1.7.5`, `mypy>=1.8`. Bandit configured in `pyproject.toml` to skip B608 across `audit/sqlite_backend.py` (all f-string SQL there interpolates only internally-controlled tenant clauses, not user input). Two `# nosec` annotations document the remaining trusted-bundle and synthetic-trace-RNG sites.
+- **COMPLIANCE.md gains "EU AI Act Annex IV evidence sections"** (maps Vaara contribution per §1–§9. Direct fill on §3, §5, §9. Contributes on §2, §4, §6, §7. Out of scope for §1, §8) **and "CEN-CENELEC harmonised standards alignment"** (per-standard table for ISO/IEC 42001, prEN 18286, prEN 18228, ISO/IEC 42006, prEN ISO/IEC 24970, prEN 18229-1, prEN ISO/IEC 12792).
+- **`scripts/lint_full.sh` pre-push lint sweep** - chains `ruff` (style + correctness), `bandit` (security), `mypy` (types - strict on `vaara.policy`, lenient on legacy modules), and `pytest`. Documented in CONTRIBUTING.md. Catches CodeRabbit-class findings before they hit a PR review round-trip. New dev extras: `bandit>=1.7.5`, `mypy>=1.8`. Bandit configured in `pyproject.toml` to skip B608 across `audit/sqlite_backend.py` (all f-string SQL there interpolates only internally-controlled tenant clauses, not user input). Two `# nosec` annotations document the remaining trusted-bundle and synthetic-trace-RNG sites.
 
 ### Changed
-- **Audit DB schema v2 → v3.** Migration `_MIGRATIONS[2]` adds four nullable transparency columns to `audit_records`. Pre-v0.6 records get NULL for the new columns; their stored `record_hash` is preserved (NOT re-hashed on load), so chain verification of historical records continues to work.
+- **Audit DB schema v2 → v3.** Migration `_MIGRATIONS[2]` adds four nullable transparency columns to `audit_records`. Pre-v0.6 records get NULL for the new columns. Their stored `record_hash` is preserved (NOT re-hashed on load), so chain verification of historical records continues to work.
 - **COMPLIANCE.md "Current limits"** replaced placeholder bullets with v0.6 measurement results:
   - **Distribution-shift split.** Hand-curated (held-out, 250): attack recall 97.1% / benign FPR 70.0%. LLM-generated (in-sample, 5,705): attack recall 95.2% / benign FPR 87.5%. The 18pp benign-FPR gap is the dominant distribution-shift signal.
-  - **Stack composition.** `heuristic_only` recall 35% / 63%. `classifier_only` recall 94% / 86%. `full_stack` recall 97% / 98%. Layers not redundant — heuristic catches a small set of attacks the classifier misses (justifies the ensemble). Most full-stack benign FPR comes from heuristic ESCALATEs, not classifier upgrades.
-  - **PAIR adaptive-attacker calibration.** Qwen2.5-32B-Instruct as both attacker and judge, 25 hand-curated jailbreak seeds, max 5 iterations: **ASR 0.0% (0/25)**. NOT a claim of imperviousness to all adaptive attackers — stronger attacker (70B+), longer iteration budgets, or alternate strategies (multi-turn drift, language-switch, obfuscation) might produce non-zero ASR.
+  - **Stack composition.** `heuristic_only` recall 35% / 63%. `classifier_only` recall 94% / 86%. `full_stack` recall 97% / 98%. Layers not redundant - heuristic catches a small set of attacks the classifier misses (justifies the ensemble). Most full-stack benign FPR comes from heuristic ESCALATEs, not classifier upgrades.
+  - **PAIR adaptive-attacker calibration.** Qwen2.5-32B-Instruct as both attacker and judge, 25 hand-curated jailbreak seeds, max 5 iterations: **ASR 0.0% (0/25)**. NOT a claim of imperviousness to all adaptive attackers - stronger attacker (70B+), longer iteration budgets, or alternate strategies (multi-turn drift, language-switch, obfuscation) might produce non-zero ASR.
 
 ### Deferred to v0.7+
-- **prEN ISO/IEC 24970 field-alias layer** — pending public final of the standard. Will land when 24970 publishes.
-- **DORA mapping refinement** — pending deployer-side signal. Conservative defaults shipped in v0.5.3 stay until a financial deployer's input refines them.
+- **prEN ISO/IEC 24970 field-alias layer** - pending public final of the standard. Will land when 24970 publishes.
+- **DORA mapping refinement** - pending deployer-side signal. Conservative defaults shipped in v0.5.3 stay until a financial deployer's input refines them.
 
 ### Reproducible artifacts
 - `tests/adversarial/distribution_shift_v0_5_3.json`
@@ -525,7 +525,7 @@ v0.5.1 remains on PyPI but ships a broken classifier. Upgrade to 0.5.2 to get th
 
 ### Changed
 - `AdversarialClassifier` retrained on an expanded benign corpus to reduce false-positive rate in live agent traffic.
-- Recommended operating threshold changed from `0.8` to `0.3` — the added benigns shifted the score distribution, and 0.3 is now the optimal balanced-accuracy point.
+- Recommended operating threshold changed from `0.8` to `0.3` - the added benigns shifted the score distribution, and 0.3 is now the optimal balanced-accuracy point.
 
 ### Added
 - `tests/adversarial/benign_generated/BT-new-http_post.jsonl` (170 variants)
@@ -541,7 +541,7 @@ v0.5.1 remains on PyPI but ships a broken classifier. Upgrade to 0.5.2 to get th
 
 ### Known regressions (disclosed)
 The new benigns shifted the decision surface toward allow. Per-category accuracy regressed in three attack categories:
-- `data_exfil`: 0% (was 28.6% heuristic baseline — classifier now worse than heuristic here)
+- `data_exfil`: 0% (was 28.6% heuristic baseline - classifier now worse than heuristic here)
 - `destructive_actions`: 25% (was 87.5% heuristic)
 - `jailbreak`: 0% (was 100% heuristic)
 
@@ -550,12 +550,12 @@ The heuristic scorer retains strong coverage in these categories. Stack both rat
 ## [0.5.0] - 2026-04-23
 
 ### Added
-- `AdversarialClassifier` — opt-in XGBoost scorer for adversarial tool-call detection. Install with `pip install vaara[ml]`.
-- `src/vaara/data/adversarial_classifier_v1.joblib` — 295 KB pre-trained bundle shipped with the wheel.
-- `scripts/classifier_vs_heuristic.py` — reproducible comparison harness (by-seed train/test split, no leakage).
-- `tests/adversarial/generated/` — 1945 LLM-generated adversarial variants across 8 attack categories (Qwen2.5-3B on MI300X, batched).
-- `tests/adversarial/benign_generated/` — 635 benign variants (487 broad + 148 targeted at http_post/send_email/shell_exec legit uses).
-- `[project.optional-dependencies.ml]` — `xgboost`, `scikit-learn`, `joblib`, `numpy`. Default install stays zero-dep.
+- `AdversarialClassifier` - opt-in XGBoost scorer for adversarial tool-call detection. Install with `pip install vaara[ml]`.
+- `src/vaara/data/adversarial_classifier_v1.joblib` - 295 KB pre-trained bundle shipped with the wheel.
+- `scripts/classifier_vs_heuristic.py` - reproducible comparison harness (by-seed train/test split, no leakage).
+- `tests/adversarial/generated/` - 1945 LLM-generated adversarial variants across 8 attack categories (Qwen2.5-3B on MI300X, batched).
+- `tests/adversarial/benign_generated/` - 635 benign variants (487 broad + 148 targeted at http_post/send_email/shell_exec legit uses).
+- `[project.optional-dependencies.ml]` - `xgboost`, `scikit-learn`, `joblib`, `numpy`. Default install stays zero-dep.
 
 ### Benchmarks
 On the by-seed held-out test (50 adversarial seeds held out entirely, plus 60 benign entries), classifier at threshold 0.8:
@@ -564,7 +564,7 @@ On the by-seed held-out test (50 adversarial seeds held out entirely, plus 60 be
 - Balanced accuracy: 74% (vs 50% heuristic)
 - Latency: 140 µs mean, 210 µs p99 (commodity CPU, no GPU at inference)
 
-Live dogfood on 174 Qwen-generated prompts with an end-to-end LangChain-style agent loop: recall 70%, FPR 51% — real-world distribution is tougher than the clean held-out test. Ship with `decision="escalate"` in production, not `decision="deny"`.
+Live dogfood on 174 Qwen-generated prompts with an end-to-end LangChain-style agent loop: recall 70%, FPR 51% - real-world distribution is tougher than the clean held-out test. Ship with `decision="escalate"` in production, not `decision="deny"`.
 
 ## [0.4.4] - 2026-04-22
 

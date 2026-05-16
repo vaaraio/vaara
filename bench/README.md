@@ -123,7 +123,7 @@ contract as **vaara-bench-v1**. See [`vaara-bench-v1.md`](vaara-bench-v1.md)
 for the frozen corpus hash, the methodology, the headline numbers
 under Vaara 0.11.0, the reproduction commands, and the license. Use
 the spec doc when citing Vaara's adversarial-detection numbers
-externally; this README is the running commentary.
+externally. This README is the running commentary.
 
 `bench/adversarial_corpus.jsonl` is a **synthetic** labelled corpus
 of 77 traces generated deterministically by `bench/build_corpus.py`.
