@@ -34,6 +34,7 @@ from vaara.policy.schema import (
     Thresholds,
 )
 from vaara.policy.loader import from_dict, from_json, from_yaml
+from vaara.policy.controller import PolicyController, ReloadResult
 from vaara.policy.validate import (
     IssueLevel,
     PolicyIssue,
@@ -57,10 +58,12 @@ __all__ = [
     "EvaluationResult",
     "IssueLevel",
     "Policy",
+    "PolicyController",
     "PolicyError",
     "PolicyIssue",
     "PolicyTestCase",
     "PolicyTestResult",
+    "ReloadResult",
     "SequencePattern",
     "Thresholds",
     "ValidationReport",

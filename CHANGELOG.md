@@ -6,6 +6,72 @@ and this project follows [Semantic Versioning](https://semver.org/spec/v2.0.0.ht
 
 ## [Unreleased]
 
+## [0.13.0] - 2026-05-17
+
+**Theme: operator surface + OVERT Phase 3 path.** Four additions that
+close the most legible competitive gaps without diluting the kernel
+position. Hot policy reload meets the Galileo Agent Control selling
+point on its own ground. The OVERT 1.0 Phase 3 Independent Attestation
+Provider (IAP) reference closes the AAL-3 → AAL-4 promotion path that
+v0.11.0's Provisional Receipt opens, so Vaara owns the full path
+without forcing dependence on an external IAP vendor. Named injection
+and PII detectors expose existing scoring surface under buyer-visible
+labels. A static HTML article-coverage dashboard adds the auditor-
+facing visual artefact that the peer set has converged on.
+
+### Added
+- **Hot policy reload.** New `vaara.policy.controller.PolicyController`
+  owns the live `Policy` and runs registered listeners under a write
+  lock on `reload()`. `AdaptiveScorer.apply_policy(policy)` rebinds
+  thresholds and sequence patterns atomically under the scorer's own
+  RLock; an `evaluate()` call in flight on another thread either sees
+  the old `(allow, deny)` pair or the new one, never a torn half.
+  Conformal calibration, MWU expert state, and agent profiles are
+  preserved across reloads. Malformed reloads are rejected with the
+  previous policy left live. `POST /v1/policy/reload` accepts a
+  server-side path or an inline body; `vaara serve --policy PATH`
+  enables the endpoint; `vaara policy reload POLICY_PATH` triggers
+  reload over HTTP from the operator's shell.
+- **OVERT 1.0 AAL-4 Phase 3 IAP reference.** New
+  `vaara.attestation.iap` ships a `Phase3Attestation` dataclass that
+  wraps a Vaara `BaseEnvelope` with a notary Ed25519 signature (over a
+  domain-separated prefix + canonical-CBOR of the inner envelope
+  including its signature) and a transparency-log inclusion proof.
+  Structural independence between the Arbiter key and the notary key
+  is enforced at both emit and verify. New
+  `vaara.attestation.transparency_log.InProcessTransparencyLog`
+  implements an RFC 6962-style binary Merkle tree with domain-
+  separated leaf and internal hashes; `append()` /
+  `inclusion_proof()` / `root_hash` match the shape a sigstore Rekor
+  adapter would expose, so a production deployment can swap in Rekor
+  at the same call sites without changing the IAP contract.
+- **Named injection + PII detector aliases.** `vaara.detect.detect_injection`
+  routes free text through the same AdversarialClassifier behind
+  vaara-bench-v1's published numbers (heuristic fallback when the ml
+  extra is absent; the `backend` field reports which path served the
+  call). `vaara.detect.detect_pii` is a zero-dependency regex extractor
+  over six categories — email, phone, US SSN, IPv4, credit_card
+  (Luhn-checked), IBAN (mod-97 checksum). `POST /v1/detect/injection`
+  and `POST /v1/detect/pii` mirror the CLI. `vaara detect injection`
+  and `vaara detect pii` read text from `--text`, `--file`, or
+  `--stdin` and exit non-zero when the detector fires.
+- **Static HTML article-coverage dashboard.**
+  `vaara.compliance.dashboard.render_html` produces a single
+  self-contained HTML page with embedded CSS, no JavaScript, no
+  external assets, no network calls. Same content as the Markdown
+  renderer (system metadata, audit-trail integrity, summary, critical
+  gaps, per-domain article tables, detailed per-article sections) with
+  status badges as colored pills and a print-friendly stylesheet.
+  `vaara compliance dashboard --db PATH --out PATH` writes the page;
+  a trailing slash or existing directory drops `index.html` inside.
+- **OpenAPI spec coverage.** `docs/openapi.yaml` adds
+  `/v1/detect/injection`, `/v1/detect/pii`, and `/v1/policy/reload`
+  with full request and response schemas. The spec remains the
+  authoritative integration surface.
+- 53 new tests (14 PolicyController + reload HTTP; 11 IAP +
+  transparency-log; 19 detect (injection + PII + HTTP); 9 HTML
+  dashboard). Total 586 passing, 12 skipped.
+
 ## [0.12.0] - 2026-05-16
 
 **Theme: agentic OVERT reference, published benchmark, product liability hook.**

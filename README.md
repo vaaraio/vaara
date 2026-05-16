@@ -73,9 +73,11 @@ curl -sX POST http://localhost:8000/v1/score \
 
 The contract is in [docs/openapi.yaml](docs/openapi.yaml). Vaara defines the interface. Control-plane and orchestration vendors call it. Integration recipes for adopters live under `examples/recipes/`.
 
+v0.13.0 adds three operator-facing endpoints. `POST /v1/policy/reload` atomically swaps the running policy without restarting the agent process (start with `vaara serve --policy PATH` to enable; in-flight requests keep the old thresholds, the next request sees the new ones). `POST /v1/detect/injection` and `POST /v1/detect/pii` expose Vaara's adversarial scorer and a zero-dependency PII extractor as named buyer-visible endpoints; the corresponding `vaara detect injection` and `vaara detect pii` CLI subcommands exit non-zero when the detector fires, so they slot into CI gates. `vaara compliance dashboard --db PATH --out site/` renders a single-file static HTML article-coverage page from the same evidence model as `vaara compliance report`.
+
 ## OVERT 1.0 attestation
 
-Vaara implements the OVERT 1.0 ([overt.is](https://overt.is/)) Protocol Profile 1.0 Base Envelope. OVERT 1.0 is an open standard for runtime trust in AI systems, authored by Glacis Technologies and published 25 March 2026. Closed-schema 9-field structure at AAL-3 Phase 2 (Provisional Receipt), canonical CBOR (RFC 8949), Ed25519 signatures, HMAC-SHA256 keyed commitments, IEEE-754 float rejection. External Independent Attestation Providers can promote AAL-3 emission to AAL-4 by attaching Phase 3 notary signatures and transparency-log inclusion proofs.
+Vaara implements the OVERT 1.0 ([overt.is](https://overt.is/)) Protocol Profile 1.0 Base Envelope. OVERT 1.0 is an open standard for runtime trust in AI systems, authored by Glacis Technologies and published 25 March 2026. Closed-schema 9-field structure at AAL-3 Phase 2 (Provisional Receipt), canonical CBOR (RFC 8949), Ed25519 signatures, HMAC-SHA256 keyed commitments, IEEE-754 float rejection. v0.13.0 adds a reference Phase 3 IAP (`vaara.attestation.iap`) that notary-signs the Provisional Receipt and anchors it in a transparency log; production deployments can swap in sigstore Rekor or an equivalent independently-operated log at the same call sites.
 
 ```
 pip install 'vaara[attestation]'
@@ -87,7 +89,7 @@ from vaara.attestation.overt import emit_base_envelope, make_request_commitment,
 envelope = emit_base_envelope(
     signing_key=key,
     request_commitment=make_request_commitment(payload, operator_key=op_key),
-    encoder_binary_identity=encoder_binary_identity(arbiter_version="vaara/0.12.0", policy_hash=ph),
+    encoder_binary_identity=encoder_binary_identity(arbiter_version="vaara/0.13.0", policy_hash=ph),
     non_content_metadata={"action_class": "tx.transfer", "decision": "escalate"},
     monotonic_counter=42,
     arbiter_instance_identifier=uuid_bytes,
