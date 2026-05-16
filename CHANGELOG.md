@@ -6,6 +6,17 @@ and this project follows [Semantic Versioning](https://semver.org/spec/v2.0.0.ht
 
 ## [Unreleased]
 
+## [0.10.0] - 2026-05-16
+
+**Theme: Vaara as the kernel others build around.** v0.10.0 ships the
+network-callable surface, the auditor-facing evidence artefact, and the
+offline-verifiable receipt pair. Each of the three pieces is additive
+and backward-compatible; together they reposition Vaara from a Python
+library to a runtime kernel that control planes, audit consumers, and
+orchestration frameworks reference. The HTTP contract at
+`docs/openapi.yaml` is versioned `/v1/` independently of the project
+version, following the OPA pattern.
+
 ### Added
 - **HTTP API reference server (`vaara[server]` extra).** Exposes the
   conformal scorer and hash-chained audit trail over HTTP per the
