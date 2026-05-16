@@ -12,7 +12,7 @@ from vaara.audit.receipts import (
     verify_receipt,
     verify_receipt_dict,
 )
-from vaara.audit.trail import AuditTrail, EventType
+from vaara.audit.trail import AuditTrail
 from vaara.taxonomy.actions import (
     ActionCategory,
     ActionRequest,

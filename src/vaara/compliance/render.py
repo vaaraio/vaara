@@ -20,13 +20,11 @@ from __future__ import annotations
 
 import json
 import time
-from typing import Any
 
 from vaara.compliance.engine import (
     ArticleEvidence,
     ConformityReport,
     EvidenceStatus,
-    EvidenceStrength,
 )
 
 
