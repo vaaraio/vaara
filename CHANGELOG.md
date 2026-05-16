@@ -33,6 +33,18 @@ and this project follows [Semantic Versioning](https://semver.org/spec/v2.0.0.ht
   [--out FILE]`** CLI subcommand. Loads an audit SQLite DB, runs
   `ComplianceEngine.assess`, renders to chosen format.
 - 5 new compliance-render tests (`tests/test_compliance_render.py`).
+- **Article 12 commit-prove receipt pair.** New module
+  `vaara.audit.receipts` derives an offline-verifiable receipt from the
+  existing audit chain: a `commit_hash` covering the gate-time decision
+  (action_id, decision, risk_score, thresholds, decided_at) and an
+  `outcome_hash` covering the post-execution outcome and embedding the
+  commit_hash. Open-standards SHA-256 over canonical JSON, no external
+  cryptography library required. Verification needs only `hashlib`,
+  enabling per-action handoff to auditors without sharing the full chain
+  or key material.
+- **`vaara trail receipt --db PATH --action-id ID [--out FILE]`** CLI
+  subcommand. Extracts and verifies the receipt pair, prints JSON.
+- 11 new receipt tests (`tests/test_receipts.py`).
 
 ## [0.9.0] - 2026-05-15
 

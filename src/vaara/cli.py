@@ -550,6 +550,45 @@ def _cmd_policy_test(args: argparse.Namespace) -> int:
     return 0 if all(r.passed for r in results) else 1
 
 
+def _cmd_trail_receipt(args: argparse.Namespace) -> int:
+    from vaara.audit.receipts import extract_receipt, verify_receipt
+    from vaara.audit.sqlite_backend import SQLiteAuditBackend
+
+    db_path = Path(args.db).expanduser()
+    if not db_path.exists():
+        print(f"audit DB not found: {db_path}", file=sys.stderr)
+        return 2
+
+    backend = SQLiteAuditBackend(str(db_path))
+    try:
+        trail = backend.load_trail()
+    except Exception as exc:
+        print(f"failed to load audit trail: {exc}", file=sys.stderr)
+        return 2
+
+    receipt = extract_receipt(trail, args.action_id)
+    if receipt is None:
+        print(
+            f"no decision record found for action_id {args.action_id!r}",
+            file=sys.stderr,
+        )
+        return 1
+
+    if not verify_receipt(receipt):
+        print(
+            "receipt verification failed — derived hashes do not match payloads",
+            file=sys.stderr,
+        )
+        return 1
+
+    text = json.dumps(receipt.to_dict(), indent=2, sort_keys=False)
+    if args.out:
+        Path(args.out).expanduser().write_text(text, encoding="utf-8")
+    else:
+        print(text)
+    return 0
+
+
 def _cmd_compliance_report(args: argparse.Namespace) -> int:
     from vaara.audit.sqlite_backend import SQLiteAuditBackend
     from vaara.compliance.engine import create_default_engine
@@ -688,6 +727,15 @@ def build_parser() -> argparse.ArgumentParser:
              "policy_override event in the trail is used.",
     )
     pei.set_defaults(func=_cmd_trail_export_incident)
+
+    prec = tsub.add_parser(
+        "receipt",
+        help="Extract an Article 12 commit-prove receipt pair for an action",
+    )
+    prec.add_argument("--db", required=True, help="Path to the audit SQLite DB")
+    prec.add_argument("--action-id", required=True, help="action_id to extract")
+    prec.add_argument("--out", default=None, help="Write to file (default: stdout)")
+    prec.set_defaults(func=_cmd_trail_receipt)
 
     pp = tsub.add_parser(
         "purge",
