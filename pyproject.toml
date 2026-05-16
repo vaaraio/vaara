@@ -43,6 +43,7 @@ export = ["cryptography>=41.0"]
 ml = ["xgboost>=2.0", "scikit-learn>=1.3", "joblib>=1.3", "numpy>=1.24"]
 yaml = ["pyyaml>=6.0"]
 server = ["fastapi>=0.110", "uvicorn>=0.27"]
+attestation = ["cbor2>=5.4", "cryptography>=41.0"]
 
 [project.scripts]
 vaara = "vaara.cli:main"

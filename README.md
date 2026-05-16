@@ -72,6 +72,29 @@ curl -sX POST http://localhost:8000/v1/score \
 
 The contract is in [docs/openapi.yaml](docs/openapi.yaml). Vaara defines the interface; control-plane and orchestration vendors call it. Integration recipes for adopters live under `examples/recipes/`.
 
+## OVERT 1.0 attestation
+
+Vaara is the first OSS Python reference implementation of the OVERT 1.0 ([overt.is](https://overt.is/), Glacis Technologies, March 2026) Protocol Profile 1.0 Base Envelope at AAL-3 Phase 2 (Provisional Receipt). Closed-schema 9-field structure, canonical CBOR encoding, Ed25519 signatures, HMAC-SHA256 keyed commitments, IEEE-754 float rejection. External Independent Attestation Providers can promote AAL-3 emission to AAL-4 by attaching Phase 3 notary signatures and transparency-log inclusion proofs.
+
+```
+pip install 'vaara[attestation]'
+```
+
+```python
+from vaara.attestation.overt import emit_base_envelope, make_request_commitment, encoder_binary_identity
+
+envelope = emit_base_envelope(
+    signing_key=key,
+    request_commitment=make_request_commitment(payload, operator_key=op_key),
+    encoder_binary_identity=encoder_binary_identity(arbiter_version="vaara/0.11.0", policy_hash=ph),
+    non_content_metadata={"action_class": "tx.transfer", "decision": "escalate"},
+    monotonic_counter=42,
+    arbiter_instance_identifier=uuid_bytes,
+)
+```
+
+Vaara operates as the **Arbiter** in OVERT terms. See [COMPLIANCE.md](COMPLIANCE.md) "Position relative to open runtime-attestation standards" for the architectural framing.
+
 ## Where things live
 
 - [docs/formal_specification.md](docs/formal_specification.md): math. MWU regret bound O(sqrt(T log N)), conformal coverage guarantees, security properties.
