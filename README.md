@@ -75,7 +75,7 @@ The contract is in [docs/openapi.yaml](docs/openapi.yaml). Vaara defines the int
 
 ## OVERT 1.0 attestation
 
-Vaara implements the OVERT 1.0 ([overt.is](https://overt.is/)) Protocol Profile 1.0 Base Envelope. OVERT 1.0 is an open standard for runtime trust in AI systems, authored by Glacis Technologies and published in March 2026. Closed-schema 9-field structure at AAL-3 Phase 2 (Provisional Receipt), canonical CBOR (RFC 8949), Ed25519 signatures, HMAC-SHA256 keyed commitments, IEEE-754 float rejection. External Independent Attestation Providers can promote AAL-3 emission to AAL-4 by attaching Phase 3 notary signatures and transparency-log inclusion proofs.
+Vaara implements the OVERT 1.0 ([overt.is](https://overt.is/)) Protocol Profile 1.0 Base Envelope. OVERT 1.0 is an open standard for runtime trust in AI systems, authored by Glacis Technologies and published 25 March 2026. Closed-schema 9-field structure at AAL-3 Phase 2 (Provisional Receipt), canonical CBOR (RFC 8949), Ed25519 signatures, HMAC-SHA256 keyed commitments, IEEE-754 float rejection. External Independent Attestation Providers can promote AAL-3 emission to AAL-4 by attaching Phase 3 notary signatures and transparency-log inclusion proofs.
 
 ```
 pip install 'vaara[attestation]'
