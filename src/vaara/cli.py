@@ -550,6 +550,24 @@ def _cmd_policy_test(args: argparse.Namespace) -> int:
     return 0 if all(r.passed for r in results) else 1
 
 
+def _cmd_serve(args: argparse.Namespace) -> int:
+    try:
+        import uvicorn
+    except ImportError:
+        print(
+            "vaara serve requires the server extra. "
+            "Install with: pip install 'vaara[server]'",
+            file=sys.stderr,
+        )
+        return 2
+
+    from vaara.server import create_app
+
+    app = create_app()
+    uvicorn.run(app, host=args.host, port=args.port, log_level=args.log_level)
+    return 0
+
+
 def build_parser() -> argparse.ArgumentParser:
     p = argparse.ArgumentParser(prog="vaara", description="Vaara AI Agent Execution Layer")
     sub = p.add_subparsers(dest="cmd", required=True)
@@ -752,6 +770,19 @@ def build_parser() -> argparse.ArgumentParser:
         help="Emit results as JSON (stable shape for CI)",
     )
     ptest.set_defaults(func=_cmd_policy_test)
+
+    pserve = sub.add_parser(
+        "serve",
+        help="Run the Vaara HTTP API reference server (requires vaara[server])",
+    )
+    pserve.add_argument("--host", default="127.0.0.1", help="Bind host")
+    pserve.add_argument("--port", type=int, default=8000, help="Bind port")
+    pserve.add_argument(
+        "--log-level",
+        default="info",
+        choices=["critical", "error", "warning", "info", "debug", "trace"],
+    )
+    pserve.set_defaults(func=_cmd_serve)
 
     return p
 

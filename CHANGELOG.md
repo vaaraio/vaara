@@ -6,6 +6,22 @@ and this project follows [Semantic Versioning](https://semver.org/spec/v2.0.0.ht
 
 ## [Unreleased]
 
+### Added
+- **HTTP API reference server (`vaara[server]` extra).** Exposes the
+  conformal scorer and hash-chained audit trail over HTTP per the
+  contract in `docs/openapi.yaml`. Endpoints: `POST /v1/score`,
+  `POST /v1/score/outcome`, `POST /v1/audit/events`,
+  `GET /v1/audit/actions/{action_id}/chain`, `POST /v1/audit/verify`,
+  `GET /v1/server`, `GET /v1/health`. The spec is authoritative; the
+  reference server in `src/vaara/server/` is a FastAPI implementation
+  suitable for local development and modest production loads.
+- **`vaara serve`** CLI subcommand.
+- **OpenAPI 3.1 contract at `docs/openapi.yaml`.** Stable v1 surface,
+  intended as the integration point for control planes, orchestration
+  frameworks, and audit consumers. Vaara defines the interface; the
+  vendors call it.
+- 11 new HTTP server tests (`tests/test_server.py`).
+
 ## [0.9.0] - 2026-05-15
 
 **Theme: policy artifact validate + test framework.** v0.9.0 ships the

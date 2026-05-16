@@ -1,0 +1,431 @@
+openapi: 3.1.0
+info:
+  title: Vaara HTTP API
+  version: "1.0.0"
+  summary: Conformal-scoring risk evaluation and hash-chained audit emission for AI agent actions.
+  description: |
+    The Vaara HTTP API exposes the Vaara runtime kernel as a network surface.
+    Any agent runtime, control plane, or evaluation framework can call the
+    `/v1/score` endpoint to obtain a calibrated risk assessment for an action,
+    and `/v1/audit/*` endpoints to append events to a hash-chained audit trail
+    aligned with EU AI Act Articles 12 (record-keeping), 14 (human oversight),
+    and 17 (quality management).
+
+    The interface is implementation-agnostic. A reference server ships with
+    `pip install vaara[server]`, but the spec is authoritative; alternative
+    servers in any language can implement it without changing the contract.
+
+    Versioning: paths are prefixed with `/v1/`. Breaking changes increment
+    the path version. Additive changes do not.
+  license:
+    name: Apache-2.0
+    url: https://www.apache.org/licenses/LICENSE-2.0
+  contact:
+    name: Vaara
+    url: https://vaara.io
+servers:
+  - url: http://localhost:8000
+    description: Local reference server (default)
+tags:
+  - { name: score, description: Risk evaluation }
+  - { name: audit, description: Hash-chained audit trail }
+  - { name: server, description: Server identity and liveness }
+
+paths:
+  /v1/score:
+    post:
+      tags: [score]
+      summary: Score an action.
+      description: |
+        Submit an action context and receive a calibrated risk assessment with
+        an `allow / escalate / deny` decision. The scorer is stateful: it
+        maintains conformal calibration, MWU expert weights, and per-agent
+        sequence-pattern history across requests.
+      operationId: score
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: { $ref: "#/components/schemas/ScoreRequest" }
+      responses:
+        "200":
+          description: Risk assessment.
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/ScoreResponse" }
+        "400":
+          description: Malformed request.
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/Error" }
+        "503":
+          description: Scorer unavailable.
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/Error" }
+
+  /v1/score/outcome:
+    post:
+      tags: [score]
+      summary: Report an outcome for online learning.
+      description: |
+        Report the observed outcome of a previously-scored action. Outcomes
+        feed the MWU expert system and conformal calibration. An action's
+        outcome can be reported once; subsequent reports for the same
+        `action_id` are no-ops.
+      operationId: reportOutcome
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: { $ref: "#/components/schemas/OutcomeRequest" }
+      responses:
+        "204": { description: Outcome recorded. }
+        "400":
+          description: Malformed request.
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/Error" }
+        "404":
+          description: Unknown action_id.
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/Error" }
+
+  /v1/audit/events:
+    post:
+      tags: [audit]
+      summary: Append an event to the audit chain.
+      description: |
+        Append a typed event to the hash-chained audit trail. The server
+        returns the assigned `event_id` and `chain_position`. The event is
+        cryptographically linked to the previous event; tampering invalidates
+        the chain past the modified point.
+      operationId: appendAuditEvent
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: { $ref: "#/components/schemas/AuditEventRequest" }
+      responses:
+        "201":
+          description: Event appended.
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/AuditEventResponse" }
+        "400":
+          description: Malformed event.
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/Error" }
+
+  /v1/audit/actions/{action_id}/chain:
+    get:
+      tags: [audit]
+      summary: Read the audit chain for an action.
+      description: |
+        Return every event recorded for a given `action_id`, in order. Each
+        event carries its hash linkage so an external auditor can verify
+        integrity offline.
+      operationId: readActionChain
+      parameters:
+        - name: action_id
+          in: path
+          required: true
+          schema: { type: string }
+      responses:
+        "200":
+          description: Chain segment for this action.
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/AuditChain" }
+        "404":
+          description: Unknown action_id.
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/Error" }
+
+  /v1/audit/verify:
+    post:
+      tags: [audit]
+      summary: Verify the audit chain.
+      description: |
+        Verify hash-chain integrity over a range of events. If `from_event_id`
+        and `to_event_id` are omitted, the full chain is verified. Returns the
+        first broken link if any, or a clean verification report.
+      operationId: verifyAuditChain
+      requestBody:
+        required: false
+        content:
+          application/json:
+            schema: { $ref: "#/components/schemas/VerifyRequest" }
+      responses:
+        "200":
+          description: Verification result.
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/VerifyResponse" }
+
+  /v1/server:
+    get:
+      tags: [server]
+      summary: Server identity and capabilities.
+      operationId: serverIdentity
+      responses:
+        "200":
+          description: Server info.
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/ServerInfo" }
+
+  /v1/health:
+    get:
+      tags: [server]
+      summary: Liveness probe.
+      operationId: health
+      responses:
+        "200":
+          description: Server is alive.
+          content:
+            application/json:
+              schema:
+                type: object
+                required: [status]
+                properties:
+                  status: { type: string, enum: [ok] }
+
+components:
+  schemas:
+    ScoreRequest:
+      type: object
+      required: [tool_name, agent_id]
+      properties:
+        tool_name:
+          type: string
+          maxLength: 512
+          example: "tx.transfer"
+        agent_id:
+          type: string
+          maxLength: 256
+          example: "agent-007"
+        action_type:
+          type: string
+          description: Optional category hint (transaction, data, infra, etc.).
+        parameters:
+          type: object
+          description: Action parameters. Used for signal extraction.
+          additionalProperties: true
+        agent_confidence:
+          type: number
+          format: float
+          minimum: 0
+          maximum: 1
+        base_risk_score:
+          type: number
+          format: float
+          minimum: 0
+          maximum: 1
+        reversibility:
+          type: string
+          enum: [reversible, partially_reversible, irreversible]
+        blast_radius:
+          type: string
+          enum: [local, account, organization, global]
+        session_id:
+          type: string
+          maxLength: 256
+        parent_action_id:
+          type: string
+          maxLength: 128
+        context:
+          type: object
+          description: Arbitrary additional context. Not used by core scorer.
+          additionalProperties: true
+
+    ScoreResponse:
+      type: object
+      required: [action_id, decision, risk, thresholds, evaluation_ms]
+      properties:
+        action_id:
+          type: string
+          description: Server-assigned identifier. Use with /score/outcome and audit endpoints.
+        decision:
+          type: string
+          enum: [allow, escalate, deny]
+        risk:
+          type: object
+          required: [point, lower, upper, alpha]
+          properties:
+            point: { type: number, format: float, minimum: 0, maximum: 1 }
+            lower: { type: number, format: float, minimum: 0, maximum: 1 }
+            upper:
+              type: number
+              format: float
+              minimum: 0
+              maximum: 1
+              description: Upper bound. The decision uses this conservatively.
+            alpha:
+              type: number
+              format: float
+              minimum: 0
+              maximum: 1
+              description: Effective miscoverage rate for this assessment.
+            bucket:
+              type: string
+              nullable: true
+              description: Mondrian bucket category, or null for marginal.
+        signals:
+          type: object
+          description: Per-expert signal contributions, name to value in [0,1].
+          additionalProperties: { type: number, format: float }
+        mwu_weights:
+          type: object
+          description: Current MWU expert weights snapshot.
+          additionalProperties: { type: number, format: float }
+        thresholds:
+          type: object
+          required: [allow, deny]
+          properties:
+            allow: { type: number, format: float }
+            deny: { type: number, format: float }
+        sequence_risk: { type: number, format: float }
+        calibration_size: { type: integer, minimum: 0 }
+        evaluation_ms: { type: number, format: float }
+        explanation: { type: string }
+
+    OutcomeRequest:
+      type: object
+      required: [action_id, outcome_severity]
+      properties:
+        action_id: { type: string }
+        outcome_severity:
+          type: number
+          format: float
+          minimum: 0
+          maximum: 1
+          description: 0 = benign, 1 = catastrophic. Drives MWU weight update.
+        notes: { type: string }
+
+    AuditEventRequest:
+      type: object
+      required: [event_type, action_id]
+      properties:
+        event_type:
+          type: string
+          enum:
+            - action_requested
+            - risk_scored
+            - decision_made
+            - action_executed
+            - action_blocked
+            - escalation_sent
+            - escalation_resolved
+            - outcome_recorded
+            - policy_override
+        action_id: { type: string }
+        agent_id: { type: string }
+        tool_name: { type: string }
+        payload:
+          type: object
+          description: Event-type-specific payload.
+          additionalProperties: true
+
+    AuditEventResponse:
+      type: object
+      required: [event_id, chain_position, event_hash, previous_hash, timestamp]
+      properties:
+        event_id: { type: string }
+        chain_position: { type: integer, minimum: 0 }
+        event_hash:
+          type: string
+          description: SHA-256 of this event including previous_hash.
+          pattern: "^[0-9a-f]{64}$"
+        previous_hash:
+          type: string
+          pattern: "^[0-9a-f]{64}$"
+        timestamp:
+          type: string
+          format: date-time
+
+    AuditChain:
+      type: object
+      required: [action_id, events]
+      properties:
+        action_id: { type: string }
+        events:
+          type: array
+          items:
+            type: object
+            required: [event_id, event_type, chain_position, event_hash, previous_hash, timestamp]
+            properties:
+              event_id: { type: string }
+              event_type: { type: string }
+              chain_position: { type: integer }
+              event_hash: { type: string }
+              previous_hash: { type: string }
+              timestamp: { type: string, format: date-time }
+              payload:
+                type: object
+                additionalProperties: true
+
+    VerifyRequest:
+      type: object
+      properties:
+        from_event_id:
+          type: string
+          description: Inclusive start. Omit for chain start.
+        to_event_id:
+          type: string
+          description: Inclusive end. Omit for chain end.
+
+    VerifyResponse:
+      type: object
+      required: [valid, events_checked]
+      properties:
+        valid: { type: boolean }
+        events_checked: { type: integer, minimum: 0 }
+        first_break:
+          type: object
+          nullable: true
+          description: Present iff valid is false. Identifies the first broken link.
+          properties:
+            event_id: { type: string }
+            chain_position: { type: integer }
+            expected_previous_hash: { type: string }
+            actual_previous_hash: { type: string }
+
+    ServerInfo:
+      type: object
+      required: [name, version, vaara_version, capabilities]
+      properties:
+        name: { type: string, example: "vaara-reference-server" }
+        version: { type: string, example: "1.0.0" }
+        vaara_version: { type: string, example: "0.10.0" }
+        capabilities:
+          type: object
+          properties:
+            score: { type: boolean }
+            audit: { type: boolean }
+            outcome_feedback: { type: boolean }
+        scorer:
+          type: object
+          properties:
+            type: { type: string }
+            calibration_size: { type: integer }
+            threshold_allow: { type: number, format: float }
+            threshold_deny: { type: number, format: float }
+            alpha: { type: number, format: float }
+
+    Error:
+      type: object
+      required: [error]
+      properties:
+        error:
+          type: object
+          required: [code, message]
+          properties:
+            code: { type: string }
+            message: { type: string }
+            details:
+              type: object
+              additionalProperties: true

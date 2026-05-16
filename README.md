@@ -55,6 +55,23 @@ else:
 
 `report_outcome` closes the loop. MWU reweights signals based on which ones predicted the outcome.
 
+## HTTP API
+
+The same scorer and audit trail are available over HTTP for non-Python agents and for control planes that prefer a network boundary. Install with the `server` extra:
+
+```
+pip install 'vaara[server]'
+vaara serve --host 0.0.0.0 --port 8000
+```
+
+```
+curl -sX POST http://localhost:8000/v1/score \
+  -H 'content-type: application/json' \
+  -d '{"tool_name":"tx.transfer","agent_id":"agent-007","base_risk_score":0.5}'
+```
+
+The contract is in [docs/openapi.yaml](docs/openapi.yaml). Vaara defines the interface; control-plane and orchestration vendors call it. Integration recipes for adopters live under `examples/recipes/`.
+
 ## Where things live
 
 - [docs/formal_specification.md](docs/formal_specification.md): math. MWU regret bound O(sqrt(T log N)), conformal coverage guarantees, security properties.
