@@ -20,8 +20,6 @@ Supported regulatory frameworks:
 The engine is declarative — it doesn't know what "good" looks like in absolute
 terms.  Instead, it maps evidence to requirements and flags where evidence
 is missing, insufficient, or stale.
-
-EU AI Act enforcement for high-risk systems: August 2, 2026.
 """
 
 from __future__ import annotations
