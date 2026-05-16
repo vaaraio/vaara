@@ -6,6 +6,18 @@ and this project follows [Semantic Versioning](https://semver.org/spec/v2.0.0.ht
 
 ## [Unreleased]
 
+### Documentation
+- **COMPLIANCE.md** gains two sections under the deployer-vs-Vaara
+  ownership boundary: an explicit eIDAS NOTICE (Vaara hash chains and
+  commit-prove receipts are technical evidence, not Qualified Electronic
+  Attestations of Attributes under Regulation (EU) 910/2014 Article
+  3(45), not a qualified trust service under Article 3(16)) and a
+  position statement relative to OVERT 1.0 (Glacis Technologies). Vaara
+  is structurally independent of the agent it governs and maps to
+  OVERT AAL-3 operator-controlled attestation; reaching AAL-4 requires
+  pairing Vaara with an external Independent Attestation Provider. The
+  design admits an external IAP layer without internal change.
+
 ## [0.10.0] - 2026-05-16
 
 **Theme: Vaara as the kernel others build around.** v0.10.0 ships the
