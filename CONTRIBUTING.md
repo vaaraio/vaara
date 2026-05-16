@@ -36,7 +36,7 @@ pip install -e '.[dev]'   # one-time setup
 scripts/lint_full.sh
 ```
 
-The script chains four checks: `ruff` (style + correctness), `bandit` (security), `mypy` (types — strict on `vaara.policy`, lenient elsewhere while legacy modules are migrated), and `pytest`. Total runtime ~10s. CI runs the same gates, so a green local sweep should mean a green PR.
+The script chains four checks: `ruff` (style + correctness), `bandit` (security), `mypy` (types - strict on `vaara.policy`, lenient elsewhere while legacy modules are migrated), and `pytest`. Total runtime ~10s. CI runs the same gates, so a green local sweep should mean a green PR.
 
 New modules under `src/vaara/` are expected to type-check cleanly. As legacy modules get cleaned up, add them to the strict mypy block in `pyproject.toml` so the typing floor only ratchets upward.
 
