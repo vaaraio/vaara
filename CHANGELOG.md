@@ -6,6 +6,17 @@ and this project follows [Semantic Versioning](https://semver.org/spec/v2.0.0.ht
 
 ## [Unreleased]
 
+## [0.11.0] - 2026-05-16
+
+**Theme: first OSS Python reference implementation of OVERT 1.0.** v0.11.0
+ships an emitter for the OVERT 1.0 Protocol Profile 1.0 Base Envelope
+(Glacis Technologies, overt.is, March 2026) at AAL-3 Phase 2 (Provisional
+Receipt). Vaara operates as the Arbiter in OVERT terms. Phase 3 notary
+attestation and AAL-4 promotion are left to external Independent
+Attestation Providers, per OVERT's structural-independence principle and
+Vaara's always-OSS-kernel rule. Plus eIDAS NOTICE and OVERT position
+statement in COMPLIANCE.md.
+
 ### Added
 - **OVERT 1.0 Protocol Profile 1.0 Base Envelope emitter (`vaara[attestation]` extra).**
   First OSS Python reference implementation of the OVERT 1.0 AAL-3
