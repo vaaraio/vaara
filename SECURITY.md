@@ -7,7 +7,7 @@ Please report security vulnerabilities privately through GitHub's
 feature. **Do not open a public issue for anything that could be exploited.**
 
 For communication outside GitHub, reach the maintainers at
-`security@vaara.io`. Use PGP if you prefer end-to-end-encrypted email; the
+`security@vaara.io`. Use PGP if you prefer end-to-end-encrypted email. The
 current public key is published at
 <https://github.com/vaaraio/vaara/blob/main/docs/signing-keys.md>.
 
