@@ -6,6 +6,57 @@ and this project follows [Semantic Versioning](https://semver.org/spec/v2.0.0.ht
 
 ## [Unreleased]
 
+## [0.10.0] - 2026-05-16
+
+**Theme: Vaara as the kernel others build around.** v0.10.0 ships the
+network-callable surface, the auditor-facing evidence artefact, and the
+offline-verifiable receipt pair. Each of the three pieces is additive
+and backward-compatible; together they reposition Vaara from a Python
+library to a runtime kernel that control planes, audit consumers, and
+orchestration frameworks reference. The HTTP contract at
+`docs/openapi.yaml` is versioned `/v1/` independently of the project
+version, following the OPA pattern.
+
+### Added
+- **HTTP API reference server (`vaara[server]` extra).** Exposes the
+  conformal scorer and hash-chained audit trail over HTTP per the
+  contract in `docs/openapi.yaml`. Endpoints: `POST /v1/score`,
+  `POST /v1/score/outcome`, `POST /v1/audit/events`,
+  `GET /v1/audit/actions/{action_id}/chain`, `POST /v1/audit/verify`,
+  `GET /v1/server`, `GET /v1/health`. The spec is authoritative; the
+  reference server in `src/vaara/server/` is a FastAPI implementation
+  suitable for local development and modest production loads.
+- **`vaara serve`** CLI subcommand.
+- **OpenAPI 3.1 contract at `docs/openapi.yaml`.** Stable v1 surface,
+  intended as the integration point for control planes, orchestration
+  frameworks, and audit consumers. Vaara defines the interface; the
+  vendors call it.
+- 11 new HTTP server tests (`tests/test_server.py`).
+- **Auditor-facing evidence report rendering.** New module
+  `vaara.compliance.render` with `render_markdown`, `render_json`, and
+  `render_narrative` for the `ConformityReport` produced by
+  `ComplianceEngine.assess`. Markdown output has per-domain article
+  tables, per-article detail sections, evidence status badges,
+  audit-chain integrity flagging, and a deployer-owns-the-decision
+  disclaimer suitable for shipping to a regulator or attaching to an
+  internal conformity submission.
+- **`vaara compliance report --db PATH --format md|json|narrative
+  [--out FILE]`** CLI subcommand. Loads an audit SQLite DB, runs
+  `ComplianceEngine.assess`, renders to chosen format.
+- 5 new compliance-render tests (`tests/test_compliance_render.py`).
+- **Article 12 commit-prove receipt pair.** New module
+  `vaara.audit.receipts` derives an offline-verifiable receipt from the
+  existing audit chain: a `commit_hash` covering the gate-time decision
+  (action_id, decision, risk_score, thresholds, decided_at) and an
+  `outcome_hash` covering the post-execution outcome and embedding the
+  commit_hash. Open-standards SHA-256 over canonical JSON, no external
+  cryptography library required. Verification needs only `hashlib`,
+  enabling per-action handoff to auditors without sharing the full chain
+  or key material.
+- **`vaara trail receipt --db PATH --action-id ID [--out FILE]`** CLI
+  subcommand. Extracts and verifies the receipt pair, prints JSON.
+- 11 new receipt tests (`tests/test_receipts.py`).
+
 ## [0.9.0] - 2026-05-15
 
 **Theme: policy artifact validate + test framework.** v0.9.0 ships the
