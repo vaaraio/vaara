@@ -1,8 +1,8 @@
 # Signing keys for Vaara audit exports
 
 Vaara signs every audit-trail export with an Ed25519 detached signature.
-The signature lets a third party — auditor, regulator, internal conformity
-reviewer — verify that an exported trail came from you and has not been
+The signature lets a third party - auditor, regulator, internal conformity
+reviewer - verify that an exported trail came from you and has not been
 tampered with.
 
 This document describes how to manage the signing key. It is written for
@@ -48,20 +48,20 @@ signing API.
 
 Supported providers:
 
-- **AWS KMS** — create an `ECC_NIST_P256` or `EDDSA` key,
+- **AWS KMS** - create an `ECC_NIST_P256` or `EDDSA` key,
   grant `kms:Sign` to the role your exporter runs as.
-- **Google Cloud KMS** — create an `EC_SIGN_ED25519` asymmetric key.
-- **Azure Key Vault** — create an EC key with curve `P-256` and the
+- **Google Cloud KMS** - create an `EC_SIGN_ED25519` asymmetric key.
+- **Azure Key Vault** - create an EC key with curve `P-256` and the
   `sign` operation enabled.
-- **YubiHSM / Nitrokey HSM** — Ed25519 keys with the `sign-eddsa`
+- **YubiHSM / Nitrokey HSM** - Ed25519 keys with the `sign-eddsa`
   capability.
 
 For any of these, do not export the PEM. In the 0.4.x series
 `export_signed` accepts a loaded `Ed25519PrivateKey` instance (or a PEM
-path / PEM bytes) — integrate by loading the key material into that
+path / PEM bytes) - integrate by loading the key material into that
 object inside your signing host's memory, never on a developer laptop.
 A pluggable signer-adapter interface (call an HSM/KMS `sign` API
-without materializing the key) is tracked for a future release; until
+without materializing the key) is tracked for a future release. Until
 then, HSM integration requires a small wrapper in your deployment code
 that fetches the key into a short-lived `Ed25519PrivateKey`.
 
@@ -103,7 +103,7 @@ Plan rotation before you need it. A concrete schedule:
 - Keep the previous public key available: a regulator who received a
   trail last quarter must still be able to verify it.
 - Do **not** re-export old trails with the new key. Signatures are
-  historical — each trail belongs to the key that signed it when
+  historical - each trail belongs to the key that signed it when
   exported.
 
 Keep a fingerprint ledger, versioned in git:
@@ -134,7 +134,7 @@ The verifier needs your public key. Two channels:
    `signer_pubkey.pem` inside the zip. If no `--pubkey` is passed the
    verifier uses the embedded one. This proves the trail is
    *internally consistent* but not that the signer is who they claim to
-   be — the auditor should always verify the fingerprint matches
+   be - the auditor should always verify the fingerprint matches
    something they received out-of-band.
 
 ---
