@@ -36,19 +36,43 @@ from vaara.attestation.s3p import (
     regularized_incomplete_beta,
     verify_s3p_attestation,
 )
+from vaara.attestation.iap import (
+    IAPError,
+    Phase3Attestation,
+    emit_phase3_attestation,
+    envelope_to_canonical_cbor,
+    verify_phase3_attestation,
+)
+from vaara.attestation.transparency_log import (
+    InProcessTransparencyLog,
+    InclusionProof,
+    LogEntry,
+    TransparencyLogError,
+    verify_inclusion,
+)
 
 __all__ = [
     "BaseEnvelope",
     "ConformalExtension",
     "EnvelopeError",
+    "IAPError",
+    "InProcessTransparencyLog",
+    "InclusionProof",
+    "LogEntry",
+    "Phase3Attestation",
     "S3PAttestation",
     "S3PError",
+    "TransparencyLogError",
     "canonical_cbor",
     "clopper_pearson_ci",
     "emit_base_envelope",
+    "emit_phase3_attestation",
     "emit_s3p_attestation",
+    "envelope_to_canonical_cbor",
     "make_epoch_nonce_commitment",
     "regularized_incomplete_beta",
     "verify_base_envelope",
+    "verify_inclusion",
+    "verify_phase3_attestation",
     "verify_s3p_attestation",
 ]

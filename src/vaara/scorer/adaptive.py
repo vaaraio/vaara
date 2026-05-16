@@ -31,7 +31,10 @@ import time
 from collections import OrderedDict, deque
 from dataclasses import dataclass, field
 from enum import Enum
-from typing import Any, Optional
+from typing import TYPE_CHECKING, Any, Optional
+
+if TYPE_CHECKING:
+    from vaara.policy.schema import Policy
 
 logger = logging.getLogger(__name__)
 
@@ -683,6 +686,33 @@ class AdaptiveScorer:
         # recent_actions while record_action appends to it). Using an
         # RLock lets nested calls inside the scorer re-enter safely.
         self._lock = threading.RLock()
+
+    def apply_policy(self, policy: "Policy") -> None:
+        """Rebind thresholds and sequence patterns from a loaded policy.
+
+        Runs under the scorer's RLock so an evaluate() in flight on
+        another thread either sees the old or the new pair completely.
+        The conformal calibrator, MWU expert state, agent profiles, and
+        cross-agent history are intentionally preserved — the operator
+        intent of a hot reload is "change the policy I'm enforcing,"
+        not "wipe the model state I've been calibrating against."
+        """
+        from vaara.policy.schema import Policy  # local import to avoid cycles
+        if not isinstance(policy, Policy):
+            raise TypeError(
+                f"apply_policy requires a Policy, got {type(policy).__name__}"
+            )
+        new_allow = policy.thresholds_default.escalate
+        new_deny = policy.thresholds_default.deny
+        new_sequences = list(policy.sequences)
+        with self._lock:
+            self._threshold_allow = new_allow
+            self._threshold_deny = new_deny
+            self._sequences = new_sequences
+            # Per-(agent, pattern) last-match cache keys may reference
+            # removed patterns; clear so the next match transition logs
+            # cleanly against the new pattern set.
+            self._seq_match_state.clear()
 
     def _seed_conformal_prior(self) -> None:
         """Seed the calibrator with 50 synthetic benign (predicted, actual) pairs.

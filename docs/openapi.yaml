@@ -166,6 +166,95 @@ paths:
             application/json:
               schema: { $ref: "#/components/schemas/VerifyResponse" }
 
+  /v1/detect/injection:
+    post:
+      tags: [detect]
+      summary: Score text for prompt-injection likelihood.
+      description: |
+        Routes through the Vaara adversarial scorer (the same model
+        behind vaara-bench-v1). Falls back to a small regex heuristic
+        set when the `ml` extra is not installed; the backend field
+        in the response reports which path served the call.
+      operationId: detectInjection
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: { $ref: "#/components/schemas/DetectInjectionRequest" }
+      responses:
+        "200":
+          description: Detection result.
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/DetectInjectionResponse" }
+
+  /v1/detect/pii:
+    post:
+      tags: [detect]
+      summary: Scan text for PII.
+      description: |
+        Regex-based extractor over six categories: email, phone, ssn,
+        ipv4, credit_card (Luhn-checked), iban (checksum-checked).
+        Returns per-finding category, value, offset, and length so
+        callers can highlight or redact in place.
+      operationId: detectPII
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: { $ref: "#/components/schemas/DetectPIIRequest" }
+      responses:
+        "200":
+          description: Detection result.
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/DetectPIIResponse" }
+
+  /v1/policy/reload:
+    post:
+      tags: [policy]
+      summary: Atomically reload the running policy.
+      description: |
+        Parse and validate a new policy document, then swap it in atomically.
+        The scorer's thresholds and sequence patterns rebind under its own
+        lock so an evaluate() call in flight on another thread either sees
+        the old pair or the new pair, never a torn half. Conformal
+        calibration, MWU expert state, and agent profiles are preserved.
+
+        Exactly one of `path` (server-side file path) or `body` (parsed
+        policy document) must be supplied. The server must have been
+        started with `vaara serve --policy PATH` for this endpoint to be
+        available; otherwise it returns `409 policy_not_configured`. A
+        malformed document returns `422 policy_invalid` and leaves the
+        previously loaded policy in place.
+      operationId: reloadPolicy
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: { $ref: "#/components/schemas/PolicyReloadRequest" }
+      responses:
+        "200":
+          description: Reload accepted, new policy active.
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/PolicyReloadResponse" }
+        "400":
+          description: Request supplied both `path` and `body`, or neither.
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/Error" }
+        "409":
+          description: Server has no PolicyController; reload is disabled.
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/Error" }
+        "422":
+          description: Policy document failed to parse or validate.
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/Error" }
+
   /v1/server:
     get:
       tags: [server]
@@ -415,6 +504,99 @@ components:
             threshold_allow: { type: number, format: float }
             threshold_deny: { type: number, format: float }
             alpha: { type: number, format: float }
+
+    DetectInjectionRequest:
+      type: object
+      required: [text]
+      properties:
+        text: { type: string, maxLength: 100000 }
+        threshold:
+          type: number
+          format: float
+          minimum: 0
+          maximum: 1
+          nullable: true
+
+    DetectInjectionResponse:
+      type: object
+      required: [detected, score, threshold, bundle_version, backend]
+      properties:
+        detected: { type: boolean }
+        score: { type: number, format: float, minimum: 0, maximum: 1 }
+        threshold: { type: number, format: float, minimum: 0, maximum: 1 }
+        bundle_version: { type: string }
+        backend:
+          type: string
+          enum: [vaara_adversarial, heuristic]
+
+    DetectPIIRequest:
+      type: object
+      required: [text]
+      properties:
+        text: { type: string, maxLength: 100000 }
+
+    DetectPIIFinding:
+      type: object
+      required: [category, value, offset, length]
+      properties:
+        category:
+          type: string
+          enum: [email, phone, ssn, ipv4, credit_card, iban]
+        value: { type: string }
+        offset: { type: integer, minimum: 0 }
+        length: { type: integer, minimum: 1 }
+
+    DetectPIIResponse:
+      type: object
+      required: [detected, categories, findings]
+      properties:
+        detected: { type: boolean }
+        categories:
+          type: array
+          items: { type: string }
+        findings:
+          type: array
+          items: { $ref: "#/components/schemas/DetectPIIFinding" }
+
+    PolicyReloadRequest:
+      type: object
+      description: |
+        Exactly one of `path` or `body` must be supplied. `path` lets the
+        server read the policy file directly; `body` carries an inline
+        parsed document for cases where the operator runs on a different
+        host than the server.
+      properties:
+        path: { type: string, maxLength: 4096 }
+        body:
+          type: object
+          additionalProperties: true
+        format:
+          type: string
+          enum: [json, yaml]
+          nullable: true
+
+    PolicyReloadResponse:
+      type: object
+      required:
+        - version
+        - thresholds_default
+        - sequence_count
+        - action_class_count
+        - escalation_route_count
+      properties:
+        version:
+          type: integer
+          minimum: 1
+          description: Monotonic generation counter; increments on every accepted reload.
+        thresholds_default:
+          type: object
+          required: [escalate, deny]
+          properties:
+            escalate: { type: number, format: float, minimum: 0, maximum: 1 }
+            deny: { type: number, format: float, minimum: 0, maximum: 1 }
+        sequence_count: { type: integer, minimum: 0 }
+        action_class_count: { type: integer, minimum: 0 }
+        escalation_route_count: { type: integer, minimum: 0 }
 
     Error:
       type: object

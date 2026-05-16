@@ -58,6 +58,11 @@ Subcommands:
         matched_sequences, and an expected verdict / route. Exit 0 if
         every case passes.
 
+    vaara policy reload POLICY_PATH [--server URL] [--inline] [--format json|yaml]
+        Trigger an atomic policy reload on a running ``vaara serve``
+        process. The new thresholds and sequence patterns take effect
+        on the next ``evaluate()``; in-flight calls keep the old ones.
+
     vaara version
         Print the installed Vaara version.
 
@@ -75,6 +80,7 @@ import stat
 import sys
 import time
 from pathlib import Path
+from typing import Optional
 
 from vaara import __version__
 
@@ -589,6 +595,34 @@ def _cmd_trail_receipt(args: argparse.Namespace) -> int:
     return 0
 
 
+def _cmd_compliance_dashboard(args: argparse.Namespace) -> int:
+    from vaara.audit.sqlite_backend import SQLiteAuditTrail
+    from vaara.compliance.dashboard import render_html
+    from vaara.compliance.engine import ComplianceEngine
+
+    db_path = Path(args.db).expanduser()
+    if not db_path.is_file():
+        print(f"vaara compliance dashboard: not a file: {db_path}", file=sys.stderr)
+        return 2
+
+    trail = SQLiteAuditTrail(str(db_path))
+    engine = ComplianceEngine()
+    report = engine.assess(
+        trail=trail,
+        system_name=args.system_name,
+        system_version=args.system_version,
+    )
+    out = Path(args.out).expanduser()
+    if out.is_dir() or args.out.endswith("/"):
+        out.mkdir(parents=True, exist_ok=True)
+        out = out / "index.html"
+    else:
+        out.parent.mkdir(parents=True, exist_ok=True)
+    out.write_text(render_html(report), encoding="utf-8")
+    print(str(out))
+    return 0
+
+
 def _cmd_compliance_report(args: argparse.Namespace) -> int:
     from vaara.audit.sqlite_backend import SQLiteAuditBackend
     from vaara.compliance.engine import create_default_engine
@@ -635,6 +669,36 @@ def _cmd_compliance_report(args: argparse.Namespace) -> int:
     return 0
 
 
+def _read_text_input(args: argparse.Namespace) -> str:
+    if args.text is not None:
+        return args.text
+    if args.file is not None:
+        return Path(args.file).expanduser().read_text(encoding="utf-8")
+    if args.stdin:
+        return sys.stdin.read()
+    raise SystemExit(
+        "vaara detect: supply --text, --file PATH, or --stdin"
+    )
+
+
+def _cmd_detect_injection(args: argparse.Namespace) -> int:
+    from vaara.detect import detect_injection
+
+    text = _read_text_input(args)
+    result = detect_injection(text, threshold=args.threshold)
+    print(json.dumps(result.to_dict(), indent=2 if args.pretty else None))
+    return 1 if result.detected else 0
+
+
+def _cmd_detect_pii(args: argparse.Namespace) -> int:
+    from vaara.detect import detect_pii
+
+    text = _read_text_input(args)
+    result = detect_pii(text)
+    print(json.dumps(result.to_dict(), indent=2 if args.pretty else None))
+    return 1 if result.detected else 0
+
+
 def _cmd_serve(args: argparse.Namespace) -> int:
     try:
         import uvicorn
@@ -648,8 +712,95 @@ def _cmd_serve(args: argparse.Namespace) -> int:
 
     from vaara.server import create_app
 
-    app = create_app()
+    controller = None
+    policy_path = getattr(args, "policy", None)
+    if policy_path:
+        from vaara.policy.controller import PolicyController
+        from vaara.policy.validate import validate_source
+
+        policy_obj, report = validate_source(Path(policy_path).expanduser())
+        if policy_obj is None:
+            print(
+                f"vaara serve: policy {policy_path} failed to parse:",
+                file=sys.stderr,
+            )
+            for issue in report.issues:
+                print(f"  {issue.level.value}: {issue.message}", file=sys.stderr)
+            return 2
+        controller = PolicyController(policy_obj)
+
+    app = create_app(policy_controller=controller)
     uvicorn.run(app, host=args.host, port=args.port, log_level=args.log_level)
+    return 0
+
+
+def _cmd_policy_reload(args: argparse.Namespace) -> int:
+    import json as _json
+    import urllib.error
+    import urllib.request
+
+    policy_path = Path(args.policy).expanduser().resolve()
+    if not policy_path.is_file():
+        print(f"vaara policy reload: not a file: {policy_path}", file=sys.stderr)
+        return 2
+
+    fmt: Optional[str] = args.format
+    if fmt is None:
+        if policy_path.suffix in (".yaml", ".yml"):
+            fmt = "yaml"
+        elif policy_path.suffix == ".json":
+            fmt = "json"
+
+    if args.inline:
+        # Send the parsed body so the server doesn't need filesystem access
+        # to the same path the operator is reading.
+        from vaara.policy.loader import from_dict as _from_dict  # noqa: F401
+        if fmt == "yaml":
+            try:
+                import yaml  # type: ignore[import-untyped]
+            except ImportError:
+                print(
+                    "vaara policy reload --inline on a YAML file needs the "
+                    "yaml extra. Install with: pip install 'vaara[yaml]'",
+                    file=sys.stderr,
+                )
+                return 2
+            body = yaml.safe_load(policy_path.read_text(encoding="utf-8"))
+        else:
+            body = _json.loads(policy_path.read_text(encoding="utf-8"))
+        payload = {"body": body}
+        if fmt is not None:
+            payload["format"] = fmt
+    else:
+        payload = {"path": str(policy_path)}
+        if fmt is not None:
+            payload["format"] = fmt
+
+    url = args.server.rstrip("/") + "/v1/policy/reload"
+    req = urllib.request.Request(
+        url,
+        data=_json.dumps(payload).encode("utf-8"),
+        headers={"Content-Type": "application/json"},
+        method="POST",
+    )
+    try:
+        with urllib.request.urlopen(req, timeout=args.timeout) as resp:
+            body_bytes = resp.read()
+    except urllib.error.HTTPError as exc:
+        print(f"vaara policy reload: HTTP {exc.code}", file=sys.stderr)
+        try:
+            print(exc.read().decode("utf-8"), file=sys.stderr)
+        except Exception:
+            pass
+        return 1
+    except urllib.error.URLError as exc:
+        print(
+            f"vaara policy reload: cannot reach {url}: {exc.reason}",
+            file=sys.stderr,
+        )
+        return 1
+
+    print(body_bytes.decode("utf-8"))
     return 0
 
 
@@ -835,7 +986,7 @@ def build_parser() -> argparse.ArgumentParser:
 
     pp_policy = sub.add_parser(
         "policy",
-        help="Policy artifact commands (validate, test)",
+        help="Policy artifact commands (validate, test, reload)",
     )
     psub = pp_policy.add_subparsers(dest="policy_cmd", required=True)
 
@@ -896,6 +1047,34 @@ def build_parser() -> argparse.ArgumentParser:
     )
     pcrep.set_defaults(func=_cmd_compliance_report)
 
+    pcdash = csub.add_parser(
+        "dashboard",
+        help=(
+            "Render the article-level evidence report as a single "
+            "self-contained HTML page (auditor-facing static dashboard)"
+        ),
+    )
+    pcdash.add_argument(
+        "--db", required=True,
+        help="Path to the audit SQLite DB to read evidence from",
+    )
+    pcdash.add_argument(
+        "--out", required=True,
+        help=(
+            "Output path. A trailing slash or existing directory writes "
+            "index.html inside; otherwise the given path is the file."
+        ),
+    )
+    pcdash.add_argument(
+        "--system-name", default="Vaara-governed AI system",
+        help="System name to include in the dashboard header",
+    )
+    pcdash.add_argument(
+        "--system-version", default="unspecified",
+        help="System version to include in the dashboard header",
+    )
+    pcdash.set_defaults(func=_cmd_compliance_dashboard)
+
     pserve = sub.add_parser(
         "serve",
         help="Run the Vaara HTTP API reference server (requires vaara[server])",
@@ -903,11 +1082,96 @@ def build_parser() -> argparse.ArgumentParser:
     pserve.add_argument("--host", default="127.0.0.1", help="Bind host")
     pserve.add_argument("--port", type=int, default=8000, help="Bind port")
     pserve.add_argument(
+        "--policy",
+        default=None,
+        help=(
+            "Path to a YAML or JSON policy file. Enables POST "
+            "/v1/policy/reload; the policy's default thresholds and "
+            "sequence patterns are applied to the scorer at startup."
+        ),
+    )
+    pserve.add_argument(
         "--log-level",
         default="info",
         choices=["critical", "error", "warning", "info", "debug", "trace"],
     )
     pserve.set_defaults(func=_cmd_serve)
+
+    pdetect = sub.add_parser(
+        "detect",
+        help="Named detectors (injection, pii) over Vaara's scoring surface",
+    )
+    dsub = pdetect.add_subparsers(dest="detect_cmd", required=True)
+
+    def _add_text_input_args(p_):
+        g = p_.add_mutually_exclusive_group(required=True)
+        g.add_argument("--text", help="Inline text to scan")
+        g.add_argument("--file", help="Path to a text file to scan")
+        g.add_argument(
+            "--stdin", action="store_true",
+            help="Read text from standard input",
+        )
+        p_.add_argument(
+            "--pretty", action="store_true",
+            help="Pretty-print the JSON output",
+        )
+
+    pdinj = dsub.add_parser(
+        "injection",
+        help=(
+            "Score text for prompt-injection likelihood via Vaara's "
+            "adversarial scorer (the same model behind vaara-bench-v1)"
+        ),
+    )
+    _add_text_input_args(pdinj)
+    pdinj.add_argument(
+        "--threshold", type=float, default=None,
+        help="Decision threshold (default 0.55, the bench escalation band)",
+    )
+    pdinj.set_defaults(func=_cmd_detect_injection)
+
+    pdpii = dsub.add_parser(
+        "pii",
+        help=(
+            "Scan text for PII categories (email, phone, ssn, ipv4, "
+            "credit_card, iban)"
+        ),
+    )
+    _add_text_input_args(pdpii)
+    pdpii.set_defaults(func=_cmd_detect_pii)
+
+    preload = psub.add_parser(
+        "reload",
+        help=(
+            "Trigger an atomic policy reload on a running Vaara server. "
+            "The new thresholds and sequence patterns are applied without "
+            "restarting the agent process."
+        ),
+    )
+    preload.add_argument(
+        "policy", help="Path to the new YAML or JSON policy file",
+    )
+    preload.add_argument(
+        "--server", default="http://127.0.0.1:8000",
+        help="Base URL of the running vaara serve process",
+    )
+    preload.add_argument(
+        "--inline", action="store_true",
+        help=(
+            "Send the parsed policy body in the HTTP request instead of "
+            "asking the server to read the file. Use when the server runs "
+            "on a different host than the operator."
+        ),
+    )
+    preload.add_argument(
+        "--format", choices=["json", "yaml"], default=None,
+        help="Override the policy format detection (default: by file suffix)",
+    )
+    preload.add_argument(
+        "--timeout", type=float, default=10.0,
+        help="HTTP request timeout in seconds (default 10)",
+    )
+    preload.set_defaults(func=_cmd_policy_reload)
 
     return p
 
