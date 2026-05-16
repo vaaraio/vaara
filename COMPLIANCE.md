@@ -245,8 +245,19 @@ Vaara's position in this picture:
   change.** The hash chain, the commit-prove receipt pair, and the
   HTTP API surface all produce structured, signable artefacts that
   an IAP can co-sign, batch into a transparency log, or seal under
-  eIDAS qualified trust services. Future work: a documented IAP
-  adapter interface.
+  eIDAS qualified trust services.
+- **Vaara ships a reference IAP from v0.13.0
+  (`vaara.attestation.iap`).** `Phase3Attestation` wraps an AAL-3
+  `BaseEnvelope` with a notary Ed25519 signature over canonical CBOR
+  of all nine envelope fields (the inner Arbiter signature bound by
+  reference) plus a transparency-log inclusion proof. Structural
+  independence between the Arbiter key and the notary key is
+  enforced at both emit and verify. `InProcessTransparencyLog` is an
+  RFC 6962-style binary Merkle log; production deployments swap in
+  sigstore Rekor or an equivalent independently-operated log at the
+  same call sites. Operators MAY run the reference IAP themselves;
+  an *independent* IAP for AAL-4 still requires a separate operator
+  controlling the notary keys.
 
 This positioning is deliberate. Vaara does not claim AAL-4
 conformance and does not market a self-attestation pattern.
@@ -279,10 +290,15 @@ correspondence.
   type) - ✅. Denials emit a `DENY` event on the hash chain with
   policy id and violation reason.
 - **TOOL-1.4** (provisional receipt before execution, upgrade to full
-  attestation after notary validation) - ◐ at AAL-3. The Article 12
-  commit-prove receipt pair (shipped v0.10.0) is the Phase 2
-  Provisional Receipt. Phase 3 (full notary attestation) requires an
-  external IAP per the OVERT-position section above.
+  attestation after notary validation) - ✅ structurally at AAL-3,
+  with the AAL-3 → AAL-4 path now implementable in-tree. The Article
+  12 commit-prove receipt pair (shipped v0.10.0) is the Phase 2
+  Provisional Receipt; the v0.11.0 OVERT Base Envelope is the
+  attested form. v0.13.0 ships a reference Phase 3 IAP
+  (`vaara.attestation.iap.emit_phase3_attestation`) that notary-signs
+  the Provisional Receipt and anchors it in a transparency log.
+  Reaching AAL-4 still requires the notary keys to live with an
+  independent operator.
 - **TOOL-2.1** (explicit function allowlist with hash in policy
   attestation) - ✅. Policy hash flows into `encoder_binary_identity`
   in the Base Envelope (v0.11.0).
@@ -310,7 +326,10 @@ correspondence.
 - **TOOL-5** (tamper-evident tool-call log with epoch attestation) -
   ✅ for TOOL-5.1 and TOOL-5.2 (hash-chained `AuditTrail`,
   Article 12 commit-prove receipt pair). TOOL-5.3 epoch notary
-  attestation is the external-IAP layer.
+  attestation is satisfied by the v0.13.0 reference IAP
+  (`vaara.attestation.iap`) paired with the in-process transparency
+  log; a sigstore Rekor-backed log can substitute at the same call
+  sites.
 
 ### Section 11.5 - MCP Server Trust Governance
 

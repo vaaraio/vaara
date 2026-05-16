@@ -199,3 +199,62 @@ def register(app: FastAPI, state: ServerState) -> None:
             events_checked=state.audit.size,
             first_break=None,
         )
+
+    @app.post(
+        "/v1/detect/injection", response_model=S.DetectInjectionResponse,
+    )
+    async def detect_injection_endpoint(req: S.DetectInjectionRequest):
+        from vaara.detect import detect_injection
+
+        result = detect_injection(req.text, threshold=req.threshold)
+        return S.DetectInjectionResponse(**result.to_dict())
+
+    @app.post("/v1/detect/pii", response_model=S.DetectPIIResponse)
+    async def detect_pii_endpoint(req: S.DetectPIIRequest):
+        from vaara.detect import detect_pii
+
+        result = detect_pii(req.text)
+        return S.DetectPIIResponse(**result.to_dict())
+
+    @app.post("/v1/policy/reload", response_model=S.PolicyReloadResponse)
+    async def reload_policy(req: S.PolicyReloadRequest):
+        from vaara.policy.schema import PolicyError
+
+        controller = state.policy_controller
+        if controller is None:
+            raise _error(
+                code="policy_not_configured",
+                message=(
+                    "Server has no PolicyController; start with "
+                    "`vaara serve --policy PATH` to enable reload."
+                ),
+                http_status=status.HTTP_409_CONFLICT,
+            )
+
+        if (req.path is None) == (req.body is None):
+            raise _error(
+                code="invalid_request",
+                message="Exactly one of `path` or `body` must be supplied.",
+                http_status=status.HTTP_400_BAD_REQUEST,
+            )
+
+        source = req.body if req.body is not None else req.path
+        try:
+            result = controller.reload(source, format=req.format)
+        except PolicyError as exc:
+            raise _error(
+                code="policy_invalid",
+                message=str(exc),
+                http_status=status.HTTP_422_UNPROCESSABLE_ENTITY,
+            )
+
+        return S.PolicyReloadResponse(
+            version=result.version,
+            thresholds_default={
+                "escalate": result.thresholds_default_escalate,
+                "deny": result.thresholds_default_deny,
+            },
+            sequence_count=result.sequence_count,
+            action_class_count=result.action_class_count,
+            escalation_route_count=result.escalation_route_count,
+        )
