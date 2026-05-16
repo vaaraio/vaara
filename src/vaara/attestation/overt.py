@@ -305,7 +305,10 @@ def verify_base_envelope(envelope: BaseEnvelope, public_key_raw: bytes) -> bool:
     public key's SHA-256 matches the envelope's `key_identifier`.
     """
     try:
-        from cryptography.exceptions import InvalidSignature
+        from cryptography.exceptions import (
+            InvalidSignature,
+            UnsupportedAlgorithm,
+        )
         from cryptography.hazmat.primitives.asymmetric.ed25519 import (
             Ed25519PublicKey,
         )
@@ -332,7 +335,7 @@ def verify_base_envelope(envelope: BaseEnvelope, public_key_raw: bytes) -> bool:
             envelope.signature, payload,
         )
         return True
-    except InvalidSignature:
+    except (InvalidSignature, ValueError, UnsupportedAlgorithm):
         return False
 
 
