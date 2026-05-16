@@ -26,11 +26,29 @@ from vaara.attestation.overt import (
     emit_base_envelope,
     verify_base_envelope,
 )
+from vaara.attestation.s3p import (
+    ConformalExtension,
+    S3PAttestation,
+    S3PError,
+    clopper_pearson_ci,
+    emit_s3p_attestation,
+    make_epoch_nonce_commitment,
+    regularized_incomplete_beta,
+    verify_s3p_attestation,
+)
 
 __all__ = [
     "BaseEnvelope",
+    "ConformalExtension",
     "EnvelopeError",
+    "S3PAttestation",
+    "S3PError",
     "canonical_cbor",
+    "clopper_pearson_ci",
     "emit_base_envelope",
+    "emit_s3p_attestation",
+    "make_epoch_nonce_commitment",
+    "regularized_incomplete_beta",
     "verify_base_envelope",
+    "verify_s3p_attestation",
 ]

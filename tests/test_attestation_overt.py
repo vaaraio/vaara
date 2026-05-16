@@ -89,6 +89,13 @@ def test_envelope_verification_rejects_wrong_key(signing_key):
     assert verify_base_envelope(env, wrong_pub) is False
 
 
+def test_envelope_verification_rejects_malformed_pubkey(signing_key):
+    env = _emit_default(signing_key)
+    # Wrong-length raw bytes raise ValueError inside cryptography;
+    # verify must surface that as a False return, not an exception.
+    assert verify_base_envelope(env, b"too-short") is False
+
+
 def test_canonical_cbor_rejects_ieee754_floats():
     with pytest.raises(EnvelopeError) as exc:
         canonical_cbor({"rate": 0.42})

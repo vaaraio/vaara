@@ -23,6 +23,7 @@ For broader agent governance (zero-trust identity, capability-based access contr
 - 5,955-entry adversarial corpus (3,422 attack across 8 categories, 2,533 benign)
 - 97.1% attack recall on held-out distribution-shift split, threshold 0.55
 - PAIR adaptive-attacker calibration: ASR 0/25 against Qwen2.5-32B
+- [vaara-bench-v1](bench/vaara-bench-v1.md): 77-trace synthetic-corpus benchmark with frozen methodology, 100% soft TPR, 0% hard FPR
 - 140 µs / 210 µs p99 inference latency, commodity CPU
 - Distribution-free conformal coverage on the score
 - MWU regret bound O(sqrt(T log N))
@@ -86,7 +87,7 @@ from vaara.attestation.overt import emit_base_envelope, make_request_commitment,
 envelope = emit_base_envelope(
     signing_key=key,
     request_commitment=make_request_commitment(payload, operator_key=op_key),
-    encoder_binary_identity=encoder_binary_identity(arbiter_version="vaara/0.11.0", policy_hash=ph),
+    encoder_binary_identity=encoder_binary_identity(arbiter_version="vaara/0.12.0", policy_hash=ph),
     non_content_metadata={"action_class": "tx.transfer", "decision": "escalate"},
     monotonic_counter=42,
     arbiter_instance_identifier=uuid_bytes,
@@ -94,6 +95,12 @@ envelope = emit_base_envelope(
 ```
 
 Vaara operates as the **Arbiter** in OVERT terms. See [COMPLIANCE.md](COMPLIANCE.md) "Position relative to open runtime-attestation standards" for the architectural framing.
+
+v0.12.0 adds an OVERT S3P (MEA-2) emitter with exact Clopper-Pearson confidence intervals (pure Python, no scipy), plus a proposed Protocol Profile extension that reports aggregate statistics over Vaara's per-action conformal prediction intervals alongside the standard binomial CI. The agentic-controls mapping in [COMPLIANCE.md](COMPLIANCE.md) "OVERT 1.0 Part 3 (Agentic AI Controls) mapping" walks Vaara's coverage of TOOL-*, MCP-*, MULTI-*, CAP-*, DISC-*, HITL-*, and DRIFT-* control by control.
+
+```python
+from vaara.attestation.s3p import emit_s3p_attestation, ConformalExtension, make_epoch_nonce_commitment
+```
 
 ## Where things live
 
