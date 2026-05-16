@@ -6,6 +6,26 @@ and this project follows [Semantic Versioning](https://semver.org/spec/v2.0.0.ht
 
 ## [Unreleased]
 
+### Added
+- **OVERT 1.0 Protocol Profile 1.0 Base Envelope emitter (`vaara[attestation]` extra).**
+  First OSS Python reference implementation of the OVERT 1.0 AAL-3
+  Phase 2 (Provisional Receipt) emission path. New module
+  `vaara.attestation.overt` produces 9-field closed-schema Base
+  Envelopes per Annex B.6, canonically CBOR-encoded per RFC 8949
+  Section 4.2, Ed25519-signed per RFC 8032, with HMAC-SHA256 keyed
+  request commitments per Annex B.4 and SHA-256 encoder-identity
+  derivation. IEEE-754 floats are rejected at the canonical-encoding
+  boundary per Protocol Profile 1.0 numeric rules. Vaara operates as
+  the **Arbiter** in OVERT terms; external Independent Attestation
+  Providers promote AAL-3 emission to AAL-4 by attaching Phase 3
+  notary signatures and transparency-log inclusion proofs. Public API:
+  `BaseEnvelope`, `emit_base_envelope`, `verify_base_envelope`,
+  `make_request_commitment`, `encoder_binary_identity`, `canonical_cbor`.
+- 13 new attestation tests (`tests/test_attestation_overt.py`).
+  Round-trip verification, IEEE-754-float rejection at every nesting
+  level, key-identifier binding, monotonic-counter binding, tampered-field
+  rejection.
+
 ### Documentation
 - **COMPLIANCE.md** gains two sections under the deployer-vs-Vaara
   ownership boundary: an explicit eIDAS NOTICE (Vaara hash chains and
