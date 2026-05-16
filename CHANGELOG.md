@@ -6,6 +6,79 @@ and this project follows [Semantic Versioning](https://semver.org/spec/v2.0.0.ht
 
 ## [Unreleased]
 
+## [0.12.0] - 2026-05-16
+
+**Theme: agentic OVERT reference, published benchmark, product liability hook.**
+v0.12.0 ships three additions that widen Vaara's category position.
+First, an OVERT 1.0 MEA-2 Statistical Safety Signal Protocol (S3P)
+emitter with exact Clopper-Pearson confidence intervals and a proposed
+Protocol Profile extension that reports aggregate statistics over
+Vaara's per-action conformal prediction intervals. Second, an explicit
+control-by-control mapping of Vaara to OVERT 1.0 Part 3 (Agentic AI
+Controls) in COMPLIANCE.md, covering Tool-Call Governance (Section 11),
+MCP Server Trust Governance (Section 11.5), Multi-Agent System Controls
+(Section 12), Capability-Based Access Control (Section 13), Agent
+Disclosure (Section 14), Human-in-the-Loop Attestation (Section 15),
+and Behavioural Drift Governance (Section 16). Third, vaara-bench-v1: a
+versioned, reproducible adversarial-detection benchmark with frozen
+corpus, methodology, and headline numbers under the v0.11.0 scorer
+(soft TPR 100%, hard FPR 0% across 77 synthetic traces). Plus a forward
+section on EU Product Liability Directive 2024/2853 (Article 9
+rebuttable-presumption hook), transposition deadline 9 December 2026.
+
+### Added
+- **OVERT 1.0 MEA-2 S3P emitter (`vaara[attestation]` extra).** New
+  module `vaara.attestation.s3p` provides exact Clopper-Pearson
+  binomial confidence intervals via a pure-Python regularized
+  incomplete beta function (no scipy dependency), plus a closed-schema
+  S3P attestation per MEA-2.6 (Ed25519-signed, canonical CBOR
+  encoding, decimal-string rates per Protocol Profile 1.0 numeric
+  rules). Public API: `emit_s3p_attestation`, `verify_s3p_attestation`,
+  `make_epoch_nonce_commitment`, `clopper_pearson_ci`,
+  `regularized_incomplete_beta`, `S3PAttestation`,
+  `ConformalExtension`.
+- **`ConformalExtension`** Protocol Profile extension (proposed).
+  Optional field in the signed S3P metadata that reports aggregate
+  statistics over Vaara's per-action conformal prediction intervals
+  alongside the standard binomial CI. Carries the same non-parametric
+  coverage guarantee with no distributional assumption.
+  Standard OVERT verifiers ignore the extension; Vaara-aware
+  verifiers cross-check it against the per-action receipts.
+- **vaara-bench-v1.** Versioned adversarial-detection benchmark with
+  frozen corpus (`bench/adversarial_corpus.jsonl`, SHA-256
+  `7a3219776e1c93a5127ab3b63832d73ba75f32fa044cabdbaa4e5d7088b33ff2`),
+  frozen methodology (`bench/scorer_eval.py`), and frozen headline
+  numbers under v0.11.0 (soft TPR 100%, soft FPR 20%, hard TPR
+  28.85%, hard FPR 0%). Spec doc at `bench/vaara-bench-v1.md`;
+  machine-readable results at `bench/vaara-bench-v1-results.json`.
+  Apache-2.0 licensed.
+- 18 new tests in `tests/test_attestation_s3p.py` covering
+  Clopper-Pearson against textbook values, the k=0 and k=n
+  endpoints, round-trip emit-and-verify, status-band selection
+  (compliant / threshold_exceeded / insufficient_sample), conformal
+  extension attachment, tampered-field rejection, wrong-key rejection,
+  and invalid-count rejection.
+
+### Documentation
+- **COMPLIANCE.md** gains two sections. **OVERT 1.0 Part 3 (Agentic AI
+  Controls) mapping** walks Vaara's coverage of every control in
+  Sections 11 through 16 with a ✅ / ◐ / ◯ marker for satisfied,
+  partial, or gap-to-deployer / future-work. Covers TOOL-1 through
+  TOOL-5, MCP-1/2/3, MULTI-1/2, CAP-1/2, DISC-1, HITL-1/2/3/4,
+  SESS-1..5, STATE-1/2, IDENT-1, and DRIFT-1, plus a final S3P
+  (Section 9, MEA-2) subsection. **EU Product Liability Directive
+  2024/2853** is added as a new forward-looking section covering
+  Articles 7, 8, and 9 (rebuttable presumption of defectiveness)
+  and how Vaara's evidence stream supports the Article 9 rebuttal.
+  Transposition deadline 9 December 2026 (Article 22).
+- **README.md** updated to reference vaara-bench-v1 in the Numbers
+  section and to mention the v0.12.0 S3P emitter and Part 3 mapping
+  in the OVERT 1.0 attestation section. Sample code uses
+  `arbiter_version="vaara/0.12.0"`.
+- **bench/README.md** points to the vaara-bench-v1 spec doc as the
+  canonical citation surface for external references to the
+  benchmark.
+
 ## [0.11.0] - 2026-05-16
 
 **Theme: first OSS Python reference implementation of OVERT 1.0.** v0.11.0
