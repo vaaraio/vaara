@@ -19,7 +19,7 @@ what each tool actually does. If you are an AI Act Article 14
 deployer comparing options, read the matrix. If you want the longer
 prose, read the sections below it.
 
-## Capability matrix
+## Capability matrix (as of 2026-05-16)
 
 | Concern                                          | Vaara | NeMo Guardrails | Guardrails AI | OpenAI Guardrails | LangChain callbacks | OWASP LLM Top 10 | Glacis Python SDK | MS Agent Governance Toolkit |
 | ------------------------------------------------ | :---: | :-------------: | :-----------: | :---------------: | :-----------------: | :--------------: | :---------------: | :-------------------------: |
@@ -152,6 +152,20 @@ tools wired in. If you are running agents in production, you want
 Vaara plus Microsoft AGT for the identity, capability, and sandboxing
 layer Vaara does not cover. They run in different places in the
 stack and the matrix above shows where each tool lives.
+
+## Sources
+
+Each row in the matrix is grounded in publicly available project documentation
+or source code. Verified as of 2026-05-16.
+
+- **Vaara**: this repository at [github.com/vaaraio/vaara](https://github.com/vaaraio/vaara).
+- **NVIDIA NeMo Guardrails**: [github.com/NVIDIA/NeMo-Guardrails](https://github.com/NVIDIA/NeMo-Guardrails).
+- **Guardrails AI**: [github.com/guardrails-ai/guardrails](https://github.com/guardrails-ai/guardrails).
+- **OpenAI Guardrails** (for OpenAI Agents SDK): [openai.github.io/openai-agents-python/guardrails/](https://openai.github.io/openai-agents-python/guardrails/).
+- **LangChain callback handlers**: [python.langchain.com/docs/concepts/callbacks/](https://python.langchain.com/docs/concepts/callbacks/).
+- **OWASP LLM Top 10**: [genai.owasp.org/llm-top-10/](https://genai.owasp.org/llm-top-10/).
+- **Glacis Python SDK**: [github.com/Glacis-io/glacis-python](https://github.com/Glacis-io/glacis-python). Capabilities recorded by source-read of the repository on 2026-05-16.
+- **Microsoft Agent Governance Toolkit**: [github.com/microsoft/agent-governance-toolkit](https://github.com/microsoft/agent-governance-toolkit).
 
 ## Numbers we publish
 

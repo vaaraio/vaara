@@ -22,7 +22,7 @@ classifiers = [
     "Topic :: Software Development :: Libraries :: Python Modules",
     "Typing :: Typed",
 ]
-keywords = ["ai", "agents", "governance", "risk", "compliance", "eu-ai-act", "conformal-prediction", "audit"]
+keywords = ["ai", "ai-agents", "ai-governance", "agent-governance", "ai-act", "eu-ai-act", "article-14", "compliance", "audit-trail", "risk-scoring", "conformal-prediction", "overt", "attestation", "runtime-monitoring"]
 
 [project.urls]
 Homepage = "https://vaara.io"
