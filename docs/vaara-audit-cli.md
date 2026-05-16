@@ -1,4 +1,4 @@
-# `vaara-audit` — third-party auditor CLI
+# `vaara-audit` - third-party auditor CLI
 
 Vaara signs its audit trail with Ed25519 and chains every record with SHA-256. Regulators, internal reviewers, and external auditors need a way to inspect those trails without running the full Vaara agent stack. `vaara-audit` is that CLI.
 
@@ -58,10 +58,10 @@ deny       11   7.7%    0.732
 
 Four rule-based detectors:
 
-- `missing_completion` — `action_requested` without a matching `decision_emitted`. Flags trail truncation, enforcement crashes, or gate bypasses. Skipped if the trail has no `decision_emitted` events at all (pure request logs are not flagged).
-- `timestamp_regression` — a record with a timestamp earlier than the previous record for the same agent. Suggests clock skew, replay, or tampering that the signature check missed (it would not — but useful belt-and-braces).
-- `rate_burst` — agent emits ≥20 records in ≤10 seconds. Default thresholds catch automated loops running away; tune in a follow-up PR if false positives appear on busy agents.
-- `unknown_spike` — ≥25% of an agent's recent 50-record window has `action_type=unknown`. Suggests the agent is using tools Vaara has no registered classification for, which is a classification gap worth investigating.
+- `missing_completion` - `action_requested` without a matching `decision_emitted`. Flags trail truncation, enforcement crashes, or gate bypasses. Skipped if the trail has no `decision_emitted` events at all (pure request logs are not flagged).
+- `timestamp_regression` - a record with a timestamp earlier than the previous record for the same agent. Suggests clock skew, replay, or tampering that the signature check missed (it would not - but useful belt-and-braces).
+- `rate_burst` - agent emits ≥20 records in ≤10 seconds. Default thresholds catch automated loops running away. Tune in a follow-up PR if false positives appear on busy agents.
+- `unknown_spike` - ≥25% of an agent's recent 50-record window has `action_type=unknown`. Suggests the agent is using tools Vaara has no registered classification for, which is a classification gap worth investigating.
 
 All rules can run together (`--rules all`, default) or in isolation (`--rules rate_burst,unknown_spike`). Exit code `0` if no findings, `1` otherwise.
 
@@ -88,4 +88,4 @@ Every subcommand supports `--json` for pipeline integration.
 
 ## Relationship to `vaara` CLI
 
-The existing `vaara trail verify` subcommand provides the same verify function wrapped in the main CLI. `vaara-audit` is the third-party entry point — a standalone name for the regulator-facing workflow, with richer `inspect`, `stats`, and `anomalies` capabilities beyond verify-only.
+The existing `vaara trail verify` subcommand provides the same verify function wrapped in the main CLI. `vaara-audit` is the third-party entry point - a standalone name for the regulator-facing workflow, with richer `inspect`, `stats`, and `anomalies` capabilities beyond verify-only.

@@ -1,4 +1,4 @@
-# Vaara Adaptive Risk Scoring — Formal Specification
+# Vaara Adaptive Risk Scoring - Formal Specification
 
 **Version**: 0.1.0
 **Date**: 2026-04-10
@@ -7,7 +7,7 @@
 
 Let an AI agent **A** operate in an environment **E** by executing a sequence of actions **a₁, a₂, ..., aₜ** drawn from an action space **A**. Each action **aₜ** has a true but unknown risk **r*(aₜ) ∈ [0, 1]**, where 0 denotes no harm and 1 denotes catastrophic harm.
 
-**The compositional safety problem**: Individual actions may be safe — r*(aᵢ) ≈ 0 for all i — yet the *sequence* (a₁, ..., aₖ) produces compound risk R*(a₁, ..., aₖ) ≫ max{r*(aᵢ)}. Example: {read_data, export_data, delete_data} is a data exfiltration pattern where each step alone is benign.
+**The compositional safety problem**: Individual actions may be safe - r*(aᵢ) ≈ 0 for all i - yet the *sequence* (a₁, ..., aₖ) produces compound risk R*(a₁, ..., aₖ) ≫ max{r*(aᵢ)}. Example: {read_data, export_data, delete_data} is a data exfiltration pattern where each step alone is benign.
 
 **Goal**: Construct an adaptive risk scorer **f: A × H → [0, 1]** and a conformal prediction set **C(aₜ) ⊆ [0, 1]** such that:
 
@@ -24,11 +24,11 @@ An action type **τ ∈ T** is characterized by a tuple:
     τ = (c, v, b, u, R)
 
 where:
-- **c ∈ {financial, data, comm, infra, identity, governance, physical}** — category
-- **v ∈ {fully, partially, irreversible}** — reversibility
-- **b ∈ {self, local, shared, global}** — blast radius
-- **u ∈ {deferrable, timely, immediate, irrevocable}** — urgency class
-- **R ⊂ {EU_AI_Act, GDPR, MiFID2, DORA, NIS2, ...}** — regulatory domains
+- **c ∈ {financial, data, comm, infra, identity, governance, physical}** - category
+- **v ∈ {fully, partially, irreversible}** - reversibility
+- **b ∈ {self, local, shared, global}** - blast radius
+- **u ∈ {deferrable, timely, immediate, irrevocable}** - urgency class
+- **R ⊂ {EU_AI_Act, GDPR, MiFID2, DORA, NIS2, ...}** - regulatory domains
 
 ### 2.2 Base Risk Score
 
@@ -50,7 +50,7 @@ The scorer maintains **K** expert signals, each producing a risk estimate sₖ(a
 
 ### 3.1 Default Expert Set (K = 5)
 
-1. **Taxonomy base** (s₁): s₁(aₜ) = β(τ(aₜ)) — the static base risk from §2.2.
+1. **Taxonomy base** (s₁): s₁(aₜ) = β(τ(aₜ)) - the static base risk from §2.2.
 
 2. **Agent history** (s₂): Blends the agent's denial rate and bad outcome rate:
 
@@ -144,7 +144,7 @@ Let C(aₜ) = [f(aₜ) − q̂, f(aₜ) + q̂] be the conformal interval. The de
 
 This is **conservative by construction**: the decision is based on the worst-case risk within the 1 − α confidence set. If even the worst case is safe, allow. If even the best case is dangerous, deny. Between: escalate for human judgment.
 
-**Proposition 5.2**: Let θ_allow = 0.3 and θ_deny = 0.7 (defaults). Before calibration, the interval is [f(a) − 0.3, f(a) + 0.3]. A raw score of f(a) ≤ 0.0 is needed for auto-allow, and f(a) ≥ 0.4 for auto-deny. This means the pre-calibration scorer is maximally cautious — most actions will be escalated, which is the correct cold-start behavior.
+**Proposition 5.2**: Let θ_allow = 0.3 and θ_deny = 0.7 (defaults). Before calibration, the interval is [f(a) − 0.3, f(a) + 0.3]. A raw score of f(a) ≤ 0.0 is needed for auto-allow, and f(a) ≥ 0.4 for auto-deny. This means the pre-calibration scorer is maximally cautious - most actions will be escalated, which is the correct cold-start behavior.
 
 ## 6. Temporal Sequence Scoring
 
@@ -152,9 +152,9 @@ This is **conservative by construction**: the decision is based on the worst-cas
 
 A dangerous pattern **p = (p₁, p₂, ..., pₘ)** is an ordered tuple of action names. Pattern p *matches* in history h = (h₁, ..., hₙ) if there exist indices i₁ < i₂ < ... < iₘ ≤ n such that h_{iⱼ} = pⱼ for all j.
 
-The matching is **ordered but not contiguous** — interleaving benign actions does not break the match. This catches evasion attempts where an attacker inserts harmless actions between the dangerous ones.
+The matching is **ordered but not contiguous** - interleaving benign actions does not break the match. This catches evasion attempts where an attacker inserts harmless actions between the dangerous ones.
 
-**Complexity**: Subsequence matching is O(n·m) per pattern per action, where n = window size and m = pattern length. With W patterns each of length ≤ M, total cost per action is O(W·n·M). With default values (W = 7, n = 10, M = 3), this is O(210) — negligible.
+**Complexity**: Subsequence matching is O(n·m) per pattern per action, where n = window size and m = pattern length. With W patterns each of length ≤ M, total cost per action is O(W·n·M). With default values (W = 7, n = 10, M = 3), this is O(210) - negligible.
 
 ### 6.2 Compositional Risk
 
@@ -162,7 +162,7 @@ The sequence risk boost δₚ is additive to the base score, not multiplicative:
 
     f_seq(aₜ) = f(aₜ) + max{δₚ : p matches}
 
-This ensures that a benign action (f(a) = 0.1) in a dangerous sequence (δ = 0.5) is scored as 0.6 — elevated but not automatically blocked. The conformal interval then widens to [0.3, 0.9], which triggers escalation.
+This ensures that a benign action (f(a) = 0.1) in a dangerous sequence (δ = 0.5) is scored as 0.6 - elevated but not automatically blocked. The conformal interval then widens to [0.3, 0.9], which triggers escalation.
 
 ## 7. Regulatory Compliance
 
@@ -172,7 +172,7 @@ Each audit record **r** is tagged with a set of regulatory articles **A(r) ⊆ A
 
     Coverage(article) = |{r : article ∈ A(r)}| / min_evidence
 
-An article has **sufficient evidence** if Coverage ≥ 1 and evidence is not stale (age < staleness_hours). **Partial** if some evidence exists but insufficient. **Insufficient** if no evidence. This is an evidence-status classification, not a compliance verdict — the deployer (and, where required, a Notified Body) makes the conformity determination.
+An article has **sufficient evidence** if Coverage ≥ 1 and evidence is not stale (age < staleness_hours). **Partial** if some evidence exists but insufficient. **Insufficient** if no evidence. This is an evidence-status classification, not a compliance verdict - the deployer (and, where required, a Notified Body) makes the conformity determination.
 
 ### 7.2 Hash Chain Integrity
 
@@ -217,11 +217,11 @@ The system transitions from rule-based to calibrated mode after 30 outcomes (min
 
 **Claim**: An adversarial agent cannot reliably evade the scorer by manipulating observable signals.
 
-- s₁ (taxonomy) is immutable per action type — the agent cannot change what "tx.transfer" means.
-- s₂ (history) is computed from the agent's own track record — the only way to improve it is to behave well.
-- s₃ (sequence) uses non-contiguous subsequence matching — interleaving benign actions doesn't help.
-- s₄ (burst) counts actions in a time window — cannot be gamed without slowing down.
-- s₅ (confidence) penalizes overcalibrated confidence claims — lying about confidence increases risk.
+- s₁ (taxonomy) is immutable per action type - the agent cannot change what "tx.transfer" means.
+- s₂ (history) is computed from the agent's own track record - the only way to improve it is to behave well.
+- s₃ (sequence) uses non-contiguous subsequence matching - interleaving benign actions doesn't help.
+- s₄ (burst) counts actions in a time window - cannot be gamed without slowing down.
+- s₅ (confidence) penalizes overcalibrated confidence claims - lying about confidence increases risk.
 
 The remaining attack vector is **outcome manipulation**: if the agent can influence the reported outcome severity, it can bias MWU weights. Defense: outcomes should be reported by an independent monitoring system, not by the agent itself.
 

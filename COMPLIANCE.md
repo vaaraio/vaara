@@ -262,9 +262,9 @@ agent boundaries, capability mediation, agent disclosure, human-in-
 the-loop attestation, and behavioural drift governance. The mapping
 below states, control by control, whether Vaara satisfies the
 requirement today (✅), partially satisfies it (◐), or leaves it as
-explicit gap-to-deployer or future-work (◯). Per OVERT Annex F.2 this
-mapping does not establish legal compliance with any regulation. It
-records technical correspondence.
+explicit gap-to-deployer or future-work (◯). This mapping does not
+establish legal compliance with any regulation. It records technical
+correspondence.
 
 ### Section 11 - Tool-Call Governance
 
