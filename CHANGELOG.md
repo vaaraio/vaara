@@ -21,6 +21,18 @@ and this project follows [Semantic Versioning](https://semver.org/spec/v2.0.0.ht
   frameworks, and audit consumers. Vaara defines the interface; the
   vendors call it.
 - 11 new HTTP server tests (`tests/test_server.py`).
+- **Auditor-facing evidence report rendering.** New module
+  `vaara.compliance.render` with `render_markdown`, `render_json`, and
+  `render_narrative` for the `ConformityReport` produced by
+  `ComplianceEngine.assess`. Markdown output has per-domain article
+  tables, per-article detail sections, evidence status badges,
+  audit-chain integrity flagging, and a deployer-owns-the-decision
+  disclaimer suitable for shipping to a regulator or attaching to an
+  internal conformity submission.
+- **`vaara compliance report --db PATH --format md|json|narrative
+  [--out FILE]`** CLI subcommand. Loads an audit SQLite DB, runs
+  `ComplianceEngine.assess`, renders to chosen format.
+- 5 new compliance-render tests (`tests/test_compliance_render.py`).
 
 ## [0.9.0] - 2026-05-15
 

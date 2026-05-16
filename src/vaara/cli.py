@@ -550,6 +550,52 @@ def _cmd_policy_test(args: argparse.Namespace) -> int:
     return 0 if all(r.passed for r in results) else 1
 
 
+def _cmd_compliance_report(args: argparse.Namespace) -> int:
+    from vaara.audit.sqlite_backend import SQLiteAuditBackend
+    from vaara.compliance.engine import create_default_engine
+    from vaara.compliance.render import (
+        render_json,
+        render_markdown,
+        render_narrative,
+    )
+
+    db_path = Path(args.db).expanduser()
+    if not db_path.exists():
+        print(f"audit DB not found: {db_path}", file=sys.stderr)
+        return 2
+
+    backend = SQLiteAuditBackend(str(db_path))
+    try:
+        trail = backend.load_trail()
+    except Exception as exc:
+        print(f"failed to load audit trail: {exc}", file=sys.stderr)
+        return 2
+
+    engine = create_default_engine()
+    report = engine.assess(
+        trail,
+        system_name=args.system_name,
+        system_version=args.system_version,
+    )
+
+    if args.format == "md":
+        text = render_markdown(report)
+    elif args.format == "json":
+        text = render_json(report)
+    elif args.format == "narrative":
+        text = render_narrative(report)
+    else:
+        print(f"unknown format: {args.format}", file=sys.stderr)
+        return 2
+
+    if args.out:
+        out_path = Path(args.out).expanduser()
+        out_path.write_text(text, encoding="utf-8")
+    else:
+        print(text)
+    return 0
+
+
 def _cmd_serve(args: argparse.Namespace) -> int:
     try:
         import uvicorn
@@ -770,6 +816,37 @@ def build_parser() -> argparse.ArgumentParser:
         help="Emit results as JSON (stable shape for CI)",
     )
     ptest.set_defaults(func=_cmd_policy_test)
+
+    pcr = sub.add_parser(
+        "compliance",
+        help="Compliance reporting commands",
+    )
+    csub = pcr.add_subparsers(dest="compliance_cmd", required=True)
+    pcrep = csub.add_parser(
+        "report",
+        help="Assemble and render an article-level evidence report",
+    )
+    pcrep.add_argument(
+        "--db", required=True,
+        help="Path to the audit SQLite DB to read evidence from",
+    )
+    pcrep.add_argument(
+        "--format", choices=["md", "json", "narrative"], default="md",
+        help="Output format (default: md)",
+    )
+    pcrep.add_argument(
+        "--out", default=None,
+        help="Write to file (default: stdout)",
+    )
+    pcrep.add_argument(
+        "--system-name", default="Vaara-governed AI system",
+        help="System name to include in the report header",
+    )
+    pcrep.add_argument(
+        "--system-version", default="unspecified",
+        help="System version to include in the report header",
+    )
+    pcrep.set_defaults(func=_cmd_compliance_report)
 
     pserve = sub.add_parser(
         "serve",
