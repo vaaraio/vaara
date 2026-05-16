@@ -203,6 +203,57 @@ If a vendor tells you a drop-in tool makes you EU AI Act compliant,
 they are either misunderstanding the regulation or selling you a
 liability.
 
+## Vaara is not an eIDAS trust service
+
+Vaara's hash-chained audit trail and Article 12 commit-prove receipts
+produce **technical evidence**. They are not Qualified Electronic
+Signatures, Qualified Electronic Seals, or Qualified Electronic
+Attestations of Attributes (QEAA) under Regulation (EU) 910/2014
+(eIDAS), Articles 3(12), 3(25), 3(45), or 3(46). Vaara does not
+operate as a qualified trust service under Article 3(16).
+
+If your conformity workstream requires evidence to be backed by a
+qualified trust service, layer that on top of Vaara's output. Vaara's
+hash chain and receipt formats are designed to be wrapped by a
+qualified seal or signature without changing the underlying evidence.
+
+## Position relative to open runtime-attestation standards
+
+The runtime-attestation space is converging on the principle that
+**self-attestation is not sufficient** — the entity attesting to
+governance should be structurally independent of the entity being
+governed. OVERT 1.0 (Glacis Technologies, overt.is) makes this
+explicit through its four-tier Attestation Assurance Level model,
+where AAL-4 mandates an Independent Attestation Provider (IAP)
+operating notary infrastructure that the AI operator does not
+control.
+
+Vaara's position in this picture:
+
+- **Vaara is structurally independent of the agent it governs.**
+  Vaara is a third-party runtime kernel that intercepts the agent's
+  actions, scores risk, and writes the audit trail. The agent does
+  not produce its own evidence about itself. This satisfies the
+  underlying *agent-vs-governor independence* principle.
+- **Vaara is not, by itself, structurally independent of the
+  operator.** The operator deploys Vaara in their own environment.
+  In OVERT 1.0 terms this maps to AAL-3 (automated monitoring with
+  operator-controlled infrastructure), not AAL-4. Reaching AAL-4
+  requires layering an external IAP — a notary service that the
+  operator does not control — on top of Vaara's emitted evidence.
+- **Vaara's design admits an external IAP layer without internal
+  change.** The hash chain, the commit-prove receipt pair, and the
+  HTTP API surface all produce structured, signable artefacts that
+  an IAP can co-sign, batch into a transparency log, or seal under
+  eIDAS qualified trust services. Future work: a documented IAP
+  adapter interface.
+
+This positioning is deliberate. Vaara does not claim AAL-4
+conformance and does not market a self-attestation pattern.
+Operators who need AAL-4 should pair Vaara with an independent
+attestation provider; the Vaara-emitted evidence is the input to
+that provider, not a replacement for it.
+
 ## Pulling the evidence
 
 ### From Python
