@@ -4,7 +4,7 @@ build-backend = "setuptools.build_meta"
 
 [project]
 name = "vaara"
-version = "0.18.1"
+version = "0.19.0"
 description = "Adaptive AI Agent Execution Layer for risk scoring, audit trails, and regulatory compliance"
 requires-python = ">=3.10"
 license = "Apache-2.0"
@@ -46,6 +46,9 @@ server = ["fastapi>=0.110", "uvicorn>=0.27"]
 attestation = ["cbor2>=5.4", "cryptography>=41.0"]
 pq = ["dilithium-py>=1.4.0"]
 pdf = ["reportlab>=4.0"]
+bedrock = ["boto3>=1.34"]
+azure-content-safety = ["azure-ai-contentsafety>=1.0"]
+gcp-model-armor = ["google-cloud-modelarmor>=0.1"]
 
 [project.scripts]
 vaara = "vaara.cli:main"
