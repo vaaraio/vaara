@@ -77,6 +77,19 @@ v0.13.0 adds three operator-facing endpoints. `POST /v1/policy/reload` atomicall
 
 v0.14.0 adds an optional ML-DSA-65 (FIPS 204) signer for the regulator-handoff export envelope (`pip install 'vaara[pq]'`), suitable for retention horizons that cross the credible quantum threshold. The same release adds `vaara.scorer.composition.ExternalScorer` and `vaara.scorer.composite.CompositeScorer` so Vaara's adaptive scorer can be run alongside external scorers (NeMo Guardrails, another Vaara instance, any service that implements the `/v1/score` wire contract); the composite preserves the strongest decision across members.
 
+v0.15.0 ships the first-party TypeScript client at [`clients/ts`](clients/ts) and on npm as `@vaara/client`. Typed wrappers over every v1 endpoint, Node 18+, ESM, declarations shipped. JS/TS agents (LangChain.js, Vercel AI SDK, MCP, any Node service) can now call Vaara without a Python sidecar.
+
+```bash
+npm install @vaara/client
+```
+
+```ts
+import { VaaraClient } from "@vaara/client";
+const vaara = new VaaraClient({ baseUrl: "http://localhost:8000" });
+const r = await vaara.score({ tool_name: "tx.transfer", agent_id: "agent-007", base_risk_score: 0.6 });
+if (r.decision === "deny") throw new Error("blocked");
+```
+
 ## OVERT 1.0 attestation
 
 Vaara implements the OVERT 1.0 ([overt.is](https://overt.is/)) Protocol Profile 1.0 Base Envelope. OVERT 1.0 is an open standard for runtime trust in AI systems, authored by Glacis Technologies and published 25 March 2026. Closed-schema 9-field structure at AAL-3 Phase 2 (Provisional Receipt), canonical CBOR (RFC 8949), Ed25519 signatures, HMAC-SHA256 keyed commitments, IEEE-754 float rejection. v0.13.0 adds a reference Phase 3 IAP (`vaara.attestation.iap`) that notary-signs the Provisional Receipt and anchors it in a transparency log; production deployments can swap in sigstore Rekor or an equivalent independently-operated log at the same call sites.
@@ -91,7 +104,7 @@ from vaara.attestation.overt import emit_base_envelope, make_request_commitment,
 envelope = emit_base_envelope(
     signing_key=key,
     request_commitment=make_request_commitment(payload, operator_key=op_key),
-    encoder_binary_identity=encoder_binary_identity(arbiter_version="vaara/0.14.0", policy_hash=ph),
+    encoder_binary_identity=encoder_binary_identity(arbiter_version="vaara/0.15.0", policy_hash=ph),
     non_content_metadata={"action_class": "tx.transfer", "decision": "escalate"},
     monotonic_counter=42,
     arbiter_instance_identifier=uuid_bytes,
