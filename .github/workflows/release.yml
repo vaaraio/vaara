@@ -87,3 +87,38 @@ jobs:
             dist/*.sigstore.json
           generate_release_notes: true
           fail_on_unmatched_files: true
+
+  publish-npm:
+    name: Publish TypeScript client to npm
+    needs: build
+    runs-on: ubuntu-latest
+    if: ${{ vars.NPM_PUBLISH_ENABLED == 'true' }}
+    permissions:
+      contents: read
+      id-token: write  # required for npm provenance
+    defaults:
+      run:
+        working-directory: clients/ts
+    steps:
+      - name: Checkout
+        uses: actions/checkout@de0fac2e4500dabe0009e67214ff5f5447ce83dd  # v6.0.2
+
+      - name: Set up Node.js
+        uses: actions/setup-node@a0853c24544627f65ddf259abe73b1d18a591444  # v6.0.0
+        with:
+          node-version: '22'
+          registry-url: 'https://registry.npmjs.org'
+
+      - name: Install (npm ci)
+        run: npm ci --no-audit --no-fund
+
+      - name: Build
+        run: npm run build
+
+      - name: Test
+        run: node --test test/*.test.mjs
+
+      - name: Publish to npm with provenance
+        run: npm publish --provenance --access public
+        env:
+          NODE_AUTH_TOKEN: ${{ secrets.NPM_TOKEN }}
