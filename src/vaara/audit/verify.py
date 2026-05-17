@@ -172,9 +172,14 @@ def verify_signed(
             trail_bytes = zf.read("trail.jsonl")
             manifest_bytes = zf.read("manifest.json")
             signature = zf.read("trail.sig")
-            embedded_pubkey = (
+            embedded_pubkey_pem = (
                 zf.read("signer_pubkey.pem")
                 if "signer_pubkey.pem" in names
+                else None
+            )
+            embedded_pubkey_bin = (
+                zf.read("signer_pubkey.bin")
+                if "signer_pubkey.bin" in names
                 else None
             )
     except zipfile.BadZipFile as e:
@@ -197,25 +202,68 @@ def verify_signed(
             "(trail was tampered after export)"
         )
 
-    if public_key is None:
-        if embedded_pubkey is None:
+    algorithm = manifest.get("signature_algorithm", "Ed25519")
+    to_verify = hashlib.sha256(trail_bytes + manifest_bytes).digest()
+
+    if algorithm == "Ed25519":
+        if public_key is None:
+            if embedded_pubkey_pem is None:
+                return VerifyResult(
+                    ok=False,
+                    errors=errors + [
+                        "no public_key argument and no signer_pubkey.pem in zip",
+                    ],
+                    manifest=manifest,
+                )
+            pk = _load_public_key(embedded_pubkey_pem)
+        else:
+            pk = _load_public_key(public_key)
+        try:
+            pk.verify(signature, to_verify)
+        except InvalidSignature:
+            errors.append(
+                "Ed25519 signature did not verify "
+                "(wrong public key, tampered manifest, or tampered trail)"
+            )
+    elif algorithm == "ML-DSA-65":
+        try:
+            from vaara.audit.signer import MLDSA65Verifier
+        except ImportError as exc:
             return VerifyResult(
                 ok=False,
-                errors=errors + ["no public_key argument and no signer_pubkey.pem in zip"],
+                errors=errors + [
+                    f"ML-DSA-65 verify requires the pq extra: {exc}",
+                ],
                 manifest=manifest,
             )
-        pk = _load_public_key(embedded_pubkey)
+        if public_key is None:
+            if embedded_pubkey_bin is None:
+                return VerifyResult(
+                    ok=False,
+                    errors=errors + [
+                        "no public_key argument and no signer_pubkey.bin in zip",
+                    ],
+                    manifest=manifest,
+                )
+            pk_bytes = embedded_pubkey_bin
+        elif isinstance(public_key, (bytes, bytearray)):
+            pk_bytes = bytes(public_key)
+        else:
+            return VerifyResult(
+                ok=False,
+                errors=errors + [
+                    "ML-DSA-65 verify requires public_key as raw bytes",
+                ],
+                manifest=manifest,
+            )
+        verifier = MLDSA65Verifier(pk_bytes)
+        if not verifier.verify(to_verify, signature):
+            errors.append(
+                "ML-DSA-65 signature did not verify "
+                "(wrong public key, tampered manifest, or tampered trail)"
+            )
     else:
-        pk = _load_public_key(public_key)
-
-    to_verify = hashlib.sha256(trail_bytes + manifest_bytes).digest()
-    try:
-        pk.verify(signature, to_verify)
-    except InvalidSignature:
-        errors.append(
-            "Ed25519 signature did not verify "
-            "(wrong public key, tampered manifest, or tampered trail)"
-        )
+        errors.append(f"unknown signature_algorithm: {algorithm!r}")
 
     chain_error = _verify_chain_bytes(trail_bytes)
     if chain_error is not None:

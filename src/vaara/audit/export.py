@@ -26,7 +26,7 @@ import time
 import zipfile
 from dataclasses import dataclass
 from pathlib import Path
-from typing import TYPE_CHECKING, Union
+from typing import TYPE_CHECKING, Optional, Union
 
 try:
     from cryptography.exceptions import UnsupportedAlgorithm
@@ -40,6 +40,7 @@ except ImportError:
     _HAS_CRYPTO = False
 
 if TYPE_CHECKING:
+    from vaara.audit.signer import Signer
     from vaara.audit.trail import AuditTrail
 
 logger = logging.getLogger(__name__)
@@ -112,7 +113,9 @@ def _build_manifest(
     first_hash: str,
     last_hash: str,
     chain_intact: bool,
-    public_key: "Ed25519PublicKey",
+    *,
+    signer_fingerprint: str,
+    signature_algorithm: str,
     vaara_version: str,
     agent_id: str = "",
 ) -> dict:
@@ -125,8 +128,8 @@ def _build_manifest(
         "last_hash": last_hash,
         "chain_intact_at_export": chain_intact,
         "trail_sha256": hashlib.sha256(trail_jsonl_bytes).hexdigest(),
-        "signer_pubkey_fingerprint": _pubkey_fingerprint(public_key),
-        "signature_algorithm": "Ed25519",
+        "signer_pubkey_fingerprint": signer_fingerprint,
+        "signature_algorithm": signature_algorithm,
         "signature_over": "sha256(trail.jsonl_bytes || manifest.json_bytes_without_signature)",
         "agent_id": agent_id or "",
     }
@@ -135,8 +138,10 @@ def _build_manifest(
 def export_signed(
     trail: "AuditTrail",
     out_path: Union[str, Path],
-    signer_key: Union[str, Path, bytes, "Ed25519PrivateKey"],
+    signer_key: Union[str, Path, bytes, "Ed25519PrivateKey", None] = None,
     agent_id: str = "",
+    *,
+    signer: Optional["Signer"] = None,
 ) -> ExportResult:
     """Produce a signed, regulator-handoff zip of the audit trail.
 
@@ -144,19 +149,42 @@ def export_signed(
         trail: The :class:`AuditTrail` to export.
         out_path: Where to write the zip file. Parent directory must exist.
         signer_key: Ed25519 private key — accepts a PEM path, PEM bytes, or
-            a loaded ``Ed25519PrivateKey`` object. For production, use keys
-            from a KMS/HSM/Vault — see ``docs/signing-keys.md``.
+            a loaded ``Ed25519PrivateKey`` object. Backward-compatible
+            shortcut for the default Ed25519 path. Mutually exclusive
+            with ``signer``.
         agent_id: Optional scope hint written to the manifest. Does not
             filter the exported records (export is whole-trail).
+        signer: A ``vaara.audit.signer.Signer`` instance — currently
+            ``Ed25519Signer`` or ``MLDSA65Signer`` (v0.14.0). Set this
+            when promoting an operator's retention horizon past the
+            credible quantum threshold. Manifest carries the algorithm
+            identifier so verifiers dispatch automatically.
 
     Returns:
         ExportResult with the output path, manifest dict, and chain status.
 
     Raises:
-        ImportError: If the ``cryptography`` package is not installed.
+        ImportError: If the ``cryptography`` package is not installed
+            for the Ed25519 path, or ``dilithium-py`` for the ML-DSA-65
+            path (install with ``pip install 'vaara[pq]'``).
         FileNotFoundError: If ``out_path`` parent directory does not exist.
+        ValueError: If both ``signer_key`` and ``signer`` are supplied,
+            or neither is.
     """
-    _require_crypto()
+    from vaara.audit.signer import Ed25519Signer
+
+    if signer is not None and signer_key is not None:
+        raise ValueError(
+            "export_signed: pass `signer` or `signer_key`, not both"
+        )
+    if signer is None and signer_key is None:
+        raise ValueError(
+            "export_signed: one of `signer` or `signer_key` is required"
+        )
+
+    if signer is None:
+        _require_crypto()
+        signer = Ed25519Signer(_load_private_key(signer_key))
 
     # Local import avoids a package-level dep on the trail module for tooling
     # that only imports the export helpers.
@@ -173,9 +201,6 @@ def export_signed(
         raise FileNotFoundError(
             f"Output directory does not exist: {out_path.parent}"
         )
-
-    private_key = _load_private_key(signer_key)
-    public_key = private_key.public_key()
 
     # Snapshot under the trail's own lock by using its existing exporter.
     # Use a temp path next to the final zip so we can stream large trails
@@ -206,25 +231,34 @@ def export_signed(
         first_hash=first_hash,
         last_hash=last_hash,
         chain_intact=chain_intact,
-        public_key=public_key,
+        signer_fingerprint=signer.public_key_fingerprint()[:32],
+        signature_algorithm=signer.algorithm,
         vaara_version=vaara_version,
         agent_id=agent_id,
     )
     manifest_bytes = json.dumps(manifest, sort_keys=True, indent=2).encode("utf-8")
 
     to_sign = hashlib.sha256(trail_bytes + manifest_bytes).digest()
-    signature = private_key.sign(to_sign)
-
-    pubkey_pem = public_key.public_bytes(
-        encoding=serialization.Encoding.PEM,
-        format=serialization.PublicFormat.SubjectPublicKeyInfo,
-    )
+    signature = signer.sign(to_sign)
 
     with zipfile.ZipFile(out_path, "w", compression=zipfile.ZIP_DEFLATED) as zf:
         zf.writestr("trail.jsonl", trail_bytes)
         zf.writestr("manifest.json", manifest_bytes)
         zf.writestr("trail.sig", signature)
-        zf.writestr("signer_pubkey.pem", pubkey_pem)
+        if signer.algorithm == "Ed25519":
+            # Preserve the existing PEM-encoded public-key file for back-
+            # compatible verification by older Vaara clients.
+            from cryptography.hazmat.primitives import serialization
+            from cryptography.hazmat.primitives.asymmetric.ed25519 import (
+                Ed25519PublicKey,
+            )
+            pub = Ed25519PublicKey.from_public_bytes(signer.public_key_bytes())
+            zf.writestr("signer_pubkey.pem", pub.public_bytes(
+                encoding=serialization.Encoding.PEM,
+                format=serialization.PublicFormat.SubjectPublicKeyInfo,
+            ))
+        else:
+            zf.writestr("signer_pubkey.bin", signer.public_key_bytes())
 
     logger.info(
         "Exported signed trail: %s (%d records, chain_intact=%s, fingerprint=%s)",
