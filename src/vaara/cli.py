@@ -840,6 +840,147 @@ def _cmd_overt_verify(args: argparse.Namespace) -> int:
     return 1
 
 
+def _cmd_tee_parse(args: argparse.Namespace) -> int:
+    """Parse an AMD SEV-SNP attestation report blob and print key fields."""
+    try:
+        from vaara.attestation.tee import (
+            TEEAttestationError,
+            parse_sev_snp_report,
+        )
+    except ImportError:
+        print(
+            "vaara tee parse requires the attestation extra. "
+            "Install with: pip install 'vaara[attestation]'",
+            file=sys.stderr,
+        )
+        return 2
+
+    report_path = Path(args.report).expanduser()
+    if not report_path.is_file():
+        print(f"vaara tee parse: not a file: {report_path}", file=sys.stderr)
+        return 2
+
+    try:
+        report = parse_sev_snp_report(report_path.read_bytes())
+    except TEEAttestationError as exc:
+        print(f"vaara tee parse: {exc}", file=sys.stderr)
+        return 1
+
+    out = {
+        "version": report.version,
+        "guest_svn": report.guest_svn,
+        "vmpl": report.vmpl,
+        "signature_algo": report.signature_algo,
+        "policy": report.policy,
+        "report_data": report.report_data.hex(),
+        "measurement": report.measurement.hex(),
+        "host_data": report.host_data.hex(),
+        "chip_id": report.chip_id.hex(),
+        "reported_tcb": report.reported_tcb,
+        "committed_tcb": report.committed_tcb,
+        "launch_tcb": report.launch_tcb,
+        "current_build": report.current_build,
+        "current_minor": report.current_minor,
+        "current_major": report.current_major,
+    }
+    print(json.dumps(out, indent=2))
+    return 0
+
+
+def _cmd_tee_verify(args: argparse.Namespace) -> int:
+    """Verify a SEV-SNP report signature, optionally against an OVERT envelope.
+
+    The VCEK (Versioned Chip Endorsement Key) must be supplied as PEM. AMD
+    KDS-based cert-chain validation (VCEK -> ASK -> ARK) is tracked for a
+    later release; v0.18.0 only validates the report signature against a
+    caller-supplied VCEK.
+    """
+    try:
+        import cbor2
+
+        from vaara.attestation.overt import BaseEnvelope
+        from vaara.attestation.tee import (
+            TEEAttestationError,
+            parse_sev_snp_report,
+            verify_envelope_binding,
+            verify_sev_snp_report_signature,
+        )
+    except ImportError:
+        print(
+            "vaara tee verify requires the attestation extra. "
+            "Install with: pip install 'vaara[attestation]'",
+            file=sys.stderr,
+        )
+        return 2
+
+    report_path = Path(args.report).expanduser()
+    if not report_path.is_file():
+        print(f"vaara tee verify: not a file: {report_path}", file=sys.stderr)
+        return 2
+
+    vcek_path = Path(args.vcek).expanduser()
+    if not vcek_path.is_file():
+        print(
+            f"vaara tee verify: VCEK PEM not found: {vcek_path}",
+            file=sys.stderr,
+        )
+        return 2
+
+    try:
+        report = parse_sev_snp_report(report_path.read_bytes())
+    except TEEAttestationError as exc:
+        print(f"vaara tee verify: {exc}", file=sys.stderr)
+        return 1
+
+    try:
+        signature_ok = verify_sev_snp_report_signature(
+            report, vcek_path.read_bytes(),
+        )
+    except TEEAttestationError as exc:
+        print(f"vaara tee verify: {exc}", file=sys.stderr)
+        return 1
+
+    result = {
+        "signature_valid": signature_ok,
+        "report_data": report.report_data.hex(),
+        "measurement": report.measurement.hex(),
+    }
+
+    if args.overt:
+        overt_path = Path(args.overt).expanduser()
+        if not overt_path.is_file():
+            print(
+                f"vaara tee verify: OVERT envelope file not found: "
+                f"{overt_path}",
+                file=sys.stderr,
+            )
+            return 2
+        decoded = cbor2.loads(overt_path.read_bytes())
+        envelope = BaseEnvelope(
+            blinded_identifier=decoded["blinded_identifier"],
+            request_commitment=decoded["request_commitment"],
+            encoder_binary_identity=decoded["encoder_binary_identity"],
+            non_content_metadata=decoded["non_content_metadata"],
+            monotonic_counter=int(decoded["monotonic_counter"]),
+            nanosecond_timestamp=int(decoded["nanosecond_timestamp"]),
+            key_identifier=decoded["key_identifier"],
+            arbiter_instance_identifier=decoded["arbiter_instance_identifier"],
+            signature=decoded["signature"],
+        )
+        result["envelope_binding_valid"] = verify_envelope_binding(
+            report, envelope,
+        )
+    else:
+        result["envelope_binding_valid"] = None
+
+    print(json.dumps(result, indent=2))
+    if not signature_ok:
+        return 1
+    if args.overt and result["envelope_binding_valid"] is False:
+        return 1
+    return 0
+
+
 def _load_overt_pubkey(args: argparse.Namespace) -> Optional[bytes]:
     """Resolve --pubkey-file or --pubkey-hex to raw bytes. None on error."""
     if args.pubkey_file:
@@ -1335,6 +1476,59 @@ def build_parser() -> argparse.ArgumentParser:
         help="Raw 32-byte Ed25519 public key encoded as 64 hex characters",
     )
     pov_verify.set_defaults(func=_cmd_overt_verify)
+
+    ptee = sub.add_parser(
+        "tee",
+        help=(
+            "Hardware TEE attestation commands (experimental, AMD SEV-SNP)"
+        ),
+    )
+    tsub = ptee.add_subparsers(dest="tee_cmd", required=True)
+
+    ptee_parse = tsub.add_parser(
+        "parse",
+        help=(
+            "Parse an AMD SEV-SNP attestation report blob and print key "
+            "fields as JSON. Requires the attestation extra."
+        ),
+    )
+    ptee_parse.add_argument(
+        "report",
+        help="Path to a binary SEV-SNP attestation report (1184 bytes)",
+    )
+    ptee_parse.set_defaults(func=_cmd_tee_parse)
+
+    ptee_verify = tsub.add_parser(
+        "verify",
+        help=(
+            "Verify a SEV-SNP report signature against a VCEK PEM, "
+            "and optionally check that REPORT_DATA binds to an OVERT envelope. "
+            "Requires the attestation extra."
+        ),
+    )
+    ptee_verify.add_argument(
+        "report",
+        help="Path to a binary SEV-SNP attestation report (1184 bytes)",
+    )
+    ptee_verify.add_argument(
+        "--vcek",
+        required=True,
+        help=(
+            "Path to a PEM-encoded VCEK (Versioned Chip Endorsement Key). "
+            "Must be supplied out of band. AMD KDS chain validation is "
+            "tracked for v0.19+."
+        ),
+    )
+    ptee_verify.add_argument(
+        "--overt",
+        default=None,
+        help=(
+            "Optional path to a canonical-CBOR OVERT 1.0 Base Envelope. "
+            "If supplied, the report's REPORT_DATA is checked against "
+            "SHA-512 of the envelope."
+        ),
+    )
+    ptee_verify.set_defaults(func=_cmd_tee_verify)
 
     preload = psub.add_parser(
         "reload",

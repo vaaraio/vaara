@@ -6,6 +6,66 @@ and this project follows [Semantic Versioning](https://semver.org/spec/v2.0.0.ht
 
 ## [Unreleased]
 
+## [0.18.0] - 2026-05-17
+
+**Theme: hardware TEE attestation hook (experimental).** Adds an optional
+hardware-rooted attestation layer alongside the Ed25519 (or ML-DSA-65)
+signature already on the OVERT 1.0 Base Envelope. Initial backend is AMD
+SEV-SNP, the natural fit for the confidential-VM deployment model used
+in agent runtimes. Intel TDX and SGX backends are tracked for later
+releases. The OVERT envelope schema is unchanged (closed per spec); the
+TEE report is a sibling artefact bound to a specific envelope by placing
+`SHA-512(canonical_cbor(envelope))` into the report's 64-byte
+`REPORT_DATA` field.
+
+### Added
+- `src/vaara/attestation/tee.py` module with:
+  - `parse_sev_snp_report`: binary parser for the 1184-byte SEV-SNP
+    attestation report (AMD SEV Secure Nested Paging Firmware ABI
+    Specification rev. 1.55, Table 22).
+  - `bind_overt_envelope_to_report_data`: computes the 64-byte
+    `REPORT_DATA` value that binds a TEE report to a specific OVERT
+    envelope. Hash covers all 9 envelope fields including the inner
+    Ed25519 signature.
+  - `verify_sev_snp_report_signature`: validates the ECDSA P-384
+    over the report body against a caller-supplied VCEK PEM.
+  - `verify_envelope_binding`: confirms `REPORT_DATA` matches
+    SHA-512 of the supplied envelope.
+  - `MockSEVSNPAttester`: deterministic in-memory attester for tests
+    and CI, building byte-compatible report blobs.
+  - `SEVSNPHostAttester`: skeleton that wraps `/dev/sev-guest` and
+    raises a clear error when not on an SEV-SNP host.
+- `vaara tee parse REPORT` CLI: dump key fields of a SEV-SNP report as
+  JSON.
+- `vaara tee verify REPORT --vcek VCEK.pem [--overt ENVELOPE.cbor]` CLI:
+  signature check plus optional binding check against an OVERT envelope.
+- 16 tests in `tests/test_attestation_tee.py` covering parse round-trip,
+  size rejection, mock-attester emission, signature verification,
+  tamper detection, wrong-VCEK rejection, envelope binding, wrong-curve
+  rejection, non-EC-key rejection, unsupported-algo rejection, and the
+  non-SEV-SNP host error path.
+
+### Not in this release
+- AMD KDS-based cert-chain validation (VCEK → ASK → ARK). Validating
+  against AMD's Key Distribution Service requires a network fetch
+  against `https://kdsintf.amd.com/` and is tracked for v0.19+.
+- Live `/dev/sev-guest` ioctl emission. The `SNP_GET_REPORT` ioctl path
+  is documented in `linux/sev-guest.h` and is tracked for v0.19+ once a
+  tested SEV-SNP guest is available for integration testing.
+- Intel TDX, Intel SGX backends. Same module shape will accommodate them
+  via additional attester classes.
+
+### Fixed
+- `src/vaara/__init__.py` `__version__` had drifted to `0.15.0` while
+  `pyproject.toml` had moved through 0.16.0 and 0.17.0. Both now read
+  `0.18.0`.
+
+### Notes
+- The OVERT 1.0 envelope schema is closed and unchanged. TEE attestation
+  is a strictly additive sibling artefact; an OVERT verifier without TEE
+  awareness still validates Vaara envelopes exactly as before.
+- 636 Python tests pass (was 620 + 16 new).
+
 ## [0.17.0] - 2026-05-17
 
 **Theme: Vaara as the OVERT 1.0 reference verifier.** Vaara has emitted
