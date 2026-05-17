@@ -75,6 +75,8 @@ The contract is in [docs/openapi.yaml](docs/openapi.yaml). Vaara defines the int
 
 v0.13.0 adds three operator-facing endpoints. `POST /v1/policy/reload` atomically swaps the running policy without restarting the agent process (start with `vaara serve --policy PATH` to enable; in-flight requests keep the old thresholds, the next request sees the new ones). `POST /v1/detect/injection` and `POST /v1/detect/pii` expose Vaara's adversarial scorer and a zero-dependency PII extractor as named buyer-visible endpoints; the corresponding `vaara detect injection` and `vaara detect pii` CLI subcommands exit non-zero when the detector fires, so they slot into CI gates. `vaara compliance dashboard --db PATH --out site/` renders a single-file static HTML article-coverage page from the same evidence model as `vaara compliance report`.
 
+v0.14.0 adds an optional ML-DSA-65 (FIPS 204) signer for the regulator-handoff export envelope (`pip install 'vaara[pq]'`), suitable for retention horizons that cross the credible quantum threshold. The same release adds `vaara.scorer.composition.ExternalScorer` and `vaara.scorer.composite.CompositeScorer` so Vaara's adaptive scorer can be run alongside external scorers (NeMo Guardrails, another Vaara instance, any service that implements the `/v1/score` wire contract); the composite preserves the strongest decision across members.
+
 ## OVERT 1.0 attestation
 
 Vaara implements the OVERT 1.0 ([overt.is](https://overt.is/)) Protocol Profile 1.0 Base Envelope. OVERT 1.0 is an open standard for runtime trust in AI systems, authored by Glacis Technologies and published 25 March 2026. Closed-schema 9-field structure at AAL-3 Phase 2 (Provisional Receipt), canonical CBOR (RFC 8949), Ed25519 signatures, HMAC-SHA256 keyed commitments, IEEE-754 float rejection. v0.13.0 adds a reference Phase 3 IAP (`vaara.attestation.iap`) that notary-signs the Provisional Receipt and anchors it in a transparency log; production deployments can swap in sigstore Rekor or an equivalent independently-operated log at the same call sites.
@@ -89,7 +91,7 @@ from vaara.attestation.overt import emit_base_envelope, make_request_commitment,
 envelope = emit_base_envelope(
     signing_key=key,
     request_commitment=make_request_commitment(payload, operator_key=op_key),
-    encoder_binary_identity=encoder_binary_identity(arbiter_version="vaara/0.13.0", policy_hash=ph),
+    encoder_binary_identity=encoder_binary_identity(arbiter_version="vaara/0.14.0", policy_hash=ph),
     non_content_metadata={"action_class": "tx.transfer", "decision": "escalate"},
     monotonic_counter=42,
     arbiter_instance_identifier=uuid_bytes,
