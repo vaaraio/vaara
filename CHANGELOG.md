@@ -6,6 +6,36 @@ and this project follows [Semantic Versioning](https://semver.org/spec/v2.0.0.ht
 
 ## [Unreleased]
 
+## [0.15.0] - 2026-05-17
+
+**Theme: Vaara reaches JavaScript.** First-party TypeScript HTTP client
+for the v1 API so JS/TS agents (LangChain.js, Vercel AI SDK, MCP, any
+Node service) can call Vaara without spawning a Python sidecar.
+
+### Added
+- **`@vaara/client` npm package (clients/ts).** Typed wrapper over
+  every v1 endpoint: ``score`` / ``reportOutcome`` /
+  ``appendAuditEvent`` / ``getActionChain`` / ``verifyAuditChain`` /
+  ``reloadPolicy`` / ``detectInjection`` / ``detectPII`` /
+  ``serverInfo`` / ``health``. ESM-only, Node 18+ (global ``fetch``),
+  TypeScript declarations shipped. Server-side ``{error: {code,
+  message}}`` bodies map to ``VaaraError`` (carries ``status`` +
+  ``code`` for pattern matching against the spec); network failures
+  map to ``VaaraTransportError``. Optional ``fetch`` injection makes
+  the client trivially mockable in tests.
+- **Release workflow gains a publish-npm job.** Guarded on the
+  repository variable ``NPM_PUBLISH_ENABLED`` so the first publish
+  stays manual. Once enabled and an ``NPM_TOKEN`` secret is set, every
+  tag push publishes ``@vaara/client`` to npm with provenance.
+- 6 new TypeScript tests covering URL construction, JSON body
+  serialisation, the 4xx → ``VaaraError`` path with server-supplied
+  code, the network-failure → ``VaaraTransportError`` path, the
+  detector response shape, and constructor input validation.
+
+### Notes
+- Python package is unchanged in v0.15.0 beyond the version bump; this
+  release ships the JS/TS surface alongside the existing PyPI artefact.
+
 ## [0.14.0] - 2026-05-17
 
 **Theme: audit-retention horizon + composer position.** Two additions.
