@@ -6,6 +6,18 @@ and this project follows [Semantic Versioning](https://semver.org/spec/v2.0.0.ht
 
 ## [Unreleased]
 
+## [0.18.1] - 2026-05-17
+
+**Release-bookkeeping patch.** The v0.18.0 release shipped Python to PyPI
+successfully but the npm publish step failed because
+`clients/ts/package.json` was not bumped from 0.17.0. The TS client is
+unchanged in behaviour; this patch restores PyPI/npm version lockstep
+established in v0.15.0. No Python code changes versus 0.18.0.
+
+### Changed
+- `clients/ts/package.json`: 0.17.0 → 0.18.1 (lockstep with PyPI).
+- `pyproject.toml`, `src/vaara/__init__.py`: 0.18.0 → 0.18.1.
+
 ## [0.18.0] - 2026-05-17
 
 **Theme: hardware TEE attestation hook (experimental).** Adds an optional
