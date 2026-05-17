@@ -265,6 +265,40 @@ Operators who need AAL-4 should pair Vaara with an independent
 attestation provider. The Vaara-emitted evidence is the input to
 that provider, not a replacement for it.
 
+### Hardware TEE attestation hook (experimental, v0.18.0)
+
+Beyond the software-signed attestation chain described above, Vaara
+since v0.18.0 supports binding an OVERT envelope to a hardware-rooted
+attestation report from a Trusted Execution Environment. The initial
+backend is **AMD SEV-SNP**, the natural fit for the confidential-VM
+deployment model used in agent runtimes. Intel TDX and Intel SGX are
+tracked for later releases.
+
+The OVERT 1.0 Base Envelope schema is closed (9 fields). Hardware TEE
+attestation does NOT extend the envelope. Instead, Vaara emits a sibling
+SEV-SNP attestation report and binds it to the envelope by placing
+`SHA-512(canonical_cbor(envelope))` into the report's 64-byte
+`REPORT_DATA` field. A relying party therefore checks two signatures
+independently:
+
+1. The envelope's Ed25519 (or ML-DSA-65) signature over the 8 signable
+   fields, as before.
+2. The SEV-SNP report's ECDSA P-384 signature against the AMD VCEK
+   (Versioned Chip Endorsement Key), and that `REPORT_DATA` equals
+   `SHA-512(canonical_cbor(envelope))`.
+
+If both hold, the attestation says "this OVERT envelope was emitted by
+an arbiter running inside an AMD SEV-SNP confidential VM at the
+measured launch state recorded in the report."
+
+What ships in v0.18.0: report parser, binding helper, signature verifier
+against a caller-supplied VCEK, deterministic mock attester for tests,
+and a `vaara tee parse|verify` CLI. What does NOT ship in v0.18.0: full
+VCEK chain validation against AMD's Key Distribution Service (tracked
+for v0.19+) and the `/dev/sev-guest` ioctl emitter (tracked for v0.19+
+once a tested SEV-SNP guest is available). The hook is marked
+experimental until both land.
+
 ## OVERT 1.0 Part 3 (Agentic AI Controls) mapping
 
 OVERT 1.0 Part 3 (Sections 11-16) defines the agentic-specific

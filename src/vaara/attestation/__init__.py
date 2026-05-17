@@ -55,6 +55,17 @@ from vaara.attestation.transparency_log import (
     TransparencyLogError,
     verify_inclusion,
 )
+from vaara.attestation.tee import (
+    MockSEVSNPAttester,
+    SEVSNPHostAttester,
+    SEVSNPReport,
+    TEEAttestationError,
+    TEEAttester,
+    bind_overt_envelope_to_report_data,
+    parse_sev_snp_report,
+    verify_envelope_binding,
+    verify_sev_snp_report_signature,
+)
 
 __all__ = [
     "BaseEnvelope",
@@ -64,10 +75,16 @@ __all__ = [
     "InProcessTransparencyLog",
     "InclusionProof",
     "LogEntry",
+    "MockSEVSNPAttester",
     "Phase3Attestation",
     "S3PAttestation",
     "S3PError",
+    "SEVSNPHostAttester",
+    "SEVSNPReport",
+    "TEEAttestationError",
+    "TEEAttester",
     "TransparencyLogError",
+    "bind_overt_envelope_to_report_data",
     "canonical_cbor",
     "clopper_pearson_ci",
     "emit_base_envelope",
@@ -75,9 +92,12 @@ __all__ = [
     "emit_s3p_attestation",
     "envelope_to_canonical_cbor",
     "make_epoch_nonce_commitment",
+    "parse_sev_snp_report",
     "regularized_incomplete_beta",
     "verify_base_envelope",
+    "verify_envelope_binding",
     "verify_inclusion",
     "verify_phase3_attestation",
     "verify_s3p_attestation",
+    "verify_sev_snp_report_signature",
 ]
