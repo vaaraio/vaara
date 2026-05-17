@@ -6,6 +6,40 @@ and this project follows [Semantic Versioning](https://semver.org/spec/v2.0.0.ht
 
 ## [Unreleased]
 
+## [0.16.0] - 2026-05-17
+
+**Theme: auditor-shippable PDF.** The article-evidence report has rendered
+as Markdown, JSON, and narrative since v0.13.0; auditors and Notified
+Bodies consume PDFs. ``vaara compliance report --format pdf --out FILE``
+now ships a styled, single-file PDF suitable for attaching to a conformity
+submission or compliance binder. No new wire-format surface. The underlying
+``ConformityReport`` is the same artefact in a different render.
+
+### Added
+- **`render_pdf(report, path)` in `vaara.compliance.render`.** Single-file
+  PDF: cover with system metadata + integrity, per-domain article tables,
+  per-article detail sections with status, strength, evidence age, gaps,
+  recommendations, and sample record IDs. Layout mirrors the Markdown
+  rendering. Returns bytes written.
+- **`vaara compliance report --format pdf --out FILE` CLI option.**
+  ``--out`` is required for ``pdf`` (binary output, no stdout path).
+  Missing reportlab raises a clear ``ImportError`` pointing at
+  ``pip install 'vaara[pdf]'``.
+- **`vaara[pdf]` optional extra.** ``reportlab>=4.0``. Pure-Python, no
+  native deps. Keeps the base install lean for deployers who only need
+  Markdown/JSON.
+- 4 new tests in ``test_compliance_render.py``: PDF magic bytes + EOF
+  marker, HTML metachar escaping in ``system_name`` (so a hostile
+  deployer name cannot smuggle ``<b>`` into a regulator-facing PDF),
+  broken-chain rendering, and the missing-reportlab error path.
+
+### Notes
+- A3 commit-prove receipt pair is **already shipped** as of v0.13.0
+  (``vaara.audit.receipts``, ``vaara trail receipt`` CLI); this release
+  closes the remaining A-tier item from the post-v0.15.0 competitive
+  differentiation move list.
+- 610 tests pass (was 606 + 4 new).
+
 ## [0.15.0] - 2026-05-17
 
 **Theme: Vaara reaches JavaScript.** First-party TypeScript HTTP client

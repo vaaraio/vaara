@@ -5,21 +5,23 @@ Each rendering produces a deployer-shippable artefact:
 - ``render_markdown`` — Markdown with per-domain sections, article tables,
   evidence status badges, and gap/recommendation lists. The canonical
   human-shipped format; reviewable in a PR, diffable in CI, attachable to
-  a regulator submission as `.md`.
+  a regulator submission as ``.md``.
 - ``render_narrative`` — Plain-text narrative (existing
-  `ConformityReport.narrative` property, re-exposed here for symmetry).
-- ``render_json`` — Strict-JSON dict (existing `ConformityReport.to_dict`,
+  ``ConformityReport.narrative`` property, re-exposed here for symmetry).
+- ``render_json`` — Strict-JSON dict (existing ``ConformityReport.to_dict``,
   also re-exposed).
-
-PDF export is intentionally NOT in v1: a clean Markdown render can be piped
-through `pandoc` or `weasyprint` by the deployer's own pipeline. Vaara
-defines the article-evidence content; format conversion is downstream.
+- ``render_pdf`` — Styled, single-file PDF suitable for attaching to a
+  Notified-Body submission or internal-audit binder. Requires the ``pdf``
+  extra (``pip install 'vaara[pdf]'``). The content mirrors the Markdown
+  rendering; the PDF form is what auditors actually consume.
 """
 
 from __future__ import annotations
 
 import json
 import time
+from pathlib import Path
+from typing import Union
 
 from vaara.compliance.engine import (
     ArticleEvidence,
@@ -177,4 +179,264 @@ def render_markdown(report: ConformityReport) -> str:
     return "\n".join(lines)
 
 
-__all__ = ["render_markdown", "render_narrative", "render_json"]
+_PDF_STATUS_LABEL = {
+    EvidenceStatus.EVIDENCE_SUFFICIENT: "sufficient",
+    EvidenceStatus.EVIDENCE_PARTIAL: "partial",
+    EvidenceStatus.EVIDENCE_INSUFFICIENT: "insufficient",
+    EvidenceStatus.NOT_APPLICABLE: "not applicable",
+}
+
+
+def render_pdf(report: ConformityReport, path: Union[str, Path]) -> int:
+    """Render the report as a single-file PDF.
+
+    Returns the number of bytes written. Requires the ``pdf`` extra
+    (``pip install 'vaara[pdf]'``); raises ``ImportError`` with a
+    pointer to the extra if reportlab is missing.
+
+    Layout mirrors the Markdown rendering: cover block, integrity,
+    summary, critical gaps, per-domain article tables, per-article
+    detail sections. One file per assessment, auditor-friendly and
+    Notified-Body-attachable.
+    """
+    flow, doc = _pdf_build(report, path)
+    doc.build(flow)
+    return Path(path).expanduser().stat().st_size
+
+
+def _pdf_build(report: ConformityReport, path: Union[str, Path]):
+    """Construct the flowable list and SimpleDocTemplate for ``render_pdf``.
+
+    Returns ``(flow, doc)``. Kept separate so the public entrypoint stays
+    short enough to read at a glance and the heavy reportlab import is
+    confined to one place.
+    """
+    try:
+        from reportlab.lib import colors
+        from reportlab.lib.pagesizes import A4
+        from reportlab.lib.styles import ParagraphStyle, getSampleStyleSheet
+        from reportlab.lib.units import cm
+        from reportlab.platypus import (
+            PageBreak,
+            Paragraph,
+            SimpleDocTemplate,
+            Spacer,
+            Table,
+            TableStyle,
+        )
+    except ImportError as exc:
+        raise ImportError(
+            "PDF export requires the 'pdf' extra: pip install 'vaara[pdf]'"
+        ) from exc
+
+    out_path = Path(path).expanduser()
+    out_path.parent.mkdir(parents=True, exist_ok=True)
+    styles = getSampleStyleSheet()
+    body, h1, h2, h3 = (
+        styles["BodyText"], styles["Heading1"],
+        styles["Heading2"], styles["Heading3"],
+    )
+    small = ParagraphStyle(
+        "small", parent=body, fontSize=8, leading=10, textColor=colors.grey,
+    )
+    disclaimer = ParagraphStyle(
+        "disclaimer", parent=body, fontSize=9, leading=12, leftIndent=12,
+        textColor=colors.HexColor("#444444"),
+    )
+    flow: list = []
+    ts = time.strftime("%Y-%m-%d %H:%M UTC", time.gmtime(report.generated_at))
+    flow.append(Paragraph("Article-level evidence report", h1))
+    flow.append(Spacer(1, 0.3 * cm))
+    flow.append(Paragraph(
+        "This is an evidence artefact assembled from the Vaara runtime "
+        "audit trail. It is <b>not</b> a conformity determination. The "
+        "deployer (and where applicable a Notified Body) owns the "
+        "conformity verdict under the EU AI Act and other applicable law.",
+        disclaimer,
+    ))
+    flow.append(Spacer(1, 0.4 * cm))
+    flow.append(Paragraph("System", h2))
+    meta_table = Table(
+        [
+            ["Name", _pdf_escape(report.system_name)],
+            ["Version", _pdf_escape(report.system_version)],
+            ["Generated", ts],
+            ["Overall evidence status", report.overall_status.value],
+        ],
+        colWidths=[5 * cm, 11 * cm],
+    )
+    meta_table.setStyle(TableStyle([
+        ("BOX", (0, 0), (-1, -1), 0.4, colors.grey),
+        ("INNERGRID", (0, 0), (-1, -1), 0.2, colors.lightgrey),
+        ("FONTNAME", (0, 0), (0, -1), "Helvetica-Bold"),
+        ("VALIGN", (0, 0), (-1, -1), "TOP"),
+        ("LEFTPADDING", (0, 0), (-1, -1), 4),
+        ("RIGHTPADDING", (0, 0), (-1, -1), 4),
+        ("TOPPADDING", (0, 0), (-1, -1), 3),
+        ("BOTTOMPADDING", (0, 0), (-1, -1), 3),
+    ]))
+    flow.append(meta_table)
+    flow.append(Spacer(1, 0.4 * cm))
+    flow.append(Paragraph("Audit trail integrity", h2))
+    chain_state = "intact" if report.trail_chain_intact else "<b>BROKEN</b>"
+    flow.append(Paragraph(
+        f"Trail size: {report.trail_size} records. Hash chain: {chain_state}.",
+        body,
+    ))
+    if not report.trail_chain_intact:
+        flow.append(Spacer(1, 0.2 * cm))
+        flow.append(Paragraph(
+            "The hash chain is broken. Every article below is reported as "
+            "insufficient until the chain is reconstructed or re-verified.",
+            disclaimer,
+        ))
+    flow.append(Spacer(1, 0.4 * cm))
+    flow.append(Paragraph("Summary", h2))
+    flow.append(Paragraph(_pdf_escape(report.summary or ""), body))
+    flow.append(Spacer(1, 0.4 * cm))
+    if report.critical_gaps:
+        flow.append(Paragraph("Critical gaps", h2))
+        for gap in report.critical_gaps:
+            flow.append(Paragraph("• " + _pdf_escape(gap), body))
+        flow.append(Spacer(1, 0.4 * cm))
+    _pdf_append_articles(flow, report, PageBreak, Paragraph, Spacer, Table,
+                         TableStyle, colors, cm, body, h2, h3, small,
+                         disclaimer)
+    flow.append(Spacer(1, 0.5 * cm))
+    flow.append(Paragraph(
+        "Generated by Vaara. Article-level evidence is collected from the "
+        "runtime audit trail; deployer owns the conformity decision.",
+        small,
+    ))
+    doc = SimpleDocTemplate(
+        str(out_path),
+        pagesize=A4,
+        title=f"Vaara evidence report: {report.system_name}",
+        author="Vaara",
+        leftMargin=2 * cm, rightMargin=2 * cm,
+        topMargin=2 * cm, bottomMargin=2 * cm,
+    )
+    return flow, doc
+
+
+def _pdf_append_articles(
+    flow, report, PageBreak, Paragraph, Spacer, Table, TableStyle, colors,
+    cm, body, h2, h3, small, disclaimer,
+) -> None:
+    """Append per-domain article tables and per-article detail sections."""
+    by_domain: dict[str, list[ArticleEvidence]] = {}
+    for a in report.articles:
+        by_domain.setdefault(a.requirement.domain.value, []).append(a)
+    for domain in sorted(by_domain):
+        articles = by_domain[domain]
+        flow.append(PageBreak())
+        flow.append(Paragraph(
+            f"{domain.upper()} — article evidence", h2,
+        ))
+        flow.append(Spacer(1, 0.2 * cm))
+        table_rows = [["Article", "Title", "Status", "Strength", "Records"]]
+        for art in articles:
+            table_rows.append([
+                art.requirement.article,
+                _pdf_escape(art.requirement.title),
+                _PDF_STATUS_LABEL.get(art.status, art.status.value),
+                art.strength.value,
+                str(art.evidence_count),
+            ])
+        article_table = Table(
+            table_rows,
+            colWidths=[2.8 * cm, 6.5 * cm, 2.6 * cm, 2.2 * cm, 1.8 * cm],
+            repeatRows=1,
+        )
+        article_table.setStyle(TableStyle([
+            ("BACKGROUND", (0, 0), (-1, 0), colors.HexColor("#eeeeee")),
+            ("FONTNAME", (0, 0), (-1, 0), "Helvetica-Bold"),
+            ("FONTSIZE", (0, 0), (-1, -1), 8),
+            ("BOX", (0, 0), (-1, -1), 0.4, colors.grey),
+            ("INNERGRID", (0, 0), (-1, -1), 0.2, colors.lightgrey),
+            ("VALIGN", (0, 0), (-1, -1), "TOP"),
+            ("LEFTPADDING", (0, 0), (-1, -1), 3),
+            ("RIGHTPADDING", (0, 0), (-1, -1), 3),
+            ("TOPPADDING", (0, 0), (-1, -1), 2),
+            ("BOTTOMPADDING", (0, 0), (-1, -1), 2),
+        ]))
+        flow.append(article_table)
+        flow.append(Spacer(1, 0.4 * cm))
+        for art in articles:
+            flow.append(Paragraph(
+                f"{domain.upper()} {art.requirement.article} — "
+                f"{_pdf_escape(art.requirement.title)}",
+                h3,
+            ))
+            status_label = _PDF_STATUS_LABEL.get(art.status, art.status.value)
+            flow.append(Paragraph(
+                f"<b>Status:</b> {status_label} &nbsp; "
+                f"<b>Strength:</b> {art.strength.value} &nbsp; "
+                f"<b>Records:</b> {art.evidence_count}",
+                body,
+            ))
+            if art.evidence_count > 0:
+                age_bits = []
+                if (art.freshest_evidence_age_hours is not None
+                        and art.freshest_evidence_age_hours != float("inf")):
+                    age_bits.append(
+                        f"freshest {art.freshest_evidence_age_hours:.1f}h"
+                    )
+                if (art.oldest_evidence_age_hours is not None
+                        and art.oldest_evidence_age_hours != float("inf")):
+                    age_bits.append(
+                        f"oldest {art.oldest_evidence_age_hours:.1f}h"
+                    )
+                if age_bits:
+                    flow.append(Paragraph(
+                        "<b>Evidence age:</b> " + ", ".join(age_bits),
+                        body,
+                    ))
+            if art.requirement.description:
+                flow.append(Spacer(1, 0.15 * cm))
+                flow.append(Paragraph(
+                    _pdf_escape(art.requirement.description), disclaimer,
+                ))
+            if art.gaps:
+                flow.append(Spacer(1, 0.1 * cm))
+                flow.append(Paragraph("<b>Gaps:</b>", body))
+                for gap in art.gaps:
+                    flow.append(Paragraph("• " + _pdf_escape(gap), body))
+            if art.recommendations:
+                flow.append(Spacer(1, 0.1 * cm))
+                flow.append(Paragraph("<b>Recommendations:</b>", body))
+                for rec in art.recommendations:
+                    flow.append(Paragraph("• " + _pdf_escape(rec), body))
+            if art.sample_record_ids:
+                flow.append(Spacer(1, 0.1 * cm))
+                flow.append(Paragraph(
+                    "<b>Sample audit record IDs:</b> "
+                    + ", ".join(
+                        f"<font face='Courier' size='8'>{rid}</font>"
+                        for rid in art.sample_record_ids[:5]
+                    ),
+                    small,
+                ))
+            flow.append(Spacer(1, 0.3 * cm))
+
+
+def _pdf_escape(value: object) -> str:
+    """Escape user-controlled text so reportlab Paragraph cannot be tricked
+    into rendering forged markup. `system_name`, gaps, recommendations, and
+    article titles flow through Paragraph which parses a tiny HTML subset;
+    a `<b>` smuggled by a hostile deployer name would otherwise render bold
+    text in a regulator-facing PDF.
+    """
+    if value is None:
+        return ""
+    s = str(value)
+    return (
+        s.replace("&", "&amp;")
+        .replace("<", "&lt;")
+        .replace(">", "&gt;")
+    )
+
+
+__all__ = [
+    "render_markdown", "render_narrative", "render_json", "render_pdf",
+]
