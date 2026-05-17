@@ -718,6 +718,149 @@ def _cmd_detect_pii(args: argparse.Namespace) -> int:
     return 1 if result.detected else 0
 
 
+_OVERT_ENVELOPE_KEYS = (
+    "blinded_identifier",
+    "request_commitment",
+    "encoder_binary_identity",
+    "non_content_metadata",
+    "monotonic_counter",
+    "nanosecond_timestamp",
+    "key_identifier",
+    "arbiter_instance_identifier",
+    "signature",
+)
+
+
+def _cmd_overt_verify(args: argparse.Namespace) -> int:
+    """Verify an OVERT 1.0 Protocol Profile 1.0 Base Envelope.
+
+    Reads a canonical CBOR file produced by any conformant implementation,
+    decodes the 9-field structure, and validates the Ed25519 signature
+    against a supplied raw 32-byte public key. Implementation-agnostic —
+    Vaara is the reference verifier for Annex B.6 envelopes.
+    """
+    try:
+        import cbor2
+    except ImportError:
+        print(
+            "vaara overt verify requires the attestation extra. "
+            "Install with: pip install 'vaara[attestation]'",
+            file=sys.stderr,
+        )
+        return 2
+
+    from vaara.attestation.overt import BaseEnvelope, verify_base_envelope
+
+    receipt_path = Path(args.receipt).expanduser()
+    if not receipt_path.is_file():
+        print(f"vaara overt verify: not a file: {receipt_path}", file=sys.stderr)
+        return 2
+
+    pubkey_raw = _load_overt_pubkey(args)
+    if pubkey_raw is None:
+        return 2
+    if len(pubkey_raw) != 32:
+        print(
+            f"vaara overt verify: public key must be 32 raw bytes, got "
+            f"{len(pubkey_raw)}",
+            file=sys.stderr,
+        )
+        return 2
+
+    try:
+        decoded = cbor2.loads(receipt_path.read_bytes())
+    except Exception as exc:
+        print(f"vaara overt verify: CBOR decode failed: {exc}", file=sys.stderr)
+        return 1
+
+    if not isinstance(decoded, dict):
+        print(
+            "vaara overt verify: envelope CBOR must decode to a map; "
+            f"got {type(decoded).__name__}",
+            file=sys.stderr,
+        )
+        return 1
+
+    missing = [k for k in _OVERT_ENVELOPE_KEYS if k not in decoded]
+    if missing:
+        print(
+            "vaara overt verify: envelope missing required fields: "
+            + ", ".join(missing),
+            file=sys.stderr,
+        )
+        return 1
+    extras = set(decoded.keys()) - set(_OVERT_ENVELOPE_KEYS)
+    if extras:
+        print(
+            "vaara overt verify: envelope carries unknown fields (the OVERT "
+            "1.0 schema is closed): " + ", ".join(sorted(extras)),
+            file=sys.stderr,
+        )
+        return 1
+
+    try:
+        envelope = BaseEnvelope(
+            blinded_identifier=decoded["blinded_identifier"],
+            request_commitment=decoded["request_commitment"],
+            encoder_binary_identity=decoded["encoder_binary_identity"],
+            non_content_metadata=decoded["non_content_metadata"],
+            monotonic_counter=int(decoded["monotonic_counter"]),
+            nanosecond_timestamp=int(decoded["nanosecond_timestamp"]),
+            key_identifier=decoded["key_identifier"],
+            arbiter_instance_identifier=decoded["arbiter_instance_identifier"],
+            signature=decoded["signature"],
+        )
+    except (TypeError, ValueError) as exc:
+        print(
+            f"vaara overt verify: envelope field types are invalid: {exc}",
+            file=sys.stderr,
+        )
+        return 1
+
+    if verify_base_envelope(envelope, pubkey_raw):
+        result = {
+            "valid": True,
+            "key_identifier": envelope.key_identifier.hex(),
+            "arbiter_instance_identifier": (
+                envelope.arbiter_instance_identifier.hex()
+            ),
+            "monotonic_counter": envelope.monotonic_counter,
+            "nanosecond_timestamp": envelope.nanosecond_timestamp,
+        }
+        print(json.dumps(result, indent=2))
+        return 0
+
+    print(
+        "vaara overt verify: signature verification failed "
+        "(either the supplied public key does not match the envelope's "
+        "key_identifier, or the signature is invalid for the canonical "
+        "CBOR of the 8 signable fields)",
+        file=sys.stderr,
+    )
+    return 1
+
+
+def _load_overt_pubkey(args: argparse.Namespace) -> Optional[bytes]:
+    """Resolve --pubkey-file or --pubkey-hex to raw bytes. None on error."""
+    if args.pubkey_file:
+        pubkey_path = Path(args.pubkey_file).expanduser()
+        if not pubkey_path.is_file():
+            print(
+                f"vaara overt verify: pubkey file not found: {pubkey_path}",
+                file=sys.stderr,
+            )
+            return None
+        return pubkey_path.read_bytes()
+    try:
+        return bytes.fromhex(args.pubkey_hex)
+    except ValueError as exc:
+        print(
+            f"vaara overt verify: --pubkey-hex is not valid hex: {exc}",
+            file=sys.stderr,
+        )
+        return None
+
+
 def _cmd_serve(args: argparse.Namespace) -> int:
     try:
         import uvicorn
@@ -1159,6 +1302,39 @@ def build_parser() -> argparse.ArgumentParser:
     )
     _add_text_input_args(pdpii)
     pdpii.set_defaults(func=_cmd_detect_pii)
+
+    povert = sub.add_parser(
+        "overt",
+        help=(
+            "OVERT 1.0 attestation commands (Protocol Profile 1.0 Annex B.6)"
+        ),
+    )
+    osub = povert.add_subparsers(dest="overt_cmd", required=True)
+    pov_verify = osub.add_parser(
+        "verify",
+        help=(
+            "Verify an OVERT 1.0 Base Envelope from any conformant emitter. "
+            "Requires the attestation extra."
+        ),
+    )
+    pov_verify.add_argument(
+        "receipt",
+        help="Path to a canonical CBOR file containing one Base Envelope",
+    )
+    pov_pk_group = pov_verify.add_mutually_exclusive_group(required=True)
+    pov_pk_group.add_argument(
+        "--pubkey-file",
+        dest="pubkey_file",
+        default=None,
+        help="Path to a file containing the raw 32-byte Ed25519 public key",
+    )
+    pov_pk_group.add_argument(
+        "--pubkey-hex",
+        dest="pubkey_hex",
+        default=None,
+        help="Raw 32-byte Ed25519 public key encoded as 64 hex characters",
+    )
+    pov_verify.set_defaults(func=_cmd_overt_verify)
 
     preload = psub.add_parser(
         "reload",
