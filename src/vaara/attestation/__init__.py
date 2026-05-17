@@ -5,8 +5,13 @@ overt.is): Vaara is the third-party runtime kernel that intercepts agent
 actions, scores risk, and writes the audit trail. In OVERT terms Vaara is
 the **Arbiter** at AAL-3 (operator-controlled notary model). Phase 1
 (Enforcement) and Phase 2 (Provisional Receipt) are emitted by Vaara
-directly. Phase 3 (Full Attestation) requires an external Independent
-Attestation Provider (IAP) and is intentionally out of scope.
+directly. Phase 3 (Full Attestation) is provided by ``vaara.attestation.iap``
+since v0.13.0 as a reference Independent Attestation Provider that
+notary-signs the Provisional Receipt and anchors it in a transparency
+log. Production deployments can swap in sigstore Rekor or an equivalent
+independently-operated log at the same call sites. As of v0.17.0, the
+``vaara overt verify`` CLI validates any OVERT 1.0 Base Envelope produced
+by a conformant emitter, Vaara or otherwise.
 
 The `BaseEnvelope` produced here implements Protocol Profile 1.0 Annex B.6
 verbatim: a 9-field closed-schema CBOR-encoded structure signed with

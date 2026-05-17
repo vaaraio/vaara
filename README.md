@@ -85,6 +85,8 @@ npm install @vaara/client
 
 v0.16.0 adds a PDF render to the article-evidence report. `vaara compliance report --db PATH --format pdf --out report.pdf` writes a styled single-file PDF (per-domain article tables plus per-article detail sections) suitable for attaching to a conformity submission or internal-audit binder. Requires `pip install 'vaara[pdf]'`. Markdown, JSON, and narrative renders remain unchanged.
 
+v0.17.0 adds an OVERT 1.0 Base Envelope verifier CLI. `vaara overt verify RECEIPT.cbor --pubkey-file PUB.bin` validates any canonical-CBOR Base Envelope (Annex B.6) against a supplied raw 32-byte Ed25519 public key. The schema is closed per the OVERT 1.0 spec, so envelopes carrying unknown fields are rejected. The verifier reads only the wire format and takes no dependency on Vaara's emitter, so any OVERT-conformant implementation can route its conformance check through it. Requires the `vaara[attestation]` extra.
+
 ```ts
 import { VaaraClient } from "@vaara/client";
 const vaara = new VaaraClient({ baseUrl: "http://localhost:8000" });

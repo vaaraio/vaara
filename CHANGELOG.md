@@ -6,6 +6,37 @@ and this project follows [Semantic Versioning](https://semver.org/spec/v2.0.0.ht
 
 ## [Unreleased]
 
+## [0.17.0] - 2026-05-17
+
+**Theme: Vaara as the OVERT 1.0 reference verifier.** Vaara has emitted
+OVERT 1.0 Protocol Profile 1.0 Base Envelopes since v0.10.0 and Phase 3
+IAP attestations since v0.13.0. This release adds the CLI surface so any
+operator, auditor, or Independent Attestation Provider can verify a Base
+Envelope produced by any conformant emitter, not only Vaara. The verifier
+is implementation-agnostic and reads the canonical CBOR wire format
+defined in Annex B.6 verbatim.
+
+### Added
+- **`vaara overt verify RECEIPT.cbor --pubkey-file PUB.bin` CLI.**
+  Validates an OVERT 1.0 Base Envelope from a canonical CBOR file against
+  a supplied raw 32-byte Ed25519 public key. The schema is closed per
+  the OVERT 1.0 spec, so envelopes carrying unknown fields are rejected.
+  Exit 0 on valid, 1 on invalid envelope or signature mismatch, 2 on
+  argument or I/O errors. Requires the existing `vaara[attestation]`
+  extra (already present for emission). Accepts `--pubkey-hex` as an
+  inline alternative to `--pubkey-file`.
+- 10 new tests in `tests/test_overt_verify_cli.py` covering happy path,
+  wrong pubkey, hex form, malformed hex, wrong-length pubkey, missing
+  receipt, malformed CBOR, missing required fields, closed-schema
+  rejection of extra fields, and tampered-signature rejection.
+
+### Notes
+- Anyone implementing OVERT 1.0 (overt.is) can route their conformance
+  check through `vaara overt verify` without taking a runtime dependency
+  on Vaara's emitter side. The CLI reads only the Annex B.6 wire format.
+- 620 Python tests pass (was 610 + 10 new). TypeScript client bumped to
+  0.17.0 for PyPI/npm lockstep, no code change.
+
 ## [0.16.0] - 2026-05-17
 
 **Theme: auditor-shippable PDF.** The article-evidence report has rendered
