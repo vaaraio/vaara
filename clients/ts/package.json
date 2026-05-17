@@ -1,0 +1,57 @@
+{
+  "name": "@vaara/client",
+  "version": "0.15.0",
+  "description": "TypeScript client for the Vaara HTTP API — conformal risk scoring, hash-chained audit, policy reload, named detectors.",
+  "main": "dist/index.js",
+  "types": "dist/index.d.ts",
+  "exports": {
+    ".": {
+      "types": "./dist/index.d.ts",
+      "import": "./dist/index.js"
+    }
+  },
+  "files": [
+    "dist",
+    "README.md",
+    "LICENSE"
+  ],
+  "type": "module",
+  "scripts": {
+    "build": "tsc -p tsconfig.json",
+    "test": "npm run build && node --test test/*.test.mjs",
+    "clean": "rm -rf dist"
+  },
+  "keywords": [
+    "ai",
+    "ai-agents",
+    "ai-governance",
+    "agent-governance",
+    "eu-ai-act",
+    "compliance",
+    "audit-trail",
+    "risk-scoring",
+    "conformal-prediction",
+    "overt",
+    "runtime-monitoring",
+    "vaara"
+  ],
+  "author": "Vaara <hello@vaara.io>",
+  "license": "Apache-2.0",
+  "repository": {
+    "type": "git",
+    "url": "https://github.com/vaaraio/vaara",
+    "directory": "clients/ts"
+  },
+  "homepage": "https://github.com/vaaraio/vaara/tree/main/clients/ts",
+  "bugs": "https://github.com/vaaraio/vaara/issues",
+  "engines": {
+    "node": ">=18"
+  },
+  "publishConfig": {
+    "access": "public",
+    "provenance": true
+  },
+  "devDependencies": {
+    "typescript": "^5.4.0"
+  }
+}
