@@ -6,6 +6,67 @@ and this project follows [Semantic Versioning](https://semver.org/spec/v2.0.0.ht
 
 ## [Unreleased]
 
+## [0.19.0] - 2026-05-17
+
+**Theme: Big Cloud guardrail adapters.** Adds three adapters that take
+findings from AWS Bedrock Guardrails, Azure AI Content Safety, and GCP
+Model Armor and route them through Vaara's hash-chained audit trail
+and OVERT envelope with EU AI Act article tags. The cloud filter runs
+as an upstream signal in the deployer's environment. Vaara records
+what the filter flagged, normalises it to a shared vocabulary, and
+tags each finding against Art. 5, 10, 13, 15, 53, and the
+CSAM-specific obligation from the May 2026 Digital Omnibus political
+agreement.
+
+The mapping itself is the value. Each adapter is a thin SDK wrapper
+around a published category-to-article table in
+`_content_safety_articles.py`. A deployer can read the table, dispute
+a row, and override mappings without touching adapter code.
+
+### Added
+- `src/vaara/integrations/_content_safety_articles.py`: canonical
+  mapping rows for 27 provider categories across the three vendors
+  (10 Bedrock, 9 Azure, 8 GCP), each tagged with EU AI Act articles
+  and OWASP LLM Top 10 codes.
+- `src/vaara/integrations/_content_safety_base.py`: shared
+  `ContentSafetyFinding` and `FindingCategory` dataclasses,
+  `ContentSafetyScorer` protocol, verdict and severity aggregators.
+  Adapter output ships with `to_audit_context()` for
+  `pipeline.intercept(context=...)` and `to_overt_metadata()` for OVERT
+  envelope `non_content_metadata` (decimal-string severities only per
+  Protocol Profile 1.0).
+- `src/vaara/integrations/bedrock_guardrails.py`:
+  `BedrockGuardrailsAdapter` plus `parse_apply_guardrail_response`.
+  Maps Bedrock's five policy buckets (topicPolicy, contentPolicy,
+  wordPolicy, sensitiveInformationPolicy, contextualGroundingPolicy).
+  Normalises `ANONYMIZED` to the shared `REDACTED` action.
+- `src/vaara/integrations/azure_content_safety.py`:
+  `AzureContentSafetyAdapter` plus `parse_responses`. Wraps
+  `analyze_text`, Prompt Shields, Protected Material, and Groundedness
+  Detection behind a single `scan_prompt` / `scan_response` pair.
+  Block threshold defaults to severity 4.
+- `src/vaara/integrations/gcp_model_armor.py`: `GcpModelArmorAdapter`
+  plus `parse_sanitize_response`. Wraps `sanitize_user_prompt` and
+  `sanitize_model_response`. CSAM, prompt injection, malicious URIs,
+  and SDP findings always block. Responsible-AI filters block at
+  `MEDIUM_AND_ABOVE` by default.
+- Three test files exercising the parsers and adapters with canned
+  fixtures (44 new tests, 680 total). No hard dependency on boto3,
+  azure-ai-contentsafety, or google-cloud-modelarmor.
+
+### Pyproject
+- New optional extras: `bedrock`, `azure-content-safety`,
+  `gcp-model-armor`. Base install stays free of cloud SDK
+  dependencies.
+
+### Strategic frame
+The cloud filters are inputs to Vaara, not Vaara's replacement.
+Vaara stays the schema findings flow into: hash-chained audit trail
+with explicit article tags, OVERT envelope metadata, EU AI Act and
+OWASP vocabulary on every finding. Not "Vaara works with AWS / Azure
+/ GCP." The other direction: AWS Bedrock Guardrails, Azure AI Content
+Safety, and GCP Model Armor work inside Vaara's compliance kernel.
+
 ## [0.18.1] - 2026-05-17
 
 **Release-bookkeeping patch.** The v0.18.0 release shipped Python to PyPI
