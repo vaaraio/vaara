@@ -1,8 +1,10 @@
-"""Tests for Markdown / narrative / JSON renderers of ConformityReport."""
+"""Tests for Markdown / narrative / JSON / PDF renderers of ConformityReport."""
 
 from __future__ import annotations
 
 import json
+
+import pytest
 
 from vaara.audit.trail import AuditTrail
 from vaara.compliance.engine import create_default_engine
@@ -11,6 +13,15 @@ from vaara.compliance.render import (
     render_markdown,
     render_narrative,
 )
+
+try:
+    import reportlab  # noqa: F401
+
+    from vaara.compliance.render import render_pdf
+
+    _HAS_REPORTLAB = True
+except ImportError:
+    _HAS_REPORTLAB = False
 from vaara.taxonomy.actions import (
     ActionCategory,
     ActionRequest,
@@ -111,3 +122,67 @@ def test_render_markdown_includes_summary_section():
     report = create_default_engine().assess(trail)
     md = render_markdown(report)
     assert "## Summary" in md
+
+
+@pytest.mark.skipif(not _HAS_REPORTLAB, reason="reportlab not installed")
+def test_render_pdf_produces_valid_pdf(tmp_path):
+    trail = _populated_trail()
+    report = create_default_engine().assess(
+        trail, system_name="PDFSys", system_version="0.16.0",
+    )
+    out = tmp_path / "report.pdf"
+    size = render_pdf(report, out)
+    assert size > 0
+    data = out.read_bytes()
+    assert data.startswith(b"%PDF-")
+    assert data.rstrip().endswith(b"%%EOF")
+    assert size == len(data)
+
+
+@pytest.mark.skipif(not _HAS_REPORTLAB, reason="reportlab not installed")
+def test_render_pdf_escapes_html_metachars_in_system_name(tmp_path):
+    """A hostile system_name must not inject reportlab markup."""
+    trail = _populated_trail()
+    report = create_default_engine().assess(
+        trail,
+        system_name="<script>alert('x')</script>",
+        system_version="<b>1.0</b>",
+    )
+    out = tmp_path / "escaped.pdf"
+    render_pdf(report, out)
+    data = out.read_bytes()
+    # PDF stream is compressed by default; just confirm valid magic and the
+    # function did not raise during Paragraph parsing.
+    assert data.startswith(b"%PDF-")
+
+
+@pytest.mark.skipif(not _HAS_REPORTLAB, reason="reportlab not installed")
+def test_render_pdf_handles_broken_chain(tmp_path):
+    trail = _populated_trail()
+    trail._records[1].record_hash = "0" * 64
+    report = create_default_engine().assess(trail)
+    out = tmp_path / "broken.pdf"
+    size = render_pdf(report, out)
+    assert size > 0
+    assert out.read_bytes().startswith(b"%PDF-")
+
+
+def test_render_pdf_raises_helpful_error_when_reportlab_missing(
+    tmp_path, monkeypatch,
+):
+    """If reportlab is unimportable, render_pdf must point at the extra."""
+    import builtins
+
+    real_import = builtins.__import__
+
+    def _fake_import(name, *a, **kw):
+        if name.startswith("reportlab"):
+            raise ImportError("simulated missing reportlab")
+        return real_import(name, *a, **kw)
+
+    monkeypatch.setattr(builtins, "__import__", _fake_import)
+    from vaara.compliance.render import render_pdf as rp
+    trail = _populated_trail()
+    report = create_default_engine().assess(trail)
+    with pytest.raises(ImportError, match=r"vaara\[pdf\]"):
+        rp(report, tmp_path / "missing.pdf")

@@ -651,6 +651,25 @@ def _cmd_compliance_report(args: argparse.Namespace) -> int:
         system_version=args.system_version,
     )
 
+    if args.format == "pdf":
+        if not args.out:
+            print(
+                "--out is required when --format pdf (binary output)",
+                file=sys.stderr,
+            )
+            return 2
+        try:
+            from vaara.compliance.render import render_pdf
+        except ImportError as exc:
+            print(str(exc), file=sys.stderr)
+            return 2
+        try:
+            render_pdf(report, Path(args.out).expanduser())
+        except ImportError as exc:
+            print(str(exc), file=sys.stderr)
+            return 2
+        return 0
+
     if args.format == "md":
         text = render_markdown(report)
     elif args.format == "json":
@@ -1030,12 +1049,13 @@ def build_parser() -> argparse.ArgumentParser:
         help="Path to the audit SQLite DB to read evidence from",
     )
     pcrep.add_argument(
-        "--format", choices=["md", "json", "narrative"], default="md",
-        help="Output format (default: md)",
+        "--format", choices=["md", "json", "narrative", "pdf"], default="md",
+        help="Output format (default: md). 'pdf' requires the 'pdf' extra "
+             "and writes binary, so --out is required for pdf.",
     )
     pcrep.add_argument(
         "--out", default=None,
-        help="Write to file (default: stdout)",
+        help="Write to file (default: stdout; required for --format pdf)",
     )
     pcrep.add_argument(
         "--system-name", default="Vaara-governed AI system",
