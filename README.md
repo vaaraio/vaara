@@ -20,6 +20,54 @@ Vaara intercepts agent tool calls, scores each one with a conformal risk interva
 
 For broader agent governance (zero-trust identity, capability-based access control, multi-language SDKs) see Microsoft's [Agent Governance Toolkit](https://github.com/microsoft/agent-governance-toolkit).
 
+## What evidence looks like
+
+`vaara compliance report --format json` against a real audit trail produces an article-level evidence record an auditor can read directly. Status is reported honestly: articles without recorded events return `evidence_insufficient`, not a rubber-stamp.
+
+```json
+{
+  "system_name": "Acme HR Assistant",
+  "system_version": "2.4.1",
+  "overall_status": "evidence_insufficient",
+  "trail_integrity": {
+    "size": 105,
+    "chain_intact": true
+  },
+  "articles": [
+    {
+      "article": "Article 12(1)",
+      "title": "Record-Keeping (Logging)",
+      "status": "evidence_sufficient",
+      "strength": "strong",
+      "evidence_count": 105
+    },
+    {
+      "article": "Article 9(2)(a)",
+      "title": "Risk Identification and Analysis",
+      "status": "evidence_sufficient",
+      "strength": "strong",
+      "evidence_count": 35
+    },
+    {
+      "article": "Article 15(1)",
+      "title": "Accuracy, Robustness and Cybersecurity",
+      "status": "evidence_insufficient",
+      "strength": "absent",
+      "evidence_count": 0
+    },
+    {
+      "article": "Article 61(1)",
+      "title": "Post-Market Monitoring",
+      "status": "evidence_insufficient",
+      "strength": "absent",
+      "evidence_count": 0
+    }
+  ]
+}
+```
+
+The same data renders as a styled PDF for Notified Bodies (`--format pdf`), a static HTML dashboard (`vaara compliance dashboard`), or a Sigstore-signed regulator-handoff envelope (`vaara trail export`).
+
 ## Numbers
 
 - 5,955-entry adversarial corpus (3,422 attack across 8 categories, 2,533 benign)
