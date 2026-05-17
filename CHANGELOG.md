@@ -6,6 +6,48 @@ and this project follows [Semantic Versioning](https://semver.org/spec/v2.0.0.ht
 
 ## [Unreleased]
 
+## [0.14.0] - 2026-05-17
+
+**Theme: audit-retention horizon + composer position.** Two additions.
+A pluggable signer abstraction lets operators sign the regulator-handoff
+export envelope with ML-DSA-65 (FIPS 204) for retention horizons that
+cross the credible quantum threshold. A composite-scorer module reuses
+Vaara's own v0.10.0 /v1/score wire contract on the inbound side so
+external scorers (NeMo Guardrails, another Vaara instance, any peer)
+slot in alongside Vaara's adaptive scorer with a single object.
+
+### Added
+- **Pluggable signer abstraction (`vaara.audit.signer`).** New
+  ``Signer`` / ``Verifier`` protocols with ``Ed25519Signer`` and
+  ``MLDSA65Signer`` implementations. ``export_signed`` accepts a
+  ``signer=`` keyword (mutually exclusive with the legacy
+  ``signer_key`` Ed25519 PEM path). The export manifest carries
+  ``signature_algorithm`` so verifiers dispatch automatically.
+  Ed25519 exports still write ``signer_pubkey.pem`` for backward-
+  compatible verification by older clients; ML-DSA-65 exports write
+  ``signer_pubkey.bin`` (raw bytes, 1,952 bytes). ``verify_signed``
+  reads the algorithm field and routes to the right verifier.
+  ML-DSA-65 requires the new ``vaara[pq]`` extra
+  (``pip install 'vaara[pq]'``), which pulls pure-Python
+  ``dilithium-py``.
+- **External-scorer composition (`vaara.scorer.composition`,
+  `vaara.scorer.composite`).** ``ExternalScorer(url)`` calls a remote
+  ``/v1/score`` endpoint (any service that implements the Vaara
+  v0.10.0 wire contract) and returns the result in Vaara's internal
+  scorer dict shape. Transport errors, malformed bodies, and non-JSON
+  responses fail closed to ``deny`` with a structured reason in the
+  ``raw_result``. ``CompositeScorer(scorers, combine="max"|"mean"|
+  callable)`` runs Vaara's ``AdaptiveScorer`` alongside one or more
+  external scorers and merges the results. The composite preserves
+  the strongest decision (``deny`` > ``escalate`` > ``allow``) so one
+  member firing high blocks the action. The composite's
+  ``evaluate(context) -> dict`` shape matches what
+  ``InterceptionPipeline`` already expects, so it drops into existing
+  pipelines as a direct replacement.
+- 20 new tests (10 signer + Ed25519 + ML-DSA-65 round-trip and zip
+  tamper-detection; 10 composition + external-scorer error handling
+  + composite combine modes).
+
 ## [0.13.0] - 2026-05-17
 
 **Theme: operator surface + OVERT Phase 3 path.** Four additions that
