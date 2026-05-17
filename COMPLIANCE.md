@@ -115,6 +115,60 @@ also ships with a DORA bundle:
 | **12(1)** | ICT Incident Detection | `ACTION_REQUESTED` and `ACTION_BLOCKED` records, with risk score and reason. |
 | **13(1)** | ICT Incident Response and Learning | `OUTCOME_RECORDED` events close the loop and feed the adaptive scorer. |
 
+## Cloud guardrail adapter pattern
+
+Adapters from v0.19.0 take findings from AWS Bedrock Guardrails, Azure
+AI Content Safety, and GCP Model Armor and route them through Vaara's
+audit trail. Each cloud filter speaks its own category vocabulary
+(`topicPolicy` / `Hate` / `responsible_ai.hate_speech`). The adapters
+normalise those onto a single Vaara vocabulary and a published
+article-mapping table at
+`src/vaara/integrations/_content_safety_articles.py`.
+
+The adapter is thin. The mapping is the artefact. A deployer can read
+the table, dispute a row, and override mappings without touching
+adapter code. 27 rows total across the three vendors as of v0.19.0.
+
+### Category to article mapping
+
+| Vaara category | Provider categories | AI Act article | OWASP LLM |
+|---|---|---|---|
+| `prohibited_topic` | Bedrock `topicPolicy` | Art. 5 | LLM08 |
+| `hate` | Bedrock `contentPolicy.HATE` / `INSULTS` · Azure `Hate` · GCP `responsible_ai.hate_speech` / `harassment` | Art. 5 | LLM05 |
+| `sexual` | Bedrock `contentPolicy.SEXUAL` · Azure `Sexual` · GCP `responsible_ai.sexually_explicit` | Art. 5 | LLM05 |
+| `violence` | Bedrock `contentPolicy.VIOLENCE` · Azure `Violence` · GCP `responsible_ai.dangerous` | Art. 5 | LLM05 |
+| `self_harm` | Azure `SelfHarm` | Art. 5 | LLM05 |
+| `misconduct` | Bedrock `contentPolicy.MISCONDUCT` | Art. 5 | LLM05 |
+| `word_block` | Bedrock `wordPolicy` | Art. 5 | LLM05 |
+| `pii` | Bedrock `sensitiveInformationPolicy` · GCP `sdp` | Art. 10 | LLM02 |
+| `protected_material` | Azure `ProtectedMaterial.Text` / `Code` | Art. 53 | LLM02 |
+| `grounding` | Bedrock `contextualGroundingPolicy` · Azure `Groundedness` | Art. 13, Art. 15 | LLM09 |
+| `adversarial` | Bedrock `contentPolicy.PROMPT_ATTACK` · Azure `PromptShield.UserPrompt` / `Documents` · GCP `pi_and_jailbreak` | Art. 15 | LLM01 |
+| `malicious_uri` | GCP `malicious_uris` | Art. 15 | LLM05 |
+| `csam` | GCP `csam` | Art. 5 + Digital Omnibus CSAM (effective 2 Dec 2026) | — |
+
+### Where the finding lands
+
+Adapter output is a `ContentSafetyFinding` with two helpers:
+
+- `to_audit_context()` returns a dict the deployer passes into
+  `pipeline.intercept(context=...)`. The finding lands on the
+  hash-chained audit trail with the article tags above, satisfying
+  Article 12 logging and feeding Article 9 risk-management evidence.
+- `to_overt_metadata()` returns a dict suitable for the OVERT envelope
+  `non_content_metadata` field. Severities are decimal strings per
+  Protocol Profile 1.0 Section B.3 (IEEE-754 floats prohibited).
+
+### What this is not
+
+The adapters do not run the cloud filter. The deployer's runtime makes
+the cloud API call with the deployer's own credentials. Vaara observes
+and records the finding. Vaara does not replace the cloud filter and
+does not claim conformity assessment of the cloud vendor's filter
+performance. The deployer's choice of guardrail vendor and confidence
+threshold is a policy decision recorded in Vaara's audit trail, not a
+decision Vaara makes.
+
 ## CEN-CENELEC harmonised standards alignment
 
 The harmonised standards under EU AI Act Article 40 are being drafted
