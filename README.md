@@ -83,6 +83,8 @@ v0.15.0 ships the first-party TypeScript client at [`clients/ts`](clients/ts) an
 npm install @vaara/client
 ```
 
+v0.16.0 adds a PDF render to the article-evidence report. `vaara compliance report --db PATH --format pdf --out report.pdf` writes a styled single-file PDF (per-domain article tables plus per-article detail sections) suitable for attaching to a conformity submission or internal-audit binder. Requires `pip install 'vaara[pdf]'`. Markdown, JSON, and narrative renders remain unchanged.
+
 ```ts
 import { VaaraClient } from "@vaara/client";
 const vaara = new VaaraClient({ baseUrl: "http://localhost:8000" });
