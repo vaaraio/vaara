@@ -14,6 +14,8 @@
   <a href="https://www.bestpractices.dev/projects/12612"><img src="https://www.bestpractices.dev/projects/12612/badge" alt="OpenSSF Best Practices"></a>
 </p>
 
+Vaara is the runtime evidence layer for AI Act compliance. Open source, no SaaS, no telemetry.
+
 Vaara intercepts agent tool calls, scores each one with a conformal risk interval, and writes a hash-chained audit record. Online learning across five expert signals via Multiplicative Weight Update. Distribution-free conformal coverage on the score.
 
 For broader agent governance (zero-trust identity, capability-based access control, multi-language SDKs) see Microsoft's [Agent Governance Toolkit](https://github.com/microsoft/agent-governance-toolkit).
@@ -55,6 +57,17 @@ else:
 ```
 
 `report_outcome` closes the loop. MWU reweights signals based on which ones predicted the outcome.
+
+## Framework integrations
+
+Native adapters in `src/vaara/integrations/` route the major Python agent frameworks through Vaara's pipeline. Each adapter intercepts tool calls via the framework's own callback or hook surface, scores them, gates them, and emits the same audit events as a direct `pipeline.intercept()` call. Frameworks are not hard dependencies (lazy import, duck typing), so the base `pip install vaara` keeps a clean dependency tree.
+
+- **LangChain** — `VaaraCallbackHandler` slots into `config={"callbacks": [...]}` and gates every tool invocation automatically. `vaara_wrap_tool(tool, pipeline)` is the per-tool variant for fine-grained control.
+- **CrewAI** — `VaaraCrewGovernance` wraps a crew so every agent action passes through the same scoring and audit chain.
+- **OpenAI Agents SDK** — `VaaraToolGuardrail` plus `vaara_wrap_function` wrap function-tool calls before they execute. Compatible with the Responses API and the Agents-SDK tracing model.
+- **MCP server** — `vaara.integrations.mcp_server` exposes scoring, audit emission, and policy reload as MCP tools so any MCP-compatible agent can route through Vaara without a custom client.
+
+All four adapters share the same in-process pipeline, so audit records hash-chain together regardless of which framework the action came through. Each adapter has its own docstring with the two integration patterns it supports.
 
 ## HTTP API
 

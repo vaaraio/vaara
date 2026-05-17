@@ -1,1 +1,1 @@
-"""Framework integrations — drop-in middleware for LangChain, CrewAI, OpenAI Agents."""
+"""Framework integrations: drop-in middleware for LangChain, CrewAI, OpenAI Agents SDK, and MCP."""
