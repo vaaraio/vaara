@@ -178,6 +178,8 @@ envelope = emit_base_envelope(
 
 Vaara operates as the **Arbiter** in OVERT terms. See [COMPLIANCE.md](COMPLIANCE.md) "Position relative to open runtime-attestation standards" for the architectural framing.
 
+v0.18.0 adds an experimental hardware TEE attestation hook (`vaara.attestation.tee`) that binds an OVERT envelope to an AMD SEV-SNP attestation report by placing `SHA-512(canonical_cbor(envelope))` into the report's 64-byte `REPORT_DATA` field. The envelope schema is unchanged (closed per spec); the TEE report is a sibling artefact. A relying party checks the Ed25519 envelope signature and the ECDSA P-384 report signature independently. `vaara tee parse` and `vaara tee verify` expose the verifier as a CLI. Full AMD KDS chain validation and `/dev/sev-guest` live emission are tracked for v0.19+; the v0.18.0 surface ships parser, binding helper, verifier against a caller-supplied VCEK, and a deterministic mock attester for tests.
+
 v0.12.0 adds an OVERT S3P (MEA-2) emitter with exact Clopper-Pearson confidence intervals (pure Python, no scipy), plus a proposed Protocol Profile extension that reports aggregate statistics over Vaara's per-action conformal prediction intervals alongside the standard binomial CI. The agentic-controls mapping in [COMPLIANCE.md](COMPLIANCE.md) "OVERT 1.0 Part 3 (Agentic AI Controls) mapping" walks Vaara's coverage of TOOL-*, MCP-*, MULTI-*, CAP-*, DISC-*, HITL-*, and DRIFT-* control by control.
 
 ```python
