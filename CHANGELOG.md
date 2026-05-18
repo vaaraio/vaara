@@ -6,6 +6,22 @@ and this project follows [Semantic Versioning](https://semver.org/spec/v2.0.0.ht
 
 ## [Unreleased]
 
+## [0.19.1] - 2026-05-18
+
+**Patch: audit DB upgrade safety.** Opening an existing audit DB at
+any schema version older than the current one crashed on first
+MCP-server boot with `no such column: tenant_id`. The init path ran
+`SCHEMA_SQL` before migrations, and `SCHEMA_SQL` contains indexes on
+columns that later migrations add.
+
+Init now runs migrations from the stored version (or from v0 for
+pre-versioned DBs that have no `audit_meta` row yet) BEFORE running
+`SCHEMA_SQL` idempotently. Fresh DBs continue to use the existing
+single-pass `SCHEMA_SQL` path.
+
+Tests added for the v0 (pre-versioning), v1, and current-version
+open paths.
+
 ## [0.19.0] - 2026-05-17
 
 **Theme: Big Cloud guardrail adapters.** Adds three adapters that take
