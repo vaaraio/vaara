@@ -12,6 +12,7 @@
   <a href="https://github.com/vaaraio/vaara/actions/workflows/ci.yml"><img src="https://img.shields.io/github/actions/workflow/status/vaaraio/vaara/ci.yml?branch=main&label=tests" alt="CI"></a>
   <a href="https://scorecard.dev/viewer/?uri=github.com/vaaraio/vaara"><img src="https://api.scorecard.dev/projects/github.com/vaaraio/vaara/badge" alt="OpenSSF Scorecard"></a>
   <a href="https://www.bestpractices.dev/projects/12612"><img src="https://www.bestpractices.dev/projects/12612/badge" alt="OpenSSF Best Practices"></a>
+  <a href="https://huggingface.co/spaces/vaaraio/vaara"><img src="https://img.shields.io/badge/%F0%9F%A4%97%20Hugging%20Face-Space-blue" alt="Hugging Face Space"></a>
 </p>
 
 Vaara is the runtime evidence layer for AI Act compliance. Open source, no SaaS, no telemetry.
@@ -126,6 +127,17 @@ Three adapters route findings from AWS Bedrock Guardrails, Azure AI Content Safe
 - **GCP Model Armor** — `vaara.integrations.gcp_model_armor.GcpModelArmorAdapter`. Wraps `sanitize_user_prompt` and `sanitize_model_response`.
 
 Each adapter returns a `ContentSafetyFinding` the deployer routes into `pipeline.intercept(context=finding.to_audit_context())`. Cloud SDKs are optional extras: `pip install 'vaara[bedrock]'`, `pip install 'vaara[azure-content-safety]'`, `pip install 'vaara[gcp-model-armor]'`. The category-to-article mapping table lives in `src/vaara/integrations/_content_safety_articles.py` and is the value the adapters wrap. Article-level rationale is in [COMPLIANCE.md](COMPLIANCE.md#cloud-guardrail-adapter-pattern).
+
+### OSS guardrails as upstream signals (v0.20.0)
+
+Four adapters route findings from NVIDIA NeMo Guardrails, Guardrails AI, LLM Guard, and Rebuff into the same audit trail and OVERT envelope path as the v0.19.0 cloud adapters. The OSS guardrail runs in the deployer's environment as an upstream signal. Vaara records the verdict, normalises 41 OSS provider categories onto the same shared vocabulary, and tags each finding against Art. 5, 10, 13, 15, and 53.
+
+- **NVIDIA NeMo Guardrails**. `vaara.integrations.nemo_guardrails.NemoGuardrailsAdapter`. Parses `GenerationResponse.log.activated_rails` across input, dialog, output, and retrieval rail types.
+- **Guardrails AI**. `vaara.integrations.guardrails_ai.GuardrailsAIAdapter`. Parses `ValidationOutcome.validation_summaries` from any `Guard.parse` or `Guard.validate` call.
+- **LLM Guard**. `vaara.integrations.llm_guard.LLMGuardAdapter`. Wraps `scan_prompt` and `scan_output` and parses the `(sanitized, results_valid, results_score)` triple.
+- **Rebuff**. `vaara.integrations.rebuff.RebuffAdapter`. Parses `DetectResponse` across the heuristic, model, and vector injection-detection layers, plus the canary-word leak check on responses.
+
+Each adapter returns a `ContentSafetyFinding` the deployer routes into `pipeline.intercept(context=finding.to_audit_context())`. OSS SDKs are optional extras: `pip install 'vaara[nemo-guardrails]'`, `pip install 'vaara[guardrails-ai]'`, `pip install 'vaara[llm-guard]'`, `pip install 'vaara[rebuff]'`. The 41 new mapping rows extend the same table at `src/vaara/integrations/_content_safety_articles.py`. Article-level rationale is in [COMPLIANCE.md](COMPLIANCE.md#oss-guardrail-adapter-pattern).
 
 ## HTTP API
 
