@@ -1,9 +1,10 @@
-"""Canonical mapping from cloud-guardrail findings to EU AI Act articles.
+"""Canonical mapping from guardrail findings to EU AI Act articles.
 
 This module is the value, not the SDK glue around it. Each provider
 returns category-typed findings using its own vocabulary (Bedrock
-``topicPolicy``, Azure ``Hate``, GCP ``responsible_ai``). The adapters
-in this package translate those into a single Vaara vocabulary and the
+``topicPolicy``, Azure ``Hate``, GCP ``responsible_ai``, Guardrails AI
+``DetectPII``, LLM Guard ``PromptInjection``, etc.). The adapters in
+this package translate those into a single Vaara vocabulary and the
 EU AI Act articles the deployer needs evidence against, so the same
 ``ContentSafetyFinding`` flows downstream regardless of which provider
 emitted it.
@@ -43,6 +44,10 @@ def _row(p: str, pc: str, vc: str, arts: tuple[str, ...],
 _BEDROCK = "aws-bedrock-guardrails"
 _AZURE = "azure-content-safety"
 _GCP = "gcp-model-armor"
+_NEMO = "nvidia-nemo-guardrails"
+_GRAILS = "guardrails-ai"
+_LLMG = "llm-guard"
+_REBUFF = "rebuff"
 
 
 BEDROCK_MAPPINGS: tuple[CategoryMapping, ...] = (
@@ -100,9 +105,100 @@ GCP_MAPPINGS: tuple[CategoryMapping, ...] = (
 )
 
 
+NEMO_MAPPINGS: tuple[CategoryMapping, ...] = (
+    _row(_NEMO, "input_rails.jailbreak", "adversarial", ("Art. 15",), ("LLM01",),
+         "Jailbreak detection input rail. Robustness/cybersecurity signal."),
+    _row(_NEMO, "input_rails.self_check", "adversarial", ("Art. 15",), ("LLM01",),
+         "Input self-check rail flags adversarial prompts."),
+    _row(_NEMO, "dialog_rails.topic", "prohibited_topic", ("Art. 5",), ("LLM08",),
+         "Topic rail blocks deployer-defined off-topic content."),
+    _row(_NEMO, "output_rails.self_check", "output_validation", ("Art. 13",), ("LLM05",),
+         "Output self-check rail flags policy-violating generations."),
+    _row(_NEMO, "output_rails.fact_check", "grounding", ("Art. 13", "Art. 15"), ("LLM09",),
+         "Fact-check rail signals ungrounded or hallucinated output."),
+    _row(_NEMO, "output_rails.sensitive_data", "pii", ("Art. 10",), ("LLM02",),
+         "Sensitive-data output rail detects PII leakage."),
+    _row(_NEMO, "retrieval_rails.relevance", "grounding", ("Art. 13",), ("LLM09",),
+         "Retrieval-relevance rail signals off-context chunks."),
+)
+
+
+GUARDRAILS_AI_MAPPINGS: tuple[CategoryMapping, ...] = (
+    _row(_GRAILS, "DetectPII", "pii", ("Art. 10",), ("LLM02",),
+         "PII detector validator. Type field carries the PII class."),
+    _row(_GRAILS, "ToxicLanguage", "hate", ("Art. 5",), ("LLM05",),
+         "Toxic-language validator. Severity reflects validator threshold."),
+    _row(_GRAILS, "ProfanityFree", "hate", ("Art. 5",), ("LLM05",)),
+    _row(_GRAILS, "SecretsPresent", "secrets_leak", ("Art. 15",), ("LLM02",),
+         "API keys, tokens, or credentials in output. Cybersecurity signal."),
+    _row(_GRAILS, "DetectPromptInjection", "adversarial", ("Art. 15",), ("LLM01",),
+         "Prompt-injection detector validator."),
+    _row(_GRAILS, "BiasCheck", "bias", ("Art. 10",), ("LLM05",),
+         "Bias validator. Art. 10 data-governance signal."),
+    _row(_GRAILS, "MentionsDrugs", "prohibited_topic", ("Art. 5",), ("LLM08",)),
+    _row(_GRAILS, "ValidJSON", "schema_violation", ("Art. 15",), ("LLM05",),
+         "JSON-schema validator failure. Robustness signal."),
+    _row(_GRAILS, "RegexMatch", "schema_violation", ("Art. 15",), ("LLM05",)),
+    _row(_GRAILS, "ValidLength", "schema_violation", ("Art. 15",), ("LLM05",)),
+)
+
+
+LLM_GUARD_MAPPINGS: tuple[CategoryMapping, ...] = (
+    _row(_LLMG, "Anonymize", "pii", ("Art. 10",), ("LLM02",),
+         "PII anonymisation scanner. Match types carry the PII class."),
+    _row(_LLMG, "BanCode", "prohibited_topic", ("Art. 5",), ("LLM08",),
+         "Code-content scanner blocks code in prompts where disallowed."),
+    _row(_LLMG, "BanCompetitors", "prohibited_topic", ("Art. 5",), ("LLM08",)),
+    _row(_LLMG, "BanSubstrings", "word_block", ("Art. 5",), ("LLM05",),
+         "Custom substring deny-list. Deployer-defined."),
+    _row(_LLMG, "BanTopics", "prohibited_topic", ("Art. 5",), ("LLM08",)),
+    _row(_LLMG, "InvisibleText", "adversarial", ("Art. 15",), ("LLM01",),
+         "Invisible-text detection (zero-width chars, homoglyphs)."),
+    _row(_LLMG, "Language", "language", ("Art. 13",), (),
+         "Language-detection scanner. Transparency-adjacent signal."),
+    _row(_LLMG, "PromptInjection", "adversarial", ("Art. 15",), ("LLM01",),
+         "Prompt-injection scanner. Cybersecurity signal."),
+    _row(_LLMG, "Regex", "word_block", ("Art. 5",), ("LLM05",),
+         "Regex deny-list scanner."),
+    _row(_LLMG, "Secrets", "secrets_leak", ("Art. 15",), ("LLM02",),
+         "Secrets-detection scanner. API keys, tokens, credentials."),
+    _row(_LLMG, "Sentiment", "sentiment", (), (),
+         "Sentiment scanner. No article mapping. Recorded as raw signal."),
+    _row(_LLMG, "TokenLimit", "resource_limit", ("Art. 15",), (),
+         "Token-limit scanner. Robustness/availability signal."),
+    _row(_LLMG, "Toxicity", "hate", ("Art. 5",), ("LLM05",)),
+    _row(_LLMG, "Bias", "bias", ("Art. 10",), ("LLM05",),
+         "Output-bias scanner. Art. 10 data-governance signal."),
+    _row(_LLMG, "Deanonymize", "pii", ("Art. 10",), ("LLM02",),
+         "Output deanonymisation scanner."),
+    _row(_LLMG, "JSON", "schema_violation", ("Art. 15",), ("LLM05",)),
+    _row(_LLMG, "MaliciousURLs", "malicious_uri", ("Art. 15",), ("LLM05",)),
+    _row(_LLMG, "NoRefusal", "output_validation", ("Art. 13",), (),
+         "Refusal detection on output. Transparency signal."),
+    _row(_LLMG, "Relevance", "grounding", ("Art. 13",), ("LLM09",)),
+    _row(_LLMG, "Sensitive", "pii", ("Art. 10",), ("LLM02",),
+         "Output sensitive-data scanner."),
+)
+
+
+REBUFF_MAPPINGS: tuple[CategoryMapping, ...] = (
+    _row(_REBUFF, "heuristic_injection", "adversarial", ("Art. 15",), ("LLM01",),
+         "Heuristic prompt-injection score. First of Rebuff's four layers."),
+    _row(_REBUFF, "model_injection", "adversarial", ("Art. 15",), ("LLM01",),
+         "LLM-based prompt-injection score."),
+    _row(_REBUFF, "vector_injection", "adversarial", ("Art. 15",), ("LLM01",),
+         "Vector-DB similarity score against known injection corpus."),
+    _row(_REBUFF, "canary_leak", "secrets_leak", ("Art. 15",), ("LLM02",),
+         "Canary-word leak in model output. Indirect-injection signal."),
+)
+
+
 _INDEX: dict[tuple[str, str], CategoryMapping] = {
     (m.provider, m.provider_category): m
-    for m in BEDROCK_MAPPINGS + AZURE_MAPPINGS + GCP_MAPPINGS
+    for m in (
+        BEDROCK_MAPPINGS + AZURE_MAPPINGS + GCP_MAPPINGS
+        + NEMO_MAPPINGS + GUARDRAILS_AI_MAPPINGS + LLM_GUARD_MAPPINGS + REBUFF_MAPPINGS
+    )
 }
 
 

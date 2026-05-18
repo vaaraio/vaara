@@ -169,6 +169,61 @@ performance. The deployer's choice of guardrail vendor and confidence
 threshold is a policy decision recorded in Vaara's audit trail, not a
 decision Vaara makes.
 
+## OSS guardrail adapter pattern
+
+Adapters from v0.20.0 take findings from NVIDIA NeMo Guardrails,
+Guardrails AI, LLM Guard, and Rebuff and route them through the same
+audit-and-OVERT path as the v0.19.0 cloud adapters. Each OSS guardrail
+speaks its own category vocabulary (`input_rails.jailbreak` /
+`DetectPII` / `PromptInjection` / `heuristicScore`). The adapters
+normalise those onto the same Vaara vocabulary and the same published
+article-mapping table at
+`src/vaara/integrations/_content_safety_articles.py`, extended with
+OSS provider rows.
+
+41 OSS rows total across the four vendors (7 NeMo, 10 Guardrails AI,
+20 LLM Guard, 4 Rebuff) as of v0.20.0. Combined with v0.19.0's 27
+cloud rows, the published table covers 68 provider categories across
+seven upstream guardrails.
+
+### Category to article mapping (OSS providers)
+
+| Vaara category | Provider categories | AI Act article | OWASP LLM |
+|---|---|---|---|
+| `adversarial` | NeMo `input_rails.jailbreak` / `self_check` · Guardrails AI `DetectPromptInjection` · LLM Guard `PromptInjection` / `InvisibleText` · Rebuff `heuristic_injection` / `model_injection` / `vector_injection` | Art. 15 | LLM01 |
+| `prohibited_topic` | NeMo `dialog_rails.topic` · Guardrails AI `MentionsDrugs` · LLM Guard `BanCode` / `BanCompetitors` / `BanTopics` | Art. 5 | LLM08 |
+| `hate` | Guardrails AI `ToxicLanguage` / `ProfanityFree` · LLM Guard `Toxicity` | Art. 5 | LLM05 |
+| `pii` | NeMo `output_rails.sensitive_data` · Guardrails AI `DetectPII` · LLM Guard `Anonymize` / `Deanonymize` / `Sensitive` | Art. 10 | LLM02 |
+| `secrets_leak` | Guardrails AI `SecretsPresent` · LLM Guard `Secrets` · Rebuff `canary_leak` | Art. 15 | LLM02 |
+| `word_block` | LLM Guard `BanSubstrings` / `Regex` | Art. 5 | LLM05 |
+| `bias` | Guardrails AI `BiasCheck` · LLM Guard `Bias` | Art. 10 | LLM05 |
+| `schema_violation` | Guardrails AI `ValidJSON` / `RegexMatch` / `ValidLength` · LLM Guard `JSON` | Art. 15 | LLM05 |
+| `output_validation` | NeMo `output_rails.self_check` · LLM Guard `NoRefusal` | Art. 13 | — |
+| `grounding` | NeMo `output_rails.fact_check` / `retrieval_rails.relevance` · LLM Guard `Relevance` | Art. 13, Art. 15 | LLM09 |
+| `malicious_uri` | LLM Guard `MaliciousURLs` | Art. 15 | LLM05 |
+| `language` | LLM Guard `Language` | Art. 13 | — |
+| `sentiment` | LLM Guard `Sentiment` | — | — |
+| `resource_limit` | LLM Guard `TokenLimit` | Art. 15 | — |
+
+### Where the finding lands
+
+Same flow as cloud adapters. OSS-adapter output is a
+`ContentSafetyFinding` with `to_audit_context()` and
+`to_overt_metadata()` helpers that route into
+`pipeline.intercept(context=...)` and OVERT `non_content_metadata`
+respectively.
+
+### What this is not
+
+The adapters do not run the OSS guardrail. The deployer's runtime
+loads NeMo, Guardrails AI, LLM Guard, or Rebuff and invokes them with
+the deployer's configuration. Vaara observes and records the finding.
+Vaara does not replace the upstream guardrail and does not claim
+conformity assessment of the guardrail vendor's detection performance.
+The deployer's choice of guardrails, scanners, validators, and
+thresholds is a policy decision recorded in Vaara's audit trail, not a
+decision Vaara makes.
+
 ## CEN-CENELEC harmonised standards alignment
 
 The harmonised standards under EU AI Act Article 40 are being drafted
