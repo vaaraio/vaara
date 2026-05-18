@@ -178,6 +178,80 @@ class TestSQLiteBackend:
             assert backend.count() == 8
 
 
+class TestSchemaUpgrade:
+    """Opening a DB at any older schema version must migrate cleanly.
+
+    Regression for the v0.19.0 init bug where SCHEMA_SQL ran before
+    migrations and crashed with `no such column: tenant_id` on any DB
+    that had not yet been brought to the tenant_id-bearing version.
+    """
+
+    _V0_AUDIT_RECORDS_SQL = """
+    CREATE TABLE audit_records (
+        record_id     TEXT PRIMARY KEY,
+        action_id     TEXT NOT NULL,
+        event_type    TEXT NOT NULL,
+        timestamp     REAL NOT NULL,
+        agent_id      TEXT NOT NULL,
+        tool_name     TEXT NOT NULL,
+        data          TEXT NOT NULL DEFAULT '{}',
+        regulatory    TEXT NOT NULL DEFAULT '[]',
+        previous_hash TEXT NOT NULL DEFAULT '',
+        record_hash   TEXT NOT NULL DEFAULT '',
+        seq           INTEGER NOT NULL
+    );
+    """
+
+    def _seed_v0_db(self, path: Path) -> None:
+        """Build a pre-versioning DB by hand: no audit_meta, no tenant_id."""
+        import sqlite3
+        conn = sqlite3.connect(str(path), isolation_level=None)
+        conn.executescript(self._V0_AUDIT_RECORDS_SQL)
+        conn.close()
+
+    def _seed_v1_db(self, path: Path) -> None:
+        """Build a v1 DB: audit_meta exists with schema_version='1',
+        audit_records has no tenant_id yet."""
+        import sqlite3
+        conn = sqlite3.connect(str(path), isolation_level=None)
+        conn.executescript(self._V0_AUDIT_RECORDS_SQL)
+        conn.execute("CREATE TABLE audit_meta (key TEXT PRIMARY KEY, value TEXT NOT NULL)")
+        conn.execute("INSERT INTO audit_meta (key, value) VALUES ('schema_version', '1')")
+        conn.close()
+
+    def _assert_current(self, path: Path) -> None:
+        import sqlite3
+        from vaara.audit.sqlite_backend import SCHEMA_VERSION
+        conn = sqlite3.connect(str(path))
+        v = conn.execute(
+            "SELECT value FROM audit_meta WHERE key='schema_version'"
+        ).fetchone()
+        assert v is not None
+        assert int(v[0]) == SCHEMA_VERSION
+        cols = [r[1] for r in conn.execute("PRAGMA table_info(audit_records)").fetchall()]
+        assert "tenant_id" in cols
+        assert "system_operation" in cols
+        assert "data_usage" in cols
+        assert "decision_making" in cols
+        assert "limitations" in cols
+        conn.close()
+
+    def test_preversion_db_migrates(self, db_path):
+        self._seed_v0_db(db_path)
+        SQLiteAuditBackend(db_path).close()
+        self._assert_current(db_path)
+
+    def test_v1_db_migrates(self, db_path):
+        self._seed_v1_db(db_path)
+        SQLiteAuditBackend(db_path).close()
+        self._assert_current(db_path)
+
+    def test_reopening_current_db_is_idempotent(self, db_path):
+        SQLiteAuditBackend(db_path).close()
+        SQLiteAuditBackend(db_path).close()
+        self._assert_current(db_path)
+
+
 class TestSkeletonRecordsCounter:
     """Loop 51: load_trail reports skeleton rows via log only; the count
     is lost to callers. Ops dashboards polling trail.persistence_failures
