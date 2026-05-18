@@ -204,27 +204,69 @@ class SQLiteAuditBackend:
         # Load GDPR redaction map into memory for O(1) read-time substitution.
         self._redaction_cache: dict[str, str] = self._load_redaction_cache()
 
-    def _init_schema(self) -> None:
-        """Create tables if they don't exist, then run any pending migrations."""
-        self._conn.executescript(SCHEMA_SQL)
+    def _table_exists(self, name: str) -> bool:
+        row = self._conn.execute(
+            "SELECT 1 FROM sqlite_master WHERE type='table' AND name=?",
+            (name,),
+        ).fetchone()
+        return row is not None
+
+    def _stored_schema_version(self) -> int | None:
+        if not self._table_exists("audit_meta"):
+            return None
         row = self._conn.execute(
             "SELECT value FROM audit_meta WHERE key='schema_version'"
         ).fetchone()
-        if row is None:
-            # Fresh database — already at current version via SCHEMA_SQL.
+        return int(row[0]) if row is not None else None
+
+    def _init_schema(self) -> None:
+        """Create tables if they don't exist, then run any pending migrations.
+
+        Migrations run BEFORE SCHEMA_SQL on any existing DB, because
+        SCHEMA_SQL contains statements (indexes on later-added columns)
+        that fail on a DB at any older version. Cases:
+
+        1. Fresh DB: no audit_records table yet. SCHEMA_SQL creates
+           everything at SCHEMA_VERSION.
+        2. Existing DB at v < SCHEMA_VERSION: migrate from stored version
+           up to SCHEMA_VERSION, then run SCHEMA_SQL idempotently to pick
+           up any tables/indexes that aren't carried by migrations.
+        3. Existing DB at v == SCHEMA_VERSION: no migrations, SCHEMA_SQL
+           is a no-op via IF NOT EXISTS.
+        4. Existing DB pre-versioning (no audit_meta or no schema_version
+           row): treated as v0 and migrated forward.
+        """
+        if not self._table_exists("audit_records"):
+            # Fresh DB
+            self._conn.executescript(SCHEMA_SQL)
             self._conn.execute(
                 "INSERT INTO audit_meta (key, value) VALUES ('schema_version', ?)",
                 (str(SCHEMA_VERSION),),
             )
-        else:
-            stored = int(row[0])
-            if stored > SCHEMA_VERSION:
-                raise RuntimeError(
-                    f"Audit DB schema version {stored} is newer than this vaara "
-                    f"version (supports up to {SCHEMA_VERSION}). Upgrade vaara."
-                )
-            if stored < SCHEMA_VERSION:
-                self._run_migrations(stored, SCHEMA_VERSION)
+            return
+        # Existing DB: ensure audit_meta exists, resolve stored version
+        if not self._table_exists("audit_meta"):
+            self._conn.execute(
+                "CREATE TABLE audit_meta "
+                "(key TEXT PRIMARY KEY, value TEXT NOT NULL)"
+            )
+        stored = self._stored_schema_version()
+        if stored is None:
+            # Pre-versioned DB: treat as v0 and bring forward via migrations
+            self._conn.execute(
+                "INSERT INTO audit_meta (key, value) VALUES ('schema_version', '0')"
+            )
+            stored = 0
+        if stored > SCHEMA_VERSION:
+            raise RuntimeError(
+                f"Audit DB schema version {stored} is newer than this vaara "
+                f"version (supports up to {SCHEMA_VERSION}). Upgrade vaara."
+            )
+        if stored < SCHEMA_VERSION:
+            self._run_migrations(stored, SCHEMA_VERSION)
+        # SCHEMA_SQL is now safe to run idempotently. All referenced
+        # columns exist because migrations have brought the DB current.
+        self._conn.executescript(SCHEMA_SQL)
 
     def _run_migrations(self, from_version: int, to_version: int) -> None:
         """Apply incremental schema migrations from_version up to to_version.
