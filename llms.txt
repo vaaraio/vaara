@@ -1,0 +1,37 @@
+# Vaara
+
+> Runtime evidence layer for EU AI Act compliance. Open source, no SaaS, no telemetry.
+
+Vaara intercepts agent tool calls, scores each one with a conformal risk interval, and writes a hash-chained audit record. Online learning across five expert signals via Multiplicative Weight Update. Distribution-free conformal coverage on the score.
+
+Position: runtime governance and enforcement layer. Implements OVERT 1.0 (Glacis Technologies, March 2026) as the Arbiter role at AAL-3 Phase 2.
+
+## Repo and packages
+- [GitHub source](https://github.com/vaaraio/vaara): code, releases, issue tracker
+- [PyPI](https://pypi.org/project/vaara/): `pip install vaara`
+- [npm @vaara/client](https://www.npmjs.com/package/@vaara/client): TypeScript HTTP client
+
+## Docs
+- [README](https://github.com/vaaraio/vaara/blob/main/README.md): install, quick start, evidence specimen, integrations
+- [COMPLIANCE.md](https://github.com/vaaraio/vaara/blob/main/COMPLIANCE.md): EU AI Act (Art. 9, 11 to 15, 61) and DORA (Art. 10, 12, 13) article-level mapping
+- [Formal specification](https://github.com/vaaraio/vaara/blob/main/docs/formal_specification.md): MWU regret bound O(sqrt(T log N)), conformal coverage, security properties
+- [vaara-bench-v1](https://github.com/vaaraio/vaara/blob/main/bench/vaara-bench-v1.md): 77-trace synthetic benchmark, frozen methodology
+- [CHANGELOG](https://github.com/vaaraio/vaara/blob/main/CHANGELOG.md): version-by-version evolution
+- [HTTP API contract](https://github.com/vaaraio/vaara/blob/main/docs/openapi.yaml): /v1/score and operator endpoints
+- [Signing keys](https://github.com/vaaraio/vaara/blob/main/docs/signing-keys.md): release verification
+
+## Integrations
+- Framework adapters: LangChain, CrewAI, OpenAI Agents SDK, MCP server
+- Cloud guardrail adapters: AWS Bedrock Guardrails, Azure AI Content Safety, GCP Model Armor (article-tagged findings into Vaara's audit trail and OVERT envelope)
+- OVERT 1.0 emitter, verifier CLI, S3P (MEA-2) emitter with Clopper-Pearson intervals, experimental AMD SEV-SNP TEE attestation hook
+
+## Numbers
+- 5,955-entry adversarial corpus (3,422 attack across 8 categories, 2,533 benign)
+- 97.1% attack recall on held-out distribution-shift split, threshold 0.55
+- PAIR adaptive-attacker calibration: ASR 0/25 against Qwen2.5-32B
+- 140 µs / 210 µs p99 inference latency, commodity CPU
+
+## Optional
+- [Article 14 runtime](https://futurium.ec.europa.eu/ga/apply-ai-alliance/community-content/article-14-runtime-why-oversight-agentic-ai-has-be-evidenced-action-not-model): position post on EU Apply AI Alliance Futurium
+- [OVERT 1.0 spec](https://overt.is/): open runtime-trust standard Vaara implements as Arbiter
+- [Microsoft Agent Governance Toolkit](https://github.com/microsoft/agent-governance-toolkit): broader agent-governance reference (zero-trust identity, capability-based access control)
