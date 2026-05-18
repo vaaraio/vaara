@@ -21,64 +21,6 @@ Vaara intercepts agent tool calls, scores each one with a conformal risk interva
 
 For broader agent governance (zero-trust identity, capability-based access control, multi-language SDKs) see Microsoft's [Agent Governance Toolkit](https://github.com/microsoft/agent-governance-toolkit).
 
-## What evidence looks like
-
-`vaara compliance report --format json` against a real audit trail produces an article-level evidence record an auditor can read directly. Status is reported honestly: articles without recorded events return `evidence_insufficient`, not a rubber-stamp.
-
-```json
-{
-  "system_name": "Acme HR Assistant",
-  "system_version": "2.4.1",
-  "overall_status": "evidence_insufficient",
-  "trail_integrity": {
-    "size": 105,
-    "chain_intact": true
-  },
-  "articles": [
-    {
-      "article": "Article 12(1)",
-      "title": "Record-Keeping (Logging)",
-      "status": "evidence_sufficient",
-      "strength": "strong",
-      "evidence_count": 105
-    },
-    {
-      "article": "Article 9(2)(a)",
-      "title": "Risk Identification and Analysis",
-      "status": "evidence_sufficient",
-      "strength": "strong",
-      "evidence_count": 35
-    },
-    {
-      "article": "Article 15(1)",
-      "title": "Accuracy, Robustness and Cybersecurity",
-      "status": "evidence_insufficient",
-      "strength": "absent",
-      "evidence_count": 0
-    },
-    {
-      "article": "Article 61(1)",
-      "title": "Post-Market Monitoring",
-      "status": "evidence_insufficient",
-      "strength": "absent",
-      "evidence_count": 0
-    }
-  ]
-}
-```
-
-The same data renders as a styled PDF for Notified Bodies (`--format pdf`), a static HTML dashboard (`vaara compliance dashboard`), or a Sigstore-signed regulator-handoff envelope (`vaara trail export`).
-
-## Numbers
-
-- 5,955-entry adversarial corpus (3,422 attack across 8 categories, 2,533 benign)
-- 97.1% attack recall on held-out distribution-shift split, threshold 0.55
-- PAIR adaptive-attacker calibration: ASR 0/25 against Qwen2.5-32B
-- [vaara-bench-v1](bench/vaara-bench-v1.md): 77-trace synthetic-corpus benchmark with frozen methodology, 100% soft TPR, 0% hard FPR
-- 140 µs / 210 µs p99 inference latency, commodity CPU
-- Distribution-free conformal coverage on the score
-- MWU regret bound O(sqrt(T log N))
-
 ## Install
 
 ```bash
@@ -107,6 +49,38 @@ else:
 
 `report_outcome` closes the loop. MWU reweights signals based on which ones predicted the outcome.
 
+## What evidence looks like
+
+`vaara compliance report --format json` against a real audit trail produces an article-level evidence record an auditor can read directly. Status is reported honestly: articles without recorded events return `evidence_insufficient`, not a rubber-stamp.
+
+```json
+{
+  "system_name": "Acme HR Assistant",
+  "overall_status": "evidence_insufficient",
+  "trail_integrity": {"size": 105, "chain_intact": true},
+  "articles": [
+    {"article": "Article 12(1)", "title": "Record-Keeping (Logging)",
+     "status": "evidence_sufficient", "strength": "strong", "evidence_count": 105},
+    {"article": "Article 9(2)(a)", "title": "Risk Identification and Analysis",
+     "status": "evidence_sufficient", "strength": "strong", "evidence_count": 35},
+    {"article": "Article 15(1)", "title": "Accuracy, Robustness and Cybersecurity",
+     "status": "evidence_insufficient", "strength": "absent", "evidence_count": 0}
+  ]
+}
+```
+
+The same data renders as a styled PDF for Notified Bodies (`vaara compliance report --format pdf`, requires `pip install 'vaara[pdf]'`), a static HTML dashboard (`vaara compliance dashboard`), or a Sigstore-signed regulator-handoff envelope (`vaara trail export`, optional ML-DSA-65 / FIPS 204 post-quantum signer via `pip install 'vaara[pq]'`).
+
+## Numbers
+
+- 5,955-entry adversarial corpus (3,422 attack across 8 categories, 2,533 benign)
+- 97.1% attack recall on held-out distribution-shift split, threshold 0.55
+- PAIR adaptive-attacker calibration: ASR 0/25 against Qwen2.5-32B
+- [vaara-bench-v1](bench/vaara-bench-v1.md): 77-trace synthetic-corpus benchmark with frozen methodology, 100% soft TPR, 0% hard FPR
+- 140 µs / 210 µs p99 inference latency, commodity CPU
+- Distribution-free conformal coverage on the score
+- MWU regret bound O(sqrt(T log N))
+
 ## Framework integrations
 
 Native adapters in `src/vaara/integrations/` route the major Python agent frameworks through Vaara's pipeline. Each adapter intercepts tool calls via the framework's own callback or hook surface, scores them, gates them, and emits the same audit events as a direct `pipeline.intercept()` call. Frameworks are not hard dependencies (lazy import, duck typing), so the base `pip install vaara` keeps a clean dependency tree.
@@ -118,7 +92,7 @@ Native adapters in `src/vaara/integrations/` route the major Python agent framew
 
 All four framework adapters share the same in-process pipeline, so audit records hash-chain together regardless of which framework the action came through. Each adapter has its own docstring with the two integration patterns it supports.
 
-### Cloud guardrails as upstream signals (v0.19.0)
+### Cloud guardrails as upstream signals
 
 Three adapters route findings from AWS Bedrock Guardrails, Azure AI Content Safety, and GCP Model Armor into Vaara's audit trail and OVERT envelope with EU AI Act article tags. The cloud filter runs in the deployer's environment as an upstream signal. Vaara records the verdict, normalises 27 provider categories onto a shared vocabulary, and tags each finding against Art. 5, 10, 13, 15, 53, and the CSAM-specific obligation from the Digital Omnibus political agreement of May 2026.
 
@@ -154,21 +128,17 @@ curl -sX POST http://localhost:8000/v1/score \
   -d '{"tool_name":"tx.transfer","agent_id":"agent-007","base_risk_score":0.5}'
 ```
 
-The contract is in [docs/openapi.yaml](docs/openapi.yaml). Vaara defines the interface. Control-plane and orchestration vendors call it. Integration recipes for adopters live under `examples/recipes/`.
+The wire contract is in [docs/openapi.yaml](docs/openapi.yaml). Vaara defines the interface. Control-plane and orchestration vendors call it. Integration recipes for adopters live under `examples/recipes/`. Operator endpoints include `POST /v1/policy/reload` for atomic hot policy swap (start with `vaara serve --policy PATH` to enable), and `POST /v1/detect/injection` and `POST /v1/detect/pii` as named buyer-visible detectors with matching CLI subcommands that exit non-zero on detection for CI gating.
 
-v0.13.0 adds three operator-facing endpoints. `POST /v1/policy/reload` atomically swaps the running policy without restarting the agent process (start with `vaara serve --policy PATH` to enable; in-flight requests keep the old thresholds, the next request sees the new ones). `POST /v1/detect/injection` and `POST /v1/detect/pii` expose Vaara's adversarial scorer and a zero-dependency PII extractor as named buyer-visible endpoints; the corresponding `vaara detect injection` and `vaara detect pii` CLI subcommands exit non-zero when the detector fires, so they slot into CI gates. `vaara compliance dashboard --db PATH --out site/` renders a single-file static HTML article-coverage page from the same evidence model as `vaara compliance report`.
+Vaara's scorer can be run alongside external scorers via `vaara.scorer.composition.ExternalScorer` and `vaara.scorer.composite.CompositeScorer`. Any service that implements the `/v1/score` wire contract (NeMo Guardrails, another Vaara instance) can be composed. The composite preserves the strongest decision across members.
 
-v0.14.0 adds an optional ML-DSA-65 (FIPS 204) signer for the regulator-handoff export envelope (`pip install 'vaara[pq]'`), suitable for retention horizons that cross the credible quantum threshold. The same release adds `vaara.scorer.composition.ExternalScorer` and `vaara.scorer.composite.CompositeScorer` so Vaara's adaptive scorer can be run alongside external scorers (NeMo Guardrails, another Vaara instance, any service that implements the `/v1/score` wire contract); the composite preserves the strongest decision across members.
+### TypeScript client
 
-v0.15.0 ships the first-party TypeScript client at [`clients/ts`](clients/ts) and on npm as `@vaara/client`. Typed wrappers over every v1 endpoint, Node 18+, ESM, declarations shipped. JS/TS agents (LangChain.js, Vercel AI SDK, MCP, any Node service) can now call Vaara without a Python sidecar.
+The first-party TypeScript client lives at [`clients/ts`](clients/ts) and ships on npm as `@vaara/client`. Typed wrappers over every v1 endpoint, Node 18+, ESM, declarations shipped. JS/TS agents (LangChain.js, Vercel AI SDK, MCP, any Node service) can call Vaara without a Python sidecar.
 
 ```bash
 npm install @vaara/client
 ```
-
-v0.16.0 adds a PDF render to the article-evidence report. `vaara compliance report --db PATH --format pdf --out report.pdf` writes a styled single-file PDF (per-domain article tables plus per-article detail sections) suitable for attaching to a conformity submission or internal-audit binder. Requires `pip install 'vaara[pdf]'`. Markdown, JSON, and narrative renders remain unchanged.
-
-v0.17.0 adds an OVERT 1.0 Base Envelope verifier CLI. `vaara overt verify RECEIPT.cbor --pubkey-file PUB.bin` validates any canonical-CBOR Base Envelope (Annex B.6) against a supplied raw 32-byte Ed25519 public key. The schema is closed per the OVERT 1.0 spec, so envelopes carrying unknown fields are rejected. The verifier reads only the wire format and takes no dependency on Vaara's emitter, so any OVERT-conformant implementation can route its conformance check through it. Requires the `vaara[attestation]` extra.
 
 ```ts
 import { VaaraClient } from "@vaara/client";
@@ -179,7 +149,7 @@ if (r.decision === "deny") throw new Error("blocked");
 
 ## OVERT 1.0 attestation
 
-Vaara implements the OVERT 1.0 ([overt.is](https://overt.is/)) Protocol Profile 1.0 Base Envelope. OVERT 1.0 is an open standard for runtime trust in AI systems, authored by Glacis Technologies and published 25 March 2026. Closed-schema 9-field structure at AAL-3 Phase 2 (Provisional Receipt), canonical CBOR (RFC 8949), Ed25519 signatures, HMAC-SHA256 keyed commitments, IEEE-754 float rejection. v0.13.0 adds a reference Phase 3 IAP (`vaara.attestation.iap`) that notary-signs the Provisional Receipt and anchors it in a transparency log; production deployments can swap in sigstore Rekor or an equivalent independently-operated log at the same call sites.
+Vaara implements the OVERT 1.0 ([overt.is](https://overt.is/)) Protocol Profile 1.0 Base Envelope. OVERT 1.0 is an open standard for runtime trust in AI systems, authored by Glacis Technologies and published 25 March 2026. Closed-schema 9-field structure at AAL-3 Phase 2 (Provisional Receipt), canonical CBOR (RFC 8949), Ed25519 signatures, HMAC-SHA256 keyed commitments, IEEE-754 float rejection.
 
 ```
 pip install 'vaara[attestation]'
@@ -198,25 +168,30 @@ envelope = emit_base_envelope(
 )
 ```
 
-Vaara operates as the **Arbiter** in OVERT terms. See [COMPLIANCE.md](COMPLIANCE.md) "Position relative to open runtime-attestation standards" for the architectural framing.
+Vaara operates as the **Arbiter** in OVERT terms. The reference Phase 3 IAP (`vaara.attestation.iap`) notary-signs the Provisional Receipt and anchors it in a transparency log. Production deployments can swap in sigstore Rekor or an equivalent independently-operated log at the same call sites. The OVERT S3P (MEA-2) emitter at `vaara.attestation.s3p` ships exact Clopper-Pearson confidence intervals (pure Python, no scipy) and a proposed Protocol Profile extension that reports aggregate statistics over per-action conformal prediction intervals alongside the standard binomial CI.
 
-v0.18.0 adds an experimental hardware TEE attestation hook (`vaara.attestation.tee`) that binds an OVERT envelope to an AMD SEV-SNP attestation report by placing `SHA-512(canonical_cbor(envelope))` into the report's 64-byte `REPORT_DATA` field. The envelope schema is unchanged (closed per spec); the TEE report is a sibling artefact. A relying party checks the Ed25519 envelope signature and the ECDSA P-384 report signature independently. `vaara tee parse` and `vaara tee verify` expose the verifier as a CLI. Full AMD KDS chain validation and `/dev/sev-guest` live emission are tracked for v0.19+; the v0.18.0 surface ships parser, binding helper, verifier against a caller-supplied VCEK, and a deterministic mock attester for tests.
+The `vaara overt verify RECEIPT.cbor --pubkey-file PUB.bin` CLI validates any canonical-CBOR Base Envelope against a supplied raw 32-byte Ed25519 public key. The verifier reads only the wire format and takes no dependency on Vaara's emitter, so any OVERT-conformant implementation can route its conformance check through it.
 
-v0.12.0 adds an OVERT S3P (MEA-2) emitter with exact Clopper-Pearson confidence intervals (pure Python, no scipy), plus a proposed Protocol Profile extension that reports aggregate statistics over Vaara's per-action conformal prediction intervals alongside the standard binomial CI. The agentic-controls mapping in [COMPLIANCE.md](COMPLIANCE.md) "OVERT 1.0 Part 3 (Agentic AI Controls) mapping" walks Vaara's coverage of TOOL-*, MCP-*, MULTI-*, CAP-*, DISC-*, HITL-*, and DRIFT-* control by control.
+An experimental hardware TEE hook (`vaara.attestation.tee`) binds an OVERT envelope to an AMD SEV-SNP attestation report by placing `SHA-512(canonical_cbor(envelope))` in the report's 64-byte `REPORT_DATA` field. The envelope schema is unchanged (closed per spec). The TEE report is a sibling artefact: a relying party checks the Ed25519 envelope signature and the ECDSA P-384 report signature independently. `vaara tee parse` and `vaara tee verify` expose the verifier as a CLI.
 
-```python
-from vaara.attestation.s3p import emit_s3p_attestation, ConformalExtension, make_epoch_nonce_commitment
-```
+See [COMPLIANCE.md](COMPLIANCE.md) "Position relative to open runtime-attestation standards" for the architectural framing and "OVERT 1.0 Part 3 (Agentic AI Controls) mapping" for the TOOL-*, MCP-*, MULTI-*, CAP-*, DISC-*, HITL-*, DRIFT-* control-by-control walk.
 
 ## Where things live
 
-- [docs/formal_specification.md](docs/formal_specification.md): math. MWU regret bound O(sqrt(T log N)), conformal coverage guarantees, security properties.
-- [COMPLIANCE.md](COMPLIANCE.md): Article-level evidence mapping for EU AI Act (Articles 9, 11 to 15, 61) and DORA (Articles 10, 12, 13). Eval numbers, threshold sweeps, PAIR adversarial calibration.
-- [Article 14 runtime: why oversight of agentic AI has to be evidenced as action, not model](https://futurium.ec.europa.eu/ga/apply-ai-alliance/community-content/article-14-runtime-why-oversight-agentic-ai-has-be-evidenced-action-not-model): why this exists. Posted on the EU Apply AI Alliance Futurium.
-- `src/vaara/integrations/`: LangChain, OpenAI Agents SDK, CrewAI, MCP server.
-- `src/vaara/audit/`: hash-chain trail, SQLite backend, append-only WAL.
-- `src/vaara/policy/`: declarative YAML / JSON policy schema with `vaara policy validate` (semantic checks) and `vaara policy test` (Conftest-style cases-file runner) for reviewing the policy artifact in CI independently from agent code.
-- `src/vaara/sandbox/`: synthetic-trace cold-start calibration.
+| Path | Contents |
+|---|---|
+| [docs/formal_specification.md](docs/formal_specification.md) | MWU regret bound, conformal coverage, security properties |
+| [COMPLIANCE.md](COMPLIANCE.md) | EU AI Act (Art. 9, 11 to 15, 61) and DORA (Art. 10, 12, 13) mapping, eval numbers, PAIR calibration |
+| [CHANGELOG.md](CHANGELOG.md) | Version-by-version feature evolution |
+| [docs/signing-keys.md](docs/signing-keys.md) | Release signing and verification |
+| [SECURITY.md](SECURITY.md) | Security policy and reporting |
+| [CONTRIBUTING.md](CONTRIBUTING.md) | Contribution guidelines |
+| `src/vaara/integrations/` | LangChain, OpenAI Agents SDK, CrewAI, MCP, Bedrock, Azure, GCP |
+| `src/vaara/audit/` | Hash-chain trail, SQLite backend, append-only WAL |
+| `src/vaara/policy/` | YAML / JSON policy schema, `vaara policy validate` and `vaara policy test` |
+| `src/vaara/sandbox/` | Synthetic-trace cold-start calibration |
+
+[Article 14 runtime: why oversight of agentic AI has to be evidenced as action, not model](https://futurium.ec.europa.eu/ga/apply-ai-alliance/community-content/article-14-runtime-why-oversight-agentic-ai-has-be-evidenced-action-not-model) is the position post on the EU Apply AI Alliance Futurium.
 
 > Vaara helps deployers assemble evidence for their own conformity work. It does not certify compliance or constitute legal advice. Deployers own their obligations under the EU AI Act and other applicable law.
 
