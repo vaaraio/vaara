@@ -6,6 +6,62 @@ and this project follows [Semantic Versioning](https://semver.org/spec/v2.0.0.ht
 
 ## [Unreleased]
 
+## [0.20.0] - 2026-05-18
+
+**Theme: OSS guardrail adapters.** Adds four adapters that take findings
+from NVIDIA NeMo Guardrails, Guardrails AI, LLM Guard, and Rebuff and
+route them through Vaara's hash-chained audit trail and OVERT envelope
+with EU AI Act article tags. Same pattern as v0.19.0's cloud adapters.
+The OSS guardrail runs as an upstream signal in the deployer's
+environment. Vaara records what the guardrail flagged, normalises it
+to a shared vocabulary, and tags each finding against Art. 5, 10, 13,
+15, and 53.
+
+The mapping itself is the value. Each adapter is a thin SDK wrapper
+around a published category-to-article table extended in
+`_content_safety_articles.py`. A deployer can read the table, dispute
+a row, and override mappings without touching adapter code.
+
+### Added
+- 41 new mapping rows in `_content_safety_articles.py` across the four
+  OSS providers (7 NeMo, 10 Guardrails AI, 20 LLM Guard, 4 Rebuff),
+  each tagged with EU AI Act articles and OWASP LLM Top 10 codes.
+  Seven new Vaara categories: `secrets_leak`, `schema_violation`,
+  `output_validation`, `bias`, `language`, `sentiment`,
+  `resource_limit`.
+- `src/vaara/integrations/nemo_guardrails.py`:
+  `NemoGuardrailsAdapter` plus `parse_generation_response`. Maps input
+  rails, dialog rails, output rails, and retrieval rails from the
+  `GenerationResponse.log.activated_rails` payload.
+- `src/vaara/integrations/guardrails_ai.py`: `GuardrailsAIAdapter` plus
+  `parse_validation_outcome`. Maps `ValidationOutcome` summary shape
+  to findings with PascalCase normalisation across hub validators.
+- `src/vaara/integrations/llm_guard.py`: `LLMGuardAdapter` plus
+  `parse_scan_result`. Wraps `scan_prompt` and `scan_output`
+  callables. Scanner-callable injection for test isolation.
+- `src/vaara/integrations/rebuff.py`: `RebuffAdapter` plus
+  `parse_detect_response` and `parse_canary_leak`. Records all three
+  injection-detection layers (heuristic, model, vector) and the
+  canary-word leak on responses.
+- Four test files exercising parsers and adapters with no SDK install
+  required (29 new tests, 712 total).
+
+### Pyproject
+- New optional extras: `nemo-guardrails`, `guardrails-ai`, `llm-guard`,
+  `rebuff`. Base install stays free of OSS guardrail dependencies.
+- HuggingFace Space added as `Demo` URL in `[project.urls]`.
+
+### README
+- HuggingFace Space badge added to the badge row.
+
+### Strategic frame
+The OSS guardrails are inputs to Vaara, not Vaara's replacement.
+Vaara stays the schema findings flow into: hash-chained audit trail,
+OVERT envelope, EU AI Act article-level evidence. Add NeMo, Guardrails
+AI, LLM Guard, or Rebuff to your stack and their findings land in the
+same Vaara audit record as Bedrock, Azure, and GCP findings did in
+v0.19.0.
+
 ## [0.19.1] - 2026-05-18
 
 **Patch: audit DB upgrade safety.** Opening an existing audit DB at
