@@ -102,7 +102,7 @@ Three adapters route findings from AWS Bedrock Guardrails, Azure AI Content Safe
 
 Each adapter returns a `ContentSafetyFinding` the deployer routes into `pipeline.intercept(context=finding.to_audit_context())`. Cloud SDKs are optional extras: `pip install 'vaara[bedrock]'`, `pip install 'vaara[azure-content-safety]'`, `pip install 'vaara[gcp-model-armor]'`. The category-to-article mapping table lives in `src/vaara/integrations/_content_safety_articles.py` and is the value the adapters wrap. Article-level rationale is in [COMPLIANCE.md](COMPLIANCE.md#cloud-guardrail-adapter-pattern).
 
-### OSS guardrails as upstream signals (v0.20.0)
+### OSS guardrails as upstream signals
 
 Four adapters route findings from NVIDIA NeMo Guardrails, Guardrails AI, LLM Guard, and Rebuff into the same audit trail and OVERT envelope path as the v0.19.0 cloud adapters. The OSS guardrail runs in the deployer's environment as an upstream signal. Vaara records the verdict, normalises 41 OSS provider categories onto the same shared vocabulary, and tags each finding against Art. 5, 10, 13, 15, and 53.
 
