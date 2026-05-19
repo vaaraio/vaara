@@ -1,8 +1,23 @@
 {
-  "_comment": "Example Claude Code MCP config showing the Vaara proxy in front of GitHub's official MCP server (github/github-mcp-server). Set GITHUB_PERSONAL_ACCESS_TOKEN in your shell, or replace the env entry below with your own value. Copy the relevant block into your Claude Code mcp config.",
+  "_comment": "Example Claude Code MCP config showing the Vaara proxy in front of GitHub's official MCP server (github/github-mcp-server). The primary recipe uses the github-mcp-server binary directly, no Docker required. Build it with: go install github.com/github/github-mcp-server/cmd/github-mcp-server@latest. The _alternative_docker block below shows the Docker-wrapped variant if you prefer that runtime. Replace /path/to/... and the PAT with your own values.",
 
   "mcpServers": {
     "github-via-vaara": {
+      "command": "python",
+      "args": [
+        "-m", "vaara.integrations.mcp_proxy",
+        "--upstream", "/path/to/github-mcp-server",
+        "--upstream-arg", "stdio",
+        "--db", "${HOME}/.vaara/github_audit.db",
+        "--agent-id", "claude-code-github"
+      ],
+      "env": {
+        "GITHUB_PERSONAL_ACCESS_TOKEN": "ghp_replace_with_your_token"
+      }
+    },
+
+    "_alternative_docker": {
+      "_comment": "Same proxy shape, with Docker wrapping the binary instead of running it directly. Use this only if you already run Docker. Requires the ghcr.io/github/github-mcp-server image (docker pull ghcr.io/github/github-mcp-server).",
       "command": "python",
       "args": [
         "-m", "vaara.integrations.mcp_proxy",
@@ -19,10 +34,6 @@
       "env": {
         "GITHUB_PERSONAL_ACCESS_TOKEN": "ghp_replace_with_your_token"
       }
-    },
-
-    "_alternative_remote_http": {
-      "_comment": "GitHub also hosts a remote HTTP MCP server at https://api.githubcopilot.com/mcp/. Vaara's proxy is stdio-based and pairs with the local Docker server above. The HTTP variant would need a different bridge and is out of scope for this demo."
     }
   }
 }
