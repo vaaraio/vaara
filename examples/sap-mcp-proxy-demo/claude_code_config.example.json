@@ -1,16 +1,33 @@
 {
-  "_comment": "Example Claude Code MCP config showing the Vaara proxy in front of a community SAP ADT MCP server. Replace SAP_URL/USER/PASSWORD/CLIENT with your own. Copy the relevant block into your Claude Code mcp config.",
+  "_comment": "Example Claude Code MCP config showing the Vaara proxy in front of community SAP MCP servers. The primary block uses @sap/mdk-mcp-server (SAP's official Mobile Development Kit MCP server, published on npm). Two sibling _alternative_* blocks show the same proxy shape with mario-andreschak/mcp-abap-abap-adt-api (clone+build) and lemaiwo/btp-sap-odata-to-mcp-server (clone+build). Copy the relevant block into your Claude Code mcp config.",
 
   "mcpServers": {
-    "sap-adt-via-vaara": {
+    "sap-mdk-via-vaara": {
       "command": "python",
       "args": [
         "-m", "vaara.integrations.mcp_proxy",
         "--upstream", "npx",
         "--upstream-arg", "-y",
-        "--upstream-arg", "@mario-andreschak/mcp-abap-abap-adt-api",
+        "--upstream-arg", "@sap/mdk-mcp-server",
+        "--upstream-arg", "--schema-version",
+        "--upstream-arg", "26.3",
         "--db", "${HOME}/.vaara/sap_audit.db",
-        "--agent-id", "claude-code-sap"
+        "--agent-id", "claude-code-sap-mdk"
+      ],
+      "env": {
+        "SAP_UX_FIORI_TOOLS_DISABLE_TELEMETRY": "true"
+      }
+    },
+
+    "_alternative_abap_adt": {
+      "_comment": "mario-andreschak/mcp-abap-abap-adt-api is not published to npm. Clone the repo, run npm install and npm run build, then point --upstream-arg at the built dist/index.js. SAP_URL/USER/PASSWORD/CLIENT come from your SAP system (NetWeaver ABAP Developer Edition, S/4HANA dev, BTP free tier, etc.).",
+      "command": "python",
+      "args": [
+        "-m", "vaara.integrations.mcp_proxy",
+        "--upstream", "node",
+        "--upstream-arg", "/PATH_TO_YOUR/mcp-abap-abap-adt-api/dist/index.js",
+        "--db", "${HOME}/.vaara/sap_audit.db",
+        "--agent-id", "claude-code-sap-abap"
       ],
       "env": {
         "SAP_URL": "https://your-sap-server:44300",
@@ -22,12 +39,12 @@
     },
 
     "_alternative_btp_odata": {
-      "_comment": "If you use lemaiwo/btp-sap-odata-to-mcp-server instead, the same proxy pattern applies. Replace the upstream command with the one that server documents, and route env vars accordingly.",
+      "_comment": "lemaiwo/btp-sap-odata-to-mcp-server: clone and build per that repo's README, then point --upstream-arg at the built entry point.",
       "command": "python",
       "args": [
         "-m", "vaara.integrations.mcp_proxy",
         "--upstream", "node",
-        "--upstream-arg", "/path/to/btp-sap-odata-to-mcp-server/dist/index.js",
+        "--upstream-arg", "/PATH_TO_YOUR/btp-sap-odata-to-mcp-server/dist/index.js",
         "--db", "${HOME}/.vaara/sap_audit.db",
         "--agent-id", "claude-code-sap-odata"
       ]
