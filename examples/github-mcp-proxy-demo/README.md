@@ -27,7 +27,7 @@ Every `tools/call` request from the MCP client routes through Vaara before reach
 ## Prerequisites
 
 - Python 3.10+
-- Docker installed and running (the official GitHub MCP server ships as the OCI image `ghcr.io/github/github-mcp-server`)
+- The `github-mcp-server` binary on disk. Either build from source (`go install github.com/github/github-mcp-server/cmd/github-mcp-server@latest` produces a stdio-capable binary, no external runtime required) or use the OCI image `ghcr.io/github/github-mcp-server` if you already run Docker.
 - A [GitHub Personal Access Token](https://github.com/settings/personal-access-tokens/new) with the scopes you want the agent to be able to use (read-only is a sensible starting point, widen later as your trust grows)
 - Claude Code or any other MCP-capable client
 
@@ -41,18 +41,14 @@ pip install vaara
 
 ### 2. Replace your MCP server entry with the Vaara proxy
 
-Before. Claude Code config pointing directly at the GitHub MCP server:
+Before. Claude Code config pointing directly at the GitHub MCP server binary:
 
 ```json
 {
   "mcpServers": {
     "github": {
-      "command": "docker",
-      "args": [
-        "run", "-i", "--rm",
-        "-e", "GITHUB_PERSONAL_ACCESS_TOKEN",
-        "ghcr.io/github/github-mcp-server"
-      ],
+      "command": "/path/to/github-mcp-server",
+      "args": ["stdio"],
       "env": {
         "GITHUB_PERSONAL_ACCESS_TOKEN": "ghp_your_token_here"
       }
@@ -61,7 +57,7 @@ Before. Claude Code config pointing directly at the GitHub MCP server:
 }
 ```
 
-After. Claude Code config pointing at the Vaara proxy, which spawns the same GitHub MCP server as a subprocess:
+After. Claude Code config pointing at the Vaara proxy, which spawns the same GitHub MCP server binary as a subprocess:
 
 ```json
 {
@@ -70,13 +66,8 @@ After. Claude Code config pointing at the Vaara proxy, which spawns the same Git
       "command": "python",
       "args": [
         "-m", "vaara.integrations.mcp_proxy",
-        "--upstream", "docker",
-        "--upstream-arg", "run",
-        "--upstream-arg", "-i",
-        "--upstream-arg", "--rm",
-        "--upstream-arg", "-e",
-        "--upstream-arg", "GITHUB_PERSONAL_ACCESS_TOKEN",
-        "--upstream-arg", "ghcr.io/github/github-mcp-server",
+        "--upstream", "/path/to/github-mcp-server",
+        "--upstream-arg", "stdio",
         "--db", "/path/to/github_audit.db"
       ],
       "env": {
@@ -88,6 +79,8 @@ After. Claude Code config pointing at the Vaara proxy, which spawns the same Git
 ```
 
 The proxy inherits the environment, so the GitHub PAT flows through to the upstream MCP server unchanged. The upstream sees the same env it would see in the direct setup.
+
+If you run the upstream via Docker instead of a local binary, swap `--upstream /path/to/github-mcp-server --upstream-arg stdio` for `--upstream docker --upstream-arg run --upstream-arg -i --upstream-arg --rm --upstream-arg -e --upstream-arg GITHUB_PERSONAL_ACCESS_TOKEN --upstream-arg ghcr.io/github/github-mcp-server`. The proxy shape is the same. The only difference is whether Docker wraps the binary or not.
 
 A full example config lives at [`claude_code_config.example.json`](claude_code_config.example.json) in this directory.
 
@@ -149,10 +142,10 @@ The PDF output is the format a Notified Body or internal compliance auditor read
 
 ## Troubleshooting
 
-- **The proxy hangs on startup.** The upstream Docker container is probably failing its initialize handshake. Check the proxy's stderr (the upstream's stderr is forwarded through). Common cause: missing or invalid `GITHUB_PERSONAL_ACCESS_TOKEN`.
-- **`docker: command not found`.** The proxy spawns `docker run` as the upstream. Install Docker, or swap the upstream for the [self-built binary](https://github.com/github/github-mcp-server#build-from-source) and point `--upstream` at the binary path.
+- **The proxy hangs on startup.** The upstream is probably failing its initialize handshake. Check the proxy's stderr (the upstream's stderr is forwarded through). Common cause: missing or invalid `GITHUB_PERSONAL_ACCESS_TOKEN`.
+- **`github-mcp-server: command not found`.** Build it with `go install github.com/github/github-mcp-server/cmd/github-mcp-server@latest` and point `--upstream` at the resulting binary in `$(go env GOBIN)` or `$(go env GOPATH)/bin`.
 - **Every tool call is blocked.** Default fail-closed policy. Define a policy file scoped to the GitHub MCP tool catalog, or relax for read-only tools as a starting point.
-- **Rate limits surface as upstream errors.** GitHub rate limits hit the upstream container, not the proxy. The proxy records the failure in the audit chain and returns the upstream's error to the client.
+- **Rate limits surface as upstream errors.** GitHub rate limits hit the upstream, not the proxy. The proxy records the failure in the audit chain and returns the upstream's error to the client.
 
 ## The same pattern in front of any MCP server
 
