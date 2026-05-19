@@ -6,6 +6,40 @@ and this project follows [Semantic Versioning](https://semver.org/spec/v2.0.0.ht
 
 ## [Unreleased]
 
+## [0.21.0] - 2026-05-19
+
+**Theme: MCP-aware proxy.** Adds
+`vaara.integrations.mcp_proxy.VaaraMCPProxy`, a transparent MCP proxy
+that sits between an MCP client (Claude Code, Cursor, any MCP-capable
+host) and an upstream MCP server (SAP ADT MCP, SAP Graph API MCP, SAP
+Cloud ALM MCP, any community-built MCP server). Every `tools/call`
+request from the client routes through Vaara's interception pipeline
+before reaching the upstream. Allowed calls forward transparently and
+report the upstream outcome back to the scorer. Blocked calls return
+an MCP `isError: true` response with the block reason. Other MCP
+methods (initialize, tools/list, resources, notifications) forward
+unchanged.
+
+### Added
+- `src/vaara/integrations/mcp_proxy.py`: `VaaraMCPProxy` and CLI entry
+  point. Invoke as `python -m vaara.integrations.mcp_proxy --upstream
+  <cmd> [--upstream-arg ...]`.
+- `src/vaara/integrations/_mcp_upstream.py`: `UpstreamMCPClient`,
+  subprocess lifecycle plus JSON-RPC id demultiplexing on a background
+  reader thread. Internal module, not part of the public surface.
+- `tests/test_integrations_mcp_proxy.py`: six smoke tests covering
+  blocked tool calls, allowed forward, severity mapping, the
+  `_vaara_agent_id` strip, non-tools/call passthrough, and invalid
+  request handling.
+
+### Strategic frame
+The community SAP MCP servers shipped at SAP Sapphire 2026 plus the
+Anthropic-SAP partnership announcement put SAP ABAP / Graph / Cloud
+ALM behind Claude Code in enterprise developer workflows. None of the
+parties (SAP, Anthropic, the community MCP server authors) ships the
+runtime governance layer the EU AI Act high-risk obligations require
+for those tool calls. The proxy is that layer in OSS today.
+
 ## [0.20.0] - 2026-05-18
 
 **Theme: OSS guardrail adapters.** Adds four adapters that take findings
