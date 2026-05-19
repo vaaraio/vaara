@@ -146,6 +146,21 @@ The PDF output is the format a Notified Body or internal compliance auditor read
 - **Every tool call is blocked.** Default fail-closed policy. Define a policy file, or tune for your specific tool catalog.
 - **Audit DB grows quickly.** Each tool call writes 4 records. Use `vaara audit purge --before <date>` to prune old records (the chain integrity is preserved across pruning).
 
+## The same pattern in front of any MCP server
+
+The proxy is MCP-protocol-level, not SAP-specific. The three-step setup above works identically when the upstream MCP server is something else. Ecosystems where this pattern fits today:
+
+- **GitHub MCP** — Claude Code uses this natively. Vaara in front audits every repo read, file edit, PR creation, and issue update the agent triggers against your code.
+- **Microsoft Graph MCP** — Email, calendar, OneDrive, Teams. Tool calls into the M365 surface frequently touch GDPR territory.
+- **Salesforce MCP** — CRM. HR / recruiting / scoring use cases fall under AI Act Annex III high-risk.
+- **ServiceNow MCP** — ITSM, change management, incident handling. Touches operational safety obligations.
+- **AWS / GCP / Azure cloud MCP servers** — infrastructure operations. Production change auditability.
+- **Databricks MCP** — data platform. Tool calls that read or transform regulated data.
+
+Each ecosystem has its own runtime governance and audit obligation. Vaara is the protocol-neutral substrate that captures the evidence regardless of which upstream MCP server the agent ends up calling.
+
+Contributions adding example configs for any of these (or any other community MCP server) are welcome. The expected shape is a sibling directory under `examples/` following the same three-step recipe as this one.
+
 ## License notes
 
 Vaara is Apache-2.0. The community SAP MCP servers have their own licenses (mario-andreschak's is MIT, SAP's official servers vary). Check the upstream server's LICENSE file. The Vaara proxy adds no licensing constraint on top of the upstream.
