@@ -1,0 +1,36 @@
+{
+  "_comment": "Example Claude Code MCP config showing the Vaara proxy in front of a community SAP ADT MCP server. Replace SAP_URL/USER/PASSWORD/CLIENT with your own. Copy the relevant block into your Claude Code mcp config.",
+
+  "mcpServers": {
+    "sap-adt-via-vaara": {
+      "command": "python",
+      "args": [
+        "-m", "vaara.integrations.mcp_proxy",
+        "--upstream", "npx",
+        "--upstream-arg", "-y",
+        "--upstream-arg", "@mario-andreschak/mcp-abap-abap-adt-api",
+        "--db", "${HOME}/.vaara/sap_audit.db",
+        "--agent-id", "claude-code-sap"
+      ],
+      "env": {
+        "SAP_URL": "https://your-sap-server:44300",
+        "SAP_USER": "YOUR_SAP_USER",
+        "SAP_PASSWORD": "YOUR_SAP_PASSWORD",
+        "SAP_CLIENT": "100",
+        "SAP_LANGUAGE": "EN"
+      }
+    },
+
+    "_alternative_btp_odata": {
+      "_comment": "If you use lemaiwo/btp-sap-odata-to-mcp-server instead, the same proxy pattern applies. Replace the upstream command with the one that server documents, and route env vars accordingly.",
+      "command": "python",
+      "args": [
+        "-m", "vaara.integrations.mcp_proxy",
+        "--upstream", "node",
+        "--upstream-arg", "/path/to/btp-sap-odata-to-mcp-server/dist/index.js",
+        "--db", "${HOME}/.vaara/sap_audit.db",
+        "--agent-id", "claude-code-sap-odata"
+      ]
+    }
+  }
+}
