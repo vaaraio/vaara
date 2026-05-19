@@ -103,7 +103,15 @@ class UpstreamMCPClient:
             self._write(payload)
             if not pending.event.wait(timeout=timeout):
                 raise ProxyError(f"Upstream MCP server did not respond within {timeout}s")
-            assert pending.response is not None
+            # event was set but response stays None when the reader thread
+            # exited (upstream closed stdout) and woke us as a shutdown signal.
+            # An assert would either raise AssertionError (escapes the caller's
+            # ProxyError handler) or be optimized out under -O (return None,
+            # silently breaking the contract). Raise ProxyError explicitly.
+            if pending.response is None:
+                raise ProxyError("Upstream MCP server closed before responding")
+            if not isinstance(pending.response, dict):
+                raise ProxyError("Upstream MCP server returned non-object JSON-RPC")
             return pending.response
         finally:
             with self._lock:

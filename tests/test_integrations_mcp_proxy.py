@@ -135,3 +135,35 @@ def test_invalid_request_returns_minus_32600(proxy):
     p, _ = proxy
     response = p._handle_request("not a dict")
     assert response["error"]["code"] == -32600
+
+
+def test_upstream_request_raises_proxy_error_when_reader_exits_without_response(monkeypatch):
+    """Regression: reader-thread exit during request must raise ProxyError, not AssertionError.
+
+    The reader sets pending.event on exit (so waiters do not hang) but does
+    not populate pending.response. Without an explicit ProxyError the
+    request() path's assertion either raises AssertionError (escapes the
+    caller's ProxyError handler) or is optimized out under python -O
+    (returns None silently). Flagged by CodeRabbit on PR #100.
+    """
+    from vaara.integrations import _mcp_upstream as up
+
+    fake_proc = MagicMock()
+    fake_proc.stdin = MagicMock()
+    fake_proc.stdout = None
+    monkeypatch.setattr(up.subprocess, "Popen", lambda *a, **k: fake_proc)
+
+    client = up.UpstreamMCPClient(command=["dummy"])
+
+    real_request_cls = up._UpstreamRequest
+
+    def pre_signaled(*args, **kwargs):
+        r = real_request_cls(*args, **kwargs)
+        r.event.set()  # waiter unblocks immediately with response still None
+        return r
+
+    monkeypatch.setattr(up, "_UpstreamRequest", pre_signaled)
+
+    with pytest.raises(up.ProxyError, match="closed before responding"):
+        client.request({"jsonrpc": "2.0", "id": 1, "method": "ping"})
+    client.close()
