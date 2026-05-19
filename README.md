@@ -18,6 +18,8 @@ Vaara is the runtime evidence layer for AI Act compliance. Open source, no SaaS,
 
 Vaara intercepts agent tool calls, scores each one with a conformal risk interval, and writes a hash-chained audit record. Online learning across five expert signals via Multiplicative Weight Update. Distribution-free conformal coverage on the score.
 
+In practical terms: every agent action gets a confidence-bounded risk score with mathematical coverage guarantees, the scorer learns from its misses, and the audit record is tamper-evident. An external auditor can verify these properties without trusting your stack.
+
 For broader agent governance (zero-trust identity, capability-based access control, multi-language SDKs) see Microsoft's [Agent Governance Toolkit](https://github.com/microsoft/agent-governance-toolkit).
 
 ## Install
@@ -71,6 +73,8 @@ else:
 The same data renders as a styled PDF for Notified Bodies (`vaara compliance report --format pdf`, requires `pip install 'vaara[pdf]'`), a static HTML dashboard (`vaara compliance dashboard`), or a Sigstore-signed regulator-handoff envelope (`vaara trail export`, optional ML-DSA-65 / FIPS 204 post-quantum signer via `pip install 'vaara[pq]'`).
 
 ## Numbers
+
+Concrete evidence the system performs at levels relevant to high-risk-use deployments. Each figure is reproducible from the public corpus or the bench harness in `bench/`.
 
 - 5,955-entry adversarial corpus (3,422 attack across 8 categories, 2,533 benign)
 - 97.1% attack recall on held-out distribution-shift split, threshold 0.55
@@ -168,6 +172,8 @@ Worked examples with real upstream servers:
 The proxy is MCP-protocol-level, not vendor-specific. The same three-step recipe applies to any stdio-capable MCP server (Microsoft Graph MCP, Salesforce MCP, ServiceNow MCP, cloud-provider MCP servers, Databricks MCP, and so on).
 
 ## OVERT 1.0 attestation
+
+OVERT 1.0 lets an external party (regulator, auditor, customer) verify that a runtime decision actually happened the way you say it did, without trusting your stack or reading your code. Vaara emits OVERT envelopes alongside its audit records.
 
 Vaara implements the OVERT 1.0 ([overt.is](https://overt.is/)) Protocol Profile 1.0 Base Envelope. OVERT 1.0 is an open standard for runtime trust in AI systems, authored by Glacis Technologies and published 25 March 2026. Closed-schema 9-field structure at AAL-3 Phase 2 (Provisional Receipt), canonical CBOR (RFC 8949), Ed25519 signatures, HMAC-SHA256 keyed commitments, IEEE-754 float rejection.
 
