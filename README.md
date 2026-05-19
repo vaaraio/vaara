@@ -112,6 +112,16 @@ Four adapters route findings from NVIDIA NeMo Guardrails, Guardrails AI, LLM Gua
 
 Each adapter returns a `ContentSafetyFinding` the deployer routes into `pipeline.intercept(context=finding.to_audit_context())`. OSS SDKs are optional extras: `pip install 'vaara[nemo-guardrails]'`, `pip install 'vaara[guardrails-ai]'`, `pip install 'vaara[llm-guard]'`, `pip install 'vaara[rebuff]'`. The 41 new mapping rows extend the same table at `src/vaara/integrations/_content_safety_articles.py`. Article-level rationale is in [COMPLIANCE.md](COMPLIANCE.md#oss-guardrail-adapter-pattern).
 
+### MCP proxy (Vaara as a transparent governance layer)
+
+`vaara.integrations.mcp_proxy.VaaraMCPProxy` sits between an MCP client (Claude Code, Cursor, any MCP-capable host) and an upstream MCP server (SAP ADT MCP, SAP Graph API MCP, SAP Cloud ALM MCP, any community-built MCP server). Every `tools/call` request from the client routes through Vaara's interception pipeline before reaching the upstream. Allowed calls forward transparently and report the upstream outcome back to the scorer. Blocked calls return an MCP `isError: true` response with the block reason. Other MCP methods (initialize, tools/list, resources, notifications) forward unchanged.
+
+```bash
+python -m vaara.integrations.mcp_proxy --upstream npx --upstream-arg @sap/adt-mcp-server
+```
+
+Point your MCP client at the proxy instead of the upstream. The audit chain captures every tool call without changing client or upstream behavior. Distinct from `mcp_server`, which exposes Vaara itself as an MCP server for agents that consult Vaara as a tool.
+
 ## HTTP API
 
 The same scorer and audit trail are available over HTTP for non-Python agents and for control planes that prefer a network boundary. Install with the `server` extra:
