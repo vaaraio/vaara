@@ -28,12 +28,12 @@ Every `tools/call` request from Claude Code routes through Vaara before reaching
 ## Prerequisites
 
 - Python 3.10+
-- An existing SAP MCP server. Examples of real community servers:
-  - [`mario-andreschak/mcp-abap-abap-adt-api`](https://github.com/mario-andreschak/mcp-abap-abap-adt-api) — wraps ABAP ADT API
-  - [`SAP/mdk-mcp-server`](https://github.com/SAP/mdk-mcp-server) — official SAP MCP server for Mobile Development Kit
-  - [`lemaiwo/btp-sap-odata-to-mcp-server`](https://github.com/lemaiwo/btp-sap-odata-to-mcp-server) — SAP OData via MCP
-  - See [`marianfoo/sap-ai-mcp-servers`](https://github.com/marianfoo/sap-ai-mcp-servers) for the curated index.
-- A SAP system the upstream MCP server can talk to (BTP free tier, S/4HANA dev, NetWeaver ABAP Developer Edition, etc.)
+- An existing SAP MCP server. Real community servers with their actual install paths:
+  - [`SAP/mdk-mcp-server`](https://github.com/SAP/mdk-mcp-server). Official SAP MCP server for Mobile Development Kit. Published on npm as [`@sap/mdk-mcp-server`](https://www.npmjs.com/package/@sap/mdk-mcp-server). Runnable via `npx -y @sap/mdk-mcp-server --schema-version 26.3`. No SAP-system credentials needed (uses your AI provider's API key, e.g. SAP AI Core via your IDE config).
+  - [`mario-andreschak/mcp-abap-abap-adt-api`](https://github.com/mario-andreschak/mcp-abap-abap-adt-api). Wraps the ABAP ADT API. Not published on npm. Install by `git clone`, then `npm install && npm run build`, then run with `node /path/to/dist/index.js`. Needs SAP system credentials (`SAP_URL`, `SAP_USER`, `SAP_PASSWORD`, `SAP_CLIENT`) for a NetWeaver ABAP Developer Edition, S/4HANA dev, or BTP backend.
+  - [`lemaiwo/btp-sap-odata-to-mcp-server`](https://github.com/lemaiwo/btp-sap-odata-to-mcp-server). SAP OData via MCP. Clone + build, same shape as Mario's.
+  - See [`marianfoo/sap-ai-mcp-servers`](https://github.com/marianfoo/sap-ai-mcp-servers) for the curated index of community SAP MCP servers.
+- A SAP system the upstream MCP server can talk to, where the chosen upstream needs one. MDK uses your AI provider config rather than a SAP backend directly. The ABAP and OData servers need SAP backend creds.
 - Claude Code or any other MCP-capable client
 
 ## Three-step setup
@@ -46,51 +46,43 @@ pip install vaara
 
 ### 2. Replace your Claude Code MCP server entry with the Vaara proxy
 
-Before — Claude Code config pointing directly at the SAP MCP server:
+Before. Claude Code config pointing directly at the SAP MDK MCP server:
 
 ```json
 {
   "mcpServers": {
-    "sap-adt": {
+    "sap-mdk": {
       "command": "npx",
-      "args": ["-y", "@mario-andreschak/mcp-abap-abap-adt-api"],
-      "env": {
-        "SAP_URL": "https://your-sap-server:44300",
-        "SAP_USER": "YOUR_USER",
-        "SAP_PASSWORD": "YOUR_PASSWORD",
-        "SAP_CLIENT": "100"
-      }
+      "args": ["-y", "@sap/mdk-mcp-server", "--schema-version", "26.3"]
     }
   }
 }
 ```
 
-After — Claude Code config pointing at the Vaara proxy, which spawns the same SAP MCP server as a subprocess:
+After. Claude Code config pointing at the Vaara proxy, which spawns the same SAP MDK MCP server as a subprocess:
 
 ```json
 {
   "mcpServers": {
-    "sap-adt-via-vaara": {
+    "sap-mdk-via-vaara": {
       "command": "python",
       "args": [
         "-m", "vaara.integrations.mcp_proxy",
         "--upstream", "npx",
         "--upstream-arg", "-y",
-        "--upstream-arg", "@mario-andreschak/mcp-abap-abap-adt-api",
+        "--upstream-arg", "@sap/mdk-mcp-server",
+        "--upstream-arg", "--schema-version",
+        "--upstream-arg", "26.3",
         "--db", "/path/to/vaara_audit.db"
-      ],
-      "env": {
-        "SAP_URL": "https://your-sap-server:44300",
-        "SAP_USER": "YOUR_USER",
-        "SAP_PASSWORD": "YOUR_PASSWORD",
-        "SAP_CLIENT": "100"
-      }
+      ]
     }
   }
 }
 ```
 
-The proxy inherits the environment, so SAP credentials flow through to the upstream MCP server unchanged. The upstream sees the same env it would see in the direct setup.
+For the clone+build servers (`mario-andreschak/mcp-abap-abap-adt-api`, `lemaiwo/btp-sap-odata-to-mcp-server`), the shape is the same but the upstream becomes `node` with the path to the built `dist/index.js`. See [`claude_code_config.example.json`](claude_code_config.example.json) for the `_alternative_abap_adt` and `_alternative_btp_odata` blocks with their respective env vars.
+
+The proxy inherits the environment, so any upstream credentials in `env` flow through unchanged. The upstream sees the same env it would see in the direct setup.
 
 A full example config lives at [`claude_code_config.example.json`](claude_code_config.example.json) in this directory.
 
