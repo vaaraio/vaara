@@ -84,10 +84,10 @@ The same data renders as a styled PDF for Notified Bodies (`vaara compliance rep
 
 Native adapters in `src/vaara/integrations/` route the major Python agent frameworks through Vaara's pipeline. Each adapter intercepts tool calls via the framework's own callback or hook surface, scores them, gates them, and emits the same audit events as a direct `pipeline.intercept()` call. Frameworks are not hard dependencies (lazy import, duck typing), so the base `pip install vaara` keeps a clean dependency tree.
 
-- **LangChain** — `VaaraCallbackHandler` slots into `config={"callbacks": [...]}` and gates every tool invocation automatically. `vaara_wrap_tool(tool, pipeline)` is the per-tool variant for fine-grained control.
-- **CrewAI** — `VaaraCrewGovernance` wraps a crew so every agent action passes through the same scoring and audit chain.
-- **OpenAI Agents SDK** — `VaaraToolGuardrail` plus `vaara_wrap_function` wrap function-tool calls before they execute. Compatible with the Responses API and the Agents-SDK tracing model.
-- **MCP server** — `vaara.integrations.mcp_server` exposes scoring, audit emission, and policy reload as MCP tools so any MCP-compatible agent can route through Vaara without a custom client.
+- **LangChain.** `VaaraCallbackHandler` slots into `config={"callbacks": [...]}` and gates every tool invocation automatically. `vaara_wrap_tool(tool, pipeline)` is the per-tool variant for fine-grained control.
+- **CrewAI.** `VaaraCrewGovernance` wraps a crew so every agent action passes through the same scoring and audit chain.
+- **OpenAI Agents SDK.** `VaaraToolGuardrail` plus `vaara_wrap_function` wrap function-tool calls before they execute. Compatible with the Responses API and the Agents-SDK tracing model.
+- **MCP server.** `vaara.integrations.mcp_server` exposes scoring, audit emission, and policy reload as MCP tools so any MCP-compatible agent can route through Vaara without a custom client. (For Vaara *in front of* an upstream MCP server, see the [MCP proxy](#mcp-proxy-vaara-as-a-transparent-governance-layer) section below.)
 
 All four framework adapters share the same in-process pipeline, so audit records hash-chain together regardless of which framework the action came through. Each adapter has its own docstring with the two integration patterns it supports.
 
@@ -95,9 +95,9 @@ All four framework adapters share the same in-process pipeline, so audit records
 
 Three adapters route findings from AWS Bedrock Guardrails, Azure AI Content Safety, and GCP Model Armor into Vaara's audit trail and OVERT envelope with EU AI Act article tags. The cloud filter runs in the deployer's environment as an upstream signal. Vaara records the verdict, normalises 27 provider categories onto a shared vocabulary, and tags each finding against Art. 5, 10, 13, 15, 53, and the CSAM-specific obligation from the Digital Omnibus political agreement of May 2026.
 
-- **AWS Bedrock Guardrails** — `vaara.integrations.bedrock_guardrails.BedrockGuardrailsAdapter`. Wraps `ApplyGuardrail` across the five Bedrock policy buckets.
-- **Azure AI Content Safety** — `vaara.integrations.azure_content_safety.AzureContentSafetyAdapter`. Wraps `analyze_text`, Prompt Shields, Protected Material, and Groundedness Detection.
-- **GCP Model Armor** — `vaara.integrations.gcp_model_armor.GcpModelArmorAdapter`. Wraps `sanitize_user_prompt` and `sanitize_model_response`.
+- **AWS Bedrock Guardrails.** `vaara.integrations.bedrock_guardrails.BedrockGuardrailsAdapter`. Wraps `ApplyGuardrail` across the five Bedrock policy buckets.
+- **Azure AI Content Safety.** `vaara.integrations.azure_content_safety.AzureContentSafetyAdapter`. Wraps `analyze_text`, Prompt Shields, Protected Material, and Groundedness Detection.
+- **GCP Model Armor.** `vaara.integrations.gcp_model_armor.GcpModelArmorAdapter`. Wraps `sanitize_user_prompt` and `sanitize_model_response`.
 
 Each adapter returns a `ContentSafetyFinding` the deployer routes into `pipeline.intercept(context=finding.to_audit_context())`. Cloud SDKs are optional extras: `pip install 'vaara[bedrock]'`, `pip install 'vaara[azure-content-safety]'`, `pip install 'vaara[gcp-model-armor]'`. The category-to-article mapping table lives in `src/vaara/integrations/_content_safety_articles.py` and is the value the adapters wrap. Article-level rationale is in [COMPLIANCE.md](COMPLIANCE.md#cloud-guardrail-adapter-pattern).
 
@@ -181,7 +181,7 @@ from vaara.attestation.overt import emit_base_envelope, make_request_commitment,
 envelope = emit_base_envelope(
     signing_key=key,
     request_commitment=make_request_commitment(payload, operator_key=op_key),
-    encoder_binary_identity=encoder_binary_identity(arbiter_version="vaara/0.15.0", policy_hash=ph),
+    encoder_binary_identity=encoder_binary_identity(arbiter_version="vaara/0.21.0", policy_hash=ph),
     non_content_metadata={"action_class": "tx.transfer", "decision": "escalate"},
     monotonic_counter=42,
     arbiter_instance_identifier=uuid_bytes,
