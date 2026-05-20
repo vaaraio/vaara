@@ -6,6 +6,54 @@ and this project follows [Semantic Versioning](https://semver.org/spec/v2.0.0.ht
 
 ## [Unreleased]
 
+## [0.24.0] - 2026-05-20
+
+**Theme: MCP proxy emits OVERT 1.0 Base Envelopes per interaction.** With
+the v0.21-v0.23 surface coverage in place across tools, resources, and
+prompts, the next step is making each interaction independently verifiable
+by a regulator or auditor. The MCP proxy can now sign every governed
+interaction as an OVERT 1.0 Protocol Profile 1.0 Base Envelope and write
+it to disk in canonical CBOR, ready for `vaara overt verify` or any other
+conformant OVERT verifier. The OVERT substrate (emitter, verifier, schema,
+CLI) shipped in earlier releases. This release wires the emitter into the
+MCP proxy as the first concrete production-shape OSS OVERT 1.0 integration.
+
+### Added
+- `vaara-mcp-proxy` learns three new flags: `--overt-signing-key PATH`
+  (Ed25519 PEM private key), `--overt-operator-key PATH` (raw bytes for
+  the HMAC request_commitment, minimum 16 bytes; also accepts
+  `VAARA_OVERT_OPERATOR_KEY_HEX` from the environment), and
+  `--overt-receipts-dir DIR` (where canonical-CBOR envelopes land). All
+  three are off unless set. When set, every allowed and every
+  perimeter-blocked `tools/call`, `resources/read`, and `prompts/get`
+  produces one Base Envelope on disk.
+- `vaara.integrations._mcp_overt`: internal `OVERTReceiptEmitter` with
+  per-process monotonic counter under a lock, per-process
+  `arbiter_instance_identifier`, `encoder_binary_identity` derived from
+  the Vaara version plus SHA-256 of the canonical perimeter config
+  (allow/deny lists across all three primitives), and a pinned
+  `pubkey.bin` written into the receipts directory on emitter start.
+- Receipt layout: `DIR/{nanosecond_timestamp}-{counter:010d}.cbor` plus
+  `DIR/pubkey.bin` (32 raw Ed25519 public-key bytes).
+- `non_content_metadata` carries structural fields only: action class
+  (`mcp.tool.call` / `mcp.resource.read` / `mcp.prompt.get`),
+  tool/resource/prompt identifier, decision, reason, agent_id, action_id.
+  Request content never leaves the operator environment. Only its
+  HMAC-SHA256 commitment crosses the trust boundary, per OVERT Annex B.4.
+- Tests: `tests/test_integrations_mcp_proxy_overt.py`. Coverage includes
+  emitter-disabled-by-default, one envelope per call site (allowed and
+  filtered), monotonic counter strictly increases, envelopes verify
+  under the pinned public key via `verify_base_envelope`, and the CLI
+  rejects misconfigurations.
+
+### Unchanged
+- Pipeline, audit chain, perimeter allow/deny semantics, MCP wire format.
+  When `--overt-signing-key` is absent, proxy behavior is byte-identical
+  to v0.23.1.
+- OVERT envelope schema (closed 9-field Annex B.6) and `vaara overt
+  verify` semantics. The verifier reads canonical-CBOR files one at a
+  time, as it did since v0.17.0.
+
 ## [0.23.1] - 2026-05-20
 
 **Theme: CI fix.** The v0.23.0 release workflow flipped `npm publish` to

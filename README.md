@@ -168,6 +168,30 @@ Point your MCP client at the proxy instead of the upstream. The audit chain capt
 
 **Resources and prompts coverage** (since v0.23.0). The same perimeter shape extends to MCP's other two primitives. `--allow-resource URI` / `--deny-resource URI` gate `resources/list` and `resources/read`. `--allow-prompt NAME` / `--deny-prompt NAME` gate `prompts/list` and `prompts/get`. Every allowed `resources/read` and `prompts/get` writes a request+decision audit pair to the hash chain so a regulator can reconstruct exactly which resources the agent read and which prompts it retrieved. Resource reads and prompt gets are read-oriented MCP surfaces. They do not run through the risk scorer. The operator perimeter is the gate, and the audit chain captures the evidence.
 
+**OVERT 1.0 envelopes per interaction** (since v0.24.0). Off by default. When you pass `--overt-signing-key KEY.pem`, `--overt-operator-key OPKEY.bin`, and `--overt-receipts-dir DIR/`, the proxy writes one OVERT 1.0 Protocol Profile 1.0 Base Envelope (canonical CBOR, Ed25519, closed 9-field schema) per governed interaction into `DIR/{nanosecond_timestamp}-{counter:010d}.cbor`. Covers all four states: allowed `tools/call`, blocked `tools/call`, perimeter-filtered call, and perimeter-filtered `resources/read` / `prompts/get`. The arbiter public key is pinned alongside as `pubkey.bin`. Each envelope verifies offline under `vaara overt verify` against any conformant verifier. Three-step recipe:
+
+```bash
+# 1. Generate an Ed25519 signing key (evaluation/demo; for production use a KMS or HSM, see docs/signing-keys.md).
+vaara keygen --dev --out signing.pem
+
+# 2. Mint an operator HMAC key (>= 16 raw bytes). Used for request_commitment per OVERT Annex B.4.
+head -c 32 /dev/urandom > op.key
+
+# 3. Run the proxy with OVERT emission turned on.
+python -m vaara.integrations.mcp_proxy \
+  --upstream npx --upstream-arg -y --upstream-arg @sap/mdk-mcp-server \
+  --overt-signing-key signing.pem \
+  --overt-operator-key op.key \
+  --overt-receipts-dir ./overt_receipts
+
+# Each interaction now produces a Provisional Receipt:
+vaara overt verify ./overt_receipts/1779309684224332669-0000000001.cbor \
+  --pubkey-file ./overt_receipts/pubkey.bin
+# → {"valid": true, "monotonic_counter": 1, ...}
+```
+
+`non_content_metadata` carries structural fields only (action class, tool/resource/prompt identifier, decision, reason, agent_id, action_id). The request content itself never leaves the operator environment. Only its HMAC-SHA256 commitment crosses the trust boundary. The monotonic counter advances strictly across the whole proxy process so gaps are detectable. Emission failure is logged and swallowed: attestation problems must not block legitimate upstream traffic.
+
 Worked examples with real upstream servers:
 
 - [`examples/github-mcp-proxy-demo/`](examples/github-mcp-proxy-demo/). Vaara in front of [`github/github-mcp-server`](https://github.com/github/github-mcp-server) (GitHub's official MCP server, MIT-licensed). End-to-end verified: real subprocess, 42 tools advertised, hash-chained audit trail recorded.
@@ -191,7 +215,7 @@ from vaara.attestation.overt import emit_base_envelope, make_request_commitment,
 envelope = emit_base_envelope(
     signing_key=key,
     request_commitment=make_request_commitment(payload, operator_key=op_key),
-    encoder_binary_identity=encoder_binary_identity(arbiter_version="vaara/0.23.0", policy_hash=ph),
+    encoder_binary_identity=encoder_binary_identity(arbiter_version="vaara/0.24.0", policy_hash=ph),
     non_content_metadata={"action_class": "tx.transfer", "decision": "escalate"},
     monotonic_counter=42,
     arbiter_instance_identifier=uuid_bytes,
