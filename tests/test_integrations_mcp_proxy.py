@@ -250,6 +250,203 @@ def test_tools_call_inside_allowlist_still_runs_pipeline(monkeypatch):
     p._upstream.request.assert_called_once_with(request)
 
 
+def test_resources_list_denylist_drops_named_uris(monkeypatch):
+    p, _ = _make_proxy(
+        monkeypatch,
+        resource_denylist={"file:///etc/secret", "file:///etc/shadow"},
+    )
+    p._upstream.request.return_value = {
+        "jsonrpc": "2.0", "id": 20,
+        "result": {"resources": [
+            {"uri": "file:///etc/secret", "name": "secret"},
+            {"uri": "file:///etc/hosts", "name": "hosts"},
+            {"uri": "file:///etc/shadow", "name": "shadow"},
+            {"uri": "file:///var/log/app.log", "name": "applog"},
+        ]},
+    }
+    response = p._handle_request({"jsonrpc": "2.0", "id": 20, "method": "resources/list"})
+    uris = [r["uri"] for r in response["result"]["resources"]]
+    assert uris == ["file:///etc/hosts", "file:///var/log/app.log"]
+
+
+def test_resources_list_allowlist_restricts_to_listed_uris(monkeypatch):
+    p, _ = _make_proxy(
+        monkeypatch,
+        resource_allowlist={"file:///etc/hosts"},
+    )
+    p._upstream.request.return_value = {
+        "jsonrpc": "2.0", "id": 21,
+        "result": {"resources": [
+            {"uri": "file:///etc/secret"},
+            {"uri": "file:///etc/hosts"},
+        ]},
+    }
+    response = p._handle_request({"jsonrpc": "2.0", "id": 21, "method": "resources/list"})
+    uris = [r["uri"] for r in response["result"]["resources"]]
+    assert uris == ["file:///etc/hosts"]
+
+
+def test_resources_list_no_policy_returns_upstream_response_unchanged(monkeypatch):
+    p, _ = _make_proxy(monkeypatch)
+    upstream_response = {
+        "jsonrpc": "2.0", "id": 22,
+        "result": {"resources": [{"uri": "file:///a"}, {"uri": "file:///b"}]},
+    }
+    p._upstream.request.return_value = upstream_response
+    response = p._handle_request({"jsonrpc": "2.0", "id": 22, "method": "resources/list"})
+    assert response is upstream_response
+
+
+def test_resources_read_on_denylisted_uri_returns_jsonrpc_error(monkeypatch):
+    p, _ = _make_proxy(monkeypatch, resource_denylist={"file:///etc/secret"})
+    request = {
+        "jsonrpc": "2.0", "id": 23, "method": "resources/read",
+        "params": {"uri": "file:///etc/secret"},
+    }
+    response = p._handle_request(request)
+    assert response["jsonrpc"] == "2.0"
+    assert response["id"] == 23
+    assert response["error"]["code"] == -32000
+    data = response["error"]["data"]
+    assert data["vaara_blocked"] is True
+    assert data["decision"] == "FILTERED"
+    assert data["uri"] == "file:///etc/secret"
+    p._upstream.request.assert_not_called()
+
+
+def test_resources_read_outside_allowlist_returns_jsonrpc_error(monkeypatch):
+    p, _ = _make_proxy(monkeypatch, resource_allowlist={"file:///etc/hosts"})
+    request = {
+        "jsonrpc": "2.0", "id": 24, "method": "resources/read",
+        "params": {"uri": "file:///etc/secret"},
+    }
+    response = p._handle_request(request)
+    assert response["error"]["code"] == -32000
+    assert response["error"]["data"]["decision"] == "FILTERED"
+    p._upstream.request.assert_not_called()
+
+
+def test_resources_read_within_perimeter_audits_and_forwards(monkeypatch):
+    p, pipeline = _make_proxy(monkeypatch, resource_allowlist={"file:///etc/hosts"})
+    upstream_response = {
+        "jsonrpc": "2.0", "id": 25,
+        "result": {"contents": [{"uri": "file:///etc/hosts", "text": "127.0.0.1 localhost"}]},
+    }
+    p._upstream.request.return_value = upstream_response
+    request = {
+        "jsonrpc": "2.0", "id": 25, "method": "resources/read",
+        "params": {"uri": "file:///etc/hosts"},
+    }
+    response = p._handle_request(request)
+    assert response is upstream_response
+    # Risk scorer must NOT be invoked for resource reads (read-oriented surface).
+    pipeline.intercept.assert_not_called()
+    pipeline.report_outcome.assert_not_called()
+    # Audit pair must be written via the trail directly.
+    pipeline.trail.record_action_requested.assert_called_once()
+    pipeline.trail.record_decision.assert_called_once()
+    decision_kwargs = pipeline.trail.record_decision.call_args.kwargs
+    assert decision_kwargs["decision"] == "allow"
+    assert decision_kwargs["tool_name"] == "mcp.resource.read"
+
+
+def test_prompts_list_denylist_drops_named_prompts(monkeypatch):
+    p, _ = _make_proxy(monkeypatch, prompt_denylist={"jailbreak_template"})
+    p._upstream.request.return_value = {
+        "jsonrpc": "2.0", "id": 26,
+        "result": {"prompts": [
+            {"name": "summarize"},
+            {"name": "jailbreak_template"},
+            {"name": "translate"},
+        ]},
+    }
+    response = p._handle_request({"jsonrpc": "2.0", "id": 26, "method": "prompts/list"})
+    names = [pr["name"] for pr in response["result"]["prompts"]]
+    assert names == ["summarize", "translate"]
+
+
+def test_prompts_list_allowlist_restricts_to_listed_prompts(monkeypatch):
+    p, _ = _make_proxy(monkeypatch, prompt_allowlist={"summarize"})
+    p._upstream.request.return_value = {
+        "jsonrpc": "2.0", "id": 27,
+        "result": {"prompts": [{"name": "summarize"}, {"name": "translate"}]},
+    }
+    response = p._handle_request({"jsonrpc": "2.0", "id": 27, "method": "prompts/list"})
+    names = [pr["name"] for pr in response["result"]["prompts"]]
+    assert names == ["summarize"]
+
+
+def test_prompts_get_on_denylisted_name_returns_jsonrpc_error(monkeypatch):
+    p, _ = _make_proxy(monkeypatch, prompt_denylist={"jailbreak_template"})
+    request = {
+        "jsonrpc": "2.0", "id": 28, "method": "prompts/get",
+        "params": {"name": "jailbreak_template", "arguments": {}},
+    }
+    response = p._handle_request(request)
+    assert response["error"]["code"] == -32000
+    data = response["error"]["data"]
+    assert data["decision"] == "FILTERED"
+    assert data["prompt"] == "jailbreak_template"
+    p._upstream.request.assert_not_called()
+
+
+def test_prompts_get_outside_allowlist_returns_jsonrpc_error(monkeypatch):
+    p, _ = _make_proxy(monkeypatch, prompt_allowlist={"summarize"})
+    request = {
+        "jsonrpc": "2.0", "id": 29, "method": "prompts/get",
+        "params": {"name": "translate", "arguments": {"text": "hi"}},
+    }
+    response = p._handle_request(request)
+    assert response["error"]["code"] == -32000
+    p._upstream.request.assert_not_called()
+
+
+def test_prompts_get_within_perimeter_audits_and_forwards(monkeypatch):
+    p, pipeline = _make_proxy(monkeypatch, prompt_allowlist={"summarize"})
+    upstream_response = {
+        "jsonrpc": "2.0", "id": 30,
+        "result": {"messages": [{"role": "user", "content": {"type": "text", "text": "..."}}]},
+    }
+    p._upstream.request.return_value = upstream_response
+    request = {
+        "jsonrpc": "2.0", "id": 30, "method": "prompts/get",
+        "params": {"name": "summarize", "arguments": {"input": "hello world"}},
+    }
+    response = p._handle_request(request)
+    assert response is upstream_response
+    pipeline.intercept.assert_not_called()
+    pipeline.trail.record_action_requested.assert_called_once()
+    pipeline.trail.record_decision.assert_called_once()
+    decision_kwargs = pipeline.trail.record_decision.call_args.kwargs
+    assert decision_kwargs["decision"] == "allow"
+    assert decision_kwargs["tool_name"] == "mcp.prompt.get"
+
+
+def test_is_filtered_treats_non_string_names_as_filtered():
+    """Defensive contract: if upstream returns a non-string in the name field
+    (a misbehaving server returning a list, dict, None, or int), the perimeter
+    must deny rather than crash on hash. Governance default for ambiguous
+    input is deny. Flagged by CodeRabbit on PR #114.
+    """
+    from vaara.integrations.mcp_proxy import VaaraMCPProxy
+    assert VaaraMCPProxy._is_filtered(None, None, set()) is True
+    assert VaaraMCPProxy._is_filtered(["tool"], None, set()) is True
+    assert VaaraMCPProxy._is_filtered({"name": "tool"}, None, set()) is True
+    assert VaaraMCPProxy._is_filtered(42, None, set()) is True
+    assert VaaraMCPProxy._is_filtered("tool", None, set()) is False
+
+
+def test_uninterpreted_method_still_forwards_verbatim(monkeypatch):
+    """Non-governed MCP methods (e.g. completion/complete, ping) pass through unchanged."""
+    p, pipeline = _make_proxy(monkeypatch)
+    upstream_response = {"jsonrpc": "2.0", "id": 31, "result": {}}
+    p._upstream.request.return_value = upstream_response
+    request = {"jsonrpc": "2.0", "id": 31, "method": "completion/complete"}
+    response = p._handle_request(request)
+    assert response is upstream_response
+    pipeline.intercept.assert_not_called()
+
+
 def test_upstream_request_raises_proxy_error_when_reader_exits_without_response(monkeypatch):
     """Regression: reader-thread exit during request must raise ProxyError, not AssertionError.
 

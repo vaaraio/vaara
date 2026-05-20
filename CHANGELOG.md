@@ -6,6 +6,48 @@ and this project follows [Semantic Versioning](https://semver.org/spec/v2.0.0.ht
 
 ## [Unreleased]
 
+## [0.23.0] - 2026-05-20
+
+**Theme: MCP proxy closes the surface-coverage gap.** Resources and
+prompts join tools as governed MCP primitives. The same operator
+allow/deny perimeter applies symmetrically to `resources/list` /
+`resources/read` and `prompts/list` / `prompts/get`, and every allowed
+read or prompt retrieval writes a request+decision audit pair to the
+hash chain. Vaara now covers all three MCP primitives, not one.
+
+### Added
+- `src/vaara/integrations/mcp_proxy.py`: `VaaraMCPProxy.__init__`
+  accepts `resource_allowlist`/`resource_denylist` and
+  `prompt_allowlist`/`prompt_denylist`. New `_handle_list` helper is
+  shared by `tools/list`, `resources/list`, and `prompts/list`. New
+  `_handle_resources_read` and `_handle_prompts_get` enforce the
+  perimeter and write a request+decision audit pair on allow.
+  Perimeter blocks for resources/prompts surface as JSON-RPC errors
+  (code -32000) with a `data` payload mirroring the tool-call block
+  shape (`vaara_blocked: true`, `decision: "FILTERED"`, `reason`).
+- CLI: `--allow-resource URI`, `--deny-resource URI`,
+  `--allow-prompt NAME`, `--deny-prompt NAME`, all repeatable.
+  Backward compatible: no flags = passthrough.
+- `tests/test_integrations_mcp_proxy.py`: twelve new tests covering
+  resources/list filtering (denylist, allowlist, no-policy), prompts/
+  list filtering, blocked resources/read returns JSON-RPC error,
+  blocked prompts/get returns JSON-RPC error, allowed resources/read
+  writes the audit pair without invoking the risk scorer, and
+  allowed prompts/get writes the audit pair.
+
+### Design
+Resource reads and prompt gets are read-oriented MCP surfaces. They
+need audit coverage so regulators can reconstruct what an agent
+accessed, but they do not run through the risk scorer (the scorer is
+for actions). The operator perimeter is the gate. The audit chain
+captures the evidence. Tool calls keep the full pipeline (classify,
+score, decide, audit).
+
+### Fixed
+- `src/vaara/__init__.py`: `__version__` was stale at `0.21.0` after
+  v0.22.0 shipped. Bumped to `0.23.0` together with `pyproject.toml`
+  and `clients/ts/package.json`.
+
 ## [0.22.0] - 2026-05-20
 
 **Theme: MCP proxy operator-side tool filtering.** Adds two repeatable
