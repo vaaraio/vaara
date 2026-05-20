@@ -118,7 +118,5 @@ jobs:
       - name: Test
         run: node --test test/*.test.mjs
 
-      - name: Publish to npm with provenance
+      - name: Publish to npm with provenance (trusted publishing via OIDC)
         run: npm publish --provenance --access public
-        env:
-          NODE_AUTH_TOKEN: ${{ secrets.NPM_TOKEN }}
