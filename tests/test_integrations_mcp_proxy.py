@@ -42,6 +42,16 @@ def proxy(monkeypatch):
     return p, pipeline
 
 
+def _make_proxy(monkeypatch, **kwargs):
+    from vaara.integrations import mcp_proxy
+
+    monkeypatch.setattr(mcp_proxy, "UpstreamMCPClient", MagicMock())
+    pipeline = MagicMock()
+    p = mcp_proxy.VaaraMCPProxy(upstream_command=["echo"], pipeline=pipeline, **kwargs)
+    p._upstream = MagicMock()
+    return p, pipeline
+
+
 def test_blocked_tool_call_returns_mcp_tool_error(proxy):
     p, pipeline = proxy
     pipeline.intercept.return_value = _StubInterceptResult(
@@ -119,22 +129,125 @@ def test_vaara_agent_id_override_is_stripped_before_forward(proxy):
     assert "_vaara_agent_id" not in forwarded["params"]["arguments"]
 
 
-def test_non_tools_call_forwards_verbatim(proxy):
+def test_non_intercepted_method_forwards_verbatim(proxy):
     p, pipeline = proxy
-    p._upstream.request.return_value = {
-        "jsonrpc": "2.0", "id": 3, "result": {"tools": [{"name": "sap.adt.read"}]},
+    upstream_response = {
+        "jsonrpc": "2.0", "id": 3, "result": {"resources": []},
     }
-    request = {"jsonrpc": "2.0", "id": 3, "method": "tools/list"}
+    p._upstream.request.return_value = upstream_response
+    request = {"jsonrpc": "2.0", "id": 3, "method": "resources/list"}
     response = p._handle_request(request)
     p._upstream.request.assert_called_once_with(request)
     pipeline.intercept.assert_not_called()
-    assert response["result"]["tools"][0]["name"] == "sap.adt.read"
+    assert response is upstream_response
 
 
 def test_invalid_request_returns_minus_32600(proxy):
     p, _ = proxy
     response = p._handle_request("not a dict")
     assert response["error"]["code"] == -32600
+
+
+def test_tools_list_denylist_drops_named_tools(monkeypatch):
+    p, pipeline = _make_proxy(monkeypatch, denylist={"delete_repository", "create_branch"})
+    p._upstream.request.return_value = {
+        "jsonrpc": "2.0", "id": 11,
+        "result": {"tools": [
+            {"name": "search_repositories"},
+            {"name": "create_branch"},
+            {"name": "get_pull_request"},
+            {"name": "delete_repository"},
+        ]},
+    }
+    response = p._handle_request({"jsonrpc": "2.0", "id": 11, "method": "tools/list"})
+    names = [t["name"] for t in response["result"]["tools"]]
+    assert names == ["search_repositories", "get_pull_request"]
+    pipeline.intercept.assert_not_called()
+
+
+def test_tools_list_allowlist_restricts_to_listed_tools(monkeypatch):
+    p, _ = _make_proxy(monkeypatch, allowlist={"search_repositories", "get_pull_request"})
+    p._upstream.request.return_value = {
+        "jsonrpc": "2.0", "id": 12,
+        "result": {"tools": [
+            {"name": "search_repositories"},
+            {"name": "create_branch"},
+            {"name": "get_pull_request"},
+        ]},
+    }
+    response = p._handle_request({"jsonrpc": "2.0", "id": 12, "method": "tools/list"})
+    names = sorted(t["name"] for t in response["result"]["tools"])
+    assert names == ["get_pull_request", "search_repositories"]
+
+
+def test_tools_list_denylist_wins_when_overlapping_with_allowlist(monkeypatch):
+    p, _ = _make_proxy(
+        monkeypatch,
+        allowlist={"search_repositories", "create_branch"},
+        denylist={"create_branch"},
+    )
+    p._upstream.request.return_value = {
+        "jsonrpc": "2.0", "id": 13,
+        "result": {"tools": [
+            {"name": "search_repositories"},
+            {"name": "create_branch"},
+        ]},
+    }
+    response = p._handle_request({"jsonrpc": "2.0", "id": 13, "method": "tools/list"})
+    names = [t["name"] for t in response["result"]["tools"]]
+    assert names == ["search_repositories"]
+
+
+def test_tools_list_no_policy_returns_upstream_response_unchanged(monkeypatch):
+    p, _ = _make_proxy(monkeypatch)
+    upstream_response = {
+        "jsonrpc": "2.0", "id": 14,
+        "result": {"tools": [{"name": "a"}, {"name": "b"}]},
+    }
+    p._upstream.request.return_value = upstream_response
+    response = p._handle_request({"jsonrpc": "2.0", "id": 14, "method": "tools/list"})
+    assert response is upstream_response
+
+
+def test_tools_call_on_denylisted_tool_returns_filter_block(monkeypatch):
+    p, pipeline = _make_proxy(monkeypatch, denylist={"delete_repository"})
+    request = {
+        "jsonrpc": "2.0", "id": 15, "method": "tools/call",
+        "params": {"name": "delete_repository", "arguments": {"owner": "vaaraio", "repo": "vaara"}},
+    }
+    response = p._handle_tools_call(request)
+    assert response["result"]["isError"] is True
+    text = response["result"]["content"][0]["text"]
+    assert "Tool filtered by operator policy" in text
+    assert "FILTERED" in text
+    p._upstream.request.assert_not_called()
+    pipeline.intercept.assert_not_called()
+    pipeline.report_outcome.assert_not_called()
+
+
+def test_tools_call_outside_allowlist_returns_filter_block(monkeypatch):
+    p, pipeline = _make_proxy(monkeypatch, allowlist={"search_repositories"})
+    request = {
+        "jsonrpc": "2.0", "id": 16, "method": "tools/call",
+        "params": {"name": "create_branch", "arguments": {}},
+    }
+    response = p._handle_tools_call(request)
+    assert response["result"]["isError"] is True
+    assert "Tool filtered by operator policy" in response["result"]["content"][0]["text"]
+    pipeline.intercept.assert_not_called()
+
+
+def test_tools_call_inside_allowlist_still_runs_pipeline(monkeypatch):
+    p, pipeline = _make_proxy(monkeypatch, allowlist={"search_repositories"})
+    pipeline.intercept.return_value = _StubInterceptResult(allowed=True, action_id="allow-1")
+    p._upstream.request.return_value = {"jsonrpc": "2.0", "id": 17, "result": {}}
+    request = {
+        "jsonrpc": "2.0", "id": 17, "method": "tools/call",
+        "params": {"name": "search_repositories", "arguments": {"q": "vaara"}},
+    }
+    p._handle_tools_call(request)
+    pipeline.intercept.assert_called_once()
+    p._upstream.request.assert_called_once_with(request)
 
 
 def test_upstream_request_raises_proxy_error_when_reader_exits_without_response(monkeypatch):
