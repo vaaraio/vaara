@@ -36,6 +36,12 @@ from typing import Any, Optional
 from vaara import __version__ as _VAARA_VERSION
 from vaara.audit.sqlite_backend import SQLiteAuditBackend
 from vaara.audit.trail import AuditTrail
+from vaara.integrations._mcp_overt import (
+    OVERTConfigError,
+    OVERTReceiptEmitter,
+    build_emitter,
+    policy_hash_from_perimeter,
+)
 from vaara.integrations._mcp_upstream import (
     ProxyError, UpstreamMCPClient, strict_json_dumps,
 )
@@ -62,6 +68,7 @@ class VaaraMCPProxy:
         resource_denylist: Optional[set[str]] = None,
         prompt_allowlist: Optional[set[str]] = None,
         prompt_denylist: Optional[set[str]] = None,
+        overt_emitter: Optional[OVERTReceiptEmitter] = None,
     ) -> None:
         if pipeline is not None:
             self._pipeline = pipeline
@@ -90,6 +97,7 @@ class VaaraMCPProxy:
             set(prompt_denylist) if prompt_denylist else set()
         )
         self._stdout_lock = threading.Lock()
+        self._overt = overt_emitter
         self._upstream = UpstreamMCPClient(
             command=upstream_command,
             on_notification=self._forward_notification_to_client,
@@ -250,6 +258,15 @@ class VaaraMCPProxy:
                 "decision": "FILTERED",
                 "tool": tool_name,
             }
+            self._overt_emit(
+                surface="mcp.tool.call",
+                identifier=tool_name,
+                identifier_field="tool_name",
+                request_obj={"tool": tool_name, "arguments": arguments},
+                decision="FILTERED",
+                reason="Tool filtered by operator policy",
+                extra={"agent_id": self._agent_id_default},
+            )
             return {
                 "jsonrpc": "2.0", "id": request.get("id"),
                 "result": {
@@ -268,12 +285,26 @@ class VaaraMCPProxy:
             agent_id=agent_id, tool_name=tool_name, parameters=arguments,
         )
         if not result.allowed:
+            decision = getattr(result, "decision", None) or "DENY"
+            reason = getattr(result, "reason", None) or "Blocked by Vaara policy"
             block_payload = {
                 "vaara_blocked": True,
-                "reason": getattr(result, "reason", None) or "Blocked by Vaara policy",
-                "decision": getattr(result, "decision", None),
+                "reason": reason,
+                "decision": decision,
                 "action_id": getattr(result, "action_id", None),
             }
+            self._overt_emit(
+                surface="mcp.tool.call",
+                identifier=tool_name,
+                identifier_field="tool_name",
+                request_obj={"tool": tool_name, "arguments": arguments},
+                decision=str(decision),
+                reason=reason,
+                extra={
+                    "agent_id": agent_id,
+                    "action_id": getattr(result, "action_id", None) or "",
+                },
+            )
             return {
                 "jsonrpc": "2.0", "id": request.get("id"),
                 "result": {
@@ -289,6 +320,19 @@ class VaaraMCPProxy:
             )
         except Exception:
             logger.exception("report_outcome failed for action_id=%s", result.action_id)
+        self._overt_emit(
+            surface="mcp.tool.call",
+            identifier=tool_name,
+            identifier_field="tool_name",
+            request_obj={"tool": tool_name, "arguments": arguments},
+            decision="allow",
+            reason="allowed by Vaara policy",
+            extra={
+                "agent_id": agent_id,
+                "action_id": getattr(result, "action_id", None) or "",
+                "outcome_severity": int(outcome_severity),
+            },
+        )
         return upstream_response
 
     def _handle_resources_read(self, request: dict) -> dict:
@@ -301,6 +345,15 @@ class VaaraMCPProxy:
         if self._resource_filtered(uri):
             logger.warning(
                 "resources/read rejected at perimeter (operator filter): %s", uri,
+            )
+            self._overt_emit(
+                surface="mcp.resource.read",
+                identifier=uri,
+                identifier_field="uri",
+                request_obj={"uri": uri},
+                decision="FILTERED",
+                reason="Resource filtered by operator policy",
+                extra={"agent_id": self._agent_id_default},
             )
             return self._perimeter_block(
                 request, code=-32000,
@@ -319,6 +372,15 @@ class VaaraMCPProxy:
             decision="allow",
             reason="resource within operator perimeter",
         )
+        self._overt_emit(
+            surface="mcp.resource.read",
+            identifier=uri,
+            identifier_field="uri",
+            request_obj={"uri": uri},
+            decision="allow",
+            reason="resource within operator perimeter",
+            extra={"agent_id": self._agent_id_default},
+        )
         return self._upstream.request(request)
 
     def _handle_prompts_get(self, request: dict) -> dict:
@@ -334,6 +396,15 @@ class VaaraMCPProxy:
         if self._prompt_filtered(name):
             logger.warning(
                 "prompts/get rejected at perimeter (operator filter): %s", name,
+            )
+            self._overt_emit(
+                surface="mcp.prompt.get",
+                identifier=name,
+                identifier_field="prompt_name",
+                request_obj={"name": name, "arguments": arguments},
+                decision="FILTERED",
+                reason="Prompt filtered by operator policy",
+                extra={"agent_id": self._agent_id_default},
             )
             return self._perimeter_block(
                 request, code=-32000,
@@ -351,6 +422,15 @@ class VaaraMCPProxy:
             parameters={"name": name, "arguments": arguments},
             decision="allow",
             reason="prompt within operator perimeter",
+        )
+        self._overt_emit(
+            surface="mcp.prompt.get",
+            identifier=name,
+            identifier_field="prompt_name",
+            request_obj={"name": name, "arguments": arguments},
+            decision="allow",
+            reason="prompt within operator perimeter",
+            extra={"agent_id": self._agent_id_default},
         )
         return self._upstream.request(request)
 
@@ -414,6 +494,44 @@ class VaaraMCPProxy:
         except Exception:
             logger.exception("Failed to record perimeter audit for %s", tool_name)
 
+    def _overt_emit(
+        self,
+        *,
+        surface: str,
+        identifier: str,
+        identifier_field: str,
+        request_obj: dict,
+        decision: str,
+        reason: str,
+        extra: Optional[dict] = None,
+    ) -> None:
+        """Emit one OVERT Base Envelope for an MCP interaction.
+
+        No-op when no emitter is configured. Failures are logged and
+        swallowed: an attestation-side failure must not block legitimate
+        upstream traffic, mirroring the perimeter-audit rule.
+        """
+        if self._overt is None:
+            return
+        try:
+            non_content_metadata = {
+                "action_class": surface,
+                identifier_field: identifier,
+                "decision": decision,
+                "reason": reason,
+            }
+            if extra:
+                non_content_metadata.update(extra)
+            request_payload = strict_json_dumps(
+                request_obj, sort_keys=True,
+            ).encode("utf-8")
+            self._overt.emit(
+                request_payload=request_payload,
+                non_content_metadata=non_content_metadata,
+            )
+        except Exception:
+            logger.exception("OVERT envelope emission failed for %s", surface)
+
     @staticmethod
     def _severity_from_response(response: dict) -> float:
         # Protocol/tool errors → 1.0 (failure signal). Clean success → 0.0.
@@ -476,24 +594,92 @@ def main(argv: Optional[list[str]] = None) -> None:
     parser.add_argument("--deny-prompt", action="append", default=[], dest="deny_prompts",
                         help="Filter this prompt name from prompts/list and reject any "
                              "prompts/get to it (repeatable). Denylist wins on overlap.")
+    parser.add_argument("--overt-signing-key", type=Path, default=None,
+                        help="Ed25519 PEM private key used to sign OVERT 1.0 Base "
+                             "Envelopes for every governed MCP interaction. Off when "
+                             "absent. Generate one with: vaara keygen --dev --out PATH.")
+    parser.add_argument("--overt-operator-key", type=Path, default=None,
+                        help="Raw bytes file holding the operator HMAC key for OVERT "
+                             "request_commitment (min 16 bytes). Required when "
+                             "--overt-signing-key is set, unless "
+                             "VAARA_OVERT_OPERATOR_KEY_HEX is set in the environment.")
+    parser.add_argument("--overt-receipts-dir", type=Path, default=None,
+                        help="Directory to write OVERT Base Envelopes into "
+                             "(one canonical-CBOR file per envelope). Required when "
+                             "--overt-signing-key is set.")
     args = parser.parse_args(argv)
     logging.basicConfig(level=logging.INFO,
                         format="%(asctime)s %(name)s %(levelname)s %(message)s",
                         stream=sys.stderr)
+    tool_allow = set(args.allow_tools) if args.allow_tools else None
+    tool_deny = set(args.deny_tools) if args.deny_tools else set()
+    resource_allow = set(args.allow_resources) if args.allow_resources else None
+    resource_deny = set(args.deny_resources) if args.deny_resources else set()
+    prompt_allow = set(args.allow_prompts) if args.allow_prompts else None
+    prompt_deny = set(args.deny_prompts) if args.deny_prompts else set()
+
+    overt_emitter = _build_overt_emitter_from_args(
+        args,
+        policy_hash=policy_hash_from_perimeter(
+            tool_allow=tool_allow, tool_deny=tool_deny,
+            resource_allow=resource_allow, resource_deny=resource_deny,
+            prompt_allow=prompt_allow, prompt_deny=prompt_deny,
+        ),
+    )
+
     proxy = VaaraMCPProxy(
         upstream_command=[args.upstream, *args.upstream_args],
         db_path=args.db, agent_id_default=args.agent_id,
-        allowlist=set(args.allow_tools) if args.allow_tools else None,
-        denylist=set(args.deny_tools) if args.deny_tools else None,
-        resource_allowlist=set(args.allow_resources) if args.allow_resources else None,
-        resource_denylist=set(args.deny_resources) if args.deny_resources else None,
-        prompt_allowlist=set(args.allow_prompts) if args.allow_prompts else None,
-        prompt_denylist=set(args.deny_prompts) if args.deny_prompts else None,
+        allowlist=tool_allow,
+        denylist=tool_deny if tool_deny else None,
+        resource_allowlist=resource_allow,
+        resource_denylist=resource_deny if resource_deny else None,
+        prompt_allowlist=prompt_allow,
+        prompt_denylist=prompt_deny if prompt_deny else None,
+        overt_emitter=overt_emitter,
     )
     try:
         proxy.run()
     finally:
         proxy.close()
+
+
+def _build_overt_emitter_from_args(
+    args: argparse.Namespace, *, policy_hash: bytes,
+) -> Optional[OVERTReceiptEmitter]:
+    """Construct the OVERT emitter from CLI args, or None if not configured.
+
+    Off when --overt-signing-key is absent. If signing-key is set, both
+    --overt-receipts-dir and an operator HMAC key (file or env var) must
+    also be present, or the proxy refuses to start.
+    """
+    if args.overt_signing_key is None:
+        if args.overt_receipts_dir is not None or args.overt_operator_key is not None:
+            print(
+                "vaara-mcp-proxy: --overt-receipts-dir and --overt-operator-key "
+                "have no effect without --overt-signing-key. Exiting.",
+                file=sys.stderr,
+            )
+            sys.exit(2)
+        return None
+    if args.overt_receipts_dir is None:
+        print(
+            "vaara-mcp-proxy: --overt-signing-key requires --overt-receipts-dir.",
+            file=sys.stderr,
+        )
+        sys.exit(2)
+    operator_key_hex = os.environ.get("VAARA_OVERT_OPERATOR_KEY_HEX")
+    try:
+        return build_emitter(
+            signing_key_path=args.overt_signing_key,
+            operator_key_path=args.overt_operator_key,
+            operator_key_hex=operator_key_hex,
+            receipts_dir=args.overt_receipts_dir,
+            policy_hash=policy_hash,
+        )
+    except OVERTConfigError as exc:
+        print(f"vaara-mcp-proxy: {exc}", file=sys.stderr)
+        sys.exit(2)
 
 
 if __name__ == "__main__":
