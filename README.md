@@ -164,6 +164,8 @@ python -m vaara.integrations.mcp_proxy \
 
 Point your MCP client at the proxy instead of the upstream. The audit chain captures every tool call without changing client or upstream behavior. Distinct from `mcp_server`, which exposes Vaara itself as an MCP server for agents that consult Vaara as a tool.
 
+**Operator-side tool filtering** (since v0.22.0). The proxy accepts repeatable `--allow-tool NAME` and `--deny-tool NAME` flags. Filtered tools are dropped from `tools/list` responses before the client sees them and any matching `tools/call` is rejected at the proxy perimeter without contacting the upstream. Use this to hide write/delete tools (e.g. `delete_file`, `merge_pull_request`) when the upstream server exposes more capability than the deployment policy allows. Denylist wins on overlap with allowlist. No flags = passthrough.
+
 Worked examples with real upstream servers:
 
 - [`examples/github-mcp-proxy-demo/`](examples/github-mcp-proxy-demo/). Vaara in front of [`github/github-mcp-server`](https://github.com/github/github-mcp-server) (GitHub's official MCP server, MIT-licensed). End-to-end verified: real subprocess, 42 tools advertised, hash-chained audit trail recorded.

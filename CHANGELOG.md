@@ -6,19 +6,46 @@ and this project follows [Semantic Versioning](https://semver.org/spec/v2.0.0.ht
 
 ## [Unreleased]
 
+## [0.22.0] - 2026-05-20
+
+**Theme: MCP proxy operator-side tool filtering.** Adds two repeatable
+CLI flags to the MCP proxy that let an operator shape the upstream
+tool surface visible to the AI client: `--allow-tool NAME` (if any are
+given, only those tools pass through) and `--deny-tool NAME` (those
+tools are filtered, wins on overlap with allowlist). Filtered tools
+are dropped from `tools/list` responses before the client sees them,
+and any `tools/call` to a filtered tool is rejected at the proxy
+perimeter with an MCP `isError: true` payload (`decision: "FILTERED"`,
+`reason: "Tool filtered by operator policy"`) without forwarding to
+the upstream or invoking the risk pipeline.
+
 ### Added
-- MCP proxy: operator-side tool filtering at the perimeter.
-  `python -m vaara.integrations.mcp_proxy` now accepts repeatable
-  `--allow-tool NAME` and `--deny-tool NAME` flags. Filtered tools are
-  dropped from `tools/list` responses before the client sees them, and
-  any `tools/call` to a filtered tool is rejected at the proxy with an
-  MCP `isError: true` payload (`decision: "FILTERED"`,
-  `reason: "Tool filtered by operator policy"`) without forwarding
-  upstream or invoking the risk pipeline. Denylist wins on overlap with
-  allowlist. Backward compatible: no flags = current passthrough
-  behavior. Use case: hide write/delete tools (e.g. `delete_repository`,
-  `create_branch`) from an MCP client when the upstream server exposes
-  more capability than the deployment policy allows.
+- `src/vaara/integrations/mcp_proxy.py`: `VaaraMCPProxy.__init__`
+  accepts `allowlist: Optional[set[str]]` and `denylist:
+  Optional[set[str]]`. New `_tool_filtered(name)` helper applied to
+  both `tools/list` (filters the `result.tools` array) and
+  `tools/call` (returns a `FILTERED` block payload before the
+  pipeline runs).
+- CLI: `--allow-tool NAME` and `--deny-tool NAME`, both repeatable.
+  Backward compatible: no flags = passthrough.
+- `tests/test_integrations_mcp_proxy.py`: eight new tests covering
+  denylist drops, allowlist restricts, denylist-wins-on-overlap,
+  no-policy passthrough, filtered tools/call returns block, and
+  allowlisted tools/call still routes through the pipeline.
+
+### Verified
+- End-to-end smoke against `github/github-mcp-server` (42 real tools):
+  `--deny-tool` drops named entries from `tools/list` and rejects
+  matching `tools/call`; `--allow-tool` restricts `tools/list` to the
+  allowlist and routes allowlisted calls through the pipeline as
+  before; no-flag run is identical to v0.21.0 behaviour.
+
+### Use case
+Hide write/delete tools (e.g. `delete_file`, `merge_pull_request`)
+when the upstream MCP server exposes more capability than the
+deployment policy allows. The LLM client never learns the tool
+exists, which is materially different from instructing the model
+not to call it.
 
 ## [0.21.0] - 2026-05-19
 
