@@ -96,7 +96,9 @@ class VaaraMCPProxy:
         )
 
     @staticmethod
-    def _is_filtered(name: str, allowlist: Optional[set[str]], denylist: set[str]) -> bool:
+    def _is_filtered(name: object, allowlist: Optional[set[str]], denylist: set[str]) -> bool:
+        if not isinstance(name, str):
+            return True
         if name in denylist:
             return True
         if allowlist is not None and name not in allowlist:

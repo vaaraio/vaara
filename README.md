@@ -152,7 +152,7 @@ if (r.decision === "deny") throw new Error("blocked");
 
 ## MCP proxy (Vaara as a transparent governance layer)
 
-`vaara.integrations.mcp_proxy.VaaraMCPProxy` sits between an MCP client (Claude Code, Cursor, any MCP-capable host) and an upstream MCP server. Every `tools/call` from the client routes through Vaara's interception pipeline before reaching the upstream. Allowed calls forward transparently and report the upstream outcome back to the scorer. Blocked calls return an MCP `isError: true` response with the block reason. Other MCP methods (initialize, tools/list, resources, notifications) forward unchanged.
+`vaara.integrations.mcp_proxy.VaaraMCPProxy` sits between an MCP client (Claude Code, Cursor, any MCP-capable host) and an upstream MCP server. Every `tools/call` from the client routes through Vaara's interception pipeline before reaching the upstream. Allowed calls forward transparently and report the upstream outcome back to the scorer. Blocked calls return an MCP `isError: true` response with the block reason. The initialization handshake and `notifications/*` forward unchanged. `tools/list`, `resources/list`, `resources/read`, `prompts/list`, and `prompts/get` route through the operator perimeter described below before reaching the client or upstream.
 
 One-line example in front of [`@sap/mdk-mcp-server`](https://www.npmjs.com/package/@sap/mdk-mcp-server) (SAP's official Mobile Development Kit MCP server, on npm):
 

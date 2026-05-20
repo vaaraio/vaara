@@ -422,6 +422,20 @@ def test_prompts_get_within_perimeter_audits_and_forwards(monkeypatch):
     assert decision_kwargs["tool_name"] == "mcp.prompt.get"
 
 
+def test_is_filtered_treats_non_string_names_as_filtered():
+    """Defensive contract: if upstream returns a non-string in the name field
+    (a misbehaving server returning a list, dict, None, or int), the perimeter
+    must deny rather than crash on hash. Governance default for ambiguous
+    input is deny. Flagged by CodeRabbit on PR #114.
+    """
+    from vaara.integrations.mcp_proxy import VaaraMCPProxy
+    assert VaaraMCPProxy._is_filtered(None, None, set()) is True
+    assert VaaraMCPProxy._is_filtered(["tool"], None, set()) is True
+    assert VaaraMCPProxy._is_filtered({"name": "tool"}, None, set()) is True
+    assert VaaraMCPProxy._is_filtered(42, None, set()) is True
+    assert VaaraMCPProxy._is_filtered("tool", None, set()) is False
+
+
 def test_uninterpreted_method_still_forwards_verbatim(monkeypatch):
     """Non-governed MCP methods (e.g. completion/complete, ping) pass through unchanged."""
     p, pipeline = _make_proxy(monkeypatch)
