@@ -170,6 +170,8 @@ Point your MCP client at the proxy instead of the upstream. The audit chain capt
 
 **OVERT 1.0 envelopes per interaction** (since v0.24.0). Off by default. When you pass `--overt-signing-key KEY.pem`, `--overt-operator-key OPKEY.bin`, and `--overt-receipts-dir DIR/`, the proxy writes one OVERT 1.0 Protocol Profile 1.0 Base Envelope (canonical CBOR, Ed25519, closed 9-field schema) per governed interaction into `DIR/{nanosecond_timestamp}-{counter:010d}.cbor`. Covers all four states: allowed `tools/call`, blocked `tools/call`, perimeter-filtered call, and perimeter-filtered `resources/read` / `prompts/get`. The arbiter public key is pinned alongside as `pubkey.bin`. Each envelope verifies offline under `vaara overt verify` against any conformant verifier. Three-step recipe:
 
+**Streaming notifications inside the boundary** (since v0.25.0). Long-running upstream tools emit `notifications/progress` and `notifications/message` over the lifetime of a `tools/call`. The proxy now routes each notification through the same audit pair (request + decision) and, when OVERT is configured, emits a dedicated Base Envelope with action class `mcp.notification.progress` or `mcp.notification.message`. Progress events correlate to the originating call via the `_meta.progressToken` from the request, so a regulator reading the receipt directory can reconstruct what arrived between request and response. Notifications still forward to the client unchanged. Audit failures are logged and swallowed: observation never blocks streaming.
+
 ```bash
 # 1. Generate an Ed25519 signing key (evaluation/demo; for production use a KMS or HSM, see docs/signing-keys.md).
 vaara keygen --dev --out signing.pem
@@ -215,7 +217,7 @@ from vaara.attestation.overt import emit_base_envelope, make_request_commitment,
 envelope = emit_base_envelope(
     signing_key=key,
     request_commitment=make_request_commitment(payload, operator_key=op_key),
-    encoder_binary_identity=encoder_binary_identity(arbiter_version="vaara/0.24.0", policy_hash=ph),
+    encoder_binary_identity=encoder_binary_identity(arbiter_version="vaara/0.25.0", policy_hash=ph),
     non_content_metadata={"action_class": "tx.transfer", "decision": "escalate"},
     monotonic_counter=42,
     arbiter_instance_identifier=uuid_bytes,
