@@ -152,7 +152,7 @@ if (r.decision === "deny") throw new Error("blocked");
 
 ## MCP proxy (Vaara as a transparent governance layer)
 
-`vaara.integrations.mcp_proxy.VaaraMCPProxy` sits between an MCP client (Claude Code, Cursor, any MCP-capable host) and an upstream MCP server. Every `tools/call` from the client routes through Vaara's interception pipeline before reaching the upstream. Allowed calls forward transparently and report the upstream outcome back to the scorer. Blocked calls return an MCP `isError: true` response with the block reason. Other MCP methods (initialize, tools/list, resources, notifications) forward unchanged.
+`vaara.integrations.mcp_proxy.VaaraMCPProxy` sits between an MCP client (Claude Code, Cursor, any MCP-capable host) and an upstream MCP server. Every `tools/call` from the client routes through Vaara's interception pipeline before reaching the upstream. Allowed calls forward transparently and report the upstream outcome back to the scorer. Blocked calls return an MCP `isError: true` response with the block reason. The initialization handshake and `notifications/*` forward unchanged. `tools/list`, `resources/list`, `resources/read`, `prompts/list`, and `prompts/get` route through the operator perimeter described below before reaching the client or upstream.
 
 One-line example in front of [`@sap/mdk-mcp-server`](https://www.npmjs.com/package/@sap/mdk-mcp-server) (SAP's official Mobile Development Kit MCP server, on npm):
 
@@ -165,6 +165,8 @@ python -m vaara.integrations.mcp_proxy \
 Point your MCP client at the proxy instead of the upstream. The audit chain captures every tool call without changing client or upstream behavior. Distinct from `mcp_server`, which exposes Vaara itself as an MCP server for agents that consult Vaara as a tool.
 
 **Operator-side tool filtering** (since v0.22.0). The proxy accepts repeatable `--allow-tool NAME` and `--deny-tool NAME` flags. Filtered tools are dropped from `tools/list` responses before the client sees them and any matching `tools/call` is rejected at the proxy perimeter without contacting the upstream. Use this to hide write/delete tools (e.g. `delete_file`, `merge_pull_request`) when the upstream server exposes more capability than the deployment policy allows. Denylist wins on overlap with allowlist. No flags = passthrough.
+
+**Resources and prompts coverage** (since v0.23.0). The same perimeter shape extends to MCP's other two primitives. `--allow-resource URI` / `--deny-resource URI` gate `resources/list` and `resources/read`. `--allow-prompt NAME` / `--deny-prompt NAME` gate `prompts/list` and `prompts/get`. Every allowed `resources/read` and `prompts/get` writes a request+decision audit pair to the hash chain so a regulator can reconstruct exactly which resources the agent read and which prompts it retrieved. Resource reads and prompt gets are read-oriented MCP surfaces. They do not run through the risk scorer. The operator perimeter is the gate, and the audit chain captures the evidence.
 
 Worked examples with real upstream servers:
 
@@ -189,7 +191,7 @@ from vaara.attestation.overt import emit_base_envelope, make_request_commitment,
 envelope = emit_base_envelope(
     signing_key=key,
     request_commitment=make_request_commitment(payload, operator_key=op_key),
-    encoder_binary_identity=encoder_binary_identity(arbiter_version="vaara/0.21.0", policy_hash=ph),
+    encoder_binary_identity=encoder_binary_identity(arbiter_version="vaara/0.23.0", policy_hash=ph),
     non_content_metadata={"action_class": "tx.transfer", "decision": "escalate"},
     monotonic_counter=42,
     arbiter_instance_identifier=uuid_bytes,
