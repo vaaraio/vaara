@@ -98,9 +98,16 @@ class VaaraMCPProxy:
         )
         self._stdout_lock = threading.Lock()
         self._overt = overt_emitter
+        # progressToken -> (action_id, agent_id, tool_name). Populated when a
+        # tools/call enters interception with params._meta.progressToken set,
+        # consulted by the upstream-notification handler so progress events
+        # arriving mid-call carry the originating action_id into the audit
+        # record and into the OVERT envelope's non_content_metadata.
+        self._inflight_progress: dict[Any, tuple[str, str, str]] = {}
+        self._inflight_lock = threading.Lock()
         self._upstream = UpstreamMCPClient(
             command=upstream_command,
-            on_notification=self._forward_notification_to_client,
+            on_notification=self._on_upstream_notification,
         )
 
     @staticmethod
@@ -284,6 +291,7 @@ class VaaraMCPProxy:
         result = self._pipeline.intercept(
             agent_id=agent_id, tool_name=tool_name, parameters=arguments,
         )
+        progress_token = self._progress_token(params)
         if not result.allowed:
             decision = getattr(result, "decision", None) or "DENY"
             reason = getattr(result, "reason", None) or "Blocked by Vaara policy"
@@ -312,7 +320,19 @@ class VaaraMCPProxy:
                     "isError": True,
                 },
             }
-        upstream_response = self._upstream.request(request)
+        if progress_token is not None:
+            with self._inflight_lock:
+                self._inflight_progress[progress_token] = (
+                    str(getattr(result, "action_id", None) or ""),
+                    agent_id,
+                    tool_name,
+                )
+        try:
+            upstream_response = self._upstream.request(request)
+        finally:
+            if progress_token is not None:
+                with self._inflight_lock:
+                    self._inflight_progress.pop(progress_token, None)
         outcome_severity = self._severity_from_response(upstream_response)
         try:
             self._pipeline.report_outcome(
@@ -542,8 +562,104 @@ class VaaraMCPProxy:
             return 1.0
         return 0.0
 
-    def _forward_notification_to_client(self, message: dict) -> None:
+    def _on_upstream_notification(self, message: dict) -> None:
+        """Audit + OVERT-emit upstream-originated notifications, then forward.
+
+        Streaming surfaces (notifications/progress, notifications/message) flow
+        upstream-to-client during a long-running tools/call. v0.25.0 brings
+        them inside the audit boundary: each notification is recorded as a
+        perimeter-style audit event (no scorer) and, when OVERT is configured,
+        emits its own Base Envelope. Progress events correlate to the
+        originating tools/call via params.progressToken when present. The
+        notification is then forwarded to the client unchanged — auditing is
+        observational, never blocking.
+        """
+        method = message.get("method") if isinstance(message, dict) else None
+        try:
+            if method == "notifications/progress":
+                self._audit_progress_notification(message)
+            elif method == "notifications/message":
+                self._audit_message_notification(message)
+        except Exception:
+            logger.exception("Streaming-notification audit failed for %s", method)
         self._write_to_client(message)
+
+    @staticmethod
+    def _progress_token(params: dict) -> Any:
+        meta = params.get("_meta") if isinstance(params, dict) else None
+        if not isinstance(meta, dict):
+            return None
+        token = meta.get("progressToken")
+        if isinstance(token, (str, int)):
+            return token
+        return None
+
+    def _audit_progress_notification(self, message: dict) -> None:
+        params = message.get("params") if isinstance(message, dict) else None
+        if not isinstance(params, dict):
+            params = {}
+        token = params.get("progressToken")
+        if not isinstance(token, (str, int)):
+            token = None
+        parent_action_id = ""
+        agent_id = self._agent_id_default
+        parent_tool = ""
+        if token is not None:
+            with self._inflight_lock:
+                entry = self._inflight_progress.get(token)
+            if entry is not None:
+                parent_action_id, agent_id, parent_tool = entry
+        self._record_perimeter_audit(
+            agent_id=agent_id,
+            tool_name="mcp.notification.progress",
+            parameters={
+                "progressToken": token,
+                "parent_action_id": parent_action_id,
+                "parent_tool": parent_tool,
+            },
+            decision="observed",
+            reason="upstream progress notification observed",
+        )
+        self._overt_emit(
+            surface="mcp.notification.progress",
+            identifier=str(token) if token is not None else "",
+            identifier_field="progress_token",
+            request_obj={k: v for k, v in params.items() if k != "_meta"},
+            decision="observed",
+            reason="upstream progress notification observed",
+            extra={
+                "agent_id": agent_id,
+                "parent_action_id": parent_action_id,
+                "parent_tool": parent_tool,
+            },
+        )
+
+    def _audit_message_notification(self, message: dict) -> None:
+        params = message.get("params") if isinstance(message, dict) else None
+        if not isinstance(params, dict):
+            params = {}
+        level = params.get("level", "")
+        if not isinstance(level, str):
+            level = ""
+        log_logger = params.get("logger", "")
+        if not isinstance(log_logger, str):
+            log_logger = ""
+        self._record_perimeter_audit(
+            agent_id=self._agent_id_default,
+            tool_name="mcp.notification.message",
+            parameters={"level": level, "logger": log_logger},
+            decision="observed",
+            reason="upstream log notification observed",
+        )
+        self._overt_emit(
+            surface="mcp.notification.message",
+            identifier=level,
+            identifier_field="level",
+            request_obj={"level": level, "logger": log_logger},
+            decision="observed",
+            reason="upstream log notification observed",
+            extra={"agent_id": self._agent_id_default},
+        )
 
     def _write_to_client(self, payload: dict) -> None:
         # Serialize stdout writes between main loop and upstream reader thread.
