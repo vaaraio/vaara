@@ -5,6 +5,11 @@ upstream MCP server (SAP ADT MCP, SAP Graph API MCP, SAP Cloud ALM MCP, any
 community-built MCP server). Forwards every request to the upstream, but
 routes ``tools/call`` through Vaara's interception pipeline first. Allowed
 calls flow through transparently. Blocked calls return an MCP tool error.
+
+Optional operator-side filtering (``--allow-tool``/``--deny-tool``): when set,
+the proxy filters the upstream's ``tools/list`` response before the client
+sees it, and rejects ``tools/call`` to a filtered tool at the perimeter with
+a ``FILTERED`` block payload, without contacting the upstream.
 """
 
 from __future__ import annotations
