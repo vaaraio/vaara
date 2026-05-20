@@ -8,6 +8,7 @@ from vaara.compliance.engine import (
     EU_AI_ACT_REQUIREMENTS,
     ComplianceEngine,
     EvidenceStatus,
+    RegulatoryRequirement,
 )
 from vaara.taxonomy.actions import (
     ActionCategory,
@@ -195,6 +196,154 @@ class TestRequirements:
                 assert len(req.evidence_event_types) > 0, (
                     f"{req.article} has no evidence event types"
                 )
+
+
+class TestVerdictDrillDown:
+    """v0.26: ConformityReport articles carry verdict_inputs (threshold-vs-actual
+    + rationale) and contributing_events (the specific audit records the
+    verdict sits on). An auditor reading the report can trace status ->
+    threshold delta -> concrete event without re-running the engine."""
+
+    def test_verdict_inputs_present_for_populated_article(
+        self, engine, populated_trail
+    ):
+        report = engine.assess(populated_trail)
+        # Find an article that has runtime evidence (skip Article 11(1) docs).
+        runtime_articles = [
+            a for a in report.articles
+            if a.requirement.evidence_event_types
+        ]
+        assert runtime_articles, "populated trail should yield runtime articles"
+        for art in runtime_articles:
+            vi = art.verdict_inputs
+            assert vi, f"{art.requirement.article} missing verdict_inputs"
+            assert "min_evidence_count" in vi
+            assert "staleness_hours" in vi
+            assert "evidence_count_observed" in vi
+            assert "strength_thresholds" in vi
+            assert "verdict_reasons" in vi
+            assert isinstance(vi["verdict_reasons"], list)
+            assert vi["verdict_reasons"], "verdict_reasons must explain the verdict"
+
+    def test_contributing_events_populated_for_runtime_article(
+        self, engine, populated_trail
+    ):
+        report = engine.assess(populated_trail)
+        # Pick an article with sufficient/partial evidence — must list at
+        # least one contributing event.
+        for art in report.articles:
+            if art.evidence_count > 0:
+                assert art.contributing_events, (
+                    f"{art.requirement.article} has {art.evidence_count} "
+                    "records but no contributing_events"
+                )
+                ev = art.contributing_events[0]
+                assert "record_id" in ev
+                assert "action_id" in ev
+                assert "event_type" in ev
+                assert "timestamp_iso" in ev
+                assert "narrative" in ev
+                assert "drill_down" in ev
+                assert isinstance(ev["drill_down"], dict)
+                return
+        raise AssertionError("expected at least one article with evidence")
+
+    def test_contributing_events_are_most_recent_first(
+        self, engine, populated_trail
+    ):
+        report = engine.assess(populated_trail)
+        for art in report.articles:
+            events = art.contributing_events
+            if len(events) < 2:
+                continue
+            ages = [
+                e["age_hours"] for e in events
+                if isinstance(e.get("age_hours"), (int, float))
+            ]
+            assert ages == sorted(ages), (
+                f"{art.requirement.article} contributing_events not "
+                "ordered most-recent-first"
+            )
+
+    def test_drill_down_filters_to_known_keys(self, engine):
+        # Build a trail with a single RISK_SCORED event whose data carries
+        # both a known reasoning key (point_estimate) and a free-form key
+        # that must NOT leak into the regulator-facing drill_down.
+        trail = AuditTrail()
+        at = ActionType(
+            "x", ActionCategory.DATA, Reversibility.FULLY, BlastRadius.SELF,
+        )
+        req = ActionRequest(agent_id="a", tool_name="x", action_type=at)
+        action_id = trail.record_action_requested(req)
+        trail.record_risk_scored(
+            action_id=action_id, agent_id="a", tool_name="x",
+            assessment={
+                "risk": 0.4,
+                "point_estimate": 0.42,
+                "conformal_lower": 0.3,
+                "conformal_upper": 0.55,
+                "secret_payload": "should-not-appear",
+            },
+        )
+        custom = RegulatoryRequirement(
+            RegulatoryDomain.EU_AI_ACT, "Article 9(1)", "RMS", "...",
+            (EventType.RISK_SCORED,), min_evidence_count=1,
+        )
+        engine = ComplianceEngine(requirements=[custom])
+        report = engine.assess(trail)
+        ev = report.articles[0].contributing_events[0]
+        drill = ev["drill_down"]
+        assert drill.get("point_estimate") == 0.42
+        assert drill.get("conformal_lower") == 0.3
+        assert drill.get("conformal_upper") == 0.55
+        assert "secret_payload" not in drill, (
+            "free-form data fields must not leak into drill_down"
+        )
+
+    def test_empty_trail_verdict_inputs_pin_to_insufficient(
+        self, engine, trail
+    ):
+        report = engine.assess(trail)
+        runtime = [
+            a for a in report.articles
+            if a.requirement.evidence_event_types
+        ]
+        for art in runtime:
+            vi = art.verdict_inputs
+            assert vi["evidence_count_observed"] == 0
+            reasons = " ".join(vi["verdict_reasons"]).upper()
+            assert "INSUFFICIENT" in reasons
+            assert art.contributing_events == []
+
+    def test_broken_chain_marks_verdict_inputs(
+        self, engine, populated_trail
+    ):
+        populated_trail._records[5].data["tampered"] = True
+        report = engine.assess(populated_trail)
+        runtime = [
+            a for a in report.articles
+            if a.requirement.evidence_event_types
+        ]
+        for art in runtime:
+            vi = art.verdict_inputs
+            assert vi.get("chain_intact") is False
+            joined = " ".join(vi.get("verdict_reasons", [])).lower()
+            assert "chain integrity compromised" in joined
+
+    def test_to_dict_includes_verdict_drill_down(
+        self, engine, populated_trail
+    ):
+        import json
+        report = engine.assess(populated_trail)
+        d = report.to_dict()
+        # JSON round-trip with strict mode — no inf/NaN must leak through.
+        text = json.dumps(d, allow_nan=False)
+        assert "verdict_inputs" in text
+        assert "contributing_events" in text
+        # Every article carries the new keys.
+        for art in d["articles"]:
+            assert "verdict_inputs" in art
+            assert "contributing_events" in art
 
 
 class TestAddRequirementIdempotent:

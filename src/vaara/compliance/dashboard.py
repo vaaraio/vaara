@@ -119,8 +119,93 @@ def _article_detail(art: ArticleEvidence, domain: str) -> str:
         out.extend(f"<li><code>{_esc(rid)}</code></li>"
                    for rid in art.sample_record_ids[:5])
         out.append("</ul>")
+    _html_append_verdict_inputs(out, art)
+    _html_append_contributing_events(out, art)
     out.append("</div>")
     return "".join(out)
+
+
+def _html_append_verdict_inputs(out: list[str], art: ArticleEvidence) -> None:
+    """Render per-article 'Verdict inputs' threshold table + rationale list."""
+    vi = art.verdict_inputs or {}
+    if not vi:
+        return
+    fresh = vi.get("freshest_evidence_age_hours")
+    fresh_str = f"{fresh:.1f}h" if isinstance(fresh, (int, float)) else "n/a"
+    st = vi.get("strength_thresholds", {})
+    chain = "intact" if vi.get("chain_intact", True) else "BROKEN"
+    rows = [
+        ("Evidence record count",
+         f">= {vi.get('min_evidence_count', '?')}",
+         vi.get("evidence_count_observed", "?")),
+        ("Freshest evidence age",
+         f"<= {vi.get('staleness_hours', '?')}h",
+         fresh_str),
+        ("Strong-strength count",
+         f">= {st.get('strong_min_count', '?')}",
+         vi.get("evidence_count_observed", "?")),
+        ("Strong-strength freshness",
+         f"< {st.get('strong_max_age_hours', '?')}h",
+         fresh_str),
+        ("Future-timestamp records", "0",
+         vi.get("future_timestamp_count", 0)),
+        ("Chain integrity", "intact", chain),
+    ]
+    out.append("<strong>Verdict inputs</strong>")
+    out.append(
+        "<table><thead><tr><th>Parameter</th><th>Threshold</th>"
+        "<th>Observed</th></tr></thead><tbody>"
+    )
+    for name, threshold, observed in rows:
+        out.append(
+            f"<tr><td>{_esc(name)}</td><td>{_esc(threshold)}</td>"
+            f"<td>{_esc(observed)}</td></tr>"
+        )
+    out.append("</tbody></table>")
+    reasons = vi.get("verdict_reasons") or []
+    if reasons:
+        out.append("<strong>Verdict rationale</strong><ul>")
+        out.extend(f"<li>{_esc(r)}</li>" for r in reasons)
+        out.append("</ul>")
+
+
+def _html_append_contributing_events(out: list[str], art: ArticleEvidence) -> None:
+    """Render per-article 'Contributing events' table."""
+    events = art.contributing_events or []
+    if not events:
+        return
+    out.append(
+        "<strong>Contributing events</strong> (most recent first)"
+    )
+    out.append(
+        "<table><thead><tr><th>When</th><th>Event</th>"
+        "<th>Agent / tool</th><th>Drill-down</th><th>Record</th></tr>"
+        "</thead><tbody>"
+    )
+    for ev in events:
+        ts = ev.get("timestamp_iso") or "n/a"
+        age = ev.get("age_hours")
+        age_str = f" ({age:.2f}h)" if isinstance(age, (int, float)) else ""
+        agent = ev.get("agent_id", "?")
+        tool = ev.get("tool_name", "?")
+        drill = ev.get("drill_down") or {}
+        if drill:
+            drill_str = ", ".join(
+                f"<code>{_esc(k)}</code>=<code>{_esc(v)}</code>"
+                for k, v in drill.items()
+            )
+        else:
+            drill_str = "—"
+        out.append(
+            "<tr>"
+            f"<td>{_esc(ts)}{_esc(age_str)}</td>"
+            f"<td><code>{_esc(ev.get('event_type', '?'))}</code></td>"
+            f"<td>{_esc(agent)} / {_esc(tool)}</td>"
+            f"<td>{drill_str}</td>"
+            f"<td><code>{_esc(ev.get('record_id', '?'))}</code></td>"
+            "</tr>"
+        )
+    out.append("</tbody></table>")
 
 
 def render_html(report: ConformityReport) -> str:

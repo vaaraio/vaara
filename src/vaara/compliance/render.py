@@ -168,6 +168,8 @@ def render_markdown(report: ConformityReport) -> str:
                 lines.append("**Sample audit record IDs:**")
                 for rid in art.sample_record_ids[:5]:
                     lines.append(f"- `{rid}`")
+            _md_append_verdict_inputs(lines, art)
+            _md_append_contributing_events(lines, art)
             lines.append("")
 
     lines.append("---")
@@ -177,6 +179,91 @@ def render_markdown(report: ConformityReport) -> str:
         "runtime audit trail; deployer owns the conformity decision._"
     )
     return "\n".join(lines)
+
+
+def _md_append_verdict_inputs(lines: list[str], art: ArticleEvidence) -> None:
+    """Append the per-article 'Verdict inputs' subsection to the markdown body.
+
+    Surfaces threshold-vs-observed values and the verdict_reasons that the
+    engine produced. Auditors reading the markdown can trace the status
+    label back to the specific parameter that pushed it there.
+    """
+    vi = art.verdict_inputs or {}
+    if not vi:
+        return
+    lines.append("")
+    lines.append("**Verdict inputs:**")
+    lines.append("")
+    lines.append("| Parameter | Threshold | Observed |")
+    lines.append("|---|---|---|")
+    lines.append(
+        f"| Evidence record count | >= {vi.get('min_evidence_count', '?')} | "
+        f"{vi.get('evidence_count_observed', '?')} |"
+    )
+    fresh = vi.get("freshest_evidence_age_hours")
+    fresh_str = f"{fresh:.1f}h" if isinstance(fresh, (int, float)) else "n/a"
+    lines.append(
+        f"| Freshest evidence age | <= {vi.get('staleness_hours', '?')}h | "
+        f"{fresh_str} |"
+    )
+    st = vi.get("strength_thresholds", {})
+    lines.append(
+        f"| Strong-strength count | >= {st.get('strong_min_count', '?')} | "
+        f"{vi.get('evidence_count_observed', '?')} |"
+    )
+    lines.append(
+        f"| Strong-strength freshness | < {st.get('strong_max_age_hours', '?')}h | "
+        f"{fresh_str} |"
+    )
+    lines.append(
+        f"| Future-timestamp records | 0 | "
+        f"{vi.get('future_timestamp_count', 0)} |"
+    )
+    lines.append(
+        f"| Chain integrity | intact | "
+        f"{'intact' if vi.get('chain_intact', True) else 'BROKEN'} |"
+    )
+    reasons = vi.get("verdict_reasons") or []
+    if reasons:
+        lines.append("")
+        lines.append("**Verdict rationale:**")
+        for r in reasons:
+            lines.append(f"- {r}")
+
+
+def _md_append_contributing_events(lines: list[str], art: ArticleEvidence) -> None:
+    """Append the per-article 'Contributing events' subsection to the markdown body."""
+    events = art.contributing_events or []
+    if not events:
+        return
+    lines.append("")
+    lines.append("**Contributing events** (most recent first):")
+    lines.append("")
+    lines.append("| When | Event | Agent / tool | Drill-down |")
+    lines.append("|---|---|---|---|")
+    for ev in events:
+        ts = ev.get("timestamp_iso") or "n/a"
+        age = ev.get("age_hours")
+        age_str = f" ({age:.2f}h)" if isinstance(age, (int, float)) else ""
+        agent = ev.get("agent_id", "?")
+        tool = ev.get("tool_name", "?")
+        drill = ev.get("drill_down") or {}
+        if drill:
+            drill_bits = ", ".join(
+                f"`{k}`=`{v}`" for k, v in drill.items()
+            )
+        else:
+            drill_bits = "—"
+        lines.append(
+            f"| {ts}{age_str} | `{ev.get('event_type', '?')}` | "
+            f"{agent} / {tool} | {drill_bits} |"
+        )
+    lines.append("")
+    lines.append("Record IDs:")
+    for ev in events:
+        lines.append(
+            f"- `{ev.get('record_id', '?')}` (action `{ev.get('action_id', '?')}`)"
+        )
 
 
 _PDF_STATUS_LABEL = {
@@ -417,7 +504,123 @@ def _pdf_append_articles(
                     ),
                     small,
                 ))
+            _pdf_append_verdict_inputs(
+                flow, art, Paragraph, Spacer, Table, TableStyle, colors,
+                cm, body, small,
+            )
+            _pdf_append_contributing_events(
+                flow, art, Paragraph, Spacer, Table, TableStyle, colors,
+                cm, body, small,
+            )
             flow.append(Spacer(1, 0.3 * cm))
+
+
+def _pdf_append_verdict_inputs(
+    flow, art, Paragraph, Spacer, Table, TableStyle, colors, cm, body, small,
+) -> None:
+    """Append per-article 'Verdict inputs' table + rationale to a PDF flow."""
+    vi = art.verdict_inputs or {}
+    if not vi:
+        return
+    flow.append(Spacer(1, 0.15 * cm))
+    flow.append(Paragraph("<b>Verdict inputs:</b>", body))
+    fresh = vi.get("freshest_evidence_age_hours")
+    fresh_str = f"{fresh:.1f}h" if isinstance(fresh, (int, float)) else "n/a"
+    st = vi.get("strength_thresholds", {})
+    rows = [
+        ["Parameter", "Threshold", "Observed"],
+        ["Evidence record count",
+         f">= {vi.get('min_evidence_count', '?')}",
+         str(vi.get('evidence_count_observed', '?'))],
+        ["Freshest evidence age",
+         f"<= {vi.get('staleness_hours', '?')}h",
+         fresh_str],
+        ["Strong-strength count",
+         f">= {st.get('strong_min_count', '?')}",
+         str(vi.get('evidence_count_observed', '?'))],
+        ["Strong-strength freshness",
+         f"< {st.get('strong_max_age_hours', '?')}h",
+         fresh_str],
+        ["Future-timestamp records", "0",
+         str(vi.get('future_timestamp_count', 0))],
+        ["Chain integrity", "intact",
+         "intact" if vi.get('chain_intact', True) else "BROKEN"],
+    ]
+    table = Table(rows, colWidths=[6 * cm, 4.5 * cm, 5 * cm], repeatRows=1)
+    table.setStyle(TableStyle([
+        ("BACKGROUND", (0, 0), (-1, 0), colors.HexColor("#eeeeee")),
+        ("FONTNAME", (0, 0), (-1, 0), "Helvetica-Bold"),
+        ("FONTSIZE", (0, 0), (-1, -1), 8),
+        ("BOX", (0, 0), (-1, -1), 0.4, colors.grey),
+        ("INNERGRID", (0, 0), (-1, -1), 0.2, colors.lightgrey),
+        ("VALIGN", (0, 0), (-1, -1), "TOP"),
+        ("LEFTPADDING", (0, 0), (-1, -1), 3),
+        ("RIGHTPADDING", (0, 0), (-1, -1), 3),
+        ("TOPPADDING", (0, 0), (-1, -1), 2),
+        ("BOTTOMPADDING", (0, 0), (-1, -1), 2),
+    ]))
+    flow.append(table)
+    reasons = vi.get("verdict_reasons") or []
+    if reasons:
+        flow.append(Spacer(1, 0.1 * cm))
+        flow.append(Paragraph("<b>Verdict rationale:</b>", body))
+        for r in reasons:
+            flow.append(Paragraph("• " + _pdf_escape(r), body))
+
+
+def _pdf_append_contributing_events(
+    flow, art, Paragraph, Spacer, Table, TableStyle, colors, cm, body, small,
+) -> None:
+    """Append per-article 'Contributing events' table to a PDF flow."""
+    events = art.contributing_events or []
+    if not events:
+        return
+    flow.append(Spacer(1, 0.15 * cm))
+    flow.append(Paragraph(
+        "<b>Contributing events</b> (most recent first):", body,
+    ))
+    rows = [["When", "Event", "Agent / tool", "Drill-down"]]
+    for ev in events:
+        ts = ev.get("timestamp_iso") or "n/a"
+        age = ev.get("age_hours")
+        age_str = f"\n({age:.2f}h)" if isinstance(age, (int, float)) else ""
+        agent = _pdf_escape(ev.get("agent_id", "?"))
+        tool = _pdf_escape(ev.get("tool_name", "?"))
+        drill = ev.get("drill_down") or {}
+        drill_str = _pdf_escape(
+            ", ".join(f"{k}={v}" for k, v in drill.items()) or "—"
+        )
+        rows.append([
+            ts + age_str,
+            ev.get("event_type", "?"),
+            f"{agent} / {tool}",
+            drill_str,
+        ])
+    table = Table(
+        rows,
+        colWidths=[3.6 * cm, 3.2 * cm, 4.5 * cm, 4.2 * cm],
+        repeatRows=1,
+    )
+    table.setStyle(TableStyle([
+        ("BACKGROUND", (0, 0), (-1, 0), colors.HexColor("#eeeeee")),
+        ("FONTNAME", (0, 0), (-1, 0), "Helvetica-Bold"),
+        ("FONTSIZE", (0, 0), (-1, -1), 7),
+        ("BOX", (0, 0), (-1, -1), 0.4, colors.grey),
+        ("INNERGRID", (0, 0), (-1, -1), 0.2, colors.lightgrey),
+        ("VALIGN", (0, 0), (-1, -1), "TOP"),
+        ("LEFTPADDING", (0, 0), (-1, -1), 3),
+        ("RIGHTPADDING", (0, 0), (-1, -1), 3),
+        ("TOPPADDING", (0, 0), (-1, -1), 2),
+        ("BOTTOMPADDING", (0, 0), (-1, -1), 2),
+    ]))
+    flow.append(table)
+    flow.append(Spacer(1, 0.1 * cm))
+    rid_bits = "; ".join(
+        f"<font face='Courier' size='7'>{ev.get('record_id', '?')}</font>"
+        f" (action <font face='Courier' size='7'>{ev.get('action_id', '?')}</font>)"
+        for ev in events
+    )
+    flow.append(Paragraph("<b>Record IDs:</b> " + rid_bits, small))
 
 
 def _pdf_escape(value: object) -> str:

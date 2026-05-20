@@ -124,6 +124,46 @@ def test_render_markdown_includes_summary_section():
     assert "## Summary" in md
 
 
+def test_render_markdown_surfaces_verdict_inputs_and_events():
+    """v0.26 drill-down: markdown body must surface verdict thresholds and
+    the contributing event rows so an auditor can trace status without
+    re-running the engine."""
+    trail = _populated_trail()
+    report = create_default_engine().assess(trail)
+    md = render_markdown(report)
+    assert "**Verdict inputs:**" in md
+    assert "| Parameter | Threshold | Observed |" in md
+    assert "Evidence record count" in md
+    assert "Strong-strength count" in md
+    assert "**Verdict rationale:**" in md
+    assert "**Contributing events**" in md
+    # Drill-down values from the populated trail should appear.
+    assert "point_estimate" in md or "decision" in md
+
+
+def test_render_narrative_surfaces_verdict_reasoning():
+    trail = _populated_trail()
+    report = create_default_engine().assess(trail)
+    narr = render_narrative(report)
+    # Each runtime article narrative includes a "Why:" line and an "Event:"
+    # line so a regulator reading plain text gets the rationale + receipts.
+    assert "Why:" in narr
+    assert "Event:" in narr
+
+
+@pytest.mark.skipif(not _HAS_REPORTLAB, reason="reportlab not installed")
+def test_render_pdf_includes_verdict_drill_down(tmp_path):
+    """PDF flow must include verdict-inputs table + contributing-events table.
+    Exact byte search is hopeless inside a compressed PDF, so this verifies
+    the renderer doesn't crash on a populated trail with the new sections."""
+    trail = _populated_trail()
+    report = create_default_engine().assess(trail)
+    out = tmp_path / "drill.pdf"
+    size = render_pdf(report, out)
+    assert size > 0
+    assert out.read_bytes().startswith(b"%PDF-")
+
+
 @pytest.mark.skipif(not _HAS_REPORTLAB, reason="reportlab not installed")
 def test_render_pdf_produces_valid_pdf(tmp_path):
     trail = _populated_trail()
