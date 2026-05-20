@@ -129,3 +129,16 @@ def test_html_critical_gaps_section_when_present(monkeypatch):
     out = render_html(report)
     assert "Critical gaps" in out
     assert "chain integrity broken" in out
+
+
+def test_html_surfaces_verdict_inputs_and_contributing_events():
+    """v0.26 drill-down: dashboard must expose the threshold-vs-actual table
+    and the contributing-events list under each runtime article."""
+    out = render_html(_report())
+    assert "Verdict inputs" in out
+    assert "Verdict rationale" in out
+    assert "Contributing events" in out
+    # Threshold/observed columns and a known parameter row.
+    assert "Threshold" in out
+    assert "Observed" in out
+    assert "Evidence record count" in out

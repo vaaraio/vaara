@@ -72,6 +72,8 @@ else:
 
 The same data renders as a styled PDF for Notified Bodies (`vaara compliance report --format pdf`, requires `pip install 'vaara[pdf]'`), a static HTML dashboard (`vaara compliance dashboard`), or a Sigstore-signed regulator-handoff envelope (`vaara trail export`, optional ML-DSA-65 / FIPS 204 post-quantum signer via `pip install 'vaara[pq]'`).
 
+**Per-article verdict drill-down** (since v0.26.0). Each article in the report now carries two extra surfaces a reviewer can read without re-running the engine. `verdict_inputs` lists the threshold-vs-observed snapshot the engine compared against (minimum record count, staleness window, strong-strength bounds, future-timestamp and chain-integrity flags) plus a `verdict_reasons` list of human-readable rationale lines explaining why the status and strength landed where they did. `contributing_events` lists the most recent qualifying audit records the verdict sits on (record ID, action ID, ISO timestamp, agent, tool, and a filtered `drill_down` dict of just the data fields that fed the risk/decision/outcome: point estimate, conformal interval, decision, reason, outcome severity). The drill-down renders in every output format: JSON, markdown, narrative, PDF, and the HTML dashboard. An auditor reading the report can trace `status → threshold delta → concrete event` in one sitting.
+
 ## Numbers
 
 Concrete evidence the system performs at levels relevant to high-risk-use deployments. Each figure is reproducible from the public corpus or the bench harness in `bench/`.
@@ -217,7 +219,7 @@ from vaara.attestation.overt import emit_base_envelope, make_request_commitment,
 envelope = emit_base_envelope(
     signing_key=key,
     request_commitment=make_request_commitment(payload, operator_key=op_key),
-    encoder_binary_identity=encoder_binary_identity(arbiter_version="vaara/0.25.0", policy_hash=ph),
+    encoder_binary_identity=encoder_binary_identity(arbiter_version="vaara/0.26.0", policy_hash=ph),
     non_content_metadata={"action_class": "tx.transfer", "decision": "escalate"},
     monotonic_counter=42,
     arbiter_instance_identifier=uuid_bytes,
