@@ -6,6 +6,29 @@ and this project follows [Semantic Versioning](https://semver.org/spec/v2.0.0.ht
 
 ## [Unreleased]
 
+## [0.23.1] - 2026-05-20
+
+**Theme: CI fix.** The v0.23.0 release workflow flipped `npm publish` to
+OIDC-only trusted publishing, but the npmjs.com side of the
+`@vaara/client` package was not yet configured for a trusted publisher.
+The npm leg of the v0.23.0 release therefore failed with a 404 on PUT,
+even though PyPI shipped cleanly and the GitHub Release was signed and
+attached. This patch restores the token + provenance model that v0.22.0
+used.
+
+### Fixed
+- `.github/workflows/release.yml`: re-add `NODE_AUTH_TOKEN: ${{ secrets.NPM_TOKEN }}`
+  env on the npm publish step. The `--provenance` flag is preserved, so
+  the npm package still ships with a Sigstore-attested provenance
+  statement from the GitHub Actions OIDC token. Auth flows via the
+  token, provenance flows via OIDC. OIDC-only publishing can return
+  later once trusted publishing is configured on the npm package
+  settings page.
+
+### Unchanged
+- Library code, public API, audit chain format, OVERT envelope schema,
+  MCP proxy behavior. v0.23.1 is a pure CI fix.
+
 ## [0.23.0] - 2026-05-20
 
 **Theme: MCP proxy closes the surface-coverage gap.** Resources and
