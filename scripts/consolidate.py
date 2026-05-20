@@ -116,6 +116,8 @@ def apply_moves(archive):
     for e in archive:
         src, dst = REPO / e["file"], bucket / e["file"]
         if src.exists():
+            if dst.exists():
+                raise FileExistsError(f"Archive destination already exists: {dst}")
             shutil.move(str(src), str(dst))
             moves.append({"from": str(src.relative_to(REPO)),
                           "to": str(dst.relative_to(REPO)),
@@ -127,9 +129,13 @@ def apply_moves(archive):
 
 def undo_manifest(mp):
     data = json.loads(mp.read_text())
+    repo_root = REPO.resolve()
     n = 0
     for m in data["moves"]:
-        src, dst = REPO / m["to"], REPO / m["from"]
+        src = (REPO / m["to"]).resolve()
+        dst = (REPO / m["from"]).resolve()
+        if not src.is_relative_to(repo_root) or not dst.is_relative_to(repo_root):
+            raise ValueError(f"Unsafe manifest path (outside repo root): {m}")
         if src.exists():
             shutil.move(str(src), str(dst))
             n += 1
