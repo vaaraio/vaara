@@ -40,6 +40,8 @@ class VaaraMCPProxy:
         pipeline: Optional[InterceptionPipeline] = None,
         db_path: Optional[Path] = None,
         agent_id_default: str = "mcp-proxy-client",
+        allowlist: Optional[set[str]] = None,
+        denylist: Optional[set[str]] = None,
     ) -> None:
         if pipeline is not None:
             self._pipeline = pipeline
@@ -50,11 +52,23 @@ class VaaraMCPProxy:
             trail = AuditTrail(on_record=self._backend.write_record)
             self._pipeline = InterceptionPipeline(trail=trail)
         self._agent_id_default = agent_id_default
+        # An empty allowlist means "no restriction" (None and empty set are equivalent
+        # here); a non-empty allowlist restricts to exactly those names. Denylist
+        # always subtracts. When both are set, denylist wins on overlap.
+        self._allowlist: Optional[set[str]] = set(allowlist) if allowlist else None
+        self._denylist: set[str] = set(denylist) if denylist else set()
         self._stdout_lock = threading.Lock()
         self._upstream = UpstreamMCPClient(
             command=upstream_command,
             on_notification=self._forward_notification_to_client,
         )
+
+    def _tool_filtered(self, name: str) -> bool:
+        if name in self._denylist:
+            return True
+        if self._allowlist is not None and name not in self._allowlist:
+            return True
+        return False
 
     def run(self) -> None:
         """Read JSON-RPC from stdin, write to stdout, route through upstream."""
@@ -90,10 +104,37 @@ class VaaraMCPProxy:
             except Exception:
                 logger.exception("Error in tools/call interception")
                 return self._error_response(req_id, -32603, "Internal proxy error")
+        if method == "tools/list":
+            try:
+                return self._handle_tools_list(request)
+            except ProxyError as e:
+                return self._error_response(req_id, -32603, f"Upstream unavailable: {e}")
         try:
             return self._upstream.request(request)
         except ProxyError as e:
             return self._error_response(req_id, -32603, f"Upstream unavailable: {e}")
+
+    def _handle_tools_list(self, request: dict) -> dict:
+        response = self._upstream.request(request)
+        if not (self._denylist or self._allowlist is not None):
+            return response
+        if not isinstance(response, dict) or "result" not in response:
+            return response
+        result = response.get("result")
+        if not isinstance(result, dict):
+            return response
+        tools = result.get("tools")
+        if not isinstance(tools, list):
+            return response
+        filtered = [
+            t for t in tools
+            if isinstance(t, dict) and not self._tool_filtered(t.get("name", ""))
+        ]
+        # Mutate a shallow copy so the upstream response object the reader
+        # parked is not aliased into the client-facing payload.
+        new_result = dict(result)
+        new_result["tools"] = filtered
+        return {**response, "result": new_result}
 
     def _handle_tools_call(self, request: dict) -> dict:
         params = request.get("params") or {}
@@ -103,6 +144,23 @@ class VaaraMCPProxy:
         arguments = params.get("arguments", {}) or {}
         if not isinstance(arguments, dict):
             arguments = {}
+        if self._tool_filtered(tool_name):
+            logger.warning(
+                "tools/call rejected at perimeter (operator filter): %s", tool_name,
+            )
+            block_payload = {
+                "vaara_blocked": True,
+                "reason": "Tool filtered by operator policy",
+                "decision": "FILTERED",
+                "tool": tool_name,
+            }
+            return {
+                "jsonrpc": "2.0", "id": request.get("id"),
+                "result": {
+                    "content": [{"type": "text", "text": strict_json_dumps(block_payload, indent=2)}],
+                    "isError": True,
+                },
+            }
         # _vaara_agent_id is a proxy-side override for audit attribution;
         # strip before forwarding so the upstream never sees Vaara metadata.
         agent_id = arguments.pop("_vaara_agent_id", self._agent_id_default)
@@ -178,6 +236,13 @@ def main(argv: Optional[list[str]] = None) -> None:
                         help="Audit database path (default: $VAARA_DB or ./vaara_audit.db)")
     parser.add_argument("--agent-id", default="mcp-proxy-client",
                         help="Default agent_id for the audit trail")
+    parser.add_argument("--allow-tool", action="append", default=[], dest="allow_tools",
+                        help="Only expose this tool name (repeatable). If any --allow-tool "
+                             "is given, all other upstream tools are filtered from tools/list "
+                             "and rejected at tools/call.")
+    parser.add_argument("--deny-tool", action="append", default=[], dest="deny_tools",
+                        help="Filter this tool name from tools/list and reject any tools/call "
+                             "to it (repeatable). Denylist wins on overlap with --allow-tool.")
     args = parser.parse_args(argv)
     logging.basicConfig(level=logging.INFO,
                         format="%(asctime)s %(name)s %(levelname)s %(message)s",
@@ -185,6 +250,8 @@ def main(argv: Optional[list[str]] = None) -> None:
     proxy = VaaraMCPProxy(
         upstream_command=[args.upstream, *args.upstream_args],
         db_path=args.db, agent_id_default=args.agent_id,
+        allowlist=set(args.allow_tools) if args.allow_tools else None,
+        denylist=set(args.deny_tools) if args.deny_tools else None,
     )
     try:
         proxy.run()
