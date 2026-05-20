@@ -447,6 +447,129 @@ def test_uninterpreted_method_still_forwards_verbatim(monkeypatch):
     pipeline.intercept.assert_not_called()
 
 
+# --- streaming notification audit (v0.25.0) ---------------------------------
+
+def test_progress_notification_records_perimeter_audit(monkeypatch):
+    p, pipeline = _make_proxy(monkeypatch)
+    p._on_upstream_notification({
+        "jsonrpc": "2.0", "method": "notifications/progress",
+        "params": {"progressToken": "tok-1", "progress": 25, "total": 100},
+    })
+    classify = pipeline.registry.classify
+    classify.assert_called_with("mcp.notification.progress", {
+        "progressToken": "tok-1", "parent_action_id": "", "parent_tool": "",
+    })
+    pipeline.trail.record_action_requested.assert_called_once()
+    pipeline.trail.record_decision.assert_called_once()
+
+
+def test_progress_notification_correlates_to_inflight_tools_call(monkeypatch):
+    p, pipeline = _make_proxy(monkeypatch)
+    pipeline.intercept.return_value = _StubInterceptResult(allowed=True, action_id="parent-act-9")
+    progress_seen: list[dict] = []
+
+    def upstream_request(req):
+        if req["method"] == "tools/call":
+            # Simulate a progress notification arriving while the upstream
+            # works on the long-running call. The reader thread would invoke
+            # this callback from a separate thread in production; calling it
+            # synchronously here verifies the correlation logic.
+            p._on_upstream_notification({
+                "jsonrpc": "2.0", "method": "notifications/progress",
+                "params": {"progressToken": "tok-stream", "progress": 50, "total": 100},
+            })
+            progress_seen.append(
+                dict(p._inflight_progress),
+            )
+        return {"jsonrpc": "2.0", "id": req["id"], "result": {}}
+
+    p._upstream.request.side_effect = upstream_request
+    p._handle_tools_call({
+        "jsonrpc": "2.0", "id": 42, "method": "tools/call",
+        "params": {
+            "name": "long_tool", "arguments": {},
+            "_meta": {"progressToken": "tok-stream"},
+        },
+    })
+    assert progress_seen == [{"tok-stream": ("parent-act-9", "mcp-proxy-client", "long_tool")}]
+    # Map is cleaned up after the call returns.
+    assert p._inflight_progress == {}
+    # Audit was called for the progress event with the parent correlation.
+    classify_calls = [c for c in pipeline.registry.classify.call_args_list
+                      if c.args[0] == "mcp.notification.progress"]
+    assert len(classify_calls) == 1
+    params = classify_calls[0].args[1]
+    assert params["parent_action_id"] == "parent-act-9"
+    assert params["parent_tool"] == "long_tool"
+
+
+def test_progress_notification_forwards_to_client(monkeypatch):
+    p, _ = _make_proxy(monkeypatch)
+    forwarded: list[dict] = []
+    monkeypatch.setattr(p, "_write_to_client", forwarded.append)
+    msg = {
+        "jsonrpc": "2.0", "method": "notifications/progress",
+        "params": {"progressToken": "tok-2", "progress": 1, "total": 1},
+    }
+    p._on_upstream_notification(msg)
+    assert forwarded == [msg]
+
+
+def test_message_notification_records_perimeter_audit(monkeypatch):
+    p, pipeline = _make_proxy(monkeypatch)
+    p._on_upstream_notification({
+        "jsonrpc": "2.0", "method": "notifications/message",
+        "params": {"level": "info", "logger": "upstream", "data": "working"},
+    })
+    classify = pipeline.registry.classify
+    classify.assert_called_with("mcp.notification.message", {
+        "level": "info", "logger": "upstream",
+    })
+
+
+def test_non_governed_notification_still_forwards_without_audit(monkeypatch):
+    p, pipeline = _make_proxy(monkeypatch)
+    forwarded: list[dict] = []
+    monkeypatch.setattr(p, "_write_to_client", forwarded.append)
+    msg = {
+        "jsonrpc": "2.0", "method": "notifications/resources/list_changed",
+        "params": {},
+    }
+    p._on_upstream_notification(msg)
+    assert forwarded == [msg]
+    pipeline.registry.classify.assert_not_called()
+
+
+def test_audit_failure_in_notification_does_not_break_forwarding(monkeypatch):
+    p, pipeline = _make_proxy(monkeypatch)
+    pipeline.registry.classify.side_effect = RuntimeError("audit blew up")
+    forwarded: list[dict] = []
+    monkeypatch.setattr(p, "_write_to_client", forwarded.append)
+    msg = {
+        "jsonrpc": "2.0", "method": "notifications/message",
+        "params": {"level": "error"},
+    }
+    p._on_upstream_notification(msg)
+    # Forward still happens — audit failure must not block streaming.
+    assert forwarded == [msg]
+
+
+def test_inflight_map_cleaned_when_tools_call_raises(monkeypatch):
+    p, pipeline = _make_proxy(monkeypatch)
+    pipeline.intercept.return_value = _StubInterceptResult(allowed=True, action_id="x")
+    from vaara.integrations._mcp_upstream import ProxyError
+    p._upstream.request.side_effect = ProxyError("boom")
+    with pytest.raises(ProxyError):
+        p._handle_tools_call({
+            "jsonrpc": "2.0", "id": 1, "method": "tools/call",
+            "params": {
+                "name": "t", "arguments": {},
+                "_meta": {"progressToken": "tok-err"},
+            },
+        })
+    assert p._inflight_progress == {}
+
+
 def test_upstream_request_raises_proxy_error_when_reader_exits_without_response(monkeypatch):
     """Regression: reader-thread exit during request must raise ProxyError, not AssertionError.
 
