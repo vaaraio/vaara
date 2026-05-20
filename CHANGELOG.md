@@ -6,6 +6,20 @@ and this project follows [Semantic Versioning](https://semver.org/spec/v2.0.0.ht
 
 ## [Unreleased]
 
+### Added
+- MCP proxy: operator-side tool filtering at the perimeter.
+  `python -m vaara.integrations.mcp_proxy` now accepts repeatable
+  `--allow-tool NAME` and `--deny-tool NAME` flags. Filtered tools are
+  dropped from `tools/list` responses before the client sees them, and
+  any `tools/call` to a filtered tool is rejected at the proxy with an
+  MCP `isError: true` payload (`decision: "FILTERED"`,
+  `reason: "Tool filtered by operator policy"`) without forwarding
+  upstream or invoking the risk pipeline. Denylist wins on overlap with
+  allowlist. Backward compatible: no flags = current passthrough
+  behavior. Use case: hide write/delete tools (e.g. `delete_repository`,
+  `create_branch`) from an MCP client when the upstream server exposes
+  more capability than the deployment policy allows.
+
 ## [0.21.0] - 2026-05-19
 
 **Theme: MCP-aware proxy.** Adds
