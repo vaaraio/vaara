@@ -230,6 +230,12 @@ class ArticleEvidence:
     sample_record_ids: list[str] = field(default_factory=list)
     gaps: list[str] = field(default_factory=list)
     recommendations: list[str] = field(default_factory=list)
+    # v0.26 verdict drill-down: the parameter inputs that pushed the
+    # status/strength into their current bound, plus the specific
+    # audit events that drove the verdict. An auditor reading the
+    # report can trace status -> threshold deltas -> concrete events.
+    verdict_inputs: dict = field(default_factory=dict)
+    contributing_events: list[dict] = field(default_factory=list)
 
     def to_dict(self) -> dict:
         # When evidence_count==0 the freshness ages are float('inf') sentinel
@@ -255,6 +261,8 @@ class ArticleEvidence:
             "gaps": self.gaps,
             "recommendations": self.recommendations,
             "sample_record_ids": self.sample_record_ids[:5],
+            "verdict_inputs": self.verdict_inputs,
+            "contributing_events": self.contributing_events,
         }
 
 
@@ -346,10 +354,269 @@ class ConformityReport:
                 if art.recommendations:
                     for rec in art.recommendations:
                         lines.append(f"       Rec: {rec}")
+                for reason in (art.verdict_inputs or {}).get(
+                    "verdict_reasons", []
+                ):
+                    lines.append(f"       Why: {reason}")
+                for ev in (art.contributing_events or [])[:3]:
+                    ts = ev.get("timestamp_iso") or "n/a"
+                    drill = ev.get("drill_down") or {}
+                    drill_str = (
+                        " " + ", ".join(f"{k}={v}" for k, v in drill.items())
+                        if drill else ""
+                    )
+                    lines.append(
+                        f"       Event: {ts} {ev.get('event_type', '?')} "
+                        f"{ev.get('tool_name', '?')}{drill_str}"
+                    )
             lines.append("")
 
         lines.append(f"SUMMARY: {self.summary}")
         return "\n".join(lines)
+
+
+# ── Verdict drill-down helpers ────────────────────────────────────────────
+#
+# Auditors reading an evidence report need to trace a status (sufficient /
+# partial / insufficient) back to (a) the threshold inputs the engine used
+# and (b) the specific audit events that pushed each input into its current
+# value. These helpers build the JSON-portable payload the renderers expose
+# under each article's `verdict_inputs` and `contributing_events`.
+
+# Per-event fields surfaced in the drill-down. Keep this list explicit:
+# the audit record's full `data` dict may contain caller-supplied payload
+# (action parameters, override reasons) that is fine to log but should not
+# be inlined verbatim into a regulator-facing report. Only the fields that
+# directly contribute to risk/decision/outcome reasoning are exposed here.
+_DRILL_DOWN_DATA_KEYS = (
+    "point_estimate",
+    "conformal_lower",
+    "conformal_upper",
+    "risk_score",
+    "decision",
+    "reason",
+    "outcome_severity",
+    "escalation_target",
+    "resolution",
+    "reviewer",
+    "override_reason",
+)
+
+
+def _external_evidence_verdict_inputs(req: RegulatoryRequirement) -> dict:
+    """Verdict inputs for articles that need external (non-runtime) evidence."""
+    return {
+        "min_evidence_count": req.min_evidence_count,
+        "staleness_hours": req.staleness_hours,
+        "evidence_event_types": [],
+        "evidence_count_observed": 0,
+        "freshest_evidence_age_hours": None,
+        "oldest_evidence_age_hours": None,
+        "future_timestamp_count": 0,
+        "chain_intact": True,
+        "strength_thresholds": {
+            "strong_min_count": req.min_evidence_count * 2,
+            "strong_max_age_hours": req.staleness_hours / 4 if req.staleness_hours else 0.0,
+            "moderate_min_count": req.min_evidence_count,
+            "moderate_max_age_hours": req.staleness_hours,
+        },
+        "verdict_reasons": [
+            "Requirement is documentary, not runtime-observable; "
+            "evidence must be supplied out-of-band.",
+        ],
+    }
+
+
+def _build_verdict_inputs(
+    req: RegulatoryRequirement,
+    *,
+    evidence_count: int,
+    freshest_age_hours: float,
+    oldest_age_hours: float,
+    future_timestamp_count: int,
+    status: "EvidenceStatus",
+    strength: "EvidenceStrength",
+) -> dict:
+    """Threshold-vs-actual snapshot that drove this article's verdict.
+
+    The returned dict is JSON-strict (no inf/NaN) and lists, in
+    ``verdict_reasons``, the human-readable rationale for why the status
+    and strength landed where they did.
+    """
+    import math as _math
+
+    def _finite_or_none(v: float) -> Optional[float]:
+        return round(v, 1) if _math.isfinite(v) else None
+
+    strong_min_count = req.min_evidence_count * 2
+    strong_max_age = req.staleness_hours / 4 if req.staleness_hours else 0.0
+
+    reasons = _verdict_reasons(
+        req,
+        evidence_count=evidence_count,
+        freshest_age_hours=freshest_age_hours,
+        future_timestamp_count=future_timestamp_count,
+        status=status,
+        strength=strength,
+        strong_min_count=strong_min_count,
+        strong_max_age=strong_max_age,
+    )
+
+    return {
+        "min_evidence_count": req.min_evidence_count,
+        "staleness_hours": req.staleness_hours,
+        "evidence_event_types": [et.value for et in req.evidence_event_types],
+        "evidence_count_observed": evidence_count,
+        "freshest_evidence_age_hours": _finite_or_none(freshest_age_hours),
+        "oldest_evidence_age_hours": _finite_or_none(oldest_age_hours),
+        "future_timestamp_count": future_timestamp_count,
+        "chain_intact": True,
+        "strength_thresholds": {
+            "strong_min_count": strong_min_count,
+            "strong_max_age_hours": round(strong_max_age, 2),
+            "moderate_min_count": req.min_evidence_count,
+            "moderate_max_age_hours": req.staleness_hours,
+        },
+        "verdict_reasons": reasons,
+    }
+
+
+def _verdict_reasons(
+    req: RegulatoryRequirement,
+    *,
+    evidence_count: int,
+    freshest_age_hours: float,
+    future_timestamp_count: int,
+    status: "EvidenceStatus",
+    strength: "EvidenceStrength",
+    strong_min_count: int,
+    strong_max_age: float,
+) -> list[str]:
+    """Render the human-readable rationale lines for the verdict_inputs payload."""
+    reasons: list[str] = []
+    if evidence_count == 0:
+        reasons.append(
+            f"No records of types {[et.value for et in req.evidence_event_types]} "
+            "found; status pinned to INSUFFICIENT."
+        )
+        return reasons
+
+    if status == EvidenceStatus.EVIDENCE_SUFFICIENT:
+        reasons.append(
+            f"Status SUFFICIENT: {evidence_count} record(s) >= threshold "
+            f"{req.min_evidence_count}, freshest {freshest_age_hours:.1f}h "
+            f"within {req.staleness_hours:.0f}h staleness window, "
+            "no clock-skew indicators."
+        )
+    elif status == EvidenceStatus.EVIDENCE_PARTIAL:
+        if freshest_age_hours > req.staleness_hours:
+            reasons.append(
+                f"Status PARTIAL: {evidence_count} record(s) meet count "
+                f"threshold {req.min_evidence_count} but freshest "
+                f"{freshest_age_hours:.1f}h exceeds {req.staleness_hours:.0f}h "
+                "staleness window."
+            )
+        else:
+            reasons.append(
+                f"Status PARTIAL: {evidence_count} record(s) present but one "
+                "or more freshness/integrity checks flagged a gap."
+            )
+    else:
+        short_by = max(0, req.min_evidence_count - evidence_count)
+        reasons.append(
+            f"Status INSUFFICIENT: {evidence_count} record(s) below threshold "
+            f"{req.min_evidence_count} (short by {short_by})."
+        )
+
+    if strength == EvidenceStrength.STRONG:
+        reasons.append(
+            f"Strength STRONG: {evidence_count} >= 2x threshold "
+            f"({strong_min_count}) and freshness {freshest_age_hours:.1f}h "
+            f"< staleness/4 ({strong_max_age:.1f}h)."
+        )
+    elif strength == EvidenceStrength.MODERATE:
+        if evidence_count < strong_min_count:
+            reasons.append(
+                f"Strength MODERATE: {evidence_count} below 2x threshold "
+                f"({strong_min_count}) needed for STRONG."
+            )
+        elif freshest_age_hours >= strong_max_age:
+            reasons.append(
+                f"Strength MODERATE: freshness {freshest_age_hours:.1f}h "
+                f">= staleness/4 ({strong_max_age:.1f}h) needed for STRONG."
+            )
+        else:
+            reasons.append("Strength MODERATE.")
+    elif strength == EvidenceStrength.WEAK:
+        reasons.append(
+            f"Strength WEAK: {evidence_count} record(s) below threshold "
+            f"{req.min_evidence_count} or freshness {freshest_age_hours:.1f}h "
+            f"exceeds {req.staleness_hours:.0f}h."
+        )
+    else:
+        reasons.append("Strength ABSENT: no qualifying records.")
+
+    if future_timestamp_count > 0:
+        reasons.append(
+            f"Strength downgraded one tier: {future_timestamp_count} record(s) "
+            "carry future timestamps; freshness signal cannot be trusted."
+        )
+    return reasons
+
+
+def _build_contributing_events(
+    records: list,
+    *,
+    now: float,
+    max_events: int = 5,
+) -> list[dict]:
+    """Pick the audit events that the per-article verdict sits on.
+
+    Strategy: the most recent ``max_events`` qualifying records (freshness
+    is the dominant verdict driver). Each event is serialised to a small
+    JSON-portable dict containing only the data fields that directly feed
+    risk/decision/outcome reasoning. Caller-supplied free-form payload is
+    not inlined — those belong in the audit record itself, not in a
+    regulator-facing summary.
+    """
+    import math as _math
+
+    if not records:
+        return []
+    by_recency = sorted(
+        records,
+        key=lambda r: (
+            r.timestamp
+            if isinstance(r.timestamp, (int, float)) and _math.isfinite(r.timestamp)
+            else float("-inf")
+        ),
+        reverse=True,
+    )
+    out: list[dict] = []
+    for r in by_recency[:max_events]:
+        ts = r.timestamp
+        if isinstance(ts, (int, float)) and _math.isfinite(ts):
+            ts_iso = time.strftime("%Y-%m-%dT%H:%M:%SZ", time.gmtime(ts))
+            age_hours: Optional[float] = round(max(0.0, (now - ts) / 3600), 2)
+        else:
+            ts_iso = None
+            age_hours = None
+        drill: dict = {}
+        for key in _DRILL_DOWN_DATA_KEYS:
+            if isinstance(r.data, dict) and key in r.data:
+                drill[key] = r.data[key]
+        out.append({
+            "record_id": r.record_id,
+            "action_id": r.action_id,
+            "event_type": r.event_type.value,
+            "timestamp_iso": ts_iso,
+            "age_hours": age_hours,
+            "agent_id": r.agent_id,
+            "tool_name": r.tool_name,
+            "narrative": r.narrative,
+            "drill_down": drill,
+        })
+    return out
 
 
 # ── Compliance Engine ─────────────────────────────────────────────────────
@@ -420,6 +687,14 @@ class ComplianceEngine:
                     "Investigate chain break, restore from verified "
                     "backup, and re-run conformity assessment",
                 )
+                if evidence.verdict_inputs:
+                    evidence.verdict_inputs["chain_intact"] = False
+                    evidence.verdict_inputs.setdefault("verdict_reasons", []).insert(
+                        0,
+                        "Audit chain integrity compromised; status pinned to "
+                        "INSUFFICIENT and strength to ABSENT regardless of "
+                        "per-article evidence count.",
+                    )
             articles.append(evidence)
 
             if (
@@ -489,6 +764,8 @@ class ComplianceEngine:
                 recommendations=[
                     "Provide technical documentation as per Annex IV"
                 ],
+                verdict_inputs=_external_evidence_verdict_inputs(req),
+                contributing_events=[],
             )
 
         # Collect evidence records
@@ -515,6 +792,16 @@ class ComplianceEngine:
                     f"Enable {', '.join(et.value for et in req.evidence_event_types)} "
                     f"recording in the audit trail"
                 ],
+                verdict_inputs=_build_verdict_inputs(
+                    req,
+                    evidence_count=0,
+                    freshest_age_hours=float("inf"),
+                    oldest_age_hours=float("inf"),
+                    future_timestamp_count=0,
+                    status=EvidenceStatus.EVIDENCE_INSUFFICIENT,
+                    strength=EvidenceStrength.ABSENT,
+                ),
+                contributing_events=[],
             )
 
         # Analyze freshness. Drop NaN/inf timestamps so a single bad row
@@ -605,6 +892,24 @@ class ComplianceEngine:
         # Sample record IDs for reference
         sample_ids = [r.record_id for r in evidence_records[:5]]
 
+        # Verdict drill-down: the threshold inputs the engine compared
+        # against to produce status/strength, plus a handful of recent
+        # records the verdict actually sits on. The renderers surface
+        # this so an auditor can walk "verdict -> threshold delta ->
+        # specific event" without re-running the engine.
+        verdict_inputs = _build_verdict_inputs(
+            req,
+            evidence_count=evidence_count,
+            freshest_age_hours=freshest_age_hours,
+            oldest_age_hours=oldest_age_hours,
+            future_timestamp_count=future_timestamp_count,
+            status=status,
+            strength=strength,
+        )
+        contributing_events = _build_contributing_events(
+            evidence_records, now=now, max_events=5,
+        )
+
         return ArticleEvidence(
             requirement=req,
             status=status,
@@ -615,6 +920,8 @@ class ComplianceEngine:
             sample_record_ids=sample_ids,
             gaps=gaps,
             recommendations=recommendations,
+            verdict_inputs=verdict_inputs,
+            contributing_events=contributing_events,
         )
 
     # ── Utilities ─────────────────────────────────────────────────

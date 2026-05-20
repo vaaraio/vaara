@@ -17,6 +17,8 @@ jobs:
     runs-on: ubuntu-latest
     permissions:
       contents: read
+      id-token: write       # OIDC for SLSA provenance signing
+      attestations: write   # store attestations on the workflow run
     steps:
       - name: Checkout
         uses: actions/checkout@de0fac2e4500dabe0009e67214ff5f5447ce83dd  # v6.0.2
@@ -31,6 +33,15 @@ jobs:
 
       - name: Build sdist and wheel
         run: python -m build
+
+      - name: Generate SLSA build provenance
+        # Emits a sigstore-backed attestation for each built artefact.
+        # The attestation binds the workflow + commit SHA + builder identity
+        # to the wheel/sdist digests, so downstream verifiers (slsa-verifier,
+        # gh attestation verify) can prove an artefact came from this repo.
+        uses: actions/attest-build-provenance@a2bbfa25375fe432b6a289bc6b6cd05ecd0c4c32  # v4.1.0
+        with:
+          subject-path: 'dist/*'
 
       - name: Upload distributions
         uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a  # v7.0.1
