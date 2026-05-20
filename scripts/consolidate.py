@@ -15,7 +15,13 @@ Never touches: .outbound_*, .application_*, .recruiter_*, .research_*,
 .proposal_*, .tier1_*, .tmp_*, dot-config files, or any subdirectory.
 """
 from __future__ import annotations
-import argparse, datetime as dt, json, re, shutil, subprocess, sys
+import argparse
+import datetime as dt
+import json
+import re
+import shutil
+import subprocess
+import sys
 from pathlib import Path
 
 REPO = Path(__file__).resolve().parent.parent
@@ -91,9 +97,9 @@ def candidates():
 
 def plan():
     tags = {t.strip() for t in sh(["git", "tag", "-l"]).splitlines() if t.strip()}
-    commits = [l.strip() for l in sh(["git", "log", "--format=%s", "-500"]).splitlines() if l.strip()]
-    merged = [l.strip() for l in sh(["gh", "pr", "list", "--state", "merged", "--limit", "200",
-                                      "--json", "title", "--jq", ".[].title"]).splitlines() if l.strip()]
+    commits = [line.strip() for line in sh(["git", "log", "--format=%s", "-500"]).splitlines() if line.strip()]
+    merged = [line.strip() for line in sh(["gh", "pr", "list", "--state", "merged", "--limit", "200",
+                                            "--json", "title", "--jq", ".[].title"]).splitlines() if line.strip()]
     archive, keep = [], []
     for p in candidates():
         ok, reason = classify(p, tags, commits, merged)
@@ -160,7 +166,7 @@ def main():
         else:
             print("\nNothing to archive.")
     else:
-        print(f"\nDry-run. Re-run with --apply.")
+        print("\nDry-run. Re-run with --apply.")
     return 0
 
 
