@@ -6,6 +6,69 @@ and this project follows [Semantic Versioning](https://semver.org/spec/v2.0.0.ht
 
 ## [Unreleased]
 
+## [0.26.0] - 2026-05-21
+
+**Theme: per-article verdict drill-down inside the compliance report.** A
+reviewer reading a v0.25 evidence report could see that Article 9(1) was
+`evidence_sufficient` with `strength: strong`, but had to re-run the engine
+or open the raw audit DB to learn which records the verdict sat on or which
+threshold pushed the strength up. v0.26.0 attaches that reasoning to every
+article so a regulator can trace status to threshold delta to concrete event
+in one read. The change extends existing report machinery and stays
+backwards compatible at the wire level. Existing fields keep their shape.
+Two new fields appear next to them.
+
+### Added
+- `ArticleEvidence.verdict_inputs`: dict of the threshold-vs-observed
+  inputs the engine compared against to produce status and strength.
+  Surfaces `min_evidence_count`, `staleness_hours`, `evidence_event_types`,
+  `evidence_count_observed`, `freshest_evidence_age_hours`,
+  `oldest_evidence_age_hours`, `future_timestamp_count`, `chain_intact`,
+  a `strength_thresholds` sub-dict (the 2x / staleness/4 bounds used for
+  `STRONG`), and a `verdict_reasons` list of human-readable rationale lines
+  explaining why this article landed at its current status and strength.
+  JSON-strict: no inf/NaN at the dict boundary.
+- `ArticleEvidence.contributing_events`: list of the most recent (up to 5)
+  qualifying audit records the verdict sits on. Each entry carries
+  `record_id`, `action_id`, `event_type`, `timestamp_iso`, `age_hours`,
+  `agent_id`, `tool_name`, the record's `narrative`, and a curated
+  `drill_down` dict containing only the data fields that directly fed
+  risk/decision/outcome reasoning (point estimate, conformal interval,
+  decision, reason, outcome severity, escalation target, resolution,
+  reviewer, override reason). Free-form `data` keys are not inlined so a
+  caller-supplied secret cannot leak into a regulator-facing summary.
+- Renderers updated end to end. `render_markdown` adds a `Verdict inputs`
+  table and `Contributing events` table per article. `render_narrative`
+  appends a `Why:` rationale line and an `Event:` line per article.
+  `render_pdf` adds the same two tables to each per-article section.
+  `compliance.dashboard.render_html` adds the same drill-down to each card
+  with HTML-escaped values. Still no JavaScript and no external assets.
+- Broken-chain handling extends to drill-down: when `verify_chain()`
+  fails, every article's `verdict_inputs.chain_intact` flips to `False`
+  and the rationale list prepends a chain-integrity warning, matching
+  the existing status / strength downgrade.
+- Tests: 11 new tests across `tests/test_compliance.py`,
+  `tests/test_compliance_render.py`, and `tests/test_compliance_dashboard.py`
+  covering verdict_inputs shape, contributing-events ordering, drill-down
+  key filtering (free-form data must not leak), broken-chain marking,
+  empty-trail INSUFFICIENT pinning, JSON strict-mode round-trip, and
+  renderer output across markdown / narrative / dashboard / PDF.
+
+### Changed
+- `.github/workflows/release.yml`: the `build` job now generates SLSA
+  build provenance via `actions/attest-build-provenance@v4.1.0` after the
+  wheel and sdist are built. The attestation binds workflow + commit SHA
+  + builder identity to the artefact digests and ships alongside the
+  Release for downstream `slsa-verifier` / `gh attestation verify` use.
+  Required new permissions on the build job: `id-token: write`,
+  `attestations: write`.
+
+### Unchanged
+- Hash chain format, OVERT envelope schema, MCP proxy perimeter semantics,
+  CLI surface (`vaara compliance report` still takes the same flags),
+  HTTP API. The `to_dict()` boundary adds two keys but does not rename or
+  remove existing ones, and v0.25 consumers ignore the additions cleanly.
+
 ## [0.25.0] - 2026-05-21
 
 **Theme: streaming notifications inside the audit boundary.** Long-running
