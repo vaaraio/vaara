@@ -232,6 +232,77 @@ def test_emitted_envelopes_verify_with_pinned_pubkey(monkeypatch, emitter, signi
     assert verify_base_envelope(env, pub_raw) is True
 
 
+def test_progress_notification_emits_envelope_with_parent_correlation(monkeypatch, emitter):
+    p, pipeline = _make_proxy(monkeypatch, emitter=emitter)
+    pipeline.intercept.return_value = _StubInterceptResult(allowed=True, action_id="parent-7")
+
+    def upstream_request(req):
+        if req["method"] == "tools/call":
+            p._on_upstream_notification({
+                "jsonrpc": "2.0", "method": "notifications/progress",
+                "params": {"progressToken": "tok-z", "progress": 10, "total": 20},
+            })
+        return {"jsonrpc": "2.0", "id": req["id"], "result": {}}
+
+    p._upstream.request.side_effect = upstream_request
+    p._handle_tools_call({
+        "jsonrpc": "2.0", "id": 1, "method": "tools/call",
+        "params": {
+            "name": "slow_tool", "arguments": {},
+            "_meta": {"progressToken": "tok-z"},
+        },
+    })
+    envs = _envelopes(emitter.receipts_dir)
+    # tools/call envelope + the in-flight progress envelope.
+    assert len(envs) == 2
+    surfaces = [e["non_content_metadata"]["action_class"] for e in envs]
+    assert "mcp.notification.progress" in surfaces
+    progress_env = next(
+        e for e in envs
+        if e["non_content_metadata"]["action_class"] == "mcp.notification.progress"
+    )
+    meta = progress_env["non_content_metadata"]
+    assert meta["progress_token"] == "tok-z"
+    assert meta["parent_action_id"] == "parent-7"
+    assert meta["parent_tool"] == "slow_tool"
+    assert meta["decision"] == "observed"
+
+
+def test_message_notification_emits_envelope(monkeypatch, emitter):
+    p, _ = _make_proxy(monkeypatch, emitter=emitter)
+    p._on_upstream_notification({
+        "jsonrpc": "2.0", "method": "notifications/message",
+        "params": {"level": "warning", "logger": "upstream", "data": "slow"},
+    })
+    envs = _envelopes(emitter.receipts_dir)
+    assert len(envs) == 1
+    meta = envs[0]["non_content_metadata"]
+    assert meta["action_class"] == "mcp.notification.message"
+    assert meta["level"] == "warning"
+    assert meta["decision"] == "observed"
+
+
+def test_orphan_progress_without_inflight_call_still_emits(monkeypatch, emitter):
+    """Progress notifications with no matching tools/call still audit + emit.
+
+    The MCP spec allows progressTokens that don't correlate cleanly (e.g.,
+    upstream lagging past response, race between reader and handler). The
+    envelope still lands, just with an empty parent_action_id — the auditor
+    can spot the dangling event rather than having it disappear.
+    """
+    p, _ = _make_proxy(monkeypatch, emitter=emitter)
+    p._on_upstream_notification({
+        "jsonrpc": "2.0", "method": "notifications/progress",
+        "params": {"progressToken": "orphan", "progress": 5},
+    })
+    envs = _envelopes(emitter.receipts_dir)
+    assert len(envs) == 1
+    meta = envs[0]["non_content_metadata"]
+    assert meta["action_class"] == "mcp.notification.progress"
+    assert meta["progress_token"] == "orphan"
+    assert meta["parent_action_id"] == ""
+
+
 def test_build_emitter_rejects_missing_operator_key(signing_key_pem, tmp_path):
     from vaara.integrations._mcp_overt import (
         OVERTConfigError, build_emitter,

@@ -6,6 +6,56 @@ and this project follows [Semantic Versioning](https://semver.org/spec/v2.0.0.ht
 
 ## [Unreleased]
 
+## [0.25.0] - 2026-05-21
+
+**Theme: streaming notifications inside the audit boundary.** Long-running
+upstream MCP tools emit `notifications/progress` and `notifications/message`
+between the request and the final response. Until v0.25.0 those flowed
+through the proxy untouched: forwarded to the client, but invisible to the
+audit chain and the OVERT receipt directory. A regulator reconstructing the
+session from receipts only could see the request and the result, never the
+events the upstream emitted while working. v0.25.0 brings each notification
+inside the same audit + attestation perimeter that already governs
+`tools/call`, `resources/read`, and `prompts/get`. The notification still
+forwards to the client unchanged. Observation never blocks streaming.
+
+### Added
+- Streaming-notification interception in `vaara.integrations.mcp_proxy`.
+  When a `tools/call` arrives with `params._meta.progressToken` set, the
+  proxy records the token in an in-flight map alongside the originating
+  `action_id`, `agent_id`, and tool name. The map is cleared in a
+  `finally` block when the call returns or raises.
+- Every `notifications/progress` arriving from the upstream is recorded
+  as a perimeter audit pair (`tool_name="mcp.notification.progress"`,
+  `decision="observed"`) carrying the parent `action_id` and tool name
+  pulled from the in-flight map. When OVERT is configured, the
+  notification additionally emits a dedicated Base Envelope with action
+  class `mcp.notification.progress` and `parent_action_id` /
+  `parent_tool` / `progress_token` in `non_content_metadata`.
+- Every `notifications/message` arriving from the upstream is similarly
+  recorded as `mcp.notification.message` and, when OVERT is configured,
+  emits a Base Envelope carrying the `level` and `logger` fields.
+- Orphan progress notifications (token with no matching in-flight call)
+  still audit and emit, with an empty `parent_action_id`, so the
+  regulator can spot dangling events rather than have them disappear.
+- Tests: 10 new tests across `tests/test_integrations_mcp_proxy.py` and
+  `tests/test_integrations_mcp_proxy_overt.py`. Coverage includes
+  correlation to in-flight `tools/call`, map cleanup on success and on
+  raise, audit-failure-still-forwards (observation must not block
+  streaming), orphan-progress, and OVERT envelope contents for both
+  progress and message surfaces.
+
+### Changed
+- `.github/workflows/release.yml`: npm publish step reverts to OIDC-only
+  (no `NODE_AUTH_TOKEN`, no `NPM_TOKEN`) now that the `@vaara/client`
+  package has a Trusted Publisher configured. Provenance flag preserved.
+
+### Unchanged
+- Pipeline, audit chain hash format, perimeter allow/deny semantics, MCP
+  wire format, OVERT envelope closed-schema fields. Notifications still
+  forward to the client byte-identically. A v0.24.0 deployment behaves
+  the same when it does not see streaming traffic.
+
 ## [0.24.0] - 2026-05-20
 
 **Theme: MCP proxy emits OVERT 1.0 Base Envelopes per interaction.** With
