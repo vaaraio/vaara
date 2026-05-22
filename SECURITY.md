@@ -67,6 +67,17 @@ receive patches at our discretion for severe issues.
 - When deploying signed audit exports, protect the signing private key using
   OS-level key management (hardware-backed keystore or HSM recommended).
 
+## Continuous Fuzzing
+
+The parsers that ingest attacker-controlled bytes — the OVERT envelope
+CBOR decoder, the audit-record `from_dict` deserialiser, and the policy
+YAML/JSON loader — are covered by ClusterFuzzLite under both AddressSanitizer
+and UndefinedBehaviorSanitizer. PRs that touch `src/`, `fuzz/`,
+`.clusterfuzzlite/`, or the CFLite workflows trigger short fuzz runs as a
+status check; a nightly cron runs a longer batch. Fuzz target sources
+live in `fuzz/fuzz_*.py`. Reports for crashes found by fuzzing should
+follow the same private-disclosure path as any other vulnerability.
+
 ## References
 
 - OWASP Top 10: <https://owasp.org/www-project-top-ten/>

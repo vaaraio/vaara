@@ -1,0 +1,30 @@
+name: ClusterFuzzLite continuous build
+
+on:
+  push:
+    branches: [main]
+    paths:
+      - src/**
+      - fuzz/**
+      - .clusterfuzzlite/**
+      - .github/workflows/cflite_cifuzz.yml
+      - pyproject.toml
+  workflow_dispatch:
+
+permissions: read-all
+
+jobs:
+  Build:
+    runs-on: ubuntu-latest
+    strategy:
+      fail-fast: false
+      matrix:
+        sanitizer: [address, undefined]
+    steps:
+      - name: Build fuzzers (${{ matrix.sanitizer }})
+        id: build
+        uses: google/clusterfuzzlite/actions/build_fuzzers@v1
+        with:
+          language: python
+          sanitizer: ${{ matrix.sanitizer }}
+          upload-build: true
