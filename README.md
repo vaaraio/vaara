@@ -40,6 +40,8 @@ pip install vaara
 
 Python 3.10+. Zero runtime deps. Optional XGBoost classifier: `pip install vaara[ml]`.
 
+Releases ship with SLSA Build Level 3 provenance. Verify with `slsa-verifier verify-artifact`.
+
 ## Quick start
 
 ```python
@@ -265,9 +267,11 @@ See [COMPLIANCE.md](COMPLIANCE.md) "Position relative to open runtime-attestatio
 | `src/vaara/policy/` | YAML / JSON policy schema, `vaara policy validate` and `vaara policy test` |
 | `src/vaara/sandbox/` | Synthetic-trace cold-start calibration |
 
-Acknowledgements: Vaara is listed in the industry acknowledgements of the [IMDA Model AI Governance Framework for Agentic AI v1.5](https://www.imda.gov.sg/-/media/imda/files/about/emerging-tech-and-research/artificial-intelligence/mgf-for-agentic-ai.pdf) (Singapore, 20 May 2026).
+Acknowledgements:
 
-[Article 14 runtime: why oversight of agentic AI has to be evidenced as action, not model](https://futurium.ec.europa.eu/ga/apply-ai-alliance/community-content/article-14-runtime-why-oversight-agentic-ai-has-be-evidenced-action-not-model) is the position post on the EU Apply AI Alliance Futurium.
+- Vaara is listed in the industry acknowledgements of the [IMDA Model AI Governance Framework for Agentic AI v1.5](https://www.imda.gov.sg/-/media/imda/files/about/emerging-tech-and-research/artificial-intelligence/mgf-for-agentic-ai.pdf) (Singapore, 20 May 2026).
+- The [AMD AI Developer Program](https://www.linkedin.com/posts/amd-developer_meet-henri-sirkkavaara-henri-created-vaara-activity-7459667676555132928-QFSd) ran a coordinated multi-channel developer testimonial of Vaara in May 2026.
+- [Article 14 runtime: why oversight of agentic AI has to be evidenced as action, not model](https://futurium.ec.europa.eu/ga/apply-ai-alliance/community-content/article-14-runtime-why-oversight-agentic-ai-has-be-evidenced-action-not-model) is the position post on the EU Apply AI Alliance Futurium.
 
 > Vaara helps deployers assemble evidence for their own conformity work. It does not certify compliance or constitute legal advice. Deployers own their obligations under the EU AI Act and other applicable law.
 
