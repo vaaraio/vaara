@@ -308,3 +308,20 @@ def test_from_yaml_path(tmp_path: Path) -> None:
     f.write_text(yaml.safe_dump(MINIMAL_POLICY))
     p = from_yaml(f)
     assert p.version == SCHEMA_VERSION
+
+
+def test_from_yaml_oversize_single_line_treated_as_content_not_path() -> None:
+    """A single-line YAML string longer than the OS path limit must not leak
+    OSError(ENAMETOOLONG) from the internal Path(...).is_file() probe.
+
+    Regression: the loader previously called Path(source).is_file() before
+    any exception handler ran, so a >255-byte single-line attacker input
+    bypassed the PolicyError contract and raised a bare OSError. Now any
+    stat() failure on the path-probe is interpreted as "not a path" and the
+    string falls through to the YAML parser, which then surfaces as a
+    PolicyError on invalid YAML or a malformed-policy error on valid YAML.
+    """
+    pytest.importorskip("yaml")
+    oversize = "a: " * 500
+    with pytest.raises(PolicyError):
+        from_yaml(oversize)

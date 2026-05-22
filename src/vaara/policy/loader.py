@@ -260,8 +260,16 @@ def from_yaml(source: Union[str, Path]) -> Policy:
 
     if isinstance(source, Path):
         text = _read_policy_text(source)
-    elif isinstance(source, str) and "\n" not in source and Path(source).is_file():
-        text = _read_policy_text(Path(source))
+    elif isinstance(source, str) and "\n" not in source:
+        # An attacker-controlled string longer than the OS path limit makes
+        # Path(...).is_file() raise OSError(ENAMETOOLONG) directly, bypassing
+        # this loader's PolicyError contract. Treat any stat() failure as
+        # "not a path" and fall through to YAML parsing.
+        try:
+            looks_like_path = Path(source).is_file()
+        except OSError:
+            looks_like_path = False
+        text = _read_policy_text(Path(source)) if looks_like_path else source
     else:
         text = source
 
