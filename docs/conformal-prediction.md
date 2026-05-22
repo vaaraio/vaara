@@ -52,8 +52,6 @@ makes the difference visible.
 
 ## Why this matters under the EU AI Act
 
-Two parts of the AI Act point at this directly.
-
 **Article 15(1)** requires high-risk AI systems to "be designed and
 developed in such a way that they achieve an appropriate level of
 accuracy, robustness and cybersecurity, and perform consistently in
@@ -65,12 +63,10 @@ deployer can publish the guarantee (e.g. "the interval covers the true
 risk at least 90% of the time") and an auditor can check it against
 observed outcomes.
 
-**Recital 133** discusses the detection of "violations or
-non-conformities" by AI systems and the need to "regularly verify the
-results obtained." A point estimate does not surface non-conformity
-until after the fact. An interval that widens or narrows is itself a
-real-time signal that the model is moving into or out of a region
-where its predictions are trustworthy.
+A widening interval is itself a real-time signal that the model is
+moving into a region where its predictions cannot be trusted. A point
+estimate does not surface that drift until ground-truth labels arrive
+and the error rate is reconstructed after the fact.
 
 In short: a conformal interval converts "trust me, the score is 0.6"
 into "the score is 0.6, here is the range we expect to be in, here is
