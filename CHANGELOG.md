@@ -33,9 +33,8 @@ ships both.
   `docs/formal_specification.md`. Explains why a point risk score is
   not enough, what the interval gives a reader, and how the
   distribution-free coverage guarantee maps to Article 15(1)
-  ("appropriate level of accuracy") and Recital 133 (detection of
-  non-conformities). Cross-linked from the README "Where things live"
-  table and from `VERDICTS.md` Article 15(1) discussion.
+  ("appropriate level of accuracy"). Cross-linked from the README
+  "Where things live" table.
 
 ### Changed
 - `COMPLIANCE.md` "EU AI Act Article Mapping" intro now points readers
