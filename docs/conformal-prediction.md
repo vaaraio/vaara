@@ -52,10 +52,10 @@ makes the difference visible.
 
 ## Why this matters under the EU AI Act
 
-**Article 15(1)** requires high-risk AI systems to "be designed and
-developed in such a way that they achieve an appropriate level of
-accuracy, robustness and cybersecurity, and perform consistently in
-those respects throughout their lifecycle." The phrase "appropriate
+**Article 15(1)** requires that "high-risk AI systems shall be
+designed and developed in such a way that they achieve an appropriate
+level of accuracy, robustness, and cybersecurity, and that they
+perform consistently in those respects throughout their lifecycle." The phrase "appropriate
 level" is meaningless without a way to measure it. A point score
 cannot be measured against an accuracy target because it has no
 notion of how often it is wrong. A conformal interval is measurable: a
