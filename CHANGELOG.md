@@ -6,6 +6,64 @@ and this project follows [Semantic Versioning](https://semver.org/spec/v2.0.0.ht
 
 ## [Unreleased]
 
+## [0.27.0] - 2026-05-22
+
+**Theme: continuous fuzzing on the parsers that ingest attacker-controlled
+input.** The OVERT envelope decoder, the audit-record `from_dict`
+deserialiser, and the policy YAML/JSON loader all sit at the boundary
+between Vaara and untrusted bytes. A crash, hang, or unhandled exception
+in any of them is a denial-of-service vector at minimum, and a
+deserialisation hazard at worst. This release wires ClusterFuzzLite into
+CI so those three parsers get continuously fuzzed on every PR and nightly
+in batch, and ships the first finding the local smoke test caught
+(`from_yaml` leaking `OSError(ENAMETOOLONG)` past the `PolicyError`
+contract).
+
+### Added
+- `fuzz/fuzz_overt_envelope.py`: atheris target that decodes attacker
+  CBOR bytes, validates the closed 9-field schema, reconstructs a
+  `BaseEnvelope`, and signature-checks against a dummy pubkey. Mirrors
+  the attack surface of `vaara overt verify`.
+- `fuzz/fuzz_audit_from_dict.py`: atheris target for `AuditRecord.from_dict`
+  + `compute_hash()` + the `narrative` property. Models the JSONL-replay
+  path where trail records get reloaded from disk.
+- `fuzz/fuzz_policy_loader.py`: atheris target for `from_json` and
+  `from_yaml`. Exercises both text paths with attacker-controlled strings.
+- `.clusterfuzzlite/Dockerfile` and `.clusterfuzzlite/build.sh`: builder
+  image based on `gcr.io/oss-fuzz-base/base-builder-python`, installs
+  Vaara with `[attestation,yaml]` extras, compiles each `fuzz/fuzz_*.py`
+  target with `compile_python_fuzzer`.
+- `.github/workflows/cflite_pr.yml`: PR-triggered fuzzing for 300s under
+  both address and undefined sanitizers, code-change mode.
+- `.github/workflows/cflite_batch.yml`: nightly cron, 3600s batch fuzzing
+  under both sanitizers.
+- `.github/workflows/cflite_cifuzz.yml`: build-sanity on push to main, so
+  a broken Dockerfile or build.sh surfaces immediately rather than at
+  next PR.
+- `tests/test_policy.py`:
+  `test_from_yaml_oversize_single_line_treated_as_content_not_path`
+  pins the regression behaviour of the loader fix below.
+- SECURITY.md: brief note on the continuous-fuzzing posture so reporters
+  know the parsers are under active fuzz coverage.
+
+### Fixed
+- `vaara.policy.loader.from_yaml`: a single-line YAML string longer than
+  the OS path limit (~255 bytes on most filesystems) previously caused
+  `Path(source).is_file()` to raise `OSError(ENAMETOOLONG)` directly,
+  bypassing the loader's `PolicyError` contract. Any caller that loads
+  YAML from attacker-controlled config could be DoS'd by an oversized
+  single-line payload. The is_file probe is now wrapped: any stat
+  failure is interpreted as "not a path" and the input falls through to
+  YAML parsing, where it surfaces as a normal `PolicyError`. Found by
+  the local smoke run of `fuzz_policy_loader.py` before any atheris
+  fuzzing ran.
+
+### Unchanged
+- Hash chain format, OVERT envelope schema, MCP proxy perimeter semantics,
+  CLI surface, HTTP API, release.yml SLSA provenance. The fuzz targets,
+  Dockerfile, and CFLite workflows are additive supply-chain
+  infrastructure; nothing in the runtime kernel moves.
+
 ## [0.26.0] - 2026-05-21
 
 **Theme: per-article verdict drill-down inside the compliance report.** A
