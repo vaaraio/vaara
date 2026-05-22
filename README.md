@@ -257,7 +257,9 @@ See [COMPLIANCE.md](COMPLIANCE.md) "Position relative to open runtime-attestatio
 | Path | Contents |
 |---|---|
 | [docs/formal_specification.md](docs/formal_specification.md) | MWU regret bound, conformal coverage, security properties |
+| [docs/conformal-prediction.md](docs/conformal-prediction.md) | Plain-language explainer for compliance reviewers and legal counsel |
 | [COMPLIANCE.md](COMPLIANCE.md) | EU AI Act (Art. 9, 11 to 15, 61) and DORA (Art. 10, 12, 13) mapping, eval numbers, PAIR calibration |
+| [VERDICTS.md](VERDICTS.md) | Per-article evidence sufficiency thresholds and decision tree |
 | [CHANGELOG.md](CHANGELOG.md) | Version-by-version feature evolution |
 | [docs/signing-keys.md](docs/signing-keys.md) | Release signing and verification |
 | [SECURITY.md](SECURITY.md) | Security policy and reporting |

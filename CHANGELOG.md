@@ -6,6 +6,49 @@ and this project follows [Semantic Versioning](https://semver.org/spec/v2.0.0.ht
 
 ## [Unreleased]
 
+## [0.28.0] - 2026-05-22
+
+**Theme: making the evidence-sufficiency rules and the conformal
+interval readable by the people who use them.** The compliance engine
+has been producing `verdict_inputs` (the threshold-vs-observed snapshot
+that drove each article's verdict) and `verdict_reasons` (human-readable
+rationale lines) since v0.26.0, and conformal intervals on every risk
+score since the first public release. What was missing was a public,
+linkable reference for the threshold values per article and a
+plain-language explainer of the conformal interval for compliance
+reviewers and legal counsel who are not statisticians. This release
+ships both.
+
+### Added
+- `VERDICTS.md`: per-article evidence sufficiency reference. Documents
+  the EU AI Act (Articles 9, 11-15, 17, 61) and DORA (Articles 10, 12,
+  13) defaults the engine ships with: minimum record count, staleness
+  window, strong-strength count and freshness bounds, future-timestamp
+  downgrade, chain-integrity pin, and the status/strength decision
+  tree. Includes worked JSON examples of `verdict_inputs` for a
+  sufficient article and the same article after a chain break.
+  Cross-linked from `COMPLIANCE.md` and from the README "Where things
+  live" table.
+- `docs/conformal-prediction.md`: plain-language companion to
+  `docs/formal_specification.md`. Explains why a point risk score is
+  not enough, what the interval gives a reader, and how the
+  distribution-free coverage guarantee maps to Article 15(1)
+  ("appropriate level of accuracy") and Recital 133 (detection of
+  non-conformities). Cross-linked from the README "Where things live"
+  table and from `VERDICTS.md` Article 15(1) discussion.
+
+### Changed
+- `COMPLIANCE.md` "EU AI Act Article Mapping" intro now points readers
+  to `VERDICTS.md` for the threshold rules behind status assignment.
+
+### Notes for deployers
+- The threshold defaults in `VERDICTS.md` are the values shipped in
+  `EU_AI_ACT_REQUIREMENTS` and `DORA_REQUIREMENTS` in
+  `vaara/compliance/engine.py`. A deployer can override any of them
+  by registering a custom `RegulatoryRequirement` with the
+  `ComplianceEngine`. The document is the public starting point, not
+  a constraint.
+
 ## [0.27.0] - 2026-05-22
 
 **Theme: continuous fuzzing on the parsers that ingest attacker-controlled
