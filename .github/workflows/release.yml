@@ -106,6 +106,7 @@ jobs:
     if: ${{ vars.NPM_PUBLISH_ENABLED == 'true' }}
     permissions:
       contents: read
+      id-token: write  # required for npm provenance
     defaults:
       run:
         working-directory: clients/ts
@@ -128,13 +129,5 @@ jobs:
       - name: Test
         run: node --test test/*.test.mjs
 
-      - name: Publish to npm
-        # Auth via NPM_TOKEN, no --provenance. Trusted Publishing OIDC was
-        # configured for v0.25 but kept 404ing on every release after a clean
-        # workflow filename save, so we fell back to the token path that
-        # ships reliably. SLSA build provenance still attests to the wheel,
-        # sdist, and GitHub Release artefacts via attest-build-provenance,
-        # only the npm-side attestation is dropped.
-        env:
-          NODE_AUTH_TOKEN: ${{ secrets.NPM_TOKEN }}
-        run: npm publish --access public
+      - name: Publish to npm with provenance
+        run: npm publish --provenance --access public
