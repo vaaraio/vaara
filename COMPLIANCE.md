@@ -20,7 +20,9 @@ from application logs after the fact.
 
 The table below maps each article Vaara addresses to the runtime event
 types that populate evidence for it. The list matches the default
-`ComplianceEngine` requirements in `vaara.compliance.engine`.
+`ComplianceEngine` requirements in `vaara.compliance.engine`. For the
+thresholds the engine uses to decide whether the evidence is sufficient,
+partial, or insufficient, see [VERDICTS.md](VERDICTS.md).
 
 | Article | Requirement | Evidence Vaara produces |
 |---|---|---|
