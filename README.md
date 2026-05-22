@@ -16,11 +16,21 @@
 
 Vaara is the runtime evidence layer for AI Act compliance. Open source, no SaaS, no telemetry.
 
-Vaara intercepts agent tool calls, scores each one with a conformal risk interval, and writes a hash-chained audit record. Online learning across five expert signals via Multiplicative Weight Update. Distribution-free conformal coverage on the score.
+Vaara intercepts agent tool calls, scores each one with a conformal risk interval, and writes a hash-chained audit record. Online learning across five expert signals via Multiplicative Weight Update. Distribution-free conformal coverage on the score. An external auditor can verify these properties without trusting your stack. Orchestration toolkits and identity layers (Microsoft Agent Governance Toolkit, others) sit on top.
 
-In practical terms: every agent action gets a confidence-bounded risk score with mathematical coverage guarantees, the scorer learns from its misses, and the audit record is tamper-evident. An external auditor can verify these properties without trusting your stack.
+## Numbers
 
-For broader agent governance (zero-trust identity, capability-based access control, multi-language SDKs) see Microsoft's [Agent Governance Toolkit](https://github.com/microsoft/agent-governance-toolkit).
+97.1% attack recall on a held-out distribution-shift split. 140 µs p99 inference latency on commodity CPU. Zero attack success against a PAIR adaptive attacker over 25 attempts.
+
+- 5,955-entry adversarial corpus (3,422 attack across 8 categories, 2,533 benign)
+- 97.1% attack recall on held-out distribution-shift split, threshold 0.55
+- PAIR adaptive-attacker calibration: ASR 0/25 against Qwen2.5-32B
+- [vaara-bench-v1](bench/vaara-bench-v1.md): 77-trace synthetic-corpus benchmark with frozen methodology, 100% soft TPR, 0% hard FPR
+- 140 µs / 210 µs p99 inference latency, commodity CPU
+- Distribution-free conformal coverage on the score
+- MWU regret bound O(sqrt(T log N))
+
+Each figure is reproducible from the public corpus or the bench harness in `bench/`.
 
 ## Install
 
@@ -50,6 +60,13 @@ else:
 
 `report_outcome` closes the loop. MWU reweights signals based on which ones predicted the outcome.
 
+## Who reaches for Vaara
+
+- **AI compliance teams** shipping high-risk systems under the EU AI Act — Article 9 risk management, Article 12 logging, Article 15 robustness, Article 61 post-market monitoring evidence.
+- **ML platform teams** adding runtime governance to agentic stacks (LangChain, CrewAI, OpenAI Agents SDK, MCP-based hosts) without rewriting orchestration.
+- **AI safety and red teams** calibrating scorers against adaptive attackers (PAIR, distribution-shift evals, custom corpora).
+- **Notified Bodies and internal auditors** reading article-level evidence reports without trusting the deployer's stack.
+
 ## What evidence looks like
 
 `vaara compliance report --format json` against a real audit trail produces an article-level evidence record an auditor can read directly. Status is reported honestly: articles without recorded events return `evidence_insufficient`, not a rubber-stamp.
@@ -72,51 +89,40 @@ else:
 
 The same data renders as a styled PDF for Notified Bodies (`vaara compliance report --format pdf`, requires `pip install 'vaara[pdf]'`), a static HTML dashboard (`vaara compliance dashboard`), or a Sigstore-signed regulator-handoff envelope (`vaara trail export`, optional ML-DSA-65 / FIPS 204 post-quantum signer via `pip install 'vaara[pq]'`).
 
-**Per-article verdict drill-down** (since v0.26.0). Each article in the report now carries two extra surfaces a reviewer can read without re-running the engine. `verdict_inputs` lists the threshold-vs-observed snapshot the engine compared against (minimum record count, staleness window, strong-strength bounds, future-timestamp and chain-integrity flags) plus a `verdict_reasons` list of human-readable rationale lines explaining why the status and strength landed where they did. `contributing_events` lists the most recent qualifying audit records the verdict sits on (record ID, action ID, ISO timestamp, agent, tool, and a filtered `drill_down` dict of just the data fields that fed the risk/decision/outcome: point estimate, conformal interval, decision, reason, outcome severity). The drill-down renders in every output format: JSON, markdown, narrative, PDF, and the HTML dashboard. An auditor reading the report can trace `status → threshold delta → concrete event` in one sitting.
+<details>
+<summary>Per-article verdict drill-down</summary>
 
-## Numbers
+Each article in the report carries two extra surfaces a reviewer can read without re-running the engine. `verdict_inputs` lists the threshold-vs-observed snapshot the engine compared against (minimum record count, staleness window, strong-strength bounds, future-timestamp and chain-integrity flags) plus a `verdict_reasons` list of human-readable rationale lines explaining why the status and strength landed where they did. `contributing_events` lists the most recent qualifying audit records the verdict sits on (record ID, action ID, ISO timestamp, agent, tool, and a filtered `drill_down` dict of just the data fields that fed the risk/decision/outcome: point estimate, conformal interval, decision, reason, outcome severity). The drill-down renders in every output format: JSON, markdown, narrative, PDF, and the HTML dashboard. An auditor reading the report can trace `status → threshold delta → concrete event` in one sitting.
+</details>
 
-Concrete evidence the system performs at levels relevant to high-risk-use deployments. Each figure is reproducible from the public corpus or the bench harness in `bench/`.
+## Framework adapters
 
-- 5,955-entry adversarial corpus (3,422 attack across 8 categories, 2,533 benign)
-- 97.1% attack recall on held-out distribution-shift split, threshold 0.55
-- PAIR adaptive-attacker calibration: ASR 0/25 against Qwen2.5-32B
-- [vaara-bench-v1](bench/vaara-bench-v1.md): 77-trace synthetic-corpus benchmark with frozen methodology, 100% soft TPR, 0% hard FPR
-- 140 µs / 210 µs p99 inference latency, commodity CPU
-- Distribution-free conformal coverage on the score
-- MWU regret bound O(sqrt(T log N))
+Native adapters in `src/vaara/integrations/` route the major Python agent frameworks through Vaara's pipeline. Each intercepts via the framework's own callback or hook surface, scores, gates, and emits the same audit events as a direct `pipeline.intercept()`. Frameworks are not hard dependencies (lazy import, duck typing).
 
-## Framework integrations
+| Framework | Entry point | Use |
+|---|---|---|
+| LangChain | `VaaraCallbackHandler`, `vaara_wrap_tool` | Slots into `config={"callbacks": [...]}` or wraps per-tool |
+| CrewAI | `VaaraCrewGovernance` | Wraps a crew so every agent action passes through scoring + audit |
+| OpenAI Agents SDK | `VaaraToolGuardrail`, `vaara_wrap_function` | Function-tool wrap, compatible with Responses API and Agents-SDK tracing |
+| MCP server | `vaara.integrations.mcp_server` | Exposes scoring, audit, policy reload as MCP tools |
 
-Native adapters in `src/vaara/integrations/` route the major Python agent frameworks through Vaara's pipeline. Each adapter intercepts tool calls via the framework's own callback or hook surface, scores them, gates them, and emits the same audit events as a direct `pipeline.intercept()` call. Frameworks are not hard dependencies (lazy import, duck typing), so the base `pip install vaara` keeps a clean dependency tree.
+All four share the same in-process pipeline, so audit records hash-chain together regardless of which framework the action came through. For Vaara *in front of* an upstream MCP server, see the [MCP proxy](#mcp-proxy-vaara-as-a-transparent-governance-layer) section below.
 
-- **LangChain.** `VaaraCallbackHandler` slots into `config={"callbacks": [...]}` and gates every tool invocation automatically. `vaara_wrap_tool(tool, pipeline)` is the per-tool variant for fine-grained control.
-- **CrewAI.** `VaaraCrewGovernance` wraps a crew so every agent action passes through the same scoring and audit chain.
-- **OpenAI Agents SDK.** `VaaraToolGuardrail` plus `vaara_wrap_function` wrap function-tool calls before they execute. Compatible with the Responses API and the Agents-SDK tracing model.
-- **MCP server.** `vaara.integrations.mcp_server` exposes scoring, audit emission, and policy reload as MCP tools so any MCP-compatible agent can route through Vaara without a custom client. (For Vaara *in front of* an upstream MCP server, see the [MCP proxy](#mcp-proxy-vaara-as-a-transparent-governance-layer) section below.)
+## Upstream-signal adapters (cloud + OSS guardrails)
 
-All four framework adapters share the same in-process pipeline, so audit records hash-chain together regardless of which framework the action came through. Each adapter has its own docstring with the two integration patterns it supports.
+Adapters route findings from cloud and OSS guardrails into Vaara's audit trail and OVERT envelope with EU AI Act article tags. The filter runs in the deployer's environment as an upstream signal. Vaara records the verdict, normalises 68 provider categories onto a shared vocabulary, and tags each finding against Art. 5, 10, 13, 15, 53, and the CSAM-specific obligation from the Digital Omnibus political agreement of May 2026.
 
-### Cloud guardrails as upstream signals
+| Provider | Adapter | Extra | Wraps |
+|---|---|---|---|
+| AWS Bedrock Guardrails | `BedrockGuardrailsAdapter` | `vaara[bedrock]` | `ApplyGuardrail` across five Bedrock policy buckets |
+| Azure AI Content Safety | `AzureContentSafetyAdapter` | `vaara[azure-content-safety]` | `analyze_text`, Prompt Shields, Protected Material, Groundedness |
+| GCP Model Armor | `GcpModelArmorAdapter` | `vaara[gcp-model-armor]` | `sanitize_user_prompt`, `sanitize_model_response` |
+| NVIDIA NeMo Guardrails | `NemoGuardrailsAdapter` | `vaara[nemo-guardrails]` | `GenerationResponse.log.activated_rails` (input / dialog / output / retrieval) |
+| Guardrails AI | `GuardrailsAIAdapter` | `vaara[guardrails-ai]` | `ValidationOutcome.validation_summaries` from `Guard.parse` / `Guard.validate` |
+| LLM Guard | `LLMGuardAdapter` | `vaara[llm-guard]` | `scan_prompt` / `scan_output`, parses `(sanitized, results_valid, results_score)` |
+| Rebuff | `RebuffAdapter` | `vaara[rebuff]` | `DetectResponse` across heuristic, model, vector layers + canary-word leak check |
 
-Three adapters route findings from AWS Bedrock Guardrails, Azure AI Content Safety, and GCP Model Armor into Vaara's audit trail and OVERT envelope with EU AI Act article tags. The cloud filter runs in the deployer's environment as an upstream signal. Vaara records the verdict, normalises 27 provider categories onto a shared vocabulary, and tags each finding against Art. 5, 10, 13, 15, 53, and the CSAM-specific obligation from the Digital Omnibus political agreement of May 2026.
-
-- **AWS Bedrock Guardrails.** `vaara.integrations.bedrock_guardrails.BedrockGuardrailsAdapter`. Wraps `ApplyGuardrail` across the five Bedrock policy buckets.
-- **Azure AI Content Safety.** `vaara.integrations.azure_content_safety.AzureContentSafetyAdapter`. Wraps `analyze_text`, Prompt Shields, Protected Material, and Groundedness Detection.
-- **GCP Model Armor.** `vaara.integrations.gcp_model_armor.GcpModelArmorAdapter`. Wraps `sanitize_user_prompt` and `sanitize_model_response`.
-
-Each adapter returns a `ContentSafetyFinding` the deployer routes into `pipeline.intercept(context=finding.to_audit_context())`. Cloud SDKs are optional extras: `pip install 'vaara[bedrock]'`, `pip install 'vaara[azure-content-safety]'`, `pip install 'vaara[gcp-model-armor]'`. The category-to-article mapping table lives in `src/vaara/integrations/_content_safety_articles.py` and is the value the adapters wrap. Article-level rationale is in [COMPLIANCE.md](COMPLIANCE.md#cloud-guardrail-adapter-pattern).
-
-### OSS guardrails as upstream signals
-
-Four adapters route findings from NVIDIA NeMo Guardrails, Guardrails AI, LLM Guard, and Rebuff into the same audit trail and OVERT envelope path as the v0.19.0 cloud adapters. The OSS guardrail runs in the deployer's environment as an upstream signal. Vaara records the verdict, normalises 41 OSS provider categories onto the same shared vocabulary, and tags each finding against Art. 5, 10, 13, 15, and 53.
-
-- **NVIDIA NeMo Guardrails**. `vaara.integrations.nemo_guardrails.NemoGuardrailsAdapter`. Parses `GenerationResponse.log.activated_rails` across input, dialog, output, and retrieval rail types.
-- **Guardrails AI**. `vaara.integrations.guardrails_ai.GuardrailsAIAdapter`. Parses `ValidationOutcome.validation_summaries` from any `Guard.parse` or `Guard.validate` call.
-- **LLM Guard**. `vaara.integrations.llm_guard.LLMGuardAdapter`. Wraps `scan_prompt` and `scan_output` and parses the `(sanitized, results_valid, results_score)` triple.
-- **Rebuff**. `vaara.integrations.rebuff.RebuffAdapter`. Parses `DetectResponse` across the heuristic, model, and vector injection-detection layers, plus the canary-word leak check on responses.
-
-Each adapter returns a `ContentSafetyFinding` the deployer routes into `pipeline.intercept(context=finding.to_audit_context())`. OSS SDKs are optional extras: `pip install 'vaara[nemo-guardrails]'`, `pip install 'vaara[guardrails-ai]'`, `pip install 'vaara[llm-guard]'`, `pip install 'vaara[rebuff]'`. The 41 new mapping rows extend the same table at `src/vaara/integrations/_content_safety_articles.py`. Article-level rationale is in [COMPLIANCE.md](COMPLIANCE.md#oss-guardrail-adapter-pattern).
+Each adapter returns a `ContentSafetyFinding` the deployer routes into `pipeline.intercept(context=finding.to_audit_context())`. The mapping table lives at `src/vaara/integrations/_content_safety_articles.py`. Article-level rationale in [COMPLIANCE.md](COMPLIANCE.md#cloud-guardrail-adapter-pattern) and [COMPLIANCE.md](COMPLIANCE.md#oss-guardrail-adapter-pattern).
 
 ## HTTP API
 
@@ -154,9 +160,7 @@ if (r.decision === "deny") throw new Error("blocked");
 
 ## MCP proxy (Vaara as a transparent governance layer)
 
-`vaara.integrations.mcp_proxy.VaaraMCPProxy` sits between an MCP client (Claude Code, Cursor, any MCP-capable host) and an upstream MCP server. Every `tools/call` from the client routes through Vaara's interception pipeline before reaching the upstream. Allowed calls forward transparently and report the upstream outcome back to the scorer. Blocked calls return an MCP `isError: true` response with the block reason. The initialization handshake and `notifications/*` forward unchanged. `tools/list`, `resources/list`, `resources/read`, `prompts/list`, and `prompts/get` route through the operator perimeter described below before reaching the client or upstream.
-
-One-line example in front of [`@sap/mdk-mcp-server`](https://www.npmjs.com/package/@sap/mdk-mcp-server) (SAP's official Mobile Development Kit MCP server, on npm):
+`vaara.integrations.mcp_proxy.VaaraMCPProxy` sits between an MCP client (Claude Code, Cursor, any MCP-capable host) and an upstream MCP server. Every `tools/call` from the client routes through Vaara's interception pipeline before reaching the upstream. Allowed calls forward transparently and report the upstream outcome back to the scorer. Blocked calls return an MCP `isError: true` response with the block reason. The initialization handshake and `notifications/*` forward unchanged. `tools/list`, `resources/list`, `resources/read`, `prompts/list`, and `prompts/get` route through the operator perimeter before reaching the client or upstream.
 
 ```bash
 python -m vaara.integrations.mcp_proxy \
@@ -166,13 +170,16 @@ python -m vaara.integrations.mcp_proxy \
 
 Point your MCP client at the proxy instead of the upstream. The audit chain captures every tool call without changing client or upstream behavior. Distinct from `mcp_server`, which exposes Vaara itself as an MCP server for agents that consult Vaara as a tool.
 
-**Operator-side tool filtering** (since v0.22.0). The proxy accepts repeatable `--allow-tool NAME` and `--deny-tool NAME` flags. Filtered tools are dropped from `tools/list` responses before the client sees them and any matching `tools/call` is rejected at the proxy perimeter without contacting the upstream. Use this to hide write/delete tools (e.g. `delete_file`, `merge_pull_request`) when the upstream server exposes more capability than the deployment policy allows. Denylist wins on overlap with allowlist. No flags = passthrough.
+<details>
+<summary>Operator perimeter: tool, resource, prompt filtering</summary>
 
-**Resources and prompts coverage** (since v0.23.0). The same perimeter shape extends to MCP's other two primitives. `--allow-resource URI` / `--deny-resource URI` gate `resources/list` and `resources/read`. `--allow-prompt NAME` / `--deny-prompt NAME` gate `prompts/list` and `prompts/get`. Every allowed `resources/read` and `prompts/get` writes a request+decision audit pair to the hash chain so a regulator can reconstruct exactly which resources the agent read and which prompts it retrieved. Resource reads and prompt gets are read-oriented MCP surfaces. They do not run through the risk scorer. The operator perimeter is the gate, and the audit chain captures the evidence.
+The proxy accepts repeatable `--allow-tool NAME` / `--deny-tool NAME`, `--allow-resource URI` / `--deny-resource URI`, and `--allow-prompt NAME` / `--deny-prompt NAME` flags. Filtered tools are dropped from `tools/list` responses before the client sees them and any matching `tools/call` is rejected at the proxy perimeter without contacting the upstream. The same shape extends to `resources/list` + `resources/read` and `prompts/list` + `prompts/get`. Denylist wins on overlap with allowlist. No flags = passthrough. Every allowed `resources/read` and `prompts/get` writes a request+decision audit pair to the hash chain so a regulator can reconstruct exactly which resources the agent read and which prompts it retrieved. Read-oriented MCP surfaces do not run through the risk scorer. The operator perimeter is the gate, the audit chain is the evidence.
+</details>
 
-**OVERT 1.0 envelopes per interaction** (since v0.24.0). Off by default. When you pass `--overt-signing-key KEY.pem`, `--overt-operator-key OPKEY.bin`, and `--overt-receipts-dir DIR/`, the proxy writes one OVERT 1.0 Protocol Profile 1.0 Base Envelope (canonical CBOR, Ed25519, closed 9-field schema) per governed interaction into `DIR/{nanosecond_timestamp}-{counter:010d}.cbor`. Covers all four states: allowed `tools/call`, blocked `tools/call`, perimeter-filtered call, and perimeter-filtered `resources/read` / `prompts/get`. The arbiter public key is pinned alongside as `pubkey.bin`. Each envelope verifies offline under `vaara overt verify` against any conformant verifier. Three-step recipe:
+<details>
+<summary>OVERT 1.0 envelopes per interaction</summary>
 
-**Streaming notifications inside the boundary** (since v0.25.0). Long-running upstream tools emit `notifications/progress` and `notifications/message` over the lifetime of a `tools/call`. The proxy now routes each notification through the same audit pair (request + decision) and, when OVERT is configured, emits a dedicated Base Envelope with action class `mcp.notification.progress` or `mcp.notification.message`. Progress events correlate to the originating call via the `_meta.progressToken` from the request, so a regulator reading the receipt directory can reconstruct what arrived between request and response. Notifications still forward to the client unchanged. Audit failures are logged and swallowed: observation never blocks streaming.
+Off by default. When you pass `--overt-signing-key KEY.pem`, `--overt-operator-key OPKEY.bin`, and `--overt-receipts-dir DIR/`, the proxy writes one OVERT 1.0 Protocol Profile 1.0 Base Envelope (canonical CBOR, Ed25519, closed 9-field schema) per governed interaction into `DIR/{nanosecond_timestamp}-{counter:010d}.cbor`. Covers all four states: allowed `tools/call`, blocked `tools/call`, perimeter-filtered call, and perimeter-filtered `resources/read` / `prompts/get`. The arbiter public key is pinned alongside as `pubkey.bin`. Each envelope verifies offline under `vaara overt verify` against any conformant verifier.
 
 ```bash
 # 1. Generate an Ed25519 signing key (evaluation/demo; for production use a KMS or HSM, see docs/signing-keys.md).
@@ -194,7 +201,14 @@ vaara overt verify ./overt_receipts/1779309684224332669-0000000001.cbor \
 # → {"valid": true, "monotonic_counter": 1, ...}
 ```
 
-`non_content_metadata` carries structural fields only (action class, tool/resource/prompt identifier, decision, reason, agent_id, action_id). The request content itself never leaves the operator environment. Only its HMAC-SHA256 commitment crosses the trust boundary. The monotonic counter advances strictly across the whole proxy process so gaps are detectable. Emission failure is logged and swallowed: attestation problems must not block legitimate upstream traffic.
+`non_content_metadata` carries structural fields only (action class, tool/resource/prompt identifier, decision, reason, agent_id, action_id). The request content itself never leaves the operator environment; only its HMAC-SHA256 commitment crosses the trust boundary. The monotonic counter advances strictly across the whole proxy process so gaps are detectable. Emission failure is logged and swallowed: attestation problems must not block legitimate upstream traffic.
+</details>
+
+<details>
+<summary>Streaming notifications inside the boundary</summary>
+
+Long-running upstream tools emit `notifications/progress` and `notifications/message` over the lifetime of a `tools/call`. The proxy routes each notification through the same audit pair (request + decision) and, when OVERT is configured, emits a dedicated Base Envelope with action class `mcp.notification.progress` or `mcp.notification.message`. Progress events correlate to the originating call via the `_meta.progressToken` from the request, so a regulator reading the receipt directory can reconstruct what arrived between request and response. Notifications still forward to the client unchanged. Audit failures are logged and swallowed: observation never blocks streaming.
+</details>
 
 Worked examples with real upstream servers:
 
@@ -205,9 +219,11 @@ The proxy is MCP-protocol-level, not vendor-specific. The same three-step recipe
 
 ## OVERT 1.0 attestation
 
-OVERT 1.0 lets an external party (regulator, auditor, customer) verify that a runtime decision actually happened the way you say it did, without trusting your stack or reading your code. Vaara emits OVERT envelopes alongside its audit records.
+**What.** OVERT 1.0 is an open standard for runtime trust in AI systems ([overt.is](https://overt.is/), authored by Glacis Technologies, published 25 March 2026). It defines a signed, schema-closed envelope a relying party can verify offline without trusting the emitter.
 
-Vaara implements the OVERT 1.0 ([overt.is](https://overt.is/)) Protocol Profile 1.0 Base Envelope. OVERT 1.0 is an open standard for runtime trust in AI systems, authored by Glacis Technologies and published 25 March 2026. Closed-schema 9-field structure at AAL-3 Phase 2 (Provisional Receipt), canonical CBOR (RFC 8949), Ed25519 signatures, HMAC-SHA256 keyed commitments, IEEE-754 float rejection.
+**Why.** A regulator, auditor, or customer can confirm that a runtime decision actually happened the way you say it did, without reading your code or trusting your stack.
+
+**How Vaara emits it.** Vaara is the **Arbiter** in OVERT terms and ships Protocol Profile 1.0 Base Envelopes (canonical CBOR per RFC 8949, Ed25519 signatures, HMAC-SHA256 keyed commitments, closed 9-field schema, IEEE-754 float rejection) alongside every audit record when attestation is enabled.
 
 ```
 pip install 'vaara[attestation]'
@@ -226,7 +242,7 @@ envelope = emit_base_envelope(
 )
 ```
 
-Vaara operates as the **Arbiter** in OVERT terms. The reference Phase 3 IAP (`vaara.attestation.iap`) notary-signs the Provisional Receipt and anchors it in a transparency log. Production deployments can swap in sigstore Rekor or an equivalent independently-operated log at the same call sites. The OVERT S3P (MEA-2) emitter at `vaara.attestation.s3p` ships exact Clopper-Pearson confidence intervals (pure Python, no scipy) and a proposed Protocol Profile extension that reports aggregate statistics over per-action conformal prediction intervals alongside the standard binomial CI.
+The reference Phase 3 IAP (`vaara.attestation.iap`) notary-signs the Provisional Receipt and anchors it in a transparency log. Production deployments can swap in sigstore Rekor or an equivalent independently-operated log at the same call sites. The OVERT S3P (MEA-2) emitter at `vaara.attestation.s3p` ships exact Clopper-Pearson confidence intervals (pure Python, no scipy) and a proposed Protocol Profile extension that reports aggregate statistics over per-action conformal prediction intervals alongside the standard binomial CI.
 
 The `vaara overt verify RECEIPT.cbor --pubkey-file PUB.bin` CLI validates any canonical-CBOR Base Envelope against a supplied raw 32-byte Ed25519 public key. The verifier reads only the wire format and takes no dependency on Vaara's emitter, so any OVERT-conformant implementation can route its conformance check through it.
 
@@ -249,10 +265,10 @@ See [COMPLIANCE.md](COMPLIANCE.md) "Position relative to open runtime-attestatio
 | `src/vaara/policy/` | YAML / JSON policy schema, `vaara policy validate` and `vaara policy test` |
 | `src/vaara/sandbox/` | Synthetic-trace cold-start calibration |
 
-[Article 14 runtime: why oversight of agentic AI has to be evidenced as action, not model](https://futurium.ec.europa.eu/ga/apply-ai-alliance/community-content/article-14-runtime-why-oversight-agentic-ai-has-be-evidenced-action-not-model) is the position post on the EU Apply AI Alliance Futurium.
+Acknowledgements: Vaara is listed in the industry acknowledgements of the [IMDA Model AI Governance Framework for Agentic AI v1.5](https://www.imda.gov.sg/-/media/imda/files/about/emerging-tech-and-research/artificial-intelligence/mgf-for-agentic-ai.pdf) (Singapore, 20 May 2026). [Article 14 runtime: why oversight of agentic AI has to be evidenced as action, not model](https://futurium.ec.europa.eu/ga/apply-ai-alliance/community-content/article-14-runtime-why-oversight-agentic-ai-has-be-evidenced-action-not-model) is the position post on the EU Apply AI Alliance Futurium.
 
 > Vaara helps deployers assemble evidence for their own conformity work. It does not certify compliance or constitute legal advice. Deployers own their obligations under the EU AI Act and other applicable law.
 
 ## License
 
-[LICENSE](LICENSE)
+Apache 2.0. See [LICENSE](LICENSE).
