@@ -98,3 +98,23 @@ staleness windows the engine applies to those records.
   Shafer) is a good academic anchor if you want the textbook proof.
   Vaara implements split-conformal prediction, the most operationally
   practical variant.
+
+## Related runtime-confidence work
+
+A different research line addresses the same underlying need (a
+static safety argument cannot keep up with what a deployed system
+actually does at runtime) by updating the confidence values inside
+a structured safety case as runtime evidence arrives.
+arXiv:2605.22530v1 (2026-05-21) describes a Subjective Logic
+formulation in which runtime Safety Performance Indicators are
+evaluated continuously and used to update targeted claims, with
+prompt confidence penalties when a violation occurs. The conformal
+interval Vaara emits is complementary to that approach: it does not
+update a safety case directly, but it gives a deployer a per-action
+numeric signal whose coverage guarantee holds without distributional
+assumptions, suitable as one of the inputs a Subjective Logic or
+similar assurance pipeline could consume.
+
+For the broader chronology of Vaara's runtime-evidence concepts and a
+neutral list of adjacent published work, see
+[`../PRIOR_ART.md`](../PRIOR_ART.md).

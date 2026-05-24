@@ -6,6 +6,54 @@ and this project follows [Semantic Versioning](https://semver.org/spec/v2.0.0.ht
 
 ## [Unreleased]
 
+## [0.29.0] - 2026-05-24
+
+**Theme: chronology anchor for Vaara's load-bearing concepts and a
+neutral list of adjacent published work.** As runtime-evidence,
+hash-chained audit, and conformal-interval framings appear in
+recent pre-prints (Protocol-Driven Development, Subjective Logic
+runtime confidence updates, formal-methods runtime monitors), a
+reader comparing Vaara against newer proposals deserves a single
+file that anchors when each Vaara concept first shipped in a tagged
+public release and lists adjacent peer-reviewed and pre-print work
+without competitive framing. This release ships that file and adds a
+short related-work section to the conformal-prediction explainer.
+
+### Added
+- `PRIOR_ART.md`: per-concept chronology table mapping each
+  load-bearing Vaara concept to its first shipped version and a path
+  into the codebase or docs. Includes a related-work section listing
+  adjacent pre-prints (Protocol-Driven Development, Formal Methods
+  Meet LLMs, Subjective Logic runtime confidence updates,
+  mechanistic interpretability for EASA learning-assurance,
+  backchaining LoC mitigations from national security benchmarks)
+  and classical foundations (conformal prediction, Linear Temporal
+  Logic runtime verification). Inclusion is neutral attribution, not
+  ranking.
+- `PRIOR_ART.md` cross-link in the README "Where things live" table.
+
+### Changed
+- `docs/conformal-prediction.md`: appended a "Related
+  runtime-confidence work" section citing the Subjective Logic
+  safety-arguments pre-print (arXiv:2605.22530v1) as a complementary
+  research line, with a cross-link to `PRIOR_ART.md` for the broader
+  chronology and related-work list. The plain-language explanation
+  and the Article 15(1) mapping are unchanged.
+
+### Unchanged
+- Hash chain format, OVERT envelope schema, MCP proxy perimeter
+  semantics, CLI surface, HTTP API, release workflow. This release
+  ships documentation surfaces only. The compliance engine,
+  scorer, audit, OVERT, and policy paths are byte-identical to
+  v0.28.0.
+
+### Notes for deployers
+- The chronology table in `PRIOR_ART.md` is reconstructed from
+  `CHANGELOG.md` and the git tags. Both can be verified
+  independently against PyPI release history and the GitHub tag
+  list. Where a deployer or auditor wants a paper trail for "since
+  when has Vaara done X," `PRIOR_ART.md` is the file to cite.
+
 ## [0.28.0] - 2026-05-22
 
 **Theme: making the evidence-sufficiency rules and the conformal
