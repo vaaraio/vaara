@@ -6,6 +6,59 @@ and this project follows [Semantic Versioning](https://semver.org/spec/v2.0.0.ht
 
 ## [Unreleased]
 
+## [0.30.0] - 2026-05-24
+
+**Theme: matrix pre-work. Vaara's coverage of OWASP Top 10 for
+Agentic Applications 2026 and OVERT 1.0 Part 3 controls, written as
+two standalone documents so an enterprise reader can see the honest
+mapping without having to read the rest of the repository.** Carlos
+Hernandez (Bosch AI Officer, awesome-eu-ai-act curator) offered a
+post-2026-06-18 side-by-side mapping of Vaara, Watcher, MS Agent
+Governance Toolkit, and OWASP controls on the GenAI Gurus platform.
+The Vaara column for that matrix needs to be drafted under the
+assumption of expert-review by the maintainers of the other
+columns. This release ships the two reference documents that anchor
+the Vaara entries for the matrix.
+
+### Added
+- `OWASP_AGENTIC.md`: Vaara mapping to OWASP Top 10 for Agentic
+  Applications 2026 (ASI01 through ASI10). Per-risk coverage with
+  ✅ / ◐ / ◯ status badge, the OWASP mitigation list quoted under
+  CC BY-SA 4.0, the Vaara primitive that satisfies each mitigation,
+  and an explicit "deployer-owned" note per risk. Includes a
+  cross-mapping summary table and the source citation (genai.owasp.org).
+- `OVERT_CONTROLS.md`: standalone OVERT 1.0 Part 3 (Agentic AI
+  Controls) mapping, extracted from `COMPLIANCE.md`. Same
+  ✅ / ◐ / ◯ status convention. Covers TOOL-*, MCP-*, MULTI-*,
+  CAP-*, DISC-*, HITL-*, DRIFT-* control families plus the S3P
+  measurement primitive in Section 9, MEA-2.
+- `OWASP_AGENTIC.md` and `OVERT_CONTROLS.md` cross-linked from the
+  README "Where things live" table.
+
+### Changed
+- `COMPLIANCE.md` "OVERT 1.0 Part 3 (Agentic AI Controls) mapping"
+  section now points readers to the new `OVERT_CONTROLS.md` and
+  `OWASP_AGENTIC.md` documents. The full inline mapping content is
+  retained in `COMPLIANCE.md` for backward compatibility with
+  existing anchors and references.
+
+### Unchanged
+- Hash chain format, OVERT envelope schema, MCP proxy semantics,
+  CLI surface, HTTP API, release workflow. This release ships
+  documentation surfaces only. The compliance engine, scorer,
+  audit, OVERT, and policy paths are byte-identical to v0.29.0.
+
+### Notes for deployers
+- The OWASP Top 10 for Agentic Applications 2026 is published by
+  the OWASP GenAI Security Project, Agentic Security Initiative,
+  December 2025, under Creative Commons CC BY-SA 4.0. The mapping
+  in `OWASP_AGENTIC.md` is referenced under that license with
+  attribution.
+- The OVERT 1.0 Part 3 mapping references controls defined by Glacis
+  Technologies (overt.is). The status assessments in
+  `OVERT_CONTROLS.md` are Vaara's own reading of which controls the
+  shipped code satisfies, not an OVERT-issued certification.
+
 ## [0.29.0] - 2026-05-24
 
 **Theme: chronology anchor for Vaara's load-bearing concepts and a
