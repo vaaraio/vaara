@@ -412,6 +412,14 @@ experimental until both land.
 
 ## OVERT 1.0 Part 3 (Agentic AI Controls) mapping
 
+The control-by-control mapping (TOOL-*, MCP-*, MULTI-*, CAP-*,
+DISC-*, HITL-*, DRIFT-*, plus the S3P measurement primitive in
+Section 9, MEA-2) is also published as the standalone
+[`OVERT_CONTROLS.md`](OVERT_CONTROLS.md) document, and the OWASP Top
+10 for Agentic Applications 2026 mapping lives in
+[`OWASP_AGENTIC.md`](OWASP_AGENTIC.md). All three use the same
+✅ / ◐ / ◯ status legend.
+
 OVERT 1.0 Part 3 (Sections 11-16) defines the agentic-specific
 execution controls: tool-call governance, MCP server trust, multi-
 agent boundaries, capability mediation, agent disclosure, human-in-
