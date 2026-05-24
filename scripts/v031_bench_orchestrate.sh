@@ -125,6 +125,7 @@ for style in roleplay hypothetical fakemode; do
         --model "$GENERATOR" \
         --style "$style" \
         --n "$EXTEND_PER_STYLE" \
+        --seeds tests/adversarial/jailbreak.jsonl \
         --out "tests/adversarial/generated/JB-${style}-v031.jsonl"
 done
 
