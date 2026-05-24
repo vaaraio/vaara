@@ -261,6 +261,7 @@ See [COMPLIANCE.md](COMPLIANCE.md) "Position relative to open runtime-attestatio
 | [COMPLIANCE.md](COMPLIANCE.md) | EU AI Act (Art. 9, 11 to 15, 61) and DORA (Art. 10, 12, 13) mapping, eval numbers, PAIR calibration |
 | [VERDICTS.md](VERDICTS.md) | Per-article evidence sufficiency thresholds and decision tree |
 | [CHANGELOG.md](CHANGELOG.md) | Version-by-version feature evolution |
+| [PRIOR_ART.md](PRIOR_ART.md) | When each Vaara concept first shipped, and a neutral list of adjacent published work |
 | [docs/signing-keys.md](docs/signing-keys.md) | Release signing and verification |
 | [SECURITY.md](SECURITY.md) | Security policy and reporting |
 | [CONTRIBUTING.md](CONTRIBUTING.md) | Contribution guidelines |
