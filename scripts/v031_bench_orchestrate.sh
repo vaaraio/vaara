@@ -42,8 +42,15 @@ ENDPOINT="http://${DROPLET_IP}:8000"
 
 # ---------- tmux self-wrap ----------
 if [[ -z "${TMUX:-}" ]]; then
-    echo "[wrap] re-execing inside tmux session '${SESSION}'"
-    exec tmux new-session -A -s "$SESSION" "$0" "$@"
+    if tmux has-session -t "$SESSION" 2>/dev/null; then
+        echo "[wrap] session '${SESSION}' already exists. attach with:"
+        echo "       tmux attach -t ${SESSION}"
+        exit 1
+    fi
+    echo "[wrap] launching detached in tmux session '${SESSION}'"
+    tmux new-session -d -s "$SESSION" "bash $0 $*"
+    echo "[wrap] attach with: tmux attach -t ${SESSION}"
+    exit 0
 fi
 
 mkdir -p "$OUT_ROOT"
@@ -113,7 +120,7 @@ vllm_up "$GENERATOR"
 
 for style in roleplay hypothetical fakemode; do
     note "extend: jailbreak style=$style n=$EXTEND_PER_STYLE"
-    python research/droplet_sync/research/e1_generate.py \
+    .venv/bin/python research/droplet_sync/research/e1_generate.py \
         --base-url "${ENDPOINT}/v1" \
         --model "$GENERATOR" \
         --style "$style" \
@@ -122,7 +129,7 @@ for style in roleplay hypothetical fakemode; do
 done
 
 note "extend: benign read_file canonical-paths"
-python research/droplet_sync/research/e2_generate.py \
+.venv/bin/python research/droplet_sync/research/e2_generate.py \
     --base-url "${ENDPOINT}/v1" \
     --model "$GENERATOR" \
     --n "$EXTEND_PER_STYLE" \
@@ -137,7 +144,7 @@ for model in $ATTACKERS; do
     vllm_up "$model"
     safe="${model//\//_}"
     note "pair: attacker=$model"
-    python scripts/eval_pair_attack.py \
+    .venv/bin/python scripts/eval_pair_attack.py \
         --endpoint "$ENDPOINT" \
         --model "$model" \
         --max-iters "$PAIR_MAX_ITERS" \
@@ -148,18 +155,18 @@ done
 
 # ---------- 3. Classifier retrain (local, CPU) ----------
 note "step 3/5: classifier retrain on extended corpus"
-python scripts/train_adversarial_classifier.py \
+.venv/bin/python scripts/train_adversarial_classifier.py \
     --json-out "$OUT_ROOT/classifier_v031.json"
 
 # ---------- 4. Distribution-shift eval (local) ----------
 note "step 4/5: distribution-shift eval"
-python scripts/eval_distribution_shift.py \
+.venv/bin/python scripts/eval_distribution_shift.py \
     --corpus-root tests/adversarial \
     --out "$OUT_ROOT/distribution_shift_v031.json"
 
 # ---------- 5. Adversarial corpus end-to-end re-eval (local) ----------
 note "step 5/5: adversarial corpus end-to-end eval (with classifier)"
-python scripts/eval_adversarial.py \
+.venv/bin/python scripts/eval_adversarial.py \
     --corpus-dir tests/adversarial \
     --with-classifier \
     --out "$OUT_ROOT/adversarial_v031.json"
