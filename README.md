@@ -262,6 +262,8 @@ See [COMPLIANCE.md](COMPLIANCE.md) "Position relative to open runtime-attestatio
 | [VERDICTS.md](VERDICTS.md) | Per-article evidence sufficiency thresholds and decision tree |
 | [CHANGELOG.md](CHANGELOG.md) | Version-by-version feature evolution |
 | [PRIOR_ART.md](PRIOR_ART.md) | When each Vaara concept first shipped, and a neutral list of adjacent published work |
+| [OWASP_AGENTIC.md](OWASP_AGENTIC.md) | Vaara mapping to OWASP Top 10 for Agentic Applications 2026 (ASI01 to ASI10) |
+| [OVERT_CONTROLS.md](OVERT_CONTROLS.md) | Vaara mapping to OVERT 1.0 Part 3 Agentic AI Controls (TOOL-*, MCP-*, MULTI-*, CAP-*, DISC-*, HITL-*, DRIFT-*) |
 | [docs/signing-keys.md](docs/signing-keys.md) | Release signing and verification |
 | [SECURITY.md](SECURITY.md) | Security policy and reporting |
 | [CONTRIBUTING.md](CONTRIBUTING.md) | Contribution guidelines |
