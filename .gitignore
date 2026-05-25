@@ -30,3 +30,4 @@ scripts/regwatch*
 src/vaara/data/adversarial_classifier_v2.joblib
 # Bench output (PAIR runs, dist-shift, vLLM logs). Reproducible by rerun.
 tests/adversarial/v031/
+.parachute/
