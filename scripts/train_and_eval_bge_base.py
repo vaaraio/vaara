@@ -121,7 +121,7 @@ def main() -> int:
     y_test = np.asarray(build_labels(folds["test"])[0], dtype=np.int32)
     print(f"[hand] TRAIN={X_tr_h.shape} VAL={X_val_h.shape} TEST={X_test_h.shape}")
 
-    print(f"[embed] loading bge-base (~440MB first-time download)...")
+    print("[embed] loading bge-base (~440MB first-time download)...")
     t0 = time.time()
     blobs = (
         [_param_blob(e) for e in folds["train"]]
@@ -165,7 +165,7 @@ def main() -> int:
     delta = test_m["recall"] - 0.843
     ship = delta >= 0.02 and test_m["fpr"] <= 0.05
     print()
-    print(f"v0.32 baseline: recall 84.3% FPR 4.6% @ T=0.9226")
+    print("v0.32 baseline: recall 84.3% FPR 4.6% @ T=0.9226")
     print(f"Δ recall = {delta:+.1%} (ship gate: +2.0pp at FPR<=5%)")
     print(f"SHIP: {ship}")
 

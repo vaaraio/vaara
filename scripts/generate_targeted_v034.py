@@ -8,7 +8,13 @@ targets. v0.31 settings: temperature=0.9, batch_size=20, seeds_per_batch=5.
 """
 from __future__ import annotations
 
-import argparse, hashlib, json, random, sys, time, urllib.request
+import argparse
+import hashlib
+import json
+import random
+import sys
+import time
+import urllib.request
 from pathlib import Path
 from typing import Iterable
 
