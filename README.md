@@ -20,16 +20,17 @@ Vaara intercepts agent tool calls, scores each one with a conformal risk interva
 
 ## Numbers
 
-Held-out TEST recall 53.9% (95% Wilson [50.3, 57.5]) at FPR 4.6% [3.1, 7.0]. Multi-attacker PAIR ASR 0/25 across three different attacker models with identical seeds. 140 µs p99 inference latency on commodity CPU. Every number reproducible end-to-end via `make repro-v031-bench`.
+Held-out TEST recall 84.3% (95% Wilson [81.5, 86.7]) at FPR 4.6% [3.1, 7.0]. Multi-attacker PAIR ASR 0/25 across three different attacker models with identical seeds. 140 µs p99 inference latency on commodity CPU (excluding one-time embedding model load). Every number reproducible end-to-end via `make repro-v031-bench`.
 
 - 7,955-entry adversarial corpus (250 hand-curated + 7,705 LLM-generated), 70/15/15 split stratified by (category, source)
-- Classifier-only at threshold 0.90 on held-out TEST n=1,196: recall 53.9% [50.3, 57.5] at FPR 4.6% [3.1, 7.0]
+- Classifier with 236 hand-features + 384-dim MiniLM embeddings at calibrated threshold 0.9226 on held-out TEST n=1,196: recall 84.3% [81.5, 86.7] at FPR 4.6% [3.1, 7.0]
 - Multi-attacker PAIR robustness: 0/25 successes per attacker across Qwen2.5-32B, Qwen2.5-72B, Llama-3.3-70B hitting identical seed indices, Wilson upper 13.3%
 - Chain of custody: corpus manifest SHA → split manifest SHA → training commit → bundle SHA, all locked and printed by every script
 - 140 µs / 210 µs p99 inference latency, commodity CPU
 - Distribution-free conformal coverage on the score
 - MWU regret bound O(sqrt(T log N))
-- [vaara-bench-v0.31](bench/vaara-bench-v0.31.md): industrial-grade methodology spec with Wilson intervals and named limits
+- [vaara-bench-v0.32](bench/vaara-bench-v0.32.md): v0.32 methodology delta. Same corpus, same split, embeddings + retuned hparams + FPR-target threshold calibration. +30.4 pp recall at the same FPR.
+- [vaara-bench-v0.31](bench/vaara-bench-v0.31.md): v0.31 methodology spec with Wilson intervals and named limits. Frozen as the v0.31 chain-of-custody anchor.
 - [vaara-bench-v1](bench/vaara-bench-v1.md): 77-trace synthetic-corpus regression baseline with frozen methodology, 100% soft TPR, 0% hard FPR
 
 Each figure is reproducible from the public corpus or the bench harness in `bench/`.

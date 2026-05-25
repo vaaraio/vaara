@@ -1,14 +1,14 @@
 """Adversarial tool-call classifier (opt-in ML scorer).
 
-Ships with a pre-trained XGBoost model (~300 KB bundle) trained on a
-5,955-entry corpus (3,422 attack across 8 categories, 2,533 benign),
-spanning hand-curated seeds and LLM-generated variants. Default
-threshold 0.55.
+Ships with a pre-trained XGBoost model trained on the v0.31 split's
+TRAIN fold (5,563 entries from a 7,955-entry corpus). v0.32 bundles
+concatenate 384-dim ``all-MiniLM-L6-v2`` embeddings of the parameter
+blob after the 236 hand-features.
 
-Headline numbers and methodology live in README.md "Adversarial Classifier"
-section. Per-source breakdown and adaptive-attacker calibration live in
-COMPLIANCE.md. Numbers intentionally not duplicated here so this docstring
-does not go stale on every release.
+Headline numbers and methodology live in README.md and
+``bench/vaara-bench-v0.31.md``. Per-source breakdown and adaptive-attacker
+calibration live in COMPLIANCE.md. Numbers intentionally not duplicated
+here so this docstring does not go stale on every release.
 
 Usage:
     pip install vaara[ml]
@@ -19,7 +19,8 @@ Usage:
         # block or escalate
         ...
 
-Requires xgboost, scikit-learn, joblib, numpy. All stay out of the default install.
+Requires xgboost, scikit-learn, joblib, numpy, sentence-transformers.
+All stay out of the default install.
 """
 from __future__ import annotations
 
@@ -62,7 +63,7 @@ _SHELL_PATTERNS = [
     ("shell_fork_bomb", re.compile(r":\(\)\s*\{\s*:\|")),
 ]
 
-_DEFAULT_BUNDLE = Path(__file__).parent / "data" / "adversarial_classifier_v2.joblib"
+_DEFAULT_BUNDLE = Path(__file__).parent / "data" / "adversarial_classifier_v3.joblib"
 
 _STATIC_FEATURES = [f"ip__{n}" for n,_ in _IP_PATTERNS] + [f"cred__{n}" for n,_ in _CRED_PATTERNS] + [f"sql__{n}" for n,_ in _SQL_PATTERNS] + [f"shell__{n}" for n,_ in _SHELL_PATTERNS] + [f"scheme__{s}" for s in _URL_SCHEMES] + ["ctx_source_injected", "param_blob_len", "has_wildcard_star", "has_all_keyword", "has_recursive_flag"]
 
@@ -78,14 +79,19 @@ def _param_blob(entry: dict) -> str:
         return str(entry)
 
 
-def _build_features_one(entry: dict, vocab: dict):
+def _build_features_one(entry: dict, vocab: dict, use_embeddings: bool = False):
     import numpy as np
     top_keys = vocab["top_keys"]
     top_ngrams = vocab["top_ngrams"]
-    n_features = (
+    n_hand = (
         len(top_ngrams) + len(top_keys) + len(_IP_PATTERNS) + len(_CRED_PATTERNS)
         + len(_SQL_PATTERNS) + len(_SHELL_PATTERNS) + len(_URL_SCHEMES) + 5
     )
+    if use_embeddings:
+        from vaara.embeddings import EMBED_DIM
+        n_features = n_hand + EMBED_DIM
+    else:
+        n_features = n_hand
     X = np.zeros((1, n_features), dtype=np.float32)
     tn = (entry.get("tool_name") or "").lower()
     params = entry.get("parameters") or {}
@@ -115,6 +121,9 @@ def _build_features_one(entry: dict, vocab: dict):
     X[0, col] = float("*" in json.dumps(params, default=str)); col += 1
     X[0, col] = float(" all " in json.dumps(params, default=str) or '"all"' in json.dumps(params, default=str)); col += 1
     X[0, col] = float(re.search(r"--force|--recursive|-rf\b", blob) is not None); col += 1
+    if use_embeddings:
+        from vaara.embeddings import embed, EMBED_DIM
+        X[0, col:col + EMBED_DIM] = embed(blob)
     return X
 
 
@@ -143,7 +152,13 @@ class AdversarialClassifier:
         self._vocab = bundle["vocab"]
         self.threshold: float = threshold if threshold is not None else bundle["default_threshold"]
         self.bundle_version: str = bundle.get("version", "unknown")
-        tail = (bundle.get("feature_names") or [])[-len(_STATIC_FEATURES):]
+        feat_names = bundle.get("feature_names") or []
+        self._use_embeddings = any(n.startswith("embed__") for n in feat_names)
+        if self._use_embeddings:
+            tail_end = next((i for i, n in enumerate(feat_names) if n.startswith("embed__")), len(feat_names))
+            tail = feat_names[tail_end - len(_STATIC_FEATURES):tail_end]
+        else:
+            tail = feat_names[-len(_STATIC_FEATURES):]
         if tail != _STATIC_FEATURES:
             diff = next((i for i, (a, b) in enumerate(zip(_STATIC_FEATURES, tail)) if a != b), -1)
             raise ValueError(f"bundle feature schema drift at static-feature index {diff}: runtime={_STATIC_FEATURES[diff] if diff>=0 else '?'!r} bundle={tail[diff] if diff>=0 else '?'!r} (len runtime={len(_STATIC_FEATURES)} bundle={len(tail)})")
@@ -151,7 +166,7 @@ class AdversarialClassifier:
     def score(self, tool_name: str, parameters: Optional[dict] = None, context: Optional[dict] = None) -> float:
         """Return adversarial probability in [0, 1]."""
         entry = {"tool_name": tool_name, "parameters": parameters or {}, "context": context or {}}
-        X = _build_features_one(entry, self._vocab)
+        X = _build_features_one(entry, self._vocab, use_embeddings=self._use_embeddings)
         return float(self._model.predict_proba(X)[0, 1])
 
     def is_malicious(self, tool_name: str, parameters: Optional[dict] = None, context: Optional[dict] = None, threshold: Optional[float] = None) -> bool:
