@@ -6,6 +6,58 @@ and this project follows [Semantic Versioning](https://semver.org/spec/v2.0.0.ht
 
 ## [Unreleased]
 
+## [0.35.0] - 2026-05-25
+
+**Theme: matched-benign corpus extension closes the v0.34 class-balance
+gap and lifts the production classifier.** 2,100 new benign entries
+(700 each for `tool_misuse`, `privilege_escalation`, `data_exfil`),
+generated via Qwen-72B-Instruct on AMD-backed MI300X, share tool_name
+and parameter shape with the v0.34 adversarial entries while encoding
+safe operations. Corpus grows from 10,055 to 12,155 entries, train
+positive_rate corrects from 0.701 back to 0.579, and a v6 classifier
+trained on the new v035 split clears the ship gate. Held-out TEST
+recall lifts to 85.0% [82.8, 87.1] at FPR 4.6% [3.3, 6.3] on n=1,827,
+calibrated threshold 0.9006. Cross-eval shows v6 lifts every category
+versus the v3 production classifier on the v035 TEST fold, with mean
+recall gain +44.7 pp and no regressions. The v6 bundle becomes the
+default production classifier. v3 remains in `src/vaara/data/` as the
+historical anchor.
+
+### Added
+- `tests/adversarial/benign_generated/BT-v035-TM.jsonl`,
+  `tests/adversarial/benign_generated/BT-v035-PE.jsonl`,
+  `tests/adversarial/benign_generated/BT-v035-DE.jsonl`: 700 matched-benign
+  entries each, generated via Qwen2.5-72B-Instruct on AMD MI300X. Each
+  entry shares tool_name and parameter shape with a v0.34 adversarial
+  anti-seed while encoding a safe operation a real operator would run.
+- `tests/adversarial/MANIFEST.sha256` regenerated to 296 entries
+  anchoring the new files.
+- `tests/adversarial/v035_split.json`: deterministic stratified
+  70/15/15 over the rebalanced 12,155-entry corpus, n=8,501 TRAIN /
+  1,827 VAL / 1,827 TEST.
+- `src/vaara/data/adversarial_classifier_v6.joblib`: production
+  classifier bundle. 620-dim feature (236 hand + 384 MiniLM, revision
+  pinned `c9745ed1d9f2`), XGBoost lr=0.10, trained on v035 TRAIN fold.
+- `bench/vaara-bench-v0.35.md`: canonical bench doc for this release.
+  Methodology delta against v0.34, per-category recall vs v3 cross-eval,
+  ship-gate verdict.
+- `bench/v035_eval_v6.json`, `bench/v035_eval_v3_cross.json`,
+  `bench/v035_per_category_v6.json`, `bench/v035_per_category_v3_cross.json`:
+  raw eval artefacts.
+- `scripts/generate_matched_benign_v035.py`: matched-benign generator,
+  shares anti-seeds with v0.34 adversarial entries on the same tool surface.
+- `scripts/v035_droplet_run.sh`: one-shot droplet driver for vLLM serve
+  + three parallel generators.
+
+### Changed
+- `src/vaara/adversarial_classifier.py`: `_DEFAULT_BUNDLE` now resolves
+  to `adversarial_classifier_v6.joblib`. v3 stays on disk as the
+  historical anchor.
+- `README.md`: headline recall, FPR, TEST n, and calibrated threshold
+  updated to the v6 numbers. Bench pointer flips from v0.34 to v0.35.
+- `Makefile`: `bench` target now evaluates v6 on the v035 split with v3
+  cross-eval as the regression control.
+
 ## [0.34.0] - 2026-05-25
 
 **Theme: adversarial corpus extension + a methodology lesson honestly

@@ -1,0 +1,51 @@
+{
+  "bundle": "src/vaara/data/adversarial_classifier_v3.joblib",
+  "bundle_version": "v0.33",
+  "uses_embeddings": true,
+  "n_features": 620,
+  "split_manifest": "tests/adversarial/v035_split.json",
+  "target_fpr": 0.05,
+  "calibrated_threshold": 0.9960070252418518,
+  "val": {
+    "threshold": 0.9960070252418518,
+    "tp": 498,
+    "fp": 39,
+    "fn": 564,
+    "tn": 726,
+    "recall": 0.4689265536723164,
+    "recall_ci": [
+      0.43907850509498264,
+      0.4989985975439086
+    ],
+    "fpr": 0.050980392156862744,
+    "fpr_ci": [
+      0.037514846408149324,
+      0.0689330877306902
+    ],
+    "precision": 0.9273743016759777,
+    "n": 1827,
+    "pos": 1062,
+    "neg": 765
+  },
+  "test": {
+    "threshold": 0.9960070252418518,
+    "tp": 527,
+    "fp": 20,
+    "fn": 536,
+    "tn": 744,
+    "recall": 0.49576669802445905,
+    "recall_ci": [
+      0.4657792241556126,
+      0.5257846593674895
+    ],
+    "fpr": 0.02617801047120419,
+    "fpr_ci": [
+      0.01700898189448014,
+      0.04008821106823508
+    ],
+    "precision": 0.9634369287020109,
+    "n": 1827,
+    "pos": 1063,
+    "neg": 764
+  }
+}

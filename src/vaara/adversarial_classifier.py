@@ -63,7 +63,7 @@ _SHELL_PATTERNS = [
     ("shell_fork_bomb", re.compile(r":\(\)\s*\{\s*:\|")),
 ]
 
-_DEFAULT_BUNDLE = Path(__file__).parent / "data" / "adversarial_classifier_v3.joblib"
+_DEFAULT_BUNDLE = Path(__file__).parent / "data" / "adversarial_classifier_v6.joblib"
 
 _STATIC_FEATURES = [f"ip__{n}" for n,_ in _IP_PATTERNS] + [f"cred__{n}" for n,_ in _CRED_PATTERNS] + [f"sql__{n}" for n,_ in _SQL_PATTERNS] + [f"shell__{n}" for n,_ in _SHELL_PATTERNS] + [f"scheme__{s}" for s in _URL_SCHEMES] + ["ctx_source_injected", "param_blob_len", "has_wildcard_star", "has_all_keyword", "has_recursive_flag"]
 
