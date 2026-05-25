@@ -25,6 +25,11 @@
 #   GENERATOR="Qwen/Qwen2.5-72B-Instruct"
 #   PAIR_MAX_ITERS=5
 #   EXTEND_PER_STYLE=500
+#   START_FROM_STEP=2   # skip earlier steps (e.g. corpus extension already on disk)
+#
+# WARNING: this script registers an EXIT trap that runs final_rsync + droplet
+# shutdown. If you need to stop it externally, use `kill -9` on the bash PID,
+# NOT `pkill` / `kill -TERM`, or the trap will fire and shutdown the droplet.
 
 set -euo pipefail
 
@@ -36,6 +41,7 @@ ATTACKERS="${ATTACKERS:-Qwen/Qwen2.5-32B-Instruct meta-llama/Llama-3.3-70B-Instr
 GENERATOR="${GENERATOR:-Qwen/Qwen2.5-72B-Instruct}"
 PAIR_MAX_ITERS="${PAIR_MAX_ITERS:-5}"
 EXTEND_PER_STYLE="${EXTEND_PER_STYLE:-500}"
+START_FROM_STEP="${START_FROM_STEP:-1}"
 
 OUT_ROOT="tests/adversarial/v031"
 ENDPOINT="http://${DROPLET_IP}:8000"
@@ -115,44 +121,56 @@ vllm_cache_purge() {
 }
 
 # ---------- 1. Corpus extension via the frontier generator ----------
-note "step 1/5: corpus extension with $GENERATOR"
-vllm_up "$GENERATOR"
+if (( START_FROM_STEP <= 1 )); then
+    note "step 1/5: corpus extension with $GENERATOR"
+    vllm_up "$GENERATOR"
 
-for style in roleplay hypothetical fakemode; do
-    note "extend: jailbreak style=$style n=$EXTEND_PER_STYLE"
-    .venv/bin/python research/droplet_sync/research/e1_generate.py \
+    for style in roleplay hypothetical fakemode; do
+        note "extend: jailbreak style=$style n=$EXTEND_PER_STYLE"
+        .venv/bin/python scripts/e1_generate.py \
+            --base-url "${ENDPOINT}/v1" \
+            --model "$GENERATOR" \
+            --style "$style" \
+            --n "$EXTEND_PER_STYLE" \
+            --seeds tests/adversarial/jailbreak.jsonl \
+            --out "tests/adversarial/generated/JB-${style}-v031.jsonl"
+    done
+
+    note "extend: benign read_file canonical-paths"
+    .venv/bin/python scripts/e2_generate.py \
         --base-url "${ENDPOINT}/v1" \
         --model "$GENERATOR" \
-        --style "$style" \
         --n "$EXTEND_PER_STYLE" \
-        --seeds tests/adversarial/jailbreak.jsonl \
-        --out "tests/adversarial/generated/JB-${style}-v031.jsonl"
-done
+        --out "tests/adversarial/benign_generated/BT-canonical-v031.jsonl"
 
-note "extend: benign read_file canonical-paths"
-.venv/bin/python research/droplet_sync/research/e2_generate.py \
-    --base-url "${ENDPOINT}/v1" \
-    --model "$GENERATOR" \
-    --n "$EXTEND_PER_STYLE" \
-    --out "tests/adversarial/benign_generated/BT-canonical-v031.jsonl"
-
-rsync -avz "${DROPLET}:/root/vllm.log" "$OUT_ROOT/vllm-generator.log"
-vllm_cache_purge
+    rsync -avz "${DROPLET}:/root/vllm.log" "$OUT_ROOT/vllm-generator.log"
+    vllm_cache_purge
+else
+    note "step 1/5: SKIPPED (START_FROM_STEP=$START_FROM_STEP, corpus already on disk)"
+fi
 
 # ---------- 2. Multi-attacker PAIR ----------
-note "step 2/5: multi-attacker PAIR"
-for model in $ATTACKERS; do
-    vllm_up "$model"
-    safe="${model//\//_}"
-    note "pair: attacker=$model"
-    .venv/bin/python scripts/eval_pair_attack.py \
-        --endpoint "$ENDPOINT" \
-        --model "$model" \
-        --max-iters "$PAIR_MAX_ITERS" \
-        --out "$OUT_ROOT/pair_${safe}.json"
-    rsync -avz "${DROPLET}:/root/vllm.log" "$OUT_ROOT/vllm-pair-${safe}.log"
-    vllm_cache_purge
-done
+if (( START_FROM_STEP <= 2 )); then
+    note "step 2/5: multi-attacker PAIR"
+    for model in $ATTACKERS; do
+        safe="${model//\//_}"
+        if [[ -s "$OUT_ROOT/pair_${safe}.json" ]]; then
+            note "pair: SKIP $model (result already on disk at $OUT_ROOT/pair_${safe}.json)"
+            continue
+        fi
+        vllm_up "$model"
+        note "pair: attacker=$model"
+        .venv/bin/python scripts/eval_pair_attack.py \
+            --endpoint "$ENDPOINT" \
+            --model "$model" \
+            --max-iters "$PAIR_MAX_ITERS" \
+            --out "$OUT_ROOT/pair_${safe}.json"
+        rsync -avz "${DROPLET}:/root/vllm.log" "$OUT_ROOT/vllm-pair-${safe}.log"
+        vllm_cache_purge
+    done
+else
+    note "step 2/5: SKIPPED (START_FROM_STEP=$START_FROM_STEP)"
+fi
 
 # ---------- 3. Classifier retrain (local, CPU) ----------
 note "step 3/5: classifier retrain on extended corpus"
