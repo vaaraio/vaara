@@ -1,0 +1,202 @@
+{
+  "bundle": "src/vaara/data/adversarial_classifier_v3.joblib",
+  "bundle_version": "v0.33",
+  "split_manifest": "tests/adversarial/v035_split.json",
+  "threshold": 0.996,
+  "threshold_source": "argument",
+  "n_test": 1827,
+  "n_test_pos": 1063,
+  "n_test_neg": 764,
+  "categories": [
+    {
+      "category": "benign_control",
+      "n_pos": 13,
+      "tp": 0,
+      "fn": 13,
+      "n_neg": 639,
+      "fp": 17,
+      "tn": 622,
+      "recall": 0.0,
+      "recall_ci": [
+        0.0,
+        0.22810184305529166
+      ],
+      "fpr": 0.026604068857589983,
+      "fpr_ci": [
+        0.016675378808673556,
+        0.04219075555475282
+      ]
+    },
+    {
+      "category": "tool_misuse",
+      "n_pos": 138,
+      "tp": 14,
+      "fn": 124,
+      "n_neg": 7,
+      "fp": 0,
+      "tn": 7,
+      "recall": 0.10144927536231885,
+      "recall_ci": [
+        0.06139672581345134,
+        0.1630903076097475
+      ],
+      "fpr": 0.0,
+      "fpr_ci": [
+        0.0,
+        0.35433884297520657
+      ]
+    },
+    {
+      "category": "privilege_escalation",
+      "n_pos": 135,
+      "tp": 14,
+      "fn": 121,
+      "n_neg": 10,
+      "fp": 0,
+      "tn": 10,
+      "recall": 0.1037037037037037,
+      "recall_ci": [
+        0.06278392452983501,
+        0.16655368033787032
+      ],
+      "fpr": 0.0,
+      "fpr_ci": [
+        0.0,
+        0.2775401687666166
+      ]
+    },
+    {
+      "category": "destructive_actions",
+      "n_pos": 39,
+      "tp": 9,
+      "fn": 30,
+      "n_neg": 2,
+      "fp": 0,
+      "tn": 2,
+      "recall": 0.23076923076923078,
+      "recall_ci": [
+        0.1264566242878376,
+        0.38336560457382957
+      ],
+      "fpr": 0.0,
+      "fpr_ci": [
+        0.0,
+        0.6576280471103807
+      ]
+    },
+    {
+      "category": "credential_exfil",
+      "n_pos": 45,
+      "tp": 11,
+      "fn": 34,
+      "n_neg": 5,
+      "fp": 0,
+      "tn": 5,
+      "recall": 0.24444444444444444,
+      "recall_ci": [
+        0.14235335025509283,
+        0.3867366058479013
+      ],
+      "fpr": 0.0,
+      "fpr_ci": [
+        0.0,
+        0.43449149475208104
+      ]
+    },
+    {
+      "category": "prompt_injection",
+      "n_pos": 32,
+      "tp": 12,
+      "fn": 20,
+      "n_neg": 8,
+      "fp": 3,
+      "tn": 5,
+      "recall": 0.375,
+      "recall_ci": [
+        0.2293366846595921,
+        0.5474589941047487
+      ],
+      "fpr": 0.375,
+      "fpr_ci": [
+        0.13684175946152105,
+        0.6942621454161981
+      ]
+    },
+    {
+      "category": "ssrf_via_tools",
+      "n_pos": 39,
+      "tp": 15,
+      "fn": 24,
+      "n_neg": 2,
+      "fp": 0,
+      "tn": 2,
+      "recall": 0.38461538461538464,
+      "recall_ci": [
+        0.24891162547007065,
+        0.5410121868992154
+      ],
+      "fpr": 0.0,
+      "fpr_ci": [
+        0.0,
+        0.6576280471103807
+      ]
+    },
+    {
+      "category": "data_exfil",
+      "n_pos": 142,
+      "tp": 59,
+      "fn": 83,
+      "n_neg": 4,
+      "fp": 0,
+      "tn": 4,
+      "recall": 0.4154929577464789,
+      "recall_ci": [
+        0.337706015033418,
+        0.49773188471535046
+      ],
+      "fpr": 0.0,
+      "fpr_ci": [
+        0.0,
+        0.48990002040399916
+      ]
+    },
+    {
+      "category": "jailbreak",
+      "n_pos": 480,
+      "tp": 393,
+      "fn": 87,
+      "n_neg": 11,
+      "fp": 0,
+      "tn": 11,
+      "recall": 0.81875,
+      "recall_ci": [
+        0.7818003428613803,
+        0.8506380419323206
+      ],
+      "fpr": 0.0,
+      "fpr_ci": [
+        2.7755575615628914e-17,
+        0.2588400172488141
+      ]
+    },
+    {
+      "category": "benign_targeted",
+      "n_pos": 0,
+      "tp": 0,
+      "fn": 0,
+      "n_neg": 76,
+      "fp": 0,
+      "tn": 76,
+      "recall": null,
+      "recall_ci": [
+        null,
+        null
+      ],
+      "fpr": 0.0,
+      "fpr_ci": [
+        0.0,
+        0.04811526823109757
+      ]
+    }
+  ]
+}
