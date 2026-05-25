@@ -126,16 +126,29 @@ def _param_blob(entry: dict) -> str:
     return " ".join(parts)
 
 
-def load_corpus() -> list[dict]:
-    entries: list[dict] = []
+def load_corpus_keyed() -> list[tuple[str, dict]]:
+    """Yield (entry_key, entry) for every JSONL row under ``CORPUS_DIR``.
+
+    ``entry_key`` is ``"<relative_path>#L<zero-based-line-index>"``. Used
+    as the join key in the train/val/test split manifest because the
+    ``id`` field is not unique across files (1,855 cross-file collisions
+    in the v0.31 corpus). The composite key is stable across reproductions
+    because ``rglob`` is sorted and line order is preserved.
+    """
+    out: list[tuple[str, dict]] = []
     for fp in sorted(CORPUS_DIR.rglob("*.jsonl")):
+        rel = fp.relative_to(CORPUS_DIR).as_posix()
         with fp.open() as f:
-            for line in f:
+            for li, line in enumerate(f):
                 line = line.strip()
                 if not line:
                     continue
-                entries.append(json.loads(line))
-    return entries
+                out.append((f"{rel}#L{li}", json.loads(line)))
+    return out
+
+
+def load_corpus() -> list[dict]:
+    return [e for _, e in load_corpus_keyed()]
 
 
 def fit_vocabulary(entries: list[dict]) -> dict:
