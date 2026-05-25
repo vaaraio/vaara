@@ -23,6 +23,7 @@ research/
 .regwatch/
 scripts/regwatch*
 .shipped/
+.v0*_watch/
 
 # Bench output (PAIR runs, dist-shift, vLLM logs). Reproducible by rerun.
 tests/adversarial/v031/
