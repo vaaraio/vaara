@@ -1,8 +1,9 @@
 """Train an XGBoost adversarial classifier and save a deployable joblib bundle.
 
-Loads the corpus via train_adversarial_classifier.load_corpus(), fits on the
-full corpus by default, and writes a bundle with provenance metadata to the
-default bundle path under src/vaara/data/ (or a custom path).
+Loads the corpus via ``train_adversarial_classifier.load_corpus_keyed``,
+optionally restricts to the TRAIN fold of a split manifest, and writes a
+bundle with provenance metadata to the default bundle path under
+``src/vaara/data/`` (or a custom path).
 
 Provenance fields written to the bundle:
     - model, vocab, feature_names, default_threshold, version
@@ -10,15 +11,18 @@ Provenance fields written to the bundle:
     - n_entries, positive_rate
     - training_corpus_manifest_sha256 (SHA256 of tests/adversarial/MANIFEST.sha256
       if present; else None)
+    - split_manifest_path, split_manifest_sha256, training_fold
+      (recorded only when ``--split-manifest`` is passed)
 
-Backs up the existing bundle to <path>.<oldver>.bak before overwriting.
+Backs up the existing bundle to ``<path>.<oldver>.bak`` before overwriting.
 
 Usage:
     .venv/bin/python scripts/save_classifier_bundle.py \\
         --version v0.31 --threshold 0.55
 
     .venv/bin/python scripts/save_classifier_bundle.py \\
-        --version v0.31 --threshold 0.70 \\
+        --version v0.31 --threshold 0.5 \\
+        --split-manifest tests/adversarial/v031_split.json \\
         --bundle-out src/vaara/data/adversarial_classifier_v2.joblib
 """
 from __future__ import annotations
@@ -26,6 +30,7 @@ from __future__ import annotations
 import argparse
 import datetime as dt
 import hashlib
+import json
 import shutil
 import subprocess
 import sys
@@ -35,7 +40,7 @@ REPO = Path(__file__).resolve().parent.parent
 sys.path.insert(0, str(REPO / "scripts"))
 
 from train_adversarial_classifier import (  # noqa: E402
-    load_corpus, build_labels, fit_vocabulary, build_features,
+    load_corpus_keyed, build_labels, fit_vocabulary, build_features,
 )
 
 DEFAULT_BUNDLE_PATH = REPO / "src/vaara/data/adversarial_classifier_v1.joblib"
@@ -66,6 +71,13 @@ def main() -> int:
                     help="Output path. Existing file is backed up to <path>.<old_version>.bak.")
     ap.add_argument("--manifest", default=str(DEFAULT_MANIFEST),
                     help="Path to corpus MANIFEST.sha256 (hashed and recorded for provenance).")
+    ap.add_argument("--split-manifest", default=None,
+                    help="If set, train only on entries whose fold == --train-fold in this split JSON "
+                         "(produced by scripts/build_train_val_test_split.py).")
+    ap.add_argument("--train-fold", default="train", choices=("train", "val", "test"),
+                    help='Which fold of the split manifest to train on (default: "train"). '
+                         'Use anything other than "train" only deliberately; leaking val/test '
+                         'into training invalidates the held-out metrics.')
     args = ap.parse_args()
 
     import numpy as np
@@ -86,11 +98,37 @@ def main() -> int:
             shutil.copy2(bundle_path, backup_path)
             print(f"[backup] {backup_path}")
 
-    entries = load_corpus()
-    print(f"[corpus] {len(entries)} entries")
+    keyed = load_corpus_keyed()
+    print(f"[corpus] {len(keyed)} entries loaded")
+
+    split_manifest_sha: str | None = None
+    split_manifest_rel: str | None = None
+    if args.split_manifest:
+        split_path = Path(args.split_manifest)
+        if not split_path.exists():
+            print(f"[error] split manifest not found: {split_path}", file=sys.stderr)
+            return 2
+        split_manifest_sha = hashlib.sha256(split_path.read_bytes()).hexdigest()
+        try:
+            split_manifest_rel = str(split_path.resolve().relative_to(REPO))
+        except ValueError:
+            split_manifest_rel = str(split_path)
+        assignments = json.loads(split_path.read_text())["assignments"]
+        before = len(keyed)
+        keyed = [(k, e) for k, e in keyed if assignments.get(k) == args.train_fold]
+        print(
+            f"[split] {split_manifest_rel}  sha={split_manifest_sha[:12]}  "
+            f"fold={args.train_fold}  kept={len(keyed)}/{before}"
+        )
+        if not keyed:
+            print(f"[error] no entries matched fold={args.train_fold} in split manifest",
+                  file=sys.stderr)
+            return 2
+
+    entries = [e for _, e in keyed]
     y, _cats = build_labels(entries)
     y = np.array(y)
-    print(f"[labels] positive rate={y.mean():.3f}")
+    print(f"[labels] n={len(entries)} positive_rate={y.mean():.3f}")
 
     vocab = fit_vocabulary(entries)
     X, feat_names, _ = build_features(entries, vocab=vocab)
@@ -115,6 +153,9 @@ def main() -> int:
         "n_entries": int(len(entries)),
         "positive_rate": float(y.mean()),
         "training_corpus_manifest_sha256": manifest_sha256(Path(args.manifest)),
+        "split_manifest_path": split_manifest_rel,
+        "split_manifest_sha256": split_manifest_sha,
+        "training_fold": args.train_fold if args.split_manifest else None,
     }
     joblib.dump(bundle, bundle_path)
     sz = bundle_path.stat().st_size

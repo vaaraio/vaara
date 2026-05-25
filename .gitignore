@@ -23,3 +23,10 @@ research/
 .regwatch/
 scripts/regwatch*
 .shipped/
+
+# v0.31 measurement-phase build artefact. Reproducible from corpus + split
+# manifest + training code. Committed only in the final v0.31 release
+# commit, alongside the runtime switch from _v1 to _v2.
+src/vaara/data/adversarial_classifier_v2.joblib
+# Bench output (PAIR runs, dist-shift, vLLM logs). Reproducible by rerun.
+tests/adversarial/v031/
