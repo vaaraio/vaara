@@ -6,6 +6,54 @@ and this project follows [Semantic Versioning](https://semver.org/spec/v2.0.0.ht
 
 ## [Unreleased]
 
+## [0.32.0] - 2026-05-25
+
+**Theme: classifier recall lift from 53.9% to 84.3% at the same 4.6%
+FPR.** The v0.31 hand-features hit a ceiling because regex patterns
+catch known surface forms and miss semantic variation. v0.32 adds a
+384-dim ``sentence-transformers/all-MiniLM-L6-v2`` embedding of the
+parameter blob to the existing 236 hand-features and retrains XGBoost
+on the concatenated 620-dim input. Threshold is calibrated on the
+v0.31 VAL fold at target FPR 5%. Same 70/15/15 split as v0.31, so the
+TEST result is directly comparable.
+
+### Added
+- ``src/vaara/embeddings.py``: lazy-loaded MiniLM singleton exposing
+  ``embed(text)`` and ``embed_batch(texts)``. 384-dim L2-normalized
+  float32. CPU backend. First call pays a one-time ~5s model load,
+  subsequent calls are sub-millisecond.
+- ``adversarial_classifier_v3.joblib`` (922 KB): retrained on the
+  v0.31 TRAIN fold (5,563 entries) with embeddings + hparams
+  ``n_estimators=400, max_depth=6, learning_rate=0.10``.
+- ``scripts/eval_v032.py``: calibrate threshold on VAL at target FPR,
+  report TEST recall and FPR with Wilson 95% intervals.
+- ``scripts/sweep_v032_hparams.py``: XGBoost hparam grid search with
+  per-config VAL calibration.
+- ``--embeddings`` flag on ``scripts/save_classifier_bundle.py``,
+  plus ``--n-estimators``, ``--max-depth``, ``--learning-rate``,
+  ``--min-child-weight``.
+
+### Changed
+- Runtime classifier switched from ``adversarial_classifier_v2.joblib``
+  to ``adversarial_classifier_v3.joblib``. The runtime detects
+  ``embed__*`` feature names in the bundle and calls ``embed()`` at
+  inference time. v2-format bundles still load unchanged.
+- ``detect_injection()`` default threshold moves from 0.90 to 0.9226,
+  the VAL-calibrated value for the new bundle. Explicit-threshold
+  callers are unaffected.
+- ``vaara[ml]`` extras now include ``sentence-transformers>=2.6``.
+- README headline numbers swap to v0.32 values: TEST recall 84.3%
+  [81.5, 86.7] at FPR 4.6% [3.1, 7.0] on held-out n=1,196.
+
+### Notes
+- 771 tests pass.
+- Same v0.31 split manifest, same TEST set. The +30.4 percentage
+  point recall lift is at the same FPR band, so the trade is a
+  recall gain at no FPR cost.
+- First-call latency now includes embedding model load (~5s on
+  CPU). After warm-up, per-call adversarial scoring stays in the
+  sub-millisecond band.
+
 ## [0.31.0] - 2026-05-25
 
 **Theme: industrial-grade adversarial benchmark.** v0.31 retires the

@@ -78,6 +78,12 @@ def main() -> int:
                     help='Which fold of the split manifest to train on (default: "train"). '
                          'Use anything other than "train" only deliberately; leaking val/test '
                          'into training invalidates the held-out metrics.')
+    ap.add_argument("--embeddings", action="store_true",
+                    help="Concatenate 384-dim MiniLM embeddings to the hand-features (v0.32+).")
+    ap.add_argument("--n-estimators", type=int, default=400)
+    ap.add_argument("--max-depth", type=int, default=6)
+    ap.add_argument("--learning-rate", type=float, default=0.07)
+    ap.add_argument("--min-child-weight", type=int, default=1)
     args = ap.parse_args()
 
     import numpy as np
@@ -131,16 +137,18 @@ def main() -> int:
     print(f"[labels] n={len(entries)} positive_rate={y.mean():.3f}")
 
     vocab = fit_vocabulary(entries)
-    X, feat_names, _ = build_features(entries, vocab=vocab)
-    print(f"[features] {X.shape}")
+    X, feat_names, _ = build_features(entries, vocab=vocab, embeddings=args.embeddings)
+    print(f"[features] {X.shape}  embeddings={args.embeddings}")
 
     model = xgb.XGBClassifier(
-        n_estimators=400, max_depth=6, learning_rate=0.07,
+        n_estimators=args.n_estimators, max_depth=args.max_depth,
+        learning_rate=args.learning_rate, min_child_weight=args.min_child_weight,
         subsample=0.9, colsample_bytree=0.9, eval_metric="logloss",
         random_state=42, n_jobs=8, tree_method="hist",
     )
     model.fit(X, y)
-    print("[fit] done")
+    print(f"[fit] done  ne={args.n_estimators} md={args.max_depth} "
+          f"lr={args.learning_rate} mc={args.min_child_weight}")
 
     bundle = {
         "model": model,
@@ -156,6 +164,13 @@ def main() -> int:
         "split_manifest_path": split_manifest_rel,
         "split_manifest_sha256": split_manifest_sha,
         "training_fold": args.train_fold if args.split_manifest else None,
+        "uses_embeddings": bool(args.embeddings),
+        "hparams": {
+            "n_estimators": args.n_estimators,
+            "max_depth": args.max_depth,
+            "learning_rate": args.learning_rate,
+            "min_child_weight": args.min_child_weight,
+        },
     }
     joblib.dump(bundle, bundle_path)
     sz = bundle_path.stat().st_size

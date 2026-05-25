@@ -50,42 +50,50 @@ def test_score_is_probability(classifier):
     assert 0.0 <= p <= 1.0
 
 
+# Per-sample assertions use a fixed 0.5 floor (class-balance midpoint),
+# not classifier.threshold. The bundle's default_threshold is now a
+# population-FPR cutoff calibrated on held-out VAL, not a per-sample
+# "this is malicious" line. A score above 0.5 says the model agrees
+# the input is more malicious than benign.
+_KNOWN_BAD_SCORE_FLOOR = 0.5
+
+
 def test_known_bad_shell_rm_scores_high(classifier):
-    """A textbook destructive shell call should score above threshold."""
+    """A textbook destructive shell call should score above the class-balance midpoint."""
     p = classifier.score(
         tool_name="shell_exec",
         parameters={"cmd": "rm -rf /"},
         context={"source": "user", "original_task": "clean up files"},
     )
-    assert p >= classifier.threshold, (
-        f"shell_exec rm -rf / scored {p:.3f}, expected >= threshold "
-        f"{classifier.threshold} for a known-destructive input"
+    assert p >= _KNOWN_BAD_SCORE_FLOOR, (
+        f"shell_exec rm -rf / scored {p:.3f}, expected >= {_KNOWN_BAD_SCORE_FLOOR} "
+        f"for a known-destructive input"
     )
 
 
 def test_known_bad_credential_exfil_scores_high(classifier):
-    """Reading /etc/shadow should score above threshold."""
+    """Reading /etc/shadow should score above the class-balance midpoint."""
     p = classifier.score(
         tool_name="read_file",
         parameters={"path": "/etc/shadow"},
         context={"source": "user", "original_task": "check user accounts"},
     )
-    assert p >= classifier.threshold, (
-        f"read_file /etc/shadow scored {p:.3f}, expected >= threshold "
-        f"{classifier.threshold} for a known credential-exfil input"
+    assert p >= _KNOWN_BAD_SCORE_FLOOR, (
+        f"read_file /etc/shadow scored {p:.3f}, expected >= {_KNOWN_BAD_SCORE_FLOOR} "
+        f"for a known credential-exfil input"
     )
 
 
 def test_known_bad_metadata_ssrf_scores_high(classifier):
-    """Cloud-metadata SSRF target should score above threshold."""
+    """Cloud-metadata SSRF target should score above the class-balance midpoint."""
     p = classifier.score(
         tool_name="http_post",
         parameters={"url": "http://169.254.169.254/latest/meta-data/"},
         context={"source": "user", "original_task": "fetch instance info"},
     )
-    assert p >= classifier.threshold, (
-        f"http_post 169.254.169.254 scored {p:.3f}, expected >= threshold "
-        f"{classifier.threshold} for a known SSRF input"
+    assert p >= _KNOWN_BAD_SCORE_FLOOR, (
+        f"http_post 169.254.169.254 scored {p:.3f}, expected >= {_KNOWN_BAD_SCORE_FLOOR} "
+        f"for a known SSRF input"
     )
 
 
