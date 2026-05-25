@@ -20,16 +20,16 @@ Vaara intercepts agent tool calls, scores each one with a conformal risk interva
 
 ## Numbers
 
-Held-out TEST recall 84.3% (95% Wilson [81.5, 86.7]) at FPR 4.6% [3.1, 7.0]. Multi-attacker PAIR ASR 0/25 across three different attacker models with identical seeds. 140 µs p99 inference latency on commodity CPU (excluding one-time embedding model load). Every number reproducible end-to-end via `make bench`.
+Held-out TEST recall 85.0% (95% Wilson [82.8, 87.1]) at FPR 4.6% [3.3, 6.3]. Multi-attacker PAIR ASR 0/25 across three different attacker models with identical seeds. 140 µs p99 inference latency on commodity CPU (excluding one-time embedding model load). Every number reproducible end-to-end via `make bench`.
 
-- 7,955-entry adversarial corpus (250 hand-curated + 7,705 LLM-generated), 70/15/15 split stratified by (category, source)
-- Classifier with 236 hand-features + 384-dim MiniLM embeddings at calibrated threshold 0.9226 on held-out TEST n=1,196: recall 84.3% [81.5, 86.7] at FPR 4.6% [3.1, 7.0]
+- 12,155-entry adversarial corpus (250 hand-curated + 11,905 LLM-generated), 70/15/15 split stratified by (category, source)
+- Classifier with 236 hand-features + 384-dim MiniLM embeddings at calibrated threshold 0.9006 on held-out TEST n=1,827: recall 85.0% [82.8, 87.1] at FPR 4.6% [3.3, 6.3]
 - Multi-attacker PAIR robustness: 0/25 successes per attacker across Qwen2.5-32B, Qwen2.5-72B, Llama-3.3-70B hitting identical seed indices, Wilson upper 13.3%
 - Chain of custody: corpus manifest SHA → split manifest SHA → training commit → bundle SHA, all locked and printed by every script
 - 140 µs / 210 µs p99 inference latency, commodity CPU
 - Distribution-free conformal coverage on the score
 - MWU regret bound O(sqrt(T log N))
-- [vaara-bench-v0.34](bench/vaara-bench-v0.34.md): current methodology, chain of custody, ship-gate record. Corpus extended to 10,055 entries with the v0.34 release; production classifier unchanged from v0.33, MiniLM embedding revision pinned in bundle metadata. Historical bench docs for v0.31, v0.32, v0.33 live under `bench/` for chain-of-custody continuity.
+- [vaara-bench-v0.35](bench/vaara-bench-v0.35.md): current methodology, chain of custody, ship-gate record. 12,155-entry corpus with matched-benign coverage on the targeted tool surfaces, MiniLM embedding revision pinned, production classifier trained on the v035 TRAIN fold. Historical bench docs live under `bench/` for chain-of-custody continuity.
 - [vaara-bench-v1](bench/vaara-bench-v1.md): 77-trace synthetic-corpus regression baseline with frozen methodology, 100% soft TPR, 0% hard FPR
 
 Each figure is reproducible from the public corpus or the bench harness in `bench/`.

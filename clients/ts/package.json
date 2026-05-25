@@ -1,6 +1,6 @@
 {
   "name": "@vaara/client",
-  "version": "0.34.0",
+  "version": "0.35.0",
   "description": "TypeScript client for the Vaara HTTP API. Conformal risk scoring, hash-chained audit, policy reload, named detectors.",
   "main": "dist/index.js",
   "types": "dist/index.d.ts",
