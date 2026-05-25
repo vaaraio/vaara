@@ -12,7 +12,7 @@ once the v0.32 extras are declared.
 """
 from __future__ import annotations
 
-from typing import Iterable, Optional
+from typing import Iterable
 
 import numpy as np
 
