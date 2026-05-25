@@ -20,7 +20,7 @@ Vaara intercepts agent tool calls, scores each one with a conformal risk interva
 
 ## Numbers
 
-Held-out TEST recall 84.3% (95% Wilson [81.5, 86.7]) at FPR 4.6% [3.1, 7.0]. Multi-attacker PAIR ASR 0/25 across three different attacker models with identical seeds. 140 µs p99 inference latency on commodity CPU (excluding one-time embedding model load). Every number reproducible end-to-end via `make repro-v031-bench`.
+Held-out TEST recall 84.3% (95% Wilson [81.5, 86.7]) at FPR 4.6% [3.1, 7.0]. Multi-attacker PAIR ASR 0/25 across three different attacker models with identical seeds. 140 µs p99 inference latency on commodity CPU (excluding one-time embedding model load). Every number reproducible end-to-end via `make bench`.
 
 - 7,955-entry adversarial corpus (250 hand-curated + 7,705 LLM-generated), 70/15/15 split stratified by (category, source)
 - Classifier with 236 hand-features + 384-dim MiniLM embeddings at calibrated threshold 0.9226 on held-out TEST n=1,196: recall 84.3% [81.5, 86.7] at FPR 4.6% [3.1, 7.0]
@@ -29,8 +29,7 @@ Held-out TEST recall 84.3% (95% Wilson [81.5, 86.7]) at FPR 4.6% [3.1, 7.0]. Mul
 - 140 µs / 210 µs p99 inference latency, commodity CPU
 - Distribution-free conformal coverage on the score
 - MWU regret bound O(sqrt(T log N))
-- [vaara-bench-v0.32](bench/vaara-bench-v0.32.md): v0.32 methodology delta. Same corpus, same split, embeddings + retuned hparams + FPR-target threshold calibration. +30.4 pp recall at the same FPR.
-- [vaara-bench-v0.31](bench/vaara-bench-v0.31.md): v0.31 methodology spec with Wilson intervals and named limits. Frozen as the v0.31 chain-of-custody anchor.
+- [vaara-bench-v0.34](bench/vaara-bench-v0.34.md): current methodology, chain of custody, ship-gate record. Corpus extended to 10,055 entries with the v0.34 release; production classifier unchanged from v0.33, MiniLM embedding revision pinned in bundle metadata. Historical bench docs for v0.31, v0.32, v0.33 live under `bench/` for chain-of-custody continuity.
 - [vaara-bench-v1](bench/vaara-bench-v1.md): 77-trace synthetic-corpus regression baseline with frozen methodology, 100% soft TPR, 0% hard FPR
 
 Each figure is reproducible from the public corpus or the bench harness in `bench/`.
@@ -240,7 +239,7 @@ from vaara.attestation.overt import emit_base_envelope, make_request_commitment,
 envelope = emit_base_envelope(
     signing_key=key,
     request_commitment=make_request_commitment(payload, operator_key=op_key),
-    encoder_binary_identity=encoder_binary_identity(arbiter_version="vaara/0.26.0", policy_hash=ph),
+    encoder_binary_identity=encoder_binary_identity(arbiter_version=f"vaara/{vaara.__version__}", policy_hash=ph),
     non_content_metadata={"action_class": "tx.transfer", "decision": "escalate"},
     monotonic_counter=42,
     arbiter_instance_identifier=uuid_bytes,
