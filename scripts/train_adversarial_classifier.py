@@ -176,13 +176,17 @@ def fit_vocabulary(entries: list[dict]) -> dict:
 
 
 def build_features(
-    entries: list[dict], vocab: Optional[dict] = None
+    entries: list[dict], vocab: Optional[dict] = None, embeddings: bool = False
 ) -> tuple[np.ndarray, list[str], dict]:
     """Transform entries to a feature matrix using ``vocab``.
 
     If ``vocab`` is None, fits vocabulary on these entries first. Pass a
     training-fitted vocab when transforming held-out entries to avoid
     leakage. Returns (X, feature_names, vocab).
+
+    With ``embeddings=True`` (v0.32+) concatenates a 384-dim L2-normalized
+    sentence-transformers all-MiniLM-L6-v2 embedding of the param blob
+    after the 236 hand-features. Vocabulary fitting is unchanged.
     """
     if vocab is None:
         vocab = fit_vocabulary(entries)
@@ -204,6 +208,10 @@ def build_features(
         "has_all_keyword",
         "has_recursive_flag",
     ]
+    n_hand = len(feature_names)
+    if embeddings:
+        from vaara.embeddings import EMBED_DIM
+        feature_names += [f"embed__{i}" for i in range(EMBED_DIM)]
 
     n = len(entries)
     X = np.zeros((n, len(feature_names)), dtype=np.float32)
@@ -246,6 +254,13 @@ def build_features(
         col += 1
         X[i, col] = float(re.search(r"--force|--recursive|-rf\b", blob) is not None)
         col += 1
+
+    if embeddings:
+        from vaara.embeddings import embed_batch, EMBED_DIM
+        blobs = [_param_blob(e) for e in entries]
+        E = embed_batch(blobs)
+        assert E.shape == (n, EMBED_DIM), f"embed_batch shape {E.shape} != ({n}, {EMBED_DIM})"
+        X[:, n_hand:n_hand + EMBED_DIM] = E
     return X, feature_names, vocab
 
 
