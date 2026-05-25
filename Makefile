@@ -1,4 +1,4 @@
-.PHONY: repro-v031-bench help
+.PHONY: bench repro-v031-bench help
 
 PY := .venv/bin/python
 ADV := tests/adversarial
@@ -6,7 +6,33 @@ V031 := $(ADV)/v031
 
 help:
 	@echo "Targets:"
-	@echo "  repro-v031-bench   reproduce every v0.31 adversarial benchmark number"
+	@echo "  bench              reproduce the current bench doc numbers (v0.34)"
+	@echo "  repro-v031-bench   reproduce the historical v0.31 bench numbers"
+
+# Current bench reproduction. Always points at the latest released
+# methodology (currently bench/vaara-bench-v0.34.md). Anyone cloning
+# at a tagged commit can run this and get the same SHAs and numbers.
+bench:
+	@echo "[1/4] verify corpus integrity (includes v0.34 additions)"
+	cd $(ADV) && sha256sum -c MANIFEST.sha256 > /dev/null
+	@echo "[2/4] evaluate production v3 bundle on v031_split TEST"
+	$(PY) scripts/eval_v032.py \
+		--bundle src/vaara/data/adversarial_classifier_v3.joblib \
+		--target-fpr 0.05 \
+		--json-out bench/v033_eval_final.json
+	@echo "[3/4] cross-eval v3 on v034_split TEST"
+	$(PY) scripts/eval_v032.py \
+		--bundle src/vaara/data/adversarial_classifier_v3.joblib \
+		--split-manifest $(ADV)/v034_split.json \
+		--target-fpr 0.05 \
+		--json-out bench/v034_eval_v3_cross.json
+	@echo "[4/4] cross-eval v5 (A/B) on v034_split TEST"
+	$(PY) scripts/eval_v032.py \
+		--bundle src/vaara/data/adversarial_classifier_v5.joblib \
+		--split-manifest $(ADV)/v034_split.json \
+		--target-fpr 0.05 \
+		--json-out bench/v034_eval_v5.json
+	@echo "done. compare SHAs to bench/vaara-bench-v0.34.md."
 
 # End-to-end reproduction of bench/vaara-bench-v0.31.md. Anyone cloning
 # the repo at a tagged commit can run this and get the same SHAs and

@@ -6,6 +6,64 @@ and this project follows [Semantic Versioning](https://semver.org/spec/v2.0.0.ht
 
 ## [Unreleased]
 
+## [0.34.0] - 2026-05-25
+
+**Theme: adversarial corpus extension + a methodology lesson honestly
+recorded.** The benchmark grows from 7,955 to 10,055 entries via 2,100
+targeted Qwen-72B-generated entries on the three weakest v0.32 TEST
+categories. A retrained v5 classifier did not clear the ship gate at
+matched FPR (one targeted category lifted +13.3 pp, two were flat,
+three untargeted categories regressed 7-13 pp), so the production
+classifier stays at v3 from v0.33. The corpus extension itself is the
+durable contribution. v0.35 will add matched benign coverage before
+retraining.
+
+### Added
+- `tests/adversarial/generated/TM-v034.jsonl`,
+  `tests/adversarial/generated/PE-v034.jsonl`,
+  `tests/adversarial/generated/DE-v034.jsonl`: 700 entries each
+  generated via Qwen2.5-72B-Instruct on AMD MI300X. Schema-validated,
+  deduplicated within and across files.
+- `tests/adversarial/MANIFEST.sha256` regenerated to 293 entries
+  (290 + 3) anchoring the new files.
+- `tests/adversarial/v034_split.json`: deterministic stratified
+  70/15/15 over the extended corpus, n=7,033 TRAIN / 1,511 VAL /
+  1,511 TEST.
+- `src/vaara/data/adversarial_classifier_v5.joblib`: experimental A/B
+  bundle trained on v034 TRAIN. Not loaded by default. Preserved for
+  reproducibility of the negative ship-gate result.
+- `bench/vaara-bench-v0.34.md`: methodology delta, chain of custody,
+  honest record of why the v5 swap did not ship.
+- `bench/v034_eval_v3_cross.json`, `bench/v034_eval_v5.json`,
+  `bench/v034_per_category_v3_at_T080.json`,
+  `bench/v034_per_category_v5_at_T095.json`: cross-eval artefacts
+  at matched FPR thresholds.
+- `bench/v034_droplet_logs/`: vLLM session log and per-category
+  generator logs (infrastructure IPs redacted before commit) for
+  the v0.34 bench-doc reproducibility table.
+- `scripts/generate_targeted_v034.py`: generalised over
+  `e1_generate.py` to accept `--category` and pull few-shot seeds
+  from `tests/adversarial/<category>.jsonl`.
+- `make bench` Makefile target: version-agnostic reproduction of the
+  current bench doc, replacing the v0.31-specific historical target
+  (which remains available as `make repro-v031-bench`).
+
+### Changed
+- `README.md` benchmark section collapses to a single canonical
+  pointer at the current bench doc. Historical per-version bench
+  links live under `bench/` for chain of custody but no longer
+  accumulate in the README.
+- README OVERT example reads `vaara.__version__` at runtime instead
+  of hardcoding a stale version string.
+
+### Not in this release
+- A production classifier swap to v5. The v5 bundle is documented
+  as a negative-result A/B, same pattern as bge-base in v0.33. The
+  production loader continues to use the v3 bundle shipped in v0.33.
+- Matched benign generation for the three weakest categories. That
+  is the scope correction for v0.35: matched benign first, then a
+  v6 retrain on the balanced corpus.
+
 ## [0.33.0] - 2026-05-25
 
 **Theme: pin the embedding model by HuggingFace commit SHA so v0.32's
