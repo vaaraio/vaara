@@ -1,0 +1,58 @@
+{
+  "experiment": "v0.33_bge_base_ab",
+  "embedding_model_id": "BAAI/bge-base-en-v1.5",
+  "embedding_model_revision": "a5beb1e3e68b9ab74eb54cfd186867f64f240e1a",
+  "embedding_dim": 768,
+  "split_manifest": "tests/adversarial/v031_split.json",
+  "target_fpr": 0.05,
+  "calibrated_threshold": 0.9509822726249695,
+  "hparams": {
+    "n_estimators": 400,
+    "max_depth": 6,
+    "learning_rate": 0.1
+  },
+  "val": {
+    "threshold": 0.9509822726249695,
+    "tp": 619,
+    "fp": 23,
+    "fn": 131,
+    "tn": 423,
+    "recall": 0.8253333333333334,
+    "recall_ci": [
+      0.7965206202988135,
+      0.8508302290042762
+    ],
+    "fpr": 0.0515695067264574,
+    "fpr_ci": [
+      0.03460596821493446,
+      0.07619214383161703
+    ],
+    "precision": 0.9641744548286605
+  },
+  "test": {
+    "threshold": 0.9509822726249695,
+    "tp": 614,
+    "fp": 23,
+    "fn": 130,
+    "tn": 429,
+    "recall": 0.8252688172043011,
+    "recall_ci": [
+      0.7963300775783713,
+      0.850865799195534
+    ],
+    "fpr": 0.05088495575221239,
+    "fpr_ci": [
+      0.034143376637204126,
+      0.07519635892005964
+    ],
+    "precision": 0.9638932496075353
+  },
+  "v032_baseline": {
+    "recall": 0.843,
+    "fpr": 0.046,
+    "threshold": 0.9226
+  },
+  "delta_recall_pp": -0.017731182795698852,
+  "ship_or_skip": "skip",
+  "trained_at": "2026-05-25T09:11:30.930148+00:00"
+}
