@@ -18,7 +18,7 @@ from dataclasses import dataclass
 from typing import Optional
 
 
-_DEFAULT_THRESHOLD = 0.90  # vaara-bench-v0.31 pick on VAL (Youden / balanced acc)
+_DEFAULT_THRESHOLD = 0.9226  # v0.32 pick on VAL at target FPR 5%
 
 
 @dataclass(frozen=True)
@@ -95,8 +95,8 @@ def detect_injection(
         text: The text to scan. Typical inputs are user-supplied prompt
             contents, retrieved-document chunks, or tool-output strings
             that flow back into an agent's context.
-        threshold: Decision threshold in [0, 1]. Defaults to 0.55
-            (vaara-bench-v1's escalation band).
+        threshold: Decision threshold in [0, 1]. Defaults to 0.9226
+            (v0.32 VAL pick at target FPR 5%).
         use_ml: When True and the ml extra is installed, route through
             the AdversarialClassifier. When False or the extra is
             absent, fall back to the heuristic regex set.
