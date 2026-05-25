@@ -32,7 +32,7 @@ def file_sha256(p):
 def is_malicious_truth(r):
     exp = r["expected"]
     labels = set(exp if isinstance(exp, list) else [exp])
-    return any(l in ("DENY", "ESCALATE") for l in labels)
+    return any(lbl in ("DENY", "ESCALATE") for lbl in labels)
 
 
 def predict_rules(r):
