@@ -41,6 +41,8 @@ and the `vX.Y.Z` tags on
 | `VERDICTS.md` per-article evidence sufficiency reference | v0.28.0, 2026-05-22 | `VERDICTS.md` |
 | `docs/conformal-prediction.md` plain-language explainer | v0.28.0, 2026-05-22 | `docs/conformal-prediction.md` |
 | This document (`PRIOR_ART.md`) | v0.29.0, 2026-05-24 | `PRIOR_ART.md` |
+| Cross-model held-out methodology with public 4,176-entry eval fold | v0.36.0, 2026-05-25 | `bench/vaara-bench-v0.36.md`, `tests/adversarial/v036_holdout.json` |
+| Destination-aware features (`dst__*`) and v7 production classifier | v0.36.0, 2026-05-25 | `src/vaara/adversarial_classifier.py`, `scripts/train_adversarial_classifier.py` |
 
 The `CHANGELOG.md` entry for each version carries the substantive
 description and, where relevant, the failure mode that motivated the
@@ -85,6 +87,30 @@ than a judgment of the work.
   evidence-sufficiency framework shipped in `VERDICTS.md` (v0.28.0,
   2026-05-22) and to the conformal interval that ships with every
   Vaara risk score (v0.1.0, 2026-04-10).
+
+### Calibration and external validation
+
+- **Calibration, Uncertainty Communication, and Deployment Readiness
+  in CKD Risk Prediction: A Framework Evaluation Study.** arXiv:2605.21566v1,
+  published 2026-05-20. Trains five classifiers on the UCI CKD dataset
+  (400 patients) and evaluates each across calibration quality, conformal
+  prediction coverage, and an eight-criterion deployment readiness
+  framework. Reports internal AUROC 1.00 collapsing to 0.48-0.58 on the
+  MIMIC-IV external cohort, with split-conformal coverage falling from
+  0.80-0.98 internal to 0.21-0.25 against a 90% target. Domain
+  incomparable to Vaara, but the methodological lesson (internal test is
+  a ceiling, the external gap is visible only against a held-out
+  generator) motivates Vaara's v0.36 cross-model held-out corpus
+  (`bench/vaara-bench-v0.36.md`).
+
+### Selective inference on conformal prediction sets
+
+- **Selecting Informative Conformal Prediction Sets with an Optimized
+  FCR-Controlled Approach.** arXiv:2605.22004v1, published 2026-05-21.
+  Formalises selective inference on conformal prediction sets with
+  finite-sample false coverage rate guarantees. Methodology pointer for
+  Vaara's planned FPR-bounded three-stage combiner (rules-veto in the
+  uncertain band), scheduled for v0.37+. Not yet implemented in Vaara.
 
 ### Aviation learning-assurance
 
