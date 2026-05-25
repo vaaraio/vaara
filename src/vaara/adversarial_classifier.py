@@ -62,10 +62,65 @@ _SHELL_PATTERNS = [
     ("shell_curl_pipe", re.compile(r"\bcurl\b[^|]*\|\s*(sh|bash)")),
     ("shell_fork_bomb", re.compile(r":\(\)\s*\{\s*:\|")),
 ]
+# v0.36 destination-aware features. Must stay byte-for-byte identical with
+# scripts/train_adversarial_classifier.py:_DST_PATTERNS so training and inference
+# produce the same feature vector. Bundles trained without dst features still
+# load; the schema check below adapts to the bundle's feature_names.
+_DST_PATTERNS = [
+    ("personal_email", re.compile(
+        r"@(gmail|yahoo|outlook|hotmail|icloud|protonmail|proton\.me|aol|"
+        r"mail\.ru|qq\.com|ya\.ru|gmx|fastmail|tutanota|zoho|posteo|hushmail)"
+        r"(\.[a-z]{2,4})?\b", re.I)),
+    ("webhook_relay", re.compile(
+        r"\b(webhook\.site|requestbin|hookbin|beeceptor|mockbin|pipedream|"
+        r"ngrok\.io|ngrok-free\.app|trycloudflare|loca\.lt|serveo)", re.I)),
+    ("paste_service", re.compile(
+        r"\b(pastebin|paste\.ee|paste\.org|hastebin|gist\.github|"
+        r"controlc|justpaste|paste\.rs|privatebin|0bin)", re.I)),
+    ("free_filehost", re.compile(
+        r"\b(transfer\.sh|file\.io|wetransfer|sendspace|mega\.nz|"
+        r"mediafire|filebin|0x0\.st|catbox\.moe|anonfile|gofile\.io)", re.I)),
+    ("public_bucket", re.compile(
+        r"(public[-_]?(temp|share|storage|bucket|read)|public-read|"
+        r"\"acl\"\s*:\s*\"public|\"visibility\"\s*:\s*\"public|"
+        r"\"private\"\s*:\s*\"?(false|no))", re.I)),
+    ("never_expires", re.compile(
+        r"\"expir(y|ation|es)\"\s*:\s*\"?(never|none|null|0|-1)|"
+        r"\"ttl\"\s*:\s*\"?(0|-1|none|null|never)", re.I)),
+    ("ext_share_scheme", re.compile(
+        r"\b(smb|ftp|sftp|webdav)://", re.I)),
+    ("ext_bucket_name", re.compile(
+        r"(temp|external|staging|public)[-_]?(storage|bucket|backup|share)", re.I)),
+    ("pii_columns", re.compile(
+        r"\b(ssn|social[-_]?security|date[-_]?of[-_]?birth|credit[-_]?card|"
+        r"cvv|passport|driver[-_]?license|medical[-_]?record|payroll|salary|"
+        r"tax[-_]?id|bank[-_]?account|routing[-_]?number|phi|pii)\b", re.I)),
+    ("bulk_select_limit", re.compile(
+        r"\bSELECT\b.{0,200}\bLIMIT\s+([1-9]\d{3,})\b", re.I | re.S)),
+    ("select_star_from", re.compile(r"\bSELECT\s+\*\s+FROM\s+\w+", re.I)),
+    ("export_dump_to", re.compile(
+        r"\b(export|copy|backup|dump)[-_]?(url|to|destination|target)\b", re.I)),
+    ("susp_tld", re.compile(
+        r"\.(tk|ml|ga|cf|gq|xyz|top|click|download|stream|loan|date|win|"
+        r"work|men|review)/", re.I)),
+    ("webhook_param_key", re.compile(
+        r"\"(webhook_url|callback_url|hook|destination_url|external_url|"
+        r"forward_to|relay_to)\"", re.I)),
+    ("tmp_or_public_path", re.compile(r"/(tmp|public|shared)/", re.I)),
+    ("share_platform", re.compile(
+        r"\b(slack\.com/files|discord\.com/channels|telegram\.me|t\.me/|"
+        r"signal\.org|whatsapp\.com|wa\.me/|m\.me/)", re.I)),
+    ("recipient_to_personal", re.compile(
+        r"\"to\"\s*:\s*\"[^\"]*@(gmail|yahoo|outlook|hotmail|icloud)", re.I)),
+    ("attachment_with_external_to", re.compile(
+        r"\"attachments?\"\s*:\s*\[.*\].*\"to\"\s*:\s*\"[^\"]*@(?!.*(corp|internal|\.local))",
+        re.I | re.S)),
+]
 
-_DEFAULT_BUNDLE = Path(__file__).parent / "data" / "adversarial_classifier_v6.joblib"
+_DEFAULT_BUNDLE = Path(__file__).parent / "data" / "adversarial_classifier_v7.joblib"
 
 _STATIC_FEATURES = [f"ip__{n}" for n,_ in _IP_PATTERNS] + [f"cred__{n}" for n,_ in _CRED_PATTERNS] + [f"sql__{n}" for n,_ in _SQL_PATTERNS] + [f"shell__{n}" for n,_ in _SHELL_PATTERNS] + [f"scheme__{s}" for s in _URL_SCHEMES] + ["ctx_source_injected", "param_blob_len", "has_wildcard_star", "has_all_keyword", "has_recursive_flag"]
+_DST_STATIC = [f"dst__{n}" for n, _ in _DST_PATTERNS]
 
 
 def _param_blob(entry: dict) -> str:
@@ -79,13 +134,14 @@ def _param_blob(entry: dict) -> str:
         return str(entry)
 
 
-def _build_features_one(entry: dict, vocab: dict, use_embeddings: bool = False):
+def _build_features_one(entry: dict, vocab: dict, use_embeddings: bool = False, use_dst: bool = False):
     import numpy as np
     top_keys = vocab["top_keys"]
     top_ngrams = vocab["top_ngrams"]
     n_hand = (
         len(top_ngrams) + len(top_keys) + len(_IP_PATTERNS) + len(_CRED_PATTERNS)
         + len(_SQL_PATTERNS) + len(_SHELL_PATTERNS) + len(_URL_SCHEMES) + 5
+        + (len(_DST_PATTERNS) if use_dst else 0)
     )
     if use_embeddings:
         from vaara.embeddings import EMBED_DIM
@@ -121,6 +177,9 @@ def _build_features_one(entry: dict, vocab: dict, use_embeddings: bool = False):
     X[0, col] = float("*" in json.dumps(params, default=str)); col += 1
     X[0, col] = float(" all " in json.dumps(params, default=str) or '"all"' in json.dumps(params, default=str)); col += 1
     X[0, col] = float(re.search(r"--force|--recursive|-rf\b", blob) is not None); col += 1
+    if use_dst:
+        for _, pat in _DST_PATTERNS:
+            X[0, col] = float(bool(pat.search(blob))); col += 1
     if use_embeddings:
         from vaara.embeddings import embed, EMBED_DIM
         X[0, col:col + EMBED_DIM] = embed(blob)
@@ -154,19 +213,21 @@ class AdversarialClassifier:
         self.bundle_version: str = bundle.get("version", "unknown")
         feat_names = bundle.get("feature_names") or []
         self._use_embeddings = any(n.startswith("embed__") for n in feat_names)
+        self._use_dst = any(n.startswith("dst__") for n in feat_names)
+        expected_static = list(_STATIC_FEATURES) + (list(_DST_STATIC) if self._use_dst else [])
         if self._use_embeddings:
             tail_end = next((i for i, n in enumerate(feat_names) if n.startswith("embed__")), len(feat_names))
-            tail = feat_names[tail_end - len(_STATIC_FEATURES):tail_end]
+            tail = feat_names[tail_end - len(expected_static):tail_end]
         else:
-            tail = feat_names[-len(_STATIC_FEATURES):]
-        if tail != _STATIC_FEATURES:
-            diff = next((i for i, (a, b) in enumerate(zip(_STATIC_FEATURES, tail)) if a != b), -1)
-            raise ValueError(f"bundle feature schema drift at static-feature index {diff}: runtime={_STATIC_FEATURES[diff] if diff>=0 else '?'!r} bundle={tail[diff] if diff>=0 else '?'!r} (len runtime={len(_STATIC_FEATURES)} bundle={len(tail)})")
+            tail = feat_names[-len(expected_static):]
+        if tail != expected_static:
+            diff = next((i for i, (a, b) in enumerate(zip(expected_static, tail)) if a != b), -1)
+            raise ValueError(f"bundle feature schema drift at static-feature index {diff}: runtime={expected_static[diff] if diff>=0 else '?'!r} bundle={tail[diff] if diff>=0 else '?'!r} (len runtime={len(expected_static)} bundle={len(tail)})")
 
     def score(self, tool_name: str, parameters: Optional[dict] = None, context: Optional[dict] = None) -> float:
         """Return adversarial probability in [0, 1]."""
         entry = {"tool_name": tool_name, "parameters": parameters or {}, "context": context or {}}
-        X = _build_features_one(entry, self._vocab, use_embeddings=self._use_embeddings)
+        X = _build_features_one(entry, self._vocab, use_embeddings=self._use_embeddings, use_dst=self._use_dst)
         return float(self._model.predict_proba(X)[0, 1])
 
     def is_malicious(self, tool_name: str, parameters: Optional[dict] = None, context: Optional[dict] = None, threshold: Optional[float] = None) -> bool:

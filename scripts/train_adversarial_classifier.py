@@ -83,6 +83,60 @@ _SHELL_PATTERNS = [
     ("shell_curl_pipe", re.compile(r"\bcurl\b[^|]*\|\s*(sh|bash)")),
     ("shell_fork_bomb", re.compile(r":\(\)\s*\{\s*:\|")),
 ]
+# v0.36 destination-aware features. The v6 gap was tool_name-heavy scoring missing
+# parameter-level destination signals (external URLs, personal email, public buckets,
+# pastebins, no-expiry markers). These features fire on destination/value patterns
+# regardless of which tool name is wrapping them.
+_DST_PATTERNS = [
+    ("personal_email", re.compile(
+        r"@(gmail|yahoo|outlook|hotmail|icloud|protonmail|proton\.me|aol|"
+        r"mail\.ru|qq\.com|ya\.ru|gmx|fastmail|tutanota|zoho|posteo|hushmail)"
+        r"(\.[a-z]{2,4})?\b", re.I)),
+    ("webhook_relay", re.compile(
+        r"\b(webhook\.site|requestbin|hookbin|beeceptor|mockbin|pipedream|"
+        r"ngrok\.io|ngrok-free\.app|trycloudflare|loca\.lt|serveo)", re.I)),
+    ("paste_service", re.compile(
+        r"\b(pastebin|paste\.ee|paste\.org|hastebin|gist\.github|"
+        r"controlc|justpaste|paste\.rs|privatebin|0bin)", re.I)),
+    ("free_filehost", re.compile(
+        r"\b(transfer\.sh|file\.io|wetransfer|sendspace|mega\.nz|"
+        r"mediafire|filebin|0x0\.st|catbox\.moe|anonfile|gofile\.io)", re.I)),
+    ("public_bucket", re.compile(
+        r"(public[-_]?(temp|share|storage|bucket|read)|public-read|"
+        r"\"acl\"\s*:\s*\"public|\"visibility\"\s*:\s*\"public|"
+        r"\"private\"\s*:\s*\"?(false|no))", re.I)),
+    ("never_expires", re.compile(
+        r"\"expir(y|ation|es)\"\s*:\s*\"?(never|none|null|0|-1)|"
+        r"\"ttl\"\s*:\s*\"?(0|-1|none|null|never)", re.I)),
+    ("ext_share_scheme", re.compile(
+        r"\b(smb|ftp|sftp|webdav)://", re.I)),
+    ("ext_bucket_name", re.compile(
+        r"(temp|external|staging|public)[-_]?(storage|bucket|backup|share)", re.I)),
+    ("pii_columns", re.compile(
+        r"\b(ssn|social[-_]?security|date[-_]?of[-_]?birth|credit[-_]?card|"
+        r"cvv|passport|driver[-_]?license|medical[-_]?record|payroll|salary|"
+        r"tax[-_]?id|bank[-_]?account|routing[-_]?number|phi|pii)\b", re.I)),
+    ("bulk_select_limit", re.compile(
+        r"\bSELECT\b.{0,200}\bLIMIT\s+([1-9]\d{3,})\b", re.I | re.S)),
+    ("select_star_from", re.compile(r"\bSELECT\s+\*\s+FROM\s+\w+", re.I)),
+    ("export_dump_to", re.compile(
+        r"\b(export|copy|backup|dump)[-_]?(url|to|destination|target)\b", re.I)),
+    ("susp_tld", re.compile(
+        r"\.(tk|ml|ga|cf|gq|xyz|top|click|download|stream|loan|date|win|"
+        r"work|men|review)/", re.I)),
+    ("webhook_param_key", re.compile(
+        r"\"(webhook_url|callback_url|hook|destination_url|external_url|"
+        r"forward_to|relay_to)\"", re.I)),
+    ("tmp_or_public_path", re.compile(r"/(tmp|public|shared)/", re.I)),
+    ("share_platform", re.compile(
+        r"\b(slack\.com/files|discord\.com/channels|telegram\.me|t\.me/|"
+        r"signal\.org|whatsapp\.com|wa\.me/|m\.me/)", re.I)),
+    ("recipient_to_personal", re.compile(
+        r"\"to\"\s*:\s*\"[^\"]*@(gmail|yahoo|outlook|hotmail|icloud)", re.I)),
+    ("attachment_with_external_to", re.compile(
+        r"\"attachments?\"\s*:\s*\[.*\].*\"to\"\s*:\s*\"[^\"]*@(?!.*(corp|internal|\.local))",
+        re.I | re.S)),
+]
 
 
 def _normalize_str(s: Any) -> str:
@@ -208,6 +262,7 @@ def build_features(
         "has_all_keyword",
         "has_recursive_flag",
     ]
+    feature_names += [f"dst__{name}" for name, _ in _DST_PATTERNS]
     n_hand = len(feature_names)
     if embeddings:
         from vaara.embeddings import EMBED_DIM
@@ -254,6 +309,9 @@ def build_features(
         col += 1
         X[i, col] = float(re.search(r"--force|--recursive|-rf\b", blob) is not None)
         col += 1
+        for _, pat in _DST_PATTERNS:
+            X[i, col] = float(bool(pat.search(blob)))
+            col += 1
 
     if embeddings:
         from vaara.embeddings import embed_batch, EMBED_DIM
