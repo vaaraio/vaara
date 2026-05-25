@@ -17,6 +17,7 @@ from typing import Iterable
 import numpy as np
 
 EMBED_MODEL_ID = "sentence-transformers/all-MiniLM-L6-v2"
+EMBED_MODEL_REVISION = "c9745ed1d9f207416be6d2e6f8de32d1f16199bf"
 EMBED_DIM = 384
 
 _model = None
@@ -31,7 +32,9 @@ def _get_model():
             raise ImportError(
                 "embeddings require sentence-transformers: pip install vaara[ml]"
             ) from exc
-        _model = SentenceTransformer(EMBED_MODEL_ID, device="cpu")
+        _model = SentenceTransformer(
+            EMBED_MODEL_ID, revision=EMBED_MODEL_REVISION, device="cpu",
+        )
     return _model
 
 
@@ -56,4 +59,6 @@ def embed_batch(texts: Iterable[str], batch_size: int = 64) -> np.ndarray:
     ).astype(np.float32)
 
 
-__all__ = ["embed", "embed_batch", "EMBED_DIM", "EMBED_MODEL_ID"]
+__all__ = [
+    "embed", "embed_batch", "EMBED_DIM", "EMBED_MODEL_ID", "EMBED_MODEL_REVISION",
+]
