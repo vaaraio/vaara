@@ -71,7 +71,7 @@ Wilson 95% intervals. Verification command:
 
 Both bundles evaluated on the v035_split TEST at matched 5% FPR target
 calibrated on v035 VAL. v3 needs T=0.9960 to achieve FPR 2.6% on this
-harder TEST; v6 hits FPR 4.6% at T=0.9006.
+harder TEST. v6 hits FPR 4.6% at T=0.9006.
 
 | metric | v6 (production) | v3 (cross-eval) |
 |---|---|---|
@@ -110,7 +110,7 @@ The v0.35 ship gate was: overall FPR ≤ 5%, weakest three categories at
 | gate | result | notes |
 |---|---|---|
 | Overall FPR ≤ 5% | PASS | 4.6% [3.3, 6.3] |
-| Weakest three categories ≥ 70% recall | PARTIAL | 66.7%, 68.9%, 71.9%; two point estimates below 70 but both Wilson 95% CIs span 70 |
+| Weakest three categories ≥ 70% recall | PARTIAL | 66.7%, 68.9%, 71.9%. Two point estimates below 70 but both Wilson 95% CIs span 70 |
 | None below 65% recall | PASS | weakest is 66.7% |
 | No category regresses by more than 3 pp vs v3 cross-eval | PASS | every category improves between +11.4 and +74.8 pp |
 
