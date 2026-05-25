@@ -6,6 +6,63 @@ and this project follows [Semantic Versioning](https://semver.org/spec/v2.0.0.ht
 
 ## [Unreleased]
 
+## [0.31.0] - 2026-05-25
+
+**Theme: industrial-grade adversarial benchmark.** v0.31 retires the
+cross-validated headline numbers and replaces them with a 70/15/15
+stratified split, threshold picked on VAL only, and Wilson 95%
+intervals on every figure cited in the release. The classifier
+bundle is retrained on TRAIN entries only. A single command
+(`make repro-v031-bench`) reproduces every number from a fresh clone
+against the four chain-of-custody hashes printed by every script.
+
+### Added
+- `bench/vaara-bench-v0.31.md`: methodology spec parallel to
+  `vaara-bench-v1.md`. Chain of custody, split methodology,
+  threshold pick by Youden's J and balanced accuracy on VAL,
+  headline numbers with Wilson 95% intervals, named limits,
+  reproduction recipe.
+- `scripts/build_train_val_test_split.py`: deterministic 70/15/15
+  split stratified by `(category, source)`, per-stratum seeded RNG,
+  key format `<rel_path>#L<line>` because raw `id` has 1,855
+  cross-file collisions.
+- `scripts/eval_pipeline_attribution.py`: per-entry attribution
+  audit running every corpus entry through a fresh `Pipeline`
+  (cold-start methodology) plus the classifier side-by-side.
+- `scripts/three_way_variants.py`: rules-only / classifier-only /
+  both-OR comparison on any fold with per-category and per-source
+  breakdowns.
+- `scripts/threshold_sweep_val.py`: classifier threshold sweep on
+  VAL only.
+- `scripts/wilson_intervals.py`: Wilson 95% intervals on every
+  headline metric. PAIR ASR upper bound at 0/25 = 13.3%.
+- `Makefile` with `repro-v031-bench` target: eight-step end-to-end
+  reproduction.
+- 2,000-entry v0.31 corpus extension: `JB-roleplay-v031.jsonl`,
+  `JB-hypothetical-v031.jsonl`, `JB-fakemode-v031.jsonl`,
+  `BT-canonical-v031.jsonl`. Qwen2.5-72B-Instruct on MI300x with
+  documented parameters.
+
+### Changed
+- Runtime classifier switched from `adversarial_classifier_v1.joblib`
+  (v0.5.3-trained, cross-validation point estimates) to
+  `adversarial_classifier_v2.joblib` (v0.31-trained on TRAIN-only).
+- `detect_injection()` default threshold raised from 0.55 to 0.90.
+  The 0.55 was the v1 bundle's escalation band against a
+  cross-validated corpus. 0.90 is the VAL-pick threshold against
+  the v2 bundle, chosen by Youden's J and balanced accuracy.
+  Callers passing an explicit threshold are unaffected.
+- `README.md` headline numbers swap to v0.31 honest values: recall
+  53.9% [50.3, 57.5] at FPR 4.6% [3.1, 7.0] on held-out TEST
+  n=1,196. The earlier 97.1% number was a contaminated read because
+  the threshold tuning saw the test fold.
+
+### Notes
+- 771 tests pass under the runtime switch + threshold change.
+- The chain of custody is the v0.31 contribution. Reviewers cannot
+  tear down the methodology, only the numbers, and the numbers are
+  intervals not point estimates.
+
 ## [0.30.0] - 2026-05-24
 
 **Theme: matrix pre-work. Vaara's coverage of OWASP Top 10 for
