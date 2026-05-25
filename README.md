@@ -20,15 +20,17 @@ Vaara intercepts agent tool calls, scores each one with a conformal risk interva
 
 ## Numbers
 
-97.1% attack recall on a held-out distribution-shift split. 140 µs p99 inference latency on commodity CPU. Zero attack success against a PAIR adaptive attacker over 25 attempts.
+Held-out TEST recall 53.9% (95% Wilson [50.3, 57.5]) at FPR 4.6% [3.1, 7.0]. Multi-attacker PAIR ASR 0/25 across three different attacker models with identical seeds. 140 µs p99 inference latency on commodity CPU. Every number reproducible end-to-end via `make repro-v031-bench`.
 
-- 5,955-entry adversarial corpus (3,422 attack across 8 categories, 2,533 benign)
-- 97.1% attack recall on held-out distribution-shift split, threshold 0.55
-- PAIR adaptive-attacker calibration: ASR 0/25 against Qwen2.5-32B
-- [vaara-bench-v1](bench/vaara-bench-v1.md): 77-trace synthetic-corpus benchmark with frozen methodology, 100% soft TPR, 0% hard FPR
+- 7,955-entry adversarial corpus (250 hand-curated + 7,705 LLM-generated), 70/15/15 split stratified by (category, source)
+- Classifier-only at threshold 0.90 on held-out TEST n=1,196: recall 53.9% [50.3, 57.5] at FPR 4.6% [3.1, 7.0]
+- Multi-attacker PAIR robustness: 0/25 successes per attacker across Qwen2.5-32B, Qwen2.5-72B, Llama-3.3-70B hitting identical seed indices, Wilson upper 13.3%
+- Chain of custody: corpus manifest SHA → split manifest SHA → training commit → bundle SHA, all locked and printed by every script
 - 140 µs / 210 µs p99 inference latency, commodity CPU
 - Distribution-free conformal coverage on the score
 - MWU regret bound O(sqrt(T log N))
+- [vaara-bench-v0.31](bench/vaara-bench-v0.31.md): industrial-grade methodology spec with Wilson intervals and named limits
+- [vaara-bench-v1](bench/vaara-bench-v1.md): 77-trace synthetic-corpus regression baseline with frozen methodology, 100% soft TPR, 0% hard FPR
 
 Each figure is reproducible from the public corpus or the bench harness in `bench/`.
 

@@ -18,7 +18,7 @@ from dataclasses import dataclass
 from typing import Optional
 
 
-_DEFAULT_THRESHOLD = 0.55  # matches vaara-bench-v1's escalation band
+_DEFAULT_THRESHOLD = 0.90  # vaara-bench-v0.31 pick on VAL (Youden / balanced acc)
 
 
 @dataclass(frozen=True)
