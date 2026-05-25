@@ -6,6 +6,58 @@ and this project follows [Semantic Versioning](https://semver.org/spec/v2.0.0.ht
 
 ## [Unreleased]
 
+## [0.33.0] - 2026-05-25
+
+**Theme: pin the embedding model by HuggingFace commit SHA so v0.32's
+recall numbers stay reproducible.** v0.32 loaded
+``sentence-transformers/all-MiniLM-L6-v2`` by ID without a revision
+pin, which made the classifier silently sensitive to upstream model
+updates. v0.33 pins the revision
+(``c9745ed1d9f207416be6d2e6f8de32d1f16199bf``) and records it in the
+classifier bundle metadata. No change to corpus, split, hparams, or
+trained weights. Headline TEST recall stays at 84.3% [81.5, 86.7] at
+FPR 4.6% [3.1, 7.0].
+
+### Added
+- ``src/vaara/embeddings.py``: ``EMBED_MODEL_REVISION`` constant.
+  The lazy MiniLM singleton now passes ``revision=`` to
+  ``SentenceTransformer`` so the embedding is reproducible across
+  upstream updates.
+- ``scripts/save_classifier_bundle.py``: writes
+  ``embedding_model_id`` and ``embedding_model_revision`` into the
+  bundle metadata when ``--embeddings`` is set.
+- ``scripts/eval_per_category.py``: per-category TEST recall / FPR
+  breakdown for any classifier bundle. Sorted ascending by recall,
+  surfacing categories where corpus extension would help most.
+- ``scripts/train_and_eval_bge_base.py``: standalone A/B harness for
+  ``BAAI/bge-base-en-v1.5`` against the MiniLM baseline. Used in
+  v0.33 ship-or-skip; result was skip, recorded below.
+- ``bench/vaara-bench-v0.33.md``: chain-of-custody anchor for the HF
+  revision SHA; documents the bge-base A/B negative result and the
+  per-category recall floor that motivates v0.34.
+- ``bench/v032_per_category_test.json``: per-category TEST recall
+  at the v0.32 calibrated threshold. ``tool_misuse`` (47.1%),
+  ``privilege_escalation`` (48.3%), and ``data_exfil`` (65.0%) are
+  the weakest.
+- ``bench/v033_bge_base_eval.json``: bge-base A/B record. TEST
+  recall 82.5% at FPR 5.1% (Wilson [79.6, 85.1] / [3.4, 7.5]),
+  -1.8 pp vs MiniLM at +440 MB extra wheel weight.
+- ``bench/v033_eval_final.json``: retrained-v3 evaluation confirming
+  headline reproduction.
+
+### Changed
+- ``src/vaara/data/adversarial_classifier_v3.joblib`` retrained on
+  the same v0.31 TRAIN fold with the embedding revision now pinned
+  in source. Determinism verified: bit-equivalent TEST recall and
+  FPR to v0.32.
+
+### Not in this release
+- bge-base-en-v1.5 as the classifier embedding. The A/B showed
+  -1.8 pp TEST recall vs MiniLM at higher cost. MiniLM stays.
+- Targeted corpus extension on the three weakest categories.
+  Scheduled for v0.34.
+- FPR-bounded three-stage ensemble combiner. Scheduled for v0.35.
+
 ## [0.32.0] - 2026-05-25
 
 **Theme: classifier recall lift from 53.9% to 84.3% at the same 4.6%

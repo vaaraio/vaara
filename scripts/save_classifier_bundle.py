@@ -150,6 +150,13 @@ def main() -> int:
     print(f"[fit] done  ne={args.n_estimators} md={args.max_depth} "
           f"lr={args.learning_rate} mc={args.min_child_weight}")
 
+    embedding_model_id = None
+    embedding_model_revision = None
+    if args.embeddings:
+        from vaara.embeddings import EMBED_MODEL_ID, EMBED_MODEL_REVISION
+        embedding_model_id = EMBED_MODEL_ID
+        embedding_model_revision = EMBED_MODEL_REVISION
+
     bundle = {
         "model": model,
         "vocab": vocab,
@@ -165,6 +172,8 @@ def main() -> int:
         "split_manifest_sha256": split_manifest_sha,
         "training_fold": args.train_fold if args.split_manifest else None,
         "uses_embeddings": bool(args.embeddings),
+        "embedding_model_id": embedding_model_id,
+        "embedding_model_revision": embedding_model_revision,
         "hparams": {
             "n_estimators": args.n_estimators,
             "max_depth": args.max_depth,
@@ -178,6 +187,9 @@ def main() -> int:
     print(f"[meta]  version={args.version}  threshold={args.threshold}  "
           f"n_features={len(feat_names)}  commit={bundle['training_commit'][:8]}  "
           f"corpus_manifest_sha={(bundle['training_corpus_manifest_sha256'] or '<absent>')[:12]}")
+    if args.embeddings:
+        print(f"[embed] {bundle['embedding_model_id']} "
+              f"revision={(bundle['embedding_model_revision'] or '<absent>')[:12]}")
     return 0
 
 
