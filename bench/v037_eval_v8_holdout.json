@@ -1,0 +1,76 @@
+{
+  "bundle": "src/vaara/data/adversarial_classifier_v8.joblib",
+  "bundle_version": "v0.37",
+  "threshold": 0.9006,
+  "split_manifest": "tests/adversarial/v037_split.json",
+  "n": 2277,
+  "pos": 2277,
+  "tp": 1522,
+  "fn": 755,
+  "recall": 0.668423364075538,
+  "recall_ci": [
+    0.6488167555363148,
+    0.687462624846786
+  ],
+  "per_category": {
+    "data_exfil": {
+      "n": 1690,
+      "tp": 968,
+      "recall": 0.5727810650887574
+    },
+    "privilege_escalation": {
+      "n": 300,
+      "tp": 291,
+      "recall": 0.97
+    },
+    "tool_misuse": {
+      "n": 287,
+      "tp": 263,
+      "recall": 0.9163763066202091
+    }
+  },
+  "per_leg": {
+    "claude": {
+      "n": 700,
+      "tp": 272,
+      "recall": 0.38857142857142857
+    },
+    "mixtral": {
+      "n": 690,
+      "tp": 489,
+      "recall": 0.7086956521739131
+    },
+    "llama33": {
+      "n": 887,
+      "tp": 761,
+      "recall": 0.8579481397970687
+    }
+  },
+  "per_category_per_leg": {
+    "data_exfil__claude": {
+      "n": 700,
+      "tp": 272,
+      "recall": 0.38857142857142857
+    },
+    "data_exfil__mixtral": {
+      "n": 690,
+      "tp": 489,
+      "recall": 0.7086956521739131
+    },
+    "data_exfil__llama33": {
+      "n": 300,
+      "tp": 207,
+      "recall": 0.69
+    },
+    "privilege_escalation__llama33": {
+      "n": 300,
+      "tp": 291,
+      "recall": 0.97
+    },
+    "tool_misuse__llama33": {
+      "n": 287,
+      "tp": 263,
+      "recall": 0.9163763066202091
+    }
+  }
+}
