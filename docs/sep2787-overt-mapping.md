@@ -61,4 +61,4 @@ equivalent in the proposed shape.
 
 - OVERT 1.0 standard: <https://overt.is>
 - SEP-2787 PR: <https://github.com/modelcontextprotocol/modelcontextprotocol/pull/2787>
-- Vaara COMPLIANCE.md "Position relative to open runtime-attestation standards"
+- [Vaara COMPLIANCE.md](../COMPLIANCE.md): section "Position relative to open runtime-attestation standards"
