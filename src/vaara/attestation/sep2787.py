@@ -42,6 +42,13 @@ kernel emitting CBOR Base Envelopes for every action; SEP-2787 is a
 per-tool-call JSON envelope carried in MCP ``_meta``. See
 ``docs/sep2787-overt-mapping.md`` for the field-level mapping between
 them.
+
+Verifier coverage: ``verify_attestation`` covers steps 1 (signature)
+and 3 (TTL) of the SEP-2787 verification rules. Step 5 (argument
+commitment) is exposed separately as ``verify_args_commitment`` so it
+can be composed by the caller once the runtime ``tools/call``
+arguments are in hand. Steps 2 (nonce replay) and 4 (tool call match)
+are stateful in the runtime and remain the caller's responsibility.
 """
 
 from __future__ import annotations
@@ -67,10 +74,15 @@ from vaara.attestation._sep2787_types import (
     PlannerDeclared,
     ToolCallBinding,
 )
+from vaara.attestation._sep2787_verifier import (
+    ArgsCommitmentResult,
+    verify_args_commitment,
+)
 
 __all__ = [
     "Algorithm",
     "ArgsCommitment",
+    "ArgsCommitmentResult",
     "ArgsDigest",
     "ArgsProjection",
     "ArgsRef",
@@ -83,5 +95,6 @@ __all__ = [
     "emit_attestation",
     "make_args_digest",
     "make_args_projection",
+    "verify_args_commitment",
     "verify_attestation",
 ]

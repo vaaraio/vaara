@@ -27,6 +27,7 @@ from vaara.attestation.sep2787 import (  # noqa: E402
     emit_attestation,
     make_args_digest,
     make_args_projection,
+    verify_args_commitment,
     verify_attestation,
 )
 
@@ -214,3 +215,120 @@ def test_cross_alg_verification_fails():
     env = _emit_attestation()
     priv = ec.generate_private_key(ec.SECP256R1())
     assert verify_attestation(env, verifying_material=priv.public_key()) is False
+
+
+# --- Step 5: argument commitment verification ---
+
+
+def test_args_commitment_digest_matching_runtime_args_ok():
+    runtime = {"path": "/archive/2024-Q3.md"}
+    args = make_args_digest(runtime)
+    result = verify_args_commitment(args, runtime_arguments=runtime)
+    assert result.ok is True
+    assert result.reason is None
+
+
+def test_args_commitment_digest_mismatch_rejects():
+    args = make_args_digest({"path": "/archive/2024-Q3.md"})
+    result = verify_args_commitment(
+        args, runtime_arguments={"path": "/etc/passwd"},
+    )
+    assert result.ok is False
+    assert result.reason == "args_commitment_mismatch"
+
+
+def test_args_commitment_digest_key_reorder_still_matches():
+    args = make_args_digest({"a": 1, "b": [1, 2, 3]})
+    result = verify_args_commitment(
+        args, runtime_arguments={"b": [1, 2, 3], "a": 1},
+    )
+    assert result.ok is True
+
+
+def test_args_commitment_ref_no_resolver_rejects():
+    args = ArgsRef(ref="ipfs://Qm...", digest="sha256:" + "0" * 64)
+    result = verify_args_commitment(args, runtime_arguments={"x": 1})
+    assert result.ok is False
+    assert result.reason == "args_commitment_mismatch"
+
+
+def test_args_commitment_ref_resolver_content_matches():
+    runtime = {"path": "/archive/2024-Q3.md"}
+    canonical = canonical_json(runtime)
+    import hashlib as _h
+    digest = "sha256:" + _h.sha256(canonical).hexdigest()
+    args = ArgsRef(ref="memory://q3", digest=digest)
+    result = verify_args_commitment(
+        args,
+        runtime_arguments=runtime,
+        ref_resolver=lambda _ref: canonical,
+    )
+    assert result.ok is True
+
+
+def test_args_commitment_ref_digest_mismatch_rejects():
+    runtime = {"path": "/archive/2024-Q3.md"}
+    args = ArgsRef(ref="memory://q3", digest="sha256:" + "0" * 64)
+    result = verify_args_commitment(
+        args,
+        runtime_arguments=runtime,
+        ref_resolver=lambda _ref: canonical_json(runtime),
+    )
+    assert result.ok is False
+    assert result.reason == "args_commitment_mismatch"
+
+
+def test_args_commitment_ref_content_does_not_match_runtime_rejects():
+    referenced = {"path": "/archive/2024-Q3.md"}
+    runtime = {"path": "/etc/passwd"}
+    canonical = canonical_json(referenced)
+    import hashlib as _h
+    digest = "sha256:" + _h.sha256(canonical).hexdigest()
+    args = ArgsRef(ref="memory://other", digest=digest)
+    result = verify_args_commitment(
+        args,
+        runtime_arguments=runtime,
+        ref_resolver=lambda _ref: canonical,
+    )
+    assert result.ok is False
+    assert result.reason == "args_commitment_mismatch"
+
+
+def test_args_commitment_ref_resolver_raising_rejects():
+    args = ArgsRef(ref="memory://oops", digest="sha256:" + "0" * 64)
+    def _broken(_ref):
+        raise RuntimeError("offline")
+    result = verify_args_commitment(
+        args, runtime_arguments={"x": 1}, ref_resolver=_broken,
+    )
+    assert result.ok is False
+    assert result.reason == "args_commitment_mismatch"
+
+
+def test_args_commitment_identity_projection_marked_match():
+    runtime = {"path": "/archive/2024-Q3.md"}
+    args = make_args_projection(runtime)
+    result = verify_args_commitment(args, runtime_arguments=runtime)
+    assert result.ok is True
+    assert result.projection_match is True
+
+
+def test_args_commitment_redacted_projection_ok_but_not_identity():
+    redacted = {"redacted_user_id": "u-001"}
+    args = make_args_projection(redacted)
+    result = verify_args_commitment(
+        args, runtime_arguments={"path": "/archive/2024-Q3.md", "user_id": "u-001"},
+    )
+    assert result.ok is True
+    assert result.projection_match is False
+
+
+def test_args_commitment_projection_with_tampered_digest_rejects():
+    from vaara.attestation.sep2787 import ArgsProjection
+    args = ArgsProjection(
+        projection={"redacted_user_id": "u-001"},
+        projection_digest="sha256:" + "0" * 64,
+    )
+    result = verify_args_commitment(args, runtime_arguments={"x": 1})
+    assert result.ok is False
+    assert result.reason == "args_commitment_mismatch"
