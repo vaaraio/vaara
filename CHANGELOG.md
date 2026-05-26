@@ -6,6 +6,31 @@ and this project follows [Semantic Versioning](https://semver.org/spec/v2.0.0.ht
 
 ## [Unreleased]
 
+### Added
+- `vaara.attestation.sep2787`: reference implementation of the SEP-2787
+  Tool Call Attestation envelope (MCP spec PR
+  `modelcontextprotocol/modelcontextprotocol#2787`), proposed shape.
+  Implements the four schema changes Vaara raised in the v1 draft
+  thread: fact-source labels (three trust-surface blocks
+  `planner_declared` / `issuer_asserted` / `payload_derived`),
+  explicit three-way args shape (`ArgsDigest` / `ArgsRef` /
+  `ArgsProjection`), RFC 8785 (JCS) canonicalization with IEEE-754
+  float rejection at the boundary, and request-attestation scope only
+  (the v1 optional `ack` field is excluded and belongs in a separate
+  extension). Supports HS256, ES256, RS256 signing per the v1 draft.
+  Coexists with the existing OVERT 1.0 implementation in
+  `vaara.attestation.overt`. See `docs/sep2787-overt-mapping.md` for
+  field-level mapping.
+- `docs/sep2787-overt-mapping.md`: field-level mapping between OVERT
+  1.0 Base Envelope (CBOR) and the SEP-2787 proposed shape (JSON).
+- `tests/test_attestation_sep2787.py`: 16 unit tests covering all
+  three signing algorithms, all three args-commitment shapes,
+  tampering rejection, canonicalization invariants, and TTL handling.
+
+### Changed
+- `attestation` optional extra: adds `rfc8785>=0.1.4` for JCS
+  canonicalization.
+
 ## [0.36.0] - 2026-05-25
 
 **Theme: first public cross-model held-out evaluation. v7 classifier
