@@ -6,6 +6,44 @@ and this project follows [Semantic Versioning](https://semver.org/spec/v2.0.0.ht
 
 ## [Unreleased]
 
+## [0.37.1] - 2026-05-27
+
+**Theme: SEP-2787 verifier step 5, argument commitment verification.**
+Closes the missing piece in Vaara's SEP-2787 reference implementation
+after the upstream SEP draft was rewritten to contain Vaara's four
+schema proposals plus a verifier-side `args_commitment_mismatch`
+rejection path. The new `verify_args_commitment` function covers all
+three commitment kinds in Vaara's three-way args shape. `ArgsDigest`
+recomputes the JCS-canonical hash of the runtime arguments and
+compares it to the bound digest. `ArgsRef` resolves the URI through a
+caller-supplied resolver, hashes the content, and matches both the
+stored digest and the canonicalized runtime arguments. `ArgsProjection`
+recomputes its own digest and reports whether the projection is an
+identity match for the runtime arguments (identity projection) or a
+signed redaction (no completeness claim, per spec). Step 5 is exposed
+as a separate function so callers compose it after the existing
+signature and TTL checks once the `tools/call` arguments are in hand.
+
+### Added
+- `src/vaara/attestation/_sep2787_verifier.py`: `verify_args_commitment`
+  and the `ArgsCommitmentResult` dataclass. Returns `ok`, an optional
+  `reason` matching the spec's `args_commitment_mismatch` enum value,
+  and a tri-state `projection_match` field for projection-kind
+  commitments.
+- Public re-exports of `verify_args_commitment` and
+  `ArgsCommitmentResult` from `vaara.attestation.sep2787`.
+- 11 new tests in `tests/test_attestation_sep2787.py` covering digest
+  match and mismatch, key-reorder canonicalization stability, ref
+  resolver missing or raising, ref digest mismatch, ref content not
+  matching runtime args, identity projection, redacted projection, and
+  projection-digest tampering.
+
+### Changed
+- `vaara.attestation.sep2787` module docstring documents verifier
+  coverage: steps 1 (signature) and 3 (TTL) inside `verify_attestation`,
+  step 5 via the new `verify_args_commitment`, steps 2 (nonce replay)
+  and 4 (tool call match) left to the runtime caller.
+
 ## [0.37.0] - 2026-05-27
 
 **Theme: third attacker family added to cross-model held-out, v8
