@@ -64,7 +64,7 @@ Per-category cuts on this leg:
 
 The data_exfil pattern from v0.36 holds. Across all three attacker
 families now seen, DE is the hardest category. PE and TM generalise
-cleanly; DE generalises unevenly.
+cleanly. DE generalises unevenly.
 
 ## Carry-forward DE numbers
 
