@@ -6,7 +6,6 @@ Internal module. Public surface is in ``vaara.attestation.sep2787``.
 from __future__ import annotations
 
 import time
-from dataclasses import asdict
 from typing import Any, Optional
 
 from vaara.attestation._sep2787_canonical import (
@@ -32,6 +31,7 @@ from vaara.attestation._sep2787_types import (
     IssuerAsserted,
     PlannerDeclared,
     args_to_dict,
+    issuer_to_dict,
     planner_to_dict,
 )
 
@@ -52,9 +52,9 @@ def _signing_payload(
     body = {
         "version": version,
         "alg": alg,
-        "planner_declared": planner_to_dict(planner_declared),
-        "issuer_asserted": asdict(issuer_asserted),
-        "payload_derived": [args_to_dict(a) for a in payload_derived],
+        "plannerDeclared": planner_to_dict(planner_declared),
+        "issuerAsserted": issuer_to_dict(issuer_asserted),
+        "payloadDerived": [args_to_dict(a) for a in payload_derived],
     }
     return canonical_json(body)
 
@@ -85,10 +85,10 @@ def emit_attestation(
     if alg not in VALID_ALGS:
         raise AttestationError(f"unsupported alg: {alg!r}")
     if not planner_declared.intent.strip():
-        raise AttestationError("planner_declared.intent MUST be non-empty")
+        raise AttestationError("plannerDeclared.intent MUST be non-empty")
     if not planner_declared.tool_calls:
         raise AttestationError(
-            "planner_declared.tool_calls MUST contain at least one entry"
+            "plannerDeclared.toolCalls MUST contain at least one entry"
         )
 
     issuer_asserted = IssuerAsserted(
