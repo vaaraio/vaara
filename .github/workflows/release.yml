@@ -78,6 +78,9 @@ jobs:
       contents: write
       id-token: write
     steps:
+      - name: Checkout (for CHANGELOG)
+        uses: actions/checkout@de0fac2e4500dabe0009e67214ff5f5447ce83dd  # v6.0.2
+
       - name: Download distributions
         uses: actions/download-artifact@3e5f45b2cfb9172054b4087a40e8e0b5a5461e7c  # v8.0.1
         with:
@@ -89,6 +92,23 @@ jobs:
         with:
           inputs: ./dist/*.tar.gz ./dist/*.whl
 
+      - name: Extract release notes from CHANGELOG
+        run: |
+          set -euo pipefail
+          VERSION="${GITHUB_REF_NAME#v}"
+          awk -v ver="$VERSION" '
+            /^## \[/ {
+              if (in_section) exit
+              if ($0 ~ "^## \\[" ver "\\]") in_section = 1
+            }
+            in_section { print }
+          ' CHANGELOG.md > release-notes.md
+          if [ ! -s release-notes.md ]; then
+            echo "::error::No CHANGELOG entry found for version $VERSION"
+            exit 1
+          fi
+          echo "Extracted $(wc -l < release-notes.md) lines for v${VERSION}"
+
       - name: Create GitHub Release
         uses: softprops/action-gh-release@b4309332981a82ec1c5618f44dd2e27cc8bfbfda  # v3.0.0
         with:
@@ -96,7 +116,7 @@ jobs:
             dist/*.tar.gz
             dist/*.whl
             dist/*.sigstore.json
-          generate_release_notes: true
+          body_path: release-notes.md
           fail_on_unmatched_files: true
 
   publish-npm:
