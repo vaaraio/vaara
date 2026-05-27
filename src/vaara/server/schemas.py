@@ -41,6 +41,7 @@ class ScoreRequest(BaseModel):
     blast_radius: Optional[_BlastRadius] = None
     session_id: Optional[str] = Field(default=None, max_length=256)
     parent_action_id: Optional[str] = Field(default=None, max_length=128)
+    tenant_id: str = Field(default="", max_length=256)
     context: dict[str, Any] = Field(default_factory=dict)
 
 
@@ -85,6 +86,7 @@ class AuditEventRequest(BaseModel):
     action_id: str
     agent_id: Optional[str] = None
     tool_name: Optional[str] = None
+    tenant_id: str = Field(default="", max_length=256)
     payload: dict[str, Any] = Field(default_factory=dict)
 
 
@@ -203,6 +205,7 @@ class PolicyReloadRequest(BaseModel):
     path: Optional[str] = Field(default=None, max_length=4096)
     body: Optional[dict[str, Any]] = None
     format: Optional[Literal["json", "yaml"]] = None
+    tenant_id: str = Field(default="", max_length=256)
 
 
 class PolicyReloadResponse(BaseModel):
@@ -211,3 +214,4 @@ class PolicyReloadResponse(BaseModel):
     sequence_count: int
     action_class_count: int
     escalation_route_count: int
+    tenant_id: str = ""

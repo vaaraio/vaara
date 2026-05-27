@@ -25,9 +25,11 @@ client sees it, and rejects matching access at the perimeter with a
 from __future__ import annotations
 
 import argparse
+import contextvars
 import json
 import logging
 import os
+import re
 import sys
 import threading
 from pathlib import Path
@@ -48,7 +50,46 @@ from vaara.integrations._mcp_upstream import (
 from vaara.pipeline import InterceptionPipeline
 from vaara.taxonomy.actions import ActionRequest
 
+# Optional dependency: only the streamable-HTTP transport needs FastAPI /
+# Starlette. Keep the import lazy so the stdio path stays installable with
+# the base extras only.
+try:  # pragma: no cover - import guard
+    from starlette.requests import Request as _StarletteRequest
+except ImportError:  # pragma: no cover
+    _StarletteRequest = None  # type: ignore[assignment]
+
 logger = logging.getLogger(__name__)
+
+
+# v0.40 per-request request scope. HTTP transport sets these per inbound
+# request so _handle_request and friends can look up the right upstream and
+# tag the audit/interception trail with the request's tenant_id without
+# threading the values through every helper signature.
+_REQUEST_UPSTREAM: contextvars.ContextVar[str] = contextvars.ContextVar(
+    "vaara_mcp_upstream", default="default",
+)
+_REQUEST_TENANT: contextvars.ContextVar[str] = contextvars.ContextVar(
+    "vaara_mcp_tenant", default="",
+)
+
+def _safe_log(value: Any, max_len: int = 200) -> str:
+    """Sanitise a user-supplied string for safe logging.
+
+    Strips CR/LF and other control characters so an attacker who controls
+    a tool / resource / prompt name can't inject fake log lines, and caps
+    length so a multi-megabyte name doesn't blow the log up.
+    """
+    if not isinstance(value, str):
+        value = str(value)
+    cleaned = "".join(c if c.isprintable() and c not in ("\r", "\n") else "?" for c in value)
+    return cleaned[:max_len]
+
+
+# Largest single MCP JSON-RPC message accepted on the /mcp HTTP endpoint.
+# Real tool calls and responses fit comfortably; the cap stops a malicious
+# client from exhausting memory at parse time. v0.41 can promote this to
+# a CLI flag if a real workload needs more headroom.
+_MCP_HTTP_MAX_BODY_BYTES = 1 * 1024 * 1024
 
 
 class VaaraMCPProxy:
@@ -58,7 +99,7 @@ class VaaraMCPProxy:
 
     def __init__(
         self,
-        upstream_command: list[str],
+        upstream_command: Optional[list[str]] = None,
         pipeline: Optional[InterceptionPipeline] = None,
         db_path: Optional[Path] = None,
         agent_id_default: str = "mcp-proxy-client",
@@ -69,6 +110,7 @@ class VaaraMCPProxy:
         prompt_allowlist: Optional[set[str]] = None,
         prompt_denylist: Optional[set[str]] = None,
         overt_emitter: Optional[OVERTReceiptEmitter] = None,
+        upstreams: Optional[dict[str, list[str]]] = None,
     ) -> None:
         if pipeline is not None:
             self._pipeline = pipeline
@@ -98,17 +140,86 @@ class VaaraMCPProxy:
         )
         self._stdout_lock = threading.Lock()
         self._overt = overt_emitter
-        # progressToken -> (action_id, agent_id, tool_name). Populated when a
-        # tools/call enters interception with params._meta.progressToken set,
-        # consulted by the upstream-notification handler so progress events
+        # progressToken -> (action_id, agent_id, tool_name, tenant_id). Populated
+        # when a tools/call enters interception with params._meta.progressToken
+        # set, consulted by the upstream-notification handler so progress events
         # arriving mid-call carry the originating action_id into the audit
-        # record and into the OVERT envelope's non_content_metadata.
-        self._inflight_progress: dict[Any, tuple[str, str, str]] = {}
+        # record and into the OVERT envelope's non_content_metadata. The tenant
+        # is captured at tools/call time because the upstream reader thread that
+        # delivers later notifications does not inherit the request ContextVars.
+        self._inflight_progress: dict[Any, tuple[str, str, str, str]] = {}
         self._inflight_lock = threading.Lock()
-        self._upstream = UpstreamMCPClient(
-            command=upstream_command,
-            on_notification=self._on_upstream_notification,
-        )
+        # v0.40 fan-out: hold N upstream MCP servers in a name -> client map.
+        # The single-upstream legacy entry point (positional ``upstream_command``)
+        # lands under the "default" name. ``--upstream NAME=CMD`` via CLI or
+        # ``upstreams={"NAME": [cmd, ...]}`` populates the map directly. The
+        # HTTP transport reads X-Vaara-Upstream per inbound request to pick;
+        # stdio transport stays on "default".
+        if upstreams and upstream_command is not None:
+            raise ValueError(
+                "Pass either upstream_command (single-upstream legacy) or "
+                "upstreams (multi-upstream fan-out), not both.",
+            )
+        upstream_map: dict[str, list[str]] = {}
+        if upstreams:
+            upstream_map = {name: list(cmd) for name, cmd in upstreams.items()}
+        elif upstream_command is not None:
+            upstream_map = {"default": list(upstream_command)}
+        else:
+            raise ValueError(
+                "VaaraMCPProxy requires upstream_command or upstreams.",
+            )
+        default_alias_target: Optional[str] = None
+        if "default" not in upstream_map:
+            # Pick a stable fallback so requests without X-Vaara-Upstream
+            # still resolve. Lexicographic first keeps multi-tenant fleets
+            # deterministic across restarts. Alias the slot rather than
+            # cloning the command so we never spawn a duplicate subprocess.
+            default_alias_target = sorted(upstream_map)[0]
+        self._upstreams: dict[str, UpstreamMCPClient] = {
+            name: UpstreamMCPClient(
+                command=command,
+                on_notification=self._on_upstream_notification,
+            )
+            for name, command in upstream_map.items()
+        }
+        if default_alias_target is not None:
+            self._upstreams["default"] = self._upstreams[default_alias_target]
+        # ``self._upstream`` resolves to the per-request upstream via the
+        # ``_REQUEST_UPSTREAM`` ContextVar. stdio transport leaves the
+        # default ("default") in place, so existing single-upstream callers
+        # see exactly one client. HTTP transport sets the ctxvar per
+        # request to dispatch into the right fleet member.
+
+    @property
+    def _upstream(self) -> UpstreamMCPClient:
+        """Resolve the upstream MCP client for the current request scope.
+
+        HTTP transport sets ``_REQUEST_UPSTREAM`` per inbound request. stdio
+        transport never sets it; the default value "default" routes to the
+        legacy single-upstream slot. Unknown names raise ``ProxyError`` so
+        a client asking for a fleet member that does not exist gets a
+        loud failure instead of a silent reroute.
+        """
+        name = _REQUEST_UPSTREAM.get()
+        client = self._upstreams.get(name)
+        if client is None:
+            raise ProxyError(
+                f"No upstream named {name!r}; configured names: "
+                f"{sorted(self._upstreams)!r}",
+            )
+        return client
+
+    @_upstream.setter
+    def _upstream(self, client: UpstreamMCPClient) -> None:
+        """Replace the default-slot upstream client.
+
+        Test fixtures and embedders that previously assigned
+        ``proxy._upstream = MagicMock()`` keep working under the v0.40
+        fan-out shape — the assignment lands in the "default" slot and the
+        property reads it back.
+        """
+        self._upstreams["default"] = client
 
     @staticmethod
     def _is_filtered(name: object, allowlist: Optional[set[str]], denylist: set[str]) -> bool:
@@ -149,6 +260,163 @@ class VaaraMCPProxy:
                     logger.exception("Failed to forward notification")
                 continue
             self._write_to_client(self._handle_request(request))
+
+    def run_http(self, host: str, port: int, log_level: str = "info") -> None:
+        """Run the proxy on Streamable HTTP (MCP 2026 transport).
+
+        POST /mcp accepts one JSON-RPC message and returns one JSON
+        response. Notifications (no ``id``) return 202 Accepted and are
+        forwarded to the upstream without a reply. Multi-tenant /
+        fan-out scope is read per request from the
+        ``X-Vaara-Tenant`` and ``X-Vaara-Upstream`` headers and pushed
+        into the per-request ContextVars before dispatch.
+        """
+        try:
+            import uvicorn
+            from fastapi import FastAPI, Header, HTTPException, Response
+            from fastapi.responses import JSONResponse
+        except ImportError as exc:
+            raise RuntimeError(
+                "vaara-mcp-proxy --transport http requires the 'server' "
+                "extra. Install with: pip install 'vaara[server]'"
+            ) from exc
+        if _StarletteRequest is None:
+            raise RuntimeError(
+                "starlette is required for the streamable-HTTP transport. "
+                "Install with: pip install 'vaara[server]'"
+            )
+
+        proxy = self
+
+        app = FastAPI(
+            title="Vaara MCP Proxy",
+            version=_VAARA_VERSION,
+            description=(
+                "Streamable HTTP transport in front of one or more upstream "
+                "MCP servers, with Vaara runtime governance applied to every "
+                "tools/call."
+            ),
+        )
+
+        @app.get("/health")
+        async def health() -> dict:
+            return {
+                "status": "ok",
+                "proxy": proxy.PROXY_NAME,
+                "upstreams": sorted(proxy._upstreams.keys()),
+            }
+
+        @app.post("/mcp")
+        async def mcp_endpoint(
+            request: _StarletteRequest,
+            x_vaara_tenant: Optional[str] = Header(default=None, alias="X-Vaara-Tenant"),
+            x_vaara_upstream: Optional[str] = Header(default=None, alias="X-Vaara-Upstream"),
+        ) -> Response:
+            # 1 MiB cap on a single MCP JSON-RPC message. Real tool calls and
+            # responses fit comfortably; anything larger is either a misuse or
+            # a DoS attempt against the proxy's JSON parser. The cap is the
+            # same order as the MCP reference servers' limit. Hard-cap here
+            # before json.loads runs so a malicious payload cannot exhaust
+            # memory at parse time.
+            content_length = request.headers.get("content-length")
+            if content_length is not None:
+                try:
+                    if int(content_length) > _MCP_HTTP_MAX_BODY_BYTES:
+                        return JSONResponse(
+                            status_code=413,
+                            content={"error": {
+                                "code": "payload_too_large",
+                                "message": (
+                                    f"MCP message exceeds "
+                                    f"{_MCP_HTTP_MAX_BODY_BYTES} bytes"
+                                ),
+                            }},
+                        )
+                except ValueError:
+                    pass  # bogus content-length, fall through to actual read
+            raw = await request.body()
+            if len(raw) > _MCP_HTTP_MAX_BODY_BYTES:
+                return JSONResponse(
+                    status_code=413,
+                    content={"error": {
+                        "code": "payload_too_large",
+                        "message": (
+                            f"MCP message exceeds "
+                            f"{_MCP_HTTP_MAX_BODY_BYTES} bytes"
+                        ),
+                    }},
+                )
+            try:
+                payload = json.loads(raw.decode("utf-8") or "{}")
+            except json.JSONDecodeError:
+                return JSONResponse(
+                    status_code=400,
+                    content=proxy._error_response(None, -32700, "Parse error"),
+                )
+
+            header_name = (x_vaara_upstream or "").strip()
+            # Real upstream slots are everything except the "default" alias.
+            # When the operator configured exactly one real slot (single-
+            # upstream deployment), silent fallback preserves the v0.39
+            # contract. When the operator configured a fleet, ambiguity is
+            # an error: missing X-Vaara-Upstream returns 400 with the list
+            # so the client knows which slots are available, instead of
+            # silently routing to whichever slot won the sort.
+            real_slots = sorted(n for n in proxy._upstreams if n != "default")
+            ambiguous_fanout = len(real_slots) > 1
+            if not header_name:
+                if ambiguous_fanout:
+                    raise HTTPException(
+                        status_code=400,
+                        detail={
+                            "error": {
+                                "code": "upstream_required",
+                                "message": (
+                                    "X-Vaara-Upstream header is required "
+                                    "when the proxy serves more than one "
+                                    "upstream. Available upstreams: "
+                                    f"{real_slots!r}"
+                                ),
+                            }
+                        },
+                    )
+                upstream_name = "default"
+            else:
+                upstream_name = header_name
+            if upstream_name not in proxy._upstreams:
+                raise HTTPException(
+                    status_code=404,
+                    detail={
+                        "error": {
+                            "code": "unknown_upstream",
+                            "message": (
+                                f"No upstream named {upstream_name!r}; "
+                                f"configured: {sorted(proxy._upstreams)!r}"
+                            ),
+                        }
+                    },
+                )
+
+            upstream_token = _REQUEST_UPSTREAM.set(upstream_name)
+            tenant_token = _REQUEST_TENANT.set((x_vaara_tenant or "").strip())
+            try:
+                if isinstance(payload, dict) and "id" not in payload:
+                    try:
+                        proxy._upstream.notify(payload)
+                    except ProxyError:
+                        logger.exception("Failed to forward HTTP notification")
+                    return Response(status_code=202)
+                response = proxy._handle_request(payload)
+                return JSONResponse(content=response)
+            finally:
+                _REQUEST_UPSTREAM.reset(upstream_token)
+                _REQUEST_TENANT.reset(tenant_token)
+
+        logger.info(
+            "Vaara MCP proxy starting on http://%s:%d (%s, upstreams=%s)",
+            host, port, self.PROXY_NAME, sorted(self._upstreams.keys()),
+        )
+        uvicorn.run(app, host=host, port=port, log_level=log_level)
 
     def _handle_request(self, request: Any) -> dict:
         if not isinstance(request, dict):
@@ -257,7 +525,8 @@ class VaaraMCPProxy:
             arguments = {}
         if self._tool_filtered(tool_name):
             logger.warning(
-                "tools/call rejected at perimeter (operator filter): %s", tool_name,
+                "tools/call rejected at perimeter (operator filter): %s",
+                _safe_log(tool_name),
             )
             block_payload = {
                 "vaara_blocked": True,
@@ -290,6 +559,7 @@ class VaaraMCPProxy:
         # registry (fail-closed). Correct default for runtime governance.
         result = self._pipeline.intercept(
             agent_id=agent_id, tool_name=tool_name, parameters=arguments,
+            tenant_id=_REQUEST_TENANT.get(),
         )
         progress_token = self._progress_token(params)
         if not result.allowed:
@@ -326,6 +596,7 @@ class VaaraMCPProxy:
                     str(getattr(result, "action_id", None) or ""),
                     agent_id,
                     tool_name,
+                    _REQUEST_TENANT.get(),
                 )
         try:
             upstream_response = self._upstream.request(request)
@@ -364,7 +635,8 @@ class VaaraMCPProxy:
             uri = ""
         if self._resource_filtered(uri):
             logger.warning(
-                "resources/read rejected at perimeter (operator filter): %s", uri,
+                "resources/read rejected at perimeter (operator filter): %s",
+                _safe_log(uri),
             )
             self._overt_emit(
                 surface="mcp.resource.read",
@@ -415,7 +687,8 @@ class VaaraMCPProxy:
             arguments = {}
         if self._prompt_filtered(name):
             logger.warning(
-                "prompts/get rejected at perimeter (operator filter): %s", name,
+                "prompts/get rejected at perimeter (operator filter): %s",
+                _safe_log(name),
             )
             self._overt_emit(
                 surface="mcp.prompt.get",
@@ -478,6 +751,7 @@ class VaaraMCPProxy:
         parameters: dict,
         decision: str,
         reason: str,
+        tenant_id: Optional[str] = None,
     ) -> None:
         """Write a request+decision audit pair for a read-oriented MCP access.
 
@@ -488,9 +762,14 @@ class VaaraMCPProxy:
         policy while still producing the two records that anchor every
         access to the hash chain. Failures here are logged and
         swallowed: a perimeter audit failure must not block legitimate
-        upstream traffic.
+        upstream traffic. ``tenant_id`` is taken from the request
+        ContextVar by default; async callers that run outside the
+        originating request (upstream notification reader thread) pass
+        the captured tenant explicitly.
         """
         import time as _time
+        if tenant_id is None:
+            tenant_id = _REQUEST_TENANT.get()
         try:
             registry = self._pipeline.registry
             action_type = registry.classify(tool_name, parameters)
@@ -500,6 +779,7 @@ class VaaraMCPProxy:
                 action_type=action_type,
                 parameters=parameters or {},
                 timestamp_utc=_time.strftime("%Y-%m-%dT%H:%M:%SZ", _time.gmtime()),
+                tenant_id=tenant_id,
             )
             action_id = self._pipeline.trail.record_action_requested(req)
             self._pipeline.trail.record_decision(
@@ -524,12 +804,16 @@ class VaaraMCPProxy:
         decision: str,
         reason: str,
         extra: Optional[dict] = None,
+        tenant_id: Optional[str] = None,
     ) -> None:
         """Emit one OVERT Base Envelope for an MCP interaction.
 
         No-op when no emitter is configured. Failures are logged and
         swallowed: an attestation-side failure must not block legitimate
-        upstream traffic, mirroring the perimeter-audit rule.
+        upstream traffic, mirroring the perimeter-audit rule. ``tenant_id``
+        is taken from the request ContextVar by default; async callers
+        that run outside the originating request pass the captured tenant
+        explicitly so the OVERT claim attributes to the right tenant.
         """
         if self._overt is None:
             return
@@ -540,6 +824,10 @@ class VaaraMCPProxy:
                 "decision": decision,
                 "reason": reason,
             }
+            if tenant_id is None:
+                tenant_id = _REQUEST_TENANT.get()
+            if tenant_id:
+                non_content_metadata["tenant_id"] = tenant_id
             if extra:
                 non_content_metadata.update(extra)
             request_payload = strict_json_dumps(
@@ -604,11 +892,17 @@ class VaaraMCPProxy:
         parent_action_id = ""
         agent_id = self._agent_id_default
         parent_tool = ""
+        # Notifications arrive on the upstream reader thread, which does
+        # not inherit the request ContextVars. Pull the tenant captured
+        # at tools/call time out of the inflight map instead of reading
+        # _REQUEST_TENANT here, otherwise the audit + OVERT claim land
+        # under empty tenant scope.
+        captured_tenant = ""
         if token is not None:
             with self._inflight_lock:
                 entry = self._inflight_progress.get(token)
             if entry is not None:
-                parent_action_id, agent_id, parent_tool = entry
+                parent_action_id, agent_id, parent_tool, captured_tenant = entry
         self._record_perimeter_audit(
             agent_id=agent_id,
             tool_name="mcp.notification.progress",
@@ -619,6 +913,7 @@ class VaaraMCPProxy:
             },
             decision="observed",
             reason="upstream progress notification observed",
+            tenant_id=captured_tenant,
         )
         self._overt_emit(
             surface="mcp.notification.progress",
@@ -632,6 +927,7 @@ class VaaraMCPProxy:
                 "parent_action_id": parent_action_id,
                 "parent_tool": parent_tool,
             },
+            tenant_id=captured_tenant,
         )
 
     def _audit_message_notification(self, message: dict) -> None:
@@ -644,12 +940,17 @@ class VaaraMCPProxy:
         log_logger = params.get("logger", "")
         if not isinstance(log_logger, str):
             log_logger = ""
+        # Log notifications carry no progressToken, so there is no way to
+        # recover the originating request's tenant from the reader thread.
+        # Pass tenant_id="" explicitly to make the fail-soft scope visible
+        # rather than reading _REQUEST_TENANT in a thread that never set it.
         self._record_perimeter_audit(
             agent_id=self._agent_id_default,
             tool_name="mcp.notification.message",
             parameters={"level": level, "logger": log_logger},
             decision="observed",
             reason="upstream log notification observed",
+            tenant_id="",
         )
         self._overt_emit(
             surface="mcp.notification.message",
@@ -659,6 +960,7 @@ class VaaraMCPProxy:
             decision="observed",
             reason="upstream log notification observed",
             extra={"agent_id": self._agent_id_default},
+            tenant_id="",
         )
 
     def _write_to_client(self, payload: dict) -> None:
@@ -672,7 +974,11 @@ class VaaraMCPProxy:
         return {"jsonrpc": "2.0", "id": req_id, "error": {"code": code, "message": message}}
 
     def close(self) -> None:
-        self._upstream.close()
+        for client in self._upstreams.values():
+            try:
+                client.close()
+            except Exception:
+                logger.exception("Failed to close upstream MCP client")
         if self._backend is not None:
             self._backend.close()
 
@@ -680,11 +986,39 @@ class VaaraMCPProxy:
 def main(argv: Optional[list[str]] = None) -> None:
     parser = argparse.ArgumentParser(
         prog="vaara-mcp-proxy",
-        description="Vaara runtime governance proxy in front of an upstream MCP server.",
+        description="Vaara runtime governance proxy in front of one or more upstream MCP servers.",
     )
-    parser.add_argument("--upstream", required=True, help="Upstream MCP server command")
+    parser.add_argument(
+        "--upstream", action="append", default=[], dest="upstreams",
+        help=(
+            "Upstream MCP server command. Repeatable for v0.40 fan-out: "
+            "`--upstream NAME=CMD` registers under a named slot; bare "
+            "`--upstream CMD` lands under 'default'. The first slot (or "
+            "'default' when supplied) is the stdio fallback."
+        ),
+    )
     parser.add_argument("--upstream-arg", action="append", default=[], dest="upstream_args",
-                        help="Argument to pass to the upstream command (repeatable)")
+                        help="Argument to pass to the (first) upstream command (repeatable)")
+    parser.add_argument(
+        "--transport",
+        choices=["stdio", "http"],
+        default="stdio",
+        help=(
+            "stdio (default) reads JSON-RPC from stdin/stdout, suitable for "
+            "in-process MCP clients. http exposes Streamable HTTP "
+            "(POST /mcp) for fleet / multi-tenant deployments and "
+            "requires the [server] extra."
+        ),
+    )
+    parser.add_argument("--http-host", default="127.0.0.1",
+                        help="Bind host when --transport http (default 127.0.0.1)")
+    parser.add_argument("--http-port", type=int, default=8765,
+                        help="Bind port when --transport http (default 8765)")
+    parser.add_argument(
+        "--http-log-level",
+        default="info",
+        choices=["critical", "error", "warning", "info", "debug", "trace"],
+    )
     parser.add_argument("--db", type=Path, default=None,
                         help="Audit database path (default: $VAARA_DB or ./vaara_audit.db)")
     parser.add_argument("--agent-id", default="mcp-proxy-client",
@@ -743,8 +1077,19 @@ def main(argv: Optional[list[str]] = None) -> None:
         ),
     )
 
+    upstreams = _parse_upstream_specs(args.upstreams, args.upstream_args)
+    if not upstreams:
+        parser.error(
+            "at least one --upstream is required (e.g. `--upstream "
+            "github=github-mcp-server` or `--upstream npx`).",
+        )
+
+    legacy_single = (
+        list(next(iter(upstreams.values()))) if len(upstreams) == 1 else None
+    )
     proxy = VaaraMCPProxy(
-        upstream_command=[args.upstream, *args.upstream_args],
+        upstream_command=legacy_single,
+        upstreams=upstreams if legacy_single is None else None,
         db_path=args.db, agent_id_default=args.agent_id,
         allowlist=tool_allow,
         denylist=tool_deny if tool_deny else None,
@@ -755,9 +1100,59 @@ def main(argv: Optional[list[str]] = None) -> None:
         overt_emitter=overt_emitter,
     )
     try:
-        proxy.run()
+        if args.transport == "http":
+            proxy.run_http(
+                host=args.http_host,
+                port=args.http_port,
+                log_level=args.http_log_level,
+            )
+        else:
+            proxy.run()
     finally:
         proxy.close()
+
+
+# A fan-out slot name is a short alphanumeric slug. The narrow pattern
+# stops _parse_upstream_specs from confusing a command that itself
+# contains '=' (e.g. ``python -m foo --bar=baz``) with a NAME=CMD prefix.
+_UPSTREAM_NAME_RE = re.compile(r"^[a-zA-Z0-9_\-]{1,64}$")
+
+
+def _parse_upstream_specs(
+    upstream_specs: list[str], legacy_args: list[str],
+) -> dict[str, list[str]]:
+    """Turn ``--upstream`` / ``--upstream-arg`` CLI input into a fan-out map.
+
+    Each ``--upstream`` is either ``NAME=CMD`` (named — NAME is a short
+    alphanumeric slug) or ``CMD`` (lands under "default"). Commands that
+    contain ``=`` (e.g. ``python -m foo --bar=baz``) stay intact because
+    the NAME-prefix check rejects anything whose left-of-``=`` half isn't
+    a valid slug. Legacy ``--upstream-arg`` values append to the first
+    named slot for back-compat with single-upstream callers.
+    """
+    upstreams: dict[str, list[str]] = {}
+    first_name: Optional[str] = None
+    for spec in upstream_specs:
+        if "=" in spec:
+            candidate_name, _, candidate_cmd = spec.partition("=")
+            candidate_name = candidate_name.strip()
+            candidate_cmd = candidate_cmd.strip()
+            if _UPSTREAM_NAME_RE.match(candidate_name) and candidate_cmd:
+                name, command = candidate_name, candidate_cmd
+            else:
+                name, command = "default", spec
+        else:
+            name, command = "default", spec
+        if not name or not command:
+            raise SystemExit(
+                f"invalid --upstream value {spec!r}; expected NAME=CMD or CMD",
+            )
+        upstreams[name] = [command]
+        if first_name is None:
+            first_name = name
+    if legacy_args and first_name is not None:
+        upstreams[first_name].extend(legacy_args)
+    return upstreams
 
 
 def _build_overt_emitter_from_args(

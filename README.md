@@ -168,12 +168,31 @@ if (r.decision === "deny") throw new Error("blocked");
 `vaara.integrations.mcp_proxy.VaaraMCPProxy` sits between an MCP client (Claude Code, Cursor, any MCP-capable host) and an upstream MCP server. Every `tools/call` from the client routes through Vaara's interception pipeline before reaching the upstream. Allowed calls forward transparently and report the upstream outcome back to the scorer. Blocked calls return an MCP `isError: true` response with the block reason. The initialization handshake and `notifications/*` forward unchanged. `tools/list`, `resources/list`, `resources/read`, `prompts/list`, and `prompts/get` route through the operator perimeter before reaching the client or upstream.
 
 ```bash
-python -m vaara.integrations.mcp_proxy \
+vaara-mcp-proxy \
   --upstream npx --upstream-arg -y --upstream-arg @sap/mdk-mcp-server \
   --db ./mcp_audit.db
 ```
 
 Point your MCP client at the proxy instead of the upstream. The audit chain captures every tool call without changing client or upstream behavior. Distinct from `mcp_server`, which exposes Vaara itself as an MCP server for agents that consult Vaara as a tool.
+
+<details>
+<summary>Fleet shape (v0.40): one proxy, many upstreams, multi-tenant policy</summary>
+
+`vaara-mcp-proxy` also runs over Streamable HTTP with fan-out, so one process can serve a fleet of upstream MCP servers:
+
+```bash
+vaara-mcp-proxy \
+  --transport http \
+  --http-host 127.0.0.1 \
+  --http-port 8765 \
+  --upstream 'github=npx -y @github/mcp-server' \
+  --upstream 'sap=npx -y @sap/mdk-mcp-server'
+```
+
+Each `POST /mcp` reads two headers. `X-Vaara-Upstream` picks the upstream slot. `X-Vaara-Tenant` scopes the policy, audit chain, and OVERT envelope for that call. Single-upstream deployments keep the v0.39 silent-default contract. Multi-upstream deployments require `X-Vaara-Upstream` per call and return 400 with the available slot list when the header is missing.
+
+The reference HTTP API server (`vaara serve --policy-dir DIR`) loads one YAML or JSON policy per file in the directory (filename stem becomes the `tenant_id`, `default.yaml` lands in the fallback slot) and hot-reloads per tenant via `POST /v1/policy/reload` with a `tenant_id` body field or `X-Vaara-Tenant` header. The scorer dispatches allow and deny thresholds per call against the calling tenant's policy at `evaluate()` time.
+</details>
 
 <details>
 <summary>Operator perimeter: tool, resource, prompt filtering</summary>
@@ -194,7 +213,7 @@ vaara keygen --dev --out signing.pem
 head -c 32 /dev/urandom > op.key
 
 # 3. Run the proxy with OVERT emission turned on.
-python -m vaara.integrations.mcp_proxy \
+vaara-mcp-proxy \
   --upstream npx --upstream-arg -y --upstream-arg @sap/mdk-mcp-server \
   --overt-signing-key signing.pem \
   --overt-operator-key op.key \
