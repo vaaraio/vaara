@@ -136,6 +136,7 @@ class ActionRequest:
     parent_action_id: Optional[str] = None  # For action chains
     sequence_position: int = 0  # Position in current action sequence
     timestamp_utc: str = ""
+    tenant_id: str = ""  # v0.40 multi-tenant scope; "" = single-tenant
 
     def to_policy_context(self) -> dict:
         """Convert to a plain dict of policy-evaluation fields.
@@ -159,6 +160,7 @@ class ActionRequest:
             "parent_action_id": self.parent_action_id,
             "sequence_position": self.sequence_position,
             "parameters": self.parameters,
+            "tenant_id": self.tenant_id,
         }
 
 

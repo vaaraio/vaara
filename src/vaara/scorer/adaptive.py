@@ -31,7 +31,7 @@ import time
 from collections import OrderedDict, deque
 from dataclasses import dataclass, field
 from enum import Enum
-from typing import TYPE_CHECKING, Any, Optional
+from typing import TYPE_CHECKING, Any, Callable, Optional
 
 if TYPE_CHECKING:
     from vaara.policy.schema import Policy
@@ -137,6 +137,8 @@ class RiskAssessment:
             "action": self.decision.value,
             "reason": self.explanation,
             "backend": "vaara_adaptive",
+            "threshold_allow": self.threshold_allow,
+            "threshold_deny": self.threshold_deny,
             "raw_result": {
                 "point_estimate": self.point_estimate,
                 "conformal_interval": [self.conformal_lower, self.conformal_upper],
@@ -609,6 +611,7 @@ class AdaptiveScorer:
         max_tracked_agents: int = 10_000,
         pre_seed_calibration: bool = True,
         mondrian_categories: bool = False,
+        policy_lookup: Optional[Callable[[str], Any]] = None,
     ) -> None:
         """
         Args:
@@ -638,6 +641,17 @@ class AdaptiveScorer:
                 pre-Mondrian marginal behaviour. The default seed prior
                 always lands in the default bucket regardless of this
                 flag — synthetic benign pairs have no real category.
+            policy_lookup: Optional callable taking a tenant_id string and
+                returning that tenant's Policy (or None if the tenant has
+                no policy of its own). When set and the evaluate-time
+                context carries a non-empty tenant_id, the scorer uses
+                that tenant's allow/deny thresholds for THIS call instead
+                of the scorer-bound defaults. Tenants that resolve to
+                None fall back to the scorer-bound defaults; an empty
+                tenant_id skips the lookup entirely. The MWU expert
+                state, conformal calibrator, agent profiles, and sequence
+                detector remain shared across tenants — only threshold
+                application is per-tenant in v0.40.
         """
         if threshold_allow >= threshold_deny:
             raise ValueError(
@@ -647,6 +661,7 @@ class AdaptiveScorer:
             )
         self._threshold_allow = threshold_allow
         self._threshold_deny = threshold_deny
+        self._policy_lookup = policy_lookup
         self._burst_window = burst_window_seconds
         self._burst_threshold = burst_threshold
         self._max_tracked_agents = max_tracked_agents
@@ -735,6 +750,48 @@ class AdaptiveScorer:
             actual = 0.05
             self._conformal.add_calibration_point(predicted, actual)
 
+    def set_policy_lookup(
+        self, policy_lookup: Optional[Callable[[str], Any]]
+    ) -> None:
+        """Late-binding setter for the per-tenant policy lookup.
+
+        ``ServerState`` constructs the scorer before the ``PolicyRegistry``
+        is wired up in some code paths, so the lookup needs to attach
+        after construction without going through __init__. Runs under
+        the scorer's RLock so an in-flight evaluate either sees the old
+        lookup (or None) or the new one — never a torn assignment.
+        """
+        with self._lock:
+            self._policy_lookup = policy_lookup
+
+    def _thresholds_for(self, tenant_id: str) -> tuple[float, float]:
+        """Resolve (allow, deny) thresholds for this call.
+
+        Empty tenant_id or no policy_lookup configured returns the
+        scorer-bound defaults rebound by the most recent apply_policy
+        on the default ("") slot. A configured lookup that returns
+        None (tenant has no policy of its own) also falls back to the
+        defaults. _thresholds_for is called from _evaluate_locked while
+        the scorer lock is held; the lookup acquires the registry lock
+        on top, so lock ordering is consistently scorer -> registry
+        across this codebase (never the reverse).
+        """
+        if not tenant_id or self._policy_lookup is None:
+            return (self._threshold_allow, self._threshold_deny)
+        try:
+            tenant_policy = self._policy_lookup(tenant_id)
+        except Exception:
+            return (self._threshold_allow, self._threshold_deny)
+        if tenant_policy is None:
+            return (self._threshold_allow, self._threshold_deny)
+        from vaara.policy.schema import Policy  # local import to avoid cycles
+        if not isinstance(tenant_policy, Policy):
+            return (self._threshold_allow, self._threshold_deny)
+        return (
+            tenant_policy.thresholds_default.escalate,
+            tenant_policy.thresholds_default.deny,
+        )
+
     def _calib_category(self, tool_name: str) -> Optional[str]:
         """Category to route through to the calibrator for this action.
 
@@ -771,10 +828,16 @@ class AdaptiveScorer:
         # Extract fields from context dict
         tool_name = context.get("tool_name", "unknown")
         agent_id = context.get("agent_id", "anonymous")
+        tenant_id = context.get("tenant_id", "") or ""
         base_risk = _coerce_unit_float(context.get("base_risk_score", 0.5), 0.5)
         agent_confidence = _coerce_optional_unit_float(context.get("agent_confidence"))
         reversibility = context.get("reversibility", "partially_reversible")
         blast_radius = context.get("blast_radius", "local")
+
+        # Per-tenant threshold dispatch. Empty tenant_id or no lookup
+        # configured returns the scorer-bound defaults bound at apply_policy
+        # time on the default ("") slot.
+        threshold_allow, threshold_deny = self._thresholds_for(tenant_id)
 
         # Build risk signals from each expert
         signals = self._compute_signals(
@@ -801,9 +864,9 @@ class AdaptiveScorer:
         # If the worst-case (within 1-alpha confidence) is safe, allow it.
         # If the best-case is dangerous, deny it.
         decision_score = upper
-        if decision_score < self._threshold_allow:
+        if decision_score < threshold_allow:
             decision = Decision.ALLOW
-        elif decision_score > self._threshold_deny:
+        elif decision_score > threshold_deny:
             decision = Decision.DENY
         else:
             decision = Decision.ESCALATE
@@ -825,7 +888,7 @@ class AdaptiveScorer:
         explanation = (
             f"{decision.value}: risk={point_estimate:.3f} "
             f"[{lower:.3f}, {upper:.3f}] "
-            f"(threshold allow<{self._threshold_allow} deny>{self._threshold_deny})"
+            f"(threshold allow<{threshold_allow} deny>{threshold_deny})"
         )
 
         assessment = RiskAssessment(
@@ -837,8 +900,8 @@ class AdaptiveScorer:
             decision=decision,
             signals=signals,
             mwu_weights=self._mwu.weights,
-            threshold_allow=self._threshold_allow,
-            threshold_deny=self._threshold_deny,
+            threshold_allow=threshold_allow,
+            threshold_deny=threshold_deny,
             sequence_risk=signals.get("sequence_pattern", 0.0),
             calibration_size=self._conformal.calibration_size,
             effective_alpha=eff_alpha,
@@ -869,10 +932,13 @@ class AdaptiveScorer:
     def _dry_run_evaluate_locked(self, context: dict[str, Any]) -> Any:
         tool_name = context.get("tool_name", "unknown")
         agent_id = context.get("agent_id", "anonymous")
+        tenant_id = context.get("tenant_id", "") or ""
         base_risk = _coerce_unit_float(context.get("base_risk_score", 0.5), 0.5)
         agent_confidence = _coerce_optional_unit_float(context.get("agent_confidence"))
         reversibility = context.get("reversibility", "partially_reversible")
         blast_radius = context.get("blast_radius", "local")
+
+        threshold_allow, threshold_deny = self._thresholds_for(tenant_id)
 
         # _compute_signals is read-only for everything except the
         # sequence detector's warning log — silence that temporarily.
@@ -898,9 +964,9 @@ class AdaptiveScorer:
         lower, upper = self._conformal.predict_interval(
             point_estimate, category=bucket,
         )
-        if upper < self._threshold_allow:
+        if upper < threshold_allow:
             decision = Decision.ALLOW
-        elif upper > self._threshold_deny:
+        elif upper > threshold_deny:
             decision = Decision.DENY
         else:
             decision = Decision.ESCALATE
@@ -913,6 +979,8 @@ class AdaptiveScorer:
                 "calibration_size": self._conformal.calibration_size,
                 "effective_alpha": self._conformal.effective_alpha_for(bucket),
                 "bucket_category": bucket,
+                "threshold_allow": threshold_allow,
+                "threshold_deny": threshold_deny,
             },
         }
 

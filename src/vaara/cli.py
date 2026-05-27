@@ -1015,9 +1015,33 @@ def _cmd_serve(args: argparse.Namespace) -> int:
 
     from vaara.server import create_app
 
-    controller = None
     policy_path = getattr(args, "policy", None)
-    if policy_path:
+    policy_dir = getattr(args, "policy_dir", None)
+    if policy_path and policy_dir:
+        print(
+            "vaara serve: pass either --policy or --policy-dir, not both.",
+            file=sys.stderr,
+        )
+        return 2
+
+    controller = None
+    registry = None
+    if policy_dir:
+        from vaara.policy.registry import PolicyRegistry
+        from vaara.policy.schema import PolicyError
+
+        registry = PolicyRegistry()
+        try:
+            tenants = registry.load_directory(Path(policy_dir).expanduser())
+        except PolicyError as exc:
+            print(f"vaara serve: --policy-dir failed to load: {exc}", file=sys.stderr)
+            return 2
+        print(
+            f"vaara serve: loaded {len(tenants)} tenant policies "
+            f"(tenants={tenants!r})",
+            file=sys.stderr,
+        )
+    elif policy_path:
         from vaara.policy.controller import PolicyController
         from vaara.policy.validate import validate_source
 
@@ -1032,7 +1056,7 @@ def _cmd_serve(args: argparse.Namespace) -> int:
             return 2
         controller = PolicyController(policy_obj)
 
-    app = create_app(policy_controller=controller)
+    app = create_app(policy_controller=controller, policy_registry=registry)
     uvicorn.run(app, host=args.host, port=args.port, log_level=args.log_level)
     return 0
 
@@ -1392,6 +1416,15 @@ def build_parser() -> argparse.ArgumentParser:
             "Path to a YAML or JSON policy file. Enables POST "
             "/v1/policy/reload; the policy's default thresholds and "
             "sequence patterns are applied to the scorer at startup."
+        ),
+    )
+    pserve.add_argument(
+        "--policy-dir",
+        default=None,
+        help=(
+            "Directory of per-tenant policy files. Each *.yaml/*.yml/*.json "
+            "file is loaded; filename stem becomes the tenant_id "
+            "(default.yaml -> fallback). Mutually exclusive with --policy."
         ),
     )
     pserve.add_argument(

@@ -17,6 +17,7 @@ from fastapi import FastAPI
 
 from vaara.audit.trail import AuditTrail
 from vaara.policy.controller import PolicyController
+from vaara.policy.registry import PolicyRegistry
 from vaara.scorer.adaptive import AdaptiveScorer
 from vaara.server.routes import register
 from vaara.server.state import ServerState
@@ -26,6 +27,7 @@ def create_app(
     scorer: Optional[AdaptiveScorer] = None,
     audit: Optional[AuditTrail] = None,
     policy_controller: Optional[PolicyController] = None,
+    policy_registry: Optional[PolicyRegistry] = None,
 ) -> FastAPI:
     """Build the FastAPI application.
 
@@ -34,11 +36,19 @@ def create_app(
         audit: Pre-configured audit trail, or None for default in-memory.
         policy_controller: Pre-loaded ``PolicyController``. When supplied,
             the scorer is registered as a listener and ``POST
-            /v1/policy/reload`` becomes available. When omitted, the
-            reload endpoint returns ``409 policy_not_configured``.
+            /v1/policy/reload`` becomes available. When omitted (and no
+            ``policy_registry``), the reload endpoint returns
+            ``409 policy_not_configured``.
+        policy_registry: Pre-loaded ``PolicyRegistry`` for multi-tenant
+            deployments. Mutually exclusive with ``policy_controller`` —
+            single-controller callers are wrapped into a registry's ""
+            slot automatically by ``ServerState``.
     """
     state = ServerState(
-        scorer=scorer, audit=audit, policy_controller=policy_controller
+        scorer=scorer,
+        audit=audit,
+        policy_controller=policy_controller,
+        policy_registry=policy_registry,
     )
     app = FastAPI(
         title="Vaara HTTP API",

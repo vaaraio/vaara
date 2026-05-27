@@ -266,6 +266,7 @@ class InterceptionPipeline:
         session_id: str = "",
         parent_action_id: Optional[str] = None,
         sequence_position: int = 0,
+        tenant_id: str = "",
     ) -> InterceptionResult:
         """Intercept an agent action request.
 
@@ -314,6 +315,7 @@ class InterceptionPipeline:
             parent_action_id=parent_action_id,
             sequence_position=sequence_position,
             timestamp_utc=time.strftime("%Y-%m-%dT%H:%M:%SZ", time.gmtime()),
+            tenant_id=tenant_id,
         )
 
         # 3. Record the request in audit trail
