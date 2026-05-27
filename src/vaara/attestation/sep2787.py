@@ -6,11 +6,11 @@ changes Vaara raised in the v1 draft thread
 written:
 
 1. **Fact-source labels.** Envelope fields are grouped under three
-   named blocks by trust surface: ``planner_declared`` (intent, tool
+   named blocks by trust surface: ``plannerDeclared`` (intent, tool
    name and server bindings the agent planner claims),
-   ``issuer_asserted`` (iss, sub, iat, exp, nonce, secret_version,
+   ``issuerAsserted`` (iss, sub, iat, expSeconds, nonce, secretVersion,
    alg, set by the attestation issuer at signing time), and
-   ``payload_derived`` (args_digest / args_ref / args_projection,
+   ``payloadDerived`` (argsDigest / argsRef / argsProjection,
    deterministically derived from the request payload). The signature
    is the binding output and lives at the envelope root.
 2. **Three-way args shape.** The v1 draft overloads a single
@@ -30,7 +30,7 @@ written:
 Signing modes follow the v1 draft: HS256 (HMAC-SHA256), ES256 (ECDSA
 P-256 raw r||s, not DER), RS256 (RSASSA-PKCS1-v1_5). The signature is
 computed over the JCS-canonical encoding of the four envelope blocks
-``{version, alg, planner_declared, issuer_asserted, payload_derived}``
+``{version, alg, plannerDeclared, issuerAsserted, payloadDerived}``
 and is excluded from its own input.
 
 Install: ``pip install 'vaara[attestation]'``. Requires ``rfc8785`` for
