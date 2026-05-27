@@ -1,27 +1,40 @@
-"""OVERT 1.0 Protocol Profile 1.0 attestation envelope emission.
+"""Runtime attestation envelopes: OVERT 1.0 and SEP-2787 v2.
 
-Vaara's structural position relative to OVERT 1.0 (Glacis Technologies,
-overt.is): Vaara is the third-party runtime kernel that intercepts agent
-actions, scores risk, and writes the audit trail. In OVERT terms Vaara is
-the **Arbiter** at AAL-3 (operator-controlled notary model). Phase 1
-(Enforcement) and Phase 2 (Provisional Receipt) are emitted by Vaara
-directly. Phase 3 (Full Attestation) is provided by ``vaara.attestation.iap``
-since v0.13.0 as a reference Independent Attestation Provider that
-notary-signs the Provisional Receipt and anchors it in a transparency
-log. Production deployments can swap in sigstore Rekor or an equivalent
-independently-operated log at the same call sites. As of v0.17.0, the
-``vaara overt verify`` CLI validates any OVERT 1.0 Base Envelope produced
-by a conformant emitter, Vaara or otherwise.
+This package ships two coexisting attestation surfaces:
 
-The `BaseEnvelope` produced here implements Protocol Profile 1.0 Annex B.6
-verbatim: a 9-field closed-schema CBOR-encoded structure signed with
-Ed25519. Any OVERT-aware verifier (auditor, IAP, relying party) can
-recompute the canonical encoding and verify the signature offline.
+**OVERT 1.0 Protocol Profile 1.0** (``vaara.attestation.overt``).
+Per-action CBOR Base Envelope, 9-field closed schema, Ed25519
+(optionally ML-DSA-65). Vaara's structural position relative to OVERT
+1.0 (Glacis Technologies, overt.is): Vaara is the third-party runtime
+kernel that intercepts agent actions, scores risk, and writes the
+audit trail. In OVERT terms Vaara is the **Arbiter** at AAL-3
+(operator-controlled notary model). Phase 1 (Enforcement) and Phase 2
+(Provisional Receipt) are emitted by Vaara directly. Phase 3 (Full
+Attestation) is provided by ``vaara.attestation.iap`` since v0.13.0
+as a reference Independent Attestation Provider that notary-signs the
+Provisional Receipt and anchors it in a transparency log. Production
+deployments can swap in sigstore Rekor or an equivalent
+independently-operated log at the same call sites. As of v0.17.0,
+the ``vaara overt verify`` CLI validates any OVERT 1.0 Base Envelope
+produced by a conformant emitter, Vaara or otherwise.
+
+**SEP-2787 v2** (``vaara.attestation.sep2787``). Per-tool-call JSON
+envelope carried inside MCP ``_meta``. Three trust-surface blocks
+(``plannerDeclared``, ``issuerAsserted``, ``payloadDerived``) plus a
+signature computed over the JCS-canonical encoding of those four
+blocks. Signing modes: HS256, ES256, RS256. ``parse_attestation``
+provides full wire round-trip so third-party consumers of the v0
+test vectors can parse JSON bytes, verify the signature, and re-emit
+byte-identically. Reference implementation pinned at tag
+``sep2787-ref-v2``.
+
+The two envelopes coexist. Field-level mapping lives in
+``docs/sep2787-overt-mapping.md``.
 
 Install: ``pip install 'vaara[attestation]'``.
 
-See COMPLIANCE.md "Position relative to open runtime-attestation standards"
-for the full architectural framing.
+See COMPLIANCE.md "Position relative to open runtime-attestation
+standards" for the full architectural framing.
 """
 
 from vaara.attestation.overt import (
@@ -69,23 +82,23 @@ from vaara.attestation.tee import (
 from vaara.attestation.sep2787 import (
     Algorithm as SEP2787Algorithm,
     ArgsCommitment as SEP2787ArgsCommitment,
-    ArgsDigest,
     ArgsProjection,
     ArgsRef,
     Attestation as SEP2787Attestation,
     AttestationError as SEP2787AttestationError,
     IssuerAsserted,
+    PayloadDerived,
     PlannerDeclared,
     ToolCallBinding,
     canonical_json as sep2787_canonical_json,
     emit_attestation as sep2787_emit_attestation,
     make_args_digest,
     make_args_projection,
+    parse_attestation as sep2787_parse_attestation,
     verify_attestation as sep2787_verify_attestation,
 )
 
 __all__ = [
-    "ArgsDigest",
     "ArgsProjection",
     "ArgsRef",
     "BaseEnvelope",
@@ -97,6 +110,7 @@ __all__ = [
     "IssuerAsserted",
     "LogEntry",
     "MockSEVSNPAttester",
+    "PayloadDerived",
     "Phase3Attestation",
     "PlannerDeclared",
     "S3PAttestation",
@@ -125,6 +139,7 @@ __all__ = [
     "regularized_incomplete_beta",
     "sep2787_canonical_json",
     "sep2787_emit_attestation",
+    "sep2787_parse_attestation",
     "sep2787_verify_attestation",
     "verify_base_envelope",
     "verify_envelope_binding",
