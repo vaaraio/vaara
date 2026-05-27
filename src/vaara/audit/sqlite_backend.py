@@ -357,7 +357,11 @@ class SQLiteAuditBackend:
                     _strict_json_dumps(record.regulatory_articles),
                     record.previous_hash,
                     record.record_hash,
-                    self._tenant_id,
+                    # Per-record tenant_id wins so a single backend instance
+                    # can serve a multi-tenant runtime (v0.40+). Empty record
+                    # tenant_id falls back to instance scope for the legacy
+                    # single-tenant init path.
+                    record.tenant_id or self._tenant_id,
                     record.system_operation,
                     record.data_usage,
                     record.decision_making,
@@ -674,6 +678,7 @@ class SQLiteAuditBackend:
             agent_id = self._redaction_cache[agent_id]
         # Defensive indexing: rows from older queries may not include
         # the v3 columns. Use a guard so loading old DBs still works.
+        tenant_id = row[11] if len(row) > 11 else ""
         sys_op = row[12] if len(row) > 12 else None
         data_use = row[13] if len(row) > 13 else None
         dec_mk = row[14] if len(row) > 14 else None
@@ -689,6 +694,7 @@ class SQLiteAuditBackend:
             regulatory_articles=json.loads(row[7]),
             previous_hash=row[8],
             record_hash=row[9],
+            tenant_id=tenant_id or "",
             system_operation=sys_op,
             data_usage=data_use,
             decision_making=dec_mk,

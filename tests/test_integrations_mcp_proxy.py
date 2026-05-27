@@ -491,7 +491,7 @@ def test_progress_notification_correlates_to_inflight_tools_call(monkeypatch):
             "_meta": {"progressToken": "tok-stream"},
         },
     })
-    assert progress_seen == [{"tok-stream": ("parent-act-9", "mcp-proxy-client", "long_tool")}]
+    assert progress_seen == [{"tok-stream": ("parent-act-9", "mcp-proxy-client", "long_tool", "")}]
     # Map is cleaned up after the call returns.
     assert p._inflight_progress == {}
     # Audit was called for the progress event with the parent correlation.
