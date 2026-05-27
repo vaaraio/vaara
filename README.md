@@ -33,7 +33,7 @@ Held-out TEST recall 84.7% (95% Wilson [82.4, 86.7]) at FPR 4.1% [2.9, 5.7]. Pha
 - [vaara-bench-v0.39](bench/vaara-bench-v0.39.md): current methodology, chain of custody, ship-gate record. v9 retrain on BIPIA-augmented corpus with follows upweighted (`--follow-weight 8.0`), calibrated to T=0.9150 at a 5% FPR target on v035 VAL. BIPIA-pressure FPR collapses from 35.2% on v8 to 1.2% on v9. In-distribution recall flat within Wilson intervals. Found-and-fixed in tree: auto-labeller `example.com` placeholder false-positive rule (42 → 14 true follows across four backends). Historical bench docs live under `bench/` for chain-of-custody continuity.
 - [vaara-bench-v1](bench/vaara-bench-v1.md): 77-trace synthetic-corpus regression baseline with frozen methodology, 100% soft TPR, 0% hard FPR
 
-Each figure is reproducible from the public corpus or the bench harness in `bench/`.
+Each figure is reproducible from the public corpus or the bench pipeline in `bench/`.
 
 ## Install
 

@@ -46,10 +46,10 @@ larger labelled-positive pool.
   post-relabel BIPIA-derived training entries, one file per backend.
 - `tests/adversarial/external/bipia/`: unmodified Microsoft BIPIA
   release ([github.com/microsoft/BIPIA](https://github.com/microsoft/BIPIA), MIT
-  licensed), vendored for harness reproducibility.
+  licensed), vendored for eval reproducibility.
 - `scripts/_v039_common.py`: shared `BipiaTrial`, `HarnessTrace`,
   `ToolCallEmit`, tool catalog, JSONL read/write.
-- `scripts/run_v039_bipia.py`: BIPIA harness driver with two provider
+- `scripts/run_v039_bipia.py`: BIPIA driver with two provider
   adapters (Anthropic SDK, OpenAI-compatible for Ollama / vLLM /
   llama.cpp).
 - `scripts/build_v039_entries.py` and `scripts/build_v039_split.py`:

@@ -59,7 +59,7 @@ Phase 1 (PAIR adversarial entries, 100% positives) moves 0.3 pp.
 Combined: 244 benign tool calls under
 `context.source=injected_via_bipia_<class>`. v8 false-positive rate
 35.2% [29.5, 41.4]. v9 false-positive rate 1.2% [0.4, 3.6]. Four
-backends, identical BIPIA harness, identical n_benign=25 / n_attack=50
+backends, identical BIPIA agent loop, identical n_benign=25 / n_attack=50
 / seed=43.
 
 ## Injection-follow result
@@ -116,7 +116,7 @@ checked-in v039 BIPIA entries reflect the post-fix labels.
 
 ## Generation provenance
 
-BIPIA harness runs are local. `claude-haiku-4-5` hits the Anthropic
+BIPIA agent-loop runs are local. `claude-haiku-4-5` hits the Anthropic
 API directly. The three Ollama backends (`llama3.1:8b`, `mistral:7b`,
 `qwen2.5:7b`) ran behind a local Ollama instance at
 `http://localhost:11434/v1` against the OpenAI-compatible adapter in
@@ -136,7 +136,7 @@ The code-attack file is uniformly attack-class payloads.
 | anchor | path | pins |
 |---|---|---|
 | BIPIA source | `tests/adversarial/external/bipia/` | unmodified Microsoft MIT release |
-| harness | `scripts/run_v039_bipia.py` + `scripts/_v039_common.py` | three-tool surface, two provider adapters |
+| agent loop | `scripts/run_v039_bipia.py` + `scripts/_v039_common.py` | three-tool surface, two provider adapters |
 | v0.39 entries | `tests/adversarial/v039_bipia/bipia-s43-{haiku,llama31-8b,mistral-7b,qwen25-7b}.jsonl` | post-relabel follow flags |
 | audit | `scripts/audit_bipia_labels.py` | prints 42 -> 14 breakdown |
 | relabel | `scripts/relabel_v039_traces.py` | strict rule, idempotent replay |
@@ -149,7 +149,7 @@ The code-attack file is uniformly attack-class payloads.
 ## Reproduction recipe
 
 ```bash
-# Re-run BIPIA harness (one model at a time)
+# Re-run BIPIA driver (one model at a time)
 PYTHONPATH=src .venv/bin/python scripts/run_v039_bipia.py \
     --provider anthropic --model claude-haiku-4-5 \
     --n-benign 25 --n-attack 50 --seed 43
@@ -174,11 +174,11 @@ PYTHONPATH=src .venv/bin/python scripts/eval_v039_v9.py \
 1. **LLMail-Inject corpus.** 208K labelled participant submissions
    covering whether an LLM email assistant followed each injection.
    Larger labelled-positive pool than BIPIA's n=2 in this run. Lands
-   in v0.40 as the follow-recall headline once the harness replays
+   in v0.40 as the follow-recall headline once the agent loop replays
    the labelled-positive subset against the same three-tool surface.
 2. **IPI fourth attacker family.** Indirect prompt injection through
    retrieved content lands cleanly as a different attack class.
-   Carries to v0.40 alongside LLMail-Inject so the same harness
+   Carries to v0.40 alongside LLMail-Inject so the same agent loop
    serves both.
 3. **Obfuscated-follow LLM judge.** The post-fix auto-labeller stays
    conservative. An LLM-as-judge pass over agent text plus tool calls
