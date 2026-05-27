@@ -6,6 +6,36 @@ and this project follows [Semantic Versioning](https://semver.org/spec/v2.0.0.ht
 
 ## [Unreleased]
 
+## [0.39.1] - 2026-05-27
+
+**Theme: SEP-2787 reference impl follows the spec into camelCase.**
+soup-oss adopted MCP camelCase convention for SEP-2787 envelope field
+names in `modelcontextprotocol/modelcontextprotocol@48c739b1`. Vaara's
+proposed-shape reference implementation now emits camelCase JSON keys
+on the serialisation boundary while keeping Python-side attributes in
+snake_case.
+
+### Changed
+- `Attestation.to_dict()` and the JCS-canonical signing payload emit
+  `plannerDeclared`, `issuerAsserted`, `payloadDerived`, `toolCalls`,
+  `serverFingerprint`, `secretVersion`, `expSeconds`,
+  `requestedCapability`, `projectionDigest`. The proposed-shape
+  reference now matches MCP camelCase convention; Python dataclass
+  attributes stay snake_case so user code is unchanged.
+- `docs/sep2787-overt-mapping.md` field-by-field table updated to the
+  camelCase shape.
+- New `issuer_to_dict` helper in `vaara.attestation._sep2787_types`
+  replaces the prior `asdict()` call so the issuer block sorts and
+  renames deterministically without leaking Python-internal names.
+
+### SEP-2787 reference implementation tag
+- `sep2787-ref-v1`: camelCase envelope. Pinned for cross-repo
+  provenance citation against
+  `modelcontextprotocol/modelcontextprotocol#2787` and the v0 test
+  vector PR (`#2789`, head `2a9360f`).
+- `sep2787-ref-v0` (preserved at commit `3d7af54`): snake_case envelope,
+  the historical proposed-shape artefact.
+
 ## [0.39.0] - 2026-05-27
 
 **Theme: v9 classifier retrain on a BIPIA-augmented corpus, with one

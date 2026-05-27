@@ -5,7 +5,7 @@ Internal module. Public surface is in ``vaara.attestation.sep2787``.
 
 from __future__ import annotations
 
-from dataclasses import asdict, dataclass, field
+from dataclasses import dataclass, field
 from typing import Any, Literal, Optional, Union
 
 Algorithm = Literal["HS256", "ES256", "RS256"]
@@ -107,8 +107,8 @@ class Attestation:
 
     Composed of three trust-surface blocks plus the signature. The
     signature is computed over the JCS-canonical encoding of
-    ``{version, alg, planner_declared, issuer_asserted,
-    payload_derived}`` and does not cover itself.
+    ``{version, alg, plannerDeclared, issuerAsserted,
+    payloadDerived}`` and does not cover itself.
 
     The ``payload_derived`` tuple parallels
     ``planner_declared.tool_calls`` in order: index N here is the args
@@ -126,9 +126,9 @@ class Attestation:
         return {
             "version": self.version,
             "alg": self.alg,
-            "planner_declared": planner_to_dict(self.planner_declared),
-            "issuer_asserted": asdict(self.issuer_asserted),
-            "payload_derived": [args_to_dict(a) for a in self.payload_derived],
+            "plannerDeclared": planner_to_dict(self.planner_declared),
+            "issuerAsserted": issuer_to_dict(self.issuer_asserted),
+            "payloadDerived": [args_to_dict(a) for a in self.payload_derived],
             "signature": self.signature,
         }
 
@@ -151,7 +151,7 @@ def args_to_dict(args: ArgsCommitment) -> dict[str, Any]:
         return {
             "kind": "projection",
             "projection": args.projection,
-            "projection_digest": args.projection_digest,
+            "projectionDigest": args.projection_digest,
         }
     raise AttestationError(f"unknown args commitment kind: {type(args)!r}")
 
@@ -159,15 +159,27 @@ def args_to_dict(args: ArgsCommitment) -> dict[str, Any]:
 def planner_to_dict(planner: PlannerDeclared) -> dict[str, Any]:
     out: dict[str, Any] = {
         "intent": planner.intent,
-        "tool_calls": [
+        "toolCalls": [
             {
                 "name": tc.name,
-                "server_fingerprint": tc.server_fingerprint,
+                "serverFingerprint": tc.server_fingerprint,
                 "args": args_to_dict(tc.args),
             }
             for tc in planner.tool_calls
         ],
     }
     if planner.requested_capability is not None:
-        out["requested_capability"] = planner.requested_capability
+        out["requestedCapability"] = planner.requested_capability
     return out
+
+
+def issuer_to_dict(issuer: IssuerAsserted) -> dict[str, Any]:
+    return {
+        "alg": issuer.alg,
+        "expSeconds": issuer.exp_seconds,
+        "iat": issuer.iat,
+        "iss": issuer.iss,
+        "nonce": issuer.nonce,
+        "secretVersion": issuer.secret_version,
+        "sub": issuer.sub,
+    }

@@ -204,11 +204,15 @@ def test_to_dict_round_trip_shape():
     env = _emit_attestation()
     d = env.to_dict()
     assert set(d) == {
-        "version", "alg", "planner_declared",
-        "issuer_asserted", "payload_derived", "signature",
+        "version", "alg", "plannerDeclared",
+        "issuerAsserted", "payloadDerived", "signature",
     }
-    assert d["planner_declared"]["tool_calls"][0]["args"]["kind"] == "digest"
-    assert d["payload_derived"][0]["kind"] == "digest"
+    assert d["plannerDeclared"]["toolCalls"][0]["args"]["kind"] == "digest"
+    assert d["plannerDeclared"]["toolCalls"][0]["serverFingerprint"].startswith("sha256:")
+    assert d["plannerDeclared"]["requestedCapability"] == "filesystem.delete"
+    assert d["issuerAsserted"]["expSeconds"] == 300
+    assert d["issuerAsserted"]["secretVersion"] == "v1"
+    assert d["payloadDerived"][0]["kind"] == "digest"
 
 
 def test_cross_alg_verification_fails():

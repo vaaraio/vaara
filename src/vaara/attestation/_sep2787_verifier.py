@@ -4,10 +4,10 @@ Internal module. Public surface is in ``vaara.attestation.sep2787``.
 
 Implements step 5 of the verification rules in the SEP-2787 draft:
 
-    If the toolCalls entry uses args_ref, resolve the URI, compute
+    If the toolCalls entry uses argsRef, resolve the URI, compute
     SHA-256 over the fetched content, and compare against the stored
     digest. Confirm the resolved content corresponds to the arguments
-    being executed. If the entry uses args_projection, compare it
+    being executed. If the entry uses argsProjection, compare it
     against the canonicalized runtime arguments (RFC 8785). Identity
     projections MUST match exactly; redacted projections are verified
     only to be signed -- the verifier makes no claim about
@@ -16,7 +16,7 @@ Implements step 5 of the verification rules in the SEP-2787 draft:
     reject with args_commitment_mismatch.
 
 Vaara's three-way args shape (ArgsDigest / ArgsRef / ArgsProjection)
-extends the spec's two-way (args_ref / args_projection) with a
+extends the spec's two-way (argsRef / argsProjection) with a
 commitment-only ArgsDigest where the payload never crosses the
 verifier. For ArgsDigest the verifier recomputes the JCS-canonical
 hash of the runtime arguments and compares against the bound digest.
