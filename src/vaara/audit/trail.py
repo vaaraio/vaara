@@ -258,6 +258,9 @@ class AuditRecord:
     data_usage: Optional[str] = None
     decision_making: Optional[str] = None
     limitations: Optional[str] = None
+    # v0.40: multi-tenant scoping. Empty string = single-tenant deployment.
+    # Excluded from compute_hash() to preserve pre-v0.40 chain re-verification.
+    tenant_id: str = ""
 
     def __post_init__(self) -> None:
         # Loaded-from-DB records carry a non-empty record_hash. Skip
@@ -492,6 +495,12 @@ class AuditTrail:
         self._by_action: dict[str, list[AuditRecord]] = defaultdict(list)
         self._last_hash = ""
         self._on_record = on_record
+        # v0.40 multi-tenant: action_id -> tenant_id, seeded by
+        # record_action_requested. Subsequent record_* calls (decision,
+        # execution, escalation) look up the action_id so every record in
+        # the lifecycle carries the same tenant scope without forcing
+        # every caller to thread tenant_id through every method signature.
+        self._tenant_for_action: dict[str, str] = {}
         # Counts on_record callback failures so callers can detect
         # persistence divergence at runtime (e.g., DB gone, disk full).
         # Without this, a silent logger.error is the only signal and the
@@ -554,9 +563,33 @@ class AuditTrail:
 
     # ── Recording events ──────────────────────────────────────────
 
+    # Defense-in-depth cap for direct-trail callers that bypass the pipeline's
+    # length cap on tenant_id. The HTTP boundary already caps at 256 via the
+    # Pydantic schema, but the AuditTrail public API is reachable from
+    # embedders that construct ActionRequest directly. A 50MB tenant_id would
+    # otherwise balloon every record on the hash chain and the in-memory
+    # action -> tenant map.
+    _MAX_TENANT_ID_LEN = 256
+    # Soft cap on the action -> tenant map. Long-running multi-tenant
+    # deployments would otherwise leak memory at one entry per action,
+    # because OUTCOME_RECORDED arrives well after ACTION_REQUESTED and the
+    # map cannot be cleared at decision time. When the cap is reached the
+    # oldest 1/8 of the map is evicted; subsequent lookups for evicted
+    # actions fall back to "" tenant, which is the legacy single-tenant
+    # contract — correct fail-soft behaviour.
+    _MAX_ACTION_TENANT_MAP = 50_000
+
     def record_action_requested(self, request: ActionRequest) -> str:
         """Record that an agent requested an action.  Returns the action_id."""
         action_id = str(uuid.uuid4())
+        tenant_id = getattr(request, "tenant_id", "") or ""
+        if tenant_id:
+            tenant_id = self._cap_record_str(tenant_id, self._MAX_TENANT_ID_LEN)
+            if len(self._tenant_for_action) >= self._MAX_ACTION_TENANT_MAP:
+                evict = max(1, self._MAX_ACTION_TENANT_MAP // 8)
+                for stale in list(self._tenant_for_action)[:evict]:
+                    self._tenant_for_action.pop(stale, None)
+            self._tenant_for_action[action_id] = tenant_id
 
         articles = self._get_regulatory_articles(
             EventType.ACTION_REQUESTED,
@@ -600,9 +633,19 @@ class AuditTrail:
                 "sequence_position": request.sequence_position,
             },
             regulatory_articles=articles,
+            tenant_id=tenant_id,
         ))
 
         return action_id
+
+    def _tenant_for(self, action_id: str) -> str:
+        """Resolve the tenant scope for an existing action lifecycle.
+
+        Returns the tenant_id captured at record_action_requested time so
+        every follow-up record (risk_scored, decision, execution,
+        escalation, outcome) carries the same scope automatically.
+        """
+        return self._tenant_for_action.get(action_id, "")
 
     def record_risk_scored(
         self,
@@ -631,6 +674,7 @@ class AuditTrail:
             tool_name=self._cap_record_str(tool_name, self._MAX_TOOL_NAME_LEN),
             data=safe_assessment,
             regulatory_articles=articles,
+            tenant_id=self._tenant_for(action_id),
         ))
 
     def record_decision(
@@ -666,6 +710,7 @@ class AuditTrail:
                 "risk_score": risk_score,
             },
             regulatory_articles=articles,
+            tenant_id=self._tenant_for(action_id),
         ))
 
     def record_execution(
@@ -702,6 +747,7 @@ class AuditTrail:
             data={"result_summary": self._cap_record_dict_bytes(
                 safe_result, self._MAX_EXECUTION_RESULT_JSON_BYTES
             )},
+            tenant_id=self._tenant_for(action_id),
         ))
 
     def record_escalation(
@@ -731,6 +777,7 @@ class AuditTrail:
                 "risk_score": risk_score,
             },
             regulatory_articles=articles,
+            tenant_id=self._tenant_for(action_id),
         ))
 
     def record_escalation_resolved(
@@ -760,6 +807,7 @@ class AuditTrail:
                 "justification": self._cap_record_str(justification, self._MAX_JUSTIFICATION_LEN),
             },
             regulatory_articles=articles,
+            tenant_id=self._tenant_for(action_id),
         ))
 
     def record_outcome(
@@ -794,6 +842,7 @@ class AuditTrail:
                 ),
             },
             regulatory_articles=articles,
+            tenant_id=self._tenant_for(action_id),
         ))
 
     # Length caps for caller-controlled free-text fields on this direct
@@ -923,6 +972,7 @@ class AuditTrail:
                 "new_decision": new_decision,
             },
             regulatory_articles=articles,
+            tenant_id=self._tenant_for(action_id),
         ))
 
     # ── Querying ──────────────────────────────────────────────────

@@ -69,7 +69,7 @@ class PolicyController:
             listener(self._policy)
 
     def reload(
-        self, source: Union[str, Path, dict], *, format: Optional[str] = None
+        self, source: Union[str, Path, dict, Policy], *, format: Optional[str] = None
     ) -> ReloadResult:
         """Parse, validate, and apply a new policy.
 
@@ -77,10 +77,14 @@ class PolicyController:
         When omitted, ``.yaml``/``.yml`` paths use the YAML loader, dicts
         bypass parsing, and everything else goes through JSON.
 
+        Already-validated ``Policy`` instances may be passed directly; the
+        registry path (``vaara.policy.registry.PolicyRegistry``) uses this
+        to swap a per-tenant policy that was parsed in bulk.
+
         Raises ``PolicyError`` if the source is malformed; in that case
         the previously loaded policy remains live.
         """
-        new_policy = _load(source, format)
+        new_policy = source if isinstance(source, Policy) else _load(source, format)
         with self._lock:
             self._policy = new_policy
             self._version += 1

@@ -6,6 +6,97 @@ and this project follows [Semantic Versioning](https://semver.org/spec/v2.0.0.ht
 
 ## [Unreleased]
 
+## [0.40.0] - 2026-05-28
+
+**Theme: deployment shape. One Vaara process now serves a fleet of
+upstream MCP servers, with multi-tenant policy, audit, and attestation
+on the same substrate.**
+
+The v0.39 sidecar shape ran one Vaara process per upstream. v0.40
+turns that into a single process that speaks Streamable HTTP, holds
+N upstream MCP-server connections, picks the upstream per request
+from a header, scopes every score, audit record, and OVERT envelope
+to a tenant, and reloads per-tenant policy in place.
+
+### Added
+- `vaara-mcp-proxy --transport http --http-host H --http-port P`:
+  Streamable HTTP transport at `POST /mcp`, backed by FastAPI /
+  uvicorn (the `vaara[server]` extra already shipped in v0.39 for
+  `vaara serve`). The endpoint reads `X-Vaara-Tenant` and
+  `X-Vaara-Upstream` per request, pushes them into ContextVars, and
+  dispatches into the existing `_handle_request` path so the policy,
+  perimeter, OVERT, and progress-notification handling all light up
+  unchanged. Notifications (no JSON-RPC `id`) return 202 Accepted.
+  Bodies above 1 MiB return 413.
+- `vaara-mcp-proxy --upstream NAME=CMD` (repeatable) for fan-out.
+  One Vaara process holds N `UpstreamMCPClient` instances in a name
+  -> client map. Bare `--upstream CMD` keeps the v0.39 single-
+  upstream contract; it lands in the "default" slot. Commands that
+  themselves contain `=` (e.g. `python -m foo --bar=baz`) stay
+  intact because the name-side regex only matches short alphanumeric
+  slugs. When more than one upstream is configured, a request with
+  no `X-Vaara-Upstream` header returns 400 with the list of valid
+  slots; silent fallback to whichever slot won the sort would be a
+  failure mode that surfaces only in production. Single-upstream
+  deployments keep the silent-default contract.
+- `tenant_id` is first-class through the request, decision, audit,
+  and attestation layers:
+  - `ScoreRequest`, `AuditEventRequest`, and `PolicyReloadRequest`
+    accept a `tenant_id` body field, with `X-Vaara-Tenant` as the
+    HTTP-header alternative. Body wins over header.
+  - `AuditRecord` gains a `tenant_id` field, excluded from
+    `compute_hash()` so pre-v0.40 chains still re-verify on load.
+  - `AuditTrail` keeps an `action_id -> tenant_id` map seeded by
+    `record_action_requested`, so every follow-up record
+    (`risk_scored`, `decision`, `execution`, `escalation`,
+    `outcome`, `policy_override`) inherits the same scope without
+    every caller threading `tenant_id` through every signature.
+    The map is soft-capped (50k entries, 12.5% eviction on
+    pressure) so long-running deployments cannot leak memory.
+  - `SQLiteAuditBackend.write_record` prefers the per-record
+    `tenant_id` when set, with the instance-scoped `tenant_id`
+    (legacy CLI tooling path) as fallback. A single backend
+    instance can now serve a multi-tenant runtime.
+  - OVERT envelopes carry `tenant_id` as a `non_content_metadata`
+    claim when present.
+- `vaara.policy.registry.PolicyRegistry`: one `PolicyController` per
+  tenant, with the empty string slot reserved as the default
+  fallback for unmatched lookups.
+- `vaara serve --policy-dir DIR`: loads one YAML/JSON policy per
+  file. Filename stem = `tenant_id`; `default.yaml` lands in the
+  fallback slot. Mutually exclusive with `--policy`.
+- `POST /v1/policy/reload` accepts a `tenant_id` body field (or
+  `X-Vaara-Tenant` header) and routes to the right registry slot;
+  creates the slot on first reload.
+
+### Changed
+- `Pipeline.intercept` takes a `tenant_id` keyword that flows onto
+  the `ActionRequest` and into the audit trail. Default `""` keeps
+  the v0.39 single-tenant contract.
+- `AdaptiveScorer.evaluate` dispatches allow / deny thresholds per
+  tenant at call time. A new `policy_lookup` constructor arg (and
+  `set_policy_lookup` setter for late binding from `ServerState`)
+  takes a `Callable[[str], Optional[Policy]]`; on every evaluate, the
+  scorer asks the registry for the calling tenant's policy and uses
+  its thresholds. An unknown or unmapped tenant falls back to the
+  scorer-bound defaults that the default-slot listener keeps fresh on
+  reload. The backend decision dict surfaces the applied
+  `threshold_allow` and `threshold_deny` so operators can confirm
+  which tenant's policy ran. MWU expert state, the conformal
+  calibrator, agent profiles, and sequence patterns stay shared
+  across tenants; only threshold application is per-tenant in v0.40.
+
+### Scope notes
+- The HTTP transport on the proxy is POST-only. GET-SSE for
+  server-initiated notifications (sampling, server-pushed progress)
+  is v0.41. The audit + OVERT emission path for upstream-originated
+  notifications still works unchanged on stdio.
+- Classifier bundle and conformal-calibrator hot-reload remain a
+  restart operation in v0.40. Per-tenant policy reload IS hot; that
+  is the configuration plane that needed to be live across tenants.
+  Classifier reload waits on a shared singleton lifecycle plus
+  per-tenant scoping question (v0.41 candidate).
+
 ## [0.39.2] - 2026-05-27
 
 **Theme: SEP-2787 envelope v2 shape, full wire round-trip, versioned
@@ -1713,7 +1804,8 @@ and backward-compatible. Together they reposition Vaara from a Python
 library to a runtime kernel that control planes, audit consumers, and
 orchestration frameworks reference. The HTTP contract at
 `docs/openapi.yaml` is versioned `/v1/` independently of the project
-version, following the OPA pattern.
+version, so the wire surface can stabilise without locking the
+library cadence.
 
 ### Added
 - **HTTP API reference server (`vaara[server]` extra).** Exposes the
@@ -1789,10 +1881,9 @@ it governs.
   action class declared, matched sequences known).
 - **`vaara.policy.test_cases_io` module.** `load_test_cases(path)`
   reads a YAML or JSON cases document and returns a list of
-  `PolicyTestCase`. Document shape mirrors typical OPA / Conftest
-  test files: a top-level `cases:` list with `action_class`,
-  `risk_score`, optional `matched_sequences`, and an `expect:` block
-  carrying `verdict` and optional `route`.
+  `PolicyTestCase`. Document shape: a top-level `cases:` list with
+  `action_class`, `risk_score`, optional `matched_sequences`, and an
+  `expect:` block carrying `verdict` and optional `route`.
 - **`vaara policy validate POLICY_PATH [--json]`** and **`vaara
   policy test POLICY_PATH --cases CASES_PATH [--json]`** CLI
   subcommands. Both honour standard CI exit codes: validate returns

@@ -7,7 +7,7 @@ import uuid
 from datetime import datetime, timezone
 from typing import Optional
 
-from fastapi import FastAPI, HTTPException, status
+from fastapi import FastAPI, Header, HTTPException, status
 from fastapi.responses import JSONResponse
 
 from vaara import __version__ as _vaara_version
@@ -29,6 +29,12 @@ def _error(code: str, message: str, http_status: int, **details) -> HTTPExceptio
 
 def _iso(ts: float) -> str:
     return datetime.fromtimestamp(ts, tz=timezone.utc).isoformat()
+
+
+def _resolve_tenant(body_value: str, header_value: Optional[str]) -> str:
+    body = (body_value or "").strip()
+    header = (header_value or "").strip()
+    return body or header
 
 
 def register(app: FastAPI, state: ServerState) -> None:
@@ -65,8 +71,13 @@ def register(app: FastAPI, state: ServerState) -> None:
         )
 
     @app.post("/v1/score", response_model=S.ScoreResponse)
-    async def score(req: S.ScoreRequest):
+    async def score(
+        req: S.ScoreRequest,
+        x_vaara_tenant: Optional[str] = Header(default=None, alias="X-Vaara-Tenant"),
+    ):
+        tenant_id = _resolve_tenant(req.tenant_id, x_vaara_tenant)
         ctx = req.model_dump(exclude_none=True)
+        ctx["tenant_id"] = tenant_id
         try:
             decision_dict = state.scorer.evaluate(ctx)
         except Exception as exc:
@@ -84,6 +95,7 @@ def register(app: FastAPI, state: ServerState) -> None:
             tool_name=req.tool_name,
             predicted_risk=float(raw.get("point_estimate", 0.5) or 0.5),
             signals=signals,
+            tenant_id=tenant_id,
         )
 
         return S.ScoreResponse(
@@ -99,8 +111,12 @@ def register(app: FastAPI, state: ServerState) -> None:
             signals=signals,
             mwu_weights={k: float(v) for k, v in state.scorer._mwu.weights.items()},
             thresholds=S.Thresholds(
-                allow=state.scorer._threshold_allow,
-                deny=state.scorer._threshold_deny,
+                allow=float(
+                    decision_dict.get("threshold_allow", state.scorer._threshold_allow)
+                ),
+                deny=float(
+                    decision_dict.get("threshold_deny", state.scorer._threshold_deny)
+                ),
             ),
             sequence_risk=float(raw.get("sequence_risk", 0.0) or 0.0),
             calibration_size=int(raw.get("calibration_size", 0) or 0),
@@ -130,7 +146,10 @@ def register(app: FastAPI, state: ServerState) -> None:
         response_model=S.AuditEventResponse,
         status_code=201,
     )
-    async def append_audit_event(req: S.AuditEventRequest):
+    async def append_audit_event(
+        req: S.AuditEventRequest,
+        x_vaara_tenant: Optional[str] = Header(default=None, alias="X-Vaara-Tenant"),
+    ):
         try:
             event_type = EventType(req.event_type)
         except ValueError:
@@ -138,6 +157,12 @@ def register(app: FastAPI, state: ServerState) -> None:
                 "bad_event_type", f"unknown event_type {req.event_type!r}",
                 status.HTTP_400_BAD_REQUEST,
             )
+
+        tenant_id = _resolve_tenant(req.tenant_id, x_vaara_tenant)
+        if not tenant_id:
+            info = state.lookup_action(req.action_id)
+            if info is not None:
+                tenant_id = info.tenant_id
 
         record = AuditRecord(
             record_id=str(uuid.uuid4()),
@@ -148,6 +173,7 @@ def register(app: FastAPI, state: ServerState) -> None:
             tool_name=req.tool_name or "",
             data=req.payload or {},
             regulatory_articles=[],
+            tenant_id=tenant_id,
         )
         state.audit._append(record)
         return S.AuditEventResponse(
@@ -217,16 +243,26 @@ def register(app: FastAPI, state: ServerState) -> None:
         return S.DetectPIIResponse(**result.to_dict())
 
     @app.post("/v1/policy/reload", response_model=S.PolicyReloadResponse)
-    async def reload_policy(req: S.PolicyReloadRequest):
+    async def reload_policy(
+        req: S.PolicyReloadRequest,
+        x_vaara_tenant: Optional[str] = Header(default=None, alias="X-Vaara-Tenant"),
+    ):
         from vaara.policy.schema import PolicyError
 
-        controller = state.policy_controller
-        if controller is None:
+        tenant_id = _resolve_tenant(req.tenant_id, x_vaara_tenant)
+        registry = state.policy_registry
+        controller = (
+            registry.get_exact(tenant_id) if registry is not None else None
+        )
+        if controller is None and not tenant_id:
+            controller = state.policy_controller
+        if registry is None and controller is None:
             raise _error(
                 code="policy_not_configured",
                 message=(
-                    "Server has no PolicyController; start with "
-                    "`vaara serve --policy PATH` to enable reload."
+                    "Server has no policy plane; start with "
+                    "`vaara serve --policy PATH` or `--policy-dir DIR` to "
+                    "enable reload."
                 ),
                 http_status=status.HTTP_409_CONFLICT,
             )
@@ -240,7 +276,10 @@ def register(app: FastAPI, state: ServerState) -> None:
 
         source = req.body if req.body is not None else req.path
         try:
-            result = controller.reload(source, format=req.format)
+            if registry is not None:
+                result = registry.reload(tenant_id, source, format=req.format)
+            else:
+                result = controller.reload(source, format=req.format)
         except PolicyError as exc:
             raise _error(
                 code="policy_invalid",
@@ -257,4 +296,5 @@ def register(app: FastAPI, state: ServerState) -> None:
             sequence_count=result.sequence_count,
             action_class_count=result.action_class_count,
             escalation_route_count=result.escalation_route_count,
+            tenant_id=tenant_id,
         )
