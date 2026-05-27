@@ -83,7 +83,7 @@ quantization flag when the model config already declares
 
 ## Reproduction recipe
 
-```
+```bash
 PYTHONPATH=src .venv/bin/python scripts/eval_v038_phase1.py \
     --bundle src/vaara/data/adversarial_classifier_v8.joblib \
     --threshold 0.9006 \
