@@ -46,16 +46,17 @@ def main() -> int:
                     body = str(p.get("body", "")).strip()
                     if body:
                         total_follows_with_body += 1
+                    host = ""
+                    if "://" in url:
+                        host = url.split("://", 1)[1].split("/", 1)[0]
                     matched = False
                     if url and url in inj:
                         url_in_inj += 1
                         matched = True
-                    elif "://" in url:
-                        host = url.split("://", 1)[1].split("/", 1)[0]
-                        if host and host != "example.com" and host in inj:
-                            host_in_inj += 1
-                            matched = True
-                    if not matched and "example.com" in url:
+                    elif host and host != "example.com" and host in inj:
+                        host_in_inj += 1
+                        matched = True
+                    if not matched and (host == "example.com" or host.endswith(".example.com")):
                         example_com_only += 1
                         matched = True
                         if len(samples_example_com) < 5:
