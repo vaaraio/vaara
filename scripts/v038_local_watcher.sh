@@ -30,6 +30,8 @@ GEN_LOCAL="tests/adversarial/generated"
 GEN_REMOTE="/root/v038-out/"
 LOG_REMOTE="/root/vllm-logs"
 
+SSH_OPTS=(-o BatchMode=yes -o ConnectTimeout=10 -o ServerAliveInterval=15 -o ServerAliveCountMax=2)
+
 mkdir -p "${WATCH_DIR}" "${GEN_LOCAL}"
 
 ts() { date -u +%FT%TZ; }
@@ -37,7 +39,7 @@ note() { echo "[$(ts)] $*" | tee -a "${WATCH_DIR}/progress.log"; }
 
 note "watcher start; droplet=${DROPLET} target=${N_PER_CAT}/category interval=${INTERVAL_SEC}s suffix=${OUT_SUFFIX}"
 
-if ! ssh -o BatchMode=yes -o ConnectTimeout=10 "${DROPLET}" 'echo ok' >/dev/null 2>&1; then
+if ! ssh "${SSH_OPTS[@]}" "${DROPLET}" 'echo ok' >/dev/null 2>&1; then
   note "FATAL: ssh ${DROPLET} 'echo ok' failed. Check droplet IP + key auth."
   exit 2
 fi
@@ -72,12 +74,12 @@ while true; do
     fi
   done
 
-  vllm_model=$(ssh -o BatchMode=yes "${DROPLET}" \
+  vllm_model=$(ssh "${SSH_OPTS[@]}" "${DROPLET}" \
     "curl -sf http://localhost:8000/v1/models 2>/dev/null | grep -oE '\"id\"[[:space:]]*:[[:space:]]*\"[^\"]*\"' | head -1 | grep -oE '\"[^\"]*\"\$' | tr -d '\"'" \
     2>/dev/null || echo "SSH_FAIL")
   if [[ "$vllm_model" != "${EXPECTED_MODEL}" ]] && [[ "$vllm_model" != "SSH_FAIL" ]]; then
     note "WARNING vllm_model='${vllm_model}' (expected ${EXPECTED_MODEL})"
-    ssh -o BatchMode=yes "${DROPLET}" "tail -20 ${LOG_REMOTE}/vllm_llama33.log" 2>&1 \
+    ssh "${SSH_OPTS[@]}" "${DROPLET}" "tail -20 ${LOG_REMOTE}/vllm_llama33.log" 2>&1 \
       | tee -a "${WATCH_DIR}/progress.log" || true
   fi
 

@@ -58,8 +58,9 @@ else
       --host 0.0.0.0 --port "${PORT}" \
       --max-model-len 8192 \
       --enforce-eager \
-      --gpu-memory-utilization 0.92 \
-      >"${LOG_DIR}/vllm_llama33.log" 2>&1
+      --gpu-memory-utilization 0.92
+
+  nohup docker logs -f vllm-llama33 >"${LOG_DIR}/vllm_llama33.log" 2>&1 &
 
   echo "[v038] waiting for /v1/models (max 30 min)"
   for i in $(seq 1 180); do
