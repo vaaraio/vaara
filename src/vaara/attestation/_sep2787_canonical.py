@@ -18,7 +18,6 @@ from datetime import datetime, timezone
 from typing import Any, Optional
 
 from vaara.attestation._sep2787_types import (
-    ArgsDigest,
     ArgsProjection,
     AttestationError,
 )
@@ -77,23 +76,37 @@ def iso8601_to_epoch(iso: str) -> Optional[float]:
         return None
 
 
-def make_args_digest(args_obj: Any) -> ArgsDigest:
-    """Build an ArgsDigest from a JSON-serialisable args object.
+def make_args_digest(args_obj: Any) -> ArgsProjection:
+    """Build a commitment-only ArgsProjection from a JSON-serialisable args object.
 
-    Computes the JCS canonical encoding, then ``sha256:<hex>``. The
-    payload itself is discarded, only the digest leaves the function.
+    Computes the JCS-canonical encoding of ``args_obj``, takes its
+    sha256, and ships the hash inside a hash-only-identity projection
+    of the form ``{"digest": "sha256:<hex>"}``. The original payload
+    never leaves the function. The verifier reconstructs the same
+    digest from the runtime arguments and rejects on mismatch.
+
+    Replaces the v1 ``ArgsDigest`` extension: per the v2 envelope
+    shape, commitment-only audit is expressed as a hash-only-identity
+    projection rather than a third commitment kind.
     """
     payload = canonical_json(args_obj)
-    return ArgsDigest(
-        digest=f"sha256:{hashlib.sha256(payload).hexdigest()}",
-        canonicalization="jcs",
+    args_digest_hex = f"sha256:{hashlib.sha256(payload).hexdigest()}"
+    projection_obj = {"digest": args_digest_hex}
+    projection_bytes = canonical_json(projection_obj)
+    return ArgsProjection(
+        projection=projection_bytes.decode("utf-8"),
+        projection_digest=f"sha256:{hashlib.sha256(projection_bytes).hexdigest()}",
     )
 
 
 def make_args_projection(projection_obj: dict[str, Any]) -> ArgsProjection:
-    """Build an ArgsProjection (reviewed redaction) with its own digest."""
+    """Build an ArgsProjection (reviewed redaction) from a projection dict.
+
+    The projection is JCS-canonicalised to bytes, decoded to UTF-8 to
+    produce the wire-format projection string, and digested.
+    """
     payload = canonical_json(projection_obj)
     return ArgsProjection(
-        projection=projection_obj,
+        projection=payload.decode("utf-8"),
         projection_digest=f"sha256:{hashlib.sha256(payload).hexdigest()}",
     )
