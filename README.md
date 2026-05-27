@@ -20,16 +20,17 @@ Vaara intercepts agent tool calls, scores each one with a conformal risk interva
 
 ## Numbers
 
-Held-out TEST recall 85.0% (95% Wilson [82.8, 87.1]) at FPR 4.6% [3.3, 6.3]. Multi-attacker PAIR ASR 0/25 across three different attacker models with identical seeds. 140 µs p99 inference latency on commodity CPU (excluding one-time embedding model load). Every number reproducible end-to-end via `make bench`.
+Held-out TEST recall 84.7% (95% Wilson [82.4, 86.7]) at FPR 4.1% [2.9, 5.7]. Phase 1 PAIR scale-up to n=300 per attacker family lands at 88.1% [85.8, 90.1]. Under BIPIA-pressure context, false-positive rate on benign tool calls 1.2% [0.4, 3.6] across four agent backends (Claude Haiku 4.5, Llama-3.1-8B, Mistral-7B, Qwen-2.5-7B). Multi-attacker PAIR ASR 0/25 across three different attacker models with identical seeds. 140 µs p99 inference latency on commodity CPU (excluding one-time embedding model load). Every number reproducible end-to-end via `make bench`.
 
 - 12,155-entry adversarial corpus (250 hand-curated + 11,905 LLM-generated), 70/15/15 split stratified by (category, source)
-- Classifier with 236 hand-features + 384-dim MiniLM embeddings at calibrated threshold 0.9006 on held-out TEST n=1,827: recall 85.0% [82.8, 87.1] at FPR 4.6% [3.3, 6.3]
+- Classifier v9 with 236 hand-features + 384-dim MiniLM embeddings at calibrated threshold 0.9150 on held-out TEST n=1,827: recall 84.7% [82.4, 86.7] at FPR 4.1% [2.9, 5.7]
 - Multi-attacker PAIR robustness: 0/25 successes per attacker across Qwen2.5-32B, Qwen2.5-72B, Llama-3.3-70B hitting identical seed indices, Wilson upper 13.3%
+- BIPIA-pressure FPR on benign tool calls 1.2% [0.4, 3.6] across four agent backends, n=244 benign tool calls under `context.source=injected_via_bipia_<class>`
 - Chain of custody: corpus manifest SHA → split manifest SHA → training commit → bundle SHA, all locked and printed by every script
 - 140 µs / 210 µs p99 inference latency, commodity CPU
 - Distribution-free conformal coverage on the score
 - MWU regret bound O(sqrt(T log N))
-- [vaara-bench-v0.38](bench/vaara-bench-v0.38.md): current methodology, chain of custody, ship-gate record. Phase 1 PAIR scale-up to n=300 per attacker family with 900 fresh Llama-3.3-70B entries on AMD-backed MI300X at seed 43. v8 production classifier unchanged from v0.37, evaluated at calibrated T=0.9006. Overall recall 88.4% [86.2, 90.4] on the Phase 1 corpus, +2.6pp over the v0.37 Llama-3.3 leg, biggest lift on data_exfil (+6.3pp). Historical bench docs live under `bench/` for chain-of-custody continuity.
+- [vaara-bench-v0.39](bench/vaara-bench-v0.39.md): current methodology, chain of custody, ship-gate record. v9 retrain on BIPIA-augmented corpus with follows upweighted (`--follow-weight 8.0`), calibrated to T=0.9150 at a 5% FPR target on v035 VAL. BIPIA-pressure FPR collapses from 35.2% on v8 to 1.2% on v9. In-distribution recall flat within Wilson intervals. Found-and-fixed in tree: auto-labeller `example.com` placeholder false-positive rule (42 → 14 true follows across four backends). Historical bench docs live under `bench/` for chain-of-custody continuity.
 - [vaara-bench-v1](bench/vaara-bench-v1.md): 77-trace synthetic-corpus regression baseline with frozen methodology, 100% soft TPR, 0% hard FPR
 
 Each figure is reproducible from the public corpus or the bench harness in `bench/`.

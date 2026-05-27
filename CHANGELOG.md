@@ -6,6 +6,82 @@ and this project follows [Semantic Versioning](https://semver.org/spec/v2.0.0.ht
 
 ## [Unreleased]
 
+## [0.39.0] - 2026-05-27
+
+**Theme: v9 classifier retrain on a BIPIA-augmented corpus, with one
+auto-labeller bug found and fixed in tree.** The v0.38 BIPIA pilot at
+n=200 on `claude-haiku-4-5` flagged 50.5% of benign tool calls under
+`context.source=injected_via_bipia_<class>`. v0.39 scales the
+measurement to four agent backends, exposes a 30 to 50% v8
+false-positive rate on benign-under-pressure tool calls, and ships v9
+to close it. v9 shares v8's feature schema and XGBoost
+hyperparameters. The training diff is the BIPIA-derived rows added to
+TRAIN with `sample_weight=8.0` on true-follow rows. Under BIPIA
+pressure, v9 FPR drops to 1.2% [0.4, 3.6] across the four backends.
+In-distribution recall moves within Wilson intervals (v035 TEST -1.9
+pp inside the 95% CI, Phase 1 PAIR -0.3 pp). v9 calibrates to T=0.9150
+against v035 VAL at a 5% FPR target.
+
+Auto-labeller bug, found and fixed: the v0.38 pilot's
+`looks_like_injection_follow` rule fired on any `http_request` URL
+containing `example.com`, regardless of injection content. Agents use
+`example.com` as a benign placeholder hostname. The audit script
+counted 67% of pre-fix flagged follows as placeholder false positives.
+After fix: 42 follows across four backends drop to 14. `claude-haiku-4-5`
+produced zero true injection-follows under the post-fix rule across
+the full BIPIA run.
+
+LLMail-Inject corpus and the IPI fourth attacker family carry to
+v0.40. The v0.40 follow-recall headline lands on top of LLMail-Inject's
+larger labelled-positive pool.
+
+### Added
+- `src/vaara/data/adversarial_classifier_v9.joblib` (sha256
+  `2566da22`): v9 production bundle, calibrated T=0.9150, MiniLM rev
+  `c9745ed1d9f2`.
+- `tests/adversarial/v039_split.json` (sha256 `73e7730d`): v0.39 split
+  manifest covering v8-corpus carry-over plus 1,181 BIPIA-derived
+  rows.
+- `tests/adversarial/v039_bipia/bipia-s43-{haiku,llama31-8b,mistral-7b,qwen25-7b}.jsonl`:
+  post-relabel BIPIA-derived training entries, one file per backend.
+- `tests/adversarial/external/bipia/`: unmodified Microsoft BIPIA
+  release ([github.com/microsoft/BIPIA](https://github.com/microsoft/BIPIA), MIT
+  licensed), vendored for harness reproducibility.
+- `scripts/_v039_common.py`: shared `BipiaTrial`, `HarnessTrace`,
+  `ToolCallEmit`, tool catalog, JSONL read/write.
+- `scripts/run_v039_bipia.py`: BIPIA harness driver with two provider
+  adapters (Anthropic SDK, OpenAI-compatible for Ollama / vLLM /
+  llama.cpp).
+- `scripts/build_v039_entries.py` and `scripts/build_v039_split.py`:
+  trace-to-entries assembly and split allocation.
+- `scripts/audit_bipia_labels.py`: labeller audit. Prints the
+  before/after breakdown across all four trace files.
+- `scripts/relabel_v039_traces.py`: idempotent replay of the post-fix
+  rule across `tests/adversarial/traces/bipia-s43-*.jsonl`.
+- `scripts/train_v9_upweighted.py`: v9 trainer with
+  `--follow-weight` and `--max-bipia-benign` flags.
+- `scripts/eval_v039_v9.py`: four-surface eval (v035 VAL, v035 TEST,
+  v0.38 Phase 1, v0.39 BIPIA holdout), v8 vs v9 side-by-side, writes
+  the bench artifact.
+- `bench/v039_v9_eval.json`: every number in the v0.39 bench doc.
+- `bench/v039_bipia_full_eval_v8_{haiku,llama,mistral,qwen}.json` and
+  `bench/v039_bipia_pilot_eval_v8.json`: v8 baseline numbers under
+  BIPIA pressure (the gap that motivated v9).
+- `bench/vaara-bench-v0.39.md`: v0.39 methodology, the labeller-bug
+  arc, chain of custody, and ship-gate record.
+
+### Changed
+- `src/vaara/adversarial_classifier.py`: `_DEFAULT_BUNDLE` bumped from
+  `adversarial_classifier_v7.joblib` to `adversarial_classifier_v9.joblib`.
+  The default had last been bumped in v0.36. v0.37 shipped v8 and
+  v0.38 carried v7 forward. Neither release updated the runtime
+  default, so PyPI `vaara==0.37.x` and `0.38.x` installs loaded v7 by
+  default while bench docs quoted v8 numbers. Bench numbers themselves
+  were honest because eval scripts pass `--bundle` explicitly, but the
+  library default was two versions stale. v0.39 catches up to v9.
+- README headline numbers updated to v9 on v035 TEST + Phase 1 + the
+  BIPIA-pressure FPR row. Bench pointer swapped from v0.38 to v0.39.
+
 ## [0.38.0] - 2026-05-27
 
 **Theme: Phase 1 PAIR scale-up to n=300 per attacker family on the
