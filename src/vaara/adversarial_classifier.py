@@ -117,7 +117,7 @@ _DST_PATTERNS = [
         re.I | re.S)),
 ]
 
-_DEFAULT_BUNDLE = Path(__file__).parent / "data" / "adversarial_classifier_v7.joblib"
+_DEFAULT_BUNDLE = Path(__file__).parent / "data" / "adversarial_classifier_v9.joblib"
 
 _STATIC_FEATURES = [f"ip__{n}" for n,_ in _IP_PATTERNS] + [f"cred__{n}" for n,_ in _CRED_PATTERNS] + [f"sql__{n}" for n,_ in _SQL_PATTERNS] + [f"shell__{n}" for n,_ in _SHELL_PATTERNS] + [f"scheme__{s}" for s in _URL_SCHEMES] + ["ctx_source_injected", "param_blob_len", "has_wildcard_star", "has_all_keyword", "has_recursive_flag"]
 _DST_STATIC = [f"dst__{n}" for n, _ in _DST_PATTERNS]
