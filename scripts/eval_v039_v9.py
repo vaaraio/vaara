@@ -146,7 +146,9 @@ def main():
 
     bm: dict[str, dict] = {}
     for e, py8, py9 in zip(hold, p8h, p9h):
-        meta = e.get("_v039_bipia", {})
+        meta = e.get("_v039_bipia")
+        if not meta:
+            continue
         m = meta.get("model", "?")
         rf = bool(meta.get("reflects_injection"))
         b = bm.setdefault(m, {"follow_n": 0, "v8_ftp": 0, "v9_ftp": 0,

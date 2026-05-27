@@ -46,7 +46,7 @@ def main() -> int:
     ap.add_argument("--max-bipia-benign", type=int, default=0,
                     help="If >0, subsample BIPIA benign-under-pressure train rows to "
                          "this many (seed=43). Default 0 = keep all.")
-    ap.add_argument("--threshold", type=float, default=0.9006)
+    ap.add_argument("--threshold", type=float, default=0.9150)
     ap.add_argument("--bundle-out", default=str(DEFAULT_OUT))
     ap.add_argument("--n-estimators", type=int, default=400)
     ap.add_argument("--max-depth", type=int, default=6)
@@ -143,7 +143,11 @@ def main() -> int:
     out_path = Path(args.bundle_out)
     out_path.parent.mkdir(parents=True, exist_ok=True)
     joblib.dump(bundle, out_path)
-    print(f"[saved] {out_path.relative_to(REPO)}  size={out_path.stat().st_size} bytes")
+    try:
+        shown = out_path.relative_to(REPO)
+    except ValueError:
+        shown = out_path
+    print(f"[saved] {shown}  size={out_path.stat().st_size} bytes")
     return 0
 
 

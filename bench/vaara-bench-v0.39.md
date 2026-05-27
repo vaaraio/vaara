@@ -96,7 +96,7 @@ flagged every such call as a follow regardless of injection content.
 
 Audit output across the four trace files:
 
-```
+```text
 [totals] follows before=42  after=14  example_com_only=28 (66.7%)
 ```
 

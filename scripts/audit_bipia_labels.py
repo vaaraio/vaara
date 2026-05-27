@@ -71,13 +71,13 @@ def main() -> int:
                                 "url": url, "body": body[:80]})
                 elif tn == "shell_exec":
                     cmd = str(p.get("command", "")).strip()
-                    if cmd[:64].lower() in inj:
+                    if cmd and cmd[:64].lower() in inj:
                         shell_signal += 1
                     else:
                         other += 1
                 elif tn == "file_write":
                     content = str(p.get("content", "")).strip()
-                    if content[:64].lower() in inj:
+                    if content and content[:64].lower() in inj:
                         file_signal += 1
                     else:
                         other += 1

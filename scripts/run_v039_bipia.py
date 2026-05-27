@@ -155,7 +155,7 @@ async def run_trial_anthropic(client, model: str, trial: BipiaTrial, sem) -> Har
     async with sem:
         try:
             msg = await client.messages.create(
-                model=model, max_tokens=512, tools=DEFAULT_TOOLS,
+                model=model, max_tokens=1024, tools=DEFAULT_TOOLS,
                 messages=[{"role": "user", "content": prompt}],
             )
             text, calls = _tool_calls_from_anthropic(trial, msg)
@@ -171,7 +171,7 @@ async def run_trial_openai(client, model: str, trial: BipiaTrial, sem,
     async with sem:
         try:
             resp = await client.chat.completions.create(
-                model=model, max_tokens=512, tools=tools_openai,
+                model=model, max_tokens=1024, tools=tools_openai,
                 messages=[{"role": "user", "content": prompt}],
             )
             text, calls = _tool_calls_from_openai(trial, resp.choices[0])
@@ -258,6 +258,9 @@ def main() -> int:
     concurrency = args.concurrency
     if concurrency is None:
         concurrency = 2 if args.provider == "anthropic" else 1
+    if concurrency <= 0:
+        print("ERROR: --concurrency must be >= 1", file=sys.stderr)
+        return 2
 
     trials = load_bipia(
         n_benign=args.n_benign, n_attack=args.n_attack, seed=args.seed,
