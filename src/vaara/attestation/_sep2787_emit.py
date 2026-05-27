@@ -25,13 +25,13 @@ from vaara.attestation._sep2787_signing import (
 from vaara.attestation._sep2787_types import (
     VALID_ALGS,
     Algorithm,
-    ArgsCommitment,
     Attestation,
     AttestationError,
     IssuerAsserted,
+    PayloadDerived,
     PlannerDeclared,
-    args_to_dict,
     issuer_to_dict,
+    payload_to_dict,
     planner_to_dict,
 )
 
@@ -42,7 +42,7 @@ def _signing_payload(
     alg: Algorithm,
     planner_declared: PlannerDeclared,
     issuer_asserted: IssuerAsserted,
-    payload_derived: tuple[ArgsCommitment, ...],
+    payload_derived: PayloadDerived,
 ) -> bytes:
     """JCS-canonical encoding of the four envelope blocks.
 
@@ -54,7 +54,7 @@ def _signing_payload(
         "alg": alg,
         "plannerDeclared": planner_to_dict(planner_declared),
         "issuerAsserted": issuer_to_dict(issuer_asserted),
-        "payloadDerived": [args_to_dict(a) for a in payload_derived],
+        "payloadDerived": payload_to_dict(payload_derived),
     }
     return canonical_json(body)
 
@@ -62,6 +62,7 @@ def _signing_payload(
 def emit_attestation(
     *,
     planner_declared: PlannerDeclared,
+    payload_derived: PayloadDerived,
     iss: str,
     sub: str,
     secret_version: str,
@@ -74,21 +75,21 @@ def emit_attestation(
 ) -> Attestation:
     """Build, JCS-canonicalize, and sign an Attestation envelope.
 
+    ``planner_declared`` carries intent and an optional requested
+    capability. ``payload_derived`` carries one or more tool-call
+    bindings, each pointing at an args commitment derived from the
+    request payload.
+
     ``signing_material`` is either a bytes shared secret (HS256) or a
     private-key object from ``cryptography.hazmat`` (ES256 / RS256).
-
-    The ``payload_derived`` block is materialised from
-    ``planner_declared.tool_calls[*].args`` in declaration order. The
-    duplication is intentional: the planner declared the binding, the
-    args commitment is the payload-derived projection of that binding.
     """
     if alg not in VALID_ALGS:
         raise AttestationError(f"unsupported alg: {alg!r}")
     if not planner_declared.intent.strip():
         raise AttestationError("plannerDeclared.intent MUST be non-empty")
-    if not planner_declared.tool_calls:
+    if not payload_derived.tool_calls:
         raise AttestationError(
-            "plannerDeclared.toolCalls MUST contain at least one entry"
+            "payloadDerived.toolCalls MUST contain at least one entry"
         )
 
     issuer_asserted = IssuerAsserted(
@@ -100,7 +101,6 @@ def emit_attestation(
         secret_version=secret_version,
         alg=alg,
     )
-    payload_derived = tuple(tc.args for tc in planner_declared.tool_calls)
 
     payload = _signing_payload(
         version=version,
