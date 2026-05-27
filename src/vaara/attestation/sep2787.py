@@ -1,31 +1,28 @@
-"""SEP-2787 Tool Call Attestation envelope, proposed-shape reference.
+"""SEP-2787 Tool Call Attestation envelope, v2 reference shape.
 
-Implements the proposed SEP-2787 envelope shape with the four schema
-changes Vaara raised in the v1 draft thread
-(modelcontextprotocol/modelcontextprotocol#2787), not the v1 draft as
-written:
+Implements the v2 envelope shape: trust-surface grouping incorporated
+into the SEP draft via soup-oss commit ``dd030d5b``, plus the four
+mechanical alignments Vaara committed to in
+``modelcontextprotocol/modelcontextprotocol#2787``
+(``issuecomment-4557017068``):
 
-1. **Fact-source labels.** Envelope fields are grouped under three
-   named blocks by trust surface: ``plannerDeclared`` (intent, tool
-   name and server bindings the agent planner claims),
-   ``issuerAsserted`` (iss, sub, iat, expSeconds, nonce, secretVersion,
-   alg, set by the attestation issuer at signing time), and
-   ``payloadDerived`` (argsDigest / argsRef / argsProjection,
-   deterministically derived from the request payload). The signature
-   is the binding output and lives at the envelope root.
-2. **Three-way args shape.** The v1 draft overloads a single
-   ``args: string`` field with both inline JSON and a magic
-   ``"resource: "`` prefix. This module replaces that with an explicit
-   tagged union: ``ArgsDigest`` (commitment only, payload stays local),
-   ``ArgsRef`` (URL plus digest), ``ArgsProjection`` (redacted /
-   transformed projection plus its own digest).
-3. **RFC 8785 (JCS) canonicalization.** The v1 "sorted keys, no
-   whitespace" rule is replaced with a normative reference to RFC
-   8785, plus an IEEE-754 float reject at the boundary (matching OVERT
-   Protocol Profile 1.0 numeric discipline).
-4. **Scope: request attestation only.** The v1 optional ``ack`` field
-   crosses the pre-exec / post-exec boundary and is removed here.
-   Execution receipts belong in a separate extension composed on top.
+1. **toolCalls under payloadDerived.** Tool bindings (name, server
+   fingerprint, args commitment) are facts derived from the request
+   payload, not planner declarations. ``plannerDeclared`` keeps intent
+   and an optional requested-capability claim.
+2. **argsProjection as JSON-stringified projection.** The ``projection``
+   field is the JCS-canonical JSON encoding of the projection object,
+   carried as a UTF-8 string; ``projectionDigest`` is computed over
+   those bytes.
+3. **No ``kind`` discriminator.** ``ArgsRef`` (ref + digest) and
+   ``ArgsProjection`` (projection + projectionDigest) self-discriminate
+   by which fields are present.
+4. **Commitment-only audit via hash-only-identity projection.** When
+   the payload must stay local, callers use ``make_args_digest`` which
+   builds an ``ArgsProjection`` whose ``projection`` is the
+   JCS-canonical encoding of ``{"digest": "sha256:..."}``. The verifier
+   reconstructs the same digest from the runtime arguments and rejects
+   on mismatch.
 
 Signing modes follow the v1 draft: HS256 (HMAC-SHA256), ES256 (ECDSA
 P-256 raw r||s, not DER), RS256 (RSASSA-PKCS1-v1_5). The signature is
@@ -65,14 +62,15 @@ from vaara.attestation._sep2787_emit import (
 from vaara.attestation._sep2787_types import (
     Algorithm,
     ArgsCommitment,
-    ArgsDigest,
     ArgsProjection,
     ArgsRef,
     Attestation,
     AttestationError,
     IssuerAsserted,
+    PayloadDerived,
     PlannerDeclared,
     ToolCallBinding,
+    attestation_from_dict as parse_attestation,
 )
 from vaara.attestation._sep2787_verifier import (
     ArgsCommitmentResult,
@@ -83,18 +81,19 @@ __all__ = [
     "Algorithm",
     "ArgsCommitment",
     "ArgsCommitmentResult",
-    "ArgsDigest",
     "ArgsProjection",
     "ArgsRef",
     "Attestation",
     "AttestationError",
     "IssuerAsserted",
+    "PayloadDerived",
     "PlannerDeclared",
     "ToolCallBinding",
     "canonical_json",
     "emit_attestation",
     "make_args_digest",
     "make_args_projection",
+    "parse_attestation",
     "verify_args_commitment",
     "verify_attestation",
 ]
