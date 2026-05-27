@@ -376,6 +376,32 @@ Operators who need AAL-4 should pair Vaara with an independent
 attestation provider. The Vaara-emitted evidence is the input to
 that provider, not a replacement for it.
 
+### SEP-2787 v2 tool-call attestation (v0.39.2)
+
+`vaara.attestation.sep2787` ships a reference implementation of
+SEP-2787, a per-tool-call JSON attestation envelope carried in MCP
+`_meta`. The v2 envelope shape groups envelope fields under three
+trust-surface blocks (`plannerDeclared`, `issuerAsserted`,
+`payloadDerived`) with `toolCalls` as a payload-derived fact, not a
+planner declaration. Signing modes are HS256 (HMAC-SHA256), ES256
+(ECDSA P-256 raw r||s), and RS256 (RSASSA-PKCS1-v1_5). The signature
+is computed over the JCS-canonical encoding of the four envelope
+blocks `{version, alg, plannerDeclared, issuerAsserted,
+payloadDerived}` and is excluded from its own input.
+
+The two envelopes coexist. OVERT 1.0 is the operator-side attestation
+kernel emitting per-action CBOR Base Envelopes. SEP-2787 is the
+per-tool-call JSON envelope carried inside MCP transport. A
+deployment can run both: the OVERT envelope binds the action chain
+while the SEP-2787 envelope binds the specific tool-call payload.
+Field-level mapping between the two lives in
+[`docs/sep2787-overt-mapping.md`](docs/sep2787-overt-mapping.md).
+
+`parse_attestation(d)` provides full wire round-trip: a third-party
+consumer of the published v0 test vectors can parse JSON bytes,
+verify the signature, and re-emit byte-identically. The reference
+implementation is pinned at tag `sep2787-ref-v2`.
+
 ### Hardware TEE attestation hook (experimental, v0.18.0)
 
 Beyond the software-signed attestation chain described above, Vaara

@@ -6,6 +6,71 @@ and this project follows [Semantic Versioning](https://semver.org/spec/v2.0.0.ht
 
 ## [Unreleased]
 
+## [0.39.2] - 2026-05-27
+
+**Theme: SEP-2787 envelope v2 shape, full wire round-trip, versioned
+audit-event schema, and Qi-survey coverage mapping.**
+
+The four mechanical alignments Vaara committed to in
+`modelcontextprotocol/modelcontextprotocol#2787` after the
+trust-surface grouping was incorporated into the SEP draft on
+soup-oss commit `dd030d5b` ship as the v2 envelope shape:
+
+1. `toolCalls` lives under `payloadDerived`, not `plannerDeclared`.
+   Tool bindings (name, server fingerprint, args commitment) are
+   facts derived from the request payload, not planner declarations.
+2. `argsProjection` serialises with a JSON-stringified `projection`
+   field carrying the JCS-canonical encoding of the projection
+   object. The digest is taken over those bytes.
+3. The v1 `kind`-discriminated union is dropped. `ArgsRef` (ref +
+   digest) and `ArgsProjection` (projection + projectionDigest)
+   self-discriminate by which fields are present.
+4. Commitment-only audit composes on `ArgsProjection` as a
+   hash-only-identity projection of the form `{"digest":
+   "sha256:..."}`. No separate `ArgsDigest` type ships in the spec.
+
+### Added
+- `parse_attestation(d)` (and `sep2787_parse_attestation` from the
+  package root): inverse of `Attestation.to_dict()`. Reconstructs the
+  Python dataclass tree from a wire JSON dict so third-party
+  consumers of the v0 test vectors can parse, verify, and re-emit
+  envelopes byte-identically. Strict field-presence validation and
+  alg allowlisting on the boundary.
+- `docs/audit_event_schema.md`: AUDIT-EVENT-SCHEMA-1.0, versioned
+  wire/storage contract for the audit events Vaara emits.
+  Independent of code version so third-party consumers can pin
+  without coupling to a Python runtime version.
+- `docs/qi_survey_mapping.md`: Vaara surface coverage against the
+  taxonomy in Qi et al., *Towards Trustworthy Agentic AI*
+  (arXiv:2605.23989, 2026-05-17). Direct, partial, and
+  out-of-scope rows by Perceive / Plan / Act / Reflect / Learn /
+  Multi-agent / Long-horizon stage under both top-level dimensions.
+- `tests/test_attestation_sep2787_wire.py`: 13 wire round-trip tests
+  covering `emit -> JCS bytes -> parse -> verify` across HS256,
+  ES256, RS256 for both `ArgsRef` and `ArgsProjection`, plus parse
+  rejection on missing-field and unsupported-alg inputs and a
+  byte-identical re-emit check.
+
+### Changed
+- `vaara.attestation.sep2787` emits the v2 envelope shape.
+- `docs/sep2787-overt-mapping.md` field table updated to v2.
+- `COMPLIANCE.md` "Position relative to open runtime-attestation
+  standards" gains a SEP-2787 v2 subsection alongside the OVERT 1.0
+  positioning.
+- `vaara.attestation` package docstring covers both OVERT 1.0 and
+  SEP-2787 v2 surfaces (previously OVERT-only by omission).
+
+### SEP-2787 reference implementation tag
+- `sep2787-ref-v2`: v2 envelope shape with the four post-soup-oss
+  alignments and full wire round-trip. Pinned for cross-repo
+  provenance citation against
+  `modelcontextprotocol/modelcontextprotocol#2787` and the v0 test
+  vector PR (`#2789`).
+- `sep2787-ref-v1` (preserved at commit `a61e87c`): camelCase
+  envelope, the prior proposed-shape artefact.
+- `sep2787-ref-v0` (preserved at commit `3d7af54`): snake_case
+  envelope, the historical proposed-shape artefact.
+
 ## [0.39.1] - 2026-05-27
 
 **Theme: SEP-2787 reference impl follows the spec into camelCase.**

@@ -7,19 +7,16 @@ Implements step 5 of the verification rules in the SEP-2787 draft:
     If the toolCalls entry uses argsRef, resolve the URI, compute
     SHA-256 over the fetched content, and compare against the stored
     digest. Confirm the resolved content corresponds to the arguments
-    being executed. If the entry uses argsProjection, compare it
-    against the canonicalized runtime arguments (RFC 8785). Identity
-    projections MUST match exactly; redacted projections are verified
-    only to be signed -- the verifier makes no claim about
-    completeness relative to the runtime arguments. If neither field
-    is present, or if the content cannot be resolved and matched,
-    reject with args_commitment_mismatch.
-
-Vaara's three-way args shape (ArgsDigest / ArgsRef / ArgsProjection)
-extends the spec's two-way (argsRef / argsProjection) with a
-commitment-only ArgsDigest where the payload never crosses the
-verifier. For ArgsDigest the verifier recomputes the JCS-canonical
-hash of the runtime arguments and compares against the bound digest.
+    being executed. If the entry uses argsProjection, recompute the
+    projection digest from the projection bytes and compare against
+    the stored projectionDigest. If the projection is an identity
+    projection (the canonical runtime arguments themselves, or a
+    hash-only-identity projection ``{"digest": "sha256:..."}`` whose
+    embedded digest matches sha256(JCS(runtime arguments))), confirm
+    the binding. Redacted projections are verified only to be signed;
+    the verifier makes no completeness claim. Reject hash-only-identity
+    projections whose embedded digest does not match the runtime args
+    with args_commitment_mismatch.
 
 Step 5 is composed by the caller after steps 1-4 (signature, nonce
 replay, TTL, tool call match). It does not perform network IO.
@@ -29,13 +26,13 @@ ArgsRef resolution is delegated to a caller-supplied resolver.
 from __future__ import annotations
 
 import hashlib
+import json
 from dataclasses import dataclass
 from typing import Any, Callable, Literal, Optional
 
 from vaara.attestation._sep2787_canonical import canonical_json
 from vaara.attestation._sep2787_types import (
     ArgsCommitment,
-    ArgsDigest,
     ArgsProjection,
     ArgsRef,
 )
@@ -56,9 +53,12 @@ class ArgsCommitmentResult:
     on failure -- matching the spec's error-reason enum.
 
     ``projection_match`` is meaningful only for ArgsProjection: True
-    when the projection equals the canonicalized runtime arguments
-    (identity projection per spec), False when it differs (redacted
-    projection -- verified only to be signed), None otherwise.
+    when the projection is an identity projection of the runtime
+    arguments (either the canonical arguments themselves, or a
+    hash-only-identity projection whose embedded digest matches);
+    False for redacted / transformed projections (signed-only,
+    verifier makes no completeness claim); None for non-projection
+    commitments.
     """
 
     ok: bool
@@ -68,6 +68,28 @@ class ArgsCommitmentResult:
 
 def _sha256_hex(content: bytes) -> str:
     return f"sha256:{hashlib.sha256(content).hexdigest()}"
+
+
+def _parse_hash_only_identity(projection_str: str) -> Optional[str]:
+    """If projection_str is a hash-only-identity carrier, return its digest.
+
+    A hash-only-identity projection is the JCS-canonical encoding of
+    a single-key object ``{"digest": "sha256:<hex>"}``. The verifier
+    treats this as an identity projection of a hash-only object: it
+    binds the underlying arguments' digest without revealing the
+    payload. Returns the embedded ``sha256:<hex>`` digest string, or
+    None if the projection has any other shape.
+    """
+    try:
+        obj = json.loads(projection_str)
+    except (json.JSONDecodeError, ValueError):
+        return None
+    if not isinstance(obj, dict) or set(obj) != {"digest"}:
+        return None
+    digest = obj["digest"]
+    if not isinstance(digest, str) or not digest.startswith("sha256:"):
+        return None
+    return digest
 
 
 def verify_args_commitment(
@@ -88,12 +110,6 @@ def verify_args_commitment(
     does not perform network IO. The deployment chooses resolver
     policy (allowed schemes, timeouts, caching, trust).
     """
-    if isinstance(args, ArgsDigest):
-        observed = _sha256_hex(canonical_json(runtime_arguments))
-        if observed != args.digest:
-            return ArgsCommitmentResult(ok=False, reason=ARGS_COMMITMENT_MISMATCH)
-        return ArgsCommitmentResult(ok=True)
-
     if isinstance(args, ArgsRef):
         if ref_resolver is None:
             return ArgsCommitmentResult(ok=False, reason=ARGS_COMMITMENT_MISMATCH)
@@ -111,12 +127,18 @@ def verify_args_commitment(
         return ArgsCommitmentResult(ok=True)
 
     if isinstance(args, ArgsProjection):
-        recomputed = _sha256_hex(canonical_json(args.projection))
-        if recomputed != args.projection_digest:
+        projection_bytes = args.projection.encode("utf-8")
+        if _sha256_hex(projection_bytes) != args.projection_digest:
             return ArgsCommitmentResult(ok=False, reason=ARGS_COMMITMENT_MISMATCH)
         runtime_canonical = canonical_json(runtime_arguments)
-        projection_canonical = canonical_json(args.projection)
-        identity = runtime_canonical == projection_canonical
+        hash_only = _parse_hash_only_identity(args.projection)
+        if hash_only is not None:
+            if hash_only != _sha256_hex(runtime_canonical):
+                return ArgsCommitmentResult(
+                    ok=False, reason=ARGS_COMMITMENT_MISMATCH,
+                )
+            return ArgsCommitmentResult(ok=True, projection_match=True)
+        identity = projection_bytes == runtime_canonical
         return ArgsCommitmentResult(ok=True, projection_match=identity)
 
     return ArgsCommitmentResult(ok=False, reason=ARGS_COMMITMENT_MISMATCH)
