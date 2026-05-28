@@ -470,7 +470,7 @@ correspondence.
   policy id and violation reason.
 - **TOOL-1.4** (provisional receipt before execution, upgrade to full
   attestation after notary validation) - ✅ structurally at AAL-3,
-  with the AAL-3 → AAL-4 path now implementable in-tree. The Article
+  with the AAL-3 to AAL-4 path now implementable in-tree. The Article
   12 commit-prove receipt pair (shipped v0.10.0) is the Phase 2
   Provisional Receipt; the v0.11.0 OVERT Base Envelope is the
   attested form. v0.13.0 ships a reference Phase 3 IAP

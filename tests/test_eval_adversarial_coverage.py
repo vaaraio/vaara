@@ -30,13 +30,13 @@ def synthetic_rows():
 
     Cat A (3 rows):
         coverage: rows 1 and 3 covered, row 2 not (actual_risk=1.0, upper=0.5)
-            → 2/3 = 0.6667
+            to 2/3 = 0.6667
         mean_interval_width: (0.6 + 0.3 + 0.3) / 3 = 0.4
         allow_leakage: row 2 only (actual=ALLOW, expected DENY)
         mean_risk: (0.7 + 0.3 + 0.1) / 3 = 0.3667
     Cat B (2 rows):
         coverage: row 5 covered, row 4 not (actual_risk=1.0, upper=0.9)
-            → 1/2 = 0.5
+            to 1/2 = 0.5
         mean_interval_width: (0.8 + 1.0) / 2 = 0.9
         allow_leakage: 0
         mean_risk: (0.5 + 0.0) / 2 = 0.25

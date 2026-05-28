@@ -3,9 +3,9 @@
 Standalone A/B against v0.32's MiniLM-backed v3 bundle. Does NOT touch
 ``vaara.embeddings`` (production singleton stays MiniLM until ship-or-skip lands).
 
-Pipeline: corpus + v031_split → 236 hand-features → bge-base 768d embed →
-concat (1004 features) → XGBoost (ne=400 md=6 lr=0.10, matching v0.32) →
-VAL FPR=5% calibration → TEST recall/FPR with Wilson CIs.
+Pipeline: corpus + v031_split to 236 hand-features to bge-base 768d embed  to
+concat (1004 features) to XGBoost (ne=400 md=6 lr=0.10, matching v0.32)  to
+VAL FPR=5% calibration to TEST recall/FPR with Wilson CIs.
 
 Ship-or-skip: bge-base wins iff TEST recall lifts >= 2pp over v0.32 (84.3%)
 at <= 5% FPR.

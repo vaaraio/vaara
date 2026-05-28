@@ -96,7 +96,7 @@ class VaaraCrewGovernance:
         """
         # Read-only scoring: hitting pipeline.intercept here would pollute
         # the audit trail with hypothetical events and bias the sequence
-        # detector (a pre-screen that checks read → export would trip the
+        # detector (a pre-screen that checks read to export would trip the
         # data_exfiltration pattern before any real action). Use the
         # scorer directly so no audit record is written.
         assessments = []

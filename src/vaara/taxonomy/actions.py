@@ -124,7 +124,7 @@ class ActionRequest:
     """Envelope for an action an agent wants to execute.
 
     This is the unit that passes through the interception pipeline:
-    taxonomy → scorer → policy engine → audit logger → execute or block.
+    taxonomy to scorer to policy engine to audit logger to execute or block.
     """
     agent_id: str
     tool_name: str
@@ -174,7 +174,7 @@ class ActionRegistry:
 
     def __init__(self) -> None:
         self._types: dict[str, ActionType] = {}
-        self._tool_mappings: dict[str, str] = {}  # tool_name → action_type name
+        self._tool_mappings: dict[str, str] = {}  # tool_name to action_type name
         # Plugins (custom domain packs) can call register / map_tool
         # from different threads during application startup, and classify()
         # runs on every intercepted action. A lock keeps the two dicts
@@ -220,7 +220,7 @@ class ActionRegistry:
         with self._lock:
             if tool_name in self._tool_mappings:
                 return self._types[self._tool_mappings[tool_name]]
-            # Try prefix matching for namespaced tools (e.g., "fs.write" → "fs")
+            # Try prefix matching for namespaced tools (e.g., "fs.write" to "fs")
             for prefix in sorted(self._tool_mappings, key=len, reverse=True):
                 if tool_name.startswith(prefix):
                     return self._types[self._tool_mappings[prefix]]
@@ -245,7 +245,7 @@ class ActionRegistry:
 
 # ── Heuristic keyword classification ───────────────────────────────────────
 
-# Keyword → built-in action-type name. Scanned (in order) against a
+# Keyword to built-in action-type name. Scanned (in order) against a
 # lowercased, non-alphanumeric-stripped tool name when explicit mapping
 # and prefix matching both miss. This is the "LangChain @tool with a
 # custom name" path: a tool called "send_slack_alert" shouldn't fall to

@@ -63,9 +63,9 @@ appear in a minor version bump; see [§ Forward compatibility](#forward-compatib
 | `policy_override` | Manual override of a prior automated decision. |
 
 Each event for one action references a single shared `action_id`. The
-canonical lifecycle is `action_requested` → `risk_scored` →
-`decision_made` → (`action_executed` | `action_blocked` |
-`escalation_sent` → `escalation_resolved`) → `outcome_recorded`.
+canonical lifecycle is `action_requested` to `risk_scored`  to 
+`decision_made` to (`action_executed` | `action_blocked` |
+`escalation_sent` to `escalation_resolved`) to `outcome_recorded`.
 `policy_override` may appear at any point after `decision_made`.
 
 ## Hash chain

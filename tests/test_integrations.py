@@ -260,7 +260,7 @@ class TestLangChainHandlerBranches:
         fake = _FakePipeline(decision="escalate", allowed=False)
         handler = VaaraCallbackHandler(fake, agent_id="test-agent")
 
-        # block_on_escalate defaults to False → must not raise
+        # block_on_escalate defaults to False to must not raise
         handler.on_tool_start(
             serialized={"name": "data.export"},
             input_str="",

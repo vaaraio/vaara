@@ -8,7 +8,7 @@ and checks it against a published root hash.
 
 The log is in-process so the protocol stays demonstrable without a hard
 dependency on an external transparency log such as sigstore Rekor. The
-public surface (append → entry, inclusion_proof, root_hash) is shaped to
+public surface (append to entry, inclusion_proof, root_hash) is shaped to
 match what a Rekor-backed adapter would expose, so a future
 ``RekorTransparencyLog`` can drop into the same call site.
 

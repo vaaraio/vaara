@@ -424,7 +424,7 @@ class VaaraMCPServer:
         elif tool_name == "vaara_report_outcome":
             return self._call_report(arguments)
         else:
-            # Unknown tool → Invalid params (-32602), not Internal (-32603).
+            # Unknown tool to Invalid params (-32602), not Internal (-32603).
             # Raise a marker that handle_request translates properly.
             raise _InvalidParams(f"Unknown tool: {tool_name!r}")
 
@@ -585,7 +585,7 @@ class VaaraMCPServer:
         action_id = args["action_id"]
         # Non-string action_id (dict/list/int) hits _pending_outcomes.get
         # with an unhashable key and escapes as -32603. Per JSON-RPC 2.0
-        # §5.1 this is client-side malformed input → -32602.
+        # §5.1 this is client-side malformed input to -32602.
         if not isinstance(action_id, str):
             raise _InvalidParams("action_id must be a string")
 

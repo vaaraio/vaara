@@ -45,8 +45,8 @@ def _load_jsonl(path: Path) -> list[dict]:
 def load_source(corpus_root: Path, *, source: str) -> list[dict]:
     """Load entries tagged with a source label.
 
-    source = 'hand_curated' → top-level *.jsonl (excluding subdirs)
-    source = 'llm_generated' → generated/ + benign_generated/ subdirs
+    source = 'hand_curated' to top-level *.jsonl (excluding subdirs)
+    source = 'llm_generated' to generated/ + benign_generated/ subdirs
     """
     entries: list[dict] = []
     if source == "hand_curated":

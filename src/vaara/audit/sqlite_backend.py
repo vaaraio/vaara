@@ -56,7 +56,7 @@ def _strict_json_dumps(obj: Any) -> str:
     return json.dumps(_scrub_nonfinite(obj), allow_nan=False, default=str)
 
 # Schema v2 — full DDL for fresh databases.
-# Migrations for v1→v2 upgrades are in _MIGRATIONS below.
+# Migrations for v1 to v2 upgrades are in _MIGRATIONS below.
 SCHEMA_SQL = """
 CREATE TABLE IF NOT EXISTS audit_meta (
     key   TEXT PRIMARY KEY,
@@ -111,7 +111,7 @@ CREATE TABLE IF NOT EXISTS api_keys (
 """
 
 # Incremental migrations applied when opening a DB with stored version < SCHEMA_VERSION.
-# Key = version being upgraded FROM (i.e., _MIGRATIONS[1] upgrades v1 → v2).
+# Key = version being upgraded FROM (i.e., _MIGRATIONS[1] upgrades v1 to v2).
 _MIGRATIONS: dict[int, str] = {
     1: """
     ALTER TABLE audit_records ADD COLUMN tenant_id TEXT NOT NULL DEFAULT '';
@@ -130,7 +130,7 @@ _MIGRATIONS: dict[int, str] = {
         last_used_at REAL
     );
     """,
-    # v2 → v3: prEN ISO/IEC 12792 transparency taxonomy (item 1, v0.6).
+    # v2 to v3: prEN ISO/IEC 12792 transparency taxonomy (item 1, v0.6).
     # Nullable columns. Pre-v0.6 records get NULL — their stored
     # record_hash is preserved (NOT re-hashed on load), so chain
     # verification of historical records continues to work.
@@ -284,7 +284,7 @@ class SQLiteAuditBackend:
             if not sql:
                 continue
             logger.info(
-                "Migrating audit DB schema v%d → v%d at %s",
+                "Migrating audit DB schema v%d to v%d at %s",
                 v, v + 1, self._db_path,
             )
             for stmt in [s.strip() for s in sql.split(";") if s.strip()]:
@@ -300,7 +300,7 @@ class SQLiteAuditBackend:
                         continue
                     raise
             # Bump schema_version per-migration, not once at the end. If
-            # v→v+1 succeeds but v+1→v+2 fails, the DB ends up correctly
+            # v to v+1 succeeds but v+1 to v+2 fails, the DB ends up correctly
             # marked at v+1 instead of stuck at the original from_version.
             self._conn.execute(
                 "UPDATE audit_meta SET value=? WHERE key='schema_version'",
@@ -643,7 +643,7 @@ class SQLiteAuditBackend:
             )
             self._redaction_cache[original_id] = replacement
         logger.info(
-            "GDPR Art.17 redaction: agent_id %r → %r affects %d records",
+            "GDPR Art.17 redaction: agent_id %r to %r affects %d records",
             original_id, replacement, count,
         )
         return count

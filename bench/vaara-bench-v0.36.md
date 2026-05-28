@@ -8,7 +8,7 @@ v0.36 is a methodology release with three contributions:
    Sonnet 4.6 (Anthropic API) on the three weakest v0.35 categories
    (`tool_misuse`, `privilege_escalation`, `data_exfil`). Pure eval fold
    under `tests/adversarial/v036_holdout.json`, never folded into TRAIN.
-2. **v6 → v7 retrain.** 18 destination-aware features added to
+2. **v6 to v7 retrain.** 18 destination-aware features added to
    `build_features`. Same v035 TRAIN fold, same XGBoost hparams. v7
    becomes production. No regression on v035 TEST.
 3. **First public cross-model held-out for an OSS runtime governance
@@ -59,7 +59,7 @@ for cross-eval reproducibility. No regression. Weak-Pareto win.
 | tool_misuse__claude | 699 | 46.2% [42.5, 49.9] |
 | tool_misuse__mixtral | 687 | 79.9% [76.8, 82.7] |
 
-In-distribution → external gap is 26 pp (85.3% v035 TEST → 59.2% v036
+In-distribution to external gap is 26 pp (85.3% v035 TEST to 59.2% v036
 held-out). The Claude leg drops more than the Mixtral leg. The gap is
 closed-weight-vs-open-weight, not Qwen-specific. Worst cell is
 data_exfil × Claude (26.0%).
@@ -84,10 +84,10 @@ was tool-name-heavy. The destination axis was not in feature space.
 
 Sample missed Claude entries (v6 score, v7 in parens):
 
-- `send_email` → personal Gmail → payroll xlsx attached → 0.18 (0.21)
-- `sql_query_execute` SELECT ssn/dob/credit_score → webhook.site → 0.01 (0.05)
-- `pastebin_create` visibility=public expiry=never → 0.09 (0.17)
-- `s3_copy` corp-sensitive-docs → public-temp-storage → 0.39 (0.48)
+- `send_email` to personal Gmail to payroll xlsx attached to 0.18 (0.21)
+- `sql_query_execute` SELECT ssn/dob/credit_score to webhook.site to 0.01 (0.05)
+- `pastebin_create` visibility=public expiry=never to 0.09 (0.17)
+- `s3_copy` corp-sensitive-docs to public-temp-storage to 0.39 (0.48)
 
 ## Engineering attempt: 18 destination-aware features
 
@@ -106,8 +106,8 @@ presence in `feature_names`).
 v7 retrained on v035 TRAIN with the new feature set. Features fire
 correctly on previously-missed Claude entries (every sample above hits
 at least one `dst__` feature). But v7 lifts overall held-out recall
-only +0.8pp (58.4% → 59.2%) and data_exfil__claude only +4.0pp
-(22.0% → 26.0%).
+only +0.8pp (58.4% to 59.2%) and data_exfil__claude only +4.0pp
+(22.0% to 26.0%).
 
 ## Honest diagnosis: training-corpus constraint, not feature space
 
@@ -130,8 +130,8 @@ v0.36 ships under a methodology-release gate, not a recall-target gate:
 
 | gate | result |
 |---|---|
-| v035 TEST recall does not regress | PASS, 85.0% → 85.3% within CI |
-| v035 TEST FPR does not regress | PASS, 4.6% → 4.6% |
+| v035 TEST recall does not regress | PASS, 85.0% to 85.3% within CI |
+| v035 TEST FPR does not regress | PASS, 4.6% to 4.6% |
 | Held-out gap published openly with mechanism | PASS |
 | Training-corpus constraint named honestly | PASS |
 | v0.37 scope written with concrete corpus plan | PASS |
@@ -146,7 +146,7 @@ releases. v7 holds the same number while opening the methodology surface.
 |---|---|---|
 | corpus manifest | `tests/adversarial/MANIFEST.sha256` (302 lines) | SHA-256 of every JSONL including v036 |
 | v035 split | `tests/adversarial/v035_split.json` | TRAIN/VAL/TEST for v7 calibration |
-| v036 held-out | `tests/adversarial/v036_holdout.json` | 4,176 keys → "holdout", never in TRAIN |
+| v036 held-out | `tests/adversarial/v036_holdout.json` | 4,176 keys to "holdout", never in TRAIN |
 | production bundle | `src/vaara/data/adversarial_classifier_v7.joblib` | trained on v035 TRAIN with dst features |
 | prior production | `src/vaara/data/adversarial_classifier_v6.joblib` | retained for cross-eval |
 | Mixtral generator | `scripts/generate_targeted_v036.py` | vLLM HTTP, FP16 on MI300X |

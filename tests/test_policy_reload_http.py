@@ -132,5 +132,5 @@ def test_reload_with_extra_field_rejected(client_with_controller):
         "/v1/policy/reload",
         json={"path": "/dev/null", "stowaway_field": True},
     )
-    # pydantic config extra="forbid" → 422 at schema level
+    # pydantic config extra="forbid" to 422 at schema level
     assert r.status_code == 422

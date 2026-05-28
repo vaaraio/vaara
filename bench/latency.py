@@ -1,7 +1,7 @@
 """Latency micro-benchmark for InterceptionPipeline.intercept().
 
 Measures the per-call overhead an agent pays to run through Vaara's
-classify → score → decide → audit path. The output is the number that
+classify to score to decide to audit path. The output is the number that
 answers "can I put this in front of a sub-second agent loop" and
 "what does one governed tool call cost" for ops budgeting.
 

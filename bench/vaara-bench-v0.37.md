@@ -70,7 +70,7 @@ cleanly. DE generalises unevenly.
 
 v036 Mixtral DE: 70.9% (v8) vs 69.3% (v7 on the same 690 entries),
 flat. v036 Claude DE: 38.9% (v8) vs 26.0% (v7 on the same 700
-entries), **+12.9pp**. The v036 → v8 lift is concentrated in the
+entries), **+12.9pp**. The v036 to v8 lift is concentrated in the
 closed-weight leg that was failing hardest. Open-weight Mixtral DE was
 already at 70%-tier and stays there. The asymmetry confirms the v0.36
 mechanism finding (destination signal is the axis, and folding the
@@ -84,16 +84,16 @@ because v8 is a production retrain:
 
 | gate | result |
 |---|---|
-| v035 TEST recall does not regress | PASS, 85.3% → 86.6%, +1.3pp |
-| v035 TEST FPR does not regress | PASS, 4.6% → 5.0%, within CI |
-| Worst v0.36 sub-cell improves | PASS, DE × Claude 26.0% → 38.9% |
+| v035 TEST recall does not regress | PASS, 85.3% to 86.6%, +1.3pp |
+| v035 TEST FPR does not regress | PASS, 4.6% to 5.0%, within CI |
+| Worst v0.36 sub-cell improves | PASS, DE × Claude 26.0% to 38.9% |
 | Third attacker family covered with recall floor | PASS, llama33 overall 85.8% |
 | Held-out gap stays published with mechanism | PASS |
 
 Cross-model overall recall is 66.8%. Below the 70% floor used as soft
 target in prior releases, but the floor was set against v035 TEST
 distribution. Cross-model overall is a harder denominator, and 66.8%
-is a 7.6 pp lift on the comparable v036 number (59.2% → 66.8%) with
+is a 7.6 pp lift on the comparable v036 number (59.2% to 66.8%) with
 a third family added to the denominator.
 
 ## Generation provenance
@@ -122,7 +122,7 @@ configuration note rather than a methodology change.
 |---|---|---|
 | corpus manifest | `tests/adversarial/MANIFEST.sha256` | SHA-256 of every JSONL including v037 |
 | v035 split (inherited) | `tests/adversarial/v035_split.json` | TRAIN/VAL/TEST for v8 calibration |
-| v037 split | `tests/adversarial/v037_split.json` | v035 inherited + v036 TM/PE → train, v036 DE + v037 → holdout |
+| v037 split | `tests/adversarial/v037_split.json` | v035 inherited + v036 TM/PE to train, v036 DE + v037 to holdout |
 | production bundle | `src/vaara/data/adversarial_classifier_v8.joblib` | trained on 11,287 entries with dst features + embeddings |
 | prior production | `src/vaara/data/adversarial_classifier_v7.joblib` | retained for cross-eval |
 | Llama-3.3 generator | `scripts/generate_targeted_v037.py` | vLLM HTTP, FP8 dynamic on MI300X |

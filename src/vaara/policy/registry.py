@@ -6,8 +6,8 @@ request carries no tenant scope or no tenant-specific policy is loaded.
 
 Filename convention for ``load_directory``:
 
-* ``default.yaml`` / ``default.json`` → tenant_id ""
-* ``TENANT.yaml`` / ``TENANT.json``   → tenant_id "TENANT"
+* ``default.yaml`` / ``default.json`` to tenant_id ""
+* ``TENANT.yaml`` / ``TENANT.json``   to tenant_id "TENANT"
 
 This is the v0.40 multi-tenant policy plane. Single-tenant deployments
 keep using ``vaara serve --policy PATH``, which lands in the "" slot.
