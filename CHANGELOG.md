@@ -6,6 +6,59 @@ and this project follows [Semantic Versioning](https://semver.org/spec/v2.0.0.ht
 
 ## [Unreleased]
 
+## [0.41.0] - 2026-05-28
+
+**Theme: server-initiated notifications and cancellation routing under fan-out.**
+
+### Added
+- `GET /mcp` Server-Sent Events endpoint on the Streamable HTTP
+  transport. Upstream-initiated notifications (progress events, log
+  messages) reach the client over a long-lived SSE stream keyed by
+  the standard `Mcp-Session-Id` header. The endpoint requires the
+  session header, refuses values longer than 128 characters, returns
+  `404` for unknown `X-Vaara-Upstream` values, and returns `400`
+  when fan-out is configured and the upstream header is missing
+  instead of guessing the slot.
+- Reconnect-with-resume via `Last-Event-ID`. The server keeps a
+  bounded replay buffer of the most recent 100 events per session
+  and replays any events newer than the resumption cursor when the
+  client reconnects. Event ids are strictly monotonic per session,
+  so a gap from eviction is observable on the client.
+- 15-second SSE heartbeat (`: keepalive` comment) and a 5-second
+  `retry:` hint so EventSource clients reconnect on a fixed cadence
+  after transient socket loss.
+- `notifications/cancelled` routing across fan-out. The proxy tracks
+  every in-flight `tools/call` request id against the upstream
+  serving it and forwards a client cancellation to that upstream
+  regardless of what `X-Vaara-Upstream` the cancel POST carries.
+  Under fan-out the cancel reaches the subprocess that owns the
+  long-running call rather than the slot named by the cancel header.
+- New `vaara.integrations._mcp_notify` module: `NotificationRouter`
+  protocol with `StdioRouter` (writes through the proxy's stdout
+  lock) and `HttpRouter` (per-session asyncio queues, bounded replay
+  buffer, broadcast across an upstream's sessions when no session
+  scope is known). The proxy holds one router instance for the
+  lifetime of the serve loop and delivers every upstream-initiated
+  notification through it.
+
+### Changed
+- `VaaraMCPProxy._inflight_progress` now carries the originating
+  `Mcp-Session-Id` alongside action id, agent id, tool name, and
+  tenant. The audit and OVERT paths discard the session id so the
+  perimeter event schema stays unchanged.
+- `UpstreamMCPClient.on_notification` is wrapped per upstream so the
+  reader-thread callback carries the upstream's name. Closes a
+  late-binding bug that would have pinned every reader thread to
+  the last name in the `_upstreams` dict.
+- `run_http` split into `_build_http_app` + uvicorn launch so tests
+  drive the FastAPI app via `fastapi.testclient.TestClient` without
+  standing up a server.
+- `server.json`, `server-vaara-server.json`, `pyproject.toml`,
+  `src/vaara/__init__.py`, and `clients/ts/package.json` version
+  fields bumped to 0.41.0.
+- `.claude-plugin/marketplace.json` `ref` bumped from `v0.40.4` to
+  `v0.41.0`.
+
 ## [0.40.4] - 2026-05-28
 
 **Theme: policy mode presets + plugin shakedown fix delivery.**
