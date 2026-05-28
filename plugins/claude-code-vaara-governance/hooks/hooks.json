@@ -33,7 +33,7 @@
             "timeout": 30
           }
         ],
-        "matcher": "mcp__.*"
+        "matcher": "Bash|WebFetch|WebSearch|mcp__.*"
       }
     ]
   }

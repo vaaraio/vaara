@@ -53,7 +53,7 @@ def main() -> int:
         db_state = f"unavailable ({exc!r})"
 
     _emit(
-        f"vaara-governance v0.1.0 loaded "
+        f"vaara-governance v0.1.2 loaded "
         f"(vaara {vaara.__version__}, mode={mode}, audit_db={db_path} [{db_state}])."
     )
     return 0

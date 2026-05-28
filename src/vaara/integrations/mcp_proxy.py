@@ -38,6 +38,11 @@ from typing import Any, Optional
 from vaara import __version__ as _VAARA_VERSION
 from vaara.audit.sqlite_backend import SQLiteAuditBackend
 from vaara.audit.trail import AuditTrail
+from vaara.integrations._mcp_notify import (
+    HttpRouter,
+    NotificationRouter,
+    StdioRouter,
+)
 from vaara.integrations._mcp_overt import (
     OVERTConfigError,
     OVERTReceiptEmitter,
@@ -70,6 +75,14 @@ _REQUEST_UPSTREAM: contextvars.ContextVar[str] = contextvars.ContextVar(
 )
 _REQUEST_TENANT: contextvars.ContextVar[str] = contextvars.ContextVar(
     "vaara_mcp_tenant", default="",
+)
+# v0.41 GET-SSE: HTTP transport sets this per inbound POST /mcp call so the
+# tools/call handler can capture the originating session in the inflight
+# map. The upstream reader thread later uses that captured session_id to
+# route notifications/progress through the HTTP router to the right SSE
+# subscriber. Empty default keeps stdio transport unaffected.
+_REQUEST_SESSION: contextvars.ContextVar[str] = contextvars.ContextVar(
+    "vaara_mcp_session", default="",
 )
 
 def _safe_log(value: Any, max_len: int = 200) -> str:
@@ -111,6 +124,7 @@ class VaaraMCPProxy:
         prompt_denylist: Optional[set[str]] = None,
         overt_emitter: Optional[OVERTReceiptEmitter] = None,
         upstreams: Optional[dict[str, list[str]]] = None,
+        router: Optional[NotificationRouter] = None,
     ) -> None:
         if pipeline is not None:
             self._pipeline = pipeline
@@ -140,14 +154,29 @@ class VaaraMCPProxy:
         )
         self._stdout_lock = threading.Lock()
         self._overt = overt_emitter
-        # progressToken -> (action_id, agent_id, tool_name, tenant_id). Populated
-        # when a tools/call enters interception with params._meta.progressToken
-        # set, consulted by the upstream-notification handler so progress events
-        # arriving mid-call carry the originating action_id into the audit
-        # record and into the OVERT envelope's non_content_metadata. The tenant
-        # is captured at tools/call time because the upstream reader thread that
-        # delivers later notifications does not inherit the request ContextVars.
-        self._inflight_progress: dict[Any, tuple[str, str, str, str]] = {}
+        # Notification router. stdio default writes through the shared stdout
+        # lock; HTTP transport swaps in HttpRouter in run_http(). The router is
+        # the only surface allowed to deliver upstream-initiated notifications
+        # to clients; tools/call response replies still go through
+        # _write_to_client / JSONResponse on their own paths.
+        self._router: NotificationRouter = router or StdioRouter(self._stdout_lock)
+        # progressToken -> (action_id, agent_id, tool_name, tenant_id, session_id).
+        # Populated when a tools/call enters interception with
+        # params._meta.progressToken set, consulted by the upstream-notification
+        # handler so progress events arriving mid-call carry the originating
+        # action_id into the audit record and into the OVERT envelope's
+        # non_content_metadata. The tenant and session_id are captured at
+        # tools/call time because the upstream reader thread that delivers
+        # later notifications does not inherit the request ContextVars.
+        self._inflight_progress: dict[Any, tuple[str, str, str, str, str]] = {}
+        # request_id -> upstream_name for every tools/call still running.
+        # Used to route notifications/cancelled to the upstream actually
+        # serving the matching request, regardless of which header the
+        # cancellation POST carries. Without this, cancellations under
+        # fan-out would land on the upstream named by X-Vaara-Upstream
+        # on the cancel POST, which the client has no reason to set
+        # correctly. Request-id ownership is the only stable identifier.
+        self._inflight_requests: dict[Any, str] = {}
         self._inflight_lock = threading.Lock()
         # v0.40 fan-out: hold N upstream MCP servers in a name -> client map.
         # The single-upstream legacy entry point (positional ``upstream_command``)
@@ -176,10 +205,16 @@ class VaaraMCPProxy:
             # deterministic across restarts. Alias the slot rather than
             # cloning the command so we never spawn a duplicate subprocess.
             default_alias_target = sorted(upstream_map)[0]
+        # Wrap on_notification per upstream so the reader thread's callback
+        # carries the upstream's name. Default-arg ``n=name`` binds the loop
+        # variable at lambda creation, avoiding the late-binding bug that
+        # would otherwise pin every upstream to the last name in the dict.
         self._upstreams: dict[str, UpstreamMCPClient] = {
             name: UpstreamMCPClient(
                 command=command,
-                on_notification=self._on_upstream_notification,
+                on_notification=(
+                    lambda msg, n=name: self._on_upstream_notification(n, msg)
+                ),
             )
             for name, command in upstream_map.items()
         }
@@ -216,7 +251,7 @@ class VaaraMCPProxy:
 
         Test fixtures and embedders that previously assigned
         ``proxy._upstream = MagicMock()`` keep working under the v0.40
-        fan-out shape — the assignment lands in the "default" slot and the
+        fan-out shape: the assignment lands in the "default" slot and the
         property reads it back.
         """
         self._upstreams["default"] = client
@@ -255,26 +290,25 @@ class VaaraMCPProxy:
             # Notifications (no id) forward silently per JSON-RPC 2.0 §4.1.
             if isinstance(request, dict) and "id" not in request:
                 try:
-                    self._upstream.notify(request)
+                    self._handle_client_notification(request)
                 except ProxyError:
                     logger.exception("Failed to forward notification")
                 continue
             self._write_to_client(self._handle_request(request))
 
-    def run_http(self, host: str, port: int, log_level: str = "info") -> None:
-        """Run the proxy on Streamable HTTP (MCP 2026 transport).
+    def _build_http_app(self):
+        """Construct the FastAPI app that backs the Streamable HTTP transport.
 
-        POST /mcp accepts one JSON-RPC message and returns one JSON
-        response. Notifications (no ``id``) return 202 Accepted and are
-        forwarded to the upstream without a reply. Multi-tenant /
-        fan-out scope is read per request from the
-        ``X-Vaara-Tenant`` and ``X-Vaara-Upstream`` headers and pushed
-        into the per-request ContextVars before dispatch.
+        Split out from ``run_http`` so tests can drive the endpoints via
+        ``fastapi.testclient.TestClient`` without standing up uvicorn. As a
+        side effect, swaps the proxy's notification router to ``HttpRouter``
+        so upstream-initiated notifications fan out to SSE subscribers
+        instead of stdout.
         """
         try:
-            import uvicorn
+            import asyncio
             from fastapi import FastAPI, Header, HTTPException, Response
-            from fastapi.responses import JSONResponse
+            from fastapi.responses import JSONResponse, StreamingResponse
         except ImportError as exc:
             raise RuntimeError(
                 "vaara-mcp-proxy --transport http requires the 'server' "
@@ -287,6 +321,13 @@ class VaaraMCPProxy:
             )
 
         proxy = self
+        # Replace the default StdioRouter with an HTTP-aware fan-out router.
+        # Mutation here is safe: it happens once at HTTP startup, before any
+        # request arrives, so the upstream reader threads consistently see
+        # the HTTP router for the lifetime of the serve loop. The StdioRouter
+        # instance is dropped.
+        http_router = HttpRouter()
+        proxy._router = http_router
 
         app = FastAPI(
             title="Vaara MCP Proxy",
@@ -311,6 +352,7 @@ class VaaraMCPProxy:
             request: _StarletteRequest,
             x_vaara_tenant: Optional[str] = Header(default=None, alias="X-Vaara-Tenant"),
             x_vaara_upstream: Optional[str] = Header(default=None, alias="X-Vaara-Upstream"),
+            mcp_session_id: Optional[str] = Header(default=None, alias="Mcp-Session-Id"),
         ) -> Response:
             # 1 MiB cap on a single MCP JSON-RPC message. Real tool calls and
             # responses fit comfortably; anything larger is either a misuse or
@@ -397,12 +439,26 @@ class VaaraMCPProxy:
                     },
                 )
 
+            session_value = (mcp_session_id or "").strip()
+            # Cap session id length to keep the inflight-progress and HttpRouter
+            # session-map keys bounded against a malicious client that submits
+            # an absurdly long header. 128 chars is comfortably wider than any
+            # realistic cryptographically-random session id.
+            if len(session_value) > 128:
+                raise HTTPException(
+                    status_code=400,
+                    detail={"error": {
+                        "code": "session_id_too_long",
+                        "message": "Mcp-Session-Id must be 128 characters or fewer",
+                    }},
+                )
             upstream_token = _REQUEST_UPSTREAM.set(upstream_name)
             tenant_token = _REQUEST_TENANT.set((x_vaara_tenant or "").strip())
+            session_token = _REQUEST_SESSION.set(session_value)
             try:
                 if isinstance(payload, dict) and "id" not in payload:
                     try:
-                        proxy._upstream.notify(payload)
+                        proxy._handle_client_notification(payload)
                     except ProxyError:
                         logger.exception("Failed to forward HTTP notification")
                     return Response(status_code=202)
@@ -411,12 +467,184 @@ class VaaraMCPProxy:
             finally:
                 _REQUEST_UPSTREAM.reset(upstream_token)
                 _REQUEST_TENANT.reset(tenant_token)
+                _REQUEST_SESSION.reset(session_token)
 
+        @app.get("/mcp")
+        async def mcp_sse_endpoint(
+            request: _StarletteRequest,
+            x_vaara_tenant: Optional[str] = Header(default=None, alias="X-Vaara-Tenant"),
+            x_vaara_upstream: Optional[str] = Header(default=None, alias="X-Vaara-Upstream"),
+            mcp_session_id: Optional[str] = Header(default=None, alias="Mcp-Session-Id"),
+            last_event_id: Optional[str] = Header(default=None, alias="Last-Event-ID"),
+        ) -> StreamingResponse:
+            session_value = (mcp_session_id or "").strip()
+            if not session_value:
+                raise HTTPException(
+                    status_code=400,
+                    detail={"error": {
+                        "code": "session_id_required",
+                        "message": "Mcp-Session-Id header is required for GET /mcp",
+                    }},
+                )
+            if len(session_value) > 128:
+                raise HTTPException(
+                    status_code=400,
+                    detail={"error": {
+                        "code": "session_id_too_long",
+                        "message": "Mcp-Session-Id must be 128 characters or fewer",
+                    }},
+                )
+            header_name = (x_vaara_upstream or "").strip()
+            real_slots = sorted(n for n in proxy._upstreams if n != "default")
+            ambiguous_fanout = len(real_slots) > 1
+            if not header_name:
+                if ambiguous_fanout:
+                    raise HTTPException(
+                        status_code=400,
+                        detail={"error": {
+                            "code": "upstream_required",
+                            "message": (
+                                "X-Vaara-Upstream header is required when "
+                                "the proxy serves more than one upstream. "
+                                f"Available upstreams: {real_slots!r}"
+                            ),
+                        }},
+                    )
+                upstream_name = "default"
+            else:
+                upstream_name = header_name
+            if upstream_name not in proxy._upstreams:
+                raise HTTPException(
+                    status_code=404,
+                    detail={"error": {
+                        "code": "unknown_upstream",
+                        "message": (
+                            f"No upstream named {upstream_name!r}; "
+                            f"configured: {sorted(proxy._upstreams)!r}"
+                        ),
+                    }},
+                )
+            # Last-Event-ID is the SSE resumption cursor. Non-integer values
+            # are tolerated and treated as 0 (full replay window) rather than
+            # rejected, matching the EventSource spec's lenient parsing.
+            resume_after = 0
+            if last_event_id is not None:
+                try:
+                    resume_after = max(int(last_event_id.strip()), 0)
+                except ValueError:
+                    resume_after = 0
+            loop = asyncio.get_running_loop()
+            state = http_router.register_session(
+                session_id=session_value,
+                upstream=upstream_name,
+                tenant=(x_vaara_tenant or "").strip(),
+                loop=loop,
+            )
+
+            async def event_stream():
+                # enqueue populates both the buffer (for replay) and the queue
+                # (for live drain), so an event that lands between
+                # register_session and the first replay_since call would arrive
+                # on both paths. Tracking the highest yielded id and filtering
+                # the drain stream by it keeps each event on the wire exactly
+                # once.
+                last_yielded = resume_after
+                try:
+                    # Initial retry hint (5s) so EventSource clients reconnect
+                    # at a predictable cadence on transient disconnect.
+                    yield b"retry: 5000\n\n"
+                    for event_id, payload in state.replay_since(resume_after):
+                        yield (
+                            f"id: {event_id}\n"
+                            f"data: {strict_json_dumps(payload)}\n\n"
+                        ).encode("utf-8")
+                        last_yielded = max(last_yielded, event_id)
+                    while True:
+                        try:
+                            entry = await asyncio.wait_for(state.drain(), timeout=15.0)
+                        except asyncio.TimeoutError:
+                            # Heartbeat. A failing yield here surfaces a dead
+                            # socket and lets the finally block tear the
+                            # session down.
+                            yield b": keepalive\n\n"
+                            continue
+                        if entry is None:
+                            break
+                        event_id, payload = entry
+                        if event_id <= last_yielded:
+                            continue
+                        yield (
+                            f"id: {event_id}\n"
+                            f"data: {strict_json_dumps(payload)}\n\n"
+                        ).encode("utf-8")
+                        last_yielded = event_id
+                finally:
+                    http_router.unregister_session(session_value)
+
+            return StreamingResponse(
+                event_stream(),
+                media_type="text/event-stream",
+                headers={"Cache-Control": "no-cache", "X-Accel-Buffering": "no"},
+            )
+
+        return app
+
+    def run_http(self, host: str, port: int, log_level: str = "info") -> None:
+        """Run the proxy on Streamable HTTP (MCP 2026 transport).
+
+        POST /mcp accepts one JSON-RPC message and returns one JSON response.
+        GET /mcp opens a server-sent-events stream for upstream-initiated
+        notifications scoped to the ``Mcp-Session-Id`` header. Notifications
+        (no ``id``) return 202 Accepted and are forwarded to the upstream
+        without a reply, with ``notifications/cancelled`` routed to the
+        upstream that owns the named request id. Multi-tenant / fan-out scope
+        is read per request from the ``X-Vaara-Tenant`` and
+        ``X-Vaara-Upstream`` headers and pushed into the per-request
+        ContextVars before dispatch.
+        """
+        try:
+            import uvicorn
+        except ImportError as exc:
+            raise RuntimeError(
+                "vaara-mcp-proxy --transport http requires the 'server' "
+                "extra. Install with: pip install 'vaara[server]'"
+            ) from exc
+        app = self._build_http_app()
         logger.info(
             "Vaara MCP proxy starting on http://%s:%d (%s, upstreams=%s)",
             host, port, self.PROXY_NAME, sorted(self._upstreams.keys()),
         )
         uvicorn.run(app, host=host, port=port, log_level=log_level)
+
+    def _handle_client_notification(self, payload: dict) -> None:
+        """Route a client-originated JSON-RPC notification to the right upstream.
+
+        Most notifications follow the per-request ContextVar set by the HTTP
+        transport from ``X-Vaara-Upstream`` (or stdio's default of "default").
+        ``notifications/cancelled`` overrides that with the upstream actually
+        serving the named ``requestId``, so under fan-out the cancel reaches
+        the upstream subprocess that owns the long-running tools/call rather
+        than whatever slot the cancel POST's header guessed at.
+        """
+        target_upstream: Optional[str] = None
+        if (
+            isinstance(payload, dict)
+            and payload.get("method") == "notifications/cancelled"
+        ):
+            params = payload.get("params")
+            if isinstance(params, dict):
+                req_id = params.get("requestId")
+                if req_id is not None:
+                    with self._inflight_lock:
+                        target_upstream = self._inflight_requests.get(req_id)
+        if target_upstream is not None and target_upstream in self._upstreams:
+            token = _REQUEST_UPSTREAM.set(target_upstream)
+            try:
+                self._upstream.notify(payload)
+            finally:
+                _REQUEST_UPSTREAM.reset(token)
+        else:
+            self._upstream.notify(payload)
 
     def _handle_request(self, request: Any) -> dict:
         if not isinstance(request, dict):
@@ -590,20 +818,27 @@ class VaaraMCPProxy:
                     "isError": True,
                 },
             }
-        if progress_token is not None:
-            with self._inflight_lock:
+        request_id = request.get("id")
+        upstream_name = _REQUEST_UPSTREAM.get()
+        with self._inflight_lock:
+            if progress_token is not None:
                 self._inflight_progress[progress_token] = (
                     str(getattr(result, "action_id", None) or ""),
                     agent_id,
                     tool_name,
                     _REQUEST_TENANT.get(),
+                    _REQUEST_SESSION.get(),
                 )
+            if request_id is not None:
+                self._inflight_requests[request_id] = upstream_name
         try:
             upstream_response = self._upstream.request(request)
         finally:
-            if progress_token is not None:
-                with self._inflight_lock:
+            with self._inflight_lock:
+                if progress_token is not None:
                     self._inflight_progress.pop(progress_token, None)
+                if request_id is not None:
+                    self._inflight_requests.pop(request_id, None)
         outcome_severity = self._severity_from_response(upstream_response)
         try:
             self._pipeline.report_outcome(
@@ -850,7 +1085,7 @@ class VaaraMCPProxy:
             return 1.0
         return 0.0
 
-    def _on_upstream_notification(self, message: dict) -> None:
+    def _on_upstream_notification(self, upstream_name: str, message: dict) -> None:
         """Audit + OVERT-emit upstream-originated notifications, then forward.
 
         Streaming surfaces (notifications/progress, notifications/message) flow
@@ -858,9 +1093,10 @@ class VaaraMCPProxy:
         them inside the audit boundary: each notification is recorded as a
         perimeter-style audit event (no scorer) and, when OVERT is configured,
         emits its own Base Envelope. Progress events correlate to the
-        originating tools/call via params.progressToken when present. The
-        notification is then forwarded to the client unchanged — auditing is
-        observational, never blocking.
+        originating tools/call via params.progressToken when present. Routing
+        to the destination client goes through the transport-aware
+        ``NotificationRouter``: stdio writes to the proxy stdout, HTTP fans
+        out to the SSE session registered for the originating tools/call.
         """
         method = message.get("method") if isinstance(message, dict) else None
         try:
@@ -870,7 +1106,24 @@ class VaaraMCPProxy:
                 self._audit_message_notification(message)
         except Exception:
             logger.exception("Streaming-notification audit failed for %s", method)
-        self._write_to_client(message)
+        # Resolve the session that originated this notification, if any. Only
+        # progress notifications carry a progressToken; log notifications and
+        # any other server-pushed message broadcast across the sessions
+        # subscribed to this upstream (HttpRouter handles broadcast when
+        # session_id is None; StdioRouter ignores both args).
+        session_id: Optional[str] = None
+        if method == "notifications/progress":
+            params = message.get("params") if isinstance(message, dict) else None
+            if isinstance(params, dict):
+                token = params.get("progressToken")
+                if isinstance(token, (str, int)):
+                    with self._inflight_lock:
+                        entry = self._inflight_progress.get(token)
+                    if entry is not None:
+                        captured_session = entry[4]
+                        if captured_session:
+                            session_id = captured_session
+        self._router.deliver(message, session_id=session_id, upstream=upstream_name)
 
     @staticmethod
     def _progress_token(params: dict) -> Any:
@@ -902,7 +1155,10 @@ class VaaraMCPProxy:
             with self._inflight_lock:
                 entry = self._inflight_progress.get(token)
             if entry is not None:
-                parent_action_id, agent_id, parent_tool, captured_tenant = entry
+                # Session id is captured for routing in _on_upstream_notification;
+                # the audit/OVERT path discards it intentionally so the perimeter
+                # record schema stays unchanged.
+                parent_action_id, agent_id, parent_tool, captured_tenant, _ = entry
         self._record_perimeter_audit(
             agent_id=agent_id,
             tool_name="mcp.notification.progress",

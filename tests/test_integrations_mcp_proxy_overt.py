@@ -238,7 +238,7 @@ def test_progress_notification_emits_envelope_with_parent_correlation(monkeypatc
 
     def upstream_request(req):
         if req["method"] == "tools/call":
-            p._on_upstream_notification({
+            p._on_upstream_notification("default", {
                 "jsonrpc": "2.0", "method": "notifications/progress",
                 "params": {"progressToken": "tok-z", "progress": 10, "total": 20},
             })
@@ -270,7 +270,7 @@ def test_progress_notification_emits_envelope_with_parent_correlation(monkeypatc
 
 def test_message_notification_emits_envelope(monkeypatch, emitter):
     p, _ = _make_proxy(monkeypatch, emitter=emitter)
-    p._on_upstream_notification({
+    p._on_upstream_notification("default", {
         "jsonrpc": "2.0", "method": "notifications/message",
         "params": {"level": "warning", "logger": "upstream", "data": "slow"},
     })
@@ -291,7 +291,7 @@ def test_orphan_progress_without_inflight_call_still_emits(monkeypatch, emitter)
     can spot the dangling event rather than having it disappear.
     """
     p, _ = _make_proxy(monkeypatch, emitter=emitter)
-    p._on_upstream_notification({
+    p._on_upstream_notification("default", {
         "jsonrpc": "2.0", "method": "notifications/progress",
         "params": {"progressToken": "orphan", "progress": 5},
     })
