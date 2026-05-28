@@ -3,7 +3,7 @@
 # workflow is broken (workflow misconfig, OIDC trust failure, lapsed
 # token). Use ONLY in that case.
 #
-# Per repo policy: transient GH Actions infra noise → wait + rerun the
+# Per repo policy: transient GH Actions infra noise, then wait + rerun the
 # workflow, do NOT bypass. This script exists for the case where the
 # workflow itself cannot run.
 #
