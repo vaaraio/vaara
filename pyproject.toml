@@ -4,7 +4,7 @@ build-backend = "setuptools.build_meta"
 
 [project]
 name = "vaara"
-version = "0.40.1"
+version = "0.40.2"
 description = "Adaptive AI Agent Execution Layer for risk scoring, audit trails, and regulatory compliance"
 requires-python = ">=3.10"
 license = "Apache-2.0"
@@ -59,6 +59,7 @@ rebuff = ["rebuff>=0.1"]
 vaara = "vaara.cli:main"
 vaara-audit = "vaara.audit_cli:main"
 vaara-mcp-proxy = "vaara.integrations.mcp_proxy:main"
+vaara-mcp-server = "vaara.integrations.mcp_server:main"
 
 [tool.setuptools.packages.find]
 where = ["src"]

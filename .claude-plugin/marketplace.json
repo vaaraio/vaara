@@ -1,0 +1,27 @@
+{
+  "$schema": "https://anthropic.com/claude-code/marketplace.schema.json",
+  "name": "vaara",
+  "description": "Vaara runtime tool-call governance plugins for Claude Code",
+  "owner": {
+    "name": "Vaara",
+    "email": "hello@vaara.io"
+  },
+  "plugins": [
+    {
+      "name": "vaara-governance",
+      "description": "Runtime tool-call governance for Claude Code. Layer-1 regex deny on Bash/WebFetch/WebSearch. Layer-2 conformal risk classifier on mcp__* tools. Hash-chained SQLite audit trail at ~/.vaara/claude-code/audit.db.",
+      "author": {
+        "name": "Henri Sirkkavaara",
+        "email": "hello@vaara.io"
+      },
+      "category": "security",
+      "source": {
+        "source": "git-subdir",
+        "url": "https://github.com/vaaraio/vaara.git",
+        "path": "plugins/claude-code-vaara-governance",
+        "ref": "main"
+      },
+      "homepage": "https://vaara.io"
+    }
+  ]
+}
