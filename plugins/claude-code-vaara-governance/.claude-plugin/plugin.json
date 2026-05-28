@@ -1,6 +1,6 @@
 {
   "name": "vaara-governance",
-  "version": "0.1.0",
+  "version": "0.1.1",
   "description": "Runtime tool-call governance for Claude Code. PreToolUse runs a two-layer check on Bash, WebFetch, WebSearch, and MCP calls (regex deny patterns on shell/web; conformal risk scorer on MCP). PostToolUse writes a hash-chained SQLite audit record. SessionStart validates the install and prints version, mode, and audit DB path.",
   "author": {
     "name": "Vaara",
