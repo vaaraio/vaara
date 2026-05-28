@@ -74,6 +74,18 @@ provenance, publish to PyPI via trusted publishing, sign with Sigstore,
 publish `@vaara/client` to npm with provenance, create the GitHub
 Release.
 
+## 3b. PR already merged via GH UI
+
+```
+scripts/release_tag_after_merge.sh <VERSION> [CO_TAG]
+```
+
+Use when the release PR was squash-merged through the GH UI (or any
+path that bypassed `release_merge_and_tag.sh`). Fetches `origin/main`,
+moves `v<VERSION>` (and `<CO_TAG>` if passed) to the merged SHA, prints
+the gated push command. Skips the `gh pr checks --watch` and
+`gh pr merge` steps from script #3.
+
 ## 4. Manual publish fallback (only when GH Actions is broken)
 
 ```
@@ -94,6 +106,19 @@ provenance, and ships npm without provenance. Those features require
 the GH OIDC flow. Manual publish trades them for being able to ship.
 Open an incident note explaining the bypass and restore the workflow
 before the next release.
+
+## 4b. npm-only manual publish
+
+```
+scripts/release_publish_npm_manual.sh <VERSION>
+```
+
+For the common case where the GH Actions npm step fails but PyPI
+already shipped (PyPI trusted publishing is rock solid; npm
+provenance via OIDC is the chunkier path). Token-based, no
+interactive `npm login`. Requires `VAARA_NPM_TOKEN` env var
+(npmjs.org → Access Tokens → Automation). Ships without provenance;
+restore the workflow before the next release.
 
 ## Cross-repo follow-up
 
