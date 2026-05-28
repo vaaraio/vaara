@@ -140,8 +140,13 @@ def bench_fanout(n_upstreams: int, n_calls: int, n_warmup: int) -> FanoutStats:
             },
         }
         t0 = time.perf_counter_ns()
-        client.post("/mcp", json=body, headers=headers)
-        return (time.perf_counter_ns() - t0) / 1_000_000.0
+        resp = client.post("/mcp", json=body, headers=headers)
+        elapsed = (time.perf_counter_ns() - t0) / 1_000_000.0
+        resp.raise_for_status()
+        payload = resp.json()
+        if isinstance(payload, dict) and payload.get("error") is not None:
+            raise RuntimeError(f"benchmark request failed: {payload['error']}")
+        return elapsed
 
     for i in range(n_warmup):
         call_once(i)
@@ -173,6 +178,11 @@ def main() -> None:
     parser.add_argument("--json", type=str, default=None,
                         help="dump machine-readable results to PATH")
     args = parser.parse_args()
+
+    if args.calls <= 0:
+        parser.error("--calls must be > 0")
+    if args.warmup < 0:
+        parser.error("--warmup must be >= 0")
 
     n_values = [int(x) for x in args.upstreams.split(",") if x.strip()]
     rows: list[FanoutStats] = []
