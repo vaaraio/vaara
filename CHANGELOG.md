@@ -530,7 +530,7 @@ the closed-weight attacker patterns the v7 fold was missing.
   tampering rejection, canonicalization invariants, and TTL handling.
 
 ### Changed
-- Production classifier: v7 → v8. v7 retained on disk for cross-eval
+- Production classifier: v7 to v8. v7 retained on disk for cross-eval
   reproducibility. Threshold unchanged at 0.9006.
 - `attestation` optional extra: adds `rfc8785>=0.1.4` for JCS
   canonicalization.
@@ -1531,8 +1531,8 @@ unchanged in behaviour; this patch restores PyPI/npm version lockstep
 established in v0.15.0. No Python code changes versus 0.18.0.
 
 ### Changed
-- `clients/ts/package.json`: 0.17.0 → 0.18.1 (lockstep with PyPI).
-- `pyproject.toml`, `src/vaara/__init__.py`: 0.18.0 → 0.18.1.
+- `clients/ts/package.json`: 0.17.0 to 0.18.1 (lockstep with PyPI).
+- `pyproject.toml`, `src/vaara/__init__.py`: 0.18.0 to 0.18.1.
 
 ## [0.18.0] - 2026-05-17
 
@@ -1574,7 +1574,7 @@ TEE report is a sibling artefact bound to a specific envelope by placing
   non-SEV-SNP host error path.
 
 ### Not in this release
-- AMD KDS-based cert-chain validation (VCEK → ASK → ARK). Validating
+- AMD KDS-based cert-chain validation (VCEK to ASK to ARK). Validating
   against AMD's Key Distribution Service requires a network fetch
   against `https://kdsintf.amd.com/` and is tracked for v0.19+.
 - Live `/dev/sev-guest` ioctl emission. The `SNP_GET_REPORT` ioctl path
@@ -1681,8 +1681,8 @@ Node service) can call Vaara without spawning a Python sidecar.
   stays manual. Once enabled and an ``NPM_TOKEN`` secret is set, every
   tag push publishes ``@vaara/client`` to npm with provenance.
 - 6 new TypeScript tests covering URL construction, JSON body
-  serialisation, the 4xx → ``VaaraError`` path with server-supplied
-  code, the network-failure → ``VaaraTransportError`` path, the
+  serialisation, the 4xx to ``VaaraError`` path with server-supplied
+  code, the network-failure to ``VaaraTransportError`` path, the
   detector response shape, and constructor input validation.
 
 ### Notes
@@ -1737,7 +1737,7 @@ slot in alongside Vaara's adaptive scorer with a single object.
 close the most legible competitive gaps without diluting the kernel
 position. Hot policy reload meets the Galileo Agent Control selling
 point on its own ground. The OVERT 1.0 Phase 3 Independent Attestation
-Provider (IAP) reference closes the AAL-3 → AAL-4 promotion path that
+Provider (IAP) reference closes the AAL-3 to AAL-4 promotion path that
 v0.11.0's Provisional Receipt opens, so Vaara owns the full path
 without forcing dependence on an external IAP vendor. Named injection
 and PII detectors expose existing scoring surface under buyer-visible
@@ -1775,7 +1775,7 @@ facing visual artefact that the peer set has converged on.
   vaara-bench-v1's published numbers (heuristic fallback when the ml
   extra is absent; the `backend` field reports which path served the
   call). `vaara.detect.detect_pii` is a zero-dependency regex extractor
-  over six categories — email, phone, US SSN, IPv4, credit_card
+  over six categories: email, phone, US SSN, IPv4, credit_card
   (Luhn-checked), IBAN (mod-97 checksum). `POST /v1/detect/injection`
   and `POST /v1/detect/pii` mirror the CLI. `vaara detect injection`
   and `vaara detect pii` read text from `--text`, `--file`, or
@@ -2090,7 +2090,7 @@ their conformal interval, get claimed by an operator, and produce an
 - **`vaara.audit.review_queue` module.** `ReviewQueue` is a
   SQLite-backed queue in its own DB file, separate from the audit DB
   (which keeps its append-only invariant clean). Statuses:
-  `pending → claimed → resolved` happy path, `pending → expired`
+  `pending to claimed to resolved` happy path, `pending to expired`
   stale path. Resolutions: `allow`, `deny`, `abstain`. `enqueue`
   records each item with the conformal interval, risk signals,
   bucket category, and request parameters/context as JSON. The
@@ -2183,7 +2183,7 @@ No functional code changes. v0.6.0 users are on the same code. V0.6.1 only refre
 - **`scripts/lint_full.sh` pre-push lint sweep** - chains `ruff` (style + correctness), `bandit` (security), `mypy` (types - strict on `vaara.policy`, lenient on legacy modules), and `pytest`. Documented in CONTRIBUTING.md. Catches CodeRabbit-class findings before they hit a PR review round-trip. New dev extras: `bandit>=1.7.5`, `mypy>=1.8`. Bandit configured in `pyproject.toml` to skip B608 across `audit/sqlite_backend.py` (all f-string SQL there interpolates only internally-controlled tenant clauses, not user input). Two `# nosec` annotations document the remaining trusted-bundle and synthetic-trace-RNG sites.
 
 ### Changed
-- **Audit DB schema v2 → v3.** Migration `_MIGRATIONS[2]` adds four nullable transparency columns to `audit_records`. Pre-v0.6 records get NULL for the new columns. Their stored `record_hash` is preserved (NOT re-hashed on load), so chain verification of historical records continues to work.
+- **Audit DB schema v2 to v3.** Migration `_MIGRATIONS[2]` adds four nullable transparency columns to `audit_records`. Pre-v0.6 records get NULL for the new columns. Their stored `record_hash` is preserved (NOT re-hashed on load), so chain verification of historical records continues to work.
 - **COMPLIANCE.md "Current limits"** replaced placeholder bullets with v0.6 measurement results:
   - **Distribution-shift split.** Hand-curated (held-out, 250): attack recall 97.1% / benign FPR 70.0%. LLM-generated (in-sample, 5,705): attack recall 95.2% / benign FPR 87.5%. The 18pp benign-FPR gap is the dominant distribution-shift signal.
   - **Stack composition.** `heuristic_only` recall 35% / 63%. `classifier_only` recall 94% / 86%. `full_stack` recall 97% / 98%. Layers not redundant - heuristic catches a small set of attacks the classifier misses (justifies the ensemble). Most full-stack benign FPR comes from heuristic ESCALATEs, not classifier upgrades.
@@ -2211,8 +2211,8 @@ No functional code changes. v0.6.0 users are on the same code. V0.6.1 only refre
 - `tests/test_adversarial_classifier_integration.py` covers the bundle-load, score-range, and known-bad-input paths end-to-end. Skipped when `vaara[ml]` extras are not installed.
 
 ### Changed
-- **Default classifier threshold: `0.5` → `0.55`.** Justified by threshold sweep on the rebalanced corpus: 0.55 is the operating point that clears the FPR and jailbreak-recall gates (global benign FPR ≤ 25%, jailbreak recall ≥ 60%) and passes the canonical preflight smoke test, while staying close to v0.5.2's balanced-accuracy band.
-- **Bundle format `version` bumped `1.1` → `1.4`.** Trained on the full 5,955-entry corpus (3,422 attack / 2,533 benign). Feature schema unchanged from v1.1 (236 features), so `_STATIC_FEATURES` schema-drift check passes without modification.
+- **Default classifier threshold: `0.5` to `0.55`.** Justified by threshold sweep on the rebalanced corpus: 0.55 is the operating point that clears the FPR and jailbreak-recall gates (global benign FPR ≤ 25%, jailbreak recall ≥ 60%) and passes the canonical preflight smoke test, while staying close to v0.5.2's balanced-accuracy band.
+- **Bundle format `version` bumped `1.1` to `1.4`.** Trained on the full 5,955-entry corpus (3,422 attack / 2,533 benign). Feature schema unchanged from v1.1 (236 features), so `_STATIC_FEATURES` schema-drift check passes without modification.
 - **`scripts/train_adversarial_classifier.py`** now coerces non-dict `context` and `parameters` entries (string-typed entries existed in the corpus from v0.5.0 onward but the trainer crashed on them) and runs `baseline_predictions` in `best_effort=True` mode. Net effect: trainer runs cleanly on the heterogeneous corpus.
 
 ### Benchmarks (5-fold CV OOF, threshold 0.55)
@@ -2259,7 +2259,7 @@ Per-category allow-leakage on the seed corpus (`tests/adversarial/<category>.jso
 | destructive_actions | 20% | **4%** |
 
 ### Known limits / honest read
-- Aggregate balanced accuracy regressed **1.5pp** from v0.5.2 (80.9% → 79.4%) and attack recall regressed **5.4pp** (85.2% → 79.8%). The trade is justified by the **+78.3pp** jailbreak recall delta and the **−2.3pp** FPR improvement, plus the cleaner edge-case behaviour evidenced by the preflight smoke test. v0.5.2's 80.9% balanced accuracy was partly inflated by counting jailbreak as "in scope" while the classifier scored 0% on it.
+- Aggregate balanced accuracy regressed **1.5pp** from v0.5.2 (80.9% to 79.4%) and attack recall regressed **5.4pp** (85.2% to 79.8%). The trade is justified by the **+78.3pp** jailbreak recall delta and the **−2.3pp** FPR improvement, plus the cleaner edge-case behaviour evidenced by the preflight smoke test. v0.5.2's 80.9% balanced accuracy was partly inflated by counting jailbreak as "in scope" while the classifier scored 0% on it.
 - LLM-generated content shares Qwen-style writing. The distribution-shift gap between generated-test recall and hand-curated-held-out recall has **not** been measured separately in this release. It will be reported in v0.6. Hand-curated regression numbers above are evidence that transfer is happening, but a formal split is owed.
 - Attacker-as-iterative-PAIR ceiling has **not** been measured. `COMPLIANCE.md` does not yet quote an adaptive-ASR figure.
 
@@ -2281,10 +2281,10 @@ At threshold 0.55, the 21.0% global FPR is a **reviewer queue**, not a blast doo
 - `_STATIC_FEATURES` constant plus load-time schema-drift check in `src/vaara/adversarial_classifier.py`. A bundle whose `feature_names` tail diverges from the runtime static feature list now raises `ValueError` at construction time, pinpointing the first differing index. This class of bug is no longer shippable without failing loud.
 
 ### Changed
-- Default threshold: `0.3` (v0.5.1) → `0.5`. Balanced accuracy peaks at 0.5 on the rebuilt bundle. The v0.5.1 claim of "52% recall, 3.3% FPR at threshold 0.3" was itself a recordkeeping error: the bundle saved `0.8`, not `0.3`, and those numbers were measured at 0.8.
+- Default threshold: `0.3` (v0.5.1) to `0.5`. Balanced accuracy peaks at 0.5 on the rebuilt bundle. The v0.5.1 claim of "52% recall, 3.3% FPR at threshold 0.3" was itself a recordkeeping error: the bundle saved `0.8`, not `0.3`, and those numbers were measured at 0.8.
 - `scripts/train_adversarial_classifier.py` `load_corpus` now uses `rglob` to recurse into `tests/adversarial/generated/` and `benign_generated/` automatically.
 - The `data_exfil` and `destructive_actions` regressions disclosed in v0.5.1 were artifacts of the broken bundle. The rebuilt classifier in v0.5.2 beats the heuristic in both: `destructive_actions` +40.2, `data_exfil` +24.7.
-- Bundle format `version` bumped 1.0 → 1.1.
+- Bundle format `version` bumped 1.0 to 1.1.
 
 ### Benchmarks (by-seed held-out, threshold 0.5)
 - Attack recall: **85.2%**
