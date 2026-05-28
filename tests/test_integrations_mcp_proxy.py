@@ -451,7 +451,7 @@ def test_uninterpreted_method_still_forwards_verbatim(monkeypatch):
 
 def test_progress_notification_records_perimeter_audit(monkeypatch):
     p, pipeline = _make_proxy(monkeypatch)
-    p._on_upstream_notification({
+    p._on_upstream_notification("default", {
         "jsonrpc": "2.0", "method": "notifications/progress",
         "params": {"progressToken": "tok-1", "progress": 25, "total": 100},
     })
@@ -474,7 +474,7 @@ def test_progress_notification_correlates_to_inflight_tools_call(monkeypatch):
             # works on the long-running call. The reader thread would invoke
             # this callback from a separate thread in production; calling it
             # synchronously here verifies the correlation logic.
-            p._on_upstream_notification({
+            p._on_upstream_notification("default", {
                 "jsonrpc": "2.0", "method": "notifications/progress",
                 "params": {"progressToken": "tok-stream", "progress": 50, "total": 100},
             })
@@ -491,7 +491,7 @@ def test_progress_notification_correlates_to_inflight_tools_call(monkeypatch):
             "_meta": {"progressToken": "tok-stream"},
         },
     })
-    assert progress_seen == [{"tok-stream": ("parent-act-9", "mcp-proxy-client", "long_tool", "")}]
+    assert progress_seen == [{"tok-stream": ("parent-act-9", "mcp-proxy-client", "long_tool", "", "")}]
     # Map is cleaned up after the call returns.
     assert p._inflight_progress == {}
     # Audit was called for the progress event with the parent correlation.
@@ -506,18 +506,21 @@ def test_progress_notification_correlates_to_inflight_tools_call(monkeypatch):
 def test_progress_notification_forwards_to_client(monkeypatch):
     p, _ = _make_proxy(monkeypatch)
     forwarded: list[dict] = []
-    monkeypatch.setattr(p, "_write_to_client", forwarded.append)
+    monkeypatch.setattr(
+        p._router, "deliver",
+        lambda message, *, session_id=None, upstream="default": forwarded.append(message),
+    )
     msg = {
         "jsonrpc": "2.0", "method": "notifications/progress",
         "params": {"progressToken": "tok-2", "progress": 1, "total": 1},
     }
-    p._on_upstream_notification(msg)
+    p._on_upstream_notification("default", msg)
     assert forwarded == [msg]
 
 
 def test_message_notification_records_perimeter_audit(monkeypatch):
     p, pipeline = _make_proxy(monkeypatch)
-    p._on_upstream_notification({
+    p._on_upstream_notification("default", {
         "jsonrpc": "2.0", "method": "notifications/message",
         "params": {"level": "info", "logger": "upstream", "data": "working"},
     })
@@ -530,12 +533,15 @@ def test_message_notification_records_perimeter_audit(monkeypatch):
 def test_non_governed_notification_still_forwards_without_audit(monkeypatch):
     p, pipeline = _make_proxy(monkeypatch)
     forwarded: list[dict] = []
-    monkeypatch.setattr(p, "_write_to_client", forwarded.append)
+    monkeypatch.setattr(
+        p._router, "deliver",
+        lambda message, *, session_id=None, upstream="default": forwarded.append(message),
+    )
     msg = {
         "jsonrpc": "2.0", "method": "notifications/resources/list_changed",
         "params": {},
     }
-    p._on_upstream_notification(msg)
+    p._on_upstream_notification("default", msg)
     assert forwarded == [msg]
     pipeline.registry.classify.assert_not_called()
 
@@ -544,12 +550,15 @@ def test_audit_failure_in_notification_does_not_break_forwarding(monkeypatch):
     p, pipeline = _make_proxy(monkeypatch)
     pipeline.registry.classify.side_effect = RuntimeError("audit blew up")
     forwarded: list[dict] = []
-    monkeypatch.setattr(p, "_write_to_client", forwarded.append)
+    monkeypatch.setattr(
+        p._router, "deliver",
+        lambda message, *, session_id=None, upstream="default": forwarded.append(message),
+    )
     msg = {
         "jsonrpc": "2.0", "method": "notifications/message",
         "params": {"level": "error"},
     }
-    p._on_upstream_notification(msg)
+    p._on_upstream_notification("default", msg)
     # Forward still happens — audit failure must not block streaming.
     assert forwarded == [msg]
 
@@ -600,3 +609,117 @@ def test_upstream_request_raises_proxy_error_when_reader_exits_without_response(
     with pytest.raises(up.ProxyError, match="closed before responding"):
         client.request({"jsonrpc": "2.0", "id": 1, "method": "ping"})
     client.close()
+
+
+# --- cancellation routing across fan-out (v0.41) ----------------------------
+
+def _make_fanout_proxy(monkeypatch):
+    """Build a proxy with two named upstreams, each backed by its own MagicMock.
+
+    The default ``UpstreamMCPClient`` patch returns the same mock instance for
+    every call, which conflates upstreams in fan-out tests. ``side_effect``
+    with a factory produces a fresh mock per construction so each slot has a
+    distinct ``notify`` call record.
+    """
+    from vaara.integrations import mcp_proxy
+
+    monkeypatch.setattr(
+        mcp_proxy, "UpstreamMCPClient",
+        MagicMock(side_effect=lambda **kw: MagicMock()),
+    )
+    pipeline = MagicMock()
+    p = mcp_proxy.VaaraMCPProxy(
+        upstreams={"alpha": ["echo", "alpha"], "beta": ["echo", "beta"]},
+        pipeline=pipeline,
+    )
+    return p, pipeline
+
+
+def test_cancellation_routes_to_upstream_that_owns_the_request_id(monkeypatch):
+    p, _ = _make_fanout_proxy(monkeypatch)
+    with p._inflight_lock:
+        p._inflight_requests[42] = "alpha"
+    p._handle_client_notification({
+        "jsonrpc": "2.0", "method": "notifications/cancelled",
+        "params": {"requestId": 42},
+    })
+    p._upstreams["alpha"].notify.assert_called_once()
+    p._upstreams["beta"].notify.assert_not_called()
+
+
+def test_cancellation_with_unknown_request_id_uses_contextvar_routing(monkeypatch):
+    p, _ = _make_fanout_proxy(monkeypatch)
+    from vaara.integrations.mcp_proxy import _REQUEST_UPSTREAM
+    token = _REQUEST_UPSTREAM.set("beta")
+    try:
+        p._handle_client_notification({
+            "jsonrpc": "2.0", "method": "notifications/cancelled",
+            "params": {"requestId": 9999},
+        })
+    finally:
+        _REQUEST_UPSTREAM.reset(token)
+    p._upstreams["beta"].notify.assert_called_once()
+    p._upstreams["alpha"].notify.assert_not_called()
+
+
+def test_non_cancellation_notification_follows_contextvar(monkeypatch):
+    p, _ = _make_fanout_proxy(monkeypatch)
+    # Even if the inflight map points to alpha, a non-cancellation
+    # notification must follow the per-request ContextVar instead.
+    with p._inflight_lock:
+        p._inflight_requests[7] = "alpha"
+    from vaara.integrations.mcp_proxy import _REQUEST_UPSTREAM
+    token = _REQUEST_UPSTREAM.set("beta")
+    try:
+        p._handle_client_notification({
+            "jsonrpc": "2.0", "method": "notifications/roots/list_changed",
+            "params": {},
+        })
+    finally:
+        _REQUEST_UPSTREAM.reset(token)
+    p._upstreams["beta"].notify.assert_called_once()
+    p._upstreams["alpha"].notify.assert_not_called()
+
+
+def test_inflight_requests_populated_during_tools_call_then_cleared(monkeypatch):
+    p, pipeline = _make_fanout_proxy(monkeypatch)
+    pipeline.intercept.return_value = _StubInterceptResult(allowed=True, action_id="a-1")
+    from vaara.integrations.mcp_proxy import _REQUEST_UPSTREAM
+    captured: list[dict] = []
+
+    def upstream_request(req):
+        # Snapshot the map mid-call; should show the request_id binding.
+        with p._inflight_lock:
+            captured.append(dict(p._inflight_requests))
+        return {"jsonrpc": "2.0", "id": req["id"], "result": {}}
+
+    token = _REQUEST_UPSTREAM.set("alpha")
+    try:
+        p._upstreams["alpha"].request.side_effect = upstream_request
+        p._handle_tools_call({
+            "jsonrpc": "2.0", "id": 77, "method": "tools/call",
+            "params": {"name": "t", "arguments": {}},
+        })
+    finally:
+        _REQUEST_UPSTREAM.reset(token)
+    assert captured == [{77: "alpha"}]
+    # Cleared after the call returns.
+    assert p._inflight_requests == {}
+
+
+def test_inflight_requests_cleared_when_tools_call_raises(monkeypatch):
+    p, pipeline = _make_fanout_proxy(monkeypatch)
+    pipeline.intercept.return_value = _StubInterceptResult(allowed=True, action_id="a-1")
+    from vaara.integrations._mcp_upstream import ProxyError
+    from vaara.integrations.mcp_proxy import _REQUEST_UPSTREAM
+    p._upstreams["alpha"].request.side_effect = ProxyError("boom")
+    token = _REQUEST_UPSTREAM.set("alpha")
+    try:
+        with pytest.raises(ProxyError):
+            p._handle_tools_call({
+                "jsonrpc": "2.0", "id": 88, "method": "tools/call",
+                "params": {"name": "t", "arguments": {}},
+            })
+    finally:
+        _REQUEST_UPSTREAM.reset(token)
+    assert p._inflight_requests == {}

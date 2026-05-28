@@ -1188,9 +1188,17 @@ def _cmd_mode_emit(args: argparse.Namespace) -> int:
     return 0
 
 
+def _help_dispatch(parser: argparse.ArgumentParser):
+    def _print(_args: argparse.Namespace) -> int:
+        parser.print_help()
+        return 0
+    return _print
+
+
 def build_parser() -> argparse.ArgumentParser:
     p = argparse.ArgumentParser(prog="vaara", description="Vaara AI Agent Execution Layer")
-    sub = p.add_subparsers(dest="cmd", required=True)
+    sub = p.add_subparsers(dest="cmd")
+    p.set_defaults(func=_help_dispatch(p))
 
     sub.add_parser("version", help="Print Vaara version").set_defaults(func=_cmd_version)
 
@@ -1208,7 +1216,8 @@ def build_parser() -> argparse.ArgumentParser:
     pk.set_defaults(func=_cmd_keygen)
 
     pt = sub.add_parser("trail", help="Audit-trail commands")
-    tsub = pt.add_subparsers(dest="trail_cmd", required=True)
+    tsub = pt.add_subparsers(dest="trail_cmd")
+    pt.set_defaults(func=_help_dispatch(pt))
 
     pe = tsub.add_parser("export", help="Export a signed, regulator-handoff trail zip")
     pe.add_argument("--trail", required=True, help="Path to trail JSONL file")
@@ -1307,7 +1316,8 @@ def build_parser() -> argparse.ArgumentParser:
         "review",
         help="Human-in-the-loop review queue (EU AI Act Article 14)",
     )
-    rsub = pr.add_subparsers(dest="review_cmd", required=True)
+    rsub = pr.add_subparsers(dest="review_cmd")
+    pr.set_defaults(func=_help_dispatch(pr))
 
     rl = rsub.add_parser("list", help="List queue items (default: pending)")
     rl.add_argument("--db", required=True, help="Path to the review queue DB")
@@ -1372,7 +1382,8 @@ def build_parser() -> argparse.ArgumentParser:
         "policy",
         help="Policy artifact commands (validate, test, reload)",
     )
-    psub = pp_policy.add_subparsers(dest="policy_cmd", required=True)
+    psub = pp_policy.add_subparsers(dest="policy_cmd")
+    pp_policy.set_defaults(func=_help_dispatch(pp_policy))
 
     pvalid = psub.add_parser(
         "validate",
@@ -1404,7 +1415,8 @@ def build_parser() -> argparse.ArgumentParser:
         "compliance",
         help="Compliance reporting commands",
     )
-    csub = pcr.add_subparsers(dest="compliance_cmd", required=True)
+    csub = pcr.add_subparsers(dest="compliance_cmd")
+    pcr.set_defaults(func=_help_dispatch(pcr))
     pcrep = csub.add_parser(
         "report",
         help="Assemble and render an article-level evidence report",
@@ -1495,7 +1507,8 @@ def build_parser() -> argparse.ArgumentParser:
         "detect",
         help="Named detectors (injection, pii) over Vaara's scoring surface",
     )
-    dsub = pdetect.add_subparsers(dest="detect_cmd", required=True)
+    dsub = pdetect.add_subparsers(dest="detect_cmd")
+    pdetect.set_defaults(func=_help_dispatch(pdetect))
 
     def _add_text_input_args(p_):
         g = p_.add_mutually_exclusive_group(required=True)
@@ -1540,7 +1553,8 @@ def build_parser() -> argparse.ArgumentParser:
             "OVERT 1.0 attestation commands (Protocol Profile 1.0 Annex B.6)"
         ),
     )
-    osub = povert.add_subparsers(dest="overt_cmd", required=True)
+    osub = povert.add_subparsers(dest="overt_cmd")
+    povert.set_defaults(func=_help_dispatch(povert))
     pov_verify = osub.add_parser(
         "verify",
         help=(
@@ -1573,7 +1587,8 @@ def build_parser() -> argparse.ArgumentParser:
             "Hardware TEE attestation commands (experimental, AMD SEV-SNP)"
         ),
     )
-    tsub = ptee.add_subparsers(dest="tee_cmd", required=True)
+    tsub = ptee.add_subparsers(dest="tee_cmd")
+    ptee.set_defaults(func=_help_dispatch(ptee))
 
     ptee_parse = tsub.add_parser(
         "parse",
@@ -1660,7 +1675,8 @@ def build_parser() -> argparse.ArgumentParser:
             "(eco / balanced / performance / strict)"
         ),
     )
-    msub = pmode.add_subparsers(dest="mode_cmd", required=True)
+    msub = pmode.add_subparsers(dest="mode_cmd")
+    pmode.set_defaults(func=_help_dispatch(pmode))
 
     pml = msub.add_parser(
         "list",
