@@ -2,19 +2,19 @@
   "$schema": "https://static.modelcontextprotocol.io/schemas/2025-12-11/server.schema.json",
   "name": "io.github.vaaraio/vaara-server",
   "title": "Vaara MCP Server",
-  "description": "Vaara governance exposed as a standalone MCP server. Provides vaara_check, vaara_intercept, and vaara_report_outcome tools plus vaara://status and vaara://compliance resources, so any MCP host can score and audit its own tool calls without running the Vaara proxy.",
+  "description": "Vaara governance as standalone MCP server. Risk scoring, intercept, hash-chained audit.",
   "websiteUrl": "https://vaara.io",
   "repository": {
     "url": "https://github.com/vaaraio/vaara",
     "source": "github"
   },
-  "version": "0.40.2",
+  "version": "0.40.3",
   "packages": [
     {
       "registryType": "pypi",
       "registryBaseUrl": "https://pypi.org",
       "identifier": "vaara",
-      "version": "0.40.2",
+      "version": "0.40.3",
       "runtimeHint": "uvx",
       "transport": {
         "type": "stdio"
