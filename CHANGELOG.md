@@ -6,6 +6,35 @@ and this project follows [Semantic Versioning](https://semver.org/spec/v2.0.0.ht
 
 ## [Unreleased]
 
+## [0.40.1] - 2026-05-28
+
+**Theme: registry-prep + README trim.**
+
+### Added
+- `server.json` at the repo root, conformant to the
+  `2025-12-11/server.schema.json` schema. Registers Vaara as
+  `io.github.vaaraio/vaara` against the official MCP Registry, points
+  at the PyPI `vaara` package, and describes the `vaara-mcp-proxy`
+  stdio invocation through `uvx --from vaara vaara-mcp-proxy
+  --upstream NAME=CMD`.
+- `mcp-name: io.github.vaaraio/vaara` ownership marker (HTML comment)
+  in `README.md`, required by the MCP Registry to verify the PyPI
+  package belongs to the publishing GitHub identity.
+- `mcpName: io.github.vaaraio/vaara` in `clients/ts/package.json`,
+  the npm-side equivalent of the same ownership check.
+
+### Changed
+- README trimmed for shape. Buyer-persona "Who reaches for Vaara"
+  section removed. Per-article verdict drill-down details collapsible
+  inlined as a single paragraph. Upstream-signal-adapter intro no
+  longer enumerates AI Act article numbers (the mapping table in
+  COMPLIANCE.md is the authority). Composite-scorer aside removed
+  from the HTTP API section. MCP-proxy OVERT collapsible removed
+  (the OVERT 1.0 attestation section directly below covers the same
+  ground). MCP-proxy streaming-notifications collapsible compressed
+  to one line. OVERT trailing IAP / S3P / TEE paragraphs collapsed
+  into one. Vendor-namedrop tail after the worked examples removed.
+
 ## [0.40.0] - 2026-05-28
 
 **Theme: deployment shape. One Vaara process now serves a fleet of
