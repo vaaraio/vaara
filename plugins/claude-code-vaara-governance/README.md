@@ -67,10 +67,11 @@ Rule shape:
 The plugin writes to a persistent SQLite trail that survives Claude Code restarts. Inspect with the Vaara CLI:
 
 ```
-vaara trail verify --db ~/.vaara/claude-code/audit.db
-vaara trail export --db ~/.vaara/claude-code/audit.db --format json
-vaara compliance report --db ~/.vaara/claude-code/audit.db --format markdown
+vaara compliance report --db ~/.vaara/claude-code/audit.db --format md
+vaara compliance dashboard --db ~/.vaara/claude-code/audit.db --out ~/audit-dashboard.html
 ```
+
+For a signed, regulator-handoff bundle, export the trail with `vaara trail export --trail PATH --out PATH --key PATH`, then verify the zip with `vaara trail verify --zip PATH`.
 
 ## Latency
 
