@@ -106,7 +106,7 @@ def governed_invoke(pipeline, lc_tool, args, *, agent_id="demo-agent"):
 
 
 console = Console()
-table = Table(title="LangChain → Vaara → tool", box=box.SIMPLE, pad_edge=False)
+table = Table(title="LangChain to Vaara to tool", box=box.SIMPLE, pad_edge=False)
 table.add_column("tool", style="cyan", no_wrap=True)
 table.add_column("args", overflow="fold")
 table.add_column("risk", no_wrap=True)
@@ -116,11 +116,11 @@ for lc_tool, args in demo_calls:
     result, output = governed_invoke(pipeline, lc_tool, args)
     risk = f"{result.risk_score:.2f} [{result.risk_interval[0]:.2f}-{result.risk_interval[1]:.2f}]"
     if result.allowed:
-        verdict = f"[green]ALLOW[/] → {output}"
+        verdict = f"[green]ALLOW[/] to {output}"
     elif result.decision == "escalate":
-        verdict = f"[yellow]ESCALATE[/] → {result.reason.split(' (')[0]}"
+        verdict = f"[yellow]ESCALATE[/] to {result.reason.split(' (')[0]}"
     else:
-        verdict = f"[red]BLOCK[/] → {result.reason.split(' (')[0]}"
+        verdict = f"[red]BLOCK[/] to {result.reason.split(' (')[0]}"
     table.add_row(lc_tool.name, str(args)[:60], risk, verdict)
 
 console.print(table)

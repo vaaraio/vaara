@@ -14,10 +14,10 @@ adding calibrated uncertainty to per-action risk:
    tracks which signals actually predict bad outcomes and up-weights them.
 
 3. **Temporal sequence reasoning** — individual actions may be safe but
-   sequences can be catastrophic (e.g., read_data → export → delete is a
+   sequences can be catastrophic (e.g., read_data to export to delete is a
    data exfiltration pattern even if each action alone is benign).
 
-4. **Cold start → learned transition** — starts with rule-based scoring,
+4. **Cold start to learned transition** — starts with rule-based scoring,
    accumulates calibration data, flips to conformal-wrapped ML scoring
    once coverage guarantee can be maintained.
 """
@@ -93,8 +93,8 @@ class RiskAssessment:
     decision: Decision
     signals: dict[str, float]      # Named signal contributions
     mwu_weights: dict[str, float]  # Current expert weights (snapshot)
-    threshold_allow: float         # Score below this → allow
-    threshold_deny: float          # Score above this → deny (between = escalate)
+    threshold_allow: float         # Score below this to allow
+    threshold_deny: float          # Score above this to deny (between = escalate)
     sequence_risk: float           # Contribution from temporal patterns
     calibration_size: int          # How many calibration points we have
     effective_alpha: float = 0.10  # FACI-adapted alpha for the bucket used
@@ -196,14 +196,14 @@ BUILTIN_SEQUENCES = [
         ("tx.approve", "tx.swap", "tx.transfer"),
         risk_boost=0.6,
         window_size=8,
-        description="Approve → swap → transfer — possible fund drainage",
+        description="Approve to swap to transfer — possible fund drainage",
     ),
     SequencePattern(
         "governance_takeover",
         ("id.grant_permission", "gov.vote", "gov.execute_proposal"),
         risk_boost=0.7,
         window_size=10,
-        description="Grant access → vote → execute — governance capture",
+        description="Grant access to vote to execute — governance capture",
     ),
     SequencePattern(
         "safety_override_sequence",
@@ -287,7 +287,7 @@ class MWUExperts:
                 continue
             if not math.isfinite(signal_f):
                 continue
-            # Loss = |prediction - outcome|.  High loss → weight decreases.
+            # Loss = |prediction - outcome|.  High loss to weight decreases.
             loss = abs(signal_f - outcome)
             self._weights[name] *= math.exp(-self._eta * loss)
             self._weights[name] = max(self._min_weight, self._weights[name])
@@ -615,9 +615,9 @@ class AdaptiveScorer:
     ) -> None:
         """
         Args:
-            threshold_allow: Risk scores below this → ALLOW.
-            threshold_deny:  Risk scores above this → DENY.
-                             Between allow and deny → ESCALATE for human review.
+            threshold_allow: Risk scores below this to ALLOW.
+            threshold_deny:  Risk scores above this to DENY.
+                             Between allow and deny to ESCALATE for human review.
             alpha: Conformal miscoverage rate (0.10 = 90% coverage guarantee).
             mwu_eta: MWU learning rate.
             sequence_patterns: Dangerous action sequences to detect.
@@ -678,7 +678,7 @@ class AdaptiveScorer:
         # Sequence patterns
         self._sequences = list(sequence_patterns or BUILTIN_SEQUENCES)
 
-        # Agent profiles (agent_id → AgentProfile). OrderedDict provides
+        # Agent profiles (agent_id to AgentProfile). OrderedDict provides
         # LRU semantics: move_to_end on access, popitem(last=False) to
         # evict oldest when over _max_tracked_agents.
         self._agents: "OrderedDict[str, AgentProfile]" = OrderedDict()
@@ -1041,7 +1041,7 @@ class AdaptiveScorer:
         when no known pattern matches but the recent window contains
         high-risk actions spanning multiple categories. The fallback
         catches attacks that don't fit a pre-enumerated template
-        (e.g., data.export → infra.deploy → gov.vote) without producing
+        (e.g., data.export to infra.deploy to gov.vote) without producing
         false positives on single-category legitimate workflows.
         """
         profile = self._agents.get(agent_id)
