@@ -150,6 +150,25 @@ const r = await vaara.score({ tool_name: "tx.transfer", agent_id: "agent-007", b
 if (r.decision === "deny") throw new Error("blocked");
 ```
 
+## Policy modes
+
+Four preset operating points for the risk thresholds, shaped like CPU power profiles:
+
+- `eco` (escalate 0.40, deny 0.60). Tight deny threshold cuts agent loops short on borderline risk. Pair with regex-first gating to short-circuit before any model forward pass.
+- `balanced` (0.55, 0.85). Vaara's default behaviour.
+- `performance` (0.70, 0.92). Looser thresholds let more through. For high-throughput pipelines where the deployer keeps tight action-class overrides on the few classes that matter.
+- `strict` (0.30, 0.55). Escalate-on-doubt. For incident response, audit prep, or production lockdown windows.
+
+Each mode emits a minimal valid Vaara policy document with `thresholds.default` set, ready for the deployer to fill in action classes, sequences, and escalation routes.
+
+```bash
+vaara mode list
+vaara mode show balanced
+vaara mode emit strict --format yaml --output policy.yaml
+```
+
+The emitted document round-trips through `vaara.policy.from_dict`, `from_json`, and `from_yaml` like any other policy artifact.
+
 ## MCP proxy (Vaara as a transparent governance layer)
 
 `vaara.integrations.mcp_proxy.VaaraMCPProxy` sits between an MCP client (Claude Code, Cursor, any MCP-capable host) and an upstream MCP server. Every `tools/call` from the client routes through Vaara's interception pipeline before reaching the upstream. Allowed calls forward transparently and report the upstream outcome back to the scorer. Blocked calls return an MCP `isError: true` response with the block reason. The initialization handshake and `notifications/*` forward unchanged. `tools/list`, `resources/list`, `resources/read`, `prompts/list`, and `prompts/get` route through the operator perimeter before reaching the client or upstream.
