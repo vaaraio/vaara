@@ -42,7 +42,15 @@ def main() -> int:
 
     mode = "shadow" if os.environ.get("VAARA_PLUGIN_SHADOW") == "1" else "enforce"
     db_path = _audit_db_path()
-    db_state = "new" if not db_path.exists() else "existing"
+    existed = db_path.exists()
+    try:
+        from vaara.audit.sqlite_backend import SQLiteAuditBackend
+
+        db_path.parent.mkdir(parents=True, exist_ok=True)
+        SQLiteAuditBackend(db_path)
+        db_state = "existing" if existed else "created"
+    except Exception as exc:
+        db_state = f"unavailable ({exc!r})"
 
     _emit(
         f"vaara-governance v0.1.0 loaded "
