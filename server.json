@@ -1,0 +1,45 @@
+{
+  "$schema": "https://static.modelcontextprotocol.io/schemas/2025-12-11/server.schema.json",
+  "name": "io.github.vaaraio/vaara",
+  "title": "Vaara",
+  "description": "Runtime governance proxy for MCP servers. Risk scoring, hash-chained audit, per-tenant policy.",
+  "websiteUrl": "https://vaara.io",
+  "repository": {
+    "url": "https://github.com/vaaraio/vaara",
+    "source": "github"
+  },
+  "version": "0.40.1",
+  "packages": [
+    {
+      "registryType": "pypi",
+      "registryBaseUrl": "https://pypi.org",
+      "identifier": "vaara",
+      "version": "0.40.1",
+      "runtimeHint": "uvx",
+      "transport": {
+        "type": "stdio"
+      },
+      "runtimeArguments": [
+        {
+          "type": "named",
+          "name": "--from",
+          "value": "vaara",
+          "description": "PyPI package providing the vaara-mcp-proxy entry point"
+        },
+        {
+          "type": "positional",
+          "value": "vaara-mcp-proxy"
+        }
+      ],
+      "packageArguments": [
+        {
+          "type": "named",
+          "name": "--upstream",
+          "description": "Upstream MCP server in NAME=CMD form. Repeatable for fan-out (e.g. --upstream github=npx -y @modelcontextprotocol/server-github). Bare --upstream CMD lands under the default slot for single-upstream stdio.",
+          "isRequired": true,
+          "isRepeated": true
+        }
+      ]
+    }
+  ]
+}

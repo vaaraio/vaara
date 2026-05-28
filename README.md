@@ -65,13 +65,6 @@ else:
 
 `report_outcome` closes the loop. MWU reweights signals based on which ones predicted the outcome.
 
-## Who reaches for Vaara
-
-- **AI compliance teams** shipping high-risk systems under the EU AI Act: Article 9 risk management, Article 12 logging, Article 15 robustness, Article 61 post-market monitoring evidence.
-- **ML platform teams** adding runtime governance to agentic stacks (LangChain, CrewAI, OpenAI Agents SDK, MCP-based hosts) without rewriting orchestration.
-- **AI safety and red teams** calibrating scorers against adaptive attackers (PAIR, distribution-shift evals, custom corpora).
-- **Notified Bodies and internal auditors** reading article-level evidence reports without trusting the deployer's stack.
-
 ## What evidence looks like
 
 `vaara compliance report --format json` against a real audit trail produces an article-level evidence record an auditor can read directly. Status is reported honestly: articles without recorded events return `evidence_insufficient`, not a rubber-stamp.
@@ -94,11 +87,7 @@ else:
 
 The same data renders as a styled PDF for Notified Bodies (`vaara compliance report --format pdf`, requires `pip install 'vaara[pdf]'`), a static HTML dashboard (`vaara compliance dashboard`), or a Sigstore-signed regulator-handoff envelope (`vaara trail export`, optional ML-DSA-65 / FIPS 204 post-quantum signer via `pip install 'vaara[pq]'`).
 
-<details>
-<summary>Per-article verdict drill-down</summary>
-
-Each article in the report carries two extra surfaces a reviewer can read without re-running the engine. `verdict_inputs` lists the threshold-vs-observed snapshot the engine compared against (minimum record count, staleness window, strong-strength bounds, future-timestamp and chain-integrity flags) plus a `verdict_reasons` list of human-readable rationale lines explaining why the status and strength landed where they did. `contributing_events` lists the most recent qualifying audit records the verdict sits on (record ID, action ID, ISO timestamp, agent, tool, and a filtered `drill_down` dict of just the data fields that fed the risk/decision/outcome: point estimate, conformal interval, decision, reason, outcome severity). The drill-down renders in every output format: JSON, markdown, narrative, PDF, and the HTML dashboard. An auditor reading the report can trace `status → threshold delta → concrete event` in one sitting.
-</details>
+Each article verdict carries `verdict_inputs` (threshold-vs-observed snapshot), `verdict_reasons` (rationale lines), and `contributing_events` (the audit records the verdict sits on, with a `drill_down` of the data that fed the risk/decision/outcome). Reviewers can trace `status → threshold delta → concrete event` without re-running the engine.
 
 ## Framework adapters
 
@@ -115,7 +104,7 @@ All four share the same in-process pipeline, so audit records hash-chain togethe
 
 ## Upstream-signal adapters (cloud + OSS guardrails)
 
-Adapters route findings from cloud and OSS guardrails into Vaara's audit trail and OVERT envelope with EU AI Act article tags. The filter runs in the deployer's environment as an upstream signal. Vaara records the verdict, normalises 68 provider categories onto a shared vocabulary, and tags each finding against Art. 5, 10, 13, 15, 53, and the CSAM-specific obligation from the Digital Omnibus political agreement of May 2026.
+Adapters route findings from cloud and OSS guardrails into Vaara's audit trail and OVERT envelope. The filter runs in the deployer's environment as an upstream signal. Vaara records the verdict, normalises 68 provider categories onto a shared vocabulary, and tags each finding against the relevant AI Act articles. Article-by-article mapping in [COMPLIANCE.md](COMPLIANCE.md).
 
 | Provider | Adapter | Extra | Wraps |
 |---|---|---|---|
@@ -144,9 +133,7 @@ curl -sX POST http://localhost:8000/v1/score \
   -d '{"tool_name":"tx.transfer","agent_id":"agent-007","base_risk_score":0.5}'
 ```
 
-The wire contract is in [docs/openapi.yaml](docs/openapi.yaml). Vaara defines the interface. Control-plane and orchestration vendors call it. Integration recipes for adopters live under `examples/recipes/`. Operator endpoints include `POST /v1/policy/reload` for atomic hot policy swap (start with `vaara serve --policy PATH` to enable), and `POST /v1/detect/injection` and `POST /v1/detect/pii` as named buyer-visible detectors with matching CLI subcommands that exit non-zero on detection for CI gating.
-
-Vaara's scorer can be run alongside external scorers via `vaara.scorer.composition.ExternalScorer` and `vaara.scorer.composite.CompositeScorer`. Any service that implements the `/v1/score` wire contract (NeMo Guardrails, another Vaara instance) can be composed. The composite preserves the strongest decision across members.
+The wire contract is in [docs/openapi.yaml](docs/openapi.yaml). Integration recipes under `examples/recipes/`. Operator endpoints include `POST /v1/policy/reload` for atomic hot policy swap, and `POST /v1/detect/injection` and `POST /v1/detect/pii` as named detectors with matching CLI subcommands that exit non-zero on detection for CI gating.
 
 ### TypeScript client
 
@@ -200,46 +187,12 @@ The reference HTTP API server (`vaara serve --policy-dir DIR`) loads one YAML or
 The proxy accepts repeatable `--allow-tool NAME` / `--deny-tool NAME`, `--allow-resource URI` / `--deny-resource URI`, and `--allow-prompt NAME` / `--deny-prompt NAME` flags. Filtered tools are dropped from `tools/list` responses before the client sees them and any matching `tools/call` is rejected at the proxy perimeter without contacting the upstream. The same shape extends to `resources/list` + `resources/read` and `prompts/list` + `prompts/get`. Denylist wins on overlap with allowlist. No flags = passthrough. Every allowed `resources/read` and `prompts/get` writes a request+decision audit pair to the hash chain so a regulator can reconstruct exactly which resources the agent read and which prompts it retrieved. Read-oriented MCP surfaces do not run through the risk scorer. The operator perimeter is the gate, the audit chain is the evidence.
 </details>
 
-<details>
-<summary>OVERT 1.0 envelopes per interaction</summary>
+OVERT envelopes per governed interaction turn on with `--overt-signing-key`, `--overt-operator-key`, `--overt-receipts-dir`. Wire format and verifier covered in the [OVERT 1.0 attestation](#overt-10-attestation) section below. Long-running tools' `notifications/progress` and `notifications/message` route through the same audit pair and OVERT envelope, correlated to the originating call via `_meta.progressToken`.
 
-Off by default. When you pass `--overt-signing-key KEY.pem`, `--overt-operator-key OPKEY.bin`, and `--overt-receipts-dir DIR/`, the proxy writes one OVERT 1.0 Protocol Profile 1.0 Base Envelope (canonical CBOR, Ed25519, closed 9-field schema) per governed interaction into `DIR/{nanosecond_timestamp}-{counter:010d}.cbor`. Covers all four states: allowed `tools/call`, blocked `tools/call`, perimeter-filtered call, and perimeter-filtered `resources/read` / `prompts/get`. The arbiter public key is pinned alongside as `pubkey.bin`. Each envelope verifies offline under `vaara overt verify` against any conformant verifier.
+Worked examples:
 
-```bash
-# 1. Generate an Ed25519 signing key. Evaluation/demo only. For production use a KMS or HSM (see docs/signing-keys.md).
-vaara keygen --dev --out signing.pem
-
-# 2. Mint an operator HMAC key (>= 16 raw bytes). Used for request_commitment per OVERT Annex B.4.
-head -c 32 /dev/urandom > op.key
-
-# 3. Run the proxy with OVERT emission turned on.
-vaara-mcp-proxy \
-  --upstream npx --upstream-arg -y --upstream-arg @sap/mdk-mcp-server \
-  --overt-signing-key signing.pem \
-  --overt-operator-key op.key \
-  --overt-receipts-dir ./overt_receipts
-
-# Each interaction now produces a Provisional Receipt:
-vaara overt verify ./overt_receipts/1779309684224332669-0000000001.cbor \
-  --pubkey-file ./overt_receipts/pubkey.bin
-# → {"valid": true, "monotonic_counter": 1, ...}
-```
-
-`non_content_metadata` carries structural fields only (action class, tool/resource/prompt identifier, decision, reason, agent_id, action_id). The request content itself never leaves the operator environment. Only its HMAC-SHA256 commitment crosses the trust boundary. The monotonic counter advances strictly across the whole proxy process so gaps are detectable. Emission failure is logged and swallowed: attestation problems must not block legitimate upstream traffic.
-</details>
-
-<details>
-<summary>Streaming notifications inside the boundary</summary>
-
-Long-running upstream tools emit `notifications/progress` and `notifications/message` over the lifetime of a `tools/call`. The proxy routes each notification through the same audit pair (request + decision) and, when OVERT is configured, emits a dedicated Base Envelope with action class `mcp.notification.progress` or `mcp.notification.message`. Progress events correlate to the originating call via the `_meta.progressToken` from the request, so a regulator reading the receipt directory can reconstruct what arrived between request and response. Notifications still forward to the client unchanged. Audit failures are logged and swallowed: observation never blocks streaming.
-</details>
-
-Worked examples with real upstream servers:
-
-- [`examples/github-mcp-proxy-demo/`](examples/github-mcp-proxy-demo/). Vaara in front of [`github/github-mcp-server`](https://github.com/github/github-mcp-server) (GitHub's official MCP server, MIT-licensed). End-to-end verified: real subprocess, 42 tools advertised, hash-chained audit trail recorded.
-- [`examples/sap-mcp-proxy-demo/`](examples/sap-mcp-proxy-demo/). Vaara in front of community SAP MCP servers ([`SAP/mdk-mcp-server`](https://github.com/SAP/mdk-mcp-server), [`mario-andreschak/mcp-abap-abap-adt-api`](https://github.com/mario-andreschak/mcp-abap-abap-adt-api), [`lemaiwo/btp-sap-odata-to-mcp-server`](https://github.com/lemaiwo/btp-sap-odata-to-mcp-server)).
-
-The proxy is MCP-protocol-level, not vendor-specific. The same three-step recipe applies to any stdio-capable MCP server (Microsoft Graph MCP, Salesforce MCP, ServiceNow MCP, cloud-provider MCP servers, Databricks MCP, and so on).
+- [`examples/github-mcp-proxy-demo/`](examples/github-mcp-proxy-demo/) — Vaara in front of [`github/github-mcp-server`](https://github.com/github/github-mcp-server), 42 tools, hash-chained audit trail recorded end-to-end.
+- [`examples/sap-mcp-proxy-demo/`](examples/sap-mcp-proxy-demo/) — Vaara in front of community SAP MCP servers ([`SAP/mdk-mcp-server`](https://github.com/SAP/mdk-mcp-server), [`mario-andreschak/mcp-abap-abap-adt-api`](https://github.com/mario-andreschak/mcp-abap-abap-adt-api), [`lemaiwo/btp-sap-odata-to-mcp-server`](https://github.com/lemaiwo/btp-sap-odata-to-mcp-server)).
 
 ## OVERT 1.0 attestation
 
@@ -266,13 +219,11 @@ envelope = emit_base_envelope(
 )
 ```
 
-The reference Phase 3 IAP (`vaara.attestation.iap`) notary-signs the Provisional Receipt and anchors it in a transparency log. Production deployments can swap in sigstore Rekor or an equivalent independently-operated log at the same call sites. The OVERT S3P (MEA-2) emitter at `vaara.attestation.s3p` ships exact Clopper-Pearson confidence intervals (pure Python, no scipy) and a proposed Protocol Profile extension that reports aggregate statistics over per-action conformal prediction intervals alongside the standard binomial CI.
+`vaara overt verify RECEIPT.cbor --pubkey-file PUB.bin` validates any canonical-CBOR Base Envelope. The verifier reads only the wire format and takes no dependency on Vaara's emitter, so any conformant implementation can route through it.
 
-The `vaara overt verify RECEIPT.cbor --pubkey-file PUB.bin` CLI validates any canonical-CBOR Base Envelope against a supplied raw 32-byte Ed25519 public key. The verifier reads only the wire format and takes no dependency on Vaara's emitter, so any OVERT-conformant implementation can route its conformance check through it.
+Adjacent surfaces: a reference Phase 3 IAP (`vaara.attestation.iap`) notary-signs the Provisional Receipt and anchors it in a transparency log (sigstore Rekor swappable); an S3P emitter (`vaara.attestation.s3p`) ships Clopper-Pearson aggregate intervals; an experimental hardware TEE hook (`vaara.attestation.tee`) binds an envelope to an AMD SEV-SNP attestation report via `SHA-512(canonical_cbor(envelope))` in `REPORT_DATA`.
 
-An experimental hardware TEE hook (`vaara.attestation.tee`) binds an OVERT envelope to an AMD SEV-SNP attestation report by placing `SHA-512(canonical_cbor(envelope))` in the report's 64-byte `REPORT_DATA` field. The envelope schema is unchanged (closed per spec). The TEE report is a sibling artefact: a relying party checks the Ed25519 envelope signature and the ECDSA P-384 report signature independently. `vaara tee parse` and `vaara tee verify` expose the verifier as a CLI.
-
-See [COMPLIANCE.md](COMPLIANCE.md) "Position relative to open runtime-attestation standards" for the architectural framing and "OVERT 1.0 Part 3 (Agentic AI Controls) mapping" for the TOOL-*, MCP-*, MULTI-*, CAP-*, DISC-*, HITL-*, DRIFT-* control-by-control walk.
+Architectural framing and the OVERT 1.0 Part 3 control walk in [COMPLIANCE.md](COMPLIANCE.md).
 
 ## Where things live
 
@@ -306,3 +257,5 @@ Acknowledgements:
 ## License
 
 Apache 2.0. See [LICENSE](LICENSE).
+
+<!-- mcp-name: io.github.vaaraio/vaara -->
