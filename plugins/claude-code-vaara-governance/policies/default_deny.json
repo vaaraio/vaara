@@ -1,0 +1,97 @@
+{
+  "version": "0.1",
+  "description": "Default deny-pattern policy for the Vaara Claude Code plugin. Regex matches against tool input fields are evaluated BEFORE the Vaara ML classifier. A match short-circuits to a hard deny with the rule's message. Operators extend or replace by pointing VAARA_PLUGIN_DENY_PATTERNS_FILE at their own JSON.",
+  "rules": [
+    {
+      "id": "ssrf_cloud_metadata_ipv4",
+      "tools": ["Bash", "WebFetch"],
+      "fields": ["command", "url"],
+      "pattern": "169\\.254\\.169\\.254",
+      "message": "AWS/GCP/Azure instance-metadata IP — common SSRF / credential exfiltration target."
+    },
+    {
+      "id": "ssrf_gcp_metadata_host",
+      "tools": ["Bash", "WebFetch"],
+      "fields": ["command", "url"],
+      "pattern": "metadata\\.google\\.internal",
+      "message": "GCP metadata host — credential exfiltration target."
+    },
+    {
+      "id": "ssrf_azure_imds_host",
+      "tools": ["Bash", "WebFetch"],
+      "fields": ["command", "url"],
+      "pattern": "100\\.100\\.100\\.200|metadata\\.azure\\.com",
+      "message": "Azure IMDS / metadata host — credential exfiltration target."
+    },
+    {
+      "id": "etc_shadow_read",
+      "tools": ["Bash"],
+      "fields": ["command"],
+      "pattern": "/etc/(shadow|gshadow|sudoers)\\b",
+      "message": "Read of /etc/shadow or related privileged files."
+    },
+    {
+      "id": "etc_passwd_exfil",
+      "tools": ["Bash"],
+      "fields": ["command"],
+      "pattern": "(curl|wget|nc|netcat|scp)\\s[^|;&]*\\b/etc/passwd\\b",
+      "message": "Exfiltration of /etc/passwd through a network tool."
+    },
+    {
+      "id": "remote_pipe_to_shell",
+      "tools": ["Bash"],
+      "fields": ["command"],
+      "pattern": "\\b(curl|wget|fetch)\\b[^|]+\\|\\s*(bash|sh|zsh|ksh|dash|fish)\\b",
+      "message": "Piping remote content directly into a shell — unverified code execution."
+    },
+    {
+      "id": "rm_rf_root",
+      "tools": ["Bash"],
+      "fields": ["command"],
+      "pattern": "\\brm\\s+(-[rRf]+|--recursive|--force)[^|;]*\\s+/(\\s|$|;|&|\\|)",
+      "message": "rm -rf / or equivalent — non-recoverable filesystem destruction."
+    },
+    {
+      "id": "fork_bomb_classic",
+      "tools": ["Bash"],
+      "fields": ["command"],
+      "pattern": ":\\(\\)\\s*\\{\\s*:\\s*\\|\\s*:\\s*&\\s*\\}\\s*;\\s*:",
+      "message": "Classic shell fork bomb."
+    },
+    {
+      "id": "dd_to_block_device",
+      "tools": ["Bash"],
+      "fields": ["command"],
+      "pattern": "\\bdd\\b[^|;]*\\bof=/dev/(sd[a-z]|nvme\\d+n\\d+|disk\\d+|mmcblk\\d+)",
+      "message": "dd writing directly to a raw block device — disk destruction."
+    },
+    {
+      "id": "history_purge",
+      "tools": ["Bash"],
+      "fields": ["command"],
+      "pattern": "history\\s+-c|>\\s*~?/?\\.bash_history|\\bunset\\s+HISTFILE",
+      "message": "Shell history purge — common post-compromise covering of tracks."
+    },
+    {
+      "id": "ssh_authorized_keys_write",
+      "tools": ["Bash"],
+      "fields": ["command"],
+      "pattern": "(>>?|tee)\\s+[^|;]*\\.ssh/authorized_keys",
+      "message": "Write to ~/.ssh/authorized_keys — persistent SSH backdoor."
+    },
+    {
+      "id": "reverse_shell_bash_tcp",
+      "tools": ["Bash"],
+      "fields": ["command"],
+      "pattern": "bash\\s+-i\\s+>&?\\s+/dev/tcp/",
+      "message": "bash reverse shell over /dev/tcp."
+    },
+    {
+      "id": "base64_piped_exec",
+      "tools": ["Bash"],
+      "fields": ["command"],
+      "pattern": "\\bbase64\\s+(--decode|-d|-D)\\b[^|]*\\|\\s*(bash|sh|python|python3|perl|ruby)\\b",
+      "message": "Base64-decoded payload piped to an interpreter — common obfuscated execution."
+    }
+  ]
+}
