@@ -19,7 +19,7 @@
         "source": "git-subdir",
         "url": "https://github.com/vaaraio/vaara.git",
         "path": "plugins/claude-code-vaara-governance",
-        "ref": "main"
+        "ref": "v0.40.2"
       },
       "homepage": "https://vaara.io"
     }
