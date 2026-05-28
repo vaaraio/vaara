@@ -63,6 +63,17 @@ Subcommands:
         process. The new thresholds and sequence patterns take effect
         on the next ``evaluate()``; in-flight calls keep the old ones.
 
+    vaara mode list
+        List the built-in policy mode presets (eco, balanced, performance,
+        strict) with their thresholds and one-line descriptions.
+
+    vaara mode show NAME
+        Print thresholds, description, and watt profile for a single mode.
+
+    vaara mode emit NAME [--format json|yaml] [--output PATH]
+        Emit a mode as a minimal, valid Vaara policy document. Round-trips
+        through ``vaara.policy.from_dict`` / ``from_json`` / ``from_yaml``.
+
     vaara version
         Print the installed Vaara version.
 
@@ -1131,6 +1142,52 @@ def _cmd_policy_reload(args: argparse.Namespace) -> int:
     return 0
 
 
+def _cmd_mode_list(_args: argparse.Namespace) -> int:
+    from vaara.policy.modes import _BY_NAME, available_modes
+
+    for name in available_modes():
+        m = _BY_NAME[name]
+        print(
+            f"{name:12s} escalate={m.escalate:.2f} deny={m.deny:.2f}  "
+            f"{m.description}"
+        )
+    return 0
+
+
+def _cmd_mode_show(args: argparse.Namespace) -> int:
+    from vaara.policy.modes import get_mode
+
+    try:
+        m = get_mode(args.name)
+    except KeyError as e:
+        print(f"vaara mode show: {e}", file=sys.stderr)
+        return 2
+    print(f"mode:        {m.name}")
+    print(f"escalate:    {m.escalate}")
+    print(f"deny:        {m.deny}")
+    print(f"description: {m.description}")
+    print(f"watts:       {m.watt_profile}")
+    return 0
+
+
+def _cmd_mode_emit(args: argparse.Namespace) -> int:
+    from vaara.policy.modes import emit_json, emit_yaml
+
+    try:
+        text = emit_yaml(args.name) if args.format == "yaml" else emit_json(args.name)
+    except KeyError as e:
+        print(f"vaara mode emit: {e}", file=sys.stderr)
+        return 2
+    except ImportError as e:
+        print(f"vaara mode emit: {e}", file=sys.stderr)
+        return 1
+    if args.output:
+        Path(args.output).write_text(text, encoding="utf-8")
+    else:
+        sys.stdout.write(text)
+    return 0
+
+
 def build_parser() -> argparse.ArgumentParser:
     p = argparse.ArgumentParser(prog="vaara", description="Vaara AI Agent Execution Layer")
     sub = p.add_subparsers(dest="cmd", required=True)
@@ -1595,6 +1652,48 @@ def build_parser() -> argparse.ArgumentParser:
         help="HTTP request timeout in seconds (default 10)",
     )
     preload.set_defaults(func=_cmd_policy_reload)
+
+    pmode = sub.add_parser(
+        "mode",
+        help=(
+            "Preset policy threshold bundles "
+            "(eco / balanced / performance / strict)"
+        ),
+    )
+    msub = pmode.add_subparsers(dest="mode_cmd", required=True)
+
+    pml = msub.add_parser(
+        "list",
+        help="List available modes with thresholds and descriptions",
+    )
+    pml.set_defaults(func=_cmd_mode_list)
+
+    pms = msub.add_parser(
+        "show",
+        help="Show a mode's thresholds, description, and watt profile",
+    )
+    pms.add_argument(
+        "name", help="Mode name (eco, balanced, performance, strict)",
+    )
+    pms.set_defaults(func=_cmd_mode_show)
+
+    pme = msub.add_parser(
+        "emit",
+        help=(
+            "Emit a mode as a valid Vaara policy document "
+            "(JSON by default, YAML with --format yaml)"
+        ),
+    )
+    pme.add_argument("name", help="Mode name")
+    pme.add_argument(
+        "--format", choices=["json", "yaml"], default="json",
+        help="Output format (default: json)",
+    )
+    pme.add_argument(
+        "--output", "-o", default=None,
+        help="Output path (default: stdout)",
+    )
+    pme.set_defaults(func=_cmd_mode_emit)
 
     return p
 

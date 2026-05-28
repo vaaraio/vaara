@@ -6,6 +6,39 @@ and this project follows [Semantic Versioning](https://semver.org/spec/v2.0.0.ht
 
 ## [Unreleased]
 
+## [0.40.4] - 2026-05-28
+
+**Theme: policy mode presets + plugin shakedown fix delivery.**
+
+### Added
+- `vaara mode` CLI subcommand with three actions:
+  - `vaara mode list` prints the four built-in preset operating points
+    (`eco`, `balanced`, `performance`, `strict`) with their thresholds
+    and one-line descriptions.
+  - `vaara mode show NAME` prints thresholds, description, and watt
+    profile for a single preset.
+  - `vaara mode emit NAME [--format json|yaml] [--output PATH]` emits
+    a minimal valid Vaara policy document for the chosen preset,
+    ready for the deployer to add action classes, sequences, and
+    escalation routes. Output round-trips through
+    `vaara.policy.from_dict`, `from_json`, and `from_yaml`.
+- New `vaara.policy.modes` module exposing `Mode`, `available_modes`,
+  `get_mode`, `to_policy_dict`, `emit_json`, and `emit_yaml`. Presets
+  are shaped like CPU power profiles: `eco` (0.40 / 0.60) cuts agent
+  loops short on borderline risk, `balanced` (0.55 / 0.85) is the
+  default, `performance` (0.70 / 0.92) is for high-throughput
+  pipelines with tight action-class overrides, `strict` (0.30 / 0.55)
+  escalates on doubt for incident response and audit prep.
+
+### Changed
+- `.claude-plugin/marketplace.json` `ref` bumped from `v0.40.3` to
+  `v0.40.4`. Delivers the session_start audit-DB-creation fix from
+  PR #161 to marketplace users.
+- `plugins/claude-code-vaara-governance/.claude-plugin/plugin.json`
+  bumped from `0.1.0` to `0.1.1`. Picks up the session_start fix.
+- `server.json` and `server-vaara-server.json` version fields bumped
+  to 0.40.4.
+
 ## [0.40.3] - 2026-05-28
 
 **Theme: registry completion + supply-chain cleanup.**
