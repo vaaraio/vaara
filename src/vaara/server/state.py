@@ -67,7 +67,7 @@ class ServerState:
                 return ctrl.policy if ctrl is not None else None
             self.scorer.set_policy_lookup(_lookup)
         self._lock = threading.Lock()
-        # action_id → info captured at score time so outcome reports can
+        # action_id to info captured at score time so outcome reports can
         # feed the MWU update without the client having to resend context.
         self._actions: dict[str, _ActionInfo] = {}
 

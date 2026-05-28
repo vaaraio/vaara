@@ -842,7 +842,7 @@ class VaaraMCPProxy:
 
     @staticmethod
     def _severity_from_response(response: dict) -> float:
-        # Protocol/tool errors → 1.0 (failure signal). Clean success → 0.0.
+        # Protocol/tool errors to 1.0 (failure signal). Clean success to 0.0.
         if not isinstance(response, dict) or "error" in response:
             return 1.0
         result = response.get("result")

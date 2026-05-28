@@ -18,13 +18,17 @@ dist_verify/
 research/
 .claude/
 
-# Private / internal — never publish
+# Private / internal, never publish
 *.tape
 .regwatch/
 scripts/regwatch*
 .shipped/
 .v0*_watch/
+application_*.pdf
+outbound_*.md
+site.py.live
 
 # Bench output (PAIR runs, dist-shift, vLLM logs). Reproducible by rerun.
 tests/adversarial/v031/
 .parachute/
+claude-code-audit.db

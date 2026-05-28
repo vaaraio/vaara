@@ -80,10 +80,10 @@ def decide(entry: dict, pipe: Pipeline, classifier=None) -> dict:
     """Run heuristic pipeline; optionally stack with AdversarialClassifier.
 
     Stacking rule (per v0.5.2 CHANGELOG recommendation):
-        - heuristic DENY  → keep DENY
-        - heuristic ESCALATE → keep ESCALATE
-        - heuristic ALLOW + classifier prob ≥ threshold → ESCALATE
-        - heuristic ALLOW + classifier prob <  threshold → ALLOW
+        - heuristic DENY  to keep DENY
+        - heuristic ESCALATE to keep ESCALATE
+        - heuristic ALLOW + classifier prob ≥ threshold to ESCALATE
+        - heuristic ALLOW + classifier prob <  threshold to ALLOW
 
     The conformal interval reported here is the pipeline's, not the classifier's.
     The classifier can override the action but does not produce a calibrated

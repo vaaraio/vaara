@@ -38,7 +38,7 @@ def _record(
 
 
 def _full_lifecycle_records() -> list[AuditRecord]:
-    """A request → score → escalate → resolve → outcome lifecycle."""
+    """A request to score to escalate to resolve to outcome lifecycle."""
     base_ts = 1700000000.0
     return [
         _record(

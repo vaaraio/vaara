@@ -26,11 +26,11 @@ Held-out TEST recall 84.7% (95% Wilson [82.4, 86.7]) at FPR 4.1% [2.9, 5.7]. Pha
 - Classifier v9 with 236 hand-features + 384-dim MiniLM embeddings at calibrated threshold 0.9150 on held-out TEST n=1,827: recall 84.7% [82.4, 86.7] at FPR 4.1% [2.9, 5.7]
 - Multi-attacker PAIR robustness: 0/25 successes per attacker across Qwen2.5-32B, Qwen2.5-72B, Llama-3.3-70B hitting identical seed indices, Wilson upper 13.3%
 - BIPIA-pressure FPR on benign tool calls 1.2% [0.4, 3.6] across four agent backends, n=244 benign tool calls under `context.source=injected_via_bipia_<class>`
-- Chain of custody: corpus manifest SHA → split manifest SHA → training commit → bundle SHA, all locked and printed by every script
+- Chain of custody: corpus manifest SHA, split manifest SHA, training commit, bundle SHA, all locked and printed by every script
 - 140 µs mean / 210 µs p99 inference latency, commodity CPU
 - Distribution-free conformal coverage on the score
 - MWU regret bound O(sqrt(T log N))
-- [vaara-bench-v0.39](bench/vaara-bench-v0.39.md): current methodology, chain of custody, ship-gate record. v9 retrain on BIPIA-augmented corpus with follows upweighted (`--follow-weight 8.0`), calibrated to T=0.9150 at a 5% FPR target on v035 VAL. BIPIA-pressure FPR collapses from 35.2% on v8 to 1.2% on v9. In-distribution recall flat within Wilson intervals. Found-and-fixed in tree: auto-labeller `example.com` placeholder false-positive rule (42 → 14 true follows across four backends). Historical bench docs live under `bench/` for chain-of-custody continuity.
+- [vaara-bench-v0.39](bench/vaara-bench-v0.39.md): current methodology, chain of custody, ship-gate record. v9 retrain on BIPIA-augmented corpus with follows upweighted (`--follow-weight 8.0`), calibrated to T=0.9150 at a 5% FPR target on v035 VAL. BIPIA-pressure FPR collapses from 35.2% on v8 to 1.2% on v9. In-distribution recall flat within Wilson intervals. Found-and-fixed in tree: auto-labeller `example.com` placeholder false-positive rule (42 to 14 true follows across four backends). Historical bench docs live under `bench/` for chain-of-custody continuity.
 - [vaara-bench-v1](bench/vaara-bench-v1.md): 77-trace synthetic-corpus regression baseline with frozen methodology, 100% soft TPR, 0% hard FPR
 
 Each figure is reproducible from the public corpus or the bench pipeline in `bench/`.
@@ -87,7 +87,7 @@ else:
 
 The same data renders as a styled PDF for Notified Bodies (`vaara compliance report --format pdf`, requires `pip install 'vaara[pdf]'`), a static HTML dashboard (`vaara compliance dashboard`), or a Sigstore-signed regulator-handoff envelope (`vaara trail export`, optional ML-DSA-65 / FIPS 204 post-quantum signer via `pip install 'vaara[pq]'`).
 
-Each article verdict carries `verdict_inputs` (threshold-vs-observed snapshot), `verdict_reasons` (rationale lines), and `contributing_events` (the audit records the verdict sits on, with a `drill_down` of the data that fed the risk/decision/outcome). Reviewers can trace `status → threshold delta → concrete event` without re-running the engine.
+Each article verdict carries `verdict_inputs` (threshold-vs-observed snapshot), `verdict_reasons` (rationale lines), and `contributing_events` (the audit records the verdict sits on, with a `drill_down` of the data that fed the risk/decision/outcome). Reviewers can trace `status` to `threshold delta` to `concrete event` without re-running the engine.
 
 ## Framework adapters
 
@@ -155,7 +155,7 @@ if (r.decision === "deny") throw new Error("blocked");
 Four preset operating points for the risk thresholds, shaped like CPU power profiles:
 
 - `eco` (escalate 0.40, deny 0.60). Tight deny threshold cuts agent loops short on borderline risk. Pair with regex-first gating to short-circuit before any model forward pass.
-- `balanced` (0.55, 0.85). Vaara's default behaviour.
+- `balanced` (0.55, 0.85). Vaara's default behavior.
 - `performance` (0.70, 0.92). Looser thresholds let more through. For high-throughput pipelines where the deployer keeps tight action-class overrides on the few classes that matter.
 - `strict` (0.30, 0.55). Escalate-on-doubt. For incident response, audit prep, or production lockdown windows.
 
@@ -210,8 +210,8 @@ OVERT envelopes per governed interaction turn on with `--overt-signing-key`, `--
 
 Worked examples:
 
-- [`examples/github-mcp-proxy-demo/`](examples/github-mcp-proxy-demo/) — Vaara in front of [`github/github-mcp-server`](https://github.com/github/github-mcp-server), 42 tools, hash-chained audit trail recorded end-to-end.
-- [`examples/sap-mcp-proxy-demo/`](examples/sap-mcp-proxy-demo/) — Vaara in front of community SAP MCP servers ([`SAP/mdk-mcp-server`](https://github.com/SAP/mdk-mcp-server), [`mario-andreschak/mcp-abap-abap-adt-api`](https://github.com/mario-andreschak/mcp-abap-abap-adt-api), [`lemaiwo/btp-sap-odata-to-mcp-server`](https://github.com/lemaiwo/btp-sap-odata-to-mcp-server)).
+- [`examples/github-mcp-proxy-demo/`](examples/github-mcp-proxy-demo/): Vaara in front of [`github/github-mcp-server`](https://github.com/github/github-mcp-server), 42 tools, hash-chained audit trail recorded end-to-end.
+- [`examples/sap-mcp-proxy-demo/`](examples/sap-mcp-proxy-demo/): Vaara in front of community SAP MCP servers ([`SAP/mdk-mcp-server`](https://github.com/SAP/mdk-mcp-server), [`mario-andreschak/mcp-abap-abap-adt-api`](https://github.com/mario-andreschak/mcp-abap-abap-adt-api), [`lemaiwo/btp-sap-odata-to-mcp-server`](https://github.com/lemaiwo/btp-sap-odata-to-mcp-server)).
 
 ## OVERT 1.0 attestation
 

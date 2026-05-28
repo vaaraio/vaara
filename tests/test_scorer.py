@@ -18,7 +18,7 @@ class TestMWUExperts:
 
     def test_predict_weighted_average(self):
         mwu = MWUExperts(["a", "b"])
-        # Uniform weights → simple average
+        # Uniform weights to simple average
         result = mwu.predict({"a": 0.2, "b": 0.8})
         assert abs(result - 0.5) < 0.01
 
@@ -116,7 +116,7 @@ class TestAdaptiveScorer:
             "base_risk_score": 0.9,
             "agent_confidence": None,
         })
-        # High base risk + unknown agent + no confidence → should be denied or escalated
+        # High base risk + unknown agent + no confidence to should be denied or escalated
         assert result["action"] in ("deny", "escalate")
 
     def test_sequence_detection(self):

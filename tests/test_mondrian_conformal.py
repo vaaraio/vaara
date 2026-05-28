@@ -32,11 +32,11 @@ class TestBackwardsCompat:
         assert calibrator.is_calibrated
 
     def test_predict_interval_marginal_path_unchanged(self, calibrator):
-        # Below min_calibration → conservative ±0.3 fallback
+        # Below min_calibration to conservative ±0.3 fallback
         assert calibrator.predict_interval(0.5) == (0.2, 0.8)
         for _ in range(10):
             calibrator.add_calibration_point(0.5, 0.5)
-        # All zero residuals → tight interval at the point estimate
+        # All zero residuals to tight interval at the point estimate
         assert calibrator.predict_interval(0.5) == (0.5, 0.5)
 
     def test_effective_alpha_starts_at_configured(self, calibrator):
@@ -72,7 +72,7 @@ class TestPerCategoryIsolation:
         assert calibrator.predict_interval(0.5) == (0.2, 0.8)
 
     def test_alpha_t_isolated_per_bucket(self, calibrator):
-        # 15 points with residual 1.0 → 5 FACI updates, alpha_t drifts
+        # 15 points with residual 1.0 to 5 FACI updates, alpha_t drifts
         for _ in range(15):
             calibrator.add_calibration_point(0.0, 1.0, category="A")
         assert calibrator.effective_alpha_for("A") != 0.10

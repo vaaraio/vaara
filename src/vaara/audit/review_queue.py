@@ -12,8 +12,8 @@ This module is the storage layer:
 * Single SQLite table, separate file from the audit DB. Audit is
   append-only by contract; the queue needs ``UPDATE`` for status,
   claim, and resolution.
-* Statuses: ``pending → claimed → resolved`` is the happy path.
-  ``pending → expired`` is the stale-without-claim path. Resolved /
+* Statuses: ``pending to claimed to resolved`` is the happy path.
+  ``pending to expired`` is the stale-without-claim path. Resolved /
   expired are terminal.
 * Resolution: ``allow``, ``deny``, ``abstain``. ``abstain`` means the
   reviewer declined to decide — keeps ``escalate`` as the final verdict.

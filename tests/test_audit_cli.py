@@ -198,7 +198,7 @@ def test_rate_burst_rule_triggers():
     base = "2026-01-01T00:00:00Z"
     from datetime import datetime, timedelta
     t0 = datetime.fromisoformat(base.replace("Z", "+00:00"))
-    # 25 records within 1 second → should trip burst with defaults (20/10s)
+    # 25 records within 1 second to should trip burst with defaults (20/10s)
     records = [
         {"agent_id": "a", "sequence_position": i, "timestamp": (t0 + timedelta(milliseconds=i * 10)).isoformat()}
         for i in range(25)
