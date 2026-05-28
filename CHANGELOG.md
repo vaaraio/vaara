@@ -6,6 +6,41 @@ and this project follows [Semantic Versioning](https://semver.org/spec/v2.0.0.ht
 
 ## [Unreleased]
 
+## [0.40.2] - 2026-05-28
+
+**Theme: vaara-mcp-server packaging + fan-out latency numbers.**
+
+### Added
+- `vaara-mcp-server` console script in `[project.scripts]`, wired to
+  the existing `vaara.integrations.mcp_server:main` entry point. The
+  standalone MCP server has shipped in the package for several
+  releases but only ran via `python -m vaara.integrations.mcp_server`.
+  It now installs as a console script alongside `vaara-mcp-proxy` and
+  exposes the `vaara_check`, `vaara_intercept`, and
+  `vaara_report_outcome` tools plus the `vaara://status` and
+  `vaara://compliance` resources to any MCP host.
+- `bench/latency_fanout.py` and `bench/v040_fanout.json`. Measures
+  Vaara's per-call overhead on the v0.40 streamable-HTTP transport
+  across N upstream slots. Result: 1.2 ms mean, 1.4 ms p99, flat from
+  N=1 to N=8. Closes the honest-scope caveat from the v0.40 PR body.
+  The upstream subprocess is mocked at the `UpstreamMCPClient` boundary
+  so the number isolates added governance cost (HTTP parse, tenant and
+  upstream header resolution, `Pipeline.intercept`, dispatch).
+- `server-vaara-server.json` for a second MCP Registry listing under
+  `io.github.vaaraio/vaara-server`, alongside the existing
+  `io.github.vaaraio/vaara` proxy entry. Two separate registry slots
+  for two separate MCP servers: the proxy that wraps upstream MCP
+  servers, and the standalone server that exposes Vaara governance as
+  MCP tools.
+- `.claude-plugin/marketplace.json` at the repo root. Registers a local
+  Claude Code plugin marketplace so `claude plugin install
+  vaara-governance@vaara` works after `claude plugin marketplace add
+  /path/to/vaara`. Same file doubles as the seed for a future
+  submission to `anthropics/claude-plugins-official`.
+
+### Changed
+- `server.json` version bumped to 0.40.2 to track the PyPI package.
+
 ## [0.40.1] - 2026-05-28
 
 **Theme: registry-prep + README trim.**
