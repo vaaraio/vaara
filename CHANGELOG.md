@@ -6,6 +6,27 @@ and this project follows [Semantic Versioning](https://semver.org/spec/v2.0.0.ht
 
 ## [Unreleased]
 
+## [0.40.3] - 2026-05-28
+
+**Theme: registry completion + supply-chain cleanup.**
+
+### Added
+- `mcp-name: io.github.vaaraio/vaara-server` ownership marker in
+  `README.md`, alongside the existing `mcp-name:
+  io.github.vaaraio/vaara` marker. Required by the MCP Registry to
+  verify that the PyPI `vaara` package owns both the proxy and the
+  standalone-server slots before publishing to either. v0.40.2 added
+  the `server-vaara-server.json` manifest but the marker was missing,
+  so the second-slot registry submission could not complete. This
+  release ships the marker so the second slot publishes cleanly.
+
+### Changed
+- `server.json` and `server-vaara-server.json` version fields bumped
+  to 0.40.3.
+- `.claude-plugin/marketplace.json` `ref` bumped from `v0.40.2` to
+  `v0.40.3`. Closes the self-reference loop where v0.40.2's
+  marketplace.json pinned to its own pre-fix tag.
+
 ## [0.40.2] - 2026-05-28
 
 **Theme: vaara-mcp-server packaging + fan-out latency numbers.**

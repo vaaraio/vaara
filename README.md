@@ -259,3 +259,4 @@ Acknowledgements:
 Apache 2.0. See [LICENSE](LICENSE).
 
 <!-- mcp-name: io.github.vaaraio/vaara -->
+<!-- mcp-name: io.github.vaaraio/vaara-server -->
