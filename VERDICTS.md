@@ -68,8 +68,8 @@ listed for that article, then evaluates in this order:
    produces `moderate`. Any qualifying records below those bars are
    `weak`. No records are `absent`.
 6. **Future-timestamp downgrade.** If any record carries a future
-   timestamp, strength drops one tier (`strong` → `moderate`,
-   `moderate` → `weak`). The freshness signal cannot be trusted when
+   timestamp, strength drops one tier (`strong` to `moderate`,
+   `moderate` to `weak`). The freshness signal cannot be trusted when
    the clock cannot be trusted.
 
 ## EU AI Act per-article thresholds

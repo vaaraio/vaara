@@ -45,7 +45,7 @@ from vaara.pipeline import InterceptionPipeline
 
 logger = logging.getLogger(__name__)
 
-# Cap on in-flight run_id → action_id mappings. Orphan tool_starts
+# Cap on in-flight run_id to action_id mappings. Orphan tool_starts
 # (cancelled runs, streaming aborts, crashes) would otherwise leak
 # unboundedly in a long-running agent. 10_000 covers realistic
 # concurrency while capping worst-case memory at ~1MB.
@@ -409,7 +409,7 @@ def vaara_wrap_tool(
     # Stamp wrappers BEFORE attaching them to the tool. Without this, two
     # concurrent wraps (e.g., two CrewAI `governed_kickoff` calls on crews
     # sharing a tool instance) can double-wrap: T1 assigns tool._run =
-    # wrapped_T1 but hasn't stamped anything yet, T2 reads tool._run →
+    # wrapped_T1 but hasn't stamped anything yet, T2 reads tool._run  to
     # wrapped_T1, fails the idempotency checks at lines above (both
     # tool._vaara_wrapped and wrapped_T1._vaara_wrapped are False),
     # builds wrapped_T2 around wrapped_T1, and stores it — giving two

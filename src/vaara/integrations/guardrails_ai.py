@@ -43,7 +43,7 @@ def _validator_key(validator_name: str) -> str:
     PascalCase short names matching ``_content_safety_articles``.
     """
     name = (validator_name or "").rsplit("/", 1)[-1]
-    # snake_case or kebab-case → PascalCase
+    # snake_case or kebab-case to PascalCase
     if "_" in name or "-" in name:
         parts = name.replace("-", "_").split("_")
         return "".join(p[:1].upper() + p[1:] for p in parts if p)

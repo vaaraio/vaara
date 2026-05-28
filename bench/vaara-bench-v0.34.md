@@ -3,7 +3,7 @@
 Methodology delta against [vaara-bench-v0.33](vaara-bench-v0.33.md).
 Three changes, in order of decreasing scope:
 
-1. **Adversarial corpus extended from 7,955 → 10,055 entries.** 700 new
+1. **Adversarial corpus extended from 7,955 to 10,055 entries.** 700 new
    targeted entries each across the three weakest v0.32 TEST categories
    (`tool_misuse`, `privilege_escalation`, `data_exfil`), generated via
    Qwen2.5-72B-Instruct on AMD MI300X. Schema-validated, deduplicated
@@ -67,7 +67,7 @@ benchmark anchor.
 | anchor | path / value | what it pins |
 |---|---|---|
 | corpus manifest | `tests/adversarial/MANIFEST.sha256` (293 lines) | SHA-256 of every JSONL including the v034 additions |
-| split manifest | `tests/adversarial/v034_split.json` | entry-key → fold, 10,055 entries, stratified 70/15/15 |
+| split manifest | `tests/adversarial/v034_split.json` | entry-key to fold, 10,055 entries, stratified 70/15/15 |
 | production bundle | `src/vaara/data/adversarial_classifier_v3.joblib` | unchanged from v0.33, MiniLM revision `c9745ed1` pinned in metadata |
 | A/B bundle (not loaded by default) | `src/vaara/data/adversarial_classifier_v5.joblib` | trained on v034_split TRAIN, documented above |
 | droplet session logs | `bench/v034_droplet_logs/` | Qwen-72B vLLM session + per-category generator logs |
@@ -136,4 +136,4 @@ cd tests/adversarial && sha256sum -c MANIFEST.sha256
 ```
 
 The Makefile target `make bench` runs the full v0.34 chain
-(integrity → split → evaluate v3 on both splits → cross-eval v5).
+(integrity to split to evaluate v3 on both splits to cross-eval v5).

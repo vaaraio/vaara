@@ -115,7 +115,7 @@ def test_overt_verify_rejects_missing_receipt(tmp_path, capsys):
 
 
 def test_overt_verify_rejects_bad_cbor(tmp_path, capsys):
-    """Either CBOR decode fails, or it decodes to a non-map. Both → exit 1."""
+    """Either CBOR decode fails, or it decodes to a non-map. Both to exit 1."""
     bad = tmp_path / "bad.cbor"
     bad.write_bytes(b"not cbor")
     pubkey = tmp_path / "pub.bin"

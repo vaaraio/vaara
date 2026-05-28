@@ -9,7 +9,7 @@ record — whether it was allowed, denied, or escalated.  Records are:
 - **Machine-readable AND human-readable**: structured JSON for automation,
   narrative explanation for auditors and regulators.
 - **Event-sourced**: outcomes are appended as follow-up events, never
-  mutated in place.  The full decision→execution→outcome lifecycle is
+  mutated in place.  The full decision to execution to outcome lifecycle is
   preserved.
 
 This is the evidence base that the compliance engine reads to assemble
@@ -365,7 +365,7 @@ class AuditRecord:
                 f"{_fmt_num(self.data.get('conformal_upper'))}]"
             ),
             EventType.DECISION_MADE: (
-                f"{prefix} action '{safe_tool}' → "
+                f"{prefix} action '{safe_tool}' to "
                 f"{_narrative_str(self.data.get('decision', 'unknown'), max_len=32).upper()}"
                 f" (reason: {_narrative_str(self.data.get('reason', 'none'))})"
             ),
@@ -906,7 +906,7 @@ class AuditTrail:
 
     @staticmethod
     def _cap_record_dict_bytes(d: dict, max_bytes: int) -> dict:
-        """Cap a sanitised dict's JSON size; over cap → single-key marker.
+        """Cap a sanitised dict's JSON size; over cap to single-key marker.
 
         Mirrors pipeline._cap_dict_bytes so a huge tool result does not
         poison the audit record. Records the original byte count and the

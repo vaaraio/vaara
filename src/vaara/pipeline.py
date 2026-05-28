@@ -2,9 +2,9 @@
 
 Wires the components together:
 
-    ActionRequest → Registry (classify) → Scorer (risk) → Policy (decide)
-                                                       → Audit (record)
-                                                       → Execute or Block
+    ActionRequest to Registry (classify) to Scorer (risk) to Policy (decide)
+                                                       to Audit (record)
+                                                       to Execute or Block
 
 Usage::
 
@@ -78,7 +78,7 @@ _MAX_SESSION_ID_LEN = 256
 _MAX_PARENT_ACTION_ID_LEN = 128
 # JSON-serialized bytes. Real tool parameters are small (an address, an
 # amount, a file path). A 50MB blob in params is either a bug or an
-# attack. Over cap → replace entire dict with a truncation marker so
+# attack. Over cap to replace entire dict with a truncation marker so
 # the audit record is still produced and the hash chain stays intact.
 _MAX_PARAMS_JSON_BYTES = 64 * 1024
 _MAX_CONTEXT_JSON_BYTES = 64 * 1024
@@ -127,7 +127,7 @@ def _json_safe_dict(d: Optional[dict]) -> dict:
 
 
 def _cap_dict_bytes(d: dict, max_bytes: int, field_name: str) -> dict:
-    """Cap a sanitised dict's JSON size. Over cap → single-key marker.
+    """Cap a sanitised dict's JSON size. Over cap to single-key marker.
 
     Sanitisation (json_safe) runs first so this only sees values json.dumps
     can encode. We cheap-estimate by trying the dump and checking len —
@@ -247,7 +247,7 @@ class InterceptionPipeline:
         self._enforce = enforce
         self._review_queue = review_queue
 
-        # Track action_id → (predicted_risk, signals) for outcome feedback.
+        # Track action_id to (predicted_risk, signals) for outcome feedback.
         # OrderedDict + bounded FIFO eviction — see _MAX_PENDING_OUTCOMES.
         self._pending_outcomes: OrderedDict[
             str, tuple[float, dict[str, float]]
