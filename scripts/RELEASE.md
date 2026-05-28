@@ -117,7 +117,7 @@ For the common case where the GH Actions npm step fails but PyPI
 already shipped (PyPI trusted publishing is rock solid; npm
 provenance via OIDC is the chunkier path). Token-based, no
 interactive `npm login`. Requires `VAARA_NPM_TOKEN` env var
-(npmjs.org → Access Tokens → Automation). Ships without provenance;
+(npmjs.org > Access Tokens > Automation). Ships without provenance;
 restore the workflow before the next release.
 
 ## Cross-repo follow-up

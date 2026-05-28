@@ -10,7 +10,7 @@
 #
 # Requires:
 #   - tag v<VERSION> exists locally and points at a pushed commit
-#   - VAARA_NPM_TOKEN env var (npmjs.org → Access Tokens → Automation)
+#   - VAARA_NPM_TOKEN env var (npmjs.org > Access Tokens > Automation)
 #
 # Ships @vaara/client@<VERSION> WITHOUT npm provenance (provenance
 # needs the GH OIDC flow). Restore the workflow before the next release.
@@ -29,7 +29,7 @@ git rev-parse "v${VERSION}" >/dev/null 2>&1 || \
 
 if [[ -z "${VAARA_NPM_TOKEN:-}" ]]; then
   echo "VAARA_NPM_TOKEN not set." >&2
-  echo "Create one at npmjs.org → Access Tokens → Generate Automation token." >&2
+  echo "Create one at npmjs.org > Access Tokens > Generate Automation token." >&2
   exit 1
 fi
 
