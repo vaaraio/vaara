@@ -124,7 +124,7 @@ as the production classifier.
 | anchor | path / value | what it pins |
 |---|---|---|
 | corpus manifest | `tests/adversarial/MANIFEST.sha256` (296 lines) | SHA-256 of every JSONL including the v035 matched-benign additions |
-| split manifest | `tests/adversarial/v035_split.json` | entry-key → fold, 12,155 entries, stratified 70/15/15 |
+| split manifest | `tests/adversarial/v035_split.json` | entry-key to fold, 12,155 entries, stratified 70/15/15 |
 | production bundle | `src/vaara/data/adversarial_classifier_v6.joblib` | trained on v035 TRAIN, MiniLM revision `c9745ed1` pinned in bundle metadata |
 | historical bundle (not loaded by default) | `src/vaara/data/adversarial_classifier_v3.joblib` | v0.33 production, retained for cross-eval reproducibility |
 | matched-benign generator | `scripts/generate_matched_benign_v035.py` | anti-seed pattern source, deterministic random seed |
@@ -151,7 +151,7 @@ cd tests/adversarial && sha256sum -c MANIFEST.sha256
     --json-out bench/v035_eval_v3_cross.json
 ```
 
-`make bench` runs the full v0.35 chain (integrity → v6 TEST eval →
+`make bench` runs the full v0.35 chain (integrity to v6 TEST eval  to 
 v3 cross-eval).
 
 ## Compute provenance

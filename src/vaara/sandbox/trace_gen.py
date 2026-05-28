@@ -14,11 +14,11 @@ representative of the RISK DISTRIBUTION.**
 
 We generate traces for three agent archetypes:
 1. **Benign agent** — reads data, makes small transfers, follows protocols.
-   Ground-truth outcome ~ Beta(2, 20) → mostly safe, rare minor issues.
+   Ground-truth outcome ~ Beta(2, 20) to mostly safe, rare minor issues.
 2. **Careless agent** — takes risky actions without checking, makes errors.
-   Ground-truth outcome ~ Beta(3, 7) → moderate risk, frequent minor issues.
+   Ground-truth outcome ~ Beta(3, 7) to moderate risk, frequent minor issues.
 3. **Adversarial agent** — executes known attack patterns, probes boundaries.
-   Ground-truth outcome ~ Beta(5, 3) → high risk, frequent severe outcomes.
+   Ground-truth outcome ~ Beta(5, 3) to high risk, frequent severe outcomes.
 
 Each trace is a sequence of (action, outcome) pairs that can be fed
 directly to the scorer's learning interface.

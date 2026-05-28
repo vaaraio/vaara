@@ -9,7 +9,7 @@ Let an AI agent **A** operate in an environment **E** by executing a sequence of
 
 **The compositional safety problem**: Individual actions may be safe - r*(aᵢ) ≈ 0 for all i - yet the *sequence* (a₁, ..., aₖ) produces compound risk R*(a₁, ..., aₖ) ≫ max{r*(aᵢ)}. Example: {read_data, export_data, delete_data} is a data exfiltration pattern where each step alone is benign.
 
-**Goal**: Construct an adaptive risk scorer **f: A × H → [0, 1]** and a conformal prediction set **C(aₜ) ⊆ [0, 1]** such that:
+**Goal**: Construct an adaptive risk scorer **f: A × H to [0, 1]** and a conformal prediction set **C(aₜ) ⊆ [0, 1]** such that:
 
 1. The scorer learns from outcomes: f improves over time as action consequences are observed.
 2. The prediction set provides a distribution-free coverage guarantee: P(r*(aₜ) ∈ C(aₜ)) ≥ 1 − α for any α ∈ (0, 1), regardless of the underlying distribution of risks.
@@ -130,7 +130,7 @@ Under distribution shift (non-exchangeability), we use Fully Adaptive Conformal 
 
 where γ > 0 is the step size. This provides long-run approximate coverage:
 
-    (1/T) Σₜ err_t → α   as T → ∞
+    (1/T) Σₜ err_t to α   as T to ∞
 
 even under arbitrary distribution shift, at the cost of wider intervals when the distribution is adversarial.
 
@@ -206,9 +206,9 @@ The FACI adaptive alpha further tightens this under stationarity and maintains a
 ### 8.3 Cold Start Duration
 
 The system transitions from rule-based to calibrated mode after 30 outcomes (min_calibration). At 10 actions/hour (moderate agent activity), calibration takes ~3 hours. During cold start:
-- MWU weights are uniform → f(a) ≈ (s₁ + s₂ + s₃ + s₄ + s₅) / 5
-- Conformal interval is [f(a) − 0.3, f(a) + 0.3] → wide, conservative
-- Most actions route through ESCALATE → human review
+- MWU weights are uniform to f(a) ≈ (s₁ + s₂ + s₃ + s₄ + s₅) / 5
+- Conformal interval is [f(a) − 0.3, f(a) + 0.3] to wide, conservative
+- Most actions route through ESCALATE to human review
 - This is **correct behavior**: new systems should have high human oversight
 
 ## 9. Security Properties
@@ -230,7 +230,7 @@ The remaining attack vector is **outcome manipulation**: if the agent can influe
 If any component fails:
 - Registry returns UNKNOWN_ACTION (medium risk) for unclassified tools
 - Scorer returns score based on available signals (never returns "allow by default")
-- Conformal interval widens when calibration is insufficient → more escalations
+- Conformal interval widens when calibration is insufficient to more escalations
 - Audit trail detects its own corruption via hash chain
 
 The system never silently degrades to "allow everything."
