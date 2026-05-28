@@ -1,0 +1,10 @@
+{
+  "name": "vaara-governance",
+  "version": "0.1.0",
+  "description": "Runtime tool-call governance for Claude Code. PreToolUse intercepts Bash, WebFetch, WebSearch, and MCP calls through Vaara's conformal risk scorer; PostToolUse writes a hash-chained audit record and optional OVERT 1.0 attestation envelope; SessionStart validates the install and prints the policy summary.",
+  "author": {
+    "name": "Vaara",
+    "email": "hello@vaara.io"
+  },
+  "homepage": "https://github.com/vaaraio/vaara/tree/main/plugins/claude-code-vaara-governance"
+}
