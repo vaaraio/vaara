@@ -6,6 +6,42 @@ and this project follows [Semantic Versioning](https://semver.org/spec/v2.0.0.ht
 
 ## [Unreleased]
 
+## [0.43.0] - 2026-05-29
+
+**Theme: proxy pairing -- SEP-2787 request attestation and execution receipt emitted per tools/call.**
+
+### Added
+- `src/vaara/integrations/_mcp_attest.py`: `AttestPairEmitter`, the paired
+  SEP-2787 attestation and execution-receipt emitter for the MCP proxy. Each
+  allowed `tools/call` writes two JSON files to a configurable receipts
+  directory: `{counter}-{nonce[:8]}-attest.json` (request attestation) and
+  `{counter}-{nonce[:8]}-receipt.json` (execution receipt). The pair is
+  cryptographically linked: the receipt carries a `backLink` digest over the
+  full attestation wire bytes, so a verifier can confirm they belong together.
+- `--attest-signing-key PATH` and `--attest-receipts-dir DIR` flags on
+  `vaara-mcp-proxy`. Off by default. Key type is auto-detected: EC P-256 PEM
+  uses ES256, RSA PEM uses RS256, raw bytes file uses HS256. For ES256 and
+  RS256 a `pubkey.pem` is written to the receipts directory so external
+  verifiers need only the public key.
+- `serverFingerprint` in each attestation starts as a SHA-256 of the upstream
+  command string (`cmd:sha256:{hex}`) and upgrades to a SHA-256 of the
+  canonical JSON of the tools list (`manifest:sha256:{hex}`) on the first
+  `tools/list` response, binding the exact capability set the proxy presented
+  to the agent.
+- `X-Vaara-Intent` HTTP request header: operators can supply a richer intent
+  label per call. stdio transport falls back to the derived
+  `tools/call/{tool_name}` string.
+- `issuerAsserted.iss` is always `"vaara-mcp-proxy"`. `sub` is
+  `"{tenant_id}/{upstream_name}"` when a tenant is set, else
+  `"{upstream_name}"`. Reuses the SEP-2787 and receipt signing stack unchanged
+  (HS256 / ES256 / RS256, RFC 8785 JCS canonicalization): a verifier that
+  already checks SEP-2787 signatures needs no new crypto for the paired
+  receipts.
+- 17 tests in `tests/test_integrations_mcp_proxy_attest.py` covering pairing,
+  SEP-2787 signature verification, back-link integrity, manifest fingerprint
+  upgrade, intent override via ContextVar, errored-receipt pairing when the
+  upstream raises, and `AttestConfigError` handling.
+
 ## [0.42.0] - 2026-05-29
 
 **Theme: execution receipts, the post-execution sibling of SEP-2787.**
