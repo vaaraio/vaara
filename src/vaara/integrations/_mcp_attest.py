@@ -296,6 +296,14 @@ def build_attest_emitter(
                 f"--attest-signing-key is not a usable PEM private key: {exc}"
             ) from exc
         if isinstance(key, EllipticCurvePrivateKey):
+            # ES256 emits a fixed 32-byte r||s; a non-P-256 curve would be
+            # mislabeled and then silently fail to sign (emit_attestation
+            # swallows errors), so reject it up front with a clear message.
+            if key.curve.name != "secp256r1":
+                raise AttestConfigError(
+                    "--attest-signing-key EC key must use the P-256 (secp256r1) "
+                    f"curve for ES256; got {key.curve.name!r}."
+                )
             alg: str = "ES256"
         elif isinstance(key, RSAPrivateKey):
             alg = "RS256"

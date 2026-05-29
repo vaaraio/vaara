@@ -723,3 +723,24 @@ def test_inflight_requests_cleared_when_tools_call_raises(monkeypatch):
     finally:
         _REQUEST_UPSTREAM.reset(token)
     assert p._inflight_requests == {}
+
+
+# ---------------------------------------------------------------------------
+# Attestation emitter slot-keying (pure; runs without the attestation extra)
+# ---------------------------------------------------------------------------
+
+def test_attest_upstreams_named_single_collapses_to_default():
+    # A named single upstream (--upstream github=CMD) collapses to the
+    # "default" slot inside the proxy, so the attestation fingerprint table
+    # must be keyed "default" too. Regression for the placeholder-fingerprint
+    # bug on the documented NAME=CMD single-upstream form.
+    from vaara.integrations.mcp_proxy import _attest_upstreams_for_slots
+    assert _attest_upstreams_for_slots(
+        {"github": ["github-mcp-server", "stdio"]}
+    ) == {"default": ["github-mcp-server", "stdio"]}
+
+
+def test_attest_upstreams_multi_preserves_names():
+    from vaara.integrations.mcp_proxy import _attest_upstreams_for_slots
+    upstreams = {"github": ["gh-srv"], "fs": ["fs-srv"]}
+    assert _attest_upstreams_for_slots(upstreams) == upstreams

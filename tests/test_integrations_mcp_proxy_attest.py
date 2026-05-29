@@ -320,6 +320,66 @@ def test_manifest_fingerprint_idempotent(monkeypatch, emitter):
 
 
 # ---------------------------------------------------------------------------
+# Key validation
+# ---------------------------------------------------------------------------
+
+def test_build_attest_emitter_rejects_non_p256_ec_key(tmp_path):
+    from cryptography.hazmat.primitives import serialization
+    from cryptography.hazmat.primitives.asymmetric import ec
+    from vaara.integrations._mcp_attest import AttestConfigError, build_attest_emitter
+    key = ec.generate_private_key(ec.SECP384R1())
+    pem = key.private_bytes(
+        encoding=serialization.Encoding.PEM,
+        format=serialization.PrivateFormat.PKCS8,
+        encryption_algorithm=serialization.NoEncryption(),
+    )
+    key_path = tmp_path / "p384.pem"
+    key_path.write_bytes(pem)
+    with pytest.raises(AttestConfigError, match="secp256r1"):
+        build_attest_emitter(
+            signing_key_path=key_path,
+            receipts_dir=tmp_path / "r",
+            upstream_commands={"default": ["echo"]},
+        )
+
+
+def test_build_attest_emitter_accepts_p256_ec_key(tmp_path):
+    from cryptography.hazmat.primitives import serialization
+    from cryptography.hazmat.primitives.asymmetric import ec
+    from vaara.integrations._mcp_attest import build_attest_emitter
+    key = ec.generate_private_key(ec.SECP256R1())
+    pem = key.private_bytes(
+        encoding=serialization.Encoding.PEM,
+        format=serialization.PrivateFormat.PKCS8,
+        encryption_algorithm=serialization.NoEncryption(),
+    )
+    key_path = tmp_path / "p256.pem"
+    key_path.write_bytes(pem)
+    emitter = build_attest_emitter(
+        signing_key_path=key_path,
+        receipts_dir=tmp_path / "r",
+        upstream_commands={"default": ["echo"]},
+    )
+    assert emitter.fingerprint_for("default").startswith("cmd:sha256:")
+
+
+def test_named_single_upstream_fingerprints_under_default(attest_key, attest_receipts_dir):
+    # End-to-end of the slot-keying fix: an emitter built the way main() now
+    # builds it for a named single upstream returns a real cmd-hash under
+    # "default", never the unknown-* placeholder.
+    from vaara.integrations._mcp_attest import build_attest_emitter
+    from vaara.integrations.mcp_proxy import _attest_upstreams_for_slots
+    emitter = build_attest_emitter(
+        signing_key_path=attest_key,
+        receipts_dir=attest_receipts_dir,
+        upstream_commands=_attest_upstreams_for_slots({"github": ["github-mcp-server"]}),
+    )
+    fp = emitter.fingerprint_for("default")
+    assert fp.startswith("cmd:sha256:")
+    assert "unknown" not in fp
+
+
+# ---------------------------------------------------------------------------
 # Config error handling
 # ---------------------------------------------------------------------------
 
