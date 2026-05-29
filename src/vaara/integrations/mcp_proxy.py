@@ -1393,7 +1393,9 @@ def main(argv: Optional[list[str]] = None) -> None:
             "github=github-mcp-server` or `--upstream npx`).",
         )
 
-    attest_emitter = _build_attest_emitter_from_args(args, upstreams=upstreams)
+    attest_emitter = _build_attest_emitter_from_args(
+        args, upstreams=_attest_upstreams_for_slots(upstreams),
+    )
 
     legacy_single = (
         list(next(iter(upstreams.values()))) if len(upstreams) == 1 else None
@@ -1465,6 +1467,23 @@ def _parse_upstream_specs(
     if legacy_args and first_name is not None:
         upstreams[first_name].extend(legacy_args)
     return upstreams
+
+
+def _attest_upstreams_for_slots(
+    upstreams: dict[str, list[str]],
+) -> dict[str, list[str]]:
+    """Key the attestation fingerprint table the way the proxy slots upstreams.
+
+    A single upstream (named ``NAME=CMD`` or bare ``CMD``) collapses into the
+    ``"default"`` slot inside ``VaaraMCPProxy``, and ``_REQUEST_UPSTREAM``
+    resolves to ``"default"`` at runtime. The emitter must be keyed the same
+    way, or ``fingerprint_for("default")`` misses the precomputed cmd-hash and
+    emits a ``cmd:sha256:unknown-default`` placeholder. Multi-upstream fan-out
+    keeps the operator-supplied slot names.
+    """
+    if len(upstreams) == 1:
+        return {"default": list(next(iter(upstreams.values())))}
+    return dict(upstreams)
 
 
 def _build_attest_emitter_from_args(
