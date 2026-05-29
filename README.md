@@ -14,7 +14,7 @@
   <a href="https://huggingface.co/spaces/vaaraio/vaara"><img src="https://img.shields.io/badge/%F0%9F%A4%97%20Hugging%20Face-Space-blue" alt="Hugging Face Space"></a>
 </p>
 
-Vaara is the runtime evidence layer for AI Act compliance. Open source, no SaaS, no telemetry.
+Vaara is the tamper-evident runtime evidence layer for AI systems. It covers EU AI Act compliance, and any other case where you need to prove what an agent actually did. Open source, no SaaS, no telemetry.
 
 Vaara intercepts agent tool calls, scores each one with a conformal risk interval, and writes a hash-chained audit record. Online learning across five expert signals via Multiplicative Weight Update. Distribution-free conformal coverage on the score. An external auditor can verify these properties without trusting your stack. Orchestration toolkits and identity layers (Microsoft Agent Governance Toolkit, others) sit on top.
 
@@ -250,6 +250,7 @@ Architectural framing and the OVERT 1.0 Part 3 control walk in [COMPLIANCE.md](C
 |---|---|
 | [docs/formal_specification.md](docs/formal_specification.md) | MWU regret bound, conformal coverage, security properties |
 | [docs/conformal-prediction.md](docs/conformal-prediction.md) | Plain-language explainer for compliance reviewers and legal counsel |
+| [docs/execution-receipts.md](docs/execution-receipts.md) | Execution receipts: the post-execution outcome record paired with SEP-2787 request attestation |
 | [COMPLIANCE.md](COMPLIANCE.md) | EU AI Act (Art. 9, 11 to 15, 61) and DORA (Art. 10, 12, 13) mapping, eval numbers, PAIR calibration |
 | [VERDICTS.md](VERDICTS.md) | Per-article evidence sufficiency thresholds and decision tree |
 | [CHANGELOG.md](CHANGELOG.md) | Version-by-version feature evolution |

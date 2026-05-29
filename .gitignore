@@ -32,3 +32,11 @@ site.py.live
 tests/adversarial/v031/
 .parachute/
 claude-code-audit.db
+
+# Local scratch (per STATE.md)
+.application_*.md
+.outbound_*.md
+.commit_msg_*.txt
+.pr_body_*.md
+.issue_body_*.md
+.comment_body_*.md
