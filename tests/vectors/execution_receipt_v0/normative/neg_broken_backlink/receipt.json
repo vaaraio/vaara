@@ -1,0 +1,25 @@
+{
+  "alg": "HS256",
+  "backLink": {
+    "attestationDigest": "sha256:b22e825faf16cf03647d4fd0773b3500b7bcc1999beecfb5d37e81b0bc416771",
+    "attestationNonce": "other-attestation-nonce-999"
+  },
+  "outcomeDerived": {
+    "completedAt": "2026-05-29T10:00:00Z",
+    "resultCommitment": {
+      "projection": "{\"digest\":\"sha256:c9a4caed49b3efaa7908a29a550b8d33ffbb088c52d519242477223a83214198\"}",
+      "projectionDigest": "sha256:4f1d82dd55dad774e144c4f8ae4ced0d891428ffe4858574d706fd736a301b50"
+    },
+    "status": "executed"
+  },
+  "receiptAsserted": {
+    "alg": "HS256",
+    "iat": "2026-05-29T10:00:00Z",
+    "iss": "issuer://test",
+    "nonce": "fixed-receipt-nonce-0001",
+    "secretVersion": "v1",
+    "sub": "agent:archiver"
+  },
+  "signature": "025039a0aead8a59fdd7dba33f91d3066fced17d461b4c6ba956d25486f55e49",
+  "version": 1
+}

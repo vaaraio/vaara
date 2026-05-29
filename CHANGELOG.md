@@ -6,6 +6,59 @@ and this project follows [Semantic Versioning](https://semver.org/spec/v2.0.0.ht
 
 ## [Unreleased]
 
+## [0.42.0] - 2026-05-29
+
+**Theme: execution receipts, the post-execution sibling of SEP-2787.**
+
+### Added
+- `vaara.attestation.receipt`: a signed execution-receipt envelope that
+  binds the outcome of one attested `tools/call` and links back to the
+  SEP-2787 request attestation it answers. SEP-2787 attests the request
+  before it runs; the receipt covers the deferred half, what happened to
+  it. The two together give end-to-end accountability for one action.
+- Three-block envelope (`backLink`, `receiptAsserted`, `outcomeDerived`)
+  plus a signature, reusing the SEP-2787 canonicalization (RFC 8785 JCS)
+  and signing stack (HS256 / ES256 / RS256) unchanged. A verifier that
+  already checks SEP-2787 signatures needs no new crypto for receipts.
+- `backLink` pins the attestation by nonce and by a digest over its full
+  wire bytes. `outcomeDerived` carries the status (`executed` /
+  `refused` / `errored`), completion time, and an optional result
+  commitment that reuses the SEP-2787 argument-commitment shapes via
+  `make_result_digest` (payload stays local) and `make_result_projection`.
+- Three composable verification checks: `verify_receipt_signature`,
+  `verify_back_link`, and the existing `verify_args_commitment` for the
+  result binding. A receipt is a durable record rather than a
+  time-bounded capability, so there is no TTL.
+- v0 conformance vectors under `tests/vectors/execution_receipt_v0/`
+  with pinned keys, five cases (positive across all three algorithms,
+  refused-without-commitment, result-mismatch, broken back-link), and a
+  stdlib-only independent walker that verifies them without importing
+  Vaara.
+- `docs/execution-receipts.md` documents the format, emission,
+  verification, and the relationship to OVERT 1.0 Part 3.
+
+### Fixed
+- `AdversarialClassifier.score` now applies a deterministic floor for
+  cloud instance-metadata endpoints (AWS IMDS, GCP metadata server, ECS
+  task-role). The v9 model underweighted a bare `http_post` to these
+  known credential-theft destinations, scoring them below the calibrated
+  threshold. The floor lifts them above it regardless of the model
+  output, defense-in-depth on top of the learned score. The match list
+  also covers the parser-confusion encodings that slip a literal-string
+  check: the IPv6 link-local address AWS serves IMDS on, and the dotless
+  32-bit decimal and hex forms of the IMDS IPv4 address, each bounded so
+  it cannot fire on a longer digit or hex run. The list is intentionally
+  not exhaustive: IMDSv2 token flows, DNS rebinding, and arbitrary octal
+  or mixed encodings still fall back to the model. The supportable claim
+  is that Vaara flags the well-known cloud instance-metadata endpoints.
+
+### Notes
+- Library surface only this release. Pairing both the SEP-2787 request
+  attestation and the receipt into the MCP proxy emission path is the
+  next increment; a receipt without its attestation persisted is not a
+  coherent artifact, so the attestation side lands properly rather than
+  bolted on.
+
 ## [0.41.0] - 2026-05-28
 
 **Theme: server-initiated notifications and cancellation routing under fan-out.**
