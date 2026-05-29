@@ -191,6 +191,16 @@ OVERT envelopes per governed interaction turn on with `--overt-signing-key`, `--
 
 SEP-2787 request attestation paired with an execution receipt turns on with `--attest-signing-key PATH` and `--attest-receipts-dir DIR`. Each allowed `tools/call` writes a `{n}-attest.json` (pre-execution SEP-2787 envelope) and a `{n}-receipt.json` (post-execution outcome record with a `backLink` digest over the attestation). Key type is auto-detected from the file: EC P-256 PEM uses ES256, RSA PEM uses RS256, raw bytes uses HS256. An operator-supplied `X-Vaara-Intent` HTTP header overrides the derived `tools/call/{tool_name}` intent label. The `serverFingerprint` field in the attestation starts as a hash of the upstream command string and upgrades to a hash of the upstream's `tools/list` response on first use, binding the exact capability set the proxy presented. See [docs/execution-receipts.md](docs/execution-receipts.md) for the receipt format.
 
+Generate the signing key and verify the output offline:
+
+```
+vaara keygen --attest --out attest_key.pem
+vaara attest verify  0000000001-ab12cd34-attest.json  --pubkey-file attest_key.pem.pub
+vaara receipt verify 0000000001-ab12cd34-receipt.json --attestation 0000000001-ab12cd34-attest.json --pubkey-file attest_key.pem.pub
+```
+
+`keygen --attest` emits an EC P-256 (ES256) key compatible with `--attest-signing-key`, replacing the `openssl ecparam | pkcs8` pipe. The two `verify` commands are reference verifiers: `attest verify` checks the attestation signature and reports TTL state (a saved attestation is durable evidence, so TTL is not enforced unless you pass `--enforce-ttl`); `receipt verify` checks the receipt signature, the attestation signature, and the `backLink` binding the two, plus an optional `--result` check when the receipt carries a result commitment. Both exit non-zero on any failed check, so they drop straight into CI or an audit script. The conformance surface they cover is documented in [docs/sep2787-conformance.md](docs/sep2787-conformance.md).
+
 Worked examples:
 
 - [`examples/github-mcp-proxy-demo/`](examples/github-mcp-proxy-demo/): Vaara in front of [`github/github-mcp-server`](https://github.com/github/github-mcp-server), 42 tools, hash-chained audit trail recorded end-to-end.
@@ -234,6 +244,7 @@ Architectural framing and the OVERT 1.0 Part 3 control walk in [COMPLIANCE.md](C
 | [docs/formal_specification.md](docs/formal_specification.md) | MWU regret bound, conformal coverage, security properties |
 | [docs/conformal-prediction.md](docs/conformal-prediction.md) | Plain-language explainer for compliance reviewers and legal counsel |
 | [docs/execution-receipts.md](docs/execution-receipts.md) | Execution receipts: the post-execution outcome record paired with SEP-2787 request attestation |
+| [docs/sep2787-conformance.md](docs/sep2787-conformance.md) | SEP-2787 conformance surface: what `vaara attest verify` / `vaara receipt verify` check, keyed to the tracked spec revision |
 | [COMPLIANCE.md](COMPLIANCE.md) | EU AI Act (Art. 9, 11 to 15, 61) and DORA (Art. 10, 12, 13) mapping, eval numbers, PAIR calibration |
 | [VERDICTS.md](VERDICTS.md) | Per-article evidence sufficiency thresholds and decision tree |
 | [CHANGELOG.md](CHANGELOG.md) | Version-by-version feature evolution |

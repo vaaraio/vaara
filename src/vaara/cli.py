@@ -74,11 +74,35 @@ Subcommands:
         Emit a mode as a minimal, valid Vaara policy document. Round-trips
         through ``vaara.policy.from_dict`` / ``from_json`` / ``from_yaml``.
 
+    vaara keygen --attest --out PATH [--force]
+        Generate an EC P-256 (ES256) keypair for SEP-2787 attestation
+        signing with ``vaara-mcp-proxy --attest-signing-key``. Replaces
+        the ``openssl ecparam | pkcs8`` pipe. Does not require --dev.
+
+    vaara attest verify ENVELOPE.json
+            (--pubkey-file PUB.pem | --hs256-secret-file SECRET)
+            [--enforce-ttl]
+        Verify a SEP-2787 attestation envelope. Reports signature
+        validity and whether the TTL has expired; TTL is not enforced
+        by default (a saved attestation is durable evidence). Exit 0
+        iff the signature verifies.
+
+    vaara receipt verify RECEIPT.json --attestation ATT.json
+            (--pubkey-file PUB.pem | --hs256-secret-file SECRET)
+            [--result RESULT.json]
+        Verify an execution receipt against its attestation: receipt
+        signature, attestation signature (TTL ignored), and the
+        back-link binding the two. When the receipt carries a result
+        commitment, --result verifies it against the runtime result.
+        Exit 0 iff all checks pass.
+
     vaara version
         Print the installed Vaara version.
 
 Installing the CLI requires no extra deps. ``keygen``/``export``/``verify``
-require ``pip install 'vaara[export]'`` (pulls cryptography).
+require ``pip install 'vaara[export]'`` (pulls cryptography). The
+``attest``/``receipt`` verifiers and ``keygen --attest`` require
+``pip install 'vaara[attestation]'``.
 """
 
 from __future__ import annotations
@@ -91,13 +115,18 @@ import stat
 import sys
 import time
 from pathlib import Path
-from typing import Optional
+from typing import Any, Optional
 
 from vaara import __version__
 
 _INSTALL_HINT = (
     "This command requires the 'cryptography' package. "
     "Install with: pip install 'vaara[export]'"
+)
+
+_ATTESTATION_HINT = (
+    "This command requires the 'attestation' extra "
+    "(rfc8785 + cryptography). Install with: pip install 'vaara[attestation]'"
 )
 
 
@@ -124,6 +153,12 @@ def _cmd_keygen(args: argparse.Namespace) -> int:
             file=sys.stderr,
         )
         return 2
+
+    if args.attest:
+        # EC P-256 (ES256) key for SEP-2787 attestation signing. This is the
+        # documented operator path for vaara-mcp-proxy --attest-signing-key, so
+        # it does not gate on --dev the way the Ed25519 trail-signing key does.
+        return _keygen_attest(out, pub_out)
 
     if not args.dev:
         print(
@@ -170,6 +205,69 @@ def _cmd_keygen(args: argparse.Namespace) -> int:
         "REMINDER: this key was generated on disk with no password and no HSM. "
         "Do not use it to sign trails you submit to a regulator. For production, "
         "see docs/signing-keys.md."
+    )
+    return 0
+
+
+def _keygen_attest(out: Path, pub_out: Path) -> int:
+    """Generate an EC P-256 (ES256) keypair for SEP-2787 attestation signing.
+
+    Writes a PKCS8 PEM private key (0600) and a SubjectPublicKeyInfo PEM
+    public key. The printed ``secretVersion`` is the first 8 hex of the
+    SHA-256 over the public-key DER, matching what ``build_attest_emitter``
+    derives, so the operator can correlate a signed envelope with this
+    keypair. Replaces the documented ``openssl ecparam | pkcs8`` pipe.
+    """
+    from cryptography.hazmat.primitives import serialization
+    from cryptography.hazmat.primitives.asymmetric import ec
+
+    key = ec.generate_private_key(ec.SECP256R1())
+    priv_pem = key.private_bytes(
+        encoding=serialization.Encoding.PEM,
+        format=serialization.PrivateFormat.PKCS8,
+        encryption_algorithm=serialization.NoEncryption(),
+    )
+    pub_pem = key.public_key().public_bytes(
+        encoding=serialization.Encoding.PEM,
+        format=serialization.PublicFormat.SubjectPublicKeyInfo,
+    )
+
+    out.parent.mkdir(parents=True, exist_ok=True)
+    out.write_bytes(priv_pem)
+    try:
+        os.chmod(out, stat.S_IRUSR | stat.S_IWUSR)  # 0600
+    except OSError:
+        pass
+    pub_out.write_bytes(pub_pem)
+
+    pub_der = key.public_key().public_bytes(
+        encoding=serialization.Encoding.DER,
+        format=serialization.PublicFormat.SubjectPublicKeyInfo,
+    )
+    secret_version = hashlib.sha256(pub_der).hexdigest()[:8]
+
+    print("Generated EC P-256 keypair for SEP-2787 attestation signing (ES256)")
+    print(f"  private key:   {out}        (0600)")
+    print(f"  public key:    {pub_out}")
+    print(f"  secretVersion: {secret_version}")
+    print()
+    print("Sign with the proxy:")
+    print(
+        f"  vaara-mcp-proxy --attest-signing-key {out} "
+        "--attest-receipts-dir DIR --upstream NAME=CMD"
+    )
+    print("Verifiers need only the public key:")
+    print(f"  vaara attest verify ATTESTATION.json --pubkey-file {pub_out}")
+    print()
+    print(
+        "The secretVersion above is the first 8 hex of SHA-256 over the public "
+        "key DER. It is carried in every attestation this key signs, so a "
+        "signed envelope can be matched to this keypair without the private key."
+    )
+    print()
+    print(
+        "REMINDER: this private key is on disk with no passphrase. For higher "
+        "assurance, hold the signing key in a KMS/HSM. See docs/signing-keys.md."
     )
     return 0
 
@@ -1013,6 +1111,217 @@ def _load_overt_pubkey(args: argparse.Namespace) -> Optional[bytes]:
         return None
 
 
+def _load_jws_verifying_material(args: argparse.Namespace) -> "tuple[Any, bool]":
+    """Resolve ``--pubkey-file`` (PEM public key) or ``--hs256-secret-file``.
+
+    Returns ``(material, ok)``. ``material`` is a public-key object (ES256 /
+    RS256) when ``--pubkey-file`` is given, or raw ``bytes`` (HS256) when
+    ``--hs256-secret-file`` is given. ``ok`` is False on error, with the
+    diagnostic already printed to stderr.
+    """
+    if args.pubkey_file:
+        from cryptography.hazmat.primitives import serialization
+
+        path = Path(args.pubkey_file).expanduser()
+        if not path.is_file():
+            print(f"pubkey file not found: {path}", file=sys.stderr)
+            return None, False
+        try:
+            return serialization.load_pem_public_key(path.read_bytes()), True
+        except Exception as exc:
+            print(
+                f"--pubkey-file is not a usable PEM public key: {exc}",
+                file=sys.stderr,
+            )
+            return None, False
+
+    path = Path(args.hs256_secret_file).expanduser()
+    if not path.is_file():
+        print(f"hs256 secret file not found: {path}", file=sys.stderr)
+        return None, False
+    return path.read_bytes(), True
+
+
+def _alg_material_mismatch(alg: str, material: Any) -> Optional[str]:
+    """Return a diagnostic if the key material does not match the envelope alg.
+
+    HS256 needs a raw shared secret (``--hs256-secret-file``); ES256 / RS256
+    need a public key (``--pubkey-file``). Catching the mismatch here yields a
+    clear message instead of a low-level signature failure, or a crash inside
+    the verifier when the wrong material type reaches the crypto backend.
+    """
+    is_secret = isinstance(material, (bytes, bytearray))
+    if alg == "HS256" and not is_secret:
+        return "alg is HS256; verify with --hs256-secret-file, not --pubkey-file"
+    if alg in ("ES256", "RS256") and is_secret:
+        return f"alg is {alg}; verify with --pubkey-file, not --hs256-secret-file"
+    return None
+
+
+def _cmd_attest_verify(args: argparse.Namespace) -> int:
+    """Verify a SEP-2787 attestation envelope's signature (and optionally TTL)."""
+    try:
+        from vaara.attestation.sep2787 import (
+            AttestationError,
+            parse_attestation,
+            verify_attestation,
+        )
+    except ImportError:
+        print(_ATTESTATION_HINT, file=sys.stderr)
+        return 2
+
+    env_path = Path(args.envelope).expanduser()
+    if not env_path.is_file():
+        print(f"vaara attest verify: not a file: {env_path}", file=sys.stderr)
+        return 2
+    try:
+        data = json.loads(env_path.read_text(encoding="utf-8"))
+    except (json.JSONDecodeError, OSError) as exc:
+        print(f"vaara attest verify: cannot read JSON: {exc}", file=sys.stderr)
+        return 1
+    try:
+        envelope = parse_attestation(data)
+    except (AttestationError, KeyError, TypeError, ValueError) as exc:
+        print(
+            f"vaara attest verify: not a valid SEP-2787 attestation: {exc}",
+            file=sys.stderr,
+        )
+        return 1
+
+    material, ok = _load_jws_verifying_material(args)
+    if not ok:
+        return 2
+    mismatch = _alg_material_mismatch(envelope.alg, material)
+    if mismatch is not None:
+        print(f"vaara attest verify: {mismatch}", file=sys.stderr)
+        return 2
+
+    # now=0.0 makes the TTL deadline trivially pass, isolating signature
+    # validity; a second pass at real time reveals whether the TTL expired.
+    # Durable evidence files are routinely checked long after exp, so TTL is
+    # reported but not enforced unless --enforce-ttl is set.
+    signature_ok = verify_attestation(envelope, verifying_material=material, now=0.0)
+    live_ok = verify_attestation(envelope, verifying_material=material)
+    ttl_expired = signature_ok and not live_ok
+
+    result = {
+        "valid": signature_ok,
+        "alg": envelope.alg,
+        "iss": envelope.issuer_asserted.iss,
+        "sub": envelope.issuer_asserted.sub,
+        "intent": envelope.planner_declared.intent,
+        "nonce": envelope.issuer_asserted.nonce,
+        "issued_at": envelope.issuer_asserted.iat,
+        "exp_seconds": envelope.issuer_asserted.exp_seconds,
+        "ttl_expired": ttl_expired,
+    }
+    print(json.dumps(result, indent=2))
+
+    if not signature_ok:
+        print("vaara attest verify: signature verification failed", file=sys.stderr)
+        return 1
+    if args.enforce_ttl and ttl_expired:
+        print("vaara attest verify: attestation TTL has expired", file=sys.stderr)
+        return 1
+    return 0
+
+
+def _cmd_receipt_verify(args: argparse.Namespace) -> int:
+    """Verify an execution receipt: signature, back-link, and optionally result."""
+    try:
+        from vaara.attestation.receipt import (
+            parse_receipt,
+            verify_back_link,
+            verify_receipt_signature,
+        )
+        from vaara.attestation.sep2787 import (
+            AttestationError,
+            parse_attestation,
+            verify_args_commitment,
+            verify_attestation,
+        )
+    except ImportError:
+        print(_ATTESTATION_HINT, file=sys.stderr)
+        return 2
+
+    receipt_path = Path(args.receipt).expanduser()
+    att_path = Path(args.attestation).expanduser()
+    for label, p in (("receipt", receipt_path), ("attestation", att_path)):
+        if not p.is_file():
+            print(f"vaara receipt verify: {label} not a file: {p}", file=sys.stderr)
+            return 2
+    try:
+        receipt = parse_receipt(json.loads(receipt_path.read_text(encoding="utf-8")))
+    except (json.JSONDecodeError, OSError, KeyError, TypeError, ValueError) as exc:
+        print(f"vaara receipt verify: not a valid receipt: {exc}", file=sys.stderr)
+        return 1
+    try:
+        attestation = parse_attestation(
+            json.loads(att_path.read_text(encoding="utf-8"))
+        )
+    except (
+        json.JSONDecodeError, OSError, AttestationError, KeyError, TypeError,
+        ValueError,
+    ) as exc:
+        print(f"vaara receipt verify: not a valid attestation: {exc}", file=sys.stderr)
+        return 1
+
+    material, ok = _load_jws_verifying_material(args)
+    if not ok:
+        return 2
+    mismatch = _alg_material_mismatch(receipt.alg, material)
+    if mismatch is not None:
+        print(f"vaara receipt verify: {mismatch}", file=sys.stderr)
+        return 2
+
+    receipt_sig_ok = verify_receipt_signature(receipt, verifying_material=material)
+    # Attestation signature checked with TTL ignored: a receipt is a durable
+    # record of an outcome, so its attestation is expected to be long expired.
+    attestation_sig_ok = verify_attestation(
+        attestation, verifying_material=material, now=0.0
+    )
+    back_link = verify_back_link(receipt, attestation=attestation)
+
+    result: dict[str, Any] = {
+        "receipt_signature_valid": receipt_sig_ok,
+        "attestation_signature_valid": attestation_sig_ok,
+        "back_link_valid": back_link.ok,
+        "status": receipt.outcome_derived.status,
+        "completed_at": receipt.outcome_derived.completed_at,
+    }
+
+    commitment = receipt.outcome_derived.result_commitment
+    if commitment is None:
+        result["result_commitment_valid"] = None
+    elif not args.result:
+        result["result_commitment_valid"] = None
+        result["result_commitment_note"] = (
+            "receipt carries a result commitment; pass --result FILE to verify it"
+        )
+    else:
+        rpath = Path(args.result).expanduser()
+        if not rpath.is_file():
+            print(f"vaara receipt verify: --result not a file: {rpath}", file=sys.stderr)
+            return 2
+        try:
+            runtime_result = json.loads(rpath.read_text(encoding="utf-8"))
+        except (json.JSONDecodeError, OSError) as exc:
+            print(
+                f"vaara receipt verify: cannot read --result JSON: {exc}",
+                file=sys.stderr,
+            )
+            return 1
+        rc = verify_args_commitment(commitment, runtime_arguments=runtime_result)
+        result["result_commitment_valid"] = rc.ok
+
+    print(json.dumps(result, indent=2))
+
+    failed = not (receipt_sig_ok and attestation_sig_ok and back_link.ok)
+    if result.get("result_commitment_valid") is False:
+        failed = True
+    return 1 if failed else 0
+
+
 def _cmd_serve(args: argparse.Namespace) -> int:
     try:
         import uvicorn
@@ -1213,6 +1522,13 @@ def build_parser() -> argparse.ArgumentParser:
         help="Required. Acknowledges this key is for local evaluation, not production.",
     )
     pk.add_argument("--force", action="store_true", help="Overwrite an existing key file")
+    pk.add_argument(
+        "--attest",
+        action="store_true",
+        help="Generate an EC P-256 (ES256) key for SEP-2787 attestation "
+             "signing with vaara-mcp-proxy --attest-signing-key, instead of "
+             "an Ed25519 trail-signing key. Does not require --dev.",
+    )
     pk.set_defaults(func=_cmd_keygen)
 
     pt = sub.add_parser("trail", help="Audit-trail commands")
@@ -1580,6 +1896,69 @@ def build_parser() -> argparse.ArgumentParser:
         help="Raw 32-byte Ed25519 public key encoded as 64 hex characters",
     )
     pov_verify.set_defaults(func=_cmd_overt_verify)
+
+    def _add_jws_key_args(p_):
+        g = p_.add_mutually_exclusive_group(required=True)
+        g.add_argument(
+            "--pubkey-file", dest="pubkey_file", default=None,
+            help="Path to a PEM public key (SubjectPublicKeyInfo) for "
+                 "ES256 / RS256 envelopes",
+        )
+        g.add_argument(
+            "--hs256-secret-file", dest="hs256_secret_file", default=None,
+            help="Path to a file holding the raw HS256 shared secret",
+        )
+
+    pattest = sub.add_parser(
+        "attest",
+        help="SEP-2787 tool-call attestation commands",
+    )
+    asub = pattest.add_subparsers(dest="attest_cmd")
+    pattest.set_defaults(func=_help_dispatch(pattest))
+    pa_verify = asub.add_parser(
+        "verify",
+        help="Verify a SEP-2787 attestation envelope's signature (and TTL). "
+             "Requires the attestation extra.",
+    )
+    pa_verify.add_argument(
+        "envelope", help="Path to a SEP-2787 attestation JSON file",
+    )
+    _add_jws_key_args(pa_verify)
+    pa_verify.add_argument(
+        "--enforce-ttl", action="store_true",
+        help="Fail if the attestation TTL has expired. Off by default: a saved "
+             "attestation is durable evidence and its short TTL is normally "
+             "long past at verification time.",
+    )
+    pa_verify.set_defaults(func=_cmd_attest_verify)
+
+    preceipt = sub.add_parser(
+        "receipt",
+        help="Execution-receipt commands (post-execution sibling of SEP-2787)",
+    )
+    rcsub = preceipt.add_subparsers(dest="receipt_cmd")
+    preceipt.set_defaults(func=_help_dispatch(preceipt))
+    prc_verify = rcsub.add_parser(
+        "verify",
+        help="Verify an execution receipt: signature, back-link to its "
+             "attestation, and optional result commitment. Requires the "
+             "attestation extra.",
+    )
+    prc_verify.add_argument(
+        "receipt", help="Path to an execution-receipt JSON file",
+    )
+    prc_verify.add_argument(
+        "--attestation", required=True,
+        help="Path to the SEP-2787 attestation JSON the receipt answers "
+             "(needed to verify the back-link)",
+    )
+    _add_jws_key_args(prc_verify)
+    prc_verify.add_argument(
+        "--result", default=None,
+        help="Path to the runtime result JSON. When the receipt carries a "
+             "result commitment, the commitment is verified against this.",
+    )
+    prc_verify.set_defaults(func=_cmd_receipt_verify)
 
     ptee = sub.add_parser(
         "tee",
