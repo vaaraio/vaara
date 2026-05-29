@@ -40,6 +40,37 @@ _IP_PATTERNS = [
     ("rfc1918_192", re.compile(r"\b192\.168\.\d+\.\d+\b")),
     ("internal_tld", re.compile(r"\.(local|internal|corp|intranet)\b", re.I)),
 ]
+# Cloud-metadata endpoints (AWS IMDS, GCP metadata server, ECS task-role) are
+# unambiguous SSRF / credential-theft destinations with no legitimate benign
+# use inside an agent tool call. The learned scorer underweights a bare
+# http_post to these, so a deterministic floor guarantees the security
+# property the model alone does not. Defense-in-depth: the model still scores
+# every input; this only lifts the floor when a known-bad destination matches.
+# Floored above the calibrated default threshold so these are actually flagged
+# at runtime, not merely scored above the class-balance midpoint.
+#
+# The list covers the canonical dotted-decimal endpoints AND the parser-
+# confusion encodings that resolve to the same AWS IMDS address but slip past
+# a literal-string check: the dotless 32-bit integer (2852039166) and hex
+# (0xa9fea9fe) forms of 169.254.169.254, and the IPv6 link-local address AWS
+# serves IMDS on (fd00:ec2::254). Each is still zero-benign: no legitimate tool
+# call encodes a host this way. Not exhaustive on purpose; IMDSv2 token flows,
+# DNS rebinding, and arbitrary octal/mixed encodings still fall back to the
+# model. The defensible public claim is "flags the well-known cloud
+# instance-metadata endpoints," not "detects SSRF" in general.
+_METADATA_SSRF_PATTERNS = (
+    re.compile(r"169\.254\.169\.254"),
+    re.compile(r"metadata\.google\.internal"),
+    re.compile(r"169\.254\.170\.2"),
+    # AWS IMDS over IPv6 link-local.
+    re.compile(r"fd00:ec2::254", re.I),
+    # 169.254.169.254 as a dotless 32-bit decimal integer, bounded so it is not
+    # a slice of a longer digit run.
+    re.compile(r"(?<!\d)2852039166(?!\d)"),
+    # 169.254.169.254 as a dotless hex integer; the 0x prefix anchors it.
+    re.compile(r"0xa9fea9fe(?![0-9a-f])", re.I),
+)
+_METADATA_SSRF_FLOOR = 0.95
 _CRED_PATTERNS = [
     ("secret_word", re.compile(r"\b(secret|password|credentials|token|api_key)\b", re.I)),
     ("env_var", re.compile(r"(AWS_|GITHUB_|STRIPE_|SLACK_|DB_|JWT_)[A-Z_]+")),
@@ -228,7 +259,11 @@ class AdversarialClassifier:
         """Return adversarial probability in [0, 1]."""
         entry = {"tool_name": tool_name, "parameters": parameters or {}, "context": context or {}}
         X = _build_features_one(entry, self._vocab, use_embeddings=self._use_embeddings, use_dst=self._use_dst)
-        return float(self._model.predict_proba(X)[0, 1])
+        prob = float(self._model.predict_proba(X)[0, 1])
+        blob = json.dumps(entry, default=str)
+        if any(p.search(blob) for p in _METADATA_SSRF_PATTERNS):
+            return max(prob, _METADATA_SSRF_FLOOR)
+        return prob
 
     def is_malicious(self, tool_name: str, parameters: Optional[dict] = None, context: Optional[dict] = None, threshold: Optional[float] = None) -> bool:
         """Return True if score >= threshold (default: bundle's default_threshold)."""
