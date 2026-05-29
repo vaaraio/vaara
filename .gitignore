@@ -28,6 +28,9 @@ application_*.pdf
 outbound_*.md
 site.py.live
 
+# CodeGraph index (local dev tool, not part of the repo)
+.codegraph/
+
 # Bench output (PAIR runs, dist-shift, vLLM logs). Reproducible by rerun.
 tests/adversarial/v031/
 .parachute/

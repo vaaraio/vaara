@@ -43,6 +43,11 @@ from vaara.integrations._mcp_notify import (
     NotificationRouter,
     StdioRouter,
 )
+from vaara.integrations._mcp_attest import (
+    AttestConfigError,
+    AttestPairEmitter,
+    build_attest_emitter,
+)
 from vaara.integrations._mcp_overt import (
     OVERTConfigError,
     OVERTReceiptEmitter,
@@ -84,6 +89,11 @@ _REQUEST_TENANT: contextvars.ContextVar[str] = contextvars.ContextVar(
 _REQUEST_SESSION: contextvars.ContextVar[str] = contextvars.ContextVar(
     "vaara_mcp_session", default="",
 )
+# v0.43 proxy pairing: HTTP transport sets this from X-Vaara-Intent per request.
+# Empty default means intent falls back to "tools/call/{tool_name}" in the emitter.
+_REQUEST_INTENT: contextvars.ContextVar[str] = contextvars.ContextVar(
+    "vaara_mcp_intent", default="",
+)
 
 def _safe_log(value: Any, max_len: int = 200) -> str:
     """Sanitise a user-supplied string for safe logging.
@@ -123,6 +133,7 @@ class VaaraMCPProxy:
         prompt_allowlist: Optional[set[str]] = None,
         prompt_denylist: Optional[set[str]] = None,
         overt_emitter: Optional[OVERTReceiptEmitter] = None,
+        attest_emitter: Optional[AttestPairEmitter] = None,
         upstreams: Optional[dict[str, list[str]]] = None,
         router: Optional[NotificationRouter] = None,
     ) -> None:
@@ -154,6 +165,7 @@ class VaaraMCPProxy:
         )
         self._stdout_lock = threading.Lock()
         self._overt = overt_emitter
+        self._attest = attest_emitter
         # Notification router. stdio default writes through the shared stdout
         # lock; HTTP transport swaps in HttpRouter in run_http(). The router is
         # the only surface allowed to deliver upstream-initiated notifications
@@ -353,6 +365,7 @@ class VaaraMCPProxy:
             x_vaara_tenant: Optional[str] = Header(default=None, alias="X-Vaara-Tenant"),
             x_vaara_upstream: Optional[str] = Header(default=None, alias="X-Vaara-Upstream"),
             mcp_session_id: Optional[str] = Header(default=None, alias="Mcp-Session-Id"),
+            x_vaara_intent: Optional[str] = Header(default=None, alias="X-Vaara-Intent"),
         ) -> Response:
             # 1 MiB cap on a single MCP JSON-RPC message. Real tool calls and
             # responses fit comfortably; anything larger is either a misuse or
@@ -455,6 +468,7 @@ class VaaraMCPProxy:
             upstream_token = _REQUEST_UPSTREAM.set(upstream_name)
             tenant_token = _REQUEST_TENANT.set((x_vaara_tenant or "").strip())
             session_token = _REQUEST_SESSION.set(session_value)
+            intent_token = _REQUEST_INTENT.set((x_vaara_intent or "").strip())
             try:
                 if isinstance(payload, dict) and "id" not in payload:
                     try:
@@ -468,6 +482,7 @@ class VaaraMCPProxy:
                 _REQUEST_UPSTREAM.reset(upstream_token)
                 _REQUEST_TENANT.reset(tenant_token)
                 _REQUEST_SESSION.reset(session_token)
+                _REQUEST_INTENT.reset(intent_token)
 
         @app.get("/mcp")
         async def mcp_sse_endpoint(
@@ -702,9 +717,14 @@ class VaaraMCPProxy:
             return self._error_response(req_id, -32603, f"Upstream unavailable: {e}")
 
     def _handle_tools_list(self, request: dict) -> dict:
-        return self._handle_list(
+        response = self._handle_list(
             request, "tools", "name", self._allowlist, self._denylist,
         )
+        if self._attest is not None:
+            self._attest.update_manifest_fingerprint(
+                _REQUEST_UPSTREAM.get(), response
+            )
+        return response
 
     def _handle_list(
         self,
@@ -820,6 +840,15 @@ class VaaraMCPProxy:
             }
         request_id = request.get("id")
         upstream_name = _REQUEST_UPSTREAM.get()
+        attest_pair = None
+        if self._attest is not None:
+            attest_pair = self._attest.emit_attestation(
+                tool_name=tool_name,
+                arguments=arguments,
+                upstream_name=upstream_name,
+                tenant_id=_REQUEST_TENANT.get(),
+                intent_override=_REQUEST_INTENT.get(),
+            )
         with self._inflight_lock:
             if progress_token is not None:
                 self._inflight_progress[progress_token] = (
@@ -831,15 +860,29 @@ class VaaraMCPProxy:
                 )
             if request_id is not None:
                 self._inflight_requests[request_id] = upstream_name
+        # Default to failure severity so a paired receipt is still emitted
+        # (errored) if the upstream raises before returning a response. The
+        # attestation was already written above; pairing it with a receipt on
+        # every path keeps the evidence trail complete with no orphans.
+        outcome_severity = 1.0
         try:
             upstream_response = self._upstream.request(request)
+            outcome_severity = self._severity_from_response(upstream_response)
         finally:
             with self._inflight_lock:
                 if progress_token is not None:
                     self._inflight_progress.pop(progress_token, None)
                 if request_id is not None:
                     self._inflight_requests.pop(request_id, None)
-        outcome_severity = self._severity_from_response(upstream_response)
+            if self._attest is not None and attest_pair is not None:
+                _attestation, _counter = attest_pair
+                self._attest.emit_receipt(
+                    attestation=_attestation,
+                    counter=_counter,
+                    outcome_severity=outcome_severity,
+                    upstream_name=upstream_name,
+                    tenant_id=_REQUEST_TENANT.get(),
+                )
         try:
             self._pipeline.report_outcome(
                 action_id=result.action_id, outcome_severity=outcome_severity,
@@ -1300,6 +1343,16 @@ def main(argv: Optional[list[str]] = None) -> None:
     parser.add_argument("--deny-prompt", action="append", default=[], dest="deny_prompts",
                         help="Filter this prompt name from prompts/list and reject any "
                              "prompts/get to it (repeatable). Denylist wins on overlap.")
+    parser.add_argument("--attest-signing-key", type=Path, default=None,
+                        help="PEM private key (EC P-256 = ES256, RSA = RS256) or raw "
+                             "bytes file (HS256) for SEP-2787 attestation + receipt "
+                             "pairing. Off when absent. Generate EC key: openssl ecparam "
+                             "-genkey -name prime256v1 | openssl pkcs8 -topk8 -nocrypt "
+                             "-out attest_key.pem")
+    parser.add_argument("--attest-receipts-dir", type=Path, default=None,
+                        help="Directory to write paired attestation + receipt JSON files "
+                             "({n}-attest.json / {n}-receipt.json). Required when "
+                             "--attest-signing-key is set.")
     parser.add_argument("--overt-signing-key", type=Path, default=None,
                         help="Ed25519 PEM private key used to sign OVERT 1.0 Base "
                              "Envelopes for every governed MCP interaction. Off when "
@@ -1340,6 +1393,8 @@ def main(argv: Optional[list[str]] = None) -> None:
             "github=github-mcp-server` or `--upstream npx`).",
         )
 
+    attest_emitter = _build_attest_emitter_from_args(args, upstreams=upstreams)
+
     legacy_single = (
         list(next(iter(upstreams.values()))) if len(upstreams) == 1 else None
     )
@@ -1354,6 +1409,7 @@ def main(argv: Optional[list[str]] = None) -> None:
         prompt_allowlist=prompt_allow,
         prompt_denylist=prompt_deny if prompt_deny else None,
         overt_emitter=overt_emitter,
+        attest_emitter=attest_emitter,
     )
     try:
         if args.transport == "http":
@@ -1409,6 +1465,42 @@ def _parse_upstream_specs(
     if legacy_args and first_name is not None:
         upstreams[first_name].extend(legacy_args)
     return upstreams
+
+
+def _build_attest_emitter_from_args(
+    args: argparse.Namespace,
+    *,
+    upstreams: dict[str, list[str]],
+) -> Optional[AttestPairEmitter]:
+    """Construct the attestation pair emitter from CLI args, or None if not configured.
+
+    Off when --attest-signing-key is absent. If signing-key is set,
+    --attest-receipts-dir must also be present, or the proxy refuses to start.
+    """
+    if args.attest_signing_key is None:
+        if args.attest_receipts_dir is not None:
+            print(
+                "vaara-mcp-proxy: --attest-receipts-dir has no effect without "
+                "--attest-signing-key. Exiting.",
+                file=sys.stderr,
+            )
+            sys.exit(2)
+        return None
+    if args.attest_receipts_dir is None:
+        print(
+            "vaara-mcp-proxy: --attest-signing-key requires --attest-receipts-dir.",
+            file=sys.stderr,
+        )
+        sys.exit(2)
+    try:
+        return build_attest_emitter(
+            signing_key_path=args.attest_signing_key,
+            receipts_dir=args.attest_receipts_dir,
+            upstream_commands=upstreams,
+        )
+    except AttestConfigError as exc:
+        print(f"vaara-mcp-proxy: {exc}", file=sys.stderr)
+        sys.exit(2)
 
 
 def _build_overt_emitter_from_args(
