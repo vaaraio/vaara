@@ -115,6 +115,61 @@ def _safe_log(value: Any, max_len: int = 200) -> str:
 # a CLI flag if a real workload needs more headroom.
 _MCP_HTTP_MAX_BODY_BYTES = 1 * 1024 * 1024
 
+# Maximum Mcp-Session-Id length accepted on the /mcp HTTP endpoint. The id
+# keys the inflight-progress and HttpRouter session maps, so the cap bounds
+# those keys against a malicious client submitting an absurdly long header.
+# 128 is comfortably wider than any realistic cryptographically-random id.
+_MCP_SESSION_ID_MAX_LEN = 128
+
+# Streamable HTTP transport revisions the /mcp endpoint speaks. The
+# MCP-Protocol-Version header arrived in 2025-06-18; per spec a request that
+# omits it is assumed to be 2025-03-26, and an unrecognised value is a 400.
+_SUPPORTED_HTTP_PROTOCOL_VERSIONS = frozenset({"2025-03-26", "2025-06-18"})
+
+
+def _session_id_is_visible_ascii(value: str) -> bool:
+    """True iff every character is visible ASCII (0x21-0x7E).
+
+    The Streamable HTTP transport requires session ids to be visible
+    ASCII. The empty string passes vacuously; callers cap length and
+    presence separately.
+    """
+    return all("\x21" <= ch <= "\x7e" for ch in value)
+
+
+def _protocol_version_supported(version: Optional[str]) -> bool:
+    """True iff the MCP-Protocol-Version header is absent, blank, or known.
+
+    An absent or blank header is allowed: per spec the server assumes
+    2025-03-26. A present, non-blank value must be one the transport speaks.
+    """
+    if version is None:
+        return True
+    stripped = version.strip()
+    return stripped == "" or stripped in _SUPPORTED_HTTP_PROTOCOL_VERSIONS
+
+
+def _accept_satisfies(accept: Optional[str], media_type: str) -> bool:
+    """True iff an Accept header value can receive ``media_type``.
+
+    A missing or blank header states no preference and is accepted. A
+    present header satisfies ``media_type`` when it lists ``*/*``, the
+    matching type wildcard (e.g. ``application/*``), or the exact type.
+    Wildcard-aware where a literal substring check would not be.
+    """
+    if not accept or not accept.strip():
+        return True
+    main_type = media_type.split("/", 1)[0]
+    tokens = {
+        token.strip().split(";", 1)[0].strip().lower()
+        for token in accept.split(",")
+    }
+    return (
+        "*/*" in tokens
+        or f"{main_type}/*" in tokens
+        or media_type.lower() in tokens
+    )
+
 
 class VaaraMCPProxy:
     """Transparent MCP proxy with Vaara interception on tool calls."""
@@ -398,6 +453,39 @@ class VaaraMCPProxy:
             mcp_session_id: Optional[str] = Header(default=None, alias="Mcp-Session-Id"),
             x_vaara_intent: Optional[str] = Header(default=None, alias="X-Vaara-Intent"),
         ) -> Response:
+            # Streamable HTTP transport header validation (MCP 2025-03-26 /
+            # 2025-06-18): the client must be able to accept both
+            # application/json and text/event-stream, and any
+            # MCP-Protocol-Version it sends must be one we speak. Reject
+            # transport violations before reading or parsing the body.
+            accept = request.headers.get("accept")
+            if not (
+                _accept_satisfies(accept, "application/json")
+                and _accept_satisfies(accept, "text/event-stream")
+            ):
+                raise HTTPException(
+                    status_code=406,
+                    detail={"error": {
+                        "code": "not_acceptable",
+                        "message": (
+                            "Accept header must allow both application/json "
+                            "and text/event-stream"
+                        ),
+                    }},
+                )
+            if not _protocol_version_supported(
+                request.headers.get("mcp-protocol-version")
+            ):
+                raise HTTPException(
+                    status_code=400,
+                    detail={"error": {
+                        "code": "unsupported_protocol_version",
+                        "message": (
+                            "MCP-Protocol-Version is not supported; supported: "
+                            f"{sorted(_SUPPORTED_HTTP_PROTOCOL_VERSIONS)!r}"
+                        ),
+                    }},
+                )
             # 1 MiB cap on a single MCP JSON-RPC message. Real tool calls and
             # responses fit comfortably; anything larger is either a misuse or
             # a DoS attempt against the proxy's JSON parser. The cap is the
@@ -484,16 +572,26 @@ class VaaraMCPProxy:
                 )
 
             session_value = (mcp_session_id or "").strip()
-            # Cap session id length to keep the inflight-progress and HttpRouter
-            # session-map keys bounded against a malicious client that submits
-            # an absurdly long header. 128 chars is comfortably wider than any
-            # realistic cryptographically-random session id.
-            if len(session_value) > 128:
+            if len(session_value) > _MCP_SESSION_ID_MAX_LEN:
                 raise HTTPException(
                     status_code=400,
                     detail={"error": {
                         "code": "session_id_too_long",
-                        "message": "Mcp-Session-Id must be 128 characters or fewer",
+                        "message": (
+                            f"Mcp-Session-Id must be {_MCP_SESSION_ID_MAX_LEN} "
+                            "characters or fewer"
+                        ),
+                    }},
+                )
+            if not _session_id_is_visible_ascii(session_value):
+                raise HTTPException(
+                    status_code=400,
+                    detail={"error": {
+                        "code": "session_id_invalid",
+                        "message": (
+                            "Mcp-Session-Id must contain only visible ASCII "
+                            "characters (0x21-0x7E)"
+                        ),
                     }},
                 )
             upstream_token = _REQUEST_UPSTREAM.set(upstream_name)
@@ -523,6 +621,19 @@ class VaaraMCPProxy:
             mcp_session_id: Optional[str] = Header(default=None, alias="Mcp-Session-Id"),
             last_event_id: Optional[str] = Header(default=None, alias="Last-Event-ID"),
         ) -> StreamingResponse:
+            if not _protocol_version_supported(
+                request.headers.get("mcp-protocol-version")
+            ):
+                raise HTTPException(
+                    status_code=400,
+                    detail={"error": {
+                        "code": "unsupported_protocol_version",
+                        "message": (
+                            "MCP-Protocol-Version is not supported; supported: "
+                            f"{sorted(_SUPPORTED_HTTP_PROTOCOL_VERSIONS)!r}"
+                        ),
+                    }},
+                )
             session_value = (mcp_session_id or "").strip()
             if not session_value:
                 raise HTTPException(
@@ -532,12 +643,26 @@ class VaaraMCPProxy:
                         "message": "Mcp-Session-Id header is required for GET /mcp",
                     }},
                 )
-            if len(session_value) > 128:
+            if len(session_value) > _MCP_SESSION_ID_MAX_LEN:
                 raise HTTPException(
                     status_code=400,
                     detail={"error": {
                         "code": "session_id_too_long",
-                        "message": "Mcp-Session-Id must be 128 characters or fewer",
+                        "message": (
+                            f"Mcp-Session-Id must be {_MCP_SESSION_ID_MAX_LEN} "
+                            "characters or fewer"
+                        ),
+                    }},
+                )
+            if not _session_id_is_visible_ascii(session_value):
+                raise HTTPException(
+                    status_code=400,
+                    detail={"error": {
+                        "code": "session_id_invalid",
+                        "message": (
+                            "Mcp-Session-Id must contain only visible ASCII "
+                            "characters (0x21-0x7E)"
+                        ),
                     }},
                 )
             header_name = (x_vaara_upstream or "").strip()
