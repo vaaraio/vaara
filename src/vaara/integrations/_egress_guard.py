@@ -65,25 +65,24 @@ def _is_metadata(ip: ipaddress._BaseAddress) -> bool:
     return ip == _METADATA_V4 or ip == _METADATA_V6
 
 
-def _ip_is_blocked(ip: ipaddress._BaseAddress) -> bool:
-    """True iff this resolved address must never be reached by default.
+def _ip_is_blocked(ip: ipaddress._BaseAddress, *, allow_private: bool = False) -> bool:
+    """True iff this resolved address must not be reached.
 
-    Covers the metadata addresses plus loopback, link-local (IPv4 169.254/16
-    and IPv6 fe80::/10), private (RFC1918 and ULA fc00::/7), unspecified,
-    reserved, and multicast.
+    The metadata addresses, the unspecified address (0.0.0.0 / ::), reserved
+    ranges, and multicast are never reachable. Loopback, link-local (IPv4
+    169.254/16 and IPv6 fe80::/10), and private (RFC1918 and ULA fc00::/7) are
+    reachable only when ``allow_private`` is set. That flag trusts internal
+    hosts, not the never-routable classes, so opting in does not re-open
+    0.0.0.0, multicast, or reserved space.
     """
     mapped = getattr(ip, "ipv4_mapped", None)
     if mapped is not None:  # ::ffff:a.b.c.d judged on the embedded v4 address
         ip = mapped
-    return (
-        _is_metadata(ip)
-        or ip.is_loopback
-        or ip.is_link_local
-        or ip.is_private
-        or ip.is_unspecified
-        or ip.is_reserved
-        or ip.is_multicast
-    )
+    if _is_metadata(ip) or ip.is_unspecified or ip.is_reserved or ip.is_multicast:
+        return True
+    if not allow_private and (ip.is_loopback or ip.is_link_local or ip.is_private):
+        return True
+    return False
 
 
 def _coerce_dotless_host(host: str) -> Optional[ipaddress._BaseAddress]:
@@ -126,7 +125,7 @@ def assert_url_egress_allowed(url: str, *, allow_private: bool = False) -> None:
             raise EgressBlocked(
                 f"upstream URL targets the cloud-metadata address: {url!r}",
             )
-        if not allow_private and _ip_is_blocked(dotless):
+        if _ip_is_blocked(dotless, allow_private=allow_private):
             raise EgressBlocked(f"upstream URL resolves to a blocked address: {url!r}")
         return
 
@@ -139,7 +138,7 @@ def assert_url_egress_allowed(url: str, *, allow_private: bool = False) -> None:
             raise EgressBlocked(
                 f"upstream URL targets the cloud-metadata address: {url!r}",
             )
-        if not allow_private and _ip_is_blocked(literal):
+        if _ip_is_blocked(literal, allow_private=allow_private):
             raise EgressBlocked(f"upstream URL resolves to a blocked address: {url!r}")
         return
 
@@ -153,7 +152,7 @@ def assert_url_egress_allowed(url: str, *, allow_private: bool = False) -> None:
             raise EgressBlocked(
                 f"upstream host {host!r} resolves to the cloud-metadata address",
             )
-        if not allow_private and _ip_is_blocked(ip):
+        if _ip_is_blocked(ip, allow_private=allow_private):
             raise EgressBlocked(
                 f"upstream host {host!r} resolves to a blocked address {ip}",
             )
@@ -178,7 +177,7 @@ def pick_egress_ip(host: str, port: Optional[int], *, allow_private: bool = Fals
     if dotless is not None:
         if dotless == _METADATA_V4:
             raise EgressBlocked(f"upstream host targets the cloud-metadata address: {host!r}")
-        if not allow_private and _ip_is_blocked(dotless):
+        if _ip_is_blocked(dotless, allow_private=allow_private):
             raise EgressBlocked(f"upstream host resolves to a blocked address: {host!r}")
         return str(dotless)
 
@@ -189,7 +188,7 @@ def pick_egress_ip(host: str, port: Optional[int], *, allow_private: bool = Fals
     if literal is not None:
         if _is_metadata(literal):
             raise EgressBlocked(f"upstream host targets the cloud-metadata address: {host!r}")
-        if not allow_private and _ip_is_blocked(literal):
+        if _ip_is_blocked(literal, allow_private=allow_private):
             raise EgressBlocked(f"upstream host resolves to a blocked address: {host!r}")
         return str(literal)
 
@@ -203,7 +202,7 @@ def pick_egress_ip(host: str, port: Optional[int], *, allow_private: bool = Fals
         ip = ipaddress.ip_address(addr)
         if _is_metadata(ip):
             raise EgressBlocked(f"upstream host {host!r} resolves to the cloud-metadata address")
-        if not allow_private and _ip_is_blocked(ip):
+        if _ip_is_blocked(ip, allow_private=allow_private):
             raise EgressBlocked(f"upstream host {host!r} resolves to a blocked address {ip}")
         if chosen is None:
             chosen = addr
