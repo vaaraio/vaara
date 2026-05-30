@@ -6,6 +6,48 @@ and this project follows [Semantic Versioning](https://semver.org/spec/v2.0.0.ht
 
 ## [Unreleased]
 
+## [0.44.0] - 2026-05-30
+
+**Theme: a runnable reference verifier. Generate the attestation key, then verify attestations and receipts offline from the command line.**
+
+### Added
+- `vaara keygen --attest --out PATH`: generate an EC P-256 (ES256) keypair
+  for SEP-2787 attestation signing, compatible with `vaara-mcp-proxy
+  --attest-signing-key`. Writes a PKCS8 PEM private key (0600) and a
+  SubjectPublicKeyInfo PEM public key. Prints the `secretVersion` (first 8 hex
+  of SHA-256 over the public-key DER) that appears in every attestation the
+  key signs, so a signed envelope can be matched to the keypair without the
+  private key. Replaces the documented `openssl ecparam | pkcs8` pipe. Unlike
+  the Ed25519 trail-signing keygen it does not gate on `--dev`, since this is
+  the documented operator path for the proxy.
+- `vaara attest verify ENVELOPE.json (--pubkey-file PUB.pem |
+  --hs256-secret-file SECRET) [--enforce-ttl]`: verify a SEP-2787 attestation
+  envelope's signature and report whether its TTL has expired. TTL is reported
+  but not enforced by default, because a saved attestation is durable evidence
+  and its short TTL is normally long past at verification time; `--enforce-ttl`
+  makes expiry a failure. Emits a JSON verdict and exits non-zero on a failed
+  signature.
+- `vaara receipt verify RECEIPT.json --attestation ATT.json (--pubkey-file
+  PUB.pem | --hs256-secret-file SECRET) [--result RESULT.json]`: verify an
+  execution receipt against its attestation in three composable checks: the
+  receipt signature, the attestation signature (TTL ignored), and the
+  `backLink` binding the two. When the receipt carries a result commitment,
+  `--result` verifies it against the runtime result object. Emits a JSON
+  verdict and exits non-zero if any check fails.
+- `docs/sep2787-conformance.md`: the conformance surface the verifier commands
+  cover, keyed to the spec revision Vaara aligns to (`dd030d5b`, tag
+  `sep2787-ref-v2`), with the verification steps Vaara checks versus the ones
+  that remain the runtime's responsibility (nonce replay, tool-call match).
+- 18 tests in `tests/test_cli_attest_receipt_verify.py` covering ES256 and
+  HS256 paths, wrong-key rejection, alg/material mismatch, TTL reporting and
+  enforcement, back-link failure, result-commitment match and mismatch, and a
+  `keygen --attest` to `attest verify` round-trip.
+
+### Changed
+- The PyPI summary now leads with the runtime-evidence framing
+  ("Tamper-evident runtime evidence layer for AI agents: ..."), aligning the
+  package metadata with the README hero and vaara.io.
+
 ## [0.43.0] - 2026-05-29
 
 **Theme: proxy pairing -- SEP-2787 request attestation and execution receipt emitted per tools/call.**

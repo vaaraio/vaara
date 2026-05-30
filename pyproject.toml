@@ -4,8 +4,8 @@ build-backend = "setuptools.build_meta"
 
 [project]
 name = "vaara"
-version = "0.43.0"
-description = "Adaptive AI Agent Execution Layer for risk scoring, audit trails, and regulatory compliance"
+version = "0.44.0"
+description = "Tamper-evident runtime evidence layer for AI agents: risk scoring, audit trails, and regulatory compliance"
 requires-python = ">=3.10"
 license = "Apache-2.0"
 readme = "README.md"
