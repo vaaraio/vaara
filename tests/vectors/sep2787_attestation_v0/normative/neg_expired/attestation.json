@@ -1,0 +1,29 @@
+{
+  "alg": "ES256",
+  "issuerAsserted": {
+    "alg": "ES256",
+    "expSeconds": 300,
+    "iat": "2026-05-29T08:00:00Z",
+    "iss": "issuer://test",
+    "nonce": "att-nonce-es-0005",
+    "secretVersion": "v1",
+    "sub": "agent:archiver"
+  },
+  "payloadDerived": {
+    "toolCalls": [
+      {
+        "args": {
+          "projection": "{\"path\":\"/archive/2024-Q3.md\",\"recursive\":false}",
+          "projectionDigest": "sha256:16fcac2dbb8f5d911362b041bbd7e2bb68393b45858d1414983be44a18df3dd4"
+        },
+        "name": "delete_file",
+        "serverFingerprint": "sha256:1111111111111111111111111111111111111111111111111111111111111111"
+      }
+    ]
+  },
+  "plannerDeclared": {
+    "intent": "archive obsolete report"
+  },
+  "signature": "93aa73b56e2323c20abcfad5a22a245293e45136986957a648a146450d944a5573c5fd802b9d1ffa0642911d8fa3016731acbdcdc0474dbe5a5447b9cf186ef5",
+  "version": 1
+}

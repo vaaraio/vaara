@@ -88,11 +88,14 @@ null`.
   `tests/vectors/execution_receipt_v0/` (five cases, pinned keys, a
   stdlib-only `_check_independent.py` walker that verifies them without
   importing Vaara).
-- SEP-2787 attestation vectors are published on the fork PR
-  `modelcontextprotocol/modelcontextprotocol#2789`. Mirroring them in-repo as
-  `tests/vectors/sep2787_attestation_v0/` is a planned follow-up so the
-  `vaara attest verify` command can be exercised against pinned fixtures the
-  same way the receipt vectors are.
+- SEP-2787 attestation vectors live in-repo at
+  `tests/vectors/sep2787_attestation_v0/` (six cases across HS256/ES256/RS256,
+  pinned keys, a stdlib-only `_check_independent.py` walker that verifies
+  signature, TTL, and the step-5 argument commitment without importing Vaara).
+  They mirror the proposed-shape vectors on the fork PR
+  `modelcontextprotocol/modelcontextprotocol#2789` so the `vaara attest verify`
+  command can be exercised against pinned fixtures the same way the receipt
+  vectors are.
 
 ## Quick start
 
