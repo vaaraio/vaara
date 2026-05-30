@@ -16,9 +16,33 @@ import subprocess
 import sys
 import threading
 from dataclasses import dataclass
-from typing import Any, Callable, Optional
+from typing import Any, Callable, Optional, Protocol, runtime_checkable
 
 logger = logging.getLogger(__name__)
+
+
+@runtime_checkable
+class UpstreamClient(Protocol):
+    """Transport-agnostic surface the proxy uses to talk to one upstream.
+
+    The proxy never cares whether the upstream is a local stdio subprocess
+    (:class:`UpstreamMCPClient`) or a remote HTTP/SSE server
+    (``HttpUpstreamClient``); it only calls these three methods and is
+    handed an ``on_notification`` callback at construction time. Construction
+    differs per transport, so it is deliberately not part of the protocol.
+    """
+
+    def request(self, payload: dict, timeout: float = 30.0) -> dict:
+        """Send a JSON-RPC request, block for the response matching its id."""
+        ...
+
+    def notify(self, payload: dict) -> None:
+        """Send a JSON-RPC notification (no response expected)."""
+        ...
+
+    def close(self) -> None:
+        """Release the transport (kill the subprocess / close the session)."""
+        ...
 
 
 class ProxyError(Exception):
