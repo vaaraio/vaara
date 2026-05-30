@@ -1499,7 +1499,10 @@ def main(argv: Optional[list[str]] = None) -> None:
     parser.add_argument(
         "--allow-private-upstream-hosts",
         action="store_true",
-        default=False,
+        # default None (not False) so an absent flag leaves the env opt-in
+        # VAARA_MCP_ALLOW_PRIVATE_UPSTREAM live; passing False here would
+        # shadow it and silently break the documented process-wide opt-in.
+        default=None,
         help=(
             "Permit --upstream-url targets that resolve to loopback, "
             "link-local, RFC1918, or ULA addresses. OFF by default: such "

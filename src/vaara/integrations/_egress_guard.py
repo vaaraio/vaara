@@ -24,12 +24,13 @@ Internal module. Public surface is :mod:`vaara.integrations._mcp_upstream_http`.
 
 from __future__ import annotations
 
+import http.client
 import ipaddress
 import os
 import socket
 import urllib.error
 import urllib.request
-from typing import Optional
+from typing import Any, Optional
 from urllib.parse import urlsplit
 
 # urllib's default redirect cap is 10; a remote MCP endpoint that needs more
@@ -158,6 +159,136 @@ def assert_url_egress_allowed(url: str, *, allow_private: bool = False) -> None:
             )
 
 
+def pick_egress_ip(host: str, port: Optional[int], *, allow_private: bool = False) -> str:
+    """Resolve ``host`` and return the single IP the caller must dial.
+
+    Mirrors :func:`assert_url_egress_allowed`'s floor but *returns the
+    address to connect to* instead of only validating. The caller dials
+    that IP literal, so the kernel never performs a second DNS lookup at
+    socket-connect time. That closes the rebind TOCTOU: the address that
+    passed the floor is the exact address the socket reaches, even if the
+    name re-resolves to a blocked target a millisecond later.
+
+    Every resolved address is checked (a rebind answer mixing a public and
+    a blocked address is still refused); the first one is pinned. Literal
+    and dotless-integer hosts are returned directly after the same checks.
+    Raises :class:`EgressBlocked` on a refused or unresolvable target.
+    """
+    dotless = _coerce_dotless_host(host)
+    if dotless is not None:
+        if dotless == _METADATA_V4:
+            raise EgressBlocked(f"upstream host targets the cloud-metadata address: {host!r}")
+        if not allow_private and _ip_is_blocked(dotless):
+            raise EgressBlocked(f"upstream host resolves to a blocked address: {host!r}")
+        return str(dotless)
+
+    try:
+        literal = ipaddress.ip_address(host)
+    except ValueError:
+        literal = None
+    if literal is not None:
+        if _is_metadata(literal):
+            raise EgressBlocked(f"upstream host targets the cloud-metadata address: {host!r}")
+        if not allow_private and _ip_is_blocked(literal):
+            raise EgressBlocked(f"upstream host resolves to a blocked address: {host!r}")
+        return str(literal)
+
+    try:
+        infos = socket.getaddrinfo(host, port, proto=socket.IPPROTO_TCP)
+    except socket.gaierror as exc:
+        raise EgressBlocked(f"upstream host does not resolve: {host!r} ({exc})") from exc
+    chosen: Optional[str] = None
+    for info in infos:
+        addr = info[4][0]
+        ip = ipaddress.ip_address(addr)
+        if _is_metadata(ip):
+            raise EgressBlocked(f"upstream host {host!r} resolves to the cloud-metadata address")
+        if not allow_private and _ip_is_blocked(ip):
+            raise EgressBlocked(f"upstream host {host!r} resolves to a blocked address {ip}")
+        if chosen is None:
+            chosen = addr
+    if chosen is None:
+        raise EgressBlocked(f"upstream host does not resolve: {host!r}")
+    return chosen
+
+
+class _PinnedHTTPConnection(http.client.HTTPConnection):
+    """HTTP connection that validates+pins the host's IP at connect time.
+
+    ``self.host`` (the original name) stays the Host header; the socket is
+    opened to the validated IP literal so no re-resolution can occur
+    between the egress check and the connect.
+    """
+
+    def __init__(self, host: str, *, _allow_private: bool = False, **kwargs: Any) -> None:
+        super().__init__(host, **kwargs)
+        self._allow_private = _allow_private
+
+    def connect(self) -> None:  # noqa: D102
+        ip = pick_egress_ip(self.host, self.port, allow_private=self._allow_private)
+        self.sock = socket.create_connection((ip, self.port), self.timeout, self.source_address)
+        if self._tunnel_host:
+            self._tunnel()
+
+
+class _PinnedHTTPSConnection(http.client.HTTPSConnection):
+    """HTTPS counterpart to :class:`_PinnedHTTPConnection`.
+
+    The TCP connect targets the pinned IP; the TLS handshake still uses the
+    original hostname for SNI and certificate verification, so a rebind to
+    an unvalidated address cannot also present a valid certificate.
+    """
+
+    def __init__(self, host: str, *, _allow_private: bool = False, **kwargs: Any) -> None:
+        super().__init__(host, **kwargs)
+        self._allow_private = _allow_private
+
+    def connect(self) -> None:  # noqa: D102
+        ip = pick_egress_ip(self.host, self.port, allow_private=self._allow_private)
+        sock = socket.create_connection((ip, self.port), self.timeout, self.source_address)
+        if self._tunnel_host:
+            self.sock = sock
+            self._tunnel()
+            server_hostname = self._tunnel_host
+        else:
+            server_hostname = self.host
+        self.sock = self._context.wrap_socket(sock, server_hostname=server_hostname)
+
+
+class _PinnedHTTPHandler(urllib.request.HTTPHandler):
+    """urllib handler that dials plain HTTP through a validated, pinned IP."""
+
+    def __init__(self, allow_private: bool) -> None:
+        super().__init__()
+        self._allow_private = allow_private
+
+    def http_open(self, req: urllib.request.Request) -> Any:  # noqa: D102
+        allow_private = self._allow_private
+
+        def factory(host: str, **kwargs: Any) -> _PinnedHTTPConnection:
+            return _PinnedHTTPConnection(host, _allow_private=allow_private, **kwargs)
+
+        return self.do_open(factory, req)
+
+
+class _PinnedHTTPSHandler(urllib.request.HTTPSHandler):
+    """urllib handler that dials HTTPS through a validated, pinned IP."""
+
+    def __init__(self, allow_private: bool) -> None:
+        super().__init__()
+        self._allow_private = allow_private
+
+    def https_open(self, req: urllib.request.Request) -> Any:  # noqa: D102
+        allow_private = self._allow_private
+
+        def factory(host: str, **kwargs: Any) -> _PinnedHTTPSConnection:
+            return _PinnedHTTPSConnection(host, _allow_private=allow_private, **kwargs)
+
+        return self.do_open(
+            factory, req, context=self._context, check_hostname=self._check_hostname
+        )
+
+
 def _same_origin(a: str, b: str) -> bool:
     """True iff two URLs share scheme, host, and effective port."""
     pa, pb = urlsplit(a), urlsplit(b)
@@ -206,7 +337,15 @@ def build_guarded_opener(allow_private: bool = False) -> urllib.request.OpenerDi
 
     Use this opener's ``open`` instead of ``urllib.request.urlopen`` so every
     redirect hop is re-checked and cross-origin hops drop the auth header. The
-    initial URL must still be checked by the caller with
-    :func:`assert_url_egress_allowed` before the request is built.
+    pinned HTTP/HTTPS handlers re-resolve, re-validate, and pin the target IP
+    at connect time on every hop, so a DNS name that re-resolves to a blocked
+    address between the floor check and the socket connect (DNS rebinding) is
+    still refused. The initial URL is also checked by the caller with
+    :func:`assert_url_egress_allowed` for a fail-fast error before the request
+    is built.
     """
-    return urllib.request.build_opener(_GuardedRedirectHandler(allow_private=allow_private))
+    return urllib.request.build_opener(
+        _GuardedRedirectHandler(allow_private=allow_private),
+        _PinnedHTTPHandler(allow_private),
+        _PinnedHTTPSHandler(allow_private),
+    )

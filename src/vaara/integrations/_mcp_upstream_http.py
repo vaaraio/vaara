@@ -178,9 +178,14 @@ class HttpUpstreamClient:
         headers = self._headers(accept="application/json, text/event-stream")
         req = urllib.request.Request(self._url, data=body, headers=headers, method="POST")
         try:
-            # Guarded opener: redirects are re-checked against the egress floor
-            # and the auth header is dropped on a cross-origin hop.
+            # Guarded opener: redirects are re-checked against the egress floor,
+            # the auth header is dropped on a cross-origin hop, and the target
+            # IP is validated and pinned at connect time (DNS-rebind safe).
             return self._opener.open(req, timeout=timeout)
+        except EgressBlocked as e:
+            # A rebind that flipped the name to a blocked address after the
+            # constructor's fail-fast check is caught here at connect time.
+            raise ProxyError(f"Upstream MCP server blocked by egress floor: {e}") from e
         except urllib.error.HTTPError as e:
             raise ProxyError(
                 f"Upstream MCP server returned HTTP {e.code}: {self._error_snippet(e)}",

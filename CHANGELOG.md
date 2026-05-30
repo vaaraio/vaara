@@ -23,6 +23,17 @@ and this project follows [Semantic Versioning](https://semver.org/spec/v2.0.0.ht
   the `allow_private_hosts` constructor arg, or the
   `VAARA_MCP_ALLOW_PRIVATE_UPSTREAM` env flag. The metadata address stays refused
   even with the opt-in.
+- DNS-rebind closure on that egress floor. Resolving the host and then handing
+  the name back to `urllib` left a gap: `urllib` re-resolved at socket-connect,
+  so a name that answered with a public address at the check and a blocked one a
+  moment later (a time-split rebind) reached the blocked target with the auth
+  header attached. The connector now validates and pins the address at connect
+  time and dials the IP literal, so the address that passed the floor is the
+  exact address the socket reaches; HTTPS still verifies the certificate against
+  the original hostname. The pin is re-applied on every redirect hop. An absent
+  `--allow-private-upstream-hosts` flag now leaves the
+  `VAARA_MCP_ALLOW_PRIVATE_UPSTREAM` env opt-in live instead of silently
+  shadowing it with a `False`.
 
 ### Fixed
 - HTTP transport no longer serialises concurrent requests. The POST `/mcp`
