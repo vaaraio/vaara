@@ -1,10 +1,10 @@
 # Vaara
 
-> Runtime evidence layer for EU AI Act compliance. Open source, no SaaS, no telemetry.
+> Tamper-evident runtime evidence layer for AI agents. Covers EU AI Act compliance and any case where you need to prove what an agent actually did. Open source, no SaaS, no telemetry.
 
-Vaara intercepts agent tool calls, scores each one with a conformal risk interval, and writes a hash-chained audit record. Online learning across five expert signals via Multiplicative Weight Update. Distribution-free conformal coverage on the score.
+Vaara intercepts agent tool calls, scores each one with a conformal risk interval, and writes a hash-chained audit record. Online learning across five expert signals via Multiplicative Weight Update. Distribution-free conformal coverage on the score. An external auditor can verify these properties without trusting your stack.
 
-Position: runtime governance and enforcement layer. Implements OVERT 1.0 (Glacis Technologies, March 2026) as the Arbiter role at AAL-3 Phase 2.
+Position: tamper-evident runtime evidence and enforcement layer. Signed attestation plus execution receipts pair each MCP tool call to the policy that allowed it.
 
 ## Repo and packages
 - [GitHub source](https://github.com/vaaraio/vaara): code, releases, issue tracker
@@ -26,10 +26,12 @@ Position: runtime governance and enforcement layer. Implements OVERT 1.0 (Glacis
 - OVERT 1.0 emitter, verifier CLI, S3P (MEA-2) emitter with Clopper-Pearson intervals, experimental AMD SEV-SNP TEE attestation hook
 
 ## Numbers
-- 5,955-entry adversarial corpus (3,422 attack across 8 categories, 2,533 benign)
-- 97.1% attack recall on held-out distribution-shift split, threshold 0.55
-- PAIR adaptive-attacker calibration: ASR 0/25 against Qwen2.5-32B
-- 140 µs / 210 µs p99 inference latency, commodity CPU
+- 12,155-entry adversarial corpus (250 hand-curated + 11,905 LLM-generated), 70/15/15 split stratified by (category, source)
+- Classifier v9 (236 hand-features + 384-dim MiniLM embeddings) at calibrated threshold 0.9150: held-out TEST recall 84.7% [82.4, 86.7] at FPR 4.1% [2.9, 5.7], n=1,827
+- Cross-model held-out recall 66.8% [64.9, 68.7] over n=2,277 with no eval-set attacker model in TRAIN; weakest sub-cell (data_exfil, closed-weight) 38.9% [35.3, 42.5]
+- BIPIA-pressure FPR on benign tool calls 1.2% [0.4, 3.6] across four agent backends
+- Multi-attacker PAIR ASR 0/25 per attacker across Qwen2.5-32B, Qwen2.5-72B, Llama-3.3-70B at identical seeds
+- 140 µs mean / 210 µs p99 for the hot-path rule scorer, commodity CPU; the MiniLM classifier is opt-in (`vaara[ml]`) and not in that path
 
 ## Optional
 - [Article 14 runtime](https://futurium.ec.europa.eu/ga/apply-ai-alliance/community-content/article-14-runtime-why-oversight-agentic-ai-has-be-evidenced-action-not-model): position post on EU Apply AI Alliance Futurium

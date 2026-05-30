@@ -182,3 +182,33 @@ def test_http_router_re_registration_replaces_session():
         assert new.replay_since(0) == [(1, {"new": True})]
     finally:
         loop.close()
+
+
+def test_stale_unregister_does_not_drop_reconnected_session():
+    """The reconnect race: the old stream's teardown must not unregister the
+    NEW session that took its id.
+
+    register_session("sess-a") returns old; a reconnect registers new under the
+    same id and closes old. When old's SSE finally block runs unregister with
+    its own state as the identity guard, the map entry (now new) is left intact
+    so delivery to sess-a still reaches the live reconnected session.
+    """
+    router = HttpRouter(replay_buffer_size=10)
+    loop = _new_loop()
+    try:
+        old = router.register_session("sess-a", "alpha", "", loop)
+        new = router.register_session("sess-a", "alpha", "", loop)
+        # Old stream tears down and runs its identity-checked unregister.
+        router.unregister_session("sess-a", expected=old)
+        assert router.session_count() == 1, "stale teardown dropped the live session"
+        # The live session still receives a targeted notification.
+        router.deliver({"jsonrpc": "2.0", "method": "notifications/x"},
+                       session_id="sess-a", upstream="alpha")
+        assert new.replay_since(0) == [
+            (1, {"jsonrpc": "2.0", "method": "notifications/x"}),
+        ]
+        # An unguarded unregister still works for the normal teardown path.
+        router.unregister_session("sess-a", expected=new)
+        assert router.session_count() == 0
+    finally:
+        loop.close()
