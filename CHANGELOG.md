@@ -36,6 +36,12 @@ and this project follows [Semantic Versioning](https://semver.org/spec/v2.0.0.ht
   `--allow-private-upstream-hosts` flag now leaves the
   `VAARA_MCP_ALLOW_PRIVATE_UPSTREAM` env opt-in live instead of silently
   shadowing it with a `False`.
+- Egress opt-in narrowed to the private classes only. The opt-in previously
+  bypassed the whole floor, so trusting internal hosts also re-opened
+  `0.0.0.0`, multicast, and reserved ranges. The never-routable classes
+  (cloud-metadata, unspecified, reserved, multicast) are now refused regardless
+  of the opt-in; only loopback, link-local, and private (RFC1918 and IPv6 ULA)
+  are relaxed by it.
 
 ### Fixed
 - HTTP transport no longer serialises concurrent requests. The POST `/mcp`
@@ -43,7 +49,13 @@ and this project follows [Semantic Versioning](https://semver.org/spec/v2.0.0.ht
   slow upstream stalled every other POST, SSE drain, and `/health` (real
   concurrency 1). It now runs on a worker thread via `asyncio.to_thread`, with
   the per-request ContextVars preserved across the hop through
-  `contextvars.copy_context()`.
+  `contextvars.copy_context()`. The JSON-RPC notification branch is offloaded
+  the same way, so a slow upstream `notify()` no longer parks the event loop
+  either.
+- `vaara trail receipt`, `compliance dashboard`, and `compliance report` leaked
+  the SQLite audit connection: each opened `SQLiteAuditBackend` and never closed
+  it, locking the DB file under in-process invocation. All three are now
+  context-managed.
 - SSE reconnect race that dropped notifications for the live session. On
   reconnect under the same `Mcp-Session-Id`, the old stream's teardown
   unregistered the NEW session. `unregister_session` is now identity-checked and
