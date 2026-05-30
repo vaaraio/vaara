@@ -610,7 +610,18 @@ class VaaraMCPProxy:
                     except ProxyError:
                         logger.exception("Failed to forward HTTP notification")
                     return Response(status_code=202)
-                response = proxy._handle_request(payload)
+                # _handle_request is a blocking sync call that waits on the
+                # upstream (up to its request timeout). Running it inline would
+                # park the event loop for the whole call, serialising every
+                # other POST /mcp, GET /mcp drain, and /health to concurrency 1.
+                # Offload to a worker thread. The per-request ContextVars set
+                # just above live on this task's context, which a bare
+                # to_thread target would not inherit, so copy the current
+                # context and run the handler inside it on the worker thread.
+                ctx = contextvars.copy_context()
+                response = await asyncio.to_thread(
+                    ctx.run, proxy._handle_request, payload,
+                )
                 return JSONResponse(content=response)
             finally:
                 _REQUEST_UPSTREAM.reset(upstream_token)
