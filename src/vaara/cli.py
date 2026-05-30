@@ -710,19 +710,25 @@ def _cmd_trail_receipt(args: argparse.Namespace) -> int:
 
 
 def _cmd_compliance_dashboard(args: argparse.Namespace) -> int:
-    from vaara.audit.sqlite_backend import SQLiteAuditTrail
+    from vaara.audit.sqlite_backend import SQLiteAuditBackend
     from vaara.compliance.dashboard import render_html
-    from vaara.compliance.engine import ComplianceEngine
+    from vaara.compliance.engine import create_default_engine
 
     db_path = Path(args.db).expanduser()
     if not db_path.is_file():
         print(f"vaara compliance dashboard: not a file: {db_path}", file=sys.stderr)
         return 2
 
-    trail = SQLiteAuditTrail(str(db_path))
-    engine = ComplianceEngine()
+    backend = SQLiteAuditBackend(str(db_path))
+    try:
+        trail = backend.load_trail()
+    except Exception as exc:
+        print(f"failed to load audit trail: {exc}", file=sys.stderr)
+        return 2
+
+    engine = create_default_engine()
     report = engine.assess(
-        trail=trail,
+        trail,
         system_name=args.system_name,
         system_version=args.system_version,
     )
