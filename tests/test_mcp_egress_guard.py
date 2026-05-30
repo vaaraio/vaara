@@ -75,6 +75,23 @@ def test_private_allowed_with_opt_in(url):
     assert_url_egress_allowed(url, allow_private=True)
 
 
+@pytest.mark.parametrize(
+    "url",
+    [
+        "http://0.0.0.0/mcp",  # unspecified
+        "http://[::]/mcp",  # unspecified IPv6
+        "http://224.0.0.1/mcp",  # multicast
+        "http://[ff02::1]/mcp",  # multicast IPv6
+        "http://240.0.0.1/mcp",  # reserved
+    ],
+)
+def test_never_routable_refused_even_with_opt_in(url):
+    # allow_private trusts internal hosts, not the never-routable classes.
+    # Opting in must not re-open 0.0.0.0, multicast, or reserved space.
+    with pytest.raises(EgressBlocked):
+        assert_url_egress_allowed(url, allow_private=True)
+
+
 def test_public_host_allowed():
     # Literal public IP so the floor passes without a live DNS lookup.
     assert_url_egress_allowed("https://8.8.8.8/mcp")
