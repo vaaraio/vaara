@@ -155,11 +155,28 @@ class HttpRouter:
             prior.close()
         return state
 
-    def unregister_session(self, session_id: str) -> None:
+    def unregister_session(
+        self, session_id: str, expected: Optional["_SessionState"] = None,
+    ) -> None:
+        """Remove a session's state.
+
+        When ``expected`` is given, the entry is popped only if it is still the
+        same ``_SessionState`` object. On reconnect, ``register_session``
+        replaces the map entry with a fresh state and closes the prior one; the
+        old stream's ``finally`` then runs ``unregister_session``. Without the
+        identity check that finally would pop the NEW state, silently dropping
+        notifications for the live reconnected session. The identity check makes
+        the stale teardown a no-op.
+        """
         with self._lock:
-            state = self._sessions.pop(session_id, None)
-        if state is not None:
-            state.close()
+            current = self._sessions.get(session_id)
+            if current is None:
+                return
+            if expected is not None and current is not expected:
+                # A newer session took this id; leave it registered.
+                return
+            state = self._sessions.pop(session_id)
+        state.close()
 
     def deliver(
         self,

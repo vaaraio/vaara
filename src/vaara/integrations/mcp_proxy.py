@@ -721,12 +721,18 @@ class VaaraMCPProxy:
                 except ValueError:
                     resume_after = 0
             loop = asyncio.get_running_loop()
-            state = http_router.register_session(
+            # my_state is THIS stream's session state. On a reconnect with the
+            # same Mcp-Session-Id, register_session installs a fresh state and
+            # closes this one; the unregister in the finally below is then
+            # identity-checked against my_state so the tearing-down old stream
+            # never pops the NEW state out from under the live reconnection.
+            my_state = http_router.register_session(
                 session_id=session_value,
                 upstream=upstream_name,
                 tenant=(x_vaara_tenant or "").strip(),
                 loop=loop,
             )
+            state = my_state
 
             async def event_stream():
                 # enqueue populates both the buffer (for replay) and the queue
@@ -766,7 +772,10 @@ class VaaraMCPProxy:
                         ).encode("utf-8")
                         last_yielded = event_id
                 finally:
-                    http_router.unregister_session(session_value)
+                    # Identity-checked: only tear down the map entry if it is
+                    # still this stream's state. A reconnect that already
+                    # replaced it leaves the live session registered.
+                    http_router.unregister_session(session_value, expected=my_state)
 
             return StreamingResponse(
                 event_stream(),
