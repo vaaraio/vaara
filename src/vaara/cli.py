@@ -679,12 +679,12 @@ def _cmd_trail_receipt(args: argparse.Namespace) -> int:
         print(f"audit DB not found: {db_path}", file=sys.stderr)
         return 2
 
-    backend = SQLiteAuditBackend(str(db_path))
-    try:
-        trail = backend.load_trail()
-    except Exception as exc:
-        print(f"failed to load audit trail: {exc}", file=sys.stderr)
-        return 2
+    with SQLiteAuditBackend(str(db_path)) as backend:
+        try:
+            trail = backend.load_trail()
+        except Exception as exc:
+            print(f"failed to load audit trail: {exc}", file=sys.stderr)
+            return 2
 
     receipt = extract_receipt(trail, args.action_id)
     if receipt is None:
@@ -719,12 +719,12 @@ def _cmd_compliance_dashboard(args: argparse.Namespace) -> int:
         print(f"vaara compliance dashboard: not a file: {db_path}", file=sys.stderr)
         return 2
 
-    backend = SQLiteAuditBackend(str(db_path))
-    try:
-        trail = backend.load_trail()
-    except Exception as exc:
-        print(f"failed to load audit trail: {exc}", file=sys.stderr)
-        return 2
+    with SQLiteAuditBackend(str(db_path)) as backend:
+        try:
+            trail = backend.load_trail()
+        except Exception as exc:
+            print(f"failed to load audit trail: {exc}", file=sys.stderr)
+            return 2
 
     engine = create_default_engine()
     report = engine.assess(
@@ -757,12 +757,12 @@ def _cmd_compliance_report(args: argparse.Namespace) -> int:
         print(f"audit DB not found: {db_path}", file=sys.stderr)
         return 2
 
-    backend = SQLiteAuditBackend(str(db_path))
-    try:
-        trail = backend.load_trail()
-    except Exception as exc:
-        print(f"failed to load audit trail: {exc}", file=sys.stderr)
-        return 2
+    with SQLiteAuditBackend(str(db_path)) as backend:
+        try:
+            trail = backend.load_trail()
+        except Exception as exc:
+            print(f"failed to load audit trail: {exc}", file=sys.stderr)
+            return 2
 
     engine = create_default_engine()
     report = engine.assess(
