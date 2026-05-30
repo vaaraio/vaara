@@ -33,6 +33,11 @@ import urllib.error
 import urllib.request
 from typing import Any, Callable, Iterator, Optional
 
+from vaara.integrations._egress_guard import (
+    EgressBlocked,
+    assert_url_egress_allowed,
+    build_guarded_opener,
+)
 from vaara.integrations._mcp_upstream import ProxyError, strict_json_dumps
 
 logger = logging.getLogger(__name__)
@@ -77,7 +82,24 @@ class HttpUpstreamClient:
         url: str,
         headers: Optional[dict[str, str]] = None,
         on_notification: Optional[Callable[[dict], None]] = None,
+        allow_private_hosts: Optional[bool] = None,
     ) -> None:
+        # SSRF egress floor. Defaults SAFE: loopback / link-local / RFC1918 /
+        # ULA / cloud-metadata targets are refused before any socket opens, and
+        # the guarded opener re-checks every redirect hop and drops the auth
+        # header on a cross-origin redirect. allow_private_hosts opts a trusted
+        # internal host in; None falls back to the VAARA_MCP_ALLOW_PRIVATE_
+        # UPSTREAM env flag. The metadata address is refused even when opted in.
+        if allow_private_hosts is None:
+            from vaara.integrations._egress_guard import _env_allows_private
+
+            allow_private_hosts = _env_allows_private()
+        self._allow_private_hosts = allow_private_hosts
+        try:
+            assert_url_egress_allowed(url, allow_private=allow_private_hosts)
+        except EgressBlocked as exc:
+            raise ProxyError(str(exc)) from exc
+        self._opener = build_guarded_opener(allow_private=allow_private_hosts)
         self._url = url
         # Caller-supplied static headers (auth). Applied first so the transport
         # control headers always win on the keys the protocol owns.
@@ -156,7 +178,14 @@ class HttpUpstreamClient:
         headers = self._headers(accept="application/json, text/event-stream")
         req = urllib.request.Request(self._url, data=body, headers=headers, method="POST")
         try:
-            return urllib.request.urlopen(req, timeout=timeout)  # noqa: S310
+            # Guarded opener: redirects are re-checked against the egress floor,
+            # the auth header is dropped on a cross-origin hop, and the target
+            # IP is validated and pinned at connect time (DNS-rebind safe).
+            return self._opener.open(req, timeout=timeout)
+        except EgressBlocked as e:
+            # A rebind that flipped the name to a blocked address after the
+            # constructor's fail-fast check is caught here at connect time.
+            raise ProxyError(f"Upstream MCP server blocked by egress floor: {e}") from e
         except urllib.error.HTTPError as e:
             raise ProxyError(
                 f"Upstream MCP server returned HTTP {e.code}: {self._error_snippet(e)}",
@@ -332,7 +361,7 @@ class HttpUpstreamClient:
             headers["Last-Event-ID"] = self._listener_last_event_id
         req = urllib.request.Request(self._url, headers=headers, method="GET")
         try:
-            resp = urllib.request.urlopen(req, timeout=_SSE_READ_TIMEOUT_SECONDS)  # noqa: S310
+            resp = self._opener.open(req, timeout=_SSE_READ_TIMEOUT_SECONDS)
         except urllib.error.HTTPError as e:
             if e.code in (404, 405, 501):
                 raise _ServerPushUnsupported from e

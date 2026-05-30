@@ -4,7 +4,9 @@ from __future__ import annotations
 
 import re
 
+from vaara.audit.sqlite_backend import SQLiteAuditBackend
 from vaara.audit.trail import AuditTrail
+from vaara.cli import main
 from vaara.compliance.dashboard import render_html
 from vaara.compliance.engine import create_default_engine
 from vaara.taxonomy.actions import (
@@ -142,3 +144,50 @@ def test_html_surfaces_verdict_inputs_and_contributing_events():
     assert "Threshold" in out
     assert "Observed" in out
     assert "Evidence record count" in out
+
+
+def test_cli_dashboard_db_to_renderer_wiring(tmp_path):
+    """End-to-end CLI smoke: `vaara compliance dashboard` must load an audit
+    trail from a real SQLite DB and write a self-contained HTML report.
+
+    The other tests call render_html directly. This exercises the wiring the
+    CLI owns (DB open, load_trail, engine.assess, render_html, file write),
+    which is exactly what regressed when the command imported a class name
+    the backend module never exported.
+    """
+    db_path = tmp_path / "audit.db"
+    backend = SQLiteAuditBackend(str(db_path))
+    try:
+        # Persist a populated trail to disk via the on_record callback so the
+        # CLI's load_trail() reconstructs real evidence, not an empty trail.
+        trail = _populated_trail()
+        for record in trail._records:
+            backend.write_record(record)
+    finally:
+        backend.close()
+
+    out_path = tmp_path / "dashboard.html"
+    rc = main([
+        "compliance", "dashboard",
+        "--db", str(db_path),
+        "--out", str(out_path),
+        "--system-name", "WiredSys",
+        "--system-version", "9.9",
+    ])
+    assert rc == 0
+    assert out_path.is_file()
+    html = out_path.read_text(encoding="utf-8")
+    assert html.startswith("<!doctype html>")
+    assert html.endswith("</html>")
+    assert "WiredSys" in html
+    assert "Article-level evidence report" in html
+
+
+def test_cli_dashboard_missing_db_returns_error(tmp_path):
+    """A non-existent --db path is a clean exit-2, not a traceback."""
+    rc = main([
+        "compliance", "dashboard",
+        "--db", str(tmp_path / "nope.db"),
+        "--out", str(tmp_path / "out.html"),
+    ])
+    assert rc == 2
