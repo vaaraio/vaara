@@ -193,6 +193,7 @@ class VaaraMCPProxy:
         upstreams: Optional[dict[str, list[str]]] = None,
         upstream_urls: Optional[dict[str, str]] = None,
         upstream_headers: Optional[dict[str, dict[str, str]]] = None,
+        allow_private_upstream_hosts: Optional[bool] = None,
         router: Optional[NotificationRouter] = None,
     ) -> None:
         if pipeline is not None:
@@ -309,12 +310,16 @@ class VaaraMCPProxy:
                 ),
             )
         for name, url in url_map.items():
+            # SSRF egress floor defaults SAFE; allow_private_upstream_hosts (or
+            # the VAARA_MCP_ALLOW_PRIVATE_UPSTREAM env flag) opts a trusted
+            # internal host in. Refused targets raise at construction here.
             self._upstreams[name] = HttpUpstreamClient(
                 url=url,
                 headers=header_map.get(name),
                 on_notification=(
                     lambda msg, n=name: self._on_upstream_notification(n, msg)
                 ),
+                allow_private_hosts=allow_private_upstream_hosts,
             )
         if default_alias_target is not None:
             self._upstreams["default"] = self._upstreams[default_alias_target]
@@ -1472,6 +1477,18 @@ def main(argv: Optional[list[str]] = None) -> None:
         ),
     )
     parser.add_argument(
+        "--allow-private-upstream-hosts",
+        action="store_true",
+        default=False,
+        help=(
+            "Permit --upstream-url targets that resolve to loopback, "
+            "link-local, RFC1918, or ULA addresses. OFF by default: such "
+            "targets are refused to block SSRF. The cloud-metadata address "
+            "stays refused even with this flag. Only set it for a trusted "
+            "internal upstream you control."
+        ),
+    )
+    parser.add_argument(
         "--transport",
         choices=["stdio", "http"],
         default="stdio",
@@ -1585,6 +1602,7 @@ def main(argv: Optional[list[str]] = None) -> None:
             upstreams=upstreams if (legacy_single is None and upstreams) else None,
             upstream_urls=upstream_urls or None,
             upstream_headers=upstream_headers or None,
+            allow_private_upstream_hosts=args.allow_private_upstream_hosts,
             db_path=args.db, agent_id_default=args.agent_id,
             allowlist=tool_allow,
             denylist=tool_deny if tool_deny else None,
@@ -1595,7 +1613,9 @@ def main(argv: Optional[list[str]] = None) -> None:
             overt_emitter=overt_emitter,
             attest_emitter=attest_emitter,
         )
-    except ValueError as e:
+    except (ValueError, ProxyError) as e:
+        # ProxyError here means a --upstream-url target was refused by the SSRF
+        # egress floor at client construction; surface it as a clean CLI error.
         parser.error(str(e))
     try:
         if args.transport == "http":

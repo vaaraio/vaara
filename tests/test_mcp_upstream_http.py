@@ -18,6 +18,16 @@ from vaara.integrations._mcp_upstream import ProxyError
 from vaara.integrations._mcp_upstream_http import HttpUpstreamClient
 
 
+@pytest.fixture(autouse=True)
+def _allow_loopback_upstream(monkeypatch):
+    """The fake MCP servers in this module bind loopback, which the SSRF egress
+    floor refuses by default. Opt in process-wide for the connector tests; the
+    dedicated egress tests below construct with allow_private_hosts=False to
+    assert the blocking path explicitly.
+    """
+    monkeypatch.setenv("VAARA_MCP_ALLOW_PRIVATE_UPSTREAM", "1")
+
+
 class _Handler(BaseHTTPRequestHandler):
     def log_message(self, *args):  # silence the test server
         pass
