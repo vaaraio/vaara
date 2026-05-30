@@ -6,6 +6,47 @@ and this project follows [Semantic Versioning](https://semver.org/spec/v2.0.0.ht
 
 ## [Unreleased]
 
+## [0.45.0] - 2026-05-30
+
+**Theme: reach remote MCP upstreams over HTTP, and make the proxy's Streamable HTTP handling conform to the spec.**
+
+### Added
+- `--upstream-url NAME=URL` on `vaara-mcp-proxy`: front a remote MCP server
+  over Streamable HTTP instead of a local stdio subprocess. A bare
+  `--upstream-url URL` lands under the `default` slot. The connector speaks the
+  2025-03-26 and 2025-06-18 protocol revisions: it POSTs JSON-RPC and reads
+  either `application/json` or `text/event-stream` replies, captures and echoes
+  the `Mcp-Session-Id`, sends the negotiated `MCP-Protocol-Version`, and holds a
+  standing GET SSE channel for server-initiated notifications with
+  `Last-Event-ID` resume and bounded reconnect. Built on the standard-library
+  `urllib` only, so the zero-dependency core is preserved (httpx is not a
+  dependency; only fastapi and uvicorn ship behind the `server` extra). The
+  deprecated 2024-11-05 two-endpoint transport and interactive OAuth are out of
+  scope; remote auth is static-header only.
+- `--upstream-header NAME=HEADER` on `vaara-mcp-proxy`: attach a static request
+  header such as a bearer token to a URL upstream. The header name splits on the
+  first `=`, so a base64 token's trailing `=` survives. Startup rejects headers
+  aimed at an unknown slot and stdio/url slot-name collisions.
+- In-repo SEP-2787 attestation conformance vectors at
+  `tests/vectors/sep2787_attestation_v0/`: pinned HS256, ES256, and RS256 keys
+  and six cases (`hs256_digest_identity`, `es256_projection_identity`,
+  `rs256_signature_ttl_only`, `neg_bad_signature`, `neg_expired`,
+  `neg_args_mismatch`) spanning the signature, TTL, and args-commitment
+  dimensions, with a standard-library-only independent checker that imports no
+  Vaara code, a generator script, and a pytest cross-check against the library
+  verifier. `docs/sep2787-conformance.md` now points at these in-repo vectors
+  rather than a planned follow-up.
+
+### Fixed
+- Streamable HTTP conformance in the proxy's HTTP transport. The `Mcp-Session-Id`
+  is now validated as visible ASCII (0x21 to 0x7E) on both POST and GET alongside
+  the existing 128-character cap. The `MCP-Protocol-Version` header is read and
+  validated against the supported set (`2025-03-26`, `2025-06-18`); an absent
+  header is treated as `2025-03-26`, an unsupported value returns 400. The POST
+  `Accept` header must offer both `application/json` and `text/event-stream`; the
+  check is wildcard-aware, so `*/*` and an absent header still pass and existing
+  clients are not broken, and a violation returns 406.
+
 ## [0.44.0] - 2026-05-30
 
 **Theme: a runnable reference verifier. Generate the attestation key, then verify attestations and receipts offline from the command line.**
