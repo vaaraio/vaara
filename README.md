@@ -162,6 +162,8 @@ vaara-mcp-proxy \
 
 Point your MCP client at the proxy instead of the upstream. The audit chain captures every tool call without changing client or upstream behavior. Distinct from `mcp_server`, which exposes Vaara itself as an MCP server for agents that consult Vaara as a tool.
 
+Upstreams can be local or remote. `--upstream` launches a local stdio MCP server; `--upstream-url NAME=URL` connects to a remote MCP server over the Streamable HTTP transport, and a bare `--upstream-url URL` lands in the `default` slot. Each slot is one transport or the other, never both.
+
 <details>
 <summary>Fleet shape (v0.40): one proxy, many upstreams, multi-tenant policy</summary>
 

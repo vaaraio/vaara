@@ -5,7 +5,7 @@ build-backend = "setuptools.build_meta"
 [project]
 name = "vaara"
 version = "0.45.0"
-description = "Tamper-evident runtime evidence layer for AI agents: risk scoring, audit trails, and regulatory compliance"
+description = "Tamper-evident runtime evidence layer for AI agents: conformal risk scoring, hash-chained audit trails, and signed attestation plus execution receipts per MCP tool call"
 requires-python = ">=3.10"
 license = "Apache-2.0"
 readme = "README.md"
