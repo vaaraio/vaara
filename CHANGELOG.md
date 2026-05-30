@@ -6,6 +6,44 @@ and this project follows [Semantic Versioning](https://semver.org/spec/v2.0.0.ht
 
 ## [Unreleased]
 
+**Theme: audit-finding fixes on the remote HTTP connector, the HTTP transport, and the public numbers.**
+
+### Security
+- SSRF egress floor on the `--upstream-url` connector. The remote HTTP connector
+  handed a user-supplied upstream URL straight to `urllib` and followed
+  redirects with the static `Authorization` header attached, so a hostile or
+  compromised upstream (or an attacker controlling a redirect target) could aim
+  the proxy at the cloud instance-metadata service or an internal host and have
+  it fetch the target with the operator's bearer token. The new `_egress_guard`
+  resolves the host and refuses loopback, link-local, RFC1918, IPv6 ULA, and the
+  cloud-metadata address (including its dotless and IPv4-mapped encodings) before
+  any socket opens; a guarded opener caps redirects, re-applies the floor to each
+  hop, and drops the auth header on a cross-origin redirect. Default is SAFE; a
+  trusted internal upstream is opted in via `--allow-private-upstream-hosts`,
+  the `allow_private_hosts` constructor arg, or the
+  `VAARA_MCP_ALLOW_PRIVATE_UPSTREAM` env flag. The metadata address stays refused
+  even with the opt-in.
+
+### Fixed
+- HTTP transport no longer serialises concurrent requests. The POST `/mcp`
+  endpoint ran the blocking `_handle_request` inline on the event loop, so one
+  slow upstream stalled every other POST, SSE drain, and `/health` (real
+  concurrency 1). It now runs on a worker thread via `asyncio.to_thread`, with
+  the per-request ContextVars preserved across the hop through
+  `contextvars.copy_context()`.
+- SSE reconnect race that dropped notifications for the live session. On
+  reconnect under the same `Mcp-Session-Id`, the old stream's teardown
+  unregistered the NEW session. `unregister_session` is now identity-checked and
+  only removes the entry when it is still the tearing-down stream's own state.
+- README mislabelled the rule-scorer latency as classifier latency. The
+  140 µs / 210 µs figure is the hot-path rule scorer; the MiniLM classifier is
+  opt-in (`vaara[ml]`) and not in that path. Also surfaces the cross-model
+  held-out recall (66.8%) and its weakest sub-cell (38.9%) the bench docs
+  already disclose.
+- `llms.txt` advertised a two-generations-stale classifier (5,955-entry corpus,
+  97.1% at threshold 0.55). Regenerated from the current v9 numbers and switched
+  the lede to the tamper-evident runtime evidence framing.
+
 ## [0.45.0] - 2026-05-30
 
 **Theme: reach remote MCP upstreams over HTTP, and make the proxy's Streamable HTTP handling conform to the spec.**
