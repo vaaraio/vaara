@@ -1,0 +1,29 @@
+{
+  "alg": "HS256",
+  "issuerAsserted": {
+    "alg": "HS256",
+    "expSeconds": 300,
+    "iat": "2026-05-29T10:00:00Z",
+    "iss": "issuer://test",
+    "nonce": "att-nonce-hs-0001",
+    "secretVersion": "v1",
+    "sub": "agent:archiver"
+  },
+  "payloadDerived": {
+    "toolCalls": [
+      {
+        "args": {
+          "projection": "{\"digest\":\"sha256:16fcac2dbb8f5d911362b041bbd7e2bb68393b45858d1414983be44a18df3dd4\"}",
+          "projectionDigest": "sha256:7f77dfef90fdde7e68aa1f92c8a09a9cbb10751387051978e67c1198f6206c52"
+        },
+        "name": "delete_file",
+        "serverFingerprint": "sha256:1111111111111111111111111111111111111111111111111111111111111111"
+      }
+    ]
+  },
+  "plannerDeclared": {
+    "intent": "archive obsolete report"
+  },
+  "signature": "99123c80e9a54bea238aa1f475adf5adc76b6d94b287d12d7e56e4904c6f465c",
+  "version": 1
+}

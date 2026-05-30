@@ -55,8 +55,9 @@ from vaara.integrations._mcp_overt import (
     policy_hash_from_perimeter,
 )
 from vaara.integrations._mcp_upstream import (
-    ProxyError, UpstreamMCPClient, strict_json_dumps,
+    ProxyError, UpstreamClient, UpstreamMCPClient, strict_json_dumps,
 )
+from vaara.integrations._mcp_upstream_http import HttpUpstreamClient
 from vaara.pipeline import InterceptionPipeline
 from vaara.taxonomy.actions import ActionRequest
 
@@ -114,6 +115,61 @@ def _safe_log(value: Any, max_len: int = 200) -> str:
 # a CLI flag if a real workload needs more headroom.
 _MCP_HTTP_MAX_BODY_BYTES = 1 * 1024 * 1024
 
+# Maximum Mcp-Session-Id length accepted on the /mcp HTTP endpoint. The id
+# keys the inflight-progress and HttpRouter session maps, so the cap bounds
+# those keys against a malicious client submitting an absurdly long header.
+# 128 is comfortably wider than any realistic cryptographically-random id.
+_MCP_SESSION_ID_MAX_LEN = 128
+
+# Streamable HTTP transport revisions the /mcp endpoint speaks. The
+# MCP-Protocol-Version header arrived in 2025-06-18; per spec a request that
+# omits it is assumed to be 2025-03-26, and an unrecognised value is a 400.
+_SUPPORTED_HTTP_PROTOCOL_VERSIONS = frozenset({"2025-03-26", "2025-06-18"})
+
+
+def _session_id_is_visible_ascii(value: str) -> bool:
+    """True iff every character is visible ASCII (0x21-0x7E).
+
+    The Streamable HTTP transport requires session ids to be visible
+    ASCII. The empty string passes vacuously; callers cap length and
+    presence separately.
+    """
+    return all("\x21" <= ch <= "\x7e" for ch in value)
+
+
+def _protocol_version_supported(version: Optional[str]) -> bool:
+    """True iff the MCP-Protocol-Version header is absent, blank, or known.
+
+    An absent or blank header is allowed: per spec the server assumes
+    2025-03-26. A present, non-blank value must be one the transport speaks.
+    """
+    if version is None:
+        return True
+    stripped = version.strip()
+    return stripped == "" or stripped in _SUPPORTED_HTTP_PROTOCOL_VERSIONS
+
+
+def _accept_satisfies(accept: Optional[str], media_type: str) -> bool:
+    """True iff an Accept header value can receive ``media_type``.
+
+    A missing or blank header states no preference and is accepted. A
+    present header satisfies ``media_type`` when it lists ``*/*``, the
+    matching type wildcard (e.g. ``application/*``), or the exact type.
+    Wildcard-aware where a literal substring check would not be.
+    """
+    if not accept or not accept.strip():
+        return True
+    main_type = media_type.split("/", 1)[0]
+    tokens = {
+        token.strip().split(";", 1)[0].strip().lower()
+        for token in accept.split(",")
+    }
+    return (
+        "*/*" in tokens
+        or f"{main_type}/*" in tokens
+        or media_type.lower() in tokens
+    )
+
 
 class VaaraMCPProxy:
     """Transparent MCP proxy with Vaara interception on tool calls."""
@@ -135,6 +191,8 @@ class VaaraMCPProxy:
         overt_emitter: Optional[OVERTReceiptEmitter] = None,
         attest_emitter: Optional[AttestPairEmitter] = None,
         upstreams: Optional[dict[str, list[str]]] = None,
+        upstream_urls: Optional[dict[str, str]] = None,
+        upstream_headers: Optional[dict[str, dict[str, str]]] = None,
         router: Optional[NotificationRouter] = None,
     ) -> None:
         if pipeline is not None:
@@ -206,30 +264,58 @@ class VaaraMCPProxy:
             upstream_map = {name: list(cmd) for name, cmd in upstreams.items()}
         elif upstream_command is not None:
             upstream_map = {"default": list(upstream_command)}
-        else:
+        # v0.45: remote upstreams reached over the MCP Streamable HTTP transport.
+        # A slot is either a stdio command or a URL, never both. Optional static
+        # headers (auth) attach per URL slot.
+        url_map: dict[str, str] = dict(upstream_urls) if upstream_urls else {}
+        header_map: dict[str, dict[str, str]] = (
+            {n: dict(h) for n, h in upstream_headers.items()} if upstream_headers else {}
+        )
+        collisions = set(upstream_map) & set(url_map)
+        if collisions:
             raise ValueError(
-                "VaaraMCPProxy requires upstream_command or upstreams.",
+                f"Upstream slot(s) {sorted(collisions)!r} given as both a stdio "
+                "command and a URL; each slot is exactly one transport.",
             )
+        stray_headers = set(header_map) - set(url_map)
+        if stray_headers:
+            raise ValueError(
+                f"Upstream header(s) for {sorted(stray_headers)!r} match no "
+                "--upstream-url slot; headers apply to URL upstreams only.",
+            )
+        if not upstream_map and not url_map:
+            raise ValueError(
+                "VaaraMCPProxy requires at least one upstream "
+                "(upstream_command, upstreams, or upstream_urls).",
+            )
+        all_names = set(upstream_map) | set(url_map)
         default_alias_target: Optional[str] = None
-        if "default" not in upstream_map:
+        if "default" not in all_names:
             # Pick a stable fallback so requests without X-Vaara-Upstream
             # still resolve. Lexicographic first keeps multi-tenant fleets
             # deterministic across restarts. Alias the slot rather than
-            # cloning the command so we never spawn a duplicate subprocess.
-            default_alias_target = sorted(upstream_map)[0]
-        # Wrap on_notification per upstream so the reader thread's callback
+            # cloning the transport so we never open a duplicate connection.
+            default_alias_target = sorted(all_names)[0]
+        # Wrap on_notification per upstream so the reader/listener callback
         # carries the upstream's name. Default-arg ``n=name`` binds the loop
-        # variable at lambda creation, avoiding the late-binding bug that
-        # would otherwise pin every upstream to the last name in the dict.
-        self._upstreams: dict[str, UpstreamMCPClient] = {
-            name: UpstreamMCPClient(
+        # variable at definition, avoiding the late-binding bug that would
+        # otherwise pin every upstream to the last name iterated.
+        self._upstreams: dict[str, UpstreamClient] = {}
+        for name, command in upstream_map.items():
+            self._upstreams[name] = UpstreamMCPClient(
                 command=command,
                 on_notification=(
                     lambda msg, n=name: self._on_upstream_notification(n, msg)
                 ),
             )
-            for name, command in upstream_map.items()
-        }
+        for name, url in url_map.items():
+            self._upstreams[name] = HttpUpstreamClient(
+                url=url,
+                headers=header_map.get(name),
+                on_notification=(
+                    lambda msg, n=name: self._on_upstream_notification(n, msg)
+                ),
+            )
         if default_alias_target is not None:
             self._upstreams["default"] = self._upstreams[default_alias_target]
         # ``self._upstream`` resolves to the per-request upstream via the
@@ -239,7 +325,7 @@ class VaaraMCPProxy:
         # request to dispatch into the right fleet member.
 
     @property
-    def _upstream(self) -> UpstreamMCPClient:
+    def _upstream(self) -> UpstreamClient:
         """Resolve the upstream MCP client for the current request scope.
 
         HTTP transport sets ``_REQUEST_UPSTREAM`` per inbound request. stdio
@@ -258,7 +344,7 @@ class VaaraMCPProxy:
         return client
 
     @_upstream.setter
-    def _upstream(self, client: UpstreamMCPClient) -> None:
+    def _upstream(self, client: UpstreamClient) -> None:
         """Replace the default-slot upstream client.
 
         Test fixtures and embedders that previously assigned
@@ -367,6 +453,39 @@ class VaaraMCPProxy:
             mcp_session_id: Optional[str] = Header(default=None, alias="Mcp-Session-Id"),
             x_vaara_intent: Optional[str] = Header(default=None, alias="X-Vaara-Intent"),
         ) -> Response:
+            # Streamable HTTP transport header validation (MCP 2025-03-26 /
+            # 2025-06-18): the client must be able to accept both
+            # application/json and text/event-stream, and any
+            # MCP-Protocol-Version it sends must be one we speak. Reject
+            # transport violations before reading or parsing the body.
+            accept = request.headers.get("accept")
+            if not (
+                _accept_satisfies(accept, "application/json")
+                and _accept_satisfies(accept, "text/event-stream")
+            ):
+                raise HTTPException(
+                    status_code=406,
+                    detail={"error": {
+                        "code": "not_acceptable",
+                        "message": (
+                            "Accept header must allow both application/json "
+                            "and text/event-stream"
+                        ),
+                    }},
+                )
+            if not _protocol_version_supported(
+                request.headers.get("mcp-protocol-version")
+            ):
+                raise HTTPException(
+                    status_code=400,
+                    detail={"error": {
+                        "code": "unsupported_protocol_version",
+                        "message": (
+                            "MCP-Protocol-Version is not supported; supported: "
+                            f"{sorted(_SUPPORTED_HTTP_PROTOCOL_VERSIONS)!r}"
+                        ),
+                    }},
+                )
             # 1 MiB cap on a single MCP JSON-RPC message. Real tool calls and
             # responses fit comfortably; anything larger is either a misuse or
             # a DoS attempt against the proxy's JSON parser. The cap is the
@@ -453,16 +572,26 @@ class VaaraMCPProxy:
                 )
 
             session_value = (mcp_session_id or "").strip()
-            # Cap session id length to keep the inflight-progress and HttpRouter
-            # session-map keys bounded against a malicious client that submits
-            # an absurdly long header. 128 chars is comfortably wider than any
-            # realistic cryptographically-random session id.
-            if len(session_value) > 128:
+            if len(session_value) > _MCP_SESSION_ID_MAX_LEN:
                 raise HTTPException(
                     status_code=400,
                     detail={"error": {
                         "code": "session_id_too_long",
-                        "message": "Mcp-Session-Id must be 128 characters or fewer",
+                        "message": (
+                            f"Mcp-Session-Id must be {_MCP_SESSION_ID_MAX_LEN} "
+                            "characters or fewer"
+                        ),
+                    }},
+                )
+            if not _session_id_is_visible_ascii(session_value):
+                raise HTTPException(
+                    status_code=400,
+                    detail={"error": {
+                        "code": "session_id_invalid",
+                        "message": (
+                            "Mcp-Session-Id must contain only visible ASCII "
+                            "characters (0x21-0x7E)"
+                        ),
                     }},
                 )
             upstream_token = _REQUEST_UPSTREAM.set(upstream_name)
@@ -492,6 +621,19 @@ class VaaraMCPProxy:
             mcp_session_id: Optional[str] = Header(default=None, alias="Mcp-Session-Id"),
             last_event_id: Optional[str] = Header(default=None, alias="Last-Event-ID"),
         ) -> StreamingResponse:
+            if not _protocol_version_supported(
+                request.headers.get("mcp-protocol-version")
+            ):
+                raise HTTPException(
+                    status_code=400,
+                    detail={"error": {
+                        "code": "unsupported_protocol_version",
+                        "message": (
+                            "MCP-Protocol-Version is not supported; supported: "
+                            f"{sorted(_SUPPORTED_HTTP_PROTOCOL_VERSIONS)!r}"
+                        ),
+                    }},
+                )
             session_value = (mcp_session_id or "").strip()
             if not session_value:
                 raise HTTPException(
@@ -501,12 +643,26 @@ class VaaraMCPProxy:
                         "message": "Mcp-Session-Id header is required for GET /mcp",
                     }},
                 )
-            if len(session_value) > 128:
+            if len(session_value) > _MCP_SESSION_ID_MAX_LEN:
                 raise HTTPException(
                     status_code=400,
                     detail={"error": {
                         "code": "session_id_too_long",
-                        "message": "Mcp-Session-Id must be 128 characters or fewer",
+                        "message": (
+                            f"Mcp-Session-Id must be {_MCP_SESSION_ID_MAX_LEN} "
+                            "characters or fewer"
+                        ),
+                    }},
+                )
+            if not _session_id_is_visible_ascii(session_value):
+                raise HTTPException(
+                    status_code=400,
+                    detail={"error": {
+                        "code": "session_id_invalid",
+                        "message": (
+                            "Mcp-Session-Id must contain only visible ASCII "
+                            "characters (0x21-0x7E)"
+                        ),
                     }},
                 )
             header_name = (x_vaara_upstream or "").strip()
@@ -1299,6 +1455,23 @@ def main(argv: Optional[list[str]] = None) -> None:
     parser.add_argument("--upstream-arg", action="append", default=[], dest="upstream_args",
                         help="Argument to pass to the (first) upstream command (repeatable)")
     parser.add_argument(
+        "--upstream-url", action="append", default=[], dest="upstream_urls",
+        help=(
+            "Remote upstream MCP server reached over the Streamable HTTP "
+            "transport. Repeatable: `--upstream-url NAME=URL` registers a named "
+            "slot; bare `--upstream-url URL` lands under 'default'. A slot is "
+            "either --upstream (stdio) or --upstream-url (remote), never both."
+        ),
+    )
+    parser.add_argument(
+        "--upstream-header", action="append", default=[], dest="upstream_headers",
+        help=(
+            "Static header sent on every request to a --upstream-url slot, e.g. "
+            "`--upstream-header NAME=Authorization: Bearer TOKEN`. Repeatable for "
+            "multiple headers or slots. The slot NAME must match an --upstream-url."
+        ),
+    )
+    parser.add_argument(
         "--transport",
         choices=["stdio", "http"],
         default="stdio",
@@ -1387,32 +1560,43 @@ def main(argv: Optional[list[str]] = None) -> None:
     )
 
     upstreams = _parse_upstream_specs(args.upstreams, args.upstream_args)
-    if not upstreams:
+    upstream_urls = _parse_upstream_url_specs(args.upstream_urls)
+    upstream_headers = _parse_upstream_header_specs(args.upstream_headers)
+    if not upstreams and not upstream_urls:
         parser.error(
-            "at least one --upstream is required (e.g. `--upstream "
-            "github=github-mcp-server` or `--upstream npx`).",
+            "at least one --upstream or --upstream-url is required (e.g. "
+            "`--upstream github=github-mcp-server` or "
+            "`--upstream-url remote=https://host/mcp`).",
         )
 
     attest_emitter = _build_attest_emitter_from_args(
         args, upstreams=_attest_upstreams_for_slots(upstreams),
     )
 
+    # The legacy single-upstream entry point only applies to a lone stdio
+    # upstream with no remote slots in play.
     legacy_single = (
-        list(next(iter(upstreams.values()))) if len(upstreams) == 1 else None
+        list(next(iter(upstreams.values())))
+        if (len(upstreams) == 1 and not upstream_urls) else None
     )
-    proxy = VaaraMCPProxy(
-        upstream_command=legacy_single,
-        upstreams=upstreams if legacy_single is None else None,
-        db_path=args.db, agent_id_default=args.agent_id,
-        allowlist=tool_allow,
-        denylist=tool_deny if tool_deny else None,
-        resource_allowlist=resource_allow,
-        resource_denylist=resource_deny if resource_deny else None,
-        prompt_allowlist=prompt_allow,
-        prompt_denylist=prompt_deny if prompt_deny else None,
-        overt_emitter=overt_emitter,
-        attest_emitter=attest_emitter,
-    )
+    try:
+        proxy = VaaraMCPProxy(
+            upstream_command=legacy_single,
+            upstreams=upstreams if (legacy_single is None and upstreams) else None,
+            upstream_urls=upstream_urls or None,
+            upstream_headers=upstream_headers or None,
+            db_path=args.db, agent_id_default=args.agent_id,
+            allowlist=tool_allow,
+            denylist=tool_deny if tool_deny else None,
+            resource_allowlist=resource_allow,
+            resource_denylist=resource_deny if resource_deny else None,
+            prompt_allowlist=prompt_allow,
+            prompt_denylist=prompt_deny if prompt_deny else None,
+            overt_emitter=overt_emitter,
+            attest_emitter=attest_emitter,
+        )
+    except ValueError as e:
+        parser.error(str(e))
     try:
         if args.transport == "http":
             proxy.run_http(
@@ -1467,6 +1651,67 @@ def _parse_upstream_specs(
     if legacy_args and first_name is not None:
         upstreams[first_name].extend(legacy_args)
     return upstreams
+
+
+def _parse_upstream_url_specs(url_specs: list[str]) -> dict[str, str]:
+    """Turn ``--upstream-url`` CLI input into a name -> URL map.
+
+    Each value is ``NAME=URL`` (NAME a short slug) or a bare ``URL`` (lands
+    under "default"). The URL must be http(s); the scheme check also keeps a
+    bare URL containing ``=`` in its query string from being misread as
+    ``NAME=URL``.
+    """
+    urls: dict[str, str] = {}
+    for spec in url_specs:
+        spec = spec.strip()
+        if spec.lower().startswith(("http://", "https://")):
+            name, url = "default", spec
+        else:
+            candidate_name, sep, candidate_url = spec.partition("=")
+            candidate_name = candidate_name.strip()
+            candidate_url = candidate_url.strip()
+            if (
+                sep
+                and _UPSTREAM_NAME_RE.match(candidate_name)
+                and candidate_url.lower().startswith(("http://", "https://"))
+            ):
+                name, url = candidate_name, candidate_url
+            else:
+                raise SystemExit(
+                    f"invalid --upstream-url value {spec!r}; expected "
+                    "NAME=URL or URL (http/https)",
+                )
+        if name in urls:
+            raise SystemExit(f"duplicate --upstream-url slot {name!r}")
+        urls[name] = url
+    return urls
+
+
+def _parse_upstream_header_specs(header_specs: list[str]) -> dict[str, dict[str, str]]:
+    """Turn ``--upstream-header`` CLI input into a name -> {header: value} map.
+
+    Each value is ``NAME=Header-Name: header value``. Splitting NAME off the
+    first ``=`` is unambiguous because the slug pattern never matches a header
+    line, so a base64 token carrying ``=`` in the value stays intact.
+    """
+    headers: dict[str, dict[str, str]] = {}
+    for spec in header_specs:
+        name, sep, header_line = spec.partition("=")
+        name = name.strip()
+        if not sep or not _UPSTREAM_NAME_RE.match(name):
+            raise SystemExit(
+                f"invalid --upstream-header value {spec!r}; expected "
+                "NAME=Header-Name: value",
+            )
+        field, colon, value = header_line.partition(":")
+        field = field.strip()
+        if not colon or not field:
+            raise SystemExit(
+                f"invalid --upstream-header value {spec!r}; the header must be "
+                "'Header-Name: value'",
+            )
+        headers.setdefault(name, {})[field] = value.strip()
+    return headers
 
 
 def _attest_upstreams_for_slots(

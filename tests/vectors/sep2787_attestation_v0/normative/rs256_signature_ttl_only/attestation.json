@@ -1,0 +1,29 @@
+{
+  "alg": "RS256",
+  "issuerAsserted": {
+    "alg": "RS256",
+    "expSeconds": 300,
+    "iat": "2026-05-29T10:00:00Z",
+    "iss": "issuer://test",
+    "nonce": "att-nonce-rs-0003",
+    "secretVersion": "v1",
+    "sub": "agent:archiver"
+  },
+  "payloadDerived": {
+    "toolCalls": [
+      {
+        "args": {
+          "projection": "{\"path\":\"/archive/2024-Q3.md\",\"recursive\":false}",
+          "projectionDigest": "sha256:16fcac2dbb8f5d911362b041bbd7e2bb68393b45858d1414983be44a18df3dd4"
+        },
+        "name": "delete_file",
+        "serverFingerprint": "sha256:1111111111111111111111111111111111111111111111111111111111111111"
+      }
+    ]
+  },
+  "plannerDeclared": {
+    "intent": "archive obsolete report"
+  },
+  "signature": "19003aac49c542741f8cda9af5dea5c9b15ec024eac884b7e532bfe04fe54b8e18f34022029ab9e171eaa30c1e6da0884a5222c2065ea4f4b05e8f32e1ace96ed1712724369104dbb0fe81f5e348a3ab13620515a9ba0b0556415ed2d1e6b6edb6cda1bd0f3a16586a74a782f55b293f55db6ae83f71f181374148a2001787857b27754a9394b3acba832bbab66f236f91cfb376ad494ad38628075df56a7ed8f3e98e6bad6c6a88a00363d5a3cfea9ee72cab9168ddecbc013752ac8ee7bb43c27dc9ddee0f917397f5fedf2dfc6907272e48c166602b8db0b3b4cfef7356c31fcffea4d910d7d2f811e86a3bacfda15a3d08ddd67542a54ecc1240e374f87b",
+  "version": 1
+}
