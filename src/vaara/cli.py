@@ -237,6 +237,8 @@ def _keygen_attest(out: Path, pub_out: Path) -> int:
     try:
         os.chmod(out, stat.S_IRUSR | stat.S_IWUSR)  # 0600
     except OSError:
+        # Best-effort: filesystems without POSIX permission bits still get the
+        # key written; the operator owns the enclosing directory's perms.
         pass
     pub_out.write_bytes(pub_pem)
 
@@ -244,12 +246,15 @@ def _keygen_attest(out: Path, pub_out: Path) -> int:
         encoding=serialization.Encoding.DER,
         format=serialization.PublicFormat.SubjectPublicKeyInfo,
     )
-    secret_version = hashlib.sha256(pub_der).hexdigest()[:8]
+    # Despite the SEP-2787 field name "secretVersion", this value is a digest
+    # of the PUBLIC key and is safe to print and publish. It is named here for
+    # what it is so it is not mistaken (by a reader or a scanner) for a secret.
+    pubkey_version = hashlib.sha256(pub_der).hexdigest()[:8]
 
     print("Generated EC P-256 keypair for SEP-2787 attestation signing (ES256)")
     print(f"  private key:   {out}        (0600)")
     print(f"  public key:    {pub_out}")
-    print(f"  secretVersion: {secret_version}")
+    print(f"  secretVersion: {pubkey_version}")
     print()
     print("Sign with the proxy:")
     print(
