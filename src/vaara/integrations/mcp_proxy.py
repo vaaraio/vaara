@@ -605,8 +605,15 @@ class VaaraMCPProxy:
             intent_token = _REQUEST_INTENT.set((x_vaara_intent or "").strip())
             try:
                 if isinstance(payload, dict) and "id" not in payload:
+                    # _handle_client_notification forwards to the upstream via a
+                    # blocking sync notify(); offload it on the same copied
+                    # context as the request path so a slow upstream notify does
+                    # not park the event loop and serialise other HTTP traffic.
+                    nctx = contextvars.copy_context()
                     try:
-                        proxy._handle_client_notification(payload)
+                        await asyncio.to_thread(
+                            nctx.run, proxy._handle_client_notification, payload,
+                        )
                     except ProxyError:
                         logger.exception("Failed to forward HTTP notification")
                     return Response(status_code=202)
