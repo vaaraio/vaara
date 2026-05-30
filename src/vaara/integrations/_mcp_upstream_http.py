@@ -359,4 +359,7 @@ class HttpUpstreamClient:
             try:
                 resp.close()
             except Exception:
+                # Best-effort close. The response may already be closed by the
+                # peer or torn down from another thread during shutdown; there
+                # is nothing to recover here.
                 pass
