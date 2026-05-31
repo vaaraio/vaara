@@ -531,6 +531,12 @@ The wire schema in this SEP is the shape shipping in the Vaara MCP proxy
 - `vaara/attestation/_receipt_verifier.py`: `make_back_link` / `verify_back_link`
   and `attestation_digest` (sha256 over the JCS-canonical full SEP-2787 wire
   bytes, signature included): the instance-binding join.
+- `vaara/attestation/decision.py`: the decision record of this SEP.
+  `DecisionRecord` / `DecisionDerived`, `emit_decision_record`,
+  `verify_decision_signature`, `verify_decision_back_link`, and
+  `records_paired` (the decision-and-outcome join). Reuses the receipt's
+  back-link, the issuer-block layout, and the shared signing stack unchanged,
+  so the decision record adds the `decisionDerived` block and no new crypto.
 - `vaara/attestation/_sep2787_types.py` and `_sep2787_canonical.py`: the shared
   commitment shapes (`ArgsRef`, `ArgsProjection`, `make_args_digest`), the
   issuer-block layout, RFC 8785 canonicalization with float rejection, and the
@@ -544,16 +550,19 @@ The wire schema in this SEP is the shape shipping in the Vaara MCP proxy
   tenant. The external time anchor over the chain head (Security Implications) is
   the next shipped step (v0.48).
 
-**Implementation gap (decision record).** The pre-execution **decision** is today
-emitted as an audit event and as a SHA-256 commit-outcome receipt pair
-(`vaara/audit/receipts.py`: `CommitPayload` with `decision`, `risk_score`,
-`threshold_allow`, `threshold_deny`, `decided_at`, and `OutcomePayload`), but as
-a hash-chained pair rather than as a signed envelope in the SEP-2787 issuer-block
-shape. The `decisionDerived` block in this SEP standardizes that content as a
-signed envelope and is the part of the reference implementation that lands
-alongside this SEP. The field mapping is direct: `decision` to `decision`,
-`risk_score` to `riskScore`, `threshold_allow` to `thresholdAllow`,
-`threshold_deny` to `thresholdBlock`, `decided_at` to `decidedAt`.
+**Bridge from the shipped audit decision.** The audit trail already records the
+pre-execution decision as a hash-chained `CommitPayload`
+(`vaara/audit/receipts.py`: `decision`, `risk_score`, `threshold_allow`,
+`threshold_deny`, `decided_at`). `decision_derived_from_commit` maps that
+payload onto the signed `decisionDerived` wire shape. The mapping is mechanical
+but not a rename: the verdict vocabulary is normalized (the audit layer records
+`deny`, the wire enum uses `block`; the review family maps to `escalate`), the
+float risk basis becomes decimal strings (floats are banned on the wire), and
+the epoch decision time becomes an ISO 8601 UTC string. `policy_id`,
+`clientTurnId`, and `reason` are not carried on the commit payload and are
+supplied by the caller when available. This keeps the long-retained signed
+record free of the float canonicalization drift that the hash-chained payload
+tolerated internally.
 
 ## Test Vectors
 
