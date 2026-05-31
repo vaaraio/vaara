@@ -327,9 +327,8 @@ def test_v2_records_roundtrip_through_sqlite(tmp_path):
     from vaara.audit.sqlite_backend import SQLiteAuditBackend
 
     db = tmp_path / "audit.db"
-    backend = SQLiteAuditBackend(db)
-    trail = AuditTrail(on_record=backend.write_record)
-    try:
+    with SQLiteAuditBackend(db) as backend:
+        trail = AuditTrail(on_record=backend.write_record)
         for tid in ("tenant-a", "tenant-b", ""):
             trail.record_action_requested(
                 ActionRequest(
@@ -337,14 +336,9 @@ def test_v2_records_roundtrip_through_sqlite(tmp_path):
                     agent_id="agent", parameters={}, tenant_id=tid,
                 )
             )
-    finally:
-        backend.close()
 
-    reopened = SQLiteAuditBackend(db)
-    try:
+    with SQLiteAuditBackend(db) as reopened:
         reloaded = reopened.load_trail(strict=True)  # raises if chain broken
-    finally:
-        reopened.close()
     assert len(reloaded._records) == 3
     assert [r.chain_version for r in reloaded._records] == [2, 2, 2]
     assert [r.tenant_id for r in reloaded._records] == ["tenant-a", "tenant-b", ""]
