@@ -33,7 +33,7 @@ The two envelopes coexist. Field-level mapping lives in
 
 Install: ``pip install 'vaara[attestation]'``.
 
-See COMPLIANCE.md "Position relative to open runtime-attestation
+See docs/COMPLIANCE.md "Position relative to open runtime-attestation
 standards" for the full architectural framing.
 """
 

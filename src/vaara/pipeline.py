@@ -531,7 +531,7 @@ class InterceptionPipeline:
             )
             # Enqueue for operator review when a queue is wired in.
             # The conformal interval is what makes Article 14 oversight
-            # substantive rather than cosmetic (see COMPLIANCE.md).
+            # substantive rather than cosmetic (see docs/COMPLIANCE.md).
             # Queue write failure must not crash the intercept path —
             # the action is already gated by the ``escalate`` decision
             # and the ESCALATION_SENT audit record. Log and continue.

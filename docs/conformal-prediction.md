@@ -2,7 +2,7 @@
 
 This document is the non-technical companion to Vaara's formal
 specification of adaptive risk scoring. The formal version lives at
-[`docs/formal_specification.md`](formal_specification.md). If you are a
+[`formal_specification.md`](formal_specification.md). If you are a
 compliance reviewer, legal counsel, or procurement officer reading a
 Vaara report and wondering what the conformal interval next to each
 risk score actually means, this is the document for you.
@@ -83,17 +83,17 @@ mathematical guarantee that holds without distributional assumptions.
 Conformal prediction is also not a substitute for ground-truth outcome
 labels. The system still needs to observe what actually happened after
 each action to update its calibration. Vaara records that signal via
-`OUTCOME_RECORDED` events. See [`COMPLIANCE.md`](../COMPLIANCE.md) for
-the article mapping and [`VERDICTS.md`](../VERDICTS.md) for the
+`OUTCOME_RECORDED` events. See [`COMPLIANCE.md`](COMPLIANCE.md) for
+the article mapping and [`VERDICTS.md`](VERDICTS.md) for the
 staleness windows the engine applies to those records.
 
 ## Where to read more
 
 - Formal definition, coverage proof, and the exact scorer Vaara
-  ships: [`docs/formal_specification.md`](formal_specification.md).
+  ships: [`formal_specification.md`](formal_specification.md).
 - How outcome records feed the calibration loop, and the staleness
   rules that decide when calibration is fresh enough to trust:
-  [`VERDICTS.md`](../VERDICTS.md), Article 15(1) row.
+  [`VERDICTS.md`](VERDICTS.md), Article 15(1) row.
 - The original conformal prediction literature (Vovk, Gammerman,
   Shafer) is a good academic anchor if you want the textbook proof.
   Vaara implements split-conformal prediction, the most operationally
@@ -117,4 +117,4 @@ similar assurance pipeline could consume.
 
 For the broader chronology of Vaara's runtime-evidence concepts and a
 neutral list of adjacent published work, see
-[`../PRIOR_ART.md`](../PRIOR_ART.md).
+[`PRIOR_ART.md`](PRIOR_ART.md).

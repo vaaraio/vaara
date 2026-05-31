@@ -7,7 +7,7 @@ blob after the 236 hand-features.
 
 Headline numbers and methodology live in README.md and
 ``bench/vaara-bench-v0.31.md``. Per-source breakdown and adaptive-attacker
-calibration live in COMPLIANCE.md. Numbers intentionally not duplicated
+calibration live in docs/COMPLIANCE.md. Numbers intentionally not duplicated
 here so this docstring does not go stale on every release.
 
 Usage:
