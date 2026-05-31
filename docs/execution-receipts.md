@@ -108,4 +108,4 @@ emitting CBOR envelopes for every governed interaction. The execution
 receipt is the per-tool-call JSON outcome record that pairs with a
 SEP-2787 request attestation and verifies against the SEP-2787 stack.
 The outcome half maps to the OVERT 1.0 Part 3 receipt family; see
-[OVERT_CONTROLS.md](../OVERT_CONTROLS.md).
+[OVERT_CONTROLS.md](OVERT_CONTROLS.md).

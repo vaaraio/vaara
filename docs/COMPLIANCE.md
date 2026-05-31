@@ -270,7 +270,7 @@ infrastructure does not yet exist in published form"* (footnote 19).
 Vaara implements pieces of that infrastructure: hash-chained
 operational-state versioning, distribution-free conformal interval
 over a behavioral metric, and MWU-bounded online policy update with
-regret guarantee O(sqrt(T log N)) (see [docs/formal_specification.md](docs/formal_specification.md)).
+regret guarantee O(sqrt(T log N)) (see [formal_specification.md](formal_specification.md)).
 
 ## What Vaara produces
 
@@ -395,7 +395,7 @@ per-tool-call JSON envelope carried inside MCP transport. A
 deployment can run both: the OVERT envelope binds the action chain
 while the SEP-2787 envelope binds the specific tool-call payload.
 Field-level mapping between the two lives in
-[`docs/sep2787-overt-mapping.md`](docs/sep2787-overt-mapping.md).
+[`sep2787-overt-mapping.md`](sep2787-overt-mapping.md).
 
 `parse_attestation(d)` provides full wire round-trip: a third-party
 consumer of the published v0 test vectors can parse JSON bytes,
@@ -630,7 +630,7 @@ relevant measurement primitive that ties everything above together.
 
 The [MIT AI Risk Repository v4](https://airisk.mit.edu/) (MIT FutureTech, Slattery et al., updated 2025-12-03, CC BY 4.0) is a meta-taxonomy of 1,835 risk-bearing entries drawn from 74 source papers, organised into 7 domains. Vaara has direct runtime evidence shape against roughly 740 of those entries (~46% of the sub-domain-tagged set), concentrated in Privacy & Security, Malicious Actors & Misuse, Human-Computer Interaction, parts of AI System Safety, and the Governance Failure sub-domain. Vaara does not cover the model-side, content-level, and structural risks that live elsewhere in the taxonomy.
 
-The full per-sub-domain map lives at [docs/mit_ai_risk_repository_mapping.md](docs/mit_ai_risk_repository_mapping.md). Local copies of the v4 database and the companion AI Risk Mitigations sheet are tracked under `research/external/` for reproducibility.
+The full per-sub-domain map lives at [mit_ai_risk_repository_mapping.md](mit_ai_risk_repository_mapping.md). Local copies of the v4 database and the companion AI Risk Mitigations sheet are tracked under `../research/external/` for reproducibility.
 
 ## EU Product Liability Directive 2024/2853
 
