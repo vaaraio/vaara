@@ -32,7 +32,7 @@ from vaara.auth import APIKey, Role, _hash_key, generate_api_key
 
 logger = logging.getLogger(__name__)
 
-SCHEMA_VERSION = 3
+SCHEMA_VERSION = 4
 
 
 def _scrub_nonfinite(obj: Any) -> Any:
@@ -81,7 +81,11 @@ CREATE TABLE IF NOT EXISTS audit_records (
     system_operation TEXT,
     data_usage       TEXT,
     decision_making  TEXT,
-    limitations      TEXT
+    limitations      TEXT,
+    -- v0.47 schema v4: hash-chain format version. Records written before
+    -- tenant binding carry 1 (tenant_id NOT in the hash); v2+ bind it.
+    -- Kept last so the column index matches the ALTER in _MIGRATIONS[3].
+    chain_version    INTEGER NOT NULL DEFAULT 1
 );
 
 CREATE INDEX IF NOT EXISTS idx_action_id   ON audit_records(action_id);
@@ -139,6 +143,13 @@ _MIGRATIONS: dict[int, str] = {
     ALTER TABLE audit_records ADD COLUMN data_usage       TEXT;
     ALTER TABLE audit_records ADD COLUMN decision_making  TEXT;
     ALTER TABLE audit_records ADD COLUMN limitations      TEXT;
+    """,
+    # v3 to v4: hash-chain format version (v0.47). Existing rows default to
+    # 1 — their record_hash was computed without tenant_id and stays valid
+    # (NOT re-hashed on load), so chain verification of historical records
+    # keeps passing. New records are written with chain_version=2.
+    3: """
+    ALTER TABLE audit_records ADD COLUMN chain_version INTEGER NOT NULL DEFAULT 1;
     """,
 }
 
@@ -340,11 +351,12 @@ class SQLiteAuditBackend:
                    (record_id, action_id, event_type, timestamp, agent_id,
                     tool_name, data, regulatory, previous_hash, record_hash, seq,
                     tenant_id,
-                    system_operation, data_usage, decision_making, limitations)
+                    system_operation, data_usage, decision_making, limitations,
+                    chain_version)
                    VALUES (
                      ?, ?, ?, ?, ?, ?, ?, ?, ?, ?,
                      COALESCE((SELECT MAX(seq) FROM audit_records), -1) + 1,
-                     ?, ?, ?, ?, ?
+                     ?, ?, ?, ?, ?, ?
                    )""",
                 (
                     record.record_id,
@@ -358,14 +370,22 @@ class SQLiteAuditBackend:
                     record.previous_hash,
                     record.record_hash,
                     # Per-record tenant_id wins so a single backend instance
-                    # can serve a multi-tenant runtime (v0.40+). Empty record
-                    # tenant_id falls back to instance scope for the legacy
-                    # single-tenant init path.
-                    record.tenant_id or self._tenant_id,
+                    # can serve a multi-tenant runtime (v0.40+). For chain v2+
+                    # tenant_id is bound into record_hash, so the stored value
+                    # MUST equal the hashed value or the chain won't re-verify
+                    # on reload — the instance-scope substitution is therefore
+                    # confined to legacy v1 records, where tenant_id was never
+                    # hashed (keeps tenant-scoped backends tagging old-style
+                    # empty-tenant writes; see test_purge_is_tenant_scoped).
+                    record.tenant_id if record.chain_version >= 2
+                    else (record.tenant_id or self._tenant_id),
                     record.system_operation,
                     record.data_usage,
                     record.decision_making,
                     record.limitations,
+                    # Persist the chain format so the tenant binding (or its
+                    # absence on legacy records) re-verifies on reload.
+                    record.chain_version,
                 ),
             )
 
@@ -661,28 +681,35 @@ class SQLiteAuditBackend:
     def _row_to_record(self, row: tuple) -> AuditRecord:
         """Convert a database row to an AuditRecord, applying GDPR redactions.
 
-        Column layout (schema v3):
+        Column layout (schema v4):
           row[0..9]  record_id, action_id, event_type, timestamp, agent_id,
                      tool_name, data, regulatory, previous_hash, record_hash
           row[10]    seq
           row[11]    tenant_id
           row[12..15] system_operation, data_usage, decision_making, limitations
+          row[16]    chain_version
 
         Pre-v0.6 records (migrated from schema v2) carry NULL for the
         transparency-taxonomy columns. Their original record_hash was
         computed without those fields and stays valid — we do NOT
-        re-hash on load.
+        re-hash on load. Likewise pre-v0.47 records carry chain_version 1
+        (the migration default), so tenant_id stays outside their hash and
+        the chain re-verifies exactly as written.
         """
         agent_id = row[4]
         if self._redaction_cache and agent_id in self._redaction_cache:
             agent_id = self._redaction_cache[agent_id]
         # Defensive indexing: rows from older queries may not include
-        # the v3 columns. Use a guard so loading old DBs still works.
+        # later-schema columns. Use a guard so loading old DBs still works.
         tenant_id = row[11] if len(row) > 11 else ""
         sys_op = row[12] if len(row) > 12 else None
         data_use = row[13] if len(row) > 13 else None
         dec_mk = row[14] if len(row) > 14 else None
         lims = row[15] if len(row) > 15 else None
+        # chain_version drives whether tenant_id is part of compute_hash;
+        # default 1 (tenant outside hash) for any short/legacy row so the
+        # reconstructed record re-hashes to its stored record_hash.
+        chain_version = row[16] if len(row) > 16 and row[16] is not None else 1
         return AuditRecord(
             record_id=row[0],
             action_id=row[1],
@@ -699,6 +726,7 @@ class SQLiteAuditBackend:
             data_usage=data_use,
             decision_making=dec_mk,
             limitations=lims,
+            chain_version=chain_version,
         )
 
     # ── Backup ────────────────────────────────────────────────────

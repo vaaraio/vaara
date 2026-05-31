@@ -6,6 +6,30 @@ and this project follows [Semantic Versioning](https://semver.org/spec/v2.0.0.ht
 
 ## [Unreleased]
 
+## [0.47.0] - 2026-05-31
+
+**Theme: tenant isolation across the evidence path. The reference server can no
+longer leak one tenant's audit chain to another, and tenant identity is now part
+of the tamper-evident hash chain itself.**
+
+### Security
+- Tenant identity is now bound into the audit hash chain. `AuditRecord` carries
+  a `chain_version`; records written from this release on (chain v2) fold
+  `tenant_id` into `compute_hash`, so re-attributing a record to another tenant
+  after the fact breaks `verify_chain()` instead of passing silently. Pre-v0.47
+  records (chain v1) keep `tenant_id` out of the hash and re-verify byte for
+  byte, so existing trails and signed exports stay valid. The SQLite store gains
+  a `chain_version` column (schema v4) with a migration defaulting legacy rows to
+  v1. The standalone verifier mirrors the same rule.
+- The reference HTTP server's audit-chain read (`GET /v1/audit/actions/{id}/chain`)
+  is now tenant-scoped: a caller can no longer read another tenant's action chain
+  by guessing an `action_id`. Unknown and cross-tenant actions both return 404
+  with an identical body, so the response is not an existence oracle. The scoped
+  read also resolves chain positions in one pass, removing an O(n^2) lookup.
+- SSE notification broadcast is now tenant-scoped: upstream-pushed notifications
+  on a shared upstream no longer fan out across tenants. Unattributable log
+  notifications (no progressToken) broadcast only within a single tenant scope.
+
 ## [0.46.0] - 2026-05-31
 
 **Theme: multi-tenant runtime governance, made real. A hardening release that

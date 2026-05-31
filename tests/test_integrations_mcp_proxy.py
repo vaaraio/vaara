@@ -508,7 +508,7 @@ def test_progress_notification_forwards_to_client(monkeypatch):
     forwarded: list[dict] = []
     monkeypatch.setattr(
         p._router, "deliver",
-        lambda message, *, session_id=None, upstream="default": forwarded.append(message),
+        lambda message, *, session_id=None, upstream="default", tenant=None: forwarded.append(message),
     )
     msg = {
         "jsonrpc": "2.0", "method": "notifications/progress",
@@ -535,7 +535,7 @@ def test_non_governed_notification_still_forwards_without_audit(monkeypatch):
     forwarded: list[dict] = []
     monkeypatch.setattr(
         p._router, "deliver",
-        lambda message, *, session_id=None, upstream="default": forwarded.append(message),
+        lambda message, *, session_id=None, upstream="default", tenant=None: forwarded.append(message),
     )
     msg = {
         "jsonrpc": "2.0", "method": "notifications/resources/list_changed",
@@ -552,7 +552,7 @@ def test_audit_failure_in_notification_does_not_break_forwarding(monkeypatch):
     forwarded: list[dict] = []
     monkeypatch.setattr(
         p._router, "deliver",
-        lambda message, *, session_id=None, upstream="default": forwarded.append(message),
+        lambda message, *, session_id=None, upstream="default", tenant=None: forwarded.append(message),
     )
     msg = {
         "jsonrpc": "2.0", "method": "notifications/message",

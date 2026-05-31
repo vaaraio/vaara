@@ -234,6 +234,17 @@ TRANSPARENCY_DEFAULTS: dict[EventType, dict[str, str]] = {
 
 # ── Audit Record ──────────────────────────────────────────────────────────
 
+# Hash-chain format version stamped on every newly appended record.
+#   v1 (legacy): tenant_id is NOT part of compute_hash() — preserves
+#       re-verification of pre-v0.47 trails written before tenant binding.
+#   v2: tenant_id and chain_version ARE bound into the hash, so a record
+#       cannot be silently re-attributed to another tenant (or downgraded
+#       to v1 to strip the binding) without breaking the chain.
+# Records loaded from storage keep their own stored chain_version; only
+# AuditTrail._append stamps the current version on fresh records.
+_CURRENT_CHAIN_VERSION = 2
+
+
 @dataclass
 class AuditRecord:
     """A single immutable audit event in the trail.
@@ -259,8 +270,12 @@ class AuditRecord:
     decision_making: Optional[str] = None
     limitations: Optional[str] = None
     # v0.40: multi-tenant scoping. Empty string = single-tenant deployment.
-    # Excluded from compute_hash() to preserve pre-v0.40 chain re-verification.
+    # Bound into compute_hash() from chain v2 (v0.47+); see chain_version.
     tenant_id: str = ""
+    # Hash-chain format version (see _CURRENT_CHAIN_VERSION). Defaults to 1
+    # so records deserialized from pre-v0.47 storage (which carry no
+    # chain_version column/key) re-hash exactly as originally written.
+    chain_version: int = 1
 
     def __post_init__(self) -> None:
         # Loaded-from-DB records carry a non-empty record_hash. Skip
@@ -305,6 +320,16 @@ class AuditRecord:
             "regulatory_articles": self.regulatory_articles,
             "previous_hash": self.previous_hash,
         }
+        # Chain v2 (v0.47+): bind tenant_id into the tamper-evident surface
+        # so a record cannot be silently re-attributed to another tenant.
+        # chain_version is bound too, so a downgrade to v1 (which would drop
+        # the tenant binding) also breaks the chain. v1 records omit both
+        # keys and hash exactly as pre-v0.47 — old trails re-verify byte for
+        # byte. The gate is >= 2 so a future v3 keeps binding these unless it
+        # deliberately changes the scheme.
+        if self.chain_version >= 2:
+            content["tenant_id"] = self.tenant_id
+            content["chain_version"] = self.chain_version
         # NOTE on transparency taxonomy (v0.6):
         # The four prEN ISO/IEC 12792 fields (system_operation, data_usage,
         # decision_making, limitations) are NOT included in the hash. They
@@ -993,6 +1018,33 @@ class AuditTrail:
         with self._lock:
             return list(self._by_action.get(action_id, []))
 
+    def get_action_chain_scoped(
+        self, action_id: str, tenant_id: str = ""
+    ) -> list[tuple[int, AuditRecord]]:
+        """Tenant-scoped chain read for the reference server.
+
+        Returns ``(chain_position, record)`` pairs for ``action_id``, but only
+        the records whose ``tenant_id`` matches the caller's ``tenant_id``. A
+        caller scoped to one tenant can never read another tenant's records,
+        and the empty-string tenant (single-tenant deployments) only ever sees
+        empty-tenant records. Positions are resolved in a single pass under the
+        lock rather than an ``O(n)`` ``index()`` per record.
+
+        Returns an empty list both when the action is unknown and when it
+        belongs to a different tenant — the caller maps both to 404, so a
+        cross-tenant probe cannot use the response to confirm an action_id
+        exists for another tenant.
+        """
+        want = tenant_id or ""
+        with self._lock:
+            if action_id not in self._by_action:
+                return []
+            return [
+                (pos, r)
+                for pos, r in enumerate(self._records)
+                if r.action_id == action_id and (r.tenant_id or "") == want
+            ]
+
     def get_agent_records(
         self, agent_id: str, limit: int = 100
     ) -> list[AuditRecord]:
@@ -1098,6 +1150,11 @@ class AuditTrail:
             record.data = {str(k): json_safe(v) for k, v in record.data.items()}
         with self._lock:
             record.previous_hash = self._last_hash
+            # Stamp the current chain format on every fresh record so its
+            # tenant_id is bound into the hash. Records reloaded from storage
+            # never pass through _append, so their stored version is left
+            # intact and old trails keep re-verifying.
+            record.chain_version = _CURRENT_CHAIN_VERSION
             record.record_hash = record.compute_hash()
             self._last_hash = record.record_hash
 
