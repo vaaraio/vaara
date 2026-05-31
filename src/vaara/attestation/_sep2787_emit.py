@@ -141,8 +141,11 @@ def verify_attestation(
     """Verify signature and TTL.
 
     Returns True iff the signature matches the JCS-canonical encoding
-    of the four envelope blocks under ``verifying_material`` AND
-    ``iat + exp_seconds + clock_skew_seconds >= now``.
+    of the four envelope blocks under ``verifying_material`` AND the
+    attestation is within its validity window:
+    ``iat - clock_skew_seconds <= now <= iat + exp_seconds + clock_skew_seconds``.
+    A future-dated ``iat`` (beyond the skew allowance) is rejected so the
+    live window cannot be extended by stamping issuance ahead of now.
 
     Replay (nonce) tracking is stateful and belongs in the verifier's
     application layer; this function does NOT track nonces.
@@ -187,6 +190,13 @@ def verify_attestation(
     iat_epoch = iso8601_to_epoch(envelope.issuer_asserted.iat)
     if iat_epoch is None:
         return False
-    deadline = iat_epoch + envelope.issuer_asserted.exp_seconds + clock_skew_seconds
     current = now if now is not None else time.time()
+    # Lower bound: an attestation issued in the future is not yet valid.
+    # Without this, a forged or clock-wrong issuer could stamp iat far ahead
+    # to extend the live window indefinitely (deadline = iat + exp + skew),
+    # so the upper-bound TTL check alone never expires it. Allow only the
+    # configured skew of forward drift.
+    if iat_epoch > current + clock_skew_seconds:
+        return False
+    deadline = iat_epoch + envelope.issuer_asserted.exp_seconds + clock_skew_seconds
     return current <= deadline

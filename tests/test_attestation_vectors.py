@@ -81,8 +81,13 @@ def test_library_verdicts_match_expected(case):
     att = parse_attestation(raw)
     material = _verifying_material(att.alg)
 
-    # now=0 makes the TTL deadline trivially pass, isolating the signature.
-    sig_ok = verify_attestation(att, verifying_material=material, now=0.0)
+    # Evaluating at issuance time (iat) sits inside the validity window for
+    # every case, isolating the signature from both TTL bounds. (now=0 no
+    # longer works: a 2026 iat reads as future-dated against the 1970 epoch
+    # and is correctly rejected by the lower-bound check.)
+    iat_epoch = datetime.fromisoformat(
+        att.issuer_asserted.iat.replace("Z", "+00:00")).timestamp()
+    sig_ok = verify_attestation(att, verifying_material=material, now=iat_epoch)
     assert sig_ok == expected["signature_ok"]
 
     # At EVAL_NOW the verdict is signature AND TTL.

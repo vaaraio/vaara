@@ -143,7 +143,8 @@ def emit_yaml(name: str) -> str:
             "emit_yaml requires the [yaml] extra. "
             "Install with: pip install 'vaara[yaml]'"
         ) from e
-    return yaml.safe_dump(
+    dumped: str = yaml.safe_dump(
         to_policy_dict(get_mode(name)),
         sort_keys=False,
     )
+    return dumped

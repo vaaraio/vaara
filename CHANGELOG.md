@@ -6,6 +6,49 @@ and this project follows [Semantic Versioning](https://semver.org/spec/v2.0.0.ht
 
 ## [Unreleased]
 
+## [0.46.0] - 2026-05-31
+
+**Theme: multi-tenant runtime governance, made real. A hardening release that
+makes the concurrent-multi-tenant claim true and safe, with no new features.**
+
+### Security
+- SEP-2787 attestation verification now rejects a future-dated `iat`. The TTL
+  check had only an upper bound (`iat + exp_seconds + clock_skew`), so an
+  attestation stamped with an issuance time in the future kept its validity
+  window open indefinitely. Verification now also enforces the lower bound
+  `now >= iat - clock_skew_seconds`, tolerating only the configured skew of
+  forward drift. The conformance test set gains explicit future-dated cases.
+
+### Fixed
+- Race in the audit trail's action-to-tenant map under concurrent writers.
+  `record_action_requested` mutated the map (length check, eviction, insert)
+  and `_tenant_for` read it without a lock, so concurrent multi-tenant traffic
+  could raise `dictionary changed size during iteration` during eviction or
+  hand one lifecycle another tenant's scope. The map now has a dedicated lock,
+  separate from the hash-chain lock. New tests run 16 tenants through full
+  lifecycles concurrently and assert chain integrity plus per-tenant scope.
+
+### Changed
+- Wheel slimmed from ~8MB to ~0.8MB. Only the production classifier bundle
+  (`adversarial_classifier_v9.joblib`) is loaded at runtime, but the wheel was
+  shipping all of v1-v8 (~7MB of dead weight) via the default
+  `include-package-data` file finder. Packaging now ships only the v9 bundle;
+  the older bundles stay in the repo for bench and cross-eval.
+
+### CI / tooling
+- mypy now runs in CI as a build-failing gate on the strict module set
+  (`vaara.policy.*`), pinned to mypy 1.20.2. Fixed the one outstanding
+  `no-any-return` in `policy/modes.py`.
+- `.gitignore` now covers SQLite WAL sidecar files (`*.db-wal`, `*.db-shm`,
+  `*.db-journal`).
+- `scripts/RELEASE.md` step 3 corrected to match `release_merge_and_tag.sh`,
+  which tags `origin/main` directly rather than checking out and pulling main.
+
+### Bench
+- `bench/vaara-bench-v0.46.md`: concurrency and governance-overhead evidence.
+  Per-call governance overhead is sub-2ms p50 and flat across 1-8 upstream
+  fan-out; raw numbers in `bench/v046_fanout.json`.
+
 ## [0.45.1] - 2026-05-30
 
 **Theme: audit-finding fixes on the remote HTTP connector, the HTTP transport, and the public numbers.**

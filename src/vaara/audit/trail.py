@@ -520,6 +520,15 @@ class AuditTrail:
         # threads can read the same _last_hash and produce two records
         # pointing at the same predecessor — verify_chain then fails.
         self._lock = threading.Lock()
+        # Guards _tenant_for_action. The map is read in _tenant_for and
+        # mutated (len-check, evict, insert) in record_action_requested
+        # from different agent threads. A bare dict left those racing:
+        # a concurrent insert during the eviction's list() iteration could
+        # raise "dictionary changed size during iteration", and a torn
+        # read/insert could hand one tenant's lifecycle records another
+        # tenant's scope. A dedicated lock keeps the map coherent without
+        # widening the hash-chain lock or risking re-entrancy with _append.
+        self._tenant_map_lock = threading.Lock()
 
     @property
     def size(self) -> int:
@@ -585,11 +594,12 @@ class AuditTrail:
         tenant_id = getattr(request, "tenant_id", "") or ""
         if tenant_id:
             tenant_id = self._cap_record_str(tenant_id, self._MAX_TENANT_ID_LEN)
-            if len(self._tenant_for_action) >= self._MAX_ACTION_TENANT_MAP:
-                evict = max(1, self._MAX_ACTION_TENANT_MAP // 8)
-                for stale in list(self._tenant_for_action)[:evict]:
-                    self._tenant_for_action.pop(stale, None)
-            self._tenant_for_action[action_id] = tenant_id
+            with self._tenant_map_lock:
+                if len(self._tenant_for_action) >= self._MAX_ACTION_TENANT_MAP:
+                    evict = max(1, self._MAX_ACTION_TENANT_MAP // 8)
+                    for stale in list(self._tenant_for_action)[:evict]:
+                        self._tenant_for_action.pop(stale, None)
+                self._tenant_for_action[action_id] = tenant_id
 
         articles = self._get_regulatory_articles(
             EventType.ACTION_REQUESTED,
@@ -645,7 +655,8 @@ class AuditTrail:
         every follow-up record (risk_scored, decision, execution,
         escalation, outcome) carries the same scope automatically.
         """
-        return self._tenant_for_action.get(action_id, "")
+        with self._tenant_map_lock:
+            return self._tenant_for_action.get(action_id, "")
 
     def record_risk_scored(
         self,
