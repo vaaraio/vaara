@@ -11,6 +11,7 @@ from __future__ import annotations
 
 import datetime
 import hashlib
+import os
 
 import pytest
 
@@ -253,3 +254,52 @@ def test_verify_anchor_over_records_rejects_rewritten_chain():
     rewritten = ["aa" * 32, "bb" * 32, "cc" * 32]
     with pytest.raises(TimeAnchorError, match="does not match the trail"):
         verify_anchor_over_records(anchor, rewritten)
+
+
+# Live network test: anchors a real chain head against a real public RFC 3161
+# TSA, then verifies the returned token offline. Opt-in only (set VAARA_LIVE_TSA)
+# so CI and offline runs never depend on a third party. The in-process tests
+# above cover the verifier; this proves the round trip against an authority we
+# do not control.
+_LIVE_TSAS = [
+    "http://timestamp.digicert.com",
+    "http://timestamp.sectigo.com",
+    "https://freetsa.org/tsr",
+]
+
+
+@pytest.mark.skipif(
+    not os.environ.get("VAARA_LIVE_TSA"),
+    reason="live TSA round trip; set VAARA_LIVE_TSA=1 to run",
+)
+def test_anchor_head_against_live_tsa():
+    from vaara.audit.trail import AuditTrail
+    from vaara.taxonomy.actions import (
+        ActionCategory, ActionRequest, ActionType, BlastRadius, Reversibility,
+    )
+
+    trail = AuditTrail()
+    trail.record_action_requested(ActionRequest(
+        action_type=ActionType(
+            name="live_anchor", category=ActionCategory.DATA,
+            reversibility=Reversibility.FULLY, blast_radius=BlastRadius.LOCAL,
+        ),
+        tool_name="t", agent_id="agent", parameters={},
+    ))
+
+    errors = {}
+    for url in _LIVE_TSAS:
+        try:
+            anchor = trail.anchor_head(RFC3161TimeAnchorClient(url, timeout=20.0))
+        except TimeAnchorError as exc:
+            errors[url] = str(exc)
+            continue
+        # Offline verification, bound to the real chain head, no network.
+        record_hashes = [r.record_hash for r in trail._records]
+        attested = verify_anchor_over_records(anchor, record_hashes)
+        assert anchor.backend == "rfc3161"
+        assert anchor.chain_position == trail.size - 1
+        assert anchor.chain_head_hash == trail._records[-1].record_hash
+        assert attested.isoformat() == anchor.anchored_time
+        return
+    pytest.fail(f"no live TSA granted/verified: {errors}")
