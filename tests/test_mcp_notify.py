@@ -77,6 +77,57 @@ def test_http_router_deliver_without_session_broadcasts_on_upstream():
         loop.close()
 
 
+def test_http_router_attributed_broadcast_is_tenant_scoped():
+    # Two tenants subscribed to the SAME upstream slot. A progress
+    # notification correlated to tenant t1's call (tenant="t1", no session_id)
+    # must reach only t1's sessions, never t2's.
+    router = HttpRouter(replay_buffer_size=10)
+    loop = _new_loop()
+    try:
+        t1 = router.register_session("sess-1", "alpha", "t1", loop)
+        t2 = router.register_session("sess-2", "alpha", "t2", loop)
+        msg = {"jsonrpc": "2.0", "method": "notifications/progress"}
+        router.deliver(msg, session_id=None, upstream="alpha", tenant="t1")
+        assert t1.replay_since(0) == [(1, msg)]
+        assert t2.replay_since(0) == []
+    finally:
+        loop.close()
+
+
+def test_http_router_unattributable_broadcast_suppressed_across_tenants():
+    # A log notification (no progressToken, tenant=None) on an upstream shared
+    # by two distinct tenants is suppressed rather than fanned out, so one
+    # tenant's upstream push cannot leak to another.
+    router = HttpRouter(replay_buffer_size=10)
+    loop = _new_loop()
+    try:
+        t1 = router.register_session("sess-1", "alpha", "t1", loop)
+        t2 = router.register_session("sess-2", "alpha", "t2", loop)
+        msg = {"jsonrpc": "2.0", "method": "notifications/message"}
+        router.deliver(msg, session_id=None, upstream="alpha", tenant=None)
+        assert t1.replay_since(0) == []
+        assert t2.replay_since(0) == []
+    finally:
+        loop.close()
+
+
+def test_http_router_unattributable_broadcast_ok_within_one_tenant():
+    # When every subscriber on the upstream shares one tenant scope, an
+    # unattributable broadcast is safe and still fans out (single-tenant
+    # deployments and the empty-tenant default keep their behavior).
+    router = HttpRouter(replay_buffer_size=10)
+    loop = _new_loop()
+    try:
+        a = router.register_session("sess-1", "alpha", "t1", loop)
+        b = router.register_session("sess-2", "alpha", "t1", loop)
+        msg = {"jsonrpc": "2.0", "method": "notifications/message"}
+        router.deliver(msg, session_id=None, upstream="alpha", tenant=None)
+        assert a.replay_since(0) == [(1, msg)]
+        assert b.replay_since(0) == [(1, msg)]
+    finally:
+        loop.close()
+
+
 def test_http_router_deliver_to_unknown_session_is_noop():
     router = HttpRouter(replay_buffer_size=10)
     loop = _new_loop()

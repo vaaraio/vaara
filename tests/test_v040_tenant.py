@@ -246,8 +246,9 @@ def test_concurrent_tenant_map_eviction_is_threadsafe():
     assert trail.verify_chain() is None
 
 
-def test_audit_record_hash_excludes_tenant_id():
-    """tenant_id is NOT part of compute_hash so pre-v0.40 chains re-verify."""
+def test_v1_record_hash_excludes_tenant_id():
+    """Chain v1 (legacy default) leaves tenant_id out of the hash, so pre-v0.47
+    trails written before tenant binding re-verify byte for byte."""
     rec_no = AuditRecord(
         record_id="r1", action_id="a1", event_type=EventType.ACTION_REQUESTED,
         timestamp=1.0, agent_id="a", tool_name="t",
@@ -256,4 +257,120 @@ def test_audit_record_hash_excludes_tenant_id():
         record_id="r1", action_id="a1", event_type=EventType.ACTION_REQUESTED,
         timestamp=1.0, agent_id="a", tool_name="t", tenant_id="tenant-x",
     )
+    assert rec_no.chain_version == 1
     assert rec_no.compute_hash() == rec_with.compute_hash()
+
+
+def test_v2_record_hash_binds_tenant_id():
+    """Chain v2 binds tenant_id into the hash, so two records differing only
+    in tenant_id hash differently."""
+    rec_a = AuditRecord(
+        record_id="r1", action_id="a1", event_type=EventType.ACTION_REQUESTED,
+        timestamp=1.0, agent_id="a", tool_name="t",
+        tenant_id="tenant-a", chain_version=2,
+    )
+    rec_b = AuditRecord(
+        record_id="r1", action_id="a1", event_type=EventType.ACTION_REQUESTED,
+        timestamp=1.0, agent_id="a", tool_name="t",
+        tenant_id="tenant-b", chain_version=2,
+    )
+    assert rec_a.compute_hash() != rec_b.compute_hash()
+
+
+def test_v1_hash_is_byte_stable_across_versions():
+    """The exact v1 hash must never change — a fixed expected digest guards
+    against any future edit silently breaking pre-v0.47 chain re-verification."""
+    import hashlib
+    import json
+
+    rec = AuditRecord(
+        record_id="r1", action_id="a1", event_type=EventType.ACTION_REQUESTED,
+        timestamp=1.0, agent_id="a", tool_name="t", tenant_id="ignored-in-v1",
+    )
+    expected = hashlib.sha256(
+        json.dumps(
+            {
+                "record_id": "r1", "action_id": "a1",
+                "event_type": "action_requested", "timestamp": 1.0,
+                "agent_id": "a", "tool_name": "t", "data": {},
+                "regulatory_articles": [], "previous_hash": "",
+            },
+            sort_keys=True, separators=(",", ":"), allow_nan=False,
+        ).encode()
+    ).hexdigest()
+    assert rec.compute_hash() == expected
+
+
+def test_trail_stamps_v2_and_detects_tenant_reattribution():
+    """A live trail stamps chain v2 on every record, and re-attributing a
+    record to another tenant breaks verify_chain (the v0.47 fix)."""
+    trail = AuditTrail()
+    aid = trail.record_action_requested(
+        ActionRequest(
+            action_type=_action_type(), tool_name="secret_tool",
+            agent_id="agent-a", parameters={}, tenant_id="tenant-a",
+        )
+    )
+    rec = trail._records[0]
+    assert rec.chain_version == 2
+    assert rec.tenant_id == "tenant-a"
+    assert trail.verify_chain() is None
+
+    rec.tenant_id = "tenant-b"  # simulate store-write re-attribution
+    assert trail.verify_chain() is not None
+    assert aid  # silence unused
+
+
+def test_v2_records_roundtrip_through_sqlite(tmp_path):
+    """v2 records persist their chain_version + tenant_id, and the chain
+    re-verifies on reload (catches the stored-vs-hashed-tenant landmine)."""
+    from vaara.audit.sqlite_backend import SQLiteAuditBackend
+
+    db = tmp_path / "audit.db"
+    backend = SQLiteAuditBackend(db)
+    trail = AuditTrail(on_record=backend.write_record)
+    try:
+        for tid in ("tenant-a", "tenant-b", ""):
+            trail.record_action_requested(
+                ActionRequest(
+                    action_type=_action_type(), tool_name="t",
+                    agent_id="agent", parameters={}, tenant_id=tid,
+                )
+            )
+    finally:
+        backend.close()
+
+    reopened = SQLiteAuditBackend(db)
+    try:
+        reloaded = reopened.load_trail(strict=True)  # raises if chain broken
+    finally:
+        reopened.close()
+    assert len(reloaded._records) == 3
+    assert [r.chain_version for r in reloaded._records] == [2, 2, 2]
+    assert [r.tenant_id for r in reloaded._records] == ["tenant-a", "tenant-b", ""]
+    assert reloaded.verify_chain() is None
+
+
+def test_signed_export_roundtrips_v2_chain(tmp_path):
+    """The standalone verifier (verify._verify_chain_bytes) must accept a v2
+    chain — keeps it in lockstep with AuditRecord.compute_hash."""
+    pytest.importorskip("cryptography")
+    from cryptography.hazmat.primitives.asymmetric.ed25519 import Ed25519PrivateKey
+
+    from vaara.audit.export import export_signed
+    from vaara.audit.verify import verify_signed
+
+    trail = AuditTrail()
+    for tid in ("tenant-a", "tenant-b"):
+        trail.record_action_requested(
+            ActionRequest(
+                action_type=_action_type(), tool_name="t",
+                agent_id="agent", parameters={}, tenant_id=tid,
+            )
+        )
+    key = Ed25519PrivateKey.generate()
+    out = tmp_path / "trail.zip"
+    export_signed(trail, out, key)
+
+    result = verify_signed(out)
+    assert result.ok, result.errors

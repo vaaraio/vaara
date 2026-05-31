@@ -132,6 +132,46 @@ def test_audit_chain_unknown_action_404(client):
     assert r.status_code == 404
 
 
+def test_audit_chain_read_is_tenant_scoped(client):
+    # Tenant A writes a chain for act-iso.
+    r = client.post(
+        "/v1/audit/events",
+        json={
+            "event_type": "action_requested",
+            "action_id": "act-iso",
+            "agent_id": "a-acme",
+            "tool_name": "data.read",
+            "payload": {"secret": "acme-only"},
+        },
+        headers={"X-Vaara-Tenant": "acme"},
+    )
+    assert r.status_code == 201, r.text
+
+    # Tenant A can read its own chain.
+    own = client.get(
+        "/v1/audit/actions/act-iso/chain",
+        headers={"X-Vaara-Tenant": "acme"},
+    )
+    assert own.status_code == 200
+    assert len(own.json()["events"]) == 1
+    assert own.json()["events"][0]["payload"]["secret"] == "acme-only"
+
+    # Tenant B knows the action_id but must not read it — and gets 404, not
+    # 403, so the response cannot confirm act-iso exists for another tenant.
+    other = client.get(
+        "/v1/audit/actions/act-iso/chain",
+        headers={"X-Vaara-Tenant": "globex"},
+    )
+    assert other.status_code == 404
+    assert "acme-only" not in other.text
+
+    # A caller with no tenant header (single-tenant scope "") is likewise
+    # walled off from a tenant-owned action.
+    anon = client.get("/v1/audit/actions/act-iso/chain")
+    assert anon.status_code == 404
+    assert "acme-only" not in anon.text
+
+
 def test_audit_event_bad_type_400(client):
     r = client.post("/v1/audit/events", json={
         "event_type": "not_a_real_event",
