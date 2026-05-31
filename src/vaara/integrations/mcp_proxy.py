@@ -1343,6 +1343,7 @@ class VaaraMCPProxy:
         # subscribed to this upstream (HttpRouter handles broadcast when
         # session_id is None; StdioRouter ignores both args).
         session_id: Optional[str] = None
+        tenant: Optional[str] = None
         if method == "notifications/progress":
             params = message.get("params") if isinstance(message, dict) else None
             if isinstance(params, dict):
@@ -1351,10 +1352,19 @@ class VaaraMCPProxy:
                     with self._inflight_lock:
                         entry = self._inflight_progress.get(token)
                     if entry is not None:
+                        # entry = (action_id, agent_id, tool_name, tenant, session)
+                        tenant = entry[3]
                         captured_session = entry[4]
                         if captured_session:
                             session_id = captured_session
-        self._router.deliver(message, session_id=session_id, upstream=upstream_name)
+        # tenant stays None for log notifications (no progressToken), so the
+        # router suppresses cross-tenant fan-out it cannot attribute.
+        self._router.deliver(
+            message,
+            session_id=session_id,
+            upstream=upstream_name,
+            tenant=tenant,
+        )
 
     @staticmethod
     def _progress_token(params: dict) -> Any:

@@ -993,6 +993,33 @@ class AuditTrail:
         with self._lock:
             return list(self._by_action.get(action_id, []))
 
+    def get_action_chain_scoped(
+        self, action_id: str, tenant_id: str = ""
+    ) -> list[tuple[int, AuditRecord]]:
+        """Tenant-scoped chain read for the reference server.
+
+        Returns ``(chain_position, record)`` pairs for ``action_id``, but only
+        the records whose ``tenant_id`` matches the caller's ``tenant_id``. A
+        caller scoped to one tenant can never read another tenant's records,
+        and the empty-string tenant (single-tenant deployments) only ever sees
+        empty-tenant records. Positions are resolved in a single pass under the
+        lock rather than an ``O(n)`` ``index()`` per record.
+
+        Returns an empty list both when the action is unknown and when it
+        belongs to a different tenant — the caller maps both to 404, so a
+        cross-tenant probe cannot use the response to confirm an action_id
+        exists for another tenant.
+        """
+        want = tenant_id or ""
+        with self._lock:
+            if action_id not in self._by_action:
+                return []
+            return [
+                (pos, r)
+                for pos, r in enumerate(self._records)
+                if r.action_id == action_id and (r.tenant_id or "") == want
+            ]
+
     def get_agent_records(
         self, agent_id: str, limit: int = 100
     ) -> list[AuditRecord]:

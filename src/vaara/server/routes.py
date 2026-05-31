@@ -188,9 +188,16 @@ def register(app: FastAPI, state: ServerState) -> None:
         "/v1/audit/actions/{action_id}/chain",
         response_model=S.AuditChain,
     )
-    async def read_action_chain(action_id: str):
-        records = state.audit._by_action.get(action_id, [])
-        if not records:
+    async def read_action_chain(
+        action_id: str,
+        x_vaara_tenant: Optional[str] = Header(default=None, alias="X-Vaara-Tenant"),
+    ):
+        tenant_id = (x_vaara_tenant or "").strip()
+        scoped = state.audit.get_action_chain_scoped(action_id, tenant_id)
+        if not scoped:
+            # Unknown action and cross-tenant action both 404 with the same
+            # message: a caller scoped to one tenant gets no signal that an
+            # action_id exists for another tenant.
             raise _error(
                 "unknown_action", f"no audit records for {action_id!r}",
                 status.HTTP_404_NOT_FOUND,
@@ -201,13 +208,13 @@ def register(app: FastAPI, state: ServerState) -> None:
                 S.AuditChainEvent(
                     event_id=r.record_id,
                     event_type=r.event_type.value,
-                    chain_position=state.audit._records.index(r),
+                    chain_position=pos,
                     event_hash=r.record_hash,
                     previous_hash=r.previous_hash,
                     timestamp=_iso(r.timestamp),
                     payload=r.data or {},
                 )
-                for r in records
+                for pos, r in scoped
             ],
         )
 
