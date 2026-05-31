@@ -99,7 +99,8 @@ def _verify_chain_bytes(trail_bytes: bytes) -> Optional[str]:
                 f"record {idx}: previous_hash mismatch "
                 f"(expected {prev_hash!r}, got {rec.get('previous_hash')!r})"
             )
-        # Recompute hash over the canonical content.
+        # Recompute hash over the canonical content. Mirrors
+        # AuditRecord.compute_hash — keep the two in lockstep.
         content = {
             "record_id": rec.get("record_id"),
             "action_id": rec.get("action_id"),
@@ -111,6 +112,13 @@ def _verify_chain_bytes(trail_bytes: bytes) -> Optional[str]:
             "regulatory_articles": rec.get("regulatory_articles", []),
             "previous_hash": prev_hash,
         }
+        # Chain v2 (v0.47+) binds tenant_id and chain_version into the hash.
+        # Records with no chain_version key are legacy v1 and omit both, so
+        # pre-v0.47 trails re-verify unchanged.
+        chain_version = rec.get("chain_version", 1)
+        if isinstance(chain_version, int) and chain_version >= 2:
+            content["tenant_id"] = rec.get("tenant_id", "")
+            content["chain_version"] = chain_version
         canonical = json.dumps(
             content, sort_keys=True, separators=(",", ":"), allow_nan=False
         )

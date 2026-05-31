@@ -234,6 +234,7 @@ class TestSchemaUpgrade:
         assert "data_usage" in cols
         assert "decision_making" in cols
         assert "limitations" in cols
+        assert "chain_version" in cols
         conn.close()
 
     def test_preversion_db_migrates(self, db_path):
@@ -250,6 +251,59 @@ class TestSchemaUpgrade:
         SQLiteAuditBackend(db_path).close()
         SQLiteAuditBackend(db_path).close()
         self._assert_current(db_path)
+
+    def test_pre_v047_record_verifies_after_v4_migration(self, db_path):
+        """A legacy record whose record_hash was computed the v1 way (tenant_id
+        NOT in the hash) must still re-verify after migrating to schema v4,
+        even though its tenant_id column is populated. This is the backward-
+        compat guarantee of the chain_version flag."""
+        import sqlite3
+
+        from vaara.audit.trail import AuditRecord, EventType
+
+        # Hash computed under v1 rules (chain_version defaults to 1).
+        rec = AuditRecord(
+            record_id="r1", action_id="a1",
+            event_type=EventType.ACTION_REQUESTED, timestamp=1.0,
+            agent_id="agent", tool_name="t",
+        )
+        legacy_hash = rec.compute_hash()
+        assert rec.chain_version == 1
+
+        # Seed a schema-v3 DB (tenant + transparency cols, NO chain_version)
+        # with that record, tenant_id populated in the column.
+        conn = sqlite3.connect(str(db_path), isolation_level=None)
+        conn.executescript(
+            self._V0_AUDIT_RECORDS_SQL.replace(
+                "seq           INTEGER NOT NULL\n    );",
+                "seq           INTEGER NOT NULL,\n"
+                "        tenant_id TEXT NOT NULL DEFAULT '',\n"
+                "        system_operation TEXT, data_usage TEXT,\n"
+                "        decision_making TEXT, limitations TEXT\n    );",
+            )
+        )
+        conn.execute("CREATE TABLE audit_meta (key TEXT PRIMARY KEY, value TEXT NOT NULL)")
+        conn.execute("INSERT INTO audit_meta (key, value) VALUES ('schema_version', '3')")
+        conn.execute(
+            "INSERT INTO audit_records (record_id, action_id, event_type, "
+            "timestamp, agent_id, tool_name, data, regulatory, previous_hash, "
+            "record_hash, seq, tenant_id) VALUES (?,?,?,?,?,?,?,?,?,?,?,?)",
+            ("r1", "a1", "action_requested", 1.0, "agent", "t", "{}", "[]",
+             "", legacy_hash, 0, "tenant-a"),
+        )
+        conn.close()
+
+        backend = SQLiteAuditBackend(db_path)  # migrates 3 -> 4
+        try:
+            reloaded = backend.load_trail(strict=True)  # raises if chain broke
+        finally:
+            backend.close()
+        self._assert_current(db_path)
+        assert reloaded.verify_chain() is None
+        loaded = reloaded._records[0]
+        assert loaded.chain_version == 1          # legacy stays v1
+        assert loaded.tenant_id == "tenant-a"     # column value preserved
+        assert loaded.record_hash == legacy_hash  # tenant NOT folded into hash
 
 
 class TestSkeletonRecordsCounter:
