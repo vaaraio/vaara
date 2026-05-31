@@ -13,7 +13,7 @@ Position: tamper-evident runtime evidence and enforcement layer. Signed attestat
 
 ## Docs
 - [README](https://github.com/vaaraio/vaara/blob/main/README.md): install, quick start, evidence specimen, integrations
-- [COMPLIANCE.md](https://github.com/vaaraio/vaara/blob/main/COMPLIANCE.md): EU AI Act (Art. 9, 11 to 15, 61) and DORA (Art. 10, 12, 13) article-level mapping
+- [COMPLIANCE.md](https://github.com/vaaraio/vaara/blob/main/docs/COMPLIANCE.md): EU AI Act (Art. 9, 11 to 15, 61) and DORA (Art. 10, 12, 13) article-level mapping
 - [Formal specification](https://github.com/vaaraio/vaara/blob/main/docs/formal_specification.md): MWU regret bound O(sqrt(T log N)), conformal coverage, security properties
 - [vaara-bench-v1](https://github.com/vaaraio/vaara/blob/main/bench/vaara-bench-v1.md): 77-trace synthetic benchmark, frozen methodology
 - [CHANGELOG](https://github.com/vaaraio/vaara/blob/main/CHANGELOG.md): version-by-version evolution
