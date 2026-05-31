@@ -2,19 +2,19 @@
   "$schema": "https://static.modelcontextprotocol.io/schemas/2025-12-11/server.schema.json",
   "name": "io.github.vaaraio/vaara",
   "title": "Vaara",
-  "description": "Runtime governance proxy for MCP servers. Risk scoring, hash-chained audit, per-tenant policy.",
+  "description": "EU AI Act runtime evidence proxy for MCP servers. Policy-gated tool calls, hash-chained tamper-evident audit with external time anchoring, per-tenant isolation.",
   "websiteUrl": "https://vaara.io",
   "repository": {
     "url": "https://github.com/vaaraio/vaara",
     "source": "github"
   },
-  "version": "0.47.0",
+  "version": "0.48.0",
   "packages": [
     {
       "registryType": "pypi",
       "registryBaseUrl": "https://pypi.org",
       "identifier": "vaara",
-      "version": "0.47.0",
+      "version": "0.48.0",
       "runtimeHint": "uvx",
       "transport": {
         "type": "stdio"

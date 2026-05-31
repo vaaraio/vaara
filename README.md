@@ -14,13 +14,13 @@
   <a href="https://huggingface.co/spaces/vaaraio/vaara"><img src="https://img.shields.io/badge/%F0%9F%A4%97%20Hugging%20Face-Space-blue" alt="Hugging Face Space"></a>
 </p>
 
-Vaara is an open-source runtime evidence layer for AI agents. It sits in front of an agent's tool calls, decides whether each one is allowed, and writes a tamper-evident record of what happened. When you have to prove what an agent actually did, to an auditor, a regulator, or a customer, that record is the proof. Runs in your own environment. No SaaS, no telemetry.
+Vaara is the open-source runtime evidence layer for AI agents under the EU AI Act. It sits in front of an agent's tool calls, gates each one against your policy, and writes a tamper-evident record an outside party can verify. When a regulator, an auditor, or a public-sector buyer needs proof of what your agent actually did and why, that record is the answer. Runs entirely in your own environment. No SaaS, no telemetry.
 
-The original driver is EU AI Act compliance, but the same trail answers any "show me exactly what the agent did, and why" question.
+EU AI Act Article 12 record-keeping is the driver. The same trail answers any "show me exactly what the agent did" demand: procurement validation, incident reconstruction, SOC 2 evidence.
 
+- Article-level EU AI Act evidence report, honest about the gaps instead of rubber-stamping them.
+- Hash-chained, tamper-evident audit trail an outside party can verify without trusting your stack, with the chain head anchorable to an external trusted timestamp (RFC 3161 / eIDAS).
 - Gate every agent tool call against your own policy: allow, block, or escalate.
-- Hash-chained, tamper-evident audit trail an outside party can verify without trusting your stack.
-- Article-level EU AI Act evidence report, honest about gaps instead of rubber-stamping them.
 
 ## How it works
 
@@ -31,6 +31,21 @@ Every tool call an agent makes passes through Vaara before it runs:
 3. **Record.** The call, the score, the decision, and the real-world outcome are written to a hash-chained audit trail. An outside auditor can verify the chain is intact without trusting your stack or your word.
 
 The scoring blends five expert signals and keeps adapting as outcomes come back, and each risk score carries a confidence interval with a coverage guarantee that holds regardless of the input distribution. Those are the properties an auditor can check independently; the math is in [Benchmarks](#benchmarks) and [docs/formal_specification.md](docs/formal_specification.md).
+
+### External time anchor
+
+The hash chain proves order and integrity but not *when* it existed: every timestamp comes from your own clock, so a compromised signing key could in principle be used to forge a backdated chain. Vaara can anchor the current chain head to an external RFC 3161 Time-Stamp Authority, the standard behind eIDAS qualified electronic timestamps. The authority signs the chain head and the time, so the chain's existence is provable against a clock you do not control. Verification is offline.
+
+```bash
+pip install 'vaara[timeanchor]'
+```
+
+```python
+from vaara.audit.timeanchor import RFC3161TimeAnchorClient
+
+# Periodically, or after a batch of high-risk actions:
+trail.anchor_head(RFC3161TimeAnchorClient("https://freetsa.org/tsr"))
+```
 
 ## Install
 

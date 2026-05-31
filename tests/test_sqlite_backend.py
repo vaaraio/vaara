@@ -293,11 +293,8 @@ class TestSchemaUpgrade:
         )
         conn.close()
 
-        backend = SQLiteAuditBackend(db_path)  # migrates 3 -> 4
-        try:
+        with SQLiteAuditBackend(db_path) as backend:  # migrates 3 -> 4
             reloaded = backend.load_trail(strict=True)  # raises if chain broke
-        finally:
-            backend.close()
         self._assert_current(db_path)
         assert reloaded.verify_chain() is None
         loaded = reloaded._records[0]

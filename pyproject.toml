@@ -4,8 +4,8 @@ build-backend = "setuptools.build_meta"
 
 [project]
 name = "vaara"
-version = "0.47.0"
-description = "Tamper-evident runtime evidence layer for AI agents: conformal risk scoring, hash-chained audit trails, and signed attestation plus execution receipts per MCP tool call"
+version = "0.48.0"
+description = "Runtime evidence layer for AI agents under the EU AI Act: policy-gated tool calls, hash-chained tamper-evident audit trails with external time anchoring, and independently verifiable attestation plus execution receipts per MCP tool call"
 requires-python = ">=3.10"
 license = "Apache-2.0"
 readme = "README.md"
@@ -45,6 +45,7 @@ ml = ["xgboost>=2.0", "scikit-learn>=1.3", "joblib>=1.3", "numpy>=1.24", "senten
 yaml = ["pyyaml>=6.0"]
 server = ["fastapi>=0.110", "uvicorn>=0.27"]
 attestation = ["cbor2>=5.4", "cryptography>=41.0", "rfc8785>=0.1.4"]
+timeanchor = ["asn1crypto>=1.5", "cryptography>=41.0"]
 pq = ["dilithium-py>=1.4.0"]
 pdf = ["reportlab>=4.0"]
 bedrock = ["boto3>=1.34"]
