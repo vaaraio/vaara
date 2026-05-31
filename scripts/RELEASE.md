@@ -62,10 +62,13 @@ scripts/release_merge_and_tag.sh <PR_NUMBER> <VERSION> [CO_TAG]
 1. `gh pr checks --watch --required` blocks until all required checks
    pass (or fails the script if a required check fails).
 2. `gh pr merge --squash --delete-branch`.
-3. `git checkout main && git pull --ff-only`.
-4. Re-creates `v<VERSION>` (and `<CO_TAG>` if passed) at the new merged
-   SHA. The pre-merge local tags pointed at the unmerged commit; squash
-   creates a new SHA so the tags need to move.
+3. `git fetch origin main` and reads the merged SHA from `origin/main`
+   directly (no `git checkout main`/`git pull` — that would need a clean
+   local main and risks the destructive-reset path).
+4. Re-creates `v<VERSION>` (and `<CO_TAG>` if passed) at the merged
+   SHA on `origin/main`. The pre-merge local tags pointed at the unmerged
+   commit; squash creates a new SHA so the tags need to move. See also
+   `release_tag_after_merge.sh` (section 3b) for the GH-UI-merge path.
 5. Prints the gated `git push origin v<VERSION> <CO_TAG>` command for
    you to paste.
 

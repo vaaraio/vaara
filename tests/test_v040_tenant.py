@@ -152,6 +152,100 @@ def test_audit_trail_caps_tenant_id_length():
     assert len(record.tenant_id) <= trail._MAX_TENANT_ID_LEN
 
 
+def test_concurrent_multi_tenant_lifecycles_preserve_scope_and_chain():
+    """Many agent threads, each its own tenant, run full lifecycles at once.
+
+    Proves the multi-tenant claim the registry entry rests on: under real
+    contention the hash chain stays intact AND every action's follow-up
+    records carry the tenant captured at request time. Before the
+    _tenant_map_lock fix this could tear the action -> tenant map.
+    """
+    import threading
+
+    trail = AuditTrail()
+    action_type = _action_type()
+    n_threads, per_thread = 16, 40
+    barrier = threading.Barrier(n_threads)
+    results: dict[str, list[str]] = {}
+    results_lock = threading.Lock()
+
+    def worker(t: int) -> None:
+        tenant = f"tenant-{t}"
+        ids: list[str] = []
+        barrier.wait()  # release all threads together for maximum contention
+        for _ in range(per_thread):
+            req = ActionRequest(
+                agent_id=f"a{t}", tool_name="t", action_type=action_type,
+                tenant_id=tenant,
+            )
+            aid = trail.record_action_requested(req)
+            trail.record_decision(
+                action_id=aid, agent_id=f"a{t}", tool_name="t",
+                decision="allow", reason="ok", risk_score=0.1,
+            )
+            trail.record_execution(
+                action_id=aid, agent_id=f"a{t}", tool_name="t", result={"ok": True},
+            )
+            ids.append(aid)
+        with results_lock:
+            results[tenant] = ids
+
+    threads = [threading.Thread(target=worker, args=(t,)) for t in range(n_threads)]
+    for th in threads:
+        th.start()
+    for th in threads:
+        th.join()
+
+    # Chain integrity held across all concurrent appends.
+    assert trail.verify_chain() is None
+    assert trail.size == n_threads * per_thread * 3
+    # Every lifecycle kept its own tenant scope, no cross-tenant bleed.
+    for tenant, ids in results.items():
+        for aid in ids:
+            recs = trail.get_action_trail(aid)
+            assert len(recs) == 3
+            assert all(r.tenant_id == tenant for r in recs)
+
+
+def test_concurrent_tenant_map_eviction_is_threadsafe():
+    """Eviction under the cap must not race with concurrent reads/writes.
+
+    The eviction path iterates list(self._tenant_for_action) while other
+    threads insert; an unguarded dict raised "dictionary changed size
+    during iteration". With the lock this completes cleanly.
+    """
+    import threading
+
+    trail = AuditTrail()
+    trail._MAX_ACTION_TENANT_MAP = 200
+    action_type = _action_type()
+    errors: list[BaseException] = []
+    barrier = threading.Barrier(8)
+
+    def worker(t: int) -> None:
+        try:
+            barrier.wait()
+            for i in range(300):  # well past the cap to force repeated eviction
+                req = ActionRequest(
+                    agent_id="a", tool_name="t", action_type=action_type,
+                    tenant_id=f"t{t}-{i}",
+                )
+                aid = trail.record_action_requested(req)
+                trail._tenant_for(aid)  # concurrent read against the evicting writer
+        except BaseException as exc:  # noqa: BLE001 — surface any race to the assert
+            errors.append(exc)
+
+    threads = [threading.Thread(target=worker, args=(t,)) for t in range(8)]
+    for th in threads:
+        th.start()
+    for th in threads:
+        th.join()
+
+    assert not errors, f"tenant-map race raised: {errors[0]!r}"
+    assert len(trail._tenant_for_action) <= trail._MAX_ACTION_TENANT_MAP
+    assert trail.verify_chain() is None
+
+
 def test_audit_record_hash_excludes_tenant_id():
     """tenant_id is NOT part of compute_hash so pre-v0.40 chains re-verify."""
     rec_no = AuditRecord(

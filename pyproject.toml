@@ -4,7 +4,7 @@ build-backend = "setuptools.build_meta"
 
 [project]
 name = "vaara"
-version = "0.45.1"
+version = "0.46.0"
 description = "Tamper-evident runtime evidence layer for AI agents: conformal risk scoring, hash-chained audit trails, and signed attestation plus execution receipts per MCP tool call"
 requires-python = ">=3.10"
 license = "Apache-2.0"
@@ -61,11 +61,20 @@ vaara-audit = "vaara.audit_cli:main"
 vaara-mcp-proxy = "vaara.integrations.mcp_proxy:main"
 vaara-mcp-server = "vaara.integrations.mcp_server:main"
 
+[tool.setuptools]
+# Default (true) auto-includes every tracked file inside a package, which
+# pulled all of data/*.joblib into the wheel. We ship data explicitly via
+# package-data below so only the production bundle lands.
+include-package-data = false
+
 [tool.setuptools.packages.find]
 where = ["src"]
 
 [tool.setuptools.package-data]
-vaara = ["data/*.joblib"]
+# Ship only the production bundle. v9 is the sole bundle loaded at runtime
+# (_DEFAULT_BUNDLE in adversarial_classifier.py); v1-v8 are retained in the
+# repo for bench/cross-eval but were ~7MB of dead weight in every wheel.
+vaara = ["data/adversarial_classifier_v9.joblib"]
 
 [tool.pytest.ini_options]
 testpaths = ["tests"]
