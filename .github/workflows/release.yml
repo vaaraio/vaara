@@ -153,3 +153,110 @@ jobs:
         run: npm publish --provenance --access public
         env:
           NODE_AUTH_TOKEN: ${{ secrets.NPM_TOKEN }}
+
+  publish-mcp-registry:
+    name: Publish manifests to the MCP Registry
+    # Gate on PyPI plus the GitHub Release. Both manifests declare
+    # registryType pypi, so the package must be live on PyPI before the
+    # registry will accept them. publish-npm is intentionally NOT a
+    # dependency: it is gated behind NPM_PUBLISH_ENABLED and a skipped
+    # needs-dependency would skip this job too.
+    needs: [publish-pypi, github-release]
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read      # checkout the server.json manifests
+      id-token: write     # OIDC login to the MCP Registry, no stored secret
+    env:
+      # Pin the publisher binary. "latest" risks an "invalid audience" auth
+      # failure if a new registry deployment expects a newer client, so we
+      # pin explicitly and bump on purpose. See the registry release page.
+      MCP_PUBLISHER_VERSION: v1.7.9
+    steps:
+      - name: Checkout (for server.json manifests)
+        uses: actions/checkout@de0fac2e4500dabe0009e67214ff5f5447ce83dd  # v6.0.2
+
+      - name: Install mcp-publisher CLI
+        run: |
+          set -euo pipefail
+          os="$(uname -s | tr '[:upper:]' '[:lower:]')"
+          arch="$(uname -m | sed 's/x86_64/amd64/;s/aarch64/arm64/')"
+          url="https://github.com/modelcontextprotocol/registry/releases/download/${MCP_PUBLISHER_VERSION}/mcp-publisher_${os}_${arch}.tar.gz"
+          echo "Downloading mcp-publisher from ${url}"
+          curl -fsSL "$url" | tar xz mcp-publisher
+          ./mcp-publisher --version || true
+
+      - name: Authenticate to the MCP Registry (GitHub OIDC)
+        # github-oidc uses the job's id-token, so no PAT or secret is needed.
+        # Requires the io.github.vaaraio/* namespace, which authenticates via
+        # the GitHub identity of this repository.
+        run: ./mcp-publisher login github-oidc
+
+      - name: Publish both manifests
+        # The publish subcommand takes the manifest path as a positional arg
+        # (defaults to ./server.json). We publish both listings. A version
+        # already on the registry returns a non-zero "already exists" error,
+        # treated as success here; the assertion below is the real gate and
+        # fails the job if the live version does not match the tag.
+        run: |
+          set -uo pipefail
+          publish_one() {
+            manifest="$1"
+            echo "::group::mcp-publisher publish ${manifest}"
+            out="$(./mcp-publisher publish "$manifest" 2>&1)" && rc=0 || rc=$?
+            echo "$out"
+            echo "::endgroup::"
+            if [ "$rc" -ne 0 ]; then
+              if echo "$out" | grep -qiE 'already exists|already published|duplicate'; then
+                echo "Version already present on the registry for ${manifest}; treating as success."
+                return 0
+              fi
+              echo "::error::Publishing ${manifest} failed (exit ${rc})."
+              return "$rc"
+            fi
+          }
+          publish_one server.json
+          publish_one server-vaara-server.json
+
+      - name: Assert registry version matches the released tag
+        # Loud post-publish gate. Strip a leading v from the tag and confirm
+        # the latest active version on the registry for BOTH listings equals it.
+        env:
+          RELEASE_TAG: ${{ github.ref_name }}
+        run: |
+          set -euo pipefail
+          EXPECTED="${RELEASE_TAG#v}"
+          echo "Expected version (from tag ${RELEASE_TAG}): ${EXPECTED}"
+          curl -fsSL 'https://registry.modelcontextprotocol.io/v0/servers?search=vaara' -o registry.json
+          python3 - "$EXPECTED" <<'PY'
+          import json, sys
+
+          expected = sys.argv[1]
+          names = ["io.github.vaaraio/vaara", "io.github.vaaraio/vaara-server"]
+          OFFICIAL = "io.modelcontextprotocol.registry/official"
+
+          with open("registry.json") as fh:
+              data = json.load(fh)
+          entries = data.get("servers", data.get("data", []))
+
+          failed = False
+          for name in names:
+              latest = None
+              for entry in entries:
+                  server = entry.get("server", entry)
+                  if server.get("name") != name:
+                      continue
+                  meta = (entry.get("_meta") or {}).get(OFFICIAL, {})
+                  if meta.get("isLatest") and meta.get("status") == "active":
+                      latest = server.get("version")
+                      break
+              if latest == expected:
+                  print(f"OK   {name}: latest active version {latest} matches tag {expected}")
+              else:
+                  print(f"FAIL {name}: expected {expected}, registry latest active is {latest!r}")
+                  failed = True
+
+          if failed:
+              print("::error::MCP Registry latest version does not match the released tag.")
+              sys.exit(1)
+          print("MCP Registry is in sync with tag", expected)
+          PY

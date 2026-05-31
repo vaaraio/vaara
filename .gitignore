@@ -7,6 +7,11 @@ build/
 *.egg
 .coverage
 *.db
+# SQLite sidecar files (WAL mode) — left behind by the TS client test harness
+# and CLI invocations; never part of the repo.
+*.db-wal
+*.db-shm
+*.db-journal
 *.sqlite3
 .venv/
 venv/
@@ -30,6 +35,11 @@ site.py.live
 
 # CodeGraph index (local dev tool, not part of the repo)
 .codegraph/
+
+# Personal local tooling — distiller, offload store, SUSE demo container,
+# rootfs, dev signing keys. Never published with Vaara.
+tools/
+keys/
 
 # Bench output (PAIR runs, dist-shift, vLLM logs). Reproducible by rerun.
 tests/adversarial/v031/

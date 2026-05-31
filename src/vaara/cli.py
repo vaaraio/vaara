@@ -1169,6 +1169,23 @@ def _alg_material_mismatch(alg: str, material: Any) -> Optional[str]:
     return None
 
 
+def _attest_isolation_now(envelope: Any) -> float:
+    """A `now` that isolates signature verification from the TTL window.
+
+    verify_attestation rejects an attestation whose iat is in the future
+    (lower bound) or past exp (upper bound). To check the signature alone we
+    evaluate at the envelope's own iat, which sits inside the window so both
+    time bounds pass and the returned verdict is the pure signature result.
+    Uses the same canonical parser verify_attestation uses internally; an
+    unparseable iat yields 0.0, and the envelope then fails verification on
+    its malformed iat regardless, which is the correct verdict.
+    """
+    from vaara.attestation._sep2787_canonical import iso8601_to_epoch
+
+    epoch = iso8601_to_epoch(envelope.issuer_asserted.iat)
+    return epoch if epoch is not None else 0.0
+
+
 def _cmd_attest_verify(args: argparse.Namespace) -> int:
     """Verify a SEP-2787 attestation envelope's signature (and optionally TTL)."""
     try:
@@ -1207,11 +1224,15 @@ def _cmd_attest_verify(args: argparse.Namespace) -> int:
         print(f"vaara attest verify: {mismatch}", file=sys.stderr)
         return 2
 
-    # now=0.0 makes the TTL deadline trivially pass, isolating signature
+    # Evaluating at the envelope's own iat sits inside the validity window
+    # (both the lower and upper time bounds pass), isolating signature
     # validity; a second pass at real time reveals whether the TTL expired.
     # Durable evidence files are routinely checked long after exp, so TTL is
     # reported but not enforced unless --enforce-ttl is set.
-    signature_ok = verify_attestation(envelope, verifying_material=material, now=0.0)
+    isolation_now = _attest_isolation_now(envelope)
+    signature_ok = verify_attestation(
+        envelope, verifying_material=material, now=isolation_now
+    )
     live_ok = verify_attestation(envelope, verifying_material=material)
     ttl_expired = signature_ok and not live_ok
 
@@ -1288,8 +1309,11 @@ def _cmd_receipt_verify(args: argparse.Namespace) -> int:
     receipt_sig_ok = verify_receipt_signature(receipt, verifying_material=material)
     # Attestation signature checked with TTL ignored: a receipt is a durable
     # record of an outcome, so its attestation is expected to be long expired.
+    # Evaluate at the attestation's iat to isolate the signature from both
+    # time bounds (see _attest_isolation_now).
     attestation_sig_ok = verify_attestation(
-        attestation, verifying_material=material, now=0.0
+        attestation, verifying_material=material,
+        now=_attest_isolation_now(attestation),
     )
     back_link = verify_back_link(receipt, attestation=attestation)
 
