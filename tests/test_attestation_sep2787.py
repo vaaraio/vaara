@@ -182,6 +182,33 @@ def test_ttl_clock_skew_tolerance():
     ) is False
 
 
+def test_future_dated_iat_rejected():
+    # An attestation stamped in the future must not verify. Without the
+    # lower bound, a forged or clock-wrong issuer could set iat far ahead
+    # to keep the TTL window (iat + exp + skew) live indefinitely.
+    iat = "2026-05-26T12:00:00Z"
+    iat_epoch = datetime(2026, 5, 26, 12, 0, 0, tzinfo=timezone.utc).timestamp()
+    env = _emit(exp_seconds=60, iat=iat)
+    # Verifier's clock is well before issuance: rejected.
+    assert verify_attestation(
+        env, verifying_material=HS_SECRET, now=iat_epoch - 3600,
+    ) is False
+
+
+def test_future_dated_iat_within_skew_accepted():
+    # Forward drift up to clock_skew_seconds is tolerated symmetrically with
+    # the trailing-edge skew, so a slightly-fast issuer clock still verifies.
+    iat = "2026-05-26T12:00:00Z"
+    iat_epoch = datetime(2026, 5, 26, 12, 0, 0, tzinfo=timezone.utc).timestamp()
+    env = _emit(exp_seconds=60, iat=iat)
+    assert verify_attestation(
+        env, verifying_material=HS_SECRET, now=iat_epoch - 15, clock_skew_seconds=30,
+    ) is True
+    assert verify_attestation(
+        env, verifying_material=HS_SECRET, now=iat_epoch - 31, clock_skew_seconds=30,
+    ) is False
+
+
 def test_cross_alg_verification_fails():
     env = _emit()
     priv = ec.generate_private_key(ec.SECP256R1())

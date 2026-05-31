@@ -719,7 +719,22 @@ class AdaptiveScorer:
             )
         new_allow = policy.thresholds_default.escalate
         new_deny = policy.thresholds_default.deny
-        new_sequences = list(policy.sequences)
+        # Translate policy-schema patterns into the scorer's runtime form.
+        # The two SequencePattern shapes differ (policy: pattern/window_seconds;
+        # scorer: actions/window_size), and the matcher reads the scorer fields.
+        # Storing the policy form verbatim raised AttributeError on the first
+        # sequence match after a hot reload. window_size is a lookback count, so
+        # give short patterns slack rather than mapping the time window onto it.
+        new_sequences = [
+            SequencePattern(
+                name=sp.name,
+                actions=sp.pattern,
+                risk_boost=sp.risk_boost,
+                window_size=max(len(sp.pattern), 10),
+                description=", ".join(sp.regulatory),
+            )
+            for sp in policy.sequences
+        ]
         with self._lock:
             self._threshold_allow = new_allow
             self._threshold_deny = new_deny

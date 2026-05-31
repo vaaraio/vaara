@@ -39,6 +39,26 @@ jobs:
       - name: Run tests
         run: pytest -q
 
+  typecheck:
+    name: Type check (mypy strict set)
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@de0fac2e4500dabe0009e67214ff5f5447ce83dd  # v6.0.2
+
+      - name: Set up Python 3.12
+        uses: actions/setup-python@a309ff8b426b58ec0e2a45f0f869d46889d02405  # v6.2.0
+        with:
+          python-version: '3.12'
+
+      - name: Install mypy
+        run: pip install mypy==1.20.2
+
+      # Strict set only (vaara.policy.*, per [[tool.mypy.overrides]] in
+      # pyproject.toml). Non-zero exit fails the build. Widen the set by
+      # adding modules to the strict override block as they are cleaned up.
+      - name: mypy
+        run: mypy src/vaara/policy/
+
   preflight:
     name: Pre-release smoke test (wheel + classifier)
     runs-on: ubuntu-latest
