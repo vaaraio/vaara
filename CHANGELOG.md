@@ -6,6 +6,26 @@ and this project follows [Semantic Versioning](https://semver.org/spec/v2.0.0.ht
 
 ## [Unreleased]
 
+### Added
+- `vaara.audit.export.export_signed_threshold` and the `vaara trail
+  export-threshold` CLI: k-of-n threshold signing for audit exports. n
+  custodians each hold an independent Ed25519 key; the export carries one
+  detached signature per available custodian and verification requires at
+  least `threshold_k` valid signatures from the authorized set. No single
+  key-holder can issue or forge a trail. `threshold_k`, `signers_n`, and the
+  authorized fingerprint set are written inside the signed manifest, so the
+  quorum cannot be downgraded without invalidating every member signature.
+  Each stored public key is bound to its manifest fingerprint, so a
+  substituted key is rejected and an unauthorized extra signature is ignored
+  rather than counted. The standalone verifier
+  (`scripts/verify_vaara_trail.py`) verifies threshold exports with only the
+  `cryptography` package. See `docs/design/threshold-signing-spec.md`.
+
+### Fixed
+- `scripts/verify_vaara_trail.py` hash-chain re-check now binds `tenant_id`
+  and `chain_version` for chain v2 records (v0.47+), matching the in-package
+  verifier. The standalone script previously failed every v0.47+ trail.
+
 ## [0.49.0] - 2026-05-31
 
 **Theme: decision records. The evidence chain now covers the full call lifecycle:

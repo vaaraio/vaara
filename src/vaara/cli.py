@@ -320,6 +320,66 @@ def _cmd_trail_export(args: argparse.Namespace) -> int:
     return 0 if result.chain_intact else 1
 
 
+def _cmd_trail_export_threshold(args: argparse.Namespace) -> int:
+    try:
+        from vaara.audit.export import (
+            _load_private_key,
+            export_signed_threshold,
+        )
+        from vaara.audit.signer import Ed25519Signer
+        from vaara.audit.trail import AuditRecord, AuditTrail
+    except ImportError:
+        print(_INSTALL_HINT, file=sys.stderr)
+        return 2
+
+    trail_path = Path(args.trail).expanduser()
+    if not trail_path.exists():
+        print(f"trail JSONL not found: {trail_path}", file=sys.stderr)
+        return 2
+
+    trail = AuditTrail()
+    with open(trail_path, "r", encoding="utf-8") as f:
+        for line in f:
+            line = line.strip()
+            if not line:
+                continue
+            rec = AuditRecord.from_dict(json.loads(line))
+            trail._records.append(rec)
+            trail._by_action[rec.action_id].append(rec)
+            if rec.record_hash:
+                trail._last_hash = rec.record_hash
+
+    signers = []
+    for key_path in args.key:
+        try:
+            signers.append(Ed25519Signer(_load_private_key(Path(key_path).expanduser())))
+        except (OSError, ValueError) as exc:
+            print(f"could not load signing key {key_path}: {exc}", file=sys.stderr)
+            return 2
+
+    out = Path(args.out).expanduser()
+    out.parent.mkdir(parents=True, exist_ok=True)
+
+    try:
+        result = export_signed_threshold(
+            trail,
+            out_path=out,
+            signers=signers,
+            threshold_k=args.threshold_k,
+            agent_id=args.agent_id or "",
+        )
+    except ValueError as exc:
+        print(f"threshold export failed: {exc}", file=sys.stderr)
+        return 2
+
+    print(f"Exported {result.manifest['threshold_k']}-of-"
+          f"{result.manifest['signers_n']} threshold-signed trail to {result.path}")
+    print(f"  records:      {result.manifest['record_count']}")
+    print(f"  chain intact: {result.chain_intact}")
+    print(f"  signer set:   {result.manifest['signer_pubkey_fingerprint']}")
+    return 0 if result.chain_intact else 1
+
+
 def _cmd_trail_verify(args: argparse.Namespace) -> int:
     try:
         from vaara.audit.verify import verify_signed
@@ -334,7 +394,12 @@ def _cmd_trail_verify(args: argparse.Namespace) -> int:
         print("Manifest:")
         print(f"  schema:       {result.manifest.get('schema_version')}")
         print(f"  records:      {result.manifest.get('record_count')}")
+        print(f"  algorithm:    {result.manifest.get('signature_algorithm')}")
         print(f"  fingerprint:  {result.manifest.get('signer_pubkey_fingerprint')}")
+        if result.manifest.get("threshold_k") is not None:
+            print(f"  threshold:    {result.manifest.get('threshold_k')}-of-"
+                  f"{result.manifest.get('signers_n')} "
+                  f"({result.manifest.get('member_algorithm')})")
         print(f"  created:      {result.manifest.get('created_utc')}")
         print(f"  vaara:        {result.manifest.get('vaara_version')}")
     if result.ok:
@@ -1576,6 +1641,28 @@ def build_parser() -> argparse.ArgumentParser:
     pe.add_argument("--key", required=True, help="Path to Ed25519 signing private key (PEM)")
     pe.add_argument("--agent-id", default="", help="Optional agent_id tag for the manifest")
     pe.set_defaults(func=_cmd_trail_export)
+
+    pet = tsub.add_parser(
+        "export-threshold",
+        help="Export a k-of-n threshold-signed trail zip (no single-key issuance)",
+    )
+    pet.add_argument("--trail", required=True, help="Path to trail JSONL file")
+    pet.add_argument("--out", required=True, help="Path to write the signed zip")
+    pet.add_argument(
+        "--key",
+        required=True,
+        action="append",
+        help="Path to a custodian Ed25519 signing key (PEM). Repeat for each "
+             "of the n custodians.",
+    )
+    pet.add_argument(
+        "--threshold-k",
+        required=True,
+        type=int,
+        help="Quorum: minimum valid custodian signatures required to verify.",
+    )
+    pet.add_argument("--agent-id", default="", help="Optional agent_id tag for the manifest")
+    pet.set_defaults(func=_cmd_trail_export_threshold)
 
     pv = tsub.add_parser("verify", help="Verify a signed trail zip")
     pv.add_argument("--zip", required=True, help="Path to signed trail zip")

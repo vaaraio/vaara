@@ -42,6 +42,8 @@ except ImportError:
 
 
 REQUIRED_FILES = {"trail.jsonl", "manifest.json", "trail.sig"}
+CORE_FILES = {"trail.jsonl", "manifest.json"}
+THRESHOLD_PREFIX = "threshold-"
 
 
 def _load_pubkey(data: bytes) -> Ed25519PublicKey:
@@ -55,6 +57,74 @@ def _load_pubkey(data: bytes) -> Ed25519PublicKey:
     if not isinstance(loaded, Ed25519PublicKey):
         raise ValueError("public key is not Ed25519")
     return loaded
+
+
+def _raw_ed25519(loaded: Ed25519PublicKey) -> bytes:
+    if hasattr(loaded, "public_bytes_raw"):
+        return loaded.public_bytes_raw()
+    return loaded.public_bytes(
+        encoding=serialization.Encoding.Raw,
+        format=serialization.PublicFormat.Raw,
+    )
+
+
+def _verify_threshold(
+    manifest: dict, to_verify: bytes, sigs: dict, pubkeys: dict
+) -> list[str]:
+    """k-of-n threshold verification (Ed25519 members). Mirrors
+    vaara.audit.verify._verify_threshold so this standalone file gives the
+    same verdict with only the 'cryptography' package installed."""
+    errors: list[str] = []
+    member_algorithm = manifest.get("member_algorithm")
+    k = manifest.get("threshold_k")
+    fps = manifest.get("signer_fingerprints")
+    if not isinstance(k, int) or k < 1:
+        return [f"invalid threshold_k: {k!r}"]
+    if not isinstance(fps, list) or not fps or not all(isinstance(f, str) for f in fps):
+        return ["manifest signer_fingerprints missing or malformed"]
+    if manifest.get("signers_n") != len(fps):
+        errors.append("signers_n does not match signer_fingerprints length")
+    if k > len(fps):
+        return errors + [f"threshold_k ({k}) exceeds n ({len(fps)})"]
+    if member_algorithm != "Ed25519":
+        return errors + [
+            f"this standalone verifier supports Ed25519 members only, "
+            f"got {member_algorithm!r}"
+        ]
+
+    authorized: dict = {}
+    for fp in fps:
+        raw = pubkeys.get(fp)
+        if raw is None:
+            errors.append(f"missing pubkeys/ entry for authorized signer {fp}")
+            continue
+        try:
+            loaded = _load_pubkey(raw)
+        except ValueError as e:
+            errors.append(f"pubkey for {fp}: {e}")
+            continue
+        raw_norm = _raw_ed25519(loaded)
+        if hashlib.sha256(raw_norm).hexdigest()[:32] != fp:
+            errors.append(f"pubkey for {fp} does not match its fingerprint (substituted key)")
+            continue
+        authorized[fp] = raw_norm
+
+    valid = set()
+    for fp, sig in sigs.items():
+        raw_norm = authorized.get(fp)
+        if raw_norm is None:
+            continue
+        try:
+            Ed25519PublicKey.from_public_bytes(raw_norm).verify(sig, to_verify)
+            valid.add(fp)
+        except (InvalidSignature, ValueError):
+            pass
+    if len(valid) < k:
+        errors.append(
+            f"threshold not met: {len(valid)} valid signature(s) from the "
+            f"authorized set, need at least {k} of {len(fps)}"
+        )
+    return errors
 
 
 def _verify_chain(trail_bytes: bytes) -> str | None:
@@ -77,6 +147,13 @@ def _verify_chain(trail_bytes: bytes) -> str | None:
             "regulatory_articles": rec.get("regulatory_articles", []),
             "previous_hash": prev_hash,
         }
+        # Chain v2 (v0.47+) binds tenant_id and chain_version into the hash.
+        # Legacy v1 records omit both, so pre-v0.47 trails re-verify
+        # unchanged. Mirrors vaara.audit.verify._verify_chain_bytes.
+        chain_version = rec.get("chain_version", 1)
+        if isinstance(chain_version, int) and chain_version >= 2:
+            content["tenant_id"] = rec.get("tenant_id", "")
+            content["chain_version"] = chain_version
         canonical = json.dumps(
             content, sort_keys=True, separators=(",", ":"), allow_nan=False
         )
@@ -92,18 +169,26 @@ def verify(zip_path: Path, pubkey_path: Path | None) -> tuple[bool, list[str], d
     if not zip_path.exists():
         return False, [f"file not found: {zip_path}"], None
 
+    threshold_sigs: dict = {}
+    threshold_pubkeys: dict = {}
     try:
         with zipfile.ZipFile(zip_path, "r") as zf:
             names = set(zf.namelist())
-            missing = REQUIRED_FILES - names
+            missing = CORE_FILES - names
             if missing:
                 return False, [f"missing files in zip: {sorted(missing)}"], None
             trail_bytes = zf.read("trail.jsonl")
             manifest_bytes = zf.read("manifest.json")
-            signature = zf.read("trail.sig")
+            signature = zf.read("trail.sig") if "trail.sig" in names else None
             embedded_pubkey = (
                 zf.read("signer_pubkey.pem") if "signer_pubkey.pem" in names else None
             )
+            for name in names:
+                if name.startswith("sigs/") and name.endswith(".sig"):
+                    threshold_sigs[name[len("sigs/"):-len(".sig")]] = zf.read(name)
+                elif name.startswith("pubkeys/") and name != "pubkeys/":
+                    fp = name[len("pubkeys/"):].rsplit(".", 1)[0]
+                    threshold_pubkeys[fp] = zf.read(name)
     except zipfile.BadZipFile as e:
         return False, [f"corrupt zip: {e}"], None
 
@@ -119,19 +204,28 @@ def verify(zip_path: Path, pubkey_path: Path | None) -> tuple[bool, list[str], d
     if manifest.get("trail_sha256") != actual_sha:
         errors.append("trail.jsonl SHA-256 does not match manifest.trail_sha256 (tampered)")
 
-    if pubkey_path is not None:
-        pk_data = pubkey_path.read_bytes()
-    elif embedded_pubkey is not None:
-        pk_data = embedded_pubkey
-    else:
-        return False, errors + ["no --pubkey given and no signer_pubkey.pem in zip"], manifest
-
-    pk = _load_pubkey(pk_data)
+    algorithm = manifest.get("signature_algorithm", "Ed25519")
     to_verify = hashlib.sha256(trail_bytes + manifest_bytes).digest()
-    try:
-        pk.verify(signature, to_verify)
-    except InvalidSignature:
-        errors.append("Ed25519 signature did not verify")
+
+    if algorithm.startswith(THRESHOLD_PREFIX):
+        errors.extend(
+            _verify_threshold(manifest, to_verify, threshold_sigs, threshold_pubkeys)
+        )
+    else:
+        if pubkey_path is not None:
+            pk_data = pubkey_path.read_bytes()
+        elif embedded_pubkey is not None:
+            pk_data = embedded_pubkey
+        else:
+            return False, errors + ["no --pubkey given and no signer_pubkey.pem in zip"], manifest
+        pk = _load_pubkey(pk_data)
+        if signature is None:
+            errors.append("missing trail.sig in zip")
+        else:
+            try:
+                pk.verify(signature, to_verify)
+            except InvalidSignature:
+                errors.append("Ed25519 signature did not verify")
 
     chain_error = _verify_chain(trail_bytes)
     if chain_error is not None:
