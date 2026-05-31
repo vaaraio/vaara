@@ -2,7 +2,7 @@
   "$schema": "https://static.modelcontextprotocol.io/schemas/2025-12-11/server.schema.json",
   "name": "io.github.vaaraio/vaara-server",
   "title": "Vaara MCP Server",
-  "description": "EU AI Act runtime evidence as a standalone MCP server. Policy gating, intercept, hash-chained tamper-evident audit with external time anchoring.",
+  "description": "EU AI Act runtime evidence as a standalone MCP server: gating, tamper-evident audit",
   "websiteUrl": "https://vaara.io",
   "repository": {
     "url": "https://github.com/vaaraio/vaara",
