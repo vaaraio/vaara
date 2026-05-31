@@ -75,6 +75,32 @@ def test_listener_applies_on_register(base_policy):
     assert controller.version == 1
 
 
+def test_reload_translates_sequences_for_matching(base_policy):
+    """A reload must rebind sequence patterns in the scorer's runtime form.
+
+    The policy schema carries `.pattern` / `.window_seconds`; the matcher
+    reads `.actions` / `.window_size`. Storing the policy form verbatim
+    raised AttributeError on the first sequence match after a hot reload.
+    """
+    scorer = AdaptiveScorer(threshold_allow=0.4, threshold_deny=0.7)
+    controller = PolicyController(base_policy)
+    controller.add_listener(scorer.apply_policy)
+
+    assert scorer._sequences
+    pat = scorer._sequences[0]
+    assert hasattr(pat, "actions") and hasattr(pat, "window_size")
+    assert pat.actions == ("data.read", "data.export")
+
+    # the data_exfil sequence must actually fire after the reload
+    scorer.evaluate(
+        {"tool_name": "data.read", "agent_id": "a", "base_risk_score": 0.1}
+    )
+    result = scorer.evaluate(
+        {"tool_name": "data.export", "agent_id": "a", "base_risk_score": 0.1}
+    )
+    assert result.get("raw_result", {}).get("sequence_risk", 0) > 0
+
+
 def test_reload_swaps_thresholds(base_policy):
     scorer = AdaptiveScorer()
     controller = PolicyController(base_policy)
