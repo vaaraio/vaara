@@ -6,6 +6,34 @@ and this project follows [Semantic Versioning](https://semver.org/spec/v2.0.0.ht
 
 ## [Unreleased]
 
+## [0.49.0] - 2026-05-31
+
+**Theme: decision records. The evidence chain now covers the full call lifecycle:
+policy verdict before execution (decision record), attestation at request time
+(SEP-2787), and outcome after execution (execution receipt). A verifier can prove
+the governing server committed to allow-or-block before the side effect ran.**
+
+### Added
+- `vaara.attestation.decision` module (`pip install 'vaara[attestation]'`).
+  `emit_decision_record` signs a `DecisionRecord` envelope that binds the
+  governing server's policy verdict and risk basis to the SEP-2787 attestation
+  via a digest back-link, before the tool call executes. Verification is two
+  composable checks: `verify_decision_signature` (crypto) and
+  `verify_decision_back_link` (binding to the attestation instance).
+  `records_paired` joins a decision record to its execution receipt.
+  Canonicalization and signing (HS256 / ES256 / RS256) reuse the same path as
+  the receipt and SEP-2787 modules; no new crypto is required.
+- `AuditTrail.enable_auto_anchor(client, *, every_records)` for automatic
+  cadence anchoring. Once enabled the trail anchors its own chain head every N
+  records without a manual call. Fail-open: a failed anchor attempt writes a
+  chained `ANCHOR_GAP` marker so the gap is auditable and the trail continues.
+- Negative test vector `neg_replay_substituted_field`: verifies that replaying a
+  receipt with any field substituted fails verification.
+
+### Fixed
+- MCP manifest `description` fields trimmed to the 100-character registry cap
+  (both `server.json` and `server-vaara-server.json`).
+
 ## [0.48.0] - 2026-05-31
 
 **Theme: external time anchoring. The audit chain head can now be timestamped by
