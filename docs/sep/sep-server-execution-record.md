@@ -414,8 +414,8 @@ this is a separate SEP rather than an extension of either.
 **Alternatives considered.** Carrying the decision inside the SEP-2787
 `issuerAsserted` block was rejected because SEP-2787 attests the call, not the
 verdict, and overloading it would blur the trust surface that SEP made explicit.
-Adopting AlgoVoi's content-addressed `action_ref` as the primary binding field
-was rejected: a content-addressed receipt id is a useful secondary index but is
+Adopting a content-addressed `action_ref` as the primary binding field was
+rejected: a content-addressed receipt id is a useful secondary index but is
 content-binding, and using it as the primary join reintroduces the replay
 problem instance-binding solves. The `action_ref` style is reconcilable as an
 optional `ArgsRef`-shaped pointer, not as the default join.
@@ -441,11 +441,16 @@ of the append-only audit chain that carries these records to an independent,
 trusted timestamp (an RFC 3161 timestamp token, or an eIDAS qualified electronic
 timestamp) so that records signed after a compromise cannot be inserted before
 the last anchored head without detection. The Vaara reference implementation
-binds each record into a hash chain today (chain version 2, with tenant identity
-bound into the chained hash), and the external-anchor mechanism is the next
-shipped step (Vaara v0.48). A conforming deployment under EU AI Act retention
-obligations SHOULD anchor the chain head externally at a cadence proportionate to
-its risk.
+binds each record into a hash chain (chain version 2, with tenant identity bound
+into the chained hash) and ships the external anchor in v0.48: an RFC 3161
+timestamp over the chain head, verifiable offline, with optional automatic cadence
+anchoring that fails open by writing a gap marker into the chain when the
+authority is unreachable. Anchoring is opt-in. The deployer configures a trusted
+timestamp authority; none is bundled by default. Offline verification proves the
+token was signed by the certificate it carries; establishing that certificate as
+a trusted (for example eIDAS-qualified) authority is deployer policy, enforced by
+pinning it. A conforming deployment under EU AI Act retention obligations SHOULD
+anchor the chain head externally at a cadence proportionate to its risk.
 
 **Replay.** Instance-binding through the SEP-2787 attestation digest (signature
 included) plus the per-record `nonce` means a record cannot be replayed against a
@@ -507,19 +512,19 @@ call and counts emission failures for operator alerting.
   agent-guard author in discussion on 2026-05-30 and is adopted here as
   normative.
 
-- **AlgoVoi / chopmob-cloud `action_ref` and `draft-hopley-x402-compliance-receipt`.**
-  Defines a content-addressed receipt identifier `action_ref = sha256(JCS(...))`.
-  This SEP does not adopt `action_ref` as the default join field, because a
-  content-addressed id is content-binding and reintroduces cross-instance replay
-  when used as the primary binding. A content-addressed pointer is reconcilable
-  as an optional `ArgsRef`-shaped reference (the `ref` carries such an id and the
-  `digest` pins it), not as the normative pairing key, which remains the
+- **Content-addressed receipt identifiers.** Some designs identify a record by a
+  content-addressed id of the form `action_ref = sha256(JCS(...))` over a
+  description of the action. This SEP does not adopt a content-addressed id as the
+  default join field, because it is content-binding and reintroduces
+  cross-instance replay when used as the primary binding. Such a pointer is
+  reconcilable as an optional `ArgsRef`-shaped reference (the `ref` carries the id
+  and the `digest` pins it), not as the normative pairing key, which remains the
   instance-scoped `backLink`.
 
 ## Reference Implementation
 
 The wire schema in this SEP is the shape shipping in the Vaara MCP proxy
-(v0.47; the receipt library landed in v0.42). Relevant modules:
+(v0.48; the receipt library landed in v0.42). Relevant modules:
 
 - `vaara/attestation/_receipt_types.py`: the `ExecutionReceipt` envelope
   (`version`, `alg`, `backLink`, `outcomeDerived`, `receiptAsserted`,
@@ -547,8 +552,12 @@ The wire schema in this SEP is the shape shipping in the Vaara MCP proxy
 - `vaara/audit/trail.py`: the append-only, hash-chained audit trail the records
   are written into; chain version 2 binds `tenant_id` and `chain_version` into
   the chained hash so a record cannot be silently re-attributed to another
-  tenant. The external time anchor over the chain head (Security Implications) is
-  the next shipped step (v0.48).
+  tenant.
+- `vaara/audit/timeanchor.py` and `AuditTrail.enable_auto_anchor`: the external
+  time anchor over the chain head (Security Implications), shipped in v0.48 as an
+  RFC 3161 client plus an offline verifier, with optional automatic cadence
+  anchoring that writes an `ANCHOR_GAP` marker into the chain when the authority
+  is unreachable.
 
 **Bridge from the shipped audit decision.** The audit trail already records the
 pre-execution decision as a hash-chained `CommitPayload`
