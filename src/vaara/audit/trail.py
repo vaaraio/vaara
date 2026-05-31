@@ -54,6 +54,7 @@ class EventType(str, Enum):
     ESCALATION_RESOLVED = "escalation_resolved"  # Human responded
     OUTCOME_RECORDED = "outcome_recorded"   # Post-execution outcome observed
     POLICY_OVERRIDE = "policy_override"     # Manual override of policy decision
+    ANCHOR_GAP = "anchor_gap"               # Auto-anchor attempt failed (fail-open marker)
 
 
 # ── Regulatory article mappings ───────────────────────────────────────────
@@ -228,6 +229,11 @@ TRANSPARENCY_DEFAULTS: dict[EventType, dict[str, str]] = {
         "system_operation": "manual_override",
         "data_usage": "operator_decision",
         "decision_making": "human_decision",
+    },
+    EventType.ANCHOR_GAP: {
+        "system_operation": "time_anchoring",
+        "data_usage": "chain_head_digest",
+        "decision_making": "n/a",
     },
 }
 
@@ -560,6 +566,16 @@ class AuditTrail:
         # chain's existence is provable against an external clock even if the
         # signing key is later compromised. See vaara.audit.timeanchor.
         self._anchors: list = []
+        # v0.49 automatic cadence anchoring. Once enable_auto_anchor() sets a
+        # client, the trail anchors its own head every _anchor_cadence records.
+        # Fail-open: a failed anchor attempt records a chained ANCHOR_GAP marker
+        # rather than raising, so a TSA outage is itself visible in the chain.
+        # _anchor_lock guards the cadence counter without widening the chain
+        # lock (the TSA round trip must happen off the chain lock).
+        self._anchor_client: Any = None
+        self._anchor_cadence = 0
+        self._records_since_anchor = 0
+        self._anchor_lock = threading.Lock()
 
     @property
     def size(self) -> int:
@@ -1172,9 +1188,91 @@ class AuditTrail:
             self._anchors.append(anchor)
         return anchor
 
+    def enable_auto_anchor(self, client: Any, *, every_records: int) -> None:
+        """Anchor the chain head automatically every ``every_records`` records.
+
+        ``client`` is a time-anchor backend (e.g.
+        ``vaara.audit.timeanchor.RFC3161TimeAnchorClient``). After every
+        ``every_records`` appended records the trail anchors its current head
+        to that authority, so a deployment does not have to call
+        :meth:`anchor_head` by hand. No TSA is configured by default; this is
+        the opt-in that turns anchoring on.
+
+        Fail-open: if the authority is unreachable or its token does not
+        verify, the trail records a chained ``ANCHOR_GAP`` marker (carrying the
+        reason and the head it tried to anchor) instead of raising, so the
+        unanchored window is itself visible and tamper-evident in the chain.
+        The TSA round trip runs off the hash-chain lock, so it does not block
+        concurrent recording beyond the triggering append.
+
+        Raises ``ValueError`` if ``every_records`` is not a positive integer.
+        """
+        if every_records < 1:
+            raise ValueError("every_records must be a positive integer")
+        with self._anchor_lock:
+            self._anchor_client = client
+            self._anchor_cadence = every_records
+            self._records_since_anchor = 0
+
     # ── Internal ──────────────────────────────────────────────────
 
     def _append(self, record: AuditRecord) -> None:
+        """Append a record, then anchor the head if the cadence is due.
+
+        The chaining itself is in :meth:`_append_chained`; this wrapper adds
+        the automatic-anchor trigger so the gap marker (which appends via
+        ``_append_chained`` directly) cannot recurse back into anchoring.
+        """
+        self._append_chained(record)
+        self._maybe_auto_anchor()
+
+    def _maybe_auto_anchor(self) -> None:
+        """Anchor the head when the per-record cadence is reached (fail-open)."""
+        if self._anchor_client is None:
+            return
+        with self._anchor_lock:
+            self._records_since_anchor += 1
+            if self._records_since_anchor < self._anchor_cadence:
+                return
+            self._records_since_anchor = 0
+            client = self._anchor_client
+        with self._lock:
+            if not self._records:
+                return
+            position = len(self._records) - 1
+            head_hash = self._records[-1].record_hash
+        try:
+            anchor = client.anchor(position, head_hash)
+        except Exception as exc:  # fail-open: never break recording on a TSA fault
+            self._record_anchor_gap(position, head_hash, repr(exc), client)
+            return
+        with self._lock:
+            self._anchors.append(anchor)
+
+    def _record_anchor_gap(
+        self, position: int, head_hash: str, reason: str, client: Any
+    ) -> None:
+        """Append a chained ANCHOR_GAP marker for a failed auto-anchor attempt."""
+        logger.warning(
+            "auto-anchor failed at chain position %d (%s); recording gap marker",
+            position, reason,
+        )
+        self._append_chained(AuditRecord(
+            record_id=str(uuid.uuid4()),
+            action_id="anchor-gap",
+            event_type=EventType.ANCHOR_GAP,
+            timestamp=time.time(),
+            agent_id="vaara",
+            tool_name="timeanchor",
+            data={
+                "reason": self._cap_record_str(reason, 512),
+                "attempted_chain_position": position,
+                "chain_head_hash": head_hash,
+                "tsa_url": getattr(client, "tsa_url", ""),
+            },
+        ))
+
+    def _append_chained(self, record: AuditRecord) -> None:
         """Append a record to the trail with hash chaining."""
         # Sanitize caller-supplied `data` at the single choke point so any
         # record_* method (including direct AuditTrail users bypassing the

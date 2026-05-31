@@ -303,3 +303,75 @@ def test_anchor_head_against_live_tsa():
         assert attested.isoformat() == anchor.anchored_time
         return
     pytest.fail(f"no live TSA granted/verified: {errors}")
+
+
+# Automatic cadence-based anchoring (v0.49): once a TSA is configured the
+# trail anchors its own head every N records, fail-open with a chained gap
+# marker so a TSA outage is itself recorded and provable.
+
+def _add_actions(trail, n):
+    from vaara.taxonomy.actions import (
+        ActionCategory, ActionRequest, ActionType, BlastRadius, Reversibility,
+    )
+    for i in range(n):
+        trail.record_action_requested(ActionRequest(
+            action_type=ActionType(
+                name=f"a{i}", category=ActionCategory.DATA,
+                reversibility=Reversibility.FULLY, blast_radius=BlastRadius.LOCAL,
+            ),
+            tool_name="t", agent_id="agent", parameters={},
+        ))
+
+
+def _failing_tsa_client():
+    def transport(url, der_request, timeout):
+        raise ConnectionError("TSA unreachable")
+    return RFC3161TimeAnchorClient("https://tsa.example/tsr", transport=transport)
+
+
+def test_auto_anchor_off_by_default():
+    from vaara.audit.trail import AuditTrail, EventType
+    trail = AuditTrail()
+    _add_actions(trail, 5)
+    assert trail.anchors == []
+    assert not any(r.event_type == EventType.ANCHOR_GAP for r in trail._records)
+
+
+def test_enable_auto_anchor_rejects_non_positive_cadence():
+    from vaara.audit.trail import AuditTrail
+    trail = AuditTrail()
+    with pytest.raises(ValueError):
+        trail.enable_auto_anchor(_local_tsa_client(), every_records=0)
+
+
+def test_auto_anchor_fires_on_cadence():
+    from vaara.audit.trail import AuditTrail
+    trail = AuditTrail()
+    trail.enable_auto_anchor(_local_tsa_client(), every_records=3)
+
+    _add_actions(trail, 3)
+    assert len(trail.anchors) == 1
+    # The anchor binds the head that was current when the cadence tripped.
+    record_hashes = [r.record_hash for r in trail._records]
+    assert verify_anchor_over_records(trail.anchors[0], record_hashes) == _GEN_TIME
+
+    _add_actions(trail, 3)
+    assert len(trail.anchors) == 2
+
+
+def test_auto_anchor_fail_open_records_chained_gap():
+    from vaara.audit.trail import AuditTrail, EventType
+    trail = AuditTrail()
+    trail.enable_auto_anchor(_failing_tsa_client(), every_records=3)
+
+    # Recording must not raise even though the TSA is unreachable.
+    _add_actions(trail, 3)
+
+    gaps = [r for r in trail._records if r.event_type == EventType.ANCHOR_GAP]
+    assert len(gaps) == 1
+    assert "unreachable" in gaps[0].data["reason"].lower()
+    # No successful anchor, but the chain (including the gap marker) is intact.
+    assert trail.anchors == []
+    assert trail.verify_chain() is None
+    # The gap marker sits inside the hash chain as the latest record.
+    assert trail._records[-1].event_type == EventType.ANCHOR_GAP
