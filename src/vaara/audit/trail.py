@@ -554,10 +554,21 @@ class AuditTrail:
         # tenant's scope. A dedicated lock keeps the map coherent without
         # widening the hash-chain lock or risking re-entrancy with _append.
         self._tenant_map_lock = threading.Lock()
+        # v0.48 external time anchors over chain-head digests. Opt-in: stays
+        # empty until anchor_head() is called. Each entry binds a chain
+        # position + head hash to a third-party trusted timestamp, so the
+        # chain's existence is provable against an external clock even if the
+        # signing key is later compromised. See vaara.audit.timeanchor.
+        self._anchors: list = []
 
     @property
     def size(self) -> int:
         return len(self._records)
+
+    @property
+    def anchors(self) -> list:
+        """External time anchors recorded over this trail's chain heads."""
+        return list(self._anchors)
 
     @property
     def persistence_failures(self) -> int:
@@ -1135,6 +1146,31 @@ class AuditTrail:
             for record in snapshot:
                 f.write(strict_json_dumps(record.to_dict()) + "\n")
         return len(snapshot)
+
+    def anchor_head(self, client: Any) -> Any:
+        """Anchor the current chain head to an external time authority.
+
+        ``client`` is a time-anchor backend such as
+        ``vaara.audit.timeanchor.RFC3161TimeAnchorClient``. Reads the latest
+        record's hash under the lock, obtains a trusted timestamp over it, and
+        appends the resulting ``TimeAnchor`` to this trail's anchor list. The
+        anchor proves the chain head existed no later than the attested time,
+        attested by a party outside Vaara's trust boundary, which is what
+        defeats post-hoc backdating after a signing-key compromise.
+
+        Raises ``ValueError`` if the trail is empty (nothing to anchor) and
+        ``TimeAnchorError`` if the authority cannot be reached or its token
+        does not verify. The anchor is appended only after the token verifies.
+        """
+        with self._lock:
+            if not self._records:
+                raise ValueError("cannot anchor an empty trail")
+            position = len(self._records) - 1
+            head_hash = self._records[-1].record_hash
+        anchor = client.anchor(position, head_hash)
+        with self._lock:
+            self._anchors.append(anchor)
+        return anchor
 
     # ── Internal ──────────────────────────────────────────────────
 

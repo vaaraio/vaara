@@ -6,6 +6,32 @@ and this project follows [Semantic Versioning](https://semver.org/spec/v2.0.0.ht
 
 ## [Unreleased]
 
+## [0.48.0] - 2026-05-31
+
+**Theme: external time anchoring. The audit chain head can now be timestamped by
+a third-party authority, so the chain's existence is provable against an external
+clock even if the signing key is later compromised. This is the anti-backdating
+property the server-side signed execution-record SEP relies on.**
+
+### Added
+- External time anchoring for the audit hash chain (`vaara.audit.timeanchor`, new
+  `timeanchor` extra). `AuditTrail.anchor_head(client)` takes the current chain
+  head (already a SHA-256 digest) and obtains an RFC 3161 trusted timestamp over
+  it from an external Time-Stamp Authority. RFC 3161 underpins eIDAS qualified
+  electronic timestamps, so a qualified TSA makes this regulator-grade evidence
+  under EU AI Act Article 12. The token is verified on receipt and kept as a
+  `TimeAnchor`; verification is offline (`verify_anchor`,
+  `verify_anchor_over_records`) and binds the anchor to a specific record, so a
+  rewritten chain or a token over a different digest is rejected. The HTTP round
+  trip uses the standard library; only the ASN.1 and signature checks need the
+  extra. See `docs/sep/sep-server-execution-record.md`.
+
+### Changed
+- Public framing leads with EU AI Act runtime evidence and data sovereignty (runs
+  in your own environment, no SaaS, no telemetry) across the README, package
+  descriptions, MCP manifests, and vaara.io. The tamper-evident receipt stays the
+  mechanism, not the headline.
+
 ## [0.47.0] - 2026-05-31
 
 **Theme: tenant isolation across the evidence path. The reference server can no
