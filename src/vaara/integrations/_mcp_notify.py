@@ -38,6 +38,7 @@ class NotificationRouter(Protocol):
         *,
         session_id: Optional[str] = None,
         upstream: str = "default",
+        tenant: Optional[str] = None,
     ) -> None:
         ...
 
@@ -54,6 +55,7 @@ class StdioRouter:
         *,
         session_id: Optional[str] = None,
         upstream: str = "default",
+        tenant: Optional[str] = None,
     ) -> None:
         with self._lock:
             sys.stdout.write(strict_json_dumps(message) + "\n")
@@ -121,9 +123,13 @@ class _SessionState:
 class HttpRouter:
     """Per-session SSE notification delivery for Streamable HTTP transport.
 
-    ``deliver`` with a session_id targets exactly that session; without one
-    (log notifications carry no progressToken) it broadcasts across every
-    registered session on the matching upstream.
+    ``deliver`` with a session_id targets exactly that session. Without one,
+    an ``tenant``-attributed broadcast (a progress notification correlated to
+    a tools/call) reaches only that tenant's sessions on the upstream; an
+    unattributed broadcast (a server-level log with no progressToken) reaches
+    every session on the upstream only when they all share one tenant scope,
+    and is otherwise suppressed so one tenant's upstream push cannot leak to
+    another tenant subscribed to the same upstream.
     """
 
     def __init__(self, replay_buffer_size: int = _DEFAULT_REPLAY_BUFFER) -> None:
@@ -184,15 +190,37 @@ class HttpRouter:
         *,
         session_id: Optional[str] = None,
         upstream: str = "default",
+        tenant: Optional[str] = None,
     ) -> None:
         with self._lock:
             if session_id is not None:
                 state = self._sessions.get(session_id)
                 targets = [state] if state is not None else []
             else:
-                targets = [
+                candidates = [
                     s for s in self._sessions.values() if s.upstream == upstream
                 ]
+                if tenant is not None:
+                    # Attributable broadcast (progress correlated to a
+                    # tools/call): only the originating tenant's sessions.
+                    targets = [s for s in candidates if s.tenant == tenant]
+                else:
+                    # Unattributable broadcast (a server-level log with no
+                    # progressToken). Safe only when every subscriber on this
+                    # upstream shares one tenant scope; across distinct tenants
+                    # it would leak one tenant's upstream push to another, so
+                    # suppress rather than fan out.
+                    scopes = {s.tenant for s in candidates}
+                    if len(scopes) <= 1:
+                        targets = candidates
+                    else:
+                        logger.debug(
+                            "suppressing unattributable broadcast on upstream "
+                            "%s spanning %d tenant scopes",
+                            upstream,
+                            len(scopes),
+                        )
+                        targets = []
         for state in targets:
             state.enqueue(message)
 
