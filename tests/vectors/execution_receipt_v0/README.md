@@ -31,6 +31,12 @@ _check_independent.py        stdlib + cryptography + rfc8785, no Vaara import
   commitment does not bind the supplied runtime result.
 - `neg_broken_backlink`: signature valid, but the receipt pins a
   different attestation than the one stored, so the back-link fails.
+- `neg_replay_substituted_field`: a valid executed receipt is replayed
+  with one signed field substituted (outcome status `executed` ->
+  `refused`) while the original signature is kept. The back-link and
+  result commitment still verify, so only the signature catches the
+  forgery: the signed envelope, not any single sub-check, is what binds
+  the outcome claim.
 
 ## Verifying
 

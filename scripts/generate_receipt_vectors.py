@@ -167,6 +167,27 @@ def main() -> None:
           expected={"signature_ok": True, "back_link_ok": False,
                     "result_commitment_ok": True})
 
+    # Negative: a valid executed receipt is replayed with one signed field
+    # substituted (outcome status executed -> refused) while the original
+    # signature is kept. The back-link and result commitment still verify, so
+    # only the signature catches the forgery. This is the replay-with-field-
+    # substitution case (distinct from a stale verifier clock): the signed
+    # envelope, not any single sub-check, is what binds the outcome claim.
+    valid = emit_receipt(
+        back_link=make_back_link(att),
+        outcome_derived=OutcomeDerived(
+            status="executed", completed_at=IAT,
+            result_commitment=make_result_digest(RESULT)),
+        alg="HS256", signing_material=HS_SECRET, **common)
+    tampered = valid.to_dict()
+    tampered["outcomeDerived"]["status"] = "refused"
+    d = OUT / "normative" / "neg_replay_substituted_field"
+    _write(d / "attestation.json", att.to_dict())
+    _write(d / "receipt.json", tampered)
+    _write(d / "runtime_result.json", RESULT)
+    _write(d / "expected.json", {"signature_ok": False, "back_link_ok": True,
+                                 "result_commitment_ok": True})
+
     print(f"wrote vectors under {OUT}")
 
 
