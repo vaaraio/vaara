@@ -14,27 +14,19 @@
   <a href="https://huggingface.co/spaces/vaaraio/vaara"><img src="https://img.shields.io/badge/%F0%9F%A4%97%20Hugging%20Face-Space-blue" alt="Hugging Face Space"></a>
 </p>
 
-Vaara is the tamper-evident runtime evidence layer for AI systems. It covers EU AI Act compliance, and any other case where you need to prove what an agent actually did. Open source, no SaaS, no telemetry.
+Vaara is an open-source runtime evidence layer for AI agents. It sits in front of an agent's tool calls, decides whether each one is allowed, and writes a tamper-evident record of what happened. When you have to prove what an agent actually did, to an auditor, a regulator, or a customer, that record is the proof. Runs in your own environment. No SaaS, no telemetry.
 
-Vaara intercepts agent tool calls, scores each one with a conformal risk interval, and writes a hash-chained audit record. Online learning across five expert signals via Multiplicative Weight Update. Distribution-free conformal coverage on the score. An external auditor can verify these properties without trusting your stack. Orchestration toolkits and identity layers (Microsoft Agent Governance Toolkit, others) sit on top.
+The original driver is EU AI Act compliance, but the same trail answers any "show me exactly what the agent did, and why" question.
 
-## Numbers
+## How it works
 
-Held-out TEST recall 84.7% (95% Wilson [82.4, 86.7]) at FPR 4.1% [2.9, 5.7]. Phase 1 PAIR scale-up to n=300 per attacker family lands at 88.1% [85.8, 90.1]. Cross-model held-out recall, where no attacker model in the eval set was in TRAIN, is 66.8% [64.9, 68.7] over n=2,277; the weakest sub-cell is data_exfil against a closed-weight model at 38.9% [35.3, 42.5] (see [vaara-bench-v0.37](bench/vaara-bench-v0.37.md)). Under BIPIA-pressure context, false-positive rate on benign tool calls 1.2% [0.4, 3.6] across four agent backends (Claude Haiku 4.5, Llama-3.1-8B, Mistral-7B, Qwen-2.5-7B). Multi-attacker PAIR ASR 0/25 across three different attacker models with identical seeds. The rule scorer that runs in the hot path adds 140 µs mean / 210 µs p99 per call on commodity CPU; the MiniLM classifier is opt-in (`vaara[ml]`) and is not in that measured path. Every number reproducible end-to-end via `make bench`.
+Every tool call an agent makes passes through Vaara before it runs:
 
-- 12,155-entry adversarial corpus (250 hand-curated + 11,905 LLM-generated), 70/15/15 split stratified by (category, source)
-- Classifier v9 with 236 hand-features + 384-dim MiniLM embeddings at calibrated threshold 0.9150 on held-out TEST n=1,827: recall 84.7% [82.4, 86.7] at FPR 4.1% [2.9, 5.7]
-- Multi-attacker PAIR robustness: 0/25 successes per attacker across Qwen2.5-32B, Qwen2.5-72B, Llama-3.3-70B hitting identical seed indices, Wilson upper 13.3%
-- BIPIA-pressure FPR on benign tool calls 1.2% [0.4, 3.6] across four agent backends, n=244 benign tool calls under `context.source=injected_via_bipia_<class>`
-- Cross-model held-out recall 66.8% [64.9, 68.7] over n=2,277 with no eval-set attacker model in TRAIN; data_exfil generalises unevenly, with a closed-weight sub-cell at 38.9% [35.3, 42.5]. This is the honest worst case; the in-distribution TEST number above is the easier denominator
-- Chain of custody: corpus manifest SHA, split manifest SHA, training commit, bundle SHA, all locked and printed by every script
-- 140 µs mean / 210 µs p99 for the hot-path rule scorer on commodity CPU; the MiniLM classifier is opt-in (`vaara[ml]`) and not in that path
-- Distribution-free conformal coverage on the score
-- MWU regret bound O(sqrt(T log N))
-- [vaara-bench-v0.39](bench/vaara-bench-v0.39.md): current methodology, chain of custody, ship-gate record. v9 retrain on BIPIA-augmented corpus with follows upweighted (`--follow-weight 8.0`), calibrated to T=0.9150 at a 5% FPR target on v035 VAL. BIPIA-pressure FPR collapses from 35.2% on v8 to 1.2% on v9. In-distribution recall flat within Wilson intervals. Found-and-fixed in tree: auto-labeller `example.com` placeholder false-positive rule (42 to 14 true follows across four backends). Historical bench docs live under `bench/` for chain-of-custody continuity.
-- [vaara-bench-v1](bench/vaara-bench-v1.md): 77-trace synthetic-corpus regression baseline with frozen methodology, 100% soft TPR, 0% hard FPR
+1. **Intercept.** Vaara catches the call (`fs.write_file`, `tx.transfer`, an MCP `tools/call`, and so on) through your framework's own hook, or transparently as an MCP proxy in front of an upstream server.
+2. **Score and decide.** Each call gets a risk score and an allow / block / escalate decision against your policy.
+3. **Record.** The call, the score, the decision, and the real-world outcome are written to a hash-chained audit trail. An outside auditor can verify the chain is intact without trusting your stack or your word.
 
-Each figure is reproducible from the public corpus or the bench pipeline in `bench/`.
+The scoring blends five expert signals and keeps adapting as outcomes come back, and each risk score carries a confidence interval with a coverage guarantee that holds regardless of the input distribution. Those are the properties an auditor can check independently; the math behind them is in [Benchmarks](#benchmarks) and [docs/formal_specification.md](docs/formal_specification.md). Orchestration toolkits and identity layers (Microsoft Agent Governance Toolkit and others) sit on top.
 
 ## Install
 
@@ -90,6 +82,30 @@ The same data renders as a styled PDF for Notified Bodies (`vaara compliance rep
 
 Each article verdict carries `verdict_inputs` (threshold-vs-observed snapshot), `verdict_reasons` (rationale lines), and `contributing_events` (the audit records the verdict sits on, with a `drill_down` of the data that fed the risk/decision/outcome). Reviewers can trace `status` to `threshold delta` to `concrete event` without re-running the engine.
 
+## Benchmarks
+
+Held-out test recall **84.7%** (95% Wilson [82.4, 86.7]) at a **4.1%** false-positive rate, and **1.2%** FPR on benign tool calls under live injection pressure. The hot-path rule scorer adds 140 µs mean / 210 µs p99 per call on commodity CPU. Every figure is reproducible end-to-end via `make bench`.
+
+<details>
+<summary>Full numbers, corpus, calibration, and chain of custody</summary>
+
+Held-out TEST recall 84.7% (95% Wilson [82.4, 86.7]) at FPR 4.1% [2.9, 5.7]. Phase 1 PAIR scale-up to n=300 per attacker family lands at 88.1% [85.8, 90.1]. Cross-model held-out recall, where no attacker model in the eval set was in TRAIN, is 66.8% [64.9, 68.7] over n=2,277; the weakest sub-cell is data_exfil against a closed-weight model at 38.9% [35.3, 42.5] (see [vaara-bench-v0.37](bench/vaara-bench-v0.37.md)). Under BIPIA-pressure context, false-positive rate on benign tool calls 1.2% [0.4, 3.6] across four agent backends (Claude Haiku 4.5, Llama-3.1-8B, Mistral-7B, Qwen-2.5-7B). Multi-attacker PAIR ASR 0/25 across three different attacker models with identical seeds. The rule scorer that runs in the hot path adds 140 µs mean / 210 µs p99 per call on commodity CPU; the MiniLM classifier is opt-in (`vaara[ml]`) and is not in that measured path.
+
+- 12,155-entry adversarial corpus (250 hand-curated + 11,905 LLM-generated), 70/15/15 split stratified by (category, source)
+- Classifier v9 with 236 hand-features + 384-dim MiniLM embeddings at calibrated threshold 0.9150 on held-out TEST n=1,827: recall 84.7% [82.4, 86.7] at FPR 4.1% [2.9, 5.7]
+- Multi-attacker PAIR robustness: 0/25 successes per attacker across Qwen2.5-32B, Qwen2.5-72B, Llama-3.3-70B hitting identical seed indices, Wilson upper 13.3%
+- BIPIA-pressure FPR on benign tool calls 1.2% [0.4, 3.6] across four agent backends, n=244 benign tool calls under `context.source=injected_via_bipia_<class>`
+- Cross-model held-out recall 66.8% [64.9, 68.7] over n=2,277 with no eval-set attacker model in TRAIN; data_exfil generalises unevenly, with a closed-weight sub-cell at 38.9% [35.3, 42.5]. This is the honest worst case; the in-distribution TEST number above is the easier denominator
+- Chain of custody: corpus manifest SHA, split manifest SHA, training commit, bundle SHA, all locked and printed by every script
+- 140 µs mean / 210 µs p99 for the hot-path rule scorer on commodity CPU; the MiniLM classifier is opt-in (`vaara[ml]`) and not in that path
+- Distribution-free conformal coverage on the score
+- MWU regret bound O(sqrt(T log N))
+- [vaara-bench-v0.39](bench/vaara-bench-v0.39.md): current methodology, chain of custody, ship-gate record. v9 retrain on BIPIA-augmented corpus with follows upweighted (`--follow-weight 8.0`), calibrated to T=0.9150 at a 5% FPR target on v035 VAL. BIPIA-pressure FPR collapses from 35.2% on v8 to 1.2% on v9. In-distribution recall flat within Wilson intervals. Found-and-fixed in tree: auto-labeller `example.com` placeholder false-positive rule (42 to 14 true follows across four backends). Historical bench docs live under `bench/` for chain-of-custody continuity.
+- [vaara-bench-v1](bench/vaara-bench-v1.md): 77-trace synthetic-corpus regression baseline with frozen methodology, 100% soft TPR, 0% hard FPR
+
+Each figure is reproducible from the public corpus or the bench pipeline in `bench/`.
+</details>
+
 ## Framework adapters
 
 Native adapters in `src/vaara/integrations/` route the major Python agent frameworks through Vaara's pipeline. Each intercepts via the framework's own callback or hook surface, scores, gates, and emits the same audit events as a direct `pipeline.intercept()`. Frameworks are not hard dependencies (lazy import, duck typing).
@@ -107,6 +123,9 @@ All four share the same in-process pipeline, so audit records hash-chain togethe
 
 Adapters route findings from cloud and OSS guardrails into Vaara's audit trail and OVERT envelope. The filter runs in the deployer's environment as an upstream signal. Vaara records the verdict, normalises 68 provider categories onto a shared vocabulary, and tags each finding against the relevant AI Act articles. Article-by-article mapping in [COMPLIANCE.md](COMPLIANCE.md).
 
+<details>
+<summary>Seven cloud and OSS guardrails: Bedrock, Azure, GCP, NeMo, Guardrails AI, LLM Guard, Rebuff</summary>
+
 | Provider | Adapter | Extra | Wraps |
 |---|---|---|---|
 | AWS Bedrock Guardrails | `BedrockGuardrailsAdapter` | `vaara[bedrock]` | `ApplyGuardrail` across five Bedrock policy buckets |
@@ -116,6 +135,8 @@ Adapters route findings from cloud and OSS guardrails into Vaara's audit trail a
 | Guardrails AI | `GuardrailsAIAdapter` | `vaara[guardrails-ai]` | `ValidationOutcome.validation_summaries` from `Guard.parse` / `Guard.validate` |
 | LLM Guard | `LLMGuardAdapter` | `vaara[llm-guard]` | `scan_prompt` / `scan_output`, parses `(sanitized, results_valid, results_score)` |
 | Rebuff | `RebuffAdapter` | `vaara[rebuff]` | `DetectResponse` across heuristic, model, vector layers + canary-word leak check |
+
+</details>
 
 Each adapter returns a `ContentSafetyFinding` the deployer routes into `pipeline.intercept(context=finding.to_audit_context())`. The mapping table lives at `src/vaara/integrations/_content_safety_articles.py`. Article-level rationale in [COMPLIANCE.md](COMPLIANCE.md#cloud-guardrail-adapter-pattern) and [COMPLIANCE.md](COMPLIANCE.md#oss-guardrail-adapter-pattern).
 
