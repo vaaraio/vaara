@@ -35,6 +35,6 @@ def test_independent_walker_passes_all_cases():
     assert _load_checker().main() == 0
 
 
-def test_at_least_five_cases_present():
+def test_at_least_six_cases_present():
     cases = [p for p in (VECTORS / "normative").iterdir() if p.is_dir()]
-    assert len(cases) >= 5
+    assert len(cases) >= 6

@@ -22,9 +22,13 @@ import hashlib
 import json
 import math
 from dataclasses import asdict, dataclass, field
-from typing import Any, Optional
+from datetime import datetime, timezone
+from typing import TYPE_CHECKING, Any, Optional
 
 from vaara.audit.trail import AuditRecord, AuditTrail, EventType
+
+if TYPE_CHECKING:
+    from vaara.attestation._decision_types import DecisionDerived
 
 
 @dataclass(frozen=True)
@@ -213,6 +217,88 @@ def _thresholds_from_risk_record(
 
 def _event_to_decision(event_type: EventType) -> str:
     return "deny" if event_type == EventType.ACTION_BLOCKED else "allow"
+
+
+# The audit layer records a verdict as ``allow`` / ``deny``; a held-for-review
+# action is recorded as ``escalate`` / ``review`` / ``refer`` depending on the
+# policy vocabulary. The SEP-2787 decision-record wire enum is
+# ``allow`` / ``block`` / ``escalate``, so ``deny`` normalises to ``block`` and
+# the review family normalises to ``escalate``.
+_VERDICT_TO_WIRE: dict[str, str] = {
+    "allow": "allow",
+    "deny": "block",
+    "block": "block",
+    "escalate": "escalate",
+    "review": "escalate",
+    "refer": "escalate",
+}
+
+
+def _verdict_to_wire(decision: str) -> str:
+    wire = _VERDICT_TO_WIRE.get(decision.strip().lower())
+    if wire is None:
+        raise ValueError(f"unmappable audit decision {decision!r}")
+    return wire
+
+
+def _decimal_str(value: float) -> str:
+    """Stable decimal string for a risk score or threshold.
+
+    Floats are banned on the decision-record wire (the JCS boundary
+    rejects them) because cross-stack float behaviour is the most common
+    source of signature drift. ``repr`` gives the shortest round-tripping
+    decimal; scientific notation is expanded so the wire value is always
+    a plain decimal.
+    """
+    if not math.isfinite(value):
+        raise ValueError("risk score and thresholds MUST be finite")
+    s = repr(float(value))
+    if "e" in s or "E" in s:
+        s = f"{value:.12f}".rstrip("0").rstrip(".")
+    return s
+
+
+def _epoch_to_iso8601(epoch: float) -> str:
+    """Epoch seconds to an RFC 3339 / ISO 8601 UTC string with a ``Z`` suffix."""
+    return (
+        datetime.fromtimestamp(epoch, tz=timezone.utc)
+        .isoformat(timespec="seconds")
+        .replace("+00:00", "Z")
+    )
+
+
+def decision_derived_from_commit(
+    commit: "CommitPayload",
+    *,
+    policy_id: Optional[str] = None,
+    client_turn_id: Optional[str] = None,
+    reason: Optional[str] = None,
+) -> "DecisionDerived":
+    """Bridge a shipped ``CommitPayload`` to a SEP-2787 ``DecisionDerived``.
+
+    The commit payload is the hash-chained pre-action decision the audit
+    trail already records. This maps it onto the signed decision-record
+    wire shape: the verdict vocabulary is normalised (``deny`` to
+    ``block``), the float risk basis becomes decimal strings, and the
+    epoch decision time becomes an ISO 8601 UTC string. ``policy_id``,
+    ``client_turn_id``, and ``reason`` are not carried on the commit
+    payload, so the caller supplies them when available.
+
+    Imports ``DecisionDerived`` lazily so the core audit layer does not
+    hard-depend on the optional ``attestation`` extra.
+    """
+    from vaara.attestation._decision_types import DecisionDerived
+
+    return DecisionDerived(
+        decision=_verdict_to_wire(commit.decision),  # type: ignore[arg-type]
+        decided_at=_epoch_to_iso8601(commit.decided_at),
+        reason=reason,
+        risk_score=_decimal_str(commit.risk_score),
+        threshold_allow=_decimal_str(commit.threshold_allow),
+        threshold_block=_decimal_str(commit.threshold_deny),
+        policy_id=policy_id,
+        client_turn_id=client_turn_id,
+    )
 
 
 def _coerce_float(value: Any) -> Optional[float]:
