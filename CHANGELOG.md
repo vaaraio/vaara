@@ -39,6 +39,19 @@ and this project follows [Semantic Versioning](https://semver.org/spec/v2.0.0.ht
   verification routes through the unchanged `verify_receipt_signature` stack. No
   new crypto, no re-canonicalization. The `@context` is vendored
   (`load_receipt_context`), so verification needs no network.
+- **Article 12 one-command regulator export.** `vaara trail export-article12`
+  (and `vaara.audit.article12_export.export_article12`) writes a signed
+  evidence zip plus a generated, human-readable report that maps the trail to
+  the EU AI Act Article 12 / 26(5) record-keeping obligations: a cover from
+  operator `--system-meta`, an obligation table driven by the event types
+  present and the chain's `regulatory_articles` tags, an event inventory, an
+  integrity statement, and verify instructions a regulator runs without a
+  Vaara install. It composes the existing signed export (single-signer or
+  k-of-n threshold), it does not duplicate it. The report is built from the
+  signed trail bytes and bound to them by the manifest `trail_sha256`; it is a
+  derived view, not a second signed surface, and the package says so. `--period`
+  is a report lens that narrows the summary counts only; the signed trail stays
+  whole. `--format md|html`. See `docs/design/article12-export-spec.md`.
 
 ### Fixed
 - `scripts/verify_vaara_trail.py` hash-chain re-check now binds `tenant_id`
