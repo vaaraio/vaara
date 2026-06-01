@@ -6,6 +6,14 @@ and this project follows [Semantic Versioning](https://semver.org/spec/v2.0.0.ht
 
 ## [Unreleased]
 
+## [0.50.0] - 2026-06-01
+
+**Theme: the verifiable evidence plane. Trail exports can be threshold-signed so
+no single custodian can issue or forge them, and custodian changes are pinned in
+the chain. Execution receipts serialize losslessly as W3C Verifiable Credentials
+for interoperability without a second trust surface. One command turns a trail
+into a signed, self-explaining EU AI Act Article 12 regulator package.**
+
 ### Added
 - `vaara.audit.export.export_signed_threshold` and the `vaara trail
   export-threshold` CLI: k-of-n threshold signing for audit exports. n
