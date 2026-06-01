@@ -108,6 +108,7 @@ require ``pip install 'vaara[export]'`` (pulls cryptography). The
 from __future__ import annotations
 
 import argparse
+import calendar
 import hashlib
 import json
 import os
@@ -320,6 +321,66 @@ def _cmd_trail_export(args: argparse.Namespace) -> int:
     return 0 if result.chain_intact else 1
 
 
+def _cmd_trail_export_threshold(args: argparse.Namespace) -> int:
+    try:
+        from vaara.audit.export import (
+            _load_private_key,
+            export_signed_threshold,
+        )
+        from vaara.audit.signer import Ed25519Signer
+        from vaara.audit.trail import AuditRecord, AuditTrail
+    except ImportError:
+        print(_INSTALL_HINT, file=sys.stderr)
+        return 2
+
+    trail_path = Path(args.trail).expanduser()
+    if not trail_path.exists():
+        print(f"trail JSONL not found: {trail_path}", file=sys.stderr)
+        return 2
+
+    trail = AuditTrail()
+    with open(trail_path, "r", encoding="utf-8") as f:
+        for line in f:
+            line = line.strip()
+            if not line:
+                continue
+            rec = AuditRecord.from_dict(json.loads(line))
+            trail._records.append(rec)
+            trail._by_action[rec.action_id].append(rec)
+            if rec.record_hash:
+                trail._last_hash = rec.record_hash
+
+    signers = []
+    for key_path in args.key:
+        try:
+            signers.append(Ed25519Signer(_load_private_key(Path(key_path).expanduser())))
+        except (OSError, ValueError) as exc:
+            print(f"could not load signing key {key_path}: {exc}", file=sys.stderr)
+            return 2
+
+    out = Path(args.out).expanduser()
+    out.parent.mkdir(parents=True, exist_ok=True)
+
+    try:
+        result = export_signed_threshold(
+            trail,
+            out_path=out,
+            signers=signers,
+            threshold_k=args.threshold_k,
+            agent_id=args.agent_id or "",
+        )
+    except ValueError as exc:
+        print(f"threshold export failed: {exc}", file=sys.stderr)
+        return 2
+
+    print(f"Exported {result.manifest['threshold_k']}-of-"
+          f"{result.manifest['signers_n']} threshold-signed trail to {result.path}")
+    print(f"  records:      {result.manifest['record_count']}")
+    print(f"  chain intact: {result.chain_intact}")
+    print(f"  signer set:   {result.manifest['signer_pubkey_fingerprint']}")
+    return 0 if result.chain_intact else 1
+
+
 def _cmd_trail_verify(args: argparse.Namespace) -> int:
     try:
         from vaara.audit.verify import verify_signed
@@ -334,7 +395,12 @@ def _cmd_trail_verify(args: argparse.Namespace) -> int:
         print("Manifest:")
         print(f"  schema:       {result.manifest.get('schema_version')}")
         print(f"  records:      {result.manifest.get('record_count')}")
+        print(f"  algorithm:    {result.manifest.get('signature_algorithm')}")
         print(f"  fingerprint:  {result.manifest.get('signer_pubkey_fingerprint')}")
+        if result.manifest.get("threshold_k") is not None:
+            print(f"  threshold:    {result.manifest.get('threshold_k')}-of-"
+                  f"{result.manifest.get('signers_n')} "
+                  f"({result.manifest.get('member_algorithm')})")
         print(f"  created:      {result.manifest.get('created_utc')}")
         print(f"  vaara:        {result.manifest.get('vaara_version')}")
     if result.ok:
@@ -439,6 +505,101 @@ def _cmd_trail_export_incident(args: argparse.Namespace) -> int:
         f"to {out}"
     )
     return 0
+
+
+def _parse_period(spec: Optional[str]) -> Optional[tuple]:
+    """Parse a ``YYYY-MM-DD:YYYY-MM-DD`` period into a (start, end) epoch pair.
+
+    Either side may be empty for an open bound (``:2026-06-30`` or
+    ``2026-01-01:``). The end date is inclusive of its whole day. Returns
+    ``None`` when ``spec`` is falsy.
+    """
+    if not spec:
+        return None
+    if ":" not in spec:
+        raise ValueError(
+            "period must be START:END (YYYY-MM-DD:YYYY-MM-DD); either side may be empty"
+        )
+    start_s, end_s = spec.split(":", 1)
+
+    def _epoch(day: str, *, end_of_day: bool) -> Optional[float]:
+        day = day.strip()
+        if not day:
+            return None
+        t = time.strptime(day, "%Y-%m-%d")
+        epoch = calendar.timegm(t)
+        return epoch + 86399 if end_of_day else float(epoch)
+
+    return (_epoch(start_s, end_of_day=False), _epoch(end_s, end_of_day=True))
+
+
+def _cmd_trail_export_article12(args: argparse.Namespace) -> int:
+    """Export a signed EU AI Act Article 12 regulator package from a trail."""
+    try:
+        from vaara.audit.article12_export import export_article12
+        from vaara.audit.trail import AuditRecord, AuditTrail
+    except ImportError:
+        print(_INSTALL_HINT, file=sys.stderr)
+        return 2
+
+    trail_path = Path(args.trail).expanduser()
+    if not trail_path.exists():
+        print(f"trail JSONL not found: {trail_path}", file=sys.stderr)
+        return 2
+
+    system_meta = None
+    if args.system_meta:
+        meta_path = Path(args.system_meta).expanduser()
+        if not meta_path.exists():
+            print(f"system-meta JSON not found: {meta_path}", file=sys.stderr)
+            return 2
+        try:
+            with open(meta_path, "r", encoding="utf-8") as f:
+                system_meta = json.load(f)
+        except (json.JSONDecodeError, OSError) as exc:
+            print(f"failed to read system-meta: {exc}", file=sys.stderr)
+            return 2
+
+    try:
+        period = _parse_period(args.period)
+    except ValueError as exc:
+        print(f"invalid --period: {exc}", file=sys.stderr)
+        return 2
+
+    trail = AuditTrail()
+    with open(trail_path, "r", encoding="utf-8") as f:
+        for line in f:
+            line = line.strip()
+            if not line:
+                continue
+            rec = AuditRecord.from_dict(json.loads(line))
+            trail._records.append(rec)
+            trail._by_action[rec.action_id].append(rec)
+            if rec.record_hash:
+                trail._last_hash = rec.record_hash
+
+    out = Path(args.out).expanduser()
+    out.parent.mkdir(parents=True, exist_ok=True)
+
+    try:
+        result = export_article12(
+            trail,
+            out_path=out,
+            signer_key=Path(args.key).expanduser(),
+            system_meta=system_meta,
+            period=period,
+            fmt=args.format,
+            agent_id=args.agent_id or "",
+        )
+    except (ValueError, ImportError) as exc:
+        print(f"Article 12 export failed: {exc}", file=sys.stderr)
+        return 2
+
+    print(f"Exported Article 12 regulator package to {result.path}")
+    print(f"  records:      {result.manifest['record_count']}")
+    print(f"  chain intact: {result.chain_intact}")
+    print(f"  report:       article12_report.{args.format}")
+    return 0 if result.chain_intact else 1
 
 
 def _cmd_trail_purge(args: argparse.Namespace) -> int:
@@ -1577,6 +1738,28 @@ def build_parser() -> argparse.ArgumentParser:
     pe.add_argument("--agent-id", default="", help="Optional agent_id tag for the manifest")
     pe.set_defaults(func=_cmd_trail_export)
 
+    pet = tsub.add_parser(
+        "export-threshold",
+        help="Export a k-of-n threshold-signed trail zip (no single-key issuance)",
+    )
+    pet.add_argument("--trail", required=True, help="Path to trail JSONL file")
+    pet.add_argument("--out", required=True, help="Path to write the signed zip")
+    pet.add_argument(
+        "--key",
+        required=True,
+        action="append",
+        help="Path to a custodian Ed25519 signing key (PEM). Repeat for each "
+             "of the n custodians.",
+    )
+    pet.add_argument(
+        "--threshold-k",
+        required=True,
+        type=int,
+        help="Quorum: minimum valid custodian signatures required to verify.",
+    )
+    pet.add_argument("--agent-id", default="", help="Optional agent_id tag for the manifest")
+    pet.set_defaults(func=_cmd_trail_export_threshold)
+
     pv = tsub.add_parser("verify", help="Verify a signed trail zip")
     pv.add_argument("--zip", required=True, help="Path to signed trail zip")
     pv.add_argument(
@@ -1622,6 +1805,38 @@ def build_parser() -> argparse.ArgumentParser:
              "policy_override event in the trail is used.",
     )
     pei.set_defaults(func=_cmd_trail_export_incident)
+
+    pa12 = tsub.add_parser(
+        "export-article12",
+        help="Export a signed EU AI Act Article 12 regulator package",
+    )
+    pa12.add_argument("--trail", required=True, help="Path to trail JSONL file")
+    pa12.add_argument(
+        "--key", required=True,
+        help="Ed25519 private key (PEM) to sign the package",
+    )
+    pa12.add_argument("--out", required=True, help="Path to write the package zip")
+    pa12.add_argument(
+        "--system-meta", default=None,
+        help="Optional JSON with system identity (system_name, provider, "
+             "deployer, intended_purpose, risk_classification). Absent fields "
+             "render as 'not provided'.",
+    )
+    pa12.add_argument(
+        "--period", default=None,
+        help="Optional report lens START:END (YYYY-MM-DD:YYYY-MM-DD); either "
+             "side may be empty. Narrows the summary counts only; the signed "
+             "trail stays whole.",
+    )
+    pa12.add_argument(
+        "--format", choices=("md", "html"), default="md",
+        help="Human-readable report format (default: md)",
+    )
+    pa12.add_argument(
+        "--agent-id", default="",
+        help="Optional scope hint written to the manifest (does not filter records)",
+    )
+    pa12.set_defaults(func=_cmd_trail_export_article12)
 
     prec = tsub.add_parser(
         "receipt",

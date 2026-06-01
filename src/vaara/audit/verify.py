@@ -30,6 +30,10 @@ if TYPE_CHECKING:
 logger = logging.getLogger(__name__)
 
 _REQUIRED_FILES = {"trail.jsonl", "manifest.json", "trail.sig"}
+# Single-signer exports carry trail.sig; threshold exports carry sigs/ +
+# pubkeys/ instead. Both always carry these two.
+_CORE_FILES = {"trail.jsonl", "manifest.json"}
+_THRESHOLD_PREFIX = "threshold-"
 _INSTALL_HINT = (
     "Signed-trail verification requires the 'cryptography' package. "
     "Install with: pip install 'vaara[export]' (or 'pip install cryptography' "
@@ -48,6 +52,11 @@ class VerifyResult:
     ok: bool
     errors: list[str] = field(default_factory=list)
     manifest: Optional[dict] = None
+    key_lifecycle: list[dict] = field(default_factory=list)
+    """Custodian key-lifecycle records found in the trail (rotations,
+    revocations, additions), in chain order. Informational: surfaced so a
+    reviewer sees the custodian set's history inline. Does not affect ``ok``.
+    """
 
 
 def _require_crypto() -> None:
@@ -129,6 +138,113 @@ def _verify_chain_bytes(trail_bytes: bytes) -> Optional[str]:
     return None
 
 
+def _raw_ed25519_bytes(loaded: "Ed25519PublicKey") -> bytes:
+    """Raw 32-byte encoding of an Ed25519 public key, version-tolerant."""
+    if hasattr(loaded, "public_bytes_raw"):
+        return loaded.public_bytes_raw()
+    return loaded.public_bytes(
+        encoding=serialization.Encoding.Raw,
+        format=serialization.PublicFormat.Raw,
+    )
+
+
+def _member_fingerprint(raw_pubkey: bytes) -> str:
+    """32-hex-char fingerprint of a raw public key (mirrors the signer)."""
+    return hashlib.sha256(raw_pubkey).hexdigest()[:32]
+
+
+def _verify_threshold(
+    *,
+    manifest: dict,
+    to_verify: bytes,
+    sigs: dict[str, bytes],
+    pubkeys: dict[str, bytes],
+) -> list[str]:
+    """Verify a k-of-n threshold export. Returns a list of error strings.
+
+    Requires at least ``threshold_k`` distinct authorized signers to carry
+    a valid signature over ``to_verify``. The authorized fingerprint list
+    lives in the signed manifest, and each stored public key is bound to
+    its manifest fingerprint, so a substituted pubkey is rejected and an
+    unauthorized extra signature is ignored rather than counted.
+    """
+    errors: list[str] = []
+    member_algorithm = manifest.get("member_algorithm")
+    k = manifest.get("threshold_k")
+    n = manifest.get("signers_n")
+    fps = manifest.get("signer_fingerprints")
+
+    if not isinstance(k, int) or k < 1:
+        return [f"invalid threshold_k: {k!r}"]
+    if not isinstance(fps, list) or not fps or not all(isinstance(f, str) for f in fps):
+        return ["manifest signer_fingerprints missing or malformed"]
+    if len(set(fps)) != len(fps):
+        errors.append("signer_fingerprints contains duplicates")
+    if n != len(fps):
+        errors.append(
+            f"signers_n ({n}) does not match signer_fingerprints length ({len(fps)})"
+        )
+    if k > len(fps):
+        return errors + [f"threshold_k ({k}) exceeds n ({len(fps)})"]
+    if member_algorithm not in ("Ed25519", "ML-DSA-65"):
+        return errors + [f"unsupported member_algorithm: {member_algorithm!r}"]
+
+    # Bind each authorized pubkey to its manifest fingerprint.
+    authorized: dict[str, bytes] = {}
+    for fp in fps:
+        raw = pubkeys.get(fp)
+        if raw is None:
+            errors.append(f"missing pubkeys/ entry for authorized signer {fp}")
+            continue
+        if member_algorithm == "Ed25519":
+            try:
+                loaded = serialization.load_pem_public_key(raw)
+            except (ValueError, UnsupportedAlgorithm) as e:
+                errors.append(f"pubkey for {fp} could not be parsed: {e}")
+                continue
+            if not isinstance(loaded, Ed25519PublicKey):
+                errors.append(f"pubkey for {fp} is not Ed25519")
+                continue
+            raw_norm = _raw_ed25519_bytes(loaded)
+        else:
+            raw_norm = raw
+        if _member_fingerprint(raw_norm) != fp:
+            errors.append(
+                f"pubkey for {fp} does not match its fingerprint (substituted key)"
+            )
+            continue
+        authorized[fp] = raw_norm
+
+    mldsa_cls = None
+    if member_algorithm == "ML-DSA-65":
+        try:
+            from vaara.audit.signer import MLDSA65Verifier as mldsa_cls  # type: ignore
+        except ImportError as exc:
+            return errors + [f"ML-DSA-65 verify requires the pq extra: {exc}"]
+
+    # Count distinct authorized signers with a valid signature.
+    valid: set[str] = set()
+    for fp, sig in sigs.items():
+        raw_norm = authorized.get(fp)
+        if raw_norm is None:
+            continue  # unknown or unauthorized signer; not counted
+        if member_algorithm == "Ed25519":
+            try:
+                Ed25519PublicKey.from_public_bytes(raw_norm).verify(sig, to_verify)
+                valid.add(fp)
+            except (InvalidSignature, ValueError):
+                pass
+        elif mldsa_cls(raw_norm).verify(to_verify, sig):
+            valid.add(fp)
+
+    if len(valid) < k:
+        errors.append(
+            f"threshold not met: {len(valid)} valid signature(s) from the "
+            f"authorized set, need at least {k} of {len(fps)}"
+        )
+    return errors
+
+
 def verify_signed(
     zip_path: Union[str, Path],
     public_key: Optional[Union[str, Path, bytes, "_PK"]] = None,
@@ -168,10 +284,15 @@ def verify_signed(
     if not zip_path.exists():
         return VerifyResult(ok=False, errors=[f"file not found: {zip_path}"])
 
+    threshold_sigs: dict[str, bytes] = {}
+    threshold_pubkeys: dict[str, bytes] = {}
     try:
         with zipfile.ZipFile(zip_path, "r") as zf:
             names = set(zf.namelist())
-            missing = _REQUIRED_FILES - names
+            # trail.jsonl + manifest.json are required for every export;
+            # the signature surface differs (single trail.sig vs threshold
+            # sigs/ + pubkeys/) and is resolved after the manifest is read.
+            missing = _CORE_FILES - names
             if missing:
                 return VerifyResult(
                     ok=False,
@@ -179,7 +300,7 @@ def verify_signed(
                 )
             trail_bytes = zf.read("trail.jsonl")
             manifest_bytes = zf.read("manifest.json")
-            signature = zf.read("trail.sig")
+            signature = zf.read("trail.sig") if "trail.sig" in names else None
             embedded_pubkey_pem = (
                 zf.read("signer_pubkey.pem")
                 if "signer_pubkey.pem" in names
@@ -190,6 +311,13 @@ def verify_signed(
                 if "signer_pubkey.bin" in names
                 else None
             )
+            for name in names:
+                if name.startswith("sigs/") and name.endswith(".sig"):
+                    threshold_sigs[name[len("sigs/"):-len(".sig")]] = zf.read(name)
+                elif name.startswith("pubkeys/") and name != "pubkeys/":
+                    stem = name[len("pubkeys/"):]
+                    fp = stem.rsplit(".", 1)[0]
+                    threshold_pubkeys[fp] = zf.read(name)
     except zipfile.BadZipFile as e:
         return VerifyResult(ok=False, errors=[f"corrupt zip: {e}"])
 
@@ -213,7 +341,16 @@ def verify_signed(
     algorithm = manifest.get("signature_algorithm", "Ed25519")
     to_verify = hashlib.sha256(trail_bytes + manifest_bytes).digest()
 
-    if algorithm == "Ed25519":
+    if algorithm.startswith(_THRESHOLD_PREFIX):
+        errors.extend(
+            _verify_threshold(
+                manifest=manifest,
+                to_verify=to_verify,
+                sigs=threshold_sigs,
+                pubkeys=threshold_pubkeys,
+            )
+        )
+    elif algorithm == "Ed25519":
         if public_key is None:
             if embedded_pubkey_pem is None:
                 return VerifyResult(
@@ -226,13 +363,16 @@ def verify_signed(
             pk = _load_public_key(embedded_pubkey_pem)
         else:
             pk = _load_public_key(public_key)
-        try:
-            pk.verify(signature, to_verify)
-        except InvalidSignature:
-            errors.append(
-                "Ed25519 signature did not verify "
-                "(wrong public key, tampered manifest, or tampered trail)"
-            )
+        if signature is None:
+            errors.append("missing trail.sig in zip")
+        else:
+            try:
+                pk.verify(signature, to_verify)
+            except InvalidSignature:
+                errors.append(
+                    "Ed25519 signature did not verify "
+                    "(wrong public key, tampered manifest, or tampered trail)"
+                )
     elif algorithm == "ML-DSA-65":
         try:
             from vaara.audit.signer import MLDSA65Verifier
@@ -264,12 +404,15 @@ def verify_signed(
                 ],
                 manifest=manifest,
             )
-        verifier = MLDSA65Verifier(pk_bytes)
-        if not verifier.verify(to_verify, signature):
-            errors.append(
-                "ML-DSA-65 signature did not verify "
-                "(wrong public key, tampered manifest, or tampered trail)"
-            )
+        if signature is None:
+            errors.append("missing trail.sig in zip")
+        else:
+            verifier = MLDSA65Verifier(pk_bytes)
+            if not verifier.verify(to_verify, signature):
+                errors.append(
+                    "ML-DSA-65 signature did not verify "
+                    "(wrong public key, tampered manifest, or tampered trail)"
+                )
     else:
         errors.append(f"unknown signature_algorithm: {algorithm!r}")
 
@@ -294,4 +437,41 @@ def verify_signed(
         except json.JSONDecodeError:
             errors.append("could not parse first/last trail record")
 
-    return VerifyResult(ok=not errors, errors=errors, manifest=manifest)
+    lifecycle = _collect_key_lifecycle(lines)
+
+    return VerifyResult(
+        ok=not errors,
+        errors=errors,
+        manifest=manifest,
+        key_lifecycle=lifecycle,
+    )
+
+
+def _collect_key_lifecycle(lines: list[bytes]) -> list[dict]:
+    """Pull custodian key-lifecycle records out of the trail, in chain order.
+
+    Informational surfacing only (see :class:`VerifyResult.key_lifecycle`);
+    the records are already covered by the hash-chain check, so a tampered
+    lifecycle record fails verification on the chain, not here.
+    """
+    out: list[dict] = []
+    for ln in lines:
+        try:
+            rec = json.loads(ln)
+        except json.JSONDecodeError:
+            continue
+        if rec.get("event_type") != "key_lifecycle":
+            continue
+        data = rec.get("data", {}) or {}
+        out.append(
+            {
+                "timestamp": rec.get("timestamp"),
+                "action": data.get("action"),
+                "fingerprint": data.get("fingerprint"),
+                "threshold_k": data.get("threshold_k"),
+                "signers_n": data.get("signers_n"),
+                "reason": data.get("reason", ""),
+                "actor": data.get("actor", ""),
+            }
+        )
+    return out
