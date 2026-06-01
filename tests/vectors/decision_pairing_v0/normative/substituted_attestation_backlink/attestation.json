@@ -1,0 +1,29 @@
+{
+  "alg": "HS256",
+  "issuerAsserted": {
+    "alg": "HS256",
+    "expSeconds": 300,
+    "iat": "2026-06-01T10:00:00Z",
+    "iss": "issuer://test",
+    "nonce": "fixed-attestation-nonce-000",
+    "secretVersion": "v1",
+    "sub": "agent:reader"
+  },
+  "payloadDerived": {
+    "toolCalls": [
+      {
+        "args": {
+          "projection": "{\"digest\":\"sha256:f735ff54b51fbc531287ba646ac3f66218ed91b783947e3e45d5e9ee3771b673\"}",
+          "projectionDigest": "sha256:5e97a35c5ee74c9e30fceea86cb31d5f3829f09022b37a728f243bd3f7b3ca1a"
+        },
+        "name": "query_table",
+        "serverFingerprint": "sha256:1111111111111111111111111111111111111111111111111111111111111111"
+      }
+    ]
+  },
+  "plannerDeclared": {
+    "intent": "show 10 employees"
+  },
+  "signature": "7f7a6ae787bc5164de7e76185ecd81ee189d1f43fe383400c2bb92b12589f69b",
+  "version": 1
+}

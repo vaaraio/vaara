@@ -1,0 +1,7 @@
+{
+  "decision_signature_ok": true,
+  "note": "fallback binding when no SEP-2787 attestation exists; the BackLink digest is over the JCS-canonical request envelope",
+  "receipt_signature_ok": true,
+  "records_paired": true,
+  "replayed_receipt_signature_ok": false
+}

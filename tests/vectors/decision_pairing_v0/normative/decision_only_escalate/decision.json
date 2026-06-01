@@ -1,0 +1,25 @@
+{
+  "alg": "ES256",
+  "backLink": {
+    "attestationDigest": "sha256:9429a30b849cdd7a8ed41680a667ef2e6516aa533320a9450eef87d31fdd6a44",
+    "attestationNonce": "fixed-attestation-nonce-000"
+  },
+  "decisionDerived": {
+    "decidedAt": "2026-06-01T10:00:00Z",
+    "decision": "escalate",
+    "policyId": "policy:read-only/3",
+    "riskScore": "0.21",
+    "thresholdAllow": "0.30",
+    "thresholdBlock": "0.80"
+  },
+  "issuerAsserted": {
+    "alg": "ES256",
+    "iat": "2026-06-01T10:00:00Z",
+    "iss": "issuer://test",
+    "nonce": "d2",
+    "secretVersion": "v1",
+    "sub": "agent:reader"
+  },
+  "signature": "017040a40f64f8ac718090ef545bb8edee738a110f18c9edbc71d345ed9fd08c0a538fde3dde59c9780bc1f4ef5ffc6e8b5ff79c5f56b1366b94f1f0cd353c7b",
+  "version": 1
+}

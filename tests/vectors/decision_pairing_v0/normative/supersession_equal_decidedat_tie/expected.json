@@ -1,0 +1,6 @@
+{
+  "both_back_links_ok": true,
+  "both_signatures_ok": true,
+  "open_contract": "equal decidedAt needs a deterministic tie-break (e.g. lexicographic on record nonce); unspecified in the reference impl as of v0.50.0",
+  "winner": null
+}
