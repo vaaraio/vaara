@@ -30,6 +30,15 @@ and this project follows [Semantic Versioning](https://semver.org/spec/v2.0.0.ht
   (`VerifyResult.key_lifecycle`), and the standalone verifier prints them, so a
   reviewer sees the custodian set's history inline with the evidence. New
   `EventType.KEY_LIFECYCLE` maps to EU AI Act Articles 15(1) and 12(1).
+- **W3C Verifiable Credential serialization for execution receipts (opt-in).**
+  `vaara.attestation.receipt.receipt_to_vc` / `receipt_from_vc` present an
+  `ExecutionReceipt` as a VCDM 2.0 credential and recover it losslessly
+  (`receipt_from_vc(receipt_to_vc(r)) == r`). The VC is a view, not a second
+  trust surface: `credentialSubject` carries the native receipt blocks verbatim,
+  `proof.proofValue` carries the existing SEP-2787 detached signature, and
+  verification routes through the unchanged `verify_receipt_signature` stack. No
+  new crypto, no re-canonicalization. The `@context` is vendored
+  (`load_receipt_context`), so verification needs no network.
 
 ### Fixed
 - `scripts/verify_vaara_trail.py` hash-chain re-check now binds `tenant_id`

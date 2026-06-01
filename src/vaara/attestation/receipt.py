@@ -54,6 +54,12 @@ from vaara.attestation._receipt_verifier import (
     make_back_link,
     verify_back_link,
 )
+from vaara.attestation._receipt_vc import (
+    VAARA_RECEIPT_CONTEXT_URL,
+    load_receipt_context,
+    receipt_from_vc,
+    receipt_to_vc,
+)
 
 # Result commitments reuse the SEP-2787 argument-commitment builders.
 # Re-export under result-oriented names so call sites read naturally.
@@ -63,6 +69,7 @@ from vaara.attestation._sep2787_canonical import (
 )
 
 __all__ = [
+    "VAARA_RECEIPT_CONTEXT_URL",
     "BackLink",
     "BackLinkResult",
     "ExecutionReceipt",
@@ -72,10 +79,13 @@ __all__ = [
     "ResultCommitment",
     "attestation_digest",
     "emit_receipt",
+    "load_receipt_context",
     "make_back_link",
     "make_result_digest",
     "make_result_projection",
     "parse_receipt",
+    "receipt_from_vc",
+    "receipt_to_vc",
     "verify_back_link",
     "verify_receipt_signature",
 ]
