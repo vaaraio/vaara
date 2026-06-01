@@ -6,6 +6,66 @@ and this project follows [Semantic Versioning](https://semver.org/spec/v2.0.0.ht
 
 ## [Unreleased]
 
+## [0.50.0] - 2026-06-01
+
+**Theme: the verifiable evidence plane. Trail exports can be threshold-signed so
+no single custodian can issue or forge them, and custodian changes are pinned in
+the chain. Execution receipts serialize losslessly as W3C Verifiable Credentials
+for interoperability without a second trust surface. One command turns a trail
+into a signed, self-explaining EU AI Act Article 12 regulator package.**
+
+### Added
+- `vaara.audit.export.export_signed_threshold` and the `vaara trail
+  export-threshold` CLI: k-of-n threshold signing for audit exports. n
+  custodians each hold an independent Ed25519 key; the export carries one
+  detached signature per available custodian and verification requires at
+  least `threshold_k` valid signatures from the authorized set. No single
+  key-holder can issue or forge a trail. `threshold_k`, `signers_n`, and the
+  authorized fingerprint set are written inside the signed manifest, so the
+  quorum cannot be downgraded without invalidating every member signature.
+  Each stored public key is bound to its manifest fingerprint, so a
+  substituted key is rejected and an unauthorized extra signature is ignored
+  rather than counted. The standalone verifier
+  (`scripts/verify_vaara_trail.py`) verifies threshold exports with only the
+  `cryptography` package. See `docs/design/threshold-signing-spec.md`.
+- **Chain-anchored key-lifecycle markers** (the second half of threshold
+  signing). `AuditTrail.record_key_lifecycle(action, fingerprint, ...)` records
+  custodian rotation, revocation, and addition as ordinary audit records, so
+  they inherit the v0.47 hash chain and the v0.48 external time anchor. A
+  `revoked` marker anchored before a compromise window pins the revocation in
+  time: a compromised key can re-sign but cannot re-anchor past chain heads.
+  `verify_signed` now returns any lifecycle records found
+  (`VerifyResult.key_lifecycle`), and the standalone verifier prints them, so a
+  reviewer sees the custodian set's history inline with the evidence. New
+  `EventType.KEY_LIFECYCLE` maps to EU AI Act Articles 15(1) and 12(1).
+- **W3C Verifiable Credential serialization for execution receipts (opt-in).**
+  `vaara.attestation.receipt.receipt_to_vc` / `receipt_from_vc` present an
+  `ExecutionReceipt` as a VCDM 2.0 credential and recover it losslessly
+  (`receipt_from_vc(receipt_to_vc(r)) == r`). The VC is a view, not a second
+  trust surface: `credentialSubject` carries the native receipt blocks verbatim,
+  `proof.proofValue` carries the existing SEP-2787 detached signature, and
+  verification routes through the unchanged `verify_receipt_signature` stack. No
+  new crypto, no re-canonicalization. The `@context` is vendored
+  (`load_receipt_context`), so verification needs no network.
+- **Article 12 one-command regulator export.** `vaara trail export-article12`
+  (and `vaara.audit.article12_export.export_article12`) writes a signed
+  evidence zip plus a generated, human-readable report that maps the trail to
+  the EU AI Act Article 12 / 26(5) record-keeping obligations: a cover from
+  operator `--system-meta`, an obligation table driven by the event types
+  present and the chain's `regulatory_articles` tags, an event inventory, an
+  integrity statement, and verify instructions a regulator runs without a
+  Vaara install. It composes the existing signed export (single-signer or
+  k-of-n threshold), it does not duplicate it. The report is built from the
+  signed trail bytes and bound to them by the manifest `trail_sha256`; it is a
+  derived view, not a second signed surface, and the package says so. `--period`
+  is a report lens that narrows the summary counts only; the signed trail stays
+  whole. `--format md|html`. See `docs/design/article12-export-spec.md`.
+
+### Fixed
+- `scripts/verify_vaara_trail.py` hash-chain re-check now binds `tenant_id`
+  and `chain_version` for chain v2 records (v0.47+), matching the in-package
+  verifier. The standalone script previously failed every v0.47+ trail.
+
 ## [0.49.0] - 2026-05-31
 
 **Theme: decision records. The evidence chain now covers the full call lifecycle:
