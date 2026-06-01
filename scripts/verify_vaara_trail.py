@@ -164,6 +164,36 @@ def _verify_chain(trail_bytes: bytes) -> str | None:
     return None
 
 
+def _collect_key_lifecycle(zip_path: Path) -> list[dict]:
+    """Custodian key-lifecycle records in the trail, in chain order.
+
+    Informational only; the records are covered by the hash-chain check, so
+    a tampered lifecycle record fails on the chain, not here.
+    """
+    out: list[dict] = []
+    try:
+        with zipfile.ZipFile(zip_path, "r") as zf:
+            trail_bytes = zf.read("trail.jsonl")
+    except (zipfile.BadZipFile, KeyError, FileNotFoundError):
+        return out
+    for raw in (ln for ln in trail_bytes.splitlines() if ln.strip()):
+        try:
+            rec = json.loads(raw)
+        except json.JSONDecodeError:
+            continue
+        if rec.get("event_type") != "key_lifecycle":
+            continue
+        data = rec.get("data", {}) or {}
+        out.append({
+            "action": data.get("action"),
+            "fingerprint": data.get("fingerprint"),
+            "threshold_k": data.get("threshold_k"),
+            "signers_n": data.get("signers_n"),
+            "reason": data.get("reason", ""),
+        })
+    return out
+
+
 def verify(zip_path: Path, pubkey_path: Path | None) -> tuple[bool, list[str], dict | None]:
     errors: list[str] = []
     if not zip_path.exists():
@@ -277,6 +307,17 @@ def main(argv: list[str] | None = None) -> int:
             "agent_id",
         ):
             print(f"  {k:<30} {manifest.get(k)}")
+
+        events = _collect_key_lifecycle(Path(args.zip_path))
+        if events:
+            print(f"  {'key_lifecycle_events':<30} {len(events)}")
+            for ev in events:
+                line = f"    - {ev['action']} {ev['fingerprint']}"
+                if ev.get("threshold_k") is not None:
+                    line += f" (quorum now {ev['threshold_k']}-of-{ev['signers_n']})"
+                if ev.get("reason"):
+                    line += f": {ev['reason']}"
+                print(line)
 
     if ok:
         print("\nVerification: OK")

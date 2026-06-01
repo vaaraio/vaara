@@ -20,6 +20,16 @@ and this project follows [Semantic Versioning](https://semver.org/spec/v2.0.0.ht
   rather than counted. The standalone verifier
   (`scripts/verify_vaara_trail.py`) verifies threshold exports with only the
   `cryptography` package. See `docs/design/threshold-signing-spec.md`.
+- **Chain-anchored key-lifecycle markers** (the second half of threshold
+  signing). `AuditTrail.record_key_lifecycle(action, fingerprint, ...)` records
+  custodian rotation, revocation, and addition as ordinary audit records, so
+  they inherit the v0.47 hash chain and the v0.48 external time anchor. A
+  `revoked` marker anchored before a compromise window pins the revocation in
+  time: a compromised key can re-sign but cannot re-anchor past chain heads.
+  `verify_signed` now returns any lifecycle records found
+  (`VerifyResult.key_lifecycle`), and the standalone verifier prints them, so a
+  reviewer sees the custodian set's history inline with the evidence. New
+  `EventType.KEY_LIFECYCLE` maps to EU AI Act Articles 15(1) and 12(1).
 
 ### Fixed
 - `scripts/verify_vaara_trail.py` hash-chain re-check now binds `tenant_id`

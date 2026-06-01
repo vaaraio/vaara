@@ -247,3 +247,58 @@ def test_standalone_verifier_parity(tmp_path):
     below = tmp_path / "b.zip"
     _drop_sigs(out, below, keep=2)
     assert _standalone(below) == 1
+
+
+# ── Key lifecycle markers (rotation / revocation / addition) ────────────────
+
+def test_key_lifecycle_record_validation():
+    trail = _make_trail()
+    with pytest.raises(ValueError):
+        trail.record_key_lifecycle("nonsense", "ab12")
+    with pytest.raises(ValueError):
+        trail.record_key_lifecycle("revoked", "")
+
+
+def test_key_lifecycle_surfaced_by_verify(tmp_path):
+    out = tmp_path / "t.zip"
+    trail = _make_trail()
+    trail.record_key_lifecycle(
+        "revoked", "deadbeef" * 4, reason="suspected compromise",
+        threshold_k=3, signers_n=5, actor="ops",
+    )
+    trail.record_key_lifecycle("added", "feedface" * 4, threshold_k=3, signers_n=6)
+    export_signed_threshold(trail, out, signers=_signers(5), threshold_k=3)
+
+    result = verify_signed(out)
+    assert result.ok, result.errors
+    assert len(result.key_lifecycle) == 2
+    revoked, added = result.key_lifecycle  # surfaced in chain order
+    assert revoked["action"] == "revoked"
+    assert revoked["fingerprint"] == "deadbeef" * 4
+    assert revoked["reason"] == "suspected compromise"
+    assert revoked["threshold_k"] == 3 and revoked["signers_n"] == 5
+    assert added["action"] == "added"
+    assert added["signers_n"] == 6
+
+
+def test_key_lifecycle_covered_by_hash_chain(tmp_path):
+    """A tampered lifecycle record fails the chain check, not silently passes."""
+    out = tmp_path / "t.zip"
+    trail = _make_trail()
+    trail.record_key_lifecycle("revoked", "cafe" * 8, reason="x")
+    export_signed_threshold(trail, out, signers=_signers(3), threshold_k=2)
+
+    with zipfile.ZipFile(out, "r") as zf:
+        trail_bytes = zf.read("trail.jsonl")
+        others = {n: zf.read(n) for n in zf.namelist() if n != "trail.jsonl"}
+    tampered = trail_bytes.replace(b"cafe" * 8, b"beef" * 8)
+    assert tampered != trail_bytes
+    rebuilt = tmp_path / "tampered.zip"
+    with zipfile.ZipFile(rebuilt, "w") as zf:
+        zf.writestr("trail.jsonl", tampered)
+        for name, body in others.items():
+            zf.writestr(name, body)
+
+    result = verify_signed(rebuilt)
+    assert not result.ok
+    assert any("hash chain" in e or "tamper" in e.lower() for e in result.errors)

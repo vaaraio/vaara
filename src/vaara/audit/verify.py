@@ -52,6 +52,11 @@ class VerifyResult:
     ok: bool
     errors: list[str] = field(default_factory=list)
     manifest: Optional[dict] = None
+    key_lifecycle: list[dict] = field(default_factory=list)
+    """Custodian key-lifecycle records found in the trail (rotations,
+    revocations, additions), in chain order. Informational: surfaced so a
+    reviewer sees the custodian set's history inline. Does not affect ``ok``.
+    """
 
 
 def _require_crypto() -> None:
@@ -432,4 +437,41 @@ def verify_signed(
         except json.JSONDecodeError:
             errors.append("could not parse first/last trail record")
 
-    return VerifyResult(ok=not errors, errors=errors, manifest=manifest)
+    lifecycle = _collect_key_lifecycle(lines)
+
+    return VerifyResult(
+        ok=not errors,
+        errors=errors,
+        manifest=manifest,
+        key_lifecycle=lifecycle,
+    )
+
+
+def _collect_key_lifecycle(lines: list[bytes]) -> list[dict]:
+    """Pull custodian key-lifecycle records out of the trail, in chain order.
+
+    Informational surfacing only (see :class:`VerifyResult.key_lifecycle`);
+    the records are already covered by the hash-chain check, so a tampered
+    lifecycle record fails verification on the chain, not here.
+    """
+    out: list[dict] = []
+    for ln in lines:
+        try:
+            rec = json.loads(ln)
+        except json.JSONDecodeError:
+            continue
+        if rec.get("event_type") != "key_lifecycle":
+            continue
+        data = rec.get("data", {}) or {}
+        out.append(
+            {
+                "timestamp": rec.get("timestamp"),
+                "action": data.get("action"),
+                "fingerprint": data.get("fingerprint"),
+                "threshold_k": data.get("threshold_k"),
+                "signers_n": data.get("signers_n"),
+                "reason": data.get("reason", ""),
+                "actor": data.get("actor", ""),
+            }
+        )
+    return out

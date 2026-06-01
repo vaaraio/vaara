@@ -55,6 +55,7 @@ class EventType(str, Enum):
     OUTCOME_RECORDED = "outcome_recorded"   # Post-execution outcome observed
     POLICY_OVERRIDE = "policy_override"     # Manual override of policy decision
     ANCHOR_GAP = "anchor_gap"               # Auto-anchor attempt failed (fail-open marker)
+    KEY_LIFECYCLE = "key_lifecycle"         # Signing-key custodian rotated/revoked/added
 
 
 # ── Regulatory article mappings ───────────────────────────────────────────
@@ -146,6 +147,18 @@ EU_AI_ACT_MAPPINGS: dict[EventType, list[RegulatoryArticle]] = {
             "Every policy override is recorded as an immutable audit event with hash-chained integrity",
         ),
     ],
+    EventType.KEY_LIFECYCLE: [
+        RegulatoryArticle(
+            RegulatoryDomain.EU_AI_ACT, "Article 15(1)",
+            "High-risk AI systems shall achieve an appropriate level of accuracy, robustness and cybersecurity",
+            "Custodian key rotation/revocation/addition is recorded as a hash-chained, externally time-anchored audit event, so the signing-key control set is itself tamper-evident",
+        ),
+        RegulatoryArticle(
+            RegulatoryDomain.EU_AI_ACT, "Article 12(1)",
+            "Automatic recording of events (logging capabilities)",
+            "Every key-lifecycle change is captured as an immutable audit event pinned in the hash chain and the external time anchor",
+        ),
+    ],
 }
 
 DORA_MAPPINGS: dict[EventType, list[RegulatoryArticle]] = {
@@ -234,6 +247,11 @@ TRANSPARENCY_DEFAULTS: dict[EventType, dict[str, str]] = {
         "system_operation": "time_anchoring",
         "data_usage": "chain_head_digest",
         "decision_making": "n/a",
+    },
+    EventType.KEY_LIFECYCLE: {
+        "system_operation": "key_custodian_management",
+        "data_usage": "custodian_fingerprint+quorum",
+        "decision_making": "operator_action",
     },
 }
 
@@ -422,6 +440,11 @@ class AuditRecord:
             EventType.POLICY_OVERRIDE: (
                 f"{prefix} policy overridden: "
                 f"{_narrative_str(self.data.get('override_reason', 'no reason given'))}"
+            ),
+            EventType.KEY_LIFECYCLE: (
+                f"{prefix} signing-key custodian "
+                f"{_narrative_str(self.data.get('action', 'changed'), max_len=16)} "
+                f"({_narrative_str(self.data.get('fingerprint', 'unknown'), max_len=64)})"
             ),
         }
 
@@ -1037,6 +1060,91 @@ class AuditTrail:
             regulatory_articles=articles,
             tenant_id=self._tenant_for(action_id),
         ))
+
+    _KEY_LIFECYCLE_ACTIONS = ("rotated", "revoked", "added")
+
+    def record_key_lifecycle(
+        self,
+        action: str,
+        fingerprint: str,
+        *,
+        threshold_k: Optional[int] = None,
+        signers_n: Optional[int] = None,
+        reason: str = "",
+        actor: str = "",
+        agent_id: str = "system",
+        tenant_id: str = "",
+    ) -> str:
+        """Record a custodian key-lifecycle event (rotation, revocation, add).
+
+        Written as an ordinary audit record, so it inherits the v0.47 hash
+        chain and the v0.48 external time anchor. That is what makes
+        "revoked before compromise" provable rather than asserted: a
+        ``revoked`` marker anchored before a compromise window pins the
+        revocation in time, and a compromised key can re-sign but cannot
+        re-anchor past chain heads to a time source it does not control.
+        :func:`vaara.audit.verify.verify_signed` surfaces these records so a
+        reviewer sees the custodian set's history inline with the evidence.
+
+        See the "Key lifecycle" section of
+        ``docs/design/threshold-signing-spec.md``.
+
+        Args:
+            action: One of ``"rotated"``, ``"revoked"``, ``"added"``.
+            fingerprint: The affected custodian public-key fingerprint
+                (32-hex-char, as printed by ``vaara keygen`` and written to
+                threshold exports).
+            threshold_k: The quorum in force after this event, if it changed.
+            signers_n: The authorized-set size after this event, if changed.
+            reason: Free-text reason (e.g. ``"scheduled rotation"``,
+                ``"suspected compromise"``).
+            actor: Who performed the action (operator or custodian id).
+            agent_id: Defaults to ``"system"`` — lifecycle events are
+                operational, not agent-initiated.
+            tenant_id: Tenant scope bound into the hash chain.
+
+        Returns:
+            The new record's ``record_id``.
+
+        Raises:
+            ValueError: If ``action`` is not a recognized lifecycle action,
+                or ``fingerprint`` is empty.
+        """
+        if action not in self._KEY_LIFECYCLE_ACTIONS:
+            raise ValueError(
+                "record_key_lifecycle: action must be one of "
+                f"{list(self._KEY_LIFECYCLE_ACTIONS)}, got {action!r}"
+            )
+        if not fingerprint:
+            raise ValueError("record_key_lifecycle: fingerprint is required")
+
+        articles = self._get_regulatory_articles(
+            EventType.KEY_LIFECYCLE, frozenset({RegulatoryDomain.EU_AI_ACT}),
+        )
+        data: dict = {
+            "action": action,
+            "fingerprint": self._cap_record_str(fingerprint, 128),
+            "reason": self._cap_record_str(reason, self._MAX_OVERRIDE_REASON_LEN),
+            "actor": self._cap_record_str(actor, self._MAX_OVERRIDER_LEN),
+        }
+        if threshold_k is not None:
+            data["threshold_k"] = int(threshold_k)
+        if signers_n is not None:
+            data["signers_n"] = int(signers_n)
+
+        record_id = str(uuid.uuid4())
+        self._append(AuditRecord(
+            record_id=record_id,
+            action_id=str(uuid.uuid4()),
+            event_type=EventType.KEY_LIFECYCLE,
+            timestamp=time.time(),
+            agent_id=self._cap_record_str(agent_id, self._MAX_AGENT_ID_LEN),
+            tool_name="key_lifecycle",
+            data=data,
+            regulatory_articles=articles,
+            tenant_id=tenant_id,
+        ))
+        return record_id
 
     # ── Querying ──────────────────────────────────────────────────
 
