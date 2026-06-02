@@ -1,0 +1,7 @@
+{
+  "decision_signature_ok": true,
+  "note": "Check A (shared attestation back-link) passes; Check B fails: the receipt's decisionDigest commits to a different decision than the one presented",
+  "receipt_signature_ok": true,
+  "records_paired": false,
+  "shared_back_link": true
+}

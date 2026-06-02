@@ -6,6 +6,33 @@ and this project follows [Semantic Versioning](https://semver.org/spec/v2.0.0.ht
 
 ## [Unreleased]
 
+## [0.51.0] - 2026-06-02
+
+**Theme: SEP-2828 Check B. A decision and an outcome now pair on two checks, not
+one. Instance binding (the shared attestation back-link) stays the anchor, and
+the outcome record additionally commits to a digest of the exact decision it ran
+under. Instance binding alone could not tell which decision a call answered when
+several shared an attestation, for example an `escalate` and the human verdict
+that superseded it; the content digest closes that gap.**
+
+### Added
+- `outcomeDerived.decisionDigest` on the execution receipt: `sha256:<hex>` over
+  the full signed decision-record wire bytes the outcome was produced under. The
+  field is additive (wire `version` stays `1`); a v0.51 emitter sets it and
+  pairing fails without it.
+- `vaara.attestation.decision.decision_digest`: the Check B digest input.
+- `vaara.attestation.decision.superseding_decision`: resolves the effective
+  decision among records sharing a back-link (latest `decidedAt`, ties broken by
+  lowest lexicographic `issuerAsserted.nonce`, so every verifier agrees with no
+  clock authority).
+- A seventh conformance vector, `substituted_decision_under_shared_attestation`,
+  isolating the case Check A cannot catch, plus the resolved supersession-tie
+  winner. The standard-library walker reproduces both from the wire bytes.
+
+### Changed
+- `records_paired` now requires both Check A (instance anchor) and Check B
+  (outcome-to-decision digest). A receipt with no `decisionDigest` does not pair.
+
 ## [0.50.0] - 2026-06-01
 
 **Theme: the verifiable evidence plane. Trail exports can be threshold-signed so
