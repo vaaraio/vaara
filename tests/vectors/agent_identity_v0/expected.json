@@ -1,0 +1,12 @@
+{
+  "bound": {
+    "bound": true,
+    "keyid": "did:web:agents.example.com:billing#key-2026",
+    "resolved": true
+  },
+  "unbound": {
+    "bound": false,
+    "keyid": null,
+    "resolved": true
+  }
+}
