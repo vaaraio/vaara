@@ -6,6 +6,32 @@ and this project follows [Semantic Versioning](https://semver.org/spec/v2.0.0.ht
 
 ## [Unreleased]
 
+## [0.52.0] - 2026-06-02
+
+**Theme: resolvable agent identity (level 2). A receipt no longer just proves it
+was signed by some key; when its `receiptAsserted.iss` is a `did:web` identity it
+can prove the signing key is one the named agent actually publishes. The check is
+pinned-resolvable: the verifier supplies the DID document, so the property holds
+offline with no network fetch. It composes over the unchanged signature verifier,
+so every existing receipt and vector verifies byte for byte.**
+
+### Added
+- `vaara.attestation.verify_receipt_identity`: confirms a receipt whose
+  `receiptAsserted.iss` is a `did:web` identity was signed by a key listed in the
+  supplied DID document. Runs after, and on top of, ordinary signature
+  verification. `ES256`/`RS256` resolve against the document; `HS256` (symmetric)
+  never does, since a shared secret cannot bind a public identity.
+- `agent_identity_v0` conformance vector family (`bound.json`, `unbound.json`,
+  `expected.json`) plus a Vaara-free independent checker
+  (`_check_independent.py`), so an external party reproduces the bound/unbound
+  verdicts from the committed wire bytes with no Vaara import.
+- Design spec: `docs/design/resolvable-agent-identity-spec.md`.
+
+### Changed
+- Purely additive over 0.51. The wire `version` is unchanged; receipts without a
+  `did:web` issuer verify exactly as before. Level 3 (live HTTPS DID resolution
+  with caching and revocation) is the planned follow-up.
+
 ## [0.51.0] - 2026-06-02
 
 **Theme: SEP-2828 Check B. A decision and an outcome now pair on two checks, not
