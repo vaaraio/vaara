@@ -39,6 +39,11 @@ from vaara.attestation._receipt_emit import (
     emit_receipt,
     verify_receipt_signature,
 )
+from vaara.attestation._receipt_identity import (
+    IdentityResult,
+    did_web_to_url,
+    verify_receipt_identity,
+)
 from vaara.attestation._receipt_types import (
     BackLink,
     ExecutionReceipt,
@@ -73,11 +78,13 @@ __all__ = [
     "BackLink",
     "BackLinkResult",
     "ExecutionReceipt",
+    "IdentityResult",
     "OutcomeDerived",
     "ReceiptAsserted",
     "ReceiptStatus",
     "ResultCommitment",
     "attestation_digest",
+    "did_web_to_url",
     "emit_receipt",
     "load_receipt_context",
     "make_back_link",
@@ -87,5 +94,6 @@ __all__ = [
     "receipt_from_vc",
     "receipt_to_vc",
     "verify_back_link",
+    "verify_receipt_identity",
     "verify_receipt_signature",
 ]
