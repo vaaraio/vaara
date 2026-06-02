@@ -80,11 +80,33 @@ def verify_back_link(record: dict, attestation: dict) -> bool:
     return bl["attestationNonce"] == attestation["issuerAsserted"]["nonce"]
 
 
+def decision_digest(decision: dict) -> str:
+    """sha256 over the full signed decision wire bytes (SEP-2828 Check B)."""
+    return _sha256_hex(_jcs(decision))
+
+
 def records_paired(decision: dict, receipt: dict) -> bool:
+    # Check A: same call instance (shared attestation back-link).
     db, rb = decision["backLink"], receipt["backLink"]
     if not hmac.compare_digest(db["attestationDigest"], rb["attestationDigest"]):
         return False
-    return db["attestationNonce"] == rb["attestationNonce"]
+    if db["attestationNonce"] != rb["attestationNonce"]:
+        return False
+    # Check B: the outcome commits to this decision's digest.
+    bound = receipt["outcomeDerived"].get("decisionDigest")
+    if bound is None:
+        return False
+    return hmac.compare_digest(bound, decision_digest(decision))
+
+
+def superseding_nonce(decisions: list) -> str:
+    """issuerAsserted.nonce of the effective decision: latest decidedAt,
+    tie-broken by lowest lexicographic issuerAsserted.nonce."""
+    latest = max(d["decisionDerived"]["decidedAt"] for d in decisions)
+    tied = [d for d in decisions
+            if d["decisionDerived"]["decidedAt"] == latest]
+    return min(tied, key=lambda d: d["issuerAsserted"]["nonce"])[
+        "issuerAsserted"]["nonce"]
 
 
 def _load(case: Path, name: str):
@@ -94,7 +116,7 @@ def _load(case: Path, name: str):
 
 # Declarative keys carried in expected.json that are documentation, not
 # crypto verdicts; the checker passes them through verbatim.
-_DOC_KEYS = {"outcome_required", "winner", "open_contract", "note"}
+_DOC_KEYS = {"outcome_required", "open_contract", "note"}
 
 
 def _verdicts(case: Path, expected: dict) -> dict:
@@ -116,6 +138,11 @@ def _verdicts(case: Path, expected: dict) -> dict:
             got[key] = verify_back_link(rec, att)
         elif key == "records_paired":
             got[key] = records_paired(dec, rec)
+        elif key == "shared_back_link":
+            got[key] = dec["backLink"] == rec["backLink"]
+        elif key == "winner":
+            got[key] = superseding_nonce([_load(case, "decision_a.json"),
+                                          _load(case, "decision_b.json")])
         elif key == "receipt_present":
             got[key] = rec is not None
         elif key == "both_signatures_ok":

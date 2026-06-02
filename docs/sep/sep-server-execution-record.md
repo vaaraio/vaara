@@ -8,7 +8,7 @@
 - **Status**: Draft
 - **Type**: Standards Track (Extensions Track)
 - **Created**: 2026-05-31
-- **Author(s)**: vaaraio (@vaaraio)
+- **Author(s)**: Henri Sirkkavaara (@vaaraio), Vaara
 - **Sponsor**: None (seeking sponsor)
 - **PR**: https://github.com/modelcontextprotocol/modelcontextprotocol/pull/XXXX
 - **Requires**: SEP-2787 (Tool call attestation)
@@ -198,7 +198,11 @@ only its content.
 
 A `decision` of `escalate` means the call was held for human oversight; the
 outcome record for that call will report `refused` if the human declined, or a
-later decision record MAY supersede it (see Pairing).
+later decision record MAY supersede it (see Pairing). The `decision` enum is
+closed at three values. Host- or framework-specific labels for "ask a human"
+(for example `refer`, or an `AskUser` tool-call interrupt) are not wire values;
+they MUST be recorded as `escalate`. The resolving human verdict is a new
+decision record (`allow` or `block`) that supersedes the `escalate`.
 
 **`issuerAsserted`** is the governing server's signed block:
 
@@ -234,18 +238,32 @@ already shipping as `vaara.attestation.receipt.ExecutionReceipt`.
 | `status`           | string | yes      | One of `executed`, `refused`, `errored`.                                             |
 | `completedAt`      | string | yes      | ISO 8601 UTC completion (or refusal) time.                                           |
 | `resultCommitment` | object | no       | An `ArgsRef` or `ArgsProjection` over the result (executed) or error object (errored). Absent for `refused`, which has no result. RECOMMENDED to use the commitment-only hash-only-identity projection so result payloads, which may contain personal data, are not copied into the record. |
+| `decisionDigest`   | string | yes\*    | `sha256:<hex>` over the JCS-canonical full decision-record wire bytes (signature included) the outcome was produced under. This is the Check B (outcome-to-decision) binding. \*Optional on the wire for backward parsing of pre-v0.51 records, but a v0.51 emitter MUST set it and pairing fails without it (see Pairing). |
 
 ### Pairing
 
-A decision record and an outcome record describe the same governed call when
-both carry the same `backLink` (`attestationDigest` and `attestationNonce`
-equal). A verifier that has both, plus the SEP-2787 attestation, can confirm the
-full chain: the attestation pins the call; the decision record pins the policy
-verdict and risk basis for that call; the outcome record pins what the call did.
-This is instance-binding, not only content-binding: two byte-identical calls
-produce two attestations with distinct nonces and therefore distinct
-`attestationDigest` values, so a decision or outcome record cannot be replayed
-against a different instance of the same call.
+A decision record and an outcome record pair when **both** of the following
+hold:
+
+- **Check A (instance anchor).** Both records carry the same `backLink`
+  (`attestationDigest` and `attestationNonce` equal). This is instance-binding,
+  not only content-binding: two byte-identical calls produce two attestations
+  with distinct nonces and therefore distinct `attestationDigest` values, so a
+  record cannot be replayed against a different instance of the same call. In the
+  no-attestation fallback, the shared `backLink` is over the request envelope
+  instead, and Check A anchors on that.
+- **Check B (outcome-to-decision digest, the normative pairing).** The outcome
+  record's `outcomeDerived.decisionDigest` equals `sha256:<hex>` over the JCS
+  canonical full wire bytes of *this* decision record. Check A alone admits a
+  different decision taken under the same attestation instance (an `escalate`
+  and the human verdict that supersedes it both share the attestation); Check B
+  pins which decision's content the outcome answers. An outcome record without
+  `decisionDigest` does not pair: content binding is mandatory, not best-effort.
+
+A verifier that has both records, plus the SEP-2787 attestation, can then confirm
+the full chain: the attestation pins the call; the decision record pins the
+policy verdict and risk basis; the outcome record pins what the call did and the
+decision it ran under.
 
 For correlation with client-asserted input context (SEP-2817), a server MAY
 include the SEP-2817 `turnId` as an additional, clearly client-asserted field
@@ -256,8 +274,13 @@ this `turnId`, not that the server vouches for it.
 A superseding decision (for example, a human resolving an `escalate`) is recorded
 as a new decision record with the same `backLink` and a later `decidedAt`. The
 record with the latest `decidedAt` for a given `backLink` is the effective
-decision; earlier ones are retained as history. Verifiers MUST NOT treat
-multiple decision records for one `backLink` as a conflict.
+decision; earlier ones are retained as history. When two records for one
+`backLink` carry the **same** `decidedAt`, the tie MUST break deterministically:
+the effective record is the one whose `issuerAsserted.nonce` is lexicographically
+lowest. This gives every verifier the same winner with no clock authority.
+Verifiers MUST NOT treat multiple decision records for one `backLink` as a
+conflict. The outcome record's `decisionDigest` (Check B) identifies which
+decision in this set the call actually ran under.
 
 ### Transport
 
@@ -317,6 +340,7 @@ Outcome record (executed, result committed by digest only):
   "outcomeDerived": {
     "status": "executed",
     "completedAt": "2026-05-31T09:30:02Z",
+    "decisionDigest": "sha256:7d6e5f4a3b2c1d0e9f8a7b6c5d4e3f2a1b0c9d8e7f6a5b4c3d2e1f8f1e2c0a9b",
     "resultCommitment": {
       "projection": "{\"digest\":\"sha256:1b2c3d4e5f6a7b8c9d0e1f2a3b4c5d6e7f8a9b0c1d2e3f4a5b6c7d8e9f0a1b2c\"}",
       "projectionDigest": "sha256:aa11bb22cc33dd44ee55ff66aa77bb88cc99dd00ee11ff22aa33bb44cc55dd66"
@@ -372,13 +396,23 @@ MUST perform, and a conforming implementation MUST pass, the following checks:
 2. Recompute `attestationDigest` from the SEP-2787 attestation wire bytes and
    confirm both records' `backLink.attestationDigest` and
    `backLink.attestationNonce` match it. Reject on mismatch.
-3. Confirm the two records share the same `backLink` (they describe the same
-   call).
-4. If `resultCommitment` is present and the verifier has the result payload,
+3. Confirm the two records share the same `backLink` (Check A: they describe the
+   same call instance). Reject on mismatch.
+4. Recompute `sha256:<hex>` over the JCS-canonical full wire bytes of the
+   decision record and confirm it equals the outcome record's
+   `outcomeDerived.decisionDigest` (Check B: the outcome was produced under this
+   decision). Reject if `decisionDigest` is absent or does not match.
+5. If `resultCommitment` is present and the verifier has the result payload,
    recompute the commitment digest from the runtime result and confirm it
    matches. Reject on mismatch.
-5. Confirm `decisionDerived.decision` is one of `allow`, `block`, `escalate` and
+6. Confirm `decisionDerived.decision` is one of `allow`, `block`, `escalate` and
    `outcomeDerived.status` is one of `executed`, `refused`, `errored`.
+
+When more than one decision record shares a `backLink`, the verifier resolves the
+effective decision by latest `decidedAt`, breaking an exact-`decidedAt` tie by
+lowest lexicographic `issuerAsserted.nonce`. The outcome's `decisionDigest`
+selects which decision in the set the call ran under, which need not be the
+effective one (a call can run under an `escalate` that was later superseded).
 
 ## Rationale
 
@@ -429,6 +463,13 @@ issuer-block shapes, so an existing SEP-2787 verifier extends to these records b
 adding the `decisionDerived` block and the `outcomeDerived.status` enum, with no
 change to the canonicalization or signature code. The records do not alter any
 existing MCP request or response method.
+
+The `outcomeDerived.decisionDigest` field (Check B) is additive: the record
+schema `version` stays `1`, and a parser reads records with or without it. The
+contract change is in the verifier, not the wire format: a conforming verifier
+requires `decisionDigest` for a pair to be valid, so an emitter that wants its
+outcomes to pair MUST set it. Records that only ever assert Check A (instance
+binding) still parse and still verify their signatures and back-links.
 
 ## Security Implications
 
@@ -506,11 +547,15 @@ call and counts emission failures for operator alerting.
 
 - **agent-guard (XuebinMa, Rust).** Models a `Guard` producing an `AuditRecord`
   and an `ExecutionProof`. The two-record decision/outcome split here covers the
-  same ground as `AuditRecord` plus `ExecutionProof`, with the binding made
-  explicit and instance-scoped through the SEP-2787 attestation digest rather
-  than left to a content hash. The instance-binding position was conceded by the
-  agent-guard author in discussion on 2026-05-30 and is adopted here as
-  normative.
+  same ground as `AuditRecord` plus `ExecutionProof`. The two are reconciled by
+  using both: instance binding through the SEP-2787 attestation digest is the
+  anchor (Check A), and the agent-guard author's outcome-to-decision content
+  digest is adopted as the normative pairing key (Check B,
+  `outcomeDerived.decisionDigest`). Instance binding alone cannot say which
+  decision a call ran under when several share an attestation; the content digest
+  alone reintroduces cross-instance replay. Requiring both closes each gap. The
+  instance-binding-as-anchor position was conceded by the agent-guard author on
+  2026-05-30; Check B incorporates the content-digest join the author proposed.
 
 - **Content-addressed receipt identifiers.** Some designs identify a record by a
   content-addressed id of the form `action_ref = sha256(JCS(...))` over a
@@ -518,19 +563,23 @@ call and counts emission failures for operator alerting.
   default join field, because it is content-binding and reintroduces
   cross-instance replay when used as the primary binding. Such a pointer is
   reconcilable as an optional `ArgsRef`-shaped reference (the `ref` carries the id
-  and the `digest` pins it), not as the normative pairing key, which remains the
-  instance-scoped `backLink`.
+  and the `digest` pins it). It is not the join key on its own: pairing requires
+  the instance-scoped `backLink` (Check A) as well as the outcome-to-decision
+  `decisionDigest` (Check B), so a content-addressed id never stands in for
+  instance binding.
 
 ## Reference Implementation
 
-The wire schema in this SEP is the shape shipping in the Vaara MCP proxy
-(v0.48; the receipt library landed in v0.42). Relevant modules:
+The wire schema in this SEP is the shape shipping in the Vaara MCP proxy (the
+receipt library landed in v0.42; the Check B `decisionDigest` binding and the
+supersession tie-break landed in v0.51). Relevant modules:
 
 - `vaara/attestation/_receipt_types.py`: the `ExecutionReceipt` envelope
   (`version`, `alg`, `backLink`, `outcomeDerived`, `receiptAsserted`,
   `signature`), `OutcomeDerived` with `status` constrained to `executed` /
-  `refused` / `errored`, and `BackLink` (`attestationDigest`,
-  `attestationNonce`). This is the outcome record of this SEP, byte for byte.
+  `refused` / `errored` and the optional `decisionDigest` (Check B), and
+  `BackLink` (`attestationDigest`, `attestationNonce`). This is the outcome
+  record of this SEP, byte for byte.
 - `vaara/attestation/_receipt_emit.py`: builds, JCS-canonicalizes (signing input
   excludes `signature`), and signs the outcome record; verifies the signature.
 - `vaara/attestation/_receipt_verifier.py`: `make_back_link` / `verify_back_link`
@@ -538,10 +587,13 @@ The wire schema in this SEP is the shape shipping in the Vaara MCP proxy
   bytes, signature included): the instance-binding join.
 - `vaara/attestation/decision.py`: the decision record of this SEP.
   `DecisionRecord` / `DecisionDerived`, `emit_decision_record`,
-  `verify_decision_signature`, `verify_decision_back_link`, and
-  `records_paired` (the decision-and-outcome join). Reuses the receipt's
-  back-link, the issuer-block layout, and the shared signing stack unchanged,
-  so the decision record adds the `decisionDerived` block and no new crypto.
+  `verify_decision_signature`, `verify_decision_back_link`, `decision_digest`
+  (sha256 over the JCS-canonical full decision wire bytes, the Check B input),
+  `records_paired` (the decision-and-outcome join, enforcing Check A and Check
+  B), and `superseding_decision` (latest `decidedAt`, tie-broken by lowest
+  `issuerAsserted.nonce`). Reuses the receipt's back-link, the issuer-block
+  layout, and the shared signing stack unchanged, so the decision record adds
+  the `decisionDerived` block and no new crypto.
 - `vaara/attestation/_sep2787_types.py` and `_sep2787_canonical.py`: the shared
   commitment shapes (`ArgsRef`, `ArgsProjection`, `make_args_digest`), the
   issuer-block layout, RFC 8785 canonicalization with float rejection, and the
@@ -578,20 +630,24 @@ tolerated internally.
 The Vaara conformance vectors for the SEP-2787 canonicalization and signature
 (`modelcontextprotocol/modelcontextprotocol#2789`) cover the JCS encoding, float
 rejection, and the detached-signature scheme that both records in this SEP reuse.
-A standard-library-only checker (no Vaara import; `cryptography` for the
-asymmetric case) verifies a signed export offline, mirroring the
-`scripts/verify_vaara_trail.py` approach. For Standards Track finalization, this
-SEP will add:
 
-- JCS canonical vectors for the `decisionDerived` block and the
-  `outcomeDerived.status` enum, in the same vector format as #2789.
-- A paired decision-plus-outcome fixture with its SEP-2787 attestation, exercising
-  the full verification algorithm above, including a replay-rejection case
-  (mismatched `backLink`) and a superseding-decision case (two decision records,
-  same `backLink`, distinct `decidedAt`).
-- A `sep-XXXX.yaml` traceability file mapping each MUST / MUST NOT and
-  SHOULD / SHOULD NOT in the Specification to a conformance check ID, as required
-  for Standards Track SEPs reaching Final.
+The decision/outcome pairing vectors are committed at
+`tests/vectors/decision_pairing_v0/` with a standard-library-only checker
+(`_check_independent.py`: `cryptography` and `rfc8785`, no Vaara import) that
+reproduces every verdict from the wire bytes alone. The seven normative cases
+exercise the full verification algorithm above: a valid paired allow/executed, a
+decision-only escalate, the two replay-rejection cases (substituted attestation
+back-link and substituted pairing nonce, both failing Check A), a substituted
+decision under a shared attestation (Check A passes, Check B fails), the
+equal-`decidedAt` supersession tie resolved by lowest `issuerAsserted.nonce`, and
+the no-SEP-2787 fallback request-envelope binding. An independent consumer
+verifier (Rul1an/Assay) reproduces the Check-A subset today and the Check-B and
+supersession cases as it adopts the digest and ordering model.
+
+For Standards Track finalization, this SEP will add a `sep-XXXX.yaml`
+traceability file mapping each MUST / MUST NOT and SHOULD / SHOULD NOT in the
+Specification to a conformance check ID, as required for Standards Track SEPs
+reaching Final.
 
 ## Acknowledgments
 
