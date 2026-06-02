@@ -89,7 +89,8 @@ to return, or returned.
 
 ## Conformance vectors
 
-Pinned fixtures and a stdlib-only walker live in
+Pinned fixtures and a walker (standard library plus `cryptography` and
+`rfc8785`, no Vaara import) live in
 [`tests/vectors/execution_receipt_v0/`](../tests/vectors/execution_receipt_v0/).
 The walker reproduces canonical bytes, signature verification across all
 three algorithms, back-link verification, and result-commitment
