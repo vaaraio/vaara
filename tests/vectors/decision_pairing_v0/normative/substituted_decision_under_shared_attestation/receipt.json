@@ -1,12 +1,12 @@
 {
   "alg": "HS256",
   "backLink": {
-    "attestationDigest": "sha256:a67b27de2cc21ee1ed67a9cc3d72ee27ca3a5450844f5f6b2296552cedc6fe3d",
-    "attestationNonce": "other-attestation-nonce-999"
+    "attestationDigest": "sha256:9429a30b849cdd7a8ed41680a667ef2e6516aa533320a9450eef87d31fdd6a44",
+    "attestationNonce": "fixed-attestation-nonce-000"
   },
   "outcomeDerived": {
     "completedAt": "2026-06-01T10:00:00Z",
-    "decisionDigest": "sha256:5d43e7841ff2a1acb412b7d82a32d3cfcf3f88ba440cb07f40558471d331ee22",
+    "decisionDigest": "sha256:1de259bb17e616f82ddc65624394f8a4f565e769cccb99720cdba912ee74f690",
     "resultCommitment": {
       "projection": "{\"digest\":\"sha256:8b7262647fbf76fb7ae30d664e65069eaffc35aa793718beaee239309c9055cf\"}",
       "projectionDigest": "sha256:ca6005c73a4e80aacec2d23cfa734c18d5c8c303cf2f54e63d7693df474b422b"
@@ -17,10 +17,10 @@
     "alg": "HS256",
     "iat": "2026-06-01T10:00:00Z",
     "iss": "issuer://test",
-    "nonce": "r3",
+    "nonce": "r7",
     "secretVersion": "v1",
     "sub": "agent:reader"
   },
-  "signature": "955f0316a5d39a33e2f8fef26430ee3dccf0ea31cb7b7ff375da270f45429db5",
+  "signature": "ee80cc41a0078771560036aa32ecfaf08d9818e5426379aba72140ab595dae55",
   "version": 1
 }

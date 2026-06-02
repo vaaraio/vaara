@@ -24,10 +24,12 @@ from cryptography.hazmat.primitives.asymmetric import ec, rsa  # noqa: E402
 
 from vaara.attestation.decision import (  # noqa: E402
     DecisionDerived,
+    decision_digest,
     emit_decision_record,
     make_back_link,
     parse_decision_record,
     records_paired,
+    superseding_decision,
     verify_decision_back_link,
     verify_decision_signature,
 )
@@ -201,15 +203,19 @@ def test_wire_round_trip():
     assert verify_decision_back_link(reparsed, attestation=att).ok is True
 
 
-def test_decision_and_outcome_pair_on_shared_attestation():
-    att = _attestation()
-    decision = _emit(att)
-    receipt = emit_receipt(
+def _outcome_receipt(att, decision, *, status="executed", dec_digest=...):
+    """Emit a receipt back-linked to ``att``. ``dec_digest`` defaults to
+    the digest of ``decision`` (Check B satisfied); pass ``None`` to omit
+    it or a string to forge it."""
+    if dec_digest is ...:
+        dec_digest = decision_digest(decision)
+    return emit_receipt(
         back_link=make_back_link(att),
         outcome_derived=OutcomeDerived(
-            status="executed",
+            status=status,
             completed_at="2026-05-31T09:30:02Z",
             result_commitment=make_result_digest({"ok": True}),
+            decision_digest=dec_digest,
         ),
         iss="vaara-proxy://acme-eu",
         sub="tenant:acme/agent:billing-bot",
@@ -217,7 +223,76 @@ def test_decision_and_outcome_pair_on_shared_attestation():
         alg="HS256",
         signing_material=HS_SECRET,
     )
+
+
+def test_decision_and_outcome_pair_on_shared_attestation():
+    att = _attestation()
+    decision = _emit(att)
+    receipt = _outcome_receipt(att, decision)
     assert records_paired(decision, receipt) is True
+
+
+def test_receipt_without_decision_digest_does_not_pair():
+    # Check B is mandatory: shared attestation (Check A) is not enough.
+    att = _attestation()
+    decision = _emit(att)
+    receipt = _outcome_receipt(att, decision, dec_digest=None)
+    assert records_paired(decision, receipt) is False
+
+
+def test_receipt_bound_to_other_decision_does_not_pair():
+    # Same attestation, but the outcome commits to a different decision's
+    # content. Check A passes, Check B rejects.
+    att = _attestation()
+    bound = _emit(att)
+    presented = emit_decision_record(
+        back_link=make_back_link(att),
+        decision_derived=DecisionDerived(
+            decision="block", decided_at="2026-05-31T09:30:01Z"),
+        iss="vaara-proxy://acme-eu",
+        sub="tenant:acme/agent:billing-bot",
+        secret_version="2026-05",
+        alg="HS256",
+        signing_material=HS_SECRET,
+    )
+    receipt = _outcome_receipt(att, bound)  # commits to `bound`, not `presented`
+    assert decision_digest(bound) != decision_digest(presented)
+    assert records_paired(bound, receipt) is True
+    assert records_paired(presented, receipt) is False
+
+
+def test_decision_digest_is_deterministic_and_instance_bound():
+    att = _attestation()
+    d1 = _emit(att)
+    assert decision_digest(d1) == decision_digest(parse_decision_record(d1.to_dict()))
+    assert decision_digest(d1).startswith("sha256:")
+    d2 = _emit(_attestation())  # fresh attestation nonce -> distinct instance
+    assert decision_digest(d1) != decision_digest(d2)
+
+
+def test_superseding_decision_latest_wins_then_lowest_nonce():
+    att = _attestation()
+    bl = make_back_link(att)
+
+    def _dec(decided_at, nonce):
+        return emit_decision_record(
+            back_link=bl,
+            decision_derived=DecisionDerived(
+                decision="allow", decided_at=decided_at),
+            iss="vaara-proxy://acme-eu", sub="tenant:acme/agent:billing-bot",
+            secret_version="2026-05", alg="HS256", signing_material=HS_SECRET,
+            nonce=nonce)
+
+    earlier = _dec("2026-05-31T09:00:00Z", "n-zzz")
+    later = _dec("2026-05-31T10:00:00Z", "n-mmm")
+    assert superseding_decision([earlier, later]) is later
+
+    # Equal decidedAt: lowest lexicographic issuerAsserted.nonce wins.
+    tie_a = _dec("2026-05-31T11:00:00Z", "n-aaa")
+    tie_b = _dec("2026-05-31T11:00:00Z", "n-bbb")
+    assert superseding_decision([tie_b, tie_a]) is tie_a
+    with pytest.raises(ValueError):
+        superseding_decision([])
 
 
 def test_records_from_different_calls_do_not_pair():
