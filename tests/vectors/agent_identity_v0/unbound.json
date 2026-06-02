@@ -1,0 +1,39 @@
+{
+  "didDocument": {
+    "id": "did:web:agents.example.com:billing",
+    "verificationMethod": [
+      {
+        "controller": "did:web:agents.example.com:billing",
+        "id": "did:web:agents.example.com:billing#key-2026",
+        "publicKeyJwk": {
+          "crv": "P-256",
+          "kty": "EC",
+          "x": "AcuJDg5_TIBVj2pPoQS8aRNAZ97wcgHTf1chwfrHA8Q",
+          "y": "4tuSsTfTGUw8fYFageZoFNfqP2zp8dZNzKR22OTG0Us"
+        },
+        "type": "JsonWebKey2020"
+      }
+    ]
+  },
+  "receipt": {
+    "alg": "ES256",
+    "backLink": {
+      "attestationDigest": "sha256:8f4ae37b34b9be4056ce0c243dabb819d225864b4aee04561ee9bdd67b9080dc",
+      "attestationNonce": "att-nonce-fixed-0001"
+    },
+    "outcomeDerived": {
+      "completedAt": "2026-05-29T10:00:00Z",
+      "status": "executed"
+    },
+    "receiptAsserted": {
+      "alg": "ES256",
+      "iat": "2026-05-29T10:00:00Z",
+      "iss": "did:web:agents.example.com:billing",
+      "nonce": "rcpt-nonce-fixed-0001",
+      "secretVersion": "v1",
+      "sub": "did:web:agents.example.com:billing"
+    },
+    "signature": "4a0368fea2011a7a163b0f88a6e6edce9eeadcb0bfa037b350317ca3794044a0b1f3213aaa4a07b2e0ead23d337c762512b53a6cf6737bcce2d1fbdd8dc9201c",
+    "version": 1
+  }
+}
