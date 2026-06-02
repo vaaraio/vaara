@@ -45,7 +45,9 @@ from vaara.attestation._decision_types import (
     decision_record_from_dict as parse_decision_record,
 )
 from vaara.attestation._decision_verifier import (
+    decision_digest,
     records_paired,
+    superseding_decision,
     verify_decision_back_link,
 )
 from vaara.attestation._receipt_types import BackLink
@@ -63,10 +65,12 @@ __all__ = [
     "DecisionVerdict",
     "IssuerAsserted",
     "attestation_digest",
+    "decision_digest",
     "emit_decision_record",
     "make_back_link",
     "parse_decision_record",
     "records_paired",
+    "superseding_decision",
     "verify_decision_back_link",
     "verify_decision_signature",
 ]

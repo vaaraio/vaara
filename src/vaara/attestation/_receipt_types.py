@@ -99,11 +99,20 @@ class OutcomeDerived:
     is optional: a refused call has no result, so the commitment is
     absent. An executed or errored call commits to the result or the
     error object respectively.
+
+    ``decision_digest`` is the SEP-2828 Check B (outcome-to-decision)
+    binding: ``sha256:<hex>`` over the full signed decision-record wire
+    bytes the outcome was produced under. It is optional on the type so
+    pre-v0.51 receipts and the no-attestation fallback still parse, but
+    v0.51 emitters MUST set it and pairing (``records_paired``) fails
+    without it. Where ``backLink`` pins the call instance (Check A), this
+    pins which decision's content the outcome answers.
     """
 
     status: ReceiptStatus
     completed_at: str
     result_commitment: Optional[ResultCommitment] = None
+    decision_digest: Optional[str] = None
 
 
 @dataclass(frozen=True)
@@ -159,6 +168,8 @@ def outcome_to_dict(od: OutcomeDerived) -> dict[str, Any]:
     }
     if od.result_commitment is not None:
         out["resultCommitment"] = args_to_dict(od.result_commitment)
+    if od.decision_digest is not None:
+        out["decisionDigest"] = od.decision_digest
     return out
 
 
@@ -203,10 +214,16 @@ def outcome_from_dict(d: dict[str, Any]) -> OutcomeDerived:
         if "resultCommitment" in d
         else None
     )
+    decision_digest = d.get("decisionDigest")
+    if decision_digest is not None and not decision_digest.startswith("sha256:"):
+        raise AttestationError(
+            "outcomeDerived.decisionDigest MUST be a 'sha256:' digest"
+        )
     return OutcomeDerived(
         status=d["status"],
         completed_at=d["completedAt"],
         result_commitment=commitment,
+        decision_digest=decision_digest,
     )
 
 
