@@ -41,6 +41,13 @@ site.py.live
 tools/
 keys/
 
+# ...but the conformance-vector keys MUST ship so an independent party can
+# verify the published fixtures from a clean checkout. Publish the public
+# keys + the test-only HMAC secret used to sign the vectors; keep private
+# signing keys out.
+!tests/vectors/*/keys/
+tests/vectors/*/keys/*_private.pem
+
 # Bench output (PAIR runs, dist-shift, vLLM logs). Reproducible by rerun.
 tests/adversarial/v031/
 .parachute/
