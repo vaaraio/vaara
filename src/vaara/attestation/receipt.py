@@ -41,6 +41,7 @@ from vaara.attestation._bundle import (
     LensResult,
     verify_evidence_bundle,
 )
+from vaara.attestation._bundle_io import evidence_bundle_from_json
 from vaara.attestation._receipt_emit import (
     emit_receipt,
     verify_receipt_signature,
@@ -120,6 +121,7 @@ __all__ = [
     "check_receipt_revocation",
     "did_web_to_url",
     "emit_receipt",
+    "evidence_bundle_from_json",
     "https_fetch",
     "load_receipt_context",
     "make_back_link",
