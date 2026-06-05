@@ -1,0 +1,28 @@
+# Append this snippet under the top-level `extensions:` key in
+# ~/.config/goose/config.yaml (macOS/Linux) or
+# %APPDATA%\Block\goose\config\config.yaml (Windows).
+#
+# Replace /path/to/github-mcp-server with the path to your upstream MCP
+# binary, and /path/to/github_audit.db with the audit database location
+# you want.
+
+extensions:
+  github-via-vaara:
+    enabled: true
+    name: "github-via-vaara"
+    description: "GitHub MCP server with Vaara runtime governance proxy"
+    type: "stdio"
+    cmd: "python"
+    args:
+      - "-m"
+      - "vaara.integrations.mcp_proxy"
+      - "--upstream"
+      - "/path/to/github-mcp-server"
+      - "--upstream-arg"
+      - "stdio"
+      - "--db"
+      - "/path/to/github_audit.db"
+    timeout: 300
+    env_keys:
+      - "GITHUB_PERSONAL_ACCESS_TOKEN"
+    envs: {}

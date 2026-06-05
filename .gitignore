@@ -6,6 +6,7 @@ dist/
 build/
 *.egg
 .coverage
+*.bak
 *.db
 # SQLite sidecar files (WAL mode) — left behind by the TS client test harness
 # and CLI invocations; never part of the repo.
@@ -81,7 +82,24 @@ claude-code-audit.db
 .gen_evidence_pair.py
 .tmp_*.py
 
+# Local marketing site, generated runtime output, bench traces, local MCP
+# config — all reproducible or machine-local, never part of the repo.
+website/
+receipts/
+tests/adversarial/traces/
+.mcp.json
+/package-lock.json
+# Empty harness/sandbox bind-mount, not a real submodule manifest
+.gitmodules
+
+# Scratch PR/comment/thread drafts and one-off HTML exports — never publish
+.pr_*_body.md
+.pr*_thread.txt
+.mcp_*_comment.md
+.vaara_*.html
+
 # Stray shell/editor env dotfiles (not part of the repo)
+.vscode
 .bashrc
 .bash_profile
 .zshrc
