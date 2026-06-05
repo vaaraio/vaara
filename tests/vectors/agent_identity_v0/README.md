@@ -1,7 +1,7 @@
 # agent_identity_v0 conformance vectors
 
-Resolvable agent identity (did:web) for execution receipts, level-2
-pinned-resolvable verification. See
+Resolvable agent identity (did:web) for execution receipts: level-2
+pinned-resolvable verification plus the level-3 revocation-in-time rule. See
 `docs/design/resolvable-agent-identity-spec.md`.
 
 A receipt names its issuer in `receiptAsserted.iss`. When that value is a
@@ -14,12 +14,21 @@ call.
 ## Cases
 
 - `bound.json`: an ES256 receipt whose `iss` is `did:web:agents.example.com:billing`,
-  plus a DID document that lists the signing key. Expected: `resolved` and `bound`.
+  plus a DID document that lists the signing key. Expected: `resolved`,
+  `bound`, `trusted`.
 - `unbound.json`: the same receipt against a DID document that lists a
-  different key. Expected: `resolved`, not `bound` (the signature matches no
-  key the document publishes).
+  different key. Expected: `resolved`, not `bound`, not `trusted` (the
+  signature matches no key the document publishes).
+- `revoked.json`: the same receipt against a document that lists the signing
+  key but marks it `revoked` before the receipt's `iat`. Expected:
+  `resolved` and `bound` (the signature still matches the key) but `revoked`
+  and not `trusted`. A key revoked at or before issuance does not yield a
+  trusted verdict; one revoked afterwards still would, because revocation is
+  not retroactive. The comparison is purely the receipt `iat` against the
+  method `revoked` instant, so it reproduces offline from the captured
+  document.
 - `expected.json`: the verdict each case must produce
-  (`resolved`, `bound`, `keyid`).
+  (`resolved`, `bound`, `keyid`, `revoked`, `trusted`).
 
 The existing `decision_pairing_v0` vectors are unaffected: this family is
 additive, the receipt envelope is unchanged, and an opaque-string `iss` is

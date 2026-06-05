@@ -2,10 +2,12 @@
 """Independent conformance checker for the agent_identity_v0 vectors.
 
 Imports only the standard library plus ``cryptography`` and ``rfc8785``.
-It does not import Vaara. For each committed case it reproduces level-2
-pinned-resolvable identity verification: confirm the receipt's did:web
-``iss`` matches the DID document id, then verify the ES256 receipt
-signature against a verification key the document lists. Verdicts are
+It does not import Vaara. For each committed case it reproduces resolvable
+identity verification: confirm the receipt's did:web ``iss`` matches the DID
+document id, verify the ES256 receipt signature against a verification key
+the document lists (level 2), then apply the level-3 revocation-in-time
+rule: a key marked ``revoked`` at or before the receipt's ``iat`` does not
+yield a trusted verdict even when the signature matches. Verdicts are
 compared against ``expected.json``.
 
 A second implementation that can run this file (or reproduce its logic)
@@ -19,6 +21,7 @@ from __future__ import annotations
 import base64
 import json
 import sys
+from datetime import datetime, timezone
 from pathlib import Path
 
 import rfc8785
@@ -62,14 +65,30 @@ def _es256_verifies(payload: bytes, signature_hex: str, public_key) -> bool:
         return False
 
 
+def _parse_iso(value):
+    if not isinstance(value, str) or not value:
+        return None
+    text = value[:-1] + "+00:00" if value.endswith("Z") else value
+    try:
+        parsed = datetime.fromisoformat(text)
+    except ValueError:
+        return None
+    return parsed.replace(tzinfo=timezone.utc) if parsed.tzinfo is None else parsed
+
+
+def _miss(resolved: bool) -> dict:
+    return {"resolved": resolved, "bound": False, "keyid": None,
+            "revoked": False, "trusted": False}
+
+
 def _evaluate(case: dict) -> dict:
     receipt = case["receipt"]
     doc = case["didDocument"]
     iss = receipt["receiptAsserted"]["iss"]
     if not iss.startswith("did:web:") or doc.get("id") != iss:
-        return {"resolved": False, "bound": False, "keyid": None}
+        return _miss(False)
     if receipt["alg"] != "ES256":
-        return {"resolved": False, "bound": False, "keyid": None}
+        return _miss(False)
 
     payload = rfc8785.dumps({k: receipt[k] for k in _RECEIPT_BLOCKS})
     for method in doc.get("verificationMethod", []):
@@ -77,14 +96,25 @@ def _evaluate(case: dict) -> dict:
         if key is None:
             continue
         if _es256_verifies(payload, receipt["signature"], key):
-            return {"resolved": True, "bound": True, "keyid": method.get("id")}
-    return {"resolved": True, "bound": False, "keyid": None}
+            # Bound. Now apply revocation-in-time and deactivation.
+            revoked = False
+            revoked_at = _parse_iso(method.get("revoked"))
+            issued_at = _parse_iso(receipt["receiptAsserted"]["iat"])
+            if method.get("revoked") is not None:
+                revoked = (
+                    revoked_at is None or issued_at is None or revoked_at <= issued_at
+                )
+            deactivated = doc.get("deactivated") is True
+            trusted = not revoked and not deactivated
+            return {"resolved": True, "bound": True, "keyid": method.get("id"),
+                    "revoked": revoked, "trusted": trusted}
+    return _miss(True)
 
 
 def main() -> int:
     expected = json.loads((HERE / "expected.json").read_text())
     failures = []
-    for name in ("bound", "unbound"):
+    for name in ("bound", "unbound", "revoked"):
         case = json.loads((HERE / f"{name}.json").read_text())
         got = _evaluate(case)
         want = expected[name]

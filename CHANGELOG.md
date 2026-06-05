@@ -6,6 +6,41 @@ and this project follows [Semantic Versioning](https://semver.org/spec/v2.0.0.ht
 
 ## [Unreleased]
 
+## [0.53.0] - 2026-06-03
+
+**Theme: resolvable agent identity, level 3. Level 2 confirmed a receipt was
+signed by a key a DID document lists, given the document. Level 3 fetches that
+document over HTTPS at audit time, records the resolution so it is
+reproducible, and adds revocation in time: a signing key revoked at or before
+the receipt was issued no longer yields a trusted verdict, even when the
+signature still verifies. A key revoked afterwards still binds, because
+revocation is not retroactive.**
+
+### Added
+- `vaara.attestation.verify_receipt_identity_live`: level-3 check that
+  resolves a `did:web` issuer over HTTPS (or from cache), runs the level-2
+  binding, then applies deactivation and revocation-in-time. Returns
+  `LiveIdentityResult` with a single `trusted` verdict plus `issued_at` and
+  `revoked_at`, so a verifier holding a stronger time anchor than the
+  self-asserted `iat` (the audit-trail hash chain) can re-decide.
+- `ResolutionMeta`: an auditable record of each resolve (`did`, `url`,
+  `fetched_at`, `document_digest` over the exact bytes, `from_cache`).
+- `DidDocumentCache`: in-memory TTL cache keyed by DID, caller-supplied clock
+  so it is deterministic under test.
+- `https_fetch`: the default size-capped, HTTPS-only DID-document fetcher.
+  Redirects are refused (an SSRF vector); deployers inject their own fetcher
+  for allowlisting, pinning, or proxy egress, or to verify offline against a
+  captured document.
+- A third `agent_identity_v0` conformance vector, `revoked.json` (bound but
+  not trusted, key revoked before issuance), with the Vaara-free independent
+  checker extended to reproduce the revocation verdict offline. `expected.json`
+  now carries `revoked` and `trusted` per case.
+
+### Changed
+- Purely additive over 0.52. The receipt envelope, canonicalization, and the
+  level-2 verifier are unchanged; existing receipts and the `bound`/`unbound`
+  vectors verify exactly as before.
+
 ## [0.52.0] - 2026-06-02
 
 **Theme: resolvable agent identity (level 2). A receipt no longer just proves it
