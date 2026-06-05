@@ -2,11 +2,22 @@
   "bound": {
     "bound": true,
     "keyid": "did:web:agents.example.com:billing#key-2026",
-    "resolved": true
+    "resolved": true,
+    "revoked": false,
+    "trusted": true
+  },
+  "revoked": {
+    "bound": true,
+    "keyid": "did:web:agents.example.com:billing#key-2026",
+    "resolved": true,
+    "revoked": true,
+    "trusted": false
   },
   "unbound": {
     "bound": false,
     "keyid": null,
-    "resolved": true
+    "resolved": true,
+    "revoked": false,
+    "trusted": false
   }
 }

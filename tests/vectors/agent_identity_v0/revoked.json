@@ -8,9 +8,10 @@
         "publicKeyJwk": {
           "crv": "P-256",
           "kty": "EC",
-          "x": "AcuJDg5_TIBVj2pPoQS8aRNAZ97wcgHTf1chwfrHA8Q",
-          "y": "4tuSsTfTGUw8fYFageZoFNfqP2zp8dZNzKR22OTG0Us"
+          "x": "B2Bb3IA08MGNseH1UseCTbv_Q-J10isZuVS7galZBEU",
+          "y": "pF0OwY17c4EPwvJJYAjp6z9tVfFo37FGfhFrwVZS_iM"
         },
+        "revoked": "2026-05-29T09:30:00Z",
         "type": "JsonWebKey2020"
       }
     ]
