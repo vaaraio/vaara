@@ -1,0 +1,740 @@
+{
+  "cases": [
+    {
+      "bundle": {
+        "attestation": {
+          "alg": "HS256",
+          "issuerAsserted": {
+            "alg": "HS256",
+            "expSeconds": 300,
+            "iat": "2026-05-29T09:59:59Z",
+            "iss": "issuer://test",
+            "nonce": "att-nonce-fixed-0001",
+            "secretVersion": "v1",
+            "sub": "agent:billing"
+          },
+          "payloadDerived": {
+            "toolCalls": [
+              {
+                "args": {
+                  "projection": "{\"digest\":\"sha256:c6a6831ac1abd02d15c339d34514c7a2171bdf61f88762075e8af6ddb70764c8\"}",
+                  "projectionDigest": "sha256:af9b301c121c56ef3b87557824487e0e525ab877300ee9297337fb3f5e2098c8"
+                },
+                "name": "charge_card",
+                "serverFingerprint": "sha256:1111111111111111111111111111111111111111111111111111111111111111"
+              }
+            ]
+          },
+          "plannerDeclared": {
+            "intent": "settle invoice"
+          },
+          "signature": "a56a65957ed4df74e3041255cfef3fe47c706274f99ec9e0f5c66c4f783a18bd",
+          "version": 1
+        },
+        "consistency": {
+          "first_root_hex": "498b70582ec73c6934935c91370c03b4cd9e2e75d9db002d6268c502139c20ac",
+          "first_size": 4,
+          "hashes_hex": [
+            "987403f55e274e1a4ba8c147684044d4bf300f240bcc2eede881f524a8060c97"
+          ],
+          "second_root_hex": "ac3012ef2f6230b062e1ea53918b5c35419cf5347a249a4788b259a2fa168cdb",
+          "second_size": 6
+        },
+        "did_document": {
+          "id": "did:web:agents.example.com:billing",
+          "verificationMethod": [
+            {
+              "controller": "did:web:agents.example.com:billing",
+              "id": "did:web:agents.example.com:billing#key-2026",
+              "publicKeyJwk": {
+                "crv": "P-256",
+                "kty": "EC",
+                "x": "B2Bb3IA08MGNseH1UseCTbv_Q-J10isZuVS7galZBEU",
+                "y": "pF0OwY17c4EPwvJJYAjp6z9tVfFo37FGfhFrwVZS_iM"
+              },
+              "type": "JsonWebKey2020"
+            }
+          ]
+        },
+        "expected_keyid": "did:web:agents.example.com:billing#key-2026",
+        "inclusion": {
+          "log_index": 2,
+          "root_hex": "498b70582ec73c6934935c91370c03b4cd9e2e75d9db002d6268c502139c20ac",
+          "siblings_hex": [
+            "851bfadbc6cacd2467c107c9f4c73dd930d7f0a59726b1cf869f89a342eae1ef",
+            "4b87bb07c29e106d681ab06ae97cf1b29e2ede0247b562f21a142813a3ae4c09"
+          ],
+          "tree_size": 4
+        },
+        "receipt": {
+          "alg": "ES256",
+          "backLink": {
+            "attestationDigest": "sha256:8f4ae37b34b9be4056ce0c243dabb819d225864b4aee04561ee9bdd67b9080dc",
+            "attestationNonce": "att-nonce-fixed-0001"
+          },
+          "outcomeDerived": {
+            "completedAt": "2026-05-29T10:00:00Z",
+            "status": "executed"
+          },
+          "receiptAsserted": {
+            "alg": "ES256",
+            "iat": "2026-05-29T10:00:00Z",
+            "iss": "did:web:agents.example.com:billing",
+            "nonce": "rcpt-nonce-fixed-0001",
+            "secretVersion": "v1",
+            "sub": "did:web:agents.example.com:billing"
+          },
+          "signature": "862d6ebc949c323cdd695290ee88818390ee49880b37b012c923e3ea823fa164720f19683959c633d614d87b84d93e42bdf17c0d0ff2765f35570d93f813fadb",
+          "version": 1
+        },
+        "registry": {
+          "entries": [],
+          "version": 1
+        }
+      },
+      "expected": {
+        "authenticity_established": true,
+        "lenses": {
+          "back_link": {
+            "applicable": true,
+            "ok": true
+          },
+          "consistency": {
+            "applicable": true,
+            "ok": true
+          },
+          "identity": {
+            "applicable": true,
+            "ok": true
+          },
+          "inclusion": {
+            "applicable": true,
+            "ok": true
+          },
+          "revocation": {
+            "applicable": true,
+            "ok": true
+          },
+          "signature": {
+            "applicable": false,
+            "ok": false
+          }
+        },
+        "ok": true
+      },
+      "name": "all_lenses_pass"
+    },
+    {
+      "bundle": {
+        "attestation": {
+          "alg": "HS256",
+          "issuerAsserted": {
+            "alg": "HS256",
+            "expSeconds": 300,
+            "iat": "2026-05-29T09:59:59Z",
+            "iss": "issuer://test",
+            "nonce": "att-nonce-fixed-0001",
+            "secretVersion": "v1",
+            "sub": "agent:billing"
+          },
+          "payloadDerived": {
+            "toolCalls": [
+              {
+                "args": {
+                  "projection": "{\"digest\":\"sha256:c6a6831ac1abd02d15c339d34514c7a2171bdf61f88762075e8af6ddb70764c8\"}",
+                  "projectionDigest": "sha256:af9b301c121c56ef3b87557824487e0e525ab877300ee9297337fb3f5e2098c8"
+                },
+                "name": "charge_card",
+                "serverFingerprint": "sha256:1111111111111111111111111111111111111111111111111111111111111111"
+              }
+            ]
+          },
+          "plannerDeclared": {
+            "intent": "settle invoice"
+          },
+          "signature": "a56a65957ed4df74e3041255cfef3fe47c706274f99ec9e0f5c66c4f783a18bd",
+          "version": 1
+        },
+        "did_document": {
+          "id": "did:web:agents.example.com:billing",
+          "verificationMethod": [
+            {
+              "controller": "did:web:agents.example.com:billing",
+              "id": "did:web:agents.example.com:billing#key-2026",
+              "publicKeyJwk": {
+                "crv": "P-256",
+                "kty": "EC",
+                "x": "B2Bb3IA08MGNseH1UseCTbv_Q-J10isZuVS7galZBEU",
+                "y": "pF0OwY17c4EPwvJJYAjp6z9tVfFo37FGfhFrwVZS_iM"
+              },
+              "type": "JsonWebKey2020"
+            }
+          ]
+        },
+        "expected_keyid": "did:web:agents.example.com:billing#key-2026",
+        "inclusion": {
+          "log_index": 2,
+          "root_hex": "498b70582ec73c6934935c91370c03b4cd9e2e75d9db002d6268c502139c20ac",
+          "siblings_hex": [
+            "851bfadbc6cacd2467c107c9f4c73dd930d7f0a59726b1cf869f89a342eae1ef",
+            "4b87bb07c29e106d681ab06ae97cf1b29e2ede0247b562f21a142813a3ae4c09"
+          ],
+          "tree_size": 4
+        },
+        "receipt": {
+          "alg": "ES256",
+          "backLink": {
+            "attestationDigest": "sha256:8f4ae37b34b9be4056ce0c243dabb819d225864b4aee04561ee9bdd67b9080dc",
+            "attestationNonce": "att-nonce-fixed-0001"
+          },
+          "outcomeDerived": {
+            "completedAt": "2026-05-29T10:00:00Z",
+            "status": "executed"
+          },
+          "receiptAsserted": {
+            "alg": "ES256",
+            "iat": "2026-05-29T10:00:00Z",
+            "iss": "did:web:agents.example.com:billing",
+            "nonce": "rcpt-nonce-fixed-0001",
+            "secretVersion": "v1",
+            "sub": "did:web:agents.example.com:billing"
+          },
+          "signature": "862d6ebc949c323cdd695290ee88818390ee49880b37b012c923e3ea823fa164720f19683959c633d614d87b84d93e42bdf17c0d0ff2765f35570d93f813fadb",
+          "version": 1
+        },
+        "registry": {
+          "entries": [
+            {
+              "revoked_at": "2026-05-29T09:30:00Z",
+              "scope": "key",
+              "subject": "did:web:agents.example.com:billing#key-2026"
+            }
+          ],
+          "version": 1
+        }
+      },
+      "expected": {
+        "authenticity_established": true,
+        "lenses": {
+          "back_link": {
+            "applicable": true,
+            "ok": true
+          },
+          "consistency": {
+            "applicable": false,
+            "ok": false
+          },
+          "identity": {
+            "applicable": true,
+            "ok": true
+          },
+          "inclusion": {
+            "applicable": true,
+            "ok": true
+          },
+          "revocation": {
+            "applicable": true,
+            "ok": false
+          },
+          "signature": {
+            "applicable": false,
+            "ok": false
+          }
+        },
+        "ok": false
+      },
+      "name": "revoked_in_time"
+    },
+    {
+      "bundle": {
+        "attestation": {
+          "alg": "HS256",
+          "issuerAsserted": {
+            "alg": "HS256",
+            "expSeconds": 300,
+            "iat": "2026-05-29T09:59:59Z",
+            "iss": "issuer://test",
+            "nonce": "att-nonce-fixed-0001",
+            "secretVersion": "v1",
+            "sub": "agent:billing"
+          },
+          "payloadDerived": {
+            "toolCalls": [
+              {
+                "args": {
+                  "projection": "{\"digest\":\"sha256:c6a6831ac1abd02d15c339d34514c7a2171bdf61f88762075e8af6ddb70764c8\"}",
+                  "projectionDigest": "sha256:af9b301c121c56ef3b87557824487e0e525ab877300ee9297337fb3f5e2098c8"
+                },
+                "name": "charge_card",
+                "serverFingerprint": "sha256:1111111111111111111111111111111111111111111111111111111111111111"
+              }
+            ]
+          },
+          "plannerDeclared": {
+            "intent": "settle invoice"
+          },
+          "signature": "a56a65957ed4df74e3041255cfef3fe47c706274f99ec9e0f5c66c4f783a18bd",
+          "version": 1
+        },
+        "did_document": {
+          "id": "did:web:agents.example.com:billing",
+          "verificationMethod": [
+            {
+              "controller": "did:web:agents.example.com:billing",
+              "id": "did:web:agents.example.com:billing#key-2026",
+              "publicKeyJwk": {
+                "crv": "P-256",
+                "kty": "EC",
+                "x": "B2Bb3IA08MGNseH1UseCTbv_Q-J10isZuVS7galZBEU",
+                "y": "pF0OwY17c4EPwvJJYAjp6z9tVfFo37FGfhFrwVZS_iM"
+              },
+              "type": "JsonWebKey2020"
+            }
+          ]
+        },
+        "inclusion": {
+          "log_index": 2,
+          "root_hex": "b6748fa7d138c396cb6ca36ec8f3fc4b3261d18a2624ffd29d973afdec63df53",
+          "siblings_hex": [
+            "851bfadbc6cacd2467c107c9f4c73dd930d7f0a59726b1cf869f89a342eae1ef",
+            "4b87bb07c29e106d681ab06ae97cf1b29e2ede0247b562f21a142813a3ae4c09"
+          ],
+          "tree_size": 4
+        },
+        "receipt": {
+          "alg": "ES256",
+          "backLink": {
+            "attestationDigest": "sha256:8f4ae37b34b9be4056ce0c243dabb819d225864b4aee04561ee9bdd67b9080dc",
+            "attestationNonce": "att-nonce-fixed-0001"
+          },
+          "outcomeDerived": {
+            "completedAt": "2026-05-29T10:00:00Z",
+            "status": "executed"
+          },
+          "receiptAsserted": {
+            "alg": "ES256",
+            "iat": "2026-05-29T10:00:00Z",
+            "iss": "did:web:agents.example.com:billing",
+            "nonce": "rcpt-nonce-fixed-0001",
+            "secretVersion": "v1",
+            "sub": "did:web:agents.example.com:billing"
+          },
+          "signature": "862d6ebc949c323cdd695290ee88818390ee49880b37b012c923e3ea823fa164720f19683959c633d614d87b84d93e42bdf17c0d0ff2765f35570d93f813fadb",
+          "version": 1
+        },
+        "registry": {
+          "entries": [],
+          "version": 1
+        }
+      },
+      "expected": {
+        "authenticity_established": true,
+        "lenses": {
+          "back_link": {
+            "applicable": true,
+            "ok": true
+          },
+          "consistency": {
+            "applicable": false,
+            "ok": false
+          },
+          "identity": {
+            "applicable": true,
+            "ok": true
+          },
+          "inclusion": {
+            "applicable": true,
+            "ok": false
+          },
+          "revocation": {
+            "applicable": true,
+            "ok": true
+          },
+          "signature": {
+            "applicable": false,
+            "ok": false
+          }
+        },
+        "ok": false
+      },
+      "name": "tampered_inclusion"
+    },
+    {
+      "bundle": {
+        "consistency": {
+          "first_root_hex": "498b70582ec73c6934935c91370c03b4cd9e2e75d9db002d6268c502139c20ac",
+          "first_size": 4,
+          "hashes_hex": [
+            "987403f55e274e1a4ba8c147684044d4bf300f240bcc2eede881f524a8060c97"
+          ],
+          "second_root_hex": "53cfed10d09dcf4f9d1e15ac6e74a3cabe630acb85db65b8774da65d05e97324",
+          "second_size": 6
+        },
+        "did_document": {
+          "id": "did:web:agents.example.com:billing",
+          "verificationMethod": [
+            {
+              "controller": "did:web:agents.example.com:billing",
+              "id": "did:web:agents.example.com:billing#key-2026",
+              "publicKeyJwk": {
+                "crv": "P-256",
+                "kty": "EC",
+                "x": "B2Bb3IA08MGNseH1UseCTbv_Q-J10isZuVS7galZBEU",
+                "y": "pF0OwY17c4EPwvJJYAjp6z9tVfFo37FGfhFrwVZS_iM"
+              },
+              "type": "JsonWebKey2020"
+            }
+          ]
+        },
+        "receipt": {
+          "alg": "ES256",
+          "backLink": {
+            "attestationDigest": "sha256:8f4ae37b34b9be4056ce0c243dabb819d225864b4aee04561ee9bdd67b9080dc",
+            "attestationNonce": "att-nonce-fixed-0001"
+          },
+          "outcomeDerived": {
+            "completedAt": "2026-05-29T10:00:00Z",
+            "status": "executed"
+          },
+          "receiptAsserted": {
+            "alg": "ES256",
+            "iat": "2026-05-29T10:00:00Z",
+            "iss": "did:web:agents.example.com:billing",
+            "nonce": "rcpt-nonce-fixed-0001",
+            "secretVersion": "v1",
+            "sub": "did:web:agents.example.com:billing"
+          },
+          "signature": "862d6ebc949c323cdd695290ee88818390ee49880b37b012c923e3ea823fa164720f19683959c633d614d87b84d93e42bdf17c0d0ff2765f35570d93f813fadb",
+          "version": 1
+        }
+      },
+      "expected": {
+        "authenticity_established": true,
+        "lenses": {
+          "back_link": {
+            "applicable": false,
+            "ok": false
+          },
+          "consistency": {
+            "applicable": true,
+            "ok": false
+          },
+          "identity": {
+            "applicable": true,
+            "ok": true
+          },
+          "inclusion": {
+            "applicable": false,
+            "ok": false
+          },
+          "revocation": {
+            "applicable": false,
+            "ok": false
+          },
+          "signature": {
+            "applicable": false,
+            "ok": false
+          }
+        },
+        "ok": false
+      },
+      "name": "forked_consistency"
+    },
+    {
+      "bundle": {
+        "attestation": {
+          "alg": "HS256",
+          "issuerAsserted": {
+            "alg": "HS256",
+            "expSeconds": 300,
+            "iat": "2026-05-29T09:59:59Z",
+            "iss": "issuer://test",
+            "nonce": "att-nonce-other-0002",
+            "secretVersion": "v1",
+            "sub": "agent:billing"
+          },
+          "payloadDerived": {
+            "toolCalls": [
+              {
+                "args": {
+                  "projection": "{\"digest\":\"sha256:2166059e526b50f65c44d4c4ce2a08b79bab73530cbe45ea35763397295c5239\"}",
+                  "projectionDigest": "sha256:3c7533cb20f55563bcb6d3fa2f15460290493ea13bd47880379e74acf8609f60"
+                },
+                "name": "charge_card",
+                "serverFingerprint": "sha256:1111111111111111111111111111111111111111111111111111111111111111"
+              }
+            ]
+          },
+          "plannerDeclared": {
+            "intent": "buy something else"
+          },
+          "signature": "5fcbf30de8243d9289dc71e9ca569d9bda184c7b4e4254196186a09c4689c292",
+          "version": 1
+        },
+        "did_document": {
+          "id": "did:web:agents.example.com:billing",
+          "verificationMethod": [
+            {
+              "controller": "did:web:agents.example.com:billing",
+              "id": "did:web:agents.example.com:billing#key-2026",
+              "publicKeyJwk": {
+                "crv": "P-256",
+                "kty": "EC",
+                "x": "B2Bb3IA08MGNseH1UseCTbv_Q-J10isZuVS7galZBEU",
+                "y": "pF0OwY17c4EPwvJJYAjp6z9tVfFo37FGfhFrwVZS_iM"
+              },
+              "type": "JsonWebKey2020"
+            }
+          ]
+        },
+        "receipt": {
+          "alg": "ES256",
+          "backLink": {
+            "attestationDigest": "sha256:8f4ae37b34b9be4056ce0c243dabb819d225864b4aee04561ee9bdd67b9080dc",
+            "attestationNonce": "att-nonce-fixed-0001"
+          },
+          "outcomeDerived": {
+            "completedAt": "2026-05-29T10:00:00Z",
+            "status": "executed"
+          },
+          "receiptAsserted": {
+            "alg": "ES256",
+            "iat": "2026-05-29T10:00:00Z",
+            "iss": "did:web:agents.example.com:billing",
+            "nonce": "rcpt-nonce-fixed-0001",
+            "secretVersion": "v1",
+            "sub": "did:web:agents.example.com:billing"
+          },
+          "signature": "862d6ebc949c323cdd695290ee88818390ee49880b37b012c923e3ea823fa164720f19683959c633d614d87b84d93e42bdf17c0d0ff2765f35570d93f813fadb",
+          "version": 1
+        }
+      },
+      "expected": {
+        "authenticity_established": true,
+        "lenses": {
+          "back_link": {
+            "applicable": true,
+            "ok": false
+          },
+          "consistency": {
+            "applicable": false,
+            "ok": false
+          },
+          "identity": {
+            "applicable": true,
+            "ok": true
+          },
+          "inclusion": {
+            "applicable": false,
+            "ok": false
+          },
+          "revocation": {
+            "applicable": false,
+            "ok": false
+          },
+          "signature": {
+            "applicable": false,
+            "ok": false
+          }
+        },
+        "ok": false
+      },
+      "name": "broken_back_link"
+    },
+    {
+      "bundle": {
+        "receipt": {
+          "alg": "ES256",
+          "backLink": {
+            "attestationDigest": "sha256:8f4ae37b34b9be4056ce0c243dabb819d225864b4aee04561ee9bdd67b9080dc",
+            "attestationNonce": "att-nonce-fixed-0001"
+          },
+          "outcomeDerived": {
+            "completedAt": "2026-05-29T10:00:00Z",
+            "status": "executed"
+          },
+          "receiptAsserted": {
+            "alg": "ES256",
+            "iat": "2026-05-29T10:00:00Z",
+            "iss": "did:web:agents.example.com:billing",
+            "nonce": "rcpt-nonce-fixed-0001",
+            "secretVersion": "v1",
+            "sub": "did:web:agents.example.com:billing"
+          },
+          "signature": "862d6ebc949c323cdd695290ee88818390ee49880b37b012c923e3ea823fa164720f19683959c633d614d87b84d93e42bdf17c0d0ff2765f35570d93f813fadb",
+          "version": 1
+        },
+        "verifying_jwk": {
+          "crv": "P-256",
+          "kty": "EC",
+          "x": "B2Bb3IA08MGNseH1UseCTbv_Q-J10isZuVS7galZBEU",
+          "y": "pF0OwY17c4EPwvJJYAjp6z9tVfFo37FGfhFrwVZS_iM"
+        }
+      },
+      "expected": {
+        "authenticity_established": true,
+        "lenses": {
+          "back_link": {
+            "applicable": false,
+            "ok": false
+          },
+          "consistency": {
+            "applicable": false,
+            "ok": false
+          },
+          "identity": {
+            "applicable": false,
+            "ok": false
+          },
+          "inclusion": {
+            "applicable": false,
+            "ok": false
+          },
+          "revocation": {
+            "applicable": false,
+            "ok": false
+          },
+          "signature": {
+            "applicable": true,
+            "ok": true
+          }
+        },
+        "ok": true
+      },
+      "name": "signature_only"
+    },
+    {
+      "bundle": {
+        "inclusion": {
+          "log_index": 2,
+          "root_hex": "498b70582ec73c6934935c91370c03b4cd9e2e75d9db002d6268c502139c20ac",
+          "siblings_hex": [
+            "851bfadbc6cacd2467c107c9f4c73dd930d7f0a59726b1cf869f89a342eae1ef",
+            "4b87bb07c29e106d681ab06ae97cf1b29e2ede0247b562f21a142813a3ae4c09"
+          ],
+          "tree_size": 4
+        },
+        "receipt": {
+          "alg": "ES256",
+          "backLink": {
+            "attestationDigest": "sha256:8f4ae37b34b9be4056ce0c243dabb819d225864b4aee04561ee9bdd67b9080dc",
+            "attestationNonce": "att-nonce-fixed-0001"
+          },
+          "outcomeDerived": {
+            "completedAt": "2026-05-29T10:00:00Z",
+            "status": "executed"
+          },
+          "receiptAsserted": {
+            "alg": "ES256",
+            "iat": "2026-05-29T10:00:00Z",
+            "iss": "did:web:agents.example.com:billing",
+            "nonce": "rcpt-nonce-fixed-0001",
+            "secretVersion": "v1",
+            "sub": "did:web:agents.example.com:billing"
+          },
+          "signature": "862d6ebc949c323cdd695290ee88818390ee49880b37b012c923e3ea823fa164720f19683959c633d614d87b84d93e42bdf17c0d0ff2765f35570d93f813fadb",
+          "version": 1
+        },
+        "registry": {
+          "entries": [],
+          "version": 1
+        }
+      },
+      "expected": {
+        "authenticity_established": false,
+        "lenses": {
+          "back_link": {
+            "applicable": false,
+            "ok": false
+          },
+          "consistency": {
+            "applicable": false,
+            "ok": false
+          },
+          "identity": {
+            "applicable": false,
+            "ok": false
+          },
+          "inclusion": {
+            "applicable": true,
+            "ok": true
+          },
+          "revocation": {
+            "applicable": true,
+            "ok": true
+          },
+          "signature": {
+            "applicable": false,
+            "ok": false
+          }
+        },
+        "ok": false
+      },
+      "name": "unauthenticated_in_log"
+    },
+    {
+      "bundle": {
+        "receipt": {
+          "alg": "ES256",
+          "backLink": {
+            "attestationDigest": "sha256:8f4ae37b34b9be4056ce0c243dabb819d225864b4aee04561ee9bdd67b9080dc",
+            "attestationNonce": "att-nonce-fixed-0001"
+          },
+          "outcomeDerived": {
+            "completedAt": "2026-05-29T10:00:00Z",
+            "status": "executed"
+          },
+          "receiptAsserted": {
+            "alg": "ES256",
+            "iat": "2026-05-29T10:00:00Z",
+            "iss": "did:web:agents.example.com:billing",
+            "nonce": "rcpt-nonce-fixed-0001",
+            "secretVersion": "v1",
+            "sub": "did:web:agents.example.com:billing"
+          },
+          "signature": "862d6ebc949c323cdd695290ee88818390ee49880b37b012c923e3ea823fa164720f19683959c633d614d87b84d93e42bdf17c0d0ff2765f35570d93f813fadb",
+          "version": 1
+        },
+        "verifying_jwk": {
+          "crv": "P-256",
+          "kty": "EC",
+          "x": "xMKFH7ij1GW5IheryC51SLydO3Tw_cVHoh-h5DSLUs0",
+          "y": "NiagCWOkeOvooDmi6ePTHLzYu3y0Z6mYNWmOXwhUr_s"
+        }
+      },
+      "expected": {
+        "authenticity_established": false,
+        "lenses": {
+          "back_link": {
+            "applicable": false,
+            "ok": false
+          },
+          "consistency": {
+            "applicable": false,
+            "ok": false
+          },
+          "identity": {
+            "applicable": false,
+            "ok": false
+          },
+          "inclusion": {
+            "applicable": false,
+            "ok": false
+          },
+          "revocation": {
+            "applicable": false,
+            "ok": false
+          },
+          "signature": {
+            "applicable": true,
+            "ok": false
+          }
+        },
+        "ok": false
+      },
+      "name": "wrong_signature_key"
+    }
+  ],
+  "did": "did:web:agents.example.com:billing",
+  "keyid": "did:web:agents.example.com:billing#key-2026"
+}
