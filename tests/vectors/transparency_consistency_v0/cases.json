@@ -1,0 +1,111 @@
+[
+  {
+    "name": "consistent_0_to_12",
+    "first_size": 0,
+    "second_size": 12,
+    "first_root": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+    "second_root": "6ce56e85bcd4acf388b120048f31b0b1562d5d4232af6c1fdb88f9a234b09f6a",
+    "proof": []
+  },
+  {
+    "name": "consistent_1_to_12",
+    "first_size": 1,
+    "second_size": 12,
+    "first_root": "22cbdb5d0ce627110e22c430ac505c6851c6fcd2ccb368453effb11cce8f9b7b",
+    "second_root": "6ce56e85bcd4acf388b120048f31b0b1562d5d4232af6c1fdb88f9a234b09f6a",
+    "proof": [
+      "5bc0582d78fe58e0b498dd7f39a86b652ce8827e67ad85ad9ea255ec848c2177",
+      "567bf67fddbf02217c5675e6416421a887fadf2f7044ebee35d523b529155314",
+      "4cad0fdb69d80c4668b49335603a9a1ce781af4d71d5388135eca696fc4d6b05",
+      "d9891e6ddaaf11f458297eebeaf87e2ccb596786c929974b3abdf4a956be3b9d"
+    ]
+  },
+  {
+    "name": "consistent_3_to_12",
+    "first_size": 3,
+    "second_size": 12,
+    "first_root": "de311156c685eb3ffac89639c3c5cbea9f624deba44d735657c72c769fd869e2",
+    "second_root": "6ce56e85bcd4acf388b120048f31b0b1562d5d4232af6c1fdb88f9a234b09f6a",
+    "proof": [
+      "07e406c42e27bd86c15eca79a9d6ccbc1774e3a9cadf9d5c4f76bf0081baaa11",
+      "3b1b1db30d87a51b6573b287df6b29be1a1dfe06ec4d6d1125604792fe3e9c9c",
+      "0e5d77c98b1f366752ce0ada3a187af7642d864d7e2ab3416eb236c83dd1bff8",
+      "4cad0fdb69d80c4668b49335603a9a1ce781af4d71d5388135eca696fc4d6b05",
+      "d9891e6ddaaf11f458297eebeaf87e2ccb596786c929974b3abdf4a956be3b9d"
+    ]
+  },
+  {
+    "name": "consistent_7_to_12",
+    "first_size": 7,
+    "second_size": 12,
+    "first_root": "767baabad6fa9b70b543341d78794196dab7205da44fd159869da3eee02de1ce",
+    "second_root": "6ce56e85bcd4acf388b120048f31b0b1562d5d4232af6c1fdb88f9a234b09f6a",
+    "proof": [
+      "6243fb18bafa2d8bd377119c4f0fb3f27069efa2389d1f2114064d87ffd16b86",
+      "d5a92ef8b1e994acd78e8e8753161e68872a64b5a22f7c06628b8ef34bd9f8a8",
+      "9604db3dcd2557d2dc883668a18d4d298be252d26e88b90b3804fc2e7305d603",
+      "8070185a3e93a45a1e2d4c4149ef795d8543249c0295dc95245d2a2a513a0ba8",
+      "d9891e6ddaaf11f458297eebeaf87e2ccb596786c929974b3abdf4a956be3b9d"
+    ]
+  },
+  {
+    "name": "consistent_8_to_12",
+    "first_size": 8,
+    "second_size": 12,
+    "first_root": "cf13081aab6a87268ae7ed59230cad72abce4d476ce0ffe98ac68ff5b5aaab6b",
+    "second_root": "6ce56e85bcd4acf388b120048f31b0b1562d5d4232af6c1fdb88f9a234b09f6a",
+    "proof": [
+      "d9891e6ddaaf11f458297eebeaf87e2ccb596786c929974b3abdf4a956be3b9d"
+    ]
+  },
+  {
+    "name": "consistent_12_to_12",
+    "first_size": 12,
+    "second_size": 12,
+    "first_root": "6ce56e85bcd4acf388b120048f31b0b1562d5d4232af6c1fdb88f9a234b09f6a",
+    "second_root": "6ce56e85bcd4acf388b120048f31b0b1562d5d4232af6c1fdb88f9a234b09f6a",
+    "proof": []
+  },
+  {
+    "name": "consistent_5_to_9",
+    "first_size": 5,
+    "second_size": 9,
+    "first_root": "27460c9ac9d56a303abd9900a86bdd270d3f3da8ba4ad90ef6b703cfafa95115",
+    "second_root": "e578bb063ec525f923f8b77b8f57bbf805739b4513701d67fb9aaed93860e5d0",
+    "proof": [
+      "36ec2b842ce19ff8e2a7f484eec3ccf44e71cf59d458581ab9098e3e36ed8189",
+      "f7e7bd4e314e13708b39187ce4b169492ae29ab78c4fa5b3835dd3986e62a526",
+      "77f68d5dd98b38d65e09aa66250705321302dded9938c821a4232bb91e0415b6",
+      "8070185a3e93a45a1e2d4c4149ef795d8543249c0295dc95245d2a2a513a0ba8",
+      "d3be918716c264b58cb219f5fc900dc6909ca4c86eb7292e0427decdc915d33f"
+    ]
+  },
+  {
+    "name": "tampered_proof_hash_3_to_12",
+    "first_size": 3,
+    "second_size": 12,
+    "first_root": "de311156c685eb3ffac89639c3c5cbea9f624deba44d735657c72c769fd869e2",
+    "second_root": "6ce56e85bcd4acf388b120048f31b0b1562d5d4232af6c1fdb88f9a234b09f6a",
+    "proof": [
+      "06e406c42e27bd86c15eca79a9d6ccbc1774e3a9cadf9d5c4f76bf0081baaa11",
+      "3b1b1db30d87a51b6573b287df6b29be1a1dfe06ec4d6d1125604792fe3e9c9c",
+      "0e5d77c98b1f366752ce0ada3a187af7642d864d7e2ab3416eb236c83dd1bff8",
+      "4cad0fdb69d80c4668b49335603a9a1ce781af4d71d5388135eca696fc4d6b05",
+      "d9891e6ddaaf11f458297eebeaf87e2ccb596786c929974b3abdf4a956be3b9d"
+    ]
+  },
+  {
+    "name": "forked_second_root_3_to_12",
+    "first_size": 3,
+    "second_size": 12,
+    "first_root": "de311156c685eb3ffac89639c3c5cbea9f624deba44d735657c72c769fd869e2",
+    "second_root": "e9aa0edeb661e07075dfdaea256359b0b29359746cf67bdd2682adafaa20b4e7",
+    "proof": [
+      "07e406c42e27bd86c15eca79a9d6ccbc1774e3a9cadf9d5c4f76bf0081baaa11",
+      "3b1b1db30d87a51b6573b287df6b29be1a1dfe06ec4d6d1125604792fe3e9c9c",
+      "0e5d77c98b1f366752ce0ada3a187af7642d864d7e2ab3416eb236c83dd1bff8",
+      "4cad0fdb69d80c4668b49335603a9a1ce781af4d71d5388135eca696fc4d6b05",
+      "d9891e6ddaaf11f458297eebeaf87e2ccb596786c929974b3abdf4a956be3b9d"
+    ]
+  }
+]

@@ -1,0 +1,29 @@
+{
+  "consistent_0_to_12": {
+    "consistent": true
+  },
+  "consistent_1_to_12": {
+    "consistent": true
+  },
+  "consistent_3_to_12": {
+    "consistent": true
+  },
+  "consistent_7_to_12": {
+    "consistent": true
+  },
+  "consistent_8_to_12": {
+    "consistent": true
+  },
+  "consistent_12_to_12": {
+    "consistent": true
+  },
+  "consistent_5_to_9": {
+    "consistent": true
+  },
+  "tampered_proof_hash_3_to_12": {
+    "consistent": false
+  },
+  "forked_second_root_3_to_12": {
+    "consistent": false
+  }
+}
