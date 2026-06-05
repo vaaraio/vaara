@@ -6,6 +6,56 @@ and this project follows [Semantic Versioning](https://semver.org/spec/v2.0.0.ht
 
 ## [Unreleased]
 
+## [0.55.0] - 2026-06-05
+
+**Theme: cross-stack revocation. Revocation used to live in exactly one
+place, the level-3 live identity check: a signing key revoked at or before a
+receipt was issued no longer yielded a trusted verdict. The same receipt
+checked through the receipt verifier, the transparency log, or an Article-12
+export ignored revocation entirely, so one receipt could get three different
+answers. This release lifts the revocation-in-time rule into a
+source-agnostic `RevocationRegistry` that every lens consults, so a receipt
+whose issuer was revoked-in-time fails consistently whichever lens looks.**
+
+### Added
+- `vaara.attestation.RevocationRegistry`: a set of revocation facts with one
+  predicate, `status(iss, issued_at, keyid=None)`. A receipt is
+  revoked-in-time iff a matching entry (identity-scope on the issuer, or
+  key-scope on the bound keyid) has a `revoked_at` at or before issuance.
+  Build it from a DID document (`from_did_document`, the same data level 3
+  reads, so the two agree by construction), from an operator's out-of-band
+  list, or from a dict. `digest()` gives a stable `sha256:` over the RFC 8785
+  canonical bytes.
+- `RevocationEntry` and `RevocationStatus`: the fact and the verdict.
+  `RevocationStatus` reports `revoked`, `matched_by`, `revoked_at`, and
+  `issued_at`, so a verifier with a stronger time anchor than the receipt's
+  self-asserted `iat` can re-decide.
+- `vaara.attestation.check_receipt_revocation`: the receipt-verifier lens,
+  the offline counterpart of the level-3 rule, with no DID fetch.
+- `vaara.attestation.verify_logged_receipt` and `LoggedReceiptVerdict`: the
+  transparency-log lens, checking inclusion and revocation in one call. `ok`
+  is true only when the receipt is both included and not revoked-in-time.
+- `export_signed(..., revocation=registry)`: the Article-12 export lens. The
+  registry's canonical bytes are written to a `revocation.json` member and
+  its digest is pinned into the signed manifest
+  (`revocation.registry_sha256`), so the revocation state at export time is
+  part of the tamper-evident bundle. The standalone
+  `scripts/verify_vaara_trail.py` checks the member against the pinned digest.
+- A `cross_stack_revocation_v0` conformance vector set (one receipt, four
+  registries) asserting the receipt-verifier, transparency-log, and
+  export-digest lenses reach the same verdict, with a Vaara-free,
+  standard-library-plus-`rfc8785` independent checker that reproduces it.
+
+### Changed
+- The level-3 live identity check (`verify_receipt_identity_live`) now applies
+  revocation through the shared `revoked_in_time` rule rather than its own
+  copy, so the identity lens and the registry cannot drift. No behavior
+  change; the existing `agent_identity_v0` verdicts are unchanged.
+- Purely additive over 0.54. No change to the receipt envelope,
+  canonicalization, inclusion- or consistency-proof formats, or signature
+  verification; the envelope version stays 1. `export_signed` with no
+  `revocation` argument produces a byte-identical manifest to 0.54.
+
 ## [0.54.0] - 2026-06-05
 
 **Theme: append-only consistency proofs for the transparency log. The log
