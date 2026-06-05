@@ -8,10 +8,8 @@ attested `tools/call` and links back to the attestation it answers.
 
 ```
 keys/                       pinned signing material
-  hs256_secret.bin          32 raw bytes
-  es256_private.pem         PKCS8, raw r||s signatures (not DER)
+  hs256_secret.bin          32 raw bytes (symmetric: needed to verify HS256)
   es256_public.pem          SubjectPublicKeyInfo
-  rs256_private.pem         PKCS8
   rs256_public.pem          SubjectPublicKeyInfo
 normative/<case>/
   attestation.json          the SEP-2787 attestation the receipt answers
