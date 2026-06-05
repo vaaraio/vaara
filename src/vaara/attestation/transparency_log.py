@@ -46,6 +46,28 @@ class LogEntry:
 
 
 @dataclass(frozen=True)
+class ConsistencyProof:
+    """RFC 9162 (RFC 6962-bis) consistency proof between two tree sizes.
+
+    Proves that the log of ``first_size`` leaves whose root was
+    ``first_root`` is a prefix of the log of ``second_size`` leaves whose
+    root is ``second_root``: every leaf in the smaller tree is present, in
+    the same position, in the larger one, and nothing earlier was rewritten.
+    This is the append-only guarantee. An inclusion proof shows an entry is
+    *in* the log; a consistency proof shows the log only ever *grew*.
+
+    ``first_size <= second_size``. The proof verifies against two roots the
+    verifier obtained independently (e.g. signed tree heads published by the
+    log operator at two points in time); the hashes alone do not bind to a
+    specific pair of roots.
+    """
+
+    first_size: int
+    second_size: int
+    hashes: tuple[bytes, ...]
+
+
+@dataclass(frozen=True)
 class InclusionProof:
     """RFC 6962-style inclusion proof.
 
@@ -112,6 +134,94 @@ def _proof_for(leaves: list[bytes], index: int) -> tuple[bytes, ...]:
         nodes = next_level
         idx //= 2
     return tuple(proof)
+
+
+def _largest_power_of_two_lt(n: int) -> int:
+    """Largest power of two strictly less than ``n`` (requires ``n >= 2``)."""
+    k = 1
+    while k * 2 < n:
+        k *= 2
+    return k
+
+
+def _subproof(m: int, leaves: list[bytes], on_path: bool) -> list[bytes]:
+    """RFC 9162 SUBPROOF over ``leaves`` for prefix size ``m``.
+
+    ``on_path`` is the spec's ``b`` flag: when the recursion has narrowed to
+    the subtree that exactly equals the ``m``-leaf prefix and that subtree is
+    still on the path from the root, its hash is implied (the verifier
+    recomputes it) and omitted; otherwise the subtree hash is included.
+    """
+    n = len(leaves)
+    if m == n:
+        return [] if on_path else [_root_from_leaves(leaves)]
+    k = _largest_power_of_two_lt(n)
+    if m <= k:
+        return _subproof(m, leaves[:k], on_path) + [_root_from_leaves(leaves[k:])]
+    return _subproof(m - k, leaves[k:], False) + [_root_from_leaves(leaves[:k])]
+
+
+def verify_consistency(
+    *,
+    first_size: int,
+    first_root: bytes,
+    second_size: int,
+    second_root: bytes,
+    proof: ConsistencyProof,
+) -> bool:
+    """Verify an RFC 9162 consistency proof between two tree heads.
+
+    Recomputes both ``first_root`` and ``second_root`` from the proof and
+    returns whether both match. A ``True`` result means the ``first_size``
+    tree is a verifiable prefix of the ``second_size`` tree: the log is
+    append-only across the two snapshots. Implements RFC 9162 section 2.1.4.2.
+    """
+    if proof.first_size != first_size or proof.second_size != second_size:
+        return False
+    if first_size > second_size:
+        return False
+    if first_size == second_size:
+        # Same tree: nothing to prove beyond identical roots.
+        return not proof.hashes and first_root == second_root
+    if first_size == 0:
+        # The empty tree is a prefix of every tree; no path hashes needed.
+        return not proof.hashes
+
+    # 0 < first_size < second_size. For a power-of-two first tree the spec
+    # omits first_root from the path because the verifier already holds it;
+    # prepend it so the seed logic below is uniform.
+    path = list(proof.hashes)
+    if first_size & (first_size - 1) == 0:
+        path = [first_root, *path]
+    if not path:
+        return False
+
+    fn = first_size - 1
+    sn = second_size - 1
+    # Strip the shared low run: these bits are interior to the first subtree
+    # and contribute no path node.
+    while fn & 1:
+        fn >>= 1
+        sn >>= 1
+
+    nodes = iter(path)
+    fr = sr = next(nodes)
+    for sibling in nodes:
+        if sn == 0:
+            # More path nodes than the second tree can account for.
+            return False
+        if fn & 1 or fn == sn:
+            fr = _hash_node(sibling, fr)
+            sr = _hash_node(sibling, sr)
+            while fn != 0 and not (fn & 1):
+                fn >>= 1
+                sn >>= 1
+        else:
+            sr = _hash_node(sr, sibling)
+        fn >>= 1
+        sn >>= 1
+
+    return sn == 0 and fr == first_root and sr == second_root
 
 
 def verify_inclusion(
@@ -183,6 +293,53 @@ class InProcessTransparencyLog:
             siblings = _proof_for(list(self._leaves), log_index)
             return InclusionProof(
                 log_index=log_index, tree_size=size, siblings=siblings,
+            )
+
+    def root_at(self, tree_size: int) -> bytes:
+        """Merkle root over the first ``tree_size`` leaves.
+
+        ``root_at(0)`` is the empty-tree hash; ``root_at(tree_size)`` equals
+        the ``root_hash`` the log had after its first ``tree_size`` appends.
+        Useful for pinning a historical signed tree head before requesting a
+        consistency proof against a later one.
+        """
+        with self._lock:
+            if not (0 <= tree_size <= len(self._leaves)):
+                raise TransparencyLogError(
+                    f"tree_size {tree_size} out of range for log of "
+                    f"{len(self._leaves)} leaves"
+                )
+            return _root_from_leaves(self._leaves[:tree_size])
+
+    def consistency_proof(
+        self, first_size: int, second_size: int
+    ) -> ConsistencyProof:
+        """Prove the ``first_size`` tree is a prefix of the ``second_size`` one.
+
+        ``0 <= first_size <= second_size <= tree_size``. The proof is empty
+        for the trivial cases (``first_size`` is 0 or equals ``second_size``).
+        Pair the result with ``root_at(first_size)`` and ``root_at(second_size)``,
+        or with two independently published roots, and check it via
+        ``verify_consistency``.
+        """
+        with self._lock:
+            size = len(self._leaves)
+            if not (0 <= first_size <= second_size <= size):
+                raise TransparencyLogError(
+                    f"consistency proof requires 0 <= first_size "
+                    f"({first_size}) <= second_size ({second_size}) <= "
+                    f"tree_size ({size})"
+                )
+            if first_size == 0 or first_size == second_size:
+                hashes: tuple[bytes, ...] = ()
+            else:
+                hashes = tuple(
+                    _subproof(first_size, self._leaves[:second_size], True)
+                )
+            return ConsistencyProof(
+                first_size=first_size,
+                second_size=second_size,
+                hashes=hashes,
             )
 
     @property

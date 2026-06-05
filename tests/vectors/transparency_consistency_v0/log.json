@@ -1,0 +1,18 @@
+{
+  "leaf_hashing": "SHA-256(0x00 || leaf)",
+  "node_hashing": "SHA-256(0x01 || left || right)",
+  "leaves": [
+    "entry-00",
+    "entry-01",
+    "entry-02",
+    "entry-03",
+    "entry-04",
+    "entry-05",
+    "entry-06",
+    "entry-07",
+    "entry-08",
+    "entry-09",
+    "entry-10",
+    "entry-11"
+  ]
+}
