@@ -6,6 +6,42 @@ and this project follows [Semantic Versioning](https://semver.org/spec/v2.0.0.ht
 
 ## [Unreleased]
 
+## [0.54.0] - 2026-06-05
+
+**Theme: append-only consistency proofs for the transparency log. The log
+already issued inclusion proofs: evidence that a given receipt is in the log.
+An inclusion proof says nothing about whether earlier history was rewritten.
+A consistency proof does: it shows the log at an earlier size is a verifiable
+prefix of the log at a later size, so a fork or a quiet rewrite of past
+entries is detectable even when every individual inclusion proof still
+verifies. A monitor that pins the log's root over time and checks a
+consistency proof between successive roots gets the append-only guarantee a
+transparency log exists to provide. RFC 9162 (RFC 6962-bis) section 2.1.4.**
+
+### Added
+- `vaara.attestation.verify_consistency`: verifies an RFC 9162 consistency
+  proof between two tree sizes and their roots, returning whether the smaller
+  tree is a verifiable prefix of the larger one. Recomputes both roots from
+  the proof; a single returned `bool`.
+- `ConsistencyProof`: the proof object (`first_size`, `second_size`, and the
+  ordered sibling `hashes`), shaped to match what a sigstore Rekor-backed
+  adapter would expose at the same call site.
+- `InProcessTransparencyLog.consistency_proof(first_size, second_size)`:
+  produces a proof between any two sizes the log has reached, empty for the
+  trivial cases (an empty prefix, or identical sizes).
+- `InProcessTransparencyLog.root_at(tree_size)`: the Merkle root over the
+  first `tree_size` leaves, for pinning a historical signed tree head before
+  requesting a consistency proof against a later one.
+- A `transparency_consistency_v0` conformance vector set (nine cases over a
+  twelve-leaf log, covering power-of-two and non-power-of-two prefixes plus a
+  tampered-proof and a forked-history negative) with a Vaara-free,
+  standard-library-only independent checker that reproduces every verdict.
+
+### Changed
+- Purely additive over 0.53. No change to the receipt envelope,
+  canonicalization, inclusion-proof format, or signature verification; the
+  envelope version stays 1.
+
 ## [0.53.0] - 2026-06-03
 
 **Theme: resolvable agent identity, level 3. Level 2 confirmed a receipt was
