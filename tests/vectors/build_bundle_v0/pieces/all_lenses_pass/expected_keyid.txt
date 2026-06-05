@@ -1,0 +1,1 @@
+did:web:agents.example.com:billing#key-2026

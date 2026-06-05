@@ -6,6 +6,44 @@ and this project follows [Semantic Versioning](https://semver.org/spec/v2.0.0.ht
 
 ## [Unreleased]
 
+## [0.58.0] - 2026-06-05
+
+**Theme: one command for the party producing evidence, the mirror of
+`verify-bundle`. v0.57.0 gave a verifier one command to check an evidence
+bundle on disk. This release gives the issuer one command to produce it.
+`vaara build-bundle` assembles the receipt plus whatever identity, signature,
+back-link, inclusion, consistency, and revocation material the issuer holds
+into the single document `verify-bundle` reads, byte for byte. Producing and
+checking evidence become one closed loop over one file.**
+
+### Added
+- `vaara build-bundle`: assemble a complete evidence bundle on disk from the
+  issuer's pieces. Supply them with `--from-dir DIR` (each piece in a
+  conventional file: `receipt.json`, `attestation.json`, `did_document.json`,
+  `verifying_jwk.json`, `inclusion.json`, `consistency.json`, `registry.json`,
+  plus the scalars `expected_keyid.txt` and `inclusion_leaf_hex.txt`) or with
+  explicit per-piece flags. Writes the bundle to `--out` or stdout, then loads
+  it back and reports the `verify-bundle` verdict. A malformed piece fails the
+  build with the offending field named.
+- `vaara.attestation.build_bundle_document`: the issuer-side mirror of
+  `evidence_bundle_from_json`. Stitches the pieces into the one on-disk
+  document and validates it by loading it straight back, so a bad piece is
+  caught at assembly time. The output is byte-for-byte the shape the
+  `bundle_doc_v0` vectors commit and `verify-bundle` reads.
+- `vaara.attestation.load_bundle_pieces_from_dir`: discover an issuer's pieces
+  in a directory by the conventional file names, returning the kwargs
+  `build_bundle_document` takes.
+- `tests/vectors/build_bundle_v0/`: each evidence bundle split into the
+  issuer's separate pieces, with a Vaara-free independent checker that
+  re-assembles them, asserts the result is byte-for-byte the document the
+  verifier reads, and reproduces the verdict, with no Vaara import.
+
+### Notes
+- Purely additive over v0.57.0. No change to the receipt envelope or any
+  canonicalization; `build-bundle` assembles the existing on-disk shape and
+  defines no new wire format. Envelope version stays 1. Round-trip property:
+  a bundle from `build-bundle`, fed to `verify-bundle`, verifies. 1308 passed.
+
 ## [0.57.0] - 2026-06-05
 
 **Theme: one command to verify an evidence bundle from disk. v0.56.0 added
