@@ -6,6 +6,16 @@ and this project follows [Semantic Versioning](https://semver.org/spec/v2.0.0.ht
 
 ## [Unreleased]
 
+### Changed
+- Dropped the superseded classifier bundles `adversarial_classifier_v1`,
+  `v2`, `v3`, `v5`, `v6`, `v7` from the repository (about 5.5 MB). The
+  published wheel already shipped only the production bundle (`v9`), so this is
+  a repository-size cleanup with no effect on the package. `v8` stays in tree
+  because the cross-evaluation scripts (`eval_v039_v9.py`,
+  `eval_v039_bipia.py`, `eval_v038_phase1.py`) compare against it; `v9` is the
+  runtime bundle. `eval_pipeline_attribution.py` now defaults to `v9`. Historic
+  per-version numbers remain recorded in `bench/`.
+
 ### Fixed
 - `vaara build-bundle`: a receipt that is valid JSON but the wrong shape (for
   example missing a required field) now exits 1 with `cannot assemble bundle:
