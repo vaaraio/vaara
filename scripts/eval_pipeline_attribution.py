@@ -47,7 +47,7 @@ def main():
     ap.add_argument("--fold", default="all",
                     choices=("all", "train", "val", "test"))
     ap.add_argument("--classifier-bundle",
-                    default="src/vaara/data/adversarial_classifier_v2.joblib")
+                    default="src/vaara/data/adversarial_classifier_v9.joblib")
     ap.add_argument("--out",
                     default="tests/adversarial/v031/pipeline_rule_attribution_v031.json")
     ap.add_argument("--manifest", default="tests/adversarial/MANIFEST.sha256")
