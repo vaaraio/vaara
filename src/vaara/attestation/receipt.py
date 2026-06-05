@@ -35,6 +35,12 @@ Install: ``pip install 'vaara[attestation]'``.
 
 from __future__ import annotations
 
+from vaara.attestation._bundle import (
+    BundleVerdict,
+    EvidenceBundle,
+    LensResult,
+    verify_evidence_bundle,
+)
 from vaara.attestation._receipt_emit import (
     emit_receipt,
     verify_receipt_signature,
@@ -94,9 +100,12 @@ __all__ = [
     "VAARA_RECEIPT_CONTEXT_URL",
     "BackLink",
     "BackLinkResult",
+    "BundleVerdict",
     "DidDocumentCache",
+    "EvidenceBundle",
     "ExecutionReceipt",
     "IdentityResult",
+    "LensResult",
     "LiveIdentityResult",
     "LoggedReceiptVerdict",
     "OutcomeDerived",
@@ -122,6 +131,7 @@ __all__ = [
     "receipt_to_vc",
     "revoked_in_time",
     "verify_back_link",
+    "verify_evidence_bundle",
     "verify_logged_receipt",
     "verify_receipt_identity",
     "verify_receipt_identity_live",

@@ -6,6 +6,46 @@ and this project follows [Semantic Versioning](https://semver.org/spec/v2.0.0.ht
 
 ## [Unreleased]
 
+## [0.56.0] - 2026-06-05
+
+**Theme: one call to verify an evidence bundle. The 0.52 to 0.55 line built
+six verification lenses, each on its own call: resolvable identity, the
+receipt signature, the back-link to the request attestation, transparency-log
+inclusion, append-only consistency, and cross-stack revocation. A consumer
+holding a full bundle had to invoke all six, track which applied, and combine
+the answers, and the combination has a sharp edge: proving a receipt is in a
+log and not revoked says nothing about who issued it unless the signature was
+also checked. This release adds `verify_evidence_bundle`, a single entrypoint
+that runs every applicable lens and returns one verdict with that edge
+enforced.**
+
+### Added
+- `vaara.attestation.verify_evidence_bundle` and `EvidenceBundle`: one
+  receipt plus whatever evidence the holder has. Each evidence field feeds one
+  lens; a field left unset makes that lens not applicable, so a partial bundle
+  is verified for what it carries rather than rejected for what it lacks.
+- `BundleVerdict` and `LensResult`: the verdict reports each lens (applicable,
+  ok, reason), whether authenticity was established, the identity-resolved
+  keyid, and one overall `ok`. `verdict.lens(name)` looks up a single result.
+- Fail-closed authenticity. `ok` is true only when the receipt signature was
+  established (the identity lens bound it to a document key, or the signature
+  lens verified it under supplied key material) and every applicable lens
+  passed. A receipt that is merely included in a log, with no signature ever
+  checked, is not `ok`: an unauthenticated record proves nothing about who
+  issued it.
+- Lens coupling. Identity runs first so the keyid it resolves sharpens the
+  revocation lens: a key-scope revocation bites under a resolved identity and
+  correctly cannot match when the receipt is verified by signature alone.
+- `evidence_bundle_v0` conformance vectors: eight bundles covering every
+  outcome (all lenses passing, each lens failing in turn, signature-only
+  authenticity, and the fail-closed included-but-unauthenticated case), with a
+  Vaara-free independent checker that reproduces every verdict.
+
+Purely additive over 0.55; the envelope version stays 1. The entrypoint
+composes the existing lens functions unchanged and issues no new crypto.
+1255 passed, 13 skipped, ruff clean, mypy clean on the gated set. See
+`docs/design/evidence-bundle-spec.md`.
+
 ## [0.55.0] - 2026-06-05
 
 **Theme: cross-stack revocation. Revocation used to live in exactly one
