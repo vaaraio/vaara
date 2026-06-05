@@ -62,10 +62,12 @@ from vaara.attestation.iap import (
     verify_phase3_attestation,
 )
 from vaara.attestation.transparency_log import (
+    ConsistencyProof,
     InProcessTransparencyLog,
     InclusionProof,
     LogEntry,
     TransparencyLogError,
+    verify_consistency,
     verify_inclusion,
 )
 from vaara.attestation.tee import (
@@ -120,6 +122,7 @@ __all__ = [
     "BackLinkResult",
     "BaseEnvelope",
     "ConformalExtension",
+    "ConsistencyProof",
     "EnvelopeError",
     "ExecutionReceipt",
     "IAPError",
@@ -169,6 +172,7 @@ __all__ = [
     "sep2787_verify_attestation",
     "verify_back_link",
     "verify_base_envelope",
+    "verify_consistency",
     "verify_envelope_binding",
     "verify_inclusion",
     "verify_phase3_attestation",
