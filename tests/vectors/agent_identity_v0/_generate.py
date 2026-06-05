@@ -1,13 +1,20 @@
 #!/usr/bin/env python3
 """Generate the agent_identity_v0 conformance vectors.
 
-Emits two cases with Vaara, using did:web resolvable agent identity:
+Emits three cases with Vaara, using did:web resolvable agent identity:
 
 - ``bound.json``: an ES256 receipt whose ``iss`` is a did:web identity,
-  plus a DID document that lists the signing key. Expected: resolved and
-  bound.
+  plus a DID document that lists the signing key. Expected: resolved,
+  bound, trusted.
 - ``unbound.json``: the same receipt against a DID document that lists a
-  different key. Expected: resolved, not bound.
+  different key. Expected: resolved, not bound, not trusted.
+- ``revoked.json``: the receipt against a document that lists the signing
+  key but marks it ``revoked`` before the receipt's ``iat``. Expected:
+  resolved and bound (the signature matches the key) but revoked and not
+  trusted (the key was revoked at or before issuance). This is the level-3
+  revocation-in-time property, reproducible offline from the captured
+  document because the comparison is purely the receipt ``iat`` against the
+  method ``revoked`` instant.
 
 ECDSA signatures are randomized, so re-running this overwrites the cases
 with fresh but equivalent vectors. The committed JSON is the vector;
@@ -61,18 +68,20 @@ def _ec_jwk(public_key: ec.EllipticCurvePublicKey) -> dict:
     }
 
 
-def _did_document(jwk: dict) -> dict:
-    return {
-        "id": DID,
-        "verificationMethod": [
-            {
-                "id": KEYID,
-                "type": "JsonWebKey2020",
-                "controller": DID,
-                "publicKeyJwk": jwk,
-            }
-        ],
+RECEIPT_IAT = "2026-05-29T10:00:00Z"
+REVOKED_BEFORE_IAT = "2026-05-29T09:30:00Z"
+
+
+def _did_document(jwk: dict, *, revoked: str | None = None) -> dict:
+    method = {
+        "id": KEYID,
+        "type": "JsonWebKey2020",
+        "controller": DID,
+        "publicKeyJwk": jwk,
     }
+    if revoked is not None:
+        method["revoked"] = revoked
+    return {"id": DID, "verificationMethod": [method]}
 
 
 def _attestation():
@@ -111,9 +120,11 @@ def main() -> None:
     )
     receipt_dict = receipt.to_dict()
 
+    jwk_a = _ec_jwk(key_a.public_key())
+
     (HERE / "bound.json").write_text(json.dumps({
         "receipt": receipt_dict,
-        "didDocument": _did_document(_ec_jwk(key_a.public_key())),
+        "didDocument": _did_document(jwk_a),
     }, indent=2, sort_keys=True) + "\n")
 
     (HERE / "unbound.json").write_text(json.dumps({
@@ -121,12 +132,27 @@ def main() -> None:
         "didDocument": _did_document(_ec_jwk(key_b.public_key())),
     }, indent=2, sort_keys=True) + "\n")
 
-    (HERE / "expected.json").write_text(json.dumps({
-        "bound": {"resolved": True, "bound": True, "keyid": KEYID},
-        "unbound": {"resolved": True, "bound": False, "keyid": None},
+    (HERE / "revoked.json").write_text(json.dumps({
+        "receipt": receipt_dict,
+        "didDocument": _did_document(jwk_a, revoked=REVOKED_BEFORE_IAT),
     }, indent=2, sort_keys=True) + "\n")
 
-    print("wrote bound.json, unbound.json, expected.json")
+    (HERE / "expected.json").write_text(json.dumps({
+        "bound": {
+            "resolved": True, "bound": True, "keyid": KEYID,
+            "revoked": False, "trusted": True,
+        },
+        "unbound": {
+            "resolved": True, "bound": False, "keyid": None,
+            "revoked": False, "trusted": False,
+        },
+        "revoked": {
+            "resolved": True, "bound": True, "keyid": KEYID,
+            "revoked": True, "trusted": False,
+        },
+    }, indent=2, sort_keys=True) + "\n")
+
+    print("wrote bound.json, unbound.json, revoked.json, expected.json")
 
 
 if __name__ == "__main__":

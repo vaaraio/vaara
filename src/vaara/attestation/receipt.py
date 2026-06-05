@@ -44,6 +44,13 @@ from vaara.attestation._receipt_identity import (
     did_web_to_url,
     verify_receipt_identity,
 )
+from vaara.attestation._receipt_identity_live import (
+    DidDocumentCache,
+    LiveIdentityResult,
+    ResolutionMeta,
+    https_fetch,
+    verify_receipt_identity_live,
+)
 from vaara.attestation._receipt_types import (
     BackLink,
     ExecutionReceipt,
@@ -77,15 +84,19 @@ __all__ = [
     "VAARA_RECEIPT_CONTEXT_URL",
     "BackLink",
     "BackLinkResult",
+    "DidDocumentCache",
     "ExecutionReceipt",
     "IdentityResult",
+    "LiveIdentityResult",
     "OutcomeDerived",
     "ReceiptAsserted",
     "ReceiptStatus",
+    "ResolutionMeta",
     "ResultCommitment",
     "attestation_digest",
     "did_web_to_url",
     "emit_receipt",
+    "https_fetch",
     "load_receipt_context",
     "make_back_link",
     "make_result_digest",
@@ -95,5 +106,6 @@ __all__ = [
     "receipt_to_vc",
     "verify_back_link",
     "verify_receipt_identity",
+    "verify_receipt_identity_live",
     "verify_receipt_signature",
 ]

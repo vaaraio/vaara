@@ -98,16 +98,54 @@ ships as a *new* vector family (`agent_identity_v0`) carrying:
 This keeps the property the #2402 thread cares about: the record verifies
 against the spec and captured inputs, not against a live service or our code.
 
+The vector family also covers level-3 revocation offline: `revoked.json`
+carries a document that lists the signing key but marks it `revoked` before
+the receipt's `iat`, with the expected verdict `bound` but not `trusted`.
+That comparison needs no network, so it ships as a vector even though the
+fetch itself does not.
+
+## Implementation
+
+Level 2 (`verify_receipt_identity`) takes a DID document the caller already
+holds and returns `IdentityResult(resolved, bound, keyid, reason)`. It is
+pure and offline.
+
+Level 3 (`verify_receipt_identity_live`) wraps level 2 with resolution,
+caching, deactivation, and revocation, and returns `LiveIdentityResult`:
+
+- **Resolution record.** Each resolve produces `ResolutionMeta(did, url,
+  fetched_at, document_digest, from_cache)`. `document_digest` is
+  `sha256:<hex>` over the exact bytes fetched, so the resolution is
+  reproducible: hand a second auditor the same document and they recompute
+  the digest and the verdict. The default fetcher is a size-capped,
+  HTTPS-only stdlib GET; a deployer injects their own for allowlisting,
+  pinning, or proxy egress, or to verify offline against a captured document.
+- **Caching.** `DidDocumentCache` is an in-memory TTL cache keyed by DID, so
+  a verifier checking many receipts from one issuer resolves once per window.
+  The clock is caller-supplied, so it is deterministic under test.
+- **Revocation in time.** A verification method may carry a `revoked` ISO
+  8601 instant; a document may carry `deactivated: true`. A key revoked at or
+  before the receipt's `iat` yields `trusted=false` even when the signature
+  matches; a key revoked afterwards still binds, because revocation is not
+  retroactive. The result surfaces both `issued_at` and `revoked_at` so a
+  verifier with a stronger time anchor than the self-asserted `iat` (the
+  audit-trail hash chain) can re-decide.
+
+`trusted` is the single overall verdict: resolved, bound, not deactivated,
+and not revoked at or before issuance.
+
 ## Open questions
 
 - Whether `sub` (the acting subject, distinct from the issuer) should resolve
   by the same mechanism, or stay opaque when the subject is an end user rather
   than an agent.
-- DID-document key rotation: a receipt pins `iss_keyid`, but a document
-  fetched years later may have rotated that key out. The hash-chain timestamp
-  plus the recorded fetch metadata give the external time anchor needed to
-  reason about which key was valid when, the same anchor the trust-model work
-  relies on for key-compromise reasoning.
+- Key rotation across long spans is partly addressed: the level-3 result
+  records the fetch (URL, time, document digest) and surfaces the revocation
+  instant against issuance, and the audit-trail hash chain supplies the
+  external time anchor for which key was valid when. What remains is a
+  convention for pinning the resolved document digest into the trail at
+  verification time, so a re-verify years later can detect a since-rotated
+  document rather than silently resolving the current one.
 - Whether to register the receipt envelope's resolvable-identity convention
   as a follow-up to SEP-2828, so the MCP audit-context line and Vaara's
   envelope name identity the same way.
