@@ -96,6 +96,23 @@ Subcommands:
         commitment, --result verifies it against the runtime result.
         Exit 0 iff all checks pass.
 
+    vaara verify-bundle PATH [--json]
+        Verify a complete evidence bundle in one command. PATH is a bundle
+        JSON file, or a directory holding bundle.json. Runs every lens whose
+        evidence is present (identity, signature, back-link, inclusion,
+        consistency, revocation) and prints one verdict. Exit 0 iff the
+        bundle is ok: the receipt signature was established and every
+        applicable lens passed.
+
+    vaara build-bundle (--receipt RECEIPT.json | --from-dir DIR) [piece flags]
+            [--out BUNDLE.json]
+        Assemble a complete evidence bundle on disk from the issuer's
+        pieces: the receipt plus whatever identity, signature, back-link,
+        inclusion, consistency, and revocation material the issuer holds.
+        Writes the single document verify-bundle reads. The issuer-side
+        mirror of verify-bundle. Round-trip: the file this writes, fed
+        straight to verify-bundle, verifies.
+
     vaara version
         Print the installed Vaara version.
 
@@ -1518,6 +1535,182 @@ def _cmd_receipt_verify(args: argparse.Namespace) -> int:
     return 1 if failed else 0
 
 
+def _cmd_verify_bundle(args: argparse.Namespace) -> int:
+    """Verify a whole evidence bundle from disk in one command.
+
+    Reads one bundle JSON document (or a directory holding ``bundle.json``),
+    runs every applicable verification lens through ``verify_evidence_bundle``,
+    and prints one verdict. Exit 0 iff the bundle is ``ok``: the receipt
+    signature was established and every lens whose evidence was present passed.
+    """
+    try:
+        from vaara.attestation.receipt import (
+            evidence_bundle_from_json,
+            verify_evidence_bundle,
+        )
+    except ImportError:
+        print(_ATTESTATION_HINT, file=sys.stderr)
+        return 2
+
+    path = Path(args.bundle).expanduser()
+    if path.is_dir():
+        candidates = [path / name for name in ("bundle.json", "evidence_bundle.json")]
+        found = next((c for c in candidates if c.is_file()), None)
+        if found is None:
+            print(
+                f"vaara verify-bundle: no bundle.json or evidence_bundle.json "
+                f"in directory {path}",
+                file=sys.stderr,
+            )
+            return 2
+        path = found
+    elif not path.is_file():
+        print(
+            f"vaara verify-bundle: not a file or directory: {path}",
+            file=sys.stderr,
+        )
+        return 2
+
+    try:
+        doc = json.loads(path.read_text(encoding="utf-8"))
+    except (json.JSONDecodeError, OSError) as exc:
+        print(f"vaara verify-bundle: cannot read bundle JSON: {exc}", file=sys.stderr)
+        return 1
+    try:
+        bundle = evidence_bundle_from_json(doc)
+    except ValueError as exc:
+        print(
+            f"vaara verify-bundle: not a valid evidence bundle: {exc}",
+            file=sys.stderr,
+        )
+        return 1
+
+    verdict = verify_evidence_bundle(bundle)
+
+    if args.json:
+        print(json.dumps(verdict.to_dict(), indent=2))
+    else:
+        print(f"verdict: {'OK' if verdict.ok else 'FAILED'}")
+        print(f"  authenticity established: {verdict.authenticity_established}")
+        if verdict.keyid:
+            print(f"  identity keyid: {verdict.keyid}")
+        print("  lenses:")
+        for r in verdict.lenses:
+            state = ("pass" if r.ok else "FAIL") if r.applicable else "n/a"
+            print(f"    {r.lens:12s} {state:4s}  {r.reason}")
+        print(f"  {verdict.reason}")
+
+    return 0 if verdict.ok else 1
+
+
+def _cmd_build_bundle(args: argparse.Namespace) -> int:
+    """Assemble an evidence bundle on disk from the issuer's pieces.
+
+    The issuer-side mirror of ``verify-bundle``: where that command checks a
+    bundle, this one produces it. Reads each piece (the receipt, and whatever
+    identity, signature, back-link, inclusion, consistency, and revocation
+    material the issuer holds), assembles the single document ``verify-bundle``
+    reads, and writes it (sorted, two-space indent: the exact bytes the
+    ``bundle_doc_v0`` vectors commit). Then loads the written document straight
+    back and reports the ``verify-bundle`` verdict, the round-trip the format
+    promises. Exit 0 once a well-formed bundle is written; a partial bundle
+    that is not yet ``ok`` is still a successful build and is reported, not
+    rejected.
+    """
+    try:
+        from vaara.attestation.receipt import (
+            build_bundle_document,
+            evidence_bundle_from_json,
+            load_bundle_pieces_from_dir,
+            verify_evidence_bundle,
+        )
+        from vaara.attestation.sep2787 import AttestationError
+    except ImportError:
+        print(_ATTESTATION_HINT, file=sys.stderr)
+        return 2
+
+    pieces: dict[str, Any] = {}
+
+    # Directory discovery first; explicit flags below override piece by piece.
+    if args.from_dir is not None:
+        try:
+            pieces.update(load_bundle_pieces_from_dir(args.from_dir))
+        except NotADirectoryError as exc:
+            print(f"vaara build-bundle: {exc}", file=sys.stderr)
+            return 2
+        except (ValueError, OSError) as exc:
+            print(f"vaara build-bundle: {exc}", file=sys.stderr)
+            return 1
+
+    flag_files = {
+        "receipt": args.receipt,
+        "did_document": args.did_document,
+        "verifying_jwk": args.verifying_jwk,
+        "attestation": args.attestation,
+        "inclusion": args.inclusion,
+        "consistency": args.consistency,
+        "registry": args.registry,
+    }
+    for key, path_str in flag_files.items():
+        if path_str is None:
+            continue
+        path = Path(path_str).expanduser()
+        try:
+            pieces[key] = json.loads(path.read_text(encoding="utf-8"))
+        except (json.JSONDecodeError, OSError) as exc:
+            flag = "--" + key.replace("_", "-")
+            print(
+                f"vaara build-bundle: cannot read {flag} from {path}: {exc}",
+                file=sys.stderr,
+            )
+            return 1
+
+    if args.expected_keyid is not None:
+        pieces["expected_keyid"] = args.expected_keyid
+    if args.inclusion_leaf_hex is not None:
+        pieces["inclusion_leaf_hex"] = args.inclusion_leaf_hex
+
+    if "receipt" not in pieces:
+        print(
+            "vaara build-bundle: a receipt is required "
+            "(--receipt PATH, or a receipt.json under --from-dir)",
+            file=sys.stderr,
+        )
+        return 2
+
+    try:
+        doc = build_bundle_document(**pieces)
+    except (AttestationError, KeyError, TypeError, ValueError) as exc:
+        print(f"vaara build-bundle: cannot assemble bundle: {exc}", file=sys.stderr)
+        return 1
+
+    rendered = json.dumps(doc, indent=2, sort_keys=True) + "\n"
+
+    out_path = None
+    if args.out is not None:
+        out_path = Path(args.out).expanduser()
+        try:
+            out_path.write_text(rendered, encoding="utf-8")
+        except OSError as exc:
+            print(f"vaara build-bundle: cannot write {out_path}: {exc}", file=sys.stderr)
+            return 2
+    else:
+        sys.stdout.write(rendered)
+
+    # Round-trip self-check: load and verify the bytes just written, the same
+    # way verify-bundle would. Reported on stderr so it never pollutes the
+    # bundle JSON a caller may be piping from stdout.
+    verdict = verify_evidence_bundle(evidence_bundle_from_json(doc))
+    where = str(out_path) if out_path is not None else "stdout"
+    state = "OK" if verdict.ok else "not ok"
+    print(
+        f"vaara build-bundle: assembled bundle to {where}; "
+        f"verify-bundle verdict {state} ({verdict.reason})",
+        file=sys.stderr,
+    )
+    return 0
+
+
 def _cmd_serve(args: argparse.Namespace) -> int:
     try:
         import uvicorn
@@ -2209,6 +2402,88 @@ def build_parser() -> argparse.ArgumentParser:
              "result commitment, the commitment is verified against this.",
     )
     prc_verify.set_defaults(func=_cmd_receipt_verify)
+
+    pvb = sub.add_parser(
+        "verify-bundle",
+        help="Verify a complete evidence bundle in one command: one receipt "
+             "plus whatever identity, signature, back-link, inclusion, "
+             "consistency, and revocation evidence accompanies it, all to one "
+             "verdict. Requires the attestation extra.",
+    )
+    pvb.add_argument(
+        "bundle",
+        help="Path to an evidence-bundle JSON file, or a directory containing "
+             "bundle.json (or evidence_bundle.json)",
+    )
+    pvb.add_argument(
+        "--json", action="store_true",
+        help="Emit the full verdict as JSON instead of a human-readable summary",
+    )
+    pvb.set_defaults(func=_cmd_verify_bundle)
+
+    pbb = sub.add_parser(
+        "build-bundle",
+        help="Assemble a complete evidence bundle on disk from the issuer's "
+             "pieces (receipt, attestation, identity, inclusion, consistency, "
+             "revocation), writing the single file verify-bundle reads. The "
+             "issuer-side mirror of verify-bundle. Requires the attestation "
+             "extra.",
+    )
+    pbb.add_argument(
+        "--from-dir", default=None,
+        help="Directory holding the issuer's pieces by conventional name: "
+             "receipt.json, did_document.json, verifying_jwk.json, "
+             "attestation.json, inclusion.json, consistency.json, "
+             "registry.json, plus scalars expected_keyid.txt and "
+             "inclusion_leaf_hex.txt. Explicit flags below override.",
+    )
+    pbb.add_argument(
+        "--receipt", default=None,
+        help="Path to the execution-receipt JSON. Required unless --from-dir "
+             "supplies receipt.json.",
+    )
+    pbb.add_argument(
+        "--did-document", default=None,
+        help="Path to the did:web DID document JSON (identity lens).",
+    )
+    pbb.add_argument(
+        "--expected-keyid", default=None,
+        help="Pin the verification-method keyid the receipt must resolve to "
+             "(identity lens).",
+    )
+    pbb.add_argument(
+        "--verifying-jwk", default=None,
+        help="Path to the verifying public-key JWK JSON (signature lens).",
+    )
+    pbb.add_argument(
+        "--attestation", default=None,
+        help="Path to the SEP-2787 request attestation JSON (back-link lens).",
+    )
+    pbb.add_argument(
+        "--inclusion", default=None,
+        help="Path to the transparency-log inclusion-proof JSON, carrying "
+             "log_index, tree_size, siblings_hex, and root_hex (inclusion lens).",
+    )
+    pbb.add_argument(
+        "--inclusion-leaf-hex", default=None,
+        help="Override the inclusion leaf bytes as hex. Defaults to the "
+             "canonical receipt bytes.",
+    )
+    pbb.add_argument(
+        "--consistency", default=None,
+        help="Path to the append-only consistency-proof JSON, carrying "
+             "first_size, second_size, hashes_hex, first_root_hex, and "
+             "second_root_hex (consistency lens).",
+    )
+    pbb.add_argument(
+        "--registry", default=None,
+        help="Path to the revocation-registry JSON (revocation lens).",
+    )
+    pbb.add_argument(
+        "--out", default=None,
+        help="Write the assembled bundle to this path. Default: stdout.",
+    )
+    pbb.set_defaults(func=_cmd_build_bundle)
 
     ptee = sub.add_parser(
         "tee",

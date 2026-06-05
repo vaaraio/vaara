@@ -1,0 +1,242 @@
+{
+  "all_lenses_pass": {
+    "authenticity_established": true,
+    "lenses": {
+      "back_link": {
+        "applicable": true,
+        "ok": true
+      },
+      "consistency": {
+        "applicable": true,
+        "ok": true
+      },
+      "identity": {
+        "applicable": true,
+        "ok": true
+      },
+      "inclusion": {
+        "applicable": true,
+        "ok": true
+      },
+      "revocation": {
+        "applicable": true,
+        "ok": true
+      },
+      "signature": {
+        "applicable": false,
+        "ok": false
+      }
+    },
+    "ok": true
+  },
+  "broken_back_link": {
+    "authenticity_established": true,
+    "lenses": {
+      "back_link": {
+        "applicable": true,
+        "ok": false
+      },
+      "consistency": {
+        "applicable": false,
+        "ok": false
+      },
+      "identity": {
+        "applicable": true,
+        "ok": true
+      },
+      "inclusion": {
+        "applicable": false,
+        "ok": false
+      },
+      "revocation": {
+        "applicable": false,
+        "ok": false
+      },
+      "signature": {
+        "applicable": false,
+        "ok": false
+      }
+    },
+    "ok": false
+  },
+  "forked_consistency": {
+    "authenticity_established": true,
+    "lenses": {
+      "back_link": {
+        "applicable": false,
+        "ok": false
+      },
+      "consistency": {
+        "applicable": true,
+        "ok": false
+      },
+      "identity": {
+        "applicable": true,
+        "ok": true
+      },
+      "inclusion": {
+        "applicable": false,
+        "ok": false
+      },
+      "revocation": {
+        "applicable": false,
+        "ok": false
+      },
+      "signature": {
+        "applicable": false,
+        "ok": false
+      }
+    },
+    "ok": false
+  },
+  "revoked_in_time": {
+    "authenticity_established": true,
+    "lenses": {
+      "back_link": {
+        "applicable": true,
+        "ok": true
+      },
+      "consistency": {
+        "applicable": false,
+        "ok": false
+      },
+      "identity": {
+        "applicable": true,
+        "ok": true
+      },
+      "inclusion": {
+        "applicable": true,
+        "ok": true
+      },
+      "revocation": {
+        "applicable": true,
+        "ok": false
+      },
+      "signature": {
+        "applicable": false,
+        "ok": false
+      }
+    },
+    "ok": false
+  },
+  "signature_only": {
+    "authenticity_established": true,
+    "lenses": {
+      "back_link": {
+        "applicable": false,
+        "ok": false
+      },
+      "consistency": {
+        "applicable": false,
+        "ok": false
+      },
+      "identity": {
+        "applicable": false,
+        "ok": false
+      },
+      "inclusion": {
+        "applicable": false,
+        "ok": false
+      },
+      "revocation": {
+        "applicable": false,
+        "ok": false
+      },
+      "signature": {
+        "applicable": true,
+        "ok": true
+      }
+    },
+    "ok": true
+  },
+  "tampered_inclusion": {
+    "authenticity_established": true,
+    "lenses": {
+      "back_link": {
+        "applicable": true,
+        "ok": true
+      },
+      "consistency": {
+        "applicable": false,
+        "ok": false
+      },
+      "identity": {
+        "applicable": true,
+        "ok": true
+      },
+      "inclusion": {
+        "applicable": true,
+        "ok": false
+      },
+      "revocation": {
+        "applicable": true,
+        "ok": true
+      },
+      "signature": {
+        "applicable": false,
+        "ok": false
+      }
+    },
+    "ok": false
+  },
+  "unauthenticated_in_log": {
+    "authenticity_established": false,
+    "lenses": {
+      "back_link": {
+        "applicable": false,
+        "ok": false
+      },
+      "consistency": {
+        "applicable": false,
+        "ok": false
+      },
+      "identity": {
+        "applicable": false,
+        "ok": false
+      },
+      "inclusion": {
+        "applicable": true,
+        "ok": true
+      },
+      "revocation": {
+        "applicable": true,
+        "ok": true
+      },
+      "signature": {
+        "applicable": false,
+        "ok": false
+      }
+    },
+    "ok": false
+  },
+  "wrong_signature_key": {
+    "authenticity_established": false,
+    "lenses": {
+      "back_link": {
+        "applicable": false,
+        "ok": false
+      },
+      "consistency": {
+        "applicable": false,
+        "ok": false
+      },
+      "identity": {
+        "applicable": false,
+        "ok": false
+      },
+      "inclusion": {
+        "applicable": false,
+        "ok": false
+      },
+      "revocation": {
+        "applicable": false,
+        "ok": false
+      },
+      "signature": {
+        "applicable": true,
+        "ok": false
+      }
+    },
+    "ok": false
+  }
+}

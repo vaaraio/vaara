@@ -6,6 +6,88 @@ and this project follows [Semantic Versioning](https://semver.org/spec/v2.0.0.ht
 
 ## [Unreleased]
 
+### Fixed
+- `vaara build-bundle`: a receipt that is valid JSON but the wrong shape (for
+  example missing a required field) now exits 1 with `cannot assemble bundle:
+  ...` instead of letting an `AttestationError` traceback escape. The handler
+  around `build_bundle_document` caught only `ValueError`; the validation path
+  can also raise `AttestationError`, `KeyError`, or `TypeError`, so it now
+  catches all four, matching the other attestation CLI commands.
+
+## [0.58.0] - 2026-06-05
+
+**Theme: one command for the party producing evidence, the mirror of
+`verify-bundle`. v0.57.0 gave a verifier one command to check an evidence
+bundle on disk. This release gives the issuer one command to produce it.
+`vaara build-bundle` assembles the receipt plus whatever identity, signature,
+back-link, inclusion, consistency, and revocation material the issuer holds
+into the single document `verify-bundle` reads, byte for byte. Producing and
+checking evidence become one closed loop over one file.**
+
+### Added
+- `vaara build-bundle`: assemble a complete evidence bundle on disk from the
+  issuer's pieces. Supply them with `--from-dir DIR` (each piece in a
+  conventional file: `receipt.json`, `attestation.json`, `did_document.json`,
+  `verifying_jwk.json`, `inclusion.json`, `consistency.json`, `registry.json`,
+  plus the scalars `expected_keyid.txt` and `inclusion_leaf_hex.txt`) or with
+  explicit per-piece flags. Writes the bundle to `--out` or stdout, then loads
+  it back and reports the `verify-bundle` verdict. A malformed piece fails the
+  build with the offending field named.
+- `vaara.attestation.build_bundle_document`: the issuer-side mirror of
+  `evidence_bundle_from_json`. Stitches the pieces into the one on-disk
+  document and validates it by loading it straight back, so a bad piece is
+  caught at assembly time. The output is byte-for-byte the shape the
+  `bundle_doc_v0` vectors commit and `verify-bundle` reads.
+- `vaara.attestation.load_bundle_pieces_from_dir`: discover an issuer's pieces
+  in a directory by the conventional file names, returning the kwargs
+  `build_bundle_document` takes.
+- `tests/vectors/build_bundle_v0/`: each evidence bundle split into the
+  issuer's separate pieces, with a Vaara-free independent checker that
+  re-assembles them, asserts the result is byte-for-byte the document the
+  verifier reads, and reproduces the verdict, with no Vaara import.
+
+### Notes
+- Purely additive over v0.57.0. No change to the receipt envelope or any
+  canonicalization; `build-bundle` assembles the existing on-disk shape and
+  defines no new wire format. Envelope version stays 1. Round-trip property:
+  a bundle from `build-bundle`, fed to `verify-bundle`, verifies. 1308 passed.
+
+## [0.57.0] - 2026-06-05
+
+**Theme: one command to verify an evidence bundle from disk. v0.56.0 added
+`verify_evidence_bundle`, one call that runs every applicable lens over an
+in-memory bundle and returns one verdict. But to check evidence someone handed
+you, those objects first have to be rebuilt from files. This release adds the
+on-disk bundle format and the `vaara verify-bundle` command, so a regulator
+handed a single file runs one step and gets the verdict, without writing any
+code or trusting the issuer's tooling.**
+
+### Added
+- `vaara verify-bundle PATH`: verify a complete evidence bundle in one command.
+  PATH is a bundle JSON file, or a directory holding `bundle.json`. The command
+  runs every lens whose evidence is present (identity, signature, back-link,
+  inclusion, consistency, revocation), prints a per-lens summary, and exits 0
+  only when the bundle is `ok`. `--json` emits the full verdict.
+- `vaara.attestation.evidence_bundle_from_json`: load an `EvidenceBundle` from
+  its on-disk JSON document. The shape is exactly the `bundle` object the
+  `evidence_bundle_v0` vectors already commit, so every committed vector is a
+  valid bundle file. The loader is strict on what is present: a malformed block
+  raises `ValueError` naming the field, rather than dropping a lens and
+  returning a falsely narrow verdict.
+- `BundleVerdict.to_dict` and `LensResult.to_dict` for JSON output.
+- `tests/vectors/bundle_doc_v0/`: the eight evidence-bundle cases as standalone
+  on-disk files, with a Vaara-free independent checker that reads each file on
+  its own and reproduces its verdict, so a single bundle file is verifiable
+  without Vaara.
+
+### Notes
+- Purely additive over v0.56.0. No change to the receipt envelope or any
+  canonicalization; the loader parses the existing bundle shape off disk and
+  defines no new wire format. Envelope version stays 1. 1278 passed.
+- The verifiable trust plane, the 0.6 milestone, is shipped end to end: the
+  receipt, each verification lens, the one-call verdict, and now a command a
+  non-developer can run against a file.
+
 ## [0.56.0] - 2026-06-05
 
 **Theme: one call to verify an evidence bundle. The 0.52 to 0.55 line built

@@ -1,0 +1,29 @@
+{
+  "receipt": {
+    "alg": "ES256",
+    "backLink": {
+      "attestationDigest": "sha256:8f4ae37b34b9be4056ce0c243dabb819d225864b4aee04561ee9bdd67b9080dc",
+      "attestationNonce": "att-nonce-fixed-0001"
+    },
+    "outcomeDerived": {
+      "completedAt": "2026-05-29T10:00:00Z",
+      "status": "executed"
+    },
+    "receiptAsserted": {
+      "alg": "ES256",
+      "iat": "2026-05-29T10:00:00Z",
+      "iss": "did:web:agents.example.com:billing",
+      "nonce": "rcpt-nonce-fixed-0001",
+      "secretVersion": "v1",
+      "sub": "did:web:agents.example.com:billing"
+    },
+    "signature": "862d6ebc949c323cdd695290ee88818390ee49880b37b012c923e3ea823fa164720f19683959c633d614d87b84d93e42bdf17c0d0ff2765f35570d93f813fadb",
+    "version": 1
+  },
+  "verifying_jwk": {
+    "crv": "P-256",
+    "kty": "EC",
+    "x": "B2Bb3IA08MGNseH1UseCTbv_Q-J10isZuVS7galZBEU",
+    "y": "pF0OwY17c4EPwvJJYAjp6z9tVfFo37FGfhFrwVZS_iM"
+  }
+}

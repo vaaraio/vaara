@@ -81,6 +81,15 @@ class LensResult:
     ok: bool
     reason: str
 
+    def to_dict(self) -> dict[str, Any]:
+        """Plain-dict form for JSON output (CLI, logs)."""
+        return {
+            "lens": self.lens,
+            "applicable": self.applicable,
+            "ok": self.ok,
+            "reason": self.reason,
+        }
+
 
 @dataclass(frozen=True)
 class EvidenceBundle:
@@ -132,6 +141,16 @@ class BundleVerdict:
             if result.lens == name:
                 return result
         raise KeyError(f"no such lens: {name!r}")
+
+    def to_dict(self) -> dict[str, Any]:
+        """Plain-dict form for JSON output (CLI, logs)."""
+        return {
+            "ok": self.ok,
+            "authenticity_established": self.authenticity_established,
+            "keyid": self.keyid,
+            "reason": self.reason,
+            "lenses": [result.to_dict() for result in self.lenses],
+        }
 
 
 def _identity_lens(bundle: EvidenceBundle) -> tuple[LensResult, Optional[str]]:
