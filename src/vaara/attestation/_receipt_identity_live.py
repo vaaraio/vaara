@@ -49,6 +49,7 @@ from vaara.attestation._receipt_identity import (
     verify_receipt_identity,
 )
 from vaara.attestation._receipt_types import ExecutionReceipt
+from vaara.attestation._revocation import _parse_iso, revoked_in_time
 from vaara.attestation._sep2787_types import AttestationError
 
 # A DID document is a small JSON file. Cap the read so a misbehaving or
@@ -64,24 +65,6 @@ Fetcher = Callable[[str], bytes]
 
 def _utc_now_iso() -> str:
     return datetime.now(timezone.utc).strftime("%Y-%m-%dT%H:%M:%SZ")
-
-
-def _parse_iso(value: str) -> Optional[datetime]:
-    """Parse an ISO 8601 instant to an aware UTC datetime, or None.
-
-    Accepts a trailing ``Z``. A naive timestamp is read as UTC so two
-    receipts are comparable regardless of which form an emitter used.
-    """
-    if not isinstance(value, str) or not value:
-        return None
-    text = value[:-1] + "+00:00" if value.endswith("Z") else value
-    try:
-        parsed = datetime.fromisoformat(text)
-    except ValueError:
-        return None
-    if parsed.tzinfo is None:
-        return parsed.replace(tzinfo=timezone.utc)
-    return parsed.astimezone(timezone.utc)
 
 
 def _parse_epoch(iso: str) -> float:
@@ -333,13 +316,11 @@ def verify_receipt_identity_live(
     revoked_at: Optional[str] = None
     if identity.bound:
         revoked_at = _revocation_instant(document, identity.keyid)
-        if revoked_at is not None:
-            revoked_dt = _parse_iso(revoked_at)
-            issued_dt = _parse_iso(issued_at)
-            # Revoked binds only when revocation is at or before issuance.
-            # An unparseable revocation or issuance instant fails closed.
-            if revoked_dt is None or issued_dt is None or revoked_dt <= issued_dt:
-                revoked = True
+        # Revoked binds only when revocation is at or before issuance; an
+        # unparseable revocation or issuance instant fails closed. Shared
+        # with the cross-stack registry so every lens applies one rule.
+        if revoked_at is not None and revoked_in_time(revoked_at, issued_at):
+            revoked = True
 
     trusted = (
         identity.resolved and identity.bound and not deactivated and not revoked
