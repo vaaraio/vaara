@@ -1,0 +1,10 @@
+{
+  "entries": [
+    {
+      "revoked_at": "2026-05-29T09:30:00Z",
+      "scope": "key",
+      "subject": "did:web:agents.example.com:billing#key-2026"
+    }
+  ],
+  "version": 1
+}

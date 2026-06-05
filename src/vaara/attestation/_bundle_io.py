@@ -41,7 +41,9 @@ parses the existing one off disk.
 
 from __future__ import annotations
 
-from typing import Any
+import json
+from pathlib import Path
+from typing import Any, Union
 
 from vaara.attestation._bundle import EvidenceBundle
 from vaara.attestation._receipt_types import receipt_from_dict
@@ -196,3 +198,130 @@ def evidence_bundle_from_json(doc: dict[str, Any]) -> EvidenceBundle:
         consistency_second_root=consistency_second_root,
         registry=registry,
     )
+
+
+# ── Issuer side: assemble the on-disk bundle document ────────────────────────
+#
+# ``evidence_bundle_from_json`` is the verifier's loader. The functions below
+# are its issuer-side mirror: the party producing evidence stitches its pieces
+# into the one document the verifier reads. They take and return plain JSON
+# values (the same shapes each piece already has on disk), so assembly defines
+# no new wire format and adds nothing the loader does not already parse.
+
+# Conventional file names for an issuer's separate artifacts, used by
+# ``vaara build-bundle --from-dir`` and mirrored by the build_bundle_v0
+# independent checker. Each maps a file in the issuer's directory to the
+# bundle-document key it fills. The ``.json`` pieces are JSON objects; the
+# ``.txt`` pieces are raw scalar strings.
+BUNDLE_PIECE_FILES: dict[str, str] = {
+    "receipt.json": "receipt",
+    "did_document.json": "did_document",
+    "verifying_jwk.json": "verifying_jwk",
+    "attestation.json": "attestation",
+    "inclusion.json": "inclusion",
+    "consistency.json": "consistency",
+    "registry.json": "registry",
+}
+BUNDLE_PIECE_SCALARS: dict[str, str] = {
+    "expected_keyid.txt": "expected_keyid",
+    "inclusion_leaf_hex.txt": "inclusion_leaf_hex",
+}
+
+# The optional document keys, in the order the loader documents them. ``receipt``
+# is required and handled separately.
+_OPTIONAL_DOC_KEYS: tuple[str, ...] = (
+    "did_document",
+    "expected_keyid",
+    "verifying_jwk",
+    "attestation",
+    "inclusion",
+    "inclusion_leaf_hex",
+    "consistency",
+    "registry",
+)
+
+
+def build_bundle_document(
+    *,
+    receipt: dict[str, Any],
+    did_document: dict[str, Any] | None = None,
+    expected_keyid: str | None = None,
+    verifying_jwk: dict[str, Any] | None = None,
+    attestation: dict[str, Any] | None = None,
+    inclusion: dict[str, Any] | None = None,
+    inclusion_leaf_hex: str | None = None,
+    consistency: dict[str, Any] | None = None,
+    registry: dict[str, Any] | None = None,
+) -> dict[str, Any]:
+    """Assemble the on-disk evidence-bundle document from the issuer's pieces.
+
+    The issuer-side mirror of :func:`evidence_bundle_from_json`: where the
+    loader reconstructs a bundle from one document, this stitches the issuer's
+    separate pieces into that one document. Each argument is the JSON the piece
+    already is on disk (the receipt, the SEP-2787 attestation it answers, the
+    transparency-log inclusion and consistency proofs, the did:web identity
+    material, the verifying JWK, and the revocation registry). ``receipt`` is
+    required; every other piece is optional and, when omitted, leaves its lens
+    not applicable, exactly as on the dataclass.
+
+    The assembled document is validated by loading it straight back through
+    :func:`evidence_bundle_from_json`, so a malformed piece raises
+    :class:`ValueError` naming the offending field at assembly time rather than
+    producing a file that will not load. Returns the document as a plain dict;
+    the caller renders it (the CLI writes it sorted with two-space indent, the
+    exact bytes the ``bundle_doc_v0`` vectors commit).
+
+    Round-trip: the document this returns, written to disk and read by
+    :func:`evidence_bundle_from_json`, reconstructs the same bundle, which is
+    what ``vaara verify-bundle`` checks.
+    """
+    doc: dict[str, Any] = {"receipt": receipt}
+    optional: dict[str, Any] = {
+        "did_document": did_document,
+        "expected_keyid": expected_keyid,
+        "verifying_jwk": verifying_jwk,
+        "attestation": attestation,
+        "inclusion": inclusion,
+        "inclusion_leaf_hex": inclusion_leaf_hex,
+        "consistency": consistency,
+        "registry": registry,
+    }
+    for key in _OPTIONAL_DOC_KEYS:
+        value = optional[key]
+        if value is not None:
+            doc[key] = value
+
+    # Validate by reconstructing: a malformed piece fails here, loudly and
+    # named, instead of being written to a bundle that the verifier rejects.
+    evidence_bundle_from_json(doc)
+    return doc
+
+
+def load_bundle_pieces_from_dir(directory: Union[str, Path]) -> dict[str, Any]:
+    """Discover an issuer's bundle pieces in a directory by conventional name.
+
+    Returns a kwargs dict for :func:`build_bundle_document`: every recognised
+    file present contributes its piece. The ``.json`` files in
+    :data:`BUNDLE_PIECE_FILES` are parsed as JSON; the scalar ``.txt`` files in
+    :data:`BUNDLE_PIECE_SCALARS` contribute their stripped text. Files outside
+    the convention are ignored. Raises :class:`ValueError` naming the file when
+    a JSON piece does not parse, and :class:`NotADirectoryError` when
+    ``directory`` is not a directory.
+    """
+    base = Path(directory).expanduser()
+    if not base.is_dir():
+        raise NotADirectoryError(f"not a directory: {base}")
+
+    pieces: dict[str, Any] = {}
+    for filename, key in BUNDLE_PIECE_FILES.items():
+        path = base / filename
+        if path.is_file():
+            try:
+                pieces[key] = json.loads(path.read_text(encoding="utf-8"))
+            except json.JSONDecodeError as exc:
+                raise ValueError(f"{path} is not valid JSON: {exc}") from exc
+    for filename, key in BUNDLE_PIECE_SCALARS.items():
+        path = base / filename
+        if path.is_file():
+            pieces[key] = path.read_text(encoding="utf-8").strip()
+    return pieces
