@@ -6,6 +6,14 @@ and this project follows [Semantic Versioning](https://semver.org/spec/v2.0.0.ht
 
 ## [Unreleased]
 
+### Fixed
+- `vaara build-bundle`: a receipt that is valid JSON but the wrong shape (for
+  example missing a required field) now exits 1 with `cannot assemble bundle:
+  ...` instead of letting an `AttestationError` traceback escape. The handler
+  around `build_bundle_document` caught only `ValueError`; the validation path
+  can also raise `AttestationError`, `KeyError`, or `TypeError`, so it now
+  catches all four, matching the other attestation CLI commands.
+
 ## [0.58.0] - 2026-06-05
 
 **Theme: one command for the party producing evidence, the mirror of

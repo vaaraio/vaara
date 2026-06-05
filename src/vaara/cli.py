@@ -1624,6 +1624,7 @@ def _cmd_build_bundle(args: argparse.Namespace) -> int:
             load_bundle_pieces_from_dir,
             verify_evidence_bundle,
         )
+        from vaara.attestation.sep2787 import AttestationError
     except ImportError:
         print(_ATTESTATION_HINT, file=sys.stderr)
         return 2
@@ -1679,7 +1680,7 @@ def _cmd_build_bundle(args: argparse.Namespace) -> int:
 
     try:
         doc = build_bundle_document(**pieces)
-    except ValueError as exc:
+    except (AttestationError, KeyError, TypeError, ValueError) as exc:
         print(f"vaara build-bundle: cannot assemble bundle: {exc}", file=sys.stderr)
         return 1
 
