@@ -1,0 +1,29 @@
+{
+  "alg": "HS256",
+  "issuerAsserted": {
+    "alg": "HS256",
+    "expSeconds": 300,
+    "iat": "2026-05-29T09:59:59Z",
+    "iss": "issuer://test",
+    "nonce": "att-nonce-other-0002",
+    "secretVersion": "v1",
+    "sub": "agent:billing"
+  },
+  "payloadDerived": {
+    "toolCalls": [
+      {
+        "args": {
+          "projection": "{\"digest\":\"sha256:2166059e526b50f65c44d4c4ce2a08b79bab73530cbe45ea35763397295c5239\"}",
+          "projectionDigest": "sha256:3c7533cb20f55563bcb6d3fa2f15460290493ea13bd47880379e74acf8609f60"
+        },
+        "name": "charge_card",
+        "serverFingerprint": "sha256:1111111111111111111111111111111111111111111111111111111111111111"
+      }
+    ]
+  },
+  "plannerDeclared": {
+    "intent": "buy something else"
+  },
+  "signature": "5fcbf30de8243d9289dc71e9ca569d9bda184c7b4e4254196186a09c4689c292",
+  "version": 1
+}
