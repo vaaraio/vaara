@@ -40,6 +40,7 @@ except ImportError:
     _HAS_CRYPTO = False
 
 if TYPE_CHECKING:
+    from vaara.attestation import RevocationRegistry
     from vaara.audit.signer import Signer
     from vaara.audit.trail import AuditTrail
 
@@ -183,6 +184,7 @@ def export_signed(
     agent_id: str = "",
     *,
     signer: Optional["Signer"] = None,
+    revocation: Optional["RevocationRegistry"] = None,
 ) -> ExportResult:
     """Produce a signed, regulator-handoff zip of the audit trail.
 
@@ -200,6 +202,16 @@ def export_signed(
             when promoting an operator's retention horizon past the
             credible quantum threshold. Manifest carries the algorithm
             identifier so verifiers dispatch automatically.
+        revocation: An optional
+            ``vaara.attestation.RevocationRegistry``. When supplied, the
+            registry's canonical bytes are written to a ``revocation.json``
+            member and its digest plus entry count are pinned into the
+            signed manifest (``revocation.registry_sha256``). This makes the
+            revocation state at export time part of the tamper-evident
+            bundle, so a regulator recomputes every receipt's
+            revocation-in-time verdict against the exact registry the
+            exporter used. Omitting it produces a byte-identical manifest to
+            earlier versions.
 
     Returns:
         ExportResult with the output path, manifest dict, and chain status.
@@ -247,6 +259,15 @@ def export_signed(
         vaara_version=vaara_version,
         agent_id=agent_id,
     )
+
+    revocation_bytes: Optional[bytes] = None
+    if revocation is not None:
+        revocation_bytes = revocation.canonical_bytes()
+        manifest["revocation"] = {
+            "entry_count": len(revocation),
+            "registry_sha256": revocation.digest(),
+        }
+
     manifest_bytes = json.dumps(manifest, sort_keys=True, indent=2).encode("utf-8")
 
     to_sign = hashlib.sha256(trail_bytes + manifest_bytes).digest()
@@ -256,6 +277,10 @@ def export_signed(
         zf.writestr("trail.jsonl", trail_bytes)
         zf.writestr("manifest.json", manifest_bytes)
         zf.writestr("trail.sig", signature)
+        if revocation_bytes is not None:
+            # Bound to the signed manifest through registry_sha256, so the
+            # file's integrity is covered transitively by trail.sig.
+            zf.writestr("revocation.json", revocation_bytes)
         if signer.algorithm == "Ed25519":
             # Preserve the existing PEM-encoded public-key file for back-
             # compatible verification by older Vaara clients.
