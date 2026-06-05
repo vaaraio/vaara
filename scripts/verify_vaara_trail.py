@@ -213,6 +213,9 @@ def verify(zip_path: Path, pubkey_path: Path | None) -> tuple[bool, list[str], d
             embedded_pubkey = (
                 zf.read("signer_pubkey.pem") if "signer_pubkey.pem" in names else None
             )
+            revocation_bytes = (
+                zf.read("revocation.json") if "revocation.json" in names else None
+            )
             for name in names:
                 if name.startswith("sigs/") and name.endswith(".sig"):
                     threshold_sigs[name[len("sigs/"):-len(".sig")]] = zf.read(name)
@@ -233,6 +236,25 @@ def verify(zip_path: Path, pubkey_path: Path | None) -> tuple[bool, list[str], d
     actual_sha = hashlib.sha256(trail_bytes).hexdigest()
     if manifest.get("trail_sha256") != actual_sha:
         errors.append("trail.jsonl SHA-256 does not match manifest.trail_sha256 (tampered)")
+
+    # Optional revocation registry (v0.55). The manifest pins the registry
+    # digest, and the manifest itself is signed, so checking revocation.json
+    # against manifest.revocation.registry_sha256 confirms the revocation
+    # state in the bundle is the one the signer attested.
+    rev_manifest = manifest.get("revocation")
+    if rev_manifest is not None or revocation_bytes is not None:
+        if rev_manifest is None:
+            errors.append("revocation.json present but manifest has no revocation block")
+        elif revocation_bytes is None:
+            errors.append("manifest declares revocation but revocation.json is missing")
+        else:
+            expected = rev_manifest.get("registry_sha256")
+            actual_rev = "sha256:" + hashlib.sha256(revocation_bytes).hexdigest()
+            if expected != actual_rev:
+                errors.append(
+                    "revocation.json digest does not match "
+                    "manifest.revocation.registry_sha256 (tampered)"
+                )
 
     algorithm = manifest.get("signature_algorithm", "Ed25519")
     to_verify = hashlib.sha256(trail_bytes + manifest_bytes).digest()

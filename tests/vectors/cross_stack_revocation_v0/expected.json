@@ -1,0 +1,26 @@
+{
+  "clean": {
+    "log_lens_included": true,
+    "log_lens_ok": true,
+    "receipt_lens_revoked": false,
+    "registry_digest": "sha256:a6a20076da005b27c9afc3a5d5b2457798c0ac817d1abc38b2fee4398ac3f133"
+  },
+  "identity_revoked_in_time": {
+    "log_lens_included": true,
+    "log_lens_ok": false,
+    "receipt_lens_revoked": true,
+    "registry_digest": "sha256:113f0f4405f4636f2abcd921250bdbb4f5ebef465fd534bf35bf2209bded2b75"
+  },
+  "key_revoked_after": {
+    "log_lens_included": true,
+    "log_lens_ok": true,
+    "receipt_lens_revoked": false,
+    "registry_digest": "sha256:cdf160a13191ac5e72902ce8990bde32a3d61a26a02fc550f7fd947efb17f292"
+  },
+  "key_revoked_in_time": {
+    "log_lens_included": true,
+    "log_lens_ok": false,
+    "receipt_lens_revoked": true,
+    "registry_digest": "sha256:5aa315f80985b7a5fc19a6c204407ea2350ba3f35877af3a22297b111c775218"
+  }
+}
