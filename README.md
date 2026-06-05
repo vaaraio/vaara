@@ -95,6 +95,25 @@ else:
 
 Each verdict carries the threshold-vs-observed snapshot, the rationale, and the underlying audit records, so a reviewer can trace `status` back to a concrete event without re-running the engine. The same data renders as a styled PDF for Notified Bodies (`--format pdf`, needs `vaara[pdf]`), a static HTML dashboard (`vaara compliance dashboard`), or a Sigstore-signed handoff envelope (`vaara trail export`, optional ML-DSA-65 / FIPS 204 post-quantum signer via `vaara[pq]`).
 
+## Verify the evidence
+
+Producing the trail is half the job. The other half is letting someone who does not trust you check it. `vaara verify-bundle` takes one evidence bundle and runs every check that applies to it, then prints a single verdict:
+
+```bash
+vaara verify-bundle evidence-bundle.json
+```
+
+No code to write, and no need to trust the tooling that produced the bundle. The command runs six lenses and is fail-closed on authenticity, so a record that is merely present in a log, with its signature never checked, does not pass:
+
+- **Identity** resolves the signing key to a `did:web` the agent controls, so the receipt names who acted, not just that something signed it.
+- **Signature** verifies the receipt under that key.
+- **Back-link** checks that the receipt binds to the request attestation it answers and to the prior chain head.
+- **Inclusion** checks that the record is in the transparency log.
+- **Consistency** checks that the log is append-only, so an earlier verified head stays consistent with the current one and nothing was rewritten behind you.
+- **Revocation** checks that no key or receipt in the chain has been revoked, across stacks.
+
+`ok` is true only when the signature is actually established and every applicable lens passes. A bundle that proves inclusion and non-revocation but never verifies a signature is not `ok`. Each lens also ships as public conformance vectors with a standalone checker that imports no Vaara code, so an independent party reproduces every verdict offline. That property is the point of the standards work behind [SEP-2828](https://github.com/modelcontextprotocol/modelcontextprotocol/pull/2828): the evidence is verifiable by someone who runs none of your software.
+
 ## Benchmarks
 
 Held-out test recall **84.7%** (95% Wilson [82.4, 86.7]) at a **4.1%** false-positive rate, and **1.2%** FPR on benign tool calls under live injection pressure. The hot-path rule scorer adds 140 µs mean / 210 µs p99 per call on commodity CPU. Every figure is reproducible end-to-end via `make bench`.
