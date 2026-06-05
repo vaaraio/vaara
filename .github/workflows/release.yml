@@ -226,34 +226,44 @@ jobs:
           set -euo pipefail
           EXPECTED="${RELEASE_TAG#v}"
           echo "Expected version (from tag ${RELEASE_TAG}): ${EXPECTED}"
-          curl -fsSL 'https://registry.modelcontextprotocol.io/v0/servers?search=vaara' -o registry.json
           python3 - "$EXPECTED" <<'PY'
-          import json, sys
+          import json, sys, time, urllib.request
 
           expected = sys.argv[1]
           names = ["io.github.vaaraio/vaara", "io.github.vaaraio/vaara-server"]
           OFFICIAL = "io.modelcontextprotocol.registry/official"
+          BASE = "https://registry.modelcontextprotocol.io/v0/servers"
 
-          with open("registry.json") as fh:
-              data = json.load(fh)
-          entries = data.get("servers", data.get("data", []))
-
-          failed = False
-          for name in names:
-              latest = None
-              for entry in entries:
+          def latest_active(name):
+              # Query per name with version=latest. The unfiltered search list is
+              # paginated and does not reliably carry every server's active entry,
+              # so a multi-listing repo needs one request per name.
+              url = f"{BASE}?search={name}&version=latest"
+              with urllib.request.urlopen(url, timeout=30) as fh:
+                  data = json.load(fh)
+              for entry in data.get("servers", data.get("data", [])):
                   server = entry.get("server", entry)
                   if server.get("name") != name:
                       continue
                   meta = (entry.get("_meta") or {}).get(OFFICIAL, {})
                   if meta.get("isLatest") and meta.get("status") == "active":
-                      latest = server.get("version")
+                      return server.get("version")
+              return None
+
+          failed = []
+          for name in names:
+              # Read-after-write on the registry can lag a publish by a few
+              # seconds, so poll before giving up.
+              latest = None
+              for _ in range(10):
+                  latest = latest_active(name)
+                  if latest == expected:
+                      print(f"OK   {name}: latest active version {latest} matches tag {expected}")
                       break
-              if latest == expected:
-                  print(f"OK   {name}: latest active version {latest} matches tag {expected}")
+                  time.sleep(6)
               else:
                   print(f"FAIL {name}: expected {expected}, registry latest active is {latest!r}")
-                  failed = True
+                  failed.append(name)
 
           if failed:
               print("::error::MCP Registry latest version does not match the released tag.")
