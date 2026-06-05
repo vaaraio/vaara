@@ -195,3 +195,16 @@ def test_cli_malformed_piece(tmp_path, capsys):
     ])
     assert rc == 1
     assert "cannot assemble bundle" in capsys.readouterr().err
+
+
+def test_cli_wrong_shape_receipt_reports_cleanly(tmp_path, capsys):
+    # A receipt that is valid JSON but the wrong shape fails validation with an
+    # AttestationError, not a ValueError. The handler must catch it and exit 1
+    # with a clean message rather than letting a traceback escape.
+    bad = tmp_path / "receipt.json"
+    bad.write_text(json.dumps({"not": "a receipt"}))
+    rc = main(["build-bundle", "--receipt", str(bad)])
+    assert rc == 1
+    err = capsys.readouterr().err
+    assert "cannot assemble bundle" in err
+    assert "Traceback" not in err
