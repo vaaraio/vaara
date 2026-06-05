@@ -96,6 +96,14 @@ Subcommands:
         commitment, --result verifies it against the runtime result.
         Exit 0 iff all checks pass.
 
+    vaara verify-bundle PATH [--json]
+        Verify a complete evidence bundle in one command. PATH is a bundle
+        JSON file, or a directory holding bundle.json. Runs every lens whose
+        evidence is present (identity, signature, back-link, inclusion,
+        consistency, revocation) and prints one verdict. Exit 0 iff the
+        bundle is ok: the receipt signature was established and every
+        applicable lens passed.
+
     vaara version
         Print the installed Vaara version.
 
@@ -1518,6 +1526,74 @@ def _cmd_receipt_verify(args: argparse.Namespace) -> int:
     return 1 if failed else 0
 
 
+def _cmd_verify_bundle(args: argparse.Namespace) -> int:
+    """Verify a whole evidence bundle from disk in one command.
+
+    Reads one bundle JSON document (or a directory holding ``bundle.json``),
+    runs every applicable verification lens through ``verify_evidence_bundle``,
+    and prints one verdict. Exit 0 iff the bundle is ``ok``: the receipt
+    signature was established and every lens whose evidence was present passed.
+    """
+    try:
+        from vaara.attestation.receipt import (
+            evidence_bundle_from_json,
+            verify_evidence_bundle,
+        )
+    except ImportError:
+        print(_ATTESTATION_HINT, file=sys.stderr)
+        return 2
+
+    path = Path(args.bundle).expanduser()
+    if path.is_dir():
+        candidates = [path / name for name in ("bundle.json", "evidence_bundle.json")]
+        found = next((c for c in candidates if c.is_file()), None)
+        if found is None:
+            print(
+                f"vaara verify-bundle: no bundle.json or evidence_bundle.json "
+                f"in directory {path}",
+                file=sys.stderr,
+            )
+            return 2
+        path = found
+    elif not path.is_file():
+        print(
+            f"vaara verify-bundle: not a file or directory: {path}",
+            file=sys.stderr,
+        )
+        return 2
+
+    try:
+        doc = json.loads(path.read_text(encoding="utf-8"))
+    except (json.JSONDecodeError, OSError) as exc:
+        print(f"vaara verify-bundle: cannot read bundle JSON: {exc}", file=sys.stderr)
+        return 1
+    try:
+        bundle = evidence_bundle_from_json(doc)
+    except ValueError as exc:
+        print(
+            f"vaara verify-bundle: not a valid evidence bundle: {exc}",
+            file=sys.stderr,
+        )
+        return 1
+
+    verdict = verify_evidence_bundle(bundle)
+
+    if args.json:
+        print(json.dumps(verdict.to_dict(), indent=2))
+    else:
+        print(f"verdict: {'OK' if verdict.ok else 'FAILED'}")
+        print(f"  authenticity established: {verdict.authenticity_established}")
+        if verdict.keyid:
+            print(f"  identity keyid: {verdict.keyid}")
+        print("  lenses:")
+        for r in verdict.lenses:
+            state = ("pass" if r.ok else "FAIL") if r.applicable else "n/a"
+            print(f"    {r.lens:12s} {state:4s}  {r.reason}")
+        print(f"  {verdict.reason}")
+
+    return 0 if verdict.ok else 1
+
+
 def _cmd_serve(args: argparse.Namespace) -> int:
     try:
         import uvicorn
@@ -2209,6 +2285,24 @@ def build_parser() -> argparse.ArgumentParser:
              "result commitment, the commitment is verified against this.",
     )
     prc_verify.set_defaults(func=_cmd_receipt_verify)
+
+    pvb = sub.add_parser(
+        "verify-bundle",
+        help="Verify a complete evidence bundle in one command: one receipt "
+             "plus whatever identity, signature, back-link, inclusion, "
+             "consistency, and revocation evidence accompanies it, all to one "
+             "verdict. Requires the attestation extra.",
+    )
+    pvb.add_argument(
+        "bundle",
+        help="Path to an evidence-bundle JSON file, or a directory containing "
+             "bundle.json (or evidence_bundle.json)",
+    )
+    pvb.add_argument(
+        "--json", action="store_true",
+        help="Emit the full verdict as JSON instead of a human-readable summary",
+    )
+    pvb.set_defaults(func=_cmd_verify_bundle)
 
     ptee = sub.add_parser(
         "tee",
