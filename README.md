@@ -114,6 +114,17 @@ No code to write, and no need to trust the tooling that produced the bundle. The
 
 `ok` is true only when the signature is actually established and every applicable lens passes. A bundle that proves inclusion and non-revocation but never verifies a signature is not `ok`. Each lens also ships as public conformance vectors with a standalone checker that imports no Vaara code, so an independent party reproduces every verdict offline. That property is the point of the standards work behind [SEP-2828](https://github.com/modelcontextprotocol/modelcontextprotocol/pull/2828): the evidence is verifiable by someone who runs none of your software.
 
+### Build the bundle
+
+`build-bundle` is the issuer side of the same file. Where `verify-bundle` checks a bundle, `build-bundle` produces it, from the receipt and whatever identity, signature, inclusion, consistency, and revocation material you hold:
+
+```bash
+vaara build-bundle --from-dir ./pieces --out evidence-bundle.json
+vaara verify-bundle evidence-bundle.json
+```
+
+It writes the exact document `verify-bundle` reads, then loads it back and reports the verdict, so producing and checking the evidence is one closed loop over one file.
+
 ## Benchmarks
 
 Held-out test recall **84.7%** (95% Wilson [82.4, 86.7]) at a **4.1%** false-positive rate, and **1.2%** FPR on benign tool calls under live injection pressure. The hot-path rule scorer adds 140 µs mean / 210 µs p99 per call on commodity CPU. Every figure is reproducible end-to-end via `make bench`.
