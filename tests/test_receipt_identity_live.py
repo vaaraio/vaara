@@ -9,13 +9,22 @@ issuance), all composed over the unchanged level-2 check.
 from __future__ import annotations
 
 import base64
+import importlib.util
 import json
 
 import pytest
-from cryptography.hazmat.primitives.asymmetric import ec
 
-from vaara.attestation._sep2787_types import AttestationError
-from vaara.attestation.receipt import (
+for _mod in ("rfc8785", "cryptography"):
+    if importlib.util.find_spec(_mod) is None:
+        pytest.skip(
+            "attestation extra not installed (pip install 'vaara[attestation]')",
+            allow_module_level=True,
+        )
+
+from cryptography.hazmat.primitives.asymmetric import ec  # noqa: E402
+
+from vaara.attestation._sep2787_types import AttestationError  # noqa: E402
+from vaara.attestation.receipt import (  # noqa: E402
     DidDocumentCache,
     OutcomeDerived,
     emit_receipt,
@@ -23,7 +32,7 @@ from vaara.attestation.receipt import (
     make_back_link,
     verify_receipt_identity_live,
 )
-from vaara.attestation.sep2787 import (
+from vaara.attestation.sep2787 import (  # noqa: E402
     PayloadDerived,
     PlannerDeclared,
     ToolCallBinding,
