@@ -1,7 +1,7 @@
 # Evidence-bundle verification (design)
 
-Status: implemented in v0.56.0. Additive over v0.55. The 0.6 trust-plane
-capstone.
+Status: implemented in v0.56.0; on-disk format and CLI added in v0.57.0.
+Additive over v0.55. The 0.6 trust-plane capstone.
 
 ## Problem
 
@@ -90,6 +90,42 @@ The verdict composes the existing lens functions unchanged. It touches
 neither the receipt envelope nor any canonicalization, so every existing
 conformance vector verifies exactly as before.
 
+## On-disk format and CLI (v0.57.0)
+
+`verify_evidence_bundle` takes in-memory objects. To verify evidence someone
+handed you, those objects first have to be reconstructed from files. v0.57.0
+adds the one JSON shape that carries a whole bundle and a command that reads
+it, so a regulator handed a single file runs one step:
+
+    vaara verify-bundle ./evidence/bundle.json
+
+The argument is a bundle JSON file, or a directory holding `bundle.json` (or
+`evidence_bundle.json`). The command prints a per-lens summary and one
+verdict, and exits 0 only when the bundle is `ok`. `--json` emits the full
+verdict instead.
+
+The document is one JSON object. Only `receipt` is required; each other key
+feeds one lens and may be omitted:
+
+| Key | Lens |
+| --- | --- |
+| `receipt` | (required), `ExecutionReceipt` JSON |
+| `did_document`, `expected_keyid` | identity |
+| `verifying_jwk` | signature (EC P-256 or RSA JWK) |
+| `attestation` | back-link, SEP-2787 JSON |
+| `inclusion`, `inclusion_leaf_hex` | inclusion |
+| `consistency` | consistency |
+| `registry` | revocation |
+
+`inclusion` is `{log_index, tree_size, siblings_hex, root_hex}`; `consistency`
+is `{first_size, second_size, hashes_hex, first_root_hex, second_root_hex}`.
+
+This is exactly the `bundle` object the `evidence_bundle_v0` vectors commit, so
+every committed vector is already a valid bundle document. The loader
+(`evidence_bundle_from_json`) is strict on what is present: a malformed block
+raises `ValueError` naming the field, rather than silently dropping a lens and
+returning a falsely narrow verdict.
+
 ## Conformance
 
 `tests/vectors/evidence_bundle_v0/` carries eight bundles spanning every
@@ -99,6 +135,11 @@ the bundle and the reference verdict. The independent checker
 (`_check_independent.py`, standard library plus `rfc8785` and `cryptography`,
 no Vaara import) reproduces every verdict, so a second implementation can
 consume the capstone without depending on Vaara.
+
+`tests/vectors/bundle_doc_v0/` covers the same eight cases as standalone
+on-disk files, the form `vaara verify-bundle` reads. Its independent checker
+reads each file on its own and reproduces the verdict, proving a single bundle
+file is verifiable without Vaara.
 
 ## Scope
 
