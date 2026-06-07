@@ -80,6 +80,15 @@ ARTICLE12_OBLIGATIONS: tuple[dict, ...] = (
             EventType.ACTION_EXECUTED.value,
         ),
     },
+    {
+        "id": "art19_logs",
+        "article": "Article 19(1)",
+        "title": (
+            "Keeping the automatically generated logs under the deployer's "
+            "control for the appropriate retention period"
+        ),
+        "evidenced_by": tuple(et.value for et in EventType),
+    },
 )
 
 
@@ -109,6 +118,7 @@ def build_article12_report(
     *,
     system_meta: Optional[dict] = None,
     period: Optional[tuple] = None,
+    time_anchor: Optional[dict] = None,
 ) -> dict:
     """Build the Article 12 report dict from a trail and its export manifest.
 
@@ -118,6 +128,10 @@ def build_article12_report(
     which records the *summary* counts. It never narrows the signed trail,
     which stays whole. ``system_meta`` carries operator-supplied identity the
     trail does not hold; absent fields render as "not provided".
+    ``time_anchor`` is an optional :class:`~vaara.audit.timeanchor.TimeAnchor`
+    serialised with ``to_dict()``: an external trusted timestamp over the
+    signed trail head, evidencing Article 19 existence-in-time independently of
+    the signing key. Its chain-head binding is checked by the caller.
     """
     system_meta = dict(system_meta or {})
     in_scope = [r for r in records if _in_period(r.timestamp, period)]
@@ -198,7 +212,7 @@ def build_article12_report(
         "schema_version": SCHEMA_VERSION,
         "report_format": "article12",
         "generated_utc": _iso(time.time()),
-        "regulation": {"framework": "EU AI Act", "articles": ["12", "26(5)"]},
+        "regulation": {"framework": "EU AI Act", "articles": ["12", "19", "26(5)"]},
         "cover": {
             "system_name": system_meta.get("system_name", "not provided"),
             "provider": system_meta.get("provider", "not provided"),
@@ -254,6 +268,27 @@ def build_article12_report(
                 "assertion."
             ),
         },
+        "time_anchor": (
+            {
+                "anchored": True,
+                "backend": time_anchor.get("backend", ""),
+                "tsa_url": time_anchor.get("tsa_url", ""),
+                "hash_algorithm": time_anchor.get("hash_algorithm", ""),
+                "chain_position": time_anchor.get("chain_position"),
+                "chain_head_hash": time_anchor.get("chain_head_hash", ""),
+                "anchored_time": time_anchor.get("anchored_time", ""),
+                "attests": (
+                    "An authority outside Vaara's control timestamped the "
+                    "signed trail head, proving these logs existed no later "
+                    "than the attested time independently of the signing key. "
+                    "Pinned to an eIDAS-qualified Time-Stamp Authority this is "
+                    "EU-recognised evidence of existence-in-time over the "
+                    "Article 19 retention window."
+                ),
+            }
+            if time_anchor
+            else {"anchored": False}
+        ),
     }
 
 
@@ -383,6 +418,30 @@ def render_report_md(report: dict) -> str:
     out.append("See docs/signing-keys.md and the trust model for the boundary.")
     out.append("")
 
+    anchor = report.get("time_anchor") or {"anchored": False}
+    out.append("## External time anchor (Article 19)")
+    out.append("")
+    if anchor.get("anchored"):
+        out.append(_md_table(["Field", "Value"], [
+            ["Anchored", "yes"],
+            ["Backend", anchor.get("backend", "")],
+            ["Time-Stamp Authority", anchor.get("tsa_url", "")],
+            ["Hash algorithm", anchor.get("hash_algorithm", "")],
+            ["Anchored chain position", anchor.get("chain_position", "")],
+            ["Anchored chain head", anchor.get("chain_head_hash", "")],
+            ["Attested time (UTC)", anchor.get("anchored_time", "")],
+        ]))
+        out.append("")
+        out.append(anchor.get("attests", ""))
+    else:
+        out.append(
+            "No external time anchor is included in this package. The signature "
+            "proves integrity and provenance; on its own it does not prove when "
+            "the logs existed. Add an RFC 3161 (eIDAS-qualified) time anchor "
+            "with: vaara trail export-article12 --anchor-tsa <url>."
+        )
+    out.append("")
+
     out.append("## How to verify")
     out.append("")
     out.append(verify_instructions_text(report))
@@ -415,6 +474,7 @@ def verify_instructions_text(report: dict) -> str:
     """Plain-text steps a regulator follows to check the package."""
     s = report["record_keeping_summary"]
     threshold = report["cover"].get("threshold")
+    anchor = report.get("time_anchor") or {"anchored": False}
     lines = [
         "How to verify this Article 12 package",
         "",
@@ -428,12 +488,34 @@ def verify_instructions_text(report: dict) -> str:
         "   the trail_sha256 in manifest.json:",
         f"     {s['trail_sha256']}",
     ]
+    step = 3
     if threshold:
         lines += [
             "",
-            f"3. This package is threshold-signed: at least {threshold['threshold_k']}",
-            f"   of {threshold['signers_n']} named custodian signatures must verify.",
+            f"{step}. This package is threshold-signed: at least "
+            f"{threshold['threshold_k']}",
+            f"   of {threshold['signers_n']} named custodian signatures must "
+            "verify.",
         ]
+        step += 1
+    if anchor.get("anchored"):
+        lines += [
+            "",
+            f"{step}. Verify the external time anchor in time_anchor.json. It "
+            "proves the signed",
+            "   trail head existed no later than the attested time, "
+            "independently of the",
+            "   signing key. With Vaara installed:",
+            "     vaara trail verify-anchor --zip <this_package>.zip",
+            "   The anchor's chain_head_hash must equal the last record_hash "
+            "in trail.jsonl,",
+            "   and the RFC 3161 token must verify under a Time-Stamp Authority "
+            "you trust",
+            "   (pin an eIDAS-qualified TSA certificate to enforce that). "
+            "Anchored head:",
+            f"     {anchor.get('chain_head_hash', '')}",
+        ]
+        step += 1
     lines += [
         "",
         "The signature covers trail.jsonl and manifest.json. This report and",
