@@ -1,0 +1,68 @@
+{
+  "advisory_refused_with_commitment": {
+    "advisories": [
+      "refused_has_no_result"
+    ],
+    "conforms": true,
+    "requiredFailed": []
+  },
+  "conforming_executed_projection": {
+    "advisories": [],
+    "conforms": true,
+    "requiredFailed": []
+  },
+  "conforming_refused_no_commitment": {
+    "advisories": [],
+    "conforms": true,
+    "requiredFailed": []
+  },
+  "neg_alg_mismatch": {
+    "advisories": [],
+    "conforms": false,
+    "requiredFailed": [
+      "receipt_asserted_alg_matches"
+    ]
+  },
+  "neg_bad_status": {
+    "advisories": [],
+    "conforms": false,
+    "requiredFailed": [
+      "status_valid"
+    ]
+  },
+  "neg_digest_mismatch": {
+    "advisories": [],
+    "conforms": false,
+    "requiredFailed": [
+      "result_commitment_self_consistent"
+    ]
+  },
+  "neg_malformed_backlink_digest": {
+    "advisories": [],
+    "conforms": false,
+    "requiredFailed": [
+      "back_link_digest_format"
+    ]
+  },
+  "neg_missing_signature": {
+    "advisories": [],
+    "conforms": false,
+    "requiredFailed": [
+      "signature_hex"
+    ]
+  },
+  "neg_not_an_object": {
+    "advisories": [],
+    "conforms": false,
+    "requiredFailed": [
+      "top_level_object"
+    ]
+  },
+  "neg_unsupported_alg": {
+    "advisories": [],
+    "conforms": false,
+    "requiredFailed": [
+      "alg_supported"
+    ]
+  }
+}

@@ -104,6 +104,14 @@ Subcommands:
         bundle is ok: the receipt signature was established and every
         applicable lens passed.
 
+    vaara verify-record RECORD.json [--attestation ATT.json] [--json]
+        Conformance-check any candidate SEP-2828 execution record against
+        the wire schema and the binding it proves about itself (the result
+        projectionDigest over the projection bytes). Keyless: needs no
+        signing key and no attestation. With --attestation the back-link is
+        checked too, still keyless. The neutral check a party runs on a
+        record someone else produced. Exit 0 iff the record conforms.
+
     vaara build-bundle (--receipt RECEIPT.json | --from-dir DIR) [piece flags]
             [--out BUNDLE.json]
         Assemble a complete evidence bundle on disk from the issuer's
@@ -1708,6 +1716,98 @@ def _cmd_verify_bundle(args: argparse.Namespace) -> int:
     return 0 if verdict.ok else 1
 
 
+def _cmd_verify_record(args: argparse.Namespace) -> int:
+    """Conformance-check any candidate SEP-2828 execution record.
+
+    Keyless by design: it checks the wire schema and the binding the
+    record proves about itself (``projectionDigest`` over the projection
+    bytes), so a party that holds neither the signing key nor the
+    attestation can still judge whether a record is well-formed. With
+    ``--attestation`` the back-link is verified too, still without a key.
+    To also check the signature, use ``vaara receipt verify`` with the
+    signer's key.
+    """
+    from vaara.attestation.receipt import check_record_conformance
+
+    path = Path(args.record).expanduser()
+    if not path.is_file():
+        print(f"vaara verify-record: not a file: {path}", file=sys.stderr)
+        return 2
+    try:
+        doc = json.loads(path.read_text(encoding="utf-8"))
+    except (json.JSONDecodeError, OSError) as exc:
+        print(f"vaara verify-record: cannot read record JSON: {exc}", file=sys.stderr)
+        return 1
+
+    report = check_record_conformance(doc)
+    back_link = _record_back_link(args.attestation, doc) if args.attestation else None
+
+    if args.json:
+        out: dict[str, Any] = {"conformance": report.to_dict()}
+        if back_link is not None:
+            out["backLink"] = back_link
+        print(json.dumps(out, indent=2))
+    else:
+        print(f"conformance: {'CONFORMS' if report.conforms else 'NON-CONFORMING'}")
+        for c in report.checks:
+            state = ("pass" if c.ok else "FAIL") if c.severity == "required" else (
+                "ok" if c.ok else "warn")
+            print(f"  [{state:4s}] {c.severity:8s} {c.id}")
+            if not c.ok:
+                print(f"           {c.detail}")
+        if back_link is not None:
+            bstate = "n/a" if back_link.get("skipped") else (
+                "pass" if back_link["ok"] else "FAIL")
+            print(f"  back-link: {bstate}  {back_link['detail']}")
+
+    if not report.conforms:
+        return 1
+    if back_link is not None and not back_link["ok"] and not back_link.get("skipped"):
+        return 1
+    return 0
+
+
+def _record_back_link(attestation_path: str, doc: Any) -> dict[str, Any]:
+    """Keyless back-link check: does the record pin this attestation?
+
+    Returns ``{ok, skipped, detail}``. ``skipped`` is True when the check
+    could not run (extra missing, attestation unreadable, record not a
+    parseable receipt) and so does not gate the verdict; a False ``ok``
+    with ``skipped`` False is a real back-link failure.
+    """
+    try:
+        from vaara.attestation.receipt import parse_receipt, verify_back_link
+        from vaara.attestation.sep2787 import AttestationError, parse_attestation
+    except ImportError:
+        return {"ok": False, "skipped": True,
+                "detail": "back-link check needs the attestation extra "
+                          "(pip install 'vaara[attestation]')"}
+    p = Path(attestation_path).expanduser()
+    if not p.is_file():
+        return {"ok": False, "skipped": True, "detail": f"attestation not a file: {p}"}
+    try:
+        attestation = parse_attestation(json.loads(p.read_text(encoding="utf-8")))
+    except (json.JSONDecodeError, OSError, AttestationError, KeyError, TypeError,
+            ValueError) as exc:
+        return {"ok": False, "skipped": True,
+                "detail": f"attestation not parseable: {exc}"}
+    try:
+        receipt = parse_receipt(doc)
+    except (AttestationError, KeyError, TypeError, ValueError) as exc:
+        return {"ok": False, "skipped": True,
+                "detail": f"record not parseable as a receipt: {exc}"}
+    try:
+        result = verify_back_link(receipt, attestation=attestation)
+    except AttestationError as exc:
+        # Computing the attestation digest needs rfc8785 (the attestation
+        # extra). Absent it, the back-link cannot be checked: skip, do not gate.
+        return {"ok": False, "skipped": True,
+                "detail": f"back-link check unavailable: {exc}"}
+    return {"ok": result.ok, "skipped": False,
+            "detail": ("record pins this attestation" if result.ok
+                       else "record does not pin this attestation")}
+
+
 def _cmd_build_bundle(args: argparse.Namespace) -> int:
     """Assemble an evidence bundle on disk from the issuer's pieces.
 
@@ -2545,6 +2645,29 @@ def build_parser() -> argparse.ArgumentParser:
         help="Emit the full verdict as JSON instead of a human-readable summary",
     )
     pvb.set_defaults(func=_cmd_verify_bundle)
+
+    pvr = sub.add_parser(
+        "verify-record",
+        help="Conformance-check any candidate SEP-2828 execution record "
+             "against the wire schema and its self-proving digest. Keyless: "
+             "needs no signing key and no attestation. With --attestation the "
+             "back-link is checked too (still keyless). The neutral check a "
+             "party runs on a record someone else produced.",
+    )
+    pvr.add_argument(
+        "record",
+        help="Path to a JSON file claiming to be a SEP-2828 execution record",
+    )
+    pvr.add_argument(
+        "--attestation", default=None,
+        help="Path to the SEP-2787 attestation the record answers; when given, "
+             "the back-link is verified (no key needed)",
+    )
+    pvr.add_argument(
+        "--json", action="store_true",
+        help="Emit the full conformance report as JSON",
+    )
+    pvr.set_defaults(func=_cmd_verify_record)
 
     pbb = sub.add_parser(
         "build-bundle",

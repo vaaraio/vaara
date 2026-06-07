@@ -46,6 +46,11 @@ from vaara.attestation._bundle_io import (
     evidence_bundle_from_json,
     load_bundle_pieces_from_dir,
 )
+from vaara.attestation._receipt_conformance import (
+    ConformanceCheck,
+    ConformanceReport,
+    check_record_conformance,
+)
 from vaara.attestation._receipt_emit import (
     emit_receipt,
     verify_receipt_signature,
@@ -106,6 +111,9 @@ __all__ = [
     "BackLink",
     "BackLinkResult",
     "BundleVerdict",
+    "ConformanceCheck",
+    "ConformanceReport",
+    "check_record_conformance",
     "DidDocumentCache",
     "EvidenceBundle",
     "ExecutionReceipt",
