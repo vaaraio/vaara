@@ -47,6 +47,8 @@ from vaara.audit.timeanchor import RFC3161TimeAnchorClient
 trail.anchor_head(RFC3161TimeAnchorClient("https://freetsa.org/tsr"))
 ```
 
+The anchor also folds into the one-command regulator package: `vaara trail export-article12 --anchor-tsa https://freetsa.org/tsr` writes the timestamp beside the signed trail as Article 19 existence-in-time evidence, and `vaara trail verify-anchor --zip <package>.zip` checks it offline.
+
 ## Install
 
 ```bash
