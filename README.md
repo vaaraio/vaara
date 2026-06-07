@@ -127,6 +127,16 @@ vaara verify-bundle evidence-bundle.json
 
 It writes the exact document `verify-bundle` reads, then loads it back and reports the verdict, so producing and checking the evidence is one closed loop over one file.
 
+### Check any record
+
+`verify-bundle` checks a bundle you assembled. `verify-record` checks the format itself: point it at any JSON that claims to be a SEP-2828 execution record, including one Vaara never produced, and it tells you whether the record is well formed and internally consistent.
+
+```bash
+vaara verify-record someone-elses-record.json
+```
+
+It needs no signing key and no attestation. The check is the wire schema plus the one binding a record proves about itself: the result commitment digest is the SHA-256 of the bytes it sits beside, so a verifier recomputes it with nothing but a hash function. Add `--attestation` to also check the back-link to the request the record answers, still without a key. The signature check, which does need the signer's key, stays in `vaara receipt verify`. This is the check an auditor, or a vendor whose software you do not run, can apply before trusting the producer or any key. The trust rests on the format, not on Vaara.
+
 ## Benchmarks
 
 Held-out test recall **84.7%** (95% Wilson [82.4, 86.7]) at a **4.1%** false-positive rate, and **1.2%** FPR on benign tool calls under live injection pressure. The hot-path rule scorer adds 140 µs mean / 210 µs p99 per call on commodity CPU. Every figure is reproducible end-to-end via `make bench`.
