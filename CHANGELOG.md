@@ -6,6 +6,36 @@ and this project follows [Semantic Versioning](https://semver.org/spec/v2.0.0.ht
 
 ## [Unreleased]
 
+## [0.60.0] - 2026-06-07
+
+**Theme: verify anyone's record, not just your own. The trust plane could
+already issue and check Vaara's own evidence end to end. This release turns
+Vaara into the neutral checker of the format itself: a keyless conformance
+check that any party can run on any SEP-2828 execution record, including one
+Vaara did not produce.**
+
+### Added
+- `vaara verify-record PATH [--attestation ATT.json] [--json]`: a
+  producer-agnostic conformance check on a candidate SEP-2828 execution
+  record. It is keyless by design. It validates the wire schema (required
+  fields and types, supported `alg`, valid `status`, `sha256:<hex>` digest
+  formats, `receiptAsserted.alg` matching the envelope) and the one binding a
+  record proves about itself: `resultCommitment.projectionDigest` equals the
+  SHA-256 of the projection bytes beside it, recomputable from the record alone
+  with nothing but a hash function. With `--attestation` the back-link to the
+  request the record answers is verified too, still without a key. The
+  signature check (which needs the signer's key) stays in `vaara receipt
+  verify`. Exit 0 iff the record conforms.
+- `check_record_conformance` on the public `vaara.attestation.receipt` surface,
+  returning a `ConformanceReport` that lists every check with its severity
+  (`required` gates conformance; `advisory` is surfaced but does not). The
+  conformance module is pure standard library, so it runs in the base install
+  with no extras.
+- `record_conformance_v0` conformance vectors: ten records (conforming,
+  non-conforming with one isolated failure each, and an advisory case) plus a
+  stdlib-only `_check_independent.py` that re-implements the rules with no Vaara
+  import, the same second-implementation discipline as the other vectors.
+
 ### Security
 - Bumped `gradio` in the Hugging Face Space example
   (`examples/huggingface-space/requirements.txt`) from `>=5.0` to `>=6.16.0`,
