@@ -1,0 +1,25 @@
+{
+  "alg": "ES256",
+  "backLink": {
+    "attestationDigest": "sha256:79acdd4bb3c22a688b1c3321b9a26cafb5cb58c990a963874066d04b8497f70b",
+    "attestationNonce": "fixed-attestation-nonce-000"
+  },
+  "outcomeDerived": {
+    "completedAt": "2026-05-29T10:00:00Z",
+    "resultCommitment": {
+      "projection": "{\"deleted\":true,\"path\":\"/archive/2024-Q3.md\"}",
+      "projectionDigest": "sha256:c9a4caed49b3efaa7908a29a550b8d33ffbb088c52d519242477223a83214198"
+    },
+    "status": "done"
+  },
+  "receiptAsserted": {
+    "alg": "ES256",
+    "iat": "2026-05-29T10:00:00Z",
+    "iss": "issuer://test",
+    "nonce": "fixed-receipt-nonce-0001",
+    "secretVersion": "v1",
+    "sub": "agent:archiver"
+  },
+  "signature": "40b9e7fd7e77ba1f970f2a106ad5ca449c2b65527f3fd875ec5ec48832f56a634454e49407874db36efe9e2ba10a5b8916bc5e0685b911c9b8abf50815b61046",
+  "version": 1
+}

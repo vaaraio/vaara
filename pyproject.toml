@@ -4,7 +4,7 @@ build-backend = "setuptools.build_meta"
 
 [project]
 name = "vaara"
-version = "0.59.0"
+version = "0.60.0"
 description = "Runtime evidence layer for AI agents under the EU AI Act: policy-gated tool calls, hash-chained tamper-evident audit trails with external time anchoring, and independently verifiable attestation plus execution receipts per MCP tool call"
 requires-python = ">=3.10"
 license = "Apache-2.0"
