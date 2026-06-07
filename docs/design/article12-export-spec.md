@@ -45,13 +45,18 @@ vaara trail export-article12 \
   --out art12_package.zip \
   [--system-meta system.json] \
   [--period 2026-01-01:2026-06-30] \
-  [--format md|html]
+  [--format md|html] \
+  [--anchor-tsa https://tsa.example/tsr | --anchor-file anchor.json]
 ```
 
 `--system-meta` is a small operator-supplied JSON (system name, provider,
 intended purpose, deployer, AI Act risk classification) that the report's
 cover section needs and the trail does not carry. Optional; absent fields
 render as "not provided" rather than failing.
+
+`--anchor-tsa` / `--anchor-file` (added v0.59.0, mutually exclusive) fold an
+external RFC 3161 time anchor over the signed trail head into the package as
+Article 19 existence-in-time evidence. See "External time anchor" below.
 
 ## Package contents (zip)
 
@@ -65,6 +70,8 @@ signer_pubkey.pem        # unchanged
 article12_report.md      # NEW: the human-readable mapping (or .html)
 article12_summary.json   # NEW: machine-readable version of the report
 verify_instructions.txt  # NEW: how the regulator checks the package
+time_anchor.json         # NEW (v0.59.0): RFC 3161 anchor over the trail head,
+                         #   present only when --anchor-tsa/--anchor-file is used
 ```
 
 The report and summary are inside the signed set: the manifest's
@@ -97,6 +104,34 @@ Generated, deterministic, from the trail + system-meta:
 
 The prose passes the strict anti-AI-tells pass before any of it is treated
 as outbound (it is regulator-facing).
+
+## External time anchor (Article 19), v0.59.0
+
+The signature proves the logs are intact and who signed them. It does not,
+on its own, prove *when* they existed: the timestamps and the signature both
+come from the operator's own key, so a later key compromise could backdate an
+alternate trail. Article 19 requires the automatically generated logs to be
+kept for the appropriate period; "kept since when" needs an anchor outside
+the operator's trust boundary.
+
+`--anchor-tsa URL` takes the signed trail head (the last record's
+`record_hash`) to an RFC 3161 Time-Stamp Authority and folds the returned
+token in as `time_anchor.json`. Pinned to an eIDAS-qualified TSA the timestamp
+is recognised EU-wide, so existence-in-time holds independently of the signing
+key. `--anchor-file` folds a pre-fetched anchor instead (for air-gapped
+issuance). The anchor binds to *this* trail: `export_article12` re-checks that
+the anchor's `chain_position` is the head and that the token verifies over that
+exact `record_hash` before writing it, so a package never claims an anchor it
+cannot back.
+
+The regulator verifies it offline with `vaara trail verify-anchor --zip
+<package>.zip`: the anchored `chain_head_hash` must equal the last
+`record_hash` in `trail.jsonl`, and the RFC 3161 token must verify under a TSA
+the regulator trusts. This reuses `vaara/audit/timeanchor.py`
+(`verify_anchor_over_records`); the report's "External time anchor (Article
+19)" section and `article12_summary.json["time_anchor"]` surface the attested
+time. Versus a blockchain-anchored digest, an eIDAS-qualified RFC 3161
+timestamp is the form an EU regulator already recognises.
 
 ## Implementation sketch
 
