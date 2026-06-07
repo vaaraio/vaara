@@ -1,2 +1,2 @@
 vaara>=0.19.1
-gradio>=5.0
+gradio>=6.16.0
