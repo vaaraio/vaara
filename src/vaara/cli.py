@@ -550,10 +550,111 @@ def _parse_period(spec: Optional[str]) -> Optional[tuple]:
     return (_epoch(start_s, end_of_day=False), _epoch(end_s, end_of_day=True))
 
 
+def _cmd_trail_verify_anchor(args: argparse.Namespace) -> int:
+    """Verify the external time anchor folded into an Article 12 package."""
+    import zipfile
+
+    try:
+        from vaara.audit.timeanchor import (
+            TimeAnchor,
+            TimeAnchorError,
+            verify_anchor_over_records,
+        )
+        from vaara.audit.trail import AuditRecord
+    except ImportError:
+        print(_INSTALL_HINT, file=sys.stderr)
+        return 2
+
+    zip_path = Path(args.zip).expanduser()
+    if not zip_path.exists():
+        print(f"package zip not found: {zip_path}", file=sys.stderr)
+        return 2
+
+    try:
+        with zipfile.ZipFile(zip_path) as zf:
+            if "time_anchor.json" not in set(zf.namelist()):
+                print(
+                    "no time_anchor.json in package (it is not time-anchored)",
+                    file=sys.stderr,
+                )
+                return 2
+            anchor = TimeAnchor.from_dict(json.loads(zf.read("time_anchor.json")))
+            trail_bytes = zf.read("trail.jsonl")
+    except (zipfile.BadZipFile, KeyError, json.JSONDecodeError, OSError,
+            TypeError) as exc:
+        print(f"could not read package: {exc}", file=sys.stderr)
+        return 2
+
+    record_hashes = [
+        AuditRecord.from_dict(json.loads(line)).record_hash
+        for line in (ln.strip() for ln in trail_bytes.splitlines())
+        if line
+    ]
+
+    try:
+        attested = verify_anchor_over_records(anchor, record_hashes)
+    except TimeAnchorError as exc:
+        print(f"time anchor INVALID: {exc}", file=sys.stderr)
+        return 1
+
+    print("time anchor OK")
+    print(f"  backend:        {anchor.backend}")
+    print(f"  TSA:            {anchor.tsa_url}")
+    print(f"  anchored head:  {anchor.chain_head_hash}")
+    print(f"  attested (UTC): {attested.isoformat()}")
+    print("  note: pin the TSA certificate to enforce an eIDAS-qualified authority.")
+    return 0
+
+
+def _obtain_time_anchor(args: argparse.Namespace, trail):
+    """Build or load the optional Article 19 time anchor over the trail head.
+
+    Returns ``None`` when neither ``--anchor-tsa`` nor ``--anchor-file`` is
+    given. Raises ``ValueError`` on any anchor failure so the CLI reports it
+    cleanly. The anchor is taken over the trail's final record (its head); the
+    export then re-verifies the binding before folding it in.
+    """
+    anchor_tsa = getattr(args, "anchor_tsa", None)
+    anchor_file = getattr(args, "anchor_file", None)
+    if not anchor_tsa and not anchor_file:
+        return None
+
+    from vaara.audit.timeanchor import (
+        RFC3161TimeAnchorClient,
+        TimeAnchor,
+        TimeAnchorError,
+    )
+
+    records = trail._records
+    if not records:
+        raise ValueError("cannot time-anchor an empty trail")
+    head_position = len(records) - 1
+    head_hash = records[-1].record_hash
+    if not head_hash:
+        raise ValueError("trail head has no record_hash to anchor")
+
+    if anchor_file:
+        path = Path(anchor_file).expanduser()
+        if not path.exists():
+            raise ValueError(f"anchor file not found: {path}")
+        try:
+            with open(path, "r", encoding="utf-8") as f:
+                return TimeAnchor.from_dict(json.load(f))
+        except (json.JSONDecodeError, OSError, KeyError, TypeError) as exc:
+            raise ValueError(f"failed to read anchor file: {exc}") from exc
+
+    try:
+        client = RFC3161TimeAnchorClient(anchor_tsa)
+        return client.anchor(head_position, head_hash)
+    except TimeAnchorError as exc:
+        raise ValueError(f"time anchoring failed: {exc}") from exc
+
+
 def _cmd_trail_export_article12(args: argparse.Namespace) -> int:
     """Export a signed EU AI Act Article 12 regulator package from a trail."""
     try:
         from vaara.audit.article12_export import export_article12
+        from vaara.audit.timeanchor import TimeAnchorError
         from vaara.audit.trail import AuditRecord, AuditTrail
     except ImportError:
         print(_INSTALL_HINT, file=sys.stderr)
@@ -599,16 +700,18 @@ def _cmd_trail_export_article12(args: argparse.Namespace) -> int:
     out.parent.mkdir(parents=True, exist_ok=True)
 
     try:
+        time_anchor = _obtain_time_anchor(args, trail)
         result = export_article12(
             trail,
             out_path=out,
             signer_key=Path(args.key).expanduser(),
             system_meta=system_meta,
             period=period,
+            time_anchor=time_anchor,
             fmt=args.format,
             agent_id=args.agent_id or "",
         )
-    except (ValueError, ImportError) as exc:
+    except (ValueError, ImportError, TimeAnchorError) as exc:
         print(f"Article 12 export failed: {exc}", file=sys.stderr)
         return 2
 
@@ -616,6 +719,8 @@ def _cmd_trail_export_article12(args: argparse.Namespace) -> int:
     print(f"  records:      {result.manifest['record_count']}")
     print(f"  chain intact: {result.chain_intact}")
     print(f"  report:       article12_report.{args.format}")
+    if time_anchor is not None:
+        print(f"  time anchor:  {time_anchor.anchored_time} ({time_anchor.backend})")
     return 0 if result.chain_intact else 1
 
 
@@ -1962,6 +2067,13 @@ def build_parser() -> argparse.ArgumentParser:
     )
     pv.set_defaults(func=_cmd_trail_verify)
 
+    pva = tsub.add_parser(
+        "verify-anchor",
+        help="Verify the external time anchor in an Article 12 package",
+    )
+    pva.add_argument("--zip", required=True, help="Path to the package zip")
+    pva.set_defaults(func=_cmd_trail_verify_anchor)
+
     pep = tsub.add_parser(
         "export-prov",
         help="Export the trail as W3C PROV-JSON (no signing, zero extra deps)",
@@ -2028,6 +2140,19 @@ def build_parser() -> argparse.ArgumentParser:
     pa12.add_argument(
         "--agent-id", default="",
         help="Optional scope hint written to the manifest (does not filter records)",
+    )
+    pa12_anchor = pa12.add_mutually_exclusive_group()
+    pa12_anchor.add_argument(
+        "--anchor-tsa", default=None, metavar="URL",
+        help="Fetch an RFC 3161 time anchor over the trail head from this "
+             "Time-Stamp Authority and fold it in as Article 19 "
+             "existence-in-time evidence. Needs the 'timeanchor' extra and "
+             "network access.",
+    )
+    pa12_anchor.add_argument(
+        "--anchor-file", default=None, metavar="PATH",
+        help="Fold in a pre-fetched time anchor (TimeAnchor JSON over the "
+             "trail head) instead of fetching one.",
     )
     pa12.set_defaults(func=_cmd_trail_export_article12)
 

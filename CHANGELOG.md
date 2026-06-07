@@ -6,6 +6,30 @@ and this project follows [Semantic Versioning](https://semver.org/spec/v2.0.0.ht
 
 ## [Unreleased]
 
+## [0.59.0] - 2026-06-07
+
+**Theme: the regulator package now proves when, not just what. The Article 12
+export already produced a signed, self-describing record-keeping package. This
+release folds an external RFC 3161 time anchor over the signed trail head into
+that package, so a regulator can confirm the logs existed at a point in time
+independently of the operator's signing key. Pinned to an eIDAS-qualified
+Time-Stamp Authority, that timestamp is the form an EU regulator already
+recognises, which is the Article 19 existence-in-time property.**
+
+### Added
+- `vaara trail export-article12 --anchor-tsa URL` (or `--anchor-file PATH`):
+  fold an external RFC 3161 time anchor over the signed trail head into the
+  Article 12 package as `time_anchor.json`. The anchor binds to the trail it
+  ships with; the export verifies the chain-head position and the RFC 3161
+  token over that exact `record_hash` before writing it, so a package never
+  claims an anchor it cannot back. The report gains an "External time anchor
+  (Article 19)" section and an `art19_logs` obligation row, and
+  `article12_summary.json` carries a `time_anchor` block.
+- `vaara trail verify-anchor --zip PACKAGE`: verify that anchor offline. It
+  checks the anchored `chain_head_hash` equals the last `record_hash` in
+  `trail.jsonl` and that the RFC 3161 token verifies. Pin the TSA certificate
+  to enforce an eIDAS-qualified authority.
+
 ### Changed
 - Dropped the superseded classifier bundles `adversarial_classifier_v1`,
   `v2`, `v3`, `v5`, `v6`, `v7` from the repository (about 5.5 MB). The
