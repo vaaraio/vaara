@@ -6,6 +6,13 @@ and this project follows [Semantic Versioning](https://semver.org/spec/v2.0.0.ht
 
 ## [Unreleased]
 
+### Security
+- Bumped `gradio` in the Hugging Face Space example
+  (`examples/huggingface-space/requirements.txt`) from `>=5.0` to `>=6.16.0`,
+  clearing 10 OSV advisories (path traversal, SSRF, CORS bypass, open redirect)
+  that OpenSSF Scorecard flagged. Example-only: `gradio` is not a dependency of
+  the Vaara package or the published wheel, so package users were never exposed.
+
 ## [0.59.0] - 2026-06-07
 
 **Theme: the regulator package now proves when, not just what. The Article 12
