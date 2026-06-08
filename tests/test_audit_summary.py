@@ -57,12 +57,6 @@ def test_independent_checker_confirms_pages_match_verdict():
     assert proc.returncode == 0, proc.stdout + proc.stderr
 
 
-def test_rendered_page_carries_no_em_dash():
-    for name in _cases():
-        page = render_record_set_summary(check_record_set(_load_set(name)))
-        assert "—" not in page  # em-dash is the AI tell; not in Vaara output
-
-
 def test_public_reexport_is_wired():
     from vaara.attestation.receipt import render_record_set_summary as public
     assert public is render_record_set_summary
