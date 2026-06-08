@@ -1,0 +1,20 @@
+{
+  "method": "tools/call",
+  "params": {
+    "name": "execute_query",
+    "arguments": {
+      "database_id": "123",
+      "query": "SELECT * FROM employees LIMIT 10"
+    },
+    "_meta": {
+      "io.modelcontextprotocol/aiInvocation": {
+        "invocationReason": {
+          "text": "The user asked to view employee rows, and the employees table was identified as the target table."
+        },
+        "model": { "name": "example-model" },
+        "userIntent": { "text": "Show me 10 employees", "redacted": false },
+        "turnId": "opaque-client-generated-id"
+      }
+    }
+  }
+}
