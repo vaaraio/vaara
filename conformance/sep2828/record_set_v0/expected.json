@@ -1,0 +1,66 @@
+{
+  "clean": {
+    "conforms": true,
+    "total": 2,
+    "conforming": 2,
+    "statusCounts": {"executed": 1, "refused": 1},
+    "verdictCounts": {},
+    "findings": []
+  },
+  "duplicate_call": {
+    "conforms": false,
+    "total": 2,
+    "conforming": 2,
+    "statusCounts": {"executed": 1, "refused": 1},
+    "verdictCounts": {},
+    "findings": [
+      {"id": "duplicate_call", "severity": "required", "records": ["r1.json", "r2.json"]}
+    ]
+  },
+  "executed_gap": {
+    "conforms": true,
+    "total": 2,
+    "conforming": 2,
+    "statusCounts": {"executed": 2},
+    "verdictCounts": {},
+    "findings": [
+      {"id": "executed_without_result_commitment", "severity": "advisory", "records": ["r1.json"]}
+    ]
+  },
+  "mixed_nonconforming": {
+    "conforms": false,
+    "total": 2,
+    "conforming": 1,
+    "statusCounts": {"executed": 1},
+    "verdictCounts": {},
+    "findings": []
+  },
+  "proper_pair": {
+    "conforms": true,
+    "total": 2,
+    "conforming": 2,
+    "statusCounts": {"executed": 1},
+    "verdictCounts": {"allow": 1},
+    "findings": []
+  },
+  "decision_without_outcome": {
+    "conforms": true,
+    "total": 3,
+    "conforming": 3,
+    "statusCounts": {"executed": 1},
+    "verdictCounts": {"allow": 1, "escalate": 1},
+    "findings": [
+      {"id": "decision_without_outcome", "severity": "advisory", "records": ["decision_b.json"]}
+    ]
+  },
+  "outcome_without_decision": {
+    "conforms": true,
+    "total": 3,
+    "conforming": 3,
+    "statusCounts": {"executed": 1, "refused": 1},
+    "verdictCounts": {"allow": 1},
+    "findings": [
+      {"id": "outcome_without_decision", "severity": "advisory", "records": ["outcome_b.json"]}
+    ]
+  }
+}
