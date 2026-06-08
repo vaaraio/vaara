@@ -1,0 +1,25 @@
+{
+  "alg": "ES256",
+  "backLink": {
+    "attestationDigest": "sha256:a9f51566bd6705f7ea6ad54bb9deb449f795582d6529a0e22207b8981233ec58",
+    "attestationNonce": "nonce-E"
+  },
+  "outcomeDerived": {
+    "completedAt": "2026-05-29T10:00:00Z",
+    "resultCommitment": {
+      "projection": "{\"done\":1}",
+      "projectionDigest": "sha256:365f5f94b674aa7451be3cf564e930141fc2156f97a6a2ec4364b63ccf8c32d8"
+    },
+    "status": "executed"
+  },
+  "receiptAsserted": {
+    "alg": "ES256",
+    "iat": "2026-05-29T10:00:00Z",
+    "iss": "issuer://test",
+    "nonce": "rnonce-E",
+    "secretVersion": "v1",
+    "sub": "agent:x"
+  },
+  "signature": "abababababababababababababababababababababababababababababababababababababababababababababababababababababababababababababababab",
+  "version": 1
+}

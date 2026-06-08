@@ -1,0 +1,21 @@
+{
+  "alg": "ES256",
+  "backLink": {
+    "attestationDigest": "sha256:6b23c0d5f35d1b11f9b683f0b0a617355deb11277d91ae091d399c655b87940d",
+    "attestationNonce": "nonce-C"
+  },
+  "outcomeDerived": {
+    "completedAt": "2026-05-29T10:00:00Z",
+    "status": "refused"
+  },
+  "receiptAsserted": {
+    "alg": "ES256",
+    "iat": "2026-05-29T10:00:00Z",
+    "iss": "issuer://test",
+    "nonce": "rnonce-C",
+    "secretVersion": "v1",
+    "sub": "agent:x"
+  },
+  "signature": "abababababababababababababababababababababababababababababababababababababababababababababababababababababababababababababababab",
+  "version": 1
+}

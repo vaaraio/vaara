@@ -51,6 +51,12 @@ from vaara.attestation._receipt_conformance import (
     ConformanceReport,
     check_record_conformance,
 )
+from vaara.attestation._record_set_conformance import (
+    RecordSetEntry,
+    RecordSetReport,
+    SetFinding,
+    check_record_set,
+)
 from vaara.attestation._receipt_emit import (
     emit_receipt,
     verify_receipt_signature,
@@ -114,6 +120,10 @@ __all__ = [
     "ConformanceCheck",
     "ConformanceReport",
     "check_record_conformance",
+    "RecordSetEntry",
+    "RecordSetReport",
+    "SetFinding",
+    "check_record_set",
     "DidDocumentCache",
     "EvidenceBundle",
     "ExecutionReceipt",
