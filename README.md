@@ -203,7 +203,7 @@ curl -sX POST http://localhost:8000/v1/score \
   -d '{"tool_name":"tx.transfer","agent_id":"agent-007","base_risk_score":0.5}'
 ```
 
-Wire contract in [docs/openapi.yaml](docs/openapi.yaml), recipes under `examples/recipes/`. Operator endpoints include `POST /v1/policy/reload` (atomic hot policy swap) and named detectors `POST /v1/detect/injection` and `POST /v1/detect/pii`, with matching CLI subcommands that exit non-zero on detection for CI gating.
+Wire contract in [docs/openapi.yaml](docs/openapi.yaml). Operator endpoints include `POST /v1/policy/reload` (atomic hot policy swap) and named detectors `POST /v1/detect/injection` and `POST /v1/detect/pii`, with matching CLI subcommands that exit non-zero on detection for CI gating.
 
 The first-party TypeScript client ships on npm as [`@vaara/client`](clients/ts): typed wrappers over every v1 endpoint, Node 18+, ESM. JS/TS agents call Vaara without a Python sidecar.
 

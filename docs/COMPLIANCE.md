@@ -147,7 +147,7 @@ adapter code. 27 rows total across the three vendors as of v0.19.0.
 | `grounding` | Bedrock `contextualGroundingPolicy` · Azure `Groundedness` | Art. 13, Art. 15 | LLM09 |
 | `adversarial` | Bedrock `contentPolicy.PROMPT_ATTACK` · Azure `PromptShield.UserPrompt` / `Documents` · GCP `pi_and_jailbreak` | Art. 15 | LLM01 |
 | `malicious_uri` | GCP `malicious_uris` | Art. 15 | LLM05 |
-| `csam` | GCP `csam` | Art. 5 + Digital Omnibus CSAM (effective 2 Dec 2026) | — |
+| `csam` | GCP `csam` | Art. 5 + Digital Omnibus CSAM (effective 2 Dec 2026) | - |
 
 ### Where the finding lands
 
@@ -200,12 +200,12 @@ seven upstream guardrails.
 | `word_block` | LLM Guard `BanSubstrings` / `Regex` | Art. 5 | LLM05 |
 | `bias` | Guardrails AI `BiasCheck` · LLM Guard `Bias` | Art. 10 | LLM05 |
 | `schema_violation` | Guardrails AI `ValidJSON` / `RegexMatch` / `ValidLength` · LLM Guard `JSON` | Art. 15 | LLM05 |
-| `output_validation` | NeMo `output_rails.self_check` · LLM Guard `NoRefusal` | Art. 13 | — |
+| `output_validation` | NeMo `output_rails.self_check` · LLM Guard `NoRefusal` | Art. 13 | - |
 | `grounding` | NeMo `output_rails.fact_check` / `retrieval_rails.relevance` · LLM Guard `Relevance` | Art. 13, Art. 15 | LLM09 |
 | `malicious_uri` | LLM Guard `MaliciousURLs` | Art. 15 | LLM05 |
-| `language` | LLM Guard `Language` | Art. 13 | — |
-| `sentiment` | LLM Guard `Sentiment` | — | — |
-| `resource_limit` | LLM Guard `TokenLimit` | Art. 15 | — |
+| `language` | LLM Guard `Language` | Art. 13 | - |
+| `sentiment` | LLM Guard `Sentiment` | - | - |
+| `resource_limit` | LLM Guard `TokenLimit` | Art. 15 | - |
 
 ### Where the finding lands
 
