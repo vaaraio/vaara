@@ -1864,6 +1864,18 @@ def _path_value(doc: dict[str, Any], dotted: str) -> Any:
     return cur
 
 
+def _safe_inline(value: Any) -> str:
+    """Render a value on one line, escaping control characters.
+
+    Advisory and attestation-derived values come from a record Vaara did not
+    produce; escaping C0 controls (newlines, tabs) stops a crafted value from
+    forging extra lines in the human report.
+    """
+    return "".join(
+        c if c.isprintable() else f"\\x{ord(c):02x}" for c in str(value)
+    )
+
+
 def _print_normalize_report(result: Any) -> None:
     if not result.recognized:
         print(f"source: unrecognized ({result.source_format})")
@@ -1876,13 +1888,13 @@ def _print_normalize_report(result: Any) -> None:
         print("fills SEP-2828:")
         for pth in result.populated:
             val = _path_value(result.sep2828, pth)
-            print(f"  {pth}" + (f" = {val}" if val is not None else ""))
+            print(f"  {pth}" + (f" = {_safe_inline(val)}" if val is not None else ""))
     else:
         print("fills SEP-2828: nothing required (advisory context only)")
     if result.advisory:
         print("carries (advisory, not proof):")
         for k, v in result.advisory.items():
-            print(f"  {k}: {v}")
+            print(f"  {k}: {_safe_inline(v)}")
     print("still needed for a complete signed record:")
     for m in result.missing:
         print(f"  {m}")

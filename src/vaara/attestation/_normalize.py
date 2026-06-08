@@ -24,9 +24,11 @@ source does and does not establish.
 
 The SEP-2643 and SEP-2817 maps are pure standard library and run in the
 base install. The SEP-2787 map computes the back-link digest the way the
-receipt verifier computes it (JCS over the attestation wire bytes),
-which needs the attestation extra; that step degrades to a reported gap
-when the extra is absent.
+receipt verifier computes it: sha256 over the JCS canonicalization of the
+SEP-2787-modeled fields (parse, then canonicalize), the same value a
+conformant receipt pins. Fields outside the modeled schema are not
+covered. That step needs the attestation extra and degrades to a reported
+gap when the extra is absent.
 """
 
 from __future__ import annotations
@@ -96,14 +98,22 @@ def _denial_authorization(doc: Any) -> Optional[dict[str, Any]]:
     """
     if not isinstance(doc, dict):
         return None
-    candidates = (
+    # Nested positions are unambiguously a denial envelope.
+    for cand in (
         _as_dict(_as_dict(doc.get("error")).get("data")).get("authorization"),
         _as_dict(doc.get("data")).get("authorization"),
-        doc.get("authorization"),
-        doc,
-    )
-    for cand in candidates:
+    ):
         if isinstance(cand, dict) and isinstance(cand.get("reason"), str):
+            return cand
+    # A bare authorization object, or the document itself, must also carry a
+    # denial marker, so a stray top-level `reason` on an unrelated record is
+    # not read as a denial ahead of the SEP-2817 reader.
+    for cand in (doc.get("authorization"), doc):
+        if (
+            isinstance(cand, dict)
+            and isinstance(cand.get("reason"), str)
+            and ("authorizationContextId" in cand or "remediationHints" in cand)
+        ):
             return cand
     return None
 
@@ -241,10 +251,12 @@ def _normalize_invocation(doc: Any) -> NormalizedEvidence:
     if isinstance(model, str):
         advisory["model"] = model
     ui = _as_dict(inv.get("userIntent"))
-    if isinstance(ui.get("text"), str):
-        advisory["userIntent"] = ui["text"]
     if ui.get("redacted") is True:
+        # The source flagged the intent as redacted: surface the flag, never
+        # the text, so Vaara does not re-propagate content the source withheld.
         advisory["userIntentRedacted"] = True
+    elif isinstance(ui.get("text"), str):
+        advisory["userIntent"] = ui["text"]
     turn = inv.get("turnId")
     if isinstance(turn, str):
         advisory["turnId"] = turn
@@ -341,9 +353,11 @@ def _back_link_from_attestation(
 
     Returns ``(back_link, None)`` on success or ``(None, reason)`` when the
     attestation extra is absent or the attestation does not parse. The
-    digest is computed the way the receipt verifier computes it, so it is
-    the exact value a conformant receipt's ``backLink.attestationDigest``
-    must equal.
+    digest is computed the way the receipt verifier computes it: sha256 over
+    the JCS canonicalization of the SEP-2787-modeled fields (parse, then
+    canonicalize), so it is the exact value a conformant receipt's
+    ``backLink.attestationDigest`` must equal. Fields outside the modeled
+    schema are not covered.
     """
     try:
         from vaara.attestation.receipt import make_back_link

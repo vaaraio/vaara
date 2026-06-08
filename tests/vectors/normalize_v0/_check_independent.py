@@ -8,10 +8,11 @@ evidence plane, which fields populated, what is still missing) and
 compares against ``expected.json``.
 
 The SEP-2643 and SEP-2817 maps are pure standard library. The SEP-2787
-map recomputes the back-link digest as ``sha256`` over the JCS-canonical
-attestation bytes (RFC 8785); that case is skipped, not failed, when
-``rfc8785`` is not installed, the same way the library degrades without
-the attestation extra.
+map reconstructs the SEP-2787-modeled envelope (dropping unmodeled fields
+and injecting the ArgsRef canonicalization default, exactly as the wire
+schema defines) and digests that under RFC 8785, which is the value the
+receipt verifier pins; that case is skipped, not failed, when ``rfc8785``
+is not installed.
 
 Run: ``python tests/vectors/normalize_v0/_check_independent.py``.
 Exit 0 means every runnable case matched its expected mapping.
@@ -46,10 +47,15 @@ def _denial(doc: Any) -> Optional[dict[str, Any]]:
     for cand in (
         _as_dict(_as_dict(doc.get("error")).get("data")).get("authorization"),
         _as_dict(doc.get("data")).get("authorization"),
-        doc.get("authorization"),
-        doc,
     ):
         if isinstance(cand, dict) and isinstance(cand.get("reason"), str):
+            return cand
+    for cand in (doc.get("authorization"), doc):
+        if (
+            isinstance(cand, dict)
+            and isinstance(cand.get("reason"), str)
+            and ("authorizationContextId" in cand or "remediationHints" in cand)
+        ):
             return cand
     return None
 
@@ -140,10 +146,10 @@ def _invocation_map(doc: Any) -> dict[str, Any]:
     if isinstance(_as_dict(inv.get("model")).get("name"), str):
         advisory["model"] = inv["model"]["name"]
     ui = _as_dict(inv.get("userIntent"))
-    if isinstance(ui.get("text"), str):
-        advisory["userIntent"] = ui["text"]
     if ui.get("redacted") is True:
         advisory["userIntentRedacted"] = True
+    elif isinstance(ui.get("text"), str):
+        advisory["userIntent"] = ui["text"]
     if isinstance(inv.get("turnId"), str):
         advisory["turnId"] = inv["turnId"]
     notes = [
@@ -164,6 +170,52 @@ def _invocation_map(doc: Any) -> dict[str, Any]:
     )
 
 
+def _modeled_args(a: dict[str, Any]) -> dict[str, Any]:
+    if "ref" in a:
+        return {
+            "ref": a.get("ref"),
+            "digest": a.get("digest"),
+            "canonicalization": a.get("canonicalization", "jcs"),
+        }
+    return {"projection": a.get("projection"), "projectionDigest": a.get("projectionDigest")}
+
+
+def _modeled_attestation(doc: Any) -> dict[str, Any]:
+    """Reconstruct the SEP-2787-modeled envelope the receipt verifier digests.
+
+    Keep only the modeled fields, inject the ArgsRef canonicalization default,
+    drop everything else. Digesting this (not the raw doc) is what makes the
+    cross-check faithful to the production back-link computation.
+    """
+    issuer = _as_dict(doc.get("issuerAsserted"))
+    planner = _as_dict(doc.get("plannerDeclared"))
+    payload = _as_dict(doc.get("payloadDerived"))
+    declared: dict[str, Any] = {"intent": planner.get("intent")}
+    if planner.get("requestedCapability") is not None:
+        declared["requestedCapability"] = planner["requestedCapability"]
+    return {
+        "version": doc.get("version"),
+        "alg": doc.get("alg"),
+        "signature": doc.get("signature"),
+        "plannerDeclared": declared,
+        "issuerAsserted": {
+            k: issuer.get(k)
+            for k in ("alg", "expSeconds", "iat", "iss", "nonce", "secretVersion", "sub")
+        },
+        "payloadDerived": {
+            "toolCalls": [
+                {
+                    "name": c.get("name"),
+                    "serverFingerprint": c.get("serverFingerprint"),
+                    "args": _modeled_args(_as_dict(c.get("args"))),
+                }
+                for c in payload.get("toolCalls", [])
+                if isinstance(c, dict)
+            ]
+        },
+    }
+
+
 def _attestation(doc: Any) -> dict[str, Any]:
     issuer = _as_dict(doc.get("issuerAsserted"))
     planner = _as_dict(doc.get("plannerDeclared"))
@@ -179,7 +231,9 @@ def _attestation(doc: Any) -> dict[str, Any]:
             {"name": c.get("name"), "serverFingerprint": c.get("serverFingerprint")}
             for c in payload["toolCalls"] if isinstance(c, dict)
         ]
-    digest = "sha256:" + hashlib.sha256(rfc8785.dumps(doc)).hexdigest()
+    digest = "sha256:" + hashlib.sha256(
+        rfc8785.dumps(_modeled_attestation(doc))
+    ).hexdigest()
     return _result(
         "sep2787", "SEP-2787 tool-call attestation", True, "decision-attested",
         {"backLink": {"attestationDigest": digest,

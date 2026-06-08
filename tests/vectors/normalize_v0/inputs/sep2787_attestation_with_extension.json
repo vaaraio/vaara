@@ -1,0 +1,31 @@
+{
+  "alg": "HS256",
+  "issuerAsserted": {
+    "alg": "HS256",
+    "expSeconds": 300,
+    "iat": "2026-05-29T10:00:00Z",
+    "iss": "issuer://test",
+    "kid": "key-2026-05",
+    "nonce": "fixed-attestation-nonce-000",
+    "secretVersion": "v1",
+    "sub": "agent:archiver"
+  },
+  "payloadDerived": {
+    "toolCalls": [
+      {
+        "args": {
+          "projection": "{\"digest\":\"sha256:866290b000d2128e0a3188a7207d447090415dc321bfcc0ceed355bd7fd3e8f8\"}",
+          "projectionDigest": "sha256:031037d68e5734d3c48fa18fb1ed5e0a3b8ec61fa4cf2823b7320436452ca84a"
+        },
+        "name": "delete_file",
+        "serverFingerprint": "sha256:1111111111111111111111111111111111111111111111111111111111111111"
+      }
+    ]
+  },
+  "plannerDeclared": {
+    "intent": "archive obsolete report"
+  },
+  "signature": "ea49c2f2e50a2fc58cd7a20bf4ec0e04a225257f7b795e7c999a927c123d4bbd",
+  "version": 1,
+  "x-extension": "an unmodeled field a real producer may carry"
+}

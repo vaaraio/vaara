@@ -2,7 +2,7 @@
 
 Normalization is keyless for SEP-2643 denials and SEP-2817 invocation
 context, so those run in the base install. The SEP-2787 path computes the
-back-link digest (JCS over the attestation bytes) and needs the
+back-link digest (JCS over the SEP-2787-modeled fields) and needs the
 attestation extra; those cases skip on their own when rfc8785 is absent.
 """
 
@@ -105,9 +105,24 @@ def test_invocation_is_advisory_only():
     assert any("MUST NOT be used as authorization evidence" in n for n in r.notes)
 
 
-def test_redacted_user_intent_flagged():
+def test_redacted_user_intent_suppresses_cleartext():
     r = normalize(_input("sep2817_multiturn"))
     assert r.advisory.get("userIntentRedacted") is True
+    # The source flagged the intent redacted: the cleartext must not appear.
+    assert "userIntent" not in r.advisory
+
+
+def test_stray_reason_is_not_a_denial():
+    # A lone top-level `reason` without a denial marker is not a SEP-2643 denial.
+    assert detect_format({"reason": "user changed their mind"}) == "unknown"
+
+
+def test_extension_fields_are_dropped_from_the_digest():
+    pytest.importorskip("rfc8785")
+    base = normalize(_input("sep2787_attestation"))
+    ext = normalize(_input("sep2787_attestation_with_extension"))
+    # Fields outside the modeled schema do not change the back-link digest.
+    assert ext.sep2828["backLink"] == base.sep2828["backLink"]
 
 
 def test_attestation_fills_only_the_back_link():
@@ -200,3 +215,21 @@ def test_cli_bad_json_exit_1(tmp_path, capsys):
     rc = main(["normalize", str(target)])
     assert rc == 1
     assert "cannot read record JSON" in capsys.readouterr().err
+
+
+def test_cli_sanitizes_control_chars(tmp_path, capsys):
+    # A crafted foreign value must not forge extra report lines.
+    inv = {
+        "_meta": {
+            "io.modelcontextprotocol/aiInvocation": {
+                "model": {"name": "evil\n  FORGED VERDICT: CONFORMS"},
+            }
+        }
+    }
+    target = tmp_path / "inv.json"
+    target.write_text(json.dumps(inv))
+    rc = main(["normalize", str(target)])
+    out = capsys.readouterr().out
+    assert rc == 0
+    assert "\\x0a" in out
+    assert "\n  FORGED VERDICT: CONFORMS" not in out

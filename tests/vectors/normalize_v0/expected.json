@@ -137,12 +137,50 @@
     "sourceFormat": "sep2787",
     "sourceTitle": "SEP-2787 tool-call attestation"
   },
+  "sep2787_attestation_with_extension": {
+    "advisory": {
+      "attestation_alg": "HS256",
+      "attestation_iss": "issuer://test",
+      "attestation_sub": "agent:archiver",
+      "intent": "archive obsolete report",
+      "toolCalls": [
+        {
+          "name": "delete_file",
+          "serverFingerprint": "sha256:1111111111111111111111111111111111111111111111111111111111111111"
+        }
+      ]
+    },
+    "evidencePlane": "decision-attested",
+    "missing": [
+      "alg",
+      "signature",
+      "receiptAsserted",
+      "outcomeDerived"
+    ],
+    "notes": [
+      "a SEP-2787 attestation is the attested request a SEP-2828 receipt answers; it fixes the exact back-link a conformant receipt must pin",
+      "plannerDeclared.intent is client-declared and bound by the issuer's signature, not asserted true by the issuer",
+      "the record's own signing (alg, signature, receiptAsserted) is a separate event by the recording side, not derived from the attestation"
+    ],
+    "populated": [
+      "backLink.attestationDigest",
+      "backLink.attestationNonce"
+    ],
+    "recognized": true,
+    "sep2828": {
+      "backLink": {
+        "attestationDigest": "sha256:79acdd4bb3c22a688b1c3321b9a26cafb5cb58c990a963874066d04b8497f70b",
+        "attestationNonce": "fixed-attestation-nonce-000"
+      }
+    },
+    "sourceFormat": "sep2787",
+    "sourceTitle": "SEP-2787 tool-call attestation"
+  },
   "sep2817_multiturn": {
     "advisory": {
       "invocationReason": "Need to inspect available tables before generating a query.",
       "model": "example-model",
       "turnId": "2f4f0c9e-8d72-4c66-9c6f-3f7f3e6a1c9f",
-      "userIntent": "Show me 10 employees",
       "userIntentRedacted": true
     },
     "evidencePlane": "decision-input",
