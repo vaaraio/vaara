@@ -112,6 +112,19 @@ Subcommands:
         checked too, still keyless. The neutral check a party runs on a
         record someone else produced. Exit 0 iff the record conforms.
 
+    vaara verify-retained RECORD.json --did-document DOC.json
+            [--key-history KH.json] [--revocations REV.json]
+            [--anchor ANCHOR.json | --anchored-time ISO] [--keyid KEYID] [--json]
+        Verify a record under a signing key that has since rotated out, over
+        the Article 12 retention window. Binds the signature to a key the
+        archived DID document lists (offline), then checks the claimed time
+        falls inside that key's validity window and the key was not revoked
+        before issuance. A retired key still verifies a signature it made
+        while valid. With a verified time anchor the verdict is corroborated:
+        the record provably existed before the key's end of life, so it
+        cannot be a later forgery under a stolen retired key. Exit 0 iff the
+        record is verifiable.
+
     vaara normalize RECORD.json [--format auto|sep2643|sep2787|sep2817] [--json]
         Map an adjacent MCP record onto the SEP-2828 evidence model. Reads a
         SEP-2643 denial, a SEP-2787 attestation, or a SEP-2817 invocation
@@ -1833,6 +1846,122 @@ def _record_back_link(attestation_path: str, doc: Any) -> dict[str, Any]:
                        else "record does not pin this attestation")}
 
 
+def _load_json_file(path: str, label: str) -> Any:
+    """Read and parse a JSON file, or raise ValueError with a CLI message."""
+    p = Path(path).expanduser()
+    if not p.is_file():
+        raise ValueError(f"{label} not a file: {p}")
+    try:
+        return json.loads(p.read_text(encoding="utf-8"))
+    except (json.JSONDecodeError, OSError) as exc:
+        raise ValueError(f"cannot read {label}: {exc}") from exc
+
+
+def _resolve_anchored_time(args: argparse.Namespace) -> "tuple[Optional[str], Optional[str]]":
+    """Return (anchored_time, error). Verifies an --anchor, or echoes --anchored-time."""
+    if args.anchored_time is not None:
+        return args.anchored_time, None
+    if args.anchor is None:
+        return None, None
+    try:
+        from vaara.audit.timeanchor import TimeAnchor, TimeAnchorError, verify_anchor
+    except ImportError:
+        return None, ("verifying --anchor requires the 'timeanchor' extra "
+                      "(pip install 'vaara[timeanchor]'); or pass --anchored-time "
+                      "with a time you verified separately")
+    try:
+        anchor = TimeAnchor.from_dict(_load_json_file(args.anchor, "anchor"))
+        attested = verify_anchor(anchor)
+    except (ValueError, KeyError, TypeError, TimeAnchorError) as exc:
+        return None, f"time anchor did not verify: {exc}"
+    return attested.isoformat(), None
+
+
+def _cmd_verify_retained(args: argparse.Namespace) -> int:
+    """Verify a record under a key that has since rotated out or retired.
+
+    The 7-year problem: an Article 12 record outlives the key that signed it.
+    Binds the signature to a key the archived DID document lists, then judges
+    the bound key's validity window and revocation at the claimed issuance
+    time. A verified time anchor upgrades the verdict to corroborated. The key
+    history and revocations default to what the document records; pass
+    --key-history / --revocations to override with an out-of-band list.
+    """
+    try:
+        from vaara.attestation.receipt import (
+            KeyHistory,
+            RevocationRegistry,
+            parse_receipt,
+            verify_receipt_retained,
+        )
+    except ImportError:
+        print(_ATTESTATION_HINT, file=sys.stderr)
+        return 2
+
+    try:
+        record = _load_json_file(args.record, "record")
+        did_document = _load_json_file(args.did_document, "DID document")
+        key_history = (
+            KeyHistory.from_dict(_load_json_file(args.key_history, "key history"))
+            if args.key_history else None
+        )
+        revocations = (
+            RevocationRegistry.from_dict(
+                _load_json_file(args.revocations, "revocations"))
+            if args.revocations else None
+        )
+    except ValueError as exc:
+        print(f"vaara verify-retained: {exc}", file=sys.stderr)
+        return 1
+
+    anchored_time, anchor_error = _resolve_anchored_time(args)
+    if anchor_error is not None:
+        print(f"vaara verify-retained: {anchor_error}", file=sys.stderr)
+        return 1
+
+    try:
+        receipt = parse_receipt(record)
+    except Exception as exc:  # noqa: BLE001 - any parse failure is a bad record
+        print(f"vaara verify-retained: not a parseable record: {exc}",
+              file=sys.stderr)
+        return 1
+
+    result = verify_receipt_retained(
+        receipt, did_document, key_history=key_history, revocations=revocations,
+        anchored_time=anchored_time, expected_keyid=args.keyid,
+    )
+
+    if args.json:
+        print(json.dumps(result.to_dict(), indent=2))
+    else:
+        _print_retained_report(result)
+
+    return 0 if result.verifiable else 1
+
+
+def _print_retained_report(r: Any) -> None:
+    # keyid and the window bounds come from a DID document the auditor may have
+    # received from an untrusted producer; escape control characters so a
+    # crafted value cannot forge extra lines in the human report.
+    keyid = _safe_inline(r.keyid) if r.keyid else None
+    print(f"verifiable: {'YES' if r.verifiable else 'NO'}")
+    print(f"  bound:          {r.bound}" + (f"  ({keyid})" if keyid else ""))
+    if r.window_recorded:
+        window = (f"[{_safe_inline(r.not_before) if r.not_before else 'open'}, "
+                  f"{_safe_inline(r.not_after) if r.not_after else 'open'})")
+    else:
+        window = "unbounded (no window recorded)"
+    print(f"  within window:  {r.within_window}  {window}")
+    print(f"  revoked:        {r.revoked}"
+          + (f"  (revoked_at={_safe_inline(r.revoked_at)})" if r.revoked_at else ""))
+    print(f"  time basis:     {r.time_basis}")
+    if r.anchored_time is not None:
+        print(f"  corroborated:   {r.corroborated}  "
+              f"(anchor predates retirement={r.anchored_before_retirement}, "
+              f"revocation={r.anchored_before_revocation})")
+    print(f"  {_safe_inline(r.reason)}")
+
+
 def _cmd_normalize(args: argparse.Namespace) -> int:
     """Map a foreign MCP record onto the SEP-2828 evidence model.
 
@@ -3005,6 +3134,57 @@ def build_parser() -> argparse.ArgumentParser:
         help="Emit the full conformance report as JSON",
     )
     pvr.set_defaults(func=_cmd_verify_record)
+
+    pvt = sub.add_parser(
+        "verify-retained",
+        help="Verify a record under a signing key that has since rotated out, "
+             "over the Article 12 retention window. Binds the signature to a "
+             "key the archived DID document lists, then checks the key was "
+             "valid (not yet retired, not revoked) when the record was signed. "
+             "A verified time anchor upgrades the verdict to corroborated: the "
+             "record provably predates the key's end of life. Requires the "
+             "attestation extra.",
+    )
+    pvt.add_argument(
+        "record",
+        help="Path to a JSON file claiming to be a SEP-2828 execution record",
+    )
+    pvt.add_argument(
+        "--did-document", required=True, dest="did_document",
+        help="Path to the archived DID document that lists the (now retired) "
+             "verification key; per-method validFrom/validUntil and revoked "
+             "markers are read from it unless overridden",
+    )
+    pvt.add_argument(
+        "--key-history", default=None, dest="key_history",
+        help="Optional key-history JSON ({version, keys:[{keyid, not_before, "
+             "not_after}]}) overriding the windows the document records",
+    )
+    pvt.add_argument(
+        "--revocations", default=None,
+        help="Optional revocation-registry JSON overriding the document's "
+             "revoked markers",
+    )
+    anchor_group = pvt.add_mutually_exclusive_group()
+    anchor_group.add_argument(
+        "--anchor", default=None,
+        help="Path to an RFC 3161 time-anchor JSON; it is verified and its "
+             "attested time corroborates existence (needs the timeanchor extra)",
+    )
+    anchor_group.add_argument(
+        "--anchored-time", default=None, dest="anchored_time",
+        help="An attested time you verified separately, used directly as the "
+             "existence-in-time proof (ISO 8601)",
+    )
+    pvt.add_argument(
+        "--keyid", default=None,
+        help="Only try the named verification method (its DID-document id)",
+    )
+    pvt.add_argument(
+        "--json", action="store_true",
+        help="Emit the full retention verdict as JSON",
+    )
+    pvt.set_defaults(func=_cmd_verify_retained)
 
     pnz = sub.add_parser(
         "normalize",

@@ -1,0 +1,341 @@
+{
+  "cases": [
+    {
+      "didDocument": {
+        "id": "did:web:agents.example.com:billing",
+        "verificationMethod": [
+          {
+            "controller": "did:web:agents.example.com:billing",
+            "id": "did:web:agents.example.com:billing#key-2026",
+            "publicKeyJwk": {
+              "crv": "P-256",
+              "kty": "EC",
+              "x": "B2Bb3IA08MGNseH1UseCTbv_Q-J10isZuVS7galZBEU",
+              "y": "pF0OwY17c4EPwvJJYAjp6z9tVfFo37FGfhFrwVZS_iM"
+            },
+            "type": "JsonWebKey2020",
+            "validFrom": "2026-01-01T00:00:00Z",
+            "validUntil": "2028-01-01T00:00:00Z"
+          }
+        ]
+      },
+      "name": "retired_key_no_anchor",
+      "receipt": {
+        "alg": "ES256",
+        "backLink": {
+          "attestationDigest": "sha256:8f4ae37b34b9be4056ce0c243dabb819d225864b4aee04561ee9bdd67b9080dc",
+          "attestationNonce": "att-nonce-fixed-0001"
+        },
+        "outcomeDerived": {
+          "completedAt": "2026-05-29T10:00:00Z",
+          "status": "executed"
+        },
+        "receiptAsserted": {
+          "alg": "ES256",
+          "iat": "2026-05-29T10:00:00Z",
+          "iss": "did:web:agents.example.com:billing",
+          "nonce": "rcpt-nonce-fixed-0001",
+          "secretVersion": "v1",
+          "sub": "did:web:agents.example.com:billing"
+        },
+        "signature": "ff66c9885b3a2fce85f6a9ccbc86bfea602f438a0d5a7b09ab07a3dbf9a23c183fc8be6512c226ff0905a4fbdbdd777f1a491fc8cc77ae70edec676e37a686cd",
+        "version": 1
+      }
+    },
+    {
+      "anchoredTime": "2026-05-29T10:05:00Z",
+      "didDocument": {
+        "id": "did:web:agents.example.com:billing",
+        "verificationMethod": [
+          {
+            "controller": "did:web:agents.example.com:billing",
+            "id": "did:web:agents.example.com:billing#key-2026",
+            "publicKeyJwk": {
+              "crv": "P-256",
+              "kty": "EC",
+              "x": "B2Bb3IA08MGNseH1UseCTbv_Q-J10isZuVS7galZBEU",
+              "y": "pF0OwY17c4EPwvJJYAjp6z9tVfFo37FGfhFrwVZS_iM"
+            },
+            "type": "JsonWebKey2020",
+            "validFrom": "2026-01-01T00:00:00Z",
+            "validUntil": "2028-01-01T00:00:00Z"
+          }
+        ]
+      },
+      "name": "retired_key_anchored",
+      "receipt": {
+        "alg": "ES256",
+        "backLink": {
+          "attestationDigest": "sha256:8f4ae37b34b9be4056ce0c243dabb819d225864b4aee04561ee9bdd67b9080dc",
+          "attestationNonce": "att-nonce-fixed-0001"
+        },
+        "outcomeDerived": {
+          "completedAt": "2026-05-29T10:00:00Z",
+          "status": "executed"
+        },
+        "receiptAsserted": {
+          "alg": "ES256",
+          "iat": "2026-05-29T10:00:00Z",
+          "iss": "did:web:agents.example.com:billing",
+          "nonce": "rcpt-nonce-fixed-0001",
+          "secretVersion": "v1",
+          "sub": "did:web:agents.example.com:billing"
+        },
+        "signature": "ff66c9885b3a2fce85f6a9ccbc86bfea602f438a0d5a7b09ab07a3dbf9a23c183fc8be6512c226ff0905a4fbdbdd777f1a491fc8cc77ae70edec676e37a686cd",
+        "version": 1
+      }
+    },
+    {
+      "didDocument": {
+        "id": "did:web:agents.example.com:billing",
+        "verificationMethod": [
+          {
+            "controller": "did:web:agents.example.com:billing",
+            "id": "did:web:agents.example.com:billing#key-2026",
+            "publicKeyJwk": {
+              "crv": "P-256",
+              "kty": "EC",
+              "x": "B2Bb3IA08MGNseH1UseCTbv_Q-J10isZuVS7galZBEU",
+              "y": "pF0OwY17c4EPwvJJYAjp6z9tVfFo37FGfhFrwVZS_iM"
+            },
+            "type": "JsonWebKey2020",
+            "validFrom": "2026-01-01T00:00:00Z",
+            "validUntil": "2026-05-01T00:00:00Z"
+          }
+        ]
+      },
+      "name": "signed_after_retirement",
+      "receipt": {
+        "alg": "ES256",
+        "backLink": {
+          "attestationDigest": "sha256:8f4ae37b34b9be4056ce0c243dabb819d225864b4aee04561ee9bdd67b9080dc",
+          "attestationNonce": "att-nonce-fixed-0001"
+        },
+        "outcomeDerived": {
+          "completedAt": "2026-05-29T10:00:00Z",
+          "status": "executed"
+        },
+        "receiptAsserted": {
+          "alg": "ES256",
+          "iat": "2026-05-29T10:00:00Z",
+          "iss": "did:web:agents.example.com:billing",
+          "nonce": "rcpt-nonce-fixed-0001",
+          "secretVersion": "v1",
+          "sub": "did:web:agents.example.com:billing"
+        },
+        "signature": "ff66c9885b3a2fce85f6a9ccbc86bfea602f438a0d5a7b09ab07a3dbf9a23c183fc8be6512c226ff0905a4fbdbdd777f1a491fc8cc77ae70edec676e37a686cd",
+        "version": 1
+      }
+    },
+    {
+      "didDocument": {
+        "id": "did:web:agents.example.com:billing",
+        "verificationMethod": [
+          {
+            "controller": "did:web:agents.example.com:billing",
+            "id": "did:web:agents.example.com:billing#key-2026",
+            "publicKeyJwk": {
+              "crv": "P-256",
+              "kty": "EC",
+              "x": "B2Bb3IA08MGNseH1UseCTbv_Q-J10isZuVS7galZBEU",
+              "y": "pF0OwY17c4EPwvJJYAjp6z9tVfFo37FGfhFrwVZS_iM"
+            },
+            "type": "JsonWebKey2020",
+            "validFrom": "2026-06-01T00:00:00Z"
+          }
+        ]
+      },
+      "name": "signed_before_activation",
+      "receipt": {
+        "alg": "ES256",
+        "backLink": {
+          "attestationDigest": "sha256:8f4ae37b34b9be4056ce0c243dabb819d225864b4aee04561ee9bdd67b9080dc",
+          "attestationNonce": "att-nonce-fixed-0001"
+        },
+        "outcomeDerived": {
+          "completedAt": "2026-05-29T10:00:00Z",
+          "status": "executed"
+        },
+        "receiptAsserted": {
+          "alg": "ES256",
+          "iat": "2026-05-29T10:00:00Z",
+          "iss": "did:web:agents.example.com:billing",
+          "nonce": "rcpt-nonce-fixed-0001",
+          "secretVersion": "v1",
+          "sub": "did:web:agents.example.com:billing"
+        },
+        "signature": "ff66c9885b3a2fce85f6a9ccbc86bfea602f438a0d5a7b09ab07a3dbf9a23c183fc8be6512c226ff0905a4fbdbdd777f1a491fc8cc77ae70edec676e37a686cd",
+        "version": 1
+      }
+    },
+    {
+      "didDocument": {
+        "id": "did:web:agents.example.com:billing",
+        "verificationMethod": [
+          {
+            "controller": "did:web:agents.example.com:billing",
+            "id": "did:web:agents.example.com:billing#key-2026",
+            "publicKeyJwk": {
+              "crv": "P-256",
+              "kty": "EC",
+              "x": "B2Bb3IA08MGNseH1UseCTbv_Q-J10isZuVS7galZBEU",
+              "y": "pF0OwY17c4EPwvJJYAjp6z9tVfFo37FGfhFrwVZS_iM"
+            },
+            "revoked": "2026-05-29T09:30:00Z",
+            "type": "JsonWebKey2020",
+            "validFrom": "2026-01-01T00:00:00Z",
+            "validUntil": "2028-01-01T00:00:00Z"
+          }
+        ]
+      },
+      "name": "revoked_before_issuance",
+      "receipt": {
+        "alg": "ES256",
+        "backLink": {
+          "attestationDigest": "sha256:8f4ae37b34b9be4056ce0c243dabb819d225864b4aee04561ee9bdd67b9080dc",
+          "attestationNonce": "att-nonce-fixed-0001"
+        },
+        "outcomeDerived": {
+          "completedAt": "2026-05-29T10:00:00Z",
+          "status": "executed"
+        },
+        "receiptAsserted": {
+          "alg": "ES256",
+          "iat": "2026-05-29T10:00:00Z",
+          "iss": "did:web:agents.example.com:billing",
+          "nonce": "rcpt-nonce-fixed-0001",
+          "secretVersion": "v1",
+          "sub": "did:web:agents.example.com:billing"
+        },
+        "signature": "ff66c9885b3a2fce85f6a9ccbc86bfea602f438a0d5a7b09ab07a3dbf9a23c183fc8be6512c226ff0905a4fbdbdd777f1a491fc8cc77ae70edec676e37a686cd",
+        "version": 1
+      }
+    },
+    {
+      "anchoredTime": "2028-06-01T00:00:00Z",
+      "didDocument": {
+        "id": "did:web:agents.example.com:billing",
+        "verificationMethod": [
+          {
+            "controller": "did:web:agents.example.com:billing",
+            "id": "did:web:agents.example.com:billing#key-2026",
+            "publicKeyJwk": {
+              "crv": "P-256",
+              "kty": "EC",
+              "x": "B2Bb3IA08MGNseH1UseCTbv_Q-J10isZuVS7galZBEU",
+              "y": "pF0OwY17c4EPwvJJYAjp6z9tVfFo37FGfhFrwVZS_iM"
+            },
+            "type": "JsonWebKey2020",
+            "validFrom": "2026-01-01T00:00:00Z",
+            "validUntil": "2028-01-01T00:00:00Z"
+          }
+        ]
+      },
+      "name": "anchor_after_retirement",
+      "receipt": {
+        "alg": "ES256",
+        "backLink": {
+          "attestationDigest": "sha256:8f4ae37b34b9be4056ce0c243dabb819d225864b4aee04561ee9bdd67b9080dc",
+          "attestationNonce": "att-nonce-fixed-0001"
+        },
+        "outcomeDerived": {
+          "completedAt": "2026-05-29T10:00:00Z",
+          "status": "executed"
+        },
+        "receiptAsserted": {
+          "alg": "ES256",
+          "iat": "2026-05-29T10:00:00Z",
+          "iss": "did:web:agents.example.com:billing",
+          "nonce": "rcpt-nonce-fixed-0001",
+          "secretVersion": "v1",
+          "sub": "did:web:agents.example.com:billing"
+        },
+        "signature": "ff66c9885b3a2fce85f6a9ccbc86bfea602f438a0d5a7b09ab07a3dbf9a23c183fc8be6512c226ff0905a4fbdbdd777f1a491fc8cc77ae70edec676e37a686cd",
+        "version": 1
+      }
+    },
+    {
+      "didDocument": {
+        "id": "did:web:agents.example.com:billing",
+        "verificationMethod": [
+          {
+            "controller": "did:web:agents.example.com:billing",
+            "id": "did:web:agents.example.com:billing#key-2026",
+            "publicKeyJwk": {
+              "crv": "P-256",
+              "kty": "EC",
+              "x": "B2Bb3IA08MGNseH1UseCTbv_Q-J10isZuVS7galZBEU",
+              "y": "pF0OwY17c4EPwvJJYAjp6z9tVfFo37FGfhFrwVZS_iM"
+            },
+            "type": "JsonWebKey2020"
+          }
+        ]
+      },
+      "name": "unbounded_key",
+      "receipt": {
+        "alg": "ES256",
+        "backLink": {
+          "attestationDigest": "sha256:8f4ae37b34b9be4056ce0c243dabb819d225864b4aee04561ee9bdd67b9080dc",
+          "attestationNonce": "att-nonce-fixed-0001"
+        },
+        "outcomeDerived": {
+          "completedAt": "2026-05-29T10:00:00Z",
+          "status": "executed"
+        },
+        "receiptAsserted": {
+          "alg": "ES256",
+          "iat": "2026-05-29T10:00:00Z",
+          "iss": "did:web:agents.example.com:billing",
+          "nonce": "rcpt-nonce-fixed-0001",
+          "secretVersion": "v1",
+          "sub": "did:web:agents.example.com:billing"
+        },
+        "signature": "ff66c9885b3a2fce85f6a9ccbc86bfea602f438a0d5a7b09ab07a3dbf9a23c183fc8be6512c226ff0905a4fbdbdd777f1a491fc8cc77ae70edec676e37a686cd",
+        "version": 1
+      }
+    },
+    {
+      "didDocument": {
+        "id": "did:web:agents.example.com:billing",
+        "verificationMethod": [
+          {
+            "controller": "did:web:agents.example.com:billing",
+            "id": "did:web:agents.example.com:billing#key-2028",
+            "publicKeyJwk": {
+              "crv": "P-256",
+              "kty": "EC",
+              "x": "AcuJDg5_TIBVj2pPoQS8aRNAZ97wcgHTf1chwfrHA8Q",
+              "y": "4tuSsTfTGUw8fYFageZoFNfqP2zp8dZNzKR22OTG0Us"
+            },
+            "type": "JsonWebKey2020",
+            "validFrom": "2026-01-01T00:00:00Z"
+          }
+        ]
+      },
+      "name": "wrong_key",
+      "receipt": {
+        "alg": "ES256",
+        "backLink": {
+          "attestationDigest": "sha256:8f4ae37b34b9be4056ce0c243dabb819d225864b4aee04561ee9bdd67b9080dc",
+          "attestationNonce": "att-nonce-fixed-0001"
+        },
+        "outcomeDerived": {
+          "completedAt": "2026-05-29T10:00:00Z",
+          "status": "executed"
+        },
+        "receiptAsserted": {
+          "alg": "ES256",
+          "iat": "2026-05-29T10:00:00Z",
+          "iss": "did:web:agents.example.com:billing",
+          "nonce": "rcpt-nonce-fixed-0001",
+          "secretVersion": "v1",
+          "sub": "did:web:agents.example.com:billing"
+        },
+        "signature": "ff66c9885b3a2fce85f6a9ccbc86bfea602f438a0d5a7b09ab07a3dbf9a23c183fc8be6512c226ff0905a4fbdbdd777f1a491fc8cc77ae70edec676e37a686cd",
+        "version": 1
+      }
+    }
+  ],
+  "did": "did:web:agents.example.com:billing",
+  "keyid": "did:web:agents.example.com:billing#key-2026"
+}

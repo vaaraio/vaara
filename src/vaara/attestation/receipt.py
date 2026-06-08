@@ -71,6 +71,12 @@ from vaara.attestation._conformance_statement import (
 from vaara.attestation._decision_conformance import (
     check_decision_conformance,
 )
+from vaara.attestation._key_history import (
+    KeyHistory,
+    KeyValidity,
+    KeyValidityStatus,
+    within_validity,
+)
 from vaara.attestation._normalize import (
     NormalizedEvidence,
     detect_format,
@@ -103,6 +109,10 @@ from vaara.attestation._receipt_identity_live import (
     ResolutionMeta,
     https_fetch,
     verify_receipt_identity_live,
+)
+from vaara.attestation._receipt_retention import (
+    RetentionResult,
+    verify_receipt_retained,
 )
 from vaara.attestation._receipt_types import (
     BackLink,
@@ -180,9 +190,13 @@ __all__ = [
     "EvidenceBundle",
     "ExecutionReceipt",
     "IdentityResult",
+    "KeyHistory",
+    "KeyValidity",
+    "KeyValidityStatus",
     "LensResult",
     "LiveIdentityResult",
     "LoggedReceiptVerdict",
+    "RetentionResult",
     "OutcomeDerived",
     "ReceiptAsserted",
     "ReceiptStatus",
@@ -213,5 +227,7 @@ __all__ = [
     "verify_logged_receipt",
     "verify_receipt_identity",
     "verify_receipt_identity_live",
+    "verify_receipt_retained",
     "verify_receipt_signature",
+    "within_validity",
 ]
