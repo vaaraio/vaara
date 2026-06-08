@@ -16,7 +16,7 @@ Each record was checked against the SEP-2828 execution-record schema for its typ
 
 Required (these gate conformance):
 
-- **duplicate_call** — 2 outcome records pin the same call (attestationDigest sha256:6b23c0d5f35d1b11f9b683f0b0a617355deb11277d91ae091d399c655b87940d, nonce nonce-C); a call MUST be recorded once (r1.json, r2.json)
+- **duplicate_call**: 2 outcome records pin the same call (attestationDigest sha256:6b23c0d5f35d1b11f9b683f0b0a617355deb11277d91ae091d399c655b87940d, nonce nonce-C); a call MUST be recorded once (r1.json, r2.json)
 
 ---
 
