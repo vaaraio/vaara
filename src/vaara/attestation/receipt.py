@@ -56,6 +56,18 @@ from vaara.attestation._audit_summary import (
     SUMMARY_SCHEMA,
     render_record_set_summary,
 )
+from vaara.attestation._conformance_statement import (
+    STATEMENT_SCHEMA,
+    ConformanceCorpusError,
+    ConformanceStatement,
+    CorpusIntegrity,
+    RecordsResult,
+    SelfTest,
+    SuiteResult,
+    build_conformance_statement,
+    render_conformance_statement,
+    verify_corpus_integrity,
+)
 from vaara.attestation._decision_conformance import (
     check_decision_conformance,
 )
@@ -151,6 +163,16 @@ __all__ = [
     "check_bundle_set",
     "SUMMARY_SCHEMA",
     "render_record_set_summary",
+    "STATEMENT_SCHEMA",
+    "ConformanceCorpusError",
+    "ConformanceStatement",
+    "CorpusIntegrity",
+    "RecordsResult",
+    "SelfTest",
+    "SuiteResult",
+    "build_conformance_statement",
+    "render_conformance_statement",
+    "verify_corpus_integrity",
     "NormalizedEvidence",
     "detect_format",
     "normalize",
