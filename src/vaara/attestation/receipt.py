@@ -46,6 +46,9 @@ from vaara.attestation._bundle_io import (
     evidence_bundle_from_json,
     load_bundle_pieces_from_dir,
 )
+from vaara.attestation._decision_conformance import (
+    check_decision_conformance,
+)
 from vaara.attestation._receipt_conformance import (
     ConformanceCheck,
     ConformanceReport,
@@ -56,6 +59,7 @@ from vaara.attestation._record_set_conformance import (
     RecordSetReport,
     SetFinding,
     check_record_set,
+    classify_record,
 )
 from vaara.attestation._receipt_emit import (
     emit_receipt,
@@ -120,10 +124,12 @@ __all__ = [
     "ConformanceCheck",
     "ConformanceReport",
     "check_record_conformance",
+    "check_decision_conformance",
     "RecordSetEntry",
     "RecordSetReport",
     "SetFinding",
     "check_record_set",
+    "classify_record",
     "DidDocumentCache",
     "EvidenceBundle",
     "ExecutionReceipt",
