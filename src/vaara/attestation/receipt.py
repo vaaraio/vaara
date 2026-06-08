@@ -52,6 +52,10 @@ from vaara.attestation._bundle_set import (
     BundleSetReport,
     check_bundle_set,
 )
+from vaara.attestation._audit_summary import (
+    SUMMARY_SCHEMA,
+    render_record_set_summary,
+)
 from vaara.attestation._decision_conformance import (
     check_decision_conformance,
 )
@@ -140,6 +144,8 @@ __all__ = [
     "BundleSetEntry",
     "BundleSetReport",
     "check_bundle_set",
+    "SUMMARY_SCHEMA",
+    "render_record_set_summary",
     "DidDocumentCache",
     "EvidenceBundle",
     "ExecutionReceipt",
