@@ -6,6 +6,29 @@ and this project follows [Semantic Versioning](https://semver.org/spec/v2.0.0.ht
 
 ## [Unreleased]
 
+## [0.64.0] - 2026-06-09
+
+### Added
+- `vaara verify-retained`: verify an execution record under a signing key that
+  has since rotated out, over the Article 12 retention window (the 7-year
+  problem). It binds the signature to a key the archived DID document lists,
+  then checks the claimed signing time falls inside that key's validity window
+  (`validFrom` / `validUntil` on the verification method) and that the key was
+  not revoked before issuance. A retired key still verifies a signature it made
+  while valid: retirement is graceful end-of-life, distinct from revocation. A
+  naive check against the current document fails on genuine old records once a
+  key rotates, which over a multi-year window is every key. With a verified
+  eIDAS RFC 3161 time anchor the verdict is corroborated: the record provably
+  existed before the key's end of life, so it cannot be a later forgery made
+  with a stolen retired key. Without an anchor the verdict rests on the
+  record's self-asserted time and names that basis. New source-agnostic
+  `KeyHistory` validity-window model (built from a DID document, an out-of-band
+  list, or directly; carries a canonical digest to pin into a signed export)
+  and `verify_receipt_retained`, composing the existing identity, revocation,
+  and time-anchor lenses. Ships with the `key_rotation_v0` conformance vectors
+  and a Vaara-free independent checker. The window and revocation checks run in
+  the base install; binding needs the attestation extra.
+
 ## [0.63.0] - 2026-06-09
 
 ### Added
