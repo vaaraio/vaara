@@ -112,6 +112,14 @@ Subcommands:
         checked too, still keyless. The neutral check a party runs on a
         record someone else produced. Exit 0 iff the record conforms.
 
+    vaara normalize RECORD.json [--format auto|sep2643|sep2787|sep2817] [--json]
+        Map an adjacent MCP record onto the SEP-2828 evidence model. Reads a
+        SEP-2643 denial, a SEP-2787 attestation, or a SEP-2817 invocation
+        audit context and reports which evidence plane it fills, which
+        SEP-2828 fields it populates, and what is still missing for a
+        complete signed record. Promotes nothing: an unsigned client claim
+        stays advisory. Exit 0 iff the record was recognized.
+
     vaara verify-records DIR [--glob '*.json'] [--json]
         Conformance-check a whole directory of SEP-2828 records at once: the
         receiving side an auditor works from. Reports how many conform, which
@@ -1815,6 +1823,73 @@ def _record_back_link(attestation_path: str, doc: Any) -> dict[str, Any]:
                        else "record does not pin this attestation")}
 
 
+def _cmd_normalize(args: argparse.Namespace) -> int:
+    """Map a foreign MCP record onto the SEP-2828 evidence model.
+
+    Vaara is the receiving side: it reads a SEP-2643 denial, a SEP-2787
+    attestation, or a SEP-2817 invocation audit context and reports which
+    SEP-2828 evidence plane it fills, which fields it populates, and what
+    is still missing for a complete signed execution record. It promotes
+    nothing: an unsigned client claim stays advisory.
+    """
+    from vaara.attestation.receipt import normalize
+
+    path = Path(args.record).expanduser()
+    if not path.is_file():
+        print(f"vaara normalize: not a file: {path}", file=sys.stderr)
+        return 2
+    try:
+        doc = json.loads(path.read_text(encoding="utf-8"))
+    except (json.JSONDecodeError, OSError) as exc:
+        print(f"vaara normalize: cannot read record JSON: {exc}", file=sys.stderr)
+        return 1
+
+    result = normalize(doc, source_format=args.format)
+
+    if args.json:
+        print(json.dumps(result.to_dict(), indent=2))
+    else:
+        _print_normalize_report(result)
+
+    return 0 if result.recognized else 1
+
+
+def _path_value(doc: dict[str, Any], dotted: str) -> Any:
+    """Follow a dotted path into a nested dict; None if absent."""
+    cur: Any = doc
+    for part in dotted.split("."):
+        if not isinstance(cur, dict) or part not in cur:
+            return None
+        cur = cur[part]
+    return cur
+
+
+def _print_normalize_report(result: Any) -> None:
+    if not result.recognized:
+        print(f"source: unrecognized ({result.source_format})")
+        for n in result.notes:
+            print(f"  note: {n}")
+        return
+    print(f"source: {result.source_title}")
+    print(f"evidence plane: {result.evidence_plane}")
+    if result.populated:
+        print("fills SEP-2828:")
+        for pth in result.populated:
+            val = _path_value(result.sep2828, pth)
+            print(f"  {pth}" + (f" = {val}" if val is not None else ""))
+    else:
+        print("fills SEP-2828: nothing required (advisory context only)")
+    if result.advisory:
+        print("carries (advisory, not proof):")
+        for k, v in result.advisory.items():
+            print(f"  {k}: {v}")
+    print("still needed for a complete signed record:")
+    for m in result.missing:
+        print(f"  {m}")
+    for n in result.notes:
+        print(f"  note: {n}")
+
+
 def _cmd_verify_records(args: argparse.Namespace) -> int:
     """Conformance-check a whole directory of SEP-2828 records at once.
 
@@ -2845,6 +2920,29 @@ def build_parser() -> argparse.ArgumentParser:
         help="Emit the full conformance report as JSON",
     )
     pvr.set_defaults(func=_cmd_verify_record)
+
+    pnz = sub.add_parser(
+        "normalize",
+        help="Map an adjacent MCP record (SEP-2643 denial, SEP-2787 "
+             "attestation, or SEP-2817 invocation audit context) onto the "
+             "SEP-2828 evidence model: which plane it fills, which fields it "
+             "populates, and what is still missing for a complete signed "
+             "record. The receiving side that reads every dialect.",
+    )
+    pnz.add_argument(
+        "record",
+        help="Path to a JSON file holding a SEP-2643, SEP-2787, or SEP-2817 record",
+    )
+    pnz.add_argument(
+        "--format", default="auto",
+        choices=("auto", "sep2643", "sep2787", "sep2817"),
+        help="Source format (default: auto-detect)",
+    )
+    pnz.add_argument(
+        "--json", action="store_true",
+        help="Emit the normalized evidence mapping as JSON",
+    )
+    pnz.set_defaults(func=_cmd_normalize)
 
     pvrs = sub.add_parser(
         "verify-records",

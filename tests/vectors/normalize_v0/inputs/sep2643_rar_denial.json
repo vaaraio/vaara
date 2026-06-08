@@ -1,0 +1,30 @@
+{
+  "jsonrpc": "2.0",
+  "id": 31,
+  "error": {
+    "code": "AUTHORIZATION_DENIAL",
+    "message": "Current authorization is insufficient for this payment.",
+    "data": {
+      "authorization": {
+        "reason": "insufficient_authorization",
+        "authorizationContextId": "authzctx_pay_9f2c",
+        "remediationHints": [
+          {
+            "type": "oauth_authorization_details",
+            "authorization_details": [
+              {
+                "type": "payment_initiation",
+                "actions": ["initiate", "status", "cancel"],
+                "locations": ["https://mcp.example.com/payments"],
+                "instructedAmount": { "currency": "EUR", "amount": "123.50" },
+                "creditorName": "Merchant A",
+                "creditorAccount": { "iban": "DE02100100109307118603" },
+                "remittanceInformationUnstructured": "Ref Number Merchant"
+              }
+            ]
+          }
+        ]
+      }
+    }
+  }
+}
