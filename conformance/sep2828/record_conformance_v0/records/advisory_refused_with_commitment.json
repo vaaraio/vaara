@@ -1,0 +1,25 @@
+{
+  "alg": "RS256",
+  "backLink": {
+    "attestationDigest": "sha256:79acdd4bb3c22a688b1c3321b9a26cafb5cb58c990a963874066d04b8497f70b",
+    "attestationNonce": "fixed-attestation-nonce-000"
+  },
+  "outcomeDerived": {
+    "completedAt": "2026-05-29T10:00:00Z",
+    "resultCommitment": {
+      "projection": "{\"deleted\":true,\"path\":\"/archive/2024-Q3.md\"}",
+      "projectionDigest": "sha256:c9a4caed49b3efaa7908a29a550b8d33ffbb088c52d519242477223a83214198"
+    },
+    "status": "refused"
+  },
+  "receiptAsserted": {
+    "alg": "RS256",
+    "iat": "2026-05-29T10:00:00Z",
+    "iss": "issuer://test",
+    "nonce": "fixed-receipt-nonce-0001",
+    "secretVersion": "v1",
+    "sub": "agent:archiver"
+  },
+  "signature": "7653e46031ab3f5ff7abe980ce6b78ff4d8a35952c4562930174e8d32da606082f86dd21be1707956111d9c11ecf0300d70f64cc17f3d84425c8e1a588934b1b983b2d8abfdb5084b22b3dc71f651c009e439e7552b332e7ba119e9ff6ed7310317aaadea1f1cc2463abc248e126bf26ede7812d84c4a52b9c95d4b5c64feb429aca0f776a9301a8946032f80a5693db96b43863246bfe2f6622f71cb45de9745ce94f8f1d5fcc47f5a13463995853aee692e5b82fcbf41d860eb6f6ea12778d1f96d4920504eaa556ab1e2ecb550c1658eba38dbe50b3fc53230ac427995b1044db92d699c0f3c42b0a99ead7c0882c23c4607ffd43db98618a5c3bdbd574cd",
+  "version": 1
+}
