@@ -1,0 +1,21 @@
+{
+  "alg": "HS256",
+  "backLink": {
+    "attestationDigest": "sha256:559aead08264d5795d3909718cdd05abd49572e84fe55590eef31a88a08fdffd",
+    "attestationNonce": "call-B"
+  },
+  "decisionDerived": {
+    "decidedAt": "2026-06-01T11:00:00Z",
+    "decision": "escalate"
+  },
+  "issuerAsserted": {
+    "alg": "HS256",
+    "iat": "2026-06-01T11:00:00Z",
+    "iss": "issuer://test",
+    "nonce": "d2",
+    "secretVersion": "v1",
+    "sub": "agent:reader"
+  },
+  "signature": "226d2a3c2998ecbd0366ac8080e27b5ce255e2680c8178fa478f69dceac571fb",
+  "version": 1
+}

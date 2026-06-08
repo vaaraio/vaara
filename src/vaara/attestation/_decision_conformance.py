@@ -1,0 +1,136 @@
+"""Producer-agnostic conformance check for SEP-2828 decision records.
+
+The sibling of ``_receipt_conformance``. A decision record is the
+*before* half of an execution record: the governing server's verdict
+(``allow`` / ``block`` / ``escalate``) and the basis for it, pinned to the
+same SEP-2787 attestation the outcome record answers. This checks that a
+candidate is a well-formed decision record, with no signing key and no
+matching attestation, so a neutral party can judge a record someone else
+produced.
+
+Like the receipt check it covers the wire schema only: required fields,
+types, supported ``alg``, valid verdict, ``sha256:<hex>`` digest format,
+and that ``issuerAsserted.alg`` matches the envelope ``alg``. The
+signature and the back-link to a held attestation are out of scope here;
+they need external material and live in the decision verifier.
+
+Pure standard library; importable without the ``attestation`` extra, so
+it runs in the base install beside ``verify-records``.
+"""
+
+from __future__ import annotations
+
+from typing import Any, Optional
+
+from vaara.attestation._receipt_conformance import (
+    ADVISORY,
+    REQUIRED,
+    _DIGEST_RE,
+    _HEX_RE,
+    _SIG_HEX_LEN,
+    VALID_ALGS,
+    ConformanceCheck,
+    ConformanceReport,
+)
+
+VALID_VERDICTS: frozenset[str] = frozenset({"allow", "block", "escalate"})
+
+DECISION_SCHEMA_NAME = "sep2828-decision-record"
+
+# Risk-basis fields are decimal strings on the wire (floats are banned at
+# the JCS boundary). When present they SHOULD be strings.
+_RISK_FIELDS = ("riskScore", "thresholdAllow", "thresholdBlock")
+
+
+def check_decision_conformance(doc: Any) -> ConformanceReport:
+    """Check a parsed JSON value against the SEP-2828 decision-record schema.
+
+    Returns a report listing every applicable check; never raises on a
+    malformed record. ``conforms`` is true iff every applicable
+    ``required`` check passed. The report's ``status`` slot carries the
+    decision verdict (the salient enum), mirroring the receipt report.
+    """
+    checks: list[ConformanceCheck] = []
+
+    def add(check_id: str, ok: bool, severity: str, detail: str) -> None:
+        checks.append(ConformanceCheck(check_id, ok, severity, detail))
+
+    def finish(alg: Any, verdict: Any) -> ConformanceReport:
+        conforms = all(c.ok for c in checks if c.severity == REQUIRED)
+        return ConformanceReport(
+            conforms=conforms,
+            checks=tuple(checks),
+            alg=alg if isinstance(alg, str) else None,
+            status=verdict if isinstance(verdict, str) else None,
+        )
+
+    if not isinstance(doc, dict):
+        add("top_level_object", False, REQUIRED, "record MUST be a JSON object")
+        return finish(None, None)
+    add("top_level_object", True, REQUIRED, "record is a JSON object")
+
+    version = doc.get("version")
+    add("version", version == 1, REQUIRED, f"version MUST be 1; got {version!r}")
+
+    alg = doc.get("alg")
+    add("alg_supported", alg in VALID_ALGS, REQUIRED,
+        f"alg MUST be one of {sorted(VALID_ALGS)}; got {alg!r}")
+
+    sig = doc.get("signature")
+    sig_hex = isinstance(sig, str) and bool(_HEX_RE.match(sig)) and len(sig) % 2 == 0
+    add("signature_hex", sig_hex, REQUIRED,
+        "signature MUST be an even-length lowercase hex string")
+    if sig_hex and isinstance(sig, str) and isinstance(alg, str) and alg in _SIG_HEX_LEN:
+        want = _SIG_HEX_LEN[alg]
+        add("signature_length", len(sig) == want, ADVISORY,
+            f"{alg} signature SHOULD be {want} hex chars; got {len(sig)}")
+
+    _check_back_link(doc.get("backLink"), add)
+
+    ia = doc.get("issuerAsserted")
+    if not isinstance(ia, dict):
+        add("issuer_asserted_present", False, REQUIRED,
+            "issuerAsserted MUST be an object")
+    else:
+        ia_fields = ("alg", "iat", "iss", "nonce", "secretVersion", "sub")
+        missing = [f for f in ia_fields if f not in ia]
+        add("issuer_asserted_present", not missing, REQUIRED,
+            f"issuerAsserted MUST carry {list(ia_fields)}; missing {missing}")
+        add("issuer_asserted_alg_matches", ia.get("alg") == alg, REQUIRED,
+            "issuerAsserted.alg MUST equal the top-level alg")
+
+    verdict = _check_decision_derived(doc.get("decisionDerived"), add)
+    return finish(alg, verdict)
+
+
+def _check_back_link(bl: Any, add: Any) -> None:
+    if not isinstance(bl, dict):
+        add("back_link_present", False, REQUIRED, "backLink MUST be an object")
+        return
+    add("back_link_present",
+        "attestationDigest" in bl and "attestationNonce" in bl, REQUIRED,
+        "backLink MUST carry attestationDigest and attestationNonce")
+    ad = bl.get("attestationDigest")
+    add("back_link_digest_format",
+        isinstance(ad, str) and bool(_DIGEST_RE.match(ad)), REQUIRED,
+        "backLink.attestationDigest MUST be 'sha256:<64 lowercase hex>'")
+    add("back_link_nonce_type", isinstance(bl.get("attestationNonce"), str),
+        REQUIRED, "backLink.attestationNonce MUST be a string")
+
+
+def _check_decision_derived(dd: Any, add: Any) -> Optional[str]:
+    if not isinstance(dd, dict):
+        add("decision_present", False, REQUIRED, "decisionDerived MUST be an object")
+        return None
+    verdict = dd.get("decision")
+    add("decision_present", "decision" in dd and "decidedAt" in dd, REQUIRED,
+        "decisionDerived MUST carry decision and decidedAt")
+    add("decision_valid", verdict in VALID_VERDICTS, REQUIRED,
+        f"decision MUST be one of {sorted(VALID_VERDICTS)}; got {verdict!r}")
+    add("decided_at_type", isinstance(dd.get("decidedAt"), str), REQUIRED,
+        "decisionDerived.decidedAt MUST be a string")
+    for field in _RISK_FIELDS:
+        if field in dd:
+            add(f"{field}_is_string", isinstance(dd[field], str), ADVISORY,
+                f"decisionDerived.{field} SHOULD be a decimal string, not a number")
+    return verdict if isinstance(verdict, str) else None

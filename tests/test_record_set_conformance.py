@@ -19,6 +19,7 @@ import pytest
 from vaara.attestation._record_set_conformance import (
     SET_SCHEMA_NAME,
     check_record_set,
+    classify_record,
 )
 from vaara.cli import main
 
@@ -51,6 +52,7 @@ def test_module_reproduces_vector_verdict(name):
         "total": report.total,
         "conforming": report.conforming,
         "statusCounts": report.status_counts,
+        "verdictCounts": report.verdict_counts,
         "findings": [
             {"id": f.id, "severity": f.severity, "records": list(f.records)}
             for f in report.findings
@@ -127,8 +129,96 @@ def test_report_to_dict_shape():
     assert d["conforms"] is True
     assert d["total"] == 2
     assert d["statusCounts"] == {"executed": 1, "refused": 1}
+    assert d["verdictCounts"] == {}
     assert d["findings"] == []
-    assert all({"name", "conforms"} <= set(e) for e in d["entries"])
+    assert all({"name", "kind", "conforms"} <= set(e) for e in d["entries"])
+    assert {e["kind"] for e in d["entries"]} == {"outcome"}
+
+
+# ── Type-aware classification ───────────────────────────────────────────────────
+
+
+def test_classify_decision_outcome_and_unknown():
+    decision = _load_set("proper_pair")
+    kinds = {n: classify_record(doc) for n, doc in decision}
+    assert kinds == {"decision.json": "decision", "outcome.json": "outcome"}
+    assert classify_record({"version": 1}) == "unknown"  # neither block
+    assert classify_record({"decisionDerived": {}, "outcomeDerived": {}}) == "unknown"
+    assert classify_record("not an object") == "unknown"
+
+
+def test_unknown_shape_record_gates_without_raising():
+    good = _load_set("proper_pair")[0]  # a decision record
+    report = check_record_set([good, ("weird.json", {"version": 1})])
+    assert not report.conforms
+    entry = next(e for e in report.entries if e.name == "weird.json")
+    assert entry.kind == "unknown"
+    assert entry.conforms is False
+    assert entry.required_failed == ("record_type",)
+
+
+def test_decision_record_is_conformance_checked_as_a_decision():
+    # A decision with an invalid verdict fails the decision schema, not the
+    # outcome schema (which would reject it for a missing outcomeDerived).
+    name, doc = _load_set("proper_pair")[0]
+    broken = dict(doc)
+    broken["decisionDerived"] = {**doc["decisionDerived"], "decision": "maybe"}
+    report = check_record_set([(name, broken)])
+    assert not report.conforms
+    entry = report.entries[0]
+    assert entry.kind == "decision"
+    assert "decision_valid" in entry.required_failed
+
+
+# ── Pairing: the coverage critic ────────────────────────────────────────────────
+
+
+def test_proper_pair_is_not_a_duplicate():
+    report = check_record_set(_load_set("proper_pair"))
+    assert report.conforms
+    assert report.findings == ()  # a decision + its outcome is the pair
+    assert report.verdict_counts == {"allow": 1}
+    assert report.status_counts == {"executed": 1}
+
+
+def test_decision_without_outcome_is_advisory_and_does_not_gate():
+    report = check_record_set(_load_set("decision_without_outcome"))
+    assert report.conforms
+    assert report.required_findings == ()
+    advisory = [f for f in report.findings if f.severity == "advisory"]
+    assert [f.id for f in advisory] == ["decision_without_outcome"]
+    assert advisory[0].records == ("decision_b.json",)
+    assert report.verdict_counts == {"allow": 1, "escalate": 1}
+
+
+def test_outcome_without_decision_is_advisory_and_does_not_gate():
+    report = check_record_set(_load_set("outcome_without_decision"))
+    assert report.conforms
+    assert report.required_findings == ()
+    advisory = [f for f in report.findings if f.severity == "advisory"]
+    assert [f.id for f in advisory] == ["outcome_without_decision"]
+    assert advisory[0].records == ("outcome_b.json",)
+
+
+def test_block_decision_alone_is_not_a_coverage_gap():
+    # A blocked call legitimately has no outcome, so a block decision paired
+    # with an unrelated outcome raises no decision_without_outcome.
+    dname, ddoc = _load_set("proper_pair")[0]
+    blocked = dict(ddoc)
+    blocked["decisionDerived"] = {**ddoc["decisionDerived"], "decision": "block"}
+    oname, odoc = _load_set("clean")[1]  # a refused outcome on a different call
+    report = check_record_set([(dname, blocked), (oname, odoc)])
+    assert report.conforms
+    ids = [f.id for f in report.findings]
+    assert "decision_without_outcome" not in ids
+
+
+def test_homogeneous_outcome_set_raises_no_pairing_findings():
+    # clean is two outcomes, no decisions: nothing to pair, so no
+    # outcome_without_decision noise.
+    report = check_record_set(_load_set("clean"))
+    assert report.conforms
+    assert report.findings == ()
 
 
 # ── CLI ───────────────────────────────────────────────────────────────────────
@@ -158,6 +248,23 @@ def test_cli_json_output(capsys):
     assert payload["schema"] == SET_SCHEMA_NAME
     assert payload["unreadable"] == []
     assert payload["findings"][0]["id"] == "executed_without_result_commitment"
+
+
+def test_cli_pairing_set_reports_decisions_and_gap(capsys):
+    rc = main(["verify-records", str(SETS / "decision_without_outcome")])
+    out = capsys.readouterr().out
+    assert rc == 0  # advisory pairing gap does not gate
+    assert "CONFORMS" in out
+    assert "decisions: allow: 1, escalate: 1" in out
+    assert "decision_without_outcome" in out
+
+
+def test_cli_json_includes_verdict_counts(capsys):
+    rc = main(["verify-records", str(SETS / "proper_pair"), "--json"])
+    payload = json.loads(capsys.readouterr().out)
+    assert rc == 0
+    assert payload["verdictCounts"] == {"allow": 1}
+    assert {e["kind"] for e in payload["entries"]} == {"decision", "outcome"}
 
 
 def test_cli_unreadable_file_gates(tmp_path, capsys):
