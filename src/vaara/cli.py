@@ -112,6 +112,13 @@ Subcommands:
         checked too, still keyless. The neutral check a party runs on a
         record someone else produced. Exit 0 iff the record conforms.
 
+    vaara verify-records DIR [--glob '*.json'] [--json]
+        Conformance-check a whole directory of SEP-2828 records at once: the
+        receiving side an auditor works from. Reports how many conform, which
+        fail and why, and the cross-record gaps verify-record cannot see (a
+        call recorded twice, an executed action that committed no result).
+        Keyless. Exit 0 iff every record conforms and no required gap fired.
+
     vaara build-bundle (--receipt RECEIPT.json | --from-dir DIR) [piece flags]
             [--out BUNDLE.json]
         Assemble a complete evidence bundle on disk from the issuer's
@@ -1808,6 +1815,63 @@ def _record_back_link(attestation_path: str, doc: Any) -> dict[str, Any]:
                        else "record does not pin this attestation")}
 
 
+def _cmd_verify_records(args: argparse.Namespace) -> int:
+    """Conformance-check a whole directory of SEP-2828 records at once.
+
+    The receiving side of the evidence: an auditor points this at a pile of
+    records, possibly from more than one emitter, and gets the roll-up that
+    ``verify-record`` cannot give on its own. How many conform, which fail
+    and why, and the cross-record gaps: a call recorded twice, an executed
+    action that committed no result. Keyless, like ``verify-record``.
+    """
+    from vaara.attestation.receipt import check_record_set
+
+    directory = Path(args.directory).expanduser()
+    if not directory.is_dir():
+        print(f"vaara verify-records: not a directory: {directory}", file=sys.stderr)
+        return 2
+
+    paths = sorted(p for p in directory.glob(args.glob) if p.is_file())
+    if not paths:
+        print(f"vaara verify-records: no files matched {args.glob!r} in {directory}",
+              file=sys.stderr)
+        return 2
+
+    parsed: list[tuple[str, Any]] = []
+    unreadable: list[tuple[str, str]] = []
+    for path in paths:
+        try:
+            parsed.append((path.name, json.loads(path.read_text(encoding="utf-8"))))
+        except (json.JSONDecodeError, OSError) as exc:
+            unreadable.append((path.name, str(exc)))
+
+    report = check_record_set(parsed)
+    ok = report.conforms and not unreadable
+
+    if args.json:
+        out: dict[str, Any] = report.to_dict()
+        out["ok"] = ok
+        out["unreadable"] = [{"name": n, "error": e} for n, e in unreadable]
+        print(json.dumps(out, indent=2))
+    else:
+        verdict = "CONFORMS" if ok else "NON-CONFORMING"
+        print(f"record set: {verdict}  ({report.conforming}/{report.total} records conform)")
+        if report.status_counts:
+            tally = ", ".join(f"{s}: {n}" for s, n in report.status_counts.items())
+            print(f"  outcomes: {tally}")
+        for entry in report.entries:
+            if not entry.conforms:
+                print(f"  [FAIL] {entry.name}: {', '.join(entry.required_failed)}")
+        for finding in report.findings:
+            mark = "FAIL" if finding.severity == "required" else "warn"
+            print(f"  [{mark}] {finding.id}: {finding.detail}")
+            print(f"         {', '.join(finding.records)}")
+        for name, exc in unreadable:
+            print(f"  [FAIL] {name}: unreadable ({exc})")
+
+    return 0 if ok else 1
+
+
 def _cmd_build_bundle(args: argparse.Namespace) -> int:
     """Assemble an evidence bundle on disk from the issuer's pieces.
 
@@ -2668,6 +2732,27 @@ def build_parser() -> argparse.ArgumentParser:
         help="Emit the full conformance report as JSON",
     )
     pvr.set_defaults(func=_cmd_verify_record)
+
+    pvrs = sub.add_parser(
+        "verify-records",
+        help="Conformance-check a whole directory of SEP-2828 records at once. "
+             "The receiving side of the evidence: how many conform, which fail, "
+             "and the cross-record gaps (a call recorded twice, an executed "
+             "action that committed no result). Keyless, like verify-record.",
+    )
+    pvrs.add_argument(
+        "directory",
+        help="Directory of JSON files, each claiming to be a SEP-2828 record",
+    )
+    pvrs.add_argument(
+        "--glob", default="*.json",
+        help="Glob for record files within the directory (default: *.json)",
+    )
+    pvrs.add_argument(
+        "--json", action="store_true",
+        help="Emit the full set conformance report as JSON",
+    )
+    pvrs.set_defaults(func=_cmd_verify_records)
 
     pbb = sub.add_parser(
         "build-bundle",
