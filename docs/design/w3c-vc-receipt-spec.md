@@ -81,8 +81,8 @@ context is static and vendored in-repo so verification needs no network.
 
 Opt-in, additive, default behavior unchanged:
 
-- `receipt_to_vc(receipt: ExecutionReceipt) -> dict` — wrap.
-- `receipt_from_vc(vc: dict) -> ExecutionReceipt` — unwrap, reconstructing
+- `receipt_to_vc(receipt: ExecutionReceipt) -> dict`: wrap.
+- `receipt_from_vc(vc: dict) -> ExecutionReceipt`: unwrap, reconstructing
   the exact `ExecutionReceipt` (inverse of `receipt_to_vc`).
 - Convenience on the public `receipt` surface, e.g. an emit helper or a
   `serialization="vc"` flag, that emits the native receipt then wraps it.
@@ -94,7 +94,7 @@ whole design hangs on.
 ## Verification path (unchanged, restated)
 
 1. `receipt_from_vc(vc)` -> `ExecutionReceipt`.
-2. `verify_receipt_signature(receipt, verifying_material=...)` — the
+2. `verify_receipt_signature(receipt, verifying_material=...)`: the
    existing call, same JCS payload, same ES256/RS256/HS256 check.
 3. Back-link and result-commitment checks compose as today.
 

@@ -6,6 +6,23 @@ and this project follows [Semantic Versioning](https://semver.org/spec/v2.0.0.ht
 
 ## [Unreleased]
 
+## [0.61.2] - 2026-06-08
+
+### Changed
+- Public docs cleanup. Dropped the README reference to `examples/recipes/`,
+  which is not in the tree. Replaced em-dashes with colons or commas across
+  the npm client README, `SECURITY.md`, the SAP proxy demo README, the Claude
+  Code plugin README, the Article 12 export and W3C-VC receipt design specs,
+  the v1 bench doc, the `COMPLIANCE.md` mapping tables, and `RELEASE.md`.
+- Removed `bench/v034_droplet_logs/`: orphaned v0.34 generation logs that
+  nothing in the repo references.
+
+### Verification
+- Added `tests/test_docs_no_emdash.py`. The shipped Markdown docs and
+  `llms.txt` are scanned for em-dashes so the doc surface stays clean and the
+  tell cannot re-enter on a later edit. Code comments, test vectors, and the
+  adversarial corpora are out of scope.
+
 ## [0.61.1] - 2026-06-08
 
 ### Fixed

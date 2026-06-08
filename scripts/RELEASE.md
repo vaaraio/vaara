@@ -63,7 +63,7 @@ scripts/release_merge_and_tag.sh <PR_NUMBER> <VERSION> [CO_TAG]
    pass (or fails the script if a required check fails).
 2. `gh pr merge --squash --delete-branch`.
 3. `git fetch origin main` and reads the merged SHA from `origin/main`
-   directly (no `git checkout main`/`git pull` — that would need a clean
+   directly (no `git checkout main`/`git pull`, which would need a clean
    local main and risks the destructive-reset path).
 4. Re-creates `v<VERSION>` (and `<CO_TAG>` if passed) at the merged
    SHA on `origin/main`. The pre-merge local tags pointed at the unmerged

@@ -66,7 +66,7 @@ Categories covered:
   (`target_index = -1` for every corpus entry in v1).
 - Decision bands:
   - **Soft caught:** verdict is anything other than `ALLOW`
-    (`ESCALATE` + `DENY`). `ESCALATE` routes to human review — this
+    (`ESCALATE` + `DENY`). `ESCALATE` routes to human review, which
     is the governance system working as designed, not a false
     positive.
   - **Hard caught:** only `DENY`. The scorer actively refused.
@@ -128,7 +128,7 @@ Vaara version so the methodology stays comparable across Vaara
 releases.
 
 A new benchmark version (**v2**) would imply changes to the corpus or
-methodology — for example adding production traces, switching to a
+methodology, for example adding production traces, switching to a
 held-out novel-attack corpus, or adding new decision bands.
 
 ## What vaara-bench-v1 is NOT
@@ -141,14 +141,14 @@ held-out novel-attack corpus, or adding new decision bands.
   System).
 - Not a third-party evaluation per OVERT MEA-3. A third party would
   need to run the benchmark independently.
-- Not a benchmark of latency, throughput, or operational characteristics
-  — see `bench/README.md` for the latency benchmark.
+- Not a benchmark of latency, throughput, or operational characteristics.
+  See `bench/README.md` for the latency benchmark.
 
 ## Cross-references
 
-- `bench/adversarial_corpus.jsonl` — the corpus itself.
-- `bench/build_corpus.py` — deterministic corpus generator.
-- `bench/scorer_eval.py` — evaluator.
-- `bench/vaara-bench-v1-results.json` — machine-readable results.
-- `bench/README.md` — latency benchmark and corpus background.
-- `COMPLIANCE.md` — Article-level mapping including MEA-2 (S3P).
+- `bench/adversarial_corpus.jsonl`: the corpus itself.
+- `bench/build_corpus.py`: deterministic corpus generator.
+- `bench/scorer_eval.py`: evaluator.
+- `bench/vaara-bench-v1-results.json`: machine-readable results.
+- `bench/README.md`: latency benchmark and corpus background.
+- `COMPLIANCE.md`: Article-level mapping including MEA-2 (S3P).
