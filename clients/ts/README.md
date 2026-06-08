@@ -10,7 +10,7 @@ Vaara is a runtime AI agent governance kernel: conformal risk scoring, hash-chai
 npm install @vaara/client
 ```
 
-Requires Node.js 18+ (global `fetch`). Works in modern browsers too — pass your own `fetch` if you want to inject one explicitly.
+Requires Node.js 18+ (global `fetch`). Works in modern browsers too. Pass your own `fetch` if you want to inject one explicitly.
 
 ## Quick start
 
@@ -66,7 +66,7 @@ try {
     // Server returned 4xx/5xx with a structured `{ error: { code, message } }`.
     console.error(`Vaara ${err.status} ${err.code}: ${err.message}`);
   } else if (err instanceof VaaraTransportError) {
-    // Network failure / non-JSON response. Treat fail-closed — do not
+    // Network failure / non-JSON response. Treat fail-closed, do not
     // assume the server saw the request.
     console.error(err);
   } else {

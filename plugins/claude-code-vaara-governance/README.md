@@ -1,4 +1,4 @@
-# vaara-governance — Claude Code plugin
+# vaara-governance: Claude Code plugin
 
 Runtime tool-call governance for Claude Code. Wires the [Vaara](https://github.com/vaaraio/vaara) risk scorer and hash-chained audit trail into the Claude Code hook system.
 
@@ -6,9 +6,9 @@ Runtime tool-call governance for Claude Code. Wires the [Vaara](https://github.c
 
 PreToolUse runs a two-layer check before Claude executes a tool:
 
-**Layer 1 — regex deny patterns** (Bash, WebFetch, WebSearch). A JSON deny-list (`policies/default_deny.json`) catches known-bad shapes: AWS / GCP / Azure metadata IPs, `/etc/shadow` reads, `curl | sh`, `rm -rf /`, fork bombs, `dd` to raw block devices, history purges, reverse shells, base64-piped exec, `~/.ssh/authorized_keys` writes. A match is a hard deny — fast, deterministic, no ML.
+**Layer 1: regex deny patterns** (Bash, WebFetch, WebSearch). A JSON deny-list (`policies/default_deny.json`) catches known-bad shapes: AWS / GCP / Azure metadata IPs, `/etc/shadow` reads, `curl | sh`, `rm -rf /`, fork bombs, `dd` to raw block devices, history purges, reverse shells, base64-piped exec, `~/.ssh/authorized_keys` writes. A match is a hard deny: fast, deterministic, no ML.
 
-**Layer 2 — Vaara classifier** (`mcp__*` only). MCP tool calls carry structured taxonomy that Vaara's adaptive scorer is trained for; the conformal risk score is meaningful there. The classifier output drives the allow / escalate / deny decision against the loaded policy thresholds.
+**Layer 2: Vaara classifier** (`mcp__*` only). MCP tool calls carry structured taxonomy that Vaara's adaptive scorer is trained for; the conformal risk score is meaningful there. The classifier output drives the allow / escalate / deny decision against the loaded policy thresholds.
 
 PostToolUse appends an outcome record to the audit trail for every `mcp__*` call, correlating it back to the PreToolUse decision and feeding the MWU online learner.
 
@@ -75,7 +75,7 @@ For a signed, regulator-handoff bundle, export the trail with `vaara trail expor
 
 ## Latency
 
-PreToolUse on Bash / WebFetch / WebSearch is regex-only — sub-millisecond. PreToolUse on `mcp__*` and PostToolUse load the Vaara pipeline, ~0.5 – 2 seconds cold-start on commodity hardware. For tighter MCP latency, run `vaara serve` as a sidecar and reuse a warm process — this path is on the v0.2.0 roadmap.
+PreToolUse on Bash / WebFetch / WebSearch is regex-only and sub-millisecond. PreToolUse on `mcp__*` and PostToolUse load the Vaara pipeline, ~0.5 – 2 seconds cold-start on commodity hardware. For tighter MCP latency, run `vaara serve` as a sidecar and reuse a warm process; that path is on the v0.2.0 roadmap.
 
 ## Known limitations (v0.1.0)
 
