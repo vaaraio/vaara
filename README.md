@@ -137,6 +137,20 @@ vaara verify-record someone-elses-record.json
 
 It needs no signing key and no attestation. The check is the wire schema plus the one binding a record proves about itself: the result commitment digest is the SHA-256 of the bytes it sits beside, so a verifier recomputes it with nothing but a hash function. Add `--attestation` to also check the back-link to the request the record answers, still without a key. The signature check, which does need the signer's key, stays in `vaara receipt verify`. This is the check an auditor, or a vendor whose software you do not run, can apply before trusting the producer or any key. The trust rests on the format, not on Vaara.
 
+### The auditor's workbench
+
+When the evidence is a folder of records or bundles rather than one file, each single-file command above has a set-level form that runs over a whole directory:
+
+```bash
+vaara verify-records ./records
+vaara verify-bundles ./bundles
+vaara audit-summary  ./records --out summary.md
+```
+
+- `verify-records` checks every record for SEP-2828 conformance, then checks the set as a whole: it flags a call recorded twice, an authorised decision with no matching outcome, and an executed action that committed no result. Keyless, like `verify-record`.
+- `verify-bundles` runs the full six-lens `verify-bundle` over every bundle and reports per-lens pass counts and how many bundles authenticated.
+- `audit-summary` renders the conformance verdict for a directory of records as a Markdown page an auditor reads directly. The page states what was checked and every count, and records that any party can reproduce it from the records alone.
+
 ## Benchmarks
 
 Held-out test recall **84.7%** (95% Wilson [82.4, 86.7]) at a **4.1%** false-positive rate, and **1.2%** FPR on benign tool calls under live injection pressure. The hot-path rule scorer adds 140 µs mean / 210 µs p99 per call on commodity CPU. Every figure is reproducible end-to-end via `make bench`.
