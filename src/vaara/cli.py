@@ -1875,6 +1875,51 @@ def _cmd_verify_records(args: argparse.Namespace) -> int:
     return 0 if ok else 1
 
 
+def _cmd_audit_summary(args: argparse.Namespace) -> int:
+    """Render a directory of records as a one-page audit summary a regulator reads.
+
+    Runs the same keyless set check as ``verify-records`` and renders the
+    verdict, the record counts, and the findings as a page of plain Markdown:
+    what was checked, how many records conform, where the gaps are, and why the
+    answer needs no signing key. Writes to ``--out`` or stdout. Exit 0 iff the
+    set conforms and every file was readable, the same gate as ``verify-records``.
+    """
+    from vaara.attestation.receipt import check_record_set, render_record_set_summary
+
+    directory = Path(args.directory).expanduser()
+    if not directory.is_dir():
+        print(f"vaara audit-summary: not a directory: {directory}", file=sys.stderr)
+        return 2
+
+    paths = sorted(p for p in directory.glob(args.glob) if p.is_file())
+    if not paths:
+        print(f"vaara audit-summary: no files matched {args.glob!r} in {directory}",
+              file=sys.stderr)
+        return 2
+
+    parsed: list[tuple[str, Any]] = []
+    unreadable: list[tuple[str, str]] = []
+    for path in paths:
+        try:
+            parsed.append((path.name, json.loads(path.read_text(encoding="utf-8"))))
+        except (json.JSONDecodeError, OSError) as exc:
+            unreadable.append((path.name, str(exc)))
+
+    report = check_record_set(parsed)
+    page = render_record_set_summary(report)
+    if unreadable:
+        names = ", ".join(n for n, _ in unreadable)
+        page += f"\n> Note: {len(unreadable)} file(s) could not be read: {names}\n"
+
+    if args.out:
+        Path(args.out).expanduser().write_text(page, encoding="utf-8")
+        print(f"wrote audit summary to {args.out}", file=sys.stderr)
+    else:
+        print(page, end="")
+
+    return 0 if (report.conforms and not unreadable) else 1
+
+
 def _cmd_verify_bundles(args: argparse.Namespace) -> int:
     """Run the full lens stack over a whole directory of evidence bundles.
 
@@ -2821,6 +2866,27 @@ def build_parser() -> argparse.ArgumentParser:
         help="Emit the full set conformance report as JSON",
     )
     pvrs.set_defaults(func=_cmd_verify_records)
+
+    pas = sub.add_parser(
+        "audit-summary",
+        help="Render a directory of SEP-2828 records as a one-page audit "
+             "summary a regulator reads: the verdict, the record counts, and "
+             "the findings as plain Markdown. The human-readable face of "
+             "verify-records. Keyless.",
+    )
+    pas.add_argument(
+        "directory",
+        help="Directory of JSON files, each claiming to be a SEP-2828 record",
+    )
+    pas.add_argument(
+        "--glob", default="*.json",
+        help="Glob for record files within the directory (default: *.json)",
+    )
+    pas.add_argument(
+        "--out", default=None,
+        help="Write the Markdown summary to this file instead of stdout",
+    )
+    pas.set_defaults(func=_cmd_audit_summary)
 
     pvbs = sub.add_parser(
         "verify-bundles",
