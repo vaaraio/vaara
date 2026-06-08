@@ -6,6 +6,21 @@ and this project follows [Semantic Versioning](https://semver.org/spec/v2.0.0.ht
 
 ## [Unreleased]
 
+## [0.61.1] - 2026-06-08
+
+### Fixed
+- `vaara audit-summary` no longer emits an em-dash in the findings line of the
+  rendered report; it uses a colon. Cosmetic only: the verdict, the counts, and
+  the findings are unchanged, and the page stays byte-deterministic.
+
+### Verification
+- Added a standalone checker for the audit-summary golden pages
+  (`tests/vectors/audit_summary_v0/_check_independent.py`) that parses each
+  rendered page with no Vaara import and asserts the verdict, counts, and
+  findings it states equal what the `record_set_v0` conformance vectors
+  independently compute. The regulator page is confirmed to state the same
+  verdict a neutral party derives from the records, not only to be byte-stable.
+
 ## [0.61.0] - 2026-06-08
 
 **Theme: the auditor's workbench. 0.60 made Vaara the neutral checker of one
