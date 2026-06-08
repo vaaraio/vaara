@@ -1,0 +1,187 @@
+{
+  "clean": {
+    "asOf": null,
+    "conforms": true,
+    "corpus": {
+      "corpusDigest": "sha256:0baa437da95d6ffb6bda3185d657385b7738c79daba77819acc0c6280ac0ed7a",
+      "fileCount": 32,
+      "name": "sep2828-execution-record-conformance",
+      "problems": [],
+      "spec": "SEP-2828",
+      "verified": true,
+      "version": "1.0.0"
+    },
+    "records": {
+      "conforming": 2,
+      "conforms": true,
+      "findings": [],
+      "nonconforming": [],
+      "total": 2,
+      "unreadable": []
+    },
+    "schema": "sep2828-conformance-statement",
+    "schemaVersion": 1,
+    "selfTest": {
+      "cases": 17,
+      "conforms": true,
+      "reproduced": 17,
+      "suites": [
+        {
+          "cases": 10,
+          "mismatches": [],
+          "name": "record_conformance_v0",
+          "reproduced": 10,
+          "runnable": true
+        },
+        {
+          "cases": 7,
+          "mismatches": [],
+          "name": "record_set_v0",
+          "reproduced": 7,
+          "runnable": true
+        }
+      ]
+    }
+  },
+  "duplicate": {
+    "asOf": null,
+    "conforms": false,
+    "corpus": {
+      "corpusDigest": "sha256:0baa437da95d6ffb6bda3185d657385b7738c79daba77819acc0c6280ac0ed7a",
+      "fileCount": 32,
+      "name": "sep2828-execution-record-conformance",
+      "problems": [],
+      "spec": "SEP-2828",
+      "verified": true,
+      "version": "1.0.0"
+    },
+    "records": {
+      "conforming": 2,
+      "conforms": false,
+      "findings": [
+        {
+          "id": "duplicate_call",
+          "records": [
+            "r1.json",
+            "r2.json"
+          ],
+          "severity": "required"
+        }
+      ],
+      "nonconforming": [],
+      "total": 2,
+      "unreadable": []
+    },
+    "schema": "sep2828-conformance-statement",
+    "schemaVersion": 1,
+    "selfTest": {
+      "cases": 17,
+      "conforms": true,
+      "reproduced": 17,
+      "suites": [
+        {
+          "cases": 10,
+          "mismatches": [],
+          "name": "record_conformance_v0",
+          "reproduced": 10,
+          "runnable": true
+        },
+        {
+          "cases": 7,
+          "mismatches": [],
+          "name": "record_set_v0",
+          "reproduced": 7,
+          "runnable": true
+        }
+      ]
+    }
+  },
+  "flawed": {
+    "asOf": null,
+    "conforms": false,
+    "corpus": {
+      "corpusDigest": "sha256:0baa437da95d6ffb6bda3185d657385b7738c79daba77819acc0c6280ac0ed7a",
+      "fileCount": 32,
+      "name": "sep2828-execution-record-conformance",
+      "problems": [],
+      "spec": "SEP-2828",
+      "verified": true,
+      "version": "1.0.0"
+    },
+    "records": {
+      "conforming": 1,
+      "conforms": false,
+      "findings": [],
+      "nonconforming": [
+        {
+          "name": "bad.json",
+          "requiredFailed": [
+            "status_valid"
+          ]
+        }
+      ],
+      "total": 2,
+      "unreadable": []
+    },
+    "schema": "sep2828-conformance-statement",
+    "schemaVersion": 1,
+    "selfTest": {
+      "cases": 17,
+      "conforms": true,
+      "reproduced": 17,
+      "suites": [
+        {
+          "cases": 10,
+          "mismatches": [],
+          "name": "record_conformance_v0",
+          "reproduced": 10,
+          "runnable": true
+        },
+        {
+          "cases": 7,
+          "mismatches": [],
+          "name": "record_set_v0",
+          "reproduced": 7,
+          "runnable": true
+        }
+      ]
+    }
+  },
+  "selftest_only": {
+    "asOf": null,
+    "conforms": true,
+    "corpus": {
+      "corpusDigest": "sha256:0baa437da95d6ffb6bda3185d657385b7738c79daba77819acc0c6280ac0ed7a",
+      "fileCount": 32,
+      "name": "sep2828-execution-record-conformance",
+      "problems": [],
+      "spec": "SEP-2828",
+      "verified": true,
+      "version": "1.0.0"
+    },
+    "records": null,
+    "schema": "sep2828-conformance-statement",
+    "schemaVersion": 1,
+    "selfTest": {
+      "cases": 17,
+      "conforms": true,
+      "reproduced": 17,
+      "suites": [
+        {
+          "cases": 10,
+          "mismatches": [],
+          "name": "record_conformance_v0",
+          "reproduced": 10,
+          "runnable": true
+        },
+        {
+          "cases": 7,
+          "mismatches": [],
+          "name": "record_set_v0",
+          "reproduced": 7,
+          "runnable": true
+        }
+      ]
+    }
+  }
+}

@@ -6,6 +6,22 @@ and this project follows [Semantic Versioning](https://semver.org/spec/v2.0.0.ht
 
 ## [Unreleased]
 
+## [0.63.0] - 2026-06-09
+
+### Added
+- `vaara conformance-statement`: the self-test a producer runs to prove SEP-2828
+  conformance against the published corpus instead of asking to be trusted. It
+  confirms the corpus bytes match `MANIFEST.json`, re-runs this implementation's
+  keyless conformance check over every corpus fixture and confirms it reproduces
+  the verdict the corpus records, optionally runs the producer's own records
+  through the same set check, and prints one statement that names the exact
+  corpus version and corpusDigest it was checked against. Keyless and
+  deterministic: no signing key and no clock, so anyone holding the same corpus
+  re-runs the command and reaches the same verdict. Ships with the
+  `conformance_statement_v0` vectors and a Vaara-free independent checker that
+  re-derives every claim and confirms the statement states it faithfully.
+  Markdown or `--json`; runs in the base install.
+
 ## [0.62.0] - 2026-06-08
 
 ### Added
