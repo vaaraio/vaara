@@ -6,6 +6,23 @@ and this project follows [Semantic Versioning](https://semver.org/spec/v2.0.0.ht
 
 ## [Unreleased]
 
+## [0.62.0] - 2026-06-08
+
+### Added
+- `vaara normalize`: read an adjacent MCP record and map it onto the SEP-2828
+  execution-record evidence model. A SEP-2643 authorization denial becomes a
+  refused outcome, a SEP-2787 tool-call attestation becomes the
+  decision-attested back-link a conformant receipt must pin, and a SEP-2817
+  invocation audit context becomes advisory decision-input. For each record the
+  command reports which evidence plane it fills, which SEP-2828 fields it
+  populates, and what is still missing for a complete signed record. It promotes
+  nothing: an unsigned client claim stays advisory, and when the source flags an
+  intent as redacted the cleartext is withheld. SEP-2643 and SEP-2817 run in the
+  base install; the SEP-2787 back-link digest needs the attestation extra. Ships
+  with the `normalize_v0` vectors (verbatim spec examples plus an
+  extension-field attestation) and a Vaara-free independent checker that
+  reconstructs the modeled envelope and reproduces every case.
+
 ## [0.61.3] - 2026-06-08
 
 ### Added

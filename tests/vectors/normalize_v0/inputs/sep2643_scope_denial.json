@@ -1,0 +1,14 @@
+{
+  "jsonrpc": "2.0",
+  "id": 17,
+  "error": {
+    "code": "AUTHORIZATION_DENIAL",
+    "message": "You must grant write access to proceed.",
+    "data": {
+      "authorization": {
+        "reason": "insufficient_authorization",
+        "authorizationContextId": "authzctx_8a3e1f4b"
+      }
+    }
+  }
+}

@@ -1,0 +1,23 @@
+{
+  "jsonrpc": "2.0",
+  "id": 17,
+  "error": {
+    "code": -32042,
+    "message": "You need to approve access to the requested folder.",
+    "data": {
+      "authorization": {
+        "reason": "insufficient_authorization",
+        "authorizationContextId": "authzctx_7c5d1d79",
+        "remediationHints": [{ "type": "url" }]
+      },
+      "elicitations": [
+        {
+          "mode": "url",
+          "elicitationId": "el_550e8400-e29b-41d4-a716-446655440000",
+          "url": "https://mcp.example.com/approve-folder-access?ctx=authzctx_7c5d1d79",
+          "message": "Open this page to approve access to the requested folder."
+        }
+      ]
+    }
+  }
+}
