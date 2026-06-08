@@ -1,0 +1,108 @@
+{
+  "clean": {
+    "authenticated": 2,
+    "lensApplicable": {
+      "back_link": 1,
+      "consistency": 1,
+      "identity": 1,
+      "inclusion": 1,
+      "revocation": 1,
+      "signature": 1
+    },
+    "lensGaps": [],
+    "lensPassed": {
+      "back_link": 1,
+      "consistency": 1,
+      "identity": 1,
+      "inclusion": 1,
+      "revocation": 1,
+      "signature": 1
+    },
+    "loaded": 2,
+    "ok": true,
+    "passed": 2,
+    "total": 2
+  },
+  "mixed": {
+    "authenticated": 2,
+    "lensApplicable": {
+      "back_link": 2,
+      "consistency": 1,
+      "identity": 2,
+      "inclusion": 2,
+      "revocation": 2,
+      "signature": 0
+    },
+    "lensGaps": [
+      "signature"
+    ],
+    "lensPassed": {
+      "back_link": 2,
+      "consistency": 1,
+      "identity": 2,
+      "inclusion": 1,
+      "revocation": 2,
+      "signature": 0
+    },
+    "loaded": 2,
+    "ok": false,
+    "passed": 1,
+    "total": 2
+  },
+  "thin": {
+    "authenticated": 1,
+    "lensApplicable": {
+      "back_link": 0,
+      "consistency": 0,
+      "identity": 0,
+      "inclusion": 0,
+      "revocation": 0,
+      "signature": 1
+    },
+    "lensGaps": [
+      "identity",
+      "back_link",
+      "inclusion",
+      "consistency",
+      "revocation"
+    ],
+    "lensPassed": {
+      "back_link": 0,
+      "consistency": 0,
+      "identity": 0,
+      "inclusion": 0,
+      "revocation": 0,
+      "signature": 1
+    },
+    "loaded": 1,
+    "ok": true,
+    "passed": 1,
+    "total": 1
+  },
+  "unauthenticated": {
+    "authenticated": 1,
+    "lensApplicable": {
+      "back_link": 1,
+      "consistency": 1,
+      "identity": 1,
+      "inclusion": 2,
+      "revocation": 2,
+      "signature": 0
+    },
+    "lensGaps": [
+      "signature"
+    ],
+    "lensPassed": {
+      "back_link": 1,
+      "consistency": 1,
+      "identity": 1,
+      "inclusion": 2,
+      "revocation": 2,
+      "signature": 0
+    },
+    "loaded": 2,
+    "ok": false,
+    "passed": 1,
+    "total": 2
+  }
+}
