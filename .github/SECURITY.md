@@ -69,9 +69,9 @@ receive patches at our discretion for severe issues.
 
 ## Continuous Fuzzing
 
-The parsers that ingest attacker-controlled bytes — the OVERT envelope
+The parsers that ingest attacker-controlled bytes (the OVERT envelope
 CBOR decoder, the audit-record `from_dict` deserialiser, and the policy
-YAML/JSON loader — are covered by ClusterFuzzLite under both AddressSanitizer
+YAML/JSON loader) are covered by ClusterFuzzLite under both AddressSanitizer
 and UndefinedBehaviorSanitizer. PRs that touch `src/`, `fuzz/`,
 `.clusterfuzzlite/`, or the CFLite workflows trigger short fuzz runs as a
 status check; a nightly cron runs a longer batch. Fuzz target sources

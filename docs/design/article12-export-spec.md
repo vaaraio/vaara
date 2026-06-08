@@ -84,21 +84,21 @@ not a different one.
 
 Generated, deterministic, from the trail + system-meta:
 
-1. **Cover** — system identity from `--system-meta`, export timestamp,
+1. **Cover**: system identity from `--system-meta`, export timestamp,
    Vaara version, signer fingerprint, reporting period.
-2. **Record-keeping summary** — total records, time span, chain-intact
+2. **Record-keeping summary**: total records, time span, chain-intact
    status, retention configuration if present.
-3. **Article 12 obligation mapping** — a table: each Article 12 / 26(5)
+3. **Article 12 obligation mapping**, a table: each Article 12 / 26(5)
    obligation against how the trail evidences it (event types present,
    counts, example record ids). Driven by `regulatory_articles` tags plus
    a static obligation checklist.
-4. **Event inventory** — event-type histogram, per-type counts, first/last
+4. **Event inventory**: event-type histogram, per-type counts, first/last
    timestamps.
-5. **Integrity statement** — the hash-chain + (if present) external time
+5. **Integrity statement**: the hash-chain + (if present) external time
    anchor status, with the trust-model one-liner: a valid signature proves
    integrity and provenance of these logs, not the truth of every recorded
    assertion. Links to `docs/signing-keys.md` and the trust model.
-6. **How to verify** — the exact `vaara trail verify` /
+6. **How to verify**: the exact `vaara trail verify` /
    `scripts/verify_vaara_trail.py` invocation, mirrored in
    `verify_instructions.txt` so a regulator with no Vaara install can act.
 
