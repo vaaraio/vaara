@@ -17,7 +17,7 @@ Each record was checked against the SEP-2828 execution-record schema for its typ
 
 Advisory (gaps that do not gate conformance):
 
-- **decision_without_outcome** — 1 allow/escalate decisions have no matching outcome record; an authorised action SHOULD leave a recorded outcome (decision_b.json)
+- **decision_without_outcome**: 1 allow/escalate decisions have no matching outcome record; an authorised action SHOULD leave a recorded outcome (decision_b.json)
 
 ---
 
