@@ -46,6 +46,12 @@ from vaara.attestation._bundle_io import (
     evidence_bundle_from_json,
     load_bundle_pieces_from_dir,
 )
+from vaara.attestation._bundle_set import (
+    BUNDLE_SET_SCHEMA_NAME,
+    BundleSetEntry,
+    BundleSetReport,
+    check_bundle_set,
+)
 from vaara.attestation._decision_conformance import (
     check_decision_conformance,
 )
@@ -130,6 +136,10 @@ __all__ = [
     "SetFinding",
     "check_record_set",
     "classify_record",
+    "BUNDLE_SET_SCHEMA_NAME",
+    "BundleSetEntry",
+    "BundleSetReport",
+    "check_bundle_set",
     "DidDocumentCache",
     "EvidenceBundle",
     "ExecutionReceipt",
