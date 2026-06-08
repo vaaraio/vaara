@@ -161,6 +161,16 @@ vaara conformance-statement --corpus conformance/sep2828 --records ./records
 
 The command prints one statement. It confirms the corpus bytes match their manifest, re-runs this implementation's keyless conformance check over every corpus fixture to confirm it reproduces the verdict the corpus records, and runs your own records through the same set check. The statement names the exact corpus version and corpusDigest it was checked against, so the claim pins a fixed byte set rather than a moving target. Keyless and deterministic: anyone holding the same corpus re-runs the command and reaches the same verdict.
 
+### Verify under a rotated key
+
+Article 12 records outlive the keys that signed them. A record signed in 2026 is audited years later, after the issuer rotated to a new key and retired the old one. The live DID document no longer lists the key that signed the record, so a plain identity check fails on a record that is perfectly genuine. `verify-retained` checks it against the document you archived at record time:
+
+```bash
+vaara verify-retained record.json --did-document archived-did.json --anchor anchor.json
+```
+
+It binds the signature to a key the archived document lists, then checks the claimed signing time falls inside that key's validity window (`validFrom` / `validUntil` on the verification method) and that the key was not revoked before issuance. A retired key still verifies a signature it made while it was valid; retirement is graceful end-of-life, not revocation. With a verified time anchor the verdict is corroborated: the record provably existed before the key's end of life, so it cannot be a later forgery made with a stolen retired key. Without an anchor the verdict rests on the record's self-asserted time and says so. The check is offline and reproducible, and a Vaara-free checker in `tests/vectors/key_rotation_v0/` reproduces every verdict with nothing but `cryptography` and a JSON canonicalizer.
+
 ## Benchmarks
 
 Held-out test recall **84.7%** (95% Wilson [82.4, 86.7]) at a **4.1%** false-positive rate, and **1.2%** FPR on benign tool calls under live injection pressure. The hot-path rule scorer adds 140 µs mean / 210 µs p99 per call on commodity CPU. Every figure is reproducible end-to-end via `make bench`.
