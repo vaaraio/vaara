@@ -3,15 +3,17 @@
 
 A second implementation of the SEP-2828 set-level rules, written from the
 schema alone with only the standard library. It does not import Vaara. For
-each committed set it reproduces the aggregate verdict, the conform count,
-the status tally, and the cross-record findings, then compares against
+each committed set it classifies every record (decision or outcome),
+reproduces the aggregate verdict, the conform count, the status and verdict
+tallies, and the cross-record findings, then compares against
 ``expected.json``.
 
 The receiving side of the evidence has to be checkable by a neutral party
 with no shared code: not just "is each record well-formed" but "is the set
-faithful" (no call recorded twice) and "is it complete" (no executed action
-left without a committed result). This file demonstrates that both fall out
-of the records alone, with nothing but a hash function and the schema.
+faithful" (no call recorded twice), "is it complete" (every authorised act
+left an outcome, every recorded act traces to a decision), and "is every
+executed action committed to its result". This file shows all of that falls
+out of the records alone, with nothing but a hash function and the schema.
 
 Run: ``python tests/vectors/record_set_v0/_check_independent.py``.
 Exit 0 means every set matched its expected verdict.
@@ -28,14 +30,27 @@ from pathlib import Path
 HERE = Path(__file__).resolve().parent
 VALID_ALGS = {"HS256", "ES256", "RS256"}
 VALID_STATUSES = {"executed", "refused", "errored"}
+VALID_VERDICTS = {"allow", "block", "escalate"}
+ACTING_VERDICTS = {"allow", "escalate"}
 DIGEST_RE = re.compile(r"^sha256:[0-9a-f]{64}$")
 HEX_RE = re.compile(r"^[0-9a-f]+$")
 
 
-def conforms(doc) -> bool:
-    """Minimal per-record conformance: enough to gate set-level reasoning."""
+def classify(doc) -> str:
+    """decision / outcome / unknown, by which derived block the record carries."""
     if not isinstance(doc, dict):
-        return False
+        return "unknown"
+    has_d = isinstance(doc.get("decisionDerived"), dict)
+    has_o = isinstance(doc.get("outcomeDerived"), dict)
+    if has_d and not has_o:
+        return "decision"
+    if has_o and not has_d:
+        return "outcome"
+    return "unknown"
+
+
+def _envelope_ok(doc, asserted_key) -> bool:
+    """Shared wire-schema checks for both record types."""
     if doc.get("version") != 1:
         return False
     alg = doc.get("alg")
@@ -52,16 +67,18 @@ def conforms(doc) -> bool:
         return False
     if not isinstance(bl.get("attestationNonce"), str):
         return False
-    ra = doc.get("receiptAsserted")
-    if not isinstance(ra, dict):
+    a = doc.get(asserted_key)
+    if not isinstance(a, dict):
         return False
-    if any(f not in ra for f in ("alg", "iat", "iss", "nonce", "secretVersion", "sub")):
+    if any(f not in a for f in ("alg", "iat", "iss", "nonce", "secretVersion", "sub")):
         return False
-    if ra.get("alg") != alg:
+    return a.get("alg") == alg
+
+
+def conforms_outcome(doc) -> bool:
+    if not _envelope_ok(doc, "receiptAsserted"):
         return False
-    od = doc.get("outcomeDerived")
-    if not isinstance(od, dict):
-        return False
+    od = doc["outcomeDerived"]
     if od.get("status") not in VALID_STATUSES:
         return False
     if not isinstance(od.get("completedAt"), str):
@@ -76,21 +93,62 @@ def conforms(doc) -> bool:
     return True
 
 
+def conforms_decision(doc) -> bool:
+    if not _envelope_ok(doc, "issuerAsserted"):
+        return False
+    dd = doc["decisionDerived"]
+    if dd.get("decision") not in VALID_VERDICTS:
+        return False
+    return isinstance(dd.get("decidedAt"), str)
+
+
+def _call_key(doc):
+    bl = doc["backLink"]
+    return bl["attestationDigest"], bl["attestationNonce"]
+
+
+def _by_call(records):
+    out = {}
+    for name, doc in records:
+        out.setdefault(_call_key(doc), []).append(name)
+    return out
+
+
 def check_set(records):
     """Reproduce the set verdict from (name, doc) pairs."""
-    conforming = [(n, d) for n, d in records if conforms(d)]
+    decisions, outcomes = [], []
+    for name, doc in records:
+        kind = classify(doc)
+        if kind == "decision" and conforms_decision(doc):
+            decisions.append((name, doc))
+        elif kind == "outcome" and conforms_outcome(doc):
+            outcomes.append((name, doc))
+
     findings = []
 
-    by_call = {}
-    for name, doc in conforming:
-        bl = doc["backLink"]
-        by_call.setdefault((bl["attestationDigest"], bl["attestationNonce"]), []).append(name)
-    for names in by_call.values():
+    for names in _by_call(outcomes).values():
         if len(names) > 1:
             findings.append({"id": "duplicate_call", "severity": "required",
                              "records": sorted(names)})
 
-    gap = sorted(n for n, d in conforming
+    if decisions and outcomes:
+        decision_calls = _by_call(decisions)
+        outcome_calls = _by_call(outcomes)
+        acting = {k: v for k, v in decision_calls.items()
+                  if any(d["decisionDerived"].get("decision") in ACTING_VERDICTS
+                         for n, d in decisions if _call_key(d) == k)}
+        no_outcome = sorted(n for k, v in acting.items()
+                            if k not in outcome_calls for n in v)
+        no_decision = sorted(n for k, v in outcome_calls.items()
+                             if k not in decision_calls for n in v)
+        if no_outcome:
+            findings.append({"id": "decision_without_outcome", "severity": "advisory",
+                             "records": no_outcome})
+        if no_decision:
+            findings.append({"id": "outcome_without_decision", "severity": "advisory",
+                             "records": no_decision})
+
+    gap = sorted(n for n, d in outcomes
                  if d["outcomeDerived"].get("status") == "executed"
                  and d["outcomeDerived"].get("resultCommitment") is None)
     if gap:
@@ -99,17 +157,24 @@ def check_set(records):
 
     findings.sort(key=lambda f: (f["id"], f["records"]))
 
-    counts = {}
-    for _n, d in conforming:
-        counts[d["outcomeDerived"]["status"]] = counts.get(d["outcomeDerived"]["status"], 0) + 1
+    status_counts = {}
+    for _n, d in outcomes:
+        s = d["outcomeDerived"]["status"]
+        status_counts[s] = status_counts.get(s, 0) + 1
+    verdict_counts = {}
+    for _n, d in decisions:
+        v = d["decisionDerived"]["decision"]
+        verdict_counts[v] = verdict_counts.get(v, 0) + 1
 
-    all_conform = len(conforming) == len(records)
+    conforming = len(decisions) + len(outcomes)
+    all_conform = conforming == len(records)
     no_required = not any(f["severity"] == "required" for f in findings)
     return {
         "conforms": all_conform and no_required,
         "total": len(records),
-        "conforming": len(conforming),
-        "statusCounts": dict(sorted(counts.items())),
+        "conforming": conforming,
+        "statusCounts": dict(sorted(status_counts.items())),
+        "verdictCounts": dict(sorted(verdict_counts.items())),
         "findings": findings,
     }
 

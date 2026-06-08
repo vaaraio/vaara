@@ -1856,6 +1856,9 @@ def _cmd_verify_records(args: argparse.Namespace) -> int:
     else:
         verdict = "CONFORMS" if ok else "NON-CONFORMING"
         print(f"record set: {verdict}  ({report.conforming}/{report.total} records conform)")
+        if report.verdict_counts:
+            tally = ", ".join(f"{v}: {n}" for v, n in report.verdict_counts.items())
+            print(f"  decisions: {tally}")
         if report.status_counts:
             tally = ", ".join(f"{s}: {n}" for s, n in report.status_counts.items())
             print(f"  outcomes: {tally}")
