@@ -151,6 +151,16 @@ vaara audit-summary  ./records --out summary.md
 - `verify-bundles` runs the full six-lens `verify-bundle` over every bundle and reports per-lens pass counts and how many bundles authenticated.
 - `audit-summary` renders the conformance verdict for a directory of records as a Markdown page an auditor reads directly. The page states what was checked and every count, and records that any party can reproduce it from the records alone.
 
+### Prove conformance
+
+A producer who claims its records are SEP-2828 records can prove it against the published conformance corpus instead of asking to be trusted:
+
+```bash
+vaara conformance-statement --corpus conformance/sep2828 --records ./records
+```
+
+The command prints one statement. It confirms the corpus bytes match their manifest, re-runs this implementation's keyless conformance check over every corpus fixture to confirm it reproduces the verdict the corpus records, and runs your own records through the same set check. The statement names the exact corpus version and corpusDigest it was checked against, so the claim pins a fixed byte set rather than a moving target. Keyless and deterministic: anyone holding the same corpus re-runs the command and reaches the same verdict.
+
 ## Benchmarks
 
 Held-out test recall **84.7%** (95% Wilson [82.4, 86.7]) at a **4.1%** false-positive rate, and **1.2%** FPR on benign tool calls under live injection pressure. The hot-path rule scorer adds 140 µs mean / 210 µs p99 per call on commodity CPU. Every figure is reproducible end-to-end via `make bench`.
