@@ -127,6 +127,16 @@ Subcommands:
         call recorded twice, an executed action that committed no result).
         Keyless. Exit 0 iff every record conforms and no required gap fired.
 
+    vaara conformance-statement [--corpus DIR] [--records DIR] [--as-of DATE]
+            [--out FILE] [--json]
+        Self-test this implementation against the published SEP-2828
+        conformance corpus and print one reproducible statement: the corpus
+        bytes match their manifest, every recorded verdict was reproduced, and
+        (with --records) your own records conform. Names the exact corpus byte
+        set (version plus corpusDigest), so the claim pins a fixed suite rather
+        than a moving target. The answer to "trust us": prove it against the
+        neutral suite. Keyless. Exit 0 iff the statement conforms.
+
     vaara build-bundle (--receipt RECEIPT.json | --from-dir DIR) [piece flags]
             [--out BUNDLE.json]
         Assemble a complete evidence bundle on disk from the issuer's
@@ -2007,6 +2017,69 @@ def _cmd_audit_summary(args: argparse.Namespace) -> int:
     return 0 if (report.conforms and not unreadable) else 1
 
 
+def _cmd_conformance_statement(args: argparse.Namespace) -> int:
+    """Self-test this implementation against the published corpus and state the result.
+
+    The answer to "trust us": run this implementation's keyless conformance
+    check over the published SEP-2828 corpus, confirm the bytes match their
+    manifest, optionally run the emitter's own records through the same set
+    check, and print one reproducible statement that names the exact corpus
+    byte set. Exit 0 iff the statement conforms (corpus verifies, the self-test
+    reproduced every verdict, and any supplied records conform).
+    """
+    from vaara.attestation.receipt import (
+        ConformanceCorpusError,
+        build_conformance_statement,
+        render_conformance_statement,
+    )
+
+    corpus = Path(args.corpus).expanduser()
+    if not corpus.is_dir():
+        print(f"vaara conformance-statement: not a corpus directory: {corpus}",
+              file=sys.stderr)
+        return 2
+
+    records: list[tuple[str, Any]] | None = None
+    unreadable: list[tuple[str, str]] = []
+    if args.records is not None:
+        records_dir = Path(args.records).expanduser()
+        if not records_dir.is_dir():
+            print(f"vaara conformance-statement: not a directory: {records_dir}",
+                  file=sys.stderr)
+            return 2
+        paths = sorted(p for p in records_dir.glob(args.glob) if p.is_file())
+        if not paths:
+            print(f"vaara conformance-statement: no files matched {args.glob!r} in "
+                  f"{records_dir}", file=sys.stderr)
+            return 2
+        records = []
+        for path in paths:
+            try:
+                records.append((path.name, json.loads(path.read_text(encoding="utf-8"))))
+            except (json.JSONDecodeError, OSError) as exc:
+                unreadable.append((path.name, str(exc)))
+
+    try:
+        statement = build_conformance_statement(
+            corpus, records=records, unreadable=unreadable, as_of=args.as_of
+        )
+    except ConformanceCorpusError as exc:
+        print(f"vaara conformance-statement: {exc}", file=sys.stderr)
+        return 2
+
+    if args.json:
+        print(json.dumps(statement.to_dict(), indent=2))
+    else:
+        page = render_conformance_statement(statement)
+        if args.out:
+            Path(args.out).expanduser().write_text(page, encoding="utf-8")
+            print(f"wrote conformance statement to {args.out}", file=sys.stderr)
+        else:
+            print(page, end="")
+
+    return 0 if statement.conforms else 1
+
+
 def _cmd_verify_bundles(args: argparse.Namespace) -> int:
     """Run the full lens stack over a whole directory of evidence bundles.
 
@@ -2997,6 +3070,41 @@ def build_parser() -> argparse.ArgumentParser:
         help="Write the Markdown summary to this file instead of stdout",
     )
     pas.set_defaults(func=_cmd_audit_summary)
+
+    pcs = sub.add_parser(
+        "conformance-statement",
+        help="Self-test this implementation against the published SEP-2828 "
+             "conformance corpus and print one reproducible statement: corpus "
+             "bytes match the manifest, every recorded verdict was reproduced, "
+             "and (with --records) your own records conform. The answer to "
+             "'trust us': prove it against the neutral suite. Keyless.",
+    )
+    pcs.add_argument(
+        "--corpus", default="conformance/sep2828",
+        help="Path to the published conformance corpus directory "
+             "(default: conformance/sep2828)",
+    )
+    pcs.add_argument(
+        "--records", default=None,
+        help="Directory of your own SEP-2828 records to check against the corpus",
+    )
+    pcs.add_argument(
+        "--glob", default="*.json",
+        help="Glob for record files within --records (default: *.json)",
+    )
+    pcs.add_argument(
+        "--as-of", default=None, dest="as_of",
+        help="A date echoed verbatim into the statement (never read from a clock)",
+    )
+    pcs.add_argument(
+        "--out", default=None,
+        help="Write the Markdown statement to this file instead of stdout",
+    )
+    pcs.add_argument(
+        "--json", action="store_true",
+        help="Emit the full statement as JSON instead of Markdown",
+    )
+    pcs.set_defaults(func=_cmd_conformance_statement)
 
     pvbs = sub.add_parser(
         "verify-bundles",
