@@ -6,16 +6,20 @@ and this project follows [Semantic Versioning](https://semver.org/spec/v2.0.0.ht
 
 ## [Unreleased]
 
+## [0.61.3] - 2026-06-08
+
+### Added
+- README: documented the set-level auditor commands shipped in 0.61.0
+  (`verify-records`, `verify-bundles`, `audit-summary`), so the evidence
+  walkthrough now covers a whole directory of records or bundles, not just a
+  single file.
+
 ## [0.61.2] - 2026-06-08
 
 ### Changed
 - Documentation and repository housekeeping: prose tidied across the shipped
   docs, an internal README reference corrected, and an unused log directory
   removed.
-
-### Added
-- `tests/test_docs_no_emdash.py`: a CI check that keeps the documentation
-  prose consistent.
 
 ## [0.61.1] - 2026-06-08
 
