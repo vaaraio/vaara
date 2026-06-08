@@ -6,6 +6,35 @@ and this project follows [Semantic Versioning](https://semver.org/spec/v2.0.0.ht
 
 ## [Unreleased]
 
+## [0.61.0] - 2026-06-08
+
+**Theme: the auditor's workbench. 0.60 made Vaara the neutral checker of one
+record. This release adds the receiving side an auditor works from: point it at
+a whole directory of records or bundles and get the set-level answer, then read
+it as a page a regulator can follow.**
+
+### Added
+- `vaara verify-records DIR [--glob] [--json]`: set-level conformance over a
+  directory of SEP-2828 records, possibly from more than one emitter. Each
+  record is classified (decision or outcome) and checked against its type's
+  schema, then the set is checked for cross-record properties: a call recorded
+  twice (required), an allow or escalate decision with no matching outcome or an
+  outcome with no matching decision (advisory pairing gaps), and an executed
+  action that committed no result (the Article 12 hole, advisory). Keyless. New
+  `check_record_set` on the public `vaara.attestation.receipt` surface;
+  `record_set_v0` vectors with a Vaara-free checker.
+- `vaara verify-bundles DIR [--glob] [--json]`: the full lens stack over a
+  directory of evidence bundles. Rolls up how many bundles verify, how many
+  establish their signature, and per-lens coverage, with an advisory gap naming
+  the lenses no bundle in the set exercised. New `check_bundle_set`;
+  `bundle_set_v0` vectors reusing the `bundle_doc_v0` documents with a Vaara-free
+  checker. Requires the attestation extra.
+- `vaara audit-summary DIR [--glob] [--out FILE]`: the human-readable face of
+  `verify-records`. Renders the verdict, the record counts, and the findings as
+  a one-page Markdown report a regulator reads, deterministic and keyless (no
+  timestamp, no signing key). New `render_record_set_summary`;
+  `audit_summary_v0` golden pages.
+
 ## [0.60.0] - 2026-06-07
 
 **Theme: verify anyone's record, not just your own. The trust plane could
