@@ -43,10 +43,12 @@ class BackLinkResult:
 
 
 def attestation_digest(attestation: Attestation) -> str:
-    """``sha256:<hex>`` over the JCS-canonical full attestation wire bytes.
+    """``sha256:<hex>`` over the JCS canonicalization of the SEP-2787-modeled
+    attestation fields (the attestation re-serialized through ``to_dict``).
 
     The signature is included: the digest pins the exact attestation
-    instance the receipt answers, not just its unsigned body.
+    instance the receipt answers, not just its unsigned body. Fields outside
+    the modeled schema are dropped by the parse and are not covered.
     """
     wire = canonical_json(attestation.to_dict())
     return f"sha256:{hashlib.sha256(wire).hexdigest()}"

@@ -59,6 +59,11 @@ from vaara.attestation._audit_summary import (
 from vaara.attestation._decision_conformance import (
     check_decision_conformance,
 )
+from vaara.attestation._normalize import (
+    NormalizedEvidence,
+    detect_format,
+    normalize,
+)
 from vaara.attestation._receipt_conformance import (
     ConformanceCheck,
     ConformanceReport,
@@ -146,6 +151,9 @@ __all__ = [
     "check_bundle_set",
     "SUMMARY_SCHEMA",
     "render_record_set_summary",
+    "NormalizedEvidence",
+    "detect_format",
+    "normalize",
     "DidDocumentCache",
     "EvidenceBundle",
     "ExecutionReceipt",

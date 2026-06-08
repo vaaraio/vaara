@@ -1,0 +1,244 @@
+{
+  "sep2643_rar_denial": {
+    "advisory": {
+      "authorizationContextId": "authzctx_pay_9f2c",
+      "reason": "insufficient_authorization",
+      "remediationHintTypes": [
+        "oauth_authorization_details"
+      ]
+    },
+    "evidencePlane": "outcome",
+    "missing": [
+      "alg",
+      "signature",
+      "backLink",
+      "receiptAsserted",
+      "outcomeDerived.completedAt"
+    ],
+    "notes": [
+      "a denial is the outcome of a refused call: it maps to outcomeDerived.status = refused",
+      "a refused outcome carries no resultCommitment",
+      "authorizationContextId is a correlation handle, not authorization material",
+      "the denial carries no completedAt, no signing envelope, and no back-link; the recording side supplies those"
+    ],
+    "populated": [
+      "outcomeDerived.status"
+    ],
+    "recognized": true,
+    "sep2828": {
+      "outcomeDerived": {
+        "status": "refused"
+      }
+    },
+    "sourceFormat": "sep2643",
+    "sourceTitle": "SEP-2643 authorization denial"
+  },
+  "sep2643_scope_denial": {
+    "advisory": {
+      "authorizationContextId": "authzctx_8a3e1f4b",
+      "reason": "insufficient_authorization"
+    },
+    "evidencePlane": "outcome",
+    "missing": [
+      "alg",
+      "signature",
+      "backLink",
+      "receiptAsserted",
+      "outcomeDerived.completedAt"
+    ],
+    "notes": [
+      "a denial is the outcome of a refused call: it maps to outcomeDerived.status = refused",
+      "a refused outcome carries no resultCommitment",
+      "authorizationContextId is a correlation handle, not authorization material",
+      "the denial carries no completedAt, no signing envelope, and no back-link; the recording side supplies those"
+    ],
+    "populated": [
+      "outcomeDerived.status"
+    ],
+    "recognized": true,
+    "sep2828": {
+      "outcomeDerived": {
+        "status": "refused"
+      }
+    },
+    "sourceFormat": "sep2643",
+    "sourceTitle": "SEP-2643 authorization denial"
+  },
+  "sep2643_url_denial": {
+    "advisory": {
+      "authorizationContextId": "authzctx_7c5d1d79",
+      "reason": "insufficient_authorization",
+      "remediationHintTypes": [
+        "url"
+      ]
+    },
+    "evidencePlane": "outcome",
+    "missing": [
+      "alg",
+      "signature",
+      "backLink",
+      "receiptAsserted",
+      "outcomeDerived.completedAt"
+    ],
+    "notes": [
+      "a denial is the outcome of a refused call: it maps to outcomeDerived.status = refused",
+      "a refused outcome carries no resultCommitment",
+      "authorizationContextId is a correlation handle, not authorization material",
+      "the denial carries no completedAt, no signing envelope, and no back-link; the recording side supplies those"
+    ],
+    "populated": [
+      "outcomeDerived.status"
+    ],
+    "recognized": true,
+    "sep2828": {
+      "outcomeDerived": {
+        "status": "refused"
+      }
+    },
+    "sourceFormat": "sep2643",
+    "sourceTitle": "SEP-2643 authorization denial"
+  },
+  "sep2787_attestation": {
+    "advisory": {
+      "attestation_alg": "HS256",
+      "attestation_iss": "issuer://test",
+      "attestation_sub": "agent:archiver",
+      "intent": "archive obsolete report",
+      "toolCalls": [
+        {
+          "name": "delete_file",
+          "serverFingerprint": "sha256:1111111111111111111111111111111111111111111111111111111111111111"
+        }
+      ]
+    },
+    "evidencePlane": "decision-attested",
+    "missing": [
+      "alg",
+      "signature",
+      "receiptAsserted",
+      "outcomeDerived"
+    ],
+    "notes": [
+      "a SEP-2787 attestation is the attested request a SEP-2828 receipt answers; it fixes the exact back-link a conformant receipt must pin",
+      "plannerDeclared.intent is client-declared and bound by the issuer's signature, not asserted true by the issuer",
+      "the record's own signing (alg, signature, receiptAsserted) is a separate event by the recording side, not derived from the attestation"
+    ],
+    "populated": [
+      "backLink.attestationDigest",
+      "backLink.attestationNonce"
+    ],
+    "recognized": true,
+    "sep2828": {
+      "backLink": {
+        "attestationDigest": "sha256:79acdd4bb3c22a688b1c3321b9a26cafb5cb58c990a963874066d04b8497f70b",
+        "attestationNonce": "fixed-attestation-nonce-000"
+      }
+    },
+    "sourceFormat": "sep2787",
+    "sourceTitle": "SEP-2787 tool-call attestation"
+  },
+  "sep2787_attestation_with_extension": {
+    "advisory": {
+      "attestation_alg": "HS256",
+      "attestation_iss": "issuer://test",
+      "attestation_sub": "agent:archiver",
+      "intent": "archive obsolete report",
+      "toolCalls": [
+        {
+          "name": "delete_file",
+          "serverFingerprint": "sha256:1111111111111111111111111111111111111111111111111111111111111111"
+        }
+      ]
+    },
+    "evidencePlane": "decision-attested",
+    "missing": [
+      "alg",
+      "signature",
+      "receiptAsserted",
+      "outcomeDerived"
+    ],
+    "notes": [
+      "a SEP-2787 attestation is the attested request a SEP-2828 receipt answers; it fixes the exact back-link a conformant receipt must pin",
+      "plannerDeclared.intent is client-declared and bound by the issuer's signature, not asserted true by the issuer",
+      "the record's own signing (alg, signature, receiptAsserted) is a separate event by the recording side, not derived from the attestation"
+    ],
+    "populated": [
+      "backLink.attestationDigest",
+      "backLink.attestationNonce"
+    ],
+    "recognized": true,
+    "sep2828": {
+      "backLink": {
+        "attestationDigest": "sha256:79acdd4bb3c22a688b1c3321b9a26cafb5cb58c990a963874066d04b8497f70b",
+        "attestationNonce": "fixed-attestation-nonce-000"
+      }
+    },
+    "sourceFormat": "sep2787",
+    "sourceTitle": "SEP-2787 tool-call attestation"
+  },
+  "sep2817_multiturn": {
+    "advisory": {
+      "invocationReason": "Need to inspect available tables before generating a query.",
+      "model": "example-model",
+      "turnId": "2f4f0c9e-8d72-4c66-9c6f-3f7f3e6a1c9f",
+      "userIntentRedacted": true
+    },
+    "evidencePlane": "decision-input",
+    "missing": [
+      "alg",
+      "signature",
+      "backLink",
+      "receiptAsserted",
+      "outcomeDerived"
+    ],
+    "notes": [
+      "SEP-2817 is client-asserted input audit context; per its own specification it MUST NOT be used as authorization evidence",
+      "it maps to the decision-input plane (the agent's stated intent), the unsigned counterpart of an attested rationale, and populates no required SEP-2828 field",
+      "turnId groups requests from one user turn; it is correlation only"
+    ],
+    "populated": [],
+    "recognized": true,
+    "sep2828": {},
+    "sourceFormat": "sep2817",
+    "sourceTitle": "SEP-2817 AI invocation audit context"
+  },
+  "sep2817_single": {
+    "advisory": {
+      "invocationReason": "The user asked to view employee rows, and the employees table was identified as the target table.",
+      "model": "example-model",
+      "turnId": "opaque-client-generated-id",
+      "userIntent": "Show me 10 employees"
+    },
+    "evidencePlane": "decision-input",
+    "missing": [
+      "alg",
+      "signature",
+      "backLink",
+      "receiptAsserted",
+      "outcomeDerived"
+    ],
+    "notes": [
+      "SEP-2817 is client-asserted input audit context; per its own specification it MUST NOT be used as authorization evidence",
+      "it maps to the decision-input plane (the agent's stated intent), the unsigned counterpart of an attested rationale, and populates no required SEP-2828 field",
+      "turnId groups requests from one user turn; it is correlation only"
+    ],
+    "populated": [],
+    "recognized": true,
+    "sep2828": {},
+    "sourceFormat": "sep2817",
+    "sourceTitle": "SEP-2817 AI invocation audit context"
+  },
+  "unknown": {
+    "advisory": {},
+    "evidencePlane": null,
+    "missing": [],
+    "notes": [
+      "not a SEP-2643 denial, SEP-2787 attestation, or SEP-2817 invocation audit context; nothing to normalize"
+    ],
+    "populated": [],
+    "recognized": false,
+    "sep2828": {},
+    "sourceFormat": "unknown",
+    "sourceTitle": "unrecognized record"
+  }
+}

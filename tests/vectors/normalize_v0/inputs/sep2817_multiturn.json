@@ -1,0 +1,17 @@
+{
+  "method": "tools/call",
+  "params": {
+    "name": "list_tables",
+    "arguments": { "database_id": "123" },
+    "_meta": {
+      "io.modelcontextprotocol/aiInvocation": {
+        "invocationReason": {
+          "text": "Need to inspect available tables before generating a query."
+        },
+        "model": { "name": "example-model" },
+        "userIntent": { "text": "Show me 10 employees", "redacted": true },
+        "turnId": "2f4f0c9e-8d72-4c66-9c6f-3f7f3e6a1c9f"
+      }
+    }
+  }
+}
