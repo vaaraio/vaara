@@ -1875,6 +1875,71 @@ def _cmd_verify_records(args: argparse.Namespace) -> int:
     return 0 if ok else 1
 
 
+def _cmd_verify_bundles(args: argparse.Namespace) -> int:
+    """Run the full lens stack over a whole directory of evidence bundles.
+
+    The batch twin of ``verify-bundle``: an auditor points this at a pile of
+    bundle documents, possibly from more than one issuer, and gets the
+    roll-up a single-file check cannot give. How many verify, how many had
+    their signature established, and what the evidence covers, with the
+    advisory gap naming the lenses no bundle in the set exercised. Requires
+    the attestation extra, like ``verify-bundle``.
+    """
+    try:
+        from vaara.attestation.receipt import check_bundle_set
+    except ImportError:
+        print(_ATTESTATION_HINT, file=sys.stderr)
+        return 2
+
+    directory = Path(args.directory).expanduser()
+    if not directory.is_dir():
+        print(f"vaara verify-bundles: not a directory: {directory}", file=sys.stderr)
+        return 2
+
+    paths = sorted(p for p in directory.glob(args.glob) if p.is_file())
+    if not paths:
+        print(f"vaara verify-bundles: no files matched {args.glob!r} in {directory}",
+              file=sys.stderr)
+        return 2
+
+    parsed: list[tuple[str, Any]] = []
+    unreadable: list[tuple[str, str]] = []
+    for path in paths:
+        try:
+            parsed.append((path.name, json.loads(path.read_text(encoding="utf-8"))))
+        except (json.JSONDecodeError, OSError) as exc:
+            unreadable.append((path.name, str(exc)))
+
+    report = check_bundle_set(parsed)
+    ok = report.ok and not unreadable
+
+    if args.json:
+        out: dict[str, Any] = report.to_dict()
+        out["ok"] = ok
+        out["unreadable"] = [{"name": n, "error": e} for n, e in unreadable]
+        print(json.dumps(out, indent=2))
+    else:
+        verdict = "OK" if ok else "FAILED"
+        print(f"bundle set: {verdict}  ({report.passed}/{report.total} bundles verify, "
+              f"{report.authenticated} authenticated)")
+        for name, count in report.lens_applicable.items():
+            tally = f"{report.lens_passed[name]}/{count} pass" if count else "not present"
+            print(f"  {name:12s} {tally}")
+        if report.lens_gaps:
+            print(f"  coverage gap: no bundle carried {', '.join(report.lens_gaps)}")
+        for entry in report.entries:
+            if not entry.loaded:
+                print(f"  [FAIL] {entry.name}: not a valid bundle ({entry.error})")
+            elif not entry.ok:
+                failed = [ln for ln, st in entry.lens_states.items() if st == "fail"]
+                reason = ", ".join(failed) if failed else "authenticity not established"
+                print(f"  [FAIL] {entry.name}: {reason}")
+        for name, exc in unreadable:
+            print(f"  [FAIL] {name}: unreadable ({exc})")
+
+    return 0 if ok else 1
+
+
 def _cmd_build_bundle(args: argparse.Namespace) -> int:
     """Assemble an evidence bundle on disk from the issuer's pieces.
 
@@ -2756,6 +2821,29 @@ def build_parser() -> argparse.ArgumentParser:
         help="Emit the full set conformance report as JSON",
     )
     pvrs.set_defaults(func=_cmd_verify_records)
+
+    pvbs = sub.add_parser(
+        "verify-bundles",
+        help="Run the full lens stack over a whole directory of evidence "
+             "bundles at once. The batch twin of verify-bundle: how many "
+             "verify, how many authenticate, and what the evidence covers, "
+             "with the gap naming the lenses no bundle exercised. Requires the "
+             "attestation extra.",
+    )
+    pvbs.add_argument(
+        "directory",
+        help="Directory of evidence-bundle JSON documents (the shape "
+             "verify-bundle reads)",
+    )
+    pvbs.add_argument(
+        "--glob", default="*.json",
+        help="Glob for bundle files within the directory (default: *.json)",
+    )
+    pvbs.add_argument(
+        "--json", action="store_true",
+        help="Emit the full set verdict report as JSON",
+    )
+    pvbs.set_defaults(func=_cmd_verify_bundles)
 
     pbb = sub.add_parser(
         "build-bundle",
