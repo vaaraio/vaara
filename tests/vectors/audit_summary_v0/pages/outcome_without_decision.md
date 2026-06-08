@@ -17,7 +17,7 @@ Each record was checked against the SEP-2828 execution-record schema for its typ
 
 Advisory (gaps that do not gate conformance):
 
-- **outcome_without_decision** — 1 outcome records have no matching decision record; a recorded action SHOULD trace to the decision that authorised it (outcome_b.json)
+- **outcome_without_decision**: 1 outcome records have no matching decision record; a recorded action SHOULD trace to the decision that authorised it (outcome_b.json)
 
 ---
 
