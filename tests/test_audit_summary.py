@@ -10,6 +10,8 @@ suite runs in the base install.
 from __future__ import annotations
 
 import json
+import subprocess
+import sys
 from pathlib import Path
 
 import pytest
@@ -18,8 +20,9 @@ from vaara.attestation._audit_summary import SUMMARY_SCHEMA
 from vaara.attestation.receipt import check_record_set, render_record_set_summary
 from vaara.cli import main
 
+VECTORS = Path(__file__).resolve().parent / "vectors" / "audit_summary_v0"
 RECORD_SETS = Path(__file__).resolve().parent / "vectors" / "record_set_v0" / "sets"
-PAGES = Path(__file__).resolve().parent / "vectors" / "audit_summary_v0" / "pages"
+PAGES = VECTORS / "pages"
 
 
 def _cases():
@@ -42,6 +45,22 @@ def test_render_matches_golden_page(name):
 
 def test_at_least_four_golden_pages_present():
     assert len(_cases()) >= 4
+
+
+def test_independent_checker_confirms_pages_match_verdict():
+    # The Vaara-free checker re-derives each verdict from record_set_v0 and
+    # asserts the rendered page states it faithfully.
+    proc = subprocess.run(
+        [sys.executable, str(VECTORS / "_check_independent.py")],
+        capture_output=True, text=True,
+    )
+    assert proc.returncode == 0, proc.stdout + proc.stderr
+
+
+def test_rendered_page_carries_no_em_dash():
+    for name in _cases():
+        page = render_record_set_summary(check_record_set(_load_set(name)))
+        assert "—" not in page  # em-dash is the AI tell; not in Vaara output
 
 
 def test_public_reexport_is_wired():

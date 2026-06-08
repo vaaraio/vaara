@@ -86,13 +86,13 @@ def render_record_set_summary(
             lines.append("Required (these gate conformance):")
             lines.append("")
             for f in required:
-                lines.append(f"- **{f.id}** — {f.detail} ({_names(f.records)})")
+                lines.append(f"- **{f.id}**: {f.detail} ({_names(f.records)})")
             lines.append("")
         if advisory:
             lines.append("Advisory (gaps that do not gate conformance):")
             lines.append("")
             for f in advisory:
-                lines.append(f"- **{f.id}** — {f.detail} ({_names(f.records)})")
+                lines.append(f"- **{f.id}**: {f.detail} ({_names(f.records)})")
             lines.append("")
 
     nonconforming = [e for e in report.entries if not e.conforms]

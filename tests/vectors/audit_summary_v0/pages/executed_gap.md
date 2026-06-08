@@ -16,7 +16,7 @@ Each record was checked against the SEP-2828 execution-record schema for its typ
 
 Advisory (gaps that do not gate conformance):
 
-- **executed_without_result_commitment** — 1 executed records carry no resultCommitment; an executed action SHOULD commit to its result (r1.json)
+- **executed_without_result_commitment**: 1 executed records carry no resultCommitment; an executed action SHOULD commit to its result (r1.json)
 
 ---
 
