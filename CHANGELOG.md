@@ -6,6 +6,26 @@ and this project follows [Semantic Versioning](https://semver.org/spec/v2.0.0.ht
 
 ## [Unreleased]
 
+### Fixed
+- `vaara review resolve --audit-db` no longer forks the audit hash chain. It
+  was writing the `ESCALATION_RESOLVED` record (Article 14(4)(d)) through a
+  fresh `AuditTrail` whose `previous_hash` started empty, so resolving an
+  escalation into an audit DB that already held the action's lifecycle broke
+  chain continuity and `verify_chain()` flagged the trail. The resolution now
+  appends to the loaded trail and continues the chain. Surfaced by the
+  `vaara-governed-tool-call` example skill.
+
+### Added
+- `examples/skills/vaara-governed-tool-call/`: an agent skill (the portable
+  `SKILL.md` + script format) that puts an EU AI Act Article 14 human-oversight
+  checkpoint and an Article 12 record in front of a high-risk tool call. The
+  agent gates a proposed call to allow / escalate / deny, escalations route to
+  the `vaara review` queue for a human, and the decision, escalation,
+  resolution, and outcome append to a hash-chained trail that exports to a
+  signed Article 12 package and verifies offline. Drops in next to capability
+  skills (for example clinical or genomic database skills) that ship the action
+  but not the oversight.
+
 ### Changed
 - `vaara.attestation.decision.superseding_decision` now reports an
   equal-`decidedAt` tie between distinct decision records as ambiguous, raising
