@@ -21,6 +21,7 @@ normative/<case>/
   attestation.json          the shared SEP-2787 attestation
   decision.json             the signed decision record
   receipt.json              the signed outcome receipt (when present)
+  request_envelope.json     the observed request envelope (no-2787 fallback only)
   expected.json             the verdict map the checker must reproduce
 _check_independent.py        standard library plus cryptography and
                              rfc8785, no Vaara import
@@ -42,11 +43,18 @@ published; the ES256 fixture is verified against the stored public key.
   Check A fails.
 - `substituted_decision_under_shared_attestation`: a second decision is
   substituted under the same attestation. Check A passes, Check B fails.
-- `fallback_envelope_binding`: the no-attestation fallback path, binding
-  to the request envelope instead.
+- `fallback_envelope_binding`: the no-attestation fallback path. The
+  back-link digest is recomputed over the committed
+  `request_envelope.json` (the `tools/call` params plus `_meta`), so an
+  independent reader reproduces the binding rather than trusting a stored
+  digest. `request_envelope_replayed.json` is the same tool with different
+  arguments: it recomputes to a different digest and does not bind
+  (`replayed_binding_ok` is false).
 - `supersession_equal_decidedat_tie`: two decisions with equal
-  `decidedAt`; the effective one is the lowest lexicographic
-  `issuerAsserted.nonce`.
+  `decidedAt` under one back-link; the effective one is the lowest
+  lexicographic `issuerAsserted.nonce`. The checker recomputes the
+  `winner` from the committed records with no clock, so two verifiers
+  agree on the same effective decision.
 
 ## Verifying
 

@@ -80,6 +80,19 @@ def verify_back_link(record: dict, attestation: dict) -> bool:
     return bl["attestationNonce"] == attestation["issuerAsserted"]["nonce"]
 
 
+def verify_fallback_binding(record: dict, envelope: dict) -> bool:
+    """No-SEP-2787 path: the back-link digest is over the JCS-canonical
+    request envelope (the tools/call params plus _meta) the server observed.
+    Recompute it from the committed envelope rather than trusting the stored
+    digest, and confirm the server nonce recorded under _meta matches."""
+    bl = record["backLink"]
+    expected = _sha256_hex(_jcs(envelope))
+    if not hmac.compare_digest(bl["attestationDigest"], expected):
+        return False
+    return bl["attestationNonce"] == envelope["_meta"][
+        "io.modelcontextprotocol/serverNonce"]
+
+
 def decision_digest(decision: dict) -> str:
     """sha256 over the full signed decision wire bytes (SEP-2828 Check B)."""
     return _sha256_hex(_jcs(decision))
@@ -153,9 +166,12 @@ def _verdicts(case: Path, expected: dict) -> dict:
         elif key == "both_back_links_ok":
             got[key] = (verify_back_link(_load(case, "decision_a.json"), att)
                         and verify_back_link(_load(case, "decision_b.json"), att))
-        elif key == "replayed_receipt_signature_ok":
-            got[key] = verify_signature(_load(case, "receipt_replayed.json"),
-                                        _RECEIPT_BLOCKS)
+        elif key == "fallback_binding_ok":
+            got[key] = verify_fallback_binding(
+                dec, _load(case, "request_envelope.json"))
+        elif key == "replayed_binding_ok":
+            got[key] = verify_fallback_binding(
+                dec, _load(case, "request_envelope_replayed.json"))
         else:
             raise ValueError(f"unknown expected key: {key!r}")
     return got

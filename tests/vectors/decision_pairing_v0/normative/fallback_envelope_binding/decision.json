@@ -1,7 +1,7 @@
 {
   "alg": "HS256",
   "backLink": {
-    "attestationDigest": "sha256:1a6582cad584f2eb28ae65120ff1a54981d897b2c252c17771910a313bee66b2",
+    "attestationDigest": "sha256:2b22dcace44e2e6e004db0a484ea587086d2ecf83107094db55b16244620c8e6",
     "attestationNonce": "server-chosen-nonce-001"
   },
   "decisionDerived": {
@@ -20,6 +20,6 @@
     "secretVersion": "v1",
     "sub": "agent:reader"
   },
-  "signature": "f469190fdd20ac6fc49090c0c8965c74c69ee298904d619ea7a785e517034adb",
+  "signature": "34507ab3469f00941946e710d0e8d75eb81132888ad4d593d95c1eafdf70a209",
   "version": 1
 }
