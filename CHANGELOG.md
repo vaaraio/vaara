@@ -4,6 +4,30 @@ All notable changes to this project are documented here.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/)
 and this project follows [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [Unreleased]
+
+### Changed
+- `vaara.attestation.decision.superseding_decision` now reports an
+  equal-`decidedAt` tie between distinct decision records as ambiguous, raising
+  `AmbiguousSupersessionError`, instead of breaking it by lowest lexicographic
+  `issuerAsserted.nonce`. The nonce is unique per record, not an ordering field,
+  so the old rule named a record that was not the genuinely-later decision and
+  could mask a producer that emitted two records which should never have tied.
+  Byte-identical records still resolve to one decision. A future ordering field
+  (a sequence or revision number) restores a deterministic winner. The SEP-2828
+  clause and the `supersession_equal_decidedat_tie` vector verdict (`winner:
+  d5a` becomes `supersession: ambiguous`) are updated to match. Raised by
+  rpelevin on modelcontextprotocol#2852.
+
+### Added
+- The no-SEP-2787 fallback case in the `decision_pairing_v0` corpus now commits
+  the observed `tools/call` request envelope as a first-class fixture input, so
+  an independent reader recomputes the back-link digest instead of trusting a
+  stored value. A replayed envelope with different arguments recomputes to a
+  different digest and does not bind. `vaara.attestation.decision`
+  `.request_envelope_digest` and `.verify_decision_fallback_binding` implement
+  the recompute in the reference verifier.
+
 ## [0.67.0] - 2026-06-09
 
 ### Added
