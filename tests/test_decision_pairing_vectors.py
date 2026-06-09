@@ -39,3 +39,28 @@ def test_independent_walker_passes_all_cases():
 def test_at_least_six_cases_present():
     cases = [p for p in (VECTORS / "normative").iterdir() if p.is_dir()]
     assert len(cases) >= 6
+
+
+def test_vaara_verifier_reproduces_fallback_binding():
+    """The Vaara reference verifier recomputes the no-2787 fallback binding
+    from the committed request envelope, and rejects a replayed envelope
+    whose arguments differ. This mirrors the independent checker's
+    fallback_binding_ok / replayed_binding_ok verdicts."""
+    import json
+
+    from vaara.attestation.decision import (
+        parse_decision_record,
+        verify_decision_fallback_binding,
+    )
+
+    case = VECTORS / "normative" / "fallback_envelope_binding"
+    decision = parse_decision_record(
+        json.loads((case / "decision.json").read_text()))
+    env = json.loads((case / "request_envelope.json").read_text())
+    env_replayed = json.loads(
+        (case / "request_envelope_replayed.json").read_text())
+
+    assert verify_decision_fallback_binding(
+        decision, request_envelope=env).ok is True
+    assert verify_decision_fallback_binding(
+        decision, request_envelope=env_replayed).ok is False

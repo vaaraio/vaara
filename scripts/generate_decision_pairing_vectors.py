@@ -20,16 +20,15 @@ Usage: python scripts/generate_decision_pairing_vectors.py
 
 from __future__ import annotations
 
-import hashlib
 import json
 from pathlib import Path
 
 from cryptography.hazmat.primitives import serialization
 from cryptography.hazmat.primitives.asymmetric import ec
 
-from vaara.attestation._sep2787_canonical import canonical_json
 from vaara.attestation.decision import (
     DecisionDerived, decision_digest, emit_decision_record, make_back_link,
+    request_envelope_digest,
 )
 from vaara.attestation.receipt import (
     BackLink, OutcomeDerived, emit_receipt, make_result_digest,
@@ -83,17 +82,25 @@ def _receipt(bl, status, *, key, alg, nonce, commit=True, dec_digest=None):
         alg=alg, signing_material=key, nonce=nonce, **COMMON)
 
 
-def _fallback_backlink() -> BackLink:
-    # No SEP-2787 attestation: bind to SHA-256 over the JCS-canonical
-    # observed request envelope plus a server nonce. The BackLink is an
-    # opaque sha256: digest + nonce, so the fallback is what the
-    # enforcement point commits to as the digest.
-    envelope = {"method": "tools/call", "params": {
-        "name": "query_table", "arguments": ARGS,
-        "_meta": {"io.modelcontextprotocol/aiInvocation": {"turnId": "turn-7"}}}}
-    digest = hashlib.sha256(canonical_json(envelope)).hexdigest()
-    return BackLink(attestation_digest="sha256:" + digest,
-                    attestation_nonce="server-chosen-nonce-001")
+SERVER_NONCE = "server-chosen-nonce-001"
+NONCE_KEY = "io.modelcontextprotocol/serverNonce"
+
+
+def _request_envelope(args: dict) -> dict:
+    # The observed tools/call params (name + arguments + _meta) when no
+    # SEP-2787 attestation exists. The server-chosen per-call nonce is
+    # recorded under _meta, so it rides under the bound digest and an
+    # independent reader recomputes both the digest and the nonce from the
+    # committed envelope.
+    return {"_meta": {NONCE_KEY: SERVER_NONCE}, "arguments": args,
+            "name": "query_table"}
+
+
+def _fallback_backlink(envelope: dict) -> BackLink:
+    # No SEP-2787 attestation: the back-link digest is over the JCS-canonical
+    # request envelope, recomputed through the same helper the verifier uses.
+    return BackLink(attestation_digest=request_envelope_digest(envelope),
+                    attestation_nonce=envelope["_meta"][NONCE_KEY])
 
 
 def main() -> None:
@@ -175,24 +182,32 @@ def main() -> None:
         "note": "equal decidedAt resolves by lexicographic issuerAsserted.nonce, "
                 "lowest wins (d5a < d5b)"})
 
-    # 6. Fallback request-envelope binding, replay/substitution. No
-    #    SEP-2787 attestation, so Check A anchors on the request-envelope
-    #    digest; Check B still binds the outcome to the decision.
-    fb = _fallback_backlink()
+    # 6. Fallback request-envelope binding. No SEP-2787 attestation, so the
+    #    back-link digest is over the observed request envelope (tools/call
+    #    params plus _meta), committed as request_envelope.json so an
+    #    independent reader recomputes the binding rather than trusting a
+    #    stored digest. Check B still binds the outcome to the decision.
+    #    request_envelope_replayed is the same tool with different arguments:
+    #    it recomputes to a different digest and does not bind.
+    env = _request_envelope(ARGS)
+    env_replayed = _request_envelope({"table": "employees", "limit": 1000})
+    fb = _fallback_backlink(env)
     d6 = OUT / "normative" / "fallback_envelope_binding"
     dec6 = _decision(fb, "allow", key=HS, alg="HS256", nonce="d6")
     _write(d6 / "decision.json", dec6.to_dict())
     rec = _receipt(fb, "executed", key=HS, alg="HS256", nonce="r6",
                    dec_digest=decision_digest(dec6))
     _write(d6 / "receipt.json", rec.to_dict())
-    replayed = rec.to_dict()
-    replayed["backLink"]["attestationDigest"] = "sha256:" + "0" * 64
-    _write(d6 / "receipt_replayed.json", replayed)
+    _write(d6 / "request_envelope.json", env)
+    _write(d6 / "request_envelope_replayed.json", env_replayed)
     _write(d6 / "expected.json", {
         "decision_signature_ok": True, "receipt_signature_ok": True,
-        "records_paired": True, "replayed_receipt_signature_ok": False,
-        "note": "fallback binding when no SEP-2787 attestation exists; the "
-                "BackLink digest is over the JCS-canonical request envelope"})
+        "records_paired": True, "fallback_binding_ok": True,
+        "replayed_binding_ok": False,
+        "note": "no SEP-2787 attestation: the backLink digest is recomputed "
+                "over the JCS-canonical request envelope (tools/call params "
+                "plus _meta); a re-presented envelope with different arguments "
+                "recomputes to a different digest and does not bind."})
 
     # 7. Check B in isolation: the receipt shares the attestation back-link
     #    (Check A passes) but commits to a DIFFERENT decision's digest, so
