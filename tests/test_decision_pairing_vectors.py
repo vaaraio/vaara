@@ -42,25 +42,104 @@ def test_at_least_six_cases_present():
 
 
 def test_vaara_verifier_reproduces_fallback_binding():
-    """The Vaara reference verifier recomputes the no-2787 fallback binding
-    from the committed request envelope, and rejects a replayed envelope
-    whose arguments differ. This mirrors the independent checker's
-    fallback_binding_ok / replayed_binding_ok verdicts."""
+    """The Vaara reference verifier reproduces the no-2787 named-projection
+    fallback binding over the committed envelopes, covering the projection
+    rule's obligations: a provider view binds; a gateway view with different
+    transport-local _meta binds to the same digest; changed bound params or a
+    changed binding block break the back-link; an absent binding block fails
+    closed instead of digesting the whole _meta."""
     import json
 
     from vaara.attestation.decision import (
+        fallback_projection,
         parse_decision_record,
+        request_envelope_digest,
         verify_decision_fallback_binding,
+    )
+    from vaara.attestation._receipt_verifier import (
+        FALLBACK_BINDING_MALFORMED,
     )
 
     case = VECTORS / "normative" / "fallback_envelope_binding"
     decision = parse_decision_record(
         json.loads((case / "decision.json").read_text()))
-    env = json.loads((case / "request_envelope.json").read_text())
-    env_replayed = json.loads(
-        (case / "request_envelope_replayed.json").read_text())
 
+    def env(name: str) -> dict:
+        return json.loads((case / name).read_text())
+
+    provider = env("request_envelope.json")
+    gateway = env("request_envelope_gateway_view.json")
+
+    # Provider view binds; gateway view binds to the same digest despite
+    # carrying different non-binding _meta (rpelevin test 1).
     assert verify_decision_fallback_binding(
-        decision, request_envelope=env).ok is True
+        decision, request_envelope=provider).ok is True
     assert verify_decision_fallback_binding(
-        decision, request_envelope=env_replayed).ok is False
+        decision, request_envelope=gateway).ok is True
+    assert request_envelope_digest(provider) == request_envelope_digest(gateway)
+    # The digest comes from the named projection, not the whole _meta.
+    assert fallback_projection(provider) == fallback_projection(gateway)
+
+    # Changed bound params (test 3) and a changed binding block (test 2) each
+    # break the back-link.
+    replayed = verify_decision_fallback_binding(
+        decision, request_envelope=env("request_envelope_replayed.json"))
+    assert replayed.ok is False
+    tampered = verify_decision_fallback_binding(
+        decision, request_envelope=env("request_envelope_tampered_binding.json"))
+    assert tampered.ok is False
+
+    # An absent binding block fails closed with a distinct reason, rather than
+    # widening the preimage to the whole _meta (test 4).
+    malformed = verify_decision_fallback_binding(
+        decision, request_envelope=env("request_envelope_no_binding.json"))
+    assert malformed.ok is False
+    assert malformed.reason == FALLBACK_BINDING_MALFORMED
+
+
+def test_fallback_projection_excludes_transport_local_meta():
+    """The projection digest is invariant to non-binding _meta a gateway can
+    add or strip, and raises on an unreconstructable binding block."""
+    from vaara.attestation.decision import (
+        MalformedFallbackBindingError,
+        request_envelope_digest,
+    )
+
+    base = {
+        "name": "query_table",
+        "arguments": {"table": "employees", "limit": 10},
+        "_meta": {
+            "authorization_binding": {
+                "nonce": "n-1",
+                "projectionVersion": "sep2828-fallback/1",
+            },
+        },
+    }
+    with_noise = {
+        "name": "query_table",
+        "arguments": {"table": "employees", "limit": 10},
+        "_meta": {
+            "authorization_binding": {
+                "nonce": "n-1",
+                "projectionVersion": "sep2828-fallback/1",
+            },
+            "io.modelcontextprotocol/progressToken": "p-9",
+            "trace": {"spanId": "abc"},
+        },
+    }
+    assert request_envelope_digest(base) == request_envelope_digest(with_noise)
+
+    # Unsupported projection version and a missing block both fail closed.
+    bad_version = json_copy(base)
+    bad_version["_meta"]["authorization_binding"]["projectionVersion"] = "x/9"
+    with pytest.raises(MalformedFallbackBindingError):
+        request_envelope_digest(bad_version)
+    no_block = {"name": "query_table", "arguments": {}, "_meta": {}}
+    with pytest.raises(MalformedFallbackBindingError):
+        request_envelope_digest(no_block)
+
+
+def json_copy(obj):
+    import json
+
+    return json.loads(json.dumps(obj))

@@ -44,12 +44,18 @@ published; the ES256 fixture is verified against the stored public key.
 - `substituted_decision_under_shared_attestation`: a second decision is
   substituted under the same attestation. Check A passes, Check B fails.
 - `fallback_envelope_binding`: the no-attestation fallback path. The
-  back-link digest is recomputed over the committed
-  `request_envelope.json` (the `tools/call` params plus `_meta`), so an
-  independent reader reproduces the binding rather than trusting a stored
-  digest. `request_envelope_replayed.json` is the same tool with different
-  arguments: it recomputes to a different digest and does not bind
-  (`replayed_binding_ok` is false).
+  back-link digest is recomputed over a named, versioned projection of the
+  committed `request_envelope.json` (the `tools/call` `name`+`arguments`
+  plus the `_meta.authorization_binding` block), not the whole `_meta`, so
+  an independent reader reproduces the binding rather than trusting a stored
+  digest. `request_envelope_gateway_view.json` carries different
+  transport-local `_meta` yet projects to the same digest
+  (`gateway_view_matches_provider_digest`). `request_envelope_replayed.json`
+  changes the bound arguments and `request_envelope_tampered_binding.json`
+  changes the binding block: each recomputes to a different digest and does
+  not bind. `request_envelope_no_binding.json` has no binding block and
+  fails closed (`malformed_binding_fails_closed`) instead of digesting the
+  whole `_meta`.
 - `supersession_equal_decidedat_tie`: two distinct decisions with equal
   `decidedAt` under one back-link and no explicit ordering field. The
   expected `supersession` verdict is `ambiguous`: a conformant verifier
