@@ -18,7 +18,8 @@ from __future__ import annotations
 
 import hashlib
 import hmac
-from collections.abc import Sequence
+from collections.abc import Mapping, Sequence
+from typing import Any
 
 from vaara.attestation._decision_types import DecisionRecord
 from vaara.attestation._receipt_types import ExecutionReceipt
@@ -61,6 +62,44 @@ def verify_decision_back_link(
     ):
         return BackLinkResult(ok=False, reason=BACK_LINK_MISMATCH)
     if record.back_link.attestation_nonce != attestation.issuer_asserted.nonce:
+        return BackLinkResult(ok=False, reason=BACK_LINK_MISMATCH)
+    return BackLinkResult(ok=True)
+
+
+def request_envelope_digest(request_envelope: Mapping[str, Any]) -> str:
+    """``sha256:<hex>`` over the JCS canonicalization of an observed request
+    envelope (the ``tools/call`` params plus ``_meta``).
+
+    This is the no-SEP-2787 fallback preimage: when a deployment does not
+    run 2787, the decision back-link binds the request instance by this
+    digest instead of an attestation digest (SEP-2828 backLink, fallback
+    path). The binding is to the request instance the server observed, so
+    a re-presented envelope whose arguments differ recomputes to a
+    different digest and does not bind.
+    """
+    wire = canonical_json(dict(request_envelope))
+    return f"sha256:{hashlib.sha256(wire).hexdigest()}"
+
+
+def verify_decision_fallback_binding(
+    record: DecisionRecord,
+    *,
+    request_envelope: Mapping[str, Any],
+) -> BackLinkResult:
+    """Confirm a decision record's back-link pins ``request_envelope``.
+
+    The no-SEP-2787 counterpart to ``verify_decision_back_link``:
+    recomputes the digest over the JCS-canonical request envelope and
+    compares it, constant-time, to the record's
+    ``backLink.attestationDigest``. The nonce is server-chosen and is not
+    derivable from the envelope alone, so it is not checked here; callers
+    that record the server nonce inside ``_meta`` get it under the digest
+    for free.
+    """
+    expected_digest = request_envelope_digest(request_envelope)
+    if not hmac.compare_digest(
+        record.back_link.attestation_digest, expected_digest
+    ):
         return BackLinkResult(ok=False, reason=BACK_LINK_MISMATCH)
     return BackLinkResult(ok=True)
 
