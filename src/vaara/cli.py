@@ -939,9 +939,12 @@ def _cmd_review_resolve(args: argparse.Namespace) -> int:
     backend = None
     if args.audit_db:
         from vaara.audit.sqlite_backend import SQLiteAuditBackend
-        from vaara.audit.trail import AuditTrail
         backend = SQLiteAuditBackend(Path(args.audit_db).expanduser())
-        trail = AuditTrail(on_record=backend.write_record)
+        # Continue the existing hash chain. A fresh AuditTrail starts at
+        # previous_hash='' and would fork the chain when the audit DB already
+        # holds the action's lifecycle, so the ESCALATION_RESOLVED record
+        # (Article 14(4)(d)) must append to the loaded trail, not a new one.
+        trail = backend.load_trail()
     try:
         with _open_review_queue(args.db) as q:
             try:
