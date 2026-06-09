@@ -1,0 +1,34 @@
+{
+  "sets": {
+    "all_verifiable": {
+      "cases": [
+        "clean_no_anchor",
+        "corroborated"
+      ],
+      "strict": false,
+      "trusted_from_case": null
+    },
+    "strict_pinned": {
+      "cases": [
+        "pinned_corroborated"
+      ],
+      "strict": true,
+      "trusted_from_case": "pinned_corroborated"
+    },
+    "strict_unmet": {
+      "cases": [
+        "corroborated"
+      ],
+      "strict": true,
+      "trusted_from_case": null
+    },
+    "with_failure": {
+      "cases": [
+        "clean_no_anchor",
+        "signed_after_retirement"
+      ],
+      "strict": false,
+      "trusted_from_case": null
+    }
+  }
+}
