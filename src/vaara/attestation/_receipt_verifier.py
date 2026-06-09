@@ -25,6 +25,9 @@ from vaara.attestation._sep2787_canonical import canonical_json
 from vaara.attestation._sep2787_types import Attestation
 
 BACK_LINK_MISMATCH: Literal["back_link_mismatch"] = "back_link_mismatch"
+FALLBACK_BINDING_MALFORMED: Literal["fallback_binding_malformed"] = (
+    "fallback_binding_malformed"
+)
 
 
 @dataclass(frozen=True)
@@ -34,12 +37,15 @@ class BackLinkResult:
     ``ok`` is True iff the receipt's ``backLink`` pins the given
     attestation: the digest matches the attestation's canonical wire
     bytes AND the nonce matches the attestation's issuer nonce.
-    ``reason`` is None on success or ``"back_link_mismatch"`` on
-    failure.
+    ``reason`` is None on success, ``"back_link_mismatch"`` when the
+    digest or nonce disagree, or ``"fallback_binding_malformed"`` when a
+    no-SEP-2787 fallback envelope has no reconstructable binding block.
     """
 
     ok: bool
-    reason: Optional[Literal["back_link_mismatch"]] = None
+    reason: Optional[
+        Literal["back_link_mismatch", "fallback_binding_malformed"]
+    ] = None
 
 
 def attestation_digest(attestation: Attestation) -> str:

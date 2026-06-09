@@ -20,13 +20,23 @@ and this project follows [Semantic Versioning](https://semver.org/spec/v2.0.0.ht
   rpelevin on modelcontextprotocol#2852.
 
 ### Added
-- The no-SEP-2787 fallback case in the `decision_pairing_v0` corpus now commits
-  the observed `tools/call` request envelope as a first-class fixture input, so
-  an independent reader recomputes the back-link digest instead of trusting a
-  stored value. A replayed envelope with different arguments recomputes to a
-  different digest and does not bind. `vaara.attestation.decision`
-  `.request_envelope_digest` and `.verify_decision_fallback_binding` implement
-  the recompute in the reference verifier.
+- The no-SEP-2787 fallback back-link now binds a **named, versioned projection**
+  of the request envelope (the `tools/call` `name`+`arguments` plus the
+  `_meta.authorization_binding` block carrying the per-call `nonce` and
+  `projectionVersion`), not the whole observed `_meta`. Observation-local and
+  transport-local `_meta` (progress tokens, trace context, UI hints, fields a
+  gateway adds or strips) is excluded, so a gateway view and a provider view of
+  the same call project to the same digest; changing the bound params or the
+  binding block breaks the back-link; an absent or malformed binding block fails
+  closed instead of widening the preimage to the whole `_meta`.
+  `vaara.attestation.decision` adds `fallback_projection`,
+  `MalformedFallbackBindingError`, and `FALLBACK_PROJECTION_V1`;
+  `request_envelope_digest` and `verify_decision_fallback_binding` implement the
+  projection and fail-closed contract in the reference verifier. The
+  `decision_pairing_v0` corpus carries the provider, gateway, replayed,
+  tampered-binding, and no-binding envelopes as first-class fixture inputs, and
+  the Vaara-free checker reproduces every verdict. Refines the no-2787 fallback
+  shape discussed on modelcontextprotocol#2867.
 
 ## [0.67.0] - 2026-06-09
 

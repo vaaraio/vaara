@@ -25,6 +25,7 @@ from vaara.attestation._decision_types import DecisionRecord
 from vaara.attestation._receipt_types import ExecutionReceipt
 from vaara.attestation._receipt_verifier import (
     BACK_LINK_MISMATCH,
+    FALLBACK_BINDING_MALFORMED,
     BackLinkResult,
     attestation_digest,
 )
@@ -66,18 +67,93 @@ def verify_decision_back_link(
     return BackLinkResult(ok=True)
 
 
-def request_envelope_digest(request_envelope: Mapping[str, Any]) -> str:
-    """``sha256:<hex>`` over the JCS canonicalization of an observed request
-    envelope (the ``tools/call`` params plus ``_meta``).
+# The named projection version that a no-SEP-2787 fallback digest commits
+# to. It is carried in the envelope's binding block and reconstructed by the
+# verifier, so a future projection rule is a new version, not a silent change.
+FALLBACK_PROJECTION_V1 = "sep2828-fallback/1"
 
-    This is the no-SEP-2787 fallback preimage: when a deployment does not
-    run 2787, the decision back-link binds the request instance by this
-    digest instead of an attestation digest (SEP-2828 backLink, fallback
-    path). The binding is to the request instance the server observed, so
-    a re-presented envelope whose arguments differ recomputes to a
-    different digest and does not bind.
+# The named binding block under ``_meta`` whose contents are authoritative for
+# the fallback digest. Everything else under ``_meta`` is excluded.
+_AUTHORIZATION_BINDING = "authorization_binding"
+
+
+class MalformedFallbackBindingError(ValueError):
+    """A no-SEP-2787 request envelope has no reconstructable fallback
+    projection: the named ``_meta.authorization_binding`` block is absent,
+    not an object, missing its ``nonce``, or carries an unsupported
+    ``projectionVersion``, or the ``tools/call`` ``name``/``arguments`` are
+    missing.
+
+    Per SEP-2828 the fallback case is then not conformant. Verifiers fail
+    closed on this rather than widening the preimage to the whole ``_meta``,
+    which would make observation-local material the authority boundary.
     """
-    wire = canonical_json(dict(request_envelope))
+
+
+def fallback_projection(request_envelope: Mapping[str, Any]) -> dict[str, Any]:
+    """The named, versioned projection a no-SEP-2787 fallback digest commits to.
+
+    Reconstructs a fixed object from only the fields that bind a decision to
+    its originating ``tools/call``:
+
+    - ``name`` and ``arguments`` (the canonical call params);
+    - the named ``_meta.authorization_binding`` block (the server's per-call
+      binding ``nonce`` and ``projectionVersion``).
+
+    Everything else under ``_meta`` is observation-local or transport-local
+    (progress tokens, trace context, UI hints, unrelated SEP blocks, fields a
+    gateway can legitimately add or strip) and is excluded, so a gateway view
+    and a provider view of the same call project to the same bytes. Raises
+    ``MalformedFallbackBindingError`` if the binding block is absent or
+    malformed: the fallback never silently widens to the whole ``_meta``.
+    """
+    meta = request_envelope.get("_meta")
+    if not isinstance(meta, Mapping):
+        raise MalformedFallbackBindingError(
+            "request envelope has no _meta object"
+        )
+    binding = meta.get(_AUTHORIZATION_BINDING)
+    if not isinstance(binding, Mapping):
+        raise MalformedFallbackBindingError(
+            f"_meta.{_AUTHORIZATION_BINDING} is absent or not an object"
+        )
+    if binding.get("projectionVersion") != FALLBACK_PROJECTION_V1:
+        raise MalformedFallbackBindingError(
+            "unsupported fallback projectionVersion: "
+            f"{binding.get('projectionVersion')!r}"
+        )
+    nonce = binding.get("nonce")
+    if not isinstance(nonce, str) or not nonce:
+        raise MalformedFallbackBindingError(
+            f"_meta.{_AUTHORIZATION_BINDING}.nonce is absent or not a string"
+        )
+    if "name" not in request_envelope or "arguments" not in request_envelope:
+        raise MalformedFallbackBindingError(
+            "request envelope is missing tools/call name or arguments"
+        )
+    return {
+        "projection": FALLBACK_PROJECTION_V1,
+        "name": request_envelope["name"],
+        "arguments": request_envelope["arguments"],
+        "authorizationBinding": dict(binding),
+    }
+
+
+def request_envelope_digest(request_envelope: Mapping[str, Any]) -> str:
+    """``sha256:<hex>`` over the JCS canonicalization of the named fallback
+    projection of a request envelope (see ``fallback_projection``).
+
+    This is the no-SEP-2787 fallback preimage: when a deployment does not run
+    2787, the decision back-link binds the request instance by this digest
+    instead of an attestation digest (SEP-2828 backLink, fallback path). The
+    digest commits to the bound call params and the named binding block only,
+    so a re-presented envelope whose arguments or binding block differ
+    recomputes to a different digest and does not bind, while transport-local
+    ``_meta`` a gateway adds or strips does not change it. Raises
+    ``MalformedFallbackBindingError`` if the binding block cannot be
+    reconstructed.
+    """
+    wire = canonical_json(fallback_projection(request_envelope))
     return f"sha256:{hashlib.sha256(wire).hexdigest()}"
 
 
@@ -86,20 +162,28 @@ def verify_decision_fallback_binding(
     *,
     request_envelope: Mapping[str, Any],
 ) -> BackLinkResult:
-    """Confirm a decision record's back-link pins ``request_envelope``.
+    """Confirm a decision record's back-link pins ``request_envelope`` under
+    the no-SEP-2787 fallback projection.
 
-    The no-SEP-2787 counterpart to ``verify_decision_back_link``:
-    recomputes the digest over the JCS-canonical request envelope and
-    compares it, constant-time, to the record's
-    ``backLink.attestationDigest``. The nonce is server-chosen and is not
-    derivable from the envelope alone, so it is not checked here; callers
-    that record the server nonce inside ``_meta`` get it under the digest
-    for free.
+    The no-SEP-2787 counterpart to ``verify_decision_back_link``: recomputes
+    the digest over the named projection (bound call params plus the
+    ``_meta.authorization_binding`` block) and compares it, constant-time, to
+    the record's ``backLink.attestationDigest``; then confirms the back-link's
+    ``attestationNonce`` echoes the binding block's ``nonce``, mirroring the
+    attestation path's nonce echo. A malformed or absent binding block fails
+    closed (``ok=False``, ``fallback_binding_malformed``), never widening the
+    preimage to the whole ``_meta``.
     """
-    expected_digest = request_envelope_digest(request_envelope)
+    try:
+        expected_digest = request_envelope_digest(request_envelope)
+    except MalformedFallbackBindingError:
+        return BackLinkResult(ok=False, reason=FALLBACK_BINDING_MALFORMED)
     if not hmac.compare_digest(
         record.back_link.attestation_digest, expected_digest
     ):
+        return BackLinkResult(ok=False, reason=BACK_LINK_MISMATCH)
+    binding_nonce = request_envelope["_meta"][_AUTHORIZATION_BINDING]["nonce"]
+    if record.back_link.attestation_nonce != binding_nonce:
         return BackLinkResult(ok=False, reason=BACK_LINK_MISMATCH)
     return BackLinkResult(ok=True)
 

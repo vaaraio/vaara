@@ -179,10 +179,29 @@ following top-level fields.
 
 If no SEP-2787 attestation exists for the call (the deployment does not run
 2787), the server MUST instead bind the request by setting `attestationDigest` to
-`sha256:<hex>` over the JCS-canonical encoding of the request envelope it
-observed (the `tools/call` params plus `_meta`), and set `attestationNonce` to a
-server-chosen per-call nonce. The binding is to the request **instance**, not
-only its content.
+`sha256:<hex>` over the JCS-canonical encoding of a **named, versioned
+projection** of the request envelope, not the whole observed `_meta`. The
+projection commits to exactly:
+
+- the `tools/call` `name` and `arguments` (the call params that bind to the
+  decision);
+- the named binding block `_meta.authorization_binding`, which carries the
+  server-chosen per-call `nonce` and the `projectionVersion` in force (this
+  release: `sep2828-fallback/1`).
+
+Every other `_meta` field is observation-local or transport-local (progress
+tokens, trace context, UI hints, unrelated SEP blocks, fields a gateway can
+legitimately add or strip) and MUST be excluded, so a gateway view and a
+provider view of the same call project to the same digest. The server sets
+`attestationNonce` to echo `_meta.authorization_binding.nonce`. The binding is to
+the request **instance**, not only its content.
+
+A verifier reconstructs the same named projection from the same named fields and
+compares the digest. If the projection cannot be reconstructed (the
+`authorization_binding` block is absent, malformed, missing its `nonce`, or
+carries an unsupported `projectionVersion`), the fallback case is **not
+conformant** and the verifier MUST fail closed rather than widen the preimage to
+the whole `_meta`.
 
 **`decisionDerived`** carries the decision and the basis for it:
 
@@ -250,8 +269,8 @@ hold:
   not only content-binding: two byte-identical calls produce two attestations
   with distinct nonces and therefore distinct `attestationDigest` values, so a
   record cannot be replayed against a different instance of the same call. In the
-  no-attestation fallback, the shared `backLink` is over the request envelope
-  instead, and Check A anchors on that.
+  no-attestation fallback, the shared `backLink` is over the named request
+  envelope projection instead, and Check A anchors on that.
 - **Check B (outcome-to-decision digest, the normative pairing).** The outcome
   record's `outcomeDerived.decisionDigest` equals `sha256:<hex>` over the JCS
   canonical full wire bytes of *this* decision record. Check A alone admits a
