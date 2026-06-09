@@ -101,11 +101,12 @@ def test_vaara_verifier_reproduces_fallback_binding():
     # fails closed rather than guessing the rule.
     import dataclasses
 
-    assert decision.back_link.fallback_projection == "sep2828-fallback/1"
+    assert (decision.back_link.fallback_projection
+            == "tools_call_params_plus_meta_authorization_binding_v1")
     bad_version = dataclasses.replace(
         decision,
         back_link=dataclasses.replace(
-            decision.back_link, fallback_projection="sep2828-fallback/99"))
+            decision.back_link, fallback_projection="unknown_projection_v9"))
     assert verify_decision_fallback_binding(
         bad_version, request_envelope=provider).ok is False
     no_version = dataclasses.replace(
@@ -145,7 +146,7 @@ def test_fallback_projection_excludes_transport_local_meta():
 
     # An unsupported version and a missing block both fail closed.
     with pytest.raises(MalformedFallbackBindingError):
-        request_envelope_digest(base, version="sep2828-fallback/99")
+        request_envelope_digest(base, version="unknown_projection_v9")
     no_block = {"name": "query_table", "arguments": {}, "_meta": {}}
     with pytest.raises(MalformedFallbackBindingError):
         request_envelope_digest(no_block)

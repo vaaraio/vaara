@@ -1,9 +1,9 @@
 {
   "alg": "HS256",
   "backLink": {
-    "attestationDigest": "sha256:ad365b402e0bd577841ba1a4e2f2f8dae53654e8c21695f5be9632e1d36bc32a",
+    "attestationDigest": "sha256:aeac6a08f83dafe8569a1a195e2874b863a7e3c7d751b6c368dbc3850fd549bb",
     "attestationNonce": "server-chosen-nonce-001",
-    "fallbackProjection": "sep2828-fallback/1"
+    "fallbackProjection": "tools_call_params_plus_meta_authorization_binding_v1"
   },
   "decisionDerived": {
     "decidedAt": "2026-06-01T10:00:00Z",
@@ -21,6 +21,6 @@
     "secretVersion": "v1",
     "sub": "agent:reader"
   },
-  "signature": "21af774b871225aa7d2c4388c61b3aa6460e9da4a4732e368cc229eea5e4f3c5",
+  "signature": "2c5e9acf04971b8e21979ac9905266af810528e3c3462a4d34322ed3de4e6c3d",
   "version": 1
 }
