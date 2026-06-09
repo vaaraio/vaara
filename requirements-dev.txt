@@ -254,9 +254,9 @@ exceptiongroup==1.3.1 ; python_full_version < '3.11' \
     # via
     #   hypothesis
     #   pytest
-hypothesis==6.155.1 \
-    --hash=sha256:07c102031612b98d7c1be15ca3608c43e1234d9d07e3a190a53fa01536700196 \
-    --hash=sha256:2753f469df3ba3c483b08e0c37dbcbc41d8316ebb921abcc07493ee9c8a7d187
+hypothesis==6.155.2 \
+    --hash=sha256:ae36880287c9c5defe9f199d3d2b67d9947a4da2a46e6c57373cbdf2345b20e1 \
+    --hash=sha256:c85ce6dcd630a90ce501f1d1dd1bc84b97f5649ca8a27e134c8cbf5aa480b1a5
     # via vaara (pyproject.toml)
 iniconfig==2.3.0 \
     --hash=sha256:c76315c77db068650d49c5b56314774a7804df16fee4402c1f19d6d15d8c4730 \
