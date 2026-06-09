@@ -6,6 +6,8 @@ and this project follows [Semantic Versioning](https://semver.org/spec/v2.0.0.ht
 
 ## [Unreleased]
 
+## [0.66.0] - 2026-06-09
+
 ### Added
 - `vaara verify-enforcement`: verify that a signed SEP-2828 execution record was
   emitted by an enforcement point running in an AMD SEV-SNP confidential VM. The
