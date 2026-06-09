@@ -80,7 +80,8 @@ def verify_back_link(record: dict, attestation: dict) -> bool:
     return bl["attestationNonce"] == attestation["issuerAsserted"]["nonce"]
 
 
-_SUPPORTED_FALLBACK_PROJECTIONS = frozenset({"sep2828-fallback/1"})
+_SUPPORTED_FALLBACK_PROJECTIONS = frozenset(
+    {"tools_call_params_plus_meta_authorization_binding_v1"})
 
 
 def fallback_projection(envelope: dict, version):
