@@ -45,8 +45,11 @@ from vaara.attestation._decision_types import (
     decision_record_from_dict as parse_decision_record,
 )
 from vaara.attestation._decision_verifier import (
+    FALLBACK_PROJECTION_V1,
     AmbiguousSupersessionError,
+    MalformedFallbackBindingError,
     decision_digest,
+    fallback_projection,
     records_paired,
     request_envelope_digest,
     superseding_decision,
@@ -61,6 +64,7 @@ from vaara.attestation._receipt_verifier import (
 )
 
 __all__ = [
+    "FALLBACK_PROJECTION_V1",
     "AmbiguousSupersessionError",
     "BackLink",
     "BackLinkResult",
@@ -68,9 +72,11 @@ __all__ = [
     "DecisionRecord",
     "DecisionVerdict",
     "IssuerAsserted",
+    "MalformedFallbackBindingError",
     "attestation_digest",
     "decision_digest",
     "emit_decision_record",
+    "fallback_projection",
     "make_back_link",
     "parse_decision_record",
     "records_paired",
