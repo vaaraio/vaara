@@ -171,6 +171,18 @@ vaara verify-retained record.json --did-document archived-did.json --anchor anch
 
 It binds the signature to a key the archived document lists, then checks the claimed signing time falls inside that key's validity window (`validFrom` / `validUntil` on the verification method) and that the key was not revoked before issuance. A retired key still verifies a signature it made while it was valid; retirement is graceful end-of-life, not revocation. With a verified time anchor the verdict is corroborated: the record provably existed before the key's end of life, so it cannot be a later forgery made with a stolen retired key. Without an anchor the verdict rests on the record's self-asserted time and says so. The check is offline and reproducible, and a Vaara-free checker in `tests/vectors/key_rotation_v0/` reproduces every verdict with nothing but `cryptography` and a JSON canonicalizer.
 
+### Hand a record to another org's regulator
+
+A provider signs a record. A deployer who runs that provider's system, a different organisation, has to show it to its own regulator, offline, years later, with no live channel back to the provider. `build-handoff` packs the record, the archived DID document, the key history, revocations, and an optional time anchor into one self-contained file, pinning each piece by content digest. `verify-handoff` checks it:
+
+```bash
+vaara build-handoff --record record.json --did-document archived-did.json \
+  --anchor anchor.json --holder did:web:deployer.example --out handoff.json
+vaara verify-handoff handoff.json --trusted-did-document provider-keys.json --strict
+```
+
+It recomputes every pinned digest, routes the record through the same rotated-key lens, and confirms an enclosed anchor's imprint is `sha256` of the record itself, so an anchor taken over a different record never corroborates this one. The verdict is honest about where trust comes from: the digests prove only that the package is internally consistent, since the holder controls both the pieces and the manifest that pins them. The record's authenticity rests on the provider's signature against the provider's identity, which you establish out of band; `--trusted-did-document` pins it against a key set you already trust, and until you do, the verdict says `producer_identity_basis: self_asserted_unpinned`. The eIDAS anchor is the one piece the holder cannot forge. `--strict` passes only a corroborated record with a recorded window, an affirmative revocation source, and a pinned identity. An optional holder custody signature is reported separately and never changes the record verdict. A Vaara-free checker in `tests/vectors/cross_org_handoff_v0/` reproduces every verdict.
+
 ## Benchmarks
 
 Held-out test recall **84.7%** (95% Wilson [82.4, 86.7]) at a **4.1%** false-positive rate, and **1.2%** FPR on benign tool calls under live injection pressure. The hot-path rule scorer adds 140 µs mean / 210 µs p99 per call on commodity CPU. Every figure is reproducible end-to-end via `make bench`.

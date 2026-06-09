@@ -6,6 +6,43 @@ and this project follows [Semantic Versioning](https://semver.org/spec/v2.0.0.ht
 
 ## [Unreleased]
 
+## [0.65.0] - 2026-06-09
+
+### Added
+- `vaara build-handoff` / `vaara verify-handoff`: package one organisation's
+  signed execution record so a different organisation's regulator can verify it
+  offline, years later, under a key that has since rotated out. A provider
+  (vendor A) signs a record; a deployer (customer B) who runs A's system keeps
+  the logs (Article 26(6)) and is audited by B's own regulator, with no live
+  channel back to A. `build-handoff` stitches the record, the archived DID
+  document, the key history, revocations, and an optional eIDAS RFC 3161 anchor
+  into one self-contained file, pinning each component by content digest (model
+  digests for the key history and revocations, `sha256(jcs(...))` for the rest).
+  `verify-handoff` recomputes every digest, routes the record through the same
+  rotated-key lens as `verify-retained` (the `verifiable` / `corroborated`
+  tiers, unchanged), and confirms an enclosed anchor's imprint is
+  `sha256(jcs(record))`, so an anchor taken over a different record never
+  corroborates this one. The verdict is honest about trust: content addressing
+  proves only that the package is internally consistent, since the holder
+  controls both the components and the manifest that pins them. The record's
+  authenticity rests on the provider's signature against an identity the
+  regulator establishes out of band; `producer_identity_basis` stays
+  `self_asserted_unpinned` until `--trusted-did-document` pins it against a key
+  set the regulator already trusts. The eIDAS anchor is the one component a
+  holder cannot forge. `--strict` passes only a corroborated record with a
+  recorded validity window, an affirmative revocation source, and a pinned
+  identity. An optional holder custody signature is reported separately and
+  never changes the record verdict. New `cross_org_handoff_v0` conformance
+  vectors with a Vaara-free checker that reproduces every verdict using only
+  `cryptography` and a JSON canonicalizer. Design in
+  `docs/design/cross-org-handoff-spec.md`.
+
+### Changed
+- `verify-handoff` and the `KeyHistory` / `RevocationRegistry` loaders fail
+  closed with a named `ValueError` on a malformed package rather than letting a
+  parser exception escape as a traceback, hardening the unhappy path against
+  hostile input.
+
 ## [0.64.0] - 2026-06-09
 
 ### Added
