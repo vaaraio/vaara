@@ -1,0 +1,46 @@
+{
+  "all_verifiable": {
+    "corroborated": 1,
+    "loaded": 2,
+    "ok": true,
+    "passed": 2,
+    "pinned": 0,
+    "pinningGap": true,
+    "strict": false,
+    "total": 2,
+    "verifiable": 2
+  },
+  "strict_pinned": {
+    "corroborated": 1,
+    "loaded": 1,
+    "ok": true,
+    "passed": 1,
+    "pinned": 1,
+    "pinningGap": false,
+    "strict": true,
+    "total": 1,
+    "verifiable": 1
+  },
+  "strict_unmet": {
+    "corroborated": 1,
+    "loaded": 1,
+    "ok": false,
+    "passed": 0,
+    "pinned": 0,
+    "pinningGap": true,
+    "strict": true,
+    "total": 1,
+    "verifiable": 1
+  },
+  "with_failure": {
+    "corroborated": 0,
+    "loaded": 2,
+    "ok": false,
+    "passed": 1,
+    "pinned": 0,
+    "pinningGap": true,
+    "strict": false,
+    "total": 2,
+    "verifiable": 1
+  }
+}
