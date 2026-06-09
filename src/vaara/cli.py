@@ -771,10 +771,31 @@ def _cmd_trail_export_article12(args: argparse.Namespace) -> int:
             if rec.record_hash:
                 trail._last_hash = rec.record_hash
 
+    # Folding handoff / enforcement evidence needs the attestation extra (the
+    # crypto the record and binding lenses use). Fail fast with the install
+    # hint rather than deep inside the export.
+    fold_requested = bool(args.handoff or args.handoffs or args.enforcements)
+    if fold_requested:
+        try:
+            import rfc8785  # noqa: F401
+
+            from vaara.attestation.receipt import (  # noqa: F401
+                check_enforcement_set,
+                check_handoff_set,
+            )
+        except ImportError:
+            print(_ATTESTATION_HINT, file=sys.stderr)
+            return 2
+
     out = Path(args.out).expanduser()
     out.parent.mkdir(parents=True, exist_ok=True)
 
+    handoffs = enforcements = None
     try:
+        if fold_requested:
+            handoffs, enforcements, trusted, expected = _collect_fold_attachments(args)
+        else:
+            trusted, expected = None, None
         time_anchor = _obtain_time_anchor(args, trail)
         result = export_article12(
             trail,
@@ -783,6 +804,10 @@ def _cmd_trail_export_article12(args: argparse.Namespace) -> int:
             system_meta=system_meta,
             period=period,
             time_anchor=time_anchor,
+            handoffs=handoffs,
+            enforcements=enforcements,
+            trusted_did_document=trusted,
+            expected_measurement=expected,
             fmt=args.format,
             agent_id=args.agent_id or "",
         )
@@ -796,6 +821,10 @@ def _cmd_trail_export_article12(args: argparse.Namespace) -> int:
     print(f"  report:       article12_report.{args.format}")
     if time_anchor is not None:
         print(f"  time anchor:  {time_anchor.anchored_time} ({time_anchor.backend})")
+    if handoffs:
+        print(f"  handoff:      {len(handoffs)} package(s) folded (Article 26(6))")
+    if enforcements:
+        print(f"  enforcement:  {len(enforcements)} binding(s) folded")
     return 0 if result.chain_intact else 1
 
 
@@ -1991,20 +2020,20 @@ def _print_retained_report(r: Any) -> None:
     print(f"  {_safe_inline(r.reason)}")
 
 
-def _resolve_handoff_anchor_time(
-    args: argparse.Namespace, doc: Any
+def _resolve_package_anchor_time(
+    doc: Any, *, anchored_time: Optional[str] = None, no_anchor: bool = False,
 ) -> "tuple[Optional[str], Optional[str]]":
     """Return (anchored_time, note) for a handoff package's enclosed anchor.
 
-    ``--anchored-time`` (a time the regulator verified out of band) wins. Else,
+    ``anchored_time`` (a time the regulator verified out of band) wins. Else,
     if the package carries an anchor and the timeanchor extra is installed, the
     RFC 3161 token is verified and its attested time returned. A missing extra
     or a token that does not verify yields no time and a note: the record stays
     verifiable, not corroborated, never silently upgraded.
     """
-    if args.anchored_time is not None:
-        return args.anchored_time, None
-    if args.no_anchor:
+    if anchored_time is not None:
+        return anchored_time, None
+    if no_anchor:
         return None, None
     evidence = doc.get("evidence") if isinstance(doc, dict) else None
     anchor = evidence.get("anchor") if isinstance(evidence, dict) else None
@@ -2022,6 +2051,154 @@ def _resolve_handoff_anchor_time(
     except (ValueError, KeyError, TypeError, TimeAnchorError) as exc:
         return None, f"the enclosed time anchor did not verify: {exc}"
     return attested.isoformat(), None
+
+
+def _resolve_handoff_anchor_time(
+    args: argparse.Namespace, doc: Any
+) -> "tuple[Optional[str], Optional[str]]":
+    """Args wrapper over :func:`_resolve_package_anchor_time` for verify-handoffs."""
+    return _resolve_package_anchor_time(
+        doc, anchored_time=args.anchored_time, no_anchor=args.no_anchor,
+    )
+
+
+def _load_handoff_docs(
+    paths: "list[Path]", *,
+    anchored_time: Optional[str] = None, no_anchor: bool = False,
+    on_note: "Optional[Any]" = None,
+) -> "tuple[list[tuple[Path, Any, Optional[str]]], list[tuple[str, str]]]":
+    """Load handoff packages from disk and resolve each enclosed anchor.
+
+    Shared by ``verify-handoffs`` and the ``export-article12`` fold: reads every
+    path, resolves the anchor time (out-of-band override, else the enclosed
+    RFC 3161 token), and returns ``(path, doc, anchor_time)`` for each readable
+    package plus an ``unreadable`` list. Callers pick the entry name (file name
+    vs stem). ``on_note(name, note)`` is called for any anchor-resolution note.
+    """
+    loaded: list[tuple[Path, Any, Optional[str]]] = []
+    unreadable: list[tuple[str, str]] = []
+    for path in paths:
+        try:
+            doc = json.loads(path.read_text(encoding="utf-8"))
+        except (json.JSONDecodeError, OSError) as exc:
+            unreadable.append((path.name, str(exc)))
+            continue
+        anchor_time, note = _resolve_package_anchor_time(
+            doc, anchored_time=anchored_time, no_anchor=no_anchor,
+        )
+        if note is not None and on_note is not None:
+            on_note(path.name, note)
+        loaded.append((path, doc, anchor_time))
+    return loaded, unreadable
+
+
+def _discover_enforcement_triples(
+    record_paths: "list[Path]", directory: Path,
+) -> "tuple[list[tuple[str, Any, bytes, bytes]], list[tuple[str, str]]]":
+    """Discover ``(stem, record, report_bytes, vcek_pem)`` triples by stem.
+
+    Shared by ``verify-enforcements`` and the ``export-article12`` fold:
+    ``NAME.record.json`` pairs with ``NAME.report.bin`` and ``NAME.vcek.pem`` in
+    the same directory. A record missing either companion, or an unreadable
+    file, becomes a failing entry in the returned ``missing`` list, never a
+    silent skip.
+    """
+    triples: list[tuple[str, Any, bytes, bytes]] = []
+    missing: list[tuple[str, str]] = []
+    for record_path in record_paths:
+        if record_path.name.endswith(".record.json"):
+            stem = record_path.name[: -len(".record.json")]
+        else:
+            stem = record_path.stem
+        report_path = directory / f"{stem}.report.bin"
+        vcek_path = directory / f"{stem}.vcek.pem"
+        try:
+            record = json.loads(record_path.read_text(encoding="utf-8"))
+        except (json.JSONDecodeError, OSError) as exc:
+            missing.append((record_path.name, f"unreadable record ({exc})"))
+            continue
+        if not report_path.is_file():
+            missing.append((record_path.name, f"no companion {report_path.name}"))
+            continue
+        if not vcek_path.is_file():
+            missing.append((record_path.name, f"no companion {vcek_path.name}"))
+            continue
+        try:
+            report_bytes = report_path.read_bytes()
+            vcek_pem = vcek_path.read_bytes()
+        except OSError as exc:
+            missing.append((record_path.name, f"cannot read companion ({exc})"))
+            continue
+        triples.append((stem, record, report_bytes, vcek_pem))
+    return triples, missing
+
+
+def _collect_fold_attachments(
+    args: argparse.Namespace,
+) -> "tuple[Optional[list], Optional[list], Optional[Any], Optional[str]]":
+    """Load the SEP-2828 attachments for the ``export-article12`` fold.
+
+    Returns ``(handoffs, enforcements, trusted_did_document,
+    expected_measurement)``, any of which may be ``None``. Single ``--handoff``
+    files and a ``--handoffs`` directory both feed the handoff list (entry name
+    = file stem, matching the verify verbs' stem discovery). Raises
+    :class:`ValueError` on any load failure (a missing file, an unreadable
+    package, an incomplete enforcement triple, a bad measurement hex) so the
+    fold fails closed before the package is written.
+    """
+    handoffs: Optional[list] = None
+    enforcements: Optional[list] = None
+    trusted: Optional[Any] = None
+    expected = args.expected_measurement
+
+    hpaths: list[Path] = []
+    for f in (args.handoff or []):
+        p = Path(f).expanduser()
+        if not p.is_file():
+            raise ValueError(f"handoff package not found: {p}")
+        hpaths.append(p)
+    if args.handoffs:
+        d = Path(args.handoffs).expanduser()
+        if not d.is_dir():
+            raise ValueError(f"--handoffs is not a directory: {d}")
+        hpaths += sorted(p for p in d.glob("*.json") if p.is_file())
+    if hpaths:
+        loaded, unreadable = _load_handoff_docs(
+            hpaths,
+            on_note=lambda name, note: print(
+                f"vaara export-article12: {name}: {note}", file=sys.stderr),
+        )
+        if unreadable:
+            joined = "; ".join(f"{n} ({e})" for n, e in unreadable)
+            raise ValueError(f"unreadable handoff package(s): {joined}")
+        handoffs = [(p.stem, doc, t) for p, doc, t in loaded]
+
+    if args.enforcements:
+        d = Path(args.enforcements).expanduser()
+        if not d.is_dir():
+            raise ValueError(f"--enforcements is not a directory: {d}")
+        recs = sorted(p for p in d.glob("*.record.json") if p.is_file())
+        triples, missing = _discover_enforcement_triples(recs, d)
+        if missing:
+            joined = "; ".join(f"{n} ({e})" for n, e in missing)
+            raise ValueError(f"incomplete enforcement triple(s): {joined}")
+        enforcements = triples
+
+    if args.trusted_did_document:
+        trusted = _load_json_file(args.trusted_did_document, "trusted DID document")
+
+    if expected is not None:
+        try:
+            raw = bytes.fromhex(expected.strip())
+        except ValueError:
+            raise ValueError("--expected-measurement is not valid hex") from None
+        if len(raw) != 48:
+            raise ValueError(
+                "--expected-measurement must be 48 bytes (96 hex chars, an "
+                "SHA-384 launch measurement)")
+        expected = expected.strip()
+
+    return handoffs, enforcements, trusted, expected
 
 
 def _cmd_verify_handoff(args: argparse.Namespace) -> int:
@@ -2614,18 +2791,14 @@ def _cmd_verify_handoffs(args: argparse.Namespace) -> int:
         print(f"vaara verify-handoffs: {exc}", file=sys.stderr)
         return 1
 
-    packages: list[tuple[str, Any, Optional[str]]] = []
-    unreadable: list[tuple[str, str]] = []
-    for path in paths:
-        try:
-            doc = json.loads(path.read_text(encoding="utf-8"))
-        except (json.JSONDecodeError, OSError) as exc:
-            unreadable.append((path.name, str(exc)))
-            continue
-        anchor_time, note = _resolve_handoff_anchor_time(args, doc)
-        if note is not None:
-            print(f"vaara verify-handoffs: {path.name}: {note}", file=sys.stderr)
-        packages.append((path.name, doc, anchor_time))
+    loaded, unreadable = _load_handoff_docs(
+        paths, anchored_time=args.anchored_time, no_anchor=args.no_anchor,
+        on_note=lambda name, note: print(
+            f"vaara verify-handoffs: {name}: {note}", file=sys.stderr),
+    )
+    packages: list[tuple[str, Any, Optional[str]]] = [
+        (p.name, doc, t) for p, doc, t in loaded
+    ]
 
     report = check_handoff_set(
         packages, trusted_did_document=trusted, strict=args.strict
@@ -2707,35 +2880,7 @@ def _cmd_verify_enforcements(args: argparse.Namespace) -> int:
               f"{directory}", file=sys.stderr)
         return 2
 
-    triples: list[tuple[str, Any, bytes, bytes]] = []
-    missing: list[tuple[str, str]] = []
-    for record_path in records:
-        # NAME.record.json -> NAME; the glob default ends in .record.json, but a
-        # custom glob may not, so fall back to the full stem.
-        if record_path.name.endswith(".record.json"):
-            stem = record_path.name[: -len(".record.json")]
-        else:
-            stem = record_path.stem
-        report_path = directory / f"{stem}.report.bin"
-        vcek_path = directory / f"{stem}.vcek.pem"
-        try:
-            record = json.loads(record_path.read_text(encoding="utf-8"))
-        except (json.JSONDecodeError, OSError) as exc:
-            missing.append((record_path.name, f"unreadable record ({exc})"))
-            continue
-        if not report_path.is_file():
-            missing.append((record_path.name, f"no companion {report_path.name}"))
-            continue
-        if not vcek_path.is_file():
-            missing.append((record_path.name, f"no companion {vcek_path.name}"))
-            continue
-        try:
-            report_bytes = report_path.read_bytes()
-            vcek_pem = vcek_path.read_bytes()
-        except OSError as exc:
-            missing.append((record_path.name, f"cannot read companion ({exc})"))
-            continue
-        triples.append((stem, record, report_bytes, vcek_pem))
+    triples, missing = _discover_enforcement_triples(records, directory)
 
     report = check_enforcement_set(
         triples, expected_measurement=expected, strict=args.strict
@@ -3215,6 +3360,33 @@ def build_parser() -> argparse.ArgumentParser:
         "--anchor-file", default=None, metavar="PATH",
         help="Fold in a pre-fetched time anchor (TimeAnchor JSON over the "
              "trail head) instead of fetching one.",
+    )
+    pa12.add_argument(
+        "--handoff", action="append", default=None, metavar="PKG.json",
+        help="Fold a verified cross-org handoff package (Article 26(6)) in as a "
+             "sidecar. Repeatable. Each is verified at export; one that does not "
+             "verify fails the export. Needs the attestation extra.",
+    )
+    pa12.add_argument(
+        "--handoffs", default=None, metavar="DIR",
+        help="Fold every handoff package matching *.json in this directory.",
+    )
+    pa12.add_argument(
+        "--enforcements", default=None, metavar="DIR",
+        help="Fold confidential-VM enforcement bindings from this directory "
+             "(NAME.record.json + NAME.report.bin + NAME.vcek.pem triples). "
+             "Each is verified at export; one that does not bind fails the "
+             "export.",
+    )
+    pa12.add_argument(
+        "--trusted-did-document", default=None, metavar="DOC.json",
+        help="DID document trusted out of band, used to pin handoff producer "
+             "identity. Without it, producer identity stays self-asserted.",
+    )
+    pa12.add_argument(
+        "--expected-measurement", default=None, metavar="HEX",
+        help="Vetted SHA-384 launch measurement (96 hex chars) to pin folded "
+             "enforcement bindings against.",
     )
     pa12.set_defaults(func=_cmd_trail_export_article12)
 
