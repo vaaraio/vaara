@@ -101,6 +101,8 @@ class RevocationEntry:
 
     @classmethod
     def from_dict(cls, data: dict[str, object]) -> "RevocationEntry":
+        if not isinstance(data, dict):
+            raise ValueError("each revocation entry must be an object")
         scope = data.get("scope")
         if scope not in ("key", "identity"):
             raise ValueError(
@@ -246,6 +248,8 @@ class RevocationRegistry:
 
     @classmethod
     def from_dict(cls, data: dict[str, object]) -> "RevocationRegistry":
+        if not isinstance(data, dict):
+            raise ValueError("revocation registry must be a JSON object")
         raw = data.get("entries", [])
         if not isinstance(raw, list):
             raise ValueError("revocation registry 'entries' must be a list")

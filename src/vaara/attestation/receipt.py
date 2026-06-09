@@ -71,6 +71,13 @@ from vaara.attestation._conformance_statement import (
 from vaara.attestation._decision_conformance import (
     check_decision_conformance,
 )
+from vaara.attestation._handoff import (
+    ComponentDigest,
+    HandoffVerdict,
+    build_handoff,
+    sign_manifest,
+    verify_handoff,
+)
 from vaara.attestation._key_history import (
     KeyHistory,
     KeyValidity,
@@ -158,8 +165,13 @@ __all__ = [
     "BackLink",
     "BackLinkResult",
     "BundleVerdict",
+    "ComponentDigest",
     "ConformanceCheck",
     "ConformanceReport",
+    "HandoffVerdict",
+    "build_handoff",
+    "sign_manifest",
+    "verify_handoff",
     "check_record_conformance",
     "check_decision_conformance",
     "RecordSetEntry",
