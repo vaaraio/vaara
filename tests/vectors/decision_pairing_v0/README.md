@@ -50,11 +50,13 @@ published; the ES256 fixture is verified against the stored public key.
   digest. `request_envelope_replayed.json` is the same tool with different
   arguments: it recomputes to a different digest and does not bind
   (`replayed_binding_ok` is false).
-- `supersession_equal_decidedat_tie`: two decisions with equal
-  `decidedAt` under one back-link; the effective one is the lowest
-  lexicographic `issuerAsserted.nonce`. The checker recomputes the
-  `winner` from the committed records with no clock, so two verifiers
-  agree on the same effective decision.
+- `supersession_equal_decidedat_tie`: two distinct decisions with equal
+  `decidedAt` under one back-link and no explicit ordering field. The
+  expected `supersession` verdict is `ambiguous`: a conformant verifier
+  reports the tie rather than resolving it by `issuerAsserted.nonce`,
+  file order, or arrival order, since none of those names the
+  genuinely-later decision. Byte-identical records are one decision, not
+  a tie.
 
 ## Verifying
 
