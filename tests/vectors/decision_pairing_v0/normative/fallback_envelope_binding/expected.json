@@ -4,8 +4,9 @@
   "gateway_view_binding_ok": true,
   "gateway_view_matches_provider_digest": true,
   "malformed_binding_fails_closed": true,
-  "note": "no SEP-2787 attestation: the backLink digest is over a named, versioned projection (the tools/call name and arguments plus the _meta.authorization_binding block), not the whole _meta. A gateway and a provider view of the same call carry different transport-local _meta yet project to the same digest; changing the bound params or the binding block breaks the back-link; an absent binding block fails closed instead of digesting the whole _meta.",
+  "note": "no SEP-2787 attestation: the backLink digest is over a named, versioned projection (the tools/call name and arguments plus the _meta.authorization_binding block), not the whole _meta. The signed record names the projection version it used (backLink.fallbackProjection), so a verifier reconstructs the same projection deterministically rather than inferring it from the observed envelope. The preimage is an allowlist: a gateway and a provider view carrying different transport-local _meta project to the same digest; changing the bound params or the binding block breaks the back-link; an absent binding block fails closed instead of digesting the whole _meta.",
   "receipt_signature_ok": true,
+  "record_names_fallback_projection": true,
   "records_paired": true,
   "replayed_binding_ok": false,
   "tampered_binding_ok": false
