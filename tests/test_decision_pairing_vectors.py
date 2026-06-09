@@ -96,6 +96,26 @@ def test_vaara_verifier_reproduces_fallback_binding():
     assert malformed.ok is False
     assert malformed.reason == FALLBACK_BINDING_MALFORMED
 
+    # The signed record names the projection version it used, so reconstruction
+    # keys off trusted data; a record naming an unsupported or absent projection
+    # fails closed rather than guessing the rule.
+    import dataclasses
+
+    assert decision.back_link.fallback_projection == "sep2828-fallback/1"
+    bad_version = dataclasses.replace(
+        decision,
+        back_link=dataclasses.replace(
+            decision.back_link, fallback_projection="sep2828-fallback/99"))
+    assert verify_decision_fallback_binding(
+        bad_version, request_envelope=provider).ok is False
+    no_version = dataclasses.replace(
+        decision,
+        back_link=dataclasses.replace(
+            decision.back_link, fallback_projection=None))
+    res = verify_decision_fallback_binding(no_version, request_envelope=provider)
+    assert res.ok is False
+    assert res.reason == FALLBACK_BINDING_MALFORMED
+
 
 def test_fallback_projection_excludes_transport_local_meta():
     """The projection digest is invariant to non-binding _meta a gateway can
@@ -109,37 +129,23 @@ def test_fallback_projection_excludes_transport_local_meta():
         "name": "query_table",
         "arguments": {"table": "employees", "limit": 10},
         "_meta": {
-            "authorization_binding": {
-                "nonce": "n-1",
-                "projectionVersion": "sep2828-fallback/1",
-            },
+            "authorization_binding": {"nonce": "n-1"},
         },
     }
     with_noise = {
         "name": "query_table",
         "arguments": {"table": "employees", "limit": 10},
         "_meta": {
-            "authorization_binding": {
-                "nonce": "n-1",
-                "projectionVersion": "sep2828-fallback/1",
-            },
+            "authorization_binding": {"nonce": "n-1"},
             "io.modelcontextprotocol/progressToken": "p-9",
             "trace": {"spanId": "abc"},
         },
     }
     assert request_envelope_digest(base) == request_envelope_digest(with_noise)
 
-    # Unsupported projection version and a missing block both fail closed.
-    bad_version = json_copy(base)
-    bad_version["_meta"]["authorization_binding"]["projectionVersion"] = "x/9"
+    # An unsupported version and a missing block both fail closed.
     with pytest.raises(MalformedFallbackBindingError):
-        request_envelope_digest(bad_version)
+        request_envelope_digest(base, version="sep2828-fallback/99")
     no_block = {"name": "query_table", "arguments": {}, "_meta": {}}
     with pytest.raises(MalformedFallbackBindingError):
         request_envelope_digest(no_block)
-
-
-def json_copy(obj):
-    import json
-
-    return json.loads(json.dumps(obj))

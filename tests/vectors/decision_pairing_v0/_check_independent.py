@@ -80,23 +80,26 @@ def verify_back_link(record: dict, attestation: dict) -> bool:
     return bl["attestationNonce"] == attestation["issuerAsserted"]["nonce"]
 
 
-FALLBACK_PROJECTION_V1 = "sep2828-fallback/1"
+_SUPPORTED_FALLBACK_PROJECTIONS = frozenset({"sep2828-fallback/1"})
 
 
-def fallback_projection(envelope: dict):
-    """Reconstruct the named, versioned no-SEP-2787 projection from a request
-    envelope, or None if it cannot be reconstructed. The preimage is only the
-    tools/call name+arguments plus the named _meta.authorization_binding block;
-    every other _meta field (trace context, progress tokens, UI hints, fields a
-    gateway adds or strips) is excluded, so a gateway and a provider view of the
-    same call project to identical bytes."""
+def fallback_projection(envelope: dict, version):
+    """Reconstruct the named projection from a request envelope at the given
+    version, or None if it cannot be reconstructed. The preimage is an
+    allowlist: only the tools/call name+arguments plus the named
+    _meta.authorization_binding block; every other _meta field (trace context,
+    progress tokens, UI hints, fields a gateway adds or strips) is excluded by
+    construction, so a gateway and a provider view of the same call project to
+    identical bytes. The version is supplied by the caller (a verifier reads it
+    from the signed record's backLink.fallbackProjection), not inferred from the
+    observed envelope."""
+    if version not in _SUPPORTED_FALLBACK_PROJECTIONS:
+        return None
     meta = envelope.get("_meta")
     if not isinstance(meta, dict):
         return None
     binding = meta.get("authorization_binding")
     if not isinstance(binding, dict):
-        return None
-    if binding.get("projectionVersion") != FALLBACK_PROJECTION_V1:
         return None
     nonce = binding.get("nonce")
     if not isinstance(nonce, str) or not nonce:
@@ -104,30 +107,36 @@ def fallback_projection(envelope: dict):
     if "name" not in envelope or "arguments" not in envelope:
         return None
     return {
-        "projection": FALLBACK_PROJECTION_V1,
+        "projection": version,
         "name": envelope["name"],
         "arguments": envelope["arguments"],
         "authorizationBinding": dict(binding),
     }
 
 
-def fallback_digest(envelope: dict):
-    """The no-2787 fallback digest over the named projection, or None if the
-    binding block cannot be reconstructed."""
-    proj = fallback_projection(envelope)
+def fallback_digest(envelope: dict, version):
+    """The no-2787 fallback digest over the named projection at version, or
+    None if the projection cannot be reconstructed."""
+    proj = fallback_projection(envelope, version)
     return None if proj is None else _sha256_hex(_jcs(proj))
 
 
 def verify_fallback_binding(record: dict, envelope: dict) -> bool:
     """No-SEP-2787 path: the back-link digest is over the named, versioned
-    projection of the request envelope, not the whole _meta. Recompute it from
-    the committed envelope rather than trusting the stored digest, confirm the
+    projection of the request envelope, not the whole _meta. The projection
+    version is read from the signed record's backLink.fallbackProjection, so
+    reconstruction is deterministic from trusted data. Recompute the digest from
+    the committed envelope rather than trusting the stored value, confirm the
     back-link nonce echoes the binding block nonce, and fail closed when the
-    binding block is absent or malformed."""
-    proj = fallback_projection(envelope)
+    record names no or an unsupported version or the binding block is
+    malformed."""
+    bl = record["backLink"]
+    version = bl.get("fallbackProjection")
+    if version is None:
+        return False
+    proj = fallback_projection(envelope, version)
     if proj is None:
         return False
-    bl = record["backLink"]
     if not hmac.compare_digest(bl["attestationDigest"], _sha256_hex(_jcs(proj))):
         return False
     return bl["attestationNonce"] == envelope["_meta"][
@@ -221,10 +230,16 @@ def _verdicts(case: Path, expected: dict) -> dict:
         elif key == "gateway_view_binding_ok":
             got[key] = verify_fallback_binding(
                 dec, _load(case, "request_envelope_gateway_view.json"))
+        elif key == "record_names_fallback_projection":
+            version = dec["backLink"].get("fallbackProjection")
+            got[key] = version in _SUPPORTED_FALLBACK_PROJECTIONS
         elif key == "gateway_view_matches_provider_digest":
+            version = dec["backLink"].get("fallbackProjection")
             got[key] = (
-                fallback_digest(_load(case, "request_envelope_gateway_view.json"))
-                == fallback_digest(_load(case, "request_envelope.json")))
+                fallback_digest(
+                    _load(case, "request_envelope_gateway_view.json"), version)
+                == fallback_digest(
+                    _load(case, "request_envelope.json"), version))
         elif key == "tampered_binding_ok":
             got[key] = verify_fallback_binding(
                 dec, _load(case, "request_envelope_tampered_binding.json"))

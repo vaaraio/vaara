@@ -174,34 +174,42 @@ following top-level fields.
 
 | Field              | Type   | Required | Description                                                                          |
 | ------------------ | ------ | -------- | ------------------------------------------------------------------------------------ |
-| `attestationDigest`| string | yes      | `sha256:<hex>` over the JCS-canonical full SEP-2787 attestation wire bytes, signature included. Pins the exact attestation instance. |
-| `attestationNonce` | string | yes      | Echoes the attestation's `issuerAsserted.nonce` for fast correlation.                |
+| `attestationDigest`| string | yes      | `sha256:<hex>` over the JCS-canonical full SEP-2787 attestation wire bytes, signature included. Pins the exact attestation instance. In the no-2787 fallback (below) it is over the named request-envelope projection instead. |
+| `attestationNonce` | string | yes      | Echoes the attestation's `issuerAsserted.nonce` for fast correlation. In the fallback it echoes `_meta.authorization_binding.nonce`. |
+| `fallbackProjection`| string | no       | Present only in the no-2787 fallback: names the projection version `attestationDigest` was computed under (this release: `sep2828-fallback/1`). Absent on the attestation path. |
 
 If no SEP-2787 attestation exists for the call (the deployment does not run
 2787), the server MUST instead bind the request by setting `attestationDigest` to
 `sha256:<hex>` over the JCS-canonical encoding of a **named, versioned
 projection** of the request envelope, not the whole observed `_meta`. The
-projection commits to exactly:
+projection is an allowlist: it contains exactly
 
 - the `tools/call` `name` and `arguments` (the call params that bind to the
   decision);
 - the named binding block `_meta.authorization_binding`, which carries the
-  server-chosen per-call `nonce` and the `projectionVersion` in force (this
-  release: `sep2828-fallback/1`).
+  server-chosen per-call `nonce`;
 
-Every other `_meta` field is observation-local or transport-local (progress
-tokens, trace context, UI hints, unrelated SEP blocks, fields a gateway can
-legitimately add or strip) and MUST be excluded, so a gateway view and a
-provider view of the same call project to the same digest. The server sets
-`attestationNonce` to echo `_meta.authorization_binding.nonce`. The binding is to
-the request **instance**, not only its content.
+and nothing else. Every other `_meta` field is excluded by construction, so a
+gateway view and a provider view of the same call, differing only in
+observation-local or transport-local `_meta` (progress tokens, trace context, UI
+hints, unrelated SEP blocks, fields a gateway can legitimately add or strip),
+project to the same digest. The rule is stated as inclusion rather than a deny
+list because a deny list can never be complete: the moment a gateway adds a field
+nobody enumerated, a deny-everything-listed rule would drift.
 
-A verifier reconstructs the same named projection from the same named fields and
-compares the digest. If the projection cannot be reconstructed (the
-`authorization_binding` block is absent, malformed, missing its `nonce`, or
-carries an unsupported `projectionVersion`), the fallback case is **not
-conformant** and the verifier MUST fail closed rather than widen the preimage to
-the whole `_meta`.
+The server sets `attestationNonce` to echo `_meta.authorization_binding.nonce`,
+and MUST name the projection version it used in `backLink.fallbackProjection`.
+The binding is to the request **instance**, not only its content.
+
+A verifier reads the version from the signed record's `backLink.fallbackProjection`
+(so reconstruction is deterministic from trusted data, and a later projection
+revision is an explicit new version rather than a silent reinterpretation),
+reconstructs the same named projection from the same named fields of the observed
+envelope, and compares the digest. If the record names no projection version or
+an unsupported one, or the projection cannot be reconstructed (the
+`authorization_binding` block is absent, malformed, or missing its `nonce`), the
+fallback case is **not conformant** and the verifier MUST fail closed rather than
+widen the preimage to the whole `_meta`.
 
 **`decisionDerived`** carries the decision and the basis for it:
 

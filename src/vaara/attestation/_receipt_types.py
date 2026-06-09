@@ -67,10 +67,19 @@ class BackLink:
     is ``sha256:<hex>`` over the JCS-canonical encoding of the full
     attestation wire envelope (signature included), pinning the exact
     attestation instance.
+
+    ``fallback_projection`` is set only in the no-SEP-2787 fallback case
+    (``fallbackProjection`` on the wire): it names the projection version
+    the ``attestation_digest`` was computed under, so a verifier
+    reconstructs the same named projection deterministically from the
+    signed record rather than inferring it from the observed envelope, and
+    a later projection revision is an explicit version rather than a silent
+    reinterpretation. It is absent on the attestation path.
     """
 
     attestation_digest: str
     attestation_nonce: str
+    fallback_projection: Optional[str] = None
 
 
 @dataclass(frozen=True)
@@ -144,10 +153,13 @@ class ExecutionReceipt:
 
 
 def back_link_to_dict(bl: BackLink) -> dict[str, Any]:
-    return {
+    out: dict[str, Any] = {
         "attestationDigest": bl.attestation_digest,
         "attestationNonce": bl.attestation_nonce,
     }
+    if bl.fallback_projection is not None:
+        out["fallbackProjection"] = bl.fallback_projection
+    return out
 
 
 def receipt_asserted_to_dict(ra: ReceiptAsserted) -> dict[str, Any]:
@@ -180,6 +192,7 @@ def back_link_from_dict(d: dict[str, Any]) -> BackLink:
     return BackLink(
         attestation_digest=d["attestationDigest"],
         attestation_nonce=d["attestationNonce"],
+        fallback_projection=d.get("fallbackProjection"),
     )
 
 
