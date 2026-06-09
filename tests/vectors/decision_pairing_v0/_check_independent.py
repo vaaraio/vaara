@@ -112,14 +112,19 @@ def records_paired(decision: dict, receipt: dict) -> bool:
     return hmac.compare_digest(bound, decision_digest(decision))
 
 
-def superseding_nonce(decisions: list) -> str:
-    """issuerAsserted.nonce of the effective decision: latest decidedAt,
-    tie-broken by lowest lexicographic issuerAsserted.nonce."""
+def supersession_verdict(decisions: list) -> str:
+    """The effective decision among records for one call. The latest
+    decidedAt wins. When distinct records share the latest decidedAt with
+    no explicit ordering field, the result is "ambiguous": a conformant
+    verifier reports it rather than picking a winner by nonce, file, or
+    arrival order. Byte-identical records are one decision, not a tie."""
     latest = max(d["decisionDerived"]["decidedAt"] for d in decisions)
     tied = [d for d in decisions
             if d["decisionDerived"]["decidedAt"] == latest]
-    return min(tied, key=lambda d: d["issuerAsserted"]["nonce"])[
-        "issuerAsserted"]["nonce"]
+    distinct = {_jcs(d) for d in tied}
+    if len(distinct) > 1:
+        return "ambiguous"
+    return tied[0]["issuerAsserted"]["nonce"]
 
 
 def _load(case: Path, name: str):
@@ -153,9 +158,9 @@ def _verdicts(case: Path, expected: dict) -> dict:
             got[key] = records_paired(dec, rec)
         elif key == "shared_back_link":
             got[key] = dec["backLink"] == rec["backLink"]
-        elif key == "winner":
-            got[key] = superseding_nonce([_load(case, "decision_a.json"),
-                                          _load(case, "decision_b.json")])
+        elif key == "supersession":
+            got[key] = supersession_verdict([_load(case, "decision_a.json"),
+                                             _load(case, "decision_b.json")])
         elif key == "receipt_present":
             got[key] = rec is not None
         elif key == "both_signatures_ok":

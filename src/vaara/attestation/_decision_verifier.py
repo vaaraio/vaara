@@ -144,6 +144,18 @@ def records_paired(
     return hmac.compare_digest(bound, decision_digest(decision))
 
 
+class AmbiguousSupersessionError(ValueError):
+    """Distinct decision records share the latest ``decidedAt`` and no
+    deterministic ordering field separates them.
+
+    For conformance the effective decision is undetermined. Reporting it
+    is correct: resolving the tie by an incidental order (issuer nonce,
+    file order, or arrival order) would name a "winner" that is not the
+    genuinely-later decision, and would mask a producer that emitted two
+    records which should never have tied.
+    """
+
+
 def superseding_decision(
     decisions: Sequence[DecisionRecord],
 ) -> DecisionRecord:
@@ -152,13 +164,15 @@ def superseding_decision(
     A superseding decision (for example a human resolving an
     ``escalate``) is a new decision record with the same back-link and a
     later ``decidedAt``; earlier records are retained as history. The
-    record with the latest ``decidedAt`` is effective. When two share the
-    same ``decidedAt``, the tie breaks deterministically on the issuer
-    nonce, lowest lexicographic wins, so every verifier selects the same
-    winner without a clock.
+    record with the latest ``decidedAt`` is effective.
 
-    The caller is responsible for passing records that share a back-link;
-    this resolves ordering only. Raises ``ValueError`` on an empty input.
+    When distinct records share the latest ``decidedAt`` and carry no
+    explicit ordering field to break the tie, the effective decision is
+    ambiguous and this raises ``AmbiguousSupersessionError`` rather than
+    guessing from nonce, file, or arrival order. Byte-identical records
+    are one decision, not a tie. The caller is responsible for passing
+    records that share a back-link; this resolves ordering only. Raises
+    ``ValueError`` on an empty input.
     """
     if not decisions:
         raise ValueError("superseding_decision requires at least one record")
@@ -166,4 +180,10 @@ def superseding_decision(
     tied = [
         d for d in decisions if d.decision_derived.decided_at == latest
     ]
-    return min(tied, key=lambda d: d.issuer_asserted.nonce)
+    distinct = {canonical_json(d.to_dict()) for d in tied}
+    if len(distinct) > 1:
+        raise AmbiguousSupersessionError(
+            "distinct decision records share the latest decidedAt with no "
+            "deterministic ordering field; effective decision is ambiguous"
+        )
+    return tied[0]

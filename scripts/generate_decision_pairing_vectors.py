@@ -168,9 +168,13 @@ def main() -> None:
          expected={"records_paired": False,
                    "note": "same attestationDigest, mismatched attestationNonce"})
 
-    # 5. Equal-decidedAt supersession tie. Resolved in v0.51: latest
-    #    decidedAt wins; on a tie, lowest issuerAsserted.nonce wins. Both
-    #    share decidedAt, so the winner is the lower nonce, "d5a".
+    # 5. Equal-decidedAt supersession tie. Two distinct decisions (block,
+    #    allow) share decidedAt with no explicit ordering field, so the
+    #    effective decision is ambiguous. A conformant verifier reports the
+    #    tie rather than resolving it by nonce, file, or arrival order: that
+    #    would name a "winner" that is not the genuinely-later decision and
+    #    would mask a producer that emitted two records which should never
+    #    have tied.
     d5 = OUT / "normative" / "supersession_equal_decidedat_tie"
     _write(d5 / "attestation.json", att.to_dict())
     _write(d5 / "decision_a.json",
@@ -178,9 +182,11 @@ def main() -> None:
     _write(d5 / "decision_b.json",
            _decision(bl, "allow", key=HS, alg="HS256", nonce="d5b").to_dict())
     _write(d5 / "expected.json", {
-        "both_signatures_ok": True, "both_back_links_ok": True, "winner": "d5a",
-        "note": "equal decidedAt resolves by lexicographic issuerAsserted.nonce, "
-                "lowest wins (d5a < d5b)"})
+        "both_signatures_ok": True, "both_back_links_ok": True,
+        "supersession": "ambiguous",
+        "note": "equal decidedAt with no explicit ordering field: the "
+                "effective decision is ambiguous, not resolved by nonce, "
+                "file, or arrival order"})
 
     # 6. Fallback request-envelope binding. No SEP-2787 attestation, so the
     #    back-link digest is over the observed request envelope (tools/call

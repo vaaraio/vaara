@@ -45,6 +45,7 @@ from vaara.attestation._decision_types import (
     decision_record_from_dict as parse_decision_record,
 )
 from vaara.attestation._decision_verifier import (
+    AmbiguousSupersessionError,
     decision_digest,
     records_paired,
     request_envelope_digest,
@@ -60,6 +61,7 @@ from vaara.attestation._receipt_verifier import (
 )
 
 __all__ = [
+    "AmbiguousSupersessionError",
     "BackLink",
     "BackLinkResult",
     "DecisionDerived",
