@@ -1,0 +1,1074 @@
+{
+  "cases": [
+    {
+      "name": "clean_no_anchor",
+      "package": {
+        "evidence": {
+          "did_document": {
+            "id": "did:web:vendor-a.example:billing",
+            "verificationMethod": [
+              {
+                "controller": "did:web:vendor-a.example:billing",
+                "id": "did:web:vendor-a.example:billing#key-2026",
+                "publicKeyJwk": {
+                  "crv": "P-256",
+                  "kty": "EC",
+                  "x": "B2Bb3IA08MGNseH1UseCTbv_Q-J10isZuVS7galZBEU",
+                  "y": "pF0OwY17c4EPwvJJYAjp6z9tVfFo37FGfhFrwVZS_iM"
+                },
+                "type": "JsonWebKey2020",
+                "validFrom": "2026-01-01T00:00:00Z",
+                "validUntil": "2028-01-01T00:00:00Z"
+              }
+            ]
+          },
+          "record": {
+            "alg": "ES256",
+            "backLink": {
+              "attestationDigest": "sha256:8f4ae37b34b9be4056ce0c243dabb819d225864b4aee04561ee9bdd67b9080dc",
+              "attestationNonce": "att-nonce-fixed-0001"
+            },
+            "outcomeDerived": {
+              "completedAt": "2026-05-29T10:00:00Z",
+              "status": "executed"
+            },
+            "receiptAsserted": {
+              "alg": "ES256",
+              "iat": "2026-05-29T10:00:00Z",
+              "iss": "did:web:vendor-a.example:billing",
+              "nonce": "rcpt-nonce-fixed-0001",
+              "secretVersion": "v1",
+              "sub": "did:web:vendor-a.example:billing"
+            },
+            "signature": "677521afd0cee4e3d908378ea08ad52e261f0596c1bf6003a6d61f4072d11173228e13eb52ececdf90fbedb584bcb8a73070a34a023085f44e752453600086d9",
+            "version": 1
+          },
+          "revocations": {
+            "entries": [],
+            "version": 1
+          }
+        },
+        "manifest": {
+          "cover": {
+            "action": "charge_card",
+            "deployer": "Customer B",
+            "obligation": "deployer log retention, AI Act Art 26(6)",
+            "provider": "Vendor A",
+            "system": "BillingBot"
+          },
+          "did_document_digest": "sha256:6732c02f9dfc49900753f0b102e30e21dd06a9eb8ffea6701d0dc3b127b98418",
+          "holder": "did:web:customer-b.example",
+          "key_history_digest": "sha256:fdaa7ae18d6514da70badd3a89c204553096cb98740afe5ba0a7b85605a4103c",
+          "producer": "did:web:vendor-a.example:billing",
+          "record_digest": "sha256:feb6111e429bcb60985b96fd1cd57bbc1eb09f624576f881e1cc813da16d54db",
+          "revocations_digest": "sha256:a6a20076da005b27c9afc3a5d5b2457798c0ac817d1abc38b2fee4398ac3f133"
+        },
+        "manifest_digest": "sha256:21350531dc0fba3fd9cb3788c7249c650207ab69b027740e35fbc7fc4460af12",
+        "schema": "vaara.cross-org-handoff/v0"
+      }
+    },
+    {
+      "name": "anchored_not_verified",
+      "package": {
+        "evidence": {
+          "anchor": {
+            "anchored_time": "2026-05-29T10:05:00Z",
+            "backend": "eidas-tsa",
+            "chain_head_hash": "feb6111e429bcb60985b96fd1cd57bbc1eb09f624576f881e1cc813da16d54db",
+            "chain_position": 0,
+            "hash_algorithm": "sha256",
+            "token_b64": "AA==",
+            "tsa_url": "https://tsa.example"
+          },
+          "did_document": {
+            "id": "did:web:vendor-a.example:billing",
+            "verificationMethod": [
+              {
+                "controller": "did:web:vendor-a.example:billing",
+                "id": "did:web:vendor-a.example:billing#key-2026",
+                "publicKeyJwk": {
+                  "crv": "P-256",
+                  "kty": "EC",
+                  "x": "B2Bb3IA08MGNseH1UseCTbv_Q-J10isZuVS7galZBEU",
+                  "y": "pF0OwY17c4EPwvJJYAjp6z9tVfFo37FGfhFrwVZS_iM"
+                },
+                "type": "JsonWebKey2020",
+                "validFrom": "2026-01-01T00:00:00Z",
+                "validUntil": "2028-01-01T00:00:00Z"
+              }
+            ]
+          },
+          "record": {
+            "alg": "ES256",
+            "backLink": {
+              "attestationDigest": "sha256:8f4ae37b34b9be4056ce0c243dabb819d225864b4aee04561ee9bdd67b9080dc",
+              "attestationNonce": "att-nonce-fixed-0001"
+            },
+            "outcomeDerived": {
+              "completedAt": "2026-05-29T10:00:00Z",
+              "status": "executed"
+            },
+            "receiptAsserted": {
+              "alg": "ES256",
+              "iat": "2026-05-29T10:00:00Z",
+              "iss": "did:web:vendor-a.example:billing",
+              "nonce": "rcpt-nonce-fixed-0001",
+              "secretVersion": "v1",
+              "sub": "did:web:vendor-a.example:billing"
+            },
+            "signature": "677521afd0cee4e3d908378ea08ad52e261f0596c1bf6003a6d61f4072d11173228e13eb52ececdf90fbedb584bcb8a73070a34a023085f44e752453600086d9",
+            "version": 1
+          },
+          "revocations": {
+            "entries": [],
+            "version": 1
+          }
+        },
+        "manifest": {
+          "anchor_digest": "sha256:4cac7afcdb8b0387bdd58c5e32400e21c1b409f45c7ec5b90a0cae1376440f7f",
+          "cover": {
+            "action": "charge_card",
+            "deployer": "Customer B",
+            "obligation": "deployer log retention, AI Act Art 26(6)",
+            "provider": "Vendor A",
+            "system": "BillingBot"
+          },
+          "did_document_digest": "sha256:6732c02f9dfc49900753f0b102e30e21dd06a9eb8ffea6701d0dc3b127b98418",
+          "holder": "did:web:customer-b.example",
+          "key_history_digest": "sha256:fdaa7ae18d6514da70badd3a89c204553096cb98740afe5ba0a7b85605a4103c",
+          "producer": "did:web:vendor-a.example:billing",
+          "record_digest": "sha256:feb6111e429bcb60985b96fd1cd57bbc1eb09f624576f881e1cc813da16d54db",
+          "revocations_digest": "sha256:a6a20076da005b27c9afc3a5d5b2457798c0ac817d1abc38b2fee4398ac3f133"
+        },
+        "manifest_digest": "sha256:3eabdfd69b8ab8fad0b07d1f814af9e204287f18048391955564ce83aa53267f",
+        "schema": "vaara.cross-org-handoff/v0"
+      }
+    },
+    {
+      "anchoredTime": "2026-05-29T10:05:00Z",
+      "name": "corroborated",
+      "package": {
+        "evidence": {
+          "anchor": {
+            "anchored_time": "2026-05-29T10:05:00Z",
+            "backend": "eidas-tsa",
+            "chain_head_hash": "feb6111e429bcb60985b96fd1cd57bbc1eb09f624576f881e1cc813da16d54db",
+            "chain_position": 0,
+            "hash_algorithm": "sha256",
+            "token_b64": "AA==",
+            "tsa_url": "https://tsa.example"
+          },
+          "did_document": {
+            "id": "did:web:vendor-a.example:billing",
+            "verificationMethod": [
+              {
+                "controller": "did:web:vendor-a.example:billing",
+                "id": "did:web:vendor-a.example:billing#key-2026",
+                "publicKeyJwk": {
+                  "crv": "P-256",
+                  "kty": "EC",
+                  "x": "B2Bb3IA08MGNseH1UseCTbv_Q-J10isZuVS7galZBEU",
+                  "y": "pF0OwY17c4EPwvJJYAjp6z9tVfFo37FGfhFrwVZS_iM"
+                },
+                "type": "JsonWebKey2020",
+                "validFrom": "2026-01-01T00:00:00Z",
+                "validUntil": "2028-01-01T00:00:00Z"
+              }
+            ]
+          },
+          "record": {
+            "alg": "ES256",
+            "backLink": {
+              "attestationDigest": "sha256:8f4ae37b34b9be4056ce0c243dabb819d225864b4aee04561ee9bdd67b9080dc",
+              "attestationNonce": "att-nonce-fixed-0001"
+            },
+            "outcomeDerived": {
+              "completedAt": "2026-05-29T10:00:00Z",
+              "status": "executed"
+            },
+            "receiptAsserted": {
+              "alg": "ES256",
+              "iat": "2026-05-29T10:00:00Z",
+              "iss": "did:web:vendor-a.example:billing",
+              "nonce": "rcpt-nonce-fixed-0001",
+              "secretVersion": "v1",
+              "sub": "did:web:vendor-a.example:billing"
+            },
+            "signature": "677521afd0cee4e3d908378ea08ad52e261f0596c1bf6003a6d61f4072d11173228e13eb52ececdf90fbedb584bcb8a73070a34a023085f44e752453600086d9",
+            "version": 1
+          },
+          "revocations": {
+            "entries": [],
+            "version": 1
+          }
+        },
+        "manifest": {
+          "anchor_digest": "sha256:4cac7afcdb8b0387bdd58c5e32400e21c1b409f45c7ec5b90a0cae1376440f7f",
+          "cover": {
+            "action": "charge_card",
+            "deployer": "Customer B",
+            "obligation": "deployer log retention, AI Act Art 26(6)",
+            "provider": "Vendor A",
+            "system": "BillingBot"
+          },
+          "did_document_digest": "sha256:6732c02f9dfc49900753f0b102e30e21dd06a9eb8ffea6701d0dc3b127b98418",
+          "holder": "did:web:customer-b.example",
+          "key_history_digest": "sha256:fdaa7ae18d6514da70badd3a89c204553096cb98740afe5ba0a7b85605a4103c",
+          "producer": "did:web:vendor-a.example:billing",
+          "record_digest": "sha256:feb6111e429bcb60985b96fd1cd57bbc1eb09f624576f881e1cc813da16d54db",
+          "revocations_digest": "sha256:a6a20076da005b27c9afc3a5d5b2457798c0ac817d1abc38b2fee4398ac3f133"
+        },
+        "manifest_digest": "sha256:3eabdfd69b8ab8fad0b07d1f814af9e204287f18048391955564ce83aa53267f",
+        "schema": "vaara.cross-org-handoff/v0"
+      }
+    },
+    {
+      "anchoredTime": "2026-05-29T10:05:00Z",
+      "name": "pinned_corroborated",
+      "package": {
+        "evidence": {
+          "anchor": {
+            "anchored_time": "2026-05-29T10:05:00Z",
+            "backend": "eidas-tsa",
+            "chain_head_hash": "feb6111e429bcb60985b96fd1cd57bbc1eb09f624576f881e1cc813da16d54db",
+            "chain_position": 0,
+            "hash_algorithm": "sha256",
+            "token_b64": "AA==",
+            "tsa_url": "https://tsa.example"
+          },
+          "did_document": {
+            "id": "did:web:vendor-a.example:billing",
+            "verificationMethod": [
+              {
+                "controller": "did:web:vendor-a.example:billing",
+                "id": "did:web:vendor-a.example:billing#key-2026",
+                "publicKeyJwk": {
+                  "crv": "P-256",
+                  "kty": "EC",
+                  "x": "B2Bb3IA08MGNseH1UseCTbv_Q-J10isZuVS7galZBEU",
+                  "y": "pF0OwY17c4EPwvJJYAjp6z9tVfFo37FGfhFrwVZS_iM"
+                },
+                "type": "JsonWebKey2020",
+                "validFrom": "2026-01-01T00:00:00Z",
+                "validUntil": "2028-01-01T00:00:00Z"
+              }
+            ]
+          },
+          "record": {
+            "alg": "ES256",
+            "backLink": {
+              "attestationDigest": "sha256:8f4ae37b34b9be4056ce0c243dabb819d225864b4aee04561ee9bdd67b9080dc",
+              "attestationNonce": "att-nonce-fixed-0001"
+            },
+            "outcomeDerived": {
+              "completedAt": "2026-05-29T10:00:00Z",
+              "status": "executed"
+            },
+            "receiptAsserted": {
+              "alg": "ES256",
+              "iat": "2026-05-29T10:00:00Z",
+              "iss": "did:web:vendor-a.example:billing",
+              "nonce": "rcpt-nonce-fixed-0001",
+              "secretVersion": "v1",
+              "sub": "did:web:vendor-a.example:billing"
+            },
+            "signature": "677521afd0cee4e3d908378ea08ad52e261f0596c1bf6003a6d61f4072d11173228e13eb52ececdf90fbedb584bcb8a73070a34a023085f44e752453600086d9",
+            "version": 1
+          },
+          "revocations": {
+            "entries": [],
+            "version": 1
+          }
+        },
+        "manifest": {
+          "anchor_digest": "sha256:4cac7afcdb8b0387bdd58c5e32400e21c1b409f45c7ec5b90a0cae1376440f7f",
+          "cover": {
+            "action": "charge_card",
+            "deployer": "Customer B",
+            "obligation": "deployer log retention, AI Act Art 26(6)",
+            "provider": "Vendor A",
+            "system": "BillingBot"
+          },
+          "did_document_digest": "sha256:6732c02f9dfc49900753f0b102e30e21dd06a9eb8ffea6701d0dc3b127b98418",
+          "holder": "did:web:customer-b.example",
+          "key_history_digest": "sha256:fdaa7ae18d6514da70badd3a89c204553096cb98740afe5ba0a7b85605a4103c",
+          "producer": "did:web:vendor-a.example:billing",
+          "record_digest": "sha256:feb6111e429bcb60985b96fd1cd57bbc1eb09f624576f881e1cc813da16d54db",
+          "revocations_digest": "sha256:a6a20076da005b27c9afc3a5d5b2457798c0ac817d1abc38b2fee4398ac3f133"
+        },
+        "manifest_digest": "sha256:3eabdfd69b8ab8fad0b07d1f814af9e204287f18048391955564ce83aa53267f",
+        "schema": "vaara.cross-org-handoff/v0"
+      },
+      "trustedDidDocument": {
+        "id": "did:web:vendor-a.example:billing",
+        "verificationMethod": [
+          {
+            "controller": "did:web:vendor-a.example:billing",
+            "id": "did:web:vendor-a.example:billing#key-2026",
+            "publicKeyJwk": {
+              "crv": "P-256",
+              "kty": "EC",
+              "x": "B2Bb3IA08MGNseH1UseCTbv_Q-J10isZuVS7galZBEU",
+              "y": "pF0OwY17c4EPwvJJYAjp6z9tVfFo37FGfhFrwVZS_iM"
+            },
+            "type": "JsonWebKey2020",
+            "validFrom": "2026-01-01T00:00:00Z",
+            "validUntil": "2028-01-01T00:00:00Z"
+          }
+        ]
+      }
+    },
+    {
+      "anchoredTime": "2026-05-29T10:05:00Z",
+      "name": "strict_pass",
+      "package": {
+        "evidence": {
+          "anchor": {
+            "anchored_time": "2026-05-29T10:05:00Z",
+            "backend": "eidas-tsa",
+            "chain_head_hash": "feb6111e429bcb60985b96fd1cd57bbc1eb09f624576f881e1cc813da16d54db",
+            "chain_position": 0,
+            "hash_algorithm": "sha256",
+            "token_b64": "AA==",
+            "tsa_url": "https://tsa.example"
+          },
+          "did_document": {
+            "id": "did:web:vendor-a.example:billing",
+            "verificationMethod": [
+              {
+                "controller": "did:web:vendor-a.example:billing",
+                "id": "did:web:vendor-a.example:billing#key-2026",
+                "publicKeyJwk": {
+                  "crv": "P-256",
+                  "kty": "EC",
+                  "x": "B2Bb3IA08MGNseH1UseCTbv_Q-J10isZuVS7galZBEU",
+                  "y": "pF0OwY17c4EPwvJJYAjp6z9tVfFo37FGfhFrwVZS_iM"
+                },
+                "type": "JsonWebKey2020",
+                "validFrom": "2026-01-01T00:00:00Z",
+                "validUntil": "2028-01-01T00:00:00Z"
+              }
+            ]
+          },
+          "record": {
+            "alg": "ES256",
+            "backLink": {
+              "attestationDigest": "sha256:8f4ae37b34b9be4056ce0c243dabb819d225864b4aee04561ee9bdd67b9080dc",
+              "attestationNonce": "att-nonce-fixed-0001"
+            },
+            "outcomeDerived": {
+              "completedAt": "2026-05-29T10:00:00Z",
+              "status": "executed"
+            },
+            "receiptAsserted": {
+              "alg": "ES256",
+              "iat": "2026-05-29T10:00:00Z",
+              "iss": "did:web:vendor-a.example:billing",
+              "nonce": "rcpt-nonce-fixed-0001",
+              "secretVersion": "v1",
+              "sub": "did:web:vendor-a.example:billing"
+            },
+            "signature": "677521afd0cee4e3d908378ea08ad52e261f0596c1bf6003a6d61f4072d11173228e13eb52ececdf90fbedb584bcb8a73070a34a023085f44e752453600086d9",
+            "version": 1
+          },
+          "revocations": {
+            "entries": [],
+            "version": 1
+          }
+        },
+        "manifest": {
+          "anchor_digest": "sha256:4cac7afcdb8b0387bdd58c5e32400e21c1b409f45c7ec5b90a0cae1376440f7f",
+          "cover": {
+            "action": "charge_card",
+            "deployer": "Customer B",
+            "obligation": "deployer log retention, AI Act Art 26(6)",
+            "provider": "Vendor A",
+            "system": "BillingBot"
+          },
+          "did_document_digest": "sha256:6732c02f9dfc49900753f0b102e30e21dd06a9eb8ffea6701d0dc3b127b98418",
+          "holder": "did:web:customer-b.example",
+          "key_history_digest": "sha256:fdaa7ae18d6514da70badd3a89c204553096cb98740afe5ba0a7b85605a4103c",
+          "producer": "did:web:vendor-a.example:billing",
+          "record_digest": "sha256:feb6111e429bcb60985b96fd1cd57bbc1eb09f624576f881e1cc813da16d54db",
+          "revocations_digest": "sha256:a6a20076da005b27c9afc3a5d5b2457798c0ac817d1abc38b2fee4398ac3f133"
+        },
+        "manifest_digest": "sha256:3eabdfd69b8ab8fad0b07d1f814af9e204287f18048391955564ce83aa53267f",
+        "schema": "vaara.cross-org-handoff/v0"
+      },
+      "strict": true,
+      "trustedDidDocument": {
+        "id": "did:web:vendor-a.example:billing",
+        "verificationMethod": [
+          {
+            "controller": "did:web:vendor-a.example:billing",
+            "id": "did:web:vendor-a.example:billing#key-2026",
+            "publicKeyJwk": {
+              "crv": "P-256",
+              "kty": "EC",
+              "x": "B2Bb3IA08MGNseH1UseCTbv_Q-J10isZuVS7galZBEU",
+              "y": "pF0OwY17c4EPwvJJYAjp6z9tVfFo37FGfhFrwVZS_iM"
+            },
+            "type": "JsonWebKey2020",
+            "validFrom": "2026-01-01T00:00:00Z",
+            "validUntil": "2028-01-01T00:00:00Z"
+          }
+        ]
+      }
+    },
+    {
+      "name": "strict_unmet_no_anchor",
+      "package": {
+        "evidence": {
+          "did_document": {
+            "id": "did:web:vendor-a.example:billing",
+            "verificationMethod": [
+              {
+                "controller": "did:web:vendor-a.example:billing",
+                "id": "did:web:vendor-a.example:billing#key-2026",
+                "publicKeyJwk": {
+                  "crv": "P-256",
+                  "kty": "EC",
+                  "x": "B2Bb3IA08MGNseH1UseCTbv_Q-J10isZuVS7galZBEU",
+                  "y": "pF0OwY17c4EPwvJJYAjp6z9tVfFo37FGfhFrwVZS_iM"
+                },
+                "type": "JsonWebKey2020",
+                "validFrom": "2026-01-01T00:00:00Z",
+                "validUntil": "2028-01-01T00:00:00Z"
+              }
+            ]
+          },
+          "record": {
+            "alg": "ES256",
+            "backLink": {
+              "attestationDigest": "sha256:8f4ae37b34b9be4056ce0c243dabb819d225864b4aee04561ee9bdd67b9080dc",
+              "attestationNonce": "att-nonce-fixed-0001"
+            },
+            "outcomeDerived": {
+              "completedAt": "2026-05-29T10:00:00Z",
+              "status": "executed"
+            },
+            "receiptAsserted": {
+              "alg": "ES256",
+              "iat": "2026-05-29T10:00:00Z",
+              "iss": "did:web:vendor-a.example:billing",
+              "nonce": "rcpt-nonce-fixed-0001",
+              "secretVersion": "v1",
+              "sub": "did:web:vendor-a.example:billing"
+            },
+            "signature": "677521afd0cee4e3d908378ea08ad52e261f0596c1bf6003a6d61f4072d11173228e13eb52ececdf90fbedb584bcb8a73070a34a023085f44e752453600086d9",
+            "version": 1
+          },
+          "revocations": {
+            "entries": [],
+            "version": 1
+          }
+        },
+        "manifest": {
+          "cover": {
+            "action": "charge_card",
+            "deployer": "Customer B",
+            "obligation": "deployer log retention, AI Act Art 26(6)",
+            "provider": "Vendor A",
+            "system": "BillingBot"
+          },
+          "did_document_digest": "sha256:6732c02f9dfc49900753f0b102e30e21dd06a9eb8ffea6701d0dc3b127b98418",
+          "holder": "did:web:customer-b.example",
+          "key_history_digest": "sha256:fdaa7ae18d6514da70badd3a89c204553096cb98740afe5ba0a7b85605a4103c",
+          "producer": "did:web:vendor-a.example:billing",
+          "record_digest": "sha256:feb6111e429bcb60985b96fd1cd57bbc1eb09f624576f881e1cc813da16d54db",
+          "revocations_digest": "sha256:a6a20076da005b27c9afc3a5d5b2457798c0ac817d1abc38b2fee4398ac3f133"
+        },
+        "manifest_digest": "sha256:21350531dc0fba3fd9cb3788c7249c650207ab69b027740e35fbc7fc4460af12",
+        "schema": "vaara.cross-org-handoff/v0"
+      },
+      "strict": true,
+      "trustedDidDocument": {
+        "id": "did:web:vendor-a.example:billing",
+        "verificationMethod": [
+          {
+            "controller": "did:web:vendor-a.example:billing",
+            "id": "did:web:vendor-a.example:billing#key-2026",
+            "publicKeyJwk": {
+              "crv": "P-256",
+              "kty": "EC",
+              "x": "B2Bb3IA08MGNseH1UseCTbv_Q-J10isZuVS7galZBEU",
+              "y": "pF0OwY17c4EPwvJJYAjp6z9tVfFo37FGfhFrwVZS_iM"
+            },
+            "type": "JsonWebKey2020",
+            "validFrom": "2026-01-01T00:00:00Z",
+            "validUntil": "2028-01-01T00:00:00Z"
+          }
+        ]
+      }
+    },
+    {
+      "anchoredTime": "2026-05-29T10:05:00Z",
+      "name": "anchor_over_different_record",
+      "package": {
+        "evidence": {
+          "anchor": {
+            "anchored_time": "2026-05-29T10:05:00Z",
+            "backend": "eidas-tsa",
+            "chain_head_hash": "abababababababababababababababababababababababababababababababab",
+            "chain_position": 0,
+            "hash_algorithm": "sha256",
+            "token_b64": "AA==",
+            "tsa_url": "https://tsa.example"
+          },
+          "did_document": {
+            "id": "did:web:vendor-a.example:billing",
+            "verificationMethod": [
+              {
+                "controller": "did:web:vendor-a.example:billing",
+                "id": "did:web:vendor-a.example:billing#key-2026",
+                "publicKeyJwk": {
+                  "crv": "P-256",
+                  "kty": "EC",
+                  "x": "B2Bb3IA08MGNseH1UseCTbv_Q-J10isZuVS7galZBEU",
+                  "y": "pF0OwY17c4EPwvJJYAjp6z9tVfFo37FGfhFrwVZS_iM"
+                },
+                "type": "JsonWebKey2020",
+                "validFrom": "2026-01-01T00:00:00Z",
+                "validUntil": "2028-01-01T00:00:00Z"
+              }
+            ]
+          },
+          "record": {
+            "alg": "ES256",
+            "backLink": {
+              "attestationDigest": "sha256:8f4ae37b34b9be4056ce0c243dabb819d225864b4aee04561ee9bdd67b9080dc",
+              "attestationNonce": "att-nonce-fixed-0001"
+            },
+            "outcomeDerived": {
+              "completedAt": "2026-05-29T10:00:00Z",
+              "status": "executed"
+            },
+            "receiptAsserted": {
+              "alg": "ES256",
+              "iat": "2026-05-29T10:00:00Z",
+              "iss": "did:web:vendor-a.example:billing",
+              "nonce": "rcpt-nonce-fixed-0001",
+              "secretVersion": "v1",
+              "sub": "did:web:vendor-a.example:billing"
+            },
+            "signature": "677521afd0cee4e3d908378ea08ad52e261f0596c1bf6003a6d61f4072d11173228e13eb52ececdf90fbedb584bcb8a73070a34a023085f44e752453600086d9",
+            "version": 1
+          },
+          "revocations": {
+            "entries": [],
+            "version": 1
+          }
+        },
+        "manifest": {
+          "anchor_digest": "sha256:407439a892f688572fe8f09dc9408c6775bb0485a6e602fb9b7b003c8edb102b",
+          "cover": {
+            "action": "charge_card",
+            "deployer": "Customer B",
+            "obligation": "deployer log retention, AI Act Art 26(6)",
+            "provider": "Vendor A",
+            "system": "BillingBot"
+          },
+          "did_document_digest": "sha256:6732c02f9dfc49900753f0b102e30e21dd06a9eb8ffea6701d0dc3b127b98418",
+          "holder": "did:web:customer-b.example",
+          "key_history_digest": "sha256:fdaa7ae18d6514da70badd3a89c204553096cb98740afe5ba0a7b85605a4103c",
+          "producer": "did:web:vendor-a.example:billing",
+          "record_digest": "sha256:feb6111e429bcb60985b96fd1cd57bbc1eb09f624576f881e1cc813da16d54db",
+          "revocations_digest": "sha256:a6a20076da005b27c9afc3a5d5b2457798c0ac817d1abc38b2fee4398ac3f133"
+        },
+        "manifest_digest": "sha256:5f638c3df7e0967eea376ca1b9146795b67f9c1dcb6f759fb3fbe6154d72cabf",
+        "schema": "vaara.cross-org-handoff/v0"
+      }
+    },
+    {
+      "name": "tampered_did_document",
+      "package": {
+        "evidence": {
+          "anchor": {
+            "anchored_time": "2026-05-29T10:05:00Z",
+            "backend": "eidas-tsa",
+            "chain_head_hash": "feb6111e429bcb60985b96fd1cd57bbc1eb09f624576f881e1cc813da16d54db",
+            "chain_position": 0,
+            "hash_algorithm": "sha256",
+            "token_b64": "AA==",
+            "tsa_url": "https://tsa.example"
+          },
+          "did_document": {
+            "id": "did:web:vendor-a.example:billing",
+            "verificationMethod": [
+              {
+                "controller": "did:web:vendor-a.example:billing",
+                "id": "did:web:vendor-a.example:billing#key-2026",
+                "publicKeyJwk": {
+                  "crv": "P-256",
+                  "kty": "EC",
+                  "x": "B2Bb3IA08MGNseH1UseCTbv_Q-J10isZuVS7galZBEU",
+                  "y": "pF0OwY17c4EPwvJJYAjp6z9tVfFo37FGfhFrwVZS_iM"
+                },
+                "type": "JsonWebKey2020",
+                "validFrom": "2026-01-01T00:00:00Z",
+                "validUntil": "2099-01-01T00:00:00Z"
+              }
+            ]
+          },
+          "record": {
+            "alg": "ES256",
+            "backLink": {
+              "attestationDigest": "sha256:8f4ae37b34b9be4056ce0c243dabb819d225864b4aee04561ee9bdd67b9080dc",
+              "attestationNonce": "att-nonce-fixed-0001"
+            },
+            "outcomeDerived": {
+              "completedAt": "2026-05-29T10:00:00Z",
+              "status": "executed"
+            },
+            "receiptAsserted": {
+              "alg": "ES256",
+              "iat": "2026-05-29T10:00:00Z",
+              "iss": "did:web:vendor-a.example:billing",
+              "nonce": "rcpt-nonce-fixed-0001",
+              "secretVersion": "v1",
+              "sub": "did:web:vendor-a.example:billing"
+            },
+            "signature": "677521afd0cee4e3d908378ea08ad52e261f0596c1bf6003a6d61f4072d11173228e13eb52ececdf90fbedb584bcb8a73070a34a023085f44e752453600086d9",
+            "version": 1
+          },
+          "revocations": {
+            "entries": [],
+            "version": 1
+          }
+        },
+        "manifest": {
+          "anchor_digest": "sha256:4cac7afcdb8b0387bdd58c5e32400e21c1b409f45c7ec5b90a0cae1376440f7f",
+          "cover": {
+            "action": "charge_card",
+            "deployer": "Customer B",
+            "obligation": "deployer log retention, AI Act Art 26(6)",
+            "provider": "Vendor A",
+            "system": "BillingBot"
+          },
+          "did_document_digest": "sha256:6732c02f9dfc49900753f0b102e30e21dd06a9eb8ffea6701d0dc3b127b98418",
+          "holder": "did:web:customer-b.example",
+          "key_history_digest": "sha256:fdaa7ae18d6514da70badd3a89c204553096cb98740afe5ba0a7b85605a4103c",
+          "producer": "did:web:vendor-a.example:billing",
+          "record_digest": "sha256:feb6111e429bcb60985b96fd1cd57bbc1eb09f624576f881e1cc813da16d54db",
+          "revocations_digest": "sha256:a6a20076da005b27c9afc3a5d5b2457798c0ac817d1abc38b2fee4398ac3f133"
+        },
+        "manifest_digest": "sha256:3eabdfd69b8ab8fad0b07d1f814af9e204287f18048391955564ce83aa53267f",
+        "schema": "vaara.cross-org-handoff/v0"
+      }
+    },
+    {
+      "name": "tampered_manifest_producer",
+      "package": {
+        "evidence": {
+          "anchor": {
+            "anchored_time": "2026-05-29T10:05:00Z",
+            "backend": "eidas-tsa",
+            "chain_head_hash": "feb6111e429bcb60985b96fd1cd57bbc1eb09f624576f881e1cc813da16d54db",
+            "chain_position": 0,
+            "hash_algorithm": "sha256",
+            "token_b64": "AA==",
+            "tsa_url": "https://tsa.example"
+          },
+          "did_document": {
+            "id": "did:web:vendor-a.example:billing",
+            "verificationMethod": [
+              {
+                "controller": "did:web:vendor-a.example:billing",
+                "id": "did:web:vendor-a.example:billing#key-2026",
+                "publicKeyJwk": {
+                  "crv": "P-256",
+                  "kty": "EC",
+                  "x": "B2Bb3IA08MGNseH1UseCTbv_Q-J10isZuVS7galZBEU",
+                  "y": "pF0OwY17c4EPwvJJYAjp6z9tVfFo37FGfhFrwVZS_iM"
+                },
+                "type": "JsonWebKey2020",
+                "validFrom": "2026-01-01T00:00:00Z",
+                "validUntil": "2028-01-01T00:00:00Z"
+              }
+            ]
+          },
+          "record": {
+            "alg": "ES256",
+            "backLink": {
+              "attestationDigest": "sha256:8f4ae37b34b9be4056ce0c243dabb819d225864b4aee04561ee9bdd67b9080dc",
+              "attestationNonce": "att-nonce-fixed-0001"
+            },
+            "outcomeDerived": {
+              "completedAt": "2026-05-29T10:00:00Z",
+              "status": "executed"
+            },
+            "receiptAsserted": {
+              "alg": "ES256",
+              "iat": "2026-05-29T10:00:00Z",
+              "iss": "did:web:vendor-a.example:billing",
+              "nonce": "rcpt-nonce-fixed-0001",
+              "secretVersion": "v1",
+              "sub": "did:web:vendor-a.example:billing"
+            },
+            "signature": "677521afd0cee4e3d908378ea08ad52e261f0596c1bf6003a6d61f4072d11173228e13eb52ececdf90fbedb584bcb8a73070a34a023085f44e752453600086d9",
+            "version": 1
+          },
+          "revocations": {
+            "entries": [],
+            "version": 1
+          }
+        },
+        "manifest": {
+          "anchor_digest": "sha256:4cac7afcdb8b0387bdd58c5e32400e21c1b409f45c7ec5b90a0cae1376440f7f",
+          "cover": {
+            "action": "charge_card",
+            "deployer": "Customer B",
+            "obligation": "deployer log retention, AI Act Art 26(6)",
+            "provider": "Vendor A",
+            "system": "BillingBot"
+          },
+          "did_document_digest": "sha256:6732c02f9dfc49900753f0b102e30e21dd06a9eb8ffea6701d0dc3b127b98418",
+          "holder": "did:web:customer-b.example",
+          "key_history_digest": "sha256:fdaa7ae18d6514da70badd3a89c204553096cb98740afe5ba0a7b85605a4103c",
+          "producer": "did:web:attacker.example",
+          "record_digest": "sha256:feb6111e429bcb60985b96fd1cd57bbc1eb09f624576f881e1cc813da16d54db",
+          "revocations_digest": "sha256:a6a20076da005b27c9afc3a5d5b2457798c0ac817d1abc38b2fee4398ac3f133"
+        },
+        "manifest_digest": "sha256:3eabdfd69b8ab8fad0b07d1f814af9e204287f18048391955564ce83aa53267f",
+        "schema": "vaara.cross-org-handoff/v0"
+      }
+    },
+    {
+      "name": "holder_attested",
+      "package": {
+        "evidence": {
+          "anchor": {
+            "anchored_time": "2026-05-29T10:05:00Z",
+            "backend": "eidas-tsa",
+            "chain_head_hash": "feb6111e429bcb60985b96fd1cd57bbc1eb09f624576f881e1cc813da16d54db",
+            "chain_position": 0,
+            "hash_algorithm": "sha256",
+            "token_b64": "AA==",
+            "tsa_url": "https://tsa.example"
+          },
+          "did_document": {
+            "id": "did:web:vendor-a.example:billing",
+            "verificationMethod": [
+              {
+                "controller": "did:web:vendor-a.example:billing",
+                "id": "did:web:vendor-a.example:billing#key-2026",
+                "publicKeyJwk": {
+                  "crv": "P-256",
+                  "kty": "EC",
+                  "x": "B2Bb3IA08MGNseH1UseCTbv_Q-J10isZuVS7galZBEU",
+                  "y": "pF0OwY17c4EPwvJJYAjp6z9tVfFo37FGfhFrwVZS_iM"
+                },
+                "type": "JsonWebKey2020",
+                "validFrom": "2026-01-01T00:00:00Z",
+                "validUntil": "2028-01-01T00:00:00Z"
+              }
+            ]
+          },
+          "record": {
+            "alg": "ES256",
+            "backLink": {
+              "attestationDigest": "sha256:8f4ae37b34b9be4056ce0c243dabb819d225864b4aee04561ee9bdd67b9080dc",
+              "attestationNonce": "att-nonce-fixed-0001"
+            },
+            "outcomeDerived": {
+              "completedAt": "2026-05-29T10:00:00Z",
+              "status": "executed"
+            },
+            "receiptAsserted": {
+              "alg": "ES256",
+              "iat": "2026-05-29T10:00:00Z",
+              "iss": "did:web:vendor-a.example:billing",
+              "nonce": "rcpt-nonce-fixed-0001",
+              "secretVersion": "v1",
+              "sub": "did:web:vendor-a.example:billing"
+            },
+            "signature": "677521afd0cee4e3d908378ea08ad52e261f0596c1bf6003a6d61f4072d11173228e13eb52ececdf90fbedb584bcb8a73070a34a023085f44e752453600086d9",
+            "version": 1
+          },
+          "revocations": {
+            "entries": [],
+            "version": 1
+          }
+        },
+        "holder_attestation": {
+          "alg": "ES256",
+          "keyid": "did:web:customer-b.example#k1",
+          "signature": "86f7396b03f18a56fdf0fb34c1b8b3ab19a8bf300102b82d8e43419e441424b6ab0a4626497e91437ebb79b63bacea5817e17a01fda516890b56877afec735e3",
+          "verifying_jwk": {
+            "crv": "P-256",
+            "kty": "EC",
+            "x": "AcuJDg5_TIBVj2pPoQS8aRNAZ97wcgHTf1chwfrHA8Q",
+            "y": "4tuSsTfTGUw8fYFageZoFNfqP2zp8dZNzKR22OTG0Us"
+          }
+        },
+        "manifest": {
+          "anchor_digest": "sha256:4cac7afcdb8b0387bdd58c5e32400e21c1b409f45c7ec5b90a0cae1376440f7f",
+          "cover": {
+            "action": "charge_card",
+            "deployer": "Customer B",
+            "obligation": "deployer log retention, AI Act Art 26(6)",
+            "provider": "Vendor A",
+            "system": "BillingBot"
+          },
+          "did_document_digest": "sha256:6732c02f9dfc49900753f0b102e30e21dd06a9eb8ffea6701d0dc3b127b98418",
+          "holder": "did:web:customer-b.example",
+          "key_history_digest": "sha256:fdaa7ae18d6514da70badd3a89c204553096cb98740afe5ba0a7b85605a4103c",
+          "producer": "did:web:vendor-a.example:billing",
+          "record_digest": "sha256:feb6111e429bcb60985b96fd1cd57bbc1eb09f624576f881e1cc813da16d54db",
+          "revocations_digest": "sha256:a6a20076da005b27c9afc3a5d5b2457798c0ac817d1abc38b2fee4398ac3f133"
+        },
+        "manifest_digest": "sha256:3eabdfd69b8ab8fad0b07d1f814af9e204287f18048391955564ce83aa53267f",
+        "schema": "vaara.cross-org-handoff/v0"
+      }
+    },
+    {
+      "name": "holder_attestation_failed",
+      "package": {
+        "evidence": {
+          "anchor": {
+            "anchored_time": "2026-05-29T10:05:00Z",
+            "backend": "eidas-tsa",
+            "chain_head_hash": "feb6111e429bcb60985b96fd1cd57bbc1eb09f624576f881e1cc813da16d54db",
+            "chain_position": 0,
+            "hash_algorithm": "sha256",
+            "token_b64": "AA==",
+            "tsa_url": "https://tsa.example"
+          },
+          "did_document": {
+            "id": "did:web:vendor-a.example:billing",
+            "verificationMethod": [
+              {
+                "controller": "did:web:vendor-a.example:billing",
+                "id": "did:web:vendor-a.example:billing#key-2026",
+                "publicKeyJwk": {
+                  "crv": "P-256",
+                  "kty": "EC",
+                  "x": "B2Bb3IA08MGNseH1UseCTbv_Q-J10isZuVS7galZBEU",
+                  "y": "pF0OwY17c4EPwvJJYAjp6z9tVfFo37FGfhFrwVZS_iM"
+                },
+                "type": "JsonWebKey2020",
+                "validFrom": "2026-01-01T00:00:00Z",
+                "validUntil": "2028-01-01T00:00:00Z"
+              }
+            ]
+          },
+          "record": {
+            "alg": "ES256",
+            "backLink": {
+              "attestationDigest": "sha256:8f4ae37b34b9be4056ce0c243dabb819d225864b4aee04561ee9bdd67b9080dc",
+              "attestationNonce": "att-nonce-fixed-0001"
+            },
+            "outcomeDerived": {
+              "completedAt": "2026-05-29T10:00:00Z",
+              "status": "executed"
+            },
+            "receiptAsserted": {
+              "alg": "ES256",
+              "iat": "2026-05-29T10:00:00Z",
+              "iss": "did:web:vendor-a.example:billing",
+              "nonce": "rcpt-nonce-fixed-0001",
+              "secretVersion": "v1",
+              "sub": "did:web:vendor-a.example:billing"
+            },
+            "signature": "677521afd0cee4e3d908378ea08ad52e261f0596c1bf6003a6d61f4072d11173228e13eb52ececdf90fbedb584bcb8a73070a34a023085f44e752453600086d9",
+            "version": 1
+          },
+          "revocations": {
+            "entries": [],
+            "version": 1
+          }
+        },
+        "holder_attestation": {
+          "alg": "ES256",
+          "keyid": "did:web:customer-b.example#k1",
+          "signature": "0000000000000000fdf0fb34c1b8b3ab19a8bf300102b82d8e43419e441424b6ab0a4626497e91437ebb79b63bacea5817e17a01fda516890b56877afec735e3",
+          "verifying_jwk": {
+            "crv": "P-256",
+            "kty": "EC",
+            "x": "AcuJDg5_TIBVj2pPoQS8aRNAZ97wcgHTf1chwfrHA8Q",
+            "y": "4tuSsTfTGUw8fYFageZoFNfqP2zp8dZNzKR22OTG0Us"
+          }
+        },
+        "manifest": {
+          "anchor_digest": "sha256:4cac7afcdb8b0387bdd58c5e32400e21c1b409f45c7ec5b90a0cae1376440f7f",
+          "cover": {
+            "action": "charge_card",
+            "deployer": "Customer B",
+            "obligation": "deployer log retention, AI Act Art 26(6)",
+            "provider": "Vendor A",
+            "system": "BillingBot"
+          },
+          "did_document_digest": "sha256:6732c02f9dfc49900753f0b102e30e21dd06a9eb8ffea6701d0dc3b127b98418",
+          "holder": "did:web:customer-b.example",
+          "key_history_digest": "sha256:fdaa7ae18d6514da70badd3a89c204553096cb98740afe5ba0a7b85605a4103c",
+          "producer": "did:web:vendor-a.example:billing",
+          "record_digest": "sha256:feb6111e429bcb60985b96fd1cd57bbc1eb09f624576f881e1cc813da16d54db",
+          "revocations_digest": "sha256:a6a20076da005b27c9afc3a5d5b2457798c0ac817d1abc38b2fee4398ac3f133"
+        },
+        "manifest_digest": "sha256:3eabdfd69b8ab8fad0b07d1f814af9e204287f18048391955564ce83aa53267f",
+        "schema": "vaara.cross-org-handoff/v0"
+      }
+    },
+    {
+      "name": "noncanonical_key_history",
+      "package": {
+        "evidence": {
+          "did_document": {
+            "id": "did:web:vendor-a.example:billing",
+            "verificationMethod": [
+              {
+                "controller": "did:web:vendor-a.example:billing",
+                "id": "did:web:vendor-a.example:billing#key-2026",
+                "publicKeyJwk": {
+                  "crv": "P-256",
+                  "kty": "EC",
+                  "x": "B2Bb3IA08MGNseH1UseCTbv_Q-J10isZuVS7galZBEU",
+                  "y": "pF0OwY17c4EPwvJJYAjp6z9tVfFo37FGfhFrwVZS_iM"
+                },
+                "type": "JsonWebKey2020",
+                "validFrom": "2026-01-01T00:00:00Z",
+                "validUntil": "2028-01-01T00:00:00Z"
+              }
+            ]
+          },
+          "key_history": {
+            "keys": [
+              {
+                "keyid": "did:web:vendor-a.example:billing#key-2026",
+                "not_after": "2026-07-01T00:00:00Z",
+                "not_before": "2026-05-01T00:00:00Z"
+              },
+              {
+                "keyid": "did:web:vendor-a.example:billing#key-2026",
+                "not_after": "2026-03-01T00:00:00Z",
+                "not_before": "2026-01-01T00:00:00Z"
+              }
+            ],
+            "version": 1
+          },
+          "record": {
+            "alg": "ES256",
+            "backLink": {
+              "attestationDigest": "sha256:8f4ae37b34b9be4056ce0c243dabb819d225864b4aee04561ee9bdd67b9080dc",
+              "attestationNonce": "att-nonce-fixed-0001"
+            },
+            "outcomeDerived": {
+              "completedAt": "2026-05-29T10:00:00Z",
+              "status": "executed"
+            },
+            "receiptAsserted": {
+              "alg": "ES256",
+              "iat": "2026-05-29T10:00:00Z",
+              "iss": "did:web:vendor-a.example:billing",
+              "nonce": "rcpt-nonce-fixed-0001",
+              "secretVersion": "v1",
+              "sub": "did:web:vendor-a.example:billing"
+            },
+            "signature": "677521afd0cee4e3d908378ea08ad52e261f0596c1bf6003a6d61f4072d11173228e13eb52ececdf90fbedb584bcb8a73070a34a023085f44e752453600086d9",
+            "version": 1
+          },
+          "revocations": {
+            "entries": [],
+            "version": 1
+          }
+        },
+        "manifest": {
+          "cover": {
+            "action": "charge_card",
+            "deployer": "Customer B",
+            "obligation": "deployer log retention, AI Act Art 26(6)",
+            "provider": "Vendor A",
+            "system": "BillingBot"
+          },
+          "did_document_digest": "sha256:6732c02f9dfc49900753f0b102e30e21dd06a9eb8ffea6701d0dc3b127b98418",
+          "holder": "did:web:customer-b.example",
+          "key_history_digest": "sha256:ccff4eb4c9cf38648e16a0514bcfd3a03926568b629a292fd9ccabbd9aa56558",
+          "producer": "did:web:vendor-a.example:billing",
+          "record_digest": "sha256:feb6111e429bcb60985b96fd1cd57bbc1eb09f624576f881e1cc813da16d54db",
+          "revocations_digest": "sha256:a6a20076da005b27c9afc3a5d5b2457798c0ac817d1abc38b2fee4398ac3f133"
+        },
+        "manifest_digest": "sha256:f84adbb2969fbf08350375a3e95a2ed7fe2b0b9fd24eecf7bc5797b79e13d5d9",
+        "schema": "vaara.cross-org-handoff/v0"
+      }
+    },
+    {
+      "name": "signed_after_retirement",
+      "package": {
+        "evidence": {
+          "anchor": {
+            "anchored_time": "2026-05-29T10:05:00Z",
+            "backend": "eidas-tsa",
+            "chain_head_hash": "feb6111e429bcb60985b96fd1cd57bbc1eb09f624576f881e1cc813da16d54db",
+            "chain_position": 0,
+            "hash_algorithm": "sha256",
+            "token_b64": "AA==",
+            "tsa_url": "https://tsa.example"
+          },
+          "did_document": {
+            "id": "did:web:vendor-a.example:billing",
+            "verificationMethod": [
+              {
+                "controller": "did:web:vendor-a.example:billing",
+                "id": "did:web:vendor-a.example:billing#key-2026",
+                "publicKeyJwk": {
+                  "crv": "P-256",
+                  "kty": "EC",
+                  "x": "B2Bb3IA08MGNseH1UseCTbv_Q-J10isZuVS7galZBEU",
+                  "y": "pF0OwY17c4EPwvJJYAjp6z9tVfFo37FGfhFrwVZS_iM"
+                },
+                "type": "JsonWebKey2020",
+                "validFrom": "2026-01-01T00:00:00Z",
+                "validUntil": "2026-05-01T00:00:00Z"
+              }
+            ]
+          },
+          "record": {
+            "alg": "ES256",
+            "backLink": {
+              "attestationDigest": "sha256:8f4ae37b34b9be4056ce0c243dabb819d225864b4aee04561ee9bdd67b9080dc",
+              "attestationNonce": "att-nonce-fixed-0001"
+            },
+            "outcomeDerived": {
+              "completedAt": "2026-05-29T10:00:00Z",
+              "status": "executed"
+            },
+            "receiptAsserted": {
+              "alg": "ES256",
+              "iat": "2026-05-29T10:00:00Z",
+              "iss": "did:web:vendor-a.example:billing",
+              "nonce": "rcpt-nonce-fixed-0001",
+              "secretVersion": "v1",
+              "sub": "did:web:vendor-a.example:billing"
+            },
+            "signature": "677521afd0cee4e3d908378ea08ad52e261f0596c1bf6003a6d61f4072d11173228e13eb52ececdf90fbedb584bcb8a73070a34a023085f44e752453600086d9",
+            "version": 1
+          },
+          "revocations": {
+            "entries": [],
+            "version": 1
+          }
+        },
+        "manifest": {
+          "anchor_digest": "sha256:4cac7afcdb8b0387bdd58c5e32400e21c1b409f45c7ec5b90a0cae1376440f7f",
+          "cover": {
+            "action": "charge_card",
+            "deployer": "Customer B",
+            "obligation": "deployer log retention, AI Act Art 26(6)",
+            "provider": "Vendor A",
+            "system": "BillingBot"
+          },
+          "did_document_digest": "sha256:91be9cc58987ead2dc65d2838ae6860a4b01c25499dd3561dea4ac332806ed4f",
+          "holder": "did:web:customer-b.example",
+          "key_history_digest": "sha256:75a8de0d69ac2543be72ce4d6d1d05a571df69fe9bb64fba9f38519c7ba519d3",
+          "producer": "did:web:vendor-a.example:billing",
+          "record_digest": "sha256:feb6111e429bcb60985b96fd1cd57bbc1eb09f624576f881e1cc813da16d54db",
+          "revocations_digest": "sha256:a6a20076da005b27c9afc3a5d5b2457798c0ac817d1abc38b2fee4398ac3f133"
+        },
+        "manifest_digest": "sha256:f0aacad60494bfd8a87e65d162d7ce30c9d2097aae6c3451ea67df1bcafb9852",
+        "schema": "vaara.cross-org-handoff/v0"
+      }
+    }
+  ],
+  "did": "did:web:vendor-a.example:billing",
+  "keyid": "did:web:vendor-a.example:billing#key-2026"
+}

@@ -1962,6 +1962,179 @@ def _print_retained_report(r: Any) -> None:
     print(f"  {_safe_inline(r.reason)}")
 
 
+def _resolve_handoff_anchor_time(
+    args: argparse.Namespace, doc: Any
+) -> "tuple[Optional[str], Optional[str]]":
+    """Return (anchored_time, note) for a handoff package's enclosed anchor.
+
+    ``--anchored-time`` (a time the regulator verified out of band) wins. Else,
+    if the package carries an anchor and the timeanchor extra is installed, the
+    RFC 3161 token is verified and its attested time returned. A missing extra
+    or a token that does not verify yields no time and a note: the record stays
+    verifiable, not corroborated, never silently upgraded.
+    """
+    if args.anchored_time is not None:
+        return args.anchored_time, None
+    if args.no_anchor:
+        return None, None
+    evidence = doc.get("evidence") if isinstance(doc, dict) else None
+    anchor = evidence.get("anchor") if isinstance(evidence, dict) else None
+    if not isinstance(anchor, dict):
+        return None, None
+    try:
+        from vaara.audit.timeanchor import TimeAnchor, TimeAnchorError, verify_anchor
+    except ImportError:
+        return None, (
+            "the package carries a time anchor but verifying it needs the "
+            "'timeanchor' extra; the record can be verifiable, not corroborated"
+        )
+    try:
+        attested = verify_anchor(TimeAnchor.from_dict(anchor))
+    except (ValueError, KeyError, TypeError, TimeAnchorError) as exc:
+        return None, f"the enclosed time anchor did not verify: {exc}"
+    return attested.isoformat(), None
+
+
+def _cmd_verify_handoff(args: argparse.Namespace) -> int:
+    """Verify a cross-org handoff package: one org's record, another's regulator.
+
+    The regulator side. Reads one self-contained handoff document, recomputes
+    every pinned component digest, routes the record through the retained-record
+    lens, confirms an enclosed anchor binds to this record, and prints one
+    verdict. Exit 0 iff ``ok`` for the chosen mode. Authenticity rests on the
+    producer's signature against an identity the regulator establishes out of
+    band; pass --trusted-did-document to pin it.
+    """
+    try:
+        from vaara.attestation.receipt import verify_handoff
+    except ImportError:
+        print(_ATTESTATION_HINT, file=sys.stderr)
+        return 2
+
+    try:
+        doc = _load_json_file(args.package, "handoff package")
+        trusted = (
+            _load_json_file(args.trusted_did_document, "trusted DID document")
+            if args.trusted_did_document else None
+        )
+    except ValueError as exc:
+        print(f"vaara verify-handoff: {exc}", file=sys.stderr)
+        return 1
+
+    anchored_time, note = _resolve_handoff_anchor_time(args, doc)
+    if note is not None:
+        print(f"vaara verify-handoff: {note}", file=sys.stderr)
+
+    try:
+        verdict = verify_handoff(
+            doc, anchor_attested_time=anchored_time,
+            trusted_did_document=trusted, strict=args.strict,
+        )
+    except ValueError as exc:
+        print(f"vaara verify-handoff: not a valid handoff package: {exc}",
+              file=sys.stderr)
+        return 1
+
+    if args.json:
+        print(json.dumps(verdict.to_dict(), indent=2))
+    else:
+        _print_handoff_report(verdict)
+
+    return 0 if verdict.ok else 1
+
+
+def _print_handoff_report(v: Any) -> None:
+    # producer, holder, keyid and component digests come from a package an
+    # untrusted holder assembled; escape control characters so a crafted value
+    # cannot forge extra lines in the human report.
+    print(f"verdict: {'OK' if v.ok else 'FAILED'}" + ("  [strict]" if v.strict else ""))
+    print(f"  integrity:        {v.integrity_ok}")
+    producer = _safe_inline(v.producer) if v.producer else "(none)"
+    print(f"  producer:         {producer}  [{v.producer_identity_basis}]")
+    if v.holder:
+        print(f"  holder:           {_safe_inline(v.holder)}")
+    keyid = f"  ({_safe_inline(v.keyid)})" if v.keyid else ""
+    print(f"  record:           bound={v.bound} verifiable={v.verifiable} "
+          f"corroborated={v.corroborated}{keyid}")
+    print(f"  window recorded:  {v.window_recorded}   revocation source: "
+          f"{v.revocation_source_present}   revoked: {v.revoked}")
+    if v.anchor_present:
+        print(f"  anchor:           binds={v.anchor_binds} verified={v.anchor_verified}")
+    hk = f"  ({_safe_inline(v.holder_keyid)})" if v.holder_keyid else ""
+    print(f"  custody:          {v.custody}{hk}")
+    print("  components:")
+    for c in v.components:
+        if c.present:
+            state = "ok" if c.ok else "DRIFT"
+        else:
+            state = "absent" if c.ok else "unexpectedly pinned"
+        print(f"    {c.name:13s} {state}")
+    print(f"  {_safe_inline(v.reason)}")
+
+
+def _cmd_build_handoff(args: argparse.Namespace) -> int:
+    """Assemble a cross-org handoff package from the producer's pieces.
+
+    The issuer side of ``verify-handoff``: stitches the record, the archived DID
+    document, the key history, revocations, and an optional eIDAS time anchor
+    into one self-contained document, pins each by digest, and writes it (sorted,
+    two-space indent). A holder custody attestation is a programmatic step
+    (``sign_manifest``); this command assembles the evidence. Exit 0 once a
+    well-formed package is written, even if the record is not yet verifiable.
+    """
+    try:
+        from vaara.attestation.receipt import build_handoff, verify_handoff
+        from vaara.attestation.sep2787 import AttestationError
+    except ImportError:
+        print(_ATTESTATION_HINT, file=sys.stderr)
+        return 2
+
+    try:
+        record = _load_json_file(args.record, "record")
+        did_document = _load_json_file(args.did_document, "DID document")
+        key_history = (
+            _load_json_file(args.key_history, "key history")
+            if args.key_history else None
+        )
+        revocations = (
+            _load_json_file(args.revocations, "revocations")
+            if args.revocations else None
+        )
+        anchor = _load_json_file(args.anchor, "anchor") if args.anchor else None
+        cover = _load_json_file(args.cover, "cover") if args.cover else None
+    except ValueError as exc:
+        print(f"vaara build-handoff: {exc}", file=sys.stderr)
+        return 1
+
+    try:
+        doc = build_handoff(
+            record=record, did_document=did_document, key_history=key_history,
+            revocations=revocations, anchor=anchor, producer=args.producer,
+            holder=args.holder, cover=cover,
+        )
+    except (AttestationError, KeyError, TypeError, ValueError) as exc:
+        print(f"vaara build-handoff: cannot assemble handoff: {exc}", file=sys.stderr)
+        return 1
+
+    rendered = json.dumps(doc, indent=2, sort_keys=True) + "\n"
+    if args.out is None:
+        sys.stdout.write(rendered)
+        return 0
+
+    out_path = Path(args.out).expanduser()
+    try:
+        out_path.write_text(rendered, encoding="utf-8")
+    except OSError as exc:
+        print(f"vaara build-handoff: cannot write {out_path}: {exc}", file=sys.stderr)
+        return 2
+    verdict = verify_handoff(doc)
+    print(f"Wrote handoff package to {out_path}")
+    print(f"  integrity:         {verdict.integrity_ok}")
+    print(f"  record verifiable: {verdict.verifiable}")
+    print(f"  anchor present:    {verdict.anchor_present}")
+    return 0
+
+
 def _cmd_normalize(args: argparse.Namespace) -> int:
     """Map a foreign MCP record onto the SEP-2828 evidence model.
 
@@ -3185,6 +3358,100 @@ def build_parser() -> argparse.ArgumentParser:
         help="Emit the full retention verdict as JSON",
     )
     pvt.set_defaults(func=_cmd_verify_retained)
+
+    pvh = sub.add_parser(
+        "verify-handoff",
+        help="Verify a cross-org handoff package: one organisation's signed "
+             "record, checked by another organisation's regulator, offline, "
+             "years later. Recomputes every pinned component digest, routes the "
+             "record through the retained-record lens (rotated-key window + "
+             "revocation + anchor corroboration), and confirms an enclosed "
+             "eIDAS anchor binds to this record. Authenticity rests on the "
+             "producer's signature against an identity you establish out of "
+             "band; pass --trusted-did-document to pin it. Requires the "
+             "attestation extra.",
+    )
+    pvh.add_argument(
+        "package",
+        help="Path to a JSON cross-org handoff package",
+    )
+    pvh.add_argument(
+        "--trusted-did-document", default=None, dest="trusted_did_document",
+        help="Path to the DID document you independently trust as the "
+             "producer's (its retained key archive); pins producer identity",
+    )
+    pvh.add_argument(
+        "--strict", action="store_true",
+        help="Regulator-grade: pass only when the record is corroborated, with "
+             "a recorded validity window, an affirmative revocation source, and "
+             "a pinned producer identity",
+    )
+    anchor_h = pvh.add_mutually_exclusive_group()
+    anchor_h.add_argument(
+        "--anchored-time", default=None, dest="anchored_time",
+        help="An attested time you verified separately, used directly as the "
+             "existence-in-time proof (ISO 8601), instead of verifying the "
+             "enclosed RFC 3161 token",
+    )
+    anchor_h.add_argument(
+        "--no-anchor", action="store_true", dest="no_anchor",
+        help="Do not verify an enclosed time anchor (report the record without "
+             "corroboration)",
+    )
+    pvh.add_argument(
+        "--json", action="store_true",
+        help="Emit the full handoff verdict as JSON",
+    )
+    pvh.set_defaults(func=_cmd_verify_handoff)
+
+    pbh = sub.add_parser(
+        "build-handoff",
+        help="Assemble a cross-org handoff package from the producer's pieces: "
+             "the record, the archived DID document, the key history, "
+             "revocations, and an optional eIDAS time anchor, each pinned by "
+             "digest. The issuer side of verify-handoff. Requires the "
+             "attestation extra.",
+    )
+    pbh.add_argument(
+        "--record", required=True,
+        help="Path to the SEP-2828 execution record (JSON)",
+    )
+    pbh.add_argument(
+        "--did-document", required=True, dest="did_document",
+        help="Path to the archived DID document listing the signing key",
+    )
+    pbh.add_argument(
+        "--key-history", default=None, dest="key_history",
+        help="Optional key-history JSON overriding the document's windows",
+    )
+    pbh.add_argument(
+        "--revocations", default=None,
+        help="Optional revocation-registry JSON overriding the document's "
+             "revoked markers (an empty registry affirmatively states none)",
+    )
+    pbh.add_argument(
+        "--anchor", default=None,
+        help="Optional RFC 3161 time-anchor JSON over sha256(jcs(record))",
+    )
+    pbh.add_argument(
+        "--producer", default=None,
+        help="Producer DID (defaults to the record issuer; must equal it)",
+    )
+    pbh.add_argument(
+        "--holder", default=None,
+        help="Holder DID, the deployer relaying the evidence (informational)",
+    )
+    pbh.add_argument(
+        "--cover", default=None,
+        help="Optional plain-language cover JSON (system, action, period, "
+             "provider, deployer, the obligation served); carried pinned, "
+             "Vaara asserts no legal conclusion about it",
+    )
+    pbh.add_argument(
+        "--out", default=None,
+        help="Write the package to this file instead of stdout",
+    )
+    pbh.set_defaults(func=_cmd_build_handoff)
 
     pnz = sub.add_parser(
         "normalize",
