@@ -67,22 +67,25 @@ def verify_decision_back_link(
     return BackLinkResult(ok=True)
 
 
-# The named projection version that a no-SEP-2787 fallback digest commits
-# to. It is carried in the envelope's binding block and reconstructed by the
-# verifier, so a future projection rule is a new version, not a silent change.
+# The named projection version a no-SEP-2787 fallback digest commits to. The
+# signed record names which version it used (backLink.fallbackProjection), so a
+# verifier reconstructs the same projection deterministically and a future
+# projection rule is an explicit new version, not a silent reinterpretation.
 FALLBACK_PROJECTION_V1 = "sep2828-fallback/1"
+_SUPPORTED_FALLBACK_PROJECTIONS = frozenset({FALLBACK_PROJECTION_V1})
 
 # The named binding block under ``_meta`` whose contents are authoritative for
-# the fallback digest. Everything else under ``_meta`` is excluded.
+# the fallback digest. The preimage is exactly the bound call params plus this
+# block (an allowlist); everything else under ``_meta`` is excluded by
+# construction, so the rule cannot drift as new _meta fields appear.
 _AUTHORIZATION_BINDING = "authorization_binding"
 
 
 class MalformedFallbackBindingError(ValueError):
-    """A no-SEP-2787 request envelope has no reconstructable fallback
-    projection: the named ``_meta.authorization_binding`` block is absent,
-    not an object, missing its ``nonce``, or carries an unsupported
-    ``projectionVersion``, or the ``tools/call`` ``name``/``arguments`` are
-    missing.
+    """A no-SEP-2787 fallback projection cannot be reconstructed: an
+    unsupported projection version, or a request envelope whose named
+    ``_meta.authorization_binding`` block is absent, not an object, or missing
+    its ``nonce``, or whose ``tools/call`` ``name``/``arguments`` are missing.
 
     Per SEP-2828 the fallback case is then not conformant. Verifiers fail
     closed on this rather than widening the preimage to the whole ``_meta``,
@@ -90,23 +93,35 @@ class MalformedFallbackBindingError(ValueError):
     """
 
 
-def fallback_projection(request_envelope: Mapping[str, Any]) -> dict[str, Any]:
+def fallback_projection(
+    request_envelope: Mapping[str, Any],
+    *,
+    version: str = FALLBACK_PROJECTION_V1,
+) -> dict[str, Any]:
     """The named, versioned projection a no-SEP-2787 fallback digest commits to.
 
-    Reconstructs a fixed object from only the fields that bind a decision to
-    its originating ``tools/call``:
+    The preimage is an allowlist: it contains exactly the fields that bind a
+    decision to its originating ``tools/call`` and nothing else.
 
     - ``name`` and ``arguments`` (the canonical call params);
     - the named ``_meta.authorization_binding`` block (the server's per-call
-      binding ``nonce`` and ``projectionVersion``).
+      binding ``nonce``).
 
-    Everything else under ``_meta`` is observation-local or transport-local
-    (progress tokens, trace context, UI hints, unrelated SEP blocks, fields a
-    gateway can legitimately add or strip) and is excluded, so a gateway view
-    and a provider view of the same call project to the same bytes. Raises
-    ``MalformedFallbackBindingError`` if the binding block is absent or
-    malformed: the fallback never silently widens to the whole ``_meta``.
+    Every other ``_meta`` field is excluded by construction (it is never read
+    into the projection), so a gateway view and a provider view of the same
+    call, differing only in observation-local ``_meta`` such as progress
+    tokens, trace context, UI hints, or unrelated SEP blocks, project to the
+    same bytes. The ``version`` is supplied by the caller, not inferred from the
+    observed envelope: a verifier passes the version named on the signed record
+    (``backLink.fallbackProjection``); an emitter passes the version it binds
+    under. Raises ``MalformedFallbackBindingError`` on an unsupported version or
+    an absent or malformed binding block, so the fallback never silently widens
+    to the whole ``_meta``.
     """
+    if version not in _SUPPORTED_FALLBACK_PROJECTIONS:
+        raise MalformedFallbackBindingError(
+            f"unsupported fallback projection version: {version!r}"
+        )
     meta = request_envelope.get("_meta")
     if not isinstance(meta, Mapping):
         raise MalformedFallbackBindingError(
@@ -116,11 +131,6 @@ def fallback_projection(request_envelope: Mapping[str, Any]) -> dict[str, Any]:
     if not isinstance(binding, Mapping):
         raise MalformedFallbackBindingError(
             f"_meta.{_AUTHORIZATION_BINDING} is absent or not an object"
-        )
-    if binding.get("projectionVersion") != FALLBACK_PROJECTION_V1:
-        raise MalformedFallbackBindingError(
-            "unsupported fallback projectionVersion: "
-            f"{binding.get('projectionVersion')!r}"
         )
     nonce = binding.get("nonce")
     if not isinstance(nonce, str) or not nonce:
@@ -132,16 +142,20 @@ def fallback_projection(request_envelope: Mapping[str, Any]) -> dict[str, Any]:
             "request envelope is missing tools/call name or arguments"
         )
     return {
-        "projection": FALLBACK_PROJECTION_V1,
+        "projection": version,
         "name": request_envelope["name"],
         "arguments": request_envelope["arguments"],
         "authorizationBinding": dict(binding),
     }
 
 
-def request_envelope_digest(request_envelope: Mapping[str, Any]) -> str:
+def request_envelope_digest(
+    request_envelope: Mapping[str, Any],
+    *,
+    version: str = FALLBACK_PROJECTION_V1,
+) -> str:
     """``sha256:<hex>`` over the JCS canonicalization of the named fallback
-    projection of a request envelope (see ``fallback_projection``).
+    projection of a request envelope at ``version`` (see ``fallback_projection``).
 
     This is the no-SEP-2787 fallback preimage: when a deployment does not run
     2787, the decision back-link binds the request instance by this digest
@@ -150,10 +164,9 @@ def request_envelope_digest(request_envelope: Mapping[str, Any]) -> str:
     so a re-presented envelope whose arguments or binding block differ
     recomputes to a different digest and does not bind, while transport-local
     ``_meta`` a gateway adds or strips does not change it. Raises
-    ``MalformedFallbackBindingError`` if the binding block cannot be
-    reconstructed.
+    ``MalformedFallbackBindingError`` if the projection cannot be reconstructed.
     """
-    wire = canonical_json(fallback_projection(request_envelope))
+    wire = canonical_json(fallback_projection(request_envelope, version=version))
     return f"sha256:{hashlib.sha256(wire).hexdigest()}"
 
 
@@ -165,17 +178,26 @@ def verify_decision_fallback_binding(
     """Confirm a decision record's back-link pins ``request_envelope`` under
     the no-SEP-2787 fallback projection.
 
-    The no-SEP-2787 counterpart to ``verify_decision_back_link``: recomputes
-    the digest over the named projection (bound call params plus the
-    ``_meta.authorization_binding`` block) and compares it, constant-time, to
-    the record's ``backLink.attestationDigest``; then confirms the back-link's
+    The no-SEP-2787 counterpart to ``verify_decision_back_link``. The
+    projection version is taken from the signed record's
+    ``backLink.fallbackProjection``, so reconstruction is deterministic from
+    trusted data rather than inferred from the observed envelope. Recomputes the
+    digest over the named projection at that version (bound call params plus the
+    ``_meta.authorization_binding`` block), compares it constant-time to the
+    record's ``backLink.attestationDigest``, then confirms the back-link's
     ``attestationNonce`` echoes the binding block's ``nonce``, mirroring the
-    attestation path's nonce echo. A malformed or absent binding block fails
+    attestation path's nonce echo. A record naming no fallback projection or an
+    unsupported one, or an envelope with no reconstructable binding block, fails
     closed (``ok=False``, ``fallback_binding_malformed``), never widening the
     preimage to the whole ``_meta``.
     """
+    version = record.back_link.fallback_projection
+    if version is None:
+        return BackLinkResult(ok=False, reason=FALLBACK_BINDING_MALFORMED)
     try:
-        expected_digest = request_envelope_digest(request_envelope)
+        expected_digest = request_envelope_digest(
+            request_envelope, version=version
+        )
     except MalformedFallbackBindingError:
         return BackLinkResult(ok=False, reason=FALLBACK_BINDING_MALFORMED)
     if not hmac.compare_digest(
