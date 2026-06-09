@@ -183,6 +183,17 @@ vaara verify-handoff handoff.json --trusted-did-document provider-keys.json --st
 
 It recomputes every pinned digest, routes the record through the same rotated-key lens, and confirms an enclosed anchor's imprint is `sha256` of the record itself, so an anchor taken over a different record never corroborates this one. The verdict is honest about where trust comes from: the digests prove only that the package is internally consistent, since the holder controls both the pieces and the manifest that pins them. The record's authenticity rests on the provider's signature against the provider's identity, which you establish out of band; `--trusted-did-document` pins it against a key set you already trust, and until you do, the verdict says `producer_identity_basis: self_asserted_unpinned`. The eIDAS anchor is the one piece the holder cannot forge. `--strict` passes only a corroborated record with a recorded window, an affirmative revocation source, and a pinned identity. An optional holder custody signature is reported separately and never changes the record verdict. A Vaara-free checker in `tests/vectors/cross_org_handoff_v0/` reproduces every verdict.
 
+### Verify a record was produced inside a confidential VM
+
+The records prove who signed, when, and what. They do not show *where* the enforcement ran. If the enforcement point runs inside an AMD SEV-SNP confidential VM, it can ask the chip for an attestation report carrying `sha512` of the record it just signed. `verify-enforcement` checks that report binds to that exact record:
+
+```bash
+vaara verify-enforcement record.json --report report.bin --vcek vcek.pem \
+  --expected-measurement <hex-of-the-vetted-image>
+```
+
+A pass means a SEV-SNP report carrying `sha512(jcs(record))` verifies against the VCEK you supplied, so this record's bytes were hashed inside some SEV-SNP confidential VM whose VCEK you chose to trust. The verdict is blunt about the rest. It does not validate the VCEK chain to AMD's ARK (that fetch is deferred), so a mock report with no AMD provenance passes the same check, and `vcek_chain_basis` stays `caller_supplied_unverified`. It does not prove the decision logic ran in the enclave, so `enforcement_logic_basis` is always `not_established`. Pinning the launch measurement with `--expected-measurement` tells you which image ran and lifts the tier to `measurement_pinned`; without it the measurement is reported but unpinned. The binding is over the whole record including its signature, so a report for one record never verifies another, and a signature-stripped variant never rides a genuine report. The word `attested`, and a `--strict` pass, are reserved for a future release that validates the AMD chain; v0 publishes that bar without pretending to clear it. A Vaara-free checker in `tests/vectors/enforcement_attestation_v0/` reproduces every verdict.
+
 ## Benchmarks
 
 Held-out test recall **84.7%** (95% Wilson [82.4, 86.7]) at a **4.1%** false-positive rate, and **1.2%** FPR on benign tool calls under live injection pressure. The hot-path rule scorer adds 140 µs mean / 210 µs p99 per call on commodity CPU. Every figure is reproducible end-to-end via `make bench`.
