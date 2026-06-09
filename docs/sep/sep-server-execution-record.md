@@ -176,7 +176,7 @@ following top-level fields.
 | ------------------ | ------ | -------- | ------------------------------------------------------------------------------------ |
 | `attestationDigest`| string | yes      | `sha256:<hex>` over the JCS-canonical full SEP-2787 attestation wire bytes, signature included. Pins the exact attestation instance. In the no-2787 fallback (below) it is over the named request-envelope projection instead. |
 | `attestationNonce` | string | yes      | Echoes the attestation's `issuerAsserted.nonce` for fast correlation. In the fallback it echoes `_meta.authorization_binding.nonce`. |
-| `fallbackProjection`| string | no       | Present only in the no-2787 fallback: names the projection version `attestationDigest` was computed under (this release: `sep2828-fallback/1`). Absent on the attestation path. |
+| `fallbackProjection`| string | no       | Present only in the no-2787 fallback: names the projection version `attestationDigest` was computed under (this release: `tools_call_params_plus_meta_authorization_binding_v1`). Absent on the attestation path. |
 
 If no SEP-2787 attestation exists for the call (the deployment does not run
 2787), the server MUST instead bind the request by setting `attestationDigest` to

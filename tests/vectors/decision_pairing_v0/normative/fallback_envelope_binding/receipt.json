@@ -1,13 +1,13 @@
 {
   "alg": "HS256",
   "backLink": {
-    "attestationDigest": "sha256:ad365b402e0bd577841ba1a4e2f2f8dae53654e8c21695f5be9632e1d36bc32a",
+    "attestationDigest": "sha256:aeac6a08f83dafe8569a1a195e2874b863a7e3c7d751b6c368dbc3850fd549bb",
     "attestationNonce": "server-chosen-nonce-001",
-    "fallbackProjection": "sep2828-fallback/1"
+    "fallbackProjection": "tools_call_params_plus_meta_authorization_binding_v1"
   },
   "outcomeDerived": {
     "completedAt": "2026-06-01T10:00:00Z",
-    "decisionDigest": "sha256:419f6be096517e0f09b94a254a75669a8b57179e1aa13623c580cbe42c18d118",
+    "decisionDigest": "sha256:784e88f46a0c7aa47cf32ab596e8c5d983e9d39436e2cf33183997489f3d3599",
     "resultCommitment": {
       "projection": "{\"digest\":\"sha256:8b7262647fbf76fb7ae30d664e65069eaffc35aa793718beaee239309c9055cf\"}",
       "projectionDigest": "sha256:ca6005c73a4e80aacec2d23cfa734c18d5c8c303cf2f54e63d7693df474b422b"
@@ -22,6 +22,6 @@
     "secretVersion": "v1",
     "sub": "agent:reader"
   },
-  "signature": "0d5e4c513eaa30e379b5b937ebc5ee06e65a846b111a472d7c4dc594b4d637be",
+  "signature": "e49c336ad1a14b48ff37a529ae87b301811f1a0b2245a58c15a30806e3f0c315",
   "version": 1
 }
