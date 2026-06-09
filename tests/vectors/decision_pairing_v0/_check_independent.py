@@ -80,17 +80,58 @@ def verify_back_link(record: dict, attestation: dict) -> bool:
     return bl["attestationNonce"] == attestation["issuerAsserted"]["nonce"]
 
 
+FALLBACK_PROJECTION_V1 = "sep2828-fallback/1"
+
+
+def fallback_projection(envelope: dict):
+    """Reconstruct the named, versioned no-SEP-2787 projection from a request
+    envelope, or None if it cannot be reconstructed. The preimage is only the
+    tools/call name+arguments plus the named _meta.authorization_binding block;
+    every other _meta field (trace context, progress tokens, UI hints, fields a
+    gateway adds or strips) is excluded, so a gateway and a provider view of the
+    same call project to identical bytes."""
+    meta = envelope.get("_meta")
+    if not isinstance(meta, dict):
+        return None
+    binding = meta.get("authorization_binding")
+    if not isinstance(binding, dict):
+        return None
+    if binding.get("projectionVersion") != FALLBACK_PROJECTION_V1:
+        return None
+    nonce = binding.get("nonce")
+    if not isinstance(nonce, str) or not nonce:
+        return None
+    if "name" not in envelope or "arguments" not in envelope:
+        return None
+    return {
+        "projection": FALLBACK_PROJECTION_V1,
+        "name": envelope["name"],
+        "arguments": envelope["arguments"],
+        "authorizationBinding": dict(binding),
+    }
+
+
+def fallback_digest(envelope: dict):
+    """The no-2787 fallback digest over the named projection, or None if the
+    binding block cannot be reconstructed."""
+    proj = fallback_projection(envelope)
+    return None if proj is None else _sha256_hex(_jcs(proj))
+
+
 def verify_fallback_binding(record: dict, envelope: dict) -> bool:
-    """No-SEP-2787 path: the back-link digest is over the JCS-canonical
-    request envelope (the tools/call params plus _meta) the server observed.
-    Recompute it from the committed envelope rather than trusting the stored
-    digest, and confirm the server nonce recorded under _meta matches."""
+    """No-SEP-2787 path: the back-link digest is over the named, versioned
+    projection of the request envelope, not the whole _meta. Recompute it from
+    the committed envelope rather than trusting the stored digest, confirm the
+    back-link nonce echoes the binding block nonce, and fail closed when the
+    binding block is absent or malformed."""
+    proj = fallback_projection(envelope)
+    if proj is None:
+        return False
     bl = record["backLink"]
-    expected = _sha256_hex(_jcs(envelope))
-    if not hmac.compare_digest(bl["attestationDigest"], expected):
+    if not hmac.compare_digest(bl["attestationDigest"], _sha256_hex(_jcs(proj))):
         return False
     return bl["attestationNonce"] == envelope["_meta"][
-        "io.modelcontextprotocol/serverNonce"]
+        "authorization_binding"]["nonce"]
 
 
 def decision_digest(decision: dict) -> str:
@@ -177,6 +218,19 @@ def _verdicts(case: Path, expected: dict) -> dict:
         elif key == "replayed_binding_ok":
             got[key] = verify_fallback_binding(
                 dec, _load(case, "request_envelope_replayed.json"))
+        elif key == "gateway_view_binding_ok":
+            got[key] = verify_fallback_binding(
+                dec, _load(case, "request_envelope_gateway_view.json"))
+        elif key == "gateway_view_matches_provider_digest":
+            got[key] = (
+                fallback_digest(_load(case, "request_envelope_gateway_view.json"))
+                == fallback_digest(_load(case, "request_envelope.json")))
+        elif key == "tampered_binding_ok":
+            got[key] = verify_fallback_binding(
+                dec, _load(case, "request_envelope_tampered_binding.json"))
+        elif key == "malformed_binding_fails_closed":
+            got[key] = verify_fallback_binding(
+                dec, _load(case, "request_envelope_no_binding.json")) is False
         else:
             raise ValueError(f"unknown expected key: {key!r}")
     return got

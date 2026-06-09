@@ -1,7 +1,7 @@
 {
   "_meta": {
     "authorization_binding": {
-      "nonce": "server-chosen-nonce-001",
+      "nonce": "attacker-swapped-nonce-999",
       "projectionVersion": "sep2828-fallback/1"
     },
     "io.modelcontextprotocol/serverTraceId": "trace-provider-7f3a"

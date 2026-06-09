@@ -4,7 +4,8 @@
       "nonce": "server-chosen-nonce-001",
       "projectionVersion": "sep2828-fallback/1"
     },
-    "io.modelcontextprotocol/serverTraceId": "trace-provider-7f3a"
+    "io.modelcontextprotocol/progressToken": "p-7",
+    "io.modelcontextprotocol/uiHint": "table-preview"
   },
   "arguments": {
     "limit": 10,
