@@ -1,0 +1,43 @@
+{
+  "sets": {
+    "all_bound": {
+      "cases": [
+        "clean_bound",
+        "pinned_measurement_match"
+      ],
+      "expected_measurement": "0102030405060708090a0b0c0d0e0f101112131415161718191a1b1c1d1e1f202122232425262728292a2b2c2d2e2f30",
+      "strict": false
+    },
+    "all_unverified": {
+      "cases": [
+        "truncated_report",
+        "wrong_signature_algo"
+      ],
+      "expected_measurement": null,
+      "strict": false
+    },
+    "mixed_failure": {
+      "cases": [
+        "clean_bound",
+        "bad_signature",
+        "bound_to_different_record"
+      ],
+      "expected_measurement": null,
+      "strict": false
+    },
+    "strict_unreachable": {
+      "cases": [
+        "pinned_measurement_match"
+      ],
+      "expected_measurement": "0102030405060708090a0b0c0d0e0f101112131415161718191a1b1c1d1e1f202122232425262728292a2b2c2d2e2f30",
+      "strict": true
+    },
+    "unpinned_only": {
+      "cases": [
+        "clean_bound"
+      ],
+      "expected_measurement": null,
+      "strict": false
+    }
+  }
+}

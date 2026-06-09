@@ -6,6 +6,23 @@ and this project follows [Semantic Versioning](https://semver.org/spec/v2.0.0.ht
 
 ## [Unreleased]
 
+### Added
+- `vaara verify-handoffs` and `vaara verify-enforcements`: the set-level forms of
+  `verify-handoff` and `verify-enforcement`, for an auditor holding a directory
+  of evidence rather than one file. `verify-handoffs` runs the handoff lens over
+  every package and rolls up how many records verify under their rotated-out
+  keys, how many are anchor-corroborated rather than resting on the signature
+  alone, and how many had their producer identity pinned. `verify-enforcements`
+  binds a directory of records to their SEV-SNP reports, discovering each triple
+  by stem (`NAME.record.json` with `NAME.report.bin` and `NAME.vcek.pem`), and
+  rolls up how many bind to a confidential VM, the per-tier tally, and whether
+  any pinned a vetted launch image. Each set is `ok` only when every item
+  verifies for the chosen mode; a coverage note (no producer pinned, no image
+  pinned) is advisory and does not gate, mirroring `verify-bundles`. New
+  `check_handoff_set` / `check_enforcement_set` with `handoff_set_v0` and
+  `enforcement_set_v0` conformance vectors, each with a Vaara-free checker that
+  reproduces the roll-up by composing the single-verb suite's own evaluator.
+
 ## [0.66.0] - 2026-06-09
 
 ### Added

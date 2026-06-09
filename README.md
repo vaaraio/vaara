@@ -142,14 +142,20 @@ It needs no signing key and no attestation. The check is the wire schema plus th
 When the evidence is a folder of records or bundles rather than one file, each single-file command above has a set-level form that runs over a whole directory:
 
 ```bash
-vaara verify-records ./records
-vaara verify-bundles ./bundles
-vaara audit-summary  ./records --out summary.md
+vaara verify-records      ./records
+vaara verify-bundles      ./bundles
+vaara verify-handoffs     ./handoffs
+vaara verify-enforcements ./enforced
+vaara audit-summary       ./records --out summary.md
 ```
 
 - `verify-records` checks every record for SEP-2828 conformance, then checks the set as a whole: it flags a call recorded twice, an authorised decision with no matching outcome, and an executed action that committed no result. Keyless, like `verify-record`.
 - `verify-bundles` runs the full six-lens `verify-bundle` over every bundle and reports per-lens pass counts and how many bundles authenticated.
+- `verify-handoffs` runs `verify-handoff` over a directory of cross-org packages and reports how many records verify under their rotated-out keys, how many are anchor-corroborated rather than resting on the signature alone, and how many had their producer pinned.
+- `verify-enforcements` runs `verify-enforcement` over a directory of records and their SEV-SNP reports (discovered by stem: `NAME.record.json` with `NAME.report.bin` and `NAME.vcek.pem`), reporting how many bind to a confidential VM, the per-tier tally, and whether any pinned a vetted launch image.
 - `audit-summary` renders the conformance verdict for a directory of records as a Markdown page an auditor reads directly. The page states what was checked and every count, and records that any party can reproduce it from the records alone.
+
+Each set form is `ok` only when every item verifies for the chosen mode; a coverage note (no producer pinned, no image pinned) is advisory and does not gate. Vaara-free checkers in `tests/vectors/handoff_set_v0/` and `tests/vectors/enforcement_set_v0/` reproduce every roll-up.
 
 ### Prove conformance
 

@@ -1,0 +1,77 @@
+{
+  "all_bound": {
+    "bound": 2,
+    "loaded": 2,
+    "measurementPinned": 2,
+    "ok": true,
+    "passed": 2,
+    "pinningGap": false,
+    "strict": false,
+    "tierCounts": {
+      "bound": 0,
+      "measurement_pinned": 2,
+      "unverified": 0
+    },
+    "total": 2
+  },
+  "all_unverified": {
+    "bound": 1,
+    "loaded": 2,
+    "measurementPinned": 0,
+    "ok": false,
+    "passed": 0,
+    "pinningGap": true,
+    "strict": false,
+    "tierCounts": {
+      "bound": 0,
+      "measurement_pinned": 0,
+      "unverified": 2
+    },
+    "total": 2
+  },
+  "mixed_failure": {
+    "bound": 2,
+    "loaded": 3,
+    "measurementPinned": 0,
+    "ok": false,
+    "passed": 1,
+    "pinningGap": true,
+    "strict": false,
+    "tierCounts": {
+      "bound": 1,
+      "measurement_pinned": 0,
+      "unverified": 2
+    },
+    "total": 3
+  },
+  "strict_unreachable": {
+    "bound": 1,
+    "loaded": 1,
+    "measurementPinned": 1,
+    "ok": false,
+    "passed": 0,
+    "pinningGap": false,
+    "strict": true,
+    "tierCounts": {
+      "bound": 0,
+      "measurement_pinned": 1,
+      "unverified": 0
+    },
+    "total": 1
+  },
+  "unpinned_only": {
+    "bound": 1,
+    "loaded": 1,
+    "measurementPinned": 0,
+    "ok": true,
+    "passed": 1,
+    "pinningGap": true,
+    "strict": false,
+    "tierCounts": {
+      "bound": 1,
+      "measurement_pinned": 0,
+      "unverified": 0
+    },
+    "total": 1
+  }
+}
