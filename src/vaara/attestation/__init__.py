@@ -100,10 +100,12 @@ from vaara.attestation.sep2787 import (
     verify_attestation as sep2787_verify_attestation,
 )
 from vaara.attestation.receipt import (
+    ENFORCEMENT_SCHEMA,
     BackLink,
     BackLinkResult,
     BundleVerdict,
     ComponentDigest,
+    EnforcementVerdict,
     EvidenceBundle,
     ExecutionReceipt,
     HandoffVerdict,
@@ -115,6 +117,7 @@ from vaara.attestation.receipt import (
     RevocationRegistry,
     RevocationStatus,
     attestation_digest,
+    bind_record_to_report_data,
     build_bundle_document,
     build_handoff,
     check_receipt_revocation,
@@ -127,6 +130,7 @@ from vaara.attestation.receipt import (
     parse_receipt,
     sign_manifest,
     verify_back_link,
+    verify_enforcement,
     verify_evidence_bundle,
     verify_handoff,
     verify_logged_receipt,
@@ -134,6 +138,7 @@ from vaara.attestation.receipt import (
 )
 
 __all__ = [
+    "ENFORCEMENT_SCHEMA",
     "ArgsProjection",
     "ArgsRef",
     "BackLink",
@@ -141,6 +146,7 @@ __all__ = [
     "BaseEnvelope",
     "BundleVerdict",
     "ComponentDigest",
+    "EnforcementVerdict",
     "ConformalExtension",
     "ConsistencyProof",
     "EnvelopeError",
@@ -177,6 +183,7 @@ __all__ = [
     "TransparencyLogError",
     "attestation_digest",
     "bind_overt_envelope_to_report_data",
+    "bind_record_to_report_data",
     "build_bundle_document",
     "build_handoff",
     "canonical_cbor",
@@ -206,6 +213,7 @@ __all__ = [
     "verify_back_link",
     "verify_base_envelope",
     "verify_consistency",
+    "verify_enforcement",
     "verify_envelope_binding",
     "verify_evidence_bundle",
     "verify_handoff",

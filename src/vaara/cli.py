@@ -125,6 +125,17 @@ Subcommands:
         cannot be a later forgery under a stolen retired key. Exit 0 iff the
         record is verifiable.
 
+    vaara verify-enforcement RECORD.json --report REPORT.bin --vcek VCEK.pem
+            [--expected-measurement HEX] [--strict] [--json]
+        Check whether a SEV-SNP attestation report binds a signed record to a
+        confidential VM whose VCEK you supply: REPORT_DATA must carry
+        sha512(jcs(record)) and the report signature must verify against the
+        VCEK, with an optional pinned launch measurement. It does not validate
+        the VCEK chain to AMD's ARK (the KDS chain is deferred) or prove the
+        decision logic ran in the enclave, so it does not by itself establish
+        genuine AMD hardware. Requires the attestation extra. Exit 0 iff the
+        report binds and any pinned measurement matched.
+
     vaara normalize RECORD.json [--format auto|sep2643|sep2787|sep2817] [--json]
         Map an adjacent MCP record onto the SEP-2828 evidence model. Reads a
         SEP-2643 denial, a SEP-2787 attestation, or a SEP-2817 invocation
@@ -2072,6 +2083,106 @@ def _print_handoff_report(v: Any) -> None:
     print(f"  {_safe_inline(v.reason)}")
 
 
+def _cmd_verify_enforcement(args: argparse.Namespace) -> int:
+    """Verify a SEV-SNP attestation report binds a SEP-2828 record to a CVM.
+
+    Reads the record, the binary SEV-SNP report, and the VCEK PEM, and prints one
+    verdict. The verdict is honest about its limits: a pass proves a report
+    carrying sha512(jcs(record)) verifies against the VCEK you supplied, not that
+    the VCEK is genuine AMD silicon (the KDS chain is not validated) or that the
+    decision logic ran in the enclave. Pass --expected-measurement to pin which
+    image ran. Exit 0 iff ``ok``.
+    """
+    try:
+        # Probe the extra eagerly: canonicalisation and the ECDSA check both
+        # import lazily, so a bare receipt import succeeds without the extra and
+        # would surface a missing dependency as a confusing record error.
+        import rfc8785  # noqa: F401
+        from cryptography.hazmat.primitives.asymmetric import ec  # noqa: F401
+
+        from vaara.attestation.receipt import verify_enforcement
+        from vaara.attestation.tee import TEEAttestationError
+    except ImportError:
+        print(_ATTESTATION_HINT, file=sys.stderr)
+        return 2
+
+    try:
+        record = _load_json_file(args.record, "record")
+    except ValueError as exc:
+        print(f"vaara verify-enforcement: {exc}", file=sys.stderr)
+        return 1
+
+    report_path = Path(args.report).expanduser()
+    if not report_path.is_file():
+        print(f"vaara verify-enforcement: report not a file: {report_path}",
+              file=sys.stderr)
+        return 1
+    vcek_path = Path(args.vcek).expanduser()
+    if not vcek_path.is_file():
+        print(f"vaara verify-enforcement: VCEK PEM not a file: {vcek_path}",
+              file=sys.stderr)
+        return 1
+
+    expected = args.expected_measurement
+    if expected is not None:
+        try:
+            raw = bytes.fromhex(expected.strip())
+        except ValueError:
+            print("vaara verify-enforcement: --expected-measurement is not valid hex",
+                  file=sys.stderr)
+            return 1
+        if len(raw) != 48:
+            print("vaara verify-enforcement: --expected-measurement must be 48 "
+                  "bytes (96 hex chars, an SHA-384 launch measurement)",
+                  file=sys.stderr)
+            return 1
+
+    try:
+        report_bytes = report_path.read_bytes()
+        vcek_pem = vcek_path.read_bytes()
+    except OSError as exc:
+        print(f"vaara verify-enforcement: cannot read input: {exc}",
+              file=sys.stderr)
+        return 1
+
+    try:
+        verdict = verify_enforcement(
+            record, report_bytes, vcek_pem,
+            expected_measurement=expected, strict=args.strict,
+        )
+    except (TEEAttestationError, ValueError, KeyError, TypeError) as exc:
+        print(f"vaara verify-enforcement: {exc}", file=sys.stderr)
+        return 1
+
+    if args.json:
+        print(json.dumps(verdict.to_dict(), indent=2))
+    else:
+        _print_enforcement_report(verdict)
+
+    return 0 if verdict.ok else 1
+
+
+def _print_enforcement_report(v: Any) -> None:
+    # measurement, report_data and report_context come from a report the caller
+    # supplied and Vaara did not produce; escape control characters so a crafted
+    # value cannot forge extra lines in the human report.
+    print(f"verdict: {'OK' if v.ok else 'FAILED'}  tier={v.tier}"
+          + ("  [strict]" if v.strict else ""))
+    version = f"  (version {v.report_version})" if v.report_version is not None else ""
+    print(f"  parsed:            {v.parsed}{version}")
+    print(f"  signature:         algo_ok={v.signature_algo_ok} "
+          f"valid={v.signature_valid}  [{v.vcek_chain_basis}]")
+    print(f"  record binding:    bound={v.bound}")
+    meas = _safe_inline(v.measurement) if v.measurement else "(none)"
+    print(f"  measurement:       {meas}  [{v.measurement_basis}]")
+    print(f"  enforcement logic: {v.enforcement_logic_basis}")
+    ctx = v.report_context
+    if ctx:
+        print(f"  report context:    vmpl={ctx.get('vmpl')} policy={ctx.get('policy')} "
+              f"guest_svn={ctx.get('guest_svn')} reported_tcb={ctx.get('reported_tcb')}")
+    print(f"  {_safe_inline(v.reason)}")
+
+
 def _cmd_build_handoff(args: argparse.Namespace) -> int:
     """Assemble a cross-org handoff package from the producer's pieces.
 
@@ -3403,6 +3514,48 @@ def build_parser() -> argparse.ArgumentParser:
         help="Emit the full handoff verdict as JSON",
     )
     pvh.set_defaults(func=_cmd_verify_handoff)
+
+    pve = sub.add_parser(
+        "verify-enforcement",
+        help="Check whether a SEV-SNP attestation report binds a signed SEP-2828 "
+             "record to a confidential VM whose VCEK you supply: the report's "
+             "REPORT_DATA must carry sha512(jcs(record)) and its signature must "
+             "verify against the VCEK, with an optional pinned launch "
+             "measurement. It does not validate the VCEK chain to AMD's ARK (KDS "
+             "deferred) or prove the decision logic ran in the enclave, so it "
+             "does not by itself establish genuine AMD hardware. Requires the "
+             "attestation extra.",
+    )
+    pve.add_argument(
+        "record",
+        help="Path to the SEP-2828 execution record (JSON) the report binds to",
+    )
+    pve.add_argument(
+        "--report", required=True,
+        help="Path to the binary AMD SEV-SNP attestation report (1184 bytes)",
+    )
+    pve.add_argument(
+        "--vcek", required=True,
+        help="Path to the PEM-encoded VCEK to check the report signature "
+             "against. Trusted as supplied; its AMD KDS chain is not validated "
+             "in v0.",
+    )
+    pve.add_argument(
+        "--expected-measurement", default=None, dest="expected_measurement",
+        help="Pin the report's launch measurement (96 hex chars / 48 bytes) "
+             "against an independently vetted value; a mismatch fails the check",
+    )
+    pve.add_argument(
+        "--strict", action="store_true",
+        help="Regulator-grade: pass only at the chain-rooted attested tier "
+             "(validated VCEK chain plus a pinned measurement), which v0 cannot "
+             "yet reach, so a strict pass is honestly unavailable",
+    )
+    pve.add_argument(
+        "--json", action="store_true",
+        help="Emit the full enforcement verdict as JSON",
+    )
+    pve.set_defaults(func=_cmd_verify_enforcement)
 
     pbh = sub.add_parser(
         "build-handoff",

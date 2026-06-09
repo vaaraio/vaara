@@ -6,6 +6,27 @@ and this project follows [Semantic Versioning](https://semver.org/spec/v2.0.0.ht
 
 ## [Unreleased]
 
+### Added
+- `vaara verify-enforcement`: verify that a signed SEP-2828 execution record was
+  emitted by an enforcement point running in an AMD SEV-SNP confidential VM. The
+  enforcement point, inside the VM, requests a hardware attestation report whose
+  64-byte `REPORT_DATA` carries `sha512(jcs(record))`; the verifier checks the
+  report parses, its ECDSA-P384 signature verifies against a supplied VCEK, and
+  `REPORT_DATA` binds to this exact record. The binding is over the full record
+  including its signature, so a report for one record never verifies another and
+  a signature-stripped variant never rides a genuine report. The verdict is
+  honest about its limits: it does not validate the VCEK chain to AMD's ARK (the
+  KDS fetch is deferred), so `vcek_chain_basis` stays `caller_supplied_unverified`
+  and a report with no AMD provenance passes the same check; it does not prove
+  the decision logic ran in the enclave (`enforcement_logic_basis` is always
+  `not_established`). Tiers are `unverified`, `bound`, and `measurement_pinned`
+  (with `--expected-measurement` pinning the launch image); `attested` and a
+  `--strict` pass are reserved for the chain-rooted future tier and are
+  unreachable in v0. New `verify_enforcement` / `bind_record_to_report_data` /
+  `EnforcementVerdict` reusing the SEV-SNP primitives in
+  `vaara.attestation.tee`, `enforcement_attestation_v0` conformance vectors with
+  a Vaara-free checker, and `docs/design/enforcement-attestation-spec.md`.
+
 ## [0.65.0] - 2026-06-09
 
 ### Added
