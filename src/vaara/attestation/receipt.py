@@ -77,12 +77,24 @@ from vaara.attestation._enforcement import (
     bind_record_to_report_data,
     verify_enforcement,
 )
+from vaara.attestation._enforcement_set import (
+    ENFORCEMENT_SET_SCHEMA_NAME,
+    EnforcementSetEntry,
+    EnforcementSetReport,
+    check_enforcement_set,
+)
 from vaara.attestation._handoff import (
     ComponentDigest,
     HandoffVerdict,
     build_handoff,
     sign_manifest,
     verify_handoff,
+)
+from vaara.attestation._handoff_set import (
+    HANDOFF_SET_SCHEMA_NAME,
+    HandoffSetEntry,
+    HandoffSetReport,
+    check_handoff_set,
 )
 from vaara.attestation._key_history import (
     KeyHistory,
@@ -178,10 +190,18 @@ __all__ = [
     "EnforcementVerdict",
     "bind_record_to_report_data",
     "verify_enforcement",
+    "ENFORCEMENT_SET_SCHEMA_NAME",
+    "EnforcementSetEntry",
+    "EnforcementSetReport",
+    "check_enforcement_set",
     "HandoffVerdict",
     "build_handoff",
     "sign_manifest",
     "verify_handoff",
+    "HANDOFF_SET_SCHEMA_NAME",
+    "HandoffSetEntry",
+    "HandoffSetReport",
+    "check_handoff_set",
     "check_record_conformance",
     "check_decision_conformance",
     "RecordSetEntry",

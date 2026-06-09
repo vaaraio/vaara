@@ -151,6 +151,24 @@ Subcommands:
         call recorded twice, an executed action that committed no result).
         Keyless. Exit 0 iff every record conforms and no required gap fired.
 
+    vaara verify-handoffs DIR [--glob '*.json'] [--trusted-did-document DOC.json]
+            [--strict] [--no-anchor] [--json]
+        Verify a whole directory of cross-org handoff packages at once: the
+        batch twin of verify-handoff. Reports how many records verify offline
+        under their rotated-out keys, how many are anchor-corroborated rather
+        than resting on the signature alone, and how many had their producer
+        identity pinned. Requires the attestation extra. Exit 0 iff every
+        package verifies for the chosen mode.
+
+    vaara verify-enforcements DIR [--glob '*.record.json']
+            [--expected-measurement HEX] [--strict] [--json]
+        Bind a whole directory of (record, report, VCEK) triples at once: the
+        batch twin of verify-enforcement. Triples are discovered by stem
+        (NAME.record.json with NAME.report.bin and NAME.vcek.pem). Reports how
+        many bind to a confidential VM, the per-tier tally, and whether any
+        pinned a vetted launch image. Requires the attestation extra. Exit 0
+        iff every triple binds for the chosen mode.
+
     vaara conformance-statement [--corpus DIR] [--records DIR] [--as-of DATE]
             [--out FILE] [--json]
         Self-test this implementation against the published SEP-2828
@@ -2558,6 +2576,200 @@ def _cmd_verify_bundles(args: argparse.Namespace) -> int:
     return 0 if ok else 1
 
 
+def _cmd_verify_handoffs(args: argparse.Namespace) -> int:
+    """Verify a whole directory of cross-org handoff packages at once.
+
+    The batch twin of ``verify-handoff``: a regulator points this at a pile of
+    packages, from one provider or several, and gets the roll-up a single-file
+    check cannot give. How many records verify offline under their rotated-out
+    keys, how many are anchor-corroborated rather than resting on the signature
+    alone, and how many had their producer identity pinned. Each package's
+    enclosed anchor is resolved independently (``--no-anchor`` skips it for all);
+    a single out-of-band attested time cannot stand in for a whole set, so this
+    has no ``--anchored-time``. Requires the attestation extra.
+    """
+    try:
+        from vaara.attestation.receipt import check_handoff_set
+    except ImportError:
+        print(_ATTESTATION_HINT, file=sys.stderr)
+        return 2
+
+    directory = Path(args.directory).expanduser()
+    if not directory.is_dir():
+        print(f"vaara verify-handoffs: not a directory: {directory}", file=sys.stderr)
+        return 2
+
+    paths = sorted(p for p in directory.glob(args.glob) if p.is_file())
+    if not paths:
+        print(f"vaara verify-handoffs: no files matched {args.glob!r} in {directory}",
+              file=sys.stderr)
+        return 2
+
+    try:
+        trusted = (
+            _load_json_file(args.trusted_did_document, "trusted DID document")
+            if args.trusted_did_document else None
+        )
+    except ValueError as exc:
+        print(f"vaara verify-handoffs: {exc}", file=sys.stderr)
+        return 1
+
+    packages: list[tuple[str, Any, Optional[str]]] = []
+    unreadable: list[tuple[str, str]] = []
+    for path in paths:
+        try:
+            doc = json.loads(path.read_text(encoding="utf-8"))
+        except (json.JSONDecodeError, OSError) as exc:
+            unreadable.append((path.name, str(exc)))
+            continue
+        anchor_time, note = _resolve_handoff_anchor_time(args, doc)
+        if note is not None:
+            print(f"vaara verify-handoffs: {path.name}: {note}", file=sys.stderr)
+        packages.append((path.name, doc, anchor_time))
+
+    report = check_handoff_set(
+        packages, trusted_did_document=trusted, strict=args.strict
+    )
+    ok = report.ok and not unreadable
+
+    if args.json:
+        out: dict[str, Any] = report.to_dict()
+        out["ok"] = ok
+        out["unreadable"] = [{"name": n, "error": e} for n, e in unreadable]
+        print(json.dumps(out, indent=2))
+    else:
+        verdict = "OK" if ok else "FAILED"
+        mode = "  [strict]" if report.strict else ""
+        print(f"handoff set: {verdict}{mode}  ({report.passed}/{report.total} verify, "
+              f"{report.corroborated} corroborated)")
+        print(f"  verifiable: {report.verifiable}   corroborated: "
+              f"{report.corroborated}   producer pinned: {report.pinned}")
+        if report.pinning_gap:
+            print("  coverage gap: no package pinned its producer identity "
+                  "(every record's authenticity is self-asserted)")
+        for entry in report.entries:
+            if not entry.loaded:
+                print(f"  [FAIL] {entry.name}: not a valid handoff package "
+                      f"({_safe_inline(entry.error or '')})")
+            elif not entry.ok:
+                tier = "corroborated" if entry.corroborated else (
+                    "verifiable" if entry.verifiable else "not verifiable")
+                print(f"  [FAIL] {entry.name}: {tier}, "
+                      f"identity {entry.producer_identity_basis}")
+        for name, exc in unreadable:
+            print(f"  [FAIL] {name}: unreadable ({exc})")
+
+    return 0 if ok else 1
+
+
+def _cmd_verify_enforcements(args: argparse.Namespace) -> int:
+    """Bind a whole directory of (record, report, VCEK) triples at once.
+
+    The batch twin of ``verify-enforcement``: an auditor points this at a
+    directory of enforced records and gets the roll-up. How many bind to a
+    confidential VM, at what tier, and whether any pinned a vetted launch image.
+    Triples are discovered by stem: ``NAME.record.json`` pairs with
+    ``NAME.report.bin`` and ``NAME.vcek.pem``. A record missing either companion
+    is a failing entry, never a silent skip. Requires the attestation extra.
+    """
+    try:
+        import rfc8785  # noqa: F401
+        from cryptography.hazmat.primitives.asymmetric import ec  # noqa: F401
+
+        from vaara.attestation.receipt import check_enforcement_set
+    except ImportError:
+        print(_ATTESTATION_HINT, file=sys.stderr)
+        return 2
+
+    directory = Path(args.directory).expanduser()
+    if not directory.is_dir():
+        print(f"vaara verify-enforcements: not a directory: {directory}",
+              file=sys.stderr)
+        return 2
+
+    expected = args.expected_measurement
+    if expected is not None:
+        try:
+            raw = bytes.fromhex(expected.strip())
+        except ValueError:
+            print("vaara verify-enforcements: --expected-measurement is not valid hex",
+                  file=sys.stderr)
+            return 1
+        if len(raw) != 48:
+            print("vaara verify-enforcements: --expected-measurement must be 48 "
+                  "bytes (96 hex chars, an SHA-384 launch measurement)",
+                  file=sys.stderr)
+            return 1
+
+    records = sorted(p for p in directory.glob(args.glob) if p.is_file())
+    if not records:
+        print(f"vaara verify-enforcements: no files matched {args.glob!r} in "
+              f"{directory}", file=sys.stderr)
+        return 2
+
+    triples: list[tuple[str, Any, bytes, bytes]] = []
+    missing: list[tuple[str, str]] = []
+    for record_path in records:
+        # NAME.record.json -> NAME; the glob default ends in .record.json, but a
+        # custom glob may not, so fall back to the full stem.
+        if record_path.name.endswith(".record.json"):
+            stem = record_path.name[: -len(".record.json")]
+        else:
+            stem = record_path.stem
+        report_path = directory / f"{stem}.report.bin"
+        vcek_path = directory / f"{stem}.vcek.pem"
+        try:
+            record = json.loads(record_path.read_text(encoding="utf-8"))
+        except (json.JSONDecodeError, OSError) as exc:
+            missing.append((record_path.name, f"unreadable record ({exc})"))
+            continue
+        if not report_path.is_file():
+            missing.append((record_path.name, f"no companion {report_path.name}"))
+            continue
+        if not vcek_path.is_file():
+            missing.append((record_path.name, f"no companion {vcek_path.name}"))
+            continue
+        try:
+            report_bytes = report_path.read_bytes()
+            vcek_pem = vcek_path.read_bytes()
+        except OSError as exc:
+            missing.append((record_path.name, f"cannot read companion ({exc})"))
+            continue
+        triples.append((stem, record, report_bytes, vcek_pem))
+
+    report = check_enforcement_set(
+        triples, expected_measurement=expected, strict=args.strict
+    )
+    ok = report.ok and not missing
+
+    if args.json:
+        out: dict[str, Any] = report.to_dict()
+        out["ok"] = ok
+        out["incomplete"] = [{"name": n, "error": e} for n, e in missing]
+        print(json.dumps(out, indent=2))
+    else:
+        verdict = "OK" if ok else "FAILED"
+        mode = "  [strict]" if report.strict else ""
+        print(f"enforcement set: {verdict}{mode}  ({report.passed}/{report.total} bind, "
+              f"{report.measurement_pinned} measurement-pinned)")
+        tally = ", ".join(f"{t}: {n}" for t, n in report.tier_counts.items() if n)
+        if tally:
+            print(f"  tiers: {tally}")
+        if report.pinning_gap:
+            print("  coverage gap: no record pinned a launch measurement "
+                  "(the set bound to a CVM, never to a vetted image)")
+        for entry in report.entries:
+            if not entry.loaded:
+                print(f"  [FAIL] {entry.name}: {_safe_inline(entry.error or '')}")
+            elif not entry.ok:
+                print(f"  [FAIL] {entry.name}: tier {entry.tier}, "
+                      f"measurement {entry.measurement_basis}")
+        for name, exc in missing:
+            print(f"  [FAIL] {name}: {exc}")
+
+    return 0 if ok else 1
+
+
 def _cmd_build_bundle(args: argparse.Namespace) -> int:
     """Assemble an evidence bundle on disk from the issuer's pieces.
 
@@ -3515,6 +3727,46 @@ def build_parser() -> argparse.ArgumentParser:
     )
     pvh.set_defaults(func=_cmd_verify_handoff)
 
+    pvhs = sub.add_parser(
+        "verify-handoffs",
+        help="Verify a whole directory of cross-org handoff packages at once. "
+             "The batch twin of verify-handoff: how many records verify offline "
+             "under their rotated-out keys, how many are anchor-corroborated "
+             "rather than resting on the signature alone, and how many had their "
+             "producer identity pinned. Requires the attestation extra.",
+    )
+    pvhs.add_argument(
+        "directory",
+        help="Directory of cross-org handoff package JSON documents",
+    )
+    pvhs.add_argument(
+        "--glob", default="*.json",
+        help="Glob for handoff files within the directory (default: *.json)",
+    )
+    pvhs.add_argument(
+        "--trusted-did-document", default=None, dest="trusted_did_document",
+        help="Path to the DID document you independently trust as the "
+             "producer's; pins producer identity across the whole set",
+    )
+    pvhs.add_argument(
+        "--strict", action="store_true",
+        help="Regulator-grade: every package must be corroborated, with a "
+             "recorded window, an affirmative revocation source, and a pinned "
+             "producer identity",
+    )
+    pvhs.add_argument(
+        "--no-anchor", action="store_true", dest="no_anchor",
+        help="Do not verify any enclosed time anchor (report each record "
+             "without corroboration)",
+    )
+    pvhs.add_argument(
+        "--json", action="store_true",
+        help="Emit the full set verdict report as JSON",
+    )
+    # _resolve_handoff_anchor_time reads args.anchored_time; the batch has no
+    # single out-of-band time, so it is always None here.
+    pvhs.set_defaults(func=_cmd_verify_handoffs, anchored_time=None)
+
     pve = sub.add_parser(
         "verify-enforcement",
         help="Check whether a SEV-SNP attestation report binds a signed SEP-2828 "
@@ -3556,6 +3808,43 @@ def build_parser() -> argparse.ArgumentParser:
         help="Emit the full enforcement verdict as JSON",
     )
     pve.set_defaults(func=_cmd_verify_enforcement)
+
+    pves = sub.add_parser(
+        "verify-enforcements",
+        help="Bind a whole directory of (record, report, VCEK) triples at once. "
+             "The batch twin of verify-enforcement: how many records bind to a "
+             "confidential VM, at what tier, and whether any pinned a vetted "
+             "launch image. Triples are discovered by stem: NAME.record.json "
+             "pairs with NAME.report.bin and NAME.vcek.pem. Requires the "
+             "attestation extra.",
+    )
+    pves.add_argument(
+        "directory",
+        help="Directory of NAME.record.json records with NAME.report.bin and "
+             "NAME.vcek.pem companions",
+    )
+    pves.add_argument(
+        "--glob", default="*.record.json",
+        help="Glob for record files within the directory (default: "
+             "*.record.json)",
+    )
+    pves.add_argument(
+        "--expected-measurement", default=None, dest="expected_measurement",
+        help="Pin every report's launch measurement (96 hex chars / 48 bytes) "
+             "against an independently vetted value; a mismatch fails that "
+             "record",
+    )
+    pves.add_argument(
+        "--strict", action="store_true",
+        help="Regulator-grade: every record must reach the chain-rooted attested "
+             "tier, which v0 cannot yet reach, so a strict pass is honestly "
+             "unavailable",
+    )
+    pves.add_argument(
+        "--json", action="store_true",
+        help="Emit the full set verdict report as JSON",
+    )
+    pves.set_defaults(func=_cmd_verify_enforcements)
 
     pbh = sub.add_parser(
         "build-handoff",
