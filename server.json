@@ -8,13 +8,13 @@
     "url": "https://github.com/vaaraio/vaara",
     "source": "github"
   },
-  "version": "0.66.0",
+  "version": "0.67.0",
   "packages": [
     {
       "registryType": "pypi",
       "registryBaseUrl": "https://pypi.org",
       "identifier": "vaara",
-      "version": "0.66.0",
+      "version": "0.67.0",
       "runtimeHint": "uvx",
       "transport": {
         "type": "stdio"
