@@ -20,6 +20,6 @@
     "secretVersion": "v1",
     "sub": "agent:reader"
   },
-  "signature": "1ab493bfcac4fcf417175142b05b308e8180e1a3ffca11ecc08af4bbfd09e75f45d774fc44fcee762fe943aab5db9fdca8af46c5c8ffad6b73338bbbb0483f05",
+  "signature": "ae2466a5332de3ba9e4d44310d674fc593f706d37245c3096ed195da6a2490d63365aae8640f1a5ce9024bbfc36da4872d6c0d454ddf76965d414a2fcf17e2a8",
   "version": 1
 }

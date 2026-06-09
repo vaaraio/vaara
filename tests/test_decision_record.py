@@ -23,6 +23,7 @@ for _mod in ("rfc8785", "cryptography"):
 from cryptography.hazmat.primitives.asymmetric import ec, rsa  # noqa: E402
 
 from vaara.attestation.decision import (  # noqa: E402
+    AmbiguousSupersessionError,
     DecisionDerived,
     decision_digest,
     emit_decision_record,
@@ -270,15 +271,15 @@ def test_decision_digest_is_deterministic_and_instance_bound():
     assert decision_digest(d1) != decision_digest(d2)
 
 
-def test_superseding_decision_latest_wins_then_lowest_nonce():
+def test_superseding_decision_latest_wins_and_ties_are_ambiguous():
     att = _attestation()
     bl = make_back_link(att)
 
-    def _dec(decided_at, nonce):
+    def _dec(decided_at, nonce, decision="allow"):
         return emit_decision_record(
             back_link=bl,
             decision_derived=DecisionDerived(
-                decision="allow", decided_at=decided_at),
+                decision=decision, decided_at=decided_at),
             iss="vaara-proxy://acme-eu", sub="tenant:acme/agent:billing-bot",
             secret_version="2026-05", alg="HS256", signing_material=HS_SECRET,
             nonce=nonce)
@@ -287,10 +288,17 @@ def test_superseding_decision_latest_wins_then_lowest_nonce():
     later = _dec("2026-05-31T10:00:00Z", "n-mmm")
     assert superseding_decision([earlier, later]) is later
 
-    # Equal decidedAt: lowest lexicographic issuerAsserted.nonce wins.
-    tie_a = _dec("2026-05-31T11:00:00Z", "n-aaa")
-    tie_b = _dec("2026-05-31T11:00:00Z", "n-bbb")
-    assert superseding_decision([tie_b, tie_a]) is tie_a
+    # Equal decidedAt, distinct records, no ordering field: ambiguous, not
+    # resolved by nonce/file/arrival order.
+    tie_a = _dec("2026-05-31T11:00:00Z", "n-aaa", decision="block")
+    tie_b = _dec("2026-05-31T11:00:00Z", "n-bbb", decision="allow")
+    with pytest.raises(AmbiguousSupersessionError):
+        superseding_decision([tie_b, tie_a])
+
+    # Byte-identical records are one decision, not a tie.
+    dup = _dec("2026-05-31T12:00:00Z", "n-dup")
+    assert superseding_decision([dup, dup]) is dup
+
     with pytest.raises(ValueError):
         superseding_decision([])
 

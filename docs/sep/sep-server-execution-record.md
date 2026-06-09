@@ -274,13 +274,21 @@ this `turnId`, not that the server vouches for it.
 A superseding decision (for example, a human resolving an `escalate`) is recorded
 as a new decision record with the same `backLink` and a later `decidedAt`. The
 record with the latest `decidedAt` for a given `backLink` is the effective
-decision; earlier ones are retained as history. When two records for one
-`backLink` carry the **same** `decidedAt`, the tie MUST break deterministically:
-the effective record is the one whose `issuerAsserted.nonce` is lexicographically
-lowest. This gives every verifier the same winner with no clock authority.
-Verifiers MUST NOT treat multiple decision records for one `backLink` as a
-conflict. The outcome record's `decisionDigest` (Check B) identifies which
-decision in this set the call actually ran under.
+decision; earlier ones are retained as history. When distinct records for one
+`backLink` carry the **same** latest `decidedAt` and no explicit ordering field
+distinguishes them, the effective decision is **ambiguous**: a verifier MUST
+report the tie as unresolved (non-conformant for selecting an effective
+decision) and MUST NOT resolve it by `issuerAsserted.nonce`, file order, or
+arrival order. `issuerAsserted.nonce` is unique per record, not an ordering
+field; breaking the tie by its lexicographic value is deterministic but
+arbitrary, names a record that is not the genuinely-later decision, and masks a
+producer that emitted two records which should never have tied. Byte-identical
+records are one decision, not a tie. A future revision or deployment profile MAY
+define an explicit ordering field (a sequence or revision number) on the
+decision record; where present, the highest such value is the deterministic
+winner. Verifiers MUST NOT treat multiple decision records for one `backLink` as
+a conflict on their own. The outcome record's `decisionDigest` (Check B)
+identifies which decision in this set the call actually ran under.
 
 ### Transport
 
@@ -409,10 +417,12 @@ MUST perform, and a conforming implementation MUST pass, the following checks:
    `outcomeDerived.status` is one of `executed`, `refused`, `errored`.
 
 When more than one decision record shares a `backLink`, the verifier resolves the
-effective decision by latest `decidedAt`, breaking an exact-`decidedAt` tie by
-lowest lexicographic `issuerAsserted.nonce`. The outcome's `decisionDigest`
-selects which decision in the set the call ran under, which need not be the
-effective one (a call can run under an `escalate` that was later superseded).
+effective decision by latest `decidedAt`. A tie between distinct records on the
+latest `decidedAt` with no explicit ordering field is reported as ambiguous, not
+broken by `issuerAsserted.nonce` or any incidental order (see Pairing). The
+outcome's `decisionDigest` selects which decision in the set the call ran under,
+which need not be the effective one (a call can run under an `escalate` that was
+later superseded).
 
 ## Rationale
 
@@ -571,8 +581,9 @@ call and counts emission failures for operator alerting.
 ## Reference Implementation
 
 The wire schema in this SEP is the shape shipping in the Vaara MCP proxy (the
-receipt library landed in v0.42; the Check B `decisionDigest` binding and the
-supersession tie-break landed in v0.51). Relevant modules:
+receipt library landed in v0.42; the Check B `decisionDigest` binding and
+supersession resolution landed in v0.51, with ambiguous ties reported rather
+than broken by nonce). Relevant modules:
 
 - `vaara/attestation/_receipt_types.py`: the `ExecutionReceipt` envelope
   (`version`, `alg`, `backLink`, `outcomeDerived`, `receiptAsserted`,
@@ -590,8 +601,10 @@ supersession tie-break landed in v0.51). Relevant modules:
   `verify_decision_signature`, `verify_decision_back_link`, `decision_digest`
   (sha256 over the JCS-canonical full decision wire bytes, the Check B input),
   `records_paired` (the decision-and-outcome join, enforcing Check A and Check
-  B), and `superseding_decision` (latest `decidedAt`, tie-broken by lowest
-  `issuerAsserted.nonce`). Reuses the receipt's back-link, the issuer-block
+  B), and `superseding_decision` (latest `decidedAt`; a distinct-record tie on
+  the latest `decidedAt` with no ordering field raises
+  `AmbiguousSupersessionError` rather than guessing an order). Reuses the
+  receipt's back-link, the issuer-block
   layout, and the shared signing stack unchanged, so the decision record adds
   the `decisionDerived` block and no new crypto.
 - `vaara/attestation/_sep2787_types.py` and `_sep2787_canonical.py`: the shared
@@ -639,10 +652,11 @@ exercise the full verification algorithm above: a valid paired allow/executed, a
 decision-only escalate, the two replay-rejection cases (substituted attestation
 back-link and substituted pairing nonce, both failing Check A), a substituted
 decision under a shared attestation (Check A passes, Check B fails), the
-equal-`decidedAt` supersession tie resolved by lowest `issuerAsserted.nonce`, and
-the no-SEP-2787 fallback request-envelope binding. An independent consumer
-verifier (Rul1an/Assay) reproduces the Check-A subset today and the Check-B and
-supersession cases as it adopts the digest and ordering model.
+equal-`decidedAt` supersession tie reported as ambiguous, and the no-SEP-2787
+fallback request-envelope binding (with its replayed-envelope substitution). An
+independent consumer verifier (Rul1an/Assay) reproduces the Check-A subset today
+and the Check-B and supersession cases as it adopts the digest and ordering
+model.
 
 For Standards Track finalization, this SEP will add a `sep-XXXX.yaml`
 traceability file mapping each MUST / MUST NOT and SHOULD / SHOULD NOT in the
