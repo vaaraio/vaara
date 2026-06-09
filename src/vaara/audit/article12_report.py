@@ -26,6 +26,83 @@ from vaara.audit.trail import AuditRecord, EventType
 
 SCHEMA_VERSION = "vaara-article12/1.0"
 
+# Honesty notes for the folded SEP-2828 attestations. These are the brand: a
+# handoff is only corroborated when an eIDAS anchor predates the key's
+# retirement, and only pinned against an out-of-band trusted DID document; an
+# enforcement binding is never "attested" in this release. The eIDAS time
+# anchor stays the only un-forgeable component of the package, and the report
+# says so plainly rather than letting a folded sidecar read as proof.
+HANDOFF_BASIS_NOTE = (
+    "A handoff is verifiable when the record's signature binds to a key the "
+    "archived DID document lists, inside that key's validity window, and the "
+    "key was not revoked before issuance. It is corroborated only when an "
+    "enclosed eIDAS time anchor predates the key's retirement and revocation. "
+    "Producer identity is pinned only when checked against a DID document "
+    "trusted out of band; otherwise it is self-asserted. Where a record is "
+    "neither corroborated nor pinned, its authenticity rests on the signature "
+    "against a self-asserted identity."
+)
+ENFORCEMENT_BASIS_NOTE = (
+    "An enforcement binding proves a SEV-SNP attestation report carries this "
+    "record's digest in REPORT_DATA. It is not attested in this release: the "
+    "VCEK certificate chain to AMD's root is not validated "
+    "(vcek_chain_basis=caller_supplied_unverified), and binding a report to a "
+    "record does not prove the record came from the image's decision path "
+    "(enforcement_logic_basis=not_established). A binding pins a launch "
+    "measurement only when a vetted value was supplied. The eIDAS time anchor "
+    "remains the only un-forgeable component of this package."
+)
+
+
+def _build_attestations_block(attestations: Optional[dict]) -> dict:
+    """Shape the folded-attestation summary for the report dict.
+
+    ``attestations`` is the pre-computed roll-up the export layer hands in
+    (counts and basis flags from ``check_handoff_set`` /
+    ``check_enforcement_set``); this module stays crypto-free. Returns a block
+    that is always present so the rendered report can state plainly when no
+    attestations were folded.
+    """
+    attestations = attestations or {}
+    handoff = attestations.get("handoff")
+    enforcement = attestations.get("enforcement")
+    articles: list[str] = []
+    if handoff:
+        articles.append("26(6)")
+    block: dict = {
+        "folded": bool(handoff or enforcement),
+        "articles": articles,
+    }
+    if handoff:
+        block["handoff"] = {
+            "present": True,
+            "packages": handoff.get("total", 0),
+            "verifiable": handoff.get("verifiable", 0),
+            "corroborated": handoff.get("corroborated", 0),
+            "producer_pinned": handoff.get("pinned", 0),
+            "passed": handoff.get("passed", 0),
+            "strict": bool(handoff.get("strict", False)),
+            "pinning_gap": bool(handoff.get("pinning_gap", False)),
+            "basis": HANDOFF_BASIS_NOTE,
+        }
+    else:
+        block["handoff"] = {"present": False}
+    if enforcement:
+        block["enforcement"] = {
+            "present": True,
+            "bindings": enforcement.get("total", 0),
+            "bound": enforcement.get("bound", 0),
+            "measurement_pinned": enforcement.get("measurement_pinned", 0),
+            "tier_counts": dict(enforcement.get("tier_counts", {})),
+            "passed": enforcement.get("passed", 0),
+            "strict": bool(enforcement.get("strict", False)),
+            "pinning_gap": bool(enforcement.get("pinning_gap", False)),
+            "basis": ENFORCEMENT_BASIS_NOTE,
+        }
+    else:
+        block["enforcement"] = {"present": False}
+    return block
+
 # Static Article 12 / 26(5) obligation checklist. Each entry names a duty and
 # the event types whose presence in the trail evidences it. The mapping is a
 # structural aid, not a legal opinion: it shows which logs speak to which
@@ -119,6 +196,7 @@ def build_article12_report(
     system_meta: Optional[dict] = None,
     period: Optional[tuple] = None,
     time_anchor: Optional[dict] = None,
+    attestations: Optional[dict] = None,
 ) -> dict:
     """Build the Article 12 report dict from a trail and its export manifest.
 
@@ -132,6 +210,10 @@ def build_article12_report(
     serialised with ``to_dict()``: an external trusted timestamp over the
     signed trail head, evidencing Article 19 existence-in-time independently of
     the signing key. Its chain-head binding is checked by the caller.
+    ``attestations`` is an optional pre-computed roll-up of folded SEP-2828
+    evidence (cross-org handoff packages, confidential-VM enforcement
+    bindings); the export layer verifies and counts them, this builder only
+    shapes and renders the summary, with the honesty notes verbatim.
     """
     system_meta = dict(system_meta or {})
     in_scope = [r for r in records if _in_period(r.timestamp, period)]
@@ -289,6 +371,7 @@ def build_article12_report(
             if time_anchor
             else {"anchored": False}
         ),
+        "attestations": _build_attestations_block(attestations),
     }
 
 
@@ -442,11 +525,83 @@ def render_report_md(report: dict) -> str:
         )
     out.append("")
 
+    _render_attestations_md(out, report.get("attestations") or {"folded": False})
+
     out.append("## How to verify")
     out.append("")
     out.append(verify_instructions_text(report))
     out.append("")
     return "\n".join(out)
+
+
+def _render_attestations_md(out: list, att: dict) -> None:
+    """Render the folded SEP-2828 attestations section, if any.
+
+    Always emits the heading so the package is self-describing: when nothing
+    was folded it states that plainly rather than leaving a regulator to wonder
+    whether handoff or enforcement evidence was meant to be present.
+    """
+    out.append("## Cross-org handoff and enforcement evidence")
+    out.append("")
+    if not att.get("folded"):
+        out.append(
+            "No cross-org handoff or confidential-VM enforcement evidence is "
+            "folded into this package. The Article 12 record-keeping above "
+            "stands on its own. Attach handoff packages or enforcement bindings "
+            "with: vaara trail export-article12 --handoffs <dir> "
+            "--enforcements <dir>."
+        )
+        out.append("")
+        return
+
+    handoff = att.get("handoff") or {"present": False}
+    if handoff.get("present"):
+        strict = " [strict]" if handoff.get("strict") else ""
+        out.append(f"### Cross-org handoff custody (Article 26(6)){strict}")
+        out.append("")
+        out.append(_md_table(["Field", "Value"], [
+            ["Packages folded", handoff.get("packages", 0)],
+            ["Verify under rotated-out key", handoff.get("passed", 0)],
+            ["Verifiable", handoff.get("verifiable", 0)],
+            ["Anchor-corroborated", handoff.get("corroborated", 0)],
+            ["Producer pinned (out of band)", handoff.get("producer_pinned", 0)],
+        ]))
+        out.append("")
+        if handoff.get("pinning_gap"):
+            out.append(
+                "Coverage note: no package pinned its producer identity against "
+                "a trusted DID document, so every record's authenticity is "
+                "self-asserted (advisory, does not gate)."
+            )
+            out.append("")
+        out.append(handoff["basis"])
+        out.append("")
+
+    enforcement = att.get("enforcement") or {"present": False}
+    if enforcement.get("present"):
+        strict = " [strict]" if enforcement.get("strict") else ""
+        out.append(f"### Where enforcement ran (confidential VM){strict}")
+        out.append("")
+        out.append(_md_table(["Field", "Value"], [
+            ["Bindings folded", enforcement.get("bindings", 0)],
+            ["Bound to a CVM report", enforcement.get("bound", 0)],
+            ["Launch measurement pinned", enforcement.get("measurement_pinned", 0)],
+        ]))
+        tiers = enforcement.get("tier_counts") or {}
+        tally = ", ".join(f"{t}: {n}" for t, n in tiers.items() if n)
+        if tally:
+            out.append("")
+            out.append(f"Tiers: {tally}.")
+        out.append("")
+        if enforcement.get("pinning_gap"):
+            out.append(
+                "Coverage note: no binding pinned a launch measurement, so the "
+                "set bound to a confidential VM but never to a vetted image "
+                "(advisory, does not gate)."
+            )
+            out.append("")
+        out.append(enforcement["basis"])
+        out.append("")
 
 
 def render_report_html(report: dict) -> str:
@@ -475,6 +630,7 @@ def verify_instructions_text(report: dict) -> str:
     s = report["record_keeping_summary"]
     threshold = report["cover"].get("threshold")
     anchor = report.get("time_anchor") or {"anchored": False}
+    att = report.get("attestations") or {"folded": False}
     lines = [
         "How to verify this Article 12 package",
         "",
@@ -516,10 +672,48 @@ def verify_instructions_text(report: dict) -> str:
             f"     {anchor.get('chain_head_hash', '')}",
         ]
         step += 1
+    if att.get("folded"):
+        handoff = att.get("handoff") or {"present": False}
+        enforcement = att.get("enforcement") or {"present": False}
+        lines += [
+            "",
+            f"{step}. Re-verify the folded SEP-2828 evidence from the bytes in "
+            "evidence/.",
+            "   These sidecars are verified at export and fail the export if "
+            "they do not",
+            "   verify; re-check them independently:",
+        ]
+        if handoff.get("present"):
+            lines += [
+                "     vaara verify-handoffs evidence/handoff",
+                "   or the Vaara-free checker in "
+                "tests/vectors/cross_org_handoff_v0/.",
+            ]
+        if enforcement.get("present"):
+            lines += [
+                "     vaara verify-enforcements evidence/enforcement",
+                "   or the Vaara-free checker in "
+                "tests/vectors/enforcement_attestation_v0/.",
+            ]
+        lines += [
+            "   The roll-up in evidence/attestations_summary.json must match "
+            "what you",
+            "   reproduce. A handoff is not corroborated without a verified "
+            "anchor, and an",
+            "   enforcement binding is not attested: the VCEK chain to AMD's "
+            "root is not",
+            "   validated in this release. The eIDAS time anchor stays the only "
+            "un-forgeable",
+            "   component of this package.",
+        ]
+        step += 1
     lines += [
         "",
         "The signature covers trail.jsonl and manifest.json. This report and",
         "article12_summary.json are a derived, human-readable view bound to the",
         "signed trail by the trail_sha256 above. They are not themselves signed.",
+        "The folded evidence/ sidecars are content-addressed SEP-2828 records, "
+        "verified",
+        "at export; they are not covered by the trail signature.",
     ]
     return "\n".join(lines)

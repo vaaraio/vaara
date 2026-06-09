@@ -25,7 +25,7 @@ from __future__ import annotations
 import json
 import zipfile
 from pathlib import Path
-from typing import TYPE_CHECKING, Optional, Union
+from typing import TYPE_CHECKING, Optional, Sequence, Union
 
 if TYPE_CHECKING:
     from vaara.audit.timeanchor import TimeAnchor
@@ -63,6 +63,150 @@ def _records_from_zip(zip_path: Path) -> tuple[list[AuditRecord], dict]:
     return records, manifest
 
 
+def _member_base(name: str) -> str:
+    """A safe zip-member base from a caller-supplied attachment name.
+
+    Strips any directory components so a hostile name cannot fold a file
+    outside ``evidence/``. The result is used to build ``evidence/.../<base>``
+    paths; an empty result is rejected by the caller.
+    """
+    return Path(str(name)).name
+
+
+def _prepare_folded_evidence(
+    handoffs: "Optional[Sequence[tuple[str, dict, Optional[str]]]]",
+    enforcements: "Optional[Sequence[tuple[str, dict, bytes, bytes]]]",
+    *,
+    trusted_did_document: Optional[dict],
+    expected_measurement: Optional[str],
+) -> "tuple[Optional[dict], Optional[dict], list[tuple[str, bytes]]]":
+    """Verify the optional SEP-2828 attachments and stage them for folding.
+
+    Returns ``(report_attestations, summary_doc, files)``:
+
+    * ``report_attestations`` is the counts-only roll-up handed to the report
+      builder (``None`` when nothing is folded).
+    * ``summary_doc`` is the self-describing ``attestations_summary.json`` body,
+      carrying the full set verdicts plus the verifier-side inputs (per-package
+      anchor times, the trusted DID document, the expected measurement) so the
+      folded evidence re-verifies offline from the package alone.
+    * ``files`` are ``(zip_member, bytes)`` pairs to fold under ``evidence/``.
+
+    Fails closed: every attachment is verified here in default mode, and a
+    single attachment that does not verify raises :class:`ValueError` naming the
+    offender. The package never ships evidence it cannot back. Needs the
+    attestation extra; a missing extra raises :class:`ImportError`.
+    """
+    if not handoffs and not enforcements:
+        return None, None, []
+
+    from vaara.attestation.receipt import (
+        check_enforcement_set,
+        check_handoff_set,
+    )
+
+    report_attestations: dict = {}
+    summary: dict = {
+        "schema": "vaara-article12-attestations",
+        "schemaVersion": 1,
+        "handoff": {"present": False},
+        "enforcement": {"present": False},
+    }
+    files: list[tuple[str, bytes]] = []
+    seen: set[str] = set()
+
+    def _fold(member: str, body: bytes) -> None:
+        if member in seen:
+            raise ValueError(f"duplicate folded evidence path: {member!r}")
+        seen.add(member)
+        files.append((member, body))
+
+    if handoffs:
+        h_report = check_handoff_set(
+            handoffs, trusted_did_document=trusted_did_document, strict=False,
+        )
+        if not h_report.ok:
+            bad = [
+                f"{e.name} ({e.error or 'did not verify'})"
+                for e in h_report.entries if not e.ok
+            ]
+            raise ValueError(
+                "handoff attachment(s) failed verification, refusing to fold: "
+                + "; ".join(bad)
+            )
+        anchored_times: dict[str, Optional[str]] = {}
+        for name, doc, anchor_time in handoffs:
+            base = _member_base(name)
+            if base.endswith(".json"):
+                base = base[: -len(".json")]
+            if not base:
+                raise ValueError(f"empty handoff attachment name: {name!r}")
+            _fold(
+                f"evidence/handoff/{base}.json",
+                json.dumps(doc, indent=2, sort_keys=True).encode("utf-8"),
+            )
+            # Key by the folded base, not the raw name, so the anchor time maps
+            # to the file an offline reader sees in the zip.
+            anchored_times[base] = anchor_time
+        summary["handoff"] = {
+            "present": True,
+            "strict": h_report.strict,
+            "trustedDidDocument": trusted_did_document,
+            "anchoredTimes": anchored_times,
+            "report": h_report.to_dict(),
+        }
+        report_attestations["handoff"] = {
+            "total": h_report.total,
+            "passed": h_report.passed,
+            "verifiable": h_report.verifiable,
+            "corroborated": h_report.corroborated,
+            "pinned": h_report.pinned,
+            "pinning_gap": h_report.pinning_gap,
+            "strict": h_report.strict,
+        }
+
+    if enforcements:
+        e_report = check_enforcement_set(
+            enforcements, expected_measurement=expected_measurement, strict=False,
+        )
+        if not e_report.ok:
+            bad = [
+                f"{e.name} ({e.error or 'did not verify'})"
+                for e in e_report.entries if not e.ok
+            ]
+            raise ValueError(
+                "enforcement attachment(s) failed verification, refusing to "
+                "fold: " + "; ".join(bad)
+            )
+        for name, record, report_bytes, vcek_pem in enforcements:
+            base = _member_base(name)
+            if not base:
+                raise ValueError(f"empty enforcement attachment name: {name!r}")
+            _fold(
+                f"evidence/enforcement/{base}.record.json",
+                json.dumps(record, indent=2, sort_keys=True).encode("utf-8"),
+            )
+            _fold(f"evidence/enforcement/{base}.report.bin", report_bytes)
+            _fold(f"evidence/enforcement/{base}.vcek.pem", vcek_pem)
+        summary["enforcement"] = {
+            "present": True,
+            "strict": e_report.strict,
+            "expectedMeasurement": expected_measurement,
+            "report": e_report.to_dict(),
+        }
+        report_attestations["enforcement"] = {
+            "total": e_report.total,
+            "passed": e_report.passed,
+            "bound": e_report.bound,
+            "measurement_pinned": e_report.measurement_pinned,
+            "tier_counts": dict(e_report.tier_counts),
+            "pinning_gap": e_report.pinning_gap,
+            "strict": e_report.strict,
+        }
+
+    return report_attestations, summary, files
+
+
 def export_article12(
     trail,
     out_path: Union[str, Path],
@@ -74,6 +218,10 @@ def export_article12(
     system_meta: Optional[dict] = None,
     period: Optional[tuple] = None,
     time_anchor: "Optional[TimeAnchor]" = None,
+    handoffs: "Optional[Sequence[tuple[str, dict, Optional[str]]]]" = None,
+    enforcements: "Optional[Sequence[tuple[str, dict, bytes, bytes]]]" = None,
+    trusted_did_document: Optional[dict] = None,
+    expected_measurement: Optional[str] = None,
     fmt: str = "md",
     agent_id: str = "",
 ) -> ExportResult:
@@ -92,12 +240,35 @@ def export_article12(
     in as ``time_anchor.json`` and surfaced in the report as Article 19
     existence-in-time evidence, independent of the signing key.
 
+    ``handoffs`` and ``enforcements`` fold verified SEP-2828 evidence in as
+    sidecars under ``evidence/``: cross-org handoff packages (Article 26(6)
+    deployer custody) as ``(name, document, anchor_attested_time)`` tuples, and
+    confidential-VM enforcement bindings as ``(name, record, report_bytes,
+    vcek_pem)`` tuples, mirroring ``check_handoff_set`` / ``check_enforcement_set``.
+    ``trusted_did_document`` pins handoff producer identity out of band;
+    ``expected_measurement`` pins enforcement launch images. Each attachment is
+    verified at export in default mode and a single one that does not verify
+    raises :class:`ValueError`: the package never ships evidence it cannot back.
+    The roll-up is written as ``evidence/attestations_summary.json`` and
+    surfaced in the report; folding these needs the attestation extra. The
+    eIDAS anchor stays the only un-forgeable component, and the report says so.
+
     Returns the underlying :class:`ExportResult` (its ``manifest`` covers the
     signed core; the Article 12 files are folded in afterwards).
     """
     if fmt not in ("md", "html"):
         raise ValueError(f"fmt must be 'md' or 'html', got {fmt!r}")
     out_path = Path(out_path)
+
+    # Verify the optional SEP-2828 attachments up front, before any bytes are
+    # written, so a bad attachment fails closed without leaving a partial zip.
+    report_attestations, attestations_summary, folded_files = (
+        _prepare_folded_evidence(
+            handoffs, enforcements,
+            trusted_did_document=trusted_did_document,
+            expected_measurement=expected_measurement,
+        )
+    )
 
     threshold_mode = signers is not None or threshold_k is not None
     if threshold_mode:
@@ -138,7 +309,7 @@ def export_article12(
 
     report = build_article12_report(
         records, manifest, system_meta=system_meta, period=period,
-        time_anchor=anchor_dict,
+        time_anchor=anchor_dict, attestations=report_attestations,
     )
 
     report_name = f"article12_report.{fmt}"
@@ -157,5 +328,14 @@ def export_article12(
                 "time_anchor.json",
                 json.dumps(anchor_dict, indent=2, sort_keys=True).encode("utf-8"),
             )
+        if attestations_summary is not None:
+            zf.writestr(
+                "evidence/attestations_summary.json",
+                json.dumps(
+                    attestations_summary, indent=2, sort_keys=True
+                ).encode("utf-8"),
+            )
+            for member, body in folded_files:
+                zf.writestr(member, body)
 
     return result

@@ -1,0 +1,81 @@
+{
+  "enforcement_only": {
+    "enforcement": {
+      "bound": 1,
+      "loaded": 1,
+      "measurementPinned": 0,
+      "ok": true,
+      "passed": 1,
+      "pinningGap": true,
+      "strict": false,
+      "tierCounts": {
+        "bound": 1,
+        "measurement_pinned": 0,
+        "unverified": 0
+      },
+      "total": 1
+    },
+    "evidence_members": [
+      "evidence/attestations_summary.json",
+      "evidence/enforcement/clean_bound.record.json",
+      "evidence/enforcement/clean_bound.report.bin",
+      "evidence/enforcement/clean_bound.vcek.pem"
+    ]
+  },
+  "full": {
+    "enforcement": {
+      "bound": 2,
+      "loaded": 2,
+      "measurementPinned": 2,
+      "ok": true,
+      "passed": 2,
+      "pinningGap": false,
+      "strict": false,
+      "tierCounts": {
+        "bound": 0,
+        "measurement_pinned": 2,
+        "unverified": 0
+      },
+      "total": 2
+    },
+    "evidence_members": [
+      "evidence/attestations_summary.json",
+      "evidence/enforcement/clean_bound.record.json",
+      "evidence/enforcement/clean_bound.report.bin",
+      "evidence/enforcement/clean_bound.vcek.pem",
+      "evidence/enforcement/pinned_measurement_match.record.json",
+      "evidence/enforcement/pinned_measurement_match.report.bin",
+      "evidence/enforcement/pinned_measurement_match.vcek.pem",
+      "evidence/handoff/clean_no_anchor.json",
+      "evidence/handoff/corroborated.json"
+    ],
+    "handoff": {
+      "corroborated": 1,
+      "loaded": 2,
+      "ok": true,
+      "passed": 2,
+      "pinned": 0,
+      "pinningGap": true,
+      "strict": false,
+      "total": 2,
+      "verifiable": 2
+    }
+  },
+  "pinned_handoff": {
+    "evidence_members": [
+      "evidence/attestations_summary.json",
+      "evidence/handoff/pinned_corroborated.json"
+    ],
+    "handoff": {
+      "corroborated": 1,
+      "loaded": 1,
+      "ok": true,
+      "passed": 1,
+      "pinned": 1,
+      "pinningGap": false,
+      "strict": false,
+      "total": 1,
+      "verifiable": 1
+    }
+  }
+}
