@@ -14,8 +14,9 @@ not import Vaara. For each committed case it reproduces the verdict
    the FULL record (including its ``signature`` field) and byte-compare all 64
    bytes. The full-record preimage is what defeats both substitution and the
    signature-malleable variant.
-3. Verify the ECDSA-P384-SHA384 signature over the body against the VCEK PEM,
-   only when the version is supported and the algorithm is ECDSA-P384-SHA384.
+3. Verify the ECDSA-P384-SHA384 signature over the body against the VCEK,
+   carried as a P-384 JWK, only when the version is supported and the algorithm
+   is ECDSA-P384-SHA384.
 4. Pin the measurement against ``expected_measurement`` when supplied.
 
 The VCEK is trusted as supplied; its chain to AMD's ARK is not validated (the
@@ -37,7 +38,7 @@ from pathlib import Path
 
 import rfc8785
 from cryptography.exceptions import InvalidSignature
-from cryptography.hazmat.primitives import hashes, serialization
+from cryptography.hazmat.primitives import hashes
 from cryptography.hazmat.primitives.asymmetric import ec
 from cryptography.hazmat.primitives.asymmetric.utils import encode_dss_signature
 
@@ -82,23 +83,35 @@ def _reject_floats(value) -> None:
             _reject_floats(v)
 
 
-def _verify_p384(body: bytes, sig_field: bytes, vcek_pem: bytes) -> bool:
-    """ECDSA-P384-SHA384 over the body against the VCEK.
+def _ec_p384_from_jwk(jwk: dict):
+    """Reconstruct a P-384 public key from a JWK, or raise ValueError.
 
-    Mirrors ``verify_sev_snp_report_signature``: a verifier-side input error (an
-    unloadable PEM, a non-EC key, or the wrong curve) raises ``ValueError``;
-    only a genuine signature mismatch returns False. Vaara raises
-    ``TEEAttestationError`` for the same inputs, so neither side silently turns a
-    bad VCEK into a verdict.
+    The VCEK is carried as a JWK (public verification material), so the checker
+    rebuilds the key from its coordinates rather than parsing a serialised PEM. A
+    malformed JWK raises ValueError, a verifier-side input error mirroring how
+    Vaara raises rather than emitting a verdict for a bad VCEK.
     """
+    if not isinstance(jwk, dict) or jwk.get("kty") != "EC" or jwk.get("crv") != "P-384":
+        raise ValueError("vcek_jwk is not a P-384 EC JWK")
+
+    def _i(v: str) -> int:
+        return int.from_bytes(
+            base64.urlsafe_b64decode(v + "=" * (-len(v) % 4)), "big")
+
     try:
-        pub = serialization.load_pem_public_key(vcek_pem)
-    except ValueError as exc:
-        raise ValueError(f"failed to load VCEK PEM: {exc}") from exc
-    if not isinstance(pub, ec.EllipticCurvePublicKey):
-        raise ValueError("VCEK is not an EC public key")
-    if not isinstance(pub.curve, ec.SECP384R1):
-        raise ValueError(f"VCEK curve is {pub.curve.name}; expected secp384r1")
+        return ec.EllipticCurvePublicNumbers(
+            _i(jwk["x"]), _i(jwk["y"]), ec.SECP384R1()).public_key()
+    except (KeyError, ValueError, TypeError) as exc:
+        raise ValueError(f"malformed vcek_jwk: {exc}") from exc
+
+
+def _verify_p384(body: bytes, sig_field: bytes, jwk: dict) -> bool:
+    """ECDSA-P384-SHA384 over the body against the VCEK JWK; False on mismatch.
+
+    Only a genuine signature mismatch returns False; a malformed JWK raises
+    (handled by :func:`_ec_p384_from_jwk`).
+    """
+    pub = _ec_p384_from_jwk(jwk)
     r = int.from_bytes(sig_field[:48], "little")
     s = int.from_bytes(sig_field[72:72 + 48], "little")
     der = encode_dss_signature(r, s)
@@ -112,7 +125,7 @@ def _verify_p384(body: bytes, sig_field: bytes, vcek_pem: bytes) -> bool:
 def _evaluate(case: dict) -> dict:
     record = case["record"]
     report = base64.b64decode(case["report_b64"])
-    vcek_pem = case["vcek_pem"].encode("ascii")
+    vcek_jwk = case["vcek_jwk"]
     expected_measurement = case["expected_measurement"]
     strict = bool(case["strict"])
 
@@ -146,7 +159,7 @@ def _evaluate(case: dict) -> dict:
         signature_algo_ok = algo == ALGO_ECDSA_P384_SHA384
         bound = report_data == expected_report_data
         if version_ok and signature_algo_ok:
-            signature_valid = _verify_p384(body, sig_field, vcek_pem)
+            signature_valid = _verify_p384(body, sig_field, vcek_jwk)
 
     if expected_measurement is None:
         measurement_basis = "unpinned"

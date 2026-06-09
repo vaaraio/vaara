@@ -88,18 +88,41 @@ def _receipt(key: ec.EllipticCurvePrivateKey, nonce: str) -> dict:
     ).to_dict()
 
 
-def _vcek_pem(key: ec.EllipticCurvePrivateKey) -> str:
-    return key.public_key().public_bytes(
+def _b64u(raw: bytes) -> str:
+    return base64.urlsafe_b64encode(raw).rstrip(b"=").decode("ascii")
+
+
+def _jwk_p384(pub: ec.EllipticCurvePublicKey) -> dict:
+    """A P-384 public key as a JWK: public verification material, not a secret.
+
+    The VCEK is stored this way (like the DID-document keys in the other vector
+    suites) rather than as a serialised PEM, so the committed cases carry no
+    key-shaped blob; the checker and the generator reconstruct the key from it.
+    """
+    n = pub.public_numbers()
+    return {"kty": "EC", "crv": "P-384",
+            "x": _b64u(n.x.to_bytes(48, "big")), "y": _b64u(n.y.to_bytes(48, "big"))}
+
+
+def _jwk_to_pem(jwk: dict) -> bytes:
+    """Reconstruct the SubjectPublicKeyInfo PEM the verifier consumes from a JWK."""
+    def _i(v: str) -> int:
+        return int.from_bytes(
+            base64.urlsafe_b64decode(v + "=" * (-len(v) % 4)), "big")
+    pub = ec.EllipticCurvePublicNumbers(
+        _i(jwk["x"]), _i(jwk["y"]), ec.SECP384R1()).public_key()
+    return pub.public_bytes(
         encoding=serialization.Encoding.PEM,
         format=serialization.PublicFormat.SubjectPublicKeyInfo,
-    ).decode("ascii")
+    )
 
 
 def main() -> None:
     vcek = ec.derive_private_key(VCEK_SCALAR, ec.SECP384R1())
     other_vcek = ec.derive_private_key(OTHER_VCEK_SCALAR, ec.SECP384R1())
     record_key = ec.derive_private_key(RECORD_SCALAR, ec.SECP256R1())
-    vcek_pem = _vcek_pem(vcek)
+    vcek_jwk = _jwk_p384(vcek.public_key())
+    other_vcek_jwk = _jwk_p384(other_vcek.public_key())
 
     record = _receipt(record_key, "rcpt-nonce-fixed-0001")
     other_record = _receipt(record_key, "rcpt-nonce-fixed-0002")
@@ -123,32 +146,32 @@ def main() -> None:
 
     cases = [
         {"name": "clean_bound", "record": record, "report_b64": b64(report),
-         "vcek_pem": vcek_pem, "expected_measurement": None, "strict": False},
+         "vcek_jwk": vcek_jwk, "expected_measurement": None, "strict": False},
         {"name": "pinned_measurement_match", "record": record,
-         "report_b64": b64(report), "vcek_pem": vcek_pem,
+         "report_b64": b64(report), "vcek_jwk": vcek_jwk,
          "expected_measurement": MEASUREMENT.hex(), "strict": False},
         {"name": "pin_mismatch", "record": record, "report_b64": b64(report),
-         "vcek_pem": vcek_pem, "expected_measurement": WRONG_MEASUREMENT.hex(),
+         "vcek_jwk": vcek_jwk, "expected_measurement": WRONG_MEASUREMENT.hex(),
          "strict": False},
         {"name": "bound_to_different_record", "record": other_record,
-         "report_b64": b64(report), "vcek_pem": vcek_pem,
+         "report_b64": b64(report), "vcek_jwk": vcek_jwk,
          "expected_measurement": None, "strict": False},
         {"name": "signature_malleable_variant", "record": variant,
-         "report_b64": b64(report), "vcek_pem": vcek_pem,
+         "report_b64": b64(report), "vcek_jwk": vcek_jwk,
          "expected_measurement": None, "strict": False},
         {"name": "bad_signature", "record": record, "report_b64": b64(bad_sig),
-         "vcek_pem": vcek_pem, "expected_measurement": None, "strict": False},
+         "vcek_jwk": vcek_jwk, "expected_measurement": None, "strict": False},
         {"name": "vcek_mismatch", "record": record, "report_b64": b64(report),
-         "vcek_pem": _vcek_pem(other_vcek), "expected_measurement": None,
+         "vcek_jwk": other_vcek_jwk, "expected_measurement": None,
          "strict": False},
         {"name": "wrong_signature_algo", "record": record,
-         "report_b64": b64(wrong_algo), "vcek_pem": vcek_pem,
+         "report_b64": b64(wrong_algo), "vcek_jwk": vcek_jwk,
          "expected_measurement": None, "strict": False},
         {"name": "truncated_report", "record": record,
-         "report_b64": b64(report[:100]), "vcek_pem": vcek_pem,
+         "report_b64": b64(report[:100]), "vcek_jwk": vcek_jwk,
          "expected_measurement": None, "strict": False},
         {"name": "strict_unmet_no_kds", "record": record,
-         "report_b64": b64(report), "vcek_pem": vcek_pem,
+         "report_b64": b64(report), "vcek_jwk": vcek_jwk,
          "expected_measurement": MEASUREMENT.hex(), "strict": True},
     ]
 
@@ -157,7 +180,7 @@ def main() -> None:
         verdict = verify_enforcement(
             case["record"],
             base64.b64decode(case["report_b64"]),
-            case["vcek_pem"].encode("ascii"),
+            _jwk_to_pem(case["vcek_jwk"]),
             expected_measurement=case["expected_measurement"],
             strict=case["strict"],
         )

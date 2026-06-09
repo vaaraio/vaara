@@ -8,7 +8,7 @@ Each case in `cases.json` carries:
 
 - `record`: the SEP-2828 execution record (the bound payload).
 - `report_b64`: base64 of the binary SEV-SNP attestation report.
-- `vcek_pem`: the PEM the report signature is checked against.
+- `vcek_jwk`: the report signature is checked against this P-384 public key (a JWK, public verification material; the checker reconstructs the key from it).
 - `expected_measurement`: a hex launch measurement to pin, or `null`.
 - `strict`: the strict flag.
 

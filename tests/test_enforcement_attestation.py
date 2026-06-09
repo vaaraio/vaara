@@ -221,6 +221,29 @@ def test_verdict_is_json_serializable(vcek_key, vcek_pem):
 # ── Conformance vectors ──────────────────────────────────────────────────────
 
 
+def _jwk_p384(pub) -> dict:
+    n = pub.public_numbers()
+
+    def _b(value: int) -> str:
+        return base64.urlsafe_b64encode(value.to_bytes(48, "big")).rstrip(
+            b"=").decode("ascii")
+
+    return {"kty": "EC", "crv": "P-384", "x": _b(n.x), "y": _b(n.y)}
+
+
+def _jwk_to_pem(jwk: dict) -> bytes:
+    def _i(v: str) -> int:
+        return int.from_bytes(
+            base64.urlsafe_b64decode(v + "=" * (-len(v) % 4)), "big")
+
+    pub = ec.EllipticCurvePublicNumbers(
+        _i(jwk["x"]), _i(jwk["y"]), ec.SECP384R1()).public_key()
+    return pub.public_bytes(
+        encoding=serialization.Encoding.PEM,
+        format=serialization.PublicFormat.SubjectPublicKeyInfo,
+    )
+
+
 def _cases():
     return json.loads((VECTORS / "cases.json").read_text())["cases"]
 
@@ -231,7 +254,7 @@ def test_vaara_reproduces_vector_verdict(case):
     verdict = verify_enforcement(
         case["record"],
         base64.b64decode(case["report_b64"]),
-        case["vcek_pem"].encode("ascii"),
+        _jwk_to_pem(case["vcek_jwk"]),
         expected_measurement=case["expected_measurement"],
         strict=case["strict"],
     )
@@ -262,7 +285,7 @@ def test_checker_matches_vaara_on_fresh_report(vcek_key, vcek_pem):
     case = {
         "record": rec,
         "report_b64": base64.b64encode(report).decode("ascii"),
-        "vcek_pem": vcek_pem.decode("ascii"),
+        "vcek_jwk": _jwk_p384(vcek_key.public_key()),
         "expected_measurement": MEASUREMENT.hex(),
         "strict": False,
     }
