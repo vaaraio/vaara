@@ -67,11 +67,13 @@ def verify_decision_back_link(
     return BackLinkResult(ok=True)
 
 
-# The named projection version a no-SEP-2787 fallback digest commits to. The
-# signed record names which version it used (backLink.fallbackProjection), so a
-# verifier reconstructs the same projection deterministically and a future
-# projection rule is an explicit new version, not a silent reinterpretation.
-FALLBACK_PROJECTION_V1 = "sep2828-fallback/1"
+# The named projection version a no-SEP-2787 fallback digest commits to. The id
+# is descriptive (it names what the preimage includes) and the signed record
+# names which version it used (backLink.fallbackProjection), so a verifier
+# reconstructs the same projection deterministically and a future projection rule
+# is an explicit new version, not a silent reinterpretation. This is the id the
+# non-normative SEP-2828 example note on modelcontextprotocol#2867 settled on.
+FALLBACK_PROJECTION_V1 = "tools_call_params_plus_meta_authorization_binding_v1"
 _SUPPORTED_FALLBACK_PROJECTIONS = frozenset({FALLBACK_PROJECTION_V1})
 
 # The named binding block under ``_meta`` whose contents are authoritative for
