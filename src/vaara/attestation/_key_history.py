@@ -212,6 +212,8 @@ class KeyHistory:
 
     @classmethod
     def from_dict(cls, data: dict[str, object]) -> "KeyHistory":
+        if not isinstance(data, dict):
+            raise ValueError("key history must be a JSON object")
         raw = data.get("keys", [])
         if not isinstance(raw, list):
             raise ValueError("key-history 'keys' must be a list")
