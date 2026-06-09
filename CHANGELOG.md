@@ -21,22 +21,25 @@ and this project follows [Semantic Versioning](https://semver.org/spec/v2.0.0.ht
 
 ### Added
 - The no-SEP-2787 fallback back-link now binds a **named, versioned projection**
-  of the request envelope (the `tools/call` `name`+`arguments` plus the
-  `_meta.authorization_binding` block carrying the per-call `nonce` and
-  `projectionVersion`), not the whole observed `_meta`. Observation-local and
-  transport-local `_meta` (progress tokens, trace context, UI hints, fields a
-  gateway adds or strips) is excluded, so a gateway view and a provider view of
-  the same call project to the same digest; changing the bound params or the
-  binding block breaks the back-link; an absent or malformed binding block fails
-  closed instead of widening the preimage to the whole `_meta`.
-  `vaara.attestation.decision` adds `fallback_projection`,
-  `MalformedFallbackBindingError`, and `FALLBACK_PROJECTION_V1`;
-  `request_envelope_digest` and `verify_decision_fallback_binding` implement the
-  projection and fail-closed contract in the reference verifier. The
-  `decision_pairing_v0` corpus carries the provider, gateway, replayed,
-  tampered-binding, and no-binding envelopes as first-class fixture inputs, and
-  the Vaara-free checker reproduces every verdict. Refines the no-2787 fallback
-  shape discussed on modelcontextprotocol#2867.
+  of the request envelope, not the whole observed `_meta`. The preimage is an
+  allowlist: exactly the `tools/call` `name`+`arguments` plus the
+  `_meta.authorization_binding` block (the per-call `nonce`), and nothing else.
+  Every other `_meta` field is excluded by construction, so a gateway view and a
+  provider view of the same call project to the same digest; changing the bound
+  params or the binding block breaks the back-link; an absent binding block fails
+  closed instead of widening the preimage to the whole `_meta`. The signed record
+  names the projection version it used in a new `backLink.fallbackProjection`
+  field, so a verifier reconstructs the same projection deterministically from
+  trusted data and a later projection revision is an explicit new version rather
+  than a silent reinterpretation. `vaara.attestation.decision` adds
+  `fallback_projection`, `MalformedFallbackBindingError`, and
+  `FALLBACK_PROJECTION_V1`; `request_envelope_digest`,
+  `verify_decision_fallback_binding`, and the shared `BackLink` carry the version
+  and the fail-closed contract in the reference verifier. The `decision_pairing_v0`
+  corpus carries the provider, gateway, replayed, tampered-binding, and
+  no-binding envelopes as first-class fixture inputs, and the Vaara-free checker
+  reproduces every verdict. Refines the no-2787 fallback shape as it converged on
+  modelcontextprotocol#2867.
 
 ## [0.67.0] - 2026-06-09
 
