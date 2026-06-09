@@ -71,6 +71,12 @@ from vaara.attestation._conformance_statement import (
 from vaara.attestation._decision_conformance import (
     check_decision_conformance,
 )
+from vaara.attestation._enforcement import (
+    ENFORCEMENT_SCHEMA,
+    EnforcementVerdict,
+    bind_record_to_report_data,
+    verify_enforcement,
+)
 from vaara.attestation._handoff import (
     ComponentDigest,
     HandoffVerdict,
@@ -168,6 +174,10 @@ __all__ = [
     "ComponentDigest",
     "ConformanceCheck",
     "ConformanceReport",
+    "ENFORCEMENT_SCHEMA",
+    "EnforcementVerdict",
+    "bind_record_to_report_data",
+    "verify_enforcement",
     "HandoffVerdict",
     "build_handoff",
     "sign_manifest",
