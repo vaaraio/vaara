@@ -227,7 +227,7 @@ jobs:
           EXPECTED="${RELEASE_TAG#v}"
           echo "Expected version (from tag ${RELEASE_TAG}): ${EXPECTED}"
           python3 - "$EXPECTED" <<'PY'
-          import json, sys, time, urllib.request
+          import json, sys, time, urllib.error, urllib.request
 
           expected = sys.argv[1]
           names = ["io.github.vaaraio/vaara", "io.github.vaaraio/vaara-server"]
@@ -239,8 +239,14 @@ jobs:
               # paginated and does not reliably carry every server's active entry,
               # so a multi-listing repo needs one request per name.
               url = f"{BASE}?search={name}&version=latest"
-              with urllib.request.urlopen(url, timeout=30) as fh:
-                  data = json.load(fh)
+              try:
+                  with urllib.request.urlopen(url, timeout=30) as fh:
+                      data = json.load(fh)
+              except (urllib.error.URLError, TimeoutError) as exc:
+                  # A transient read timeout or 5xx must not abort the publish gate.
+                  # Treat it as a miss so the surrounding poll retries.
+                  print(f"WARN {name}: registry read failed ({exc!r}); will retry")
+                  return None
               for entry in data.get("servers", data.get("data", [])):
                   server = entry.get("server", entry)
                   if server.get("name") != name:
