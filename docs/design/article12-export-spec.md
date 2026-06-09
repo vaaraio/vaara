@@ -170,3 +170,80 @@ The two features compose; build threshold first.
 - Auto-submission to any regulator intake portal.
 - Per-article legal interpretation beyond the static obligation checklist
   (semantic-correctness layer; stays human-owned per the trust model).
+
+## Folding SEP-2828 evidence as sidecars (the fold)
+
+The package can carry verified SEP-2828 evidence beside the trail: cross-org
+handoff packages (Article 26(6) deployer custody) and confidential-VM
+enforcement bindings ("where it ran"). One deployer command then produces one
+package coherent across Article 12 (the signed trail), Article 19 (the eIDAS
+anchor), and Article 26(6) (the handoff records), with an optional
+confidential-VM attestation alongside.
+
+### The architectural seam
+
+Article 12 export operates on the **audit trail** (the hash-chained
+`AuditRecord` trail, the governance plane). Handoff and enforcement operate on
+**SEP-2828 execution records** (the attestation plane). These are two planes.
+The fold attaches SEP-2828 evidence as verified sidecars to the trail package;
+it does not claim the trail records are SEP-2828 records, and it does not bring
+the sidecars under the trail signature. The sidecars are content-addressed
+SEP-2828 records, verified at export.
+
+### Layout
+
+```
+evidence/handoff/<name>.json
+evidence/enforcement/<name>.{record.json,report.bin,vcek.pem}
+evidence/attestations_summary.json
+```
+
+`attestations_summary.json` carries the roll-up `check_handoff_set` /
+`check_enforcement_set` produce, plus the verifier-side inputs used at export
+(per-package anchor times, the trusted DID document, the expected measurement),
+so the folded evidence re-verifies offline from the package alone. The report
+gains a "Cross-org handoff and enforcement evidence" section mapping the counts
+to Article 26(6) custody and the confidential-VM "where enforcement ran"
+evidence, each with the honesty note verbatim.
+
+### Verified at export, fail closed
+
+Each attachment is verified before any bytes are written, in default mode, by
+the same `check_handoff_set` / `check_enforcement_set` the verify verbs use. A
+single attachment that does not verify raises and writes no package: v0 never
+ships evidence it cannot back, and there is no `--skip-invalid`.
+
+### Honesty model (the brand applies)
+
+- The eIDAS time anchor stays the **only** un-forgeable component of the package.
+- A handoff is `verifiable` when the signature binds to a listed key inside its
+  window and not revoked; it is `corroborated` only with a verified anchor that
+  predates retirement, and `pinned` only against a `--trusted-did-document`. It
+  is never silently upgraded.
+- An enforcement binding is never "attested" in v0: `vcek_chain_basis` stays
+  `caller_supplied_unverified` and `enforcement_logic_basis` stays
+  `not_established`. `--expected-measurement` pins a launch image; the
+  `attested` tier and a strict pass are reserved for the future KDS-chained tier.
+
+### Conformance
+
+`article12_fold_v0` vectors fold named subsets of the `cross_org_handoff_v0` and
+`enforcement_attestation_v0` corpora into a real package and pin the roll-up and
+`evidence/` membership. The Vaara-free checker reproduces every folded verdict
+from the same bytes folded into the zip (not a re-snapshot), composing the two
+single-verb suites' own evaluators.
+
+### CLI
+
+```
+vaara trail export-article12 --trail t.jsonl --key signer.pem --out pack.zip \
+    --anchor-tsa https://freetsa.org/tsr \
+    --handoff one.json --handoffs ./handoffs \
+    --enforcements ./enforced \
+    --trusted-did-document issuer-did.json \
+    --expected-measurement <96-hex>
+```
+
+`--handoff` is repeatable for single packages; `--handoffs` globs `*.json` in a
+directory; `--enforcements` discovers `NAME.record.json` + `NAME.report.bin` +
+`NAME.vcek.pem` triples by stem. Folding needs the attestation extra.

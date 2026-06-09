@@ -7,6 +7,28 @@ and this project follows [Semantic Versioning](https://semver.org/spec/v2.0.0.ht
 ## [Unreleased]
 
 ### Added
+- The Article 12 regulator pack now folds in cross-org handoff (Article 26(6))
+  and confidential-VM enforcement evidence, and verifies a full directory of
+  records in one pass. One deployer command produces one package coherent across
+  Article 12 (the signed record-keeping trail), Article 19 (existence in time
+  under the eIDAS anchor), and Article 26(6) (the records a deployer hands its
+  own regulator), with an optional "where it ran" confidential-VM attestation
+  alongside. It is a more complete pack, not a certificate: the eIDAS time
+  anchor stays the only un-forgeable component, a handoff is corroborated only
+  with a verified anchor and pinned only against a trusted DID document, and an
+  enforcement binding is never "attested" (the VCEK chain to AMD's root is not
+  validated in this release).
+- `vaara trail export-article12 --handoffs <dir> --enforcements <dir>` (also
+  `--handoff <pkg.json>`, repeatable): fold verified handoff packages and
+  confidential-VM enforcement bindings into the regulator package as sidecars
+  under `evidence/`, with the roll-up in `evidence/attestations_summary.json`
+  and a report section mapping them to Article 26(6) custody and the
+  confidential-VM "where enforcement ran" evidence. Each attachment is verified
+  at export; one that does not verify fails the export closed, so the package
+  never ships evidence it cannot back. `--trusted-did-document` pins handoff
+  producer identity out of band, `--expected-measurement` pins enforcement
+  launch images. New `article12_fold_v0` conformance vectors with a Vaara-free
+  checker that reproduces every folded verdict from the bytes inside the package.
 - `vaara verify-handoffs` and `vaara verify-enforcements`: the set-level forms of
   `verify-handoff` and `verify-enforcement`, for an auditor holding a directory
   of evidence rather than one file. `verify-handoffs` runs the handoff lens over

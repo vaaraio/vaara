@@ -49,6 +49,8 @@ trail.anchor_head(RFC3161TimeAnchorClient("https://freetsa.org/tsr"))
 
 The anchor also folds into the one-command regulator package: `vaara trail export-article12 --anchor-tsa https://freetsa.org/tsr` writes the timestamp beside the signed trail as Article 19 existence-in-time evidence, and `vaara trail verify-anchor --zip <package>.zip` checks it offline.
 
+The same command folds in cross-org handoff and confidential-VM enforcement evidence as verified sidecars: `vaara trail export-article12 --anchor-tsa <url> --handoffs ./handoffs --enforcements ./enforced` adds the records a deployer hands its own regulator (Article 26(6)) and "where enforcement ran" attestations under `evidence/`, with a roll-up in the report. Each attachment is verified at export and one that does not verify fails the export, so the package never ships evidence it cannot back. It is a more complete pack, not a certificate: the eIDAS anchor stays the only un-forgeable component, a handoff is corroborated only with a verified anchor, and an enforcement binding is never "attested" in this release.
+
 ## Install
 
 ```bash
