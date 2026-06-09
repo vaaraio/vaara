@@ -1,6 +1,6 @@
 {
   "both_back_links_ok": true,
   "both_signatures_ok": true,
-  "note": "equal decidedAt resolves by lexicographic issuerAsserted.nonce, lowest wins (d5a < d5b)",
-  "winner": "d5a"
+  "note": "equal decidedAt with no explicit ordering field: the effective decision is ambiguous, not resolved by nonce, file, or arrival order",
+  "supersession": "ambiguous"
 }
