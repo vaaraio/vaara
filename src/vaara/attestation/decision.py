@@ -47,8 +47,10 @@ from vaara.attestation._decision_types import (
 from vaara.attestation._decision_verifier import (
     decision_digest,
     records_paired,
+    request_envelope_digest,
     superseding_decision,
     verify_decision_back_link,
+    verify_decision_fallback_binding,
 )
 from vaara.attestation._receipt_types import BackLink
 from vaara.attestation._receipt_verifier import (
@@ -70,7 +72,9 @@ __all__ = [
     "make_back_link",
     "parse_decision_record",
     "records_paired",
+    "request_envelope_digest",
     "superseding_decision",
     "verify_decision_back_link",
+    "verify_decision_fallback_binding",
     "verify_decision_signature",
 ]

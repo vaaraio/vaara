@@ -1,0 +1,10 @@
+{
+  "_meta": {
+    "io.modelcontextprotocol/serverNonce": "server-chosen-nonce-001"
+  },
+  "arguments": {
+    "limit": 10,
+    "table": "employees"
+  },
+  "name": "query_table"
+}
