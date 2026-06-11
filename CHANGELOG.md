@@ -4,6 +4,18 @@ All notable changes to this project are documented here.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/)
 and this project follows [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [Unreleased]
+
+### Added
+- A negative conformance vector for an unsupported `alg` identifier in the
+  SEP-2787 attestation set (`neg_unknown_alg`): a well-formed HS256 envelope
+  re-labelled `alg: "none"`, the classic algorithm-confusion shape. A conformant
+  verifier must refuse it rather than treat the envelope as unsigned. The
+  Vaara-free walker reaches `signature_ok` false (no `alg` branch); the Vaara
+  reference refuses earlier, at the parse boundary (`alg` not in `VALID_ALGS`).
+  This completes the negative coverage promised for this surface alongside the
+  receipt replay-substitution case already shipped.
+
 ## [0.69.0] - 2026-06-11
 
 ### Added
