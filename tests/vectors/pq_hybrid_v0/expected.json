@@ -1,0 +1,92 @@
+{
+  "classical_only": {
+    "classical_bound": true,
+    "downgrade_resistant": false,
+    "pq_bound": false,
+    "pq_keyid": null,
+    "quantum_resistant": false,
+    "suite": null,
+    "tier": "classical-only"
+  },
+  "downgrade_stripped": {
+    "classical_bound": true,
+    "downgrade_resistant": false,
+    "pq_bound": false,
+    "pq_keyid": null,
+    "quantum_resistant": false,
+    "suite": "ES256+ML-DSA-65",
+    "tier": "hybrid-downgraded"
+  },
+  "es256_hybrid_clean": {
+    "classical_bound": true,
+    "downgrade_resistant": true,
+    "pq_bound": true,
+    "pq_keyid": "did:web:issuer.example#mldsa-2026",
+    "quantum_resistant": true,
+    "suite": "ES256+ML-DSA-65",
+    "tier": "hybrid-verified"
+  },
+  "pq_wrong_key": {
+    "classical_bound": true,
+    "downgrade_resistant": false,
+    "pq_bound": false,
+    "pq_keyid": "did:web:issuer.example#mldsa-2026",
+    "quantum_resistant": false,
+    "suite": "ES256+ML-DSA-65",
+    "tier": "hybrid-downgraded"
+  },
+  "pqc_present": {
+    "classical_bound": true,
+    "downgrade_resistant": false,
+    "pq_bound": true,
+    "pq_keyid": "did:web:issuer.example#mldsa-2026",
+    "quantum_resistant": true,
+    "suite": null,
+    "tier": "pqc-present"
+  },
+  "rs256_hybrid_clean": {
+    "classical_bound": true,
+    "downgrade_resistant": true,
+    "pq_bound": true,
+    "pq_keyid": "did:web:issuer.example#mldsa-2026",
+    "quantum_resistant": true,
+    "suite": "RS256+ML-DSA-65",
+    "tier": "hybrid-verified"
+  },
+  "suite_alg_mismatch": {
+    "classical_bound": true,
+    "downgrade_resistant": false,
+    "pq_bound": true,
+    "pq_keyid": "did:web:issuer.example#mldsa-2026",
+    "quantum_resistant": false,
+    "suite": "RS256+ML-DSA-65",
+    "tier": "hybrid-downgraded"
+  },
+  "tampered_body": {
+    "classical_bound": false,
+    "downgrade_resistant": false,
+    "pq_bound": false,
+    "pq_keyid": "did:web:issuer.example#mldsa-2026",
+    "quantum_resistant": false,
+    "suite": "ES256+ML-DSA-65",
+    "tier": "hybrid-downgraded"
+  },
+  "tampered_pq_sig": {
+    "classical_bound": true,
+    "downgrade_resistant": false,
+    "pq_bound": false,
+    "pq_keyid": "did:web:issuer.example#mldsa-2026",
+    "quantum_resistant": false,
+    "suite": "ES256+ML-DSA-65",
+    "tier": "hybrid-downgraded"
+  },
+  "unknown_suite": {
+    "classical_bound": true,
+    "downgrade_resistant": false,
+    "pq_bound": false,
+    "pq_keyid": null,
+    "quantum_resistant": false,
+    "suite": "ES256+BOGUS",
+    "tier": "hybrid-downgraded"
+  }
+}

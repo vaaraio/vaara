@@ -73,6 +73,7 @@ def emit_receipt(
     nonce: Optional[str] = None,
     iat: Optional[str] = None,
     version: int = 1,
+    sig_suite: Optional[str] = None,
 ) -> ExecutionReceipt:
     """Build, JCS-canonicalize, and sign an ExecutionReceipt envelope.
 
@@ -100,6 +101,7 @@ def emit_receipt(
         nonce=nonce or new_nonce(),
         secret_version=secret_version,
         alg=alg,
+        sig_suite=sig_suite,
     )
 
     payload = _signing_payload(
