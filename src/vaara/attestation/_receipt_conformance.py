@@ -43,6 +43,10 @@ _DIGEST_RE = re.compile(r"^sha256:[0-9a-f]{64}$")
 _HEX_RE = re.compile(r"^[0-9a-f]+$")
 # Fixed-width hex signature lengths. RS256 is modulus-width (variable).
 _SIG_HEX_LEN: dict[str, int] = {"HS256": 64, "ES256": 128}
+# Allowlisted post-quantum hybrid suites, in lockstep with _receipt_pq.
+_HYBRID_SUITES: frozenset[str] = frozenset(
+    {"ES256+ML-DSA-65", "RS256+ML-DSA-65"}
+)
 
 
 @dataclass(frozen=True)
@@ -181,7 +185,44 @@ def check_record_conformance(doc: Any) -> ConformanceReport:
                 isinstance(dd, str) and bool(_DIGEST_RE.match(dd)), REQUIRED,
                 "outcomeDerived.decisionDigest MUST be 'sha256:<64 lowercase hex>'")
 
+    _check_pq_fields(doc, ra if isinstance(ra, dict) else {}, add)
     return finish(alg, status)
+
+
+def _check_pq_fields(
+    doc: dict[str, Any], ra: dict[str, Any],
+    add: Callable[[str, bool, str, str], None],
+) -> None:
+    """Schema and self-evident-downgrade checks for the optional PQ fields.
+
+    Advisory only: a record without these fields is a perfectly conforming
+    classical record, and the quantum-resistance *tier* (``pq_verdict``) is a
+    verification judgment, not a schema gate. What is schema-visible here is
+    that a record committing to a hybrid ``sigSuite`` should carry the
+    ``pqSignature`` it promised; absence is a downgrade the record shows about
+    itself, reported but not gating.
+    """
+    suite = ra.get("sigSuite")
+    if suite is not None:
+        add("sig_suite_type", isinstance(suite, str), ADVISORY,
+            "receiptAsserted.sigSuite SHOULD be a string when present")
+    pq = doc.get("pqSignature")
+    if pq is not None:
+        shape_ok = isinstance(pq, dict) and all(
+            isinstance(pq.get(k), str) and pq.get(k) for k in ("alg", "keyid", "sig")
+        )
+        add("pq_signature_shape", shape_ok, ADVISORY,
+            "pqSignature SHOULD be an object with non-empty string alg, keyid, sig")
+        sig = pq.get("sig") if isinstance(pq, dict) else None
+        if isinstance(sig, str):
+            add("pq_signature_hex",
+                bool(_HEX_RE.match(sig)) and len(sig) % 2 == 0, ADVISORY,
+                "pqSignature.sig SHOULD be an even-length lowercase hex string")
+    if isinstance(suite, str) and suite in _HYBRID_SUITES:
+        add("committed_suite_has_pq_signature",
+            doc.get("pqSignature") is not None, ADVISORY,
+            "receiptAsserted.sigSuite commits to a hybrid suite but no "
+            "pqSignature is present (a schema-visible downgrade)")
 
 
 def _check_result_commitment(

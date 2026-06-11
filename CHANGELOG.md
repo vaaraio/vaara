@@ -4,6 +4,44 @@ All notable changes to this project are documented here.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/)
 and this project follows [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [0.69.0] - 2026-06-11
+
+### Added
+- Post-quantum hybrid signing for execution receipts (Track E1). A receipt is a
+  durable Article 12 record kept for years, so the live threat is "trust now,
+  forge later": its classical ES256 / RS256 signature is forgeable by a future
+  quantum adversary who can then backdate a forgery into the retention window. A
+  receipt may now carry a parallel **ML-DSA-65 (FIPS 204)** signature over the
+  same JCS preimage the classical signature covers; both must verify. The new
+  `receiptAsserted.sigSuite` names an allowlisted hybrid suite
+  (`ES256+ML-DSA-65` / `RS256+ML-DSA-65`) **inside** the signed preimage, so a
+  stripped `pqSignature` is a detectable downgrade rather than a silent loss of
+  protection, and the new top-level `pqSignature` block rides outside it. A new
+  `pq_verdict` reports a quantum-resistance tier orthogonal to
+  verifiable/corroborated: `hybrid-verified` (quantum- and downgrade-resistant),
+  `pqc-present` (a valid PQC signature but no committed suite, so strippable),
+  `classical-only` (verifiable today, not quantum-resistant), and the fail-closed
+  `hybrid-downgraded`. Pre-quantum and classical-only receipts are byte-for-byte
+  unchanged and verify exactly as before. ML-DSA public keys ride in the DID
+  document as an `AKP` JWK, tracking the JOSE/COSE post-quantum drafts. ML-DSA is
+  the pure-Python `dilithium-py`, imported lazily through the `pq` extra
+  (`pip install 'vaara[attestation,pq]'`); the base install and every classical
+  path stay standard-library. `dilithium-py` is a reference implementation (not
+  constant-time, not side-channel-hardened per its own docs): used for the
+  independent verifier and the vectors, while production signing of real
+  long-lived keys should use a hardened or FIPS-validated ML-DSA behind the same
+  signer boundary. v0 reports the quantum-resistance tier through `pq_verdict`
+  but does not yet gate `verify_receipt_retained`, the evidence bundle, or the
+  conformance `conforms` verdict on it (an E1b follow-on); a committed-downgrade
+  record is surfaced as a conformance advisory. New `pq_hybrid_v0` vectors (ten
+  cases) plus a Vaara-free independent checker reproduce every verdict. See
+  `docs/design/pq-hybrid-signing-spec.md`.
+- Execution-receipt parsing now rejects an unrecognized field under any signed
+  block (`receipt`, `receiptAsserted`, `backLink`, `outcomeDerived`) instead of
+  silently dropping it, so the modeled signing preimage stays byte-exact to the
+  wire and a verifier that re-derives the preimage from the model cannot call a
+  record signed when injected bytes were never covered by either signature.
+
 ## [0.68.0] - 2026-06-09
 
 ### Added
