@@ -1,0 +1,6 @@
+{
+  "args_commitment_ok": true,
+  "projection_match": true,
+  "signature_ok": false,
+  "ttl_ok": true
+}
