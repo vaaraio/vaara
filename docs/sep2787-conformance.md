@@ -89,7 +89,7 @@ null`.
   `_check_independent.py` walker that uses only the standard library plus
   `cryptography` and `rfc8785` to verify them without importing Vaara).
 - SEP-2787 attestation vectors live in-repo at
-  `tests/vectors/sep2787_attestation_v0/` (six cases across HS256/ES256/RS256,
+  `tests/vectors/sep2787_attestation_v0/` (seven cases across HS256/ES256/RS256,
   pinned keys, a `_check_independent.py` walker that uses only the standard
   library plus `cryptography` and `rfc8785` to verify signature, TTL, and the
   step-5 argument commitment without importing Vaara).

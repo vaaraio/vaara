@@ -114,6 +114,7 @@ vaara verify-bundle evidence-bundle.json
 | `verify-record` | The SEP-2828 wire format of any record, including one Vaara never produced. Keyless: the result commitment is the SHA-256 of the bytes beside it. |
 | `conformance-statement` | A producer proves its records conform against the published corpus, naming the exact corpus version and digest. |
 | `verify-retained` | A record under a key that has since rotated out, over the Article 12 retention window. |
+| hybrid PQC signing (`pq_verdict`) | A receipt's parallel ML-DSA-65 / FIPS 204 signature over the same preimage, for records that must outlive classical crypto. The suite is committed in the signed bytes, so stripping the post-quantum signature is a detectable downgrade, not a silent loss. |
 | `build-handoff` / `verify-handoff` | A self-contained package one org hands another org's regulator, offline, years later, under a rotated-out key. |
 | `verify-enforcement` | Binds a record to an AMD SEV-SNP confidential-VM attestation report. |
 | `verify-records`, `verify-bundles`, `verify-handoffs`, `verify-enforcements` | The set-level forms: each single-file check run over a whole directory, with a roll-up. |
