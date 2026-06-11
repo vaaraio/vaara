@@ -55,6 +55,13 @@ three:
   deadline at the pinned instant.
 - `neg_args_mismatch`: signature and TTL valid, but the commitment binds
   arguments other than the supplied runtime arguments.
+- `neg_unknown_alg`: a well-formed HS256 envelope re-labelled `alg:
+  "none"` (the classic algorithm-confusion shape). TTL and the argument
+  commitment still hold, but the signature must be refused: a verifier
+  MUST NOT treat an unsupported `alg` as unsigned. The independent walker
+  reaches `signature_ok` false (the `alg` dispatch finds no branch); the
+  Vaara reference refuses one layer earlier, at the parse boundary
+  (`alg` not in `VALID_ALGS`, raising `AttestationError`). Both refuse.
 
 A redacted (non-identity) projection verifies with `args_commitment_ok`
 true and `projection_match` false: the verifier confirms the projection

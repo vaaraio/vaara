@@ -166,6 +166,21 @@ def main() -> None:
           expected={"signature_ok": True, "ttl_ok": True,
                     "args_commitment_ok": False, "projection_match": None})
 
+    # Negative: unsupported `alg` identifier. A well-formed HS256 envelope
+    # re-labelled alg "none" -- the classic algorithm-confusion shape. The
+    # TTL and the argument commitment still hold, but a conformant verifier
+    # MUST refuse to verify under an algorithm it does not support, rather
+    # than treat the envelope as unsigned. The independent walker reaches
+    # signature_ok false (the alg dispatch finds no branch); Vaara refuses
+    # one layer earlier, at the parse boundary (alg not in VALID_ALGS).
+    att = _attest(alg="HS256", signing_material=HS_SECRET,
+                  args=make_args_digest(ARGS), nonce="att-nonce-hs-0007")
+    unknown = att.to_dict()
+    unknown["alg"] = "none"
+    _case("neg_unknown_alg", attestation_dict=unknown, runtime_args=ARGS,
+          expected={"signature_ok": False, "ttl_ok": True,
+                    "args_commitment_ok": True, "projection_match": True})
+
     print(f"wrote vectors under {OUT}")
     print(f"TTL evaluated at {EVAL_NOW_ISO}")
 

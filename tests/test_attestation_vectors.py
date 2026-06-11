@@ -29,10 +29,13 @@ for _mod in ("rfc8785", "cryptography"):
 from cryptography.hazmat.primitives import serialization  # noqa: E402
 
 from vaara.attestation.sep2787 import (  # noqa: E402
+    AttestationError,
     parse_attestation,
     verify_args_commitment,
     verify_attestation,
 )
+
+SUPPORTED_ALGS = frozenset({"HS256", "ES256", "RS256"})
 
 VECTORS = Path(__file__).parent / "vectors" / "sep2787_attestation_v0"
 KEYS = VECTORS / "keys"
@@ -70,14 +73,25 @@ def test_independent_walker_passes_all_cases():
     assert _load_checker().main() == 0
 
 
-def test_at_least_six_cases_present():
-    assert len(_cases()) >= 6
+def test_at_least_seven_cases_present():
+    assert len(_cases()) >= 7
 
 
 @pytest.mark.parametrize("case", _cases(), ids=lambda p: p.name)
 def test_library_verdicts_match_expected(case):
     raw = json.loads((case / "attestation.json").read_text())
     expected = json.loads((case / "expected.json").read_text())
+
+    # An unsupported `alg` is refused fail-closed at the parse boundary,
+    # before any signature work -- the independent walker reaches the same
+    # refusal one layer later, as signature_ok false. Both refuse; neither
+    # treats the envelope as unsigned.
+    if raw["alg"] not in SUPPORTED_ALGS:
+        with pytest.raises(AttestationError):
+            parse_attestation(raw)
+        assert expected["signature_ok"] is False
+        return
+
     att = parse_attestation(raw)
     material = _verifying_material(att.alg)
 
