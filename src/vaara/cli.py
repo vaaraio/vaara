@@ -2381,6 +2381,73 @@ def _print_enforcement_report(v: Any) -> None:
     print(f"  {_safe_inline(v.reason)}")
 
 
+def _cmd_verify_tpm_binding(args: argparse.Namespace) -> int:
+    """Verify a TPM 2.0 quote + IMA evidence bundle binds a SEP-2828 record.
+
+    Reads one ``vaara.tpm-evidence-bundle/v0`` JSON file and prints one verdict.
+    Honest limits: a pass proves the quote was signed by the AK you supplied, its
+    extraData carries sha512(jcs(record)), the supplied PCR values recompute the
+    signed digest, and the IMA log replays to the quoted PCR 10. It does not prove
+    the AK belongs to a genuine TPM (the EK chain is not validated) or that the
+    measured software decided anything (IMA measures files, not semantics). Pass
+    expectedImaPcr in the bundle to pin which measured state ran. Exit 0 iff ok.
+    """
+    try:
+        import rfc8785  # noqa: F401
+        from cryptography.hazmat.primitives.asymmetric import ec  # noqa: F401
+
+        from vaara.attestation._tpm import TPMAttestationError
+        from vaara.attestation.receipt import verify_tpm_bundle
+    except ImportError:
+        print(_ATTESTATION_HINT, file=sys.stderr)
+        return 2
+
+    try:
+        doc = _load_json_file(args.bundle, "TPM evidence bundle")
+    except ValueError as exc:
+        print(f"vaara verify-tpm-binding: {exc}", file=sys.stderr)
+        return 1
+
+    try:
+        verdict = verify_tpm_bundle(doc, strict=args.strict)
+    except (ValueError, TPMAttestationError) as exc:
+        print(f"vaara verify-tpm-binding: {exc}", file=sys.stderr)
+        return 1
+
+    if args.json:
+        print(json.dumps(verdict.to_dict(), indent=2))
+    else:
+        _print_tpm_binding_report(verdict)
+    return 0 if verdict.ok else 1
+
+
+def _print_tpm_binding_report(v: Any) -> None:
+    # extraData, the PCR values and the IMA log come from a bundle the caller
+    # supplied and Vaara did not produce; escape control characters so a crafted
+    # value cannot forge extra lines in the human report.
+    print(f"verdict: {'OK' if v.ok else 'FAILED'}  tier={v.tier}"
+          + ("  [strict]" if v.strict else ""))
+    print(f"  parsed:          {v.parsed}  magic_ok={v.magic_ok} "
+          f"quote={v.attest_type_ok}")
+    print(f"  signature:       algo_ok={v.signature_algo_ok} "
+          f"valid={v.signature_valid}  [{v.ak_chain_basis}]")
+    print(f"  record binding:  bound={v.bound}")
+    print(f"  pcr digest:      recomputed={v.pcr_digest_recomputed}")
+    quoted = _safe_inline(v.ima_pcr_quoted) if v.ima_pcr_quoted else "(none)"
+    print(f"  IMA PCR {v.ima_pcr_index}:      {quoted}  [{v.pcr_pin_basis}]")
+    print(f"  IMA replay:      replayed={v.ima_replayed} "
+          f"entries={v.ima_log_entries}")
+    print(f"  decision logic:  {v.decision_logic_basis}")
+    print(f"  freshness:       {v.freshness_basis}")
+    ctx = v.pcr_context
+    if ctx:
+        print(f"  quote context:   reset={ctx.get('reset_count')} "
+              f"restart={ctx.get('restart_count')} "
+              f"fw={ctx.get('firmware_version')} "
+              f"pcrs={_safe_inline(str(ctx.get('selected_pcrs')))}")
+    print(f"  {_safe_inline(v.reason)}")
+
+
 def _cmd_build_handoff(args: argparse.Namespace) -> int:
     """Assemble a cross-org handoff package from the producer's pieces.
 
@@ -3983,6 +4050,36 @@ def build_parser() -> argparse.ArgumentParser:
         help="Emit the full enforcement verdict as JSON",
     )
     pve.set_defaults(func=_cmd_verify_enforcement)
+
+    pvt = sub.add_parser(
+        "verify-tpm-binding",
+        help="Check whether a TPM 2.0 quote plus the kernel IMA log binds a "
+             "signed SEP-2828 record to measured, un-tampered hardware: the "
+             "quote's extraData must carry sha512(jcs(record)), its signature "
+             "must verify against the AK you supply, the PCR values must "
+             "recompute the signed pcrDigest, and the IMA log must replay to the "
+             "quoted PCR 10. It does not validate the AK to a TPM vendor root (EK "
+             "chain deferred) or prove the measured software made any decision "
+             "(IMA measures files, not semantics), so it does not by itself "
+             "establish a genuine TPM. Reads one vaara.tpm-evidence-bundle/v0 "
+             "JSON file. Requires the attestation extra.",
+    )
+    pvt.add_argument(
+        "bundle",
+        help="Path to the vaara.tpm-evidence-bundle/v0 JSON file (record, quote, "
+             "AK, PCR values, and IMA log; produced by scripts/tpm/)",
+    )
+    pvt.add_argument(
+        "--strict", action="store_true",
+        help="Regulator-grade: pass only at the EK-rooted attested tier "
+             "(validated AK chain plus a pinned IMA PCR), which v0 cannot yet "
+             "reach, so a strict pass is honestly unavailable",
+    )
+    pvt.add_argument(
+        "--json", action="store_true",
+        help="Emit the full TPM binding verdict as JSON",
+    )
+    pvt.set_defaults(func=_cmd_verify_tpm_binding)
 
     pves = sub.add_parser(
         "verify-enforcements",
