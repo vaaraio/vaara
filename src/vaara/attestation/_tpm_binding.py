@@ -16,7 +16,7 @@ who trusts neither Vaara nor the operator:
 
 1. The AK signature verifies over the exact quote bytes, so the quote was
    produced by whoever holds that attestation key.
-2. ``extraData`` in the quote equals ``SHA-512(jcs(record))``, so the quote was
+2. ``extraData`` in the quote equals ``SHA-256(jcs(record))``, so the quote was
    taken *for this record* and not lifted from elsewhere.
 3. The supplied PCR values recompute the ``pcrDigest`` the AK signed, so those
    values are the ones the TPM quoted, not a convenient substitute.
@@ -77,16 +77,23 @@ TPM_BINDING_SCHEMA = "vaara.tpm-binding-attestation/v0"
 
 
 def bind_record_to_extra_data(record: dict[str, Any]) -> bytes:
-    """The 64-byte TPM quote ``extraData`` that binds a quote to a record.
+    """The 32-byte TPM quote ``extraData`` that binds a quote to a record.
 
-    ``extraData = SHA-512(canonical_json(record))`` over the FULL on-disk record
-    dict, *including* its top-level ``signature`` field. Identical preimage
-    discipline to :func:`~vaara.attestation._enforcement.bind_record_to_report_data`:
-    SHA-512 is 64 bytes, exactly the ``TPM2B_DATA`` ceiling, and hashing the whole
-    record (not the signed-block subset) closes the signature-malleability gap
-    where a stripped or swapped signature would canonicalise the same.
+    ``extraData = SHA-256(canonical_json(record))`` over the FULL on-disk record
+    dict, *including* its top-level ``signature`` field. Same preimage discipline as
+    :func:`~vaara.attestation._enforcement.bind_record_to_report_data` (hash the
+    whole record, not the signed-block subset, to close the signature-malleability
+    gap where a stripped or swapped signature would canonicalise the same).
+
+    SHA-256, not SHA-512: a quote's ``qualifyingData`` is a ``TPM2B_DATA`` whose
+    ceiling is ``sizeof(TPMU_HA)`` (the TPM's largest *implemented* hash), so a
+    64-byte nonce is rejected ``TPM_RC_SIZE`` on any TPM without SHA-512 (most fTPMs
+    cap at SHA-384 = 48 bytes; confirmed against an AMD fTPM 2026-06-12). 32 bytes
+    fits every TPM 2.0, where SHA-256 is mandatory. SEV-SNP ``REPORT_DATA`` is a
+    flat 64-byte field with no such constraint, so the enforcement side still uses
+    SHA-512; only the TPM nonce changes.
     """
-    return hashlib.sha512(canonical_json(record)).digest()
+    return hashlib.sha256(canonical_json(record)).digest()
 
 
 def bind_record_to_chain_extra_data(
@@ -94,19 +101,20 @@ def bind_record_to_chain_extra_data(
 ) -> bytes:
     """The ``extraData`` for one link of a continuous-attestation chain.
 
-    ``extraData = SHA-512(canonical_json(record) || prev_digest || seq_be64)``.
+    ``extraData = SHA-256(canonical_json(record) || prev_digest || seq_be64)``.
     Where :func:`bind_record_to_extra_data` binds a lone quote to a record, this
     additionally folds in the position in the chain (``seq``, a big-endian u64) and
     the predecessor link (``prev_digest``, the SHA-256 of the previous link's signed
     quote bytes; the genesis link uses 32 zero bytes). Because the AK signs the
     quote and the quote covers this ``extraData``, the linkage is tamper-evident:
     dropping, reordering, or splicing a link changes the ``prev_digest`` a later
-    link committed to, so its binding no longer holds. Still 64 bytes, the
-    ``TPM2B_DATA`` ceiling, for the same reason as the Phase-0 binding.
+    link committed to, so its binding no longer holds. 32 bytes, for the same
+    ``TPM2B_DATA`` portability reason as the Phase-0 binding (a 64-byte nonce is
+    rejected ``TPM_RC_SIZE`` on a TPM without SHA-512).
     """
     if seq < 0:
         raise ValueError("seq must be non-negative")
-    return hashlib.sha512(
+    return hashlib.sha256(
         canonical_json(record) + prev_digest + seq.to_bytes(8, "big")
     ).digest()
 
@@ -302,7 +310,7 @@ def _reason(
         parts.append("the quote signature did not verify against the supplied AK")
     elif not bound:
         parts.append(
-            "extraData does not equal sha512(jcs(record)): the quote does not "
+            "extraData does not equal sha256(jcs(record)): the quote does not "
             "bind to this record"
         )
     elif not pcr_digest_recomputed:
@@ -373,7 +381,7 @@ def verify_tpm_binding(
     were quoted; ``ima_log`` is the ascii IMA runtime-measurement log.
     ``expected_ima_pcr`` optionally pins the quoted PCR 10 (hex) against a vetted
     reference. ``expected_extra_data`` overrides the expected ``extraData``: by
-    default the quote is expected to bind to ``SHA-512(jcs(record))``; the
+    default the quote is expected to bind to ``SHA-256(jcs(record))``; the
     continuous-attestation chain passes the chain-extended binding from
     :func:`bind_record_to_chain_extra_data` so each link is checked against its own
     position and predecessor. ``strict`` requires the EK-rooted ``attested`` tier

@@ -4,7 +4,7 @@
 # Phase 1 of the hardware-governance binding, the continuous-attestation loop. It
 # takes one signed SEP-2828 record and, on a fixed interval, asks the local TPM 2.0
 # for a sequence of quotes over PCR 10. Each tick's extraData carries the
-# chain-extended nonce SHA-512(jcs(record) || prev_digest || seq), so the ticks are
+# chain-extended nonce SHA-256(jcs(record) || prev_digest || seq), so the ticks are
 # hash-linked: a regulator running `vaara verify-tpm-chain` offline learns the
 # measured platform held continuously across the window, with no reboot and an
 # append-only IMA log, trusting no operator.
