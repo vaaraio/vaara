@@ -6,6 +6,18 @@ and this project follows [Semantic Versioning](https://semver.org/spec/v2.0.0.ht
 
 ## [Unreleased]
 
+## [0.70.0] - 2026-06-12
+
+The hardware-rooted continuous-governance layer. A signed SEP-2828 execution
+record is bound to a TPM 2.0 quote and the kernel's IMA measurement log, and then
+to an ordered chain of quotes that shows the measured platform held continuously
+across a window. A regulator recomputes every link offline, without trusting the
+operator and without a vendor-specific confidential VM. This is the
+commodity-hardware floor beneath the existing SEV-SNP enforcement path: the same
+governance record, now anchored to whatever silicon a box actually has. The
+verifiers and document formats are pure and fully tested with no hardware
+present; the capture scripts feed them real evidence on a box with a TPM.
+
 ### Added
 - `vaara verify-tpm-chain`: Phase 1 of the hardware-governance binding, the
   continuous-attestation loop. Where `verify-tpm-binding` binds one TPM 2.0 quote
@@ -58,6 +70,18 @@ and this project follows [Semantic Versioning](https://semver.org/spec/v2.0.0.ht
   reference refuses earlier, at the parse boundary (`alg` not in `VALID_ALGS`).
   This completes the negative coverage promised for this surface alongside the
   receipt replay-substitution case already shipped.
+
+### Fixed
+- The TPM quote binding nonce is SHA-256 (32 bytes), not SHA-512. A quote's
+  `qualifyingData` is a `TPM2B_DATA` whose buffer ceiling is the TPM's largest
+  *implemented* hash, so a 64-byte SHA-512 nonce is rejected `TPM_RC_SIZE` on the
+  many fTPMs that cap at SHA-384 (confirmed against an AMD fTPM). SHA-256 is
+  mandatory on every TPM 2.0 and fits the slot. SEV-SNP `REPORT_DATA` is a flat
+  64-byte field with no such constraint and is unchanged.
+- The capture scripts flush stale transient objects and sessions before creating
+  the EK/AK. fTPMs implement only a few object slots, so a prior interrupted run
+  could leave keys resident and make the next `tpm2_createak` fail
+  `TPM_RC_OBJECT_MEMORY`.
 
 ## [0.69.0] - 2026-06-11
 
