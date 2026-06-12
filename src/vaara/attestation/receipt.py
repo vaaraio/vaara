@@ -83,6 +83,21 @@ from vaara.attestation._enforcement_set import (
     EnforcementSetReport,
     check_enforcement_set,
 )
+from vaara.attestation._tpm import (
+    MockTPMQuoter,
+    TPMAttestationError,
+)
+from vaara.attestation._tpm_binding import (
+    TPM_BINDING_SCHEMA,
+    TPMBindingVerdict,
+    bind_record_to_extra_data,
+    verify_tpm_binding,
+)
+from vaara.attestation._tpm_bundle import (
+    TPM_BUNDLE_SCHEMA,
+    build_tpm_bundle_document,
+    verify_tpm_bundle,
+)
 from vaara.attestation._handoff import (
     ComponentDigest,
     HandoffVerdict,
@@ -204,6 +219,15 @@ __all__ = [
     "EnforcementSetEntry",
     "EnforcementSetReport",
     "check_enforcement_set",
+    "TPM_BINDING_SCHEMA",
+    "TPM_BUNDLE_SCHEMA",
+    "TPMAttestationError",
+    "TPMBindingVerdict",
+    "MockTPMQuoter",
+    "bind_record_to_extra_data",
+    "build_tpm_bundle_document",
+    "verify_tpm_binding",
+    "verify_tpm_bundle",
     "HandoffVerdict",
     "build_handoff",
     "sign_manifest",

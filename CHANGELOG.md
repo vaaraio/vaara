@@ -7,6 +7,27 @@ and this project follows [Semantic Versioning](https://semver.org/spec/v2.0.0.ht
 ## [Unreleased]
 
 ### Added
+- `vaara verify-tpm-binding`: the commodity-hardware, vendor-neutral twin of
+  `verify-enforcement` (Phase 0 of the hardware-governance binding). Where the
+  SEV-SNP path binds a confidential-VM report, this binds an ordinary **TPM 2.0
+  quote** plus the kernel's **IMA** runtime-measurement log to a signed SEP-2828
+  record. One `vaara.tpm-evidence-bundle/v0` document carries the record, the
+  quote, its AK signature, the quoted PCR values, and the IMA log; the offline
+  verifier checks four links a regulator can reproduce without trusting the
+  operator: the AK signature over the quote, `extraData == sha512(jcs(record))`,
+  the supplied PCR values recomputing the signed `pcrDigest`, and the IMA log
+  replaying to the quoted PCR 10. The verdict tiers `unverified` / `bound` /
+  `pcr_pinned` mirror the enforcement model, with the same honesty fields: the AK
+  is trusted as supplied (its EK chain to a TPM vendor root is the deferred
+  `attested` tier, so `--strict` is honestly unreachable), IMA measures files not
+  decision semantics (`decision_logic_basis` is always `not_established`), and a
+  captured quote carries no verifier challenge so freshness is not asserted. The
+  binding preimage is the full record including its signature, closing the same
+  signature-malleability gap as the SEV-SNP binding. New `vaara[attestation]`
+  surface: `verify_tpm_binding`, `verify_tpm_bundle`, `build_tpm_bundle_document`,
+  `bind_record_to_extra_data`, `MockTPMQuoter`. A real-hardware capture script
+  lives in `scripts/tpm/` (needs tpm2-tools and TPM access); the verifier and bundle
+  format are pure and tested with no hardware present.
 - A negative conformance vector for an unsupported `alg` identifier in the
   SEP-2787 attestation set (`neg_unknown_alg`): a well-formed HS256 envelope
   re-labelled `alg: "none"`, the classic algorithm-confusion shape. A conformant
