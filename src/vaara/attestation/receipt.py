@@ -90,6 +90,7 @@ from vaara.attestation._tpm import (
 from vaara.attestation._tpm_binding import (
     TPM_BINDING_SCHEMA,
     TPMBindingVerdict,
+    bind_record_to_chain_extra_data,
     bind_record_to_extra_data,
     verify_tpm_binding,
 )
@@ -97,6 +98,16 @@ from vaara.attestation._tpm_bundle import (
     TPM_BUNDLE_SCHEMA,
     build_tpm_bundle_document,
     verify_tpm_bundle,
+)
+from vaara.attestation._tpm_chain import (
+    TPM_CHAIN_SCHEMA,
+    TPMChainLink,
+    TPMChainVerdict,
+    verify_tpm_chain,
+)
+from vaara.attestation._tpm_chain_bundle import (
+    build_tpm_chain_document,
+    verify_tpm_chain_bundle,
 )
 from vaara.attestation._handoff import (
     ComponentDigest,
@@ -221,13 +232,20 @@ __all__ = [
     "check_enforcement_set",
     "TPM_BINDING_SCHEMA",
     "TPM_BUNDLE_SCHEMA",
+    "TPM_CHAIN_SCHEMA",
     "TPMAttestationError",
     "TPMBindingVerdict",
+    "TPMChainLink",
+    "TPMChainVerdict",
     "MockTPMQuoter",
+    "bind_record_to_chain_extra_data",
     "bind_record_to_extra_data",
     "build_tpm_bundle_document",
+    "build_tpm_chain_document",
     "verify_tpm_binding",
     "verify_tpm_bundle",
+    "verify_tpm_chain",
+    "verify_tpm_chain_bundle",
     "HandoffVerdict",
     "build_handoff",
     "sign_manifest",
