@@ -22,6 +22,12 @@ docs/blog/
 docs/grant/
 dist_verify/
 research/
+# HARD RULE — copyrighted, personally-watermarked draft standards (SFS/CEN/ISO,
+# "Downloaded by hello@vaara.io", do-not-distribute). NEVER commit, even if the
+# broad research/ line above is ever loosened. Folder also carries its own
+# .gitignore ('*') as a second guard. Do not remove either.
+research/sfs_sr315/
+**/sfs_sr315/
 .claude/
 
 # Private / internal, never publish
