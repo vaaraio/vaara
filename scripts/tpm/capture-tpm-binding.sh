@@ -48,7 +48,7 @@ else
   PY="python3"
 fi
 
-for tool in tpm2_createek tpm2_createak tpm2_quote tpm2_pcrread; do
+for tool in tpm2_createek tpm2_createak tpm2_quote tpm2_pcrread tpm2_flushcontext; do
   if ! command -v "${tool}" >/dev/null 2>&1; then
     echo "error: ${tool} not found; install tpm2-tools" >&2
     exit 3
@@ -71,6 +71,16 @@ trap 'rm -rf "${WORK}"' EXIT
 
 echo "==> computing quote nonce = SHA-256(jcs(record))"
 EXTRA_DATA_HEX="$("${PY}" "${ASSEMBLE}" extra-data "${RECORD}")"
+
+# fTPMs implement only a handful of transient object slots. A previous run that
+# died mid-way (or any other TPM user) can leave the EK/AK or a session resident,
+# and tpm2_createak then fails 0x902 (TPM_RC_OBJECT_MEMORY, "out of memory for
+# object contexts"). Flush stale transient objects and sessions first; harmless
+# when nothing is loaded.
+echo "==> flushing any stale transient objects + sessions"
+tpm2_flushcontext -t >/dev/null 2>&1 || true
+tpm2_flushcontext -l >/dev/null 2>&1 || true
+tpm2_flushcontext -s >/dev/null 2>&1 || true
 
 echo "==> creating ephemeral ECC endorsement + attestation keys"
 tpm2_createek -c "${WORK}/ek.ctx" -G ecc >/dev/null
