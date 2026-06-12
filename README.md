@@ -14,7 +14,7 @@
   <a href="https://huggingface.co/spaces/vaaraio/vaara"><img src="https://img.shields.io/badge/%F0%9F%A4%97%20Hugging%20Face-Space-blue" alt="Hugging Face Space"></a>
 </p>
 
-Vaara is the open-source runtime evidence layer for AI agents under the EU AI Act. It sits in front of an agent's tool calls, gates each one against your policy, and writes a tamper-evident record an outside party can verify. When a regulator, an auditor, or a public-sector buyer needs proof of what your agent actually did and why, that record is the answer. Runs entirely in your own environment. No SaaS, no telemetry.
+Vaara is an open-source evidence layer for AI governance: it gates each agent tool call against your policy, writes an offline-verifiable execution record, and binds that record to the machine's own TPM 2.0 + IMA attestation. When a regulator, an auditor, or a public-sector buyer needs proof of what your agent actually did and why, that record is the answer. Runs entirely in your own environment. No SaaS, no telemetry.
 
 EU AI Act Article 12 record-keeping is the driver. The same trail answers any "show me exactly what the agent did" demand: procurement validation, incident reconstruction, SOC 2 evidence.
 
