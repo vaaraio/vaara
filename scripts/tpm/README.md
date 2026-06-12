@@ -19,7 +19,7 @@ For one bundle, four links checked by someone who trusts neither Vaara nor the
 operator:
 
 1. the AK signature verifies over the exact quote bytes;
-2. the quote's `extraData` equals `SHA-512(jcs(record))`, so the quote was taken
+2. the quote's `extraData` equals `SHA-256(jcs(record))`, so the quote was taken
    for *this* record;
 3. the supplied PCR values recompute the `pcrDigest` the AK signed;
 4. the supplied IMA log replays to the quoted PCR 10.
@@ -71,7 +71,7 @@ reference state to reach the `pcr_pinned` tier.
 `vaara verify-tpm-chain` extends Phase 0 from one quote to an ordered sequence,
 the Keylime-style loop. The capture script takes a quote on a fixed interval,
 reusing one AK, and each tick's `extraData` is the chain-extended nonce
-`SHA-512(jcs(record) || prev_digest || seq)` (`prev_digest` is the SHA-256 of the
+`SHA-256(jcs(record) || prev_digest || seq)` (`prev_digest` is the SHA-256 of the
 previous tick's quote; genesis is 32 zero bytes). The links are hash-chained, so a
 dropped, reordered, or spliced tick fails its successor's binding.
 

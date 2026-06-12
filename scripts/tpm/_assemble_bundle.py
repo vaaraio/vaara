@@ -1,7 +1,7 @@
 """Assemble a vaara.tpm-evidence-bundle/v0 from tpm2-tools capture outputs.
 
 Called by ``capture-tpm-binding.sh`` after it has driven the TPM. Kept separate
-so the canonicalisation of the record (``SHA-512(jcs(record))`` for the quote
+so the canonicalisation of the record (``SHA-256(jcs(record))`` for the quote
 nonce) and the bundle assembly run through the *same* vaara code the verifier
 uses, with no re-implementation in shell. Run under an interpreter that has
 ``vaara[attestation]`` installed.
@@ -59,7 +59,7 @@ def main() -> None:
     parser = argparse.ArgumentParser(description=__doc__)
     sub = parser.add_subparsers(dest="cmd", required=True)
 
-    p_extra = sub.add_parser("extra-data", help="print SHA-512(jcs(record)) hex")
+    p_extra = sub.add_parser("extra-data", help="print SHA-256(jcs(record)) hex")
     p_extra.add_argument("record")
 
     p_asm = sub.add_parser("assemble", help="build the bundle JSON")

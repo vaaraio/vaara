@@ -13,7 +13,7 @@ What a ``continuous`` chain proves that one quote does not
 ---------------------------------------------------------
 
 1. **Ordering, tamper-evident.** Each link's ``extraData`` is
-   ``SHA-512(jcs(record) || prev_digest || seq)`` where ``prev_digest`` is the
+   ``SHA-256(jcs(record) || prev_digest || seq)`` where ``prev_digest`` is the
    SHA-256 of the previous link's signed quote (genesis: 32 zero bytes). The AK
    signs the quote and the quote covers ``extraData``, so dropping, reordering, or
    splicing a link changes the ``prev_digest`` a later link committed to and its

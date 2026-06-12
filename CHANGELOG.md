@@ -12,7 +12,7 @@ and this project follows [Semantic Versioning](https://semver.org/spec/v2.0.0.ht
   to a record at a point in time, this binds an ordered sequence of quotes over a
   window (the Keylime-style loop): each tick re-quotes the TPM and folds the grown
   IMA log into a hash-linked chain. Each link's `extraData` is
-  `SHA-512(jcs(record) || prev_digest || seq)`, so dropping, reordering, or
+  `SHA-256(jcs(record) || prev_digest || seq)`, so dropping, reordering, or
   splicing a link fails its successor's binding. A `continuous` verdict requires,
   on top of every link passing the Phase-0 check: the TPM clock strictly
   increasing, `resetCount`/`restartCount` constant (no reboot, no unmeasured gap),
@@ -36,7 +36,7 @@ and this project follows [Semantic Versioning](https://semver.org/spec/v2.0.0.ht
   record. One `vaara.tpm-evidence-bundle/v0` document carries the record, the
   quote, its AK signature, the quoted PCR values, and the IMA log; the offline
   verifier checks four links a regulator can reproduce without trusting the
-  operator: the AK signature over the quote, `extraData == sha512(jcs(record))`,
+  operator: the AK signature over the quote, `extraData == sha256(jcs(record))`,
   the supplied PCR values recomputing the signed `pcrDigest`, and the IMA log
   replaying to the quoted PCR 10. The verdict tiers `unverified` / `bound` /
   `pcr_pinned` mirror the enforcement model, with the same honesty fields: the AK
