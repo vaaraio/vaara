@@ -119,10 +119,10 @@ def _build_links(
 # --- binding primitives ---------------------------------------------------
 
 
-def test_chain_extra_data_is_64_bytes_and_deterministic():
+def test_chain_extra_data_is_32_bytes_and_deterministic():
     rec = _record()
     a = bind_record_to_chain_extra_data(rec, GENESIS_PREV_DIGEST, 0)
-    assert len(a) == 64
+    assert len(a) == 32
     assert a == bind_record_to_chain_extra_data(rec, GENESIS_PREV_DIGEST, 0)
 
 

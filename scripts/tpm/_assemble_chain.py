@@ -6,7 +6,7 @@ assembly run through the *same* vaara code the verifier uses, with no
 re-implementation in shell.
 
 The chain nonce for tick ``seq`` is
-``SHA-512(jcs(record) || prev_digest || seq_be64)`` where ``prev_digest`` is the
+``SHA-256(jcs(record) || prev_digest || seq_be64)`` where ``prev_digest`` is the
 SHA-256 of the previous tick's ``TPMS_ATTEST`` bytes (the genesis tick uses 32 zero
 bytes). The shell computes it per tick with the ``extra-data`` subcommand before
 asking for that tick's quote, then assembles every tick at the end.
