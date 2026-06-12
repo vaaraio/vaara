@@ -11,28 +11,39 @@ ECDSA-signs real ``TPMS_ATTEST`` quotes, so no TPM is needed.
 
 from __future__ import annotations
 
+import importlib.util
 import json
 from dataclasses import replace
 
 import pytest
-from cryptography.hazmat.primitives import serialization
-from cryptography.hazmat.primitives.asymmetric import ec
 
-from vaara.attestation._tpm import (
+for _mod in ("rfc8785", "cryptography"):
+    if importlib.util.find_spec(_mod) is None:
+        pytest.skip(
+            "attestation extra not installed (pip install 'vaara[attestation]')",
+            allow_module_level=True,
+        )
+
+from cryptography.hazmat.primitives import serialization  # noqa: E402
+from cryptography.hazmat.primitives.asymmetric import ec  # noqa: E402
+
+from vaara.attestation._tpm import (  # noqa: E402
     IMA_PCR,
     TPM_ALG_SHA256,
     MockTPMQuoter,
     replay_ima_pcr,
 )
-from vaara.attestation._tpm_binding import bind_record_to_chain_extra_data
-from vaara.attestation._tpm_chain import (
+from vaara.attestation._tpm_binding import (  # noqa: E402
+    bind_record_to_chain_extra_data,
+)
+from vaara.attestation._tpm_chain import (  # noqa: E402
     GENESIS_PREV_DIGEST,
     TPM_CHAIN_SCHEMA,
     TPMChainLink,
     link_digest,
     verify_tpm_chain,
 )
-from vaara.attestation.receipt import (
+from vaara.attestation.receipt import (  # noqa: E402
     build_tpm_chain_document,
     verify_tpm_chain_bundle,
 )
