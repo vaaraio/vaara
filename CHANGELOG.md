@@ -7,6 +7,28 @@ and this project follows [Semantic Versioning](https://semver.org/spec/v2.0.0.ht
 ## [Unreleased]
 
 ### Added
+- `vaara verify-tpm-chain`: Phase 1 of the hardware-governance binding, the
+  continuous-attestation loop. Where `verify-tpm-binding` binds one TPM 2.0 quote
+  to a record at a point in time, this binds an ordered sequence of quotes over a
+  window (the Keylime-style loop): each tick re-quotes the TPM and folds the grown
+  IMA log into a hash-linked chain. Each link's `extraData` is
+  `SHA-512(jcs(record) || prev_digest || seq)`, so dropping, reordering, or
+  splicing a link fails its successor's binding. A `continuous` verdict requires,
+  on top of every link passing the Phase-0 check: the TPM clock strictly
+  increasing, `resetCount`/`restartCount` constant (no reboot, no unmeasured gap),
+  and the IMA log growing append-only across the window. This is what moves
+  freshness from `not_established` (a lone quote carries no challenge) to
+  `chain_continuity`, an ordered single-boot monotonic-clock window; it is not a
+  live verifier challenge, so the chain stays offline-verifiable, and anchoring its
+  head and tail to a trusted timestamp is what would bound it to wall-clock. Tiers
+  `unverified` / `linked` / `continuous`; the Phase-0 honesty fields carry over
+  unchanged (the AK is trusted as supplied, IMA measures files not decisions, so
+  `--strict` stays unreachable). New `vaara.tpm-evidence-chain/v0` document and
+  `vaara[attestation]` surface: `verify_tpm_chain`, `verify_tpm_chain_bundle`,
+  `build_tpm_chain_document`, `bind_record_to_chain_extra_data`, `TPMChainLink`,
+  `TPMChainVerdict`. A real-hardware loop-capture script lives at
+  `scripts/tpm/capture-tpm-chain.sh`; the verifier is pure and tested
+  (`tests/test_tpm_chain.py`) with no hardware present.
 - `vaara verify-tpm-binding`: the commodity-hardware, vendor-neutral twin of
   `verify-enforcement` (Phase 0 of the hardware-governance binding). Where the
   SEV-SNP path binds a confidential-VM report, this binds an ordinary **TPM 2.0

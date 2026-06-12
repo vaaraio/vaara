@@ -89,6 +89,28 @@ def bind_record_to_extra_data(record: dict[str, Any]) -> bytes:
     return hashlib.sha512(canonical_json(record)).digest()
 
 
+def bind_record_to_chain_extra_data(
+    record: dict[str, Any], prev_digest: bytes, seq: int
+) -> bytes:
+    """The ``extraData`` for one link of a continuous-attestation chain.
+
+    ``extraData = SHA-512(canonical_json(record) || prev_digest || seq_be64)``.
+    Where :func:`bind_record_to_extra_data` binds a lone quote to a record, this
+    additionally folds in the position in the chain (``seq``, a big-endian u64) and
+    the predecessor link (``prev_digest``, the SHA-256 of the previous link's signed
+    quote bytes; the genesis link uses 32 zero bytes). Because the AK signs the
+    quote and the quote covers this ``extraData``, the linkage is tamper-evident:
+    dropping, reordering, or splicing a link changes the ``prev_digest`` a later
+    link committed to, so its binding no longer holds. Still 64 bytes, the
+    ``TPM2B_DATA`` ceiling, for the same reason as the Phase-0 binding.
+    """
+    if seq < 0:
+        raise ValueError("seq must be non-negative")
+    return hashlib.sha512(
+        canonical_json(record) + prev_digest + seq.to_bytes(8, "big")
+    ).digest()
+
+
 @dataclass(frozen=True)
 class TPMBindingVerdict:
     """Verdict over a TPM 2.0 quote + IMA log bound to a SEP-2828 record.
@@ -339,6 +361,7 @@ def verify_tpm_binding(
     pcr_values: dict[int, bytes],
     ima_log: str,
     expected_ima_pcr: Optional[str] = None,
+    expected_extra_data: Optional[bytes] = None,
     strict: bool = False,
 ) -> TPMBindingVerdict:
     """Verify a TPM 2.0 quote + IMA log binds to a SEP-2828 record. One verdict.
@@ -349,8 +372,12 @@ def verify_tpm_binding(
     validated). ``pcr_values`` maps PCR index to the raw bank-digest bytes that
     were quoted; ``ima_log`` is the ascii IMA runtime-measurement log.
     ``expected_ima_pcr`` optionally pins the quoted PCR 10 (hex) against a vetted
-    reference. ``strict`` requires the EK-rooted ``attested`` tier (unreachable in
-    v0).
+    reference. ``expected_extra_data`` overrides the expected ``extraData``: by
+    default the quote is expected to bind to ``SHA-512(jcs(record))``; the
+    continuous-attestation chain passes the chain-extended binding from
+    :func:`bind_record_to_chain_extra_data` so each link is checked against its own
+    position and predecessor. ``strict`` requires the EK-rooted ``attested`` tier
+    (unreachable in v0).
 
     A malformed quote, signature, or IMA log yields ``tier='unverified'`` with the
     failing link flagged, never a traceback. Raises :class:`ValueError` if
@@ -362,10 +389,13 @@ def verify_tpm_binding(
         raise ValueError(
             f"record must be a JSON object, got {type(record).__name__}"
         )
-    try:
-        expected_extra = bind_record_to_extra_data(record)
-    except Exception as exc:  # noqa: BLE001 - canonical_json raises on bad shapes
-        raise ValueError(f"cannot canonicalise record: {exc}") from exc
+    if expected_extra_data is not None:
+        expected_extra = expected_extra_data
+    else:
+        try:
+            expected_extra = bind_record_to_extra_data(record)
+        except Exception as exc:  # noqa: BLE001 - canonical_json raises on bad shapes
+            raise ValueError(f"cannot canonicalise record: {exc}") from exc
     extra_data_expected = expected_extra.hex()
 
     parsed = magic_ok = attest_type_ok = False
@@ -527,6 +557,7 @@ def verify_tpm_binding(
 __all__ = [
     "TPM_BINDING_SCHEMA",
     "TPMBindingVerdict",
+    "bind_record_to_chain_extra_data",
     "bind_record_to_extra_data",
     "verify_tpm_binding",
 ]
