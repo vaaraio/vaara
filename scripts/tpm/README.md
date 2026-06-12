@@ -38,9 +38,11 @@ un-tampered hardware. The binding of the two is the point.
   the agent decided anything. The decision content is what the signed record
   carries.
 - **IMA policy completeness.** v0 does not check which IMA policy was loaded.
-- **Freshness.** `extraData` carries the record hash, not a verifier challenge, so
-  a captured quote can be replayed against the same record. The continuous loop
-  (Phase 1) is what closes this.
+- **Freshness.** A single bundle's `extraData` carries the record hash, not a
+  verifier challenge, so a lone captured quote can be replayed against the same
+  record. The continuous chain (Phase 1, below) moves this to chain-continuity: an
+  ordered, single-boot, monotonic-clock window. It is still not a live verifier
+  challenge.
 - **IMA template-field consistency.** The verifier replays the template-hash
   column and confirms it aggregates to the signed PCR; it does not yet recompute
   each template hash from the `(file-hash, path)` fields, so the human-readable
@@ -64,10 +66,40 @@ vaara verify-tpm-binding OUT_BUNDLE.json
 `EXPECTED_IMA_PCR_HEX` is optional: pin the quoted PCR 10 against a vetted
 reference state to reach the `pcr_pinned` tier.
 
+## Phase 1: the continuous chain
+
+`vaara verify-tpm-chain` extends Phase 0 from one quote to an ordered sequence,
+the Keylime-style loop. The capture script takes a quote on a fixed interval,
+reusing one AK, and each tick's `extraData` is the chain-extended nonce
+`SHA-512(jcs(record) || prev_digest || seq)` (`prev_digest` is the SHA-256 of the
+previous tick's quote; genesis is 32 zero bytes). The links are hash-chained, so a
+dropped, reordered, or spliced tick fails its successor's binding.
+
+A `continuous` verdict adds, on top of every link passing the Phase-0 check:
+
+1. the TPM clock strictly increases across the window;
+2. `resetCount` / `restartCount` hold constant (no reboot, no unmeasured gap);
+3. the IMA log grows append-only, tick to tick.
+
+That moves freshness from unestablished to chain-continuity (an ordered,
+single-boot, monotonic-clock window). It is still not a live verifier challenge;
+anchoring the chain head and tail to a trusted timestamp is what bounds it to
+wall-clock. The Phase-0 limits on AK provenance, decision semantics, and IMA policy
+all carry over unchanged.
+
+```sh
+scripts/tpm/capture-tpm-chain.sh RECORD.json OUT_CHAIN.json [TICKS] [INTERVAL_SEC]
+vaara verify-tpm-chain OUT_CHAIN.json
+```
+
+Code in `src/vaara/attestation/_tpm_chain.py`, `_tpm_chain_bundle.py`; schema
+`vaara.tpm-evidence-chain/v0`.
+
 ## Status
 
-The verifier and bundle format are tested end to end (`tests/test_tpm_binding.py`,
-via a software `MockTPMQuoter` that marshals and signs a real `TPMS_ATTEST`). The
-capture script follows documented tpm2-tools behaviour but has not been run
-against live hardware in CI; the one place to adjust if a tpm2-tools version
-marshals the quote message or signature differently is `_assemble_bundle.py`.
+The verifiers and bundle formats are tested end to end (`tests/test_tpm_binding.py`
+and `tests/test_tpm_chain.py`, via a software `MockTPMQuoter` that marshals and
+signs a real `TPMS_ATTEST`). The capture scripts follow documented tpm2-tools
+behaviour but have not been run against live hardware in CI; the one place to
+adjust if a tpm2-tools version marshals the quote message or signature differently
+is `_assemble_bundle.py` (single) or `_assemble_chain.py` (chain).

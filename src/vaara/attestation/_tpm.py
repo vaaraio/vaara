@@ -405,9 +405,23 @@ class MockTPMQuoter:
         self._firmware_version = firmware_version
 
     def attest_bytes(
-        self, extra_data: bytes, pcr_values: dict[int, bytes]
+        self,
+        extra_data: bytes,
+        pcr_values: dict[int, bytes],
+        *,
+        clock: int = 0,
+        reset_count: int = 0,
+        restart_count: int = 0,
     ) -> bytes:
-        """Marshal a ``TPMS_ATTEST`` over the given nonce and PCR values."""
+        """Marshal a ``TPMS_ATTEST`` over the given nonce and PCR values.
+
+        ``clock``, ``reset_count`` and ``restart_count`` fill the ``TPMS_CLOCK_INFO``
+        block. They default to zero (one quote in isolation, as Phase 0 uses), but
+        a continuous-attestation chain advances ``clock`` per quote and holds the
+        reset counters fixed across a single boot, which is exactly what the chain
+        verifier checks for. They let the mock reproduce both a clean chain and the
+        reboot / clock-rollback negatives with no hardware.
+        """
         if len(extra_data) > EXTRA_DATA_SIZE:
             raise TPMAttestationError(
                 f"extra_data must be at most {EXTRA_DATA_SIZE} bytes"
@@ -418,7 +432,8 @@ class MockTPMQuoter:
         out += struct.pack(">IH", TPM_GENERATED_VALUE, TPM_ST_ATTEST_QUOTE)
         out += _marshal_tpm2b(b"")  # qualifiedSigner (empty for the mock)
         out += _marshal_tpm2b(extra_data)
-        out += struct.pack(">QIIB", 0, 0, 0, 1)  # clockInfo (clock=0, safe=1)
+        # clockInfo: clock(u64) resetCount(u32) restartCount(u32) safe(u8=1).
+        out += struct.pack(">QIIB", clock, reset_count, restart_count, 1)
         out += struct.pack(">Q", self._firmware_version)
         out += struct.pack(">I", 1)  # one PCR selection
         out += _marshal_pcr_selection(selection)
@@ -447,10 +462,22 @@ class MockTPMQuoter:
         return out
 
     def quote(
-        self, extra_data: bytes, pcr_values: dict[int, bytes]
+        self,
+        extra_data: bytes,
+        pcr_values: dict[int, bytes],
+        *,
+        clock: int = 0,
+        reset_count: int = 0,
+        restart_count: int = 0,
     ) -> tuple[bytes, bytes]:
         """Return ``(attest_bytes, tpmt_signature_bytes)`` for one quote."""
-        attest = self.attest_bytes(extra_data, pcr_values)
+        attest = self.attest_bytes(
+            extra_data,
+            pcr_values,
+            clock=clock,
+            reset_count=reset_count,
+            restart_count=restart_count,
+        )
         return attest, self.sign(attest)
 
 

@@ -2448,6 +2448,72 @@ def _print_tpm_binding_report(v: Any) -> None:
     print(f"  {_safe_inline(v.reason)}")
 
 
+def _cmd_verify_tpm_chain(args: argparse.Namespace) -> int:
+    """Verify a continuous-attestation chain binds a SEP-2828 record over a window.
+
+    Reads one ``vaara.tpm-evidence-chain/v0`` JSON file (an ordered list of TPM
+    quotes + IMA logs) and prints one verdict. A ``continuous`` pass proves every
+    link verifies and binds to the record in order, the TPM clock strictly advanced
+    on one uninterrupted boot (no reboot), and the IMA log grew append-only across
+    the window. It carries forward the Phase-0 limits: the AK is trusted as
+    supplied (EK chain not validated) and IMA measures files, not decision
+    semantics. The chain moves freshness from unestablished to chain-continuity; it
+    is not a live verifier challenge. Exit 0 iff ok.
+    """
+    try:
+        import rfc8785  # noqa: F401
+        from cryptography.hazmat.primitives.asymmetric import ec  # noqa: F401
+
+        from vaara.attestation._tpm import TPMAttestationError
+        from vaara.attestation.receipt import verify_tpm_chain_bundle
+    except ImportError:
+        print(_ATTESTATION_HINT, file=sys.stderr)
+        return 2
+
+    try:
+        doc = _load_json_file(args.chain, "TPM evidence chain")
+    except ValueError as exc:
+        print(f"vaara verify-tpm-chain: {exc}", file=sys.stderr)
+        return 1
+
+    try:
+        verdict = verify_tpm_chain_bundle(doc, strict=args.strict)
+    except (ValueError, TPMAttestationError) as exc:
+        print(f"vaara verify-tpm-chain: {exc}", file=sys.stderr)
+        return 1
+
+    if args.json:
+        print(json.dumps(verdict.to_dict(), indent=2))
+    else:
+        _print_tpm_chain_report(verdict)
+    return 0 if verdict.ok else 1
+
+
+def _print_tpm_chain_report(v: Any) -> None:
+    print(f"verdict: {'OK' if v.ok else 'FAILED'}  tier={v.tier}"
+          + ("  [strict]" if v.strict else ""))
+    print(f"  links:           {v.n_links}  all_bound={v.links_bound}")
+    print(f"  clock:           monotonic={v.clock_monotonic} "
+          f"reboot_free={v.reboot_free}  [reset={v.reset_count} "
+          f"restart={v.restart_count}]")
+    print(f"  IMA growth:      append_only={v.ima_append_only}  "
+          f"[{v.window.get('ima_entries_first')} -> "
+          f"{v.window.get('ima_entries_last')} entries]")
+    print(f"  attestation key: stable={v.ak_stable}  [{v.ak_chain_basis}]")
+    print(f"  IMA PCR pin:     {v.pcr_pin_basis}")
+    print(f"  window clock:    {v.window.get('clock_first')} -> "
+          f"{v.window.get('clock_last')}")
+    print(f"  decision logic:  {v.decision_logic_basis}")
+    print(f"  freshness:       {v.freshness_basis}")
+    failing = [
+        i for i, lk in enumerate(v.links)
+        if lk.get("tier") == "unverified"
+    ]
+    if failing:
+        print(f"  failing links:   {failing}")
+    print(f"  {_safe_inline(v.reason)}")
+
+
 def _cmd_build_handoff(args: argparse.Namespace) -> int:
     """Assemble a cross-org handoff package from the producer's pieces.
 
@@ -4080,6 +4146,38 @@ def build_parser() -> argparse.ArgumentParser:
         help="Emit the full TPM binding verdict as JSON",
     )
     pvt.set_defaults(func=_cmd_verify_tpm_binding)
+
+    pvtc = sub.add_parser(
+        "verify-tpm-chain",
+        help="Check a continuous-attestation chain: an ordered sequence of TPM "
+             "quotes plus IMA logs that each bind the same signed SEP-2828 record. "
+             "A continuous pass proves every link verifies and binds in order "
+             "(hash-linked so a link cannot be dropped, reordered, or spliced), the "
+             "TPM clock strictly advanced on one uninterrupted boot (no reboot), "
+             "and the IMA log grew append-only across the window. This is what "
+             "moves freshness from unestablished (a lone quote) to chain-continuity; "
+             "it is not a live verifier challenge. Same Phase-0 limits hold: the AK "
+             "is trusted as supplied (EK chain deferred) and IMA measures files, not "
+             "decisions. Reads one vaara.tpm-evidence-chain/v0 JSON file. Requires "
+             "the attestation extra.",
+    )
+    pvtc.add_argument(
+        "chain",
+        help="Path to the vaara.tpm-evidence-chain/v0 JSON file (one record and an "
+             "ordered list of quote + AK + PCR + IMA-log links; produced by "
+             "scripts/tpm/)",
+    )
+    pvtc.add_argument(
+        "--strict", action="store_true",
+        help="Regulator-grade: pass only at the EK-rooted attested tier (validated "
+             "AK chain), which v0 cannot yet reach, so a strict pass is honestly "
+             "unavailable",
+    )
+    pvtc.add_argument(
+        "--json", action="store_true",
+        help="Emit the full TPM chain verdict as JSON",
+    )
+    pvtc.set_defaults(func=_cmd_verify_tpm_chain)
 
     pves = sub.add_parser(
         "verify-enforcements",
