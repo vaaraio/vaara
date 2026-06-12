@@ -105,6 +105,12 @@ for (( seq=0; seq<TICKS; seq++ )); do
     exit 4
   fi
 
+  # Each tpm2_quote ContextLoads the AK into a transient object slot. fTPMs have
+  # only a few and the loaded objects accumulate across ticks until ContextLoad
+  # fails 0x902 (TPM_RC_OBJECT_MEMORY). Flush transient objects before each quote:
+  # the AK is reloaded from ak.ctx on disk, so every tick runs on a clean slate.
+  tpm2_flushcontext -t >/dev/null 2>&1 || true
+
   tpm2_quote \
     -c "${WORK}/ak.ctx" \
     -l "sha256:10" \
