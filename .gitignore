@@ -22,6 +22,8 @@ docs/blog/
 docs/grant/
 dist_verify/
 research/
+research/sfs_sr315/
+**/sfs_sr315/
 .claude/
 
 # Private / internal, never publish
