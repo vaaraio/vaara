@@ -111,10 +111,10 @@ def _verify(ak_key, ak_pem, record=None, ima=None, **kw):
 # ── bind_record_to_extra_data ────────────────────────────────────────────────
 
 
-def test_binding_is_64_bytes_and_deterministic():
+def test_binding_is_32_bytes_and_deterministic():
     rec = _record()
     a = bind_record_to_extra_data(rec)
-    assert len(a) == 64
+    assert len(a) == 32
     assert a == bind_record_to_extra_data(rec)
 
 

@@ -5,7 +5,7 @@ Where ``tee.py`` reads an AMD SEV-SNP report, this module reads a TPM 2.0
 ``TPM2_Quote`` and the kernel's IMA runtime-measurement log. The pairing is the
 Phase-0 piece of the hardware-governance binding: a TPM quote proves a measured,
 un-tampered platform state at a point in time, and its ``extraData`` slot carries
-``SHA-512(jcs(record))`` so the quote binds to one specific SEP-2828 record. The
+``SHA-256(jcs(record))`` so the quote binds to one specific SEP-2828 record. The
 verdict lives in :mod:`vaara.attestation._tpm_binding`; this module is the wire
 layer it stands on.
 
@@ -67,10 +67,12 @@ TPM_ALG_SHA384 = 0x000C
 TPM_ALG_SHA512 = 0x000D
 TPM_ALG_ECDSA = 0x0018
 
-# extraData is a TPM2B_DATA; its buffer maxes at sizeof(TPMU_HA) = 64 (SHA-512).
-# SHA-512(record) is 64 bytes, so it fills the slot exactly, the same reasoning
-# that puts SHA-512 in SEV-SNP's 64-byte REPORT_DATA.
-EXTRA_DATA_SIZE = 64
+# extraData/qualifyingData is a TPM2B_DATA; its buffer maxes at sizeof(TPMU_HA),
+# the TPM's largest IMPLEMENTED hash. That is only 64 on a TPM that implements
+# SHA-512; most fTPMs cap at SHA-384 (48) and reject a 64-byte nonce TPM_RC_SIZE
+# (confirmed on an AMD fTPM 2026-06-12). The binding nonce is therefore SHA-256
+# (32 bytes), which fits every TPM 2.0 since SHA-256 is mandatory.
+EXTRA_DATA_SIZE = 32
 
 # IMA extends PCR 10 by convention (CONFIG_IMA_MEASURE_PCR_IDX default).
 IMA_PCR = 10

@@ -2,7 +2,7 @@
 # capture-tpm-binding.sh: produce a vaara.tpm-evidence-bundle/v0 from a real TPM.
 #
 # Phase 0 of the hardware-governance binding: take a signed SEP-2828 record, ask
-# the local TPM 2.0 for a quote whose extraData carries SHA-512(jcs(record)) over
+# the local TPM 2.0 for a quote whose extraData carries SHA-256(jcs(record)) over
 # PCR 10, grab the kernel IMA measurement log, and stitch all of it into one
 # bundle that `vaara verify-tpm-binding` checks offline, trusting no operator.
 #
@@ -69,7 +69,7 @@ fi
 WORK="$(mktemp -d)"
 trap 'rm -rf "${WORK}"' EXIT
 
-echo "==> computing quote nonce = SHA-512(jcs(record))"
+echo "==> computing quote nonce = SHA-256(jcs(record))"
 EXTRA_DATA_HEX="$("${PY}" "${ASSEMBLE}" extra-data "${RECORD}")"
 
 echo "==> creating ephemeral ECC endorsement + attestation keys"
