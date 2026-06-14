@@ -43,6 +43,28 @@ and the `vX.Y.Z` tags on
 | This document (`PRIOR_ART.md`) | v0.29.0, 2026-05-24 | `PRIOR_ART.md` |
 | Cross-model held-out methodology with public 4,176-entry eval fold | v0.36.0, 2026-05-25 | `bench/vaara-bench-v0.36.md`, `tests/adversarial/v036_holdout.json` |
 | Destination-aware features (`dst__*`) and v7 production classifier | v0.36.0, 2026-05-25 | `src/vaara/adversarial_classifier.py`, `scripts/train_adversarial_classifier.py` |
+| MCP proxy HTTP transport with multi-upstream fan-out | v0.40.0, 2026-05-28 | `src/vaara/integrations/mcp_proxy.py`, `CHANGELOG.md` v0.40.0 |
+| Signed execution-receipt envelope paired with request attestation (three blocks: `backLink`, `receiptAsserted`, `outcomeDerived`) | v0.42.0, 2026-05-29 | `src/vaara/attestation/receipt.py`, `docs/execution-receipts.md` |
+| Standalone attestation-envelope verifier (`vaara attest verify`) | v0.44.0, 2026-05-30 | `src/vaara/attestation/`, `docs/sep2787-conformance.md` |
+| Remote MCP upstream connector (`--upstream-url`) over Streamable HTTP | v0.45.0, 2026-05-30 | `src/vaara/integrations/mcp_proxy.py` |
+| External time anchoring of the audit hash chain (RFC 3161 / eIDAS existence-in-time) | v0.48.0, 2026-05-31 | `src/vaara/audit/timeanchor.py`, `README.md` |
+| `vaara.attestation.decision`: decision records with supersession resolution | v0.49.0, 2026-05-31 | `src/vaara/attestation/decision.py` |
+| Threshold-signed export with chain-anchored key-lifecycle markers | v0.50.0, 2026-06-01 | `src/vaara/audit/export.py`, `CHANGELOG.md` v0.50.0 |
+| Receipt identity binding to a DID, with live-resolution audit (`verify_receipt_identity`) | v0.52.0, 2026-06-02 | `src/vaara/attestation/` |
+| RFC 9162 transparency-log consistency-proof verification | v0.54.0, 2026-06-05 | `src/vaara/attestation/` |
+| Revocation registry and status lens | v0.55.0, 2026-06-05 | `src/vaara/attestation/` |
+| One-file evidence bundle verified through six lenses (identity, signature, back-link, inclusion, consistency, revocation) | v0.56.0, 2026-06-05 | `src/vaara/attestation/`, `docs/verifying-evidence.md` |
+| Time-anchored Article 12 regulator pack with offline anchor verification | v0.59.0, 2026-06-07 | `src/vaara/audit/`, `docs/verifying-evidence.md` |
+| Keyless conformance verifier for any SEP-2828 record, including records Vaara never produced (`verify-record`) | v0.60.0, 2026-06-07 | `src/vaara/attestation/receipt.py` |
+| Cross-format normalization of adjacent MCP records (SEP-2643/2787/2817) onto SEP-2828 (`vaara normalize`) | v0.62.0, 2026-06-08 | `src/vaara/attestation/`, `CHANGELOG.md` v0.62.0 |
+| Producer conformance self-statement against a versioned published corpus (`conformance-statement`) | v0.63.0, 2026-06-09 | `conformance/`, `src/vaara/attestation/` |
+| Retention-window verification of a record under a rotated-out key (`verify-retained`) | v0.64.0, 2026-06-09 | `src/vaara/attestation/`, `docs/verifying-evidence.md` |
+| Cross-organisation evidence handoff package, offline-verifiable years later under a rotated key (`build-handoff` / `verify-handoff`, Article 26(6)) | v0.65.0, 2026-06-09 | `src/vaara/attestation/` |
+| Attested enforcement: a record bound to an AMD SEV-SNP confidential-VM attestation report (`verify-enforcement`) | v0.66.0, 2026-06-09 | `src/vaara/attestation/`, `docs/verifying-evidence.md` |
+| Governed-tool-call agent skill (Article 14 oversight plus Article 12 record in front of a high-risk tool call) | v0.68.0, 2026-06-09 | `examples/skills/vaara-governed-tool-call/` |
+| Post-quantum hybrid-signed execution receipts with the signature suite committed in the signed preimage (a stripped PQC signature is a detectable downgrade) | v0.69.0, 2026-06-11 | `src/vaara/attestation/`, `docs/design/pq-hybrid-signing-spec.md` |
+| TPM 2.0 plus IMA binding of a signed SEP-2828 record, offline-verifiable on commodity hardware (`verify-tpm-binding`) | v0.70.0, 2026-06-12 | `src/vaara/attestation/`, `scripts/tpm/` |
+| Continuous TPM 2.0 plus IMA attestation chain bound to the per-action record (`verify-tpm-chain`) | v0.70.0, 2026-06-12 | `src/vaara/attestation/`, `tests/test_tpm_chain.py` |
 
 The `CHANGELOG.md` entry for each version carries the substantive
 description and, where relevant, the failure mode that motivated the
