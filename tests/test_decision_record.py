@@ -25,6 +25,7 @@ from cryptography.hazmat.primitives.asymmetric import ec, rsa  # noqa: E402
 from vaara.attestation.decision import (  # noqa: E402
     AmbiguousSupersessionError,
     DecisionDerived,
+    EvidenceRef,
     decision_digest,
     emit_decision_record,
     make_back_link,
@@ -36,6 +37,7 @@ from vaara.attestation.decision import (  # noqa: E402
 )
 from vaara.attestation.receipt import (  # noqa: E402
     OutcomeDerived,
+    check_decision_conformance,
     emit_receipt,
     make_result_digest,
 )
@@ -202,6 +204,135 @@ def test_wire_round_trip():
     assert reparsed == r
     assert verify_decision_signature(reparsed, verifying_material=HS_SECRET) is True
     assert verify_decision_back_link(reparsed, attestation=att).ok is True
+
+
+def _drift_evidence_ref(digest_hex="a" * 64, ref="ipfs://bafy-drift-record"):
+    """A content-addressed pointer to an external drift-detection record."""
+    return EvidenceRef(
+        digest="sha256:" + digest_hex,
+        canonicalization="JCS",
+        schema="interlock.drift-record/v0",
+        ref=ref,
+    )
+
+
+def test_evidence_ref_round_trips_and_signs():
+    att = _attestation()
+    dd = dataclasses.replace(_decision(), evidence_ref=_drift_evidence_ref())
+    r = _emit(att, decision_derived=dd)
+    # The reference rides inside the signed basis, so it is covered.
+    assert verify_decision_signature(r, verifying_material=HS_SECRET) is True
+    reparsed = parse_decision_record(r.to_dict())
+    assert reparsed == r
+    assert reparsed.decision_derived.evidence_ref == _drift_evidence_ref()
+    assert verify_decision_signature(reparsed, verifying_material=HS_SECRET) is True
+
+
+def test_evidence_ref_omitted_when_none():
+    att = _attestation()
+    r = _emit(att)  # _decision() has no evidence_ref
+    assert "evidenceRef" not in r.to_dict()["decisionDerived"]
+
+
+def test_evidence_ref_minimal_ref_optional():
+    att = _attestation()
+    minimal = EvidenceRef(
+        digest="sha256:" + "b" * 64,
+        canonicalization="JCS",
+        schema="interlock.drift-record/v0",
+    )
+    dd = dataclasses.replace(_decision(), evidence_ref=minimal)
+    r = _emit(att, decision_derived=dd)
+    wire = r.to_dict()["decisionDerived"]["evidenceRef"]
+    assert "ref" not in wire
+    assert parse_decision_record(r.to_dict()) == r
+
+
+def test_swapping_evidence_ref_breaks_signature():
+    # The binding property: cite a different evidence digest after signing
+    # and the decision no longer verifies.
+    att = _attestation()
+    dd = dataclasses.replace(_decision(), evidence_ref=_drift_evidence_ref())
+    r = _emit(att, decision_derived=dd)
+    swapped = dataclasses.replace(
+        r,
+        decision_derived=dataclasses.replace(
+            r.decision_derived,
+            evidence_ref=_drift_evidence_ref(digest_hex="c" * 64),
+        ),
+    )
+    assert verify_decision_signature(swapped, verifying_material=HS_SECRET) is False
+
+
+def test_stripping_evidence_ref_breaks_signature():
+    # Dropping the cited evidence after signing is a detectable downgrade.
+    att = _attestation()
+    dd = dataclasses.replace(_decision(), evidence_ref=_drift_evidence_ref())
+    r = _emit(att, decision_derived=dd)
+    stripped = dataclasses.replace(
+        r,
+        decision_derived=dataclasses.replace(r.decision_derived, evidence_ref=None),
+    )
+    assert verify_decision_signature(stripped, verifying_material=HS_SECRET) is False
+
+
+def test_parse_rejects_evidence_ref_bad_digest():
+    att = _attestation()
+    dd = dataclasses.replace(_decision(), evidence_ref=_drift_evidence_ref())
+    d = _emit(att, decision_derived=dd).to_dict()
+    d["decisionDerived"]["evidenceRef"]["digest"] = "deadbeef"  # missing sha256: prefix
+    with pytest.raises(Exception):
+        parse_decision_record(d)
+
+
+def test_parse_rejects_evidence_ref_missing_canonicalization():
+    att = _attestation()
+    dd = dataclasses.replace(_decision(), evidence_ref=_drift_evidence_ref())
+    d = _emit(att, decision_derived=dd).to_dict()
+    del d["decisionDerived"]["evidenceRef"]["canonicalization"]
+    with pytest.raises(Exception):
+        parse_decision_record(d)
+
+
+def test_parse_rejects_evidence_ref_unknown_key():
+    # The signed sub-block is closed: an extra key would not survive a
+    # byte-exact re-derivation, so parsing must fail closed.
+    att = _attestation()
+    dd = dataclasses.replace(_decision(), evidence_ref=_drift_evidence_ref())
+    d = _emit(att, decision_derived=dd).to_dict()
+    d["decisionDerived"]["evidenceRef"]["surprise"] = "x"
+    with pytest.raises(Exception):
+        parse_decision_record(d)
+
+
+def test_emit_rejects_evidence_ref_bad_digest():
+    att = _attestation()
+    bad = EvidenceRef(
+        digest="deadbeef",
+        canonicalization="JCS",
+        schema="interlock.drift-record/v0",
+    )
+    dd = dataclasses.replace(_decision(), evidence_ref=bad)
+    with pytest.raises(Exception):
+        _emit(att, decision_derived=dd)
+
+
+def test_conformance_passes_with_evidence_ref():
+    att = _attestation()
+    dd = dataclasses.replace(_decision(), evidence_ref=_drift_evidence_ref())
+    r = _emit(att, decision_derived=dd)
+    report = check_decision_conformance(r.to_dict())
+    assert report.conforms is True
+    assert any(c.id == "evidence_ref_digest_format" and c.ok for c in report.checks)
+
+
+def test_conformance_fails_on_malformed_evidence_ref():
+    att = _attestation()
+    dd = dataclasses.replace(_decision(), evidence_ref=_drift_evidence_ref())
+    d = _emit(att, decision_derived=dd).to_dict()
+    d["decisionDerived"]["evidenceRef"]["digest"] = "not-a-digest"
+    report = check_decision_conformance(d)
+    assert report.conforms is False
 
 
 def _outcome_receipt(att, decision, *, status="executed", dec_digest=...):

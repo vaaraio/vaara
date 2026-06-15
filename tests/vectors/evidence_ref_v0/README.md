@@ -1,0 +1,108 @@
+# evidenceRef conformance vectors, v0
+
+Fixtures for the `evidenceRef` content-addressed evidence slot on the
+SEP-2828 decision basis. A decision record carries a verdict and its risk
+basis but does not fix what *produced* that basis. When the basis is a
+runtime detection, the evidence lives in a separate record emitted by the
+detector. `evidenceRef` binds the two by content address: the detector
+emits its own record, that record gets an address, and the decision's
+signed basis cites the address. The two records stay independent, joined
+by one hash a third party can recompute.
+
+Each case pins a signed decision record, the external drift record its
+basis points at, and the verdict a conformant verifier must reach. Two
+verdicts, independent of each other:
+
+- **`decision_signature_ok`:** the signature verifies over the canonical
+  `(version, alg, backLink, decisionDerived, issuerAsserted)` blocks.
+  `evidenceRef` lives inside `decisionDerived`, so it is covered by the
+  signature. A swapped or stripped citation breaks this verdict; the
+  binding is not advisory.
+- **`evidence_ref_resolves`:** `sha256` over the JCS-canonical drift
+  record equals `decisionDerived.evidenceRef.digest`. The citation
+  resolves to exactly the committed bytes and nothing else.
+
+The two are separable on purpose. `tampered_drift_record` holds a valid
+signature while the evidence stops resolving. That is the substitution a
+signature alone cannot catch.
+
+## Layout
+
+```
+keys/                       verification material (test-only)
+  hs256_secret.bin          32 raw bytes, used by the HS256 fixtures
+  es256_public.pem          SubjectPublicKeyInfo, for the ES256 fixtures
+normative/<case>/
+  decision.json             the signed decision record
+  drift_record.json         the external evidence the decision cites
+  expected.json             the verdict map the checker must reproduce
+_check_independent.py        standard library plus cryptography and
+                             rfc8785, no Vaara import
+```
+
+Only verification material ships: the public key and the symmetric HMAC
+secret the fixtures were signed with. The ES256 private key is not
+published; the ES256 fixtures are verified against the stored public key.
+
+## Cases
+
+- `valid_evidence_ref_resolves`: an ES256 escalate decision citing the
+  drift record. Both verdicts pass.
+- `hs256_valid_resolves`: the same contract under an HS256 key, so a
+  verifier holding the shared secret reproduces both verdicts.
+- `swapped_evidence_digest`: `evidenceRef.digest` is repointed at a
+  different address after signing. The signature breaks (the citation is
+  signed) and the committed drift record no longer resolves to the stored
+  digest.
+- `stripped_evidence_ref`: `evidenceRef` is removed after signing. The
+  signature covered it, so verification fails; with no reference there is
+  nothing to resolve.
+- `tampered_drift_record`: the decision is untouched and verifies, but the
+  committed drift record bytes were altered. The content address no longer
+  matches, so the cited evidence does not resolve while the signature
+  stays valid.
+
+## The two-implementation recompute contract
+
+The drift record is `interlock.drift-record/v0`, a record shape Interlock
+(the detector) owns; Vaara (the decision issuer) never parses its fields.
+The interop contract is one address, recomputed by both sides:
+
+1. **Detector emits.** Interlock produces the drift record and computes
+   its content address under the named `canonicalization` (`JCS`, RFC
+   8785). That address goes into the decision's `evidenceRef.digest`.
+2. **Decision issuer signs.** Vaara emits the decision with the
+   `evidenceRef` in the basis and signs the whole `decisionDerived` block.
+3. **Verifier recomputes, both sides.** A third party with the drift
+   record bytes and the decision canonicalizes the drift bytes under
+   `evidenceRef.canonicalization` and checks the hash equals
+   `evidenceRef.digest`, and verifies the decision signature.
+
+The check passes only if the detector's address computation and the
+verifier's recomputation produce the same bytes and therefore the same
+digest. The two implementations need agree on nothing else: the detector
+chooses its own record shape, the issuer its own policy and signing key.
+Only the address has to match. `canonicalization` is named in the
+reference so this is explicit rather than assumed.
+
+The worked example in `docs/design/evidence-ref-mapping-spec.md` carries
+the same drift record; its content address is
+`sha256:d303af9242e0d6d6c329c054d1fb2e32bbfde67bbbb7014873f0721174f239ac`,
+the digest cited in the valid fixtures here.
+
+## Verifying
+
+```
+python tests/vectors/evidence_ref_v0/_check_independent.py
+```
+
+Exit code 0 means every case matched its expected verdict. The checker
+reproduces the canonical bytes (RFC 8785 JCS), the decision signature, and
+the content-address resolution, all without importing Vaara.
+
+## Provenance
+
+Generated by `scripts/generate_evidence_ref_vectors.py` against the Vaara
+reference implementation, aligned to the `evidenceRef` mapping spec
+(`docs/design/evidence-ref-mapping-spec.md`) tracked on
+`modelcontextprotocol/modelcontextprotocol#2826`. Apache-2.0.

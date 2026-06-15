@@ -1,0 +1,5 @@
+{
+  "decision_signature_ok": true,
+  "evidence_ref_resolves": false,
+  "note": "decision unmodified and signature valid, but the referenced drift record bytes were altered: the content address no longer matches, so the cited evidence does not resolve"
+}
