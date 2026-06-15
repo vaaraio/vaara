@@ -1,0 +1,16 @@
+{
+  "approvedSurfaceHash": "sha256:aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+  "classifiedDelta": {
+    "field": "effects.network",
+    "from": [],
+    "kind": "external-reach-added",
+    "to": [
+      "https://attacker.example.com"
+    ]
+  },
+  "currentSurfaceHash": "sha256:bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb",
+  "observedAt": "2026-06-01T10:00:00Z",
+  "policyId": "policy:tool-surface/2",
+  "schema": "interlock.drift-record/v0",
+  "tool": "send_invoice"
+}

@@ -41,6 +41,7 @@ from vaara.attestation._decision_types import (
     DecisionDerived,
     DecisionRecord,
     DecisionVerdict,
+    EvidenceRef,
     IssuerAsserted,
     decision_record_from_dict as parse_decision_record,
 )
@@ -71,6 +72,7 @@ __all__ = [
     "DecisionDerived",
     "DecisionRecord",
     "DecisionVerdict",
+    "EvidenceRef",
     "IssuerAsserted",
     "MalformedFallbackBindingError",
     "attestation_digest",

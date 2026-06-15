@@ -1,0 +1,5 @@
+{
+  "decision_signature_ok": false,
+  "evidence_ref_resolves": false,
+  "note": "evidenceRef stripped after signing: a verifier cannot recover the omitted citation, so the signature fails and no reference resolves"
+}
