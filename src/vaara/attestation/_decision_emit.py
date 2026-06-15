@@ -91,6 +91,9 @@ def emit_decision_record(
         )
     if not back_link.attestation_nonce:
         raise AttestationError("backLink.attestationNonce MUST be non-empty")
+    er = decision_derived.evidence_ref
+    if er is not None and not er.digest.startswith("sha256:"):
+        raise AttestationError("evidenceRef.digest MUST be a 'sha256:' digest")
 
     issuer_asserted = IssuerAsserted(
         iss=iss,

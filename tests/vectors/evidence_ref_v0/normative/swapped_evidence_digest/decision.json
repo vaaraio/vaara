@@ -1,0 +1,32 @@
+{
+  "alg": "ES256",
+  "backLink": {
+    "attestationDigest": "sha256:ae3f3318f5d18b53fef74ea873dad50e03b902896268c5ff432f2f73b1ea4be2",
+    "attestationNonce": "fixed-attestation-nonce-000"
+  },
+  "decisionDerived": {
+    "decidedAt": "2026-06-01T10:00:00Z",
+    "decision": "escalate",
+    "evidenceRef": {
+      "canonicalization": "JCS",
+      "digest": "sha256:cccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccc",
+      "ref": "ipfs://bafy-drift-record-cid",
+      "schema": "interlock.drift-record/v0"
+    },
+    "policyId": "policy:tool-surface/2",
+    "reason": "post-approval external-reach drift on send_invoice",
+    "riskScore": "0.74",
+    "thresholdAllow": "0.30",
+    "thresholdBlock": "0.80"
+  },
+  "issuerAsserted": {
+    "alg": "ES256",
+    "iat": "2026-06-01T10:00:00Z",
+    "iss": "issuer://test",
+    "nonce": "d1",
+    "secretVersion": "v1",
+    "sub": "agent:reader"
+  },
+  "signature": "fad7f4387599ad120d1565127420655552b2246db9ac30d52a3ee45eba76f54a072913911fb58c2fd5d357040f1c9024db8a283fbf9f3c50598a92c25efc13fb",
+  "version": 1
+}
