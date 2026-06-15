@@ -133,4 +133,37 @@ def _check_decision_derived(dd: Any, add: Any) -> Optional[str]:
         if field in dd:
             add(f"{field}_is_string", isinstance(dd[field], str), ADVISORY,
                 f"decisionDerived.{field} SHOULD be a decimal string, not a number")
+    if "evidenceRef" in dd:
+        _check_evidence_ref(dd["evidenceRef"], add)
     return verdict if isinstance(verdict, str) else None
+
+
+def _check_evidence_ref(er: Any, add: Any) -> None:
+    """Check the optional content-addressed evidence reference on the basis.
+
+    Fires only when ``evidenceRef`` is present; the field itself is optional.
+    The digest is the binding (``sha256:<hex>``), and ``canonicalization``
+    plus ``schema`` are what let an independent implementation recompute the
+    address and interpret the referenced object, so all three are required
+    once the reference exists. ``ref`` is an optional non-authoritative
+    locator.
+    """
+    if not isinstance(er, dict):
+        add("evidence_ref_object", False, REQUIRED,
+            "decisionDerived.evidenceRef MUST be an object")
+        return
+    add("evidence_ref_object", True, REQUIRED,
+        "decisionDerived.evidenceRef is an object")
+    dg = er.get("digest")
+    add("evidence_ref_digest_format",
+        isinstance(dg, str) and bool(_DIGEST_RE.match(dg)), REQUIRED,
+        "evidenceRef.digest MUST be 'sha256:<64 lowercase hex>'")
+    add("evidence_ref_canonicalization",
+        isinstance(er.get("canonicalization"), str) and bool(er.get("canonicalization")),
+        REQUIRED, "evidenceRef.canonicalization MUST be a non-empty string")
+    add("evidence_ref_schema",
+        isinstance(er.get("schema"), str) and bool(er.get("schema")),
+        REQUIRED, "evidenceRef.schema MUST be a non-empty string")
+    if "ref" in er:
+        add("evidence_ref_ref_type", isinstance(er["ref"], str) and bool(er["ref"]),
+            ADVISORY, "evidenceRef.ref SHOULD be a non-empty string when present")
