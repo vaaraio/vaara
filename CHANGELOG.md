@@ -4,7 +4,7 @@ All notable changes to this project are documented here.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/)
 and this project follows [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
-## [Unreleased]
+## [0.71.0] - 2026-06-16
 
 Phase 2 of the hardware-governance layer: neutral verify. A Vaara attestation
 verdict is re-expressed as an IETF RATS EAR (the EAT-based Attestation Result of
