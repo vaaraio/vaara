@@ -2514,6 +2514,57 @@ def _print_tpm_chain_report(v: Any) -> None:
     print(f"  {_safe_inline(v.reason)}")
 
 
+def _cmd_export_attestation_result(args: argparse.Namespace) -> int:
+    """Re-express a Vaara attestation verdict as an IETF RATS EAR (Phase 2).
+
+    Reads the JSON a ``verify-tpm-binding``, ``verify-tpm-chain``, or
+    ``verify-enforcement`` ``--json`` run produced and emits a
+    ``vaara.attestation-result/v0`` document: an EAR (draft-ietf-rats-ear) carrying
+    an AR4SI trustworthiness vector, root-agnostic so a Relying Party reads a TPM and
+    a SEV-SNP appraisal the same way. The mapping never claims more than the verdict:
+    while the hardware root is trusted as supplied, the result tops out at the
+    ``warning`` tier and ``affirming`` stays out of reach. The EAR is unsigned (it is
+    the verifier's appraisal result; the evidence it appraises carries its own
+    signatures). Pure standard library; no attestation extra needed.
+    """
+    # Imported from the leaf module so the export path stays base-install (it does
+    # not parse evidence, only re-shapes a verdict the verify commands produced).
+    from vaara import __version__
+    from vaara.attestation._attestation_result import build_attestation_result
+
+    try:
+        verdict = _load_json_file(args.verdict, "verdict")
+    except ValueError as exc:
+        print(f"vaara export-attestation-result: {exc}", file=sys.stderr)
+        return 1
+
+    issued_at = args.iat if args.iat is not None else int(time.time())
+    try:
+        ear = build_attestation_result(
+            verdict,
+            issued_at=issued_at,
+            verifier_build=f"vaara {__version__}",
+            submod_label=args.submod,
+        )
+    except ValueError as exc:
+        print(f"vaara export-attestation-result: {exc}", file=sys.stderr)
+        return 1
+
+    rendered = json.dumps(ear, indent=2)
+    if args.out:
+        try:
+            Path(args.out).expanduser().write_text(rendered + "\n", encoding="utf-8")
+        except OSError as exc:
+            print(f"vaara export-attestation-result: cannot write output: {exc}",
+                  file=sys.stderr)
+            return 1
+        print(f"vaara export-attestation-result: wrote {args.out} "
+              f"(ear_status={ear['ear_status']})", file=sys.stderr)
+    else:
+        print(rendered)
+    return 0
+
+
 def _cmd_build_handoff(args: argparse.Namespace) -> int:
     """Assemble a cross-org handoff package from the producer's pieces.
 
@@ -4178,6 +4229,39 @@ def build_parser() -> argparse.ArgumentParser:
         help="Emit the full TPM chain verdict as JSON",
     )
     pvtc.set_defaults(func=_cmd_verify_tpm_chain)
+
+    pear = sub.add_parser(
+        "export-attestation-result",
+        help="Re-express an attestation verdict as an IETF RATS EAR "
+             "(draft-ietf-rats-ear) carrying an AR4SI trustworthiness vector "
+             "(draft-ietf-rats-ar4si). Reads the JSON a verify-tpm-binding, "
+             "verify-tpm-chain, or verify-enforcement --json run produced and emits a "
+             "vaara.attestation-result/v0 document, root-agnostic so a Relying Party "
+             "reads a TPM and a SEV-SNP appraisal the same way. The mapping never "
+             "claims more than the verdict: while the hardware root is trusted as "
+             "supplied the result tops out at the warning tier and affirming stays "
+             "out of reach. The EAR is unsigned. Pure stdlib; no attestation extra.",
+    )
+    pear.add_argument(
+        "verdict",
+        help="Path to a verdict JSON file (the output of verify-tpm-binding, "
+             "verify-tpm-chain, or verify-enforcement run with --json)",
+    )
+    pear.add_argument(
+        "--out", default=None,
+        help="Write the EAR document here instead of stdout",
+    )
+    pear.add_argument(
+        "--iat", type=int, default=None,
+        help="Appraisal time as integer epoch seconds (the EAR iat); defaults to "
+             "now. Pin it for reproducible output.",
+    )
+    pear.add_argument(
+        "--submod", default=None,
+        help="Override the EAR submodule label (defaults to the root type: tpm or "
+             "sev-snp)",
+    )
+    pear.set_defaults(func=_cmd_export_attestation_result)
 
     pves = sub.add_parser(
         "verify-enforcements",

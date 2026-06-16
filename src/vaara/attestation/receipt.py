@@ -109,6 +109,10 @@ from vaara.attestation._tpm_chain_bundle import (
     build_tpm_chain_document,
     verify_tpm_chain_bundle,
 )
+from vaara.attestation._attestation_result import (
+    SCHEMA as ATTESTATION_RESULT_SCHEMA,
+    build_attestation_result,
+)
 from vaara.attestation._handoff import (
     ComponentDigest,
     HandoffVerdict,
@@ -246,6 +250,8 @@ __all__ = [
     "verify_tpm_bundle",
     "verify_tpm_chain",
     "verify_tpm_chain_bundle",
+    "ATTESTATION_RESULT_SCHEMA",
+    "build_attestation_result",
     "HandoffVerdict",
     "build_handoff",
     "sign_manifest",
