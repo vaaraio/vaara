@@ -118,3 +118,9 @@ tests/adversarial/traces/
 .ripgreprc
 .idea/
 .vscode/
+
+# local canonical copy of the vaara.io site source (deploy target, not a remote)
+.vaara-site/
+
+# local-brain independence build: goose XDG home + scratch (quiet research project)
+.local-brain/
