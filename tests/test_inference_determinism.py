@@ -10,9 +10,18 @@ refused outright.
 
 from __future__ import annotations
 
+import importlib.util
+
 import pytest
 
-from vaara.attestation.inference import (
+for _mod in ("rfc8785", "cryptography"):
+    if importlib.util.find_spec(_mod) is None:
+        pytest.skip(
+            "attestation extra not installed (pip install 'vaara[attestation]')",
+            allow_module_level=True,
+        )
+
+from vaara.attestation.inference import (  # noqa: E402
     determinism_verdict,
     honest_tier,
     make_output_commitment,

@@ -9,9 +9,18 @@ Subject attestation+receipt pairs are HS256-signed with a fixed test secret.
 
 from __future__ import annotations
 
+import importlib.util
+
 import pytest
 
-from vaara.attestation._inference_crosscheck import (
+for _mod in ("rfc8785", "cryptography"):
+    if importlib.util.find_spec(_mod) is None:
+        pytest.skip(
+            "attestation extra not installed (pip install 'vaara[attestation]')",
+            allow_module_level=True,
+        )
+
+from vaara.attestation._inference_crosscheck import (  # noqa: E402
     CROSSCHECK_METHOD,
     CROSSCHECK_SCHEMA,
     JudgeOutcome,
@@ -21,13 +30,13 @@ from vaara.attestation._inference_crosscheck import (
     verify_crosscheck,
     verify_crosscheck_signature,
 )
-from vaara.attestation._inference_types import (
+from vaara.attestation._inference_types import (  # noqa: E402
     InferenceOutcome,
     ModelDerived,
     RequestDeclared,
 )
-from vaara.attestation._sep2787_types import AttestationError
-from vaara.attestation.inference import (
+from vaara.attestation._sep2787_types import AttestationError  # noqa: E402
+from vaara.attestation.inference import (  # noqa: E402
     emit_inference_attestation,
     emit_inference_receipt,
     make_inference_back_link,

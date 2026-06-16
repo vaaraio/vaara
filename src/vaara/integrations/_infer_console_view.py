@@ -2,10 +2,9 @@
 # Copyright (C) 2026 Henri Sirkkavaara
 """The console's single-page view.
 
-One self-contained HTML string: inline CSS, vanilla JS, no build step, in the
-house style of ``.vaara-site/site.py`` and ``ui/apps/clock.html``. Left column is
-the chat with the sovereign local brain; right column is the live proof of that
-chat. Receipt + signature verify on every turn; the hardware chain and the
+One self-contained HTML string: inline CSS, vanilla JS, no build step. Left
+column is the chat with the sovereign local brain; right column is the live proof
+of that chat. Receipt + signature verify on every turn; the hardware chain and the
 second-model cross-check are deliberate, on-demand buttons. All DOM is built with
 ``textContent`` (no ``innerHTML``), so model output and verdict strings can never
 inject markup.

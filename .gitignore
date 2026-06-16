@@ -119,8 +119,6 @@ tests/adversarial/traces/
 .idea/
 .vscode/
 
-# local canonical copy of the vaara.io site source (deploy target, not a remote)
+# developer-local site source and scratch directories (never published)
 .vaara-site/
-
-# local-brain independence build: goose XDG home + scratch (quiet research project)
 .local-brain/

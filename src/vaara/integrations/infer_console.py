@@ -11,8 +11,8 @@ cross-check signing key is optional and represents a distinct verifier identity.
 Run::
 
     python -m vaara.integrations.infer_console \\
-        --receipts-dir .local-brain/receipts/infer \\
-        --pubkey .local-brain/receipts/infer/pubkey.pem \\
+        --receipts-dir ./receipts/infer \\
+        --pubkey ./receipts/infer/pubkey.pem \\
         [--listen 127.0.0.1:11456] [--proxy-url http://127.0.0.1:11435] \\
         [--chain CHAIN.json] [--judge-model M --crosscheck-key KEY.pem]
 """
