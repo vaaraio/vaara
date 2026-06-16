@@ -41,10 +41,12 @@ from typing import Any, Optional
 SCHEMA = "vaara.attestation-result/v0"
 
 # The EAR profile this document conforms to (draft-ietf-rats-ear-04), and the
-# Vaara profile that signals the verifier-claims extension on the submodule.
+# Vaara profile (the submodule eat_profile) that names the schema its
+# ear_verifier_claims follow. The verifier-claims ride in the standard EAR
+# ear_verifier_claims field (CBOR 1006), not a custom key.
 EAR_PROFILE = "tag:ietf.org,2026:rats/ear#04"
 VAARA_PROFILE = "tag:vaara.io,2026:attestation-result#v0"
-VERIFIER_CLAIMS_KEY = "vaara.io/verifier-claims"
+VERIFIER_CLAIMS_KEY = "ear_verifier_claims"
 VERIFIER_DEVELOPER = "https://vaara.io"
 
 # AR4SI trustworthiness tier anchors (draft-ietf-rats-ar4si section 2.3.2). Only the

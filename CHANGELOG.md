@@ -22,8 +22,8 @@ bespoke verdicts.
   (`2` affirming, `32` warning, `96` contraindicated), and while the hardware root is
   trusted as supplied (TPM EK chain / AMD KDS VCEK chain not validated) the
   `hardware` and `instance-identity` claims top out at a warning, so the overall
-  `ear_status` cannot read `affirming` — reachable only with a validated root, the
-  same capability the reserved `attested` tier waits on. The EAR is unsigned (it is
+  `ear_status` cannot read `affirming`; that tier is reachable only with a validated
+  root, the same capability the reserved `attested` tier waits on. The EAR is unsigned (it is
   the verifier's appraisal result; the evidence carries its own signatures) and the
   decision-semantics limit stays a verifier-claim, not a fabricated AR4SI claim. New
   `vaara.attestation.receipt` exports `build_attestation_result` and

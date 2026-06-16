@@ -33,7 +33,7 @@ HERE = Path(__file__).resolve().parent
 
 EAR_PROFILE = "tag:ietf.org,2026:rats/ear#04"
 VAARA_PROFILE = "tag:vaara.io,2026:attestation-result#v0"
-VERIFIER_CLAIMS_KEY = "vaara.io/verifier-claims"
+VERIFIER_CLAIMS_KEY = "ear_verifier_claims"
 VERIFIER_DEVELOPER = "https://vaara.io"
 SCHEMA = "vaara.attestation-result/v0"
 HONEST_LIMIT = (

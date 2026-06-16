@@ -17,7 +17,7 @@
           "executables": 32,
           "configuration": 32
         },
-        "vaara.io/verifier-claims": {
+        "ear_verifier_claims": {
           "schema": "vaara.attestation-result/v0",
           "source_schema": "vaara.tpm-evidence-chain/v0",
           "result_is_unsigned": true,
@@ -52,7 +52,7 @@
           "executables": 2,
           "configuration": 2
         },
-        "vaara.io/verifier-claims": {
+        "ear_verifier_claims": {
           "schema": "vaara.attestation-result/v0",
           "source_schema": "vaara.tpm-evidence-chain/v0",
           "result_is_unsigned": true,
@@ -87,7 +87,7 @@
           "executables": 32,
           "configuration": 32
         },
-        "vaara.io/verifier-claims": {
+        "ear_verifier_claims": {
           "schema": "vaara.attestation-result/v0",
           "source_schema": "vaara.tpm-evidence-chain/v0",
           "result_is_unsigned": true,
@@ -122,7 +122,7 @@
           "executables": 96,
           "configuration": 96
         },
-        "vaara.io/verifier-claims": {
+        "ear_verifier_claims": {
           "schema": "vaara.attestation-result/v0",
           "source_schema": "vaara.tpm-evidence-chain/v0",
           "result_is_unsigned": true,
@@ -157,7 +157,7 @@
           "executables": 32,
           "configuration": 32
         },
-        "vaara.io/verifier-claims": {
+        "ear_verifier_claims": {
           "schema": "vaara.attestation-result/v0",
           "source_schema": "vaara.tpm-binding-attestation/v0",
           "result_is_unsigned": true,
@@ -191,7 +191,7 @@
           "executables": 2,
           "configuration": 2
         },
-        "vaara.io/verifier-claims": {
+        "ear_verifier_claims": {
           "schema": "vaara.attestation-result/v0",
           "source_schema": "vaara.tpm-binding-attestation/v0",
           "result_is_unsigned": true,
@@ -225,7 +225,7 @@
           "executables": 96,
           "configuration": 96
         },
-        "vaara.io/verifier-claims": {
+        "ear_verifier_claims": {
           "schema": "vaara.attestation-result/v0",
           "source_schema": "vaara.tpm-binding-attestation/v0",
           "result_is_unsigned": true,
@@ -259,7 +259,7 @@
           "executables": 96,
           "configuration": 96
         },
-        "vaara.io/verifier-claims": {
+        "ear_verifier_claims": {
           "schema": "vaara.attestation-result/v0",
           "source_schema": "vaara.tpm-binding-attestation/v0",
           "result_is_unsigned": true,
@@ -293,7 +293,7 @@
           "executables": 2,
           "configuration": 2
         },
-        "vaara.io/verifier-claims": {
+        "ear_verifier_claims": {
           "schema": "vaara.attestation-result/v0",
           "source_schema": "vaara.enforcement-attestation/v0",
           "result_is_unsigned": true,
@@ -326,7 +326,7 @@
           "executables": 2,
           "configuration": 2
         },
-        "vaara.io/verifier-claims": {
+        "ear_verifier_claims": {
           "schema": "vaara.attestation-result/v0",
           "source_schema": "vaara.enforcement-attestation/v0",
           "result_is_unsigned": true,
@@ -359,7 +359,7 @@
           "executables": 32,
           "configuration": 32
         },
-        "vaara.io/verifier-claims": {
+        "ear_verifier_claims": {
           "schema": "vaara.attestation-result/v0",
           "source_schema": "vaara.enforcement-attestation/v0",
           "result_is_unsigned": true,
@@ -390,7 +390,7 @@
           "instance-identity": 96,
           "hardware": 96
         },
-        "vaara.io/verifier-claims": {
+        "ear_verifier_claims": {
           "schema": "vaara.attestation-result/v0",
           "source_schema": "vaara.enforcement-attestation/v0",
           "result_is_unsigned": true,
