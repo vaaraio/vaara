@@ -38,7 +38,7 @@ prose, read the sections below it.
 | Execution sandboxing                             |   ✗   |        ✗        |       ✗       |         ✗         |          ✗          |        ✗         |         ✗         |              ✓              |
 | Multi-language SDKs                              | Python only |     N/A    |   Python      |  Python (Agents)  |   Python / JS       |      N/A         |    Python only    |              ✓              |
 | Self-hostable Python library (no SaaS required)  |   ✓   |        ✓        |       ✓       |         ✓         |          ✓          |     document     |         ✓         |              ✓              |
-| License                                          | Apache-2.0 |   Apache-2.0 |   Apache-2.0 |        MIT        |        MIT          |      CC-BY       |    Apache-2.0     |             MIT             |
+| License                                          | AGPL-3.0 |   Apache-2.0 |   Apache-2.0 |        MIT        |        MIT          |      CC-BY       |    Apache-2.0     |             MIT             |
 
 Reading the matrix: Vaara and the other tools are complementary, not
 competitive. Different cells of the matrix. Different parts of the

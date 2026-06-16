@@ -161,4 +161,4 @@ Contributions adding example configs for any community MCP server are welcome. T
 
 ## License notes
 
-Vaara is Apache-2.0. The GitHub MCP server is MIT-licensed by GitHub. The Vaara proxy adds no licensing constraint on top of the upstream.
+Vaara is AGPL-3.0-or-later. The GitHub MCP server is MIT-licensed by GitHub. The Vaara proxy adds no licensing constraint on top of the upstream.

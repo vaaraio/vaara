@@ -1,8 +1,8 @@
 # Trademark Policy
 
-Last updated: 2026-05-22
+Last updated: 2026-06-17
 
-The Apache License 2.0 covers the source code in this repository. Apache 2.0 does not grant rights to the project name, the project wordmark, or any related marks. This file states how those marks may be used in connection with this open-source project.
+The GNU Affero General Public License v3.0 or later (AGPL-3.0-or-later) covers the source code in this repository. The AGPL does not grant rights to the project name, the project wordmark, or any related marks. This file states how those marks may be used in connection with this open-source project.
 
 ## Marks covered
 
@@ -28,7 +28,7 @@ The following are explicitly allowed and need no permission:
 - Linking to vaara.io, the PyPI package, the GitHub repository, or any official Vaara channel.
 - Citing the project in academic papers, regulatory submissions, standards-body documents, conference talks, and similar substantive contexts.
 - Using the wordmark images unmodified to identify a product or service that integrates with this Vaara project, provided the use does not suggest endorsement.
-- Forks under Apache 2.0 retaining attribution to this Vaara project. A fork distributed under a different identity must rename itself.
+- Forks under AGPL-3.0-or-later retaining attribution to this Vaara project. A fork distributed under a different identity must rename itself.
 
 ## Not permitted without written permission
 
@@ -39,7 +39,7 @@ The following require written permission from the project maintainer:
 - Implying official endorsement, partnership, or affiliation with this Vaara project without an established relationship.
 - Using the marks in ways that disparage or misrepresent the project.
 
-The Apache 2.0 license to the source code remains intact regardless of trademark status. Forking the code is welcome. Forking the identity is not.
+The AGPL-3.0-or-later license to the source code remains intact regardless of trademark status. Forking the code is welcome. Forking the identity is not.
 
 ## Permission requests
 

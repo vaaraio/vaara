@@ -124,5 +124,5 @@
     ],
     "wallclock_seconds_approx": 2
   },
-  "license": "Apache-2.0 (inherited from vaara repo LICENSE)"
+  "license": "AGPL-3.0-or-later (inherited from vaara repo LICENSE)"
 }

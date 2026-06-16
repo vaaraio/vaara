@@ -7,7 +7,7 @@ sdk: gradio
 sdk_version: "5.0.0"
 app_file: app.py
 pinned: false
-license: apache-2.0
+license: agpl-3.0
 short_description: Runtime governance for AI agent tool calls
 thumbnail: https://raw.githubusercontent.com/vaaraio/vaara/main/docs/vaara-wordmark-light.png
 tags:
@@ -57,4 +57,4 @@ pip install vaara
 - Source: <https://github.com/vaaraio/vaara>
 - PyPI: <https://pypi.org/project/vaara/>
 - Site: <https://vaara.io>
-- License: Apache-2.0
+- License: AGPL-3.0-or-later

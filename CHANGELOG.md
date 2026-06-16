@@ -4,6 +4,30 @@ All notable changes to this project are documented here.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/)
 and this project follows [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [1.0.0] - 2026-06-17
+
+First major release: the sovereign inference harness, public under AGPL-3.0-or-later.
+
+This is the release that carries the sovereign half of Vaara to the distribution
+surfaces for the first time. It runs a local model and emits a signed, hardware-rooted
+receipt that a second local model independently cross-checks: the inference-receipt
+family, the signing proxy, the session / chain / cross-check / determinism verifiers,
+and the governance console. The code was developed privately and is published here
+under AGPL-3.0-or-later.
+
+The AGPL-3.0-or-later relicense is now complete and consistent across the whole
+repository: the root and per-package `LICENSE` files, pyproject metadata, the npm
+client, the Claude Code plugin, every README, `CONTRIBUTING.md`, `docs/TRADEMARK.md`,
+the benchmark spec and result metadata, the conformance-vector provenance notes, the
+comparison table, and the Hugging Face Space metadata. Third-party license statements
+(TypeScript, Glacis, Goose, the Qwen judge model, the MIT-licensed upstream MCP
+servers) and the historical note in `LICENSING.md` that releases through v0.71.0 were
+published under Apache 2.0 are left intact. Henri Sirkkavaara is the sole copyright
+holder.
+
+Carries everything through v0.71.0 (RATS/EAT neutral verify via the IETF RATS EAR
+export), which was merged to main but never released to PyPI or npm.
+
 ## [0.71.0] - 2026-06-16
 
 Phase 2 of the hardware-governance layer: neutral verify. A Vaara attestation

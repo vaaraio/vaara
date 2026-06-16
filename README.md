@@ -297,7 +297,7 @@ Acknowledgements:
 
 ## License
 
-Apache 2.0. See [LICENSE](LICENSE).
+AGPL-3.0-or-later. See [LICENSE](LICENSE).
 
 <!-- mcp-name: io.github.vaaraio/vaara -->
 <!-- mcp-name: io.github.vaaraio/vaara-server -->

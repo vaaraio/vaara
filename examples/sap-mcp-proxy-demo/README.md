@@ -155,4 +155,4 @@ Contributions adding example configs for any of these (or any other community MC
 
 ## License notes
 
-Vaara is Apache-2.0. The community SAP MCP servers have their own licenses (mario-andreschak's is MIT, SAP's official servers vary). Check the upstream server's LICENSE file. The Vaara proxy adds no licensing constraint on top of the upstream.
+Vaara is AGPL-3.0-or-later. The community SAP MCP servers have their own licenses (mario-andreschak's is MIT, SAP's official servers vary). Check the upstream server's LICENSE file. The Vaara proxy adds no licensing constraint on top of the upstream.

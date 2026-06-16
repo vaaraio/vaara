@@ -83,4 +83,4 @@ try {
 
 ## License
 
-Apache-2.0. See the [LICENSE](https://github.com/vaaraio/vaara/blob/main/LICENSE) in the repository root.
+AGPL-3.0-or-later. See the [LICENSE](https://github.com/vaaraio/vaara/blob/main/LICENSE) in the repository root.
