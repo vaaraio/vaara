@@ -117,6 +117,7 @@ vaara verify-bundle evidence-bundle.json
 | hybrid PQC signing (`pq_verdict`) | A receipt's parallel ML-DSA-65 / FIPS 204 signature over the same preimage, for records that must outlive classical crypto. The suite is committed in the signed bytes, so stripping the post-quantum signature is a detectable downgrade, not a silent loss. |
 | `build-handoff` / `verify-handoff` | A self-contained package one org hands another org's regulator, offline, years later, under a rotated-out key. |
 | `verify-enforcement` | Binds a record to an AMD SEV-SNP confidential-VM attestation report. |
+| `export-attestation-result` | Re-expresses any attestation verdict (TPM binding, TPM chain, SEV-SNP) as an IETF RATS EAR with an AR4SI trustworthiness vector, so a Relying Party reads every root through one standards-aligned shape. While the hardware root is trusted as supplied the result tops out at the `warning` tier, never `affirming`. |
 | `verify-records`, `verify-bundles`, `verify-handoffs`, `verify-enforcements` | The set-level forms: each single-file check run over a whole directory, with a roll-up. |
 | `audit-summary` | Renders the conformance verdict for a directory as a Markdown page an auditor reads directly. |
 

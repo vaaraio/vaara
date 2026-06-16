@@ -1,0 +1,408 @@
+{
+  "tpm_chain_continuous_unverified_root": {
+    "eat_profile": "tag:ietf.org,2026:rats/ear#04",
+    "iat": 1750000000,
+    "ear_status": "warning",
+    "ear_verifier_id": {
+      "developer": "https://vaara.io",
+      "build": "vaara 0.0.0-test"
+    },
+    "submods": {
+      "tpm": {
+        "eat_profile": "tag:vaara.io,2026:attestation-result#v0",
+        "ear_status": "warning",
+        "ear_trustworthiness_vector": {
+          "instance-identity": 32,
+          "hardware": 32,
+          "executables": 32,
+          "configuration": 32
+        },
+        "vaara.io/verifier-claims": {
+          "schema": "vaara.attestation-result/v0",
+          "source_schema": "vaara.tpm-evidence-chain/v0",
+          "result_is_unsigned": true,
+          "honest_limit": "The platform is attested, not the decision semantics; the decision content is carried by the signed SEP-2828 record this result references by digest. affirming requires a validated hardware root and is unreachable while the root is trusted as supplied.",
+          "native_tier": "continuous",
+          "root_trust_basis": "caller_supplied_unverified",
+          "pcr_pin_basis": "unpinned",
+          "ima_policy_basis": "not_established",
+          "freshness_basis": "chain_continuity",
+          "decision_semantics_basis": "not_established",
+          "chain_continuous": true,
+          "n_links": 15
+        }
+      }
+    }
+  },
+  "tpm_chain_continuous_pinned_validated_root": {
+    "eat_profile": "tag:ietf.org,2026:rats/ear#04",
+    "iat": 1750000000,
+    "ear_status": "affirming",
+    "ear_verifier_id": {
+      "developer": "https://vaara.io",
+      "build": "vaara 0.0.0-test"
+    },
+    "submods": {
+      "tpm": {
+        "eat_profile": "tag:vaara.io,2026:attestation-result#v0",
+        "ear_status": "affirming",
+        "ear_trustworthiness_vector": {
+          "instance-identity": 2,
+          "hardware": 2,
+          "executables": 2,
+          "configuration": 2
+        },
+        "vaara.io/verifier-claims": {
+          "schema": "vaara.attestation-result/v0",
+          "source_schema": "vaara.tpm-evidence-chain/v0",
+          "result_is_unsigned": true,
+          "honest_limit": "The platform is attested, not the decision semantics; the decision content is carried by the signed SEP-2828 record this result references by digest. affirming requires a validated hardware root and is unreachable while the root is trusted as supplied.",
+          "native_tier": "continuous",
+          "root_trust_basis": "ek_chain_verified",
+          "pcr_pin_basis": "pinned",
+          "ima_policy_basis": "not_established",
+          "freshness_basis": "chain_continuity",
+          "decision_semantics_basis": "not_established",
+          "chain_continuous": true,
+          "n_links": 15
+        }
+      }
+    }
+  },
+  "tpm_chain_linked_unpinned": {
+    "eat_profile": "tag:ietf.org,2026:rats/ear#04",
+    "iat": 1750000000,
+    "ear_status": "warning",
+    "ear_verifier_id": {
+      "developer": "https://vaara.io",
+      "build": "vaara 0.0.0-test"
+    },
+    "submods": {
+      "tpm": {
+        "eat_profile": "tag:vaara.io,2026:attestation-result#v0",
+        "ear_status": "warning",
+        "ear_trustworthiness_vector": {
+          "instance-identity": 32,
+          "hardware": 32,
+          "executables": 32,
+          "configuration": 32
+        },
+        "vaara.io/verifier-claims": {
+          "schema": "vaara.attestation-result/v0",
+          "source_schema": "vaara.tpm-evidence-chain/v0",
+          "result_is_unsigned": true,
+          "honest_limit": "The platform is attested, not the decision semantics; the decision content is carried by the signed SEP-2828 record this result references by digest. affirming requires a validated hardware root and is unreachable while the root is trusted as supplied.",
+          "native_tier": "linked",
+          "root_trust_basis": "caller_supplied_unverified",
+          "pcr_pin_basis": "unpinned",
+          "ima_policy_basis": "not_established",
+          "freshness_basis": "not_established",
+          "decision_semantics_basis": "not_established",
+          "chain_continuous": false,
+          "n_links": 15
+        }
+      }
+    }
+  },
+  "tpm_chain_unverified": {
+    "eat_profile": "tag:ietf.org,2026:rats/ear#04",
+    "iat": 1750000000,
+    "ear_status": "contraindicated",
+    "ear_verifier_id": {
+      "developer": "https://vaara.io",
+      "build": "vaara 0.0.0-test"
+    },
+    "submods": {
+      "tpm": {
+        "eat_profile": "tag:vaara.io,2026:attestation-result#v0",
+        "ear_status": "contraindicated",
+        "ear_trustworthiness_vector": {
+          "instance-identity": 96,
+          "hardware": 96,
+          "executables": 96,
+          "configuration": 96
+        },
+        "vaara.io/verifier-claims": {
+          "schema": "vaara.attestation-result/v0",
+          "source_schema": "vaara.tpm-evidence-chain/v0",
+          "result_is_unsigned": true,
+          "honest_limit": "The platform is attested, not the decision semantics; the decision content is carried by the signed SEP-2828 record this result references by digest. affirming requires a validated hardware root and is unreachable while the root is trusted as supplied.",
+          "native_tier": "unverified",
+          "root_trust_basis": "caller_supplied_unverified",
+          "pcr_pin_basis": "unpinned",
+          "ima_policy_basis": "not_established",
+          "freshness_basis": "not_established",
+          "decision_semantics_basis": "not_established",
+          "chain_continuous": false,
+          "n_links": 15
+        }
+      }
+    }
+  },
+  "tpm_binding_bound_unpinned": {
+    "eat_profile": "tag:ietf.org,2026:rats/ear#04",
+    "iat": 1750000000,
+    "ear_status": "warning",
+    "ear_verifier_id": {
+      "developer": "https://vaara.io",
+      "build": "vaara 0.0.0-test"
+    },
+    "submods": {
+      "tpm": {
+        "eat_profile": "tag:vaara.io,2026:attestation-result#v0",
+        "ear_status": "warning",
+        "ear_trustworthiness_vector": {
+          "instance-identity": 32,
+          "hardware": 32,
+          "executables": 32,
+          "configuration": 32
+        },
+        "vaara.io/verifier-claims": {
+          "schema": "vaara.attestation-result/v0",
+          "source_schema": "vaara.tpm-binding-attestation/v0",
+          "result_is_unsigned": true,
+          "honest_limit": "The platform is attested, not the decision semantics; the decision content is carried by the signed SEP-2828 record this result references by digest. affirming requires a validated hardware root and is unreachable while the root is trusted as supplied.",
+          "native_tier": "bound",
+          "root_trust_basis": "caller_supplied_unverified",
+          "pcr_pin_basis": "unpinned",
+          "ima_policy_basis": "not_established",
+          "freshness_basis": "not_established",
+          "decision_semantics_basis": "not_established",
+          "bound_record_digest": "abababababababababababababababababababababababababababababababab"
+        }
+      }
+    }
+  },
+  "tpm_binding_pcr_pinned_validated_root": {
+    "eat_profile": "tag:ietf.org,2026:rats/ear#04",
+    "iat": 1750000000,
+    "ear_status": "affirming",
+    "ear_verifier_id": {
+      "developer": "https://vaara.io",
+      "build": "vaara 0.0.0-test"
+    },
+    "submods": {
+      "tpm": {
+        "eat_profile": "tag:vaara.io,2026:attestation-result#v0",
+        "ear_status": "affirming",
+        "ear_trustworthiness_vector": {
+          "instance-identity": 2,
+          "hardware": 2,
+          "executables": 2,
+          "configuration": 2
+        },
+        "vaara.io/verifier-claims": {
+          "schema": "vaara.attestation-result/v0",
+          "source_schema": "vaara.tpm-binding-attestation/v0",
+          "result_is_unsigned": true,
+          "honest_limit": "The platform is attested, not the decision semantics; the decision content is carried by the signed SEP-2828 record this result references by digest. affirming requires a validated hardware root and is unreachable while the root is trusted as supplied.",
+          "native_tier": "pcr_pinned",
+          "root_trust_basis": "ek_chain_verified",
+          "pcr_pin_basis": "pinned",
+          "ima_policy_basis": "not_established",
+          "freshness_basis": "not_established",
+          "decision_semantics_basis": "not_established",
+          "bound_record_digest": "abababababababababababababababababababababababababababababababab"
+        }
+      }
+    }
+  },
+  "tpm_binding_pin_mismatch": {
+    "eat_profile": "tag:ietf.org,2026:rats/ear#04",
+    "iat": 1750000000,
+    "ear_status": "contraindicated",
+    "ear_verifier_id": {
+      "developer": "https://vaara.io",
+      "build": "vaara 0.0.0-test"
+    },
+    "submods": {
+      "tpm": {
+        "eat_profile": "tag:vaara.io,2026:attestation-result#v0",
+        "ear_status": "contraindicated",
+        "ear_trustworthiness_vector": {
+          "instance-identity": 32,
+          "hardware": 32,
+          "executables": 96,
+          "configuration": 96
+        },
+        "vaara.io/verifier-claims": {
+          "schema": "vaara.attestation-result/v0",
+          "source_schema": "vaara.tpm-binding-attestation/v0",
+          "result_is_unsigned": true,
+          "honest_limit": "The platform is attested, not the decision semantics; the decision content is carried by the signed SEP-2828 record this result references by digest. affirming requires a validated hardware root and is unreachable while the root is trusted as supplied.",
+          "native_tier": "bound",
+          "root_trust_basis": "caller_supplied_unverified",
+          "pcr_pin_basis": "pin_mismatch",
+          "ima_policy_basis": "not_established",
+          "freshness_basis": "not_established",
+          "decision_semantics_basis": "not_established",
+          "bound_record_digest": "abababababababababababababababababababababababababababababababab"
+        }
+      }
+    }
+  },
+  "tpm_binding_unverified": {
+    "eat_profile": "tag:ietf.org,2026:rats/ear#04",
+    "iat": 1750000000,
+    "ear_status": "contraindicated",
+    "ear_verifier_id": {
+      "developer": "https://vaara.io",
+      "build": "vaara 0.0.0-test"
+    },
+    "submods": {
+      "tpm": {
+        "eat_profile": "tag:vaara.io,2026:attestation-result#v0",
+        "ear_status": "contraindicated",
+        "ear_trustworthiness_vector": {
+          "instance-identity": 96,
+          "hardware": 96,
+          "executables": 96,
+          "configuration": 96
+        },
+        "vaara.io/verifier-claims": {
+          "schema": "vaara.attestation-result/v0",
+          "source_schema": "vaara.tpm-binding-attestation/v0",
+          "result_is_unsigned": true,
+          "honest_limit": "The platform is attested, not the decision semantics; the decision content is carried by the signed SEP-2828 record this result references by digest. affirming requires a validated hardware root and is unreachable while the root is trusted as supplied.",
+          "native_tier": "unverified",
+          "root_trust_basis": "caller_supplied_unverified",
+          "pcr_pin_basis": "unpinned",
+          "ima_policy_basis": "not_established",
+          "freshness_basis": "not_established",
+          "decision_semantics_basis": "not_established",
+          "bound_record_digest": "abababababababababababababababababababababababababababababababab"
+        }
+      }
+    }
+  },
+  "enforcement_measurement_pinned_unverified_root": {
+    "eat_profile": "tag:ietf.org,2026:rats/ear#04",
+    "iat": 1750000000,
+    "ear_status": "warning",
+    "ear_verifier_id": {
+      "developer": "https://vaara.io",
+      "build": "vaara 0.0.0-test"
+    },
+    "submods": {
+      "sev-snp": {
+        "eat_profile": "tag:vaara.io,2026:attestation-result#v0",
+        "ear_status": "warning",
+        "ear_trustworthiness_vector": {
+          "instance-identity": 32,
+          "hardware": 32,
+          "executables": 2,
+          "configuration": 2
+        },
+        "vaara.io/verifier-claims": {
+          "schema": "vaara.attestation-result/v0",
+          "source_schema": "vaara.enforcement-attestation/v0",
+          "result_is_unsigned": true,
+          "honest_limit": "The platform is attested, not the decision semantics; the decision content is carried by the signed SEP-2828 record this result references by digest. affirming requires a validated hardware root and is unreachable while the root is trusted as supplied.",
+          "native_tier": "measurement_pinned",
+          "root_trust_basis": "caller_supplied_unverified",
+          "measurement_basis": "pinned",
+          "tcb_appraisal": "not_established",
+          "enforcement_logic_basis": "not_established",
+          "bound_record_digest": "abababababababababababababababababababababababababababababababababababababababababababababababababababababababababababababababab"
+        }
+      }
+    }
+  },
+  "enforcement_measurement_pinned_kds_verified": {
+    "eat_profile": "tag:ietf.org,2026:rats/ear#04",
+    "iat": 1750000000,
+    "ear_status": "affirming",
+    "ear_verifier_id": {
+      "developer": "https://vaara.io",
+      "build": "vaara 0.0.0-test"
+    },
+    "submods": {
+      "sev-snp": {
+        "eat_profile": "tag:vaara.io,2026:attestation-result#v0",
+        "ear_status": "affirming",
+        "ear_trustworthiness_vector": {
+          "instance-identity": 2,
+          "hardware": 2,
+          "executables": 2,
+          "configuration": 2
+        },
+        "vaara.io/verifier-claims": {
+          "schema": "vaara.attestation-result/v0",
+          "source_schema": "vaara.enforcement-attestation/v0",
+          "result_is_unsigned": true,
+          "honest_limit": "The platform is attested, not the decision semantics; the decision content is carried by the signed SEP-2828 record this result references by digest. affirming requires a validated hardware root and is unreachable while the root is trusted as supplied.",
+          "native_tier": "measurement_pinned",
+          "root_trust_basis": "kds_verified",
+          "measurement_basis": "pinned",
+          "tcb_appraisal": "not_established",
+          "enforcement_logic_basis": "not_established",
+          "bound_record_digest": "abababababababababababababababababababababababababababababababababababababababababababababababababababababababababababababababab"
+        }
+      }
+    }
+  },
+  "enforcement_bound_unpinned": {
+    "eat_profile": "tag:ietf.org,2026:rats/ear#04",
+    "iat": 1750000000,
+    "ear_status": "warning",
+    "ear_verifier_id": {
+      "developer": "https://vaara.io",
+      "build": "vaara 0.0.0-test"
+    },
+    "submods": {
+      "sev-snp": {
+        "eat_profile": "tag:vaara.io,2026:attestation-result#v0",
+        "ear_status": "warning",
+        "ear_trustworthiness_vector": {
+          "instance-identity": 32,
+          "hardware": 32,
+          "executables": 32,
+          "configuration": 32
+        },
+        "vaara.io/verifier-claims": {
+          "schema": "vaara.attestation-result/v0",
+          "source_schema": "vaara.enforcement-attestation/v0",
+          "result_is_unsigned": true,
+          "honest_limit": "The platform is attested, not the decision semantics; the decision content is carried by the signed SEP-2828 record this result references by digest. affirming requires a validated hardware root and is unreachable while the root is trusted as supplied.",
+          "native_tier": "bound",
+          "root_trust_basis": "caller_supplied_unverified",
+          "measurement_basis": "unpinned",
+          "tcb_appraisal": "not_established",
+          "enforcement_logic_basis": "not_established",
+          "bound_record_digest": "abababababababababababababababababababababababababababababababababababababababababababababababababababababababababababababababab"
+        }
+      }
+    }
+  },
+  "enforcement_unverified": {
+    "eat_profile": "tag:ietf.org,2026:rats/ear#04",
+    "iat": 1750000000,
+    "ear_status": "contraindicated",
+    "ear_verifier_id": {
+      "developer": "https://vaara.io",
+      "build": "vaara 0.0.0-test"
+    },
+    "submods": {
+      "sev-snp": {
+        "eat_profile": "tag:vaara.io,2026:attestation-result#v0",
+        "ear_status": "contraindicated",
+        "ear_trustworthiness_vector": {
+          "instance-identity": 96,
+          "hardware": 96
+        },
+        "vaara.io/verifier-claims": {
+          "schema": "vaara.attestation-result/v0",
+          "source_schema": "vaara.enforcement-attestation/v0",
+          "result_is_unsigned": true,
+          "honest_limit": "The platform is attested, not the decision semantics; the decision content is carried by the signed SEP-2828 record this result references by digest. affirming requires a validated hardware root and is unreachable while the root is trusted as supplied.",
+          "native_tier": "unverified",
+          "root_trust_basis": "caller_supplied_unverified",
+          "measurement_basis": "unpinned",
+          "tcb_appraisal": "not_established",
+          "enforcement_logic_basis": "not_established",
+          "bound_record_digest": "abababababababababababababababababababababababababababababababababababababababababababababababababababababababababababababababab"
+        }
+      }
+    }
+  }
+}

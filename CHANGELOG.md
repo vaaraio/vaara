@@ -6,6 +6,32 @@ and this project follows [Semantic Versioning](https://semver.org/spec/v2.0.0.ht
 
 ## [Unreleased]
 
+Phase 2 of the hardware-governance layer: neutral verify. A Vaara attestation
+verdict is re-expressed as an IETF RATS EAR (the EAT-based Attestation Result of
+draft-ietf-rats-ear) carrying an AR4SI trustworthiness vector
+(draft-ietf-rats-ar4si), so a Relying Party reads a TPM binding, a TPM chain, and a
+SEV-SNP report through one standards-aligned, root-agnostic shape instead of three
+bespoke verdicts.
+
+### Added
+
+- `vaara export-attestation-result VERDICT.json`: reads the JSON a
+  `verify-tpm-binding`, `verify-tpm-chain`, or `verify-enforcement` `--json` run
+  produced and emits a `vaara.attestation-result/v0` document. The AR4SI mapping is
+  conservative and honest: it asserts only the three canonical tier anchors
+  (`2` affirming, `32` warning, `96` contraindicated), and while the hardware root is
+  trusted as supplied (TPM EK chain / AMD KDS VCEK chain not validated) the
+  `hardware` and `instance-identity` claims top out at a warning, so the overall
+  `ear_status` cannot read `affirming` — reachable only with a validated root, the
+  same capability the reserved `attested` tier waits on. The EAR is unsigned (it is
+  the verifier's appraisal result; the evidence carries its own signatures) and the
+  decision-semantics limit stays a verifier-claim, not a fabricated AR4SI claim. New
+  `vaara.attestation.receipt` exports `build_attestation_result` and
+  `ATTESTATION_RESULT_SCHEMA`. Pure standard library, base-install (no attestation
+  extra, no hardware). New `_attestation_result.py`, `attestation_result_v0` vectors
+  with a Vaara-free independent checker, design spec at
+  `docs/design/attestation-result-spec.md`.
+
 ## [0.70.0] - 2026-06-12
 
 The hardware-rooted continuous-governance layer. A signed SEP-2828 execution
