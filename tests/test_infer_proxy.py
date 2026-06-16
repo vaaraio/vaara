@@ -32,7 +32,6 @@ from vaara.integrations._infer_proxy_shape import (  # noqa: E402
     StreamAccumulator,
     _coerce_eval_stats,
     extract_sampling,
-    parse_openai_response,
 )
 
 MESSAGES = [{"role": "user", "content": "Summarize Q3."}]
