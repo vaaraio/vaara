@@ -1,6 +1,6 @@
 {
   "name": "@vaara/client",
-  "version": "0.71.0",
+  "version": "1.0.0",
   "mcpName": "io.github.vaaraio/vaara",
   "description": "TypeScript client for the Vaara HTTP API: EU AI Act runtime evidence for MCP tool calls. Conformal risk scoring, policy gating, hash-chained tamper-evident audit, named detectors.",
   "main": "dist/index.js",
@@ -37,7 +37,7 @@
     "vaara"
   ],
   "author": "Vaara <hello@vaara.io>",
-  "license": "Apache-2.0",
+  "license": "AGPL-3.0-or-later",
   "repository": {
     "type": "git",
     "url": "https://github.com/vaaraio/vaara",

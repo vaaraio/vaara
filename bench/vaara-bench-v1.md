@@ -105,7 +105,7 @@ produces byte-identical output.
 ## License
 
 The corpus, generator, evaluator, and results in this directory are
-released under **Apache-2.0**, inherited from the top-level `LICENSE`
+released under **AGPL-3.0-or-later**, inherited from the top-level `LICENSE`
 in this repository. Citation suggested but not required:
 
 ```text

@@ -127,4 +127,4 @@ The proxy is MCP-protocol-level, not GitHub-specific. The three-step setup above
 
 ## License notes
 
-Vaara is Apache-2.0. Goose is Apache-2.0 (Block, Inc.). The upstream MCP server you wrap retains its own license. The Vaara proxy adds no licensing constraint on top of the upstream.
+Vaara is AGPL-3.0-or-later. Goose is Apache-2.0 (Block, Inc.). The upstream MCP server you wrap retains its own license. The Vaara proxy adds no licensing constraint on top of the upstream.

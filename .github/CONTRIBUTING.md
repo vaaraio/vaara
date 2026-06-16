@@ -42,4 +42,4 @@ New modules under `src/vaara/` are expected to type-check cleanly. As legacy mod
 
 ## Licensing
 
-By contributing you agree that your contributions will be licensed under the Apache License 2.0, the same license that covers the project (see `LICENSE`).
+By contributing you agree that your contributions will be licensed under the GNU Affero General Public License v3.0 or later (AGPL-3.0-or-later), the same license that covers the project (see `LICENSE`).

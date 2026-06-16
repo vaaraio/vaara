@@ -87,4 +87,4 @@ PreToolUse on Bash / WebFetch / WebSearch is regex-only and sub-millisecond. Pre
 
 ## License
 
-Apache 2.0. See [LICENSE](LICENSE).
+AGPL-3.0-or-later. See [LICENSE](LICENSE).
