@@ -114,3 +114,7 @@ tests/adversarial/traces/
 .ripgreprc
 .idea/
 .vscode/
+
+# developer-local site source and scratch directories (never published)
+.vaara-site/
+.local-brain/
