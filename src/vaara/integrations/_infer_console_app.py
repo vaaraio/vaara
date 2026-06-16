@@ -117,8 +117,11 @@ def _register_proof_routes(
                 receipts=_ordered_pairs(receipts_dir),
                 verifying_material=verifying_material,
             )
-        except ValueError as exc:  # structurally malformed chain bundle
-            return JSONResponse({"available": True, "ok": False, "reason": str(exc)})
+        except ValueError:  # structurally malformed chain bundle
+            logger.warning("Chain verify failed on malformed bundle", exc_info=True)
+            return JSONResponse(
+                {"available": True, "ok": False, "reason": "malformed chain bundle"}
+            )
         return JSONResponse({
             "available": True,
             "ok": v["ok"],
@@ -180,8 +183,9 @@ def _register_proof_routes(
                 alg=crosscheck["alg"],
                 signing_material=crosscheck["signing_material"],
             )
-        except Exception as exc:
-            return JSONResponse({"available": True, "error": str(exc)})
+        except Exception:
+            logger.warning("Cross-check failed", exc_info=True)
+            return JSONResponse({"available": True, "error": "cross-check failed"})
         return JSONResponse({
             "available": True,
             "agreement": record.agreement,
