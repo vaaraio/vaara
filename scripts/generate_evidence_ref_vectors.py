@@ -53,14 +53,41 @@ IAT = "2026-06-01T10:00:00Z"
 COMMON = dict(iss="issuer://test", sub="agent:reader",
               secret_version="v1", iat=IAT)
 
+def _jcs_address(obj: dict) -> str:
+    import hashlib
+
+    import rfc8785
+    return "sha256:" + hashlib.sha256(rfc8785.dumps(obj)).hexdigest()
+
+
+# The two tool surfaces the drift record's hashes are computed over. These
+# are Interlock's schema (the detector owns the surface shape); they ship
+# so the surface hashes in the drift record are real sha256 over published
+# bytes, not placeholders. send_invoice gains an external network effect
+# after approval: effects.network goes from [] to billing.example.com.
+APPROVED_SURFACE = {
+    "schema": "interlock.tool-surface/v0",
+    "tool": "send_invoice",
+    "inputs": {"invoice": "string"},
+    "effects": {"network": [], "filesystem": []},
+}
+CURRENT_SURFACE = {
+    "schema": "interlock.tool-surface/v0",
+    "tool": "send_invoice",
+    "inputs": {"invoice": "string"},
+    "effects": {"network": ["https://billing.example.com"], "filesystem": []},
+}
+
 # The drift record from the worked example in
-# docs/design/evidence-ref-mapping-spec.md. Its JCS content address is
-# sha256:d303af9242e0d6d6c329c054d1fb2e32bbfde67bbbb7014873f0721174f239ac.
+# docs/design/evidence-ref-mapping-spec.md. approvedSurfaceHash and
+# currentSurfaceHash are the JCS content addresses of the two surfaces
+# above, so the whole chain (surface bytes -> surface hash -> drift record
+# -> evidenceRef address) recomputes end to end.
 DRIFT_RECORD = {
     "schema": "interlock.drift-record/v0",
     "tool": "send_invoice",
-    "approvedSurfaceHash": "sha256:" + "a" * 64,
-    "currentSurfaceHash": "sha256:" + "b" * 64,
+    "approvedSurfaceHash": _jcs_address(APPROVED_SURFACE),
+    "currentSurfaceHash": _jcs_address(CURRENT_SURFACE),
     "classifiedDelta": {
         "kind": "external-reach-added",
         "field": "effects.network",
@@ -70,13 +97,6 @@ DRIFT_RECORD = {
     "policyId": "policy:tool-surface/2",
     "observedAt": "2026-06-01T10:00:00Z",
 }
-
-
-def _jcs_address(obj: dict) -> str:
-    import hashlib
-
-    import rfc8785
-    return "sha256:" + hashlib.sha256(rfc8785.dumps(obj)).hexdigest()
 
 
 def _write(path: Path, obj: dict) -> None:
@@ -123,6 +143,13 @@ def main() -> None:
     ref = EvidenceRef(
         digest=address, canonicalization="JCS",
         schema="interlock.drift-record/v0", ref="ipfs://bafy-drift-record-cid")
+
+    # Publish the two surfaces the drift record's hashes are computed over,
+    # so a second implementation can recompute approvedSurfaceHash and
+    # currentSurfaceHash from real bytes, not just the evidenceRef address.
+    valid_dir = OUT / "normative" / "valid_evidence_ref_resolves"
+    _write(valid_dir / "approved_surface.json", APPROVED_SURFACE)
+    _write(valid_dir / "current_surface.json", CURRENT_SURFACE)
 
     def case(name, *, decision, drift, expected):
         d = OUT / "normative" / name

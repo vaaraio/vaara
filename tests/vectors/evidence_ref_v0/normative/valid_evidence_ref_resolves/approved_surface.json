@@ -1,0 +1,11 @@
+{
+  "effects": {
+    "filesystem": [],
+    "network": []
+  },
+  "inputs": {
+    "invoice": "string"
+  },
+  "schema": "interlock.tool-surface/v0",
+  "tool": "send_invoice"
+}

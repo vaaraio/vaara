@@ -1,5 +1,5 @@
 {
-  "approvedSurfaceHash": "sha256:aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+  "approvedSurfaceHash": "sha256:9f2c6449382c2a66702240bd64db6ebb3e1abe247c74dbeedd39b17abf2aae3b",
   "classifiedDelta": {
     "field": "effects.network",
     "from": [],
@@ -8,7 +8,7 @@
       "https://attacker.example.com"
     ]
   },
-  "currentSurfaceHash": "sha256:bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb",
+  "currentSurfaceHash": "sha256:bae6c4803252f0a6239c86105d9a305dff9bded37730dc884eaf5671b8662a67",
   "observedAt": "2026-06-01T10:00:00Z",
   "policyId": "policy:tool-surface/2",
   "schema": "interlock.drift-record/v0",

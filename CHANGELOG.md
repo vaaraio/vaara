@@ -4,6 +4,27 @@ All notable changes to this project are documented here.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/)
 and this project follows [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [1.0.2] - 2026-06-17
+
+Patch release: the evidenceRef worked example recomputes end to end, and the CI and
+OpenSSF Scorecard badges render again.
+
+- The evidenceRef conformance vectors carried placeholder surface hashes
+  (`sha256:aaaa...` / `sha256:bbbb...`), so the published worked example could not be
+  reproduced past the drift record. The vectors now compute `approvedSurfaceHash` and
+  `currentSurfaceHash` from two real tool surfaces that ship alongside them
+  (`approved_surface.json`, `current_surface.json`), so a second implementation can
+  recompute the whole chain: surface bytes to surface hash to drift record to the
+  `evidenceRef` content address. The address changes accordingly; the mapping spec and
+  the vector README carry the new values.
+- The CI badge URL carried a raw `&`, which GitHub's HTML sanitizer mangled, and the
+  Scorecard badge used a shields.io endpoint the image proxy kept failing to fetch.
+  Both now point at GitHub-native `badge.svg` endpoints, served directly by GitHub, so
+  they render as images instead of falling back to text links.
+
+No functional change to the published package. Test vectors, documentation, and version
+metadata only.
+
 ## [1.0.1] - 2026-06-17
 
 Patch release: the README renders correctly on PyPI, the sovereign inference harness

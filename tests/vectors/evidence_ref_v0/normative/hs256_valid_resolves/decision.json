@@ -9,7 +9,7 @@
     "decision": "escalate",
     "evidenceRef": {
       "canonicalization": "JCS",
-      "digest": "sha256:d303af9242e0d6d6c329c054d1fb2e32bbfde67bbbb7014873f0721174f239ac",
+      "digest": "sha256:8e22e733c3526ca8e7987ab2355f18e66752f29ac629dbd41c9b80650822a56b",
       "ref": "ipfs://bafy-drift-record-cid",
       "schema": "interlock.drift-record/v0"
     },
@@ -27,6 +27,6 @@
     "secretVersion": "v1",
     "sub": "agent:reader"
   },
-  "signature": "319cd96a99c5d281f29590bdd85a708fdd1139ccc766f2b6a7f9bcebddcf9a5f",
+  "signature": "3b09f337e37adcda237185560651ec9dcd72a75a5d4d5c2bd7f25508ce81c3e9",
   "version": 1
 }

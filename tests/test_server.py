@@ -36,7 +36,7 @@ def test_server_info(client):
     assert r.status_code == 200
     body = r.json()
     assert body["name"] == "vaara-reference-server"
-    assert body["version"] == "1.0.1"
+    assert body["version"] == "1.0.2"
     assert body["capabilities"] == {
         "score": True, "audit": True, "outcome_feedback": True,
     }
