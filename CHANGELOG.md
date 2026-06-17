@@ -4,6 +4,24 @@ All notable changes to this project are documented here.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/)
 and this project follows [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [1.0.3] - 2026-06-17
+
+Patch release: documentation only. No functional change to the published package.
+
+- Rewrote the README from a 321-line reference dump into a 161-line read that leads with
+  the problem, shows the install and first call early, and pushes the detailed reference
+  into focused docs. The deep material moved verbatim into new `docs/architecture.md`
+  (how it works, scoring, the external time anchor), `docs/standards.md` (OVERT 1.0, the
+  sovereign inference harness, the SEP-2787 pair), and `docs/adapters.md` (framework
+  adapters, cloud and OSS guardrail adapters, the MCP proxy, the HTTP API, the TypeScript
+  client). Nothing was dropped; the benchmark numbers stay inline behind a disclosure.
+- Brought `docs/PRIOR_ART.md` current: chronology rows for v0.71.0 (RATS EAR neutral
+  verify), v1.0.0 (sovereign inference harness, AGPL relicense), and v1.0.2 (evidenceRef
+  recomputes end to end); a license-era note; and same-lane related work it had missed
+  (Notarized Agents / Sello, the Five-Plane architecture, Attested Tool-Server Admission,
+  the autogen/A2A/MCP signing cluster, Determs, and Interlock as the first independent
+  party recomputing the published SEP-2828 vectors).
+
 ## [1.0.2] - 2026-06-17
 
 Patch release: the evidenceRef worked example recomputes end to end, and the CI and

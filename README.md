@@ -14,53 +14,19 @@
   <a href="https://huggingface.co/spaces/vaaraio/vaara"><img src="https://img.shields.io/badge/%F0%9F%A4%97%20Hugging%20Face-Space-blue" alt="Hugging Face Space"></a>
 </p>
 
-Vaara is an open-source evidence layer for AI governance: it gates each agent tool call against your policy, writes an offline-verifiable execution record, and binds that record to the machine's own TPM 2.0 + IMA attestation. When a regulator, an auditor, or a public-sector buyer needs proof of what your agent actually did and why, that record is the answer. Runs entirely in your own environment. No SaaS, no telemetry.
+Your AI agent transferred the funds, wrote the file, called the tool. Later, someone who does not trust you asks you to prove exactly what it did and why. A regulator, an auditor, a customer after an incident. Your own logs will not settle it, because you could have edited them.
 
-EU AI Act Article 12 record-keeping is the driver. The same trail answers any "show me exactly what the agent did" demand: procurement validation, incident reconstruction, SOC 2 evidence.
+Vaara is an open-source evidence layer for AI governance. It checks every agent tool call against your policy, writes the call and its outcome into a hash-chained, signed record, and binds that record to your machine's own TPM 2.0 hardware root. An outside party can verify the whole trail offline, with no access to your system and none of your software. EU AI Act Article 12 record-keeping is what it was built for; it answers any "show me what the agent actually did" just as well.
 
-- Article-level EU AI Act evidence report, honest about the gaps instead of rubber-stamping them.
-- Hash-chained, tamper-evident audit trail an outside party can verify without trusting your stack, with the chain head anchorable to an external trusted timestamp (RFC 3161 / eIDAS).
-- Gate every agent tool call against your own policy: allow, block, or escalate.
-- Govern the model call itself, not only the tools around it: a signed, hardware-rooted inference receipt that a second local model cross-checks. This is the sovereign inference harness, new in v1.0.
+It runs entirely in your own environment. No SaaS, no telemetry. Python 3.10+, zero runtime dependencies.
 
-## How it works
-
-Every tool call an agent makes passes through Vaara before it runs:
-
-1. **Intercept.** Vaara catches the call (`fs.write_file`, `tx.transfer`, an MCP `tools/call`, and so on) through your framework's own hook, or transparently as an MCP proxy in front of an upstream server.
-2. **Score and decide.** Each call gets a risk score and an allow / block / escalate decision against your policy.
-3. **Record.** The call, the score, the decision, and the real-world outcome are written to a hash-chained audit trail. An outside auditor can verify the chain is intact without trusting your stack or your word.
-
-The scoring blends five expert signals and keeps adapting as outcomes come back, and each risk score carries a confidence interval with a coverage guarantee that holds regardless of the input distribution. Those are the properties an auditor can check independently; the math is in [Benchmarks](#benchmarks) and [docs/formal_specification.md](docs/formal_specification.md).
-
-### External time anchor
-
-The hash chain proves order and integrity but not *when* it existed: every timestamp comes from your own clock, so a compromised signing key could in principle be used to forge a backdated chain. Vaara can anchor the current chain head to an external RFC 3161 Time-Stamp Authority, the standard behind eIDAS qualified electronic timestamps. The authority signs the chain head and the time, so the chain's existence is provable against a clock you do not control. Verification is offline.
-
-```bash
-pip install 'vaara[timeanchor]'
-```
-
-```python
-from vaara.audit.timeanchor import RFC3161TimeAnchorClient
-
-# Periodically, or after a batch of high-risk actions:
-trail.anchor_head(RFC3161TimeAnchorClient("https://freetsa.org/tsr"))
-```
-
-The anchor also folds into the one-command regulator package: `vaara trail export-article12 --anchor-tsa https://freetsa.org/tsr` writes the timestamp beside the signed trail as Article 19 existence-in-time evidence, and `vaara trail verify-anchor --zip <package>.zip` checks it offline.
-
-The same command folds cross-org handoffs and confidential-VM enforcement evidence into the package as verified sidecars (`--handoffs ./handoffs --enforcements ./enforced`); an attachment that does not verify fails the export, so the package never ships evidence it cannot back. It is a more complete pack, not a certificate. See [docs/verifying-evidence.md](docs/verifying-evidence.md).
-
-## Install
+## Install and first call
 
 ```bash
 pip install vaara
 ```
 
-Python 3.10+. Zero runtime deps. Optional XGBoost classifier: `pip install vaara[ml]`. Releases ship with SLSA Build Level 3 provenance, verifiable via `slsa-verifier verify-artifact`.
-
-## Quick start
+Releases ship SLSA Build Level 3 provenance, verifiable with `slsa-verifier verify-artifact`. Optional ML classifier: `pip install 'vaara[ml]'`.
 
 ```python
 from vaara.pipeline import InterceptionPipeline
@@ -78,11 +44,23 @@ else:
     print(result.reason)
 ```
 
-`report_outcome` closes the loop: the signal weights reweight based on which ones predicted the outcome.
+Every call gets a risk score and an allow / block / escalate decision against your policy, then the call, the decision, and the real outcome are written to the audit trail. `report_outcome` closes the loop: the scorer reweights based on which signals actually predicted the outcome.
 
-## What evidence looks like
+That is the whole loop. The rest of this page is what makes the record worth keeping.
 
-`vaara compliance report --format json` against a real audit trail produces an article-level evidence record an auditor can read directly. Articles without recorded events return `evidence_insufficient`, not a rubber-stamp.
+## Verify it without trusting the producer
+
+Writing a trail is the easy half. The half that matters is letting someone who does not trust you check it, with no key, no access, and none of your code. Every Vaara record is content-addressed and fail-closed on authenticity, and ships with public conformance vectors plus a standalone checker that imports no Vaara code, so an independent party reproduces every verdict offline.
+
+```bash
+vaara verify-bundle evidence-bundle.json
+```
+
+`ok` only when a signature is actually established, not merely present in a log. The same property drives the standards work behind [SEP-2828](https://github.com/modelcontextprotocol/modelcontextprotocol/pull/2828): evidence that holds up for someone who runs none of your software. The full verifier set, the trust model for each verb, and where trust comes from in each case are in [docs/verifying-evidence.md](docs/verifying-evidence.md).
+
+## What the evidence looks like
+
+`vaara compliance report --format json` against a real trail produces an article-level evidence record an auditor reads directly. Articles with no recorded events return `evidence_insufficient`, not a rubber stamp.
 
 ```json
 {
@@ -98,112 +76,27 @@ else:
 }
 ```
 
-Each verdict carries the threshold-vs-observed snapshot, the rationale, and the underlying audit records, so a reviewer can trace `status` back to a concrete event without re-running the engine. The same data renders as a styled PDF for Notified Bodies (`--format pdf`, needs `vaara[pdf]`), a static HTML dashboard (`vaara compliance dashboard`), or a Sigstore-signed handoff envelope (`vaara trail export`, optional ML-DSA-65 / FIPS 204 post-quantum signer via `vaara[pq]`).
+Each verdict carries the threshold-versus-observed snapshot, the rationale, and the underlying records, so a reviewer traces `status` back to a concrete event. The same data renders as a Notified-Body PDF, a static HTML dashboard, or a Sigstore-signed handoff envelope. See [docs/COMPLIANCE.md](docs/COMPLIANCE.md).
 
-## Verify the evidence
+## What you get
 
-Producing the trail is half the job. The other half is letting someone who does not trust you check it, with no key, no access to your system, and none of your software. Every verifier below reads the wire format, is fail-closed on authenticity, and ships with public conformance vectors plus a standalone checker that imports no Vaara code, so an independent party reproduces every verdict offline. That property is the point of the standards work behind [SEP-2828](https://github.com/modelcontextprotocol/modelcontextprotocol/pull/2828): the evidence is verifiable by someone who runs none of your software.
+- **Gate every tool call** against your own policy: allow, block, or escalate.
+- **A tamper-evident trail** an outside party verifies without trusting your stack, with the chain head anchorable to an external RFC 3161 / eIDAS timestamp so its existence is provable against a clock you do not control.
+- **Article-level EU AI Act evidence**, honest about the gaps instead of papering over them.
+- **Governance of the model call itself**, not only the tools around it: a hardware-rooted inference receipt that a second, different local model cross-checks. This is the sovereign inference harness, new in v1.0.
 
-```bash
-vaara verify-bundle evidence-bundle.json
-```
+## Where it plugs in
 
-| Command | What it checks |
+Native adapters route the major Python agent frameworks through the same pipeline, each via the framework's own hook, emitting identical audit events:
+
+| Framework | Entry point |
 |---|---|
-| `verify-bundle` | One evidence bundle through six lenses (identity, signature, back-link, inclusion, consistency, revocation). `ok` only when the signature is actually established, not merely present in a log. |
-| `build-bundle` | The issuer side: assembles the exact document `verify-bundle` reads, so producing and checking is one closed loop over one file. |
-| `verify-record` | The SEP-2828 wire format of any record, including one Vaara never produced. Keyless: the result commitment is the SHA-256 of the bytes beside it. |
-| `conformance-statement` | A producer proves its records conform against the published corpus, naming the exact corpus version and digest. |
-| `verify-retained` | A record under a key that has since rotated out, over the Article 12 retention window. |
-| hybrid PQC signing (`pq_verdict`) | A receipt's parallel ML-DSA-65 / FIPS 204 signature over the same preimage, for records that must outlive classical crypto. The suite is committed in the signed bytes, so stripping the post-quantum signature is a detectable downgrade, not a silent loss. |
-| `build-handoff` / `verify-handoff` | A self-contained package one org hands another org's regulator, offline, years later, under a rotated-out key. |
-| `verify-enforcement` | Binds a record to an AMD SEV-SNP confidential-VM attestation report. |
-| `export-attestation-result` | Re-expresses any attestation verdict (TPM binding, TPM chain, SEV-SNP) as an IETF RATS EAR with an AR4SI trustworthiness vector, so a Relying Party reads every root through one standards-aligned shape. While the hardware root is trusted as supplied the result tops out at the `warning` tier, never `affirming`. |
-| `verify-records`, `verify-bundles`, `verify-handoffs`, `verify-enforcements` | The set-level forms: each single-file check run over a whole directory, with a roll-up. |
-| `audit-summary` | Renders the conformance verdict for a directory as a Markdown page an auditor reads directly. |
+| LangChain | `VaaraCallbackHandler`, `vaara_wrap_tool` |
+| CrewAI | `VaaraCrewGovernance` |
+| OpenAI Agents SDK | `VaaraToolGuardrail`, `vaara_wrap_function` |
+| MCP server | `vaara.integrations.mcp_server` |
 
-Each verifier is honest about where trust comes from: content-addressing proves only that a package is internally consistent, producer identity is pinned out of band, an enforcement binding is never called `attested` in this release, and the eIDAS time anchor is the one component a holder cannot forge. Every command ships a Vaara-free checker under `tests/vectors/` that reproduces its verdicts offline. The full trust model for each verb is in [docs/verifying-evidence.md](docs/verifying-evidence.md).
-
-## Benchmarks
-
-Held-out test recall **84.7%** (95% Wilson [82.4, 86.7]) at a **4.1%** false-positive rate, and **1.2%** FPR on benign tool calls under live injection pressure. The hot-path rule scorer adds 140 µs mean / 210 µs p99 per call on commodity CPU. Every figure is reproducible end-to-end via `make bench`.
-
-<details>
-<summary>Full numbers, corpus, calibration, and chain of custody</summary>
-
-- 12,155-entry adversarial corpus (250 hand-curated + 11,905 LLM-generated), 70/15/15 split stratified by (category, source)
-- Classifier v9 (236 hand-features + 384-dim MiniLM embeddings) at calibrated threshold 0.9150 on held-out TEST n=1,827: recall 84.7% [82.4, 86.7] at FPR 4.1% [2.9, 5.7]. Phase 1 PAIR scale-up to n=300 per attacker family lands at 88.1% [85.8, 90.1]
-- Cross-model held-out recall 66.8% [64.9, 68.7] over n=2,277 with no eval-set attacker model in TRAIN; the weakest sub-cell is data_exfil against a closed-weight model at 38.9% [35.3, 42.5]. This is the honest worst case; the in-distribution number above is the easier denominator
-- BIPIA-pressure FPR on benign tool calls 1.2% [0.4, 3.6] across four agent backends (Claude Haiku 4.5, Llama-3.1-8B, Mistral-7B, Qwen-2.5-7B), n=244. Collapses from 35.2% on v8 to 1.2% on v9
-- Multi-attacker PAIR robustness: 0/25 successes per attacker across Qwen2.5-32B, Qwen2.5-72B, Llama-3.3-70B on identical seeds, Wilson upper 13.3%
-- 140 µs mean / 210 µs p99 for the hot-path rule scorer on commodity CPU; the MiniLM classifier is opt-in (`vaara[ml]`) and not in that path
-- Distribution-free conformal coverage on the score; MWU regret bound O(sqrt(T log N))
-- Chain of custody: corpus, split, training commit, and bundle SHAs locked and printed by every script
-- Current methodology and ship-gate record in [vaara-bench-v0.39](bench/vaara-bench-v0.39.md); per-cell breakdown in [vaara-bench-v0.37](bench/vaara-bench-v0.37.md). Historical bench docs live under `bench/`
-
-Each figure is reproducible from the public corpus or the bench pipeline in `bench/`.
-</details>
-
-## Framework adapters
-
-Native adapters in `src/vaara/integrations/` route the major Python agent frameworks through Vaara's pipeline. Each intercepts via the framework's own callback or hook surface, scores, gates, and emits the same audit events as a direct `pipeline.intercept()`. Frameworks are not hard dependencies (lazy import, duck typing), so audit records hash-chain together regardless of which one the action came through.
-
-| Framework | Entry point | Use |
-|---|---|---|
-| LangChain | `VaaraCallbackHandler`, `vaara_wrap_tool` | Slots into `config={"callbacks": [...]}` or wraps per-tool |
-| CrewAI | `VaaraCrewGovernance` | Wraps a crew so every agent action passes through scoring + audit |
-| OpenAI Agents SDK | `VaaraToolGuardrail`, `vaara_wrap_function` | Function-tool wrap, compatible with Responses API and Agents-SDK tracing |
-| MCP server | `vaara.integrations.mcp_server` | Exposes scoring, audit, policy reload as MCP tools |
-
-For Vaara *in front of* an upstream MCP server, see [MCP proxy](#mcp-proxy) below.
-
-## Upstream-signal adapters (cloud + OSS guardrails)
-
-Adapters route findings from cloud and OSS guardrails into Vaara's audit trail and OVERT envelope. The filter runs in the deployer's environment; Vaara records the verdict, normalises 68 provider categories onto a shared vocabulary, and tags each finding against the relevant AI Act articles. Each adapter returns a `ContentSafetyFinding` the deployer routes into `pipeline.intercept(context=finding.to_audit_context())`. Article-by-article mapping in [COMPLIANCE.md](docs/COMPLIANCE.md).
-
-<details>
-<summary>Seven cloud and OSS guardrails: Bedrock, Azure, GCP, NeMo, Guardrails AI, LLM Guard, Rebuff</summary>
-
-| Provider | Adapter | Extra | Wraps |
-|---|---|---|---|
-| AWS Bedrock Guardrails | `BedrockGuardrailsAdapter` | `vaara[bedrock]` | `ApplyGuardrail` across five Bedrock policy buckets |
-| Azure AI Content Safety | `AzureContentSafetyAdapter` | `vaara[azure-content-safety]` | `analyze_text`, Prompt Shields, Protected Material, Groundedness |
-| GCP Model Armor | `GcpModelArmorAdapter` | `vaara[gcp-model-armor]` | `sanitize_user_prompt`, `sanitize_model_response` |
-| NVIDIA NeMo Guardrails | `NemoGuardrailsAdapter` | `vaara[nemo-guardrails]` | `GenerationResponse.log.activated_rails` (input / dialog / output / retrieval) |
-| Guardrails AI | `GuardrailsAIAdapter` | `vaara[guardrails-ai]` | `ValidationOutcome.validation_summaries` from `Guard.parse` / `Guard.validate` |
-| LLM Guard | `LLMGuardAdapter` | `vaara[llm-guard]` | `scan_prompt` / `scan_output` |
-| Rebuff | `RebuffAdapter` | `vaara[rebuff]` | `DetectResponse` across heuristic, model, vector layers + canary-word leak check |
-
-Mapping table at `src/vaara/integrations/_content_safety_articles.py`. Rationale in [COMPLIANCE.md](docs/COMPLIANCE.md#cloud-guardrail-adapter-pattern).
-</details>
-
-## HTTP API
-
-The same scorer and audit trail are available over HTTP for non-Python agents and control planes that prefer a network boundary.
-
-```bash
-pip install 'vaara[server]'
-vaara serve --host 0.0.0.0 --port 8000
-
-curl -sX POST http://localhost:8000/v1/score \
-  -H 'content-type: application/json' \
-  -d '{"tool_name":"tx.transfer","agent_id":"agent-007","base_risk_score":0.5}'
-```
-
-Wire contract in [docs/openapi.yaml](docs/openapi.yaml). Operator endpoints include `POST /v1/policy/reload` (atomic hot policy swap) and named detectors `POST /v1/detect/injection` and `POST /v1/detect/pii`, with matching CLI subcommands that exit non-zero on detection for CI gating.
-
-The first-party TypeScript client ships on npm as [`@vaara/client`](clients/ts): typed wrappers over every v1 endpoint, Node 18+, ESM. JS/TS agents call Vaara without a Python sidecar.
-
-```ts
-import { VaaraClient } from "@vaara/client";
-const vaara = new VaaraClient({ baseUrl: "http://localhost:8000" });
-const r = await vaara.score({ tool_name: "tx.transfer", agent_id: "agent-007", base_risk_score: 0.6 });
-if (r.decision === "deny") throw new Error("blocked");
-```
-
-## MCP proxy
-
-`VaaraMCPProxy` sits between an MCP client (Claude Code, Cursor, any MCP host) and an upstream MCP server. Every `tools/call` routes through Vaara's pipeline before reaching the upstream: allowed calls forward transparently and report the outcome back to the scorer, blocked calls return an MCP `isError: true` with the reason. The handshake and `notifications/*` forward unchanged.
+To put Vaara **in front of** an MCP server, run it as a proxy. Every `tools/call` routes through the pipeline before reaching the upstream; allowed calls forward transparently, blocked calls return an MCP error.
 
 ```bash
 vaara-mcp-proxy \
@@ -211,105 +104,52 @@ vaara-mcp-proxy \
   --db ./mcp_audit.db
 ```
 
-Point your MCP client at the proxy instead of the upstream; the audit chain captures every call without changing client or upstream behavior. Upstreams can be local (`--upstream` launches a local stdio server) or remote (`--upstream-url NAME=URL` over Streamable HTTP). This is distinct from `mcp_server`, which exposes Vaara itself as a tool.
+Point your MCP client (Claude Code, Cursor, any host) at the proxy instead of the upstream. There is also an HTTP API (`pip install 'vaara[server]'`, `vaara serve`) and a first-party TypeScript client on npm ([`@vaara/client`](clients/ts)) for non-Python agents. Framework details, the cloud and OSS guardrail adapters (Bedrock, Azure, GCP, NeMo, Guardrails AI, LLM Guard, Rebuff), and the multi-tenant proxy are in [docs/adapters.md](docs/adapters.md).
+
+## How it scores
+
+Each risk score blends five expert signals and keeps adapting as outcomes come back, and it carries a confidence interval with a coverage guarantee that holds regardless of the input distribution. On a held-out adversarial corpus the classifier reaches **84.7%** recall (95% Wilson [82.4, 86.7]) at a **4.1%** false-positive rate, and **1.2%** FPR on benign calls under live injection pressure. The hot-path rule scorer adds 140 µs mean per call on commodity CPU; the ML classifier is opt-in (`vaara[ml]`) and off that path. Every figure is reproducible via `make bench`.
 
 <details>
-<summary>Fleet shape: one proxy, many upstreams, multi-tenant policy</summary>
+<summary>Full numbers, corpus, calibration, and chain of custody</summary>
 
-`vaara-mcp-proxy` also runs over Streamable HTTP with fan-out, so one process can serve a fleet:
+- 12,155-entry adversarial corpus (250 hand-curated + 11,905 LLM-generated), 70/15/15 split stratified by (category, source).
+- Classifier v9 (236 hand-features + 384-dim MiniLM embeddings) at calibrated threshold 0.9150 on held-out TEST n=1,827: recall 84.7% [82.4, 86.7] at FPR 4.1% [2.9, 5.7].
+- Cross-model held-out recall 66.8% [64.9, 68.7] over n=2,277 with no eval-set attacker model in TRAIN; the weakest sub-cell is data_exfil against a closed-weight model at 38.9%. This is the honest worst case; the in-distribution number above is the easier denominator.
+- BIPIA-pressure FPR on benign tool calls 1.2% [0.4, 3.6] across four agent backends (Claude Haiku 4.5, Llama-3.1-8B, Mistral-7B, Qwen-2.5-7B). Down from 35.2% on v8.
+- Multi-attacker PAIR robustness: 0/25 successes per attacker across Qwen2.5-32B, Qwen2.5-72B, Llama-3.3-70B on identical seeds, Wilson upper 13.3%.
+- Distribution-free conformal coverage on the score; MWU regret bound O(sqrt(T log N)).
+- Chain of custody: corpus, split, training commit, and bundle SHAs locked and printed by every script.
 
-```bash
-vaara-mcp-proxy \
-  --transport http --http-host 127.0.0.1 --http-port 8765 \
-  --upstream 'github=npx -y @github/mcp-server' \
-  --upstream 'sap=npx -y @sap/mdk-mcp-server'
-```
-
-Each `POST /mcp` reads two headers: `X-Vaara-Upstream` picks the upstream slot, `X-Vaara-Tenant` scopes the policy, audit chain, and OVERT envelope. Single-upstream deployments keep the silent-default contract; multi-upstream deployments require `X-Vaara-Upstream` per call and return 400 with the slot list when it is missing. `vaara serve --policy-dir DIR` loads one policy per file (filename stem becomes `tenant_id`, `default.yaml` is the fallback) and hot-reloads per tenant.
+Method and per-cell breakdown: [docs/architecture.md](docs/architecture.md) and [bench/](bench/).
 </details>
 
-<details>
-<summary>Operator perimeter and request attestation</summary>
+## Standards and attestation
 
-Repeatable `--allow-tool` / `--deny-tool` flags (and the same for resources and prompts) filter the MCP surface. Filtered tools are dropped from `tools/list` before the client sees them and any matching call is rejected at the perimeter without contacting the upstream. Denylist wins on overlap; no flags means passthrough. Every allowed `resources/read` and `prompts/get` writes a request+decision audit pair so a regulator can reconstruct exactly what the agent read.
+- **[SEP-2828](https://github.com/modelcontextprotocol/modelcontextprotocol/pull/2828)** signed execution records and **SEP-2787** request-attestation test vectors, in the MCP standards process. A second independent implementation has reproduced the SEP-2828 conformance vectors from a clean checkout with no shared code.
+- **OVERT 1.0** ([overt.is](https://overt.is/)): Vaara is the Arbiter and emits Protocol Profile 1.0 Base Envelopes (canonical CBOR, Ed25519) alongside every record when attestation is on.
+- **Post-quantum**: an optional parallel ML-DSA-65 / FIPS 204 signature over the same preimage, so a stripped post-quantum signature is a detectable downgrade rather than a silent loss.
+- **Sovereign inference harness** (v1.0): a local model behind a signing proxy that emits a hardware-rooted inference receipt a second local model cross-checks. Developed privately, published here under AGPL-3.0.
 
-OVERT envelopes per interaction turn on with `--overt-signing-key`, `--overt-operator-key`, `--overt-receipts-dir`. SEP-2787 request attestation paired with an execution receipt turns on with `--attest-signing-key PATH` and `--attest-receipts-dir DIR`: each allowed call writes a pre-execution attestation and a post-execution receipt linked by a `backLink` digest. Key type auto-detects from the file (EC P-256 = ES256, RSA = RS256, raw bytes = HS256). Generate and verify offline:
+Details and the offline checkers for each: [docs/standards.md](docs/standards.md).
 
-```
-vaara keygen --attest --out attest_key.pem
-vaara attest verify  0000000001-ab12cd34-attest.json  --pubkey-file attest_key.pem.pub
-vaara receipt verify 0000000001-ab12cd34-receipt.json --attestation 0000000001-ab12cd34-attest.json --pubkey-file attest_key.pem.pub
-```
-
-Both verifiers exit non-zero on any failed check, so they drop straight into CI. Format in [docs/execution-receipts.md](docs/execution-receipts.md), conformance surface in [docs/sep2787-conformance.md](docs/sep2787-conformance.md).
-</details>
-
-Worked examples: [`examples/github-mcp-proxy-demo/`](examples/github-mcp-proxy-demo/) (Vaara in front of `github/github-mcp-server`, 42 tools) and [`examples/sap-mcp-proxy-demo/`](examples/sap-mcp-proxy-demo/) (community SAP MCP servers).
-
-## OVERT 1.0 attestation
-
-OVERT 1.0 is an open standard for runtime trust in AI systems ([overt.is](https://overt.is/), authored by Glacis Technologies, published 25 March 2026): a signed, schema-closed envelope a relying party can verify offline without trusting the emitter. Vaara is the **Arbiter** in OVERT terms and ships Protocol Profile 1.0 Base Envelopes (canonical CBOR per RFC 8949, Ed25519 signatures, HMAC-SHA256 commitments, closed 9-field schema) alongside every audit record when attestation is enabled.
-
-```
-pip install 'vaara[attestation]'
-```
-
-```python
-from vaara.attestation.overt import emit_base_envelope, make_request_commitment, encoder_binary_identity
-
-envelope = emit_base_envelope(
-    signing_key=key,
-    request_commitment=make_request_commitment(payload, operator_key=op_key),
-    encoder_binary_identity=encoder_binary_identity(arbiter_version=f"vaara/{vaara.__version__}", policy_hash=ph),
-    non_content_metadata={"action_class": "tx.transfer", "decision": "escalate"},
-    monotonic_counter=42,
-    arbiter_instance_identifier=uuid_bytes,
-)
-```
-
-`vaara overt verify RECEIPT.cbor --pubkey-file PUB.bin` validates any canonical-CBOR Base Envelope. The verifier reads only the wire format and takes no dependency on Vaara's emitter, so any conformant implementation can route through it. Adjacent surfaces (`vaara.attestation.iap` notary + transparency log, `vaara.attestation.s3p` aggregate intervals, an experimental AMD SEV-SNP TEE hook) and the OVERT 1.0 Part 3 control walk are in [COMPLIANCE.md](docs/COMPLIANCE.md).
-
-## Sovereign inference harness
-
-The governance proxy binds a `tools/call`. The sovereign inference harness, published in v1.0, binds the model call underneath it: which model answered, on which silicon-resident weights, given what input, and what it returned. It runs a local model behind a signing proxy (OpenAI- and ollama-compatible) and emits a hardware-rooted inference receipt that a second, different local model independently cross-checks. The point is signed evidence that the inference itself is accounted for, not only the tooling around it.
-
-Two envelopes mirror the SEP-2787 attestation and receipt pair and reuse its canonicalization (RFC 8785 JCS) and signing stack (HS256 / ES256 / RS256), so a verifier that already reads Vaara records needs no new crypto:
-
-- `InferenceAttestation` is the pre-call commitment: declared intent, a request commitment, an issuer block with a TTL, and the model facts the proxy derived at call time.
-- `InferenceReceipt` is the post-call outcome, back-linked to the exact attestation, carrying status, an output commitment, eval-stat counters, and an honest `tier` self-label.
-
-Tier A (`integrity`) binds model, input, and output with no determinism claim and ships standalone. Tier B (`replay`), the byte-reproducibility claim, is deferred and labeled as such instead of overclaimed.
-
-```python
-from vaara.attestation.inference import emit_inference_attestation, emit_inference_receipt
-```
-
-The session, chain, cross-check, and determinism verifiers each ship a Vaara-free checker that reproduces its verdict offline, and the governance console renders a live inference chain an outside party can replay. Install with `pip install 'vaara[attestation]'`. Developed privately, published here under AGPL-3.0-or-later.
-
-## Where things live
+## Docs
 
 | Path | Contents |
 |---|---|
-| [docs/formal_specification.md](docs/formal_specification.md) | MWU regret bound, conformal coverage, security properties |
-| [docs/conformal-prediction.md](docs/conformal-prediction.md) | Plain-language explainer for compliance reviewers and legal counsel |
-| [docs/execution-receipts.md](docs/execution-receipts.md) | Execution receipts paired with SEP-2787 request attestation |
-| [docs/sep2787-conformance.md](docs/sep2787-conformance.md) | What `vaara attest verify` / `vaara receipt verify` check |
-| [docs/COMPLIANCE.md](docs/COMPLIANCE.md) | EU AI Act (Art. 9, 11 to 15, 61) and DORA (Art. 10, 12, 13) mapping, eval numbers |
-| [docs/VERDICTS.md](docs/VERDICTS.md) | Per-article evidence sufficiency thresholds and decision tree |
-| [CHANGELOG.md](CHANGELOG.md) | Version-by-version feature evolution |
-| [docs/PRIOR_ART.md](docs/PRIOR_ART.md) | When each Vaara concept first shipped, plus adjacent published work |
-| [docs/OWASP_AGENTIC.md](docs/OWASP_AGENTIC.md) | Mapping to OWASP Top 10 for Agentic Applications 2026 |
-| [docs/OVERT_CONTROLS.md](docs/OVERT_CONTROLS.md) | Mapping to OVERT 1.0 Part 3 Agentic AI Controls |
-| [docs/mit_ai_risk_repository_mapping.md](docs/mit_ai_risk_repository_mapping.md) | Coverage map against the MIT AI Risk Repository v4 |
-| [docs/signing-keys.md](docs/signing-keys.md) | Release signing and verification |
-| [.github/SECURITY.md](.github/SECURITY.md) | Security policy and reporting |
-| [.github/CONTRIBUTING.md](.github/CONTRIBUTING.md) | Contribution guidelines |
+| [docs/verifying-evidence.md](docs/verifying-evidence.md) | Every verifier and its trust model |
+| [docs/architecture.md](docs/architecture.md) | Scoring, conformal coverage, time anchor, formal properties |
+| [docs/standards.md](docs/standards.md) | SEP-2828, SEP-2787, OVERT, the sovereign inference harness |
+| [docs/adapters.md](docs/adapters.md) | Framework and cloud/OSS guardrail adapters, multi-tenant proxy |
+| [docs/COMPLIANCE.md](docs/COMPLIANCE.md) | EU AI Act and DORA article mapping, eval numbers |
+| [CHANGELOG.md](CHANGELOG.md) | Version-by-version evolution |
+| [docs/PRIOR_ART.md](docs/PRIOR_ART.md) | When each concept first shipped, plus adjacent work |
 
-Acknowledgements:
+## Acknowledgements
 
-- Vaara is listed in the industry acknowledgements of the [IMDA Model AI Governance Framework for Agentic AI v1.5](https://www.imda.gov.sg/-/media/imda/files/about/emerging-tech-and-research/artificial-intelligence/mgf-for-agentic-ai.pdf) (Singapore, 20 May 2026).
-- The [AMD AI Developer Program](https://www.linkedin.com/posts/amd-developer_meet-henri-sirkkavaara-henri-created-vaara-activity-7459667676555132928-QFSd) ran a coordinated multi-channel developer testimonial of Vaara in May 2026.
-- [Article 14 runtime: why oversight of agentic AI has to be evidenced as action, not model](https://futurium.ec.europa.eu/ga/apply-ai-alliance/community-content/article-14-runtime-why-oversight-agentic-ai-has-be-evidenced-action-not-model) is the position post on the EU Apply AI Alliance Futurium.
+- Listed in the industry acknowledgements of the [IMDA Model AI Governance Framework for Agentic AI v1.5](https://www.imda.gov.sg/-/media/imda/files/about/emerging-tech-and-research/artificial-intelligence/mgf-for-agentic-ai.pdf) (Singapore, 20 May 2026).
+- The [AMD AI Developer Program](https://www.linkedin.com/posts/amd-developer_meet-henri-sirkkavaara-henri-created-vaara-activity-7459667676555132928-QFSd) ran a developer testimonial of Vaara in May 2026.
+- [Article 14 runtime: why oversight of agentic AI has to be evidenced as action, not model](https://futurium.ec.europa.eu/ga/apply-ai-alliance/community-content/article-14-runtime-why-oversight-agentic-ai-has-be-evidenced-action-not-model), the position post on the EU Apply AI Alliance Futurium.
 
 > Vaara helps deployers assemble evidence for their own conformity work. It does not certify compliance or constitute legal advice. Deployers own their obligations under the EU AI Act and other applicable law.
 
