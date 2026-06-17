@@ -13,6 +13,10 @@ Version numbers and dates can be verified against
 and the `vX.Y.Z` tags on
 [https://github.com/vaaraio/vaara/tags](https://github.com/vaaraio/vaara/tags).
 
+From v1.0.0 (2026-06-17) the project is licensed AGPL-3.0-or-later; releases
+through v0.71.0 were published under Apache 2.0. Tag dates and version numbers
+verify against the PyPI history and the `vX.Y.Z` git tags regardless of license era.
+
 ## When each Vaara concept first shipped
 
 | Concept | First shipped | Where to read it |
@@ -65,6 +69,9 @@ and the `vX.Y.Z` tags on
 | Post-quantum hybrid-signed execution receipts with the signature suite committed in the signed preimage (a stripped PQC signature is a detectable downgrade) | v0.69.0, 2026-06-11 | `src/vaara/attestation/`, `docs/design/pq-hybrid-signing-spec.md` |
 | TPM 2.0 plus IMA binding of a signed SEP-2828 record, offline-verifiable on commodity hardware (`verify-tpm-binding`) | v0.70.0, 2026-06-12 | `src/vaara/attestation/`, `scripts/tpm/` |
 | Continuous TPM 2.0 plus IMA attestation chain bound to the per-action record (`verify-tpm-chain`) | v0.70.0, 2026-06-12 | `src/vaara/attestation/`, `tests/test_tpm_chain.py` |
+| RATS EAR neutral verify: a Vaara attestation verdict re-expressed as an IETF RATS EAR (draft-ietf-rats-ear) carrying an AR4SI trustworthiness vector (draft-ietf-rats-ar4si), root-agnostic across TPM binding, TPM chain, and SEV-SNP (`export-attestation-result`) | v0.71.0, 2026-06-16 | `src/vaara/attestation/`, `docs/design/attestation-result-spec.md` |
+| Sovereign inference harness: a local model emits a signed, hardware-rooted inference receipt that a second local model independently cross-checks, with session, chain, cross-check, and determinism verifiers (first public release, AGPL-3.0-or-later) | v1.0.0, 2026-06-17 | `src/vaara/`, `CHANGELOG.md` v1.0.0 |
+| evidenceRef worked example recomputes end to end from real tool-surface bytes (surface bytes to surface hash to drift record to content-addressed `evidenceRef`), so a second implementation can reproduce the whole chain | v1.0.2, 2026-06-17 | `tests/vectors/evidence_ref_v0/`, `CHANGELOG.md` v1.0.2 |
 
 The `CHANGELOG.md` entry for each version carries the substantive
 description and, where relevant, the failure mode that motivated the
@@ -98,6 +105,30 @@ than a judgment of the work.
   intervening monitors that act at runtime to preempt predicted
   violations. Adjacent to Vaara's policy-driven runtime decisions and
   external-scorer composition (shipped v0.14.0, 2026-05-17).
+- **Notarized Agents: Receiver-Attested Confidential Receipts for AI
+  Agent Actions.** arXiv:2606.04193v1, published 2026-06-02. Inverts
+  the trust boundary so the service receiving an agent's call signs a
+  receipt of what it observed, encrypts it to the owner, and publishes
+  it to a witness-cosigned Merkle log (the Sello protocol). Same problem
+  statement as Vaara (the entity producing the log is the entity being
+  logged), with a different placement: the signature is on the receiving
+  service rather than at a governance proxy in front of the agent, and
+  the root of trust is a transparency log rather than a hardware
+  attestation. Situates a wider field (Signet, AgentROA, Agent Passport
+  System, draft-farley-acta, SCITT). Vaara's signed execution-receipt
+  envelope shipped at v0.42.0 (2026-05-29); its transparency-log
+  consistency proofs at v0.54.0 (2026-06-05).
+- **A Five-Plane Reference Architecture for Runtime Governance of
+  Production AI Agents.** arXiv:2606.12320v1, published 2026-06-10. A
+  reasoning plane that adjudicates intent over four enforcement planes
+  (network, identity, endpoint, data), with stop-anywhere mediation,
+  composite principals whose authority attenuates through delegation
+  chains, and audit treated as a structured evidence substrate. Direct
+  conceptual neighbour to Vaara's interception pipeline (v0.1.0,
+  2026-04-10) and per-article `verdict_inputs` / `contributing_events`
+  (v0.26.0, 2026-05-21); it specifies a policy-engine core and
+  architecture, where Vaara ships a proxy whose audit substrate is
+  cryptographically signed and hardware-bound.
 
 ### Safety cases with runtime confidence updates
 
@@ -154,6 +185,54 @@ than a judgment of the work.
   use-case-specific benchmarks. Adjacent in motivation to Vaara's
   policy-driven decisions over agent tool calls, in a deployment
   context Vaara does not currently target.
+
+### Agent-action signing and attestation protocols
+
+- **Attested Tool-Server Admission: A Security Extension to the Model
+  Context Protocol.** arXiv:2605.24248v2, published 2026-06-01. Three
+  additive mechanisms for MCP: an offline-signed clearance assertion a
+  tool server publishes at a well-known URI and a host verifies against
+  a pinned trust root; a deny-by-default per-server tool allowlist; and
+  a flavor-gated enforcement mode writing every decision to a
+  tamper-evident audit log, stated in RFC-2119 form as an MCP addendum.
+  Adjacent to Vaara's MCP proxy and signed records: admission-time trust
+  of a tool server, where Vaara attests the per-call action at runtime.
+- **Signed agent-action receipt and identity proposals in the framework
+  repos (2026-06).** A cluster of proposals converging on the primitive
+  Vaara shipped earlier: AutoGen Cryptographic Action Receipts
+  (microsoft/autogen#7360, Ed25519-signed, SHA-256 input/output hashes,
+  offline-verifiable); a minimal Ed25519 + RFC-9421 per-message signing
+  extension for A2A (a2aproject/A2A#1829); A2A agent-identity
+  verification with AgentCard revocation (a2aproject/A2A#1497); signed
+  MCP tool manifests for tool-poisoning / rug-pull defense
+  (modelcontextprotocol#2913); and runtime tool-drift detection
+  (modelcontextprotocol#2826). Vaara shipped the signed per-action
+  execution-receipt envelope at v0.42.0 (2026-05-29) and the DID-bound
+  receipt identity with revocation at v0.52.0 to v0.55.0 (2026-06-02 to
+  2026-06-05), ahead of these proposals; listing them records the
+  convergence, not a competitive claim.
+
+### Same-lane open projects
+
+- **Determs (Verifiable Decision Record).** determs.com,
+  github.com/determs-com, PyPI `determs`; surfaced 2026-06-07. An open
+  spec plus reference implementation for per-action machine-generated
+  records (Article 12) whose digests are anchored to public
+  infrastructure (Article 19). Anchor-centric: no signing key in the
+  trust path, with verification from the record JSON, RFC 8785,
+  SHA-256, and public-blockchain anchor data (OpenTimestamps to
+  Bitcoin). Vaara's comparable evidence story combines a signature, an
+  independent eIDAS-qualified RFC-3161 time anchor (v0.48.0, 2026-05-31),
+  transparency-log consistency proofs (v0.54.0, 2026-06-05), and a
+  revocation registry (v0.55.0, 2026-06-05).
+- **Interlock (getinterlock.dev).** Runtime tool-drift detection at the
+  MCP layer (modelcontextprotocol discussion #2826). Notable to this
+  document because Interlock has begun recomputing Vaara's published
+  SEP-2828 evidenceRef drift vectors, the first independent exercise of
+  the keyless conformance verifier shipped at v0.60.0 (2026-06-07).
+  Interlock detects drift; Vaara emits the signed, content-addressed
+  record the drift check resolves against. Listed as adjacent and
+  interoperating.
 
 ### Classical foundations
 
