@@ -1,7 +1,7 @@
 <p align="center">
   <picture>
-    <source media="(prefers-color-scheme: dark)" srcset="docs/vaara-wordmark-dark.png">
-    <img src="docs/vaara-wordmark-light.png" alt="Vaara" width="900">
+    <source media="(prefers-color-scheme: dark)" srcset="https://raw.githubusercontent.com/vaaraio/vaara/main/docs/vaara-wordmark-dark.png">
+    <img src="https://raw.githubusercontent.com/vaaraio/vaara/main/docs/vaara-wordmark-light.png" alt="Vaara" width="900">
   </picture>
 </p>
 
@@ -9,7 +9,7 @@
   <a href="https://pypi.org/project/vaara/"><img src="https://img.shields.io/pypi/v/vaara.svg" alt="PyPI"></a>
   <a href="https://github.com/vaaraio/vaara/blob/main/LICENSE"><img src="https://img.shields.io/pypi/l/vaara.svg" alt="License"></a>
   <a href="https://github.com/vaaraio/vaara/actions/workflows/ci.yml"><img src="https://img.shields.io/github/actions/workflow/status/vaaraio/vaara/ci.yml?branch=main&label=tests" alt="CI"></a>
-  <a href="https://scorecard.dev/viewer/?uri=github.com/vaaraio/vaara"><img src="https://api.scorecard.dev/projects/github.com/vaaraio/vaara/badge" alt="OpenSSF Scorecard"></a>
+  <a href="https://scorecard.dev/viewer/?uri=github.com/vaaraio/vaara"><img src="https://img.shields.io/ossf-scorecard/github.com/vaaraio/vaara?label=OpenSSF%20Scorecard" alt="OpenSSF Scorecard"></a>
   <a href="https://www.bestpractices.dev/projects/12612"><img src="https://www.bestpractices.dev/projects/12612/badge" alt="OpenSSF Best Practices"></a>
   <a href="https://huggingface.co/spaces/vaaraio/vaara"><img src="https://img.shields.io/badge/%F0%9F%A4%97%20Hugging%20Face-Space-blue" alt="Hugging Face Space"></a>
 </p>
@@ -21,6 +21,7 @@ EU AI Act Article 12 record-keeping is the driver. The same trail answers any "s
 - Article-level EU AI Act evidence report, honest about the gaps instead of rubber-stamping them.
 - Hash-chained, tamper-evident audit trail an outside party can verify without trusting your stack, with the chain head anchorable to an external trusted timestamp (RFC 3161 / eIDAS).
 - Gate every agent tool call against your own policy: allow, block, or escalate.
+- Govern the model call itself, not only the tools around it: a signed, hardware-rooted inference receipt that a second local model cross-checks. This is the sovereign inference harness, new in v1.0.
 
 ## How it works
 
@@ -267,6 +268,23 @@ envelope = emit_base_envelope(
 ```
 
 `vaara overt verify RECEIPT.cbor --pubkey-file PUB.bin` validates any canonical-CBOR Base Envelope. The verifier reads only the wire format and takes no dependency on Vaara's emitter, so any conformant implementation can route through it. Adjacent surfaces (`vaara.attestation.iap` notary + transparency log, `vaara.attestation.s3p` aggregate intervals, an experimental AMD SEV-SNP TEE hook) and the OVERT 1.0 Part 3 control walk are in [COMPLIANCE.md](docs/COMPLIANCE.md).
+
+## Sovereign inference harness
+
+The governance proxy binds a `tools/call`. The sovereign inference harness, published in v1.0, binds the model call underneath it: which model answered, on which silicon-resident weights, given what input, and what it returned. It runs a local model behind a signing proxy (OpenAI- and ollama-compatible) and emits a hardware-rooted inference receipt that a second, different local model independently cross-checks. The point is signed evidence that the inference itself is accounted for, not only the tooling around it.
+
+Two envelopes mirror the SEP-2787 attestation and receipt pair and reuse its canonicalization (RFC 8785 JCS) and signing stack (HS256 / ES256 / RS256), so a verifier that already reads Vaara records needs no new crypto:
+
+- `InferenceAttestation` is the pre-call commitment: declared intent, a request commitment, an issuer block with a TTL, and the model facts the proxy derived at call time.
+- `InferenceReceipt` is the post-call outcome, back-linked to the exact attestation, carrying status, an output commitment, eval-stat counters, and an honest `tier` self-label.
+
+Tier A (`integrity`) binds model, input, and output with no determinism claim and ships standalone. Tier B (`replay`), the byte-reproducibility claim, is deferred and labeled as such instead of overclaimed.
+
+```python
+from vaara.attestation.inference import emit_inference_attestation, emit_inference_receipt
+```
+
+The session, chain, cross-check, and determinism verifiers each ship a Vaara-free checker that reproduces its verdict offline, and the governance console renders a live inference chain an outside party can replay. Install with `pip install 'vaara[attestation]'`. Developed privately, published here under AGPL-3.0-or-later.
 
 ## Where things live
 
