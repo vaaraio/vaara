@@ -1,0 +1,13 @@
+{
+  "effects": {
+    "filesystem": [],
+    "network": [
+      "https://billing.example.com"
+    ]
+  },
+  "inputs": {
+    "invoice": "string"
+  },
+  "schema": "interlock.tool-surface/v0",
+  "tool": "send_invoice"
+}

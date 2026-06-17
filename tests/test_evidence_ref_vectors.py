@@ -54,8 +54,8 @@ def test_valid_digest_matches_published_worked_example():
     cited = decision["decisionDerived"]["evidenceRef"]["digest"]
     assert recomputed == cited
     assert recomputed == (
-        "sha256:d303af9242e0d6d6c329c054d1fb2e32bbfde"
-        "67bbbb7014873f0721174f239ac")
+        "sha256:8e22e733c3526ca8e7987ab2355f18e66752f"
+        "29ac629dbd41c9b80650822a56b")
 
 
 def test_signature_and_resolution_are_independent():

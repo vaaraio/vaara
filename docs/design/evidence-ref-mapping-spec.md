@@ -53,14 +53,50 @@ content-addressable record.
 
 ### 1. The drift record (detector's schema)
 
-A tool that gained an external-reach effect after it was approved:
+A tool that gained an external-reach effect after it was approved. The
+drift record names two tool surfaces by hash: the surface as approved, and
+the surface as observed now. Those two surfaces are the detector's own
+schema (`interlock.tool-surface/v0` here), and they ship alongside the
+vectors as `approved_surface.json` and `current_surface.json` so the
+surface hashes are real `sha256` over published bytes, not placeholders.
+The approved surface declares no network effect:
+
+```json
+{
+  "schema": "interlock.tool-surface/v0",
+  "tool": "send_invoice",
+  "inputs": {"invoice": "string"},
+  "effects": {"network": [], "filesystem": []}
+}
+```
+
+The current surface adds the external host the tool now reaches:
+
+```json
+{
+  "schema": "interlock.tool-surface/v0",
+  "tool": "send_invoice",
+  "inputs": {"invoice": "string"},
+  "effects": {"network": ["https://billing.example.com"], "filesystem": []}
+}
+```
+
+Their JCS content addresses are `approvedSurfaceHash` and
+`currentSurfaceHash` below:
+
+```
+approved: sha256:9f2c6449382c2a66702240bd64db6ebb3e1abe247c74dbeedd39b17abf2aae3b
+current:  sha256:bae6c4803252f0a6239c86105d9a305dff9bded37730dc884eaf5671b8662a67
+```
+
+The drift record references them and classifies the delta:
 
 ```json
 {
   "schema": "interlock.drift-record/v0",
   "tool": "send_invoice",
-  "approvedSurfaceHash": "sha256:aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
-  "currentSurfaceHash": "sha256:bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb",
+  "approvedSurfaceHash": "sha256:9f2c6449382c2a66702240bd64db6ebb3e1abe247c74dbeedd39b17abf2aae3b",
+  "currentSurfaceHash": "sha256:bae6c4803252f0a6239c86105d9a305dff9bded37730dc884eaf5671b8662a67",
   "classifiedDelta": {
     "kind": "external-reach-added",
     "field": "effects.network",
@@ -80,13 +116,13 @@ implementation that can verify a decision signature already has the bytes
 rule it needs here. The canonical bytes are:
 
 ```
-{"approvedSurfaceHash":"sha256:aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa","classifiedDelta":{"field":"effects.network","from":[],"kind":"external-reach-added","to":["https://billing.example.com"]},"currentSurfaceHash":"sha256:bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb","observedAt":"2026-06-01T10:00:00Z","policyId":"policy:tool-surface/2","schema":"interlock.drift-record/v0","tool":"send_invoice"}
+{"approvedSurfaceHash":"sha256:9f2c6449382c2a66702240bd64db6ebb3e1abe247c74dbeedd39b17abf2aae3b","classifiedDelta":{"field":"effects.network","from":[],"kind":"external-reach-added","to":["https://billing.example.com"]},"currentSurfaceHash":"sha256:bae6c4803252f0a6239c86105d9a305dff9bded37730dc884eaf5671b8662a67","observedAt":"2026-06-01T10:00:00Z","policyId":"policy:tool-surface/2","schema":"interlock.drift-record/v0","tool":"send_invoice"}
 ```
 
 and the content address is:
 
 ```
-sha256:d303af9242e0d6d6c329c054d1fb2e32bbfde67bbbb7014873f0721174f239ac
+sha256:8e22e733c3526ca8e7987ab2355f18e66752f29ac629dbd41c9b80650822a56b
 ```
 
 This digest is deterministic from the record bytes alone. It is the unit
@@ -110,7 +146,7 @@ The governing server escalates and cites the drift record in its basis:
     "thresholdBlock": "0.80",
     "policyId": "policy:tool-surface/2",
     "evidenceRef": {
-      "digest": "sha256:d303af9242e0d6d6c329c054d1fb2e32bbfde67bbbb7014873f0721174f239ac",
+      "digest": "sha256:8e22e733c3526ca8e7987ab2355f18e66752f29ac629dbd41c9b80650822a56b",
       "canonicalization": "JCS",
       "schema": "interlock.drift-record/v0",
       "ref": "ipfs://<drift-record-cid>"
@@ -179,5 +215,5 @@ import hashlib
 from vaara.attestation._sep2787_canonical import canonical_json
 drift = { ... }  # the record from step 1
 addr = "sha256:" + hashlib.sha256(canonical_json(drift)).hexdigest()
-# sha256:d303af9242e0d6d6c329c054d1fb2e32bbfde67bbbb7014873f0721174f239ac
+# sha256:8e22e733c3526ca8e7987ab2355f18e66752f29ac629dbd41c9b80650822a56b
 ```

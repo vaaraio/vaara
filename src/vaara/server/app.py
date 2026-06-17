@@ -52,7 +52,7 @@ def create_app(
     )
     app = FastAPI(
         title="Vaara HTTP API",
-        version="1.0.1",
+        version="1.0.2",
         description=(
             "Conformal-scoring risk evaluation and hash-chained audit "
             "emission. Authoritative spec: docs/openapi.yaml in the vaara "

@@ -36,6 +36,8 @@ normative/<case>/
   decision.json             the signed decision record
   drift_record.json         the external evidence the decision cites
   expected.json             the verdict map the checker must reproduce
+  approved_surface.json     (valid case) the tool surface as approved
+  current_surface.json      (valid case) the tool surface as observed now
 _check_independent.py        standard library plus cryptography and
                              rfc8785, no Vaara import
 ```
@@ -43,6 +45,12 @@ _check_independent.py        standard library plus cryptography and
 Only verification material ships: the public key and the symmetric HMAC
 secret the fixtures were signed with. The ES256 private key is not
 published; the ES256 fixtures are verified against the stored public key.
+
+The valid case also ships the two tool surfaces the drift record's
+`approvedSurfaceHash` and `currentSurfaceHash` are computed over, so those
+hashes resolve to real published bytes: JCS-canonicalize either surface
+file, `sha256` it, and the result equals the hash named in the drift
+record. The surfaces are the detector's schema; Vaara never parses them.
 
 ## Cases
 
@@ -87,7 +95,7 @@ reference so this is explicit rather than assumed.
 
 The worked example in `docs/design/evidence-ref-mapping-spec.md` carries
 the same drift record; its content address is
-`sha256:d303af9242e0d6d6c329c054d1fb2e32bbfde67bbbb7014873f0721174f239ac`,
+`sha256:8e22e733c3526ca8e7987ab2355f18e66752f29ac629dbd41c9b80650822a56b`,
 the digest cited in the valid fixtures here.
 
 ## Verifying
