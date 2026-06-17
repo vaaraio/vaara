@@ -4,6 +4,25 @@ All notable changes to this project are documented here.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/)
 and this project follows [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [1.0.1] - 2026-06-17
+
+Patch release: the README renders correctly on PyPI, the sovereign inference harness
+is documented, and the dependency bumps are folded in.
+
+- The wordmark and the OpenSSF Scorecard badge now use absolute URLs, so the project
+  page renders on PyPI instead of showing a broken hero image and dead links. The
+  scorecard badge points at the stable shields.io OpenSSF endpoint, which GitHub's
+  image proxy serves without the redirect that was blanking the old badge.
+- New README section documenting the sovereign inference harness shipped in 1.0.0:
+  the inference attestation and receipt pair, the integrity and replay tiers, the
+  second-model cross-check, and the offline verifiers.
+- Dependency bumps: cryptography to 49.0.0 (closes two high advisories on the bundled
+  OpenSSL in the dev lockfile), plus pytest, ruff, hypothesis, and the
+  sigstore-python GitHub Action.
+
+No functional change to the published package. Documentation, dependency, and version
+metadata only.
+
 ## [1.0.0] - 2026-06-17
 
 First major release: the sovereign inference harness, public under AGPL-3.0-or-later.

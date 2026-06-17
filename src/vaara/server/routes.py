@@ -17,7 +17,7 @@ from vaara.server.state import ServerState
 
 
 _SERVER_NAME = "vaara-reference-server"
-_SERVER_VERSION = "1.0.0"
+_SERVER_VERSION = "1.0.1"
 
 
 def _error(code: str, message: str, http_status: int, **details) -> HTTPException:
