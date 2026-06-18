@@ -1,0 +1,9 @@
+{
+  "toolName": "files.read",
+  "args": {
+    "path": "/data/report.txt"
+  },
+  "tenantId": "tenant-alpha",
+  "now": 1781784005.0,
+  "keyHex": "636f6e666f726d616e63652d63726564656e7469616c2d6772616e742d76302d7368617265642d7365637265742121"
+}

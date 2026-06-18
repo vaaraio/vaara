@@ -112,6 +112,7 @@ tests/adversarial/traces/
 .profile
 .gitconfig
 .ripgreprc
+.idea
 .idea/
 .vscode/
 

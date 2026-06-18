@@ -1,0 +1,22 @@
+{
+  "version": 1,
+  "alg": "HS256",
+  "scope": {
+    "argsCommitment": "sha256:22a7553ad5a0608e2553f02f441c1c2453f4f91381f61b5de9b9c9f34a5cf5d2",
+    "tenantId": "tenant-alpha",
+    "toolName": "files.read"
+  },
+  "binding": {
+    "attestationDigest": "sha256:78fb051dbed07e84f706d41fb4c28064e2e57e2c54ccf97e0d0d468674654827",
+    "attestationNonce": "4A1sMS-rRPEjUEOnWd_c1hrI"
+  },
+  "asserted": {
+    "expSeconds": 60,
+    "iat": "2026-06-18T12:00:00Z",
+    "iss": "vaara-mcp-proxy",
+    "nonce": "grant-nonce-fixed",
+    "secretVersion": "key-v1",
+    "sub": "tenant-alpha/default"
+  },
+  "signature": "00cc95c72c49f2670fd15c9e5427518a1b0004e976726a08435d539b8c8ca3fb"
+}

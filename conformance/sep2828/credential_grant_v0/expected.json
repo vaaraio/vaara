@@ -1,0 +1,22 @@
+{
+  "bad_signature": {
+    "ok": false,
+    "reason": "bad_signature"
+  },
+  "binding_unknown": {
+    "ok": false,
+    "reason": "binding_unknown"
+  },
+  "expired": {
+    "ok": false,
+    "reason": "expired"
+  },
+  "ok": {
+    "ok": true,
+    "reason": "ok"
+  },
+  "scope_mismatch": {
+    "ok": false,
+    "reason": "scope_mismatch"
+  }
+}
