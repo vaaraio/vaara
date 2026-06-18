@@ -4,6 +4,19 @@ All notable changes to this project are documented here.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/)
 and this project follows [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [1.1.1] - 2026-06-18
+
+Patch release: clear the CodeQL `py/clear-text-storage-sensitive-data` false positives on
+main. The flagged writes are the conformance-vector builders emitting intentionally-public
+recompute fixtures (the shared HS256 test key and the HMAC signatures derived from it are
+the published artifact, not a leaked secret). The genuinely key-bearing write was never
+flagged; CodeQL tainted the library-derived grant and attestation objects instead.
+
+- Added `.github/codeql/codeql-config.yml` with `paths-ignore` for the two dev-time vector
+  generators (`scripts/build_credential_grant_vectors.py`,
+  `tests/vectors/handoff_set_v0/_generate.py`), wired in via the CodeQL workflow
+  `config-file`. No application code or runtime behavior changes.
+
 ## [1.1.0] - 2026-06-18
 
 Minor release: the credential broker, Vaara's authority layer. Observability gains an

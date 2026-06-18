@@ -1,0 +1,10 @@
+name: vaara-codeql
+
+# Dev-time conformance-vector generators are excluded from analysis.
+# They exist to emit intentionally-public recompute fixtures: the shared
+# HS256 test key and the HMAC signatures derived from it ARE the published
+# artifact, so py/clear-text-storage-sensitive-data does not apply. The
+# fixtures let a neutral party recompute every verdict with no `import vaara`.
+paths-ignore:
+  - scripts/build_credential_grant_vectors.py
+  - tests/vectors/handoff_set_v0/_generate.py
