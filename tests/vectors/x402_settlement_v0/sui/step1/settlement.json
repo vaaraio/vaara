@@ -6,14 +6,15 @@
   "scope": "merchant:acme/order:INV-1/amount:42.00USDC",
   "seq": 1,
   "settlement": {
-    "amount": "42.00",
+    "amount": "1000000",
     "assertedFrom": "net-balance-change-to-payTo",
     "asset": "0x2::sui::SUI",
+    "decimals": 9,
     "network": "testnet",
-    "payTo": "0x0000000000000000000000000000000000000000000000000000000000000000",
+    "payTo": "0xf0dab0dbd3011967b8a986abe16d0a7e580e408e972b6dc8473532815b898d86",
     "rail": "sui",
     "scheme": "exact",
-    "txDigest": "11111111111111111111111111111111",
+    "txDigest": "7eGzqT3xijsWJKw5aJRA8c6EtmB8ZbfXuDfMe4LJsGEW",
     "verifiedBy": "facilitator://sui-exact"
   },
   "terminal": true,

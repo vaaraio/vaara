@@ -1,7 +1,7 @@
 {
   "alg": "ES256",
   "backLink": {
-    "attestationDigest": "sha256:b965e9cb1f9910bc827beced4910064ad1c80b0cfde78476d0da5910b2b52e30",
+    "attestationDigest": "sha256:2f6e3319ad0238b0a0824e7e80efc3792bdfd592199bc96b29e59d802e92fdd3",
     "attestationNonce": "x402-generic-0"
   },
   "decisionDerived": {
@@ -27,6 +27,6 @@
     "secretVersion": "v1",
     "sub": "agent:checkout-bot"
   },
-  "signature": "044761eb8a502518ab20e6bbe475a8a94315cabe9460f6a91f4e0240b91f149ad882f55835fc1052d5ec1fe02ff399bd3eb7f4dd20c6035586cae42a5f38668a",
+  "signature": "8cd38318acb2e5851ea3b211e20dde9490fd28efdcff2bd6f8f3f824b70de59da6fa3dcca7ecb050b6c94e2ff14433d31d5525c7bac2647c491fbb2c27f6ffa8",
   "version": 1
 }

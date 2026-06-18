@@ -1,7 +1,7 @@
 {
   "alg": "ES256",
   "backLink": {
-    "attestationDigest": "sha256:c89d63157717a264aad120ef743de5cf9e785e75e260afd99524a6b89ce4fec3",
+    "attestationDigest": "sha256:aa44f86a164e5de2b95378a3631fad170ef1a218e419fad93d88bf9a670075c4",
     "attestationNonce": "x402-sui-1"
   },
   "decisionDerived": {
@@ -9,7 +9,7 @@
     "decision": "allow",
     "evidenceRef": {
       "canonicalization": "JCS",
-      "digest": "sha256:15f24edbd3dcf86027819cc362bd8822462fe53e773d1f3bb1743a865d9b1b1e",
+      "digest": "sha256:d10cc62bb210d5c5a82eab9151c5ab49616faae45eeb66a704bf04de53ace7c2",
       "ref": "x402:action_ref/sha256:42f279db7f430127d682f1ccf6acdf90e679086b3c78b38fa30085cd6addc2f3",
       "schema": "x402.settlement.sui/v0"
     },
@@ -27,6 +27,6 @@
     "secretVersion": "v1",
     "sub": "agent:checkout-bot"
   },
-  "signature": "8446671c585649d1b5b747361ce00bb2fb999830d6889415d7d9aa9b0d9ad7c73ce8cc0f4ba4da4ad30522dc3cd791533a393772cad658380e9463199925817e",
+  "signature": "25bce8b99a1308b18b412ddbe8cd4046fce8bcc70f11b8e161308e0c05faeddb5df3ab4d5c9dc6bcf8c3855e457880aed946af161cf219a8597c6f8405049780",
   "version": 1
 }
