@@ -4,6 +4,29 @@ All notable changes to this project are documented here.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/)
 and this project follows [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [1.1.0] - 2026-06-18
+
+Minor release: the credential broker, Vaara's authority layer. Observability gains an
+enforcement edge. The proxy can mint a signed, short-lived credential bound to a specific
+attestation digest (transitively the mediation receipt) and scoped to one tool plus an
+args commitment plus tenant. A gateway in front of a protected tool refuses any call that
+lacks a valid, unexpired, non-revoked, attestation-bound grant. Bypass stops being silent
+and successful; it becomes "defeat the broker first." This is detection, not a
+mathematical completeness claim.
+
+- New `vaara.credential` package: grant types, parse, emit, verify, and the
+  `CredentialGateway`. The grant reuses the SEP-2787 signing stack (HS256 / ES256 / RS256
+  over RFC 8785 JCS), so the grant key matches the attestation and receipt key.
+- Proxy minting is gated behind `_mint_credentials`, default off. No runtime behavior
+  changes for existing deployments until an operator turns it on with an attestation key
+  configured.
+- Conformance vectors under `conformance/sep2828/credential_grant_v0/` with a checker that
+  verifies grants without importing Vaara, so an independent implementer can recompute the
+  format. Five verdict vectors covering valid, expired, wrong-scope, revoked, and tampered
+  grants.
+- Design spec at `docs/design/credential-broker-spec.md` covering the grant schema, the
+  binding chain to the receipt, the threat model, and the honest limits of the approach.
+
 ## [1.0.3] - 2026-06-17
 
 Patch release: documentation only. No functional change to the published package.

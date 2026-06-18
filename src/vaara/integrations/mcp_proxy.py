@@ -225,6 +225,12 @@ class VaaraMCPProxy:
         self._stdout_lock = threading.Lock()
         self._overt = overt_emitter
         self._attest = attest_emitter
+        # Authority layer (Phase A): when True and an attestation emitter is
+        # configured, mint a short-lived, scoped, attestation-bound credential
+        # per allowed tools/call and inject it at params._meta["vaara/credential"]
+        # for a CredentialGateway downstream. Default OFF: observability is
+        # unchanged until an operator opts into enforcement.
+        self._mint_credentials = False
         # Notification router. stdio default writes through the shared stdout
         # lock; HTTP transport swaps in HttpRouter in run_http(). The router is
         # the only surface allowed to deliver upstream-initiated notifications
@@ -1037,6 +1043,19 @@ class VaaraMCPProxy:
                 tenant_id=_REQUEST_TENANT.get(),
                 intent_override=_REQUEST_INTENT.get(),
             )
+        if self._mint_credentials and self._attest is not None and attest_pair is not None:
+            _att, _counter = attest_pair
+            grant = self._attest.emit_grant(
+                attestation=_att,
+                counter=_counter,
+                tool_name=tool_name,
+                upstream_name=upstream_name,
+                tenant_id=_REQUEST_TENANT.get(),
+            )
+            if grant is not None:
+                params = request.setdefault("params", {})
+                meta = params.setdefault("_meta", {})
+                meta["vaara/credential"] = grant.to_dict()
         with self._inflight_lock:
             if progress_token is not None:
                 self._inflight_progress[progress_token] = (

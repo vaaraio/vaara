@@ -186,6 +186,70 @@ class AttestPairEmitter:
             logger.exception("SEP-2787 attestation emission failed for tool=%r", tool_name)
             return None
 
+    def emit_grant(
+        self,
+        *,
+        attestation: Any,
+        counter: int,
+        tool_name: str,
+        upstream_name: str,
+        tenant_id: str,
+        grant_exp_seconds: int = 60,
+    ) -> "Optional[Any]":
+        """Mint and persist a short-lived credential bound to ``attestation``.
+
+        Returns the ``BrokeredCredential`` on success, ``None`` on failure
+        (logged and swallowed: authority minting must not block traffic, and a
+        gateway fails closed on a missing credential). The args commitment is
+        read straight off the attestation so the grant scope cannot drift from
+        what was attested. Paired filename ``{counter}-{nonce}-grant.json``.
+        """
+        try:
+            from vaara.attestation.receipt import attestation_digest
+            from vaara.credential import (
+                GrantBinding,
+                GrantScope,
+                emit_grant as _emit_grant,
+            )
+
+            args_commitment = (
+                attestation.payload_derived.tool_calls[0].args.projection_digest
+            )
+            scope = GrantScope(
+                tool_name=tool_name,
+                args_commitment=args_commitment,
+                tenant_id=tenant_id,
+            )
+            binding = GrantBinding(
+                attestation_digest=attestation_digest(attestation),
+                attestation_nonce=attestation.issuer_asserted.nonce,
+            )
+            sub = f"{tenant_id}/{upstream_name}" if tenant_id else upstream_name
+
+            credential = _emit_grant(
+                scope=scope,
+                binding=binding,
+                iss=_ISS,
+                sub=sub,
+                secret_version=self._secret_version,
+                alg=self._alg,
+                signing_material=self._signing_key,
+                exp_seconds=grant_exp_seconds,
+            )
+
+            nonce_tag = attestation.issuer_asserted.nonce[:8]
+            path = self._receipts_dir / f"{counter:010d}-{nonce_tag}-grant.json"
+            path.write_text(
+                json.dumps(credential.to_dict(), indent=2), encoding="utf-8"
+            )
+            logger.debug(
+                "Grant %s tool=%r upstream=%r", path.name, tool_name, upstream_name
+            )
+            return credential
+        except Exception:
+            logger.exception("Credential grant emission failed for tool=%r", tool_name)
+            return None
+
     def emit_receipt(
         self,
         *,

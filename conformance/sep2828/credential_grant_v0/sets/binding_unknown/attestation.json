@@ -1,0 +1,29 @@
+{
+  "version": 1,
+  "alg": "HS256",
+  "plannerDeclared": {
+    "intent": "tools/call/files.read"
+  },
+  "issuerAsserted": {
+    "alg": "HS256",
+    "expSeconds": 300,
+    "iat": "2026-06-18T11:59:06Z",
+    "iss": "vaara-mcp-proxy",
+    "nonce": "DdhmkIgsSgEwdnSFM8HZVmoK",
+    "secretVersion": "9a08d205",
+    "sub": "tenant-alpha/default"
+  },
+  "payloadDerived": {
+    "toolCalls": [
+      {
+        "name": "files.read",
+        "serverFingerprint": "cmd:sha256:092c79e8f80e559e404bcf660c48f3522b67aba9ff1484b0367e1a4ddef7431d",
+        "args": {
+          "projection": "{\"digest\":\"sha256:81cfc61c8cb71718b34a4ae23d591fb5c189c8f6856e52e366d490be910b6b39\"}",
+          "projectionDigest": "sha256:22a7553ad5a0608e2553f02f441c1c2453f4f91381f61b5de9b9c9f34a5cf5d2"
+        }
+      }
+    ]
+  },
+  "signature": "1282f201e6bfa3728cb75a4b6374e52aac53c86ea27d0ab618cb4d8c57e0c324"
+}
