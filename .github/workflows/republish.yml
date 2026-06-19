@@ -1,0 +1,163 @@
+name: Republish (npm + MCP Registry)
+
+# Recovery workflow for when the tagged Release run published PyPI and the
+# GitHub Release correctly but the npm and/or MCP Registry jobs failed (e.g.
+# a stale manifest version). Re-running the original run is no use: it is
+# frozen to the tag commit. This dispatches the two package-registry
+# publishes against the current default branch, and deliberately does NOT
+# touch PyPI or the GitHub Release.
+#
+# MCP Registry has no off-Actions path (it authenticates via GitHub OIDC),
+# so this workflow is the only clean way to re-publish those manifests.
+
+on:
+  workflow_dispatch:
+    inputs:
+      version:
+        description: 'Version to publish (no leading v), e.g. 1.2.0. Must match main.'
+        required: true
+        type: string
+
+permissions: read-all
+
+concurrency:
+  group: republish-${{ github.repository }}
+  cancel-in-progress: false
+
+jobs:
+  publish-npm:
+    name: Publish TypeScript client to npm
+    runs-on: ubuntu-latest
+    if: ${{ vars.NPM_PUBLISH_ENABLED == 'true' }}
+    permissions:
+      contents: read
+      id-token: write  # required for npm provenance
+    defaults:
+      run:
+        working-directory: clients/ts
+    env:
+      VERSION: ${{ inputs.version }}
+    steps:
+      - name: Checkout
+        uses: actions/checkout@df4cb1c069e1874edd31b4311f1884172cec0e10  # v6.0.3
+      - name: Set up Node.js
+        uses: actions/setup-node@48b55a011bda9f5d6aeb4c2d9c7362e8dae4041e  # v6.0.0
+        with:
+          node-version: '22'
+          registry-url: 'https://registry.npmjs.org'
+      - name: Confirm package.json matches requested version
+        run: |
+          set -euo pipefail
+          pkg="$(node -p "require('./package.json').version")"
+          if [ "$pkg" != "$VERSION" ]; then
+            echo "::error::clients/ts/package.json is ${pkg}, requested ${VERSION}. Bump main first."
+            exit 1
+          fi
+      - name: Install (npm ci)
+        run: npm ci --no-audit --no-fund
+      - name: Build
+        run: npm run build
+      - name: Test
+        run: node --test test/*.test.mjs
+      - name: Publish to npm with provenance (skip if already published)
+        run: |
+          set -euo pipefail
+          if npm view "@vaara/client@${VERSION}" version >/dev/null 2>&1; then
+            echo "@vaara/client@${VERSION} already on npm; nothing to do."
+            exit 0
+          fi
+          npm publish --provenance --access public
+        env:
+          NODE_AUTH_TOKEN: ${{ secrets.NPM_TOKEN }}
+
+  publish-mcp-registry:
+    name: Publish manifests to the MCP Registry
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read  # checkout server.json manifests
+      id-token: write  # OIDC login to MCP Registry, no stored secret
+    env:
+      MCP_PUBLISHER_VERSION: v1.7.9
+      EXPECTED_VERSION: ${{ inputs.version }}
+    steps:
+      - name: Checkout (for server.json manifests)
+        uses: actions/checkout@df4cb1c069e1874edd31b4311f1884172cec0e10  # v6.0.3
+      - name: Install mcp-publisher CLI
+        run: |
+          set -euo pipefail
+          os="$(uname -s | tr '[:upper:]' '[:lower:]')"
+          arch="$(uname -m | sed 's/x86_64/amd64/;s/aarch64/arm64/')"
+          url="https://github.com/modelcontextprotocol/registry/releases/download/${MCP_PUBLISHER_VERSION}/mcp-publisher_${os}_${arch}.tar.gz"
+          echo "Downloading mcp-publisher from ${url}"
+          curl -fsSL "$url" | tar xz mcp-publisher
+          ./mcp-publisher --version || true
+      - name: Authenticate to the MCP Registry (GitHub OIDC)
+        run: ./mcp-publisher login github-oidc
+      - name: Publish both manifests
+        run: |
+          set -uo pipefail
+          publish_one() {
+            manifest="$1"
+            echo "::group::mcp-publisher publish ${manifest}"
+            out="$(./mcp-publisher publish "$manifest" 2>&1)" && rc=0 || rc=$?
+            echo "$out"
+            echo "::endgroup::"
+            if [ "$rc" -ne 0 ]; then
+              if echo "$out" | grep -qiE 'already exists|already published|duplicate'; then
+                echo "Version already present on the registry for ${manifest}; treating as success."
+                return 0
+              fi
+              echo "::error::Publishing ${manifest} failed (exit ${rc})."
+              return "$rc"
+            fi
+          }
+          publish_one server.json
+          publish_one server-vaara-server.json
+      - name: Assert registry version matches the requested version
+        run: |
+          set -euo pipefail
+          EXPECTED="${EXPECTED_VERSION#v}"
+          echo "Expected version: ${EXPECTED}"
+          python3 - "$EXPECTED" <<'PY'
+          import json, sys, time, urllib.error, urllib.request
+
+          expected = sys.argv[1]
+          names = ["io.github.vaaraio/vaara", "io.github.vaaraio/vaara-server"]
+          OFFICIAL = "io.modelcontextprotocol.registry/official"
+          BASE = "https://registry.modelcontextprotocol.io/v0/servers"
+
+          def latest_active(name):
+              url = f"{BASE}?search={name}&version=latest"
+              try:
+                  with urllib.request.urlopen(url, timeout=30) as fh:
+                      data = json.load(fh)
+              except (urllib.error.URLError, TimeoutError) as exc:
+                  print(f"WARN {name}: registry read failed ({exc!r}); will retry")
+                  return None
+              for entry in data.get("servers", data.get("data", [])):
+                  server = entry.get("server", entry)
+                  if server.get("name") != name:
+                      continue
+                  meta = (entry.get("_meta") or {}).get(OFFICIAL, {})
+                  if meta.get("isLatest") and meta.get("status") == "active":
+                      return server.get("version")
+              return None
+
+          failed = []
+          for name in names:
+              latest = None
+              for _ in range(10):
+                  latest = latest_active(name)
+                  if latest == expected:
+                      print(f"OK   {name}: latest active version {latest} matches {expected}")
+                      break
+                  time.sleep(6)
+              else:
+                  print(f"FAIL {name}: expected {expected}, registry latest active is {latest!r}")
+                  failed.append(name)
+
+          if failed:
+              print("::error::MCP Registry latest version does not match the requested version.")
+              sys.exit(1)
+          print("MCP Registry is in sync with", expected)
+          PY

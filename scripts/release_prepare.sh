@@ -15,7 +15,7 @@
 #   1. Pre-flight: required files exist, CHANGELOG entry present,
 #      working tree clean except for the staged release changes.
 #   2. Bumps version in pyproject.toml + clients/ts/package.json +
-#      src/vaara/__init__.py.
+#      src/vaara/__init__.py + server.json + server-vaara-server.json.
 #   3. ruff check on changed Python paths.
 #   4. pytest --no-header on the full suite (skips adversarial dir;
 #      deselects pre-existing known-failing test).
@@ -70,10 +70,17 @@ fi
 sed -i -E "s/^version = \"[0-9]+\.[0-9]+\.[0-9]+\"$/version = \"${VERSION}\"/" pyproject.toml
 sed -i -E "s/^  \"version\": \"[0-9]+\.[0-9]+\.[0-9]+\",$/  \"version\": \"${VERSION}\",/" clients/ts/package.json
 sed -i -E "s/^__version__ = \"[0-9]+\.[0-9]+\.[0-9]+\"$/__version__ = \"${VERSION}\"/" src/vaara/__init__.py
+# MCP Registry manifests: bump every semver "version" value (root listing
+# + the pypi package entry). The release workflow asserts the live registry
+# version equals the tag, so a stale manifest fails the publish gate.
+sed -i -E "s/(\"version\": \")[0-9]+\.[0-9]+\.[0-9]+(\")/\1${VERSION}\2/g" \
+  server.json server-vaara-server.json
 
 grep -E "^version = \"${VERSION}\"$" pyproject.toml >/dev/null
 grep -E "\"version\": \"${VERSION}\"" clients/ts/package.json >/dev/null
 grep -E "^__version__ = \"${VERSION}\"$" src/vaara/__init__.py >/dev/null
+grep -E "\"version\": \"${VERSION}\"" server.json >/dev/null
+grep -E "\"version\": \"${VERSION}\"" server-vaara-server.json >/dev/null
 
 # 3. Lint changed paths (best-effort; lint all of src + tests if no
 # precise change list)
@@ -90,7 +97,8 @@ fi
   --deselect tests/test_adversarial_classifier_integration.py::test_known_bad_metadata_ssrf_scores_high
 
 # 5. Stage explicit paths only
-git add CHANGELOG.md pyproject.toml clients/ts/package.json src/vaara/__init__.py
+git add CHANGELOG.md pyproject.toml clients/ts/package.json src/vaara/__init__.py \
+  server.json server-vaara-server.json
 # Re-add any other paths the caller has already staged
 git status --short
 
