@@ -84,6 +84,7 @@ Each verdict carries the threshold-versus-observed snapshot, the rationale, and 
 - **A tamper-evident trail** an outside party verifies without trusting your stack, with the chain head anchorable to an external RFC 3161 / eIDAS timestamp so its existence is provable against a clock you do not control.
 - **Article-level EU AI Act evidence**, honest about the gaps instead of papering over them.
 - **Governance of the model call itself**, not only the tools around it: a hardware-rooted inference receipt that a second, different local model cross-checks. This is the sovereign inference harness, new in v1.0.
+- **Enforcement, not only a record** (v1.1.0): a credential broker mints a signed, short-lived credential bound to the attestation digest and scoped to one tool, its argument commitment, and tenant, with typed capability scopes that bound what a call may do. A gateway in front of a protected tool refuses any call without a valid, attestation-bound grant, so a bypass stops being silent. Off by default.
 
 ## Where it plugs in
 
@@ -126,6 +127,7 @@ Method and per-cell breakdown: [docs/architecture.md](docs/architecture.md) and 
 
 ## Standards and attestation
 
+- **[vaara.receipt/v1](SPEC.md)** is the canonical parent spec for the signed receipt format: hash-chained, canonicalized with JCS (RFC 8785), verifiable offline from a public key. The x402 settlement binding and an eIDAS qualified-timestamp profile are downstream profiles that pin to it rather than competing formats. Receipts can carry a self-hosted RFC 3161 timestamp that Vaara mints offline.
 - **[SEP-2828](https://github.com/modelcontextprotocol/modelcontextprotocol/pull/2828)** signed execution records and **SEP-2787** request-attestation test vectors, in the MCP standards process. A second independent implementation has reproduced the SEP-2828 conformance vectors from a clean checkout with no shared code.
 - **OVERT 1.0** ([overt.is](https://overt.is/)): Vaara is the Arbiter and emits Protocol Profile 1.0 Base Envelopes (canonical CBOR, Ed25519) alongside every record when attestation is on.
 - **Post-quantum**: an optional parallel ML-DSA-65 / FIPS 204 signature over the same preimage, so a stripped post-quantum signature is a detectable downgrade rather than a silent loss.
@@ -139,6 +141,7 @@ Details and the offline checkers for each: [docs/standards.md](docs/standards.md
 |---|---|
 | [docs/verifying-evidence.md](docs/verifying-evidence.md) | Every verifier and its trust model |
 | [docs/architecture.md](docs/architecture.md) | Scoring, conformal coverage, time anchor, formal properties |
+| [SPEC.md](SPEC.md) | The canonical vaara.receipt/v1 receipt format spec |
 | [docs/standards.md](docs/standards.md) | SEP-2828, SEP-2787, OVERT, the sovereign inference harness |
 | [docs/adapters.md](docs/adapters.md) | Framework and cloud/OSS guardrail adapters, multi-tenant proxy |
 | [docs/COMPLIANCE.md](docs/COMPLIANCE.md) | EU AI Act and DORA article mapping, eval numbers |
