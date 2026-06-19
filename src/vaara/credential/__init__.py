@@ -14,6 +14,14 @@ The grant reuses the SEP-2787 signing stack (HS256 / ES256 / RS256 over RFC
 
 from __future__ import annotations
 
+from vaara.credential._authorization_receipt import (
+    AUTHORIZATION_SCHEMA,
+    AuthorizationReceipt,
+    ReceiptSigner,
+    build_authorization_evidence,
+    mint_authorization_receipt,
+    mint_for_signer,
+)
 from vaara.credential._grant_capability import Capability
 from vaara.credential._grant_emit import emit_grant, verify_grant_signature
 from vaara.credential._grant_parse import (
@@ -33,6 +41,8 @@ from vaara.credential._grant_verify import GrantVerdict, verify_grant
 from vaara.credential.gateway import CredentialGateway
 
 __all__ = [
+    "AUTHORIZATION_SCHEMA",
+    "AuthorizationReceipt",
     "BrokeredCredential",
     "Capability",
     "CredentialGateway",
@@ -41,10 +51,14 @@ __all__ = [
     "GrantBinding",
     "GrantScope",
     "GrantVerdict",
+    "ReceiptSigner",
     "asserted_from_dict",
     "binding_from_dict",
+    "build_authorization_evidence",
     "emit_grant",
     "grant_from_dict",
+    "mint_authorization_receipt",
+    "mint_for_signer",
     "scope_from_dict",
     "verify_grant",
     "verify_grant_signature",
