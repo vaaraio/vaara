@@ -4,6 +4,29 @@ All notable changes to this project are documented here.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/)
 and this project follows [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [1.2.0] - 2026-06-19
+
+Minor release: the receipt format gets a canonical spec, self-hosted time anchoring, and
+typed capability scopes on credential grants.
+
+- Published `SPEC.md`, the canonical `vaara.receipt/v1` parent spec. The x402 settlement
+  binding and the eIDAS profile are downstream profiles that pin to it rather than
+  competing formats. Section 4 documents the timestamp anchor methods, including the two
+  Vaara produces directly.
+- Added self-hosted RFC 3161 timestamp anchors for receipts (`src/vaara/audit/receipt_anchor.py`).
+  `SelfHostedTSA` mints real RFC 3161 tokens offline in pure Python and reuses the existing
+  offline verifier; `anchor_receipt` emits the SPEC.md Section 4 shape with
+  `anchoredDigest` equal to the sha256 of the JCS-canonical signed payload. Anchor tests
+  skip cleanly when the `asn1crypto` extra is absent.
+- Added capability scopes for credential grants (`src/vaara/credential/_grant_capability.py`):
+  typed, enforceable per-argument limits (`le`/`ge`/`in`/`eq`) with closed coverage, so a
+  grant can bound what a tool call may do rather than only pinning an exact argument set.
+  When a grant carries capabilities, verification enforces the typed constraints with
+  closed coverage (every runtime argument must be named by a capability or it is rejected)
+  and treats the exact `argsCommitment` as a mint-time anchor only. Grants without
+  capabilities keep the existing exact-args mode with a byte-identical signing preimage, so
+  prior vectors and the independent-recompute conformance check are unchanged.
+
 ## [1.1.1] - 2026-06-18
 
 Patch release: clear the CodeQL `py/clear-text-storage-sensitive-data` false positives on
