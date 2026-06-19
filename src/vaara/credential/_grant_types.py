@@ -28,6 +28,7 @@ from dataclasses import dataclass
 from typing import Any
 
 from vaara.attestation._sep2787_types import Algorithm
+from vaara.credential._grant_capability import Capability, capability_to_dict
 
 GrantAlgorithm = Algorithm
 
@@ -84,9 +85,10 @@ class BrokeredCredential:
     binding: GrantBinding
     asserted: GrantAsserted
     signature: str
+    capabilities: tuple[Capability, ...] = ()
 
     def to_dict(self) -> dict[str, Any]:
-        return {
+        d: dict[str, Any] = {
             "version": self.version,
             "alg": self.alg,
             "scope": scope_to_dict(self.scope),
@@ -94,6 +96,9 @@ class BrokeredCredential:
             "asserted": asserted_to_dict(self.asserted),
             "signature": self.signature,
         }
+        if self.capabilities:
+            d["capabilities"] = [capability_to_dict(c) for c in self.capabilities]
+        return d
 
 
 def scope_to_dict(s: GrantScope) -> dict[str, Any]:
@@ -128,5 +133,5 @@ ASSERTED_KEYS = frozenset(
     {"expSeconds", "iat", "iss", "nonce", "secretVersion", "sub"}
 )
 GRANT_KEYS = frozenset(
-    {"version", "alg", "scope", "binding", "asserted", "signature"}
+    {"version", "alg", "scope", "binding", "asserted", "signature", "capabilities"}
 )

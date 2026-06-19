@@ -13,6 +13,7 @@ from __future__ import annotations
 from typing import Any
 
 from vaara.attestation._sep2787_types import VALID_ALGS, AttestationError
+from vaara.credential._grant_capability import Capability, capability_from_dict
 from vaara.credential._grant_types import (
     ASSERTED_KEYS,
     BINDING_KEYS,
@@ -105,6 +106,12 @@ def grant_from_dict(d: dict[str, Any]) -> BrokeredCredential:
         raise AttestationError("credential.version must be an integer")
     if d["alg"] not in VALID_ALGS:
         raise AttestationError(f"unsupported alg {d['alg']!r}")
+    caps_raw = d.get("capabilities")
+    capabilities: tuple[Capability, ...] = ()
+    if caps_raw is not None:
+        if not isinstance(caps_raw, list) or not caps_raw:
+            raise AttestationError("credential.capabilities must be a non-empty list")
+        capabilities = tuple(capability_from_dict(c) for c in caps_raw)
     return BrokeredCredential(
         version=d["version"],
         alg=d["alg"],
@@ -112,4 +119,5 @@ def grant_from_dict(d: dict[str, Any]) -> BrokeredCredential:
         binding=binding_from_dict(d["binding"]),
         asserted=asserted_from_dict(d["asserted"]),
         signature=_require_str(d, "signature", "credential"),
+        capabilities=capabilities,
     )
