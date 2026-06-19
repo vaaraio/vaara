@@ -1,0 +1,29 @@
+{
+  "argsCommitment": "sha256:2d157b099dfac0d954b567f2479bb047fa477da8368015b5e3c48ff8f14b49fb",
+  "capabilities": [
+    {
+      "arg": "amount",
+      "op": "le",
+      "value": "500"
+    },
+    {
+      "arg": "vendor",
+      "op": "in",
+      "value": [
+        "acme",
+        "globex"
+      ]
+    },
+    {
+      "arg": "destination",
+      "op": "eq",
+      "value": "0xABC"
+    }
+  ],
+  "grantFingerprint": "sha256:5b47b43cbca316d5ef074886038b1c9a4d8654a499f74845476e4335db94d6ea",
+  "reason": "capability_exceeded",
+  "schema": "vaara.authorization/v0",
+  "tenantId": "tenant-a",
+  "toolName": "pay.send",
+  "verdict": "deny"
+}

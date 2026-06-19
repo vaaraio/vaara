@@ -120,6 +120,7 @@ defines only its own evidence record (the `schema` and contents behind
 | Profile | Evidence schema | Pins to | Vectors |
 |---|---|---|---|
 | x402 settlement binding | `x402.settlement.*/v0` | `vaara.receipt/v1` | `tests/vectors/x402_settlement_v0/` |
+| authorization decision | `vaara.authorization/v0` | `vaara.receipt/v1` | `tests/vectors/authorization_v0/` |
 
 ### 5.2 Profile example: x402 settlement binding
 
@@ -135,6 +136,33 @@ lifecycle, on a generic rail and on the Sui exact-payment rail. It adds:
 A third party recomputes three per-step verdicts (action-ref recomputes,
 settlement binding resolves, signature verifies) and one lifecycle verdict, with
 only the settlement and the receipt in hand. See `_check_independent.py`.
+
+### 5.3 Profile example: authorization decision
+
+This profile turns an enforcement decision into a receipt. A credential broker
+authorizes a tool call against a signed, attestation-bound grant with typed
+capability scopes; the gateway's verdict, allow or deny, is minted as a receipt
+instead of being discarded. The decision maps onto the envelope verdict
+vocabulary: an allowed call is `allow`, a refused call is `block` carrying the
+machine reason (`capability_exceeded`, `binding_unknown`, `missing_credential`,
+...) as `decisionDerived.reason`. It adds:
+
+- An authorization record (`schema` = `vaara.authorization/v0`) whose JCS digest
+  is the receipt's `evidenceRef.digest`. It binds `toolName`, `tenantId`, the
+  grant by content address (`grantFingerprint` = `sha256(JCS(signed grant))`),
+  the runtime argument commitment (`argsCommitment` = `sha256(JCS(args))`), the
+  evaluated `capabilities`, and the `verdict` / `reason`.
+- The raw arguments never enter the record; only their commitment does, so the
+  receipt is publishable while the arguments stay private. An auditor holding the
+  arguments out of band recomputes the commitment and re-runs the verdict.
+
+The deny case is the point. A refused call leaves a signed, content-addressed,
+portable proof of the non-action: a third party recomputes the verdict from the
+grant and the arguments and confirms the refusal, trusting only the issuer's
+public key. A third party recomputes five verdicts per case (grant fingerprint,
+argument commitment, capability verdict, evidence binding, signature) with only
+the grant, the arguments, the evidence, and the receipt in hand. See
+`_check_independent.py`.
 
 ## 6. Conformance
 
