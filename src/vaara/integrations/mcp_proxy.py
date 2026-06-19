@@ -231,6 +231,13 @@ class VaaraMCPProxy:
         # for a CredentialGateway downstream. Default OFF: observability is
         # unchanged until an operator opts into enforcement.
         self._mint_credentials = False
+        # Proof-carrying enforcement (Phase: authorization receipts). When True
+        # alongside credential minting, every allowed tools/call also mints a
+        # signed, content-addressed, independently recomputable authorization
+        # receipt (the broker's allow-proof) next to the grant. Default OFF:
+        # deny-proofs remain the downstream gateway's to mint, and the evidence
+        # trail is unchanged until an operator opts in.
+        self._emit_authorization_receipts = False
         # Notification router. stdio default writes through the shared stdout
         # lock; HTTP transport swaps in HttpRouter in run_http(). The router is
         # the only surface allowed to deliver upstream-initiated notifications
@@ -1056,6 +1063,15 @@ class VaaraMCPProxy:
                 params = request.setdefault("params", {})
                 meta = params.setdefault("_meta", {})
                 meta["vaara/credential"] = grant.to_dict()
+                if self._emit_authorization_receipts:
+                    self._attest.emit_authorization_receipt(
+                        credential=grant,
+                        runtime_args=arguments,
+                        attestation=_att,
+                        counter=_counter,
+                        upstream_name=upstream_name,
+                        tenant_id=_REQUEST_TENANT.get(),
+                    )
         with self._inflight_lock:
             if progress_token is not None:
                 self._inflight_progress[progress_token] = (

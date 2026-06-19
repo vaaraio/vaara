@@ -86,6 +86,7 @@ def build_authorization_evidence(
     credential: BrokeredCredential,
     runtime_args: Any,
     verdict: GrantVerdict,
+    coverage: Optional[dict[str, Any]] = None,
 ) -> dict[str, Any]:
     """Build the ``vaara.authorization/v0`` evidence record for one decision.
 
@@ -95,6 +96,14 @@ def build_authorization_evidence(
     plus the failing :data:`GrantReason`). The grant's capabilities are echoed
     so the record names the bounds the verdict was computed against without a
     reader having to dereference the grant.
+
+    ``coverage``, when supplied, states the observation boundary the decision
+    was made under: which capability surface was in scope, named in the trace
+    itself. It is what lets a reader tell absence-as-fact from absence-as-silence,
+    so a missing deny for an in-scope call reads as "not refused within a stated
+    boundary" rather than "not observed". A recomputing auditor reads the verdict
+    against the same declared scope. Omitted (the default) when no boundary is
+    asserted, keeping the record byte-identical to a coverage-free decision.
     """
     record: dict[str, Any] = {
         "schema": AUTHORIZATION_SCHEMA,
@@ -109,6 +118,8 @@ def build_authorization_evidence(
         record["capabilities"] = [
             capability_to_dict(c) for c in credential.capabilities
         ]
+    if coverage:
+        record["coverage"] = coverage
     return record
 
 
@@ -157,6 +168,7 @@ def mint_authorization_receipt(
     nonce: Optional[str] = None,
     policy_id: Optional[str] = None,
     ref: Optional[str] = None,
+    coverage: Optional[dict[str, Any]] = None,
 ) -> AuthorizationReceipt:
     """Mint a signed authorization receipt for one gateway verdict.
 
@@ -166,9 +178,16 @@ def mint_authorization_receipt(
     receipt offline. ``signing_material`` is the issuer's signing key under
     ``alg`` (a bytes secret for HS256, a private-key object for ES256 / RS256),
     the same key used for the grant and the execution receipt.
+
+    ``coverage`` states the observation boundary the decision was made under and
+    is folded into the evidence record so the boundary is named in the trace and
+    travels under the same signature.
     """
     evidence = build_authorization_evidence(
-        credential=credential, runtime_args=runtime_args, verdict=verdict
+        credential=credential,
+        runtime_args=runtime_args,
+        verdict=verdict,
+        coverage=coverage,
     )
     evidence_ref = EvidenceRef(
         digest=_digest(evidence),
@@ -210,6 +229,7 @@ def mint_for_signer(
     nonce: Optional[str] = None,
     policy_id: Optional[str] = None,
     ref: Optional[str] = None,
+    coverage: Optional[dict[str, Any]] = None,
 ) -> AuthorizationReceipt:
     """Mint an authorization receipt using a :class:`ReceiptSigner` bundle."""
     return mint_authorization_receipt(
@@ -225,4 +245,5 @@ def mint_for_signer(
         nonce=nonce,
         policy_id=policy_id,
         ref=ref,
+        coverage=coverage,
     )
