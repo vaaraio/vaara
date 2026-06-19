@@ -31,6 +31,7 @@ from dataclasses import dataclass
 from typing import Any, Optional
 
 from vaara.attestation._sep2787_canonical import iso8601_to_epoch, make_args_digest
+from vaara.credential._grant_capability import evaluate
 from vaara.credential._grant_emit import verify_grant_signature
 from vaara.credential._grant_types import BrokeredCredential
 
@@ -76,9 +77,16 @@ def verify_grant(
         return GrantVerdict(False, "scope_mismatch")
     if scope.tenant_id != runtime_tenant_id:
         return GrantVerdict(False, "scope_mismatch")
-    runtime_commitment = make_args_digest(runtime_args).projection_digest
-    if scope.args_commitment != runtime_commitment:
-        return GrantVerdict(False, "scope_mismatch")
+    if credential.capabilities:
+        # Capability mode: enforce typed constraints (closed coverage) instead
+        # of the exact args commitment, which becomes a mint-time anchor only.
+        ok, reason = evaluate(credential.capabilities, runtime_args)
+        if not ok:
+            return GrantVerdict(False, reason)
+    else:
+        runtime_commitment = make_args_digest(runtime_args).projection_digest
+        if scope.args_commitment != runtime_commitment:
+            return GrantVerdict(False, "scope_mismatch")
 
     if revocation is not None:
         status = revocation.status(

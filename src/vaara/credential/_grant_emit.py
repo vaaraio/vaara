@@ -11,7 +11,7 @@ envelope layout (``_grant_types``).
 
 from __future__ import annotations
 
-from typing import Any, Optional
+from typing import Any, Optional, Sequence
 
 from vaara.attestation._sep2787_canonical import (
     canonical_json,
@@ -31,6 +31,7 @@ from vaara.attestation._sep2787_types import (
     Algorithm,
     AttestationError,
 )
+from vaara.credential._grant_capability import Capability, capability_to_dict
 from vaara.credential._grant_types import (
     BrokeredCredential,
     GrantAsserted,
@@ -49,15 +50,18 @@ def _signing_payload(
     scope: GrantScope,
     binding: GrantBinding,
     asserted: GrantAsserted,
+    capabilities: Sequence[Capability] = (),
 ) -> bytes:
     """JCS-canonical encoding of the grant blocks, signature excluded."""
-    body = {
+    body: dict[str, Any] = {
         "version": version,
         "alg": alg,
         "scope": scope_to_dict(scope),
         "binding": binding_to_dict(binding),
         "asserted": asserted_to_dict(asserted),
     }
+    if capabilities:
+        body["capabilities"] = [capability_to_dict(c) for c in capabilities]
     return canonical_json(body)
 
 
@@ -74,6 +78,7 @@ def emit_grant(
     nonce: Optional[str] = None,
     iat: Optional[str] = None,
     version: int = 1,
+    capabilities: Sequence[Capability] = (),
 ) -> BrokeredCredential:
     """Build, JCS-canonicalize, and sign a BrokeredCredential envelope.
 
@@ -81,6 +86,10 @@ def emit_grant(
     (build it from ``attestation_digest`` + the attestation nonce).
     ``signing_material`` is either a bytes shared secret (HS256) or a
     private-key object from ``cryptography.hazmat`` (ES256 / RS256).
+
+    Passing ``capabilities`` mints a capability-mode grant: the gateway
+    enforces the typed constraints against runtime args (closed coverage)
+    instead of the exact ``scope.argsCommitment``.
     """
     if alg not in VALID_ALGS:
         raise AttestationError(f"unsupported alg: {alg!r}")
@@ -101,7 +110,12 @@ def emit_grant(
     )
 
     payload = _signing_payload(
-        version=version, alg=alg, scope=scope, binding=binding, asserted=asserted
+        version=version,
+        alg=alg,
+        scope=scope,
+        binding=binding,
+        asserted=asserted,
+        capabilities=capabilities,
     )
 
     if alg == "HS256":
@@ -122,6 +136,7 @@ def emit_grant(
         binding=binding,
         asserted=asserted,
         signature=signature_hex,
+        capabilities=tuple(capabilities),
     )
 
 
@@ -142,6 +157,7 @@ def verify_grant_signature(
         scope=credential.scope,
         binding=credential.binding,
         asserted=credential.asserted,
+        capabilities=credential.capabilities,
     )
 
     if credential.alg == "HS256":
