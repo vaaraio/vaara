@@ -7,12 +7,14 @@ from pathlib import Path
 
 import pytest
 
-from vaara.audit.receipt_anchor import (
+pytest.importorskip("asn1crypto")  # the 'timeanchor' extra; skip when absent
+
+from vaara.audit.receipt_anchor import (  # noqa: E402
     SelfHostedTSA,
     anchored_digest,
     verify_receipt_anchor,
 )
-from vaara.audit.timeanchor import TimeAnchorError
+from vaara.audit.timeanchor import TimeAnchorError  # noqa: E402
 
 VECTOR = (Path(__file__).resolve().parents[1]
           / "tests/vectors/x402_settlement_v0/generic/step1/receipt.json")
