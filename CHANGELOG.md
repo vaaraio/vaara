@@ -4,6 +4,23 @@ All notable changes to this project are documented here.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/)
 and this project follows [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [1.2.1] - 2026-06-19
+
+Patch release: documentation only. No functional change to the published package.
+
+- Brought the README current with the two pillars it never mentioned. The standards
+  section now leads with the canonical `vaara.receipt/v1` spec (`SPEC.md`), with the x402
+  settlement binding and the eIDAS qualified-timestamp profile pinning to it and the
+  self-hosted RFC 3161 anchor; "What you get" now lists the v1.1.0 credential broker, the
+  authority layer that turns a record into enforcement; and a `SPEC.md` row was added to
+  the docs table.
+- Brought `docs/PRIOR_ART.md` current: chronology rows for the credential broker (v1.1.0),
+  the canonical `vaara.receipt/v1` spec, the self-hosted RFC 3161 anchors, and typed
+  capability scopes on credential grants (v1.2.0).
+
+This release exists to refresh the README on PyPI and the package metadata on npm and the
+MCP Registry, which serve the version's README rather than main. Code is unchanged.
+
 ## [1.2.0] - 2026-06-19
 
 Minor release: the receipt format gets a canonical spec, self-hosted time anchoring, and
