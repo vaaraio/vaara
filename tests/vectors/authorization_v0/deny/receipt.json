@@ -1,0 +1,29 @@
+{
+  "alg": "ES256",
+  "backLink": {
+    "attestationDigest": "sha256:abababababababababababababababababababababababababababababababab",
+    "attestationNonce": "att-nonce-xyz"
+  },
+  "decisionDerived": {
+    "decidedAt": "2026-06-18T12:00:05Z",
+    "decision": "block",
+    "evidenceRef": {
+      "canonicalization": "JCS",
+      "digest": "sha256:0de561f8b0be88e7d0382ed8a525e736a24826dad6392b6c9f1766f43a9c9906",
+      "ref": "vaara:authorization/pay.send",
+      "schema": "vaara.authorization/v0"
+    },
+    "policyId": "policy:vaara-credential-broker/1",
+    "reason": "capability_exceeded"
+  },
+  "issuerAsserted": {
+    "alg": "ES256",
+    "iat": "2026-06-19T20:41:49Z",
+    "iss": "vaara-mcp-proxy",
+    "nonce": "decision-nonce-deny",
+    "secretVersion": "key-v1",
+    "sub": "tenant-a/upstream"
+  },
+  "signature": "3ee66e86dba534da358efe0ca7f5958e1f7fcb38c4b4470ad1326b8ca7ad37f9139a5f703ccae0b0d528e46d4ed8be466a220ce884fb380e1d73527c90b14b19",
+  "version": 1
+}

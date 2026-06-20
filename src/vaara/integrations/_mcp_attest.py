@@ -47,6 +47,12 @@ logger = logging.getLogger(__name__)
 
 _ISS = "vaara-mcp-proxy"
 
+# The enforcement coverage boundary: the proxy observes and decides over calls
+# routed through it. A tool reached on an out-of-band path is out of coverage,
+# so an absent receipt for it is silence, not a clean negative. Stamped into
+# every authorization receipt's coverage block.
+_COVERAGE_SCOPE = "calls-routed-through-chokepoint"
+
 
 class AttestConfigError(RuntimeError):
     """Operator-side attestation config is incomplete or unusable."""
@@ -248,6 +254,85 @@ class AttestPairEmitter:
             return credential
         except Exception:
             logger.exception("Credential grant emission failed for tool=%r", tool_name)
+            return None
+
+    def emit_authorization_receipt(
+        self,
+        *,
+        credential: Any,
+        runtime_args: Any,
+        attestation: Any,
+        counter: int,
+        upstream_name: str,
+        tenant_id: str,
+        verdict: Any = None,
+    ) -> "Optional[Any]":
+        """Mint and persist a signed authorization receipt for an allowed call.
+
+        Proof-carrying enforcement at the broker chokepoint. The grant was just
+        minted for this exact call's argument commitment, so the decision is
+        ``allow``: this is the broker's allow-proof, a signed, content-addressed,
+        independently recomputable ``vaara.authorization/v0`` record an auditor
+        confirms from the grant and the runtime arguments alone, trusting only
+        the issuer's public key. Deny-proofs are the downstream gateway's to
+        mint; pass an explicit ``verdict`` to record one here instead.
+
+        Paired filename ``{counter}-{nonce}-authz.json`` carries both the signed
+        receipt and the evidence bytes the digest pins, so the file is
+        self-contained for recomputation. Returns the ``AuthorizationReceipt`` on
+        success, ``None`` on failure (logged and swallowed: proof minting must
+        not block traffic).
+        """
+        try:
+            from vaara.credential._authorization_receipt import (
+                mint_authorization_receipt,
+            )
+            from vaara.credential._grant_verify import GrantVerdict
+
+            if verdict is None:
+                verdict = GrantVerdict(True, "ok")
+            sub = f"{tenant_id}/{upstream_name}" if tenant_id else upstream_name
+
+            # Coverage: name the observation boundary this decision was made
+            # under, in the trace itself. The server fingerprint pins the exact
+            # capability surface in scope; the scope literal states that the
+            # chokepoint sees calls routed through it and nothing on an
+            # out-of-band path. A reader tells an absent deny apart from an
+            # unobserved one by reading it against this boundary.
+            coverage = {
+                "boundary": _ISS,
+                "upstream": upstream_name,
+                "serverFingerprint": self.fingerprint_for(upstream_name),
+                "scope": _COVERAGE_SCOPE,
+            }
+
+            auth = mint_authorization_receipt(
+                credential=credential,
+                runtime_args=runtime_args,
+                verdict=verdict,
+                iss=_ISS,
+                sub=sub,
+                secret_version=self._secret_version,
+                alg=self._alg,
+                signing_material=self._signing_key,
+                coverage=coverage,
+            )
+
+            nonce_tag = attestation.issuer_asserted.nonce[:8]
+            path = self._receipts_dir / f"{counter:010d}-{nonce_tag}-authz.json"
+            path.write_text(
+                json.dumps(
+                    {"record": auth.record.to_dict(), "evidence": auth.evidence},
+                    indent=2,
+                ),
+                encoding="utf-8",
+            )
+            logger.debug(
+                "Authorization receipt %s verdict=%s", path.name, auth.evidence["verdict"]
+            )
+            return auth
+        except Exception:
+            logger.exception("Authorization receipt emission failed")
             return None
 
     def emit_receipt(

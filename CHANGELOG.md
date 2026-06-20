@@ -4,6 +4,14 @@ All notable changes to this project are documented here.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/)
 and this project follows [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [1.3.0] - 2026-06-20
+
+Minor release: proof-carrying enforcement reaches the proxy, and every authorization receipt carries a signed coverage boundary.
+
+- Wired authorization receipts into the MCP proxy, the real chokepoint. On an allowed `tools/call` the broker mints a signed, content-addressed, independently recomputable authorization receipt next to the grant: the allow-proof. An auditor recomputes the verdict from the grant and the runtime arguments alone, trusting only the issuer's public key. The path is off by default (`AttestPairEmitter.emit_authorization_receipt`, gated behind a proxy flag), so the evidence trail is unchanged until an operator opts in. Deny-proofs remain the downstream gateway's to mint.
+- Added a signed coverage boundary to the `vaara.authorization/v0` evidence. Each receipt names the observation boundary the decision was made under: the chokepoint identity, the exact capability surface in scope (the effective tool manifest fingerprint), and a scope literal stating that only calls routed through the chokepoint are observed. A verdict is only as meaningful as what the issuer could see, so an absent refusal now reads against a declared boundary, "not refused within this scope" rather than the silence of "not observed." Coverage travels in the trace under the same signature, recomputable evidence rather than a separate trust root. The block is absent by default, leaving coverage-free receipts and the conformance vectors byte-identical.
+- `SPEC.md` Section 5.3 documents the coverage block and the absence-as-fact versus absence-as-silence distinction.
+
 ## [1.2.1] - 2026-06-19
 
 Patch release: documentation only. No functional change to the published package.

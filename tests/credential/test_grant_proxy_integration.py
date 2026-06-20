@@ -110,3 +110,74 @@ def test_blocked_call_mints_no_grant(monkeypatch, emitter, receipts_dir):
         "params": {"name": "delete_db", "arguments": {}},
     })
     assert _grants(receipts_dir) == []
+
+
+def _authzs(receipts_dir: Path) -> list[dict]:
+    return [json.loads(f.read_text()) for f in sorted(receipts_dir.glob("*-authz.json"))]
+
+
+def test_allowed_call_emits_recomputable_authorization_receipt(
+    monkeypatch, emitter, receipts_dir
+):
+    """Proof-carrying enforcement: the allow-path mints a signed, recomputable
+    authorization receipt an auditor confirms from the issuer key alone."""
+    import hashlib
+
+    from vaara.attestation._sep2787_canonical import canonical_json
+    from vaara.attestation.decision import (
+        parse_decision_record,
+        verify_decision_signature,
+    )
+
+    p = _make_proxy(monkeypatch, emitter=emitter, mint=True)
+    p._emit_authorization_receipts = True
+    args = {"path": "/tmp/x"}
+    p._handle_tools_call({
+        "jsonrpc": "2.0", "id": 1, "method": "tools/call",
+        "params": {"name": "read_file", "arguments": args},
+    })
+
+    authzs = _authzs(receipts_dir)
+    assert len(authzs) == 1
+    bundle = authzs[0]
+    record = parse_decision_record(bundle["record"])
+    evidence = bundle["evidence"]
+
+    # The broker's allow-proof: the decision is allow.
+    assert record.decision_derived.decision == "allow"
+    assert evidence["verdict"] == "allow"
+    # Signed; verifies against the issuer key with zero trust in the producer.
+    assert verify_decision_signature(record, verifying_material=KEY)
+    # Content-addressed: the receipt pins the evidence by its JCS digest, and the
+    # evidence bytes travel in the same file so the proof is self-contained.
+    evidence_digest = "sha256:" + hashlib.sha256(canonical_json(evidence)).hexdigest()
+    assert record.decision_derived.evidence_ref.digest == evidence_digest
+    # Only the argument commitment travels; the raw arguments never do.
+    assert args not in evidence.values()
+    assert evidence["argsCommitment"] == (
+        "sha256:" + hashlib.sha256(canonical_json(args)).hexdigest()
+    )
+    # Coverage: the decision names the observation boundary in the trace, so an
+    # absent deny reads against a stated scope, not an assumed one. The server
+    # fingerprint pins the exact capability surface the proxy decided over.
+    coverage = evidence["coverage"]
+    assert coverage["boundary"] == "vaara-mcp-proxy"
+    assert coverage["scope"] == "calls-routed-through-chokepoint"
+    assert coverage["serverFingerprint"] == emitter.fingerprint_for("default")
+    # The coverage block is under the signature: it is part of what the digest
+    # pins, so a reader cannot strip or rewrite the boundary without breaking it.
+    assert verify_decision_signature(record, verifying_material=KEY)
+    # The allow-proof pairs with exactly one grant and one attestation.
+    assert len(_grants(receipts_dir)) == 1
+    assert len(_attests(receipts_dir)) == 1
+
+
+def test_authorization_receipt_off_by_default(monkeypatch, emitter, receipts_dir):
+    """Credential minting on, proof flag off: a grant but no allow-proof."""
+    p = _make_proxy(monkeypatch, emitter=emitter, mint=True)
+    p._handle_tools_call({
+        "jsonrpc": "2.0", "id": 1, "method": "tools/call",
+        "params": {"name": "read_file", "arguments": {"path": "/tmp/x"}},
+    })
+    assert len(_grants(receipts_dir)) == 1
+    assert _authzs(receipts_dir) == []
