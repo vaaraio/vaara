@@ -120,6 +120,7 @@ defines only its own evidence record (the `schema` and contents behind
 | Profile | Evidence schema | Pins to | Vectors |
 |---|---|---|---|
 | x402 settlement binding | `x402.settlement.*/v0` | `vaara.receipt/v1` | `tests/vectors/x402_settlement_v0/` |
+| authorization decision | `vaara.authorization/v0` | `vaara.receipt/v1` | `tests/vectors/authorization_v0/` |
 
 ### 5.2 Profile example: x402 settlement binding
 
@@ -135,6 +136,50 @@ lifecycle, on a generic rail and on the Sui exact-payment rail. It adds:
 A third party recomputes three per-step verdicts (action-ref recomputes,
 settlement binding resolves, signature verifies) and one lifecycle verdict, with
 only the settlement and the receipt in hand. See `_check_independent.py`.
+
+### 5.3 Profile example: authorization decision
+
+This profile turns an enforcement decision into a receipt. A credential broker
+authorizes a tool call against a signed, attestation-bound grant with typed
+capability scopes; the gateway's verdict, allow or deny, is minted as a receipt
+instead of being discarded. The decision maps onto the envelope verdict
+vocabulary: an allowed call is `allow`, a refused call is `block` carrying the
+machine reason (`capability_exceeded`, `binding_unknown`, `missing_credential`,
+...) as `decisionDerived.reason`. It adds:
+
+- An authorization record (`schema` = `vaara.authorization/v0`) whose JCS digest
+  is the receipt's `evidenceRef.digest`. It binds `toolName`, `tenantId`, the
+  grant by content address (`grantFingerprint` = `sha256(JCS(signed grant))`),
+  the runtime argument commitment (`argsCommitment` = `sha256(JCS(args))`), the
+  evaluated `capabilities`, and the `verdict` / `reason`.
+- The raw arguments never enter the record; only their commitment does, so the
+  receipt is publishable while the arguments stay private. An auditor holding the
+  arguments out of band recomputes the commitment and re-runs the verdict.
+- An optional `coverage` block names the observation boundary the decision was
+  made under, inside the record and therefore under the signature. It binds the
+  `boundary` (the chokepoint identity), the `serverFingerprint` (the exact
+  capability surface in scope, `manifest:sha256(JCS(tools))` or the command
+  hash), and a `scope` literal stating that only calls routed through the
+  chokepoint are observed. A tool reached on an out-of-band path is out of
+  coverage. The block is absent when no boundary is asserted, leaving the record
+  byte-identical to a coverage-free decision.
+
+A verdict is only as meaningful as what the issuer could see. `allow` over an
+unbounded surface and `allow` over a stated one are identical bytes with
+opposite meaning, so an absent refusal reads as fact only against a declared
+scope: "not refused within this boundary", never "not observed". The `coverage`
+block carries that boundary in the trace itself, so it is recomputable evidence
+rather than a separate trust root. The verdict stays a thin read over it. The
+chokepoint remains an observer of what passes through it, not a claim about what
+does not.
+
+The deny case is the point. A refused call leaves a signed, content-addressed,
+portable proof of the non-action: a third party recomputes the verdict from the
+grant and the arguments and confirms the refusal, trusting only the issuer's
+public key. A third party recomputes five verdicts per case (grant fingerprint,
+argument commitment, capability verdict, evidence binding, signature) with only
+the grant, the arguments, the evidence, and the receipt in hand. See
+`_check_independent.py`.
 
 ## 6. Conformance
 

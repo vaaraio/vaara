@@ -1,0 +1,16 @@
+{
+  "allow": {
+    "args_commitment_recomputes": true,
+    "evidence_binding_resolves": true,
+    "grant_fingerprint_recomputes": true,
+    "receipt_signature_ok": true,
+    "verdict_recomputes": true
+  },
+  "deny": {
+    "args_commitment_recomputes": true,
+    "evidence_binding_resolves": true,
+    "grant_fingerprint_recomputes": true,
+    "receipt_signature_ok": true,
+    "verdict_recomputes": true
+  }
+}
