@@ -215,6 +215,17 @@ than a judgment of the work.
   receipt identity with revocation at v0.52.0 to v0.55.0 (2026-06-02 to
   2026-06-05), ahead of these proposals; listing them records the
   convergence, not a competitive claim.
+- **Agent Authorization Envelope (AAE).** Kroehl,
+  draft-kroehl-agentic-trust-aae-00 (IETF Internet-Draft, 21 May
+  2026). A structured authorization container for autonomous agents,
+  built from MANDATE, CONSTRAINTS, and VALIDITY blocks bound to W3C
+  DIDs and Verifiable Credentials, with SHA-256 delegation-chain
+  linking computed over the parent envelope's raw JWS serialization
+  (canonicalization explicitly excluded). AAE specifies the
+  authorization a gate evaluates against; a Vaara receipt records the
+  decision the gate reached and binds it to a recomputable evidence
+  record. Adjacent at the grant layer and interoperable: a Vaara
+  authorization-decision receipt can name the AAE it evaluated.
 
 ### Same-lane open projects
 
