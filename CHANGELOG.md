@@ -4,6 +4,12 @@ All notable changes to this project are documented here.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/)
 and this project follows [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [1.3.1] - 2026-06-20
+
+Patch release: documentation only. Records the Agent Authorization Envelope (AAE) in prior art.
+
+- `docs/PRIOR_ART.md` cites AAE (`draft-kroehl-agentic-trust-aae-00`, IETF, 21 May 2026) as the adjacent grant-layer spec: an authorization container (MANDATE, CONSTRAINTS, VALIDITY over W3C DIDs and Verifiable Credentials), not a receipt format. Verified against the live draft: no `receipt_id`, no JCS, delegation hash over raw JWS octets with canonicalization excluded. A Vaara authorization-decision receipt can name the AAE it evaluated. No code or conformance-vector changes.
+
 ## [1.3.0] - 2026-06-20
 
 Minor release: proof-carrying enforcement reaches the proxy, and every authorization receipt carries a signed coverage boundary.
