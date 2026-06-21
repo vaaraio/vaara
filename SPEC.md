@@ -177,6 +177,11 @@ machine reason (`capability_exceeded`, `binding_unknown`, `missing_credential`,
   under the boundary up to and including this one (`runningCount` = `seq + 1`).
   The block is absent when no sequence is asserted, leaving the record
   byte-identical to a completeness-free decision.
+- An optional sealing record finalizes the boundary: a terminal completeness
+  block (`{boundaryId, sealed: true, total: N}`) that pins the boundary's final
+  count independently of the per-record sequence. It is additive and emitted once
+  the boundary is closed; a boundary that is never sealed verifies exactly as
+  before, with the seal absent and the stream byte-identical.
 
 A verdict is only as meaningful as what the issuer could see. `allow` over an
 unbounded surface and `allow` over a stated one are identical bytes with
@@ -201,12 +206,20 @@ into each record, a dropped receipt is a missing sequence number that any holder
 detects from the receipts alone: the highest running count names how many exist,
 so a short set is self-evidently incomplete and the absent `seq` is named. This
 needs no issuer access and no external witness. The `tests/vectors/contiguity_v0/`
-vectors and the `vaara verify-contiguity` surface carry that check. One honest
-limit remains: a pure tail truncation (holding `0..k` with nothing after) cannot
-be told from a complete stream by contiguity alone, since the latest held count
-is then `k + 1`. Closing it is the job of an rfc3161 anchor over the running
-count (Section 4), which attests that at time T, N receipts existed under the
-boundary.
+vectors and the `vaara verify-contiguity` surface carry that check.
+
+The per-record running count alone cannot tell a pure tail truncation (holding
+`0..k` with nothing after) from a complete stream, since the latest held count is
+then `k + 1` and reads as whole. The optional sealing record closes that gap: when
+a boundary is finalized, the holder expects `max(seq + 1, runningCount, total)`
+records, so a dropped tail shows as the missing range up to the sealed `total`. A
+boundary that is never sealed verifies exactly as before. One residual remains, and
+it is irreducible from the held set alone: a suffix drop that also suppresses the
+sealing record leaves nothing to detect. Closing that is the job of an rfc3161
+anchor over the running count (Section 4), which attests that at time T, N receipts
+existed under the boundary. The layering is `seq` for order, the hash chain for
+tamper-evidence, the sealing record for a truncated tail, and the timestamp anchor
+for the seal-suppressed residual.
 
 ### 5.4 Profile example: AP2 checkout binding
 
