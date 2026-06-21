@@ -1,0 +1,18 @@
+{
+  "canon_version": "urn:x402:canonicalisation:jcs-rfc8785-v1",
+  "claim_type": "payment.checkout",
+  "frame_id": "sha256:5a48376bf026870c5ceeffb2f8e0a9436094b999c0b0685712f75005141118cd",
+  "frame_provider_did": "did:web:acme.example",
+  "frame_timestamp_ms": 1779267600500,
+  "receipt": {
+    "amount": "49.99",
+    "cartId": "cart-7f3a",
+    "currency": "USD",
+    "merchant": "merchant:acme",
+    "payerAgent": "agent:checkout-bot",
+    "paymentMethod": "card",
+    "schema": "ap2.checkout-receipt/v0",
+    "settledAtMs": 1779267600000
+  },
+  "receipt_hash": "sha256:690fb66ae06c9337586092cee9a99e3790161225d035277989c6cc4af8443b63"
+}
