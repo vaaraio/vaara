@@ -403,3 +403,66 @@ def test_build_attest_emitter_rejects_short_key(tmp_path):
             receipts_dir=tmp_path / "r",
             upstream_commands={"default": ["echo"]},
         )
+
+
+# ---------------------------------------------------------------------------
+# Completeness sequence (contiguity)
+# ---------------------------------------------------------------------------
+
+def test_completeness_seq_is_monotonic_and_gap_free(emitter):
+    seen = [emitter._next_completeness("vaara-mcp-proxy") for _ in range(5)]
+    assert [s for s, _ in seen] == [0, 1, 2, 3, 4]
+    assert [c for _, c in seen] == [1, 2, 3, 4, 5]
+
+
+def test_completeness_seq_is_scoped_per_boundary(emitter):
+    assert emitter._next_completeness("boundary-a") == (0, 1)
+    assert emitter._next_completeness("boundary-b") == (0, 1)
+    assert emitter._next_completeness("boundary-a") == (1, 2)
+
+
+def test_completeness_seq_no_dupes_under_concurrency(emitter):
+    # Concurrent issuance must never share or skip a number: the assigned set is
+    # exactly 0..N-1, which is what makes a missing seq a provable gap.
+    import threading
+
+    out: list[int] = []
+    lock = threading.Lock()
+    n = 200
+
+    def worker() -> None:
+        seq, _ = emitter._next_completeness("vaara-mcp-proxy")
+        with lock:
+            out.append(seq)
+
+    threads = [threading.Thread(target=worker) for _ in range(n)]
+    for t in threads:
+        t.start()
+    for t in threads:
+        t.join()
+    assert sorted(out) == list(range(n))
+
+
+def test_emitted_authz_receipts_carry_contiguous_completeness(emitter):
+    # Two allowed calls under the same boundary get seq 0 then 1 (runningCount
+    # 1 then 2), and the completeness boundaryId matches the coverage boundary.
+    args = {"path": "/tmp/x"}
+    seqs = []
+    for _ in range(2):
+        att, counter = emitter.emit_attestation(
+            tool_name="read_file", arguments=args,
+            upstream_name="default", tenant_id="t1",
+        )
+        cred = emitter.emit_grant(
+            attestation=att, counter=counter, tool_name="read_file",
+            upstream_name="default", tenant_id="t1",
+        )
+        auth = emitter.emit_authorization_receipt(
+            credential=cred, runtime_args=args, attestation=att, counter=counter,
+            upstream_name="default", tenant_id="t1",
+        )
+        assert auth is not None
+        block = auth.evidence["completeness"]
+        assert block["boundaryId"] == auth.evidence["coverage"]["boundary"]
+        seqs.append((block["seq"], block["runningCount"]))
+    assert seqs == [(0, 1), (1, 2)]
