@@ -8,6 +8,7 @@ and this project follows [Semantic Versioning](https://semver.org/spec/v2.0.0.ht
 
 - The CrewAI completeness adapter can seal a run. `VaaraGovernance.finalize_run()` emits a terminal record that pins the boundary's final decision count, so a dropped tail shows as a provable gap even though the removed records took their own sequence number with them. This lifts the per-record running count (which alone cannot see a truncation) to catch a tail drop, and it addresses the v1.4.0 honest limit for this adapter. The sealing block is additive: a run that is never finalized verifies exactly as before, and the shared `verify-contiguity` path is byte-identical for streams that carry no seal.
 - The irreducible residual is documented in the code and tests: a suffix drop that also suppresses the sealing record stays invisible from the held set alone. An external anchor, the rfc3161 timestamp minted over the run, is what closes that; the held set cannot.
+- Synced the canonical spec to the sealing record. `SPEC.md` Section 5.3 now describes the terminal sealing block (`{boundaryId, sealed: true, total: N}`) and the full completeness layering: `seq` for order, the hash chain for tamper-evidence, the seal for a truncated tail, and the rfc3161 anchor for the seal-suppressed residual. The earlier text described the tail truncation as an open limit, which the seal has since closed to that residual. The published I-D resyncs at its next revision.
 
 ## [1.5.0] - 2026-06-21
 
