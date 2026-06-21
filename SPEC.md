@@ -120,7 +120,7 @@ defines only its own evidence record (the `schema` and contents behind
 | Profile | Evidence schema | Pins to | Vectors |
 |---|---|---|---|
 | x402 settlement binding | `x402.settlement.*/v0` | `vaara.receipt/v1` | `tests/vectors/x402_settlement_v0/` |
-| authorization decision | `vaara.authorization/v0` | `vaara.receipt/v1` | `tests/vectors/authorization_v0/` |
+| authorization decision | `vaara.authorization/v0` | `vaara.receipt/v1` | `tests/vectors/authorization_v0/`, `tests/vectors/contiguity_v0/` |
 
 ### 5.2 Profile example: x402 settlement binding
 
@@ -163,6 +163,13 @@ machine reason (`capability_exceeded`, `binding_unknown`, `missing_credential`,
   chokepoint are observed. A tool reached on an out-of-band path is out of
   coverage. The block is absent when no boundary is asserted, leaving the record
   byte-identical to a coverage-free decision.
+- An optional `completeness` block scopes a sequence to that boundary, inside the
+  record and therefore under the signature. It binds the `boundaryId` (the same
+  boundary the `coverage` block names), a monotonic `seq` starting at 0 with no
+  gaps by construction, and a `runningCount` equal to the total receipts issued
+  under the boundary up to and including this one (`runningCount` = `seq + 1`).
+  The block is absent when no sequence is asserted, leaving the record
+  byte-identical to a completeness-free decision.
 
 A verdict is only as meaningful as what the issuer could see. `allow` over an
 unbounded surface and `allow` over a stated one are identical bytes with
@@ -180,6 +187,19 @@ public key. A third party recomputes five verdicts per case (grant fingerprint,
 argument commitment, capability verdict, evidence binding, signature) with only
 the grant, the arguments, the evidence, and the receipt in hand. See
 `_check_independent.py`.
+
+Coverage states the boundary; completeness makes a gap inside it provable. With
+the per-boundary `seq` contiguous by construction and the `runningCount` signed
+into each record, a dropped receipt is a missing sequence number that any holder
+detects from the receipts alone: the highest running count names how many exist,
+so a short set is self-evidently incomplete and the absent `seq` is named. This
+needs no issuer access and no external witness. The `tests/vectors/contiguity_v0/`
+vectors and the `vaara verify-contiguity` surface carry that check. One honest
+limit remains: a pure tail truncation (holding `0..k` with nothing after) cannot
+be told from a complete stream by contiguity alone, since the latest held count
+is then `k + 1`. Closing it is the job of an rfc3161 anchor over the running
+count (Section 4), which attests that at time T, N receipts existed under the
+boundary.
 
 ## 6. Conformance
 
