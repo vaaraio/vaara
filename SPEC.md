@@ -127,6 +127,7 @@ defines only its own evidence record (the `schema` and contents behind
 |---|---|---|---|
 | x402 settlement binding | `x402.settlement.*/v0` | `vaara.receipt/v1` | `tests/vectors/x402_settlement_v0/` |
 | authorization decision | `vaara.authorization/v0` | `vaara.receipt/v1` | `tests/vectors/authorization_v0/`, `tests/vectors/contiguity_v0/` |
+| AP2 checkout binding | `vaara.authorization/v0` (names AP2 PEF `frame_id`) | `vaara.receipt/v1` | `tests/vectors/ap2_v0/` |
 
 ### 5.2 Profile example: x402 settlement binding
 
@@ -206,6 +207,34 @@ be told from a complete stream by contiguity alone, since the latest held count
 is then `k + 1`. Closing it is the job of an rfc3161 anchor over the running
 count (Section 4), which attests that at time T, N receipts existed under the
 boundary.
+
+### 5.4 Profile example: AP2 checkout binding
+
+This profile binds an AP2 checkout to the post-checkout agent actions a
+credential broker authorizes, so the actions taken after a payment settles carry
+the same recomputable, gap-evident record as the authorization decisions in 5.3.
+It reuses the `vaara.authorization/v0` evidence record unchanged and adds a join
+to the AP2 Payment Evidence Frame (PEF, AP2 PR #274):
+
+- The AP2 checkout emits a PEF whose `frame_id` = `sha256(JCS(frame))`, with
+  `frame_id` and `signature` excluded from the preimage, and whose `receipt_hash`
+  = `sha256(JCS(receipt))` content-addresses the wrapped Checkout Receipt.
+  Canonicalization is `urn:x402:canonicalisation:jcs-rfc8785-v1` (JCS / RFC 8785),
+  the same as this envelope, so the address joins with no re-canonicalization.
+- Each post-checkout authorization receipt names the checkout it followed by
+  content address: `decisionDerived.evidenceRef.ref` = `ap2:checkout/<frame_id>`,
+  under the receipt signature. The AP2 task scope is the `coverage.boundary`
+  (5.3), and the `completeness` block sequences the actions under it.
+
+The identity of the checkout is the PEF `frame_id`, a content address the payment
+side already computes; the completeness of the actions taken under it is the
+`vaara.authorization/v0` contiguity stream. A per-action hash says an action was
+recorded; the running count says none inside the AP2 task boundary was dropped.
+A third party recomputes the frame address, confirms every receipt names that
+checkout, resolves each evidence binding, verifies each signature, and re-runs
+the gap check, with only the PEF and the held receipts in hand. See
+`tests/vectors/ap2_v0/_check_independent.py`. AP2 can pin from the point the
+Checkout Receipt ends rather than define a new post-settlement primitive.
 
 ## 6. Conformance
 
