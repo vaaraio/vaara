@@ -82,13 +82,14 @@ Table of Contents
      6.1.  Registry  . . . . . . . . . . . . . . . . . . . . . . . .   7
      6.2.  Profile Example: x402 Settlement Binding  . . . . . . . .   7
      6.3.  Profile Example: Authorization Decision . . . . . . . . .   8
-   7.  Conformance . . . . . . . . . . . . . . . . . . . . . . . . .   9
-   8.  Versioning  . . . . . . . . . . . . . . . . . . . . . . . . .  10
-   9.  Security Considerations . . . . . . . . . . . . . . . . . . .  10
-   10. IANA Considerations . . . . . . . . . . . . . . . . . . . . .  10
-   11. Normative References  . . . . . . . . . . . . . . . . . . . .  10
-   12. Informative References  . . . . . . . . . . . . . . . . . . .  11
-   Author's Address  . . . . . . . . . . . . . . . . . . . . . . . .  12
+     6.4.  Profile Example: AP2 Checkout Binding . . . . . . . . . .   9
+   7.  Conformance . . . . . . . . . . . . . . . . . . . . . . . . .  10
+   8.  Versioning  . . . . . . . . . . . . . . . . . . . . . . . . .  11
+   9.  Security Considerations . . . . . . . . . . . . . . . . . . .  11
+   10. IANA Considerations . . . . . . . . . . . . . . . . . . . . .  11
+   11. Normative References  . . . . . . . . . . . . . . . . . . . .  11
+   12. Informative References  . . . . . . . . . . . . . . . . . . .  12
+   Author's Address  . . . . . . . . . . . . . . . . . . . . . . . .  13
 
 1.  Introduction
 
@@ -99,7 +100,6 @@ Table of Contents
    document.  Downstream specifications define profiles that pin to a
    version of this document and add only their own evidence schema; they
    do not redefine the envelope.
-
 
 
 
@@ -348,7 +348,7 @@ Internet-Draft                Vaara Receipt                    June 2026
 
 6.1.  Registry
 
-   Both profiles below pin to vaara.receipt/v1.  Vector paths are
+   The profiles below pin to vaara.receipt/v1.  Vector paths are
    relative to the source repository ([VAARA-REPO]).
 
       +===============+======================+=====================+
@@ -362,6 +362,10 @@ Internet-Draft                Vaara Receipt                    June 2026
       | decision      | v0                   | authorization_v0/,  |
       |               |                      | tests/vectors/      |
       |               |                      | contiguity_v0/      |
+      +---------------+----------------------+---------------------+
+      | AP2 checkout  | vaara.authorization/ | tests/vectors/      |
+      | binding       | v0 (names AP2 PEF    | ap2_v0/             |
+      |               | frame_id)            |                     |
       +---------------+----------------------+---------------------+
 
                         Table 4: Profile registry
@@ -380,10 +384,6 @@ Internet-Draft                Vaara Receipt                    June 2026
       in-progress receipt (terminal: false) cannot be presented where
       the terminal one is required.
 
-   A third party recomputes three per-step verdicts (action-ref
-   recomputes, settlement binding resolves, signature verifies) and one
-   lifecycle verdict, with only the settlement and the receipt in hand.
-   See _check_independent.py in the vectors directory.
 
 
 
@@ -393,6 +393,11 @@ Sirkkavaara             Expires 23 December 2026                [Page 7]
 
 Internet-Draft                Vaara Receipt                    June 2026
 
+
+   A third party recomputes three per-step verdicts (action-ref
+   recomputes, settlement binding resolves, signature verifies) and one
+   lifecycle verdict, with only the settlement and the receipt in hand.
+   See _check_independent.py in the vectors directory.
 
 6.3.  Profile Example: Authorization Decision
 
@@ -436,12 +441,7 @@ Internet-Draft                Vaara Receipt                    June 2026
       is absent when no sequence is asserted, leaving the record byte-
       identical to a completeness-free decision.
 
-   A verdict is only as meaningful as what the issuer could see. "allow"
-   over an unbounded surface and "allow" over a stated one are identical
-   bytes with opposite meaning, so an absent refusal reads as fact only
-   against a declared scope: "not refused within this boundary", never
-   "not observed".  The coverage block carries that boundary in the
-   trace itself, so it is recomputable evidence rather than a separate
+
 
 
 
@@ -450,6 +450,12 @@ Sirkkavaara             Expires 23 December 2026                [Page 8]
 Internet-Draft                Vaara Receipt                    June 2026
 
 
+   A verdict is only as meaningful as what the issuer could see. "allow"
+   over an unbounded surface and "allow" over a stated one are identical
+   bytes with opposite meaning, so an absent refusal reads as fact only
+   against a declared scope: "not refused within this boundary", never
+   "not observed".  The coverage block carries that boundary in the
+   trace itself, so it is recomputable evidence rather than a separate
    trust root.  The verdict stays a thin read over it.  The chokepoint
    remains an observer of what passes through it, not a claim about what
    does not.
@@ -478,6 +484,54 @@ Internet-Draft                Vaara Receipt                    June 2026
    (Section 5), which attests that at time T, N receipts existed under
    the boundary.
 
+6.4.  Profile Example: AP2 Checkout Binding
+
+   This profile binds an AP2 checkout to the post-checkout agent actions
+   a credential broker authorizes, so the actions taken after a payment
+   settles carry the same recomputable, gap-evident record as the
+   authorization decisions in Section 6.3.  It reuses the
+   vaara.authorization/v0 evidence record unchanged and adds a join to
+   the AP2 Payment Evidence Frame (PEF, AP2 PR #274):
+
+
+
+
+
+
+
+
+
+Sirkkavaara             Expires 23 December 2026                [Page 9]
+
+Internet-Draft                Vaara Receipt                    June 2026
+
+
+   *  The AP2 checkout emits a PEF whose frame_id = sha256(JCS(frame)),
+      with frame_id and signature excluded from the preimage, and whose
+      receipt_hash = sha256(JCS(receipt)) content-addresses the wrapped
+      Checkout Receipt.  Canonicalization is
+      urn:x402:canonicalisation:jcs-rfc8785-v1 (JCS / RFC 8785), the
+      same as this envelope, so the address joins with no re-
+      canonicalization.
+
+   *  Each post-checkout authorization receipt names the checkout it
+      followed by content address: decisionDerived.evidenceRef.ref =
+      ap2:checkout/<frame_id>, under the receipt signature.  The AP2
+      task scope is the coverage.boundary (Section 6.3), and the
+      completeness block sequences the actions under it.
+
+   The identity of the checkout is the PEF frame_id, a content address
+   the payment side already computes; the completeness of the actions
+   taken under it is the vaara.authorization/v0 contiguity stream.  A
+   per-action hash says an action was recorded; the running count says
+   none inside the AP2 task boundary was dropped.  A third party
+   recomputes the frame address, confirms every receipt names that
+   checkout, resolves each evidence binding, verifies each signature,
+   and re-runs the gap check, with only the PEF and the held receipts in
+   hand.  See tests/vectors/ap2_v0/_check_independent.py.  AP2 can pin
+   from the point the Checkout Receipt ends rather than define a new
+   post-settlement primitive.
+
 7.  Conformance
 
    An implementation conforms to vaara.receipt/v1 if, for every receipt
@@ -501,7 +555,9 @@ Internet-Draft                Vaara Receipt                    June 2026
 
 
 
-Sirkkavaara             Expires 23 December 2026                [Page 9]
+
+
+Sirkkavaara             Expires 23 December 2026               [Page 10]
 
 Internet-Draft                Vaara Receipt                    June 2026
 
@@ -557,7 +613,7 @@ Internet-Draft                Vaara Receipt                    June 2026
 
 
 
-Sirkkavaara             Expires 23 December 2026               [Page 10]
+Sirkkavaara             Expires 23 December 2026               [Page 11]
 
 Internet-Draft                Vaara Receipt                    June 2026
 
@@ -613,7 +669,7 @@ Internet-Draft                Vaara Receipt                    June 2026
 
 
 
-Sirkkavaara             Expires 23 December 2026               [Page 11]
+Sirkkavaara             Expires 23 December 2026               [Page 12]
 
 Internet-Draft                Vaara Receipt                    June 2026
 
@@ -669,4 +725,4 @@ Author's Address
 
 
 
-Sirkkavaara             Expires 23 December 2026               [Page 12]
+Sirkkavaara             Expires 23 December 2026               [Page 13]
