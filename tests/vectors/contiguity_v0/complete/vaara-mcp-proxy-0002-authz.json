@@ -1,0 +1,65 @@
+{
+  "evidence": {
+    "argsCommitment": "sha256:d3b028477b8c178d5711825ee3228906c4c0ec1b17ff7dcbdf5dac82d65c008b",
+    "capabilities": [
+      {
+        "arg": "amount",
+        "op": "le",
+        "value": "500"
+      },
+      {
+        "arg": "vendor",
+        "op": "in",
+        "value": [
+          "acme",
+          "globex"
+        ]
+      },
+      {
+        "arg": "destination",
+        "op": "eq",
+        "value": "0xABC"
+      }
+    ],
+    "completeness": {
+      "boundaryId": "vaara-mcp-proxy",
+      "runningCount": 3,
+      "seq": 2
+    },
+    "grantFingerprint": "sha256:1391e34c3ec2a7b6bf3da147a33505b0ccdc697f2cac371689d6ad0ea8e71085",
+    "reason": "ok",
+    "schema": "vaara.authorization/v0",
+    "tenantId": "tenant-a",
+    "toolName": "pay.send",
+    "verdict": "allow"
+  },
+  "record": {
+    "alg": "ES256",
+    "backLink": {
+      "attestationDigest": "sha256:abababababababababababababababababababababababababababababababab",
+      "attestationNonce": "att-nonce-xyz"
+    },
+    "decisionDerived": {
+      "decidedAt": "2026-06-18T12:00:05Z",
+      "decision": "allow",
+      "evidenceRef": {
+        "canonicalization": "JCS",
+        "digest": "sha256:eb2638ee99293f56b320faf6007d92140e412bd5703d73e108dd35ba567e04d9",
+        "ref": "vaara:authorization/pay.send",
+        "schema": "vaara.authorization/v0"
+      },
+      "policyId": "policy:vaara-credential-broker/1",
+      "reason": "ok"
+    },
+    "issuerAsserted": {
+      "alg": "ES256",
+      "iat": "2026-06-21T07:17:26Z",
+      "iss": "vaara-mcp-proxy",
+      "nonce": "decision-nonce-2",
+      "secretVersion": "key-v1",
+      "sub": "tenant-a/upstream"
+    },
+    "signature": "0516de7ed7092a61acd0f6831ff042031f8d24938e113a4d89d6136ae20f7c91ef3690f3e984581875403f6129690dacd375a90c54257e9d14e5004c530d91b9",
+    "version": 1
+  }
+}

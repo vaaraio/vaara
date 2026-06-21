@@ -1,0 +1,24 @@
+{
+  "complete": {
+    "all_evidence_bindings_resolve": true,
+    "all_signatures_ok": true,
+    "contiguity": {
+      "expected": 5,
+      "missingSeqs": [],
+      "ok": true,
+      "present": 5
+    }
+  },
+  "dropped": {
+    "all_evidence_bindings_resolve": true,
+    "all_signatures_ok": true,
+    "contiguity": {
+      "expected": 5,
+      "missingSeqs": [
+        2
+      ],
+      "ok": false,
+      "present": 4
+    }
+  }
+}
