@@ -78,6 +78,7 @@ verify against the PyPI history and the `vX.Y.Z` git tags regardless of license 
 | Typed capability scopes on credential grants (`le`/`ge`/`in`/`eq`) with closed coverage, bounding what a tool call may do rather than only pinning an exact argument set | v1.2.0, 2026-06-19 | `src/vaara/credential/_grant_capability.py` |
 | Proof-carrying enforcement at the MCP proxy: an allowed `tools/call` mints a signed, independently recomputable authorization receipt next to the grant, carrying a signed coverage boundary (chokepoint identity, capability-surface fingerprint, scope literal) so an absent refusal reads against a declared scope rather than silence (off by default) | v1.3.0, 2026-06-20 | `src/vaara/integrations/_mcp_attest.py`, `src/vaara/credential/`, `tests/vectors/authorization_v0/` |
 | Gap-evident completeness: a signed per-boundary sequence and running count on each authorization receipt make a dropped receipt a provable gap from the held receipts alone, with no issuer access and no external witness (`verify-contiguity`), with public conformance vectors (off by default) | v1.4.0, 2026-06-21 | `src/vaara/credential/_contiguity.py`, `tests/vectors/contiguity_v0/`, `SPEC.md` |
+| AP2 checkout binding profile: a post-checkout authorization receipt names the AP2 Payment Evidence Frame it followed by content address (`decisionDerived.evidenceRef.ref` equal to `ap2:checkout/<frame_id>`), with the AP2 task as the `coverage` boundary and gap-evident completeness over the receipts inside it, with public conformance vectors | v1.5.0, 2026-06-21 | `SPEC.md` section 5.4, `tests/vectors/ap2_v0/` |
 
 The `CHANGELOG.md` entry for each version carries the substantive
 description and, where relevant, the failure mode that motivated the
@@ -262,8 +263,10 @@ than a judgment of the work.
   re-expressible as an IETF RATS EAR carrying an AR4SI vector (v0.71.0,
   2026-06-16), externally time-anchored over RFC 3161 / eIDAS (v0.48.0,
   2026-05-31; self-hosted v1.2.0, 2026-06-19), with gap-evident completeness
-  verifiable from the held receipts alone (v1.4.0, 2026-06-21). Listed as
-  adjacent.
+  verifiable from the held receipts alone (v1.4.0, 2026-06-21). A TRACE
+  attestation entry can reference a Vaara receipt as the content-addressed
+  artifact its `type` names, so the two interoperate at the record level
+  without either format forking. Listed as adjacent and interoperating.
 
 ### Classical foundations
 
