@@ -2281,6 +2281,68 @@ def _print_handoff_report(v: Any) -> None:
     print(f"  {_safe_inline(v.reason)}")
 
 
+def _cmd_verify_contiguity(args: argparse.Namespace) -> int:
+    """Check authorization receipts for completeness gaps under one boundary.
+
+    Reads the ``evidence`` half of each ``*-authz.json`` file and checks that the
+    per-boundary sequence is contiguous. Exit 0 when complete, 1 when a gap is
+    found, 2 on a usage or input error.
+    """
+    from vaara.credential import verify_contiguity
+
+    files: list[Path] = []
+    for raw in args.paths:
+        p = Path(raw)
+        if p.is_dir():
+            files.extend(sorted(p.glob("*-authz.json")))
+        else:
+            files.append(p)
+    if not files:
+        print(
+            "vaara verify-contiguity: no authorization receipts found",
+            file=sys.stderr,
+        )
+        return 2
+
+    evidence: list[dict] = []
+    for f in files:
+        try:
+            payload = json.loads(f.read_text(encoding="utf-8"))
+        except (OSError, json.JSONDecodeError) as exc:
+            print(f"vaara verify-contiguity: {f}: {exc}", file=sys.stderr)
+            return 2
+        # Persisted authz files are {"record": ..., "evidence": ...}; accept a
+        # bare evidence record too, so the check runs over either form.
+        ev = payload.get("evidence", payload) if isinstance(payload, dict) else None
+        if isinstance(ev, dict):
+            evidence.append(ev)
+
+    try:
+        report = verify_contiguity(evidence, boundary_id=args.boundary_id)
+    except ValueError as exc:
+        print(f"vaara verify-contiguity: {exc}", file=sys.stderr)
+        return 2
+
+    if args.json:
+        print(
+            json.dumps(
+                {
+                    "boundaryId": report.boundary_id,
+                    "present": report.present,
+                    "expected": report.expected,
+                    "missingSeqs": report.missing_seqs,
+                    "duplicateSeqs": report.duplicate_seqs,
+                    "countMismatches": report.count_mismatches,
+                    "ok": report.ok,
+                },
+                indent=2,
+            )
+        )
+    else:
+        print(report.gap_report())
+    return 0 if report.ok else 1
+
+
 def _cmd_verify_enforcement(args: argparse.Namespace) -> int:
     """Verify a SEV-SNP attestation report binds a SEP-2828 record to a CVM.
 
@@ -4167,6 +4229,38 @@ def build_parser() -> argparse.ArgumentParser:
         help="Emit the full enforcement verdict as JSON",
     )
     pve.set_defaults(func=_cmd_verify_enforcement)
+
+    pvc = sub.add_parser(
+        "verify-contiguity",
+        help=(
+            "Check authorization receipts for completeness gaps: the per-boundary "
+            "sequence must be contiguous, so a dropped receipt is a provable gap "
+            "with no issuer access and no external witness."
+        ),
+    )
+    pvc.add_argument(
+        "paths",
+        nargs="+",
+        help=(
+            "Authorization receipt JSON files, or directories scanned for "
+            "*-authz.json files"
+        ),
+    )
+    pvc.add_argument(
+        "--boundary",
+        default=None,
+        dest="boundary_id",
+        help=(
+            "Coverage boundary id to check; inferred when the receipts name "
+            "exactly one boundary"
+        ),
+    )
+    pvc.add_argument(
+        "--json",
+        action="store_true",
+        help="Emit the contiguity report as JSON",
+    )
+    pvc.set_defaults(func=_cmd_verify_contiguity)
 
     pvt = sub.add_parser(
         "verify-tpm-binding",
