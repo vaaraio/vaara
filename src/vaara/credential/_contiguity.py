@@ -119,37 +119,56 @@ def verify_contiguity(
     ``runningCount`` says it should. ``runningCount`` must equal ``seq + 1`` for
     every held record, or the count itself is inconsistent. The report is
     self-contained evidence of completeness or of the specific receipts absent.
+
+    An optional sealing block (``{"sealed": True, "total": N}``) finalizes a run
+    and lets a dropped tail be caught; without it, dropping the last record(s)
+    is invisible from the held set alone. See the inline note below.
     """
     boundary, blocks = _completeness_records(evidence_records, boundary_id)
-    if not blocks:
+    # A sealing block (``{"sealed": True, "total": N}``) pins the run length
+    # independently of the held decision records. It is optional and additive: a
+    # stream carrying only ``{seq, runningCount}`` blocks behaves exactly as
+    # before. When a seal is present, a dropped tail still shows as missing even
+    # though the dropped records took their own ``seq`` with them. A suffix that
+    # also suppresses the seal stays outside held-set-alone detection; an
+    # external anchor (e.g. an rfc3161 timestamp over the run) closes that.
+    seq_blocks = [b for b in blocks if not b.get("sealed")]
+    sealed_total = max(
+        (int(b["total"]) for b in blocks if b.get("sealed")), default=0
+    )
+
+    if not seq_blocks:
+        # Nothing but a possible seal. A seal asserting N over zero held records
+        # is a fully-dropped run; no seal and no records is a no-op.
         return ContiguityReport(
             boundary_id=boundary,
             present=0,
-            expected=0,
-            missing_seqs=[],
+            expected=sealed_total,
+            missing_seqs=list(range(sealed_total)),
             duplicate_seqs=[],
             count_mismatches=[],
-            ok=True,
+            ok=(sealed_total == 0),
         )
 
-    seqs = [int(b["seq"]) for b in blocks]
-    counts = [int(b["runningCount"]) for b in blocks]
+    seqs = [int(b["seq"]) for b in seq_blocks]
+    counts = [int(b["runningCount"]) for b in seq_blocks]
     max_seq = max(seqs)
     max_running = max(counts)
-    # What the stream claims exists: the furthest seq, or a runningCount that
-    # outruns it (a later receipt was dropped, taking its own seq with it).
-    expected = max(max_seq + 1, max_running)
+    # What the stream claims exists: the furthest seq, a runningCount that
+    # outruns it (a later receipt was dropped, taking its own seq with it), or
+    # the sealed total when the run was finalized.
+    expected = max(max_seq + 1, max_running, sealed_total)
 
     seq_counts = Counter(seqs)
     duplicate_seqs = sorted(s for s, n in seq_counts.items() if n > 1)
     missing_seqs = sorted(set(range(expected)) - set(seqs))
     count_mismatches = [
         {"seq": int(b["seq"]), "runningCount": int(b["runningCount"])}
-        for b in blocks
+        for b in seq_blocks
         if int(b["runningCount"]) != int(b["seq"]) + 1
     ]
 
-    present = len(blocks)
+    present = len(seq_blocks)
     ok = (
         not missing_seqs
         and not duplicate_seqs

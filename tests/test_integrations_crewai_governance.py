@@ -102,25 +102,76 @@ def test_leading_drop_is_a_provable_gap():
     assert report.missing_seqs == [0]
 
 
-def test_tail_drop_is_the_known_limitation():
-    """running_count is per-record (seq+1), not a sealed run total, so dropping
-    the final record(s) is NOT detectable from the held set alone. This is the
-    boundary of the guarantee: a closing/sealing record would be needed to catch
-    a tail truncation. Interior and leading drops are caught (see above)."""
+def test_tail_drop_is_caught_with_a_sealing_record():
+    """A finalized run pins its total, so a dropped tail shows as missing even
+    though the removed records took their own ``seq`` with them. This is the
+    upgrade over per-record ``running_count`` (which alone cannot see a
+    truncation). Interior and leading drops are caught without a seal (above)."""
     gov = VaaraGovernance()
     for i in range(6):
         gov.before_tool_call(_ctx(tool_input={"i": i}))
+    seal = gov.finalize_run("crew-1")
+    assert seal == {"boundaryId": "crew-1", "sealed": True, "total": 6}
 
     held = gov.decisions("crew-1")
     kept = [d for d in held if d["seq"] < 4]  # drop the last two
     evidence = [
         {"completeness": d["extensions"]["vaara"]["completeness"]} for d in kept
     ]
+    evidence.append({"completeness": seal})  # the seal survives
 
     report = verify_contiguity(evidence, "crew-1")
-    assert report.ok  # documents the limitation, not an endorsement
+    assert not report.ok
+    assert report.present == 4
+    assert report.expected == 6
+    assert report.missing_seqs == [4, 5]
+
+
+def test_finalized_run_verifies_whole():
+    """A complete, sealed run verifies; the seal does not perturb a full set."""
+    gov = VaaraGovernance()
+    for i in range(6):
+        gov.before_tool_call(_ctx(tool_input={"i": i}))
+    gov.finalize_run("crew-1")
+
+    report = gov.verify_run("crew-1")
+    assert report.ok
+    assert report.present == 6
+    assert report.expected == 6
+    assert report.missing_seqs == []
+
+
+def test_tail_drop_with_seal_also_removed_is_the_residual():
+    """The irreducible limit: a suffix drop that also suppresses the sealing
+    record stays invisible from the held set alone. An external anchor (an
+    rfc3161 timestamp over the run) is what closes this; the held set cannot."""
+    gov = VaaraGovernance()
+    for i in range(6):
+        gov.before_tool_call(_ctx(tool_input={"i": i}))
+    gov.finalize_run("crew-1")
+
+    held = gov.decisions("crew-1")
+    kept = [d for d in held if d["seq"] < 4]  # drop last two AND withhold seal
+    evidence = [
+        {"completeness": d["extensions"]["vaara"]["completeness"]} for d in kept
+    ]
+
+    report = verify_contiguity(evidence, "crew-1")
+    assert report.ok  # documents the residual, not an endorsement
     assert report.present == 4
     assert report.expected == 4
+
+
+def test_seal_alone_flags_a_fully_dropped_run():
+    """A seal asserting N over zero held records is a fully-dropped run."""
+    evidence = [
+        {"completeness": {"boundaryId": "crew-1", "sealed": True, "total": 3}}
+    ]
+    report = verify_contiguity(evidence, "crew-1")
+    assert not report.ok
+    assert report.present == 0
+    assert report.expected == 3
+    assert report.missing_seqs == [0, 1, 2]
 
 
 def test_receipts_recompute():
