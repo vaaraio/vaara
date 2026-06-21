@@ -4,6 +4,16 @@ All notable changes to this project are documented here.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/)
 and this project follows [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [1.4.0] - 2026-06-21
+
+Minor release: gap-evident completeness. An authorization receipt can carry a signed, gap-free sequence number and running count within its coverage boundary, so a dropped receipt inside that boundary becomes a provable gap from the held receipts alone, with no appeal to the issuer's logs.
+
+- Authorization receipts can now carry an optional completeness block: a per-boundary sequence number and a running count, both signed under the same receipt signature. Issuance assigns them gap-free at the chokepoint, so consecutive receipts from one boundary carry consecutive numbers. A missing number is then a missing receipt, recomputable from the stream itself rather than asserted by whoever held the log. The block is absent by default; coverage-free receipts and the existing conformance vectors stay byte-identical.
+- Added `vaara verify-contiguity`, which reads a stream of authorization receipts and reports the gaps: every boundary whose sequence numbers skip, with the exact missing range named. A clean run proves the held receipts are contiguous within each declared boundary; a gap names what is absent instead of leaving silence to be explained away.
+- Published the `contiguity_v0` conformance vectors with an independent checker, so a third party can confirm the gap math without running Vaara.
+- An honest limit, documented in the spec, the test, and the vector README: contiguity catches a drop between two held receipts, not a truncated tail. Numbers run in memory at the chokepoint; binding the running count into the timestamp anchor is deferred to a later release.
+- Secondary: the README and `SPEC.md` no longer assume a single deployment root, and `docs/PRIOR_ART.md` is current as of this release.
+
 ## [1.3.1] - 2026-06-20
 
 Patch release: documentation only. Records the Agent Authorization Envelope (AAE) in prior art.
