@@ -11,6 +11,12 @@ document. Downstream specifications (a payment rail, a compliance regime, a
 framework integration) define *profiles* that pin to a version of this document
 and add only their own evidence schema; they do not redefine the envelope.
 
+The receipt's trust is root-agnostic. The same record is verifiable with or
+without a hardware TEE and re-expressible as an IETF RATS EAR (AR4SI vector),
+whether rooted in a TPM 2.0 host, an AMD SEV-SNP confidential VM, or software
+alone. The signature and the optional external time anchor carry the evidence,
+not a single trust root.
+
 The key words MUST, MUST NOT, REQUIRED, SHOULD, MAY are to be interpreted as in
 RFC 2119.
 

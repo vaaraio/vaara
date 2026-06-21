@@ -85,6 +85,7 @@ Each verdict carries the threshold-versus-observed snapshot, the rationale, and 
 - **Article-level EU AI Act evidence**, honest about the gaps instead of papering over them.
 - **Governance of the model call itself**, not only the tools around it: a hardware-rooted inference receipt that a second, different local model cross-checks. This is the sovereign inference harness, new in v1.0.
 - **Enforcement, not only a record** (v1.1.0): a credential broker mints a signed, short-lived credential bound to the attestation digest and scoped to one tool, its argument commitment, and tenant, with typed capability scopes that bound what a call may do. A gateway in front of a protected tool refuses any call without a valid, attestation-bound grant, so a bypass stops being silent. Off by default.
+- **Gap-evident completeness** (v1.4.0): each authorization receipt can carry a signed per-boundary sequence and running count, so a dropped receipt inside a declared boundary is a provable gap from the held receipts alone, with no issuer access and no external witness (`vaara verify-contiguity`). Off by default.
 
 ## Where it plugs in
 
@@ -131,6 +132,7 @@ Method and per-cell breakdown: [docs/architecture.md](docs/architecture.md) and 
 - **[SEP-2828](https://github.com/modelcontextprotocol/modelcontextprotocol/pull/2828)** signed execution records and **SEP-2787** request-attestation test vectors, in the MCP standards process. A second independent implementation has reproduced the SEP-2828 conformance vectors from a clean checkout with no shared code.
 - **OVERT 1.0** ([overt.is](https://overt.is/)): Vaara is the Arbiter and emits Protocol Profile 1.0 Base Envelopes (canonical CBOR, Ed25519) alongside every record when attestation is on.
 - **Post-quantum**: an optional parallel ML-DSA-65 / FIPS 204 signature over the same preimage, so a stripped post-quantum signature is a detectable downgrade rather than a silent loss.
+- **Root-agnostic evidence**: the same Article 12 record is provable with or without a hardware TEE and re-expressible as an IETF RATS EAR (AR4SI vector), whether rooted in a TPM 2.0 host, an AMD SEV-SNP confidential VM, or no TEE at all.
 - **Sovereign inference harness** (v1.0): a local model behind a signing proxy that emits a hardware-rooted inference receipt a second local model cross-checks. Developed privately, published here under AGPL-3.0.
 
 Details and the offline checkers for each: [docs/standards.md](docs/standards.md).

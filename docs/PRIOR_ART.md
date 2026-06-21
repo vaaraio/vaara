@@ -76,6 +76,8 @@ verify against the PyPI history and the `vX.Y.Z` git tags regardless of license 
 | Canonical `vaara.receipt/v1` parent spec, with the x402 settlement binding and the eIDAS qualified-timestamp profile as downstream profiles that pin to it rather than competing formats | v1.2.0, 2026-06-19 | `SPEC.md`, `CHANGELOG.md` v1.2.0 |
 | Self-hosted RFC 3161 timestamp anchors minted offline in pure Python, with `anchoredDigest` equal to the sha256 of the JCS-canonical signed payload, verified through the existing offline anchor verifier | v1.2.0, 2026-06-19 | `src/vaara/audit/receipt_anchor.py` |
 | Typed capability scopes on credential grants (`le`/`ge`/`in`/`eq`) with closed coverage, bounding what a tool call may do rather than only pinning an exact argument set | v1.2.0, 2026-06-19 | `src/vaara/credential/_grant_capability.py` |
+| Proof-carrying enforcement at the MCP proxy: an allowed `tools/call` mints a signed, independently recomputable authorization receipt next to the grant, carrying a signed coverage boundary (chokepoint identity, capability-surface fingerprint, scope literal) so an absent refusal reads against a declared scope rather than silence (off by default) | v1.3.0, 2026-06-20 | `src/vaara/integrations/_mcp_attest.py`, `src/vaara/credential/`, `tests/vectors/authorization_v0/` |
+| Gap-evident completeness: a signed per-boundary sequence and running count on each authorization receipt make a dropped receipt a provable gap from the held receipts alone, with no issuer access and no external witness (`verify-contiguity`), with public conformance vectors (off by default) | v1.4.0, 2026-06-21 | `src/vaara/credential/_contiguity.py`, `tests/vectors/contiguity_v0/`, `SPEC.md` |
 
 The `CHANGELOG.md` entry for each version carries the substantive
 description and, where relevant, the failure mode that motivated the
@@ -248,6 +250,20 @@ than a judgment of the work.
   Interlock detects drift; Vaara emits the signed, content-addressed
   record the drift check resolves against. Listed as adjacent and
   interoperating.
+- **TRACE (Opaque Systems).** Distributed with the open
+  `microsoft/agent-governance-toolkit`; surfaced 2026-06-21, announced for
+  launch at the Confidential Computing Summit on 2026-06-23. An Entity
+  Attestation Token (EAT) governance record for agent actions, with
+  completeness scoped to a per-session call count and a planned SCITT
+  transparency log. Its own `LIMITATIONS.md` states that the software-only
+  tier does not by itself meet EU AI Act Article 12 or DORA, and that
+  compliance-grade trust requires a hardware TEE. Vaara's comparable evidence
+  is root-agnostic: an Article-12 record is provable with or without a TEE and
+  re-expressible as an IETF RATS EAR carrying an AR4SI vector (v0.71.0,
+  2026-06-16), externally time-anchored over RFC 3161 / eIDAS (v0.48.0,
+  2026-05-31; self-hosted v1.2.0, 2026-06-19), with gap-evident completeness
+  verifiable from the held receipts alone (v1.4.0, 2026-06-21). Listed as
+  adjacent.
 
 ### Classical foundations
 
