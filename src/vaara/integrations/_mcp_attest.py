@@ -85,6 +85,12 @@ class AttestPairEmitter:
         self._secret_version = secret_version
         self._exp_seconds = exp_seconds
         self._counter = 0
+        # Per-coverage-boundary sequence for authorization receipts, gap-free by
+        # construction. Distinct from ``_counter`` (the per-call attestation id):
+        # this ticks once per authorization receipt actually persisted, so the
+        # stream of receipts under a boundary is 0..N-1 contiguous and a missing
+        # seq is a provable gap. Guarded by ``_lock``.
+        self._completeness: dict[str, int] = {}
         self._lock = threading.Lock()
         # cmd-hash fingerprints pre-computed at construction; upgraded to
         # manifest-hash on first tools/list response per upstream.
@@ -256,6 +262,27 @@ class AttestPairEmitter:
             logger.exception("Credential grant emission failed for tool=%r", tool_name)
             return None
 
+    def _next_completeness(self, boundary_id: str) -> tuple[int, int]:
+        """Assign the next gap-free sequence number for a coverage boundary.
+
+        Returns ``(seq, running_count)`` where ``seq`` is a monotonic 0-based
+        index scoped to ``boundary_id`` and ``running_count == seq + 1`` is the
+        count of receipts issued under the boundary up to and including this one.
+        Assigned under ``_lock`` so concurrent calls never share or skip a number.
+
+        The number is consumed at assignment, before the receipt is signed and
+        written. So a write that fails after this returns leaves that ``seq`` with
+        no persisted receipt, which surfaces downstream as a gap. That is the
+        intended reading: a missing ``seq`` means a receipt that should exist does
+        not, whether it was never persisted here or dropped later. The sequence
+        does not roll back, because under concurrency a later call may already
+        hold ``seq + 1``.
+        """
+        with self._lock:
+            seq = self._completeness.get(boundary_id, 0)
+            self._completeness[boundary_id] = seq + 1
+            return seq, seq + 1
+
     def emit_authorization_receipt(
         self,
         *,
@@ -306,6 +333,17 @@ class AttestPairEmitter:
                 "scope": _COVERAGE_SCOPE,
             }
 
+            # Completeness: a gap-free per-boundary sequence and running count,
+            # scoped to the same boundary the coverage block names. Assigned here
+            # so seq/runningCount ride inside the signed evidence, making a dropped
+            # receipt within the boundary a provable gap (no external witness).
+            seq, running_count = self._next_completeness(_ISS)
+            completeness = {
+                "boundaryId": _ISS,
+                "seq": seq,
+                "runningCount": running_count,
+            }
+
             auth = mint_authorization_receipt(
                 credential=credential,
                 runtime_args=runtime_args,
@@ -316,6 +354,7 @@ class AttestPairEmitter:
                 alg=self._alg,
                 signing_material=self._signing_key,
                 coverage=coverage,
+                completeness=completeness,
             )
 
             nonce_tag = attestation.issuer_asserted.nonce[:8]
