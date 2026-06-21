@@ -87,6 +87,7 @@ def build_authorization_evidence(
     runtime_args: Any,
     verdict: GrantVerdict,
     coverage: Optional[dict[str, Any]] = None,
+    completeness: Optional[dict[str, Any]] = None,
 ) -> dict[str, Any]:
     """Build the ``vaara.authorization/v0`` evidence record for one decision.
 
@@ -104,6 +105,16 @@ def build_authorization_evidence(
     boundary" rather than "not observed". A recomputing auditor reads the verdict
     against the same declared scope. Omitted (the default) when no boundary is
     asserted, keeping the record byte-identical to a coverage-free decision.
+
+    ``completeness``, when supplied, carries a monotonic per-boundary ``seq`` and
+    the ``runningCount`` of receipts issued under that boundary up to and
+    including this one. Both ride inside the content-addressed evidence, so they
+    are pinned by ``evidenceRef.digest`` and travel under the receipt's
+    signature. Because the issuer assigns ``seq`` gap-free by construction, a
+    missing sequence number in an exported set is a provable gap, and the latest
+    ``runningCount`` makes a short set self-evidently incomplete, with no
+    external witness required. Omitted (the default) when no boundary asserts a
+    sequence, keeping the record byte-identical to a completeness-free decision.
     """
     record: dict[str, Any] = {
         "schema": AUTHORIZATION_SCHEMA,
@@ -120,6 +131,8 @@ def build_authorization_evidence(
         ]
     if coverage:
         record["coverage"] = coverage
+    if completeness:
+        record["completeness"] = completeness
     return record
 
 
@@ -169,6 +182,7 @@ def mint_authorization_receipt(
     policy_id: Optional[str] = None,
     ref: Optional[str] = None,
     coverage: Optional[dict[str, Any]] = None,
+    completeness: Optional[dict[str, Any]] = None,
 ) -> AuthorizationReceipt:
     """Mint a signed authorization receipt for one gateway verdict.
 
@@ -181,13 +195,16 @@ def mint_authorization_receipt(
 
     ``coverage`` states the observation boundary the decision was made under and
     is folded into the evidence record so the boundary is named in the trace and
-    travels under the same signature.
+    travels under the same signature. ``completeness`` carries the per-boundary
+    ``seq`` and ``runningCount`` for the same purpose, making a dropped receipt
+    inside the boundary a provable gap.
     """
     evidence = build_authorization_evidence(
         credential=credential,
         runtime_args=runtime_args,
         verdict=verdict,
         coverage=coverage,
+        completeness=completeness,
     )
     evidence_ref = EvidenceRef(
         digest=_digest(evidence),
@@ -230,6 +247,7 @@ def mint_for_signer(
     policy_id: Optional[str] = None,
     ref: Optional[str] = None,
     coverage: Optional[dict[str, Any]] = None,
+    completeness: Optional[dict[str, Any]] = None,
 ) -> AuthorizationReceipt:
     """Mint an authorization receipt using a :class:`ReceiptSigner` bundle."""
     return mint_authorization_receipt(
@@ -246,4 +264,5 @@ def mint_for_signer(
         policy_id=policy_id,
         ref=ref,
         coverage=coverage,
+        completeness=completeness,
     )
