@@ -309,6 +309,10 @@ class VaaraGovernance:
         # pairing only attaches outcomes. A context-carried request id (or the
         # PR #6030 decision_id round-trip) would make it exact.
         self._pending: dict[tuple[str, str, str], deque[str]] = {}
+        # Per-boundary sealing record, set by ``finalize_run``. Optional: a run
+        # that is never finalized verifies exactly as before, minus tail-drop
+        # detection.
+        self._seals: dict[str, dict[str, Any]] = {}
 
     # -- hooks ---------------------------------------------------------------
 
@@ -461,7 +465,52 @@ class VaaraGovernance:
             for d in self.decisions(boundary_id)
             if "vaara" in d.get("extensions", {})
         ]
+        with self._lock:
+            if boundary_id is None:
+                seals = list(self._seals.values())
+            else:
+                seal = self._seals.get(boundary_id)
+                seals = [seal] if seal is not None else []
+        for seal in seals:
+            evidence_records.append({"completeness": dict(seal)})
         return verify_contiguity(evidence_records, boundary_id)
+
+    def finalize_run(self, boundary_id: Optional[str] = None) -> dict[str, Any]:
+        """Seal a run: emit a terminal record pinning the final decision count.
+
+        ``running_count`` is per-record (``seq + 1``), so a truncated stream
+        still looks internally consistent and a dropped tail is invisible from
+        the held set alone. A sealing record carries the boundary's final total;
+        ``verify_run`` then flags a short set even when the missing records took
+        their own ``seq`` with them.
+
+        The irreducible residual: a suffix drop that *also* removes this seal
+        stays invisible from the held set alone. An external anchor (an rfc3161
+        timestamp minted over the run) closes that, and is recorded separately.
+
+        Returns the sealing completeness block so a holder can carry it beside
+        the decision stream. Re-sealing updates the total to the current count.
+        """
+        with self._lock:
+            if boundary_id is None:
+                known = list(self._counters)
+                if len(known) == 1:
+                    boundary_id = known[0]
+                elif not known:
+                    boundary_id = _DEFAULT_BOUNDARY
+                else:
+                    raise ValueError(
+                        "finalize_run needs an explicit boundary_id when the "
+                        "recorder spans more than one boundary"
+                    )
+            total = self._counters.get(boundary_id, 0)
+            seal: dict[str, Any] = {
+                "boundaryId": boundary_id,
+                "sealed": True,
+                "total": total,
+            }
+            self._seals[boundary_id] = seal
+            return dict(seal)
 
     # -- internals -----------------------------------------------------------
 

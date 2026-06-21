@@ -4,6 +4,11 @@ All notable changes to this project are documented here.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/)
 and this project follows [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [Unreleased]
+
+- The CrewAI completeness adapter can seal a run. `VaaraGovernance.finalize_run()` emits a terminal record that pins the boundary's final decision count, so a dropped tail shows as a provable gap even though the removed records took their own sequence number with them. This lifts the per-record running count (which alone cannot see a truncation) to catch a tail drop, and it addresses the v1.4.0 honest limit for this adapter. The sealing block is additive: a run that is never finalized verifies exactly as before, and the shared `verify-contiguity` path is byte-identical for streams that carry no seal.
+- The irreducible residual is documented in the code and tests: a suffix drop that also suppresses the sealing record stays invisible from the held set alone. An external anchor, the rfc3161 timestamp minted over the run, is what closes that; the held set cannot.
+
 ## [1.5.0] - 2026-06-21
 
 Minor release: an AP2 checkout binding profile. The actions an agent takes after an AP2 checkout settles can carry the same recomputable, gap-evident record as any other authorization decision, pinned to the checkout they followed.
