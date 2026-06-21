@@ -1,0 +1,42 @@
+{
+  "alg": "ES256",
+  "asserted": {
+    "expSeconds": 60,
+    "iat": "2026-06-18T12:00:00Z",
+    "iss": "vaara-mcp-proxy",
+    "nonce": "grant-nonce-1",
+    "secretVersion": "key-v1",
+    "sub": "tenant-a/upstream"
+  },
+  "binding": {
+    "attestationDigest": "sha256:abababababababababababababababababababababababababababababababab",
+    "attestationNonce": "att-nonce-xyz"
+  },
+  "capabilities": [
+    {
+      "arg": "amount",
+      "op": "le",
+      "value": "500"
+    },
+    {
+      "arg": "vendor",
+      "op": "in",
+      "value": [
+        "acme",
+        "globex"
+      ]
+    },
+    {
+      "arg": "destination",
+      "op": "eq",
+      "value": "0xABC"
+    }
+  ],
+  "scope": {
+    "argsCommitment": "sha256:2dbf913a8f549f545ea81d818f7d260475eb4f9f169dd061afe8b11bb213d180",
+    "tenantId": "tenant-a",
+    "toolName": "pay.send"
+  },
+  "signature": "96af75f913aaacface5f69b2121ea89cd88ea3e426585d2294701bd567469bd2c5989476f1b127c6528ba5ca284b27db1c7b939766e4e3ad8736d50ce36c872c",
+  "version": 1
+}
