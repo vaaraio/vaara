@@ -4,6 +4,14 @@ All notable changes to this project are documented here.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/)
 and this project follows [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [1.5.0] - 2026-06-21
+
+Minor release: an AP2 checkout binding profile. The actions an agent takes after an AP2 checkout settles can carry the same recomputable, gap-evident record as any other authorization decision, pinned to the checkout they followed.
+
+- Added the AP2 checkout binding profile (`SPEC.md` Section 5.4). An AP2 Payment Evidence Frame (PEF, AP2 PR #274) is named by its content-addressed `frame_id` inside a `vaara.authorization/v0` receipt; the AP2 task scope is the coverage boundary; the signed completeness block makes a dropped post-checkout action a provable gap. So AP2 can pin to `vaara.receipt/v1` from the point the Checkout Receipt ends rather than define a new post-settlement primitive.
+- Published the `ap2_v0` conformance vectors with an independent checker (standard library plus `cryptography` and `rfc8785`, no Vaara import). It recomputes the PEF `frame_id` and `receipt_hash`, confirms every receipt names the checkout, resolves the evidence bindings and signatures, and re-runs the contiguity check over the post-checkout stream. The same streams verify through the shipped `vaara verify-contiguity` CLI. Same JCS / RFC 8785 canonicalization as the PEF and the rest of the envelope, so the address joins with no re-canonicalization.
+- Secondary: scaffolded an Internet-Draft of `vaara.receipt/v1` under `ietf/` (`draft-sirkkavaara-vaara-receipt-00`, xml2rfc v3 source), a citable, vendor-neutral rendering of the canonical spec. Docs only; no change to the published package surface.
+
 ## [1.4.0] - 2026-06-21
 
 Minor release: gap-evident completeness. An authorization receipt can carry a signed, gap-free sequence number and running count within its coverage boundary, so a dropped receipt inside that boundary becomes a provable gap from the held receipts alone, with no appeal to the issuer's logs.
