@@ -181,3 +181,41 @@ def test_evidence_names_the_capabilities_the_verdict_used(key):
     assert auth.evidence["tenantId"] == "tenant-a"
     caps = auth.evidence["capabilities"]
     assert {c["arg"] for c in caps} == {"amount", "vendor", "destination"}
+
+
+def test_completeness_block_is_absent_by_default(key):
+    # A decision with no asserted sequence stays byte-identical to before:
+    # the completeness block must not appear unless the issuer supplies one.
+    cred = _grant(key)
+    verdict = _verdict(cred, key, RUNTIME_OK)
+    auth = _mint(cred, key, verdict, RUNTIME_OK)
+    assert "completeness" not in auth.evidence
+
+
+def test_completeness_block_rides_under_the_signature(key):
+    # seq + runningCount travel inside the content-addressed evidence, so they
+    # are pinned by evidenceRef.digest and covered by the receipt signature.
+    cred = _grant(key)
+    verdict = _verdict(cred, key, RUNTIME_OK)
+    completeness = {"boundaryId": "vaara-mcp-proxy", "seq": 0, "runningCount": 1}
+    auth = mint_authorization_receipt(
+        credential=cred,
+        runtime_args=RUNTIME_OK,
+        verdict=verdict,
+        iss="vaara-mcp-proxy",
+        sub="tenant-a/upstream",
+        secret_version="key-v1",
+        alg="ES256",
+        signing_material=key,
+        decided_at="2026-06-18T12:00:05Z",
+        completeness=completeness,
+    )
+    assert auth.evidence["completeness"] == completeness
+    # Pinned by the evidence digest and verifiable against the issuer key alone.
+    assert auth.record.decision_derived.evidence_ref.digest == _digest(auth.evidence)
+    assert verify_decision_signature(auth.record, verifying_material=key.public_key())
+
+    # Tampering with the running count breaks the digest binding.
+    tampered = dict(auth.evidence)
+    tampered["completeness"] = {"boundaryId": "vaara-mcp-proxy", "seq": 0, "runningCount": 2}
+    assert _digest(tampered) != auth.record.decision_derived.evidence_ref.digest
