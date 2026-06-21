@@ -223,7 +223,7 @@
 
       <section anchor="registry" numbered="true">
         <name>Registry</name>
-        <t>Both profiles below pin to vaara.receipt/v1. Vector paths are relative
+        <t>The profiles below pin to vaara.receipt/v1. Vector paths are relative
         to the source repository (<xref target="VAARA-REPO"/>).</t>
         <table anchor="profile-registry">
           <name>Profile registry</name>
@@ -233,6 +233,7 @@
           <tbody>
             <tr><td>x402 settlement binding</td><td>x402.settlement.*/v0</td><td>tests/vectors/x402_settlement_v0/</td></tr>
             <tr><td>authorization decision</td><td>vaara.authorization/v0</td><td>tests/vectors/authorization_v0/, tests/vectors/contiguity_v0/</td></tr>
+            <tr><td>AP2 checkout binding</td><td>vaara.authorization/v0 (names AP2 PEF frame_id)</td><td>tests/vectors/ap2_v0/</td></tr>
           </tbody>
         </table>
       </section>
@@ -322,6 +323,38 @@
         held count is then k + 1. Closing it is the job of an rfc3161 anchor over
         the running count (<xref target="anchors"/>), which attests that at time T,
         N receipts existed under the boundary.</t>
+      </section>
+      <section anchor="profile-ap2" numbered="true">
+        <name>Profile Example: AP2 Checkout Binding</name>
+        <t>This profile binds an AP2 checkout to the post-checkout agent actions a
+        credential broker authorizes, so the actions taken after a payment settles
+        carry the same recomputable, gap-evident record as the authorization
+        decisions in <xref target="profile-authz"/>. It reuses the
+        vaara.authorization/v0 evidence record unchanged and adds a join to the AP2
+        Payment Evidence Frame (PEF, AP2 PR #274):</t>
+        <ul>
+          <li>The AP2 checkout emits a PEF whose frame_id = sha256(JCS(frame)),
+          with frame_id and signature excluded from the preimage, and whose
+          receipt_hash = sha256(JCS(receipt)) content-addresses the wrapped
+          Checkout Receipt. Canonicalization is
+          urn:x402:canonicalisation:jcs-rfc8785-v1 (JCS / RFC 8785), the same as
+          this envelope, so the address joins with no re-canonicalization.</li>
+          <li>Each post-checkout authorization receipt names the checkout it
+          followed by content address: decisionDerived.evidenceRef.ref =
+          ap2:checkout/&lt;frame_id&gt;, under the receipt signature. The AP2 task
+          scope is the coverage.boundary (<xref target="profile-authz"/>), and the
+          completeness block sequences the actions under it.</li>
+        </ul>
+        <t>The identity of the checkout is the PEF frame_id, a content address the
+        payment side already computes; the completeness of the actions taken under
+        it is the vaara.authorization/v0 contiguity stream. A per-action hash says
+        an action was recorded; the running count says none inside the AP2 task
+        boundary was dropped. A third party recomputes the frame address, confirms
+        every receipt names that checkout, resolves each evidence binding, verifies
+        each signature, and re-runs the gap check, with only the PEF and the held
+        receipts in hand. See tests/vectors/ap2_v0/_check_independent.py. AP2 can
+        pin from the point the Checkout Receipt ends rather than define a new
+        post-settlement primitive.</t>
       </section>
     </section>
     <section anchor="conformance" numbered="true">
