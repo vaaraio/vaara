@@ -6,7 +6,14 @@ and this project follows [Semantic Versioning](https://semver.org/spec/v2.0.0.ht
 
 ## [Unreleased]
 
-- The sealing record can carry the boundary's highest action class. `VaaraGovernance.finalize_run(max_class=...)` adds an optional `maxClass` to the seal, and `verify-contiguity` surfaces it as `worst_case_class`. A gap proves a record is absent but not what it would have authorized; when the reading is worst-case-governs, `maxClass` bounds it: a missing record could have authorized an action of at most that class, computed from the held set and the seal alone with no issuer. The field is optional and additive: a seal that names no class verifies exactly as before, and the gap report stays silent on the worst case. `SPEC.md` Section 5.3 carries the field; the published I-D resyncs at its next revision.
+## [1.7.0] - 2026-06-22
+
+Minor release: the sealing record can carry the boundary's highest action class, so a gap's worst case is read from the held set alone. This makes the worst-case-governs reading a recomputable value rather than a posture the holder applies by hand.
+
+- The sealing record can carry the boundary's highest action class. `VaaraGovernance.finalize_run(max_class=...)` adds an optional `maxClass` to the seal, and `verify-contiguity` surfaces it as `worst_case_class`. A gap proves a record is absent but not what it would have authorized; when the reading is worst-case-governs, `maxClass` bounds it: a missing record could have authorized an action of at most that class, computed from the held set and the seal alone with no issuer. The issuer commits the max at seal time and the verifier reads it back; no ordering is computed over class labels downstream.
+- The field is optional and additive: a seal that names no class verifies exactly as before, and a stream carrying no seal is byte-identical on the shared `verify-contiguity` path. The gap report stays silent on the worst case when no class is sealed.
+- The honest scope is documented in code, tests, and the spec: the sealed max buys the honest-issuer case where the agent trims its own tail, because the commit precedes the drop. An issuer that under-seals a low max over a boundary that reached higher is a dishonest issuer, which falls to reconciliation against the log, not to the seal.
+- `SPEC.md` Section 5.3 carries the field; the published I-D resyncs at its next revision.
 
 ## [1.6.0] - 2026-06-22
 
