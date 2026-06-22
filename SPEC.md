@@ -128,6 +128,7 @@ defines only its own evidence record (the `schema` and contents behind
 | x402 settlement binding | `x402.settlement.*/v0` | `vaara.receipt/v1` | `tests/vectors/x402_settlement_v0/` |
 | authorization decision | `vaara.authorization/v0` | `vaara.receipt/v1` | `tests/vectors/authorization_v0/`, `tests/vectors/contiguity_v0/` |
 | AP2 checkout binding | `vaara.authorization/v0` (names AP2 PEF `frame_id`) | `vaara.receipt/v1` | `tests/vectors/ap2_v0/` |
+| TAP request binding | `tap.request/v0` | `vaara.receipt/v1` | `tests/vectors/tap_v0/` |
 
 ### 5.2 Profile example: x402 settlement binding
 
@@ -248,6 +249,35 @@ checkout, resolves each evidence binding, verifies each signature, and re-runs
 the gap check, with only the PEF and the held receipts in hand. See
 `tests/vectors/ap2_v0/_check_independent.py`. AP2 can pin from the point the
 Checkout Receipt ends rather than define a new post-settlement primitive.
+
+### 5.5 Profile example: TAP request binding
+
+This profile binds a Visa Trusted Agent Protocol (TAP) request to the action a
+trusted agent takes under it, across the action lifecycle, so the
+post-authorization record is the same recomputable evidence as any other
+decision receipt. It adds a TAP request evidence record (`schema` =
+`tap.request/v0`) whose JCS digest is the receipt's `evidenceRef.digest`, and the
+join key `actionRef` = `sha256(JCS({agentId, actionType, scope, timestampMs,
+seq, terminal}))` carried on the request:
+
+- The trusted agent presents the TAP request to the relying party. The decision
+  receipt names it by content address: `decisionDerived.evidenceRef.digest` =
+  `sha256(JCS(request))`, `decisionDerived.evidenceRef.ref` =
+  `tap:request/<actionRef>`, both under the receipt signature. Canonicalization
+  is JCS / RFC 8785, the same as this envelope, so the address joins with no
+  re-canonicalization.
+- The lifecycle lives in the join key. Because the action tuple covers
+  `terminal`, the in-progress (`terminal: false`) request has a different
+  `actionRef` than the final (`terminal: true`) one, and the in-progress receipt
+  does not resolve against the terminal request. A mid-action receipt cannot be
+  presented where the final one is required.
+
+The verdict is recomputable offline. A third party recomputes the action ref,
+resolves the request binding, and verifies the signature with only the TAP
+request, the held receipts, and the issuer's public key, with the TAP service
+offline and no live verifier endpoint to trust. See
+`tests/vectors/tap_v0/_check_independent.py`. TAP can pin to `vaara.receipt/v1`
+for the post-authorization record rather than define a new primitive.
 
 ## 6. Conformance
 
