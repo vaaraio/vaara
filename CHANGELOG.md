@@ -6,6 +6,8 @@ and this project follows [Semantic Versioning](https://semver.org/spec/v2.0.0.ht
 
 ## [Unreleased]
 
+- The sealing record can carry the boundary's highest action class. `VaaraGovernance.finalize_run(max_class=...)` adds an optional `maxClass` to the seal, and `verify-contiguity` surfaces it as `worst_case_class`. A gap proves a record is absent but not what it would have authorized; when the reading is worst-case-governs, `maxClass` bounds it: a missing record could have authorized an action of at most that class, computed from the held set and the seal alone with no issuer. The field is optional and additive: a seal that names no class verifies exactly as before, and the gap report stays silent on the worst case. `SPEC.md` Section 5.3 carries the field; the published I-D resyncs at its next revision.
+
 ## [1.6.0] - 2026-06-22
 
 Minor release: a Visa Trusted Agent Protocol (TAP) request binding profile, plus run sealing for the CrewAI completeness adapter. A TAP request becomes the evidence a decision receipt names across the action lifecycle, so an in-progress receipt cannot stand in for the terminal one. A finalized CrewAI run seals its decision count, so a dropped tail shows as a provable gap.

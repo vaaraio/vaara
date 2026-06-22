@@ -28,6 +28,12 @@ class ContiguityReport:
     run with consistent running counts and no duplicates. ``missing_seqs`` names
     the gaps; ``expected`` is the count the latest receipt asserts exists, so a
     short set reports the tail it is missing.
+
+    ``worst_case_class`` is the ``maxClass`` a sealing record carried, when one
+    did: the highest action class the boundary authorized. A dropped record took
+    its own contents with it, so the most a gap could have hidden is an action of
+    this class. It lets a holder bound a gap's worst case from the held set
+    alone, with no issuer. ``None`` when no seal named a class.
     """
 
     boundary_id: str
@@ -37,6 +43,7 @@ class ContiguityReport:
     duplicate_seqs: list[int]
     count_mismatches: list[dict[str, int]]
     ok: bool
+    worst_case_class: Optional[str] = None
 
     def gap_report(self) -> str:
         """A short human-readable verdict naming any gaps."""
@@ -53,6 +60,11 @@ class ContiguityReport:
         )
         if self.missing_seqs:
             lines.append(f"  missing seq: {_compact(self.missing_seqs)}")
+            if self.worst_case_class is not None:
+                lines.append(
+                    f"  gap worst-case: action class up to "
+                    f"{self.worst_case_class!r} may be unrecorded"
+                )
         if self.duplicate_seqs:
             lines.append(f"  duplicate seq: {_compact(self.duplicate_seqs)}")
         for mm in self.count_mismatches:
@@ -122,7 +134,9 @@ def verify_contiguity(
 
     An optional sealing block (``{"sealed": True, "total": N}``) finalizes a run
     and lets a dropped tail be caught; without it, dropping the last record(s)
-    is invisible from the held set alone. See the inline note below.
+    is invisible from the held set alone. See the inline note below. The seal may
+    also carry ``maxClass`` (the highest action class the boundary authorized),
+    surfaced as ``worst_case_class`` so a gap's worst case is read held-set-alone.
     """
     boundary, blocks = _completeness_records(evidence_records, boundary_id)
     # A sealing block (``{"sealed": True, "total": N}``) pins the run length
@@ -136,6 +150,18 @@ def verify_contiguity(
     sealed_total = max(
         (int(b["total"]) for b in blocks if b.get("sealed")), default=0
     )
+    # The seal may name the boundary's highest action class. A gap could have
+    # hidden an action of at most this class, so it bounds the worst case from
+    # the held set alone. Class labels carry no generic ordering here, so we
+    # surface the first one a seal asserts (one seal per boundary in practice).
+    worst_case_class = next(
+        (
+            str(b["maxClass"])
+            for b in blocks
+            if b.get("sealed") and b.get("maxClass") is not None
+        ),
+        None,
+    )
 
     if not seq_blocks:
         # Nothing but a possible seal. A seal asserting N over zero held records
@@ -148,6 +174,7 @@ def verify_contiguity(
             duplicate_seqs=[],
             count_mismatches=[],
             ok=(sealed_total == 0),
+            worst_case_class=worst_case_class,
         )
 
     seqs = [int(b["seq"]) for b in seq_blocks]
@@ -183,4 +210,5 @@ def verify_contiguity(
         duplicate_seqs=duplicate_seqs,
         count_mismatches=count_mismatches,
         ok=ok,
+        worst_case_class=worst_case_class,
     )

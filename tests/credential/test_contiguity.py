@@ -123,3 +123,41 @@ def test_gap_report_compacts_ranges():
     assert not report.ok
     assert report.missing_seqs == [3, 4, 5, 8]
     assert "missing seq: 3-5, 8" in report.gap_report()
+
+
+def _seal(total: int, boundary: str = BOUNDARY, max_class: str | None = None) -> dict:
+    """A terminal sealing record pinning the run length (and optional max class)."""
+    completeness: dict = {"boundaryId": boundary, "sealed": True, "total": total}
+    if max_class is not None:
+        completeness["maxClass"] = max_class
+    return {"schema": "vaara.authorization/v0", "completeness": completeness}
+
+
+def test_seal_max_class_bounds_a_gap_worst_case():
+    # Seal asserts 5 receipts and that the boundary's highest action class is
+    # "transfer". Drop the tail (seqs 3,4): the held set alone now both proves
+    # the gap and bounds its worst case.
+    stream = _stream(3) + [_seal(5, max_class="transfer")]
+    report = verify_contiguity(stream)
+    assert not report.ok
+    assert report.missing_seqs == [3, 4]
+    assert report.worst_case_class == "transfer"
+    assert "gap worst-case: action class up to 'transfer'" in report.gap_report()
+
+
+def test_seal_without_max_class_leaves_worst_case_unset():
+    stream = _stream(3) + [_seal(5)]
+    report = verify_contiguity(stream)
+    assert not report.ok
+    assert report.worst_case_class is None
+    assert "worst-case" not in report.gap_report()
+
+
+def test_max_class_surfaces_on_a_complete_run():
+    # A seal's class rides along even when the run is whole; there is just no gap
+    # for it to bound, and the gap-report stays quiet.
+    stream = _stream(5) + [_seal(5, max_class="refund")]
+    report = verify_contiguity(stream)
+    assert report.ok
+    assert report.worst_case_class == "refund"
+    assert "worst-case" not in report.gap_report()

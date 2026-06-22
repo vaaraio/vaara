@@ -182,7 +182,9 @@ machine reason (`capability_exceeded`, `binding_unknown`, `missing_credential`,
   block (`{boundaryId, sealed: true, total: N}`) that pins the boundary's final
   count independently of the per-record sequence. It is additive and emitted once
   the boundary is closed; a boundary that is never sealed verifies exactly as
-  before, with the seal absent and the stream byte-identical.
+  before, with the seal absent and the stream byte-identical. The seal may also
+  carry `maxClass`, the highest action class the boundary authorized; it bounds a
+  gap's worst case (see Section 5.3) and is itself optional.
 
 A verdict is only as meaningful as what the issuer could see. `allow` over an
 unbounded surface and `allow` over a stated one are identical bytes with
@@ -221,6 +223,13 @@ anchor over the running count (Section 4), which attests that at time T, N recei
 existed under the boundary. The layering is `seq` for order, the hash chain for
 tamper-evidence, the sealing record for a truncated tail, and the timestamp anchor
 for the seal-suppressed residual.
+
+A gap proves that a record is absent but not what it would have authorized. When
+worst-case-governs is the reading, the seal's optional `maxClass` bounds it: it
+names the highest action class the boundary authorized, so a missing record could
+have authorized an action of at most that class. The verifier surfaces this as
+`worstCaseClass`, computed from the held set and the seal alone, with no issuer.
+The field is optional; absent it, a gap reports only that a record is missing.
 
 ### 5.4 Profile example: AP2 checkout binding
 

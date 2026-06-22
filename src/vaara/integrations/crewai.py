@@ -475,7 +475,11 @@ class VaaraGovernance:
             evidence_records.append({"completeness": dict(seal)})
         return verify_contiguity(evidence_records, boundary_id)
 
-    def finalize_run(self, boundary_id: Optional[str] = None) -> dict[str, Any]:
+    def finalize_run(
+        self,
+        boundary_id: Optional[str] = None,
+        max_class: Optional[str] = None,
+    ) -> dict[str, Any]:
         """Seal a run: emit a terminal record pinning the final decision count.
 
         ``running_count`` is per-record (``seq + 1``), so a truncated stream
@@ -483,6 +487,11 @@ class VaaraGovernance:
         the held set alone. A sealing record carries the boundary's final total;
         ``verify_run`` then flags a short set even when the missing records took
         their own ``seq`` with them.
+
+        ``max_class`` optionally pins the highest action class the boundary
+        authorized. It rides on the seal as ``maxClass`` so a reader bounds a
+        gap's worst case (a dropped record could have authorized an action of at
+        most this class) from the held set alone. Omitted, the seal is unchanged.
 
         The irreducible residual: a suffix drop that *also* removes this seal
         stays invisible from the held set alone. An external anchor (an rfc3161
@@ -509,6 +518,8 @@ class VaaraGovernance:
                 "sealed": True,
                 "total": total,
             }
+            if max_class is not None:
+                seal["maxClass"] = str(max_class)
             self._seals[boundary_id] = seal
             return dict(seal)
 
