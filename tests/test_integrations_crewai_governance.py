@@ -162,6 +162,46 @@ def test_tail_drop_with_seal_also_removed_is_the_residual():
     assert report.expected == 4
 
 
+def test_finalize_run_can_pin_the_boundary_max_class():
+    """The seal optionally carries the boundary's highest action class, so a
+    gap's worst case is bounded from the held set alone. A dropped tail then
+    both shows as missing and reports the most it could have hidden."""
+    gov = VaaraGovernance()
+    for i in range(6):
+        gov.before_tool_call(_ctx(tool_input={"i": i}))
+    seal = gov.finalize_run("crew-1", max_class="transfer")
+    assert seal == {
+        "boundaryId": "crew-1",
+        "sealed": True,
+        "total": 6,
+        "maxClass": "transfer",
+    }
+
+    held = gov.decisions("crew-1")
+    kept = [d for d in held if d["seq"] < 4]  # drop the last two
+    evidence = [
+        {"completeness": d["extensions"]["vaara"]["completeness"]} for d in kept
+    ]
+    evidence.append({"completeness": seal})
+
+    report = verify_contiguity(evidence, "crew-1")
+    assert not report.ok
+    assert report.missing_seqs == [4, 5]
+    assert report.worst_case_class == "transfer"
+    assert "gap worst-case: action class up to 'transfer'" in report.gap_report()
+
+
+def test_finalize_run_without_max_class_is_unchanged():
+    """The class is opt-in: omit it and the seal is byte-for-byte as before."""
+    gov = VaaraGovernance()
+    for i in range(3):
+        gov.before_tool_call(_ctx(tool_input={"i": i}))
+    seal = gov.finalize_run("crew-1")
+    assert seal == {"boundaryId": "crew-1", "sealed": True, "total": 3}
+    assert "maxClass" not in seal
+    assert gov.verify_run("crew-1").worst_case_class is None
+
+
 def test_seal_alone_flags_a_fully_dropped_run():
     """A seal asserting N over zero held records is a fully-dropped run."""
     evidence = [
