@@ -6,6 +6,8 @@ and this project follows [Semantic Versioning](https://semver.org/spec/v2.0.0.ht
 
 ## [Unreleased]
 
+- Enforcement-time consumption of the sealed worst-case class: the v1.7.0 seal's `maxClass`, beyond bounding a gap at audit time, gates a chain recipient's own next unattended action. `enforce_on_sealed_class(...)` and the `vaara enforce-by-class` verb hold a policy set of permitted action classes and permit iff the sealed worst-case class is a member, failing closed when no class is sealed (exit 0 permit, 1 deny). It is a membership test, not an ordering over class labels (SPEC 5.3 computes no ordering). A permitted class permits even over a gap, since the seal bounds the gap at that class; the recipient consumes the committed bound and does not re-derive the chain or query a log. `SPEC.md` Section 5.3, `tests/vectors/class_gate_v0/` with an independent checker that imports no Vaara.
+
 ## [1.8.0] - 2026-06-22
 
 Minor release: one binding mechanism, not one per plane. The named profiles (x402, AP2, TAP) are instances of a single schema-agnostic binding. A verifier carrying an `external_execution_evidence` slot resolves it against a `vaara.receipt/v1` authorization receipt as the recomputable producer, and a new plane pins by naming its artifact through the slot with no new code. The completeness layer rides along, so a dropped record inside the boundary is still a provable gap.

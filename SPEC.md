@@ -239,6 +239,20 @@ have authorized an action of at most that class. The verifier surfaces this as
 `worstCaseClass`, computed from the held set and the seal alone, with no issuer.
 The field is optional; absent it, a gap reports only that a record is missing.
 
+Beyond bounding a gap at audit time, the sealed `maxClass` is consumable at
+enforcement time. A chain recipient gating its own next unattended action holds a
+policy set of action classes it will proceed under and permits iff the sealed
+worst-case class is a member of that set, failing closed when no class is sealed.
+This is a membership test, not an ordering: Section 5.3 computes no ordering over
+class labels, so the recipient asks "is the sealed class one I permit," never "is
+it at or below a ceiling." Because the seal bounds a gap's worst case at
+`maxClass`, a permitted class permits even when the boundary has a gap: the
+recipient consumes the committed bound and does not re-derive the chain or query a
+log. The bound is trustworthy under the honest issuer whose seal commits before any
+tail is trimmed; a seal that under-states the class is a reconciliation question
+against the issuer's log, not one this held-set-alone gate answers. The conformance
+vectors are in `tests/vectors/class_gate_v0/`.
+
 ### 5.4 Profile example: AP2 checkout binding
 
 This profile binds an AP2 checkout to the post-checkout agent actions a

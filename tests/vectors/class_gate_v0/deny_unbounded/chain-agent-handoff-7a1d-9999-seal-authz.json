@@ -1,0 +1,69 @@
+{
+  "evidence": {
+    "argsCommitment": "sha256:e3a62f3e1a45f98ad944348e0718aa79e7fa33478d9b3560bf7c9a71b5219d5c",
+    "capabilities": [
+      {
+        "arg": "region",
+        "op": "in",
+        "value": [
+          "EU",
+          "US"
+        ]
+      },
+      {
+        "arg": "items",
+        "op": "le",
+        "value": "10"
+      },
+      {
+        "arg": "orderRef",
+        "op": "eq",
+        "value": "cart-7a1d"
+      }
+    ],
+    "completeness": {
+      "boundaryId": "chain:agent-handoff-7a1d",
+      "sealed": true,
+      "total": 3
+    },
+    "coverage": {
+      "boundary": "chain:agent-handoff-7a1d",
+      "scope": "only steps in this handoff chain are observed"
+    },
+    "grantFingerprint": "sha256:b9fbf6799abf499a35a97dd82073cf25b891362a832fc19eea07658771e2e9b4",
+    "reason": "ok",
+    "schema": "vaara.authorization/v0",
+    "tenantId": "tenant-a",
+    "toolName": "handoff.dispatch",
+    "verdict": "allow"
+  },
+  "record": {
+    "alg": "ES256",
+    "backLink": {
+      "attestationDigest": "sha256:efefefefefefefefefefefefefefefefefefefefefefefefefefefefefefefef",
+      "attestationNonce": "att-nonce-classgate"
+    },
+    "decisionDerived": {
+      "decidedAt": "2026-06-22T15:00:05Z",
+      "decision": "allow",
+      "evidenceRef": {
+        "canonicalization": "JCS",
+        "digest": "sha256:d1c9340030a4344e93082b43e7ea62cb26f83741c99db61e562c4affe067133e",
+        "ref": "mcp:seal/chain:agent-handoff-7a1d",
+        "schema": "vaara.authorization/v0"
+      },
+      "policyId": "policy:vaara-credential-broker/1",
+      "reason": "ok"
+    },
+    "issuerAsserted": {
+      "alg": "ES256",
+      "iat": "2026-06-22T17:02:54Z",
+      "iss": "vaara-mcp-proxy",
+      "nonce": "seal-nonce-none",
+      "secretVersion": "key-v1",
+      "sub": "tenant-a/upstream"
+    },
+    "signature": "7a83dad57300e5e4f861cecde2539b7a675e4bc8036dbfe628ee60d3a5b49a538f9941b996b2490154c8b44c909bee0dcef353b5d942d863270ac603de9a90e8",
+    "version": 1
+  }
+}

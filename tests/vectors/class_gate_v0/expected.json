@@ -1,0 +1,60 @@
+{
+  "cases": {
+    "deny_class": {
+      "all_signatures_ok": true,
+      "contiguity": {
+        "expected": 3,
+        "missingSeqs": [],
+        "ok": true,
+        "present": 3
+      },
+      "permit": false,
+      "reason": "class_not_permitted",
+      "worstCaseClass": "tx.transfer"
+    },
+    "deny_unbounded": {
+      "all_signatures_ok": true,
+      "contiguity": {
+        "expected": 3,
+        "missingSeqs": [
+          1
+        ],
+        "ok": false,
+        "present": 2
+      },
+      "permit": false,
+      "reason": "unbounded_no_sealed_class",
+      "worstCaseClass": null
+    },
+    "permit": {
+      "all_signatures_ok": true,
+      "contiguity": {
+        "expected": 3,
+        "missingSeqs": [],
+        "ok": true,
+        "present": 3
+      },
+      "permit": true,
+      "reason": "permitted",
+      "worstCaseClass": "data.read"
+    },
+    "permit_gap_bounded": {
+      "all_signatures_ok": true,
+      "contiguity": {
+        "expected": 3,
+        "missingSeqs": [
+          1
+        ],
+        "ok": false,
+        "present": 2
+      },
+      "permit": true,
+      "reason": "permitted",
+      "worstCaseClass": "data.read"
+    }
+  },
+  "permittedClasses": [
+    "data.read",
+    "data.write"
+  ]
+}

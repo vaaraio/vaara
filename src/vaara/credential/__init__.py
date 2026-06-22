@@ -22,7 +22,12 @@ from vaara.credential._authorization_receipt import (
     mint_authorization_receipt,
     mint_for_signer,
 )
-from vaara.credential._contiguity import ContiguityReport, verify_contiguity
+from vaara.credential._contiguity import (
+    ClassGateDecision,
+    ContiguityReport,
+    enforce_on_sealed_class,
+    verify_contiguity,
+)
 from vaara.credential._grant_capability import Capability
 from vaara.credential._grant_emit import emit_grant, verify_grant_signature
 from vaara.credential._grant_parse import (
@@ -46,6 +51,7 @@ __all__ = [
     "AuthorizationReceipt",
     "BrokeredCredential",
     "Capability",
+    "ClassGateDecision",
     "ContiguityReport",
     "CredentialGateway",
     "GrantAlgorithm",
@@ -58,6 +64,7 @@ __all__ = [
     "binding_from_dict",
     "build_authorization_evidence",
     "emit_grant",
+    "enforce_on_sealed_class",
     "grant_from_dict",
     "mint_authorization_receipt",
     "mint_for_signer",

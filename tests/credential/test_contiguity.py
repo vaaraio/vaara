@@ -10,7 +10,12 @@ from __future__ import annotations
 
 import pytest
 
-from vaara.credential import ContiguityReport, verify_contiguity
+from vaara.credential import (
+    ClassGateDecision,
+    ContiguityReport,
+    enforce_on_sealed_class,
+    verify_contiguity,
+)
 
 BOUNDARY = "vaara-mcp-proxy"
 
@@ -161,3 +166,55 @@ def test_max_class_surfaces_on_a_complete_run():
     assert report.ok
     assert report.worst_case_class == "refund"
     assert "worst-case" not in report.gap_report()
+
+
+# -- enforce_on_sealed_class: the gate that consumes the sealed class ----------
+
+PERMITTED = ["data.read", "data.write"]
+
+
+def test_gate_permits_when_sealed_class_is_permitted():
+    stream = _stream(3) + [_seal(3, max_class="data.read")]
+    decision = enforce_on_sealed_class(stream, PERMITTED)
+    assert isinstance(decision, ClassGateDecision)
+    assert decision.permit
+    assert decision.reason == "permitted"
+    assert decision.worst_case_class == "data.read"
+    assert "PERMIT" in decision.gate_report()
+
+
+def test_gate_permits_over_a_gap_the_seal_bounds():
+    # The load-bearing case: seq 1 is dropped, so the run has a provable gap, yet
+    # the gate permits because the sealed data.read bounds the gap's worst case.
+    stream = [_ev(0, 1), _ev(2, 3), _seal(3, max_class="data.read")]
+    decision = enforce_on_sealed_class(stream, PERMITTED)
+    assert verify_contiguity(stream).ok is False
+    assert decision.permit
+    assert decision.reason == "permitted"
+
+
+def test_gate_denies_a_class_outside_the_permitted_set():
+    stream = _stream(3) + [_seal(3, max_class="tx.transfer")]
+    decision = enforce_on_sealed_class(stream, PERMITTED)
+    assert not decision.permit
+    assert decision.reason == "class_not_permitted"
+    assert decision.worst_case_class == "tx.transfer"
+
+
+def test_gate_fails_closed_when_no_class_is_sealed():
+    # No maxClass: a gap's worst case is unbounded, so the gate denies even though
+    # the stream is otherwise well-formed.
+    stream = [_ev(0, 1), _ev(2, 3), _seal(3)]
+    decision = enforce_on_sealed_class(stream, PERMITTED)
+    assert not decision.permit
+    assert decision.reason == "unbounded_no_sealed_class"
+    assert decision.worst_case_class is None
+    assert "fail-closed" in decision.gate_report()
+
+
+def test_gate_fails_closed_on_a_complete_run_with_no_sealed_class():
+    # Even a whole run denies when no class is sealed: there is no bound to consume.
+    stream = _stream(3) + [_seal(3)]
+    decision = enforce_on_sealed_class(stream, PERMITTED)
+    assert not decision.permit
+    assert decision.reason == "unbounded_no_sealed_class"
