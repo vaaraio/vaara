@@ -1,0 +1,42 @@
+{
+  "alg": "ES256",
+  "asserted": {
+    "expSeconds": 60,
+    "iat": "2026-06-22T15:00:00Z",
+    "iss": "vaara-mcp-proxy",
+    "nonce": "grant-nonce-1",
+    "secretVersion": "key-v1",
+    "sub": "tenant-a/upstream"
+  },
+  "binding": {
+    "attestationDigest": "sha256:efefefefefefefefefefefefefefefefefefefefefefefefefefefefefefefef",
+    "attestationNonce": "att-nonce-classgate"
+  },
+  "capabilities": [
+    {
+      "arg": "region",
+      "op": "in",
+      "value": [
+        "EU",
+        "US"
+      ]
+    },
+    {
+      "arg": "items",
+      "op": "le",
+      "value": "10"
+    },
+    {
+      "arg": "orderRef",
+      "op": "eq",
+      "value": "cart-7a1d"
+    }
+  ],
+  "scope": {
+    "argsCommitment": "sha256:b17a237498b4ddbb68c832ac29e645097959b9d729fa3468fef4fb00361c0ea2",
+    "tenantId": "tenant-a",
+    "toolName": "handoff.dispatch"
+  },
+  "signature": "2cb03a6529c3b5323aa98f9d4ff8d42a1541a3a72a49d19e8016c6fb53490cd4914c0719aa5673df91c7cb8d5a271d647a215cfb6ae5a0cdb30d77221013a225",
+  "version": 1
+}

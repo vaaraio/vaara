@@ -2343,6 +2343,67 @@ def _cmd_verify_contiguity(args: argparse.Namespace) -> int:
     return 0 if report.ok else 1
 
 
+def _cmd_enforce_by_class(args: argparse.Namespace) -> int:
+    """Gate the next unattended action on a boundary's sealed worst-case class.
+
+    Reads the ``evidence`` half of each ``*-authz.json`` file and permits iff the
+    boundary's sealed ``maxClass`` is in ``--permit``; fails closed when no class
+    is sealed. Exit 0 permit, 1 deny, 2 on a usage or input error.
+    """
+    from vaara.credential import enforce_on_sealed_class
+
+    files: list[Path] = []
+    for raw in args.paths:
+        p = Path(raw)
+        if p.is_dir():
+            files.extend(sorted(p.glob("*-authz.json")))
+        else:
+            files.append(p)
+    if not files:
+        print(
+            "vaara enforce-by-class: no authorization receipts found",
+            file=sys.stderr,
+        )
+        return 2
+
+    evidence: list[dict] = []
+    for f in files:
+        try:
+            payload = json.loads(f.read_text(encoding="utf-8"))
+        except (OSError, json.JSONDecodeError) as exc:
+            print(f"vaara enforce-by-class: {f}: {exc}", file=sys.stderr)
+            return 2
+        ev = payload.get("evidence", payload) if isinstance(payload, dict) else None
+        if isinstance(ev, dict):
+            evidence.append(ev)
+
+    permitted = args.permitted_classes or []
+    try:
+        decision = enforce_on_sealed_class(
+            evidence, permitted, boundary_id=args.boundary_id
+        )
+    except ValueError as exc:
+        print(f"vaara enforce-by-class: {exc}", file=sys.stderr)
+        return 2
+
+    if args.json:
+        print(
+            json.dumps(
+                {
+                    "boundaryId": decision.boundary_id,
+                    "permit": decision.permit,
+                    "reason": decision.reason,
+                    "worstCaseClass": decision.worst_case_class,
+                    "permittedClasses": decision.permitted_classes,
+                },
+                indent=2,
+            )
+        )
+    else:
+        print(decision.gate_report())
+    return 0 if decision.permit else 1
+
+
 def _cmd_verify_enforcement(args: argparse.Namespace) -> int:
     """Verify a SEV-SNP attestation report binds a SEP-2828 record to a CVM.
 
@@ -4261,6 +4322,50 @@ def build_parser() -> argparse.ArgumentParser:
         help="Emit the contiguity report as JSON",
     )
     pvc.set_defaults(func=_cmd_verify_contiguity)
+
+    pec = sub.add_parser(
+        "enforce-by-class",
+        help=(
+            "Gate the next unattended action on a boundary's sealed worst-case "
+            "class: permit iff the sealed maxClass is in --permit, fail closed "
+            "when no class is sealed. A permitted class permits even over a gap, "
+            "since the seal bounds the gap at that class. Exit 0 permit, 1 deny."
+        ),
+    )
+    pec.add_argument(
+        "paths",
+        nargs="+",
+        help=(
+            "Authorization receipt JSON files, or directories scanned for "
+            "*-authz.json files"
+        ),
+    )
+    pec.add_argument(
+        "--permit",
+        action="append",
+        default=None,
+        dest="permitted_classes",
+        metavar="CLASS",
+        help=(
+            "An action class the consumer will proceed under unattended; repeat "
+            "to permit several. The gate is membership, not an ordering."
+        ),
+    )
+    pec.add_argument(
+        "--boundary",
+        default=None,
+        dest="boundary_id",
+        help=(
+            "Coverage boundary id to gate on; inferred when the receipts name "
+            "exactly one boundary"
+        ),
+    )
+    pec.add_argument(
+        "--json",
+        action="store_true",
+        help="Emit the gate decision as JSON",
+    )
+    pec.set_defaults(func=_cmd_enforce_by_class)
 
     pvt = sub.add_parser(
         "verify-tpm-binding",
