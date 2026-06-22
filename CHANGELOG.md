@@ -6,6 +6,10 @@ and this project follows [Semantic Versioning](https://semver.org/spec/v2.0.0.ht
 
 ## [Unreleased]
 
+## [1.8.0] - 2026-06-22
+
+Minor release: one binding mechanism, not one per plane. The named profiles (x402, AP2, TAP) are instances of a single schema-agnostic binding. A verifier carrying an `external_execution_evidence` slot resolves it against a `vaara.receipt/v1` authorization receipt as the recomputable producer, and a new plane pins by naming its artifact through the slot with no new code. The completeness layer rides along, so a dropped record inside the boundary is still a provable gap.
+
 - Generic external-execution-evidence binding profile: the schema-agnostic binding the named profiles (x402, AP2, TAP) are instances of. There is one binding mechanism, not one per plane. A verifier carrying an `external_execution_evidence` slot (`linked_call_id` / `evidence_hash` / `evidence_type`, the shape used by agentrust trace-spec #34 and cMCP #301) resolves it against a `vaara.receipt/v1` authorization receipt as the recomputable producer: the slot's `evidence_hash` equals the receipt's `decisionDerived.evidenceRef.digest`, the `linked_call_id` is the call the receipt names (`evidenceRef.ref` equal to `mcp:call/<linked_call_id>`), and the `evidence_type` is the receipt's evidence schema. A new plane pins by naming its artifact through the slot rather than defining a profile of its own. `SPEC.md` Section 5.6, `tests/vectors/external_evidence_v0/`.
 - The trace is the coverage boundary and each receipt carries a signed completeness block, so a slot's per-record `evidence_hash` proves a record exists while the held running count proves none inside the boundary was dropped. The `dropped` vector withholds one record, slot and receipt both, and the running count still flags it. Every verdict recomputes offline from the held bytes with no live endpoint, through the independent checker that imports no Vaara.
 
