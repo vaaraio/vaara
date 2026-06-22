@@ -1,0 +1,42 @@
+{
+  "alg": "ES256",
+  "asserted": {
+    "expSeconds": 60,
+    "iat": "2026-06-22T09:00:00Z",
+    "iss": "vaara-mcp-proxy",
+    "nonce": "grant-nonce-1",
+    "secretVersion": "key-v1",
+    "sub": "tenant-a/upstream"
+  },
+  "binding": {
+    "attestationDigest": "sha256:abababababababababababababababababababababababababababababababab",
+    "attestationNonce": "att-nonce-extev"
+  },
+  "capabilities": [
+    {
+      "arg": "region",
+      "op": "in",
+      "value": [
+        "EU",
+        "US"
+      ]
+    },
+    {
+      "arg": "items",
+      "op": "le",
+      "value": "10"
+    },
+    {
+      "arg": "orderRef",
+      "op": "eq",
+      "value": "cart-9f2c"
+    }
+  ],
+  "scope": {
+    "argsCommitment": "sha256:4c75676c293a2dc41f25dd384afae82d3ee108e798075cc2da50f82674d04f78",
+    "tenantId": "tenant-a",
+    "toolName": "fulfillment.dispatch"
+  },
+  "signature": "52977f31f566dc484d434f924aadf787d0adaf297324cf73fe2906e4a27a2fd347ad0253a6a0494fd0cfc1f994555d57862c72a5c32d89d1f8af2abc48aaf885",
+  "version": 1
+}

@@ -1,0 +1,76 @@
+{
+  "evidence": {
+    "argsCommitment": "sha256:e0e76ee67e1f571d29a9db0992d7536e8f104d0112a004d2f9fe704ae02db90f",
+    "capabilities": [
+      {
+        "arg": "region",
+        "op": "in",
+        "value": [
+          "EU",
+          "US"
+        ]
+      },
+      {
+        "arg": "items",
+        "op": "le",
+        "value": "10"
+      },
+      {
+        "arg": "orderRef",
+        "op": "eq",
+        "value": "cart-9f2c"
+      }
+    ],
+    "completeness": {
+      "boundaryId": "trace:agent-run-9f2c",
+      "runningCount": 1,
+      "seq": 0
+    },
+    "coverage": {
+      "boundary": "trace:agent-run-9f2c",
+      "scope": "only calls routed through this agent run are observed",
+      "serverFingerprint": "manifest:sha256:cdcdcdcdcdcdcdcdcdcdcdcdcdcdcdcdcdcdcdcdcdcdcdcdcdcdcdcdcdcdcdcd"
+    },
+    "grantFingerprint": "sha256:c423d6e72920b75812ca2870eaa9cdea6c8c70b0d55b0bfc942c6c2c41c4332a",
+    "reason": "ok",
+    "schema": "vaara.authorization/v0",
+    "tenantId": "tenant-a",
+    "toolName": "fulfillment.dispatch",
+    "verdict": "allow"
+  },
+  "record": {
+    "alg": "ES256",
+    "backLink": {
+      "attestationDigest": "sha256:abababababababababababababababababababababababababababababababab",
+      "attestationNonce": "att-nonce-extev"
+    },
+    "decisionDerived": {
+      "decidedAt": "2026-06-22T09:00:05Z",
+      "decision": "allow",
+      "evidenceRef": {
+        "canonicalization": "JCS",
+        "digest": "sha256:2b3e5fdb11715e5bb06eaebe5a08c6309468225edaabd487584e1788c7e7e89f",
+        "ref": "mcp:call/call-9f2c-0000",
+        "schema": "vaara.authorization/v0"
+      },
+      "policyId": "policy:vaara-credential-broker/1",
+      "reason": "ok"
+    },
+    "issuerAsserted": {
+      "alg": "ES256",
+      "iat": "2026-06-22T15:40:55Z",
+      "iss": "vaara-mcp-proxy",
+      "nonce": "decision-nonce-0",
+      "secretVersion": "key-v1",
+      "sub": "tenant-a/upstream"
+    },
+    "signature": "62d0ea23e0393f1d78b990667ce2be2b50906038a9cccfc2fd2d5dfac5547387a4bdf47284d0825a528e3ee0cebb4986d8cc825ab652c7a5830631f86d0a0881",
+    "version": 1
+  },
+  "slot": {
+    "evidenceHash": "sha256:2b3e5fdb11715e5bb06eaebe5a08c6309468225edaabd487584e1788c7e7e89f",
+    "evidenceType": "vaara.authorization/v0",
+    "linkedCallId": "call-9f2c-0000",
+    "schema": "exec.evidence/v0"
+  }
+}

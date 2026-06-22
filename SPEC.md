@@ -121,6 +121,13 @@ defines only its own evidence record (the `schema` and contents behind
 `evidenceRef`), plus any join keys it needs. A profile MUST state the
 `vaara.receipt/vN` version it pins to and SHOULD ship recomputable vectors.
 
+There is one binding mechanism, not one per plane. Each named profile (5.2-5.5)
+names an external artifact by content address and binds it through this envelope
+unchanged; they differ only in which artifact is hashed and the `evidenceRef.ref`
+label. Section 5.6 states that mechanism in schema-agnostic form: a single binding
+that does not depend on what is connected to it. The named profiles are instances
+of it, kept because a given ecosystem pins to a label it recognizes as its own.
+
 ### 5.1 Registry
 
 | Profile | Evidence schema | Pins to | Vectors |
@@ -129,6 +136,7 @@ defines only its own evidence record (the `schema` and contents behind
 | authorization decision | `vaara.authorization/v0` | `vaara.receipt/v1` | `tests/vectors/authorization_v0/`, `tests/vectors/contiguity_v0/` |
 | AP2 checkout binding | `vaara.authorization/v0` (names AP2 PEF `frame_id`) | `vaara.receipt/v1` | `tests/vectors/ap2_v0/` |
 | TAP request binding | `tap.request/v0` | `vaara.receipt/v1` | `tests/vectors/tap_v0/` |
+| generic external execution evidence | `vaara.authorization/v0` (names an `external_execution_evidence` slot) | `vaara.receipt/v1` | `tests/vectors/external_evidence_v0/` |
 
 ### 5.2 Profile example: x402 settlement binding
 
@@ -287,6 +295,36 @@ request, the held receipts, and the issuer's public key, with the TAP service
 offline and no live verifier endpoint to trust. See
 `tests/vectors/tap_v0/_check_independent.py`. TAP can pin to `vaara.receipt/v1`
 for the post-authorization record rather than define a new primitive.
+
+### 5.6 Profile: generic external execution evidence
+
+This is the schema-agnostic binding the named profiles above are instances of. It
+takes any external execution-evidence artifact, content-addresses it, and binds it
+through this envelope unchanged, with no field names that depend on what produced
+it. A verifier carrying an `external_execution_evidence` slot (`linked_call_id` /
+`evidence_hash` / `evidence_type`, the shape used by agentrust trace-spec #34 and
+cMCP #301) resolves that slot against a `vaara.receipt/v1` authorization receipt as
+the recomputable producer:
+
+- `evidence_hash` = `sha256(JCS(evidence_record))`, equal to the receipt's
+  `decisionDerived.evidenceRef.digest`, so the slot and the receipt name the same
+  recomputable artifact (JCS / RFC 8785, no re-canonicalization).
+- `linked_call_id` is the call the receipt names: `decisionDerived.evidenceRef.ref`
+  = `mcp:call/<linked_call_id>`, under the receipt signature.
+- `evidence_type` is the receipt's evidence schema (`vaara.authorization/v0`).
+
+The trace is the `coverage.boundary`, and each receipt carries a signed
+`completeness` block (`seq` + `runningCount`), so the held set proves not only that
+each named call's evidence resolves but that none inside the boundary was dropped.
+A slot's `evidence_hash` alone proves a given record exists; the completeness block
+turns a silent drop into a named gap. The `dropped` vector withholds one record,
+slot and receipt both, and the signed running count still proves it existed.
+
+A third party recomputes every verdict offline with only the held slots, the
+receipts, and the issuer's public key, with no live verifier endpoint to trust. See
+`tests/vectors/external_evidence_v0/_check_independent.py`. Any plane that emits
+execution evidence pins here by naming its artifact through this slot, rather than
+defining a new primitive or a profile of its own.
 
 ## 6. Conformance
 
