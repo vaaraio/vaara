@@ -1,0 +1,32 @@
+{
+  "alg": "ES256",
+  "backLink": {
+    "attestationDigest": "sha256:ef56b27660f3c7761a6982d01fe6b5911e3f8e2cf38d2464dd7aee1ef6dff346",
+    "attestationNonce": "tap-1"
+  },
+  "decisionDerived": {
+    "decidedAt": "2026-06-22T10:00:00Z",
+    "decision": "allow",
+    "evidenceRef": {
+      "canonicalization": "JCS",
+      "digest": "sha256:4573564fe523d1823dddff8c8130fa6f0460208d68ef983775feede97eba5a5e",
+      "ref": "tap:request/sha256:a19fbbb6de5970daab18f40bc2973a3468a6d0a8a5b319c3ec2c375a766062ca",
+      "schema": "tap.request/v0"
+    },
+    "policyId": "policy:tap-authorize/1",
+    "reason": "trusted agent acted within the authorized scope of the TAP request",
+    "riskScore": "0.10",
+    "thresholdAllow": "0.30",
+    "thresholdBlock": "0.80"
+  },
+  "issuerAsserted": {
+    "alg": "ES256",
+    "iat": "2026-06-22T10:00:00Z",
+    "iss": "issuer://merchant-gateway",
+    "nonce": "d-1",
+    "secretVersion": "v1",
+    "sub": "agent:checkout-bot"
+  },
+  "signature": "9c76f0681b517dbc7551265eeba9cfd6fd997a014b165e2370ec035f70a491c5cc4fd0f9d1b9d7a865991fa97b353944b2b04aa5d2e2018fc1f8c3c1a6de1dad",
+  "version": 1
+}

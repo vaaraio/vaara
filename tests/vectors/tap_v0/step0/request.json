@@ -1,0 +1,15 @@
+{
+  "actionRef": "sha256:8737c26c7300668a53470ab027653daef0b5b09d28200d06172911077888cae0",
+  "actionType": "purchase.authorize",
+  "agentId": "agent:checkout-bot",
+  "consumerRef": "card:tokenized-pan-ref-9f2c",
+  "intent": "purchase.authorize",
+  "relyingParty": "merchant:acme",
+  "requestId": "tap-req-7f3a",
+  "schema": "tap.request/v0",
+  "scope": "merchant:acme/order:INV-1/amount:42.00USD",
+  "seq": 0,
+  "terminal": false,
+  "timestampMs": 1779271200000,
+  "trustedAgentId": "agent:checkout-bot"
+}
