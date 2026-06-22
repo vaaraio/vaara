@@ -1,0 +1,69 @@
+{
+  "evidence": {
+    "argsCommitment": "sha256:e3a62f3e1a45f98ad944348e0718aa79e7fa33478d9b3560bf7c9a71b5219d5c",
+    "capabilities": [
+      {
+        "arg": "region",
+        "op": "in",
+        "value": [
+          "EU",
+          "US"
+        ]
+      },
+      {
+        "arg": "items",
+        "op": "le",
+        "value": "10"
+      },
+      {
+        "arg": "orderRef",
+        "op": "eq",
+        "value": "cart-7a1d"
+      }
+    ],
+    "completeness": {
+      "boundaryId": "chain:agent-handoff-7a1d",
+      "runningCount": 2,
+      "seq": 1
+    },
+    "coverage": {
+      "boundary": "chain:agent-handoff-7a1d",
+      "scope": "only steps in this handoff chain are observed"
+    },
+    "grantFingerprint": "sha256:b9fbf6799abf499a35a97dd82073cf25b891362a832fc19eea07658771e2e9b4",
+    "reason": "ok",
+    "schema": "vaara.authorization/v0",
+    "tenantId": "tenant-a",
+    "toolName": "handoff.dispatch",
+    "verdict": "allow"
+  },
+  "record": {
+    "alg": "ES256",
+    "backLink": {
+      "attestationDigest": "sha256:efefefefefefefefefefefefefefefefefefefefefefefefefefefefefefefef",
+      "attestationNonce": "att-nonce-classgate"
+    },
+    "decisionDerived": {
+      "decidedAt": "2026-06-22T15:00:05Z",
+      "decision": "allow",
+      "evidenceRef": {
+        "canonicalization": "JCS",
+        "digest": "sha256:e49594535196d90e5b21da1c87f98d00ecffc539ab3dce309891d3986579d1cd",
+        "ref": "mcp:call/call-7a1d-0001",
+        "schema": "vaara.authorization/v0"
+      },
+      "policyId": "policy:vaara-credential-broker/1",
+      "reason": "ok"
+    },
+    "issuerAsserted": {
+      "alg": "ES256",
+      "iat": "2026-06-22T17:02:54Z",
+      "iss": "vaara-mcp-proxy",
+      "nonce": "decision-nonce-1",
+      "secretVersion": "key-v1",
+      "sub": "tenant-a/upstream"
+    },
+    "signature": "7dacc660b873d05d81068b6805d1384861f859f30841075da56d30fe41a6b8ef88bf143632c1b3db2f38f98ca07eb3c11580a8d37029dfc2c37e460fb982119a",
+    "version": 1
+  }
+}

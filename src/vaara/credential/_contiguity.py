@@ -212,3 +212,94 @@ def verify_contiguity(
         ok=ok,
         worst_case_class=worst_case_class,
     )
+
+
+@dataclass(frozen=True)
+class ClassGateDecision:
+    """A chain recipient's permit/deny for its own next unattended action.
+
+    The decision is read from a boundary's sealed worst-case class alone: the
+    consumer holds a policy set of action classes it will proceed under
+    (``permitted_classes``) and permits iff the sealed ``worst_case_class`` is a
+    member of that set. ``reason`` is one of ``permitted`` (sealed class is in
+    the set), ``class_not_permitted`` (sealed class is outside it), or
+    ``unbounded_no_sealed_class`` (no seal named a class, so a gap's worst case
+    is unbounded). It is a membership test, not an ordering over class labels
+    (SPEC 5.3 computes no such ordering), so it adds no rank the spec withholds.
+    """
+
+    boundary_id: str
+    permit: bool
+    reason: str
+    worst_case_class: Optional[str]
+    permitted_classes: list[str]
+
+    def gate_report(self) -> str:
+        """A short human-readable verdict naming the gated class."""
+        if self.reason == "permitted":
+            return (
+                f"boundary {self.boundary_id!r}: PERMIT "
+                f"(sealed worst-case class {self.worst_case_class!r} is permitted)"
+            )
+        if self.reason == "class_not_permitted":
+            return (
+                f"boundary {self.boundary_id!r}: DENY "
+                f"(sealed worst-case class {self.worst_case_class!r} not in "
+                f"permitted set {sorted(self.permitted_classes)!r})"
+            )
+        return (
+            f"boundary {self.boundary_id!r}: DENY "
+            "(no sealed action class; a gap's worst case is unbounded, fail-closed)"
+        )
+
+
+def enforce_on_sealed_class(
+    evidence_records: list[dict[str, Any]],
+    permitted_classes: Any,
+    boundary_id: Optional[str] = None,
+) -> ClassGateDecision:
+    """Gate the next unattended action on a boundary's sealed worst-case class.
+
+    This consumes the v1.7.0 seal at enforcement time. ``verify_contiguity``
+    surfaces a seal's ``maxClass`` as ``worst_case_class``: the highest action
+    class the boundary authorized, and so the most a gap inside it could have
+    hidden. A chain recipient gates its own next step by **membership**: it
+    holds ``permitted_classes`` (the classes it will proceed under unattended)
+    and permits iff the sealed class is one of them; it **fails closed** when no
+    class is sealed. The check is held-set-alone: it reads the bound off the
+    boundary and does not re-derive the chain or query a log.
+
+    The key property is that a permitted sealed class permits **even when the
+    boundary has a gap**, because the seal bounds the missing record's worst
+    case at ``maxClass``. The gate does not need the dropped record; it needs
+    only the bound the seal already committed.
+
+    Scope (honest by construction): the bound is trustworthy under the honest
+    issuer whose seal commits before any tail is trimmed. A dishonest issuer
+    that *under-seals* the class is not caught here; that case falls to
+    reconciliation against the issuer's log, not to this held-set-alone gate.
+    The gate consumes a committed bound; it does not detect a lying seal.
+
+    ``boundary_id`` is inferred when the records name exactly one boundary;
+    ``verify_contiguity`` raises ``ValueError`` if they span several and none is
+    given, so the caller must disambiguate (a usage error, not a deny).
+    """
+    permitted = [str(c) for c in permitted_classes]
+    report = verify_contiguity(evidence_records, boundary_id=boundary_id)
+    sealed_class = report.worst_case_class
+    if sealed_class is None:
+        return ClassGateDecision(
+            boundary_id=report.boundary_id,
+            permit=False,
+            reason="unbounded_no_sealed_class",
+            worst_case_class=None,
+            permitted_classes=permitted,
+        )
+    permit = sealed_class in permitted
+    return ClassGateDecision(
+        boundary_id=report.boundary_id,
+        permit=permit,
+        reason="permitted" if permit else "class_not_permitted",
+        worst_case_class=sealed_class,
+        permitted_classes=permitted,
+    )
