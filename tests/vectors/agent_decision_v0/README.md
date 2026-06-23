@@ -69,3 +69,21 @@ its own:
     python tests/vectors/agent_decision_v0/_generate.py
 
 and commit the result.
+
+## Independent re-mint (second producer)
+
+`_generate.py` builds `expected.json` by calling Vaara's `normalize`. To show
+the vector does not depend on that generator, `_remint.py` re-derives every
+committed file from the source statement with a second implementation that
+shares no code with `_generate.py` and imports nothing from Vaara (standard
+library, `cryptography`, `rfc8785`):
+
+    python tests/vectors/agent_decision_v0/_remint.py
+
+It recomputes the JCS payload, the DSSE pre-authentication encoding, the
+deterministic Ed25519 signature, `paeSha256`, and the SEP-2828 mapping (from the
+declarative profile, with its own spec interpreter), then compares
+`statement.json`, `envelope.json`, `expected.json`, and the public key
+byte-for-byte. A tamper pass mutates the decision and confirms the content
+address moves, so a forged statement cannot reuse the committed digest. The
+bytes reproduce with no generator and no issuer in the loop.

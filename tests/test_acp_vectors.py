@@ -34,6 +34,15 @@ def test_independent_checker_passes():
     assert proc.returncode == 0, proc.stdout + proc.stderr
 
 
+def test_independent_remint_reproduces():
+    proc = subprocess.run(
+        [sys.executable, str(VECTORS / "_remint.py")],
+        capture_output=True,
+        text=True,
+    )
+    assert proc.returncode == 0, proc.stdout + proc.stderr
+
+
 def test_module_reproduces_committed_mapping():
     from vaara.attestation.receipt import normalize
 
