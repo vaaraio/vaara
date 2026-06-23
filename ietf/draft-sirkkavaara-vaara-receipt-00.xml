@@ -24,7 +24,7 @@
       </address>
     </author>
 
-    <date year="2026" month="June" day="21"/>
+    <date year="2026" month="June" day="23"/>
 
     <area>General</area>
     <workgroup>Independent Submission</workgroup>
@@ -221,6 +221,16 @@
       evidenceRef), plus any join keys it needs. A profile MUST state the
       vaara.receipt/vN version it pins to and SHOULD ship recomputable vectors.</t>
 
+      <t>There is one binding mechanism, not one per plane. Each named profile
+      (<xref target="profile-x402"/>, <xref target="profile-authz"/>,
+      <xref target="profile-ap2"/>, <xref target="profile-tap"/>) names an external
+      artifact by content address and binds it through this envelope unchanged; they
+      differ only in which artifact is hashed and the evidenceRef.ref label.
+      <xref target="profile-generic"/> states that mechanism in schema-agnostic form:
+      a single binding that does not depend on what is connected to it. The named
+      profiles are instances of it, kept because a given ecosystem pins to a label it
+      recognizes as its own.</t>
+
       <section anchor="registry" numbered="true">
         <name>Registry</name>
         <t>The profiles below pin to vaara.receipt/v1. Vector paths are relative
@@ -232,8 +242,10 @@
           </thead>
           <tbody>
             <tr><td>x402 settlement binding</td><td>x402.settlement.*/v0</td><td>tests/vectors/x402_settlement_v0/</td></tr>
-            <tr><td>authorization decision</td><td>vaara.authorization/v0</td><td>tests/vectors/authorization_v0/, tests/vectors/contiguity_v0/</td></tr>
+            <tr><td>authorization decision</td><td>vaara.authorization/v0</td><td>tests/vectors/authorization_v0/, tests/vectors/contiguity_v0/, tests/vectors/class_gate_v0/</td></tr>
             <tr><td>AP2 checkout binding</td><td>vaara.authorization/v0 (names AP2 PEF frame_id)</td><td>tests/vectors/ap2_v0/</td></tr>
+            <tr><td>TAP request binding</td><td>tap.request/v0</td><td>tests/vectors/tap_v0/</td></tr>
+            <tr><td>generic external execution evidence</td><td>vaara.authorization/v0 (names an external_execution_evidence slot)</td><td>tests/vectors/external_evidence_v0/</td></tr>
           </tbody>
         </table>
       </section>
@@ -294,6 +306,14 @@
           (runningCount = seq + 1). The block is absent when no sequence is
           asserted, leaving the record byte-identical to a completeness-free
           decision.</li>
+          <li>An optional sealing record finalizes the boundary: a terminal
+          completeness block ({boundaryId, sealed: true, total: N}) that pins the
+          boundary's final count independently of the per-record sequence. It is
+          additive and emitted once the boundary is closed; a boundary that is never
+          sealed verifies exactly as before, with the seal absent and the stream
+          byte-identical. The seal may also carry maxClass, the highest action class
+          the boundary authorized; it bounds a gap's worst case and is itself
+          optional.</li>
         </ul>
         <t>A verdict is only as meaningful as what the issuer could see. "allow"
         over an unbounded surface and "allow" over a stated one are identical bytes
@@ -316,13 +336,53 @@
         sequence number that any holder detects from the receipts alone: the
         highest running count names how many exist, so a short set is
         self-evidently incomplete and the absent seq is named. This needs no issuer
-        access and no external witness. The tests/vectors/contiguity_v0/ vectors
-        and the "vaara verify-contiguity" surface carry that check. One honest
-        limit remains: a pure tail truncation (holding 0..k with nothing after)
-        cannot be told from a complete stream by contiguity alone, since the latest
-        held count is then k + 1. Closing it is the job of an rfc3161 anchor over
-        the running count (<xref target="anchors"/>), which attests that at time T,
-        N receipts existed under the boundary.</t>
+        access and no external witness. The tests/vectors/contiguity_v0/ vectors and
+        the "vaara verify-contiguity" surface carry that check.</t>
+        <t>The per-record running count alone cannot tell a pure tail truncation
+        (holding 0..k with nothing after) from a complete stream, since the latest
+        held count is then k + 1 and reads as whole. The optional sealing record
+        closes that gap: when a boundary is finalized, the holder expects
+        max(seq + 1, runningCount, total) records, so a dropped tail shows as the
+        missing range up to the sealed total. A boundary that is never sealed
+        verifies exactly as before. One residual remains, and it is irreducible from
+        the held set alone: a suffix drop that also suppresses the sealing record
+        leaves nothing to detect. Closing that is the job of an rfc3161 anchor over
+        the running count (<xref target="anchors"/>), which attests that at time T, N
+        receipts existed under the boundary. The layering is seq for order, the hash
+        chain for tamper-evidence, the sealing record for a truncated tail, and the
+        timestamp anchor for the seal-suppressed residual.</t>
+        <t>A gap proves that a record is absent but not what it would have
+        authorized. When worst-case-governs is the reading, the seal's optional
+        maxClass bounds it: it names the highest action class the boundary
+        authorized, so a missing record could have authorized an action of at most
+        that class. The verifier surfaces this as worstCaseClass, computed from the
+        held set and the seal alone, with no issuer. The field is optional; absent
+        it, a gap reports only that a record is missing.</t>
+        <t>Beyond bounding a gap at audit time, the sealed maxClass is consumable at
+        enforcement time. A chain recipient gating its own next unattended action
+        holds a policy set of action classes it will proceed under and permits if and
+        only if the sealed worst-case class is a member of that set, failing closed
+        when no class is sealed. This is a membership test, not an ordering: this
+        document computes no ordering over class labels, so the recipient asks "is
+        the sealed class one I permit", never "is it at or below a ceiling". Because
+        the seal bounds a gap's worst case at maxClass, a permitted class permits
+        even when the boundary has a gap: the recipient consumes the committed bound
+        and does not re-derive the chain or query a log. The bound is trustworthy
+        under the honest issuer whose seal commits before any tail is trimmed; a seal
+        that under-states the class is a reconciliation question against the issuer's
+        log, not one this held-set-alone gate answers.</t>
+        <t>maxClass lives in the unsigned evidence block, so a recipient MUST NOT
+        consume it raw. It rides under signature only through the binding: the seal's
+        signed decisionDerived.evidenceRef.digest is "sha256:" + JCS(evidence), so
+        recomputing that digest proves the class is the class that was signed. Before
+        gating, a recipient MUST verify each receipt's signature and that its
+        evidence recomputes to the signed digest; a seal whose binding fails is not
+        trusted, contributes no class, and the gate fails closed. Without this, an
+        agent loosens the gate by relabeling an irreversible action's class into a
+        permitted one while the record signature, which never covered the evidence,
+        still verifies. The conformance vectors are in tests/vectors/class_gate_v0/;
+        the deny_relabeled case carries exactly this attack and the independent
+        checker rejects it.</t>
       </section>
       <section anchor="profile-ap2" numbered="true">
         <name>Profile Example: AP2 Checkout Binding</name>
@@ -355,6 +415,68 @@
         receipts in hand. See tests/vectors/ap2_v0/_check_independent.py. AP2 can
         pin from the point the Checkout Receipt ends rather than define a new
         post-settlement primitive.</t>
+      </section>
+
+      <section anchor="profile-tap" numbered="true">
+        <name>Profile Example: TAP Request Binding</name>
+        <t>This profile binds a Visa Trusted Agent Protocol (TAP) request to the
+        action a trusted agent takes under it, across the action lifecycle, so the
+        post-authorization record is the same recomputable evidence as any other
+        decision receipt. It adds a TAP request evidence record (schema =
+        tap.request/v0) whose JCS digest is the receipt's evidenceRef.digest, and the
+        join key actionRef = sha256(JCS({agentId, actionType, scope, timestampMs,
+        seq, terminal})) carried on the request:</t>
+        <ul>
+          <li>The trusted agent presents the TAP request to the relying party. The
+          decision receipt names it by content address:
+          decisionDerived.evidenceRef.digest = sha256(JCS(request)),
+          decisionDerived.evidenceRef.ref = tap:request/&lt;actionRef&gt;, both under
+          the receipt signature. Canonicalization is JCS / RFC 8785, the same as this
+          envelope, so the address joins with no re-canonicalization.</li>
+          <li>The lifecycle lives in the join key. Because the action tuple covers
+          terminal, the in-progress (terminal: false) request has a different
+          actionRef than the final (terminal: true) one, and the in-progress receipt
+          does not resolve against the terminal request. A mid-action receipt cannot
+          be presented where the final one is required.</li>
+        </ul>
+        <t>The verdict is recomputable offline. A third party recomputes the action
+        ref, resolves the request binding, and verifies the signature with only the
+        TAP request, the held receipts, and the issuer's public key, with the TAP
+        service offline and no live verifier endpoint to trust. See
+        tests/vectors/tap_v0/_check_independent.py. TAP can pin to vaara.receipt/v1
+        for the post-authorization record rather than define a new primitive.</t>
+      </section>
+
+      <section anchor="profile-generic" numbered="true">
+        <name>Profile: Generic External Execution Evidence</name>
+        <t>This is the schema-agnostic binding the named profiles above are instances
+        of. It takes any external execution-evidence artifact, content-addresses it,
+        and binds it through this envelope unchanged, with no field names that depend
+        on what produced it. A verifier carrying an external_execution_evidence slot
+        (linked_call_id / evidence_hash / evidence_type) resolves that slot against a
+        vaara.receipt/v1 authorization receipt as the recomputable producer:</t>
+        <ul>
+          <li>evidence_hash = sha256(JCS(evidence_record)), equal to the receipt's
+          decisionDerived.evidenceRef.digest, so the slot and the receipt name the
+          same recomputable artifact (JCS / RFC 8785, no re-canonicalization).</li>
+          <li>linked_call_id is the call the receipt names:
+          decisionDerived.evidenceRef.ref = mcp:call/&lt;linked_call_id&gt;, under the
+          receipt signature.</li>
+          <li>evidence_type is the receipt's evidence schema
+          (vaara.authorization/v0).</li>
+        </ul>
+        <t>The trace is the coverage.boundary, and each receipt carries a signed
+        completeness block (seq + runningCount), so the held set proves not only that
+        each named call's evidence resolves but that none inside the boundary was
+        dropped. A slot's evidence_hash alone proves a given record exists; the
+        completeness block turns a silent drop into a named gap. The dropped vector
+        withholds one record, slot and receipt both, and the signed running count
+        still proves it existed.</t>
+        <t>A third party recomputes every verdict offline with only the held slots,
+        the receipts, and the issuer's public key, with no live verifier endpoint to
+        trust. See tests/vectors/external_evidence_v0/_check_independent.py. Any plane
+        that emits execution evidence pins here by naming its artifact through this
+        slot, rather than defining a new primitive or a profile of its own.</t>
       </section>
     </section>
     <section anchor="conformance" numbered="true">
@@ -412,6 +534,18 @@
       completeness block makes a dropped receipt inside the boundary detectable,
       but a pure tail truncation is not detectable by sequence contiguity alone and
       requires a timestamp anchor over the running count to close.</t>
+      <t>A recipient that consumes a sealed maxClass to gate its own next action
+      (<xref target="profile-authz"/>) MUST bind the class to the signature before
+      acting on it. maxClass sits in the unsigned evidence block and is covered by
+      the signature only through the seal's decisionDerived.evidenceRef.digest =
+      "sha256:" + JCS(evidence). A recipient MUST verify each receipt's signature and
+      that its evidence recomputes to that signed digest; a seal whose binding fails
+      contributes no class and the gate fails closed. A recipient that reads maxClass
+      raw, without recomputing the binding, can be made to permit an irreversible
+      action whose class an agent relabeled into a permitted one while the record
+      signature, which never covered the evidence, still verifies. The gate is also
+      a membership test over class labels, not an ordering; this document defines no
+      ordering over classes, and a recipient MUST NOT infer one.</t>
     </section>
 
     <section anchor="iana" numbered="true">
