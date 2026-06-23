@@ -4,7 +4,9 @@ All notable changes to this project are documented here.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/)
 and this project follows [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
-## [Unreleased]
+## [1.12.0] - 2026-06-23
+
+Minor release: the `agent-decision` profile and a public-key-verifiable conformance vector. The closest foreign format to a native signed decision record becomes a source format, and the recomputable vector offered on in-toto/attestation#554 ships.
 
 - New declarative `agent-decision` source profile: it recognizes an in-toto `agent-decision/v0.1` predicate (the proposed predicate in [in-toto/attestation#554](https://github.com/in-toto/attestation/issues/554)) and maps it onto the SEP-2828 model. It is the closest foreign format to a native signed decision record, so it maps to the decision-attested plane, yet fills no SEP-2828 field on its own: the in-toto Statement's signature lives in the DSSE envelope (a separate signing event), `args_hash` is an argument commitment rather than a back-link to an attested request, and the predicate carries the decision but not the outcome. The honest gap is the report. `args_state` keeps the explicit-omission state first-class (`present`, `args_redacted`, `args_unavailable`, `args_not_recorded`), so a redacted call and an unrecorded call stay distinct claims.
 - New `tests/vectors/agent_decision_v0/` conformance vector: that same statement sealed in a DSSE envelope under Ed25519, with a published verifying key. The independent checker imports no Vaara code and recomputes the DSSE pre-authentication encoding, verifies the signature from the public key, and reproduces the SEP-2828 mapping from the shipped profile spec. It is the recomputable `{statement, expected-verdict}` pair, anchored to the bytes rather than to any one producer.
