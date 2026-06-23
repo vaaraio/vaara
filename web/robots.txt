@@ -1,0 +1,4 @@
+User-agent: *
+Allow: /
+
+Sitemap: https://vaaraio.github.io/vaara/sitemap.xml
