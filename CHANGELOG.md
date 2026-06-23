@@ -4,6 +4,13 @@ All notable changes to this project are documented here.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/)
 and this project follows [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [1.13.0] - 2026-06-23
+
+Minor release: the `acp-checkout` profile and a conformance vector for the payments lane. An Agentic Commerce Protocol checkout session becomes a source format, the outcome twin of the `agent-decision` profile.
+
+- New declarative `acp-checkout` source profile: it recognizes an [Agentic Commerce Protocol](https://github.com/agentic-commerce-protocol/agentic-commerce-protocol) checkout session and maps it onto the SEP-2828 model at the `outcome` plane. It is the closest foreign format to a settled-transaction record (the terminal status, the totals that settled, the payment handler and PSP, the order produced), yet fills no SEP-2828 field on its own: ACP signs nothing in the record (it authenticates the API call at the transport), so `alg`, `signature`, and `receiptAsserted` are absent, there is no `backLink` pinning the request that authorized the spend, and `status` is a merchant-asserted state lifted as advisory context rather than a bound `outcomeDerived`. The honest gap is the report. It is the inverse of `agent-decision`, which carries the authorizing decision but not the outcome; neither is a receipt until the decision and the outcome are bound under one signature.
+- New `tests/vectors/acp_checkout_v0/` conformance vector: a real-shaped completed checkout session with its order. ACP objects are unsigned, so the recomputable anchor is a JCS (RFC 8785) content digest over the statement rather than a signature. The independent checker imports no Vaara code and reproduces the digest and the SEP-2828 mapping from the shipped profile spec. It is the recomputable `{statement, expected-verdict}` pair, anchored to the bytes.
+
 ## [1.12.0] - 2026-06-23
 
 Minor release: the `agent-decision` profile and a public-key-verifiable conformance vector. The closest foreign format to a native signed decision record becomes a source format, and the recomputable vector offered on in-toto/attestation#554 ships.

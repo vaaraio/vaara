@@ -1,0 +1,40 @@
+{
+  "sourceFormat": "acp-checkout",
+  "sourceTitle": "Agentic Commerce Protocol checkout session",
+  "priority": 45,
+  "detect": {
+    "all": [
+      {"path": "status", "in": ["incomplete", "not_ready_for_payment", "requires_escalation", "authentication_required", "ready_for_payment", "pending_approval", "complete_in_progress", "completed", "canceled", "in_progress", "expired"]},
+      {"path": "currency", "exists": true},
+      {"path": "line_items", "exists": true},
+      {"path": "totals", "exists": true},
+      {"path": "capabilities", "exists": true}
+    ]
+  },
+  "evidencePlane": "outcome",
+  "advisory": {
+    "sessionId": "id",
+    "status": "status",
+    "protocolVersion": "protocol.version",
+    "currency": "currency",
+    "buyerEmail": "buyer.email",
+    "firstLineItemId": "line_items[0].id",
+    "firstTotalType": "totals[0].type",
+    "firstTotalAmount": "totals[0].amount",
+    "paymentHandlerId": "capabilities.payment.handlers[0].id",
+    "paymentHandlerName": "capabilities.payment.handlers[0].name",
+    "paymentPsp": "capabilities.payment.handlers[0].psp",
+    "orderId": "order.id",
+    "orderStatus": "order.status",
+    "orderNumber": "order.order_number",
+    "confirmationNumber": "order.confirmation.confirmation_number"
+  },
+  "sep2828": {},
+  "missing": ["alg", "signature", "backLink", "receiptAsserted"],
+  "notes": [
+    "an ACP checkout session is the commercial-outcome face of an agent purchase: a terminal status (completed, canceled, expired), the line items and totals that settled, the payment handler and PSP that took the money, and the order it produced; it is the closest foreign analog to a settled-transaction record",
+    "nothing in the object is signed: ACP authenticates the API call (request signing at the transport), not the session record, so alg, signature, and receiptAsserted are absent and the session states an outcome it does not itself prove",
+    "the session carries no SEP-2828 backLink: there is no attestationDigest pinning the attested request or the authorizing decision that a conformant receipt must answer, so the spend is reported without a link to what authorized it",
+    "status is a merchant-asserted state, not a SEP-2828 outcomeDerived bound to an attested execution; it is lifted here as advisory context (advisory.status, advisory.orderStatus), the commercial result a receipt would bind rather than assert"
+  ]
+}
