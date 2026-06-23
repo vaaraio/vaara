@@ -58,6 +58,22 @@ vaara verify-bundle evidence-bundle.json
 
 `ok` only when a signature is actually established, not merely present in a log. The same property drives the standards work behind [SEP-2828](https://github.com/modelcontextprotocol/modelcontextprotocol/pull/2828): evidence that holds up for someone who runs none of your software. The full verifier set, the trust model for each verb, and where trust comes from in each case are in [docs/verifying-evidence.md](docs/verifying-evidence.md).
 
+To check that claim yourself, without installing Vaara, run the standalone checker against the published vectors. Its only dependencies are `cryptography` and `rfc8785`:
+
+```bash
+git clone https://github.com/vaaraio/vaara
+cd vaara
+pip install cryptography rfc8785        # the checker's only dependencies
+python tests/vectors/external_evidence_v0/_check_independent.py
+```
+
+It re-derives every verdict from the receipt bytes and the public key alone. The output shows the property the trail is built for: a receipt dropped from inside a declared boundary is a provable gap from the held set, with no issuer access and no external witness.
+
+```
+[OK] complete.contiguity: {'ok': True, 'present': 3, 'expected': 3, 'missingSeqs': []}
+[OK] dropped.contiguity: {'ok': False, 'present': 2, 'expected': 3, 'missingSeqs': [1]}
+```
+
 ## What the evidence looks like
 
 `vaara compliance report --format json` against a real trail produces an article-level evidence record an auditor reads directly. Articles with no recorded events return `evidence_insufficient`, not a rubber stamp.
