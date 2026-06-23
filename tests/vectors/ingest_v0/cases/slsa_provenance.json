@@ -1,0 +1,51 @@
+{
+  "evidence": {
+    "advisory": {
+      "buildType": "https://github.com/slsa-framework/slsa-github-generator/generic@v1",
+      "builderId": "https://github.com/slsa-framework/slsa-github-generator/.github/workflows/builder_generic_slsa3.yml@refs/tags/v2.0.0",
+      "subjectName": "pkg:pypi/vaara@1.10.0"
+    },
+    "evidencePlane": null,
+    "missing": [
+      "alg",
+      "signature",
+      "backLink",
+      "receiptAsserted",
+      "outcomeDerived"
+    ],
+    "notes": [
+      "a SLSA provenance statement attests how an artifact was built (builder, build type, materials); it is build-time lineage, not an execution decision-and-outcome",
+      "the in-toto Statement is carried in a DSSE envelope whose signature is not modeled here; alg/signature/receiptAsserted remain a separate signing event",
+      "subject[].digest binds the built artifact, but no SEP-2828 back-link (an attested request) is present"
+    ],
+    "populated": [],
+    "recognized": true,
+    "sep2828": {},
+    "sourceFormat": "slsa-provenance",
+    "sourceTitle": "SLSA v1 in-toto provenance"
+  },
+  "record": {
+    "alg": "HS256",
+    "completeness": {
+      "runningCount": 1,
+      "seq": 1
+    },
+    "evidenceRef": {
+      "canonicalization": "JCS",
+      "digest": "sha256:076f80f21fa99726c8d4c9aaaf86da07634d4c70c868c0e3e2a6aa3f5a5ec53d",
+      "schema": "vaara.normalized-evidence/v0"
+    },
+    "ingestAsserted": {
+      "alg": "HS256",
+      "iat": "2026-06-23T00:00:00Z",
+      "iss": "did:web:vaara.io",
+      "nonce": "ingest-fixed-nonce-000000",
+      "secretVersion": "k1",
+      "sub": "sink"
+    },
+    "schema": "vaara.ingest/v0",
+    "signature": "3f980f9cb80d07a44a901ca452c956cd2347c9ea33bb4f79f36f5ae52603c003",
+    "sourceFormat": "slsa-provenance",
+    "version": 0
+  }
+}

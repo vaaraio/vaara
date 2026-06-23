@@ -1,0 +1,24 @@
+{
+  "claim_generator": "vaara/1.10.0 c2pa-rs/0.36.0",
+  "title": "press-photo.jpg",
+  "format": "image/jpeg",
+  "assertions": [
+    {
+      "label": "c2pa.actions",
+      "data": {
+        "actions": [
+          {"action": "c2pa.created", "softwareAgent": "vaara/1.10.0"},
+          {"action": "c2pa.edited", "parameters": {"name": "crop"}}
+        ]
+      }
+    },
+    {
+      "label": "stds.schema-org.CreativeWork",
+      "data": {
+        "@context": "https://schema.org",
+        "@type": "CreativeWork",
+        "author": [{"@type": "Person", "name": "H. Sirkkavaara"}]
+      }
+    }
+  ]
+}

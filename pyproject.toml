@@ -78,6 +78,8 @@ where = ["src"]
 # (_DEFAULT_BUNDLE in adversarial_classifier.py); v1-v8 are retained in the
 # repo for bench/cross-eval but were ~7MB of dead weight in every wheel.
 vaara = ["data/adversarial_classifier_v9.joblib"]
+# Declarative source-profile specs loaded at runtime by _declarative.py.
+"vaara.attestation" = ["profiles/*.json"]
 
 [tool.pytest.ini_options]
 testpaths = ["tests"]
