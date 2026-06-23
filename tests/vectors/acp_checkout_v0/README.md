@@ -63,3 +63,17 @@ decision and the outcome are bound under one signature.
     python tests/vectors/acp_checkout_v0/_generate.py
 
 and commit the result.
+
+## Independent re-mint (second producer)
+
+`_generate.py` builds `expected.json` by calling Vaara's `normalize`. To show
+the verdict does not depend on that generator, `_remint.py` re-derives it from
+the statement with a second implementation that shares no code with
+`_generate.py` and imports nothing from Vaara (standard library, `rfc8785`):
+
+    python tests/vectors/acp_checkout_v0/_remint.py
+
+It recomputes `jcsSha256` and the SEP-2828 mapping (from the declarative
+profile, with its own spec interpreter) and reproduces `expected.json`
+byte-for-byte. A tamper pass mutates the status and confirms the content address
+moves. The bytes reproduce with no generator and no issuer in the loop.
