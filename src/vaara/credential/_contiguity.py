@@ -15,9 +15,47 @@ never asserted a sequence has nothing to be incomplete against.
 
 from __future__ import annotations
 
+import hashlib
 from collections import Counter
 from dataclasses import dataclass
 from typing import Any, Optional
+
+from vaara.attestation._sep2787_canonical import canonical_json
+
+
+def evidence_binding_ok(receipt: dict[str, Any]) -> bool:
+    """The receipt's ``evidence`` block binds to its signed ``evidenceRef.digest``.
+
+    A full authorization receipt is ``{"record": ..., "evidence": ...}``. The
+    ES256 signature covers the ``record`` half only; ``maxClass`` and the rest of
+    ``evidence`` are unsigned. What carries them under signature is this binding:
+    the signed ``record.decisionDerived.evidenceRef.digest`` is ``sha256:`` +
+    JCS(evidence). Recomputing and comparing proves the evidence is the evidence
+    that was signed, so a relabeled ``maxClass`` is rejected even though the record
+    signature still verifies.
+
+    Returns ``False`` when the structure is missing, the canonicalization is not
+    ``JCS``, or the digest does not match. It does NOT verify the signature
+    itself: the digest is under signature only if the signature over the record
+    also verifies, so a caller that needs the full guarantee against a key must
+    pair this with signature verification. Without a key, this still defeats the
+    naive relabel (mutate ``maxClass``, leave the digest), which is the attack a
+    held-set-alone gate is exposed to.
+    """
+    if not isinstance(receipt, dict):
+        return False
+    evidence = receipt.get("evidence")
+    record = receipt.get("record")
+    if not isinstance(evidence, dict) or not isinstance(record, dict):
+        return False
+    derived = record.get("decisionDerived")
+    ref = derived.get("evidenceRef") if isinstance(derived, dict) else None
+    if not isinstance(ref, dict) or ref.get("canonicalization") != "JCS":
+        return False
+    signed = ref.get("digest")
+    if not isinstance(signed, str):
+        return False
+    return "sha256:" + hashlib.sha256(canonical_json(evidence)).hexdigest() == signed
 
 
 @dataclass(frozen=True)
@@ -137,6 +175,9 @@ def verify_contiguity(
     is invisible from the held set alone. See the inline note below. The seal may
     also carry ``maxClass`` (the highest action class the boundary authorized),
     surfaced as ``worst_case_class`` so a gap's worst case is read held-set-alone.
+    ``maxClass`` is read off the evidence as given and is unsigned on its own; it
+    is trustworthy only if the caller has verified each receipt's signature and
+    ``evidence_binding_ok`` (see ``enforce_on_sealed_class``).
     """
     boundary, blocks = _completeness_records(evidence_records, boundary_id)
     # A sealing block (``{"sealed": True, "total": N}``) pins the run length
@@ -274,11 +315,23 @@ def enforce_on_sealed_class(
     case at ``maxClass``. The gate does not need the dropped record; it needs
     only the bound the seal already committed.
 
-    Scope (honest by construction): the bound is trustworthy under the honest
-    issuer whose seal commits before any tail is trimmed. A dishonest issuer
-    that *under-seals* the class is not caught here; that case falls to
-    reconciliation against the issuer's log, not to this held-set-alone gate.
-    The gate consumes a committed bound; it does not detect a lying seal.
+    Integrity assumption (load-bearing): this reads ``maxClass`` off the
+    ``evidence`` halves it is given and does NOT verify signatures or the
+    evidence binding. ``maxClass`` is unsigned on its own; it rides under
+    signature only via ``record.decisionDerived.evidenceRef.digest`` ==
+    ``sha256:`` + JCS(evidence). A caller MUST therefore pass evidence taken from
+    receipts whose signature verifies AND whose ``evidence_binding_ok`` holds,
+    else an agent loosens the gate by relabeling an irreversible action's class
+    into a permitted one with the record signature still intact. Use
+    ``evidence_binding_ok`` (and a signature check against the issuer key) before
+    calling, or call ``vaara enforce-by-class`` which does this for you.
+
+    Scope (honest by construction): even with verified, bound evidence, the bound
+    is trustworthy under the honest issuer whose seal commits before any tail is
+    trimmed. A dishonest issuer that *under-seals* the class is not caught here;
+    that case falls to reconciliation against the issuer's log, not to this
+    held-set-alone gate. The gate consumes a committed bound; it does not detect a
+    lying seal.
 
     ``boundary_id`` is inferred when the records name exactly one boundary;
     ``verify_contiguity`` raises ``ValueError`` if they span several and none is

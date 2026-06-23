@@ -26,6 +26,7 @@ from vaara.credential._contiguity import (
     ClassGateDecision,
     ContiguityReport,
     enforce_on_sealed_class,
+    evidence_binding_ok,
     verify_contiguity,
 )
 from vaara.credential._grant_capability import Capability
@@ -65,6 +66,7 @@ __all__ = [
     "build_authorization_evidence",
     "emit_grant",
     "enforce_on_sealed_class",
+    "evidence_binding_ok",
     "grant_from_dict",
     "mint_authorization_receipt",
     "mint_for_signer",

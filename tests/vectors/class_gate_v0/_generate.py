@@ -1,8 +1,8 @@
 #!/usr/bin/env python3
 """Regenerate the class_gate_v0 conformance vectors.
 
-Enforcement-time consumption of a sealed worst-case class (C9.2.4 consuming
-C9.2.10 as data). A chain recipient gates its own next unattended action on the
+Enforcement-time consumption of a sealed worst-case class. A chain recipient gates
+its own next unattended action on the
 boundary's sealed ``maxClass`` (the v1.7.0 seal): it holds a policy set of action
 classes it will proceed under (``permitted_classes``) and permits iff the sealed
 class is a member of that set, failing closed when no class is sealed. The gate is
@@ -150,6 +150,7 @@ def main() -> int:
         permit, reason = _gate(max_class)
         expected[case] = {
             "all_signatures_ok": True,
+            "all_evidence_bound": True,
             "permit": permit,
             "reason": reason,
             "worstCaseClass": max_class,
@@ -159,8 +160,32 @@ def main() -> int:
             },
         }
 
+    # deny_relabeled: the adversary Mayur021 named. Mint an honest tx.transfer
+    # seal (correctly denied), then relabel maxClass DOWN to a permitted class
+    # WITHOUT re-signing. The record signature still verifies (it never covered
+    # the evidence block); the evidence no longer recomputes to the signed
+    # evidenceRef.digest. A binding-checking gate drops the unbound seal and fails
+    # closed; a gate that reads maxClass raw is tricked into permit.
+    relabeled = "deny_relabeled"
+    for seq in range(STREAM_LEN):
+        _write(HERE / relabeled / f"{slug}-{seq:04d}-authz.json", seq_items[seq])
+    tampered = _seal("tx.transfer")
+    tampered["evidence"]["completeness"]["maxClass"] = "data.read"
+    _write(HERE / relabeled / seal_name, tampered)
+    expected[relabeled] = {
+        "all_signatures_ok": True,
+        "all_evidence_bound": False,
+        "permit": False,
+        "reason": "unbounded_no_sealed_class",
+        "worstCaseClass": None,
+        "contiguity": {
+            "ok": True, "present": STREAM_LEN,
+            "expected": STREAM_LEN, "missingSeqs": [],
+        },
+    }
+
     _write(HERE / "expected.json", {"permittedClasses": PERMITTED_CLASSES, "cases": expected})
-    print("wrote class_gate_v0 vectors: " + ", ".join(_CASES))
+    print("wrote class_gate_v0 vectors: " + ", ".join([*_CASES, relabeled]))
     return 0
 
 

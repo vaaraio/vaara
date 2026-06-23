@@ -39,11 +39,39 @@ def test_independent_checker_passes():
         ("permit_gap_bounded", 0),
         ("deny_class", 1),
         ("deny_unbounded", 1),
+        ("deny_relabeled", 1),
     ],
 )
 def test_cli_enforce_by_class(case, code):
     proc = subprocess.run(
         [sys.executable, "-m", "vaara.cli", "enforce-by-class", str(VECTORS / case), *_PERMIT],
+        capture_output=True,
+        text=True,
+    )
+    assert proc.returncode == code, proc.stdout + proc.stderr
+
+
+def test_cli_relabeled_seal_fails_closed_keyless():
+    # The relabel attack: maxClass changed to a permitted class after signing. The
+    # keyless binding check must drop the unbound seal and deny.
+    proc = subprocess.run(
+        [sys.executable, "-m", "vaara.cli", "enforce-by-class",
+         str(VECTORS / "deny_relabeled"), *_PERMIT],
+        capture_output=True,
+        text=True,
+    )
+    assert proc.returncode == 1, proc.stdout + proc.stderr
+    assert "does not bind" in proc.stderr
+
+
+@pytest.mark.parametrize("case,code", [("permit", 0), ("deny_relabeled", 1)])
+def test_cli_enforce_by_class_with_key(case, code):
+    # With --key the issuer signature is verified too; the honest permit still
+    # permits and the relabeled seal still denies.
+    key = VECTORS / "keys" / "es256_public.pem"
+    proc = subprocess.run(
+        [sys.executable, "-m", "vaara.cli", "enforce-by-class", str(VECTORS / case),
+         *_PERMIT, "--key", str(key)],
         capture_output=True,
         text=True,
     )
