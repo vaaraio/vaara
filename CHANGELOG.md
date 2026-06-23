@@ -4,6 +4,15 @@ All notable changes to this project are documented here.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/)
 and this project follows [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [1.10.0] - 2026-06-23
+
+Minor release: the universal evidence sink. Foreign evidence flows in; one canonical signed record flows out, so adjacent formats become source formats rather than rivals.
+
+- New `vaara.ingest/v0` signed envelope and the `vaara ingest` verb. It seals any record `normalize` understands (SEP-2643, SEP-2787, SEP-2817, or an unrecognized record) into one signed, content-addressed envelope. `evidenceRef.digest` is `sha256:` + JCS(normalized evidence); the honest gap report (`missing`), the established proof fields (`sep2828`), and the non-proof context (`advisory`) all live inside that digested object, so editing the gap report or a proof field breaks the signature. The envelope asserts nothing the source did not establish: no fabricated verdict, no fabricated back-link, which is why it is a sibling of `vaara.receipt/v1` and cannot reuse the receipt or authorization envelopes. Reuses the JCS + ES256/HS256/RS256 stack with no new crypto. `completeness` carries a per-stream `seq` and `runningCount`, so a dropped record inside a stream is a provable gap.
+- The published conformance corpus is generated from the registry, not authored by hand. `tests/vectors/ingest_v0/_generate.py` loops the normalize input corpus into deterministic `{record, evidence}` pairs; `_check_independent.py` reproduces every content address and HS256 signature with no Vaara import (pure standard library plus the JCS canonicalizer). Adding a source format is a `SourceProfile` registration plus one input fixture, and its vector materializes from the loop. A drift guard fails the suite if emit logic changes without a regenerate.
+- `vaara ingest RECORD.json` signs with a PEM `--key` (EC P-256 to ES256, RSA to RS256) or `--hs256-secret-file`, and writes the `{record, evidence}` pair to stdout or `--out`.
+- `SPEC.md` Section 6 specifies the envelope and its conformance run; Conformance and Versioning renumber to Sections 7 and 8.
+
 ## [1.9.1] - 2026-06-23
 
 - Bind the sealed `maxClass` to the signature at every consume path, closing a relabeling gap in the v1.9.0 enforce-by-class gate. `maxClass` lives in the unsigned `evidence` block; it rides under signature only through the binding `decisionDerived.evidenceRef.digest` == `sha256:` + JCS(`evidence`). v1.9.0 verified the record signature but never recomputed that digest, so relabeling a sealed `maxClass` to a permitted class left the record signature intact and the gate trusted the forgery. Now the sealed class is consumed only from a seal whose evidence binds; an unbound (relabeled) seal contributes no class and the gate fails closed. New `evidence_binding_ok(receipt)` in `vaara.credential` performs the check; the independent checker reports `all_evidence_bound` and gates `maxClass` on it; `vaara enforce-by-class` drops unbound receipts before gating and takes an optional `--key` to verify issuer signatures too.
