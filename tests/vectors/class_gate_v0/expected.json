@@ -1,6 +1,7 @@
 {
   "cases": {
     "deny_class": {
+      "all_evidence_bound": true,
       "all_signatures_ok": true,
       "contiguity": {
         "expected": 3,
@@ -12,7 +13,21 @@
       "reason": "class_not_permitted",
       "worstCaseClass": "tx.transfer"
     },
+    "deny_relabeled": {
+      "all_evidence_bound": false,
+      "all_signatures_ok": true,
+      "contiguity": {
+        "expected": 3,
+        "missingSeqs": [],
+        "ok": true,
+        "present": 3
+      },
+      "permit": false,
+      "reason": "unbounded_no_sealed_class",
+      "worstCaseClass": null
+    },
     "deny_unbounded": {
+      "all_evidence_bound": true,
       "all_signatures_ok": true,
       "contiguity": {
         "expected": 3,
@@ -27,6 +42,7 @@
       "worstCaseClass": null
     },
     "permit": {
+      "all_evidence_bound": true,
       "all_signatures_ok": true,
       "contiguity": {
         "expected": 3,
@@ -39,6 +55,7 @@
       "worstCaseClass": "data.read"
     },
     "permit_gap_bounded": {
+      "all_evidence_bound": true,
       "all_signatures_ok": true,
       "contiguity": {
         "expected": 3,

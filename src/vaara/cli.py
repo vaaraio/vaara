@@ -2343,14 +2343,42 @@ def _cmd_verify_contiguity(args: argparse.Namespace) -> int:
     return 0 if report.ok else 1
 
 
+def _receipt_signature_verifies(payload: dict, verifying_material: Any) -> bool:
+    """The receipt's ES256 record signature verifies under ``verifying_material``.
+
+    ``payload`` is a full authorization receipt; only the ``record`` half is
+    signed. Reuses the production decision-record verifier. Returns False on a
+    malformed record rather than raising, so a bad receipt is dropped, not fatal.
+    """
+    from vaara.attestation.decision import (
+        parse_decision_record,
+        verify_decision_signature,
+    )
+    from vaara.attestation.sep2787 import AttestationError
+
+    try:
+        record = parse_decision_record(payload["record"])
+    except (AttestationError, KeyError, TypeError, ValueError):
+        return False
+    return verify_decision_signature(record, verifying_material=verifying_material)
+
+
 def _cmd_enforce_by_class(args: argparse.Namespace) -> int:
     """Gate the next unattended action on a boundary's sealed worst-case class.
 
-    Reads the ``evidence`` half of each ``*-authz.json`` file and permits iff the
-    boundary's sealed ``maxClass`` is in ``--permit``; fails closed when no class
-    is sealed. Exit 0 permit, 1 deny, 2 on a usage or input error.
+    Reads each ``*-authz.json`` as a full authorization receipt and consumes the
+    sealed ``maxClass`` ONLY from receipts whose ``evidence`` binds to their
+    signed ``decisionDerived.evidenceRef.digest`` (``evidence_binding_ok``). A
+    receipt that does not bind, e.g. a ``maxClass`` relabeled after signing or an
+    evidence-only file with no record to bind against, is dropped before gating,
+    so a relabeled seal fails closed instead of loosening the gate. With ``--key``
+    (an ES256 public PEM) each receipt's signature is verified too and any that
+    does not verify is dropped, which closes the full forgery (recompute the
+    digest AND re-sign needs the key). Permits iff the surviving sealed
+    ``maxClass`` is in ``--permit``; fails closed when no class is sealed. Exit 0
+    permit, 1 deny, 2 on a usage or input error.
     """
-    from vaara.credential import enforce_on_sealed_class
+    from vaara.credential import enforce_on_sealed_class, evidence_binding_ok
 
     files: list[Path] = []
     for raw in args.paths:
@@ -2366,16 +2394,52 @@ def _cmd_enforce_by_class(args: argparse.Namespace) -> int:
         )
         return 2
 
+    verifying_material = None
+    if args.key:
+        from cryptography.hazmat.primitives import serialization
+
+        key_path = Path(args.key).expanduser()
+        try:
+            verifying_material = serialization.load_pem_public_key(
+                key_path.read_bytes()
+            )
+        except (OSError, ValueError) as exc:
+            print(f"vaara enforce-by-class: --key: {exc}", file=sys.stderr)
+            return 2
+
     evidence: list[dict] = []
+    dropped_unbound = 0
+    dropped_unsigned = 0
     for f in files:
         try:
             payload = json.loads(f.read_text(encoding="utf-8"))
         except (OSError, json.JSONDecodeError) as exc:
             print(f"vaara enforce-by-class: {f}: {exc}", file=sys.stderr)
             return 2
-        ev = payload.get("evidence", payload) if isinstance(payload, dict) else None
-        if isinstance(ev, dict):
-            evidence.append(ev)
+        if not isinstance(payload, dict):
+            continue
+        if not evidence_binding_ok(payload):
+            dropped_unbound += 1
+            continue
+        if verifying_material is not None and not _receipt_signature_verifies(
+            payload, verifying_material
+        ):
+            dropped_unsigned += 1
+            continue
+        evidence.append(payload["evidence"])
+
+    if dropped_unbound:
+        print(
+            f"vaara enforce-by-class: dropped {dropped_unbound} receipt(s) whose "
+            "evidence does not bind to its signed digest; not trusted",
+            file=sys.stderr,
+        )
+    if dropped_unsigned:
+        print(
+            f"vaara enforce-by-class: dropped {dropped_unsigned} receipt(s) whose "
+            "signature did not verify under --key",
+            file=sys.stderr,
+        )
 
     permitted = args.permitted_classes or []
     try:
@@ -4328,8 +4392,11 @@ def build_parser() -> argparse.ArgumentParser:
         help=(
             "Gate the next unattended action on a boundary's sealed worst-case "
             "class: permit iff the sealed maxClass is in --permit, fail closed "
-            "when no class is sealed. A permitted class permits even over a gap, "
-            "since the seal bounds the gap at that class. Exit 0 permit, 1 deny."
+            "when no class is sealed. The maxClass is consumed only from receipts "
+            "whose evidence binds to its signed digest, so a relabeled seal fails "
+            "closed; pass --key to also verify signatures. A permitted class "
+            "permits even over a gap, since the seal bounds the gap at that class. "
+            "Exit 0 permit, 1 deny."
         ),
     )
     pec.add_argument(
@@ -4358,6 +4425,16 @@ def build_parser() -> argparse.ArgumentParser:
         help=(
             "Coverage boundary id to gate on; inferred when the receipts name "
             "exactly one boundary"
+        ),
+    )
+    pec.add_argument(
+        "--key",
+        default=None,
+        metavar="PEM",
+        help=(
+            "ES256 public key (PEM) of the issuer; when given, each receipt's "
+            "signature is verified and any that does not verify is dropped before "
+            "gating. Without it, the evidence-to-digest binding is still enforced"
         ),
     )
     pec.add_argument(

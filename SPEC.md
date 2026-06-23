@@ -250,8 +250,19 @@ it at or below a ceiling." Because the seal bounds a gap's worst case at
 recipient consumes the committed bound and does not re-derive the chain or query a
 log. The bound is trustworthy under the honest issuer whose seal commits before any
 tail is trimmed; a seal that under-states the class is a reconciliation question
-against the issuer's log, not one this held-set-alone gate answers. The conformance
-vectors are in `tests/vectors/class_gate_v0/`.
+against the issuer's log, not one this held-set-alone gate answers.
+
+`maxClass` lives in the unsigned `evidence` block, so a recipient MUST NOT consume
+it raw. It rides under signature only through the binding: the seal's signed
+`decisionDerived.evidenceRef.digest` is `sha256:` + JCS(`evidence`), so recomputing
+that digest proves the class is the class that was signed. Before gating, a
+recipient MUST verify each receipt's signature and that its evidence recomputes to
+the signed digest; a seal whose binding fails is not trusted, contributes no class,
+and the gate fails closed. Without this, an agent loosens the gate by relabeling an
+irreversible action's class into a permitted one while the record signature, which
+never covered the evidence, still verifies. The conformance vectors are in
+`tests/vectors/class_gate_v0/`; the `deny_relabeled` case carries exactly this
+attack and the independent checker rejects it.
 
 ### 5.4 Profile example: AP2 checkout binding
 

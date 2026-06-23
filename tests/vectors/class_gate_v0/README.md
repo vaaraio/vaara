@@ -10,9 +10,8 @@ import.
 
 This is the artifact behind "the sealed `maxClass`, beyond bounding a gap at audit
 time, is consumable at enforcement time": moving worst-case-across-chain from an
-audit property to an enforcement one (C9.2.4 consuming C9.2.10 as data). See the
-parent `SPEC.md` Section 5.3 and `tests/vectors/external_evidence_v0/` for the
-completeness half this reuses.
+audit property to an enforcement one. See the parent `SPEC.md` Section 5.3 and
+`tests/vectors/external_evidence_v0/` for the completeness half this reuses.
 
 ## The gate
 
@@ -22,8 +21,12 @@ below a ceiling"; it asks "is the sealed class one I permit." It reads the bound
 off the boundary and does not re-derive the chain or query a log:
 
 - The seal pins the run length and, optionally, the highest action class the
-  boundary authorized (`maxClass`). It is minted as a signed terminal receipt
-  here, so the bound is under signature, not asserted loose.
+  boundary authorized (`maxClass`). `maxClass` lives in the unsigned `evidence`
+  block; what carries it under signature is the binding: the seal's signed
+  `decisionDerived.evidenceRef.digest` is `sha256:` + JCS(evidence), so
+  recomputing the digest proves the class is the class that was signed. The gate
+  consumes `maxClass` only from a seal whose evidence binds; an unbound (relabeled)
+  seal contributes no class and the gate fails closed.
 - `permitted` when the sealed class is in `permittedClasses`; `class_not_permitted`
   when it is outside; `unbounded_no_sealed_class` when no class is sealed, so a
   gap's worst case is unbounded and the gate fails closed.
@@ -49,13 +52,24 @@ a third party reaches the same permit/deny offline from the committed bytes.
   set), so contiguous but denied.
 - `deny_unbounded/`: seq 1 withheld plus a seal that names no class, a gap whose
   worst case is unbounded, so the gate fails closed and denies.
+- `deny_relabeled/`: the adversary. A full run plus a seal whose `maxClass` was
+  relabeled from `tx.transfer` to the permitted `data.read` after signing. The
+  record signature still verifies (`all_signatures_ok` true), but the evidence no
+  longer recomputes to the signed digest (`all_evidence_bound` false), so the gate
+  refuses to consume the class and fails closed. A gate that read `maxClass` raw
+  would be tricked into permit.
 
 ## Verdicts
 
-Per case: `all_signatures_ok`, `contiguity` (`ok` / `present` / `expected` /
-`missingSeqs`), and the gate decision (`permit` / `reason` / `worstCaseClass`).
-The expected matrix is `expected.json`. Note `permit_gap_bounded` permits while its
-`contiguity.ok` is false: the gap is real, and the seal bounds it.
+Per case: `all_signatures_ok`, `all_evidence_bound`, `contiguity` (`ok` /
+`present` / `expected` / `missingSeqs`), and the gate decision (`permit` /
+`reason` / `worstCaseClass`). The expected matrix is `expected.json`.
+`all_evidence_bound` is the load-bearing one: it recomputes each receipt's
+`evidence` digest against the signed `evidenceRef.digest`, which is what places the
+sealed `maxClass` under signature. Note `permit_gap_bounded` permits while its
+`contiguity.ok` is false (the gap is real, the seal bounds it), and
+`deny_relabeled` denies while `all_signatures_ok` is true (the signature holds, the
+binding does not).
 
 ## Run
 
