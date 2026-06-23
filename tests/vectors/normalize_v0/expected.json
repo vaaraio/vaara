@@ -1,4 +1,30 @@
 {
+  "c2pa_manifest": {
+    "advisory": {
+      "claimGenerator": "vaara/1.10.0 c2pa-rs/0.36.0",
+      "firstAssertion": "c2pa.actions",
+      "format": "image/jpeg",
+      "title": "press-photo.jpg"
+    },
+    "evidencePlane": null,
+    "missing": [
+      "alg",
+      "signature",
+      "backLink",
+      "receiptAsserted",
+      "outcomeDerived"
+    ],
+    "notes": [
+      "a C2PA manifest asserts content provenance (who or what created or edited an asset, with which assertions); it is media lineage, not an execution decision-and-outcome",
+      "the manifest is sealed into a COSE/DSSE signature at embed time by the signer; the manifest-definition document carries no signature, so alg/signature/receiptAsserted stay a separate event",
+      "no SEP-2828 back-link (an attested request) is present"
+    ],
+    "populated": [],
+    "recognized": true,
+    "sep2828": {},
+    "sourceFormat": "c2pa-manifest",
+    "sourceTitle": "C2PA content provenance manifest"
+  },
   "sep2643_rar_denial": {
     "advisory": {
       "authorizationContextId": "authzctx_pay_9f2c",
@@ -227,6 +253,31 @@
     "sep2828": {},
     "sourceFormat": "sep2817",
     "sourceTitle": "SEP-2817 AI invocation audit context"
+  },
+  "slsa_provenance": {
+    "advisory": {
+      "buildType": "https://github.com/slsa-framework/slsa-github-generator/generic@v1",
+      "builderId": "https://github.com/slsa-framework/slsa-github-generator/.github/workflows/builder_generic_slsa3.yml@refs/tags/v2.0.0",
+      "subjectName": "pkg:pypi/vaara@1.10.0"
+    },
+    "evidencePlane": null,
+    "missing": [
+      "alg",
+      "signature",
+      "backLink",
+      "receiptAsserted",
+      "outcomeDerived"
+    ],
+    "notes": [
+      "a SLSA provenance statement attests how an artifact was built (builder, build type, materials); it is build-time lineage, not an execution decision-and-outcome",
+      "the in-toto Statement is carried in a DSSE envelope whose signature is not modeled here; alg/signature/receiptAsserted remain a separate signing event",
+      "subject[].digest binds the built artifact, but no SEP-2828 back-link (an attested request) is present"
+    ],
+    "populated": [],
+    "recognized": true,
+    "sep2828": {},
+    "sourceFormat": "slsa-provenance",
+    "sourceTitle": "SLSA v1 in-toto provenance"
   },
   "unknown": {
     "advisory": {},

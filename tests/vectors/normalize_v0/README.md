@@ -23,9 +23,17 @@ Each input is a verbatim or near-verbatim example from the source spec.
 | `sep2787_attestation_with_extension.json` | SEP-2787 attestation carrying extension fields | decision-attested | `backLink` (extras dropped) |
 | `sep2817_single.json` | SEP-2817 invocation audit context | decision-input | nothing required (advisory) |
 | `sep2817_multiturn.json` | SEP-2817 (redacted intent, shared turn) | decision-input | nothing required (advisory) |
+| `slsa_provenance.json` | SLSA v1 in-toto provenance (declarative profile) | n/a | nothing required (advisory) |
+| `c2pa_manifest.json` | C2PA content provenance manifest (declarative profile) | n/a | nothing required (advisory) |
 | `unknown.json` | unrecognized object | n/a | nothing |
 
 `expected.json` holds the normalized mapping for each input.
+
+The `slsa-provenance` and `c2pa-manifest` rows come from declarative profiles:
+data-only specs under `src/vaara/attestation/profiles/*.json`, compiled by
+`_declarative.py`. The independent checker reads those same specs and reproduces
+the mapping with its own code, so they are no more self-confirming than the
+hand-written profiles. See `docs/source-profile-contract.md`.
 
 ## What the back-link case proves
 

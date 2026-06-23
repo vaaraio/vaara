@@ -1,0 +1,32 @@
+{
+  "_type": "https://in-toto.io/Statement/v1",
+  "subject": [
+    {
+      "name": "pkg:pypi/vaara@1.10.0",
+      "digest": {"sha256": "9f86d081884c7d659a2feaa0c55ad015a3bf4f1b2b0b822cd15d6c15b0f00a08"}
+    }
+  ],
+  "predicateType": "https://slsa.dev/provenance/v1",
+  "predicate": {
+    "buildDefinition": {
+      "buildType": "https://github.com/slsa-framework/slsa-github-generator/generic@v1",
+      "externalParameters": {
+        "workflow": {
+          "ref": "refs/tags/v1.10.0",
+          "repository": "https://github.com/vaaraio/vaara"
+        }
+      },
+      "resolvedDependencies": [
+        {"uri": "git+https://github.com/vaaraio/vaara@refs/tags/v1.10.0"}
+      ]
+    },
+    "runDetails": {
+      "builder": {
+        "id": "https://github.com/slsa-framework/slsa-github-generator/.github/workflows/builder_generic_slsa3.yml@refs/tags/v2.0.0"
+      },
+      "metadata": {
+        "invocationId": "https://github.com/vaaraio/vaara/actions/runs/9876543210"
+      }
+    }
+  }
+}

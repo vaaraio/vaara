@@ -1,0 +1,52 @@
+{
+  "evidence": {
+    "advisory": {
+      "claimGenerator": "vaara/1.10.0 c2pa-rs/0.36.0",
+      "firstAssertion": "c2pa.actions",
+      "format": "image/jpeg",
+      "title": "press-photo.jpg"
+    },
+    "evidencePlane": null,
+    "missing": [
+      "alg",
+      "signature",
+      "backLink",
+      "receiptAsserted",
+      "outcomeDerived"
+    ],
+    "notes": [
+      "a C2PA manifest asserts content provenance (who or what created or edited an asset, with which assertions); it is media lineage, not an execution decision-and-outcome",
+      "the manifest is sealed into a COSE/DSSE signature at embed time by the signer; the manifest-definition document carries no signature, so alg/signature/receiptAsserted stay a separate event",
+      "no SEP-2828 back-link (an attested request) is present"
+    ],
+    "populated": [],
+    "recognized": true,
+    "sep2828": {},
+    "sourceFormat": "c2pa-manifest",
+    "sourceTitle": "C2PA content provenance manifest"
+  },
+  "record": {
+    "alg": "HS256",
+    "completeness": {
+      "runningCount": 1,
+      "seq": 1
+    },
+    "evidenceRef": {
+      "canonicalization": "JCS",
+      "digest": "sha256:3d02ab1236af269f497797fe75f08ec772fc1080e66c424a03d53ab54fbe5cf7",
+      "schema": "vaara.normalized-evidence/v0"
+    },
+    "ingestAsserted": {
+      "alg": "HS256",
+      "iat": "2026-06-23T00:00:00Z",
+      "iss": "did:web:vaara.io",
+      "nonce": "ingest-fixed-nonce-000000",
+      "secretVersion": "k1",
+      "sub": "sink"
+    },
+    "schema": "vaara.ingest/v0",
+    "signature": "ffb1f8ab39b6436811fd8d969a679fdcb5ee83cfcdf8a2cf804913a9542ca604",
+    "sourceFormat": "c2pa-manifest",
+    "version": 0
+  }
+}

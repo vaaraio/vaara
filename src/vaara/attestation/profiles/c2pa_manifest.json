@@ -1,0 +1,24 @@
+{
+  "sourceFormat": "c2pa-manifest",
+  "sourceTitle": "C2PA content provenance manifest",
+  "priority": 60,
+  "detect": {
+    "all": [
+      {"path": "claim_generator", "exists": true},
+      {"path": "assertions", "exists": true}
+    ]
+  },
+  "evidencePlane": null,
+  "advisory": {
+    "claimGenerator": "claim_generator",
+    "title": "title",
+    "format": "format",
+    "firstAssertion": "assertions[0].label"
+  },
+  "missing": ["alg", "signature", "backLink", "receiptAsserted", "outcomeDerived"],
+  "notes": [
+    "a C2PA manifest asserts content provenance (who or what created or edited an asset, with which assertions); it is media lineage, not an execution decision-and-outcome",
+    "the manifest is sealed into a COSE/DSSE signature at embed time by the signer; the manifest-definition document carries no signature, so alg/signature/receiptAsserted stay a separate event",
+    "no SEP-2828 back-link (an attested request) is present"
+  ]
+}

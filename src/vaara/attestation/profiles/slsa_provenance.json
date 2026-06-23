@@ -1,0 +1,23 @@
+{
+  "sourceFormat": "slsa-provenance",
+  "sourceTitle": "SLSA v1 in-toto provenance",
+  "priority": 50,
+  "detect": {
+    "all": [
+      {"path": "_type", "equals": "https://in-toto.io/Statement/v1"},
+      {"path": "predicateType", "startsWith": "https://slsa.dev/provenance/"}
+    ]
+  },
+  "evidencePlane": null,
+  "advisory": {
+    "subjectName": "subject[0].name",
+    "buildType": "predicate.buildDefinition.buildType",
+    "builderId": "predicate.runDetails.builder.id"
+  },
+  "missing": ["alg", "signature", "backLink", "receiptAsserted", "outcomeDerived"],
+  "notes": [
+    "a SLSA provenance statement attests how an artifact was built (builder, build type, materials); it is build-time lineage, not an execution decision-and-outcome",
+    "the in-toto Statement is carried in a DSSE envelope whose signature is not modeled here; alg/signature/receiptAsserted remain a separate signing event",
+    "subject[].digest binds the built artifact, but no SEP-2828 back-link (an attested request) is present"
+  ]
+}
