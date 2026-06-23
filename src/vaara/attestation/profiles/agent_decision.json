@@ -1,0 +1,35 @@
+{
+  "sourceFormat": "agent-decision",
+  "sourceTitle": "in-toto agent-decision/v0.1 policy decision",
+  "priority": 40,
+  "detect": {
+    "all": [
+      {"path": "_type", "equals": "https://in-toto.io/Statement/v1"},
+      {"path": "predicateType", "startsWith": "https://in-toto.io/attestation/agent-decision/"}
+    ]
+  },
+  "evidencePlane": "decision-attested",
+  "advisory": {
+    "agentId": "predicate.agent_id",
+    "principal": "predicate.principal",
+    "decision": "predicate.decision",
+    "decidedAt": "predicate.decided_at",
+    "firstPolicyId": "predicate.policy_evaluations[0].policy_id",
+    "firstPolicyResult": "predicate.policy_evaluations[0].result",
+    "firstToolName": "predicate.tool_calls[0].name",
+    "firstToolArgsHash": "predicate.tool_calls[0].args_hash",
+    "firstToolArgsCanonicalization": "predicate.tool_calls[0].args_canonicalization",
+    "firstToolArgsState": "predicate.tool_calls[0].args_state",
+    "secondToolName": "predicate.tool_calls[1].name",
+    "secondToolArgsState": "predicate.tool_calls[1].args_state"
+  },
+  "sep2828": {},
+  "missing": ["alg", "signature", "backLink", "receiptAsserted", "outcomeDerived"],
+  "notes": [
+    "an agent-decision predicate records an agent's policy verdict on a tool call (which policies evaluated, allow or deny, the per-call argument commitment, when); it is the attested-decision face of an execution event, the closest foreign analog to a signed decision record",
+    "the in-toto Statement is carried in a DSSE envelope whose signature is not modeled here; alg, signature, and receiptAsserted remain a separate signing event, so the predicate declares the decision but does not on its own carry the issuer signature that makes it a receipt assertion",
+    "tool_calls[].args_hash commits the call arguments but is not a SEP-2828 backLink, which pins the attestationDigest of an attested request a conformant receipt must answer; the commitment is portable only when args_canonicalization names a shared projection, here JCS (RFC 8785)",
+    "args_state carries the explicit-omission state as a first-class attested value (present, args_redacted, args_unavailable, args_not_recorded), so a redacted call and an unrecorded call stay distinct claims rather than collapsing into one missing field",
+    "the predicate records the decision (allow or deny the call), not outcomeDerived (whether the call then executed and with what result)"
+  ]
+}

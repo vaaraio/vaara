@@ -25,9 +25,20 @@ Each input is a verbatim or near-verbatim example from the source spec.
 | `sep2817_multiturn.json` | SEP-2817 (redacted intent, shared turn) | decision-input | nothing required (advisory) |
 | `slsa_provenance.json` | SLSA v1 in-toto provenance (declarative profile) | n/a | nothing required (advisory) |
 | `c2pa_manifest.json` | C2PA content provenance manifest (declarative profile) | n/a | nothing required (advisory) |
+| `agent_decision.json` | in-toto agent-decision/v0.1 policy decision (declarative profile) | decision-attested | nothing required (advisory) |
 | `unknown.json` | unrecognized object | n/a | nothing |
 
 `expected.json` holds the normalized mapping for each input.
+
+The `agent-decision` row covers the closest foreign format to a native signed
+decision record: an in-toto predicate that names the policy verdict, the
+per-call argument commitments with their explicit-omission state, and the
+allow/deny. It maps to the decision-attested plane, yet still fills no SEP-2828
+field on its own, because its signature lives in the DSSE envelope (not modeled
+here) and its `args_hash` is an argument commitment, not a back-link to an
+attested request. The honest gap is the wedge. A DSSE-signed, public-key-
+verifiable form of this same statement is the conformance vector in
+`../agent_decision_v0/`.
 
 The `slsa-provenance` and `c2pa-manifest` rows come from declarative profiles:
 data-only specs under `src/vaara/attestation/profiles/*.json`, compiled by

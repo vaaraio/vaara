@@ -1,0 +1,31 @@
+{
+  "_type": "https://in-toto.io/Statement/v1",
+  "subject": [
+    {
+      "name": "tool:payments.transfer",
+      "digest": {"sha256": "a272e30c87687285d7a8dcd6c5e23254cd5db2c6820254df542c2918e00117bd"}
+    }
+  ],
+  "predicateType": "https://in-toto.io/attestation/agent-decision/v0.1",
+  "predicate": {
+    "agent_id": "agent:acme/checkout-bot/1",
+    "principal": "tenant:acme-eu",
+    "decision": "deny",
+    "decided_at": "2026-06-23T12:00:05Z",
+    "policy_evaluations": [
+      {"policy_id": "policy:spend-cap/eur-500", "result": "deny", "rule": "amount.le.50000"}
+    ],
+    "tool_calls": [
+      {
+        "name": "payments.transfer",
+        "args_hash": "sha256:91c0c215cce3f5e7c49d2ddf0a540eb2255554ea3e7a885067d39168b3ac8564",
+        "args_canonicalization": "JCS",
+        "args_state": "present"
+      },
+      {
+        "name": "customer.lookup",
+        "args_state": "args_redacted"
+      }
+    ]
+  }
+}
