@@ -1,0 +1,52 @@
+{
+  "evidence": {
+    "advisory": {
+      "invocationReason": "The user asked to view employee rows, and the employees table was identified as the target table.",
+      "model": "example-model",
+      "turnId": "opaque-client-generated-id",
+      "userIntent": "Show me 10 employees"
+    },
+    "evidencePlane": "decision-input",
+    "missing": [
+      "alg",
+      "signature",
+      "backLink",
+      "receiptAsserted",
+      "outcomeDerived"
+    ],
+    "notes": [
+      "SEP-2817 is client-asserted input audit context; per its own specification it MUST NOT be used as authorization evidence",
+      "it maps to the decision-input plane (the agent's stated intent), the unsigned counterpart of an attested rationale, and populates no required SEP-2828 field",
+      "turnId groups requests from one user turn; it is correlation only"
+    ],
+    "populated": [],
+    "recognized": true,
+    "sep2828": {},
+    "sourceFormat": "sep2817",
+    "sourceTitle": "SEP-2817 AI invocation audit context"
+  },
+  "record": {
+    "alg": "HS256",
+    "completeness": {
+      "runningCount": 1,
+      "seq": 1
+    },
+    "evidenceRef": {
+      "canonicalization": "JCS",
+      "digest": "sha256:1fe5c7025515dfeaef6cd6e88b4ace4de999511008bb0ca7481390aaff48e371",
+      "schema": "vaara.normalized-evidence/v0"
+    },
+    "ingestAsserted": {
+      "alg": "HS256",
+      "iat": "2026-06-23T00:00:00Z",
+      "iss": "did:web:vaara.io",
+      "nonce": "ingest-fixed-nonce-000000",
+      "secretVersion": "k1",
+      "sub": "sink"
+    },
+    "schema": "vaara.ingest/v0",
+    "signature": "d6fdeb5d30e0923f0202f4ea526ec67d46f72dfa7edd73ae9cf79a4d71677be4",
+    "sourceFormat": "sep2817",
+    "version": 0
+  }
+}

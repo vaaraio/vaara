@@ -1,0 +1,57 @@
+{
+  "alg": "HS256",
+  "cases": [
+    "sep2643_rar_denial",
+    "sep2643_scope_denial",
+    "sep2643_url_denial",
+    "sep2787_attestation",
+    "sep2787_attestation_with_extension",
+    "sep2817_multiturn",
+    "sep2817_single",
+    "unknown"
+  ],
+  "corpusDigest": "sha256:917e5f5c8f500982b7e5bbe93664db212f6c45a11e8d6297e2dcb7aa62827682",
+  "fixed": {
+    "iat": "2026-06-23T00:00:00Z",
+    "iss": "did:web:vaara.io",
+    "nonce": "ingest-fixed-nonce-000000",
+    "secretVersion": "k1",
+    "sub": "sink"
+  },
+  "manifest": {
+    "sep2643_rar_denial": {
+      "evidenceDigest": "sha256:06e748273802ade556dac8d705c291af7dc6504ab15f25a31cd9ef102cfe245d",
+      "signature": "4333a5ea4a990207e2a0305890ed7d8cb0722c374be3dba81facd81b8b031395"
+    },
+    "sep2643_scope_denial": {
+      "evidenceDigest": "sha256:7a655ee9e74dd6a2661132f3fc95b6d52f7f9f7598b2839289b709d5abe2f47f",
+      "signature": "74a04d2ee855ab3484b35a53fb14620bf39d6d77dc7966d80fdc494c124208c1"
+    },
+    "sep2643_url_denial": {
+      "evidenceDigest": "sha256:900db896cfb906480651be2c3fab953c08b733f8c911f8d06ba96d66542f1367",
+      "signature": "fc5f9bfa55602c3f7bdc3039d05a3ff8364ac98974a959fab7d7420d76d7db21"
+    },
+    "sep2787_attestation": {
+      "evidenceDigest": "sha256:9bd7611b104a86a21e59f03f3ab78f4d9a5e1dca6b6453a6bcf6f780625f8052",
+      "signature": "19451f4c1298d80e57206d3d492a31d4ed28be7d4f85946ae817ff3073852495"
+    },
+    "sep2787_attestation_with_extension": {
+      "evidenceDigest": "sha256:9bd7611b104a86a21e59f03f3ab78f4d9a5e1dca6b6453a6bcf6f780625f8052",
+      "signature": "19451f4c1298d80e57206d3d492a31d4ed28be7d4f85946ae817ff3073852495"
+    },
+    "sep2817_multiturn": {
+      "evidenceDigest": "sha256:e5e2ff7b6c35e8a9de5086ddb9764ef4c321456ec8aba30dd08bcd8b5f8e68e8",
+      "signature": "1d188537ce03f2c8eb2feac5463a2bcc2093ac68764b44f64fd1f0412ba27af0"
+    },
+    "sep2817_single": {
+      "evidenceDigest": "sha256:1fe5c7025515dfeaef6cd6e88b4ace4de999511008bb0ca7481390aaff48e371",
+      "signature": "d6fdeb5d30e0923f0202f4ea526ec67d46f72dfa7edd73ae9cf79a4d71677be4"
+    },
+    "unknown": {
+      "evidenceDigest": "sha256:51699f76cdeb6fbedf45041ff60720aeaa3a74fe8c846b31990485897638ee69",
+      "signature": "0226a4e0414e58956a822d8317f3130cd91defdac939863fc21a35da6239e646"
+    }
+  },
+  "schema": "vaara.ingest-conformance/v0",
+  "sharedSecretHex": "696e676573742d636f6e666f726d616e63652d7368617265642d7365637265742d30303031"
+}

@@ -2846,6 +2846,94 @@ def _cmd_normalize(args: argparse.Namespace) -> int:
     return 0 if result.recognized else 1
 
 
+def _resolve_ingest_signer(args: argparse.Namespace) -> tuple[Any, Any, str]:
+    """Resolve the signing material and alg for ``vaara ingest``.
+
+    Returns ``(signing_material, alg, error)``. ``error`` is "" on success.
+    HS256 takes a raw shared-secret file; a PEM private key signs ES256 (EC)
+    or RS256 (RSA), the alg detected from the key type, mirroring the
+    ``--pubkey-file`` / ``--hs256-secret-file`` split on the verify side.
+    """
+    if args.hs256_secret_file:
+        try:
+            secret = Path(args.hs256_secret_file).expanduser().read_bytes()
+        except OSError as exc:
+            return None, None, f"--hs256-secret-file: {exc}"
+        return secret, "HS256", ""
+    if args.key:
+        from cryptography.hazmat.primitives import serialization
+        from cryptography.hazmat.primitives.asymmetric import ec, rsa
+        try:
+            priv = serialization.load_pem_private_key(
+                Path(args.key).expanduser().read_bytes(), password=None
+            )
+        except (OSError, ValueError) as exc:
+            return None, None, f"--key: {exc}"
+        if isinstance(priv, ec.EllipticCurvePrivateKey):
+            return priv, "ES256", ""
+        if isinstance(priv, rsa.RSAPrivateKey):
+            return priv, "RS256", ""
+        return None, None, "--key: unsupported key type (need EC P-256 or RSA)"
+    return None, None, "one of --key (PEM) or --hs256-secret-file is required"
+
+
+def _cmd_ingest(args: argparse.Namespace) -> int:
+    """Seal one foreign evidence record into a signed vaara.ingest/v0 envelope.
+
+    The universal sink. Reads any record ``normalize`` understands, maps it
+    onto the SEP-2828 evidence model, and seals it into one signed,
+    content-addressed envelope: ``evidenceRef.digest`` pins the normalized
+    evidence, and the honest gap report rides inside that digest under the
+    signature. Nothing the source did not establish is asserted; an
+    unrecognized record still seals, honestly marked as such.
+    """
+    from vaara.attestation.receipt import emit_ingest_receipt, normalize
+    from vaara.attestation.sep2787 import AttestationError
+
+    path = Path(args.record).expanduser()
+    if not path.is_file():
+        print(f"vaara ingest: not a file: {path}", file=sys.stderr)
+        return 2
+    try:
+        doc = json.loads(path.read_text(encoding="utf-8"))
+    except (json.JSONDecodeError, OSError) as exc:
+        print(f"vaara ingest: cannot read record JSON: {exc}", file=sys.stderr)
+        return 1
+
+    signing_material, alg, error = _resolve_ingest_signer(args)
+    if error:
+        print(f"vaara ingest: {error}", file=sys.stderr)
+        return 2
+
+    normalized = normalize(doc, source_format=args.format)
+    try:
+        receipt = emit_ingest_receipt(
+            normalized=normalized,
+            iss=args.iss,
+            sub=args.sub,
+            secret_version=args.secret_version,
+            alg=alg,
+            signing_material=signing_material,
+            evidence_ref=args.evidence_ref,
+        )
+    except AttestationError as exc:
+        print(f"vaara ingest: {exc}", file=sys.stderr)
+        return 1
+
+    text = json.dumps(receipt.to_dict(), indent=2, sort_keys=True)
+    if args.out:
+        out_path = Path(args.out).expanduser()
+        try:
+            out_path.write_text(text + "\n", encoding="utf-8")
+        except OSError as exc:
+            print(f"vaara ingest: cannot write {out_path}: {exc}", file=sys.stderr)
+            return 1
+        print(f"wrote {out_path} ({normalized.source_format})", file=sys.stderr)
+    else:
+        print(text)
+    return 0
+
+
 def _path_value(doc: dict[str, Any], dotted: str) -> Any:
     """Follow a dotted path into a nested dict; None if absent."""
     cur: Any = doc
@@ -4647,6 +4735,46 @@ def build_parser() -> argparse.ArgumentParser:
         help="Emit the normalized evidence mapping as JSON",
     )
     pnz.set_defaults(func=_cmd_normalize)
+
+    ping = sub.add_parser(
+        "ingest",
+        help="Seal any foreign evidence record into one signed, "
+             "content-addressed vaara.ingest/v0 envelope: normalize it onto "
+             "the SEP-2828 model, then sign, with the honest gap report bound "
+             "under the signature. The universal sink.",
+    )
+    ping.add_argument(
+        "record",
+        help="Path to a JSON file holding a SEP-2643, SEP-2787, or SEP-2817 record",
+    )
+    ping.add_argument(
+        "--format", default="auto",
+        choices=("auto", "sep2643", "sep2787", "sep2817"),
+        help="Source format (default: auto-detect)",
+    )
+    ping.add_argument(
+        "--key",
+        help="PEM private key to sign with (EC P-256 -> ES256, RSA -> RS256)",
+    )
+    ping.add_argument(
+        "--hs256-secret-file", dest="hs256_secret_file", default=None,
+        help="Raw shared-secret file to sign with HS256 (alternative to --key)",
+    )
+    ping.add_argument("--iss", default="urn:vaara:ingest", help="Issuer identity")
+    ping.add_argument("--sub", default="ingest", help="Subject")
+    ping.add_argument(
+        "--secret-version", dest="secret_version", default="1",
+        help="Signing-key version label (default: 1)",
+    )
+    ping.add_argument(
+        "--evidence-ref", dest="evidence_ref", default=None,
+        help="Optional non-authoritative locator (URI/path) for the evidence bytes",
+    )
+    ping.add_argument(
+        "--out", default=None,
+        help="Write the {record, evidence} JSON here (default: stdout)",
+    )
+    ping.set_defaults(func=_cmd_ingest)
 
     pvrs = sub.add_parser(
         "verify-records",
