@@ -28,6 +28,10 @@ from typing import Any, Optional
 
 HERE = Path(__file__).resolve().parent
 AI_KEY = "io.modelcontextprotocol/aiInvocation"
+# Declarative profiles are data: this checker reads the same JSON specs the
+# product ships and reproduces the field-mapping with its own code below,
+# importing nothing from Vaara.
+PROFILE_DIR = HERE.parents[2] / "src" / "vaara" / "attestation" / "profiles"
 
 try:
     import rfc8785
@@ -102,11 +106,88 @@ def normalize(doc: Any) -> dict[str, Any]:
         return _denial_map(doc)
     if _invocation(doc) is not None:
         return _invocation_map(doc)
+    declarative = _declarative_map(doc)
+    if declarative is not None:
+        return declarative
     return _result(
         "unknown", "unrecognized record", False, None, {}, {}, [], [],
         ["not a SEP-2643 denial, SEP-2787 attestation, or SEP-2817 "
          "invocation audit context; nothing to normalize"],
     )
+
+
+def _resolve(doc: Any, path: str) -> Any:
+    """Independent reimplementation of the contract's dotted/[index] path."""
+    cur = doc
+    for raw in path.split("."):
+        key, _, rest = raw.partition("[")
+        if key:
+            if not isinstance(cur, dict) or key not in cur:
+                return None
+            cur = cur[key]
+        for tok in (t for t in rest.split("[") if t):
+            idx = int(tok.rstrip("]"))
+            if not isinstance(cur, list) or idx >= len(cur):
+                return None
+            cur = cur[idx]
+    return cur
+
+
+def _rule_ok(doc: Any, rule: dict[str, Any]) -> bool:
+    value = _resolve(doc, rule["path"])
+    if "equals" in rule:
+        return value == rule["equals"]
+    if "startsWith" in rule:
+        return isinstance(value, str) and value.startswith(rule["startsWith"])
+    if "in" in rule:
+        return value in rule["in"]
+    if "exists" in rule:
+        return (value is not None) == bool(rule["exists"])
+    return False
+
+
+def _spec_lift(doc: Any, mapping: dict[str, Any]) -> dict[str, Any]:
+    out: dict[str, Any] = {}
+    for key, source in mapping.items():
+        if isinstance(source, dict) and "const" in source:
+            out[key] = source["const"]
+        elif isinstance(source, str):
+            value = _resolve(doc, source)
+            if value is not None:
+                out[key] = value
+    return out
+
+
+def _declarative_map(doc: Any) -> dict[str, Any] | None:
+    """Reproduce any matching declarative profile from its shipped JSON spec."""
+    if not isinstance(doc, dict) or not PROFILE_DIR.is_dir():
+        return None
+    specs = [json.loads(p.read_text()) for p in sorted(PROFILE_DIR.glob("*.json"))]
+    specs.sort(key=lambda s: (s.get("priority", 100), s["sourceFormat"]))
+    for spec in specs:
+        detect = spec["detect"]
+        if not all(_rule_ok(doc, r) for r in detect.get("all", [])):
+            continue
+        any_rules = detect.get("any", [])
+        if any_rules and not any(_rule_ok(doc, r) for r in any_rules):
+            continue
+        sep2828: dict[str, Any] = {}
+        populated: list[str] = []
+        for dotted, value in _spec_lift(doc, spec.get("sep2828", {})).items():
+            cur = sep2828
+            parts = dotted.split(".")
+            for part in parts[:-1]:
+                cur = cur.setdefault(part, {})
+            cur[parts[-1]] = value
+            populated.append(dotted)
+        return _result(
+            spec["sourceFormat"], spec["sourceTitle"], True,
+            spec.get("evidencePlane"), sep2828,
+            _spec_lift(doc, spec.get("advisory", {})),
+            sorted(populated), list(spec.get("missing", [])),
+            list(spec.get("notes", [])),
+        )
+    return None
 
 
 def _denial_map(doc: Any) -> dict[str, Any]:

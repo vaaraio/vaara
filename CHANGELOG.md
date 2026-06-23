@@ -4,6 +4,14 @@ All notable changes to this project are documented here.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/)
 and this project follows [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [1.11.0] - 2026-06-23
+
+Minor release: declarative source profiles. Binding a new evidence format to the ingest sink is now a JSON spec dropped into the tree, not an adapter written in Python.
+
+- A source profile can be authored as a JSON spec in `src/vaara/attestation/profiles/`. `_declarative.py` compiles each spec into the same `SourceProfile` the registry already holds, with no change to the hot path. A spec declares how to detect its format and which fields map onto the SEP-2828 evidence block, the established proof fields, and the honest `missing` gap report. It cannot fabricate a value the source did not establish: a signature or a back-link is computed, not copied, so those cases stay in Python by design. The contract is published in `docs/source-profile-contract.md`.
+- Two worked profiles ship with this release. `slsa-provenance` reads an SLSA v1 in-toto provenance statement, and `c2pa-manifest` reads a C2PA manifest. Both seal through `vaara ingest` with an honest gap report and no fabricated proof, so a software-supply-chain or content-provenance artifact becomes a source format rather than something to bind by hand.
+- The independent checker reads the same JSON specs and reproduces their output with zero Vaara import, so a declarative profile is not self-confirming. Conformance vectors for both new profiles materialize from the registry loop in `tests/vectors/ingest_v0/` and `tests/vectors/normalize_v0/`.
+
 ## [1.10.0] - 2026-06-23
 
 Minor release: the universal evidence sink. Foreign evidence flows in; one canonical signed record flows out, so adjacent formats become source formats rather than rivals.

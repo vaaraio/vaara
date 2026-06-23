@@ -477,3 +477,13 @@ register(SourceProfile(
     normalizer=_normalize_invocation,
     priority=30,
 ))
+
+# Declarative (data-only) profiles ship as JSON specs under profiles/ and
+# register here at import, after the built-ins, so a new field-mapping format
+# is a dropped file rather than new dispatch code. Imported at the tail to
+# avoid a circular import: _declarative needs the names defined above.
+from vaara.attestation._declarative import (  # noqa: E402
+    load_builtin_declarative_profiles,
+)
+
+load_builtin_declarative_profiles()
