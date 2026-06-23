@@ -1,0 +1,39 @@
+{
+  "evidence": {
+    "advisory": {},
+    "evidencePlane": null,
+    "missing": [],
+    "notes": [
+      "not a SEP-2643 denial, SEP-2787 attestation, or SEP-2817 invocation audit context; nothing to normalize"
+    ],
+    "populated": [],
+    "recognized": false,
+    "sep2828": {},
+    "sourceFormat": "unknown",
+    "sourceTitle": "unrecognized record"
+  },
+  "record": {
+    "alg": "HS256",
+    "completeness": {
+      "runningCount": 1,
+      "seq": 1
+    },
+    "evidenceRef": {
+      "canonicalization": "JCS",
+      "digest": "sha256:51699f76cdeb6fbedf45041ff60720aeaa3a74fe8c846b31990485897638ee69",
+      "schema": "vaara.normalized-evidence/v0"
+    },
+    "ingestAsserted": {
+      "alg": "HS256",
+      "iat": "2026-06-23T00:00:00Z",
+      "iss": "did:web:vaara.io",
+      "nonce": "ingest-fixed-nonce-000000",
+      "secretVersion": "k1",
+      "sub": "sink"
+    },
+    "schema": "vaara.ingest/v0",
+    "signature": "0226a4e0414e58956a822d8317f3130cd91defdac939863fc21a35da6239e646",
+    "sourceFormat": "unknown",
+    "version": 0
+  }
+}

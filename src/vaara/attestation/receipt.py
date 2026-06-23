@@ -137,6 +137,13 @@ from vaara.attestation._normalize import (
     detect_format,
     normalize,
 )
+from vaara.attestation._ingest_emit import (
+    INGEST_SCHEMA,
+    NORMALIZED_EVIDENCE_SCHEMA,
+    IngestReceipt,
+    emit_ingest_receipt,
+    verify_ingest_signature,
+)
 from vaara.attestation._receipt_conformance import (
     ConformanceCheck,
     ConformanceReport,
@@ -286,6 +293,11 @@ __all__ = [
     "NormalizedEvidence",
     "detect_format",
     "normalize",
+    "INGEST_SCHEMA",
+    "NORMALIZED_EVIDENCE_SCHEMA",
+    "IngestReceipt",
+    "emit_ingest_receipt",
+    "verify_ingest_signature",
     "DidDocumentCache",
     "EvidenceBundle",
     "ExecutionReceipt",

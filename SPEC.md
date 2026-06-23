@@ -351,7 +351,42 @@ receipts, and the issuer's public key, with no live verifier endpoint to trust. 
 execution evidence pins here by naming its artifact through this slot, rather than
 defining a new primitive or a profile of its own.
 
-## 6. Conformance
+## 6. The ingest envelope (`vaara.ingest/v0`)
+
+The profiles in Section 5 bind external evidence *into* a `vaara.receipt/v1`
+decision: they carry a verdict, or a back-link, or both. Not every foreign
+record is a decision. An adjacent log line, an identity assertion, a denial, an
+invocation context establishes something narrower, and forcing it into a receipt
+or an authorization envelope would fabricate a verdict or a back-link the source
+never carried. The ingest envelope is the sink for exactly that case: it wraps
+any foreign record, content-addressed, and asserts nothing the source did not
+establish.
+
+It is a sibling envelope to `vaara.receipt/v1`, not a profile of it, and reuses
+the Section 1 canonicalization and the Section 2.1 signing construction
+unchanged. The signed payload is:
+
+- `schema` = `vaara.ingest/v0`, `version`, `alg`.
+- `sourceFormat`, the recognized format of the foreign record (or `unknown`).
+- `evidenceRef`: `digest` = `sha256(JCS(normalized_evidence))`,
+  `canonicalization` = `JCS`, `schema` = `vaara.normalized-evidence/v0`, and an
+  optional non-authoritative `ref` locator.
+- `ingestAsserted`: `iss` / `sub` / `iat` / `nonce` / `secretVersion` / `alg`.
+- `completeness`: a per-stream `seq` and `runningCount`; a lone ingest is `seq 1`
+  of a one-record stream.
+
+`signature` is appended over the JCS encoding of that payload.
+
+The normalized evidence object pinned by `evidenceRef.digest` carries the SEP-2828
+fields the source establishes (`sep2828`), the context it carries that is not on
+its own a proof (`advisory`), and the honest gap report (`missing`): what a
+complete signed record still needs that this source does not supply. Because the
+object is bound by digest under the signature, editing the gap report, a proof
+field, or the source format breaks verification. The sink never launders a weak
+source into a strong-looking receipt; the `missing` list is the record admitting
+what it is not.
+
+## 7. Conformance
 
 An implementation conforms to `vaara.receipt/v1` if, for every receipt it emits:
 
@@ -363,9 +398,12 @@ An implementation conforms to `vaara.receipt/v1` if, for every receipt it emits:
 
 The committed vectors plus `_check_independent.py` are the reference conformance
 suite; `python tests/vectors/x402_settlement_v0/_check_independent.py` exiting 0
-is a passing run for the x402 profile.
+is a passing run for the x402 profile. A `vaara.ingest/v0` envelope conforms when
+the evidence object recomputes to `evidenceRef.digest` and the signature verifies,
+both reproducible with no Vaara import;
+`python tests/vectors/ingest_v0/_check_independent.py` exiting 0 is a passing run.
 
-## 7. Versioning
+## 8. Versioning
 
 The envelope version is the integer `version` field and the `vaara.receipt/vN`
 schema id. Additive, backward-compatible changes (new optional fields, new

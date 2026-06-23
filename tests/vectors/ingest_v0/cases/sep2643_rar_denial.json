@@ -1,0 +1,60 @@
+{
+  "evidence": {
+    "advisory": {
+      "authorizationContextId": "authzctx_pay_9f2c",
+      "reason": "insufficient_authorization",
+      "remediationHintTypes": [
+        "oauth_authorization_details"
+      ]
+    },
+    "evidencePlane": "outcome",
+    "missing": [
+      "alg",
+      "signature",
+      "backLink",
+      "receiptAsserted",
+      "outcomeDerived.completedAt"
+    ],
+    "notes": [
+      "a denial is the outcome of a refused call: it maps to outcomeDerived.status = refused",
+      "a refused outcome carries no resultCommitment",
+      "authorizationContextId is a correlation handle, not authorization material",
+      "the denial carries no completedAt, no signing envelope, and no back-link; the recording side supplies those"
+    ],
+    "populated": [
+      "outcomeDerived.status"
+    ],
+    "recognized": true,
+    "sep2828": {
+      "outcomeDerived": {
+        "status": "refused"
+      }
+    },
+    "sourceFormat": "sep2643",
+    "sourceTitle": "SEP-2643 authorization denial"
+  },
+  "record": {
+    "alg": "HS256",
+    "completeness": {
+      "runningCount": 1,
+      "seq": 1
+    },
+    "evidenceRef": {
+      "canonicalization": "JCS",
+      "digest": "sha256:06e748273802ade556dac8d705c291af7dc6504ab15f25a31cd9ef102cfe245d",
+      "schema": "vaara.normalized-evidence/v0"
+    },
+    "ingestAsserted": {
+      "alg": "HS256",
+      "iat": "2026-06-23T00:00:00Z",
+      "iss": "did:web:vaara.io",
+      "nonce": "ingest-fixed-nonce-000000",
+      "secretVersion": "k1",
+      "sub": "sink"
+    },
+    "schema": "vaara.ingest/v0",
+    "signature": "4333a5ea4a990207e2a0305890ed7d8cb0722c374be3dba81facd81b8b031395",
+    "sourceFormat": "sep2643",
+    "version": 0
+  }
+}

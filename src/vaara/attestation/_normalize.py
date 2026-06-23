@@ -33,8 +33,12 @@ gap when the extra is absent.
 
 from __future__ import annotations
 
+import logging
+import threading
 from dataclasses import dataclass, field
-from typing import Any, Optional
+from typing import Any, Callable, Optional
+
+logger = logging.getLogger(__name__)
 
 SOURCE_SEP2643 = "sep2643"
 SOURCE_SEP2787 = "sep2787"
@@ -81,6 +85,70 @@ class NormalizedEvidence:
             "missing": list(self.missing),
             "notes": list(self.notes),
         }
+
+
+@dataclass(frozen=True)
+class SourceProfile:
+    """A pluggable foreign-evidence format the sink can ingest.
+
+    ``detector`` returns True when a document is this format; ``normalizer``
+    maps it onto the SEP-2828 evidence model. Lower ``priority`` runs first in
+    ``detect_format``, so a more specific format can pre-empt a looser one
+    regardless of registration order.
+    """
+
+    source_format: str
+    source_title: str
+    detector: Callable[[Any], bool]
+    normalizer: Callable[[Any], "NormalizedEvidence"]
+    priority: int = 100
+
+
+# A new format is a registry entry (data), not a new dispatch branch. The lock
+# mirrors taxonomy.actions.ActionRegistry: plugins may register from different
+# threads at startup while detect_format()/normalize() read on the hot path.
+_REGISTRY_LOCK = threading.RLock()
+SOURCE_PROFILE_REGISTRY: dict[str, SourceProfile] = {}
+
+
+def register(profile: SourceProfile) -> None:
+    """Register a source profile under its ``source_format`` id.
+
+    A clashing id silently replaces the prior profile but logs a warning, so
+    plugins with overlapping formats are visible at startup instead of failing
+    mysteriously later (same contract as ``ActionRegistry.register``).
+    """
+    with _REGISTRY_LOCK:
+        existing = SOURCE_PROFILE_REGISTRY.get(profile.source_format)
+        if existing is not None and existing is not profile:
+            logger.warning(
+                "SourceProfile registry: replacing profile %r "
+                "(previous %r registered; new one wins)",
+                profile.source_format, existing.source_title,
+            )
+        SOURCE_PROFILE_REGISTRY[profile.source_format] = profile
+
+
+def _ordered_profiles() -> list[SourceProfile]:
+    """Profiles in detection order: ascending priority, id breaking ties."""
+    with _REGISTRY_LOCK:
+        return sorted(
+            SOURCE_PROFILE_REGISTRY.values(),
+            key=lambda p: (p.priority, p.source_format),
+        )
+
+
+def _unknown_record() -> NormalizedEvidence:
+    """The result for a document no registered profile recognizes."""
+    return NormalizedEvidence(
+        source_format=SOURCE_UNKNOWN,
+        source_title="unrecognized record",
+        recognized=False,
+        notes=(
+            "not a SEP-2643 denial, SEP-2787 attestation, or SEP-2817 "
+            "invocation audit context; nothing to normalize",
+        ),
+    )
 
 
 def _as_dict(value: Any) -> dict[str, Any]:
@@ -148,38 +216,38 @@ def _looks_like_attestation(doc: Any) -> bool:
 
 
 def detect_format(doc: Any) -> str:
-    """Identify which adjacent-SEP record ``doc`` is, or ``"unknown"``."""
-    if _looks_like_attestation(doc):
-        return SOURCE_SEP2787
-    if _denial_authorization(doc) is not None:
-        return SOURCE_SEP2643
-    if _ai_invocation(doc) is not None:
-        return SOURCE_SEP2817
+    """Identify which registered source format ``doc`` is, or ``"unknown"``.
+
+    Detectors run in ascending ``priority`` order; the first match wins, so a
+    new profile slots into the precedence chain by its priority alone.
+    """
+    for profile in _ordered_profiles():
+        try:
+            if profile.detector(doc):
+                return profile.source_format
+        except Exception:
+            # A misbehaving third-party detector must not block detection of
+            # the other formats; treat it as a non-match and keep going.
+            logger.warning(
+                "SourceProfile %r detector raised; treating as no-match",
+                profile.source_format, exc_info=True,
+            )
     return SOURCE_UNKNOWN
 
 
 def normalize(doc: Any, *, source_format: str = "auto") -> NormalizedEvidence:
-    """Map a foreign MCP record onto the SEP-2828 evidence model.
+    """Map a foreign record onto the SEP-2828 evidence model.
 
-    ``source_format`` is ``"auto"`` (detect) or one of ``"sep2643"``,
-    ``"sep2787"``, ``"sep2817"`` to force a reading.
+    ``source_format`` is ``"auto"`` (detect from the registry) or a registered
+    source-format id (e.g. ``"sep2643"``, ``"sep2787"``, ``"sep2817"``) to
+    force a reading. An unrecognized document, or a forced format with no
+    registered profile, yields an unrecognized result with nothing normalized.
     """
     fmt = detect_format(doc) if source_format == "auto" else source_format
-    if fmt == SOURCE_SEP2787:
-        return _normalize_attestation(doc)
-    if fmt == SOURCE_SEP2643:
-        return _normalize_denial(doc)
-    if fmt == SOURCE_SEP2817:
-        return _normalize_invocation(doc)
-    return NormalizedEvidence(
-        source_format=SOURCE_UNKNOWN,
-        source_title="unrecognized record",
-        recognized=False,
-        notes=(
-            "not a SEP-2643 denial, SEP-2787 attestation, or SEP-2817 "
-            "invocation audit context; nothing to normalize",
-        ),
-    )
+    profile = SOURCE_PROFILE_REGISTRY.get(fmt)
+    if profile is None:
+        return _unknown_record()
+    return profile.normalizer(doc)
 
 
 def _unrecognized(fmt: str, title: str, why: str) -> NormalizedEvidence:
@@ -382,3 +450,30 @@ def _back_link_from_attestation(
         },
         None,
     )
+
+
+# ── Built-in source profiles ───────────────────────────────────────────────
+# Registered at module load in the historical detection order via explicit
+# priorities, so detect_format() is independent of registration/import order.
+# Adding a format is one register() call (data), not new dispatch code.
+register(SourceProfile(
+    source_format=SOURCE_SEP2787,
+    source_title="SEP-2787 tool-call attestation",
+    detector=_looks_like_attestation,
+    normalizer=_normalize_attestation,
+    priority=10,
+))
+register(SourceProfile(
+    source_format=SOURCE_SEP2643,
+    source_title="SEP-2643 authorization denial",
+    detector=lambda doc: _denial_authorization(doc) is not None,
+    normalizer=_normalize_denial,
+    priority=20,
+))
+register(SourceProfile(
+    source_format=SOURCE_SEP2817,
+    source_title="SEP-2817 AI invocation audit context",
+    detector=lambda doc: _ai_invocation(doc) is not None,
+    normalizer=_normalize_invocation,
+    priority=30,
+))
