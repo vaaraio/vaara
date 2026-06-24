@@ -1,0 +1,59 @@
+{
+  "id": "checkout_session_7Yx",
+  "protocol": { "version": "2026-04-17" },
+  "status": "completed",
+  "currency": "usd",
+  "buyer": {
+    "first_name": "John",
+    "last_name": "Smith",
+    "email": "john.smith@example.com"
+  },
+  "line_items": [
+    {
+      "id": "li_laptop",
+      "item": { "id": "item_mbp16", "name": "MacBook Pro 16\"", "unit_amount": 249900 },
+      "quantity": 1,
+      "totals": [
+        { "type": "subtotal", "display_text": "Subtotal", "amount": 249900 }
+      ]
+    }
+  ],
+  "totals": [
+    { "type": "subtotal", "display_text": "Subtotal", "amount": 249900 },
+    { "type": "tax", "display_text": "Tax", "amount": 21866 },
+    { "type": "total", "display_text": "Total", "amount": 271766 }
+  ],
+  "fulfillment_options": [],
+  "messages": [],
+  "links": [],
+  "capabilities": {
+    "payment": {
+      "handlers": [
+        {
+          "id": "card_tokenized",
+          "name": "dev.acp.tokenized.card",
+          "display_name": "Credit Card",
+          "version": "2026-01-22",
+          "spec": "https://acp.dev/handlers/tokenized.card",
+          "requires_delegate_payment": true,
+          "requires_pci_compliance": false,
+          "psp": "stripe"
+        }
+      ]
+    }
+  },
+  "created_at": "2026-06-23T12:00:00Z",
+  "updated_at": "2026-06-23T12:00:42Z",
+  "order": {
+    "type": "order",
+    "id": "ord_shipped_456",
+    "checkout_session_id": "checkout_session_7Yx",
+    "order_number": "ORD-2026-00456",
+    "permalink_url": "https://merchant.example.com/orders/ord_shipped_456",
+    "status": "completed",
+    "confirmation": {
+      "confirmation_number": "CONF-9F86-2026",
+      "confirmation_email_sent": true
+    }
+  }
+}

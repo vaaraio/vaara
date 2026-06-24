@@ -131,6 +131,7 @@ def test_builtin_profiles_registered_and_recognized():
     ids = load_builtin_declarative_profiles()
     assert "slsa-provenance" in ids
     assert "c2pa-manifest" in ids
+    assert "acp-checkout" in ids
 
 
 def test_slsa_recognized_end_to_end():
@@ -159,3 +160,39 @@ def test_c2pa_recognized_end_to_end():
     assert ev["recognized"] is True
     assert ev["advisory"]["firstAssertion"] == "c2pa.actions"
     assert ev["sep2828"] == {}               # provenance, asserts no signed record field
+
+
+def test_acp_checkout_recognized_end_to_end():
+    doc = {
+        "id": "checkout_session_7Yx",
+        "status": "completed",
+        "currency": "usd",
+        "line_items": [{"id": "li_laptop"}],
+        "totals": [{"type": "total", "amount": 271766}],
+        "capabilities": {"payment": {"handlers": [{"id": "card_tokenized",
+                                                    "psp": "stripe"}]}},
+        "order": {"id": "ord_456", "status": "completed"},
+    }
+    assert detect_format(doc) == "acp-checkout"
+    ev = normalize(doc).to_dict()
+    assert ev["recognized"] is True
+    assert ev["evidencePlane"] == "outcome"      # the commercial-outcome face
+    assert ev["advisory"]["paymentPsp"] == "stripe"
+    assert ev["advisory"]["orderStatus"] == "completed"
+    assert ev["sep2828"] == {}                   # unsigned: asserts no signed record field
+    assert "signature" in ev["missing"]          # honest gap: ACP signs nothing here
+
+
+def test_acp_does_not_match_a_bare_order():
+    # An ACP Order carries status + line_items but no currency/capabilities, so
+    # the checkout-session profile must not claim it.
+    order = {
+        "type": "order",
+        "id": "ord_456",
+        "checkout_session_id": "cs_1",
+        "permalink_url": "https://m.example/o/ord_456",
+        "status": "completed",
+        "line_items": [{"id": "li_1"}],
+        "totals": [{"type": "total", "amount": 100}],
+    }
+    assert detect_format(order) != "acp-checkout"
