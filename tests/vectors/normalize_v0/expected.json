@@ -1,4 +1,40 @@
 {
+  "agent_decision": {
+    "advisory": {
+      "agentId": "agent:acme/checkout-bot/1",
+      "decidedAt": "2026-06-23T12:00:05Z",
+      "decision": "deny",
+      "firstPolicyId": "policy:spend-cap/eur-500",
+      "firstPolicyResult": "deny",
+      "firstToolArgsCanonicalization": "JCS",
+      "firstToolArgsHash": "sha256:91c0c215cce3f5e7c49d2ddf0a540eb2255554ea3e7a885067d39168b3ac8564",
+      "firstToolArgsState": "present",
+      "firstToolName": "payments.transfer",
+      "principal": "tenant:acme-eu",
+      "secondToolArgsState": "args_redacted",
+      "secondToolName": "customer.lookup"
+    },
+    "evidencePlane": "decision-attested",
+    "missing": [
+      "alg",
+      "signature",
+      "backLink",
+      "receiptAsserted",
+      "outcomeDerived"
+    ],
+    "notes": [
+      "an agent-decision predicate records an agent's policy verdict on a tool call (which policies evaluated, allow or deny, the per-call argument commitment, when); it is the attested-decision face of an execution event, the closest foreign analog to a signed decision record",
+      "the in-toto Statement is carried in a DSSE envelope whose signature is not modeled here; alg, signature, and receiptAsserted remain a separate signing event, so the predicate declares the decision but does not on its own carry the issuer signature that makes it a receipt assertion",
+      "tool_calls[].args_hash commits the call arguments but is not a SEP-2828 backLink, which pins the attestationDigest of an attested request a conformant receipt must answer; the commitment is portable only when args_canonicalization names a shared projection, here JCS (RFC 8785)",
+      "args_state carries the explicit-omission state as a first-class attested value (present, args_redacted, args_unavailable, args_not_recorded), so a redacted call and an unrecorded call stay distinct claims rather than collapsing into one missing field",
+      "the predicate records the decision (allow or deny the call), not outcomeDerived (whether the call then executed and with what result)"
+    ],
+    "populated": [],
+    "recognized": true,
+    "sep2828": {},
+    "sourceFormat": "agent-decision",
+    "sourceTitle": "in-toto agent-decision/v0.1 policy decision"
+  },
   "c2pa_manifest": {
     "advisory": {
       "claimGenerator": "vaara/1.10.0 c2pa-rs/0.36.0",

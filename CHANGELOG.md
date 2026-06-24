@@ -4,6 +4,30 @@ All notable changes to this project are documented here.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/)
 and this project follows [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [1.14.0] - 2026-06-23
+
+Minor release: independent producibility for the two conformance carriers. Each vector now reproduces from scratch with a second generator that shares no code with the one that minted it and imports nothing from Vaara, so the bytes stand on the declared canonicalization alone, with no generator and no issuer in the loop.
+
+- `tests/vectors/agent_decision_v0/_remint.py` re-derives the signed DSSE/Ed25519 carrier end to end from its source statement: the JCS payload bytes, the DSSE pre-authentication encoding, the deterministic Ed25519 signature (RFC 8032), `paeSha256`, and the SEP-2828 mapping lifted from the shipped declarative profile with its own spec interpreter. Every recomputed artifact (`statement.json`, `envelope.json`, `expected.json`, and the public key) is compared byte-for-byte against the committed file.
+- `tests/vectors/acp_checkout_v0/_remint.py` does the same for the unsigned JCS carrier: it recomputes `jcsSha256` over the canonical statement bytes plus the SEP-2828 mapping, and reproduces `expected.json` byte-for-byte.
+- Both re-mints fail closed: a tamper pass mutates the carrier and confirms the content address moves, so a forged statement cannot reuse the committed digest. Both run in CI (`test_independent_remint_reproduces`), so a drift in emit logic that breaks reproduction fails the suite.
+
+Where the existing `_check_independent.py` verifies a committed vector with no Vaara import, the re-mint proves the same vector is reproducible from its declared inputs by a second, independent generator: a signed (DSSE/Ed25519) and an unsigned (JCS) carrier, each producible with nothing from Vaara in the loop.
+
+## [1.13.0] - 2026-06-23
+
+Minor release: the `acp-checkout` profile and a conformance vector for the payments lane. An Agentic Commerce Protocol checkout session becomes a source format, the outcome twin of the `agent-decision` profile.
+
+- New declarative `acp-checkout` source profile: it recognizes an [Agentic Commerce Protocol](https://github.com/agentic-commerce-protocol/agentic-commerce-protocol) checkout session and maps it onto the SEP-2828 model at the `outcome` plane. It is the closest foreign format to a settled-transaction record (the terminal status, the totals that settled, the payment handler and PSP, the order produced), yet fills no SEP-2828 field on its own: ACP signs nothing in the record (it authenticates the API call at the transport), so `alg`, `signature`, and `receiptAsserted` are absent, there is no `backLink` pinning the request that authorized the spend, and `status` is a merchant-asserted state lifted as advisory context rather than a bound `outcomeDerived`. The honest gap is the report. It is the inverse of `agent-decision`, which carries the authorizing decision but not the outcome; neither is a receipt until the decision and the outcome are bound under one signature.
+- New `tests/vectors/acp_checkout_v0/` conformance vector: a real-shaped completed checkout session with its order. ACP objects are unsigned, so the recomputable anchor is a JCS (RFC 8785) content digest over the statement rather than a signature. The independent checker imports no Vaara code and reproduces the digest and the SEP-2828 mapping from the shipped profile spec. It is the recomputable `{statement, expected-verdict}` pair, anchored to the bytes.
+
+## [1.12.0] - 2026-06-23
+
+Minor release: the `agent-decision` profile and a public-key-verifiable conformance vector. The closest foreign format to a native signed decision record becomes a source format, and the recomputable vector offered on in-toto/attestation#554 ships.
+
+- New declarative `agent-decision` source profile: it recognizes an in-toto `agent-decision/v0.1` predicate (the proposed predicate in [in-toto/attestation#554](https://github.com/in-toto/attestation/issues/554)) and maps it onto the SEP-2828 model. It is the closest foreign format to a native signed decision record, so it maps to the decision-attested plane, yet fills no SEP-2828 field on its own: the in-toto Statement's signature lives in the DSSE envelope (a separate signing event), `args_hash` is an argument commitment rather than a back-link to an attested request, and the predicate carries the decision but not the outcome. The honest gap is the report. `args_state` keeps the explicit-omission state first-class (`present`, `args_redacted`, `args_unavailable`, `args_not_recorded`), so a redacted call and an unrecorded call stay distinct claims.
+- New `tests/vectors/agent_decision_v0/` conformance vector: that same statement sealed in a DSSE envelope under Ed25519, with a published verifying key. The independent checker imports no Vaara code and recomputes the DSSE pre-authentication encoding, verifies the signature from the public key, and reproduces the SEP-2828 mapping from the shipped profile spec. It is the recomputable `{statement, expected-verdict}` pair, anchored to the bytes rather than to any one producer.
+
 ## [1.11.0] - 2026-06-23
 
 Minor release: declarative source profiles. Binding a new evidence format to the ingest sink is now a JSON spec dropped into the tree, not an adapter written in Python.

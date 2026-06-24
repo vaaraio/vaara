@@ -1,6 +1,7 @@
 {
   "alg": "HS256",
   "cases": [
+    "agent_decision",
     "c2pa_manifest",
     "sep2643_rar_denial",
     "sep2643_scope_denial",
@@ -12,7 +13,7 @@
     "slsa_provenance",
     "unknown"
   ],
-  "corpusDigest": "sha256:d677c656dae493c7e646b38bbe6738b52fa8e1d31229b633b0afe6dfde10d903",
+  "corpusDigest": "sha256:d2f90accaf6327be03774a46e790a8f2ebee109d384bb8706ba09adf3eb147f2",
   "fixed": {
     "iat": "2026-06-23T00:00:00Z",
     "iss": "did:web:vaara.io",
@@ -21,6 +22,10 @@
     "sub": "sink"
   },
   "manifest": {
+    "agent_decision": {
+      "evidenceDigest": "sha256:9cf19f4ceff14d68fa00e44a914e8c7bf91f5d3bfceae5d4dc55ccef5cf0de2d",
+      "signature": "5fdc0ae4b9dead7af973261f832e00416e4652f325cfc3b79790f3032ae68dd6"
+    },
     "c2pa_manifest": {
       "evidenceDigest": "sha256:3d02ab1236af269f497797fe75f08ec772fc1080e66c424a03d53ab54fbe5cf7",
       "signature": "ffb1f8ab39b6436811fd8d969a679fdcb5ee83cfcdf8a2cf804913a9542ca604"

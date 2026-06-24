@@ -1,0 +1,41 @@
+{
+  "jcsSha256": "sha256:ebf5cdbc67afd945edd993002a8c917b4f047a0b435d60dad97b9746cb4522c4",
+  "normalized": {
+    "advisory": {
+      "buyerEmail": "john.smith@example.com",
+      "confirmationNumber": "CONF-9F86-2026",
+      "currency": "usd",
+      "firstLineItemId": "li_laptop",
+      "firstTotalAmount": 249900,
+      "firstTotalType": "subtotal",
+      "orderId": "ord_shipped_456",
+      "orderNumber": "ORD-2026-00456",
+      "orderStatus": "completed",
+      "paymentHandlerId": "card_tokenized",
+      "paymentHandlerName": "dev.acp.tokenized.card",
+      "paymentPsp": "stripe",
+      "protocolVersion": "2026-04-17",
+      "sessionId": "checkout_session_7Yx",
+      "status": "completed"
+    },
+    "evidencePlane": "outcome",
+    "missing": [
+      "alg",
+      "signature",
+      "backLink",
+      "receiptAsserted"
+    ],
+    "notes": [
+      "an ACP checkout session is the commercial-outcome face of an agent purchase: a terminal status (completed, canceled, expired), the line items and totals that settled, the payment handler and PSP that took the money, and the order it produced; it is the closest foreign analog to a settled-transaction record",
+      "nothing in the object is signed: ACP authenticates the API call (request signing at the transport), not the session record, so alg, signature, and receiptAsserted are absent and the session states an outcome it does not itself prove",
+      "the session carries no SEP-2828 backLink: there is no attestationDigest pinning the attested request or the authorizing decision that a conformant receipt must answer, so the spend is reported without a link to what authorized it",
+      "status is a merchant-asserted state, not a SEP-2828 outcomeDerived bound to an attested execution; it is lifted here as advisory context (advisory.status, advisory.orderStatus), the commercial result a receipt would bind rather than assert"
+    ],
+    "populated": [],
+    "recognized": true,
+    "sep2828": {},
+    "sourceFormat": "acp-checkout",
+    "sourceTitle": "Agentic Commerce Protocol checkout session"
+  },
+  "status": "completed"
+}
