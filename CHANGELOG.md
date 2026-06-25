@@ -4,6 +4,15 @@ All notable changes to this project are documented here.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/)
 and this project follows [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [1.15.0] - 2026-06-25
+
+Minor release: Track 1 authority-layer enforcement. The proxy now mints a short-lived credential per allowed tool call and enforces it fail-closed at the chokepoint before any upstream forward occurs.
+
+- **Credential injection (Step A).** When the proxy is started with `--tool-constraints PATH`, `AttestPairEmitter` mints a scoped, attestation-bound JWT per allowed `tools/call` and injects it at `params._meta["vaara/credential"]` on the forwarded request. The JWT binds the attestation digest, the tool name, the argument commitment (`ArgsProjection.projection_digest`), and the tenant ID, signed with the same key used for attestation (ES256, RS256, or HS256). Capabilities from the constraints file travel in the `capabilities` array. A downstream `CredentialGateway` can verify the credential independently without contacting the proxy.
+- **Fail-closed enforcement (Step B).** `_handle_tools_call` now runs a `CredentialGateway` check after grant injection and before the upstream forward. Tools listed in the constraints file are fail-closed: a missing, malformed, expired, scope-mismatched, or attestation-unbound credential returns MCP error `-32603` and the upstream is never reached. The gateway is built once at proxy init, verifying material derived from the signing key (public half for asymmetric algorithms, same bytes for HS256).
+- **Config wire.** `--tool-constraints PATH` accepts a JSON file of the form `{"tools": {"tool_name": [{arg, op, value}]}}`. Each capability constrains one argument of the named tool; the grant carries the full list so a downstream enforcer can apply them without re-reading the config.
+- 2 new integration tests covering the enforcement path: valid grant passes the gateway; absent grant (simulated emit failure) is blocked with `-32603`.
+
 ## [1.14.0] - 2026-06-23
 
 Minor release: independent producibility for the two conformance carriers. Each vector now reproduces from scratch with a second generator that shares no code with the one that minted it and imports nothing from Vaara, so the bytes stand on the declared canonicalization alone, with no generator and no issuer in the loop.
