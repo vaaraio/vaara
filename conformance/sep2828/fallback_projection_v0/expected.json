@@ -3,6 +3,14 @@
     "attestationDigest": "sha256:f3c2ac13827482df4f4d1af226ad6cd4e46bc557617095faffbf734576986b29",
     "projectionBytes": "{\"arguments\":{\"action\":\"read\",\"path\":\"/docs/report.pdf\"},\"toolName\":\"filesystem_read\"}"
   },
+  "neg_different_args": {
+    "attestationDigest": "sha256:667d71cdf498c46b3aa8025153f71d6306d9e1a7e855f148c680704ec09752a2",
+    "projectionBytes": "{\"arguments\":{\"file\":\"statement.pdf\"},\"authBinding\":{\"policyId\":\"pol-abc\",\"scope\":\"read\"},\"toolName\":\"document_fetch\"}"
+  },
+  "neg_different_auth_binding": {
+    "attestationDigest": "sha256:5472968662e4e1a2d2aeea7f137f04e44d4621fa3d3f6cb92ad5977594a6ddc9",
+    "projectionBytes": "{\"arguments\":{\"file\":\"invoice.pdf\"},\"authBinding\":{\"policyId\":\"pol-xyz\",\"scope\":\"write\"},\"toolName\":\"document_fetch\"}"
+  },
   "neg_different_tool": {
     "attestationDigest": "sha256:db7b84f4a12f7ca4fba78699322f8a6cb5c15bea5fc2bcba139297da600ec1ff",
     "projectionBytes": "{\"arguments\":{\"file\":\"invoice.pdf\"},\"authBinding\":{\"policyId\":\"pol-abc\",\"scope\":\"read\"},\"toolName\":\"document_fetch_v2\"}"
