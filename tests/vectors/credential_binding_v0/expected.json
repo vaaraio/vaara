@@ -1,0 +1,24 @@
+{
+  "cases": {
+    "neg_args_changed": {
+      "expected_verdict": "scope_mismatch",
+      "signature_ok": true
+    },
+    "neg_expired": {
+      "expected_verdict": "expired",
+      "signature_ok": true
+    },
+    "neg_no_credential": {
+      "expected_verdict": "missing_credential",
+      "signature_ok": false
+    },
+    "neg_wrong_tenant": {
+      "expected_verdict": "scope_mismatch",
+      "signature_ok": true
+    },
+    "pos_valid_grant": {
+      "expected_verdict": "ok",
+      "signature_ok": true
+    }
+  }
+}
