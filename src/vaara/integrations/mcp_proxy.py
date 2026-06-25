@@ -1072,6 +1072,24 @@ class VaaraMCPProxy:
                         upstream_name=upstream_name,
                         tenant_id=_REQUEST_TENANT.get(),
                     )
+        if (
+            self._mint_credentials
+            and self._attest is not None
+            and self._attest.gateway is not None
+            and self._attest.is_constrained(tool_name)
+        ):
+            _gw_params = request.get("params")
+            verdict = self._attest.gateway.authorize(
+                _gw_params,
+                tool_name=tool_name,
+                arguments=arguments,
+            )
+            if not verdict.ok:
+                return self._error_response(
+                    request_id,
+                    -32603,
+                    f"vaara: grant required but not valid for tool {tool_name!r}: {verdict.reason}",
+                )
         with self._inflight_lock:
             if progress_token is not None:
                 self._inflight_progress[progress_token] = (
