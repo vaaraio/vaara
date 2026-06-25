@@ -1,0 +1,22 @@
+{
+  "basic_no_auth_binding": {
+    "attestationDigest": "sha256:f3c2ac13827482df4f4d1af226ad6cd4e46bc557617095faffbf734576986b29",
+    "projectionBytes": "{\"arguments\":{\"action\":\"read\",\"path\":\"/docs/report.pdf\"},\"toolName\":\"filesystem_read\"}"
+  },
+  "neg_different_tool": {
+    "attestationDigest": "sha256:db7b84f4a12f7ca4fba78699322f8a6cb5c15bea5fc2bcba139297da600ec1ff",
+    "projectionBytes": "{\"arguments\":{\"file\":\"invoice.pdf\"},\"authBinding\":{\"policyId\":\"pol-abc\",\"scope\":\"read\"},\"toolName\":\"document_fetch_v2\"}"
+  },
+  "observer_stable_a": {
+    "attestationDigest": "sha256:4992f3a0b25594b13faa71f61452d5ee9fa936d7d271f912dddc6a39e4b31d8d",
+    "projectionBytes": "{\"arguments\":{\"file\":\"invoice.pdf\"},\"authBinding\":{\"policyId\":\"pol-abc\",\"scope\":\"read\"},\"toolName\":\"document_fetch\"}"
+  },
+  "observer_stable_b": {
+    "attestationDigest": "sha256:4992f3a0b25594b13faa71f61452d5ee9fa936d7d271f912dddc6a39e4b31d8d",
+    "projectionBytes": "{\"arguments\":{\"file\":\"invoice.pdf\"},\"authBinding\":{\"policyId\":\"pol-abc\",\"scope\":\"read\"},\"toolName\":\"document_fetch\"}"
+  },
+  "with_auth_binding": {
+    "attestationDigest": "sha256:e98a68f744cd5a6d52e21c3c35f17570c603882b0715ea2900f14696ac770ef9",
+    "projectionBytes": "{\"arguments\":{\"bucket\":\"prod-data\",\"object\":\"reports/q1.csv\"},\"authBinding\":{\"capabilityGrant\":\"read-only\",\"policyId\":\"pol-2026-001\",\"scope\":\"storage\"},\"toolName\":\"gcs_read\"}"
+  }
+}
