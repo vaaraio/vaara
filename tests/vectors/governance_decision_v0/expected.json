@@ -1,0 +1,67 @@
+{
+  "cases": {
+    "continuation_mismatch": {
+      "expected_verdict": "deny",
+      "signatures_ok": true
+    },
+    "duplicate_outcome": {
+      "expected_verdict": "deny",
+      "signatures_ok": true
+    },
+    "exact_intent_mismatch": {
+      "expected_verdict": "deny",
+      "signatures_ok": true
+    },
+    "target_state_drift": {
+      "expected_verdict": "revise",
+      "signatures_ok": true
+    }
+  },
+  "stream": {
+    "complete": {
+      "all_signatures_ok": true,
+      "sealed_contiguity": {
+        "expected": 4,
+        "missingSeqs": [],
+        "ok": true,
+        "present": 4
+      }
+    },
+    "dropped": {
+      "all_signatures_ok": true,
+      "sealed_contiguity": {
+        "expected": 4,
+        "missingSeqs": [
+          2
+        ],
+        "ok": false,
+        "present": 3
+      }
+    },
+    "tail_sealed": {
+      "all_signatures_ok": true,
+      "sealed_contiguity": {
+        "expected": 4,
+        "missingSeqs": [
+          3
+        ],
+        "ok": false,
+        "present": 3
+      }
+    },
+    "tail_unsealed": {
+      "all_signatures_ok": true,
+      "sealed_contiguity": {
+        "expected": 3,
+        "missingSeqs": [],
+        "ok": true,
+        "present": 3
+      }
+    }
+  },
+  "unicode_scope": {
+    "intent_ref": "sha256:c06fd32039743c4a87f5614c7da49d02edc943c8006fd1a3a9ff912fdb958c9d",
+    "params_hash": "sha256:37fafbd83fd98a4c931fc892408a7595e2f55d100fa806c355c5a8426045f328",
+    "signature_ok": true
+  }
+}

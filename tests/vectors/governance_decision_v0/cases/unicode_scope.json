@@ -1,0 +1,30 @@
+{
+  "record": {
+    "action_type": "purchase.fulfill",
+    "agent_id": "agent:crewai/checkout-bot",
+    "completeness": {
+      "boundaryId": "crew:checkout-run/2026-06-25",
+      "runningCount": 1,
+      "seq": 0
+    },
+    "continuation_id": "session:abc-123",
+    "decision": "allow",
+    "decision_context_hash": "sha256:6110dc18a3da0e728326d4f653edb9f5cc6cc0fb2bcf46079c3b7bbf338bc735",
+    "decision_id": "crew:checkout-run/2026-06-25#0",
+    "idempotency_key": "idem-U",
+    "intent_digest": "sha256:ede130469b640817de648d11e72e1be371c8d19b4f7e0c946e0c5ac2e28f4b93",
+    "intent_ref": "sha256:c06fd32039743c4a87f5614c7da49d02edc943c8006fd1a3a9ff912fdb958c9d",
+    "normalization_id": "jcs-rfc8785-v1",
+    "normalized_scope": "merchant:caf\u00e9/order:\u00dcn\u00efcode-\u20ac",
+    "params_hash": "sha256:37fafbd83fd98a4c931fc892408a7595e2f55d100fa806c355c5a8426045f328",
+    "policy_refs": [
+      "policy:spend-limit/v3",
+      "policy:eu-ai-act-art14/v1"
+    ],
+    "receipt_ref": "sha256:323cfadbc509e63687a1db269025d773b198f8f0c60a4186454c0f944e0e96ef",
+    "schema": "crewai.governance.decision/v1",
+    "target_state_digest": "sha256:023d46e0f386d0dd3e913380e6cdf685761625c7f6ba6402dc167d00e6159cf3",
+    "timestamp_ms": 1779200000000
+  },
+  "signature": "f011582da2e6a53fc5572c827a5039b47c66a7acf019d6d7315798c19ae40f18165822c15b7ad7e1f543e3378997d3bff1512c05bec6da5751a55181d924082c"
+}

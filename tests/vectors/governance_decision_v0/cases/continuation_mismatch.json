@@ -1,0 +1,63 @@
+{
+  "approved": {
+    "record": {
+      "action_type": "purchase.fulfill",
+      "agent_id": "agent:crewai/checkout-bot",
+      "completeness": {
+        "boundaryId": "crew:checkout-run/2026-06-25",
+        "runningCount": 1,
+        "seq": 0
+      },
+      "continuation_id": "session:abc-123",
+      "decision": "allow",
+      "decision_context_hash": "sha256:6110dc18a3da0e728326d4f653edb9f5cc6cc0fb2bcf46079c3b7bbf338bc735",
+      "decision_id": "crew:checkout-run/2026-06-25#0",
+      "idempotency_key": "idem-A",
+      "intent_digest": "sha256:0cba8d0055f5d0833c901ed88681616f01ecfadb0c5b88336be709e537e1d73b",
+      "intent_ref": "sha256:a51b72b29097f6c807cfb4a668a0c930cb0fb83c3e1049e1e08986af133ae48a",
+      "normalization_id": "jcs-rfc8785-v1",
+      "normalized_scope": "merchant:acme/order:INV-1",
+      "params_hash": "sha256:5e74cb8c654dc04978ede9257fb8007a7df3cd52700ad883acd5bdd2b19cd7d5",
+      "policy_refs": [
+        "policy:spend-limit/v3",
+        "policy:eu-ai-act-art14/v1"
+      ],
+      "receipt_ref": "sha256:297c7e4498b8a7c99672ba6b6ebf5382240e9f023c81c5689e095ec93f7131e8",
+      "schema": "crewai.governance.decision/v1",
+      "target_state_digest": "sha256:023d46e0f386d0dd3e913380e6cdf685761625c7f6ba6402dc167d00e6159cf3",
+      "timestamp_ms": 1779200000000
+    },
+    "signature": "2677b45ce7bd9392ac9734381adb8b43656e0fdf4ba0caf96cead2114ea93e80bad40b2666c1f01943043e5cb3050c088fef839249fd32682b03961060b7a635"
+  },
+  "candidate": {
+    "record": {
+      "action_type": "purchase.fulfill",
+      "agent_id": "agent:crewai/checkout-bot",
+      "completeness": {
+        "boundaryId": "crew:checkout-run/2026-06-25",
+        "runningCount": 1,
+        "seq": 0
+      },
+      "continuation_id": "session:hijacked-999",
+      "decision": "allow",
+      "decision_context_hash": "sha256:51548e91dbfec869f3ce26b6d165c0191322a638bf4c419f286974e484ed072b",
+      "decision_id": "crew:checkout-run/2026-06-25#0",
+      "idempotency_key": "idem-A",
+      "intent_digest": "sha256:0cba8d0055f5d0833c901ed88681616f01ecfadb0c5b88336be709e537e1d73b",
+      "intent_ref": "sha256:a51b72b29097f6c807cfb4a668a0c930cb0fb83c3e1049e1e08986af133ae48a",
+      "normalization_id": "jcs-rfc8785-v1",
+      "normalized_scope": "merchant:acme/order:INV-1",
+      "params_hash": "sha256:5e74cb8c654dc04978ede9257fb8007a7df3cd52700ad883acd5bdd2b19cd7d5",
+      "policy_refs": [
+        "policy:spend-limit/v3",
+        "policy:eu-ai-act-art14/v1"
+      ],
+      "receipt_ref": "sha256:457b3be624fa4d8838f8a16c3c43bac53243af0ef618a74064f95801e0389752",
+      "schema": "crewai.governance.decision/v1",
+      "target_state_digest": "sha256:023d46e0f386d0dd3e913380e6cdf685761625c7f6ba6402dc167d00e6159cf3",
+      "timestamp_ms": 1779200000000
+    },
+    "signature": "0710ceb649e903ea90328155a0ff6e5c259ade0f8eb3bf6badb39aca398862c92c15ce541874dd2b413ad318177cb90e0e44b12f1ebbbd7241cecec7ad126a3a"
+  },
+  "expected_verdict": "deny"
+}
