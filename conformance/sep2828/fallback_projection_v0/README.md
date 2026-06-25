@@ -35,16 +35,34 @@ transport correlation artifacts are excluded.
 
 | Name | Property tested |
 |------|----------------|
-| `basic_no_auth_binding` | Projection without authBinding (no authorization_binding in _meta) |
+| `basic_no_auth_binding` | Unauthenticated fallback profile: authBinding absent from projection |
 | `with_auth_binding` | Projection with authBinding present |
-| `observer_stable_a` | Observer A: gateway sees progressToken + traceId in _meta |
-| `observer_stable_b` | Observer B: provider sees different progressToken + x-injected-id |
-| `neg_different_tool` | Different toolName → different attestationDigest |
+| `observer_stable_a` | Observer A: gateway sees `{"progressToken":"pt-aaa","traceId":"tr-001","authorization_binding":{…}}` in _meta |
+| `observer_stable_b` | Observer B: provider sees `{"progressToken":"pt-bbb","x-injected-id":"inj-999","authorization_binding":{…}}` in _meta |
+| `neg_different_tool` | Different toolName → different attestationDigest (same args + authBinding) |
+| `neg_different_args` | Different arguments → different attestationDigest (same toolName + authBinding) |
+| `neg_different_auth_binding` | Different authBinding → different attestationDigest (same toolName + args) |
 
 `observer_stable_a` and `observer_stable_b` have **identical projections**
 and therefore identical `attestationDigest` values, proving the portability
 property: honest observers with different `_meta` sidecars agree on the
-digest.
+digest. The raw _meta values shown above differ in `progressToken` and
+`x-injected-id`; both are stripped. Only `authorization_binding` survives
+as `authBinding`.
+
+`basic_no_auth_binding` is the **explicitly defined unauthenticated fallback
+profile**: when `_meta` carries no `authorization_binding` key, `authBinding`
+is absent from the projection and the digest covers `{arguments, toolName}`
+only. Implementations that require authorization MUST reject calls with no
+`authBinding` at the policy layer; the projection itself does not fail-close
+on absent authBinding because the spec defines this as a valid profile.
+
+**Instance separation via nonce.** The projection hash is content-binding
+only: two identical calls (same toolName, arguments, authBinding) produce the
+same `attestationDigest`. Instance separation is the responsibility of the
+receipt layer via `backLink.attestationNonce`, which the server chooses per
+call. The projection corpus does not include nonces because nonces live in the
+receipt envelope, not in the projection preimage.
 
 ## Running the checker
 

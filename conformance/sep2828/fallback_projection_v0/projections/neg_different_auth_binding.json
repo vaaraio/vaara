@@ -1,0 +1,10 @@
+{
+  "arguments": {
+    "file": "invoice.pdf"
+  },
+  "authBinding": {
+    "policyId": "pol-xyz",
+    "scope": "write"
+  },
+  "toolName": "document_fetch"
+}

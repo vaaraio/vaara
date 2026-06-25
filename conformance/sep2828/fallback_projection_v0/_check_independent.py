@@ -81,7 +81,23 @@ def main() -> int:
     else:
         print("[OK]   neg_different_tool diverges from observer_stable")
 
-    total = len(expected) + 2  # +2 for the cross-vector assertions
+    # Negative (item 2): different arguments must produce different digest
+    d_args = expected["neg_different_args"]["attestationDigest"]
+    if d_args == a:
+        print("[FAIL] neg_different_args: digest should differ from observer_stable")
+        failures += 1
+    else:
+        print("[OK]   neg_different_args diverges from observer_stable")
+
+    # Negative (item 3): different authBinding must produce different digest
+    d_auth = expected["neg_different_auth_binding"]["attestationDigest"]
+    if d_auth == a:
+        print("[FAIL] neg_different_auth_binding: digest should differ from observer_stable")
+        failures += 1
+    else:
+        print("[OK]   neg_different_auth_binding diverges from observer_stable")
+
+    total = len(expected) + 4  # +4 for cross-vector assertions
     passed = total - failures
     print(f"\n{passed}/{total} checks passed.")
     return 1 if failures else 0
