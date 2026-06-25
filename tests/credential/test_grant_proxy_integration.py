@@ -214,6 +214,64 @@ def test_tool_constraints_minted_as_capabilities(monkeypatch, tmp_path, receipts
     assert caps == [{"arg": "path", "op": "in", "value": ["/tmp", "/var/data"]}]
 
 
+def test_gateway_passes_constrained_tool_on_valid_grant(monkeypatch, tmp_path, receipts_dir):
+    """Gateway built for constrained tool; valid grant passes, upstream is called."""
+    from vaara.integrations._mcp_attest import build_attest_emitter
+
+    key = tmp_path / "attest.key"
+    key.write_bytes(KEY)
+    cfg = tmp_path / "constraints.json"
+    cfg.write_text(json.dumps({
+        "tools": {"read_file": [{"arg": "path", "op": "in", "value": ["/tmp"]}]}
+    }))
+    em = build_attest_emitter(
+        signing_key_path=key,
+        receipts_dir=receipts_dir,
+        upstream_commands={"default": ["echo"]},
+        tool_constraints_path=cfg,
+    )
+    assert em.gateway is not None
+    p = _make_proxy(monkeypatch, emitter=em, mint=True)
+    resp = p._handle_tools_call({
+        "jsonrpc": "2.0", "id": 1, "method": "tools/call",
+        "params": {"name": "read_file", "arguments": {"path": "/tmp"}},
+    })
+    # Gateway passed — upstream was called, no MCP error.
+    assert p._upstream.request.called
+    assert "error" not in resp
+
+
+def test_gateway_blocks_constrained_tool_when_grant_missing(monkeypatch, tmp_path, receipts_dir):
+    """Gateway fails closed: constrained tool with no credential gets MCP -32603."""
+    from unittest.mock import patch
+
+    from vaara.integrations._mcp_attest import build_attest_emitter
+
+    key = tmp_path / "attest.key"
+    key.write_bytes(KEY)
+    cfg = tmp_path / "constraints.json"
+    cfg.write_text(json.dumps({
+        "tools": {"read_file": [{"arg": "path", "op": "in", "value": ["/tmp"]}]}
+    }))
+    em = build_attest_emitter(
+        signing_key_path=key,
+        receipts_dir=receipts_dir,
+        upstream_commands={"default": ["echo"]},
+        tool_constraints_path=cfg,
+    )
+    p = _make_proxy(monkeypatch, emitter=em, mint=True)
+    # Simulate emit_grant failure so no credential is injected.
+    with patch.object(em, "emit_grant", return_value=None):
+        resp = p._handle_tools_call({
+            "jsonrpc": "2.0", "id": 1, "method": "tools/call",
+            "params": {"name": "read_file", "arguments": {"path": "/tmp/x"}},
+        })
+    assert "error" in resp
+    assert resp["error"]["code"] == -32603
+    assert "read_file" in resp["error"]["message"]
+    assert not p._upstream.request.called
+
+
 def test_unconstrained_tool_gets_no_capabilities(monkeypatch, tmp_path, receipts_dir):
     """A tool not in the constraints map gets an exact-args grant with no capabilities."""
     from vaara.integrations._mcp_attest import build_attest_emitter

@@ -100,10 +100,35 @@ class AttestPairEmitter:
             name: _cmd_hash(cmd) for name, cmd in upstream_commands.items()
         }
         self._write_pubkey_pin()
+        # Fail-closed gateway for tools listed in tool_constraints. Built once at
+        # init so the verifying material stays paired with the signing key. Only
+        # present when tool_constraints is non-empty; absent = no enforcement.
+        self._gateway: "Optional[Any]" = None
+        if self._tool_constraints:
+            try:
+                from vaara.credential.gateway import CredentialGateway
+                vm = (
+                    self._signing_key.public_key()
+                    if self._alg in ("ES256", "RS256")
+                    else self._signing_key
+                )
+                self._gateway = CredentialGateway(
+                    verifying_material=vm,
+                    receipts_dir=self._receipts_dir,
+                )
+            except Exception:
+                logger.exception("Failed to build CredentialGateway for tool constraints")
 
     @property
     def receipts_dir(self) -> Path:
         return self._receipts_dir
+
+    @property
+    def gateway(self) -> "Optional[Any]":
+        return self._gateway
+
+    def is_constrained(self, tool_name: str) -> bool:
+        return tool_name in self._tool_constraints
 
     def update_manifest_fingerprint(
         self, upstream_name: str, tools_list_response: dict
