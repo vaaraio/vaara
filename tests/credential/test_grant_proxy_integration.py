@@ -181,3 +181,58 @@ def test_authorization_receipt_off_by_default(monkeypatch, emitter, receipts_dir
     })
     assert len(_grants(receipts_dir)) == 1
     assert _authzs(receipts_dir) == []
+
+
+def test_tool_constraints_minted_as_capabilities(monkeypatch, tmp_path, receipts_dir):
+    """Capabilities from tool_constraints appear in the grant for the matching tool."""
+    from vaara.integrations._mcp_attest import build_attest_emitter
+
+    key = tmp_path / "attest.key"
+    key.write_bytes(KEY)
+    cfg = tmp_path / "constraints.json"
+    cfg.write_text(json.dumps({
+        "tools": {
+            "read_file": [
+                {"arg": "path", "op": "in", "value": ["/tmp", "/var/data"]},
+            ]
+        }
+    }))
+    em = build_attest_emitter(
+        signing_key_path=key,
+        receipts_dir=receipts_dir,
+        upstream_commands={"default": ["echo"]},
+        tool_constraints_path=cfg,
+    )
+    p = _make_proxy(monkeypatch, emitter=em, mint=True)
+    p._handle_tools_call({
+        "jsonrpc": "2.0", "id": 1, "method": "tools/call",
+        "params": {"name": "read_file", "arguments": {"path": "/tmp/x"}},
+    })
+    grants = _grants(receipts_dir)
+    assert len(grants) == 1
+    caps = grants[0].get("capabilities", [])
+    assert caps == [{"arg": "path", "op": "in", "value": ["/tmp", "/var/data"]}]
+
+
+def test_unconstrained_tool_gets_no_capabilities(monkeypatch, tmp_path, receipts_dir):
+    """A tool not in the constraints map gets an exact-args grant with no capabilities."""
+    from vaara.integrations._mcp_attest import build_attest_emitter
+
+    key = tmp_path / "attest.key"
+    key.write_bytes(KEY)
+    cfg = tmp_path / "constraints.json"
+    cfg.write_text(json.dumps({"tools": {"other_tool": [{"arg": "x", "op": "eq", "value": "y"}]}}))
+    em = build_attest_emitter(
+        signing_key_path=key,
+        receipts_dir=receipts_dir,
+        upstream_commands={"default": ["echo"]},
+        tool_constraints_path=cfg,
+    )
+    p = _make_proxy(monkeypatch, emitter=em, mint=True)
+    p._handle_tools_call({
+        "jsonrpc": "2.0", "id": 1, "method": "tools/call",
+        "params": {"name": "read_file", "arguments": {"path": "/tmp/x"}},
+    })
+    grants = _grants(receipts_dir)
+    assert len(grants) == 1
+    assert "capabilities" not in grants[0]

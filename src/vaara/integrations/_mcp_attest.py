@@ -74,6 +74,7 @@ class AttestPairEmitter:
         secret_version: str,
         upstream_commands: dict[str, list[str]],
         exp_seconds: int = 300,
+        tool_constraints: "Optional[dict[str, tuple[Any, ...]]]" = None,
     ) -> None:
         from vaara.attestation._sep2787_types import VALID_ALGS
         if alg not in VALID_ALGS:
@@ -84,6 +85,7 @@ class AttestPairEmitter:
         self._receipts_dir.mkdir(parents=True, exist_ok=True)
         self._secret_version = secret_version
         self._exp_seconds = exp_seconds
+        self._tool_constraints: dict[str, tuple[Any, ...]] = tool_constraints or {}
         self._counter = 0
         # Per-coverage-boundary sequence for authorization receipts, gap-free by
         # construction. Distinct from ``_counter`` (the per-call attestation id):
@@ -238,6 +240,7 @@ class AttestPairEmitter:
             )
             sub = f"{tenant_id}/{upstream_name}" if tenant_id else upstream_name
 
+            capabilities = self._tool_constraints.get(tool_name, ())
             credential = _emit_grant(
                 scope=scope,
                 binding=binding,
@@ -247,6 +250,7 @@ class AttestPairEmitter:
                 alg=self._alg,
                 signing_material=self._signing_key,
                 exp_seconds=grant_exp_seconds,
+                capabilities=capabilities,
             )
 
             nonce_tag = attestation.issuer_asserted.nonce[:8]
@@ -445,6 +449,7 @@ def build_attest_emitter(
     upstream_commands: dict[str, list[str]],
     secret_version: Optional[str] = None,
     exp_seconds: int = 300,
+    tool_constraints_path: Optional[Path] = None,
 ) -> AttestPairEmitter:
     """Load signing key from path and return an ``AttestPairEmitter``.
 
@@ -518,6 +523,15 @@ def build_attest_emitter(
         if secret_version is None:
             secret_version = hashlib.sha256(raw).hexdigest()[:8]
 
+    tool_constraints: dict[str, tuple[Any, ...]] = {}
+    if tool_constraints_path is not None:
+        from vaara.credential._grant_capability import capability_from_dict
+        raw_cfg = json.loads(
+            Path(tool_constraints_path).expanduser().read_text(encoding="utf-8")
+        )
+        for tname, cap_list in raw_cfg.get("tools", {}).items():
+            tool_constraints[tname] = tuple(capability_from_dict(c) for c in cap_list)
+
     return AttestPairEmitter(
         signing_key=signing_material,
         alg=alg,
@@ -525,4 +539,5 @@ def build_attest_emitter(
         secret_version=secret_version,
         upstream_commands=upstream_commands,
         exp_seconds=exp_seconds,
+        tool_constraints=tool_constraints or None,
     )
