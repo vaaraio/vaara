@@ -1,0 +1,10 @@
+{
+  "record": {
+    "boundaryId": "crew:checkout-run/2026-06-25",
+    "maxClass": "confidential",
+    "schema": "crewai.governance.seal/v1",
+    "sealed": true,
+    "total": 4
+  },
+  "signature": "c97909fc3b1f83037ba332f850dac0109f3eaf3bc6e5fb890f3b8b93dfa557536c4de957c323a62d48169bec807e9dcf3e0628f78319baa682b8194f050820b2"
+}

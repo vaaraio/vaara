@@ -1,0 +1,30 @@
+{
+  "record": {
+    "action_type": "purchase.fulfill",
+    "agent_id": "agent:crewai/checkout-bot",
+    "completeness": {
+      "boundaryId": "crew:checkout-run/2026-06-25",
+      "runningCount": 4,
+      "seq": 3
+    },
+    "continuation_id": "session:abc-123",
+    "decision": "allow",
+    "decision_context_hash": "sha256:6110dc18a3da0e728326d4f653edb9f5cc6cc0fb2bcf46079c3b7bbf338bc735",
+    "decision_id": "crew:checkout-run/2026-06-25#3",
+    "idempotency_key": "idem-3",
+    "intent_digest": "sha256:d23d5f9ca38bb38bd9267f6738642534712c3d57f5f52bb844d0a41111e65fd3",
+    "intent_ref": "sha256:0226110a90e2a9e652b2829afea74f337689a32d9d7b90801f21d1154453d33a",
+    "normalization_id": "jcs-rfc8785-v1",
+    "normalized_scope": "merchant:acme/order:INV-3",
+    "params_hash": "sha256:a8c53f6a12d5d020cf357a7bb11c5b2cc59522dcbfa00d04f1b0595c3ea10cce",
+    "policy_refs": [
+      "policy:spend-limit/v3",
+      "policy:eu-ai-act-art14/v1"
+    ],
+    "receipt_ref": "sha256:316e2d07a3458f97f354931172c2f642ebbd3ad5e88c0683dbf686a3122a541c",
+    "schema": "crewai.governance.decision/v1",
+    "target_state_digest": "sha256:023d46e0f386d0dd3e913380e6cdf685761625c7f6ba6402dc167d00e6159cf3",
+    "timestamp_ms": 1779200003000
+  },
+  "signature": "f4dad38913d2c688b83f85542c91a32b318a569c2d3885d1bc47f975b7460a68740e6ee76d4eb0f7cb7b2a0189eca180731e380c818559ad117a40980e28283e"
+}

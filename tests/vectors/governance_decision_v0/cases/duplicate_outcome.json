@@ -1,0 +1,37 @@
+{
+  "expected_verdict": "deny",
+  "first": {
+    "record": {
+      "completeness": {
+        "boundaryId": "crew:checkout-run/2026-06-25",
+        "runningCount": 1,
+        "seq": 0
+      },
+      "decision_id": "crew:checkout-run/2026-06-25#0",
+      "idempotency_key": "idem-A",
+      "intent_ref": "sha256:a51b72b29097f6c807cfb4a668a0c930cb0fb83c3e1049e1e08986af133ae48a",
+      "receipt_ref": "sha256:297c7e4498b8a7c99672ba6b6ebf5382240e9f023c81c5689e095ec93f7131e8",
+      "result_digest": "sha256:b3f323627efb2569b2080ce37542008d94f713f286c5472cb0fac6de2625991b",
+      "schema": "crewai.governance.outcome/v1",
+      "status": "executed"
+    },
+    "signature": "59cb772f977e4fda176d2a5291952a84bb0bdd2aedf6116bc4418b3f043409e7579ba707124994f000f97e9fbcb978d05ec9958aeccc4c0b57e7d38b2994941b"
+  },
+  "second": {
+    "record": {
+      "completeness": {
+        "boundaryId": "crew:checkout-run/2026-06-25",
+        "runningCount": 1,
+        "seq": 0
+      },
+      "decision_id": "crew:checkout-run/2026-06-25#0",
+      "idempotency_key": "idem-A",
+      "intent_ref": "sha256:a51b72b29097f6c807cfb4a668a0c930cb0fb83c3e1049e1e08986af133ae48a",
+      "receipt_ref": "sha256:297c7e4498b8a7c99672ba6b6ebf5382240e9f023c81c5689e095ec93f7131e8",
+      "result_digest": "sha256:b3f323627efb2569b2080ce37542008d94f713f286c5472cb0fac6de2625991b",
+      "schema": "crewai.governance.outcome/v1",
+      "status": "executed"
+    },
+    "signature": "7f5ee32faa141a07411498aa53878830c5f8038c060f075220c56d839ea6a7243dce603a5288013dabac6c751da47b9819e1dccbdf01e9347f44633e965f110b"
+  }
+}
