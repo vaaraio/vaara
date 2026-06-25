@@ -1618,6 +1618,13 @@ def main(argv: Optional[list[str]] = None) -> None:
                         help="Directory to write paired attestation + receipt JSON files "
                              "({n}-attest.json / {n}-receipt.json). Required when "
                              "--attest-signing-key is set.")
+    parser.add_argument("--tool-constraints", type=Path, default=None,
+                        metavar="PATH",
+                        help="JSON file mapping tool names to capability constraints for "
+                             "credential grants. Keys are tool names; values are lists of "
+                             "{arg, op, value} objects (op: le/ge/eq/in). Grants for listed "
+                             "tools carry typed constraints; unlisted tools get exact-args "
+                             "grants. Has no effect without --attest-signing-key.")
     parser.add_argument("--overt-signing-key", type=Path, default=None,
                         help="Ed25519 PEM private key used to sign OVERT 1.0 Base "
                              "Envelopes for every governed MCP interaction. Off when "
@@ -1856,6 +1863,7 @@ def _build_attest_emitter_from_args(
             signing_key_path=args.attest_signing_key,
             receipts_dir=args.attest_receipts_dir,
             upstream_commands=upstreams,
+            tool_constraints_path=getattr(args, "tool_constraints", None),
         )
     except AttestConfigError as exc:
         print(f"vaara-mcp-proxy: {exc}", file=sys.stderr)
