@@ -4,6 +4,13 @@ All notable changes to this project are documented here.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/)
 and this project follows [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [1.17.0] - 2026-06-26
+
+Minor release: MITRE ATLAS threat-detection conformance corpus.
+
+- **atlas_threat_v0 corpus.** Five fixture files in `tests/vectors/atlas_threat_v0/` ground `vaara.receipt/v1` against named MITRE ATLAS AI agent attack patterns: `pos_clean_execution` (control), `neg_injected_args` (Prompt Injection: args commitment diverges from authorization), `neg_tool_substitution` (Unauthorized Access: actionType changed at runtime), `neg_replay` (Replay: receipt re-presented 120 s after issuance, outside the 60 s freshness window), and `neg_scope_escalation` (Privilege Escalation: runtime scope exceeds authorized boundary). Each receipt is HMAC-SHA256 over RFC 8785 JCS. `_check_independent.py` reproduces all five verdicts with no Vaara import, only `hmac`, `hashlib`, and `rfc8785`.
+
+
 ## [1.16.0] - 2026-06-25
 
 Minor release: credential-binding enforcement corpus. Five independently verifiable conformance vectors pin the gateway enforcement contract for MCP tool calls.
