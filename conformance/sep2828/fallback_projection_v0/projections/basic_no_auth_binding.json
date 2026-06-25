@@ -1,0 +1,7 @@
+{
+  "arguments": {
+    "action": "read",
+    "path": "/docs/report.pdf"
+  },
+  "toolName": "filesystem_read"
+}
