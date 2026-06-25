@@ -1,0 +1,19 @@
+{
+  "cases": {
+    "neg_injected_args": {
+      "expected_verdict": "args_tampered"
+    },
+    "neg_replay": {
+      "expected_verdict": "stale"
+    },
+    "neg_scope_escalation": {
+      "expected_verdict": "scope_exceeded"
+    },
+    "neg_tool_substitution": {
+      "expected_verdict": "tool_mismatch"
+    },
+    "pos_clean_execution": {
+      "expected_verdict": "ok"
+    }
+  }
+}

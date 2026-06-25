@@ -1,0 +1,24 @@
+{
+  "authorization": {
+    "actionType": "file.read",
+    "agentId": "agent:file-reader",
+    "argsCommitment": "sha256:80bf4780ba595506be78b2a09cb8fad8895bec2a248523412e74ecbeedf67b12",
+    "scope": "path:/tmp/vaara/"
+  },
+  "expected_verdict": "scope_exceeded",
+  "freshness_window_ms": 60000,
+  "now_ms": 1779200030000,
+  "receipt": {
+    "actionType": "file.read",
+    "agentId": "agent:file-reader",
+    "argsCommitment": "sha256:80bf4780ba595506be78b2a09cb8fad8895bec2a248523412e74ecbeedf67b12",
+    "iss": "vaara-test-proxy",
+    "schema": "vaara.receipt/v1",
+    "scope": "path:/etc/",
+    "seq": 0,
+    "signature": "feeca89bb19999db740d4b1c0b4d7d96f85a87580f0a8aa09108682899a0b86f",
+    "sub": "corpus/atlas-threat",
+    "timestampMs": 1779200000000,
+    "version": 1
+  }
+}
