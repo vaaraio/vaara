@@ -1,0 +1,34 @@
+{
+  "credential": {
+    "alg": "HS256",
+    "asserted": {
+      "expSeconds": 60,
+      "iat": "2026-05-19T14:13:20Z",
+      "iss": "vaara-mcp-proxy",
+      "nonce": "lBaEgLPvEtwVpWHQa7pMGiXg",
+      "secretVersion": "corpus-key-v0",
+      "sub": "corpus/test"
+    },
+    "binding": {
+      "attestationDigest": "sha256:5e1698aff870d68621ac7426cb6b351e9148a54fcc74f5a71d8a4d1c048953e4",
+      "attestationNonce": "dGVzdG5vbmNlMTIz"
+    },
+    "scope": {
+      "argsCommitment": "sha256:068dde1aacab815c86401c9259bdf09c2ac5a139a1e735e868a5cbaa6827f061",
+      "tenantId": "mcp-tenant-01",
+      "toolName": "read_file"
+    },
+    "signature": "c3b03ae982d0caea8b7cdb0a000ad9dcd5312862aa605259b4b7d8c3487fb529",
+    "version": 1
+  },
+  "expected_verdict": "scope_mismatch",
+  "known_attestation_digests": [
+    "sha256:5e1698aff870d68621ac7426cb6b351e9148a54fcc74f5a71d8a4d1c048953e4"
+  ],
+  "now": 1779200030,
+  "runtime_args": {
+    "path": "/tmp/vaara/read_file_test"
+  },
+  "runtime_tenant_id": "other-tenant",
+  "runtime_tool_name": "read_file"
+}
