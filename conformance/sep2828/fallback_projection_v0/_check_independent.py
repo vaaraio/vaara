@@ -79,7 +79,7 @@ def main() -> int:
         print("[FAIL] neg_different_tool: digest should differ from observer_stable")
         failures += 1
     else:
-        print(f"[OK]   neg_different_tool diverges from observer_stable")
+        print("[OK]   neg_different_tool diverges from observer_stable")
 
     total = len(expected) + 2  # +2 for the cross-vector assertions
     passed = total - failures
