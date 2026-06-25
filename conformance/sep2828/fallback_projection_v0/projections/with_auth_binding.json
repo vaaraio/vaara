@@ -1,0 +1,12 @@
+{
+  "arguments": {
+    "bucket": "prod-data",
+    "object": "reports/q1.csv"
+  },
+  "authBinding": {
+    "capabilityGrant": "read-only",
+    "policyId": "pol-2026-001",
+    "scope": "storage"
+  },
+  "toolName": "gcs_read"
+}
