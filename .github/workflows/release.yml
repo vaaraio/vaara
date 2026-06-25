@@ -151,7 +151,14 @@ jobs:
         run: node --test test/*.test.mjs
 
       - name: Publish to npm with provenance
-        run: npm publish --provenance --access public
+        run: |
+          set -euo pipefail
+          pkg="$(node -p "require('./package.json').name")@$(node -p "require('./package.json').version")"
+          if npm view "$pkg" version > /dev/null 2>&1; then
+            echo "Already published: $pkg"
+          else
+            npm publish --provenance --access public
+          fi
         env:
           NODE_AUTH_TOKEN: ${{ secrets.NPM_TOKEN }}
 
