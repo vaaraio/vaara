@@ -1,0 +1,17 @@
+{
+  "record": {
+    "completeness": {
+      "boundaryId": "crew:checkout-run/2026-06-25",
+      "runningCount": 3,
+      "seq": 2
+    },
+    "decision_id": "crew:checkout-run/2026-06-25#2",
+    "idempotency_key": "idem-2",
+    "intent_ref": "sha256:f63235b3c47c5414ff81b8571fc5b6ece584c3d51096de679100201c0000f6d1",
+    "receipt_ref": "sha256:67ecf5b2b20c7c8924fefc587ae604ca998df58d13beaf6848a04f7975dc2087",
+    "result_digest": "sha256:d056a96d25c0164c38963860352b2cb92fbf5c6f09629f040b4787c8a33aff16",
+    "schema": "crewai.governance.outcome/v1",
+    "status": "executed"
+  },
+  "signature": "ddd7f708f6d3a3dafeabe78f7f69834015dee0ce38223102f212282a5eb18876e47b143441ce2533e56b068813c5c7a42c6a5081bd3dbac019eadcc217ccea95"
+}
