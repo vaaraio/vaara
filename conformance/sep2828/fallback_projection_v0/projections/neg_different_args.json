@@ -1,0 +1,10 @@
+{
+  "arguments": {
+    "file": "statement.pdf"
+  },
+  "authBinding": {
+    "policyId": "pol-abc",
+    "scope": "read"
+  },
+  "toolName": "document_fetch"
+}
