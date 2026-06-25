@@ -4,6 +4,13 @@ All notable changes to this project are documented here.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/)
 and this project follows [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [1.16.0] - 2026-06-25
+
+Minor release: credential-binding enforcement corpus. Five independently verifiable conformance vectors pin the gateway enforcement contract for MCP tool calls.
+
+- **credential_binding_v0 corpus.** Five fixture files in `tests/vectors/credential_binding_v0/` cover the full enforcement boundary: `pos_valid_grant` (valid credential + matching arg commitment), `neg_args_changed` (arg commitment mismatch at runtime), `neg_expired` (expired credential), `neg_wrong_tenant` (tenant ID mismatch), and `neg_no_credential` (missing credential, fail-closed with MCP -32603). `_check_independent.py` reproduces all five verdicts with no Vaara import — only HMAC-SHA256 over RFC 8785 JCS — so a passing run is a property of the bytes, not of this codebase.
+- The proxy already shipped the enforcement path in v1.15.0. This release pins it as a standalone conformance target so downstream verifiers can test gateway compliance without running the proxy.
+
 ## [1.15.0] - 2026-06-25
 
 Minor release: Track 1 authority-layer enforcement. The proxy now mints a short-lived credential per allowed tool call and enforces it fail-closed at the chokepoint before any upstream forward occurs.
