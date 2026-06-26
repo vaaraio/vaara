@@ -4,6 +4,14 @@ All notable changes to this project are documented here.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/)
 and this project follows [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+
+## [1.18.0] - 2026-06-26
+
+Minor release: capability-scope conformance corpus. A credential grant now carries machine-checkable capability constraints, and the published vectors prove a gate enforces them without trusting the chain.
+
+- `capability_scope_v0` ships five conformance cases under `tests/vectors/capability_scope_v0/`: a valid grant resolves to `ok`, an over-limit amount and an out-of-set vendor both resolve to `capability_exceeded`, an argument no capability covers resolves to `capability_uncovered` (closed coverage: an unnamed argument is denied, not ignored), and an absent credential resolves to `missing_credential`. Comparisons run over `Decimal` with `le`/`ge`/`eq`/`in` operators, and a boolean is rejected rather than coerced.
+- The independent checker reproduces every verdict and HS256 signature over RFC 8785 JCS with zero Vaara import (standard library plus the canonicalizer), so the corpus does not confirm itself. The signing payload is the grant's `{alg, asserted, binding, scope, version}` together with its declared capabilities.
+- The cases pin two OWASP AISVS 1.0 controls, C9.2.3 (reversibility classification) and C9.2.4 (runtime enforcement by class), published 2026-06-26, as an executable reference a recipient can check independently.
 ## [1.17.0] - 2026-06-26
 
 Minor release: MITRE ATLAS threat-detection conformance corpus.

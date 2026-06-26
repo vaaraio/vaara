@@ -1,0 +1,51 @@
+{
+  "credential": {
+    "alg": "HS256",
+    "asserted": {
+      "expSeconds": 300,
+      "iat": "2026-06-26T09:11:59Z",
+      "iss": "vaara.io",
+      "nonce": "CQKQ653u4aLwdzZn142NsFmv",
+      "secretVersion": "corpus-key-v0",
+      "sub": "mcp-tenant-01"
+    },
+    "binding": {
+      "attestationDigest": "sha256:aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+      "attestationNonce": "nonce-cap-v0-01"
+    },
+    "capabilities": [
+      {
+        "arg": "amount",
+        "op": "le",
+        "value": "500"
+      },
+      {
+        "arg": "vendor",
+        "op": "in",
+        "value": [
+          "acme",
+          "globex"
+        ]
+      }
+    ],
+    "scope": {
+      "argsCommitment": "",
+      "tenantId": "mcp-tenant-01",
+      "toolName": "transfer_funds"
+    },
+    "signature": "acb64324b6c7336fefa6f482a0ed454f8e57102a98199166106e377fa140e1ec",
+    "version": 1
+  },
+  "expected_verdict": "capability_uncovered",
+  "known_attestation_digests": [
+    "sha256:aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa"
+  ],
+  "now": 1782465119.842607,
+  "runtime_args": {
+    "amount": 400,
+    "memo": "hidden",
+    "vendor": "acme"
+  },
+  "runtime_tenant_id": "mcp-tenant-01",
+  "runtime_tool_name": "transfer_funds"
+}
