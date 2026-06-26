@@ -18,8 +18,8 @@ info:
     Versioning: paths are prefixed with `/v1/`. Breaking changes increment
     the path version. Additive changes do not.
   license:
-    name: Apache-2.0
-    url: https://www.apache.org/licenses/LICENSE-2.0
+    name: AGPL-3.0-or-later
+    url: https://www.gnu.org/licenses/agpl-3.0.en.html
   contact:
     name: Vaara
     url: https://vaara.io

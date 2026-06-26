@@ -28,6 +28,20 @@ pip install vaara
 
 Releases ship SLSA Build Level 3 provenance, verifiable with `slsa-verifier verify-artifact`. Optional ML classifier: `pip install 'vaara[ml]'`.
 
+### One line
+
+The smallest way in. Decorate a function and every call is governed: classified, risk-scored, decided allow/deny/escalate, and written to the audit trail, with zero setup.
+
+```python
+import vaara
+
+@vaara.govern
+def transfer_funds(to: str, amount: float) -> str:
+    ...
+```
+
+A blocked call raises `vaara.Blocked` before the body runs, carrying the decision, reason, and risk. An allowed call runs and reports its outcome back so the scorer keeps calibrating. `@vaara.govern(shadow=True)` audits every call without blocking, so you can see what would be denied before you enforce. When you need signed receipts, the MCP proxy, or the credential gateway, reach for the full `InterceptionPipeline` below. Same engine, smaller surface.
+
 ```python
 from vaara.pipeline import InterceptionPipeline
 

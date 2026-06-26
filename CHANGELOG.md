@@ -5,6 +5,15 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/)
 and this project follows [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
 
+## [1.19.0] - 2026-06-26
+
+Minor release: the one-line adoption surface. `@vaara.govern` turns any function into a governed tool call with zero configuration, over the same `InterceptionPipeline` the framework adapters and the MCP proxy already drive.
+
+- `vaara.govern` decorates a function so every call is classified, risk-scored with a conformal interval, decided allow/deny/escalate, and written to the hash-chained audit trail before the body runs. It fails closed: any non-allow decision raises `vaara.Blocked`, which carries the decision, reason, risk score, and interval. An allowed call runs and reports its outcome back so the scorer keeps calibrating.
+- `shadow=True` runs non-enforcing: classify, score, and audit every call but block nothing, so a team collects evidence of what would be denied before flipping to enforcing. `set_default_pipeline` wires a configured pipeline (signing trail, tuned scorer) under every decorator once at startup.
+- Re-exported as `vaara.govern` and `vaara.Blocked`. The first decorated call lazily builds a process-wide default pipeline, so importing vaara stays cheap and side-effect free.
+- Fixes a stale `Apache-2.0` license declaration in `docs/openapi.yaml`; the project is AGPL-3.0-or-later throughout.
+
 ## [1.18.0] - 2026-06-26
 
 Minor release: capability-scope conformance corpus. A credential grant now carries machine-checkable capability constraints, and the published vectors prove a gate enforces them without trusting the chain.
