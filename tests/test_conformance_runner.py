@@ -13,6 +13,8 @@ from __future__ import annotations
 import importlib.util
 from pathlib import Path
 
+import pytest
+
 REPO = Path(__file__).resolve().parent.parent
 RUNNER = REPO / "scripts" / "conformance_runner.py"
 VECTORS = REPO / "tests" / "vectors"
@@ -43,6 +45,10 @@ def test_argument_only_suite_is_skipped_not_failed() -> None:
 
 
 def test_known_good_suite_passes_through_main() -> None:
+    # Every suite's checker canonicalizes with rfc8785 (the `attestation`
+    # extra). Where it is not installed (CI's base test env), the checker
+    # cannot run, so skip rather than report a false runner failure.
+    pytest.importorskip("rfc8785")
     runner = _load_runner()
     rc = runner.main(["--corpus", "capability_scope_v0"])
     assert rc == 0
