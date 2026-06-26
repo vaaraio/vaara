@@ -1,0 +1,19 @@
+{
+  "cases": {
+    "neg_amount_exceeded": {
+      "expected_verdict": "capability_exceeded"
+    },
+    "neg_missing_credential": {
+      "expected_verdict": "missing_credential"
+    },
+    "neg_uncovered_arg": {
+      "expected_verdict": "capability_uncovered"
+    },
+    "neg_vendor_not_in_set": {
+      "expected_verdict": "capability_exceeded"
+    },
+    "pos_valid_grant": {
+      "expected_verdict": "ok"
+    }
+  }
+}
