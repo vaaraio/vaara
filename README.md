@@ -163,6 +163,10 @@ Method and per-cell breakdown: [docs/architecture.md](docs/architecture.md) and 
 
 Details and the offline checkers for each: [docs/standards.md](docs/standards.md).
 
+## Surface stability
+
+The public surface is fixed: the signed envelope (`vaara.receipt/v1`), capability constraints, the credential grant and gateway, and the `@vaara.govern` entry point. No new primitives are planned. New behavior ships as profiles that pin to `vaara.receipt/v1`, not as new core types, and no new format bindings will be added (the last was v1.13.0). From here the work is hardening and subtraction within this surface, so anyone building on it has a stable target.
+
 ## Docs
 
 | Path | Contents |
