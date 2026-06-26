@@ -28,20 +28,6 @@ pip install vaara
 
 Releases ship SLSA Build Level 3 provenance, verifiable with `slsa-verifier verify-artifact`. Optional ML classifier: `pip install 'vaara[ml]'`.
 
-### One line
-
-The smallest way in. Decorate a function and every call is governed: classified, risk-scored, decided allow/deny/escalate, and written to the audit trail, with zero setup.
-
-```python
-import vaara
-
-@vaara.govern
-def transfer_funds(to: str, amount: float) -> str:
-    ...
-```
-
-A blocked call raises `vaara.Blocked` before the body runs, carrying the decision, reason, and risk. An allowed call runs and reports its outcome back so the scorer keeps calibrating. `@vaara.govern(shadow=True)` audits every call without blocking, so you can see what would be denied before you enforce. When you need signed receipts, the MCP proxy, or the credential gateway, reach for the full `InterceptionPipeline` below. Same engine, smaller surface.
-
 ```python
 from vaara.pipeline import InterceptionPipeline
 
@@ -83,6 +69,15 @@ python tests/vectors/external_evidence_v0/_check_independent.py
 
 It re-derives every verdict from the receipt bytes and the public key alone. The output shows the property the trail is built for: a receipt dropped from inside a declared boundary is a provable gap from the held set, with no issuer access and no external witness.
 
+The aggregate runner grades every suite at once, and grades another implementation's vectors the same way:
+
+```bash
+python scripts/conformance_runner.py                                 # grade the reference corpus
+python scripts/conformance_runner.py --vectors-dir ./your_vectors    # grade your own
+```
+
+The named, versioned rule set, what a pass does and does not establish, and the full suite list are in [docs/conformance-profile.md](docs/conformance-profile.md).
+
 ```
 [OK] complete.contiguity: {'ok': True, 'present': 3, 'expected': 3, 'missingSeqs': []}
 [OK] dropped.contiguity: {'ok': False, 'present': 2, 'expected': 3, 'missingSeqs': [1]}
@@ -116,6 +111,7 @@ Each verdict carries the threshold-versus-observed snapshot, the rationale, and 
 - **Governance of the model call itself**, not only the tools around it: a hardware-rooted inference receipt that a second, different local model cross-checks. This is the sovereign inference harness, new in v1.0.
 - **Enforcement, not only a record** (v1.1.0): a credential broker mints a signed, short-lived credential bound to the attestation digest and scoped to one tool, its argument commitment, and tenant, with typed capability scopes that bound what a call may do. A gateway in front of a protected tool refuses any call without a valid, attestation-bound grant, so a bypass stops being silent. Off by default.
 - **Gap-evident completeness** (v1.4.0): each authorization receipt can carry a signed per-boundary sequence and running count, so a dropped receipt inside a declared boundary is a provable gap from the held receipts alone, with no issuer access and no external witness (`vaara verify-contiguity`). Off by default.
+- **Independent re-mint** (v1.14.0): a second generator in each public vector set reproduces the signed carrier byte-exact from the declared canonicalization alone, with no Vaara import. A verifier that has never run Vaara software reproduces the same bytes.
 
 ## Where it plugs in
 
@@ -159,7 +155,7 @@ Method and per-cell breakdown: [docs/architecture.md](docs/architecture.md) and 
 ## Standards and attestation
 
 - **[vaara.receipt/v1](SPEC.md)** is the canonical parent spec for the signed receipt format: hash-chained, canonicalized with JCS (RFC 8785), verifiable offline from a public key. The x402 settlement binding and an eIDAS qualified-timestamp profile are downstream profiles that pin to it rather than competing formats. Receipts can carry a self-hosted RFC 3161 timestamp that Vaara mints offline.
-- **[SEP-2828](https://github.com/modelcontextprotocol/modelcontextprotocol/pull/2828)** signed execution records and **SEP-2787** request-attestation test vectors, in the MCP standards process. A second independent implementation has reproduced the SEP-2828 conformance vectors from a clean checkout with no shared code.
+- **[SEP-2828](https://github.com/modelcontextprotocol/modelcontextprotocol/pull/2828)** signed execution records and **SEP-2787** request-attestation test vectors, in the MCP standards process. A second independent implementation has reproduced the SEP-2828 conformance vectors from a clean checkout with no shared code. Published corpora with independent checkers cover the fallback binding path ([`conformance/sep2828/fallback_projection_v0/`](conformance/sep2828/fallback_projection_v0/)) and CrewAI governance decisions ([`tests/vectors/governance_decision_v0/`](tests/vectors/governance_decision_v0/)).
 - **OVERT 1.0** ([overt.is](https://overt.is/)): Vaara is the Arbiter and emits Protocol Profile 1.0 Base Envelopes (canonical CBOR, Ed25519) alongside every record when attestation is on.
 - **Post-quantum**: an optional parallel ML-DSA-65 / FIPS 204 signature over the same preimage, so a stripped post-quantum signature is a detectable downgrade rather than a silent loss.
 - **Root-agnostic evidence**: the same Article 12 record is provable with or without a hardware TEE and re-expressible as an IETF RATS EAR (AR4SI vector), whether rooted in a TPM 2.0 host, an AMD SEV-SNP confidential VM, or no TEE at all.
