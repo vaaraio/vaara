@@ -209,7 +209,7 @@ Vaara helps deployers assemble evidence for their own conformity work. It does n
 
 ## License
 
-AGPL-3.0-or-later. See [LICENSE](LICENSE).
+Copyright © 2026 Henri Sirkkavaara. Licensed under AGPL-3.0-or-later. See [LICENSE](LICENSE).
 
 <!-- mcp-name: io.github.vaaraio/vaara -->
 <!-- mcp-name: io.github.vaaraio/vaara-server -->
