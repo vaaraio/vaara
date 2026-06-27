@@ -93,6 +93,19 @@ jobs:
           ./mcp-publisher --version || true
       - name: Authenticate to the MCP Registry (GitHub OIDC)
         run: ./mcp-publisher login github-oidc
+      - name: Sync manifest versions to the requested version
+        # The registry publishes whatever version is committed in the manifests.
+        # Rewrite both to the requested version so a stale manifest cannot make
+        # the publish + assertion below fail. jq is pre-installed on ubuntu-latest.
+        run: |
+          set -euo pipefail
+          VERSION="${EXPECTED_VERSION#v}"
+          for manifest in server.json server-vaara-server.json; do
+            tmp="$(mktemp)"
+            jq --arg v "$VERSION" '.version = $v | (.packages[]?.version) |= $v' "$manifest" > "$tmp"
+            mv "$tmp" "$manifest"
+            echo "Set ${manifest} version to ${VERSION}"
+          done
       - name: Publish both manifests
         run: |
           set -uo pipefail

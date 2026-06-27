@@ -199,6 +199,24 @@ jobs:
         # the GitHub identity of this repository.
         run: ./mcp-publisher login github-oidc
 
+      - name: Sync manifest versions to the released tag
+        # The registry publishes whatever version is committed in the manifests,
+        # and nothing else bumps them on release. Rewrite both to the tag here so
+        # a forgotten manual manifest bump cannot make the publish + assertion
+        # below fail (the recurring failure mode for v1.17.0/v1.18.0). jq is
+        # pre-installed on ubuntu-latest runners.
+        env:
+          RELEASE_TAG: ${{ github.ref_name }}
+        run: |
+          set -euo pipefail
+          VERSION="${RELEASE_TAG#v}"
+          for manifest in server.json server-vaara-server.json; do
+            tmp="$(mktemp)"
+            jq --arg v "$VERSION" '.version = $v | (.packages[]?.version) |= $v' "$manifest" > "$tmp"
+            mv "$tmp" "$manifest"
+            echo "Set ${manifest} version to ${VERSION}"
+          done
+
       - name: Publish both manifests
         # The publish subcommand takes the manifest path as a positional arg
         # (defaults to ./server.json). We publish both listings. A version
