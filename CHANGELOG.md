@@ -5,6 +5,13 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/)
 and this project follows [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
 
+## [1.20.0] - 2026-06-27
+
+Minor release: the eIDAS 2.0 Qualified Electronic Ledger (QEL) profile. A new downstream profile maps a Vaara receipt chain to the QEL record model without adding a primitive.
+
+- `docs/eidas-qel-profile.md` profiles `vaara.receipt/v1` against the eIDAS 2.0 QEL requirements (Regulation (EU) 2024/1183, Art. 45k/45l). It crosswalks the shipped substrate (append-only hash chain, recompute-from-bytes tamper-evidence, RFC 3161 / qualified timestamp anchoring, RFC 6962 transparency proofs) to each requirement and marks what only a Qualified Trust Service Provider adds: key custody, a qualified seal over the export, and conformity assessment. The profile is deliberately gated. The QEL implementing act is not adopted as of June 2026, so nothing carries "qualified" status until a listed QTSP operates the chain.
+- Release pipeline: `release.yml` and `republish.yml` now rewrite the MCP manifest versions (`server.json`, `server-vaara-server.json`) to the released version before publishing, so a missed manual manifest bump can no longer desync the MCP Registry from PyPI.
+
 ## [1.19.0] - 2026-06-26
 
 Minor release: the one-line adoption surface. `@vaara.govern` turns any function into a governed tool call with zero configuration, over the same `InterceptionPipeline` the framework adapters and the MCP proxy already drive.
