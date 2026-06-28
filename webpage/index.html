@@ -1,0 +1,252 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<title>Vaara — Tamper-evident evidence layer for AI agents | EU AI Act Article 12</title>
+<meta name="description" content="Vaara is the open-source tamper-evident runtime evidence layer for AI agents. Prove what an agent actually did, let an outside party verify it without trusting you, and bind the record to the machine's own TPM 2.0 + IMA attestation. EU AI Act Article 12 audit trail. No SaaS, no telemetry, AGPL-3.0.">
+<meta name="keywords" content="AI agent audit trail, tamper-evident AI logging, EU AI Act Article 12, EU AI Act compliance, AI governance, signed execution record, verifiable AI, AI accountability, TPM 2.0 attestation, IMA measurement, RFC 3161 timestamp, eIDAS qualified timestamp, SEP-2828, MCP execution record, agent observability, sovereign AI, hash-chained audit log, Ed25519, ML-DSA-65, post-quantum, SLSA, Sigstore, open source AI compliance">
+<meta name="author" content="Henri Sirkkavaara">
+<meta name="robots" content="index, follow, max-image-preview:large, max-snippet:-1, max-video-preview:-1">
+<meta name="googlebot" content="index, follow">
+<meta name="theme-color" content="#5fb878">
+<link rel="canonical" href="https://vaara.io/">
+<link rel="icon" type="image/svg+xml" href="/favicon.svg">
+<link rel="alternate icon" href="/favicon.ico">
+<link rel="apple-touch-icon" href="/favicon-180.png">
+<link rel="sitemap" type="application/xml" href="/sitemap.xml">
+<link rel="preconnect" href="https://raw.githubusercontent.com" crossorigin>
+<meta name="google-site-verification" content="_O6ZNl1tSt0i5pigo0iZmqrHbBQRRz_J7Db9nvPEi5A">
+
+<!-- Open Graph -->
+<meta property="og:type" content="website">
+<meta property="og:site_name" content="Vaara">
+<meta property="og:title" content="Vaara — Tamper-evident evidence layer for AI agents">
+<meta property="og:description" content="Prove what an AI agent actually did. An outside party verifies it without trusting you, bound to the machine's own TPM 2.0 + IMA attestation. EU AI Act Article 12. Open source, AGPL-3.0.">
+<meta property="og:url" content="https://vaara.io/">
+<meta property="og:image" content="https://raw.githubusercontent.com/vaaraio/vaara/main/docs/vaara-wordmark-light.png">
+<meta property="og:image:alt" content="Vaara">
+<meta property="og:locale" content="en_US">
+
+<!-- Twitter / X -->
+<meta name="twitter:card" content="summary_large_image">
+<meta name="twitter:title" content="Vaara — Tamper-evident evidence layer for AI agents">
+<meta name="twitter:description" content="Prove what an AI agent actually did, verifiable by an outside party without trusting you. EU AI Act Article 12. Open source, AGPL-3.0.">
+<meta name="twitter:image" content="https://raw.githubusercontent.com/vaaraio/vaara/main/docs/vaara-wordmark-light.png">
+<style>
+  :root {
+    --bg: #ececec;
+    --ink: #1a1a1a;
+    --rule: #cfcfcf;
+    --muted: #6b6b6b;
+    --accent: #5fb878;
+    --mono: 'JetBrains Mono','Fira Code','Hack','Cascadia Code','SF Mono','Menlo','Consolas','Liberation Mono',monospace;
+  }
+  @media (prefers-color-scheme: dark) {
+    :root {
+      --bg: #2a2a2a;
+      --ink: #eaeaea;
+      --rule: #3a3a3a;
+      --muted: #888;
+      --accent: #5fb878;
+    }
+  }
+  * { box-sizing: border-box; }
+  html, body {
+    margin: 0; padding: 0;
+    min-height: 100vh;
+    background: var(--bg); color: var(--ink);
+    font-family: var(--mono); font-size: 15px; line-height: 1.65;
+    -webkit-font-smoothing: antialiased;
+  }
+  main { max-width: 740px; margin: 0 auto; padding: 16px 28px 96px; }
+  .wordmark { margin: 0 auto; text-align: center; }
+  .wordmark img { width: min(70vw, 520px); height: auto; display: inline-block; }
+  h1 { font-size: 1.05rem; font-weight: 500; color: var(--ink); margin: 0 0 12px; letter-spacing: -0.1px; text-align: center; }
+  p { margin: 0 0 18px; color: var(--ink); }
+  .stance { font-size: 0.86rem; color: var(--muted); margin-bottom: 48px; letter-spacing: 0.2px; text-align: center; }
+  .stamp { font-size: 0.7rem; letter-spacing: 1.8px; text-transform: uppercase; color: var(--muted); font-weight: 600; margin: 0 0 14px; }
+  ul { margin: 0 0 40px; padding: 0; list-style: none; border-top: 1px solid var(--rule); }
+  ul li { padding: 12px 0 12px 24px; border-bottom: 1px solid var(--rule); color: var(--ink); position: relative; }
+  ul li::before { content: "\00B7"; color: var(--muted); font-size: 1.2rem; line-height: 1; position: absolute; left: 0; top: 12px; }
+  ul li b { font-weight: 600; }
+  ul li code { font-size: 0.82rem; background: rgba(95,184,120,0.12); padding: 1px 5px; border-radius: 3px; }
+  .links { display: grid; grid-template-columns: repeat(2, 1fr); gap: 12px; margin-top: 8px; margin-bottom: 8px; }
+  .links a { color: var(--ink); text-decoration: none; border: 1.5px solid var(--muted); padding: 14px 16px; font-size: 0.92rem; display: flex; flex-direction: column; gap: 6px; transition: border-color 0.15s ease, background 0.15s ease, transform 0.06s ease, box-shadow 0.15s ease; background: var(--bg); }
+  .links a:hover { border-color: var(--ink); color: var(--accent); box-shadow: 0 2px 0 0 var(--ink); transform: translate(0, -1px); }
+  .links a:active { transform: translate(0, 0); box-shadow: 0 0 0 0 var(--ink); }
+  .links a:focus-visible { outline: 2px solid var(--accent); outline-offset: 2px; }
+  .links .label { color: var(--muted); font-size: 0.66rem; letter-spacing: 1.8px; text-transform: uppercase; font-weight: 600; }
+  .links a:hover .label { color: var(--ink); }
+  .links .target { font-size: 0.86rem; color: var(--ink); word-break: break-all; }
+  .links a:hover .target { color: var(--accent); }
+  @media (max-width: 520px) { .links { grid-template-columns: 1fr; } }
+  footer { margin-top: 64px; padding-top: 24px; border-top: 1px solid var(--rule); font-size: 0.78rem; color: var(--muted); letter-spacing: 0.2px; }
+  .evidence { background: #0a0a0a; color: #e7e7e7; border: 1px solid #1f1f1f; margin: 0 0 48px; font-size: 0.78rem; line-height: 1.65; overflow-x: auto; }
+  .evidence-head { display: flex; justify-content: space-between; padding: 10px 18px; border-bottom: 1px solid #1f1f1f; font-size: 0.62rem; letter-spacing: 1.6px; text-transform: uppercase; color: #888; }
+  .evidence-head .live { color: var(--accent); display: inline-flex; gap: 6px; align-items: center; }
+  .evidence-head .live::before { content: ""; width: 6px; height: 6px; background: var(--accent); border-radius: 50%; display: inline-block; }
+  .evidence pre { margin: 0; padding: 16px 18px; white-space: pre; font-family: inherit; color: #e7e7e7; }
+  .evidence .prompt { color: var(--accent); }
+  .evidence .ok { color: var(--accent); }
+  .evidence .dim { color: #888; }
+  #pypi-month, #pypi-week, #npm-week { color: var(--accent); font-weight: 600; }
+</style>
+<script type="application/ld+json">
+{
+  "@context": "https://schema.org",
+  "@graph": [
+    {
+      "@type": "SoftwareApplication",
+      "name": "Vaara",
+      "applicationCategory": "DeveloperApplication",
+      "applicationSubCategory": "AI governance and audit",
+      "operatingSystem": "Linux, macOS, Windows",
+      "description": "Open-source tamper-evident runtime evidence layer for AI agents. Produces signed, hash-chained, independently verifiable execution records bound to TPM 2.0 and IMA attestation, for EU AI Act Article 12 audit trails.",
+      "url": "https://vaara.io/",
+      "downloadUrl": "https://pypi.org/project/vaara/",
+      "softwareHelp": "https://github.com/vaaraio/vaara",
+      "license": "https://www.gnu.org/licenses/agpl-3.0.html",
+      "isAccessibleForFree": true,
+      "offers": { "@type": "Offer", "price": "0", "priceCurrency": "EUR" },
+      "author": { "@type": "Person", "name": "Henri Sirkkavaara" },
+      "keywords": "AI agent audit trail, EU AI Act Article 12, tamper-evident logging, TPM 2.0, IMA, RFC 3161, SEP-2828, verifiable AI",
+      "sameAs": [
+        "https://github.com/vaaraio/vaara",
+        "https://pypi.org/project/vaara/",
+        "https://www.npmjs.com/package/@vaara/client"
+      ]
+    },
+    {
+      "@type": "Organization",
+      "name": "Vaara",
+      "url": "https://vaara.io/",
+      "logo": "https://raw.githubusercontent.com/vaaraio/vaara/main/docs/vaara-wordmark-light.png",
+      "founder": { "@type": "Person", "name": "Henri Sirkkavaara" },
+      "sameAs": [
+        "https://github.com/vaaraio/vaara",
+        "https://www.linkedin.com/in/sirkkavaara",
+        "https://pypi.org/project/vaara/",
+        "https://www.npmjs.com/package/@vaara/client"
+      ]
+    },
+    {
+      "@type": "WebSite",
+      "name": "Vaara",
+      "url": "https://vaara.io/",
+      "inLanguage": "en"
+    },
+    {
+      "@type": "FAQPage",
+      "mainEntity": [
+        {
+          "@type": "Question",
+          "name": "What is Vaara?",
+          "acceptedAnswer": { "@type": "Answer", "text": "Vaara is an open-source tamper-evident runtime evidence layer for AI agents. It turns every action an agent takes into a signed, hash-chained record that an outside party can verify without trusting the operator, and binds that record to the machine's own TPM 2.0 and IMA attestation." }
+        },
+        {
+          "@type": "Question",
+          "name": "Does Vaara help with EU AI Act compliance?",
+          "acceptedAnswer": { "@type": "Answer", "text": "Yes. Vaara produces EU AI Act Article 12 record-keeping evidence and a one-command regulator package (vaara trail export-article12) that writes the signed trail, per-article evidence, and a trusted time anchor an authority can verify offline." }
+        },
+        {
+          "@type": "Question",
+          "name": "Does Vaara require a trusted execution environment or special hardware?",
+          "acceptedAnswer": { "@type": "Answer", "text": "No. Vaara is root-agnostic: it recomputes verification from the recorded bytes, so no trusted execution environment is required. When a TPM 2.0 or IMA root is present, Vaara binds records to it as an optional upgrade." }
+        },
+        {
+          "@type": "Question",
+          "name": "Is Vaara free and open source?",
+          "acceptedAnswer": { "@type": "Answer", "text": "Yes. Vaara is licensed under AGPL-3.0, with no SaaS, no telemetry, and no signup. It ships on PyPI, npm, and the MCP registry, with SLSA Build Level 3 and Sigstore-signed releases." }
+        }
+      ]
+    }
+  ]
+}
+</script>
+</head>
+<body>
+<main>
+<div class="wordmark">
+  <picture>
+    <source srcset="https://raw.githubusercontent.com/vaaraio/vaara/main/docs/vaara-wordmark-dark.png" media="(prefers-color-scheme: dark)">
+    <img src="https://raw.githubusercontent.com/vaaraio/vaara/main/docs/vaara-wordmark-light.png" alt="Vaara">
+  </picture>
+</div>
+<h1>Vaara is the tamper-evident runtime evidence layer for AI systems. It turns every action an agent takes into a record an outside party can verify without trusting you, then binds that record to the machine's own TPM 2.0 + IMA attestation. EU AI Act compliance, and any other case where you have to prove what an agent actually did.</h1>
+<p class="stance">Open source. No SaaS. No telemetry. No signup.</p>
+<div class="evidence">
+  <div class="evidence-head">
+    <span>anyone can check a record</span>
+    <span class="live">keyless</span>
+  </div>
+<pre><span class="prompt">$</span> vaara verify-record someone-elses-record.json
+
+  schema             <span class="ok">ok</span>    well-formed SEP-2828 execution record
+  result commitment  <span class="ok">ok</span>    projectionDigest == sha256(projection)
+  verdict            <span class="ok">CONFORMS</span>
+
+<span class="dim">no signing key, no access to the system that produced it</span></pre>
+</div>
+<p class="stamp">What's shipped</p>
+<ul>
+  <li>Check any record yourself: <code>vaara verify-record</code> tests any JSON against the published SEP-2828 format, including a record Vaara never produced, with no signing key and no access to the system that made it. <code>vaara verify-bundle</code> runs the full evidence set and prints a single pass or fail, fail-closed on authenticity.</li>
+  <li>One sink for any stack's evidence: <code>vaara ingest</code> seals a record from another format, an MCP execution record or a <code>did:web</code> catalog entry, into one canonical, content-addressed envelope with an honest gap report, so a dropped record is a provable hole. The conformance corpus is reproduced by a checker that imports no Vaara.</li>
+  <li>Hash-chained, tamper-evident audit trail (SHA-256, optional Ed25519, optional post-quantum ML-DSA-65), anchored to an RFC 3161 / eIDAS qualified timestamp so a record cannot be backdated against a clock you do not control. An auditor verifies it offline with a public key.</li>
+  <li>Hardware-rooted binding: <code>vaara verify-tpm-binding</code> and <code>vaara verify-tpm-chain</code> tie an execution record to the machine's own TPM 2.0 quote and IMA measurements.</li>
+  <li>Sovereign inference: run a local model through Vaara and every answer carries a signed receipt bound to the machine's TPM. Open under AGPL-3.0.</li>
+  <li>One-command regulator package: <code>vaara trail export-article12</code> writes the signed trail, per-article EU AI Act evidence, and the time anchor as Article 19 existence-in-time, in one file an authority checks offline.</li>
+  <li>Policy gating on every tool call: allow, block, or escalate each agent action against your own policy before it runs, through a transparent MCP proxy with native hooks for LangChain, CrewAI, and the OpenAI Agents SDK. TypeScript client on npm, Claude Code plugin in the same repo.</li>
+  <li>Authored SEP-2828, the Model Context Protocol server-side execution-record proposal, reproduced in full by an independent developer from a clean checkout. Releases are SLSA Build Level 3 and Sigstore-signed, with continuous fuzzing on the decoder, audit, and policy loader.</li>
+</ul>
+<p class="stamp">Adoption (live)</p>
+<ul>
+  <li><span id="pypi-month">-</span> PyPI downloads, last 30 days</li>
+  <li><span id="pypi-week">-</span> PyPI downloads, last 7 days</li>
+  <li><span id="npm-week">-</span> npm downloads, last 7 days (@vaara/client)</li>
+</ul>
+
+<p class="stamp">Acknowledged by</p>
+<ul>
+  <li>IMDA Model AI Governance Framework for Agentic AI v1.5 (Singapore, 20 May 2026), industry contributors</li>
+  <li>AMD developer testimonial (May 2026)</li>
+  <li>OpenSSF Best Practices Project 12612</li>
+</ul>
+
+<p class="stamp">Where</p>
+<div class="links">
+  <a href="https://github.com/vaaraio/vaara"><span class="label">code</span><span class="target">github.com/vaaraio/vaara</span></a>
+  <a href="https://pypi.org/project/vaara/"><span class="label">pypi</span><span class="target">pypi.org/project/vaara</span></a>
+  <a href="https://www.npmjs.com/package/@vaara/client"><span class="label">npm</span><span class="target">@vaara/client</span></a>
+  <a href="https://registry.modelcontextprotocol.io/v0.1/servers?search=io.github.vaaraio/vaara"><span class="label">mcp registry</span><span class="target">io.github.vaaraio/vaara</span></a>
+  <a href="https://github.com/modelcontextprotocol/modelcontextprotocol/pull/2828"><span class="label">proposal</span><span class="target">SEP-2828</span></a>
+  <a href="https://github.com/vaaraio/vaara/blob/main/COMPLIANCE.md"><span class="label">compliance</span><span class="target">COMPLIANCE.md</span></a>
+  <a href="https://github.com/sponsors/vaaraio"><span class="label">sponsor</span><span class="target">github.com/sponsors/vaaraio</span></a>
+  <a href="https://www.linkedin.com/in/sirkkavaara"><span class="label">linkedin</span><span class="target">in/sirkkavaara</span></a>
+</div>
+
+<footer>Vaara&trade; Copyright (C) 2026 Henri Sirkkavaara. AGPL-3.0. EU-built. Sigstore-signed releases.</footer>
+</main>
+<script>
+(function(){
+  function setText(id, value) { var el = document.getElementById(id); if (el) el.textContent = value; }
+  function fmt(n) { return n.toLocaleString("en-US"); }
+  fetch("/api/base/public/pypi-recent")
+    .then(function(r){ return r.ok ? r.json() : null; })
+    .then(function(d){
+      if (!d || !d.data) return;
+      if (typeof d.data.last_month === "number") setText("pypi-month", fmt(d.data.last_month));
+      if (typeof d.data.last_week === "number") setText("pypi-week", fmt(d.data.last_week));
+    })
+    .catch(function(){});
+  fetch("https://api.npmjs.org/downloads/point/last-week/@vaara/client")
+    .then(function(r){ return r.ok ? r.json() : null; })
+    .then(function(d){
+      if (!d || typeof d.downloads !== "number") return;
+      setText("npm-week", fmt(d.downloads));
+    })
+    .catch(function(){});
+})();
+</script>
+</body>
+</html>
