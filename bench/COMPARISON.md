@@ -19,7 +19,7 @@ what each tool actually does. If you are an AI Act Article 14
 deployer comparing options, read the matrix. If you want the longer
 prose, read the sections below it.
 
-## Capability matrix (as of 2026-05-16)
+## Capability matrix (as of 2026-06-29, Vaara v1.20.0)
 
 | Concern                                          | Vaara | NeMo Guardrails | Guardrails AI | OpenAI Guardrails | LangChain callbacks | OWASP LLM Top 10 | Glacis Python SDK | MS Agent Governance Toolkit |
 | ------------------------------------------------ | :---: | :-------------: | :-----------: | :---------------: | :-----------------: | :--------------: | :---------------: | :-------------------------: |
@@ -28,15 +28,18 @@ prose, read the sections below it.
 | Detects temporal **sequence** patterns           |   ✓   |        ✗        |       ✗       |         ✗         |          ✗          |        ✗         |         ✗         |              ✗              |
 | Hash-chained, regulator-exportable audit trail   |   ✓   |        ✗        |       ✗       |         ✗         |          ✗          |        ✗         |  partial (Merkle) |      partial (logging)      |
 | EU AI Act Art. 12 / 14 / 26 evidence mapping     |   ✓   |        ✗        |       ✗       |         ✗         |          ✗          |        ✗         |         ✗         |              ✗              |
+| Independently-recomputable conformance corpus    |   ✓   |        ✗        |       ✗       |         ✗         |          ✗          |        ✗         |         ✗         |              ✗              |
+| Spec in a standards process (IETF / MCP)         |   ✓   |        ✗        |       ✗       |         ✗         |          ✗          |     taxonomy     |  OVERT (self-pub) |              ✗              |
 | OVERT 1.0 Base Envelope emission (RFC 8949 CBOR) |   ✓   |        ✗        |       ✗       |         ✗         |          ✗          |        ✗         |         ✗         |              ✗              |
 | RFC 6962 Merkle inclusion proof integration      |  ext. IAP  |     ✗      |       ✗       |         ✗         |          ✗          |        ✗         |    ✓ (hosted)     |              ✗              |
 | Validates LLM *output text* (PII, toxicity, etc) |   ✗   |        ✓        |       ✓       |         ✓         |          ✗          |   advisory only  |         ✗         |              ✗              |
 | Validates LLM *input prompt* (jailbreak etc)     |   ✗   |        ✓        |       ✓       |         ✓         |          ✗          |   advisory only  |         ✗         |              ✗              |
 | Structured-output validation (schema / regex)    | partial|        ✓        |       ✓       |         ✓         |          ✗          |        ✗         |         ✗         |          partial            |
 | Zero-trust agent identity primitives             |   ✗   |        ✗        |       ✗       |         ✗         |          ✗          |        ✗         |         ✗         |              ✓              |
-| Capability-based access control                  | policy schema |  ✗        |       ✗       |         ✗         |          ✗          |        ✗         |         ✗         |              ✓              |
+| Capability-based access control                  |   ✓   |        ✗        |       ✗       |         ✗         |          ✗          |        ✗         |         ✗         |              ✓              |
+| Attestation-bound credential gateway             | ✓ (opt-in) |   ✗      |       ✗       |         ✗         |          ✗          |        ✗         |         ✗         |              ✗              |
 | Execution sandboxing                             |   ✗   |        ✗        |       ✗       |         ✗         |          ✗          |        ✗         |         ✗         |              ✓              |
-| Multi-language SDKs                              | Python only |     N/A    |   Python      |  Python (Agents)  |   Python / JS       |      N/A         |    Python only    |              ✓              |
+| Multi-language SDKs                              | Python + TS |   N/A    |   Python      |  Python (Agents)  |   Python / JS       |      N/A         |    Python only    |              ✓              |
 | Self-hostable Python library (no SaaS required)  |   ✓   |        ✓        |       ✓       |         ✓         |          ✓          |     document     |         ✓         |              ✓              |
 | License                                          | AGPL-3.0 |   Apache-2.0 |   Apache-2.0 |        MIT        |        MIT          |      CC-BY       |    Apache-2.0     |             MIT             |
 
@@ -44,13 +47,16 @@ Reading the matrix: Vaara and the other tools are complementary, not
 competitive. Different cells of the matrix. Different parts of the
 stack. A real production agent deployment uses several of these at
 once. Vaara owns the runtime risk-scoring + Article 14 evidence +
-OVERT 1.0 attestation slice. NeMo and Guardrails AI cover the LLM
-text-rail slice. Microsoft AGT covers the agent identity, capability,
-and sandboxing slice. Glacis SDK is a client to Glacis's hosted
-attestation service. Vaara does not validate LLM text output, so use
-Guardrails AI or NeMo for that. Vaara does not provide zero-trust
-agent identity, so use Microsoft AGT for that. The text-rail tools do
-not validate tool-call arguments at runtime, so use Vaara for that.
+OVERT 1.0 attestation slice, and the part no one else does: a public
+conformance corpus that an independent party recomputes offline with a
+checker that imports none of Vaara's code. NeMo and Guardrails AI cover
+the LLM text-rail slice. Microsoft AGT covers the agent identity,
+capability, and sandboxing slice. Glacis SDK is a client to Glacis's
+hosted attestation service. Vaara does not validate LLM text output, so
+use Guardrails AI or NeMo for that. Vaara does not provide zero-trust
+agent identity or execution sandboxing, so use Microsoft AGT for those.
+The text-rail tools do not validate tool-call arguments at runtime, so
+use Vaara for that.
 
 ## One paragraph each
 
@@ -112,27 +118,32 @@ SDKs for deployers running heterogeneous agent stacks. Where Vaara
 provides runtime risk scoring and Article 14 audit evidence, AGT
 provides agent identity primitives and the sandboxing layer that
 isolates agent execution from the host environment. The two tools
-cover different layers of the same governance stack. The
-`GenAI-Gurus/awesome-eu-ai-act` curator places Vaara and AGT side
-by side in the AI Agent Governance section for exactly this reason:
-deployers running production agents typically want both wired in.
+cover different layers of the same governance stack: deployers running
+production agents typically want both wired in.
 
 ## Where Vaara fits
 
 Vaara is the gate between an AI agent's *decision* to take an action
-and the actual *execution* of that action. It classifies the action,
-scores the risk, decides allow/escalate/deny, and writes a
-hash-chained audit record suitable for Article 14 oversight evidence.
-It is framework-agnostic: LangChain, LangGraph, any MCP-compatible
-runtime, or a custom loop.
+and the actual *execution* of that action. The entry point is one
+decorator, `@vaara.govern`: every call to a governed function is
+risk-scored and decided against your policy before the body runs, a
+blocked call raises `vaara.Blocked`, and the decision, the call, and
+the outcome land in a signed record anyone can verify offline. Vaara
+classifies the action, scores the risk, decides allow/escalate/deny,
+and writes a hash-chained audit record suitable for Article 14
+oversight evidence. It is framework-agnostic: LangChain, LangGraph,
+any MCP-compatible runtime, or a custom loop.
 
-The three things Vaara does that the tools above do not:
+The four things Vaara does that the tools above do not:
 
 1. Look at the **arguments** of the tool call, not just the LLM text.
 2. Score the tool call probabilistically against an **adaptive**
    model (MWU + conformal prediction + taxonomy base rate).
 3. Produce **regulator-ready** evidence: cryptographic audit chain,
    signal breakdown per decision, conformity report.
+4. Ship a **public conformance corpus** with a standalone checker, so
+   any third party recomputes every verdict offline, with no key, no
+   access, and none of Vaara's code.
 
 The things Vaara does not do that the tools above handle well:
 
@@ -140,25 +151,38 @@ The things Vaara does not do that the tools above handle well:
    Guardrails AI, OpenAI Guardrails).
 2. LLM input guardrails, jailbreak detection, topical rails (same).
 3. Constrained decoding and structured output generation (same).
-4. Zero-trust agent identity primitives and capability-based access
-   control as first-class types (Microsoft Agent Governance Toolkit).
+4. Zero-trust agent identity primitives (Microsoft Agent Governance
+   Toolkit).
 5. Execution sandboxing as a built-in primitive (Microsoft AGT).
 6. Hosted Merkle-inclusion-proof attestation as a managed service
    (Glacis Python SDK).
 
+Vaara does carry its own access-control layer: typed capability scopes
+that bound what a governed call may do, plus an opt-in credential
+gateway that refuses a tool call unless it carries a credential bound
+to the runtime's attestation. That is access control as evidence, not
+as a sandbox; AGT's identity and sandboxing primitives sit at a
+different layer and the two compose.
+
 If you are building an agent that writes to user-visible text **and**
 executes tools, you want Vaara plus one of the output-validation
 tools wired in. If you are running agents in production, you want
-Vaara plus Microsoft AGT for the identity, capability, and sandboxing
-layer Vaara does not cover. They run in different places in the
+Vaara plus Microsoft AGT for the identity and sandboxing layer Vaara
+does not cover. They run in different places in the
 stack and the matrix above shows where each tool lives.
 
 ## Sources
 
 Each row in the matrix is grounded in publicly available project documentation
-or source code. Verified as of 2026-05-16.
+or source code. Verified as of 2026-06-29.
 
 - **Vaara**: this repository at [github.com/vaaraio/vaara](https://github.com/vaaraio/vaara).
+  The `@vaara.govern` entry point (`src/vaara/govern.py`), the TypeScript
+  client (`clients/ts/`), the conformance corpus and standalone checkers
+  (`conformance/` and `tests/vectors/`), and the Internet-Draft
+  `draft-sirkkavaara-vaara-receipt` (Independent Submission stream,
+  Informational, under consideration) plus SEP-2828 (Server-Side Signed
+  Execution Record) in the MCP process.
 - **NVIDIA NeMo Guardrails**: [github.com/NVIDIA/NeMo-Guardrails](https://github.com/NVIDIA/NeMo-Guardrails).
 - **Guardrails AI**: [github.com/guardrails-ai/guardrails](https://github.com/guardrails-ai/guardrails).
 - **OpenAI Guardrails** (for OpenAI Agents SDK): [openai.github.io/openai-agents-python/guardrails/](https://openai.github.io/openai-agents-python/guardrails/).
