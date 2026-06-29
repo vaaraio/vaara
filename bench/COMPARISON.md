@@ -5,8 +5,8 @@ named in the same breath. Two clusters: LLM-text rails and output
 validators on one side (**NVIDIA NeMo Guardrails**, **Guardrails AI**,
 **OpenAI Guardrails** for Agents SDK, **LangChain callback handlers**,
 and the **OWASP LLM Top 10** threat taxonomy), and agent governance
-plus attestation tools on the other (**Glacis Python SDK** and
-**Microsoft Agent Governance Toolkit**).
+plus attestation tools on the other (**Glacis Python SDK**,
+**Microsoft Agent Governance Toolkit**, and **Apollo Watcher**).
 
 No benchmark numbers are cited for the other tools here. Each one
 solves a different problem than Vaara, so a head-to-head TPR/FPR on
@@ -21,27 +21,28 @@ prose, read the sections below it.
 
 ## Capability matrix (as of 2026-06-29, Vaara v1.20.0)
 
-| Concern                                          | Vaara | NeMo Guardrails | Guardrails AI | OpenAI Guardrails | LangChain callbacks | OWASP LLM Top 10 | Glacis Python SDK | MS Agent Governance Toolkit |
-| ------------------------------------------------ | :---: | :-------------: | :-----------: | :---------------: | :-----------------: | :--------------: | :---------------: | :-------------------------: |
-| Validates tool-call **arguments** at runtime     |   ✓   |        ✗        |       ✗       |         ✗         |    observes only    |   not software   |         ✗         |              ✓              |
-| Probabilistic / conformal risk scoring per call  |   ✓   |        ✗        |       ✗       |         ✗         |          ✗          |        ✗         |         ✗         |              ✗              |
-| Detects temporal **sequence** patterns           |   ✓   |        ✗        |       ✗       |         ✗         |          ✗          |        ✗         |         ✗         |              ✗              |
-| Hash-chained, regulator-exportable audit trail   |   ✓   |        ✗        |       ✗       |         ✗         |          ✗          |        ✗         |  partial (Merkle) |      partial (logging)      |
-| EU AI Act Art. 12 / 14 / 26 evidence mapping     |   ✓   |        ✗        |       ✗       |         ✗         |          ✗          |        ✗         |         ✗         |              ✗              |
-| Independently-recomputable conformance corpus    |   ✓   |        ✗        |       ✗       |         ✗         |          ✗          |        ✗         |         ✗         |              ✗              |
-| Spec in a standards process (IETF / MCP)         |   ✓   |        ✗        |       ✗       |         ✗         |          ✗          |     taxonomy     |  OVERT (self-pub) |              ✗              |
-| OVERT 1.0 Base Envelope emission (RFC 8949 CBOR) |   ✓   |        ✗        |       ✗       |         ✗         |          ✗          |        ✗         |         ✗         |              ✗              |
-| RFC 6962 Merkle inclusion proof integration      |  ext. IAP  |     ✗      |       ✗       |         ✗         |          ✗          |        ✗         |    ✓ (hosted)     |              ✗              |
-| Validates LLM *output text* (PII, toxicity, etc) |   ✗   |        ✓        |       ✓       |         ✓         |          ✗          |   advisory only  |         ✗         |              ✗              |
-| Validates LLM *input prompt* (jailbreak etc)     |   ✗   |        ✓        |       ✓       |         ✓         |          ✗          |   advisory only  |         ✗         |              ✗              |
-| Structured-output validation (schema / regex)    | partial|        ✓        |       ✓       |         ✓         |          ✗          |        ✗         |         ✗         |          partial            |
-| Zero-trust agent identity primitives             |   ✗   |        ✗        |       ✗       |         ✗         |          ✗          |        ✗         |         ✗         |              ✓              |
-| Capability-based access control                  |   ✓   |        ✗        |       ✗       |         ✗         |          ✗          |        ✗         |         ✗         |              ✓              |
-| Attestation-bound credential gateway             | ✓ (opt-in) |   ✗      |       ✗       |         ✗         |          ✗          |        ✗         |         ✗         |              ✗              |
-| Execution sandboxing                             |   ✗   |        ✗        |       ✗       |         ✗         |          ✗          |        ✗         |         ✗         |              ✓              |
-| Multi-language SDKs                              | Python + TS |   N/A    |   Python      |  Python (Agents)  |   Python / JS       |      N/A         |    Python only    |              ✓              |
-| Self-hostable Python library (no SaaS required)  |   ✓   |        ✓        |       ✓       |         ✓         |          ✓          |     document     |         ✓         |              ✓              |
-| License                                          | AGPL-3.0 |   Apache-2.0 |   Apache-2.0 |        MIT        |        MIT          |      CC-BY       |    Apache-2.0     |             MIT             |
+| Concern                                          | Vaara | NeMo Guardrails | Guardrails AI | OpenAI Guardrails | LangChain callbacks | OWASP LLM Top 10 | Glacis Python SDK | MS Agent Governance Toolkit | Apollo Watcher |
+| ------------------------------------------------ | :---: | :-------------: | :-----------: | :---------------: | :-----------------: | :--------------: | :---------------: | :-------------------------: | :------------: |
+| Validates tool-call **arguments** at runtime     |   ✓   |        ✗        |       ✗       |         ✗         |    observes only    |   not software   |         ✗         |              ✓              | partial (hook escalation) |
+| Probabilistic / conformal risk scoring per call  |   ✓   |        ✗        |       ✗       |         ✗         |          ✗          |        ✗         |         ✗         |              ✗              | ✗ (rubric grading) |
+| Detects temporal **sequence** patterns           |   ✓   |        ✗        |       ✗       |         ✗         |          ✗          |        ✗         |         ✗         |              ✗              | partial (session drift) |
+| Hash-chained, regulator-exportable audit trail   |   ✓   |        ✗        |       ✗       |         ✗         |          ✗          |        ✗         |  partial (Merkle) |      partial (logging)      | ✗ |
+| EU AI Act Art. 12 / 14 / 26 evidence mapping     |   ✓   |        ✗        |       ✗       |         ✗         |          ✗          |        ✗         |         ✗         |              ✗              | ✗ |
+| Independently-recomputable conformance corpus    |   ✓   |        ✗        |       ✗       |         ✗         |          ✗          |        ✗         |         ✗         |              ✗              | ✗ |
+| Spec in a standards process (IETF / MCP)         |   ✓   |        ✗        |       ✗       |         ✗         |          ✗          |     taxonomy     |  OVERT (self-pub) |              ✗              | ✗ |
+| OVERT 1.0 Base Envelope emission (RFC 8949 CBOR) |   ✓   |        ✗        |       ✗       |         ✗         |          ✗          |        ✗         |         ✗         |              ✗              | ✗ |
+| RFC 6962 Merkle inclusion proof integration      |  ext. IAP  |     ✗      |       ✗       |         ✗         |          ✗          |        ✗         |    ✓ (hosted)     |              ✗              | ✗ |
+| Validates LLM *output text* (PII, toxicity, etc) |   ✗   |        ✓        |       ✓       |         ✓         |          ✗          |   advisory only  |         ✗         |              ✗              | ✗ |
+| Validates LLM *input prompt* (jailbreak etc)     |   ✗   |        ✓        |       ✓       |         ✓         |          ✗          |   advisory only  |         ✗         |              ✗              | ✗ |
+| Structured-output validation (schema / regex)    | partial|        ✓        |       ✓       |         ✓         |          ✗          |        ✗         |         ✗         |          partial            | ✗ |
+| Real-time agent-session behavioral oversight     |partial|        ✗        |       ✗       |         ✗         |          ✗          |   advisory only  |         ✗         |              ✗              | ✓ |
+| Zero-trust agent identity primitives             |   ✗   |        ✗        |       ✗       |         ✗         |          ✗          |        ✗         |         ✗         |              ✓              | ✗ |
+| Capability-based access control                  |   ✓   |        ✗        |       ✗       |         ✗         |          ✗          |        ✗         |         ✗         |              ✓              | ✗ |
+| Attestation-bound credential gateway             | ✓ (opt-in) |   ✗      |       ✗       |         ✗         |          ✗          |        ✗         |         ✗         |              ✗              | ✗ |
+| Execution sandboxing                             |   ✗   |        ✗        |       ✗       |         ✗         |          ✗          |        ✗         |         ✗         |              ✓              | ✗ |
+| Multi-language SDKs                              | Python + TS |   N/A    |   Python      |  Python (Agents)  |   Python / JS       |      N/A         |    Python only    |              ✓              | Claude Code hooks |
+| Self-hostable (no SaaS / vendor cloud required)  |   ✓   |        ✓        |       ✓       |         ✓         |          ✓          |     document     |         ✓         |              ✓              | ✗ (monitors run on Apollo cloud) |
+| License                                          | AGPL-3.0 |   Apache-2.0 |   Apache-2.0 |        MIT        |        MIT          |      CC-BY       |    Apache-2.0     |             MIT             | source-available (NOASSERTION) |
 
 Reading the matrix: Vaara and the other tools are complementary, not
 competitive. Different cells of the matrix. Different parts of the
@@ -56,7 +57,10 @@ hosted attestation service. Vaara does not validate LLM text output, so
 use Guardrails AI or NeMo for that. Vaara does not provide zero-trust
 agent identity or execution sandboxing, so use Microsoft AGT for those.
 The text-rail tools do not validate tool-call arguments at runtime, so
-use Vaara for that.
+use Vaara for that. Apollo Watcher is the closest to Vaara's lane, both
+sit at agent runtime, but Watcher grades a session's behavior on Apollo's
+cloud while Vaara gates the individual call locally and emits a
+recomputable record, so the two cover different jobs at the same layer.
 
 ## One paragraph each
 
@@ -121,6 +125,22 @@ isolates agent execution from the host environment. The two tools
 cover different layers of the same governance stack: deployers running
 production agents typically want both wired in.
 
+**Apollo Watcher.** A real-time oversight layer for coding agents from
+Apollo Research, a Delaware public-benefit corporation with servers in
+Western Europe. It installs hooks into a Claude Code session, captures
+every tool call and permission decision, and grades them against
+configurable rubrics to flag failure modes such as deception, instruction
+drift, scope creep, and dangerous commands. A flagged action can be
+escalated to a human through the blocking permission hook, and full
+pre-execution blocking ("Active Control") is described as a roadmap goal.
+The code is public on GitHub but carries no open-source license (the
+GitHub API reports it as NOASSERTION), it is free during alpha, and the
+monitoring runs on Apollo's cloud rather than your own machine, so agent
+trajectories leave your control unless you opt out. Watcher and Vaara are
+complementary: Watcher watches a session's behavior and grades it, Vaara
+gates the individual call and writes a signed record you recompute and
+have checked offline.
+
 ## Where Vaara fits
 
 Vaara is the gate between an AI agent's *decision* to take an action
@@ -156,6 +176,8 @@ The things Vaara does not do that the tools above handle well:
 5. Execution sandboxing as a built-in primitive (Microsoft AGT).
 6. Hosted Merkle-inclusion-proof attestation as a managed service
    (Glacis Python SDK).
+7. Real-time behavioral grading of an agent session for deception,
+   instruction drift, and scope creep (Apollo Watcher).
 
 Vaara does carry its own access-control layer: typed capability scopes
 that bound what a governed call may do, plus an opt-in credential
@@ -190,6 +212,7 @@ or source code. Verified as of 2026-06-29.
 - **OWASP LLM Top 10**: [genai.owasp.org/llm-top-10/](https://genai.owasp.org/llm-top-10/).
 - **Glacis Python SDK**: [github.com/Glacis-io/glacis-python](https://github.com/Glacis-io/glacis-python). Capabilities recorded by source-read of the repository on 2026-05-16.
 - **Microsoft Agent Governance Toolkit**: [github.com/microsoft/agent-governance-toolkit](https://github.com/microsoft/agent-governance-toolkit).
+- **Apollo Watcher**: [github.com/ApolloResearch/watcher](https://github.com/ApolloResearch/watcher) and the [product page](https://www.apolloresearch.ai/products/introducing-watcher-for-ai-oversight/). License reported by the GitHub API as NOASSERTION (no open-source license) on 2026-06-29; alpha status, cloud-hosted monitoring, and EU-based servers per the product page and docs.
 
 ## Numbers we publish
 
