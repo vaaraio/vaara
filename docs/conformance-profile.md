@@ -23,7 +23,7 @@ reproduce the published verdicts under the same checker. The aggregate runner
 `scripts/conformance_runner.py` discovers every suite, runs each checker in a
 subprocess, and returns a single pass/fail.
 
-Profile v1 covers the 36 suites listed below, at the `v0` vector format. The
+Profile v1 covers the 37 suites listed below, at the `v0` vector format. The
 authoritative, always-current enumeration for any tagged release is the runner's
 own `--list` output at that tag.
 
@@ -111,7 +111,8 @@ contiguity_v0                record_set_v0
 credential_binding_v0        sep2787_attestation_v0
 cross_org_handoff_v0         tap_v0
 cross_stack_revocation_v0    transparency_consistency_v0
-decision_pairing_v0          x402_settlement_v0
+data_locality_v0             x402_settlement_v0
+decision_pairing_v0
 ```
 
 ## Related

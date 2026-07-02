@@ -1,0 +1,27 @@
+{
+  "attested": false,
+  "expected_verdict": "bad_signature",
+  "payload": {
+    "subject": "user-42",
+    "text": "personal data payload"
+  },
+  "record": {
+    "alg": "Ed25519",
+    "decision": {
+      "decision": "allow",
+      "policyId": "eu-inference-only@v1"
+    },
+    "issuer": "vaara-locality-emitter",
+    "schema": "vaara.data-locality/v0",
+    "signature": "cb4cebec84dcd1e9dbd5408c76024855c190e40b2b0fe6faae69e124eadca57fef0c0258867ad88bd02484bee9b49b9acba3cdc0450f86f3a533fbb4dbda3905",
+    "transfer": {
+      "actionId": "act-005",
+      "dataClass": "personal_data",
+      "endpoint": "https://api.eu-central-1.model.example/v1/infer",
+      "endpointRegion": "us-east-1",
+      "payloadDigest": "sha256:fba55d08632dd5ba1a0b8007f28b05e19f000cac068965ad4d5767a9cc756f06",
+      "tlsCertSha256": "sha256:90b583a43a94daf255b60c2abbdbf1e411b020321740237b265ea0899df2c7a2"
+    },
+    "version": 1
+  }
+}

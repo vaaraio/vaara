@@ -1,0 +1,33 @@
+{
+  "attested": true,
+  "expected_verdict": "ok_attested",
+  "payload": {
+    "subject": "user-42",
+    "text": "personal data payload"
+  },
+  "record": {
+    "alg": "Ed25519",
+    "decision": {
+      "decision": "allow",
+      "policyId": "eu-inference-only@v1"
+    },
+    "issuer": "vaara-locality-emitter",
+    "regionAttestation": {
+      "attestedRegion": "eu-central-1",
+      "attester": "provider-tee-01",
+      "nonce": "nonce-eu-1",
+      "sig": "fbaa06cdecedb4e451a9650ba7abb6f9983c71813af472d21963411e2eb5f821d0330f4eb8c875fccaad4a1e5a4f2987e85fbff9fc6ee5a4764c44c3f5be5b06"
+    },
+    "schema": "vaara.data-locality/v0",
+    "signature": "255125b38974a456649ff689852b7290eb7b88a5f039b4a2ccf3c2dc835afe9bbfae5c44bacf351ee56dda0957effa28d542f5c0fa109c120696ff5fd38bb603",
+    "transfer": {
+      "actionId": "act-001",
+      "dataClass": "personal_data",
+      "endpoint": "https://api.eu-central-1.model.example/v1/infer",
+      "endpointRegion": "eu-central-1",
+      "payloadDigest": "sha256:fba55d08632dd5ba1a0b8007f28b05e19f000cac068965ad4d5767a9cc756f06",
+      "tlsCertSha256": "sha256:90b583a43a94daf255b60c2abbdbf1e411b020321740237b265ea0899df2c7a2"
+    },
+    "version": 1
+  }
+}
