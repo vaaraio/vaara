@@ -1,0 +1,27 @@
+{
+  "attested": false,
+  "expected_verdict": "payload_mismatch",
+  "payload": {
+    "metric": "latency_ms",
+    "value": 12
+  },
+  "record": {
+    "alg": "Ed25519",
+    "decision": {
+      "decision": "allow",
+      "policyId": "eu-inference-only@v1"
+    },
+    "issuer": "vaara-locality-emitter",
+    "schema": "vaara.data-locality/v0",
+    "signature": "6cfb8074c25dfacd376f896c083b04e4ba685a56285dc2f7737bc3cca418a128b44bb3fd9fb5633990c13f607fac12822c439d8398d5edae64d31c2bdffe1c0c",
+    "transfer": {
+      "actionId": "act-006",
+      "dataClass": "personal_data",
+      "endpoint": "https://api.eu-central-1.model.example/v1/infer",
+      "endpointRegion": "eu-central-1",
+      "payloadDigest": "sha256:fba55d08632dd5ba1a0b8007f28b05e19f000cac068965ad4d5767a9cc756f06",
+      "tlsCertSha256": "sha256:90b583a43a94daf255b60c2abbdbf1e411b020321740237b265ea0899df2c7a2"
+    },
+    "version": 1
+  }
+}
