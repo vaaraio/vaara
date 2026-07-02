@@ -42,9 +42,16 @@ def tree_fingerprint(tag: str) -> str:
     path, mode, and blob id in the release tree, so the digest fingerprints the
     exact tree state without depending on archive/timestamp quirks.
     """
-    out = subprocess.check_output(
-        ["git", "-C", str(REPO), "ls-tree", "-r", "--full-tree", tag])
-    return hashlib.sha256(out).hexdigest()
+    proc = subprocess.run(
+        ["git", "-C", str(REPO), "ls-tree", "-r", "--full-tree", tag],
+        capture_output=True)
+    if proc.returncode != 0:
+        raise SystemExit(
+            f"cannot resolve tag {tag!r} locally. Release tags are created on the "
+            f"remote and are not fetched automatically — run:\n"
+            f"    git fetch origin tag {tag}\n"
+            f"then retry.")
+    return hashlib.sha256(proc.stdout).hexdigest()
 
 
 def _recompute_cmd(tag: str) -> str:
