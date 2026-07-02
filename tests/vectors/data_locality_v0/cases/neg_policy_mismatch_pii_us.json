@@ -1,0 +1,27 @@
+{
+  "attested": false,
+  "expected_verdict": "policy_mismatch",
+  "payload": {
+    "subject": "user-42",
+    "text": "personal data payload"
+  },
+  "record": {
+    "alg": "Ed25519",
+    "decision": {
+      "decision": "allow",
+      "policyId": "eu-inference-only@v1"
+    },
+    "issuer": "vaara-locality-emitter",
+    "schema": "vaara.data-locality/v0",
+    "signature": "0befdc7a244cec64c384a9e4f7497493e7b687ea325f292d87b13a1916894c3aaac4f78a26bbb6544b22cc752e269909a0f8520b6be409f59109f0cf46bd080b",
+    "transfer": {
+      "actionId": "act-004",
+      "dataClass": "personal_data",
+      "endpoint": "https://api.us-east-1.model.example/v1/infer",
+      "endpointRegion": "us-east-1",
+      "payloadDigest": "sha256:fba55d08632dd5ba1a0b8007f28b05e19f000cac068965ad4d5767a9cc756f06",
+      "tlsCertSha256": "sha256:ded5928f7b33056fe700399d00784dc9e015bf3d09fac9c0e82d2b0378d6e0af"
+    },
+    "version": 1
+  }
+}

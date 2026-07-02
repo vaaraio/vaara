@@ -5,6 +5,14 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/)
 and this project follows [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
 
+## [1.21.0] - 2026-07-02
+
+Minor release: the data-locality evidence profile and its conformance corpus. A signed record binds an agent action's cross-border transfer facts to the enforced decision, so a recipient can check where data went without trusting the exporter.
+
+- `data_locality_v0` conformance corpus (`tests/vectors/data_locality_v0/`): eight cases pin a two-tier evidence contract. Tier A recomputes the issuer signature, the payload digest, and the allow/block decision from the transfer facts under a named policy with no trusted party (`ok_asserted`). Tier B verifies a carried region attestation signed by a party distinct from the issuer and checks it agrees with the claimed region (`ok_attested`). The load-bearing case records `allow` for personal data to a US region and is caught as `policy_mismatch`, because the independent checker recomputes the decision rather than trusting it. The checker imports no Vaara code (Ed25519 over RFC 8785 JCS).
+- `vaara.attestation.data_locality` reference emitter builds and signature-verifies these records over the shipped receipt primitives. It is deliberately policy-agnostic: it records the decision the pipeline made, and recomputing correctness is the checker's job. Tests grade every emitted record with the corpus's dependency-free checker, so a format drift fails the build.
+- `docs/data-locality-profile.md` maps the record to GDPR Chapter V transfer accountability and states what it does not establish: it is evidence for a Transfer Impact Assessment, never an adequacy finding. Registered as the 37th suite in Vaara Conformance Profile v1.
+
 ## [1.20.0] - 2026-06-27
 
 Minor release: the eIDAS 2.0 Qualified Electronic Ledger (QEL) profile. A new downstream profile maps a Vaara receipt chain to the QEL record model without adding a primitive.

@@ -1,0 +1,48 @@
+{
+  "cases": {
+    "neg_attestation_bad_sig": {
+      "attested": false,
+      "expected_verdict": "attestation_bad_sig"
+    },
+    "neg_attestation_region_mismatch": {
+      "attested": true,
+      "expected_verdict": "attestation_region_mismatch"
+    },
+    "neg_bad_signature": {
+      "attested": false,
+      "expected_verdict": "bad_signature"
+    },
+    "neg_payload_tampered": {
+      "attested": false,
+      "expected_verdict": "payload_mismatch"
+    },
+    "neg_policy_mismatch_pii_us": {
+      "attested": false,
+      "expected_verdict": "policy_mismatch"
+    },
+    "pos_asserted_eu_no_attestation": {
+      "attested": false,
+      "expected_verdict": "ok_asserted"
+    },
+    "pos_attested_eu": {
+      "attested": true,
+      "expected_verdict": "ok_attested"
+    },
+    "pos_nonpersonal_us": {
+      "attested": false,
+      "expected_verdict": "ok_asserted"
+    }
+  },
+  "keys": {
+    "attesterPublicKey": "c6c7848783b4a580d89e424f25b5881eb9051b3f3692550a13208acf9d2a31eb",
+    "issuerPublicKey": "b91edfb5ace2fb9930529aecd23019ce5a8e2b3b0e4f2d137349488245f7bce9"
+  },
+  "policy": {
+    "euRegions": [
+      "eu-central-1",
+      "eu-north-1",
+      "eu-west-1"
+    ],
+    "id": "eu-inference-only@v1"
+  }
+}
