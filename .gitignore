@@ -23,6 +23,7 @@ docs/grant/
 dist_verify/
 research/
 research/sfs_sr315/
+webpage/
 **/sfs_sr315/
 .claude/
 
