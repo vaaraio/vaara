@@ -5,6 +5,14 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/)
 and this project follows [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
 
+## [1.22.0] - 2026-07-02
+
+Minor release: a per-receipt CycloneDX-CBOM crypto-posture block. An execution receipt can now carry, inside its signed preimage, a record of which signature algorithms protect it and the NIST post-quantum security level they reach, so an auditor reads the record's quantum resistance from the signed bytes alone.
+
+- `receiptAsserted.cryptoPosture` (optional, additive): a CycloneDX 1.6 / ECMA-424 shaped block naming each signing algorithm, its primitive, and its `nistQuantumSecurityLevel` (0 for the classical suites, 3 for ML-DSA-65 under FIPS 204), plus the effective floor as the max over the legs. It rides inside `receiptAsserted`, next to `sigSuite`, so it is covered by the signature. An inflated quantum-resistance claim or a stripped ML-DSA leg is recomputable from the signed record. Absent means the record predates the block and the envelope is byte-for-byte unchanged.
+- `crypto_posture_for(alg, sig_suite)` derives the block from a closed algorithm-to-level table and fails closed on an unknown algorithm or suite. `verify_crypto_posture(receipt)` recomputes the expected posture with no keying material and returns one of `crypto_posture_ok`, `crypto_posture_absent`, `crypto_posture_mismatch`, `crypto_posture_downgrade`, so an independent checker reproduces the verdict offline. `emit_receipt` gains an optional `crypto_posture` argument.
+- `docs/design/cbom-crypto-posture-spec.md` specifies the block, the level table, and the verdicts, and states the scope limit: it records the posture of the one algorithm set that signed the record, and is not a host or dependency scanner.
+
 ## [1.21.0] - 2026-07-02
 
 Minor release: the data-locality evidence profile and its conformance corpus. A signed record binds an agent action's cross-border transfer facts to the enforced decision, so a recipient can check where data went without trusting the exporter.

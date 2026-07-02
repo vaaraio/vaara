@@ -15,6 +15,7 @@ from typing import Any, Optional
 
 from vaara.attestation._receipt_types import (
     BackLink,
+    CryptoPosture,
     ExecutionReceipt,
     OutcomeDerived,
     ReceiptAsserted,
@@ -74,6 +75,7 @@ def emit_receipt(
     iat: Optional[str] = None,
     version: int = 1,
     sig_suite: Optional[str] = None,
+    crypto_posture: Optional[CryptoPosture] = None,
 ) -> ExecutionReceipt:
     """Build, JCS-canonicalize, and sign an ExecutionReceipt envelope.
 
@@ -84,6 +86,11 @@ def emit_receipt(
 
     ``signing_material`` is either a bytes shared secret (HS256) or a
     private-key object from ``cryptography.hazmat`` (ES256 / RS256).
+
+    ``crypto_posture`` is the optional CycloneDX-CBOM crypto-posture block.
+    Derive it with ``crypto_posture_for(alg=..., sig_suite=...)`` so it stays
+    consistent with the signing algorithm and any hybrid suite; it is written
+    into ``receiptAsserted`` and so covered by the signature.
     """
     if alg not in VALID_ALGS:
         raise AttestationError(f"unsupported alg: {alg!r}")
@@ -102,6 +109,7 @@ def emit_receipt(
         secret_version=secret_version,
         alg=alg,
         sig_suite=sig_suite,
+        crypto_posture=crypto_posture,
     )
 
     payload = _signing_payload(
