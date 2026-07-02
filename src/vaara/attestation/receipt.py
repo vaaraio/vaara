@@ -185,8 +185,18 @@ from vaara.attestation._receipt_retention import (
     RetentionResult,
     verify_receipt_retained,
 )
+from vaara.attestation._receipt_cbom import (
+    CBOM_ABSENT,
+    CBOM_DOWNGRADE,
+    CBOM_MISMATCH,
+    CBOM_OK,
+    crypto_posture_for,
+    verify_crypto_posture,
+)
 from vaara.attestation._receipt_types import (
     BackLink,
+    CryptoAlgorithm,
+    CryptoPosture,
     ExecutionReceipt,
     OutcomeDerived,
     PqSignature,
@@ -298,6 +308,14 @@ __all__ = [
     "IngestReceipt",
     "emit_ingest_receipt",
     "verify_ingest_signature",
+    "CryptoAlgorithm",
+    "CryptoPosture",
+    "CBOM_OK",
+    "CBOM_ABSENT",
+    "CBOM_MISMATCH",
+    "CBOM_DOWNGRADE",
+    "crypto_posture_for",
+    "verify_crypto_posture",
     "DidDocumentCache",
     "EvidenceBundle",
     "ExecutionReceipt",

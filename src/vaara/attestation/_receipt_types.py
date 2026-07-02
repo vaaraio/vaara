@@ -117,6 +117,15 @@ class ReceiptAsserted:
     (e.g. ``"ES256+ML-DSA-65"``), committing the issuer's intent *inside*
     the signed preimage so a stripped ``pqSignature`` is a detectable
     downgrade. See ``docs/design/pq-hybrid-signing-spec.md``.
+
+    ``crypto_posture`` (``cryptoPosture`` on the wire) is the optional
+    CycloneDX-CBOM crypto-posture block: the signature algorithms protecting
+    the record and the effective NIST post-quantum security level they reach.
+    Like ``sig_suite`` it rides inside the signed preimage, so an inflated
+    quantum-resistance claim or a stripped ML-DSA leg is recomputable from the
+    signed bytes. Absent means the record predates the block and the envelope
+    is byte-for-byte what it was before. See
+    ``docs/design/cbom-crypto-posture-spec.md``.
     """
 
     iss: str
@@ -126,6 +135,7 @@ class ReceiptAsserted:
     secret_version: str
     alg: Algorithm
     sig_suite: Optional[str] = None
+    crypto_posture: Optional["CryptoPosture"] = None
 
 
 @dataclass(frozen=True)
@@ -187,6 +197,131 @@ def pq_signature_from_dict(d: dict[str, Any]) -> PqSignature:
 
 
 @dataclass(frozen=True)
+class CryptoAlgorithm:
+    """One cryptographic algorithm protecting a receipt, CycloneDX-CBOM shaped.
+
+    ``algorithm`` is the JOSE / Vaara suite name (``"ES256"``, ``"ML-DSA-65"``).
+    ``primitive`` is the CycloneDX cryptographic primitive: ``"signature"`` for
+    the asymmetric suites, ``"mac"`` for the HS256 keyed-MAC path.
+    ``nist_quantum_security_level`` is the NIST post-quantum security category
+    the algorithm reaches: 0 for the classical suites (no quantum resistance),
+    3 for ML-DSA-65 (FIPS 204, Category 3). Field names track CycloneDX 1.6
+    ``cryptoProperties.algorithmProperties`` (ECMA-424).
+    """
+
+    algorithm: str
+    primitive: str
+    nist_quantum_security_level: int
+
+
+@dataclass(frozen=True)
+class CryptoPosture:
+    """CycloneDX-CBOM crypto posture committed inside the receipt preimage.
+
+    A signed, tamper-evident declaration of which signature algorithms protect
+    the record and the effective NIST post-quantum security level they reach.
+    It rides inside ``receiptAsserted`` (so inside the signed preimage) next to
+    ``sigSuite``: a verifier recomputes the expected posture from the receipt's
+    own ``alg`` + ``sigSuite``, so an inflated quantum-resistance claim, or a
+    stripped ML-DSA leg, is a signed statement the record cannot back.
+
+    ``nist_quantum_security_level`` is the effective floor for the record: the
+    max over ``algorithms``. A hybrid reaches its ML-DSA leg's category because
+    an attacker must still forge that leg; a classical-only receipt reports 0.
+    """
+
+    asset_type: str
+    nist_quantum_security_level: int
+    algorithms: tuple[CryptoAlgorithm, ...]
+
+
+def crypto_algorithm_to_dict(ca: CryptoAlgorithm) -> dict[str, Any]:
+    return {
+        "algorithm": ca.algorithm,
+        "primitive": ca.primitive,
+        "nistQuantumSecurityLevel": ca.nist_quantum_security_level,
+    }
+
+
+def crypto_posture_to_dict(cp: CryptoPosture) -> dict[str, Any]:
+    return {
+        "assetType": cp.asset_type,
+        "nistQuantumSecurityLevel": cp.nist_quantum_security_level,
+        "algorithms": [crypto_algorithm_to_dict(a) for a in cp.algorithms],
+    }
+
+
+_CRYPTO_ALGORITHM_KEYS = frozenset(
+    {"algorithm", "primitive", "nistQuantumSecurityLevel"}
+)
+_CRYPTO_POSTURE_KEYS = frozenset(
+    {"assetType", "nistQuantumSecurityLevel", "algorithms"}
+)
+
+
+def _crypto_level(value: Any, where: str) -> int:
+    """A NIST quantum-security level: an integer 0..5, rejecting bool.
+
+    ``bool`` is an ``int`` subclass, so ``True``/``False`` would otherwise slip
+    through and canonicalize to ``1``/``0``, letting a boolean masquerade as a
+    level. Reject it explicitly.
+    """
+    if not isinstance(value, int) or isinstance(value, bool) or not (0 <= value <= 5):
+        raise AttestationError(f"{where} must be an integer 0..5")
+    return value
+
+
+def crypto_algorithm_from_dict(d: dict[str, Any]) -> CryptoAlgorithm:
+    _reject_unknown_keys(d, _CRYPTO_ALGORITHM_KEYS, "cryptoPosture.algorithms[]")
+    for required in ("algorithm", "primitive", "nistQuantumSecurityLevel"):
+        if required not in d:
+            raise AttestationError(
+                f"cryptoPosture algorithm missing required field {required!r}"
+            )
+    algorithm = d["algorithm"]
+    primitive = d["primitive"]
+    if not isinstance(algorithm, str) or not algorithm:
+        raise AttestationError(
+            "cryptoPosture.algorithms[].algorithm must be a non-empty string"
+        )
+    if not isinstance(primitive, str) or not primitive:
+        raise AttestationError(
+            "cryptoPosture.algorithms[].primitive must be a non-empty string"
+        )
+    return CryptoAlgorithm(
+        algorithm=algorithm,
+        primitive=primitive,
+        nist_quantum_security_level=_crypto_level(
+            d["nistQuantumSecurityLevel"],
+            "cryptoPosture.algorithms[].nistQuantumSecurityLevel",
+        ),
+    )
+
+
+def crypto_posture_from_dict(d: dict[str, Any]) -> CryptoPosture:
+    _reject_unknown_keys(d, _CRYPTO_POSTURE_KEYS, "cryptoPosture")
+    for required in ("assetType", "nistQuantumSecurityLevel", "algorithms"):
+        if required not in d:
+            raise AttestationError(
+                f"cryptoPosture missing required field {required!r}"
+            )
+    if d["assetType"] != "algorithm":
+        raise AttestationError("cryptoPosture.assetType must be 'algorithm'")
+    algorithms = d["algorithms"]
+    if not isinstance(algorithms, list) or not algorithms:
+        raise AttestationError(
+            "cryptoPosture.algorithms must be a non-empty array"
+        )
+    return CryptoPosture(
+        asset_type="algorithm",
+        nist_quantum_security_level=_crypto_level(
+            d["nistQuantumSecurityLevel"], "cryptoPosture.nistQuantumSecurityLevel"
+        ),
+        algorithms=tuple(crypto_algorithm_from_dict(a) for a in algorithms),
+    )
+
+
+@dataclass(frozen=True)
 class ExecutionReceipt:
     """Execution-receipt envelope.
 
@@ -243,6 +378,8 @@ def receipt_asserted_to_dict(ra: ReceiptAsserted) -> dict[str, Any]:
     }
     if ra.sig_suite is not None:
         out["sigSuite"] = ra.sig_suite
+    if ra.crypto_posture is not None:
+        out["cryptoPosture"] = crypto_posture_to_dict(ra.crypto_posture)
     return out
 
 
@@ -262,7 +399,8 @@ _BACK_LINK_KEYS = frozenset(
     {"attestationDigest", "attestationNonce", "fallbackProjection"}
 )
 _RECEIPT_ASSERTED_KEYS = frozenset(
-    {"alg", "iat", "iss", "nonce", "secretVersion", "sub", "sigSuite"}
+    {"alg", "iat", "iss", "nonce", "secretVersion", "sub", "sigSuite",
+     "cryptoPosture"}
 )
 _OUTCOME_KEYS = frozenset(
     {"status", "completedAt", "resultCommitment", "decisionDigest"}
@@ -297,6 +435,14 @@ def receipt_asserted_from_dict(d: dict[str, Any]) -> ReceiptAsserted:
     sig_suite = d.get("sigSuite")
     if sig_suite is not None and not isinstance(sig_suite, str):
         raise AttestationError("receiptAsserted.sigSuite must be a string or absent")
+    crypto_posture_raw = d.get("cryptoPosture")
+    crypto_posture = None
+    if crypto_posture_raw is not None:
+        if not isinstance(crypto_posture_raw, dict):
+            raise AttestationError(
+                "receiptAsserted.cryptoPosture must be an object or absent"
+            )
+        crypto_posture = crypto_posture_from_dict(crypto_posture_raw)
     return ReceiptAsserted(
         alg=d["alg"],
         iat=d["iat"],
@@ -305,6 +451,7 @@ def receipt_asserted_from_dict(d: dict[str, Any]) -> ReceiptAsserted:
         secret_version=d["secretVersion"],
         sub=d["sub"],
         sig_suite=sig_suite,
+        crypto_posture=crypto_posture,
     )
 
 
