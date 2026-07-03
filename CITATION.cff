@@ -1,0 +1,25 @@
+cff-version: 1.2.0
+title: Vaara
+message: >-
+  If you use Vaara, please cite this repository and the
+  specification it implements.
+type: software
+authors:
+  - family-names: Sirkkavaara
+    given-names: Henri
+    email: hello@vaara.io
+repository-code: https://github.com/vaaraio/vaara
+url: https://vaara.io
+license: AGPL-3.0-or-later
+references:
+  - type: standard
+    title: >-
+      The Vaara Receipt: A Recomputable Receipt Format for
+      Decisions About Agent Actions
+    authors:
+      - family-names: Sirkkavaara
+        given-names: Henri
+    institution:
+      name: Internet Engineering Task Force (IETF)
+    number: draft-sirkkavaara-vaara-receipt-04
+    url: https://datatracker.ietf.org/doc/draft-sirkkavaara-vaara-receipt/
