@@ -208,6 +208,12 @@ The public surface is fixed: the signed envelope (`vaara.receipt/v1`), capabilit
 
 Vaara helps deployers assemble evidence for their own conformity work. It does not certify compliance or constitute legal advice. Deployers own their obligations under the EU AI Act and other applicable law.
 
+## Citation
+
+If you build on Vaara or its receipt format, cite the repository (see [CITATION.cff](CITATION.cff)) and the specification it implements:
+
+Henri Sirkkavaara. *The Vaara Receipt: A Recomputable Receipt Format for Decisions About Agent Actions.* IETF Internet-Draft [draft-sirkkavaara-vaara-receipt](https://datatracker.ietf.org/doc/draft-sirkkavaara-vaara-receipt/).
+
 ## License
 
 Copyright © 2026 Henri Sirkkavaara. Licensed under AGPL-3.0-or-later. See [LICENSE](LICENSE).
