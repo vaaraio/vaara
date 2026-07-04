@@ -19,9 +19,10 @@ CONSOLE_HTML = r"""<!DOCTYPE html>
 <meta name="viewport" content="width=device-width, initial-scale=1">
 <title>Vaara console</title>
 <style>
-  :root { --bg:#1a1a1a; --panel:#202225; --line:#34373d; --ink:#eaeaea;
-          --dim:#8b8f96; --ok:#5fb878; --bad:#e0625a; --wait:#5a5f66;
-          --accent:#5fb878; --sage:#8fae98; --field:#121315;
+  :root { /* Vaara brand palette (research/vaara_book) */
+          --bg:#0B1012; --panel:#1A2226; --line:#2d3a35; --ink:#EEF2F0;
+          --dim:#8B9792; --ok:#93B8A3; --bad:#D98B8B; --wait:#5E6A66;
+          --accent:#78A08A; --sage:#93B8A3; --field:#0F1417; --sand:#E4D8A8;
           --mono:'JetBrains Mono','Fira Code','SF Mono','Menlo','Consolas',
             'Liberation Mono',monospace; }
   * { box-sizing:border-box; }
@@ -43,7 +44,7 @@ CONSOLE_HTML = r"""<!DOCTYPE html>
   textarea { flex:1; resize:none; height:46px; background:var(--field); color:var(--ink);
     border:1px solid var(--line); border-radius:8px; padding:10px; font:inherit; }
   textarea:focus { outline:none; border-color:var(--accent); }
-  button { background:#26282c; color:var(--ink); border:1px solid var(--line);
+  button { background:#1c2529; color:var(--ink); border:1px solid var(--line);
     border-radius:8px; padding:8px 14px; cursor:pointer; font:inherit; }
   button:hover:not(:disabled) { border-color:var(--accent); color:var(--accent); }
   button:disabled { opacity:.45; cursor:default; }
