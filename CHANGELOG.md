@@ -5,6 +5,13 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/)
 and this project follows [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
 
+## [1.23.1] - 2026-07-07
+
+Patch: robustness fixes to the 1.23.0 verification-hardening surfaces, from post-release review.
+
+- `vaara verify-contiguity --key` now fails closed when any receipt is dropped. A wrong key drops every receipt, and completeness over the resulting empty set no longer reports a vacuous pass (exit non-zero, `ok=false`); the JSON verdict also carries `dropped`.
+- `--pubkey` / `--key` loading catches `OSError` and `UnsupportedAlgorithm` alongside `ValueError`, so a missing, unreadable, or unsupported key produces a clean error line rather than an uncaught traceback (`scripts/verify_vaara_trail.py`, `vaara verify-bundle`, `vaara verify-contiguity`).
+
 ## [1.23.0] - 2026-07-07
 
 Minor release: verification hardening. Every verification surface gains an optional out-of-band key or certificate pin, so a party that already holds the issuer's key can authenticate issuer identity rather than only internal consistency. All additive and backward-compatible: keyless verification is unchanged and the `vaara.receipt/v1` wire format is untouched.
