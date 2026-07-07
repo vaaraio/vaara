@@ -159,6 +159,7 @@ def _verify_threshold(
     to_verify: bytes,
     sigs: dict[str, bytes],
     pubkeys: dict[str, bytes],
+    pinned_fp: Optional[str] = None,
 ) -> list[str]:
     """Verify a k-of-n threshold export. Returns a list of error strings.
 
@@ -167,6 +168,14 @@ def _verify_threshold(
     lives in the signed manifest, and each stored public key is bound to
     its manifest fingerprint, so a substituted pubkey is rejected and an
     unauthorized extra signature is ignored rather than counted.
+
+    ``pinned_fp`` is the member fingerprint of a public key the caller
+    supplied out-of-band. When set, it establishes *authenticity* rather
+    than mere internal consistency: the pinned key must itself be one of
+    the members that carried a valid signature, else the export is a
+    self-consistent forgery under an attacker-chosen signer set and is
+    rejected. When ``None`` the result is integrity/consistency only — the
+    signer set is whatever the (untrusted) manifest declares.
     """
     errors: list[str] = []
     member_algorithm = manifest.get("member_algorithm")
@@ -241,6 +250,13 @@ def _verify_threshold(
         errors.append(
             f"threshold not met: {len(valid)} valid signature(s) from the "
             f"authorized set, need at least {k} of {len(fps)}"
+        )
+    if pinned_fp is not None and pinned_fp not in valid:
+        errors.append(
+            "pinned public_key is not among the valid threshold signers: "
+            "the signer set is attacker-suppliable unless a caller-supplied "
+            "key is one of the signers, so this export is not authenticated "
+            "against the pinned key (integrity only)"
         )
     return errors
 
@@ -342,12 +358,30 @@ def verify_signed(
     to_verify = hashlib.sha256(trail_bytes + manifest_bytes).digest()
 
     if algorithm.startswith(_THRESHOLD_PREFIX):
+        # A caller-supplied key pins authenticity: it must be one of the
+        # members that signed, else the threshold set is attacker-chosen.
+        pinned_fp: Optional[str] = None
+        if public_key is not None:
+            try:
+                loaded_pin = _load_public_key(public_key)
+            except (ValueError, TypeError) as exc:
+                errors.append(f"pinned public_key could not be loaded: {exc}")
+                loaded_pin = None
+            if loaded_pin is not None:
+                if isinstance(loaded_pin, Ed25519PublicKey):
+                    pinned_fp = _member_fingerprint(_raw_ed25519_bytes(loaded_pin))
+                else:
+                    errors.append(
+                        "pinned public_key is not Ed25519; cannot match it to a "
+                        "threshold member"
+                    )
         errors.extend(
             _verify_threshold(
                 manifest=manifest,
                 to_verify=to_verify,
                 sigs=threshold_sigs,
                 pubkeys=threshold_pubkeys,
+                pinned_fp=pinned_fp,
             )
         )
     elif algorithm == "Ed25519":
