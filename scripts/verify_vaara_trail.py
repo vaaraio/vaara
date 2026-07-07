@@ -69,11 +69,16 @@ def _raw_ed25519(loaded: Ed25519PublicKey) -> bytes:
 
 
 def _verify_threshold(
-    manifest: dict, to_verify: bytes, sigs: dict, pubkeys: dict
+    manifest: dict, to_verify: bytes, sigs: dict, pubkeys: dict,
+    pinned_fp: str | None = None,
 ) -> list[str]:
     """k-of-n threshold verification (Ed25519 members). Mirrors
     vaara.audit.verify._verify_threshold so this standalone file gives the
-    same verdict with only the 'cryptography' package installed."""
+    same verdict with only the 'cryptography' package installed.
+
+    ``pinned_fp`` is the member fingerprint of an out-of-band --pubkey. When
+    set, that key must itself be one of the members that signed, else the
+    signer set is attacker-chosen and the export is not authenticated."""
     errors: list[str] = []
     member_algorithm = manifest.get("member_algorithm")
     k = manifest.get("threshold_k")
@@ -123,6 +128,12 @@ def _verify_threshold(
         errors.append(
             f"threshold not met: {len(valid)} valid signature(s) from the "
             f"authorized set, need at least {k} of {len(fps)}"
+        )
+    if pinned_fp is not None and pinned_fp not in valid:
+        errors.append(
+            "pinned --pubkey is not among the valid threshold signers: the "
+            "signer set is attacker-suppliable unless the supplied key is one "
+            "of the signers, so this export is not authenticated (integrity only)"
         )
     return errors
 
@@ -260,8 +271,19 @@ def verify(zip_path: Path, pubkey_path: Path | None) -> tuple[bool, list[str], d
     to_verify = hashlib.sha256(trail_bytes + manifest_bytes).digest()
 
     if algorithm.startswith(THRESHOLD_PREFIX):
+        # Only an out-of-band --pubkey pins authenticity; the embedded key is
+        # in-zip (attacker-controllable) and must not serve as a pin.
+        pinned_fp = None
+        if pubkey_path is not None:
+            try:
+                loaded_pin = _load_pubkey(pubkey_path.read_bytes())
+                pinned_fp = hashlib.sha256(_raw_ed25519(loaded_pin)).hexdigest()[:32]
+            except ValueError as e:
+                errors.append(f"--pubkey could not be loaded: {e}")
         errors.extend(
-            _verify_threshold(manifest, to_verify, threshold_sigs, threshold_pubkeys)
+            _verify_threshold(
+                manifest, to_verify, threshold_sigs, threshold_pubkeys, pinned_fp
+            )
         )
     else:
         if pubkey_path is not None:
