@@ -497,6 +497,14 @@ def _cmd_trail_verify(args: argparse.Namespace) -> int:
         print(f"  vaara:        {result.manifest.get('vaara_version')}")
     if result.ok:
         print("Verification: OK")
+        if pubkey is None:
+            print(
+                "  WARNING: no --pubkey given — the trail was checked against the "
+                "key inside the archive (integrity / internal consistency only); "
+                "issuer identity is NOT authenticated. Pass --pubkey <trusted.pem> "
+                "you hold out of band to authenticate.",
+                file=sys.stderr,
+            )
         return 0
     print("Verification: FAILED", file=sys.stderr)
     for e in result.errors:
@@ -1797,7 +1805,22 @@ def _cmd_verify_bundle(args: argparse.Namespace) -> int:
         )
         return 1
 
-    verdict = verify_evidence_bundle(bundle)
+    trusted_material = None
+    if getattr(args, "pubkey", None):
+        try:
+            from cryptography.exceptions import UnsupportedAlgorithm
+            from cryptography.hazmat.primitives.serialization import (
+                load_pem_public_key,
+            )
+
+            trusted_material = load_pem_public_key(
+                Path(args.pubkey).expanduser().read_bytes()
+            )
+        except (OSError, ValueError, UnsupportedAlgorithm) as exc:
+            print(f"vaara verify-bundle: cannot load --pubkey: {exc}", file=sys.stderr)
+            return 1
+
+    verdict = verify_evidence_bundle(bundle, trusted_verifying_material=trusted_material)
 
     if args.json:
         print(json.dumps(verdict.to_dict(), indent=2))
@@ -2288,7 +2311,25 @@ def _cmd_verify_contiguity(args: argparse.Namespace) -> int:
     per-boundary sequence is contiguous. Exit 0 when complete, 1 when a gap is
     found, 2 on a usage or input error.
     """
-    from vaara.credential import verify_contiguity
+    from vaara.credential import evidence_binding_ok, verify_contiguity
+
+    # Opt-in out-of-band issuer key. Without it the completeness check is
+    # keyless/structural (integrity only): a forger can renumber the held
+    # evidence to hide a drop. With it, only receipts whose signature verifies
+    # AND whose evidence binds to the signed digest are counted, so forged or
+    # renumbered completeness cannot pass. Draft requires the signature check.
+    verifying_material = None
+    if getattr(args, "key", None):
+        from cryptography.exceptions import UnsupportedAlgorithm
+        from cryptography.hazmat.primitives import serialization
+
+        try:
+            verifying_material = serialization.load_pem_public_key(
+                Path(args.key).expanduser().read_bytes()
+            )
+        except (OSError, ValueError, UnsupportedAlgorithm) as exc:
+            print(f"vaara verify-contiguity: --key: {exc}", file=sys.stderr)
+            return 2
 
     files: list[Path] = []
     for raw in args.paths:
@@ -2305,23 +2346,54 @@ def _cmd_verify_contiguity(args: argparse.Namespace) -> int:
         return 2
 
     evidence: list[dict] = []
+    dropped = 0
     for f in files:
         try:
             payload = json.loads(f.read_text(encoding="utf-8"))
         except (OSError, json.JSONDecodeError) as exc:
             print(f"vaara verify-contiguity: {f}: {exc}", file=sys.stderr)
             return 2
-        # Persisted authz files are {"record": ..., "evidence": ...}; accept a
-        # bare evidence record too, so the check runs over either form.
-        ev = payload.get("evidence", payload) if isinstance(payload, dict) else None
-        if isinstance(ev, dict):
-            evidence.append(ev)
+        if not isinstance(payload, dict):
+            continue
+        if verifying_material is not None:
+            # Authenticated path: full {"record", "evidence"} payloads only.
+            if not evidence_binding_ok(payload) or not _receipt_signature_verifies(
+                payload, verifying_material
+            ):
+                dropped += 1
+                continue
+            evidence.append(payload["evidence"])
+        else:
+            # Keyless/structural path: accept a full payload or a bare record.
+            ev = payload.get("evidence", payload)
+            if isinstance(ev, dict):
+                evidence.append(ev)
+
+    if verifying_material is not None and dropped:
+        print(
+            f"vaara verify-contiguity: dropped {dropped} receipt(s) whose signature "
+            "or evidence binding did not verify under --key; not counted",
+            file=sys.stderr,
+        )
+    if verifying_material is None:
+        print(
+            "vaara verify-contiguity: NOTE structural completeness only — receipts "
+            "not signature-verified; pass --key <issuer.pem> to authenticate",
+            file=sys.stderr,
+        )
 
     try:
         report = verify_contiguity(evidence, boundary_id=args.boundary_id)
     except ValueError as exc:
         print(f"vaara verify-contiguity: {exc}", file=sys.stderr)
         return 2
+
+    # With --key, any dropped receipt means some records could not be
+    # authenticated, so a completeness verdict over only the survivors is not a
+    # trustworthy pass. In particular a wrong key drops every receipt, leaving
+    # an empty set that verify_contiguity would otherwise report as ok=true
+    # (a vacuous pass). Fail closed instead.
+    ok = report.ok and not (verifying_material is not None and dropped)
 
     if args.json:
         print(
@@ -2333,14 +2405,21 @@ def _cmd_verify_contiguity(args: argparse.Namespace) -> int:
                     "missingSeqs": report.missing_seqs,
                     "duplicateSeqs": report.duplicate_seqs,
                     "countMismatches": report.count_mismatches,
-                    "ok": report.ok,
+                    "dropped": dropped,
+                    "ok": ok,
                 },
                 indent=2,
             )
         )
     else:
         print(report.gap_report())
-    return 0 if report.ok else 1
+        if verifying_material is not None and dropped:
+            print(
+                f"vaara verify-contiguity: FAILED — {dropped} receipt(s) did not "
+                "verify under --key; completeness cannot be authenticated",
+                file=sys.stderr,
+            )
+    return 0 if ok else 1
 
 
 def _receipt_signature_verifies(payload: dict, verifying_material: Any) -> bool:
@@ -4240,6 +4319,13 @@ def build_parser() -> argparse.ArgumentParser:
         "--json", action="store_true",
         help="Emit the full verdict as JSON instead of a human-readable summary",
     )
+    pvb.add_argument(
+        "--pubkey",
+        help="Path to the issuer's public key (PEM) you hold OUT OF BAND. When "
+             "given, authenticity means the receipt verifies under THIS key, so a "
+             "self-consistent bundle signed with an attacker's own key is rejected. "
+             "Without it, the verdict is keyless internal consistency only.",
+    )
     pvb.set_defaults(func=_cmd_verify_bundle)
 
     pvr = sub.add_parser(
@@ -4472,6 +4558,14 @@ def build_parser() -> argparse.ArgumentParser:
         "--json",
         action="store_true",
         help="Emit the contiguity report as JSON",
+    )
+    pvc.add_argument(
+        "--key",
+        default=None,
+        help="Path to the issuer's public key (PEM), held OUT OF BAND. When given, "
+             "only receipts whose signature and evidence binding verify are counted, "
+             "so forged or renumbered completeness cannot pass. Without it the check "
+             "is keyless/structural (integrity only).",
     )
     pvc.set_defaults(func=_cmd_verify_contiguity)
 
