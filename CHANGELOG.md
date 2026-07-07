@@ -5,6 +5,16 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/)
 and this project follows [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
 
+## [1.23.0] - 2026-07-07
+
+Minor release: verification hardening. Every verification surface gains an optional out-of-band key or certificate pin, so a party that already holds the issuer's key can authenticate issuer identity rather than only internal consistency. All additive and backward-compatible: keyless verification is unchanged and the `vaara.receipt/v1` wire format is untouched.
+
+- Threshold-signed trail verification now honours a caller-supplied public key: the pinned key must be one of the members that actually signed, so a self-consistent export minted under an attacker-chosen signer set is rejected. Keyless (no key) verification is unchanged. (`vaara.audit.verify.verify_signed`, `scripts/verify_vaara_trail.py`)
+- `verify_evidence_bundle` gains `trusted_verifying_material` / `trusted_keyid`, and `vaara verify-bundle` gains `--pubkey`: with a held key, authenticity means the receipt verifies under that key, so a bundle that carries its own DID document and key cannot self-certify. Without it, the result is keyless internal consistency as before.
+- `vaara verify-contiguity` gains `--key`: with it, only receipts whose signature and evidence binding verify are counted toward completeness, so renumbered or fabricated completeness cannot pass; without it the check prints an explicit structural-only note.
+- The RFC 3161 timestamp verifier gains `trusted_signer_cert`: the token's signer certificate must equal the TSA certificate held out of band before the attested time is treated as independently anchored. (`vaara.audit.timeanchor.verify_timestamp_token`, `vaara.audit.receipt_anchor.verify_receipt_anchor`)
+- `vaara trail verify` and `vaara-audit verify` now note that a pass with no `--pubkey` is integrity / internal-consistency only, not authenticated issuer identity.
+
 ## [1.22.0] - 2026-07-02
 
 Minor release: a per-receipt CycloneDX-CBOM crypto-posture block. An execution receipt can now carry, inside its signed preimage, a record of which signature algorithms protect it and the NIST post-quantum security level they reach, so an auditor reads the record's quantum resistance from the signed bytes alone.
