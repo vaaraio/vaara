@@ -214,11 +214,24 @@ def _verify_cms_signature(signed_data: Any, signer_cert: Any) -> None:
         ) from exc
 
 
+def _cert_der(cert_bytes: bytes) -> bytes:
+    """Normalize a PEM- or DER-encoded certificate to its DER bytes."""
+    from cryptography import x509
+    from cryptography.hazmat.primitives import serialization
+
+    try:
+        cert = x509.load_pem_x509_certificate(cert_bytes)
+    except ValueError:
+        cert = x509.load_der_x509_certificate(cert_bytes)
+    return cert.public_bytes(serialization.Encoding.DER)
+
+
 def verify_timestamp_token(
     token_der: bytes,
     expected_digest: bytes,
     *,
     hash_algorithm: str = "sha256",
+    trusted_signer_cert: Optional[bytes] = None,
 ) -> datetime:
     """Verify an RFC 3161 token and return the attested UTC time.
 
@@ -228,10 +241,12 @@ def verify_timestamp_token(
     the TSA's signature over the SignedAttributes verifies under the embedded
     signer certificate. Raises :class:`TimeAnchorError` on any failure.
 
-    Trust note: this proves the token is internally consistent and signed by
-    the certificate it carries. Establishing that the certificate is a trusted
-    (e.g. eIDAS-qualified) TSA is the deployer's policy; pin the TSA
-    certificate out of band to enforce that.
+    Trust note: without ``trusted_signer_cert`` this proves only that the token
+    is internally consistent and signed by the certificate it carries — the
+    time is self-asserted by whoever holds that certificate. Pass
+    ``trusted_signer_cert`` (PEM or DER of the TSA certificate you hold out of
+    band, e.g. an eIDAS-qualified TSA) to require the token's signer to be that
+    exact certificate; otherwise the returned time is not independently trusted.
     """
     _require_deps()
     try:
@@ -283,7 +298,18 @@ def verify_timestamp_token(
     if h.finalize() != md_attr:
         raise TimeAnchorError("signed message_digest does not match the TSTInfo content")
 
-    _verify_cms_signature(signed_data, _signer_cert(signed_data))
+    signer_cert = _signer_cert(signed_data)
+    _verify_cms_signature(signed_data, signer_cert)
+    if trusted_signer_cert is not None:
+        from cryptography.hazmat.primitives import serialization
+
+        if signer_cert.public_bytes(serialization.Encoding.DER) != _cert_der(
+            trusted_signer_cert
+        ):
+            raise TimeAnchorError(
+                "token signer certificate does not match the pinned trusted TSA "
+                "certificate; the timestamp is not independently trusted"
+            )
 
     gen_time = tst_info["gen_time"].native
     if gen_time.tzinfo is None:

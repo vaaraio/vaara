@@ -147,6 +147,9 @@ def cmd_verify(args) -> int:
         "trail": str(zip_path),
         "manifest": result.manifest,
         "errors": list(result.errors),
+        # Honest labeling: with no out-of-band --pubkey, a passing result is
+        # integrity/internal-consistency only, not authenticated issuer identity.
+        "identity_pinned": pubkey is not None,
     }
     if args.json:
         _emit_json(payload)
@@ -162,6 +165,11 @@ def cmd_verify(args) -> int:
             print("errors:")
             for e in payload["errors"]:
                 print(f"  - {e}")
+        if payload["ok"] and pubkey is None:
+            print(
+                "  WARNING: no --pubkey given — identity NOT authenticated "
+                "(integrity only); pass --pubkey <trusted.pem> to authenticate"
+            )
     return 0 if payload["ok"] else 1
 
 

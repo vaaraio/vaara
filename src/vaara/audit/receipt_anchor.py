@@ -177,11 +177,19 @@ class SelfHostedTSA:
         }
 
 
-def verify_receipt_anchor(receipt: dict, anchor: dict) -> datetime:
+def verify_receipt_anchor(
+    receipt: dict, anchor: dict, *, trusted_signer_cert: Optional[bytes] = None
+) -> datetime:
     """Verify a ``timestampAnchors`` entry against its receipt. Returns UTC time.
 
     Pins anchoredDigest == sha256 of the JCS signed payload (rule 3), then
     verifies the token attests that digest via the shared offline verifier.
+
+    Without ``trusted_signer_cert`` the returned time is self-asserted by
+    whoever signed the token (the ``method`` string, including
+    ``rfc3161-eidas-qualified``, is not proof on its own). Pass the TSA
+    certificate you hold out of band to require the token's signer to be that
+    exact certificate before the time is treated as independently anchored.
     """
     if anchor.get("method") not in ("rfc3161", "rfc3161-eidas-qualified"):
         raise TimeAnchorError(f"not an rfc3161 anchor: method={anchor.get('method')!r}")
@@ -194,7 +202,8 @@ def verify_receipt_anchor(receipt: dict, anchor: dict) -> datetime:
     except Exception as exc:
         raise TimeAnchorError(f"anchor token is not valid base64: {exc}") from exc
     return verify_timestamp_token(
-        token_der, bytes.fromhex(expected.split(":", 1)[1]), hash_algorithm="sha256")
+        token_der, bytes.fromhex(expected.split(":", 1)[1]),
+        hash_algorithm="sha256", trusted_signer_cert=trusted_signer_cert)
 
 
 __all__ = ["SelfHostedTSA", "anchored_digest", "verify_receipt_anchor"]
