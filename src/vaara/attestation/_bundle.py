@@ -153,24 +153,36 @@ class BundleVerdict:
         }
 
 
-def _identity_lens(bundle: EvidenceBundle) -> tuple[LensResult, Optional[str]]:
+def _identity_lens(
+    bundle: EvidenceBundle, trusted_keyid: Optional[str] = None
+) -> tuple[LensResult, Optional[str]]:
     if bundle.did_document is None:
         return LensResult("identity", False, False, "no DID document supplied"), None
+    # An out-of-band trusted keyid, when supplied, overrides the bundle's own
+    # (in-band, attacker-suppliable) expected_keyid as the pin.
+    expected = trusted_keyid if trusted_keyid is not None else bundle.expected_keyid
     result = verify_receipt_identity(
-        bundle.receipt, bundle.did_document, expected_keyid=bundle.expected_keyid
+        bundle.receipt, bundle.did_document, expected_keyid=expected
     )
     ok = result.resolved and result.bound
     return LensResult("identity", True, ok, result.reason), result.keyid
 
 
-def _signature_lens(bundle: EvidenceBundle) -> LensResult:
-    if bundle.verifying_material is None:
+def _signature_lens(
+    bundle: EvidenceBundle, trusted_verifying_material: Optional[Any] = None
+) -> LensResult:
+    # A caller-held (out-of-band) key takes precedence over the bundle's own
+    # in-band verifying material, which a forger controls.
+    material = (
+        trusted_verifying_material
+        if trusted_verifying_material is not None
+        else bundle.verifying_material
+    )
+    if material is None:
         return LensResult(
             "signature", False, False, "no verifying key material supplied"
         )
-    ok = verify_receipt_signature(
-        bundle.receipt, verifying_material=bundle.verifying_material
-    )
+    ok = verify_receipt_signature(bundle.receipt, verifying_material=material)
     reason = (
         "signature verifies under supplied key material"
         if ok
@@ -243,19 +255,32 @@ def _revocation_lens(bundle: EvidenceBundle, keyid: Optional[str]) -> LensResult
     return LensResult("revocation", True, not status.revoked, status.reason)
 
 
-def verify_evidence_bundle(bundle: EvidenceBundle) -> BundleVerdict:
+def verify_evidence_bundle(
+    bundle: EvidenceBundle,
+    *,
+    trusted_verifying_material: Optional[Any] = None,
+    trusted_keyid: Optional[str] = None,
+) -> BundleVerdict:
     """Run every applicable lens over ``bundle`` and return one verdict.
 
     Runs identity, signature, back-link, inclusion, consistency, and
     revocation, each only when the bundle carries its evidence. The keyid
     the identity lens resolves (falling back to ``expected_keyid``) is
-    threaded into the revocation lens so key-scope revocations apply. ``ok``
-    is True only when the receipt signature was established by the identity
-    or signature lens AND every applicable lens passed.
+    threaded into the revocation lens so key-scope revocations apply.
+
+    Trust model: a bundle is self-describing, so its own DID document and
+    verifying key are attacker-suppliable. ``trusted_verifying_material``
+    (and optionally ``trusted_keyid``) is the issuer key a reader already
+    holds out of band — the "verify from the bytes and a public key alone"
+    path. When it is supplied, ``authenticity`` means the receipt verifies
+    under THAT key, so a self-consistent forgery signed with the attacker's
+    own key is rejected. When it is absent, the result is keyless internal
+    consistency (integrity), exactly as before: the in-band key can prove the
+    bundle is self-consistent, not that the named issuer produced it.
     """
-    identity, resolved_keyid = _identity_lens(bundle)
+    identity, resolved_keyid = _identity_lens(bundle, trusted_keyid=trusted_keyid)
     keyid = resolved_keyid if resolved_keyid is not None else bundle.expected_keyid
-    signature = _signature_lens(bundle)
+    signature = _signature_lens(bundle, trusted_verifying_material=trusted_verifying_material)
     back_link = _back_link_lens(bundle)
     inclusion = _inclusion_lens(bundle)
     consistency = _consistency_lens(bundle)
@@ -263,24 +288,39 @@ def verify_evidence_bundle(bundle: EvidenceBundle) -> BundleVerdict:
 
     lenses = (identity, signature, back_link, inclusion, consistency, revocation)
 
-    authenticity = identity.ok or signature.ok
+    pinned = trusted_verifying_material is not None
+    if pinned:
+        # Out-of-band key held: authenticity is signature-under-that-key. The
+        # in-band identity document cannot self-certify a forgery.
+        authenticity = signature.ok
+    else:
+        authenticity = identity.ok or signature.ok
     applicable_failures = [r.lens for r in lenses if r.applicable and not r.ok]
     ok = authenticity and not applicable_failures
 
     if not authenticity:
         reason = (
-            "authenticity not established: neither the identity lens nor the "
+            "authenticity not established: the receipt signature did not verify "
+            "under the supplied trusted key"
+            if pinned
+            else "authenticity not established: neither the identity lens nor the "
             "signature lens verified the receipt signature"
         )
     elif applicable_failures:
         reason = "applicable lenses failed: " + ", ".join(applicable_failures)
     else:
         applied = [r.lens for r in lenses if r.applicable]
-        via = "identity" if identity.ok else "signature"
-        reason = (
-            f"all {len(applied)} applicable lenses passed; "
-            f"authenticity established via {via}"
-        )
+        if pinned:
+            reason = (
+                f"all {len(applied)} applicable lenses passed; authenticity "
+                f"established against the supplied trusted key"
+            )
+        else:
+            via = "identity" if identity.ok else "signature"
+            reason = (
+                f"all {len(applied)} applicable lenses passed; "
+                f"authenticity established via {via}"
+            )
 
     return BundleVerdict(
         ok=ok,
