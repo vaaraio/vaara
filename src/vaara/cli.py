@@ -1808,6 +1808,7 @@ def _cmd_verify_bundle(args: argparse.Namespace) -> int:
     trusted_material = None
     if getattr(args, "pubkey", None):
         try:
+            from cryptography.exceptions import UnsupportedAlgorithm
             from cryptography.hazmat.primitives.serialization import (
                 load_pem_public_key,
             )
@@ -1815,7 +1816,7 @@ def _cmd_verify_bundle(args: argparse.Namespace) -> int:
             trusted_material = load_pem_public_key(
                 Path(args.pubkey).expanduser().read_bytes()
             )
-        except (OSError, ValueError) as exc:
+        except (OSError, ValueError, UnsupportedAlgorithm) as exc:
             print(f"vaara verify-bundle: cannot load --pubkey: {exc}", file=sys.stderr)
             return 1
 
@@ -2319,13 +2320,14 @@ def _cmd_verify_contiguity(args: argparse.Namespace) -> int:
     # renumbered completeness cannot pass. Draft requires the signature check.
     verifying_material = None
     if getattr(args, "key", None):
+        from cryptography.exceptions import UnsupportedAlgorithm
         from cryptography.hazmat.primitives import serialization
 
         try:
             verifying_material = serialization.load_pem_public_key(
                 Path(args.key).expanduser().read_bytes()
             )
-        except (OSError, ValueError) as exc:
+        except (OSError, ValueError, UnsupportedAlgorithm) as exc:
             print(f"vaara verify-contiguity: --key: {exc}", file=sys.stderr)
             return 2
 
@@ -2386,6 +2388,13 @@ def _cmd_verify_contiguity(args: argparse.Namespace) -> int:
         print(f"vaara verify-contiguity: {exc}", file=sys.stderr)
         return 2
 
+    # With --key, any dropped receipt means some records could not be
+    # authenticated, so a completeness verdict over only the survivors is not a
+    # trustworthy pass. In particular a wrong key drops every receipt, leaving
+    # an empty set that verify_contiguity would otherwise report as ok=true
+    # (a vacuous pass). Fail closed instead.
+    ok = report.ok and not (verifying_material is not None and dropped)
+
     if args.json:
         print(
             json.dumps(
@@ -2396,14 +2405,21 @@ def _cmd_verify_contiguity(args: argparse.Namespace) -> int:
                     "missingSeqs": report.missing_seqs,
                     "duplicateSeqs": report.duplicate_seqs,
                     "countMismatches": report.count_mismatches,
-                    "ok": report.ok,
+                    "dropped": dropped,
+                    "ok": ok,
                 },
                 indent=2,
             )
         )
     else:
         print(report.gap_report())
-    return 0 if report.ok else 1
+        if verifying_material is not None and dropped:
+            print(
+                f"vaara verify-contiguity: FAILED — {dropped} receipt(s) did not "
+                "verify under --key; completeness cannot be authenticated",
+                file=sys.stderr,
+            )
+    return 0 if ok else 1
 
 
 def _receipt_signature_verifies(payload: dict, verifying_material: Any) -> bool:

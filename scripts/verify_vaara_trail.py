@@ -278,7 +278,7 @@ def verify(zip_path: Path, pubkey_path: Path | None) -> tuple[bool, list[str], d
             try:
                 loaded_pin = _load_pubkey(pubkey_path.read_bytes())
                 pinned_fp = hashlib.sha256(_raw_ed25519(loaded_pin)).hexdigest()[:32]
-            except ValueError as e:
+            except (OSError, ValueError) as e:
                 errors.append(f"--pubkey could not be loaded: {e}")
         errors.extend(
             _verify_threshold(
