@@ -90,7 +90,7 @@
   .evidence .prompt { color: var(--accent); }
   .evidence .ok { color: var(--accent); }
   .evidence .dim { color: #888; }
-  #pypi-month, #pypi-week, #npm-week { color: var(--accent); font-weight: 600; }
+  #installs { color: var(--accent); font-weight: 600; }
 </style>
 <script type="application/ld+json">
 {
@@ -201,9 +201,7 @@
 </ul>
 <p class="stamp">Adoption (live)</p>
 <ul>
-  <li><span id="pypi-month">-</span> PyPI downloads, last 30 days</li>
-  <li><span id="pypi-week">-</span> PyPI downloads, last 7 days</li>
-  <li><span id="npm-week">-</span> npm downloads, last 7 days (@vaara/client)</li>
+  <li><span id="installs">-</span> total installs across PyPI and npm</li>
 </ul>
 
 <p class="stamp">Acknowledged by</p>
@@ -231,19 +229,11 @@
 (function(){
   function setText(id, value) { var el = document.getElementById(id); if (el) el.textContent = value; }
   function fmt(n) { return n.toLocaleString("en-US"); }
-  fetch("/api/base/public/pypi-recent")
+  fetch("https://raw.githubusercontent.com/vaaraio/vaara/main/.github/badges/installs.json")
     .then(function(r){ return r.ok ? r.json() : null; })
     .then(function(d){
-      if (!d || !d.data) return;
-      if (typeof d.data.last_month === "number") setText("pypi-month", fmt(d.data.last_month));
-      if (typeof d.data.last_week === "number") setText("pypi-week", fmt(d.data.last_week));
-    })
-    .catch(function(){});
-  fetch("https://api.npmjs.org/downloads/point/last-week/@vaara/client")
-    .then(function(r){ return r.ok ? r.json() : null; })
-    .then(function(d){
-      if (!d || typeof d.downloads !== "number") return;
-      setText("npm-week", fmt(d.downloads));
+      if (!d || typeof d.total !== "number") return;
+      setText("installs", fmt(d.total));
     })
     .catch(function(){});
 })();
