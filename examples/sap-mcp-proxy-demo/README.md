@@ -143,7 +143,7 @@ The PDF output is the format a Notified Body or internal compliance auditor read
 The proxy is MCP-protocol-level, not SAP-specific. The three-step setup above works identically when the upstream MCP server is something else. Ecosystems where this pattern fits today:
 
 - **GitHub MCP**: Claude Code uses this natively. Vaara in front audits every repo read, file edit, PR creation, and issue update the agent triggers against your code.
-- **Microsoft Graph MCP**: Email, calendar, OneDrive, Teams. Tool calls into the M365 surface frequently touch GDPR territory.
+- **Google Workspace MCP**: Email, calendar, Drive. Tool calls into the Workspace surface frequently touch GDPR territory.
 - **Salesforce MCP**: CRM. HR / recruiting / scoring use cases fall under AI Act Annex III high-risk.
 - **ServiceNow MCP**: ITSM, change management, incident handling. Touches operational safety obligations.
 - **AWS / GCP / Azure cloud MCP servers**: infrastructure operations. Production change auditability.

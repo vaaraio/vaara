@@ -123,7 +123,7 @@ provides runtime risk scoring and Article 14 audit evidence, AGT
 provides agent identity primitives and the sandboxing layer that
 isolates agent execution from the host environment. The two tools
 cover different layers of the same governance stack: deployers running
-production agents typically want both wired in. Recent versions add an audit layer with a Merkle audit chain, signed entries, and an EU AI Act compliance mapping. By the toolkit's own documentation that integrity is partial. One chain verifier is a stub that always returns true, audit entries are signed with symmetric HMAC keys an insider could forge, and the default retention falls short of Article 26(6). The audit is verified with Microsoft's own keys, with no public conformance corpus and no way for an outside party to recompute a record without trusting the vendor.
+production agents typically want both wired in. Recent versions add an audit layer with a Merkle audit chain, signed entries, and an EU AI Act compliance mapping. That audit is signed and checked with the vendor's own keys, with no public conformance corpus and no way for an outside party to recompute a record without trusting the vendor.
 
 **Apollo Watcher.** A real-time oversight layer for coding agents from
 Apollo Research, a Delaware public-benefit corporation with servers in
@@ -211,7 +211,7 @@ or source code. Verified as of 2026-06-29.
 - **LangChain callback handlers**: [python.langchain.com/docs/concepts/callbacks/](https://python.langchain.com/docs/concepts/callbacks/).
 - **OWASP LLM Top 10**: [genai.owasp.org/llm-top-10/](https://genai.owasp.org/llm-top-10/).
 - **Glacis Python SDK**: [github.com/Glacis-io/glacis-python](https://github.com/Glacis-io/glacis-python). Capabilities recorded by source-read of the repository on 2026-05-16.
-- **Microsoft Agent Governance Toolkit**: [github.com/microsoft/agent-governance-toolkit](https://github.com/microsoft/agent-governance-toolkit). Audit-chain and EU AI Act mapping features verified by source-read on 2026-06-29.
+- **Microsoft Agent Governance Toolkit**: [github.com/microsoft/agent-governance-toolkit](https://github.com/microsoft/agent-governance-toolkit). Audit-chain and EU AI Act mapping features recorded by source-read on 2026-06-29.
 - **Apollo Watcher**: [github.com/ApolloResearch/watcher](https://github.com/ApolloResearch/watcher) and the [product page](https://www.apolloresearch.ai/products/introducing-watcher-for-ai-oversight/). License reported by the GitHub API as NOASSERTION (no open-source license) on 2026-06-29; alpha status, cloud-hosted monitoring, and EU-based servers per the product page and docs.
 
 ## Numbers we publish
