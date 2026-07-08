@@ -7,6 +7,9 @@
 
 <p align="center">
   <a href="https://pepy.tech/project/vaara"><img src="https://img.shields.io/endpoint?url=https://raw.githubusercontent.com/vaaraio/vaara/main/.github/badges/installs.json" alt="Downloads"></a>
+</p>
+
+<p align="center">
   <a href="https://pypi.org/project/vaara/"><img src="https://img.shields.io/pypi/v/vaara.svg" alt="PyPI"></a>
   <a href="https://github.com/vaaraio/vaara/blob/main/LICENSE"><img src="https://img.shields.io/pypi/l/vaara.svg" alt="License"></a>
   <a href="https://github.com/vaaraio/vaara/actions/workflows/ci.yml"><img src="https://github.com/vaaraio/vaara/actions/workflows/ci.yml/badge.svg" alt="CI"></a>
