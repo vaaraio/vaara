@@ -122,7 +122,7 @@ The proxy is MCP-protocol-level, not GitHub-specific. The three-step setup above
 
 - **`@modelcontextprotocol/server-filesystem`.** Filesystem read and write tools, governed at the path level. Command becomes `npx -y @modelcontextprotocol/server-filesystem /path/to/scope`.
 - **`@modelcontextprotocol/server-sqlite`.** Database access, governed at the query level.
-- **Microsoft Graph MCP, Salesforce MCP, ServiceNow MCP, Databricks MCP.** Enterprise SaaS surfaces where per-call audit has direct compliance value.
+- **Salesforce MCP, ServiceNow MCP, Databricks MCP.** Enterprise SaaS surfaces where per-call audit has direct compliance value.
 - **Sibling demos in the Vaara repo.** [`examples/github-mcp-proxy-demo/`](../github-mcp-proxy-demo/) and [`examples/sap-mcp-proxy-demo/`](../sap-mcp-proxy-demo/) follow the same recipe with different upstreams.
 
 ## License notes

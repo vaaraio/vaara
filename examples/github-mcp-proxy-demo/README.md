@@ -152,7 +152,7 @@ The PDF output is the format a Notified Body or internal compliance auditor read
 The proxy is MCP-protocol-level, not GitHub-specific. The three-step setup above works identically when the upstream is something else. Sibling demos and the broader landscape:
 
 - [`examples/sap-mcp-proxy-demo/`](../sap-mcp-proxy-demo/). Vaara in front of community SAP MCP servers (SAP ADT, SAP BTP, SAP Mobile Development Kit).
-- **Microsoft Graph MCP.** Email, calendar, OneDrive, Teams. Tool calls into the M365 surface that frequently touch GDPR territory.
+- **Google Workspace MCP.** Email, calendar, Drive. Tool calls into the Workspace surface that frequently touch GDPR territory.
 - **Salesforce / ServiceNow MCP.** CRM and ITSM. HR and operational-safety obligations.
 - **AWS / GCP / Azure cloud MCP servers.** Infrastructure operations. Production change auditability.
 - **Databricks MCP.** Data platform. Tool calls that read or transform regulated data.
