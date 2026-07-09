@@ -9,7 +9,7 @@
 <meta name="author" content="Henri Sirkkavaara">
 <meta name="robots" content="index, follow, max-image-preview:large, max-snippet:-1, max-video-preview:-1">
 <meta name="googlebot" content="index, follow">
-<meta name="theme-color" content="#5fb878">
+<meta name="theme-color" content="#0F1417">
 <link rel="canonical" href="https://vaara.io/">
 <link rel="icon" type="image/svg+xml" href="/favicon.svg">
 <link rel="alternate icon" href="/favicon.ico">
@@ -34,63 +34,66 @@
 <meta name="twitter:description" content="Prove what an AI agent actually did, verifiable by an outside party without trusting you. EU AI Act Article 12. Open source, AGPL-3.0.">
 <meta name="twitter:image" content="https://raw.githubusercontent.com/vaaraio/vaara/main/docs/vaara-wordmark-light.png">
 <style>
+  /* Locked to the vaara_book / vaara_card grammar (research/vaara_visual_style.md).
+     Palette tokens are exact from research/vaara_book.html :root. Single dark
+     theme: the grammar is dark by construction. */
   :root {
-    --bg: #ececec;
-    --ink: #1a1a1a;
-    --rule: #cfcfcf;
-    --muted: #6b6b6b;
-    --accent: #5fb878;
-    --mono: 'JetBrains Mono','Fira Code','Hack','Cascadia Code','SF Mono','Menlo','Consolas','Liberation Mono',monospace;
-  }
-  @media (prefers-color-scheme: dark) {
-    :root {
-      --bg: #2a2a2a;
-      --ink: #eaeaea;
-      --rule: #3a3a3a;
-      --muted: #888;
-      --accent: #5fb878;
-    }
+    --bg: #0F1417;
+    --panel: #1A2226;
+    --panel-2: #151D20;
+    --deep: #0B1012;
+    --line: rgba(123,156,138,.16);
+    --ink: #DEE4E1;
+    --muted: #8B9792;
+    --faint: #5E6A66;
+    --tri: #78A08A;
+    --tri-bright: #93B8A3;
+    --warn: #D98B8B;
+    --mono: ui-monospace,'SFMono-Regular','JetBrains Mono','Fira Code',Menlo,Consolas,'Liberation Mono',monospace;
+    --sans: 'Inter',-apple-system,BlinkMacSystemFont,'Segoe UI',Helvetica,Arial,sans-serif;
   }
   * { box-sizing: border-box; }
   html, body {
     margin: 0; padding: 0;
     min-height: 100vh;
     background: var(--bg); color: var(--ink);
-    font-family: var(--mono); font-size: 15px; line-height: 1.65;
+    font-family: var(--sans); font-size: 16px; line-height: 1.65;
     -webkit-font-smoothing: antialiased;
   }
-  main { max-width: 740px; margin: 0 auto; padding: 16px 28px 96px; }
-  .wordmark { margin: 0 auto; text-align: center; }
-  .wordmark img { width: min(70vw, 520px); height: auto; display: inline-block; }
-  h1 { font-size: 1.05rem; font-weight: 500; color: var(--ink); margin: 0 0 12px; letter-spacing: -0.1px; text-align: center; }
+  main { max-width: 760px; margin: 0 auto; padding: 20px 28px 96px; }
+  .wordmark { margin: 8px auto 0; text-align: center; }
+  .wordmark img { width: min(60vw, 440px); height: auto; display: inline-block; }
+  h1 { font-family: var(--sans); font-size: 18px; font-weight: 500; line-height: 1.6; color: var(--ink); margin: 24px 0 12px; letter-spacing: -0.01em; text-align: center; }
   p { margin: 0 0 18px; color: var(--ink); }
-  .stance { font-size: 0.86rem; color: var(--muted); margin-bottom: 48px; letter-spacing: 0.2px; text-align: center; }
-  .stamp { font-size: 0.7rem; letter-spacing: 1.8px; text-transform: uppercase; color: var(--muted); font-weight: 600; margin: 0 0 14px; }
-  ul { margin: 0 0 40px; padding: 0; list-style: none; border-top: 1px solid var(--rule); }
-  ul li { padding: 12px 0 12px 24px; border-bottom: 1px solid var(--rule); color: var(--ink); position: relative; }
-  ul li::before { content: "\00B7"; color: var(--muted); font-size: 1.2rem; line-height: 1; position: absolute; left: 0; top: 12px; }
-  ul li b { font-weight: 600; }
-  ul li code { font-size: 0.82rem; background: rgba(95,184,120,0.12); padding: 1px 5px; border-radius: 3px; }
+  .stance { font-family: var(--mono); font-size: 12px; letter-spacing: 0.22em; text-transform: uppercase; color: var(--tri); margin-bottom: 46px; text-align: center; }
+  .stamp { font-family: var(--mono); font-size: 12px; letter-spacing: 0.24em; text-transform: uppercase; color: var(--tri); font-weight: 600; margin: 0 0 14px; }
+  ul { margin: 0 0 40px; padding: 0; list-style: none; border-top: 1px solid var(--line); }
+  ul li { padding: 13px 0 13px 22px; border-bottom: 1px solid var(--line); color: var(--ink); position: relative; font-size: 16px; }
+  ul li::before { content: ""; position: absolute; left: 2px; top: 20px; width: 5px; height: 5px; background: var(--tri); }
+  ul li b { font-weight: 600; color: var(--ink); }
+  code, ul li code { font-family: var(--mono); font-size: 14px; background: rgba(120,160,138,0.13); color: var(--tri-bright); padding: 1px 5px; border-radius: 3px; }
+  ul li a { color: var(--tri-bright); text-decoration: none; border-bottom: 1px solid var(--line); }
+  ul li a:hover { color: var(--tri); border-bottom-color: var(--tri); }
   .links { display: grid; grid-template-columns: repeat(2, 1fr); gap: 12px; margin-top: 8px; margin-bottom: 8px; }
-  .links a { color: var(--ink); text-decoration: none; border: 1.5px solid var(--muted); padding: 14px 16px; font-size: 0.92rem; display: flex; flex-direction: column; gap: 6px; transition: border-color 0.15s ease, background 0.15s ease, transform 0.06s ease, box-shadow 0.15s ease; background: var(--bg); }
-  .links a:hover { border-color: var(--ink); color: var(--accent); box-shadow: 0 2px 0 0 var(--ink); transform: translate(0, -1px); }
-  .links a:active { transform: translate(0, 0); box-shadow: 0 0 0 0 var(--ink); }
-  .links a:focus-visible { outline: 2px solid var(--accent); outline-offset: 2px; }
-  .links .label { color: var(--muted); font-size: 0.66rem; letter-spacing: 1.8px; text-transform: uppercase; font-weight: 600; }
-  .links a:hover .label { color: var(--ink); }
-  .links .target { font-size: 0.86rem; color: var(--ink); word-break: break-all; }
-  .links a:hover .target { color: var(--accent); }
+  .links a { font-family: var(--mono); color: var(--ink); text-decoration: none; border: 1px solid var(--line); border-radius: 12px; padding: 14px 16px; font-size: 14px; display: flex; flex-direction: column; gap: 6px; background: var(--panel); transition: border-color 0.15s ease, color 0.15s ease, background 0.15s ease, transform 0.06s ease; }
+  .links a:hover { border-color: var(--tri); color: var(--tri-bright); background: var(--panel-2); transform: translate(0, -1px); }
+  .links a:active { transform: translate(0, 0); }
+  .links a:focus-visible { outline: 2px solid var(--tri); outline-offset: 2px; }
+  .links .label { color: var(--faint); font-size: 12px; letter-spacing: 0.22em; text-transform: uppercase; font-weight: 600; }
+  .links a:hover .label { color: var(--tri); }
+  .links .target { font-size: 14px; color: var(--ink); word-break: break-all; }
+  .links a:hover .target { color: var(--tri-bright); }
   @media (max-width: 520px) { .links { grid-template-columns: 1fr; } }
-  footer { margin-top: 64px; padding-top: 24px; border-top: 1px solid var(--rule); font-size: 0.78rem; color: var(--muted); letter-spacing: 0.2px; }
-  .evidence { background: #0a0a0a; color: #e7e7e7; border: 1px solid #1f1f1f; margin: 0 0 48px; font-size: 0.78rem; line-height: 1.65; overflow-x: auto; }
-  .evidence-head { display: flex; justify-content: space-between; padding: 10px 18px; border-bottom: 1px solid #1f1f1f; font-size: 0.62rem; letter-spacing: 1.6px; text-transform: uppercase; color: #888; }
-  .evidence-head .live { color: var(--accent); display: inline-flex; gap: 6px; align-items: center; }
-  .evidence-head .live::before { content: ""; width: 6px; height: 6px; background: var(--accent); border-radius: 50%; display: inline-block; }
-  .evidence pre { margin: 0; padding: 16px 18px; white-space: pre; font-family: inherit; color: #e7e7e7; }
-  .evidence .prompt { color: var(--accent); }
-  .evidence .ok { color: var(--accent); }
-  .evidence .dim { color: #888; }
-  #installs { color: var(--accent); font-weight: 600; }
+  footer { margin-top: 64px; padding-top: 24px; border-top: 1px solid var(--line); font-family: var(--mono); font-size: 12px; color: var(--faint); letter-spacing: 0.04em; text-align: center; }
+  .evidence { background: var(--panel-2); color: var(--ink); border: 1px solid var(--line); border-radius: 12px; margin: 0 0 48px; font-family: var(--mono); font-size: 14px; line-height: 1.65; overflow-x: auto; }
+  .evidence-head { display: flex; justify-content: space-between; padding: 10px 18px; border-bottom: 1px solid var(--line); font-size: 12px; letter-spacing: 0.2em; text-transform: uppercase; color: var(--faint); }
+  .evidence-head .live { color: var(--tri); display: inline-flex; gap: 6px; align-items: center; }
+  .evidence-head .live::before { content: ""; width: 6px; height: 6px; background: var(--tri); border-radius: 50%; display: inline-block; }
+  .evidence pre { margin: 0; padding: 16px 18px; white-space: pre; font-family: inherit; color: var(--ink); }
+  .evidence .prompt { color: var(--tri); }
+  .evidence .ok { color: var(--tri-bright); }
+  .evidence .dim { color: var(--faint); }
+  #installs, #npm-week { color: var(--tri-bright); font-weight: 600; font-family: var(--mono); }
 </style>
 <script type="application/ld+json">
 {
@@ -168,10 +171,7 @@
 <body>
 <main>
 <div class="wordmark">
-  <picture>
-    <source srcset="https://raw.githubusercontent.com/vaaraio/vaara/main/docs/vaara-wordmark-dark.png" media="(prefers-color-scheme: dark)">
-    <img src="https://raw.githubusercontent.com/vaaraio/vaara/main/docs/vaara-wordmark-light.png" alt="Vaara">
-  </picture>
+  <img src="https://raw.githubusercontent.com/vaaraio/vaara/main/docs/vaara-wordmark-dark.png" alt="Vaara">
 </div>
 <h1>Vaara is the tamper-evident runtime evidence layer for AI systems. It turns every action an agent takes into a record an outside party can verify without trusting you, then binds that record to the machine's own TPM 2.0 + IMA attestation. EU AI Act compliance, and any other case where you have to prove what an agent actually did.</h1>
 <p class="stance">Open source. No SaaS. No telemetry. No signup.</p>
@@ -182,9 +182,12 @@
   </div>
 <pre><span class="prompt">$</span> vaara verify-record someone-elses-record.json
 
-  schema             <span class="ok">ok</span>    well-formed SEP-2828 execution record
-  result commitment  <span class="ok">ok</span>    projectionDigest == sha256(projection)
-  verdict            <span class="ok">CONFORMS</span>
+conformance: <span class="ok">CONFORMS</span>
+  [<span class="ok">pass</span>] required  alg_supported
+  [<span class="ok">pass</span>] required  signature_hex
+  [<span class="ok">pass</span>] required  result_commitment_self_consistent
+                   <span class="dim">projectionDigest == sha256 over the projection bytes</span>
+  <span class="dim">... 13 more checks, all pass</span>
 
 <span class="dim">no signing key, no access to the system that produced it</span></pre>
 </div>
@@ -202,13 +205,14 @@
 <p class="stamp">Adoption (live)</p>
 <ul>
   <li><span id="installs">-</span> total downloads across PyPI and npm</li>
+  <li><span id="npm-week">-</span> npm downloads, last 7 days (@vaara/client)</li>
 </ul>
 
 <p class="stamp">Acknowledged by</p>
 <ul>
-  <li>IMDA Model AI Governance Framework for Agentic AI v1.5 (Singapore, 20 May 2026), industry contributors</li>
-  <li>AMD developer testimonial (May 2026)</li>
-  <li>OpenSSF Best Practices Project 12612</li>
+  <li>Listed in the industry acknowledgements of the <a href="https://www.imda.gov.sg/-/media/imda/files/about/emerging-tech-and-research/artificial-intelligence/mgf-for-agentic-ai.pdf">IMDA Model AI Governance Framework for Agentic AI v1.5</a> (Singapore, 20 May 2026)</li>
+  <li><a href="https://www.linkedin.com/posts/amd-developer_meet-henri-sirkkavaara-henri-created-vaara-activity-7459667676555132928-QFSd">AMD AI Developer Program testimonial</a> of Vaara (May 2026)</li>
+  <li><a href="https://www.bestpractices.dev/projects/12612">OpenSSF Best Practices Project 12612</a> (passing)</li>
 </ul>
 
 <p class="stamp">Where</p>
@@ -219,6 +223,8 @@
   <a href="https://registry.modelcontextprotocol.io/v0.1/servers?search=io.github.vaaraio/vaara"><span class="label">mcp registry</span><span class="target">io.github.vaaraio/vaara</span></a>
   <a href="https://github.com/modelcontextprotocol/modelcontextprotocol/pull/2828"><span class="label">proposal</span><span class="target">SEP-2828</span></a>
   <a href="https://github.com/vaaraio/vaara/blob/main/COMPLIANCE.md"><span class="label">compliance</span><span class="target">COMPLIANCE.md</span></a>
+  <a href="https://futurium.ec.europa.eu/en/apply-ai-alliance/community-content/article-12-and-difference-between-log-and-evidence"><span class="label">Article 12</span><span class="target">Log vs evidence (EU AI Alliance)</span></a>
+  <a href="https://futurium.ec.europa.eu/en/apply-ai-alliance/community-content/article-14-runtime-why-oversight-agentic-ai-has-be-evidenced-action-not-model"><span class="label">Article 14</span><span class="target">Oversight as action (EU AI Alliance)</span></a>
   <a href="https://github.com/sponsors/vaaraio"><span class="label">sponsor</span><span class="target">github.com/sponsors/vaaraio</span></a>
   <a href="https://www.linkedin.com/in/sirkkavaara"><span class="label">linkedin</span><span class="target">in/sirkkavaara</span></a>
 </div>
@@ -234,6 +240,13 @@
     .then(function(d){
       if (!d || typeof d.total !== "number") return;
       setText("installs", fmt(d.total));
+    })
+    .catch(function(){});
+  fetch("https://api.npmjs.org/downloads/point/last-week/@vaara/client")
+    .then(function(r){ return r.ok ? r.json() : null; })
+    .then(function(d){
+      if (!d || typeof d.downloads !== "number") return;
+      setText("npm-week", fmt(d.downloads));
     })
     .catch(function(){});
 })();
