@@ -36,10 +36,18 @@ import threading
 import time
 from collections import OrderedDict
 from dataclasses import dataclass
-from typing import Any, Optional
+from typing import TYPE_CHECKING, Any, Optional, Sequence
 
 from vaara._sanitize import json_safe
 from vaara.audit.trail import AuditTrail
+
+if TYPE_CHECKING:
+    # Capability appears only in annotations, which `from __future__ import
+    # annotations` leaves as strings. capability_subsumes is imported lazily
+    # inside intercept() so the core pipeline never pulls the credential
+    # package's optional attestation/crypto dependency at import time — a base
+    # `pip install vaara` (no extras) must still `import vaara.Pipeline`.
+    from vaara.credential._grant_capability import Capability
 from vaara.compliance.engine import ComplianceEngine, ConformityReport
 from vaara.scorer.adaptive import AdaptiveScorer
 from vaara.taxonomy.actions import (
@@ -57,6 +65,14 @@ logger = logging.getLogger(__name__)
 # agent session. Evicting the oldest entry keeps memory bounded;
 # late report_outcome calls after eviction no-op with a warning.
 _MAX_PENDING_OUTCOMES = 50_000
+
+# Cap on the action -> granted-capability map used for delegated-privilege
+# attenuation. Same unbounded-growth concern as pending outcomes: an agent
+# session that threads capabilities through many intercepts would grow the
+# map one entry per action. Oldest-first eviction keeps it bounded; a child
+# whose parent grant was evicted simply cannot be attenuation-checked and is
+# handled fail-open on the lookup (the parent grant is unknown, not broadened).
+_MAX_TRACKED_GRANTS = 50_000
 
 
 # Length caps on caller-supplied string fields at the pipeline ingress.
@@ -253,6 +269,15 @@ class InterceptionPipeline:
             str, tuple[float, dict[str, float]]
         ] = OrderedDict()
         self._pending_outcomes_lock = threading.Lock()
+
+        # Delegated-privilege attenuation: action_id -> the capability grant
+        # under which that action ran. A child action carrying its own grant
+        # plus a parent_action_id is checked so its authority never exceeds
+        # the parent grant (see capability_subsumes). Bounded FIFO eviction.
+        self._grants_for_action: OrderedDict[
+            str, tuple[Capability, ...]
+        ] = OrderedDict()
+        self._grants_lock = threading.Lock()
         self._metrics = PipelineMetrics()
         self._metrics_lock = threading.Lock()
 
@@ -267,11 +292,19 @@ class InterceptionPipeline:
         parent_action_id: Optional[str] = None,
         sequence_position: int = 0,
         tenant_id: str = "",
+        capabilities: Optional[Sequence[Capability]] = None,
     ) -> InterceptionResult:
         """Intercept an agent action request.
 
         This is the single function that agents/frameworks call.
         It classifies, scores, decides, and audits in one shot.
+
+        ``capabilities`` is the optional capability grant this action runs
+        under. When supplied together with ``parent_action_id``, the pipeline
+        enforces delegated-privilege attenuation: the action's grant must be a
+        subset of the parent action's grant, so authority never grows down a
+        delegation chain. A broadening grant is denied fail-closed regardless
+        of risk score. With no capabilities the behaviour is unchanged.
 
         Returns an InterceptionResult — check .allowed before executing.
         """
@@ -320,6 +353,30 @@ class InterceptionPipeline:
 
         # 3. Record the request in audit trail
         action_id = self.trail.record_action_requested(request)
+
+        # 3b. Delegated-privilege attenuation. Record this action's grant for
+        # its own children to check against, then verify this action does not
+        # exceed the grant of the parent that delegated to it. Fail-closed on a
+        # broadening grant; fail-open when the parent grant is unknown (never
+        # recorded, or evicted) — absence of a parent grant is not evidence of
+        # a violation. Applied to the decision at step 6b.
+        child_caps = tuple(capabilities) if capabilities else None
+        attenuation_reason: Optional[str] = None
+        if child_caps is not None:
+            # Lazy import: only when a caller actually uses capability grants,
+            # which already live in the credential/attestation extra.
+            from vaara.credential._grant_attenuation import capability_subsumes
+            with self._grants_lock:
+                self._grants_for_action[action_id] = child_caps
+                if len(self._grants_for_action) > _MAX_TRACKED_GRANTS:
+                    self._grants_for_action.popitem(last=False)
+            if parent_action_id:
+                with self._grants_lock:
+                    parent_caps = self._grants_for_action.get(parent_action_id)
+                if parent_caps is not None:
+                    ok, why = capability_subsumes(parent_caps, child_caps)
+                    if not ok:
+                        attenuation_reason = why
 
         # 4. Score the risk. If the scorer raises — corrupt model bundle,
         # feature pipeline exception, any library bug — we've already
@@ -508,6 +565,19 @@ class InterceptionPipeline:
         # output as a caller-controlled ingress point like any other
         # string that lands on the hash chain (see Loop 47/50 caps).
         reason = _cap_str(reason, _MAX_DECISION_REASON_LEN, "reason")
+
+        # 6b. Attenuation override. A child grant that broadens its parent
+        # forces a fail-closed deny regardless of the scored risk — authority
+        # must never grow across a delegation hop. Prepend the reason so the
+        # audit decision record and the returned result both name it.
+        if attenuation_reason is not None:
+            decision_str = "deny"
+            allowed = False
+            reason = _cap_str(
+                f"privilege attenuation violation ({attenuation_reason})"
+                + (f"; {reason}" if reason else ""),
+                _MAX_DECISION_REASON_LEN, "reason",
+            )
 
         # 7. Record the decision in audit
         self.trail.record_decision(

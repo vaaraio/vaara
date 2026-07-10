@@ -29,6 +29,11 @@ from vaara.credential._contiguity import (
     evidence_binding_ok,
     verify_contiguity,
 )
+from vaara.credential._grant_attenuation import (
+    AttenuationReport,
+    capability_subsumes,
+    chain_is_attenuating,
+)
 from vaara.credential._grant_capability import Capability
 from vaara.credential._grant_emit import emit_grant, verify_grant_signature
 from vaara.credential._grant_parse import (
@@ -49,9 +54,12 @@ from vaara.credential.gateway import CredentialGateway
 
 __all__ = [
     "AUTHORIZATION_SCHEMA",
+    "AttenuationReport",
     "AuthorizationReceipt",
     "BrokeredCredential",
     "Capability",
+    "capability_subsumes",
+    "chain_is_attenuating",
     "ClassGateDecision",
     "ContiguityReport",
     "CredentialGateway",

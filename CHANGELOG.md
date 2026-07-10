@@ -5,6 +5,15 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/)
 and this project follows [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
 
+## [1.24.0] - 2026-07-10
+
+Minor release: multi-agent delegation attribution and delegated-privilege attenuation. Additive and backward-compatible; existing single-agent behaviour and the audit schema wire format are unchanged.
+
+- Delegation-chain reconstruction: `vaara.audit.delegation` walks the hash-covered `parent_action_id` edge already recorded on each request into the full delegation chain (`chain_for`, `descendants`, `root_of`, `depth_of`). Reconstruction is defensive against dangling parents and cycles. Because the edge is hash-covered, tampering with a delegation link breaks `verify_chain()`. `AuditTrail.snapshot()` is added as the read accessor.
+- Delegated-privilege attenuation: `vaara.credential.capability_subsumes` and `chain_is_attenuating` decide whether a child capability grant permits a subset of what its parent grant permits, so authority cannot grow down a delegation chain. The check is sound and fail-closed: it never approves a broadening.
+- Runtime enforcement: `Pipeline.intercept(capabilities=...)` denies, fail-closed, any child action whose grant broadens the grant of the parent that delegated to it, regardless of risk score, and records the denial in the audit trail. With no capabilities the behaviour is unchanged. The credential import is lazy, so a base install without the attestation extra is unaffected.
+- OWASP Top 10 for Agentic Applications 2026 mapping updated (ASI03, ASI07, ASI08) and the audit event schema now documents the delegation keys.
+
 ## [1.23.1] - 2026-07-07
 
 Patch: robustness fixes to the 1.23.0 verification-hardening surfaces, from post-release review.

@@ -111,7 +111,10 @@ after the fact breaks chain verification.
 `event_type` is non-exhaustive at 1.0 (consumers MUST accept unknown
 keys). Reserved top-level keys:
 
-- `action_requested`: `action_request` (object), `context` (object, optional).
+- `action_requested`: `parameters` (object), `context` (object, optional), and
+  the delegation keys `session_id` (string), `parent_action_id` (string or
+  null), `sequence_position` (integer). The delegation keys link this action
+  to the one that spawned it; see [§ Delegation linkage](#delegation-linkage).
 - `risk_scored`: `risk_score` (number in [0, 1]), `interval` (`[low, high]`), `classifier_version` (string), `contributing_signals` (array).
 - `decision_made`: `decision` (`allow` | `escalate` | `deny`), `threshold_set` (string), `verdict_inputs` (array).
 - `action_executed`: `executor` (string), `duration_ms` (number).
@@ -125,6 +128,32 @@ Caller-controlled strings in `data` (`agent_id`, `reason`,
 `override_reason`) MUST be treated as untrusted at narrative-rendering
 time. The hash chain still covers original values; the renderer
 sanitizes for display only.
+
+## Delegation linkage
+
+Multi-agent systems delegate: agent A's action spawns agent B's action, which
+spawns agent C's. The `action_requested` event carries that edge in three
+`data` keys:
+
+- `parent_action_id`: the `action_id` of the action that spawned this one, or
+  `null`/absent for a root action.
+- `session_id`: groups actions belonging to one agent session.
+- `sequence_position`: this action's ordinal within its session.
+
+`parent_action_id` is populated automatically by the LangChain integration
+(from `parent_run_id`) and by the MCP proxy (which tracks nested calls), or
+explicitly via `Pipeline.intercept(parent_action_id=...)`.
+
+Because these keys live inside `data`, they are covered by the hash chain (see
+[§ Hash chain](#hash-chain)). Rewriting a delegation edge after the fact —
+forging who authorized a downstream action — changes the record's `data` and
+therefore breaks `record_hash`, which `verify_chain()` detects. The edge is
+tamper-evident with no additional mechanism.
+
+A consumer reconstructs the delegation forest by walking `parent_action_id ->
+action_id`; the reference walker is `vaara.audit.delegation` (`chain_for`,
+`descendants`, `root_of`, `depth_of`). `root_action_id` and depth are computed
+from the walk, not stored, so no schema field is added for them.
 
 ## Numeric and string discipline
 

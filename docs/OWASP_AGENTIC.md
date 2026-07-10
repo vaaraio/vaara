@@ -43,12 +43,12 @@ classes, OVERT 1.0 Part 3 names enforcement controls.
 |---|---|---|
 | ASI01 Agent Goal Hijack | ◐ | Intercept boundary, classifier, audit chain, OVERT envelope |
 | ASI02 Tool Misuse and Exploitation | ✅ | Policy DSL, intercept boundary, audit chain, commit-prove receipts |
-| ASI03 Identity and Privilege Abuse | ◐ | Caller identity in audit, taxonomy scopes, review queue |
+| ASI03 Identity and Privilege Abuse | ◐ | Caller identity in audit, taxonomy scopes, review queue, delegation-chain reconstruction |
 | ASI04 Agentic Supply Chain Vulnerabilities | ◐ | SLSA provenance, Sigstore signing, ClusterFuzzLite, policy hash binding |
 | ASI05 Unexpected Code Execution (RCE) | ◐ | Policy DSL allowlists, intercept-time approval gates |
 | ASI06 Memory and Context Poisoning | ◯ | Adaptive scorer drift signal only |
 | ASI07 Insecure Inter-Agent Communication | ◐ | OVERT signing per call, audit chain integrity |
-| ASI08 Cascading Failures | ◐ | Hash-chained audit, circuit breakers, FACI drift signal |
+| ASI08 Cascading Failures | ◐ | Hash-chained audit, delegation lineage, circuit breakers, FACI drift signal |
 | ASI09 Human-Agent Trust Exploitation | ◐ | Conformal interval, signed narratives, escalation queue |
 | ASI10 Rogue Agents | ◐ | Hash-chained audit, per-agent identity, drift signals |
 
@@ -127,18 +127,37 @@ agent context.
   routes `ESCALATE` verdicts, records `ESCALATION_RESOLVED` events
   with reviewer identity, timestamp, decision.
 - ◐ Enforce Task-Scoped, Time-Bound Permissions: policy DSL declares
-  per-tool scopes. Vaara does not issue or rotate the tokens.
+  per-tool scopes, and `vaara.credential.capability_subsumes` /
+  `chain_is_attenuating` verify delegated-privilege attenuation — a
+  child grant must permit a subset of what its parent grant permits, so
+  authority provably never grows down a delegation chain (checked
+  against the reconstructed chain from `vaara.audit.delegation`). The
+  check is sound and fail-closed: it never approves a broadening.
+  `Pipeline.intercept(capabilities=...)` enforces this at runtime — a
+  child action whose grant broadens the delegating parent's grant is
+  denied and audited regardless of risk score. Vaara still does not
+  issue or rotate the underlying tokens.
 - ◐ Isolate Agent Identities and Contexts: Vaara records active
   `agent_id` per call. Memory segmentation is a deployer
   architecture choice.
+- ✅ Reconstruct and verify delegation chains: `parent_action_id` is
+  recorded per action inside the hash-covered audit `data`, and
+  `vaara.audit.delegation` walks those edges into the full delegation
+  chain (`chain_for`, `descendants`, `root_of`, `depth_of`).
+  Manipulating a delegation edge after the fact — forging who
+  authorized a downstream action — changes the record's `data` and
+  breaks `verify_chain()`, so delegation-chain tampering is detectable
+  rather than silent.
 - ◐ Define Intent, bind tokens to signed intent: partial via OVERT
   Base Envelope. External OAuth token binding is deployer-owned.
 - ◯ Evaluate Agentic Identity Management Platforms (Entra, Bedrock
   Agents, Agentforce): deployer concern.
 
 **Deployer-owned:** identity provider, token issuance and rotation,
-per-session memory segmentation, federated delegation chain
-integrity.
+per-session memory segmentation. (Federated delegation-chain integrity
+is now reconstructable and tamper-evident via the hash-covered
+`parent_action_id` edge; live identity binding of each hop still relies
+on the deployer's IdP.)
 
 ## ASI04 Agentic Supply Chain Vulnerabilities ◐
 
@@ -241,6 +260,11 @@ downgrade, and descriptor forgery.
 - ◐ Agent-aware anti-replay (nonces, session identifiers,
   timestamps): the audit chain carries timestamps and per-record
   hash. Dedicated session nonces are deployer concern.
+- ◐ Inter-agent hand-off provenance: the `parent_action_id` edge ties
+  each agent's action to the delegator inside the hash-covered trail,
+  so a hand-off between agents is reconstructable and tamper-evident
+  after the fact (`vaara.audit.delegation`). Live channel
+  authentication (mTLS, signed agent cards) remains deployer-owned.
 - ◐ Discovery and routing protection (authenticate discovery using
   cryptographic identity): OVERT Base Envelope carries the
   governing Vaara instance identity. Cross-agent discovery is
@@ -280,6 +304,11 @@ into system-wide harm.
   cryptographic agent identities with lineage metadata: exactly the
   hash-chained `AuditTrail`, OVERT Base Envelope, and Article 12
   commit-prove receipt pair.
+- ✅ Fault lineage and blast radius: `vaara.audit.delegation`
+  reconstructs the delegation forest from the tamper-evident trail, so
+  a fault's downstream spread is enumerable (`descendants`) and its
+  origin traceable (`root_of`). Lineage is a queryable structure, not
+  just per-record metadata.
 - ◐ JIT one-time tool access with runtime checks: the intercept is
   the runtime check. JIT credential issuance is deployer-owned.
 - ◐ Blast-radius guardrails (quotas, progress caps, circuit
