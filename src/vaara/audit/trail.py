@@ -1148,6 +1148,17 @@ class AuditTrail:
 
     # ── Querying ──────────────────────────────────────────────────
 
+    def snapshot(self) -> list[AuditRecord]:
+        """Return a point-in-time list of every record, in append order.
+
+        Read-only view for consumers that need the whole trail at once
+        (e.g. delegation-chain reconstruction). Taken under the chain lock
+        so it never races a concurrent ``_append``; the returned list is a
+        fresh container, though the ``AuditRecord`` objects are shared.
+        """
+        with self._lock:
+            return list(self._records)
+
     def get_action_trail(self, action_id: str) -> list[AuditRecord]:
         """Get all events for a specific action, in order."""
         with self._lock:
