@@ -17,6 +17,7 @@ Schema ``vaara.tpm-evidence-bundle/v0``.
 from __future__ import annotations
 
 import base64
+import binascii
 from typing import Any, Optional
 
 from vaara.attestation._tpm import IMA_PCR
@@ -106,7 +107,7 @@ def verify_tpm_bundle(
             _require(quote, "signature_b64", str, "quote.signature_b64"),
             validate=True,
         )
-    except (ValueError, base64.binascii.Error) as exc:
+    except (ValueError, binascii.Error) as exc:
         raise ValueError(f"TPM bundle has a non-base64 quote field: {exc}") from exc
     ak_pub_pem = _require(quote, "akPubPem", str, "quote.akPubPem").encode("ascii")
 

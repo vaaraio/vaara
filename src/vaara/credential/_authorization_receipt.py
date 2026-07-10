@@ -35,7 +35,7 @@ from __future__ import annotations
 
 import hashlib
 from dataclasses import dataclass
-from typing import Any, Optional
+from typing import Any, Literal, Optional, cast
 
 from vaara.attestation._sep2787_canonical import canonical_json, now_iso8601
 from vaara.attestation.decision import (
@@ -229,7 +229,7 @@ def mint_authorization_receipt(
         iss=iss,
         sub=sub,
         secret_version=secret_version,
-        alg=alg,
+        alg=cast(Literal["HS256", "ES256", "RS256"], alg),
         signing_material=signing_material,
         nonce=nonce,
     )
