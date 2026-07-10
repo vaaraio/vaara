@@ -21,6 +21,7 @@ Schema ``vaara.tpm-evidence-chain/v0``.
 from __future__ import annotations
 
 import base64
+import binascii
 from typing import Any, Optional
 
 from vaara.attestation._tpm_chain import (
@@ -109,7 +110,7 @@ def _parse_link(entry: dict[str, Any], idx: int) -> TPMChainLink:
             ),
             validate=True,
         )
-    except (ValueError, base64.binascii.Error) as exc:
+    except (ValueError, binascii.Error) as exc:
         raise ValueError(
             f"TPM chain link {idx} has a non-base64 quote field: {exc}"
         ) from exc
