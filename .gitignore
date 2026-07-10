@@ -120,3 +120,15 @@ tests/adversarial/traces/
 # developer-local site source and scratch directories (never published)
 .vaara-site/
 .local-brain/
+
+# Local-only working dirs and docs that live in the workspace but must never
+# be published: competitive intel and cloned competitor repos, the private
+# file-exchange drop, Serena/tooling caches, reference material (PDFs), local
+# operating rules, and dated local audit notes. None are tracked; these rules
+# exist so an accidental `git add -A` cannot stage them.
+.intel/
+.shared/
+.serena/
+.reference/
+CLAUDE.md
+/AUDIT-*.md
