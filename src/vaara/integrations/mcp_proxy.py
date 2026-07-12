@@ -195,15 +195,23 @@ class VaaraMCPProxy:
         upstream_headers: Optional[dict[str, dict[str, str]]] = None,
         allow_private_upstream_hosts: Optional[bool] = None,
         router: Optional[NotificationRouter] = None,
+        policy: Optional[Any] = None,
+        shadow: bool = False,
     ) -> None:
         if pipeline is not None:
+            # An explicit pipeline carries its own enforce setting; shadow
+            # only applies to the internally-built one.
             self._pipeline = pipeline
             self._backend = None
         else:
             db = db_path or Path(os.environ.get("VAARA_DB", "vaara_audit.db"))
             self._backend = SQLiteAuditBackend(db)
             trail = AuditTrail(on_record=self._backend.write_record)
-            self._pipeline = InterceptionPipeline(trail=trail)
+            self._pipeline = InterceptionPipeline(trail=trail, enforce=not shadow)
+        if policy is not None:
+            # Same rebinding `vaara serve` does: thresholds and sequence
+            # patterns come from the loaded policy, scorer state is kept.
+            self._pipeline.scorer.apply_policy(policy)
         self._agent_id_default = agent_id_default
         # An empty allowlist means "no restriction" (None and empty set are equivalent
         # here); a non-empty allowlist restricts to exactly those names. Denylist
@@ -1603,6 +1611,16 @@ def main(argv: Optional[list[str]] = None) -> None:
     )
     parser.add_argument("--db", type=Path, default=None,
                         help="Audit database path (default: $VAARA_DB or ./vaara_audit.db)")
+    parser.add_argument("--policy", type=Path, default=None,
+                        help="YAML/JSON policy file (thresholds, sequences) applied to the "
+                             "interception pipeline. Same format as `vaara serve --policy`; "
+                             "starter policies for common MCP servers live in "
+                             "examples/policies/mcp-starters/. YAML needs the [yaml] extra.")
+    parser.add_argument("--shadow", action="store_true",
+                        help="Observe-only mode: classify, score, and audit every call but "
+                             "block nothing. The trail records the true decision, so "
+                             "`vaara trail shadow-report` shows what enforcement would have "
+                             "blocked. Flip to enforcing by dropping this flag.")
     parser.add_argument("--agent-id", default="mcp-proxy-client",
                         help="Default agent_id for the audit trail")
     parser.add_argument("--allow-tool", action="append", default=[], dest="allow_tools",
@@ -1667,12 +1685,30 @@ def main(argv: Optional[list[str]] = None) -> None:
     prompt_allow = set(args.allow_prompts) if args.allow_prompts else None
     prompt_deny = set(args.deny_prompts) if args.deny_prompts else set()
 
+    policy_obj = None
+    policy_source: Optional[bytes] = None
+    if args.policy is not None:
+        from vaara.policy.validate import validate_source
+
+        policy_path = args.policy.expanduser()
+        policy_obj, report = validate_source(policy_path)
+        if policy_obj is None:
+            print(
+                f"vaara-mcp-proxy: policy {policy_path} failed validation:",
+                file=sys.stderr,
+            )
+            for issue in report.issues:
+                print(f"  {issue.level.value}: {issue.message}", file=sys.stderr)
+            sys.exit(2)
+        policy_source = policy_path.read_bytes()
+
     overt_emitter = _build_overt_emitter_from_args(
         args,
         policy_hash=policy_hash_from_perimeter(
             tool_allow=tool_allow, tool_deny=tool_deny,
             resource_allow=resource_allow, resource_deny=resource_deny,
             prompt_allow=prompt_allow, prompt_deny=prompt_deny,
+            policy_source=policy_source,
         ),
     )
 
@@ -1712,6 +1748,8 @@ def main(argv: Optional[list[str]] = None) -> None:
             prompt_denylist=prompt_deny if prompt_deny else None,
             overt_emitter=overt_emitter,
             attest_emitter=attest_emitter,
+            policy=policy_obj,
+            shadow=args.shadow,
         )
     except (ValueError, ProxyError) as e:
         # ProxyError here means a --upstream-url target was refused by the SSRF

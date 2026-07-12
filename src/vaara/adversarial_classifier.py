@@ -24,6 +24,7 @@ All stay out of the default install.
 """
 from __future__ import annotations
 
+import hashlib
 import json
 import re
 from pathlib import Path
@@ -149,6 +150,12 @@ _DST_PATTERNS = [
 ]
 
 _DEFAULT_BUNDLE = Path(__file__).parent / "data" / "adversarial_classifier_v9.joblib"
+# Pinned digest of the shipped bundle, verified before unpickling. joblib.load
+# is pickle, so a swapped bundle file is arbitrary code execution; the pin
+# turns that into a clean ValueError. Regenerate with
+# `sha256sum src/vaara/data/adversarial_classifier_v9.joblib` when the
+# production bundle changes.
+_DEFAULT_BUNDLE_SHA256 = "2566da22bf5229a3982f5b6ac2a1bb6ca36d13177a32bbbffcc251d8e4fb16c1"
 
 _STATIC_FEATURES = [f"ip__{n}" for n,_ in _IP_PATTERNS] + [f"cred__{n}" for n,_ in _CRED_PATTERNS] + [f"sql__{n}" for n,_ in _SQL_PATTERNS] + [f"shell__{n}" for n,_ in _SHELL_PATTERNS] + [f"scheme__{s}" for s in _URL_SCHEMES] + ["ctx_source_injected", "param_blob_len", "has_wildcard_star", "has_all_keyword", "has_recursive_flag"]
 _DST_STATIC = [f"dst__{n}" for n, _ in _DST_PATTERNS]
@@ -225,7 +232,12 @@ class AdversarialClassifier:
     install with ``pip install vaara[ml]``.
     """
 
-    def __init__(self, bundle_path: Optional[str] = None, threshold: Optional[float] = None) -> None:
+    def __init__(
+        self,
+        bundle_path: Optional[str] = None,
+        threshold: Optional[float] = None,
+        expected_sha256: Optional[str] = None,
+    ) -> None:
         try:
             import joblib  # noqa: F401
             import xgboost  # noqa: F401
@@ -237,6 +249,18 @@ class AdversarialClassifier:
         path = Path(bundle_path) if bundle_path else _DEFAULT_BUNDLE
         if not path.exists():
             raise FileNotFoundError(f"bundle not found: {path}")
+        # Verify before unpickling: the shipped bundle against its pinned
+        # digest always, a caller-supplied bundle only when the caller
+        # declares one. joblib.load on a tampered file is code execution,
+        # so a mismatch must never reach it.
+        expected = expected_sha256 if bundle_path else (expected_sha256 or _DEFAULT_BUNDLE_SHA256)
+        if expected:
+            actual = hashlib.sha256(path.read_bytes()).hexdigest()
+            if actual != expected:
+                raise ValueError(
+                    f"bundle integrity check failed for {path}: "
+                    f"sha256 {actual} != expected {expected}"
+                )
         bundle = joblib.load(path)
         self._model = bundle["model"]
         self._vocab = bundle["vocab"]

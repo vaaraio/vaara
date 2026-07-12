@@ -130,6 +130,7 @@ def policy_hash_from_perimeter(
     resource_deny: set[str],
     prompt_allow: Optional[set[str]],
     prompt_deny: set[str],
+    policy_source: Optional[bytes] = None,
 ) -> bytes:
     """SHA-256 over canonical JSON of the operator perimeter configuration.
 
@@ -146,6 +147,11 @@ def policy_hash_from_perimeter(
         "prompt_allow": sorted(prompt_allow) if prompt_allow else None,
         "prompt_deny": sorted(prompt_deny),
     }
+    if policy_source is not None:
+        # A --policy file governs decisions, so it must be covered by the
+        # attested hash. The key is added only when a policy is present, so
+        # perimeter-only deployments keep their historical hash.
+        config["policy_sha256"] = hashlib.sha256(policy_source).hexdigest()
     payload = json.dumps(config, sort_keys=True, separators=(",", ":")).encode("utf-8")
     return hashlib.sha256(payload).digest()
 

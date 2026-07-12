@@ -111,7 +111,10 @@
       "softwareHelp": "https://github.com/vaaraio/vaara",
       "license": "https://www.gnu.org/licenses/agpl-3.0.html",
       "isAccessibleForFree": true,
-      "offers": { "@type": "Offer", "price": "0", "priceCurrency": "EUR" },
+      "offers": [
+        { "@type": "Offer", "name": "Open source (AGPL-3.0)", "price": "0", "priceCurrency": "EUR" },
+        { "@type": "Offer", "name": "Paid pilot and commercial license", "url": "https://vaara.io/#pilots", "availability": "https://schema.org/InStock" }
+      ],
       "author": { "@type": "Person", "name": "Henri Sirkkavaara" },
       "keywords": "AI agent audit trail, EU AI Act Article 12, tamper-evident logging, TPM 2.0, IMA, RFC 3161, SEP-2828, verifiable AI",
       "sameAs": [
@@ -161,6 +164,11 @@
           "@type": "Question",
           "name": "Is Vaara free and open source?",
           "acceptedAnswer": { "@type": "Answer", "text": "Yes. Vaara is licensed under AGPL-3.0, with no SaaS, no telemetry, and no signup. It ships on PyPI, npm, and the MCP registry, with SLSA Build Level 3 and Sigstore-signed releases." }
+        },
+        {
+          "@type": "Question",
+          "name": "Does Vaara offer paid pilots or a commercial license?",
+          "acceptedAnswer": { "@type": "Answer", "text": "Yes. A structured four-week pilot deploys Vaara in your environment against your own agent traffic and ends with a signed evidence bundle and an auditor-ready compliance report on that traffic. A commercial license is available for building on Vaara without the AGPL's source-disclosure obligations. Contact hello@vaara.io." }
         }
       ]
     }
@@ -202,6 +210,14 @@ conformance: <span class="ok">CONFORMS</span>
   <li>Policy gating on every tool call: allow, block, or escalate each agent action against your own policy before it runs, through a transparent MCP proxy with native hooks for LangChain, CrewAI, and the OpenAI Agents SDK. TypeScript client on npm, Claude Code plugin in the same repo.</li>
   <li>Authored SEP-2828, the Model Context Protocol server-side execution-record proposal, reproduced in full by an independent developer from a clean checkout. Releases are SLSA Build Level 3 and Sigstore-signed, with continuous fuzzing on the decoder, audit, and policy loader.</li>
 </ul>
+<p class="stamp" id="pilots">Paid pilots</p>
+<ul>
+  <li>Four weeks, your environment, your traffic. Week 1: the Vaara MCP proxy goes in front of your agents in shadow mode, observing and recording without blocking anything. Weeks 2 and 3: we read the shadow report together, tune a policy and tool perimeter to your actual traffic, and flip to enforcement. Week 4: you receive a signed evidence bundle and an auditor-ready compliance report generated from your own trail.</li>
+  <li>Everything runs in your infrastructure and stays there. The trail, the policy, the reports, and the archive are yours, and they stay verifiable with the standalone checker even if you never talk to us again. The evidence does not depend on the vendor; that is the point of the design.</li>
+  <li>Building Vaara into a closed-source product, or running a modified version as a hosted service without releasing your changes, needs a commercial license instead of the AGPL, granted directly by the sole copyright holder. See <a href="https://github.com/vaaraio/vaara/blob/main/LICENSING.md">LICENSING.md</a>.</li>
+  <li>Contact: <a href="mailto:hello@vaara.io">hello@vaara.io</a>. A fixed fee agreed up front, with no subscription.</li>
+</ul>
+
 <p class="stamp">Adoption (live)</p>
 <ul>
   <li><span id="installs">-</span> total downloads across PyPI and npm</li>

@@ -5,6 +5,22 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/)
 and this project follows [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
 
+## [1.26.0] - 2026-07-12
+
+Pilot-readiness release: shadow-first onboarding, fail-closed retention rotation, starter perimeters for common MCP servers, and release hygiene. All additive; wire formats unchanged.
+
+- Fixed: `vaara.__version__` said "1.22.0" since v1.23.0; wheels for 1.23.0 through 1.25.0 self-report the wrong version. The string is corrected, a test pins it to pyproject, and the preflight smoke test now fails on any future drift between the wheel version and the installed package.
+- Fixed: the wheel now ships `py.typed`, backing the "Typing :: Typed" classifier so type checkers read the package's annotations (PEP 561).
+- Security: the shipped adversarial-classifier bundle is verified against a pinned SHA-256 before `joblib.load` unpickles it, and `AdversarialClassifier` accepts `expected_sha256` for caller-supplied bundles. A tampered bundle raises `ValueError` instead of executing.
+- Security: the base rule scorer now blocks a cloud-metadata SSRF fetch (169.254.169.254 and its IPv6, dotless-decimal, and hex encodings, recursed through nested parameters) in a zero-config install. Previously only the opt-in ML classifier caught it. A deterministic decision floor is applied for this one unambiguous case, mirroring the egress guard's boundary; legitimate private and loopback hosts are unaffected.
+- Per-action-class policy thresholds are now enforced. A `thresholds` override keyed to an action class (for example `tx.sign`) resolves by the call's tool name at decision time, composing over the policy default; before, overrides parsed and validated but were silently ignored. Applies to both the single-policy and per-tenant paths.
+- MCP proxy: `--policy` loads a YAML/JSON policy (thresholds, sequences) into the interception pipeline, failing closed on validation errors; the policy bytes feed the attested OVERT policy hash, so a silent policy swap is detectable from receipts. Perimeter-only deployments keep their historical hash.
+- MCP proxy: `--shadow` runs the pipeline non-enforcing: every call is classified, scored, and recorded, nothing is blocked. `vaara trail shadow-report --db X [--days N] [--format json]` summarises what enforcement would have done, grouped by tool.
+- `vaara trail rotate --db X --out archive.zip --key K --retention-days N` runs the documented export-then-purge retention workflow as one fail-closed command: the purge never executes unless the signed archive re-verified from its own bytes.
+- Starter perimeters for five MCP servers (GitHub, filesystem, Slack, Postgres, Google Workspace) under `examples/policies/mcp-starters/`, with exact tool names checked against each server's current catalog and a shared starter policy file.
+- `docs/multi-replica-deployment.md` states the supported scale-out pattern: one chain per process, per-replica DBs and rotation, operator-signed archive index; with the honest limits of each.
+- `examples/quickstart.py` now leads with `@vaara.govern`, matching the README, and no longer implies the zero-config trail is persistent.
+
 ## [1.25.0] - 2026-07-12
 
 Minor release: SCITT-compatible COSE Receipts over the transparency log. Additive and backward-compatible; the `vaara.receipt/v1` wire format and existing verification surfaces are unchanged.
