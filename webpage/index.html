@@ -93,7 +93,7 @@
   .evidence .prompt { color: var(--tri); }
   .evidence .ok { color: var(--tri-bright); }
   .evidence .dim { color: var(--faint); }
-  #installs, #npm-week { color: var(--tri-bright); font-weight: 600; font-family: var(--mono); }
+  #installs { color: var(--tri-bright); font-weight: 600; font-family: var(--mono); }
 </style>
 <script type="application/ld+json">
 {
@@ -220,8 +220,7 @@ conformance: <span class="ok">CONFORMS</span>
 
 <p class="stamp">Adoption (live)</p>
 <ul>
-  <li><span id="installs">-</span> total downloads across PyPI and npm</li>
-  <li><span id="npm-week">-</span> npm downloads, last 7 days (@vaara/client)</li>
+  <li><span id="installs">-</span> total downloads, all time (PyPI and npm)</li>
 </ul>
 
 <p class="stamp">Acknowledged by</p>
@@ -256,13 +255,6 @@ conformance: <span class="ok">CONFORMS</span>
     .then(function(d){
       if (!d || typeof d.total !== "number") return;
       setText("installs", fmt(d.total));
-    })
-    .catch(function(){});
-  fetch("https://api.npmjs.org/downloads/point/last-week/@vaara/client")
-    .then(function(r){ return r.ok ? r.json() : null; })
-    .then(function(d){
-      if (!d || typeof d.downloads !== "number") return;
-      setText("npm-week", fmt(d.downloads));
     })
     .catch(function(){});
 })();
