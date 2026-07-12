@@ -5,6 +5,15 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/)
 and this project follows [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
 
+## [Unreleased]
+
+CLI usability, driven by first-run friction on the export path. No wire-format change.
+
+- `vaara trail export` and `vaara trail export-article12` accept `--db` to export straight from an audit SQLite DB (for example the Claude Code plugin's `~/.vaara/claude-code/audit.db`); `--trail` JSONL remains and the two are mutually exclusive. Previously the only DB-to-signed-zip route was a `trail rotate --dry-run` workaround.
+- A mistyped command now gets a did-you-mean suggestion (`vaara trail exoprt` suggests `export`) instead of only the choices list.
+- `vaara --help` and error usage lines show `COMMAND` instead of the full brace-wall of 33 subcommand names, at every level.
+- The Claude Code plugin README's export instructions now name a command that can read the plugin's own DB, and mention the `vaara[export]` extra.
+
 ## [1.26.1] - 2026-07-12
 
 Release hygiene. No functional change to the Python package.

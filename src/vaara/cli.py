@@ -204,6 +204,7 @@ import calendar
 import hashlib
 import json
 import os
+import re
 import stat
 import sys
 import time
@@ -417,21 +418,31 @@ def _cmd_trail_shadow_report(args: argparse.Namespace) -> int:
     return 0
 
 
-def _cmd_trail_export(args: argparse.Namespace) -> int:
-    try:
-        from vaara.audit.export import export_signed
-        from vaara.audit.trail import AuditTrail
-    except ImportError:
-        print(_INSTALL_HINT, file=sys.stderr)
-        return 2
+def _load_trail_source(args: argparse.Namespace):
+    """Load an AuditTrail from --trail (JSONL) or --db (SQLite).
+
+    Returns (trail, None) on success or (None, exit_code) on failure with
+    the error already printed. The two flags are mutually exclusive and one
+    is required, enforced at the parser level.
+    """
+    from vaara.audit.trail import AuditRecord, AuditTrail
+
+    db_arg = getattr(args, "db", None)
+    if db_arg:
+        db_path = Path(db_arg).expanduser()
+        if not db_path.is_file():
+            print(f"audit DB not found: {db_path}", file=sys.stderr)
+            return None, 2
+        from vaara.audit.sqlite_backend import SQLiteAuditBackend
+
+        return SQLiteAuditBackend(db_path).load_trail(), None
 
     trail_path = Path(args.trail).expanduser()
     if not trail_path.exists():
         print(f"trail JSONL not found: {trail_path}", file=sys.stderr)
-        return 2
+        return None, 2
 
     trail = AuditTrail()
-    from vaara.audit.trail import AuditRecord
     with open(trail_path, "r", encoding="utf-8") as f:
         for line in f:
             line = line.strip()
@@ -442,6 +453,30 @@ def _cmd_trail_export(args: argparse.Namespace) -> int:
             trail._by_action[rec.action_id].append(rec)
             if rec.record_hash:
                 trail._last_hash = rec.record_hash
+    return trail, None
+
+
+def _add_trail_source_args(sub_parser: argparse.ArgumentParser) -> None:
+    """--trail JSONL / --db SQLite input group shared by the trail exports."""
+    src = sub_parser.add_mutually_exclusive_group(required=True)
+    src.add_argument("--trail", help="Path to trail JSONL file")
+    src.add_argument(
+        "--db",
+        help="Path to an audit SQLite DB (e.g. the Claude Code plugin's "
+             "~/.vaara/claude-code/audit.db)",
+    )
+
+
+def _cmd_trail_export(args: argparse.Namespace) -> int:
+    try:
+        from vaara.audit.export import export_signed
+    except ImportError:
+        print(_INSTALL_HINT, file=sys.stderr)
+        return 2
+
+    trail, err = _load_trail_source(args)
+    if trail is None:
+        return err
 
     out = Path(args.out).expanduser()
     out.parent.mkdir(parents=True, exist_ok=True)
@@ -785,14 +820,8 @@ def _cmd_trail_export_article12(args: argparse.Namespace) -> int:
     try:
         from vaara.audit.article12_export import export_article12
         from vaara.audit.timeanchor import TimeAnchorError
-        from vaara.audit.trail import AuditRecord, AuditTrail
     except ImportError:
         print(_INSTALL_HINT, file=sys.stderr)
-        return 2
-
-    trail_path = Path(args.trail).expanduser()
-    if not trail_path.exists():
-        print(f"trail JSONL not found: {trail_path}", file=sys.stderr)
         return 2
 
     system_meta = None
@@ -814,17 +843,9 @@ def _cmd_trail_export_article12(args: argparse.Namespace) -> int:
         print(f"invalid --period: {exc}", file=sys.stderr)
         return 2
 
-    trail = AuditTrail()
-    with open(trail_path, "r", encoding="utf-8") as f:
-        for line in f:
-            line = line.strip()
-            if not line:
-                continue
-            rec = AuditRecord.from_dict(json.loads(line))
-            trail._records.append(rec)
-            trail._by_action[rec.action_id].append(rec)
-            if rec.record_hash:
-                trail._last_hash = rec.record_hash
+    trail, err = _load_trail_source(args)
+    if trail is None:
+        return err
 
     # Folding handoff / enforcement evidence needs the attestation extra (the
     # crypto the record and binding lenses use). Fail fast with the install
@@ -3793,9 +3814,37 @@ def _help_dispatch(parser: argparse.ArgumentParser):
     return _print
 
 
+class _SuggestingParser(argparse.ArgumentParser):
+    """ArgumentParser that adds a did-you-mean hint on unknown commands.
+
+    argparse only grew ``suggest_on_error`` in Python 3.14; this backports
+    the one case that matters for a CLI this wide: a mistyped subcommand.
+    """
+
+    def error(self, message: str):
+        match = re.search(r"invalid choice: '([^']+)' \(choose from (.+)\)", message)
+        if match:
+            import difflib
+
+            attempted = match.group(1)
+            choices = [c.strip().strip("'\"") for c in match.group(2).split(",")]
+            close = difflib.get_close_matches(attempted, choices, n=1)
+            if close:
+                message = (
+                    f"invalid choice: {attempted!r}. Did you mean {close[0]!r}? "
+                    f"Run `{self.prog} --help` for the full command list."
+                )
+            else:
+                message = (
+                    f"invalid choice: {attempted!r}. "
+                    f"Run `{self.prog} --help` for the full command list."
+                )
+        super().error(message)
+
+
 def build_parser() -> argparse.ArgumentParser:
-    p = argparse.ArgumentParser(prog="vaara", description="Vaara AI Agent Execution Layer")
-    sub = p.add_subparsers(dest="cmd")
+    p = _SuggestingParser(prog="vaara", description="Vaara AI Agent Execution Layer")
+    sub = p.add_subparsers(dest="cmd", metavar="COMMAND")
     p.set_defaults(func=_help_dispatch(p))
 
     sub.add_parser("version", help="Print Vaara version").set_defaults(func=_cmd_version)
@@ -3821,11 +3870,11 @@ def build_parser() -> argparse.ArgumentParser:
     pk.set_defaults(func=_cmd_keygen)
 
     pt = sub.add_parser("trail", help="Audit-trail commands")
-    tsub = pt.add_subparsers(dest="trail_cmd")
+    tsub = pt.add_subparsers(dest="trail_cmd", metavar="COMMAND")
     pt.set_defaults(func=_help_dispatch(pt))
 
     pe = tsub.add_parser("export", help="Export a signed, regulator-handoff trail zip")
-    pe.add_argument("--trail", required=True, help="Path to trail JSONL file")
+    _add_trail_source_args(pe)
     pe.add_argument("--out", required=True, help="Path to write the signed zip")
     pe.add_argument("--key", required=True, help="Path to Ed25519 signing private key (PEM)")
     pe.add_argument("--agent-id", default="", help="Optional agent_id tag for the manifest")
@@ -3910,7 +3959,7 @@ def build_parser() -> argparse.ArgumentParser:
         "export-article12",
         help="Export a signed EU AI Act Article 12 regulator package",
     )
-    pa12.add_argument("--trail", required=True, help="Path to trail JSONL file")
+    _add_trail_source_args(pa12)
     pa12.add_argument(
         "--key", required=True,
         help="Ed25519 private key (PEM) to sign the package",
@@ -4060,7 +4109,7 @@ def build_parser() -> argparse.ArgumentParser:
         "review",
         help="Human-in-the-loop review queue (EU AI Act Article 14)",
     )
-    rsub = pr.add_subparsers(dest="review_cmd")
+    rsub = pr.add_subparsers(dest="review_cmd", metavar="COMMAND")
     pr.set_defaults(func=_help_dispatch(pr))
 
     rl = rsub.add_parser("list", help="List queue items (default: pending)")
@@ -4126,7 +4175,7 @@ def build_parser() -> argparse.ArgumentParser:
         "policy",
         help="Policy artifact commands (validate, test, reload)",
     )
-    psub = pp_policy.add_subparsers(dest="policy_cmd")
+    psub = pp_policy.add_subparsers(dest="policy_cmd", metavar="COMMAND")
     pp_policy.set_defaults(func=_help_dispatch(pp_policy))
 
     pvalid = psub.add_parser(
@@ -4159,7 +4208,7 @@ def build_parser() -> argparse.ArgumentParser:
         "compliance",
         help="Compliance reporting commands",
     )
-    csub = pcr.add_subparsers(dest="compliance_cmd")
+    csub = pcr.add_subparsers(dest="compliance_cmd", metavar="COMMAND")
     pcr.set_defaults(func=_help_dispatch(pcr))
     pcrep = csub.add_parser(
         "report",
@@ -4251,7 +4300,7 @@ def build_parser() -> argparse.ArgumentParser:
         "detect",
         help="Named detectors (injection, pii) over Vaara's scoring surface",
     )
-    dsub = pdetect.add_subparsers(dest="detect_cmd")
+    dsub = pdetect.add_subparsers(dest="detect_cmd", metavar="COMMAND")
     pdetect.set_defaults(func=_help_dispatch(pdetect))
 
     def _add_text_input_args(p_):
@@ -4297,7 +4346,7 @@ def build_parser() -> argparse.ArgumentParser:
             "OVERT 1.0 attestation commands (Protocol Profile 1.0 Annex B.6)"
         ),
     )
-    osub = povert.add_subparsers(dest="overt_cmd")
+    osub = povert.add_subparsers(dest="overt_cmd", metavar="COMMAND")
     povert.set_defaults(func=_help_dispatch(povert))
     pov_verify = osub.add_parser(
         "verify",
@@ -4341,7 +4390,7 @@ def build_parser() -> argparse.ArgumentParser:
         "attest",
         help="SEP-2787 tool-call attestation commands",
     )
-    asub = pattest.add_subparsers(dest="attest_cmd")
+    asub = pattest.add_subparsers(dest="attest_cmd", metavar="COMMAND")
     pattest.set_defaults(func=_help_dispatch(pattest))
     pa_verify = asub.add_parser(
         "verify",
@@ -4364,7 +4413,7 @@ def build_parser() -> argparse.ArgumentParser:
         "receipt",
         help="Execution-receipt commands (post-execution sibling of SEP-2787)",
     )
-    rcsub = preceipt.add_subparsers(dest="receipt_cmd")
+    rcsub = preceipt.add_subparsers(dest="receipt_cmd", metavar="COMMAND")
     preceipt.set_defaults(func=_help_dispatch(preceipt))
     prc_verify = rcsub.add_parser(
         "verify",
@@ -5125,7 +5174,7 @@ def build_parser() -> argparse.ArgumentParser:
             "Hardware TEE attestation commands (experimental, AMD SEV-SNP)"
         ),
     )
-    tsub = ptee.add_subparsers(dest="tee_cmd")
+    tsub = ptee.add_subparsers(dest="tee_cmd", metavar="COMMAND")
     ptee.set_defaults(func=_help_dispatch(ptee))
 
     ptee_parse = tsub.add_parser(
@@ -5213,7 +5262,7 @@ def build_parser() -> argparse.ArgumentParser:
             "(eco / balanced / performance / strict)"
         ),
     )
-    msub = pmode.add_subparsers(dest="mode_cmd")
+    msub = pmode.add_subparsers(dest="mode_cmd", metavar="COMMAND")
     pmode.set_defaults(func=_help_dispatch(pmode))
 
     pml = msub.add_parser(

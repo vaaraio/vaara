@@ -95,7 +95,7 @@ vaara compliance report --db ~/.vaara/claude-code/audit.db --format md
 vaara compliance dashboard --db ~/.vaara/claude-code/audit.db --out ~/audit-dashboard.html
 ```
 
-For a signed, regulator-handoff bundle, export the trail with `vaara trail export --trail PATH --out PATH --key PATH`, then verify the zip with `vaara trail verify --zip PATH`.
+For a signed, regulator-handoff bundle, export straight from the plugin's DB with `vaara trail export --db ~/.vaara/claude-code/audit.db --out trail.zip --key PATH`, then verify the zip with `vaara trail verify --zip trail.zip`. Signing needs the export extra: `pip install "vaara[export]"`.
 
 ## Latency
 
