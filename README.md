@@ -6,16 +6,16 @@
 </p>
 
 <p align="center">
-  <a href="https://pepy.tech/project/vaara"><img src="https://img.shields.io/endpoint?url=https://raw.githubusercontent.com/vaaraio/vaara/main/.github/badges/installs.json" alt="Downloads"></a>
-</p>
-
-<p align="center">
   <a href="https://pypi.org/project/vaara/"><img src="https://img.shields.io/pypi/v/vaara.svg" alt="PyPI"></a>
   <a href="https://github.com/vaaraio/vaara/blob/main/LICENSE"><img src="https://img.shields.io/pypi/l/vaara.svg" alt="License"></a>
   <a href="https://github.com/vaaraio/vaara/actions/workflows/ci.yml"><img src="https://github.com/vaaraio/vaara/actions/workflows/ci.yml/badge.svg" alt="CI"></a>
   <a href="https://scorecard.dev/viewer/?uri=github.com/vaaraio/vaara"><img src="https://github.com/vaaraio/vaara/actions/workflows/scorecard.yml/badge.svg" alt="OpenSSF Scorecard"></a>
   <a href="https://www.bestpractices.dev/projects/12612"><img src="https://www.bestpractices.dev/projects/12612/badge" alt="OpenSSF Best Practices"></a>
   <a href="https://huggingface.co/spaces/vaaraio/vaara"><img src="https://img.shields.io/badge/%F0%9F%A4%97%20Hugging%20Face-Space-blue" alt="Hugging Face Space"></a>
+</p>
+
+<p align="center">
+  <a href="https://pepy.tech/project/vaara"><img src="https://img.shields.io/endpoint?url=https://raw.githubusercontent.com/vaaraio/vaara/main/.github/badges/installs.json" alt="Downloads"></a>
 </p>
 
 Your AI agent transferred the funds, wrote the file, called the tool. Later, someone who does not trust you asks you to prove exactly what it did and why: a regulator, an auditor, a customer after an incident. Your own logs will not settle it, because you could have edited them.
@@ -83,6 +83,8 @@ python tests/vectors/external_evidence_v0/_check_independent.py
 ```
 
 It re-derives every verdict from the receipt bytes and the public key alone. The output shows the property the trail is built for: a receipt dropped from inside a declared boundary is a provable gap from the held set, with no issuer access and no external witness.
+
+For the whole loop in one runnable file, produce a signed record, verify it yourself, then watch a single forged byte get caught, see [examples/prove-it-yourself/](examples/prove-it-yourself/). The logs-versus-evidence argument behind it is in [docs/logs-vs-evidence.md](docs/logs-vs-evidence.md).
 
 The aggregate runner grades every suite at once, and grades another implementation's vectors the same way:
 
@@ -192,6 +194,7 @@ The public surface is fixed: the signed envelope (`vaara.receipt/v1`), capabilit
 | Path | Contents |
 |---|---|
 | [docs/verifying-evidence.md](docs/verifying-evidence.md) | Every verifier and its trust model |
+| [docs/logs-vs-evidence.md](docs/logs-vs-evidence.md) | Logs vs evidence: proving what an agent did, and what the AI Act actually requires |
 | [docs/architecture.md](docs/architecture.md) | Scoring, conformal coverage, time anchor, formal properties |
 | [SPEC.md](SPEC.md) | The canonical vaara.receipt/v1 receipt format spec |
 | [docs/standards.md](docs/standards.md) | SEP-2828, SEP-2787, OVERT, the sovereign inference harness |
