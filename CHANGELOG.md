@@ -5,6 +5,13 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/)
 and this project follows [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
 
+## [1.25.0] - 2026-07-12
+
+Minor release: SCITT-compatible COSE Receipts over the transparency log. Additive and backward-compatible; the `vaara.receipt/v1` wire format and existing verification surfaces are unchanged.
+
+- `vaara.attestation.cose_receipt` serialises a transparency-log inclusion proof as a COSE Receipt shaped after draft-ietf-cose-merkle-tree-proofs (verifiable-data-structure type 1 / RFC 9162 SHA-256), so a SCITT-aware relying party can consume Vaara evidence. Keyless: the receipt verifies by recomputation from bytes with no key and no operator to trust, reusing `transparency_log.verify_inclusion`. An optional ES256 COSE_Sign1 wrapper is available for relying parties that require the operator-signed wire form and never replaces the keyless check.
+- Scope: the encoding reuses Vaara's own RFC 6962 Merkle maths, so a COSE receipt and a native inclusion proof are the same computation. Byte-exact interop against a third-party SCITT reference verifier is not yet validated.
+
 ## [1.24.0] - 2026-07-10
 
 Minor release: multi-agent delegation attribution and delegated-privilege attenuation. Additive and backward-compatible; existing single-agent behaviour and the audit schema wire format are unchanged.
