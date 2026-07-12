@@ -74,7 +74,7 @@ Each tool call produces a hash-chained sequence of records. A typical session ag
 - An `action_executed` or `action_blocked` record depending on the decision.
 - An `outcome_recorded` record after the upstream returns, carrying the severity signal back to the scorer.
 
-Each record links to the previous via SHA-256. The chain is tamper-evident. `vaara audit verify` checks it.
+Each record links to the previous via SHA-256. The chain is tamper-evident. `vaara-audit verify` checks an exported archive.
 
 ## How this composes with Goose's existing security features
 
@@ -104,10 +104,10 @@ After the audit DB has captured live activity:
 ```bash
 vaara compliance report --db /path/to/github_audit.db --format json
 vaara compliance report --db /path/to/github_audit.db --format pdf
-vaara trail export --db /path/to/github_audit.db
+vaara trail rotate --db /path/to/github_audit.db --out archive.zip --key key.pem --retention-days 90 --all-tenants
 ```
 
-The PDF output is the format a Notified Body or internal compliance reviewer reads. The `trail export` produces a Sigstore-signed envelope suitable for regulator handoff. For organisations subject to EU AI Act high-risk-use obligations on agentic systems, Article 12 (logging) and Article 14 (human oversight) apply at the tool-call layer, not at the LLM layer.
+The PDF output is the format a Notified Body or internal compliance reviewer reads. `trail rotate` runs the export-then-purge retention workflow: it writes a signed archive that `vaara-audit verify` checks offline, and purges only what the archive re-verified from its own bytes. For organisations subject to EU AI Act high-risk-use obligations on agentic systems, Article 12 (logging) and Article 14 (human oversight) apply at the tool-call layer, not at the LLM layer.
 
 ## Troubleshooting
 
