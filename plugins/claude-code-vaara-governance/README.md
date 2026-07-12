@@ -12,11 +12,13 @@ PreToolUse runs a two-layer check before Claude executes a tool:
 
 PostToolUse appends an outcome record to the audit trail for every `mcp__*` call, correlating it back to the PreToolUse decision and feeding the MWU online learner.
 
-SessionStart prints a one-line status (Vaara version, mode, audit DB path).
+Blocks and escalations also pop a native desktop notification (macOS via osascript, Linux via notify-send when present), so a decision is visible even when the terminal is buried. Notifications are fire-and-forget and can never break the hook.
+
+SessionStart prints a one-line status (Vaara version, mode, protection preset, notifications, audit DB path).
 
 | Hook | Matches | Mechanism |
 |---|---|---|
-| `PreToolUse` | `Bash`, `WebFetch`, `WebSearch`, `mcp__*` | Layer 1 regex on shell / web. Layer 2 ML on MCP. |
+| `PreToolUse` | `Bash`, `WebFetch`, `WebSearch`, `mcp__*` | Layer 1 regex on shell / web. Layer 2 ML on MCP. Desktop notification on block/escalate. |
 | `PostToolUse` | `mcp__*` | Audit outcome + MWU feedback. |
 | `SessionStart` | n/a | Validate install, print status. |
 
@@ -30,14 +32,36 @@ Then install the plugin via the Claude Code plugin command for your install path
 
 ## Configuration
 
-All knobs are environment variables. None required for the default behaviour.
+The friendly path: run `/vaara-setup` inside Claude Code. It asks three plain-language questions (protect, watch, or off; how strict; popups or not) and writes `~/.vaara/claude-code/config.json`. Nothing is required for the default behaviour.
+
+The config file, hand-editable:
+
+```json
+{
+  "mode": "protect",
+  "protection": "balanced",
+  "notifications": true
+}
+```
+
+| Key | Values | Effect |
+|---|---|---|
+| `mode` | `protect` (default), `watch`, `off` | `watch` checks and records everything but never blocks; `off` disables the plugin. |
+| `protection` | `eco`, `balanced` (default), `performance`, `strict` | Policy preset applied to MCP scoring; these are the `vaara mode` presets. |
+| `notifications` | `true` (default), `false` | Desktop popups on block/escalate. |
+| `agent_id` | string | Agent id written to the audit chain (default `claude-code`). |
+| `audit_db` | path | Audit DB path (default `~/.vaara/claude-code/audit.db`). |
+
+Environment variables override the file (useful for CI or a single session):
 
 | Variable | Effect |
 |---|---|
 | `VAARA_PLUGIN_DISABLE=1` | Disable the whole plugin. All hooks pass through. |
-| `VAARA_PLUGIN_SHADOW=1` | Record every decision to the audit trail but never block. Useful for soak testing before flipping to enforce. |
-| `VAARA_PLUGIN_AGENT_ID` | Override the agent_id written to the audit chain (default `claude-code`). |
-| `VAARA_PLUGIN_AUDIT_DB` | Override the audit DB path (default `~/.vaara/claude-code/audit.db`). |
+| `VAARA_PLUGIN_SHADOW=1` | Same as `"mode": "watch"`: record every decision, never block. |
+| `VAARA_PLUGIN_PROTECTION` | Same as `"protection"`: preset name. |
+| `VAARA_PLUGIN_NOTIFY=0` | Turn desktop notifications off. |
+| `VAARA_PLUGIN_AGENT_ID` | Override the agent_id written to the audit chain. |
+| `VAARA_PLUGIN_AUDIT_DB` | Override the audit DB path. |
 | `VAARA_PLUGIN_DENY_PATTERNS_FILE` | Replace the bundled `policies/default_deny.json` with your own. |
 
 ## Extending the deny patterns
@@ -75,9 +99,9 @@ For a signed, regulator-handoff bundle, export the trail with `vaara trail expor
 
 ## Latency
 
-PreToolUse on Bash / WebFetch / WebSearch is regex-only and sub-millisecond. PreToolUse on `mcp__*` and PostToolUse load the Vaara pipeline, ~0.5 – 2 seconds cold-start on commodity hardware. For tighter MCP latency, run `vaara serve` as a sidecar and reuse a warm process; that path is on the v0.2.0 roadmap.
+PreToolUse on Bash / WebFetch / WebSearch is regex-only and sub-millisecond. PreToolUse on `mcp__*` and PostToolUse load the Vaara pipeline, roughly 0.5 to 2 seconds cold-start on commodity hardware. For tighter MCP latency, run `vaara serve` as a sidecar and reuse a warm process; that path is on the roadmap.
 
-## Known limitations (v0.1.0)
+## Known limitations
 
 - Cold-start latency per MCP call (see above).
 - PostToolUse correlates to the most recent `ACTION_REQUESTED` for the same agent + tool. Parallel calls to the same MCP tool can race; outcome attribution may swap. The audit chain itself stays intact.

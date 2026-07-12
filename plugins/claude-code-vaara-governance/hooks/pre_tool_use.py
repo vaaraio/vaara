@@ -23,12 +23,20 @@ VAARA_PLUGIN_DENY_PATTERNS_FILE.
 from __future__ import annotations
 
 import json
-import os
 import sys
 from pathlib import Path
 
 sys.path.insert(0, str(Path(__file__).parent))
+import _config  # noqa: E402
 from _deny_patterns import load_deny_rules, match_deny_rule  # noqa: E402
+from _notify import notify as _raw_notify  # noqa: E402
+
+CFG = _config.load_config()
+
+
+def notify(verdict: str, tool_name: str, detail: str) -> None:
+    if _config.notifications_enabled(CFG):
+        _raw_notify(verdict, tool_name, detail)
 
 
 def _emit(message: str) -> None:
@@ -36,10 +44,7 @@ def _emit(message: str) -> None:
 
 
 def _audit_db_path() -> Path:
-    override = os.environ.get("VAARA_PLUGIN_AUDIT_DB")
-    if override:
-        return Path(override).expanduser()
-    return Path.home() / ".vaara" / "claude-code" / "audit.db"
+    return _config.audit_db_path(CFG)
 
 
 def _append_deny_audit(
@@ -91,6 +96,19 @@ def _classify_mcp(
     trail._on_record = backend.write_record
     pipeline = InterceptionPipeline(trail=trail, enforce=not shadow)
 
+    preset = _config.protection_preset(CFG)
+    if preset:
+        try:
+            from vaara.policy import from_dict
+            from vaara.policy.modes import get_mode, to_policy_dict
+
+            pipeline.scorer.apply_policy(from_dict(to_policy_dict(get_mode(preset))))
+        except Exception as exc:
+            _emit(
+                f"vaara-governance: protection preset {preset!r} not applied "
+                f"({exc}); using default thresholds."
+            )
+
     try:
         result = pipeline.intercept(
             agent_id=agent_id,
@@ -109,6 +127,9 @@ def _classify_mcp(
                 f"(risk {result.risk_score:.2f}, action_id={result.action_id}). "
                 f"Reason: {result.reason}"
             )
+            notify(
+                "ESCALATE", tool_name, f"risk {result.risk_score:.2f}: {result.reason}"
+            )
         return 0
 
     _emit(
@@ -116,11 +137,12 @@ def _classify_mcp(
         f"(risk {result.risk_score:.2f}, action_id={result.action_id}). "
         f"Reason: {result.reason}"
     )
+    notify("BLOCKED", tool_name, f"risk {result.risk_score:.2f}: {result.reason}")
     return 2
 
 
 def main() -> int:
-    if os.environ.get("VAARA_PLUGIN_DISABLE") == "1":
+    if _config.plugin_disabled(CFG):
         return 0
 
     try:
@@ -133,8 +155,8 @@ def main() -> int:
     if not isinstance(tool_input, dict):
         tool_input = {"_raw": tool_input}
     session_id = event.get("session_id", "")
-    agent_id = os.environ.get("VAARA_PLUGIN_AGENT_ID", "claude-code")
-    shadow = os.environ.get("VAARA_PLUGIN_SHADOW") == "1"
+    agent_id = _config.agent_id(CFG)
+    shadow = _config.shadow_mode(CFG)
 
     rules = load_deny_rules()
     match = match_deny_rule(rules, tool_name, tool_input)
@@ -146,8 +168,10 @@ def main() -> int:
                 f"vaara-governance: SHADOW deny on {tool_name} "
                 f"(rule={rule_id}): {message}"
             )
+            notify("SHADOW deny", tool_name, message)
             return 0
         _emit(f"vaara-governance: BLOCKED {tool_name} (rule={rule_id}). {message}")
+        notify("BLOCKED", tool_name, message)
         return 2
 
     if not tool_name.startswith("mcp__"):

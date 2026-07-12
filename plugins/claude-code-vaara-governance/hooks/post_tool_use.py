@@ -19,16 +19,17 @@ Env vars match pre_tool_use.py:
 from __future__ import annotations
 
 import json
-import os
 import sys
 from pathlib import Path
 
+sys.path.insert(0, str(Path(__file__).parent))
+import _config  # noqa: E402
+
+CFG = _config.load_config()
+
 
 def _audit_db_path() -> Path:
-    override = os.environ.get("VAARA_PLUGIN_AUDIT_DB")
-    if override:
-        return Path(override).expanduser()
-    return Path.home() / ".vaara" / "claude-code" / "audit.db"
+    return _config.audit_db_path(CFG)
 
 
 def _outcome_severity(tool_response: object) -> float:
@@ -52,7 +53,7 @@ def _outcome_severity(tool_response: object) -> float:
 
 
 def main() -> int:
-    if os.environ.get("VAARA_PLUGIN_DISABLE") == "1":
+    if _config.plugin_disabled(CFG):
         return 0
 
     try:
@@ -69,7 +70,7 @@ def main() -> int:
     except ImportError:
         return 0
 
-    agent_id = os.environ.get("VAARA_PLUGIN_AGENT_ID", "claude-code")
+    agent_id = _config.agent_id(CFG)
     db_path = _audit_db_path()
     if not db_path.exists():
         return 0
