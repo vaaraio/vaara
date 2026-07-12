@@ -199,6 +199,7 @@ The public surface is fixed: the signed envelope (`vaara.receipt/v1`), capabilit
 | [docs/eu-ai-act-article-12.md](docs/eu-ai-act-article-12.md) | Article 12 record-keeping: what it requires, what it does not, what to demand from tooling |
 | [docs/tamper-evident-audit-trail.md](docs/tamper-evident-audit-trail.md) | How the trail works, its honest limits, and what it costs |
 | [docs/vaara-vs-observability-vs-grc.md](docs/vaara-vs-observability-vs-grc.md) | Vaara vs Datadog/Splunk vs Vanta/Drata: three different questions |
+| [docs/dogfood/](docs/dogfood/README.md) | Our marketing runs under this gate; the signed trail and key to verify it |
 | [docs/architecture.md](docs/architecture.md) | Scoring, conformal coverage, time anchor, formal properties |
 | [SPEC.md](SPEC.md) | The canonical vaara.receipt/v1 receipt format spec |
 | [docs/standards.md](docs/standards.md) | SEP-2828, SEP-2787, OVERT, the sovereign inference harness |

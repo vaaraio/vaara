@@ -1,0 +1,40 @@
+# The live policy for Vaara's own marketing runtime. This is the exact
+# document loaded by the pipeline whose signed trail is published next to
+# this file (marketing-evidence.zip).
+#
+# The property to notice: publish.social_post has an escalate threshold of
+# 0.0, so no reachable risk score lets a publish call pass without a human.
+# The review gate is a property of the policy, not a workflow promise.
+
+version: "0.1"
+domains: [eu_ai_act]
+
+action_classes:
+  content.read:
+    category: data
+    reversibility: fully_reversible
+    blast_radius: self
+    urgency: deferrable
+    regulatory: ["aiact:12"]
+
+  fs.write_file:
+    category: data
+    reversibility: partially_reversible
+    blast_radius: local
+    urgency: timely
+    regulatory: ["aiact:12"]
+
+  publish.social_post:
+    category: communication
+    reversibility: irreversible
+    blast_radius: global
+    urgency: timely
+    regulatory: ["aiact:13", "aiact:50"]
+
+thresholds:
+  default:
+    escalate: 0.55
+    deny: 0.85
+  publish.social_post:
+    escalate: 0.0
+    deny: 0.99
