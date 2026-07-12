@@ -9,9 +9,13 @@ VAARA_PLUGIN_AUDIT_DB, VAARA_PLUGIN_SHADOW).
 """
 from __future__ import annotations
 
-import os
 import sys
 from pathlib import Path
+
+sys.path.insert(0, str(Path(__file__).parent))
+import _config  # noqa: E402
+
+CFG = _config.load_config()
 
 
 def _emit(message: str) -> None:
@@ -19,15 +23,12 @@ def _emit(message: str) -> None:
 
 
 def _audit_db_path() -> Path:
-    override = os.environ.get("VAARA_PLUGIN_AUDIT_DB")
-    if override:
-        return Path(override).expanduser()
-    return Path.home() / ".vaara" / "claude-code" / "audit.db"
+    return _config.audit_db_path(CFG)
 
 
 def main() -> int:
-    if os.environ.get("VAARA_PLUGIN_DISABLE") == "1":
-        _emit("vaara-governance: disabled via VAARA_PLUGIN_DISABLE=1.")
+    if _config.plugin_disabled(CFG):
+        _emit("vaara-governance: off (config.json mode or VAARA_PLUGIN_DISABLE=1).")
         return 0
 
     try:
@@ -40,7 +41,9 @@ def main() -> int:
         )
         return 0
 
-    mode = "shadow" if os.environ.get("VAARA_PLUGIN_SHADOW") == "1" else "enforce"
+    mode = "watch (nothing blocked, all recorded)" if _config.shadow_mode(CFG) else "protect"
+    preset = _config.protection_preset(CFG) or "balanced"
+    notif = "on" if _config.notifications_enabled(CFG) else "off"
     db_path = _audit_db_path()
     existed = db_path.exists()
     try:
@@ -53,8 +56,10 @@ def main() -> int:
         db_state = f"unavailable ({exc!r})"
 
     _emit(
-        f"vaara-governance v0.1.2 loaded "
-        f"(vaara {vaara.__version__}, mode={mode}, audit_db={db_path} [{db_state}])."
+        f"vaara-governance v0.2.0 loaded "
+        f"(vaara {vaara.__version__}, mode={mode}, protection={preset}, "
+        f"notifications={notif}, audit_db={db_path} [{db_state}]). "
+        f"Settings: /vaara-setup"
     )
     return 0
 
