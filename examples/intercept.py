@@ -1,4 +1,8 @@
-"""Minimal Vaara demo — risky action intercepted."""
+"""The explicit pipeline API — same engine as `@vaara.govern`, decision object in hand.
+
+Start with examples/quickstart.py for the one-decorator path; use this when
+you want the InterceptionResult itself. Needs `pip install rich` for output.
+"""
 from rich import box
 from rich.console import Console
 from rich.panel import Panel

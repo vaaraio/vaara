@@ -370,6 +370,53 @@ def _keygen_attest(out: Path, pub_out: Path) -> int:
     return 0
 
 
+def _cmd_trail_rotate(args: argparse.Namespace) -> int:
+    from vaara.audit.rotate import rotate
+
+    db_path = Path(args.db).expanduser()
+    if not db_path.is_file():
+        print(f"vaara trail rotate: not a file: {db_path}", file=sys.stderr)
+        return 2
+
+    result = rotate(
+        db_path=db_path,
+        out_path=Path(args.out).expanduser(),
+        signer_key=Path(args.key).expanduser(),
+        retention_days=args.retention_days,
+        tenant_id="" if args.all_tenants else args.tenant,
+        dry_run=args.dry_run,
+    )
+    if not result.ok:
+        for err in result.errors:
+            print(f"vaara trail rotate: {err}", file=sys.stderr)
+        return 1
+    print(f"Archived {result.exported_records} record(s) to {result.archive_path} (verified).")
+    if args.dry_run:
+        print(f"Would purge {result.purged_records} record(s) older than {args.retention_days} day(s).")
+        print("Run without --dry-run to apply.")
+    else:
+        print(f"Purged {result.purged_records} record(s) older than {args.retention_days} day(s).")
+        print("Archive the zip externally; the live DB now has a chain seam at the boundary.")
+    return 0
+
+
+def _cmd_trail_shadow_report(args: argparse.Namespace) -> int:
+    import json as _json
+
+    from vaara.audit.shadow_report import render_text, shadow_report
+
+    db_path = Path(args.db).expanduser()
+    if not db_path.is_file():
+        print(f"vaara trail shadow-report: not a file: {db_path}", file=sys.stderr)
+        return 2
+    report = shadow_report(db_path, days=args.days)
+    if args.format == "json":
+        print(_json.dumps(report, indent=2))
+    else:
+        print(render_text(report))
+    return 0
+
+
 def _cmd_trail_export(args: argparse.Namespace) -> int:
     try:
         from vaara.audit.export import export_signed
@@ -3970,6 +4017,44 @@ def build_parser() -> argparse.ArgumentParser:
         help="Purge across all tenants in this DB. Use only on single-tenant deployments or after deliberate review.",
     )
     pp.set_defaults(func=_cmd_trail_purge)
+
+    prot = tsub.add_parser(
+        "rotate",
+        help="Export a signed archive, verify it, then purge old records (fail-closed)",
+    )
+    prot.add_argument("--db", required=True, help="Path to the audit SQLite DB")
+    prot.add_argument("--out", required=True, help="Path to write the signed archive zip")
+    prot.add_argument("--key", required=True, help="Path to Ed25519 signing private key (PEM)")
+    prot.add_argument(
+        "--retention-days", required=True, type=int,
+        help="Records older than this many days are purged after the archive verifies",
+    )
+    prot.add_argument(
+        "--dry-run", action="store_true",
+        help="Export and verify the archive, report the purge count, delete nothing",
+    )
+    rot_scope = prot.add_mutually_exclusive_group(required=True)
+    rot_scope.add_argument("--tenant", help="Restrict rotation to records with this tenant_id")
+    rot_scope.add_argument(
+        "--all-tenants", action="store_true",
+        help="Rotate across all tenants in this DB",
+    )
+    prot.set_defaults(func=_cmd_trail_rotate)
+
+    psr = tsub.add_parser(
+        "shadow-report",
+        help="Summarise what enforcement would have blocked over the trailing window",
+    )
+    psr.add_argument("--db", required=True, help="Path to the audit SQLite DB")
+    psr.add_argument(
+        "--days", type=int, default=7,
+        help="Trailing window in days (default 7)",
+    )
+    psr.add_argument(
+        "--format", choices=["text", "json"], default="text",
+        help="Output format (default text)",
+    )
+    psr.set_defaults(func=_cmd_trail_shadow_report)
 
     pr = sub.add_parser(
         "review",

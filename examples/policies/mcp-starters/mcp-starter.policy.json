@@ -1,0 +1,8 @@
+{
+  "version": "0.1",
+  "domains": ["eu_ai_act"],
+  "action_classes": {},
+  "thresholds": {
+    "default": {"escalate": 0.35, "deny": 0.65}
+  }
+}

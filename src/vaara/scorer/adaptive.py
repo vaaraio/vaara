@@ -662,6 +662,10 @@ class AdaptiveScorer:
         self._threshold_allow = threshold_allow
         self._threshold_deny = threshold_deny
         self._policy_lookup = policy_lookup
+        # The default-slot policy set by apply_policy, kept so per-action-class
+        # threshold overrides resolve at decision time. None until a policy is
+        # applied, in which case the constructor defaults stand.
+        self._default_policy: Any = None
         self._burst_window = burst_window_seconds
         self._burst_threshold = burst_threshold
         self._max_tracked_agents = max_tracked_agents
@@ -739,6 +743,9 @@ class AdaptiveScorer:
             self._threshold_allow = new_allow
             self._threshold_deny = new_deny
             self._sequences = new_sequences
+            # Keep the policy so per-action-class threshold overrides
+            # (policy.threshold_for) resolve by tool name at decision time.
+            self._default_policy = policy
             # Per-(agent, pattern) last-match cache keys may reference
             # removed patterns; clear so the next match transition logs
             # cleanly against the new pattern set.
@@ -779,33 +786,39 @@ class AdaptiveScorer:
         with self._lock:
             self._policy_lookup = policy_lookup
 
-    def _thresholds_for(self, tenant_id: str) -> tuple[float, float]:
+    def _thresholds_for(self, tenant_id: str, tool_name: str = "") -> tuple[float, float]:
         """Resolve (allow, deny) thresholds for this call.
 
-        Empty tenant_id or no policy_lookup configured returns the
-        scorer-bound defaults rebound by the most recent apply_policy
-        on the default ("") slot. A configured lookup that returns
-        None (tenant has no policy of its own) also falls back to the
-        defaults. _thresholds_for is called from _evaluate_locked while
-        the scorer lock is held; the lookup acquires the registry lock
-        on top, so lock ordering is consistently scorer -> registry
-        across this codebase (never the reverse).
+        Resolution order: the tenant policy if a lookup is configured and
+        returns one, else the default-slot policy from the most recent
+        apply_policy, else the scorer-bound constructor defaults. Whichever
+        policy applies, a per-action-class override for ``tool_name``
+        (policy.threshold_for) is composed on top of that policy's defaults,
+        so tightening one class does not restate the others.
+
+        _thresholds_for is called from _evaluate_locked while the scorer lock
+        is held; the lookup acquires the registry lock on top, so lock
+        ordering is consistently scorer -> registry across this codebase
+        (never the reverse).
         """
-        if not tenant_id or self._policy_lookup is None:
-            return (self._threshold_allow, self._threshold_deny)
-        try:
-            tenant_policy = self._policy_lookup(tenant_id)
-        except Exception:
-            return (self._threshold_allow, self._threshold_deny)
-        if tenant_policy is None:
-            return (self._threshold_allow, self._threshold_deny)
         from vaara.policy.schema import Policy  # local import to avoid cycles
-        if not isinstance(tenant_policy, Policy):
+
+        policy: Any = None
+        if tenant_id and self._policy_lookup is not None:
+            try:
+                candidate = self._policy_lookup(tenant_id)
+            except Exception:
+                candidate = None
+            if isinstance(candidate, Policy):
+                policy = candidate
+        if policy is None and isinstance(self._default_policy, Policy):
+            policy = self._default_policy
+
+        if policy is None:
             return (self._threshold_allow, self._threshold_deny)
-        return (
-            tenant_policy.thresholds_default.escalate,
-            tenant_policy.thresholds_default.deny,
-        )
+
+        resolved = policy.threshold_for(tool_name) if tool_name else policy.thresholds_default
+        return (resolved.escalate, resolved.deny)
 
     def _calib_category(self, tool_name: str) -> Optional[str]:
         """Category to route through to the calibrator for this action.
@@ -852,7 +865,7 @@ class AdaptiveScorer:
         # Per-tenant threshold dispatch. Empty tenant_id or no lookup
         # configured returns the scorer-bound defaults bound at apply_policy
         # time on the default ("") slot.
-        threshold_allow, threshold_deny = self._thresholds_for(tenant_id)
+        threshold_allow, threshold_deny = self._thresholds_for(tenant_id, tool_name)
 
         # Build risk signals from each expert
         signals = self._compute_signals(
@@ -879,6 +892,18 @@ class AdaptiveScorer:
         # If the worst-case (within 1-alpha confidence) is safe, allow it.
         # If the best-case is dangerous, deny it.
         decision_score = upper
+
+        # Deterministic content floor: a call parameter pointing at a
+        # cloud-metadata endpoint is a known SSRF attack, not a probabilistic
+        # risk to be averaged away by the experts. Floor the decision score so
+        # the base install (no ML extra) does not silently allow it. Benign
+        # and private hosts return 0.0 and leave the score untouched.
+        from vaara.scorer._param_signals import metadata_endpoint_risk
+        content_floor = metadata_endpoint_risk(context.get("parameters"))
+        if content_floor > decision_score:
+            decision_score = content_floor
+            signals["parameter_content"] = content_floor
+
         if decision_score < threshold_allow:
             decision = Decision.ALLOW
         elif decision_score > threshold_deny:
@@ -953,7 +978,7 @@ class AdaptiveScorer:
         reversibility = context.get("reversibility", "partially_reversible")
         blast_radius = context.get("blast_radius", "local")
 
-        threshold_allow, threshold_deny = self._thresholds_for(tenant_id)
+        threshold_allow, threshold_deny = self._thresholds_for(tenant_id, tool_name)
 
         # _compute_signals is read-only for everything except the
         # sequence detector's warning log — silence that temporarily.

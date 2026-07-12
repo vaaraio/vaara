@@ -20,7 +20,7 @@
 
 Your AI agent transferred the funds, wrote the file, called the tool. Later, someone who does not trust you asks you to prove exactly what it did and why: a regulator, an auditor, a customer after an incident. Your own logs will not settle it, because you could have edited them.
 
-Vaara checks every agent tool call against your policy and writes the call and its outcome into a signed, hash-chained record an outside party can verify offline, with no access to your system and none of your software. It needs no special hardware, and binds to your machine's TPM 2.0 or confidential-VM root when you have one. It runs entirely in your own environment. No SaaS, no telemetry. EU AI Act Article 12 is what it was built for; it answers any "show me what the agent actually did" just as well.
+Vaara checks every agent tool call against your policy and writes the call and its outcome into a signed, hash-chained record an outside party can verify offline, with no access to your system and none of your software. It needs no special hardware, and binds to your machine's TPM 2.0 or confidential-VM root when you have one. It runs entirely in your own environment. No SaaS, no telemetry. It answers "show me what the agent actually did" wherever that question lands: after an incident, in procurement, in a dispute. And when EU AI Act record-keeping obligations reach your systems, the same trail is the Article 12 evidence, already running.
 
 ## Quick start
 
@@ -145,10 +145,10 @@ To put Vaara **in front of** an MCP server, run it as a proxy. Every `tools/call
 ```bash
 vaara-mcp-proxy \
   --upstream npx --upstream-arg -y --upstream-arg @sap/mdk-mcp-server \
-  --db ./mcp_audit.db
+  --db ./mcp_audit.db --shadow
 ```
 
-Point your MCP client (Claude Code, Cursor, any host) at the proxy instead of the upstream. There is also an HTTP API (`pip install 'vaara[server]'`, `vaara serve`) and a first-party TypeScript client on npm ([`@vaara/client`](clients/ts)) for non-Python agents. Framework details, the cloud and OSS guardrail adapters (Bedrock, Azure, GCP, NeMo, Guardrails AI, LLM Guard, Rebuff), and the multi-tenant proxy are in [docs/adapters.md](docs/adapters.md).
+Start with `--shadow`: every call is classified, scored, and recorded, nothing is blocked. After a few days, `vaara trail shadow-report --db ./mcp_audit.db` shows what enforcement would have done; then drop the flag and enforce, starting from a ready-made perimeter for common MCP servers in [examples/policies/mcp-starters/](examples/policies/mcp-starters/README.md). Point your MCP client (Claude Code, Cursor, any host) at the proxy instead of the upstream. There is also an HTTP API (`pip install 'vaara[server]'`, `vaara serve`) and a first-party TypeScript client on npm ([`@vaara/client`](clients/ts)) for non-Python agents. Framework details, the cloud and OSS guardrail adapters (Bedrock, Azure, GCP, NeMo, Guardrails AI, LLM Guard, Rebuff), and the multi-tenant proxy are in [docs/adapters.md](docs/adapters.md).
 </details>
 
 <details>
@@ -197,11 +197,14 @@ The public surface is fixed: the signed envelope (`vaara.receipt/v1`), capabilit
 | [docs/standards.md](docs/standards.md) | SEP-2828, SEP-2787, OVERT, the sovereign inference harness |
 | [docs/adapters.md](docs/adapters.md) | Framework and cloud/OSS guardrail adapters, multi-tenant proxy |
 | [docs/COMPLIANCE.md](docs/COMPLIANCE.md) | EU AI Act and DORA article mapping, eval numbers |
+| [docs/multi-replica-deployment.md](docs/multi-replica-deployment.md) | Scaling past one proxy process: per-replica chains, rotation, archive index |
 | [CHANGELOG.md](CHANGELOG.md) | Version-by-version evolution |
 | [docs/PRIOR_ART.md](docs/PRIOR_ART.md) | When each concept first shipped, plus adjacent work |
 </details>
 
 Vaara helps deployers assemble evidence for their own conformity work. It does not certify compliance or constitute legal advice. Deployers own their obligations under the EU AI Act and other applicable law.
+
+Commercial license and paid pilots available: see [vaara.io](https://vaara.io/#pilots) or contact [hello@vaara.io](mailto:hello@vaara.io). Licensing terms are in [LICENSING.md](LICENSING.md).
 
 ## Acknowledgements
 

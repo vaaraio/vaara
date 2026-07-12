@@ -121,12 +121,11 @@ For organisations subject to EU AI Act high-risk-use obligations on agentic syst
 
 The default policy ships fail-closed for unknown tool names. To tune for the GitHub MCP catalog:
 
-- Start with a read-only policy that allows `get_*`, `list_*`, `search_*` tools and routes mutating tools (`create_*`, `update_*`, `delete_*`, `merge_*`, `push_*`) to ESCALATE.
-- Tighten further on the destructive end: any `delete_*` or force-push-equivalent operation goes DENY unless explicitly approved.
+- Start from the ready-made GitHub perimeter in [`examples/policies/mcp-starters/`](../policies/mcp-starters/README.md): an exact-name read-only allowlist plus a denylist of the destructive tools, built against the current tool catalog.
+- Pass a policy file with `--policy /path/to/policy.json` to set the risk thresholds the pipeline enforces (see [`mcp-starter.policy.json`](../policies/mcp-starters/mcp-starter.policy.json) for a stricter-than-default starting point).
+- Per-tool allow/deny is exact-name matching via `--allow-tool` / `--deny-tool` (repeatable; denylist wins on overlap).
 - Override the default agent_id by passing `--agent-id <your-id>` to the proxy.
 - Per-call overrides via the `_vaara_agent_id` argument key on a `tools/call` request (the proxy strips it before forwarding).
-
-See the main Vaara README "Policy" section for the full policy file shape.
 
 ## Generating evidence for AI Act conformity
 
@@ -144,7 +143,7 @@ The PDF output is the format a Notified Body or internal compliance auditor read
 
 - **The proxy hangs on startup.** The upstream is probably failing its initialize handshake. Check the proxy's stderr (the upstream's stderr is forwarded through). Common cause: missing or invalid `GITHUB_PERSONAL_ACCESS_TOKEN`.
 - **`github-mcp-server: command not found`.** Build it with `go install github.com/github/github-mcp-server/cmd/github-mcp-server@latest` and point `--upstream` at the resulting binary in `$(go env GOBIN)` or `$(go env GOPATH)/bin`.
-- **Every tool call is blocked.** Default fail-closed policy. Define a policy file scoped to the GitHub MCP tool catalog, or relax for read-only tools as a starting point.
+- **Every tool call is blocked.** Default fail-closed policy. Start from the GitHub perimeter in [`examples/policies/mcp-starters/`](../policies/mcp-starters/README.md), or relax for read-only tools as a starting point.
 - **Rate limits surface as upstream errors.** GitHub rate limits hit the upstream, not the proxy. The proxy records the failure in the audit chain and returns the upstream's error to the client.
 
 ## The same pattern in front of any MCP server

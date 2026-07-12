@@ -24,6 +24,11 @@ rm -rf dist_preflight
 }
 WHEEL=$(ls dist_preflight/vaara-*.whl)
 echo "[preflight] built: $(basename "$WHEEL")"
+# The version the wheel was built as (from pyproject). The installed package
+# must report exactly this; v1.23.0-v1.25.0 shipped with a stale __version__
+# because nothing compared the two.
+WHEEL_VERSION="$(basename "$WHEEL" | sed -E 's/^vaara-([^-]+)-.*/\1/')"
+export VAARA_EXPECTED_VERSION="$WHEEL_VERSION"
 
 echo "[preflight] install wheel + [ml] extras in fresh venv..."
 python3 -m venv "$VDIR/test"
@@ -32,9 +37,15 @@ python3 -m venv "$VDIR/test"
 
 echo "[preflight] import + classifier load + smoke scoring..."
 "$VDIR/test/bin/python" - <<'PY'
+import os
 import sys
+from pathlib import Path
 import vaara
-assert vaara.__version__, "missing __version__"
+expected = os.environ["VAARA_EXPECTED_VERSION"]
+assert vaara.__version__ == expected, (
+    f"version drift: installed package reports {vaara.__version__!r}, wheel is {expected!r}"
+)
+assert Path(vaara.__file__).with_name("py.typed").is_file(), "py.typed missing from wheel"
 print(f"    vaara=={vaara.__version__}")
 
 from vaara.adversarial_classifier import AdversarialClassifier
