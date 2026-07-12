@@ -5,6 +5,13 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/)
 and this project follows [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
 
+## [1.26.1] - 2026-07-12
+
+Release hygiene. No functional change to the Python package.
+
+- The npm client (`@vaara/client`) is now version-synced to the release tag in the publish workflow, so it can no longer lag the Python package the way v1.26.0 did (it stayed at 1.25.0). `clients/ts/package.json` bumped to match.
+- The Claude Code plugin marketplace manifest (`.claude-plugin/marketplace.json`) is corrected: the plugin `source` is a repo-relative path and the stale `ref` pin is dropped, so `/plugin marketplace add vaaraio/vaara` then `/plugin install vaara-governance@vaara` installs the current plugin.
+
 ## [1.26.0] - 2026-07-12
 
 Pilot-readiness release: shadow-first onboarding, fail-closed retention rotation, starter perimeters for common MCP servers, and release hygiene. All additive; wire formats unchanged.

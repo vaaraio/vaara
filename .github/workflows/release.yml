@@ -150,6 +150,17 @@ jobs:
       - name: Test
         run: node --test test/*.test.mjs
 
+      - name: Sync client version to the released tag
+        # The npm client is versioned in clients/ts/package.json, decoupled from
+        # the Python package. A missed manual bump (as in v1.26.0) desyncs the
+        # npm client from the release. Rewrite the version from the tag here, the
+        # same way the MCP manifests are synced below, so it can no longer drift.
+        run: |
+          set -euo pipefail
+          VERSION="${GITHUB_REF_NAME#v}"
+          node -e "const fs=require('fs');const p=require('./package.json');p.version='${VERSION}';fs.writeFileSync('package.json',JSON.stringify(p,null,2)+'\n')"
+          echo "Set @vaara/client version to ${VERSION}"
+
       - name: Publish to npm with provenance
         run: |
           set -euo pipefail
