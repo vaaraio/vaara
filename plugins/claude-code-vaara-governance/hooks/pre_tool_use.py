@@ -97,16 +97,24 @@ def _classify_mcp(
     pipeline = InterceptionPipeline(trail=trail, enforce=not shadow)
 
     preset = _config.protection_preset(CFG)
-    if preset:
+    custom = _config.custom_thresholds(CFG)
+    if preset or custom:
         try:
             from vaara.policy import from_dict
             from vaara.policy.modes import get_mode, to_policy_dict
 
-            pipeline.scorer.apply_policy(from_dict(to_policy_dict(get_mode(preset))))
+            policy = to_policy_dict(get_mode(preset or "balanced"))
+            if custom:
+                escalate, deny = custom
+                policy["thresholds"]["default"] = {
+                    "escalate": escalate, "deny": deny,
+                }
+            pipeline.scorer.apply_policy(from_dict(policy))
         except Exception as exc:
             _emit(
-                f"vaara-governance: protection preset {preset!r} not applied "
-                f"({exc}); using default thresholds."
+                f"vaara-governance: policy (preset={preset!r}, "
+                f"custom_thresholds={custom!r}) not applied ({exc}); "
+                f"using default thresholds."
             )
 
     try:
