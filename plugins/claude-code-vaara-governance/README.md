@@ -24,9 +24,16 @@ SessionStart prints a one-line status (Vaara version, mode, protection preset, n
 
 ## Install
 
+Any install that puts the `vaara` CLI on PATH is a complete engine
+install — the hooks run through the binary:
+
 ```
-pip install 'vaara>=0.40.1'
+pip install vaara            # or: pipx install vaara
+brew install vaaraio/tap/vaara
 ```
+
+(Installs that predate `vaara hook` fall back to `python3` with the
+vaara package importable, the pre-0.6.0 behavior.)
 
 Then install the plugin via the Claude Code plugin command for your install path (the plugin lives at `plugins/claude-code-vaara-governance/` in the [vaaraio/vaara](https://github.com/vaaraio/vaara) repo).
 

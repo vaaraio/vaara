@@ -1,12 +1,12 @@
 {
-  "description": "Vaara runtime tool-call governance. PreToolUse classifies, blocks on deny, warns on escalate. PostToolUse appends an audit record. SessionStart validates the install.",
+  "description": "Vaara runtime tool-call governance. Hooks run through the vaara binary on PATH when available (any CLI install method works: pip, pipx, Homebrew), falling back to the bundled python3 scripts. PreToolUse classifies, blocks on deny, warns on escalate. PostToolUse appends an audit record. SessionStart validates the install and records the configured Article 50(1) disclosure.",
   "hooks": {
     "SessionStart": [
       {
         "hooks": [
           {
             "type": "command",
-            "command": "python3 \"${CLAUDE_PLUGIN_ROOT}/hooks/session_start.py\"",
+            "command": "sh \"${CLAUDE_PLUGIN_ROOT}/hooks/run.sh\" session-start",
             "timeout": 30
           }
         ]
@@ -17,7 +17,7 @@
         "hooks": [
           {
             "type": "command",
-            "command": "python3 \"${CLAUDE_PLUGIN_ROOT}/hooks/pre_tool_use.py\"",
+            "command": "sh \"${CLAUDE_PLUGIN_ROOT}/hooks/run.sh\" pre-tool-use",
             "timeout": 30
           }
         ],
@@ -29,7 +29,7 @@
         "hooks": [
           {
             "type": "command",
-            "command": "python3 \"${CLAUDE_PLUGIN_ROOT}/hooks/post_tool_use.py\"",
+            "command": "sh \"${CLAUDE_PLUGIN_ROOT}/hooks/run.sh\" post-tool-use",
             "timeout": 30
           }
         ],

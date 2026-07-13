@@ -80,6 +80,8 @@ where = ["src"]
 vaara = ["data/adversarial_classifier_v9.joblib", "py.typed"]
 # Declarative source-profile specs loaded at runtime by _declarative.py.
 "vaara.attestation" = ["profiles/*.json"]
+# Default deny patterns for the Claude Code hook runner (vaara hook).
+"vaara.integrations" = ["claude_code_deny.json"]
 
 [tool.pytest.ini_options]
 testpaths = ["tests"]
