@@ -7,6 +7,8 @@ and this project follows [Semantic Versioning](https://semver.org/spec/v2.0.0.ht
 
 ## [Unreleased]
 
+- Claude Code plugin 0.5.0: set `"article50_statement"` in config.json (or `VAARA_PLUGIN_ARTICLE50_STATEMENT`) and every session start auto-records it as an EU AI Act Article 50(1) disclosure event into the audit trail, bound to the session id and timestamped before the session's first tool call — the 50(5) timing question answered by construction. The SessionStart status line reports it, and its version string now reads from plugin.json instead of a hardcoded constant (it said v0.2.0 since 0.3.0).
+
 - EU AI Act Article 50 transparency evidence: `vaara.audit.article50.record_disclosure()` records a disclosure event (50(1) through 50(4), with channel, subject, and an optional notice hash) into the same signed hash-chained trail as the agent's actions, through the existing pipeline — no new event type or wire format. `vaara trail export-article50 --db|--trail --key --out [--system-meta] [--period]` writes the standard signed trail zip with `article50_report.md` and `article50_summary.json` folded in: per-paragraph counts, the events, and 50(1) session coverage with the 50(5) at-or-before-first-action timing check. The report states what it proves and what it does not.
 
 CLI usability, driven by first-run friction on the export path. No wire-format change.

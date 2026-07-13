@@ -145,3 +145,44 @@ def test_missing_vaara_passes_through_with_fail_open(tmp_path):
 def test_missing_vaara_passes_through_in_shadow(tmp_path):
     proc = _run_hook_without_vaara(tmp_path, {"mode": "watch"}, {})
     assert proc.returncode == 0, proc.stderr
+
+
+def test_article50_statement_reader(config_mod, monkeypatch):
+    monkeypatch.delenv("VAARA_PLUGIN_ARTICLE50_STATEMENT", raising=False)
+    assert config_mod.article50_statement({}) is None
+    assert config_mod.article50_statement({"article50_statement": "  "}) is None
+    assert config_mod.article50_statement(
+        {"article50_statement": "You are talking to AI."}
+    ) == "You are talking to AI."
+    monkeypatch.setenv("VAARA_PLUGIN_ARTICLE50_STATEMENT", "Env notice")
+    assert config_mod.article50_statement({}) == "Env notice"
+
+
+def test_session_start_records_article50_disclosure(tmp_path):
+    """Full subprocess run: hook writes the 50(1) event with the session id."""
+    import sqlite3
+
+    home = tmp_path / "home"
+    cfg_dir = home / ".vaara" / "claude-code"
+    cfg_dir.mkdir(parents=True)
+    (cfg_dir / "config.json").write_text(json.dumps(
+        {"article50_statement": "You are interacting with an AI assistant."}
+    ))
+    proc = subprocess.run(
+        [sys.executable, str(_HOOKS / "session_start.py")],
+        input=json.dumps({"session_id": "sess-42"}),
+        capture_output=True, text=True, timeout=60,
+        env={"HOME": str(home), "PATH": os.environ.get("PATH", "")},
+    )
+    assert proc.returncode == 0, proc.stderr
+    assert "article50_disclosure=recorded" in proc.stderr
+
+    conn = sqlite3.connect(cfg_dir / "audit.db")
+    rows = conn.execute(
+        "SELECT data FROM audit_records WHERE tool_name = "
+        "'vaara.article50.disclosure' AND event_type = 'action_requested'"
+    ).fetchall()
+    assert len(rows) == 1
+    data = json.loads(rows[0][0])
+    assert data["session_id"] == "sess-42"
+    assert data["parameters"]["article"] == "50(1)"
