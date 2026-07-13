@@ -178,3 +178,80 @@ def test_cli_anchor_ots_and_upgrade_ots(receipt: dict, tmp_path, monkeypatch, ca
     upgraded = json.loads(out2.read_text())
     assert upgraded["timestampAnchors"][-1]["status"] == "confirmed"
     assert "confirmed" in capsys.readouterr().out
+
+
+def _pending_transport_with_uri(uri: str):
+    """Calendar POST /digest reply whose pending attestation names ``uri``."""
+    def transport(url: str, data, timeout: float) -> bytes:
+        assert url.endswith("/digest") and data is not None
+        ts = Timestamp(data)
+        ts.attestations.add(PendingAttestation(uri))
+        ctx = BytesSerializationContext()
+        ts.serialize(ctx)
+        return ctx.getbytes()
+    return transport
+
+
+def test_upgrade_never_fetches_untrusted_attestation_uri(receipt: dict) -> None:
+    """A proof-supplied URI outside the anchor's calendars is never fetched.
+
+    The pending-attestation URI lives inside the (attacker-suppliable) proof
+    bytes; following it blindly is SSRF. Only the anchor's recorded calendars
+    and the package defaults may be fetched during an upgrade.
+    """
+    evil = "http://169.254.169.254/latest/meta-data"
+    anchor = ots_anchor_receipt(
+        receipt, calendars=[CAL], transport=_pending_transport_with_uri(evil))
+    fetched: list[str] = []
+
+    def recording_transport(url: str, data, timeout: float) -> bytes:
+        fetched.append(url)
+        return _bitcoin_upgrade_transport(url, data, timeout)
+
+    upgraded = upgrade_ots_anchor(anchor, transport=recording_transport)
+    assert fetched == []
+    assert upgraded["status"] == "pending"
+
+
+def test_upgrade_rejects_non_https_scheme_even_for_lookalike(receipt: dict) -> None:
+    evil = "file:///etc/passwd"
+    anchor = ots_anchor_receipt(
+        receipt, calendars=[CAL], transport=_pending_transport_with_uri(evil))
+    fetched: list[str] = []
+
+    def recording_transport(url: str, data, timeout: float) -> bytes:
+        fetched.append(url)
+        return _bitcoin_upgrade_transport(url, data, timeout)
+
+    upgraded = upgrade_ots_anchor(anchor, transport=recording_transport)
+    assert fetched == []
+    assert upgraded["status"] == "pending"
+
+
+def test_upgrade_fetches_recorded_calendar_uri(receipt: dict) -> None:
+    """The legitimate case still works: attestation URI == recorded calendar."""
+    anchor = ots_anchor_receipt(
+        receipt, calendars=[CAL], transport=_pending_calendar_transport)
+    upgraded = upgrade_ots_anchor(anchor, transport=_bitcoin_upgrade_transport)
+    assert upgraded["status"] == "confirmed"
+
+
+def test_cli_upgrade_persists_earlier_success_on_later_failure(
+        receipt: dict, tmp_path, monkeypatch, capsys) -> None:
+    """Anchor 0 upgrades, anchor 1 is corrupt: exit 2 but anchor 0 is saved."""
+    import vaara.audit.ots_anchor as mod
+    from vaara.cli import main
+
+    good = ots_anchor_receipt(
+        receipt, calendars=[CAL], transport=_pending_calendar_transport)
+    corrupt = dict(good, proof="!!!not-base64!!!")
+    receipt["timestampAnchors"] = [good, corrupt]
+    rpath = tmp_path / "receipt.json"
+    rpath.write_text(json.dumps(receipt))
+
+    monkeypatch.setattr(mod, "_default_transport", _bitcoin_upgrade_transport)
+    out = tmp_path / "upgraded.json"
+    assert main(["receipt", "upgrade-ots", str(rpath), "--out", str(out)]) == 2
+    saved = json.loads(out.read_text())
+    assert saved["timestampAnchors"][0]["status"] == "confirmed"
+    assert "anchor 1" in capsys.readouterr().err

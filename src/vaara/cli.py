@@ -1945,6 +1945,10 @@ def _cmd_receipt_upgrade_ots(args: argparse.Namespace) -> int:
             upgraded = upgrade_ots_anchor(anchors[i])
         except TimeAnchorError as exc:
             print(f"vaara receipt upgrade-ots: anchor {i}: {exc}", file=sys.stderr)
+            # A bad anchor must not discard upgrades already fetched for
+            # earlier anchors: persist those before reporting the failure.
+            if changed or args.out:
+                _write_receipt_out(receipt, args, path)
             return 2
         if upgraded != anchors[i]:
             anchors[i] = upgraded

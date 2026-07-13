@@ -29,6 +29,7 @@ from __future__ import annotations
 import base64
 import copy
 import os
+import urllib.parse
 import urllib.request
 from typing import Any, Callable, Optional
 
@@ -198,6 +199,12 @@ def upgrade_ots_anchor(
     no calendar has the Bitcoin attestation yet) the anchor is returned
     unchanged and still pending; call again later. Returns a new dict, never
     mutates the input.
+
+    Pending-attestation URIs live inside the proof bytes, which may come from
+    an untrusted party; following them blindly would let a crafted proof point
+    the upgrade fetch anywhere (SSRF). Only URIs whose https origin matches the
+    anchor's recorded ``calendars`` or the package defaults are fetched; any
+    other attestation is left pending, untouched.
     """
     _require_deps()
     if anchor.get("method") != "opentimestamps":
@@ -213,10 +220,17 @@ def upgrade_ots_anchor(
     if heights:
         return dict(anchor, status="confirmed")
 
+    trusted = {
+        _https_origin(cal)
+        for cal in tuple(anchor.get("calendars") or ()) + tuple(DEFAULT_CALENDARS)
+        if _https_origin(cal) is not None
+    }
     upgraded = False
     for msg, attestation in list(detached.timestamp.all_attestations()):
         if not isinstance(attestation, PendingAttestation):
             continue
+        if _https_origin(attestation.uri) not in trusted:
+            continue  # proof-supplied URI outside the trusted calendars
         url = attestation.uri.rstrip("/") + "/timestamp/" + msg.hex()
         try:
             body = send(url, None, timeout)
@@ -238,6 +252,17 @@ def upgrade_ots_anchor(
         proof=base64.b64encode(_serialize_proof(detached)).decode("ascii"),
         status="confirmed" if heights else "pending",
     )
+
+
+def _https_origin(uri: str) -> Optional[str]:
+    """``scheme://netloc`` for an https URI, ``None`` for anything else."""
+    try:
+        parsed = urllib.parse.urlsplit(uri.strip())
+    except ValueError:
+        return None
+    if parsed.scheme != "https" or not parsed.netloc:
+        return None
+    return f"https://{parsed.netloc.lower()}"
 
 
 def _walk(timestamp: "Timestamp"):
