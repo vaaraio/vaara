@@ -35,6 +35,39 @@ Article 50 obligations are behavioral: inform, mark, disclose, at a defined time
 
 This is the same evidence problem Vaara already solves for tool calls: the [signed, hash-chained trail](tamper-evident-audit-trail.md) records events at the decision point, and an outside party [verifies the export offline](verifying-evidence.md). A disclosure event is one more event type in the same chain. The [logs vs evidence distinction](logs-vs-evidence.md) applies unchanged: a disclosure line in an application log persuades people who already trust you; a verifiable record persuades the ones who do not.
 
+## Recording and exporting Article 50 evidence
+
+Vaara treats a disclosure as one more event in the same signed,
+hash-chained trail as the agent's actions. At the moment the notice is
+shown:
+
+```python
+from vaara.audit.article50 import record_disclosure
+
+record_disclosure(
+    trail,
+    paragraph="50(1)",
+    statement="You are chatting with an AI assistant operated by Demo Oy.",
+    session_id=session_id,
+    channel="chat_ui",
+)
+```
+
+When someone asks, one command produces the package:
+
+```bash
+vaara trail export-article50 --db audit.db --out article50.zip --key signing.pem
+```
+
+The zip is the standard signed trail with `article50_report.md` folded
+in: disclosure counts per paragraph, the events themselves, and 50(1)
+session coverage including whether each disclosure preceded the
+session's first action (the 50(5) timing question). The report states
+plainly what it proves (the record was made then and has not been
+altered) and what it does not (that pixels rendered, or that wording met
+accessibility requirements). Verify offline with
+`vaara trail verify --zip article50.zip --pubkey <key>`.
+
 ## Questions
 
 **Does Article 50 apply to my internal-only agent?** 50(1) turns on interaction with natural persons; an internal tool where every user knows it is AI is typically covered by the "obvious from the context" carve-out. Document that reasoning; the assessment itself is worth recording.
