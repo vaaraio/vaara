@@ -60,6 +60,18 @@ def notifications_enabled(cfg: dict) -> bool:
     return cfg.get("notifications", True) is not False
 
 
+def fail_open(cfg: dict) -> bool:
+    """Whether a missing vaara package passes MCP calls through unscored.
+
+    Default False: in protect mode the gate fails closed when its engine
+    is not importable. ``"fail_open": true`` in config.json opts back
+    into availability-over-enforcement.
+    """
+    if os.environ.get("VAARA_PLUGIN_FAIL_OPEN") == "1":
+        return True
+    return cfg.get("fail_open") is True
+
+
 def protection_preset(cfg: dict) -> str | None:
     preset = os.environ.get("VAARA_PLUGIN_PROTECTION") or cfg.get("protection")
     return preset if isinstance(preset, str) and preset else None
