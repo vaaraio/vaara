@@ -106,9 +106,10 @@ Registered methods (the registry is open; a profile MAY register more):
 | `rfc3161` | An RFC 3161 timestamp token from any Time-Stamping Authority. | Self-hostable (e.g. OpenSSL `ts`); needs no third party. |
 | `rfc3161-eidas-qualified` | An RFC 3161 token from a *qualified* TSA under eIDAS. | A qualified trust service provider. Adds legal / court-admissible weight; this is the only thing the qualification adds over `rfc3161`. |
 | `ledger` | A commitment of the anchored digest to a public ledger; the block time bounds existence. | Self-producible; trust-minimized, no TSA. |
+| `opentimestamps` | A `ledger`-family method with a concrete proof format: the anchored digest is committed to OpenTimestamps calendar servers, which aggregate it into a Bitcoin transaction. Instead of `token`/`authority` the entry carries `proof` (base64 of a standard detached `.ots` file), `status` (`pending` until the Bitcoin attestation is folded into the proof in place, then `confirmed`), and `calendars` (the servers used). The entry is written immediately with the pending proof; pending never blocks the receipt. | Self-producible against the free public calendars, no account or contract; the proof is verifiable with the reference `ots` client against a Bitcoin node (producer: `vaara.audit.ots_anchor`). |
 
 A receipt MAY carry several anchors of different methods. The technical anchor
-(`rfc3161`, `ledger`) and the legal anchor (`rfc3161-eidas-qualified`) are
+(`rfc3161`, `ledger`, `opentimestamps`) and the legal anchor (`rfc3161-eidas-qualified`) are
 independent: a producer can stand up its own time evidence and add qualified
 legal weight as a separate, swappable method. No single anchor method is
 load-bearing for the receipt's integrity, which rests on the Section 2.1
