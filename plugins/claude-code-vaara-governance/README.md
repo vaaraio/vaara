@@ -48,6 +48,7 @@ The config file, hand-editable:
 |---|---|---|
 | `mode` | `protect` (default), `watch`, `off` | `watch` checks and records everything but never blocks; `off` disables the plugin. |
 | `protection` | `eco`, `balanced` (default), `performance`, `strict` | Policy preset applied to MCP scoring; these are the `vaara mode` presets. |
+| `thresholds` | `{"escalate": E, "deny": D}` with `0 <= E <= D <= 1` | Optional custom decision thresholds, overriding the preset's defaults. The preset still provides the rest of the policy shape. Malformed values are ignored. |
 | `notifications` | `true` (default), `false` | Desktop popups on block/escalate. |
 | `agent_id` | string | Agent id written to the audit chain (default `claude-code`). |
 | `audit_db` | path | Audit DB path (default `~/.vaara/claude-code/audit.db`). |
