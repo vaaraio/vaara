@@ -13,6 +13,8 @@ Keys:
   notifications  true (default) | false, desktop popups on block/escalate
   agent_id       agent id written to the audit chain (default "claude-code")
   audit_db       audit DB path (default ~/.vaara/claude-code/audit.db)
+  article50_statement  optional Article 50(1) disclosure text, auto-recorded
+                 into the trail per session by SessionStart
 """
 from __future__ import annotations
 
@@ -75,6 +77,23 @@ def fail_open(cfg: dict) -> bool:
 def protection_preset(cfg: dict) -> str | None:
     preset = os.environ.get("VAARA_PLUGIN_PROTECTION") or cfg.get("protection")
     return preset if isinstance(preset, str) and preset else None
+
+
+def article50_statement(cfg: dict) -> str | None:
+    """Optional Article 50(1) disclosure statement, auto-recorded per session.
+
+    When set (config key ``article50_statement`` or env
+    ``VAARA_PLUGIN_ARTICLE50_STATEMENT``), the SessionStart hook records
+    the statement as a 50(1) disclosure event into the audit trail with
+    the session id, at the moment the session begins — before the
+    session's first tool call, which is what the 50(5) timing question
+    asks. Absent or empty means off.
+    """
+    statement = (
+        os.environ.get("VAARA_PLUGIN_ARTICLE50_STATEMENT")
+        or cfg.get("article50_statement")
+    )
+    return statement if isinstance(statement, str) and statement.strip() else None
 
 
 def custom_thresholds(cfg: dict) -> tuple[float, float] | None:
