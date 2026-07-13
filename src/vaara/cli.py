@@ -815,6 +815,55 @@ def _obtain_time_anchor(args: argparse.Namespace, trail):
         raise ValueError(f"time anchoring failed: {exc}") from exc
 
 
+def _cmd_trail_export_article50(args: argparse.Namespace) -> int:
+    """Export a signed EU AI Act Article 50 transparency evidence package."""
+    try:
+        from vaara.audit.article50 import export_article50
+    except ImportError:
+        print(_INSTALL_HINT, file=sys.stderr)
+        return 2
+
+    system_meta = None
+    if args.system_meta:
+        meta_path = Path(args.system_meta).expanduser()
+        if not meta_path.exists():
+            print(f"system-meta JSON not found: {meta_path}", file=sys.stderr)
+            return 2
+        try:
+            with open(meta_path, "r", encoding="utf-8") as f:
+                system_meta = json.load(f)
+        except (json.JSONDecodeError, OSError) as exc:
+            print(f"failed to read system-meta: {exc}", file=sys.stderr)
+            return 2
+
+    try:
+        period = _parse_period(args.period)
+    except ValueError as exc:
+        print(f"invalid --period: {exc}", file=sys.stderr)
+        return 2
+
+    trail, err = _load_trail_source(args)
+    if trail is None:
+        return err
+
+    out = Path(args.out).expanduser()
+    out.parent.mkdir(parents=True, exist_ok=True)
+    try:
+        result = export_article50(
+            trail, out, signer_key=Path(args.key).expanduser(),
+            system_meta=system_meta, period=period,
+        )
+    except ImportError:
+        print(_INSTALL_HINT, file=sys.stderr)
+        return 2
+
+    print(f"Exported Article 50 transparency package to {out}")
+    print(f"  records:      {result.manifest['record_count']}")
+    print(f"  chain intact: {result.chain_intact}")
+    print("  report:       article50_report.md")
+    return 0 if result.chain_intact else 1
+
+
 def _cmd_trail_export_article12(args: argparse.Namespace) -> int:
     """Export a signed EU AI Act Article 12 regulator package from a trail."""
     try:
@@ -4026,6 +4075,29 @@ def build_parser() -> argparse.ArgumentParser:
              "enforcement bindings against.",
     )
     pa12.set_defaults(func=_cmd_trail_export_article12)
+
+    pa50 = tsub.add_parser(
+        "export-article50",
+        help="Export a signed EU AI Act Article 50 transparency evidence package",
+    )
+    _add_trail_source_args(pa50)
+    pa50.add_argument(
+        "--key", required=True,
+        help="Ed25519 private key (PEM) to sign the package",
+    )
+    pa50.add_argument("--out", required=True, help="Path to write the package zip")
+    pa50.add_argument(
+        "--system-meta", default=None,
+        help="Optional JSON with system identity (system_name, provider, "
+             "deployer). Absent fields are simply omitted from the report.",
+    )
+    pa50.add_argument(
+        "--period", default=None,
+        help="Optional report lens START:END (YYYY-MM-DD:YYYY-MM-DD); either "
+             "side may be empty. Narrows the summary counts only; the signed "
+             "trail stays whole.",
+    )
+    pa50.set_defaults(func=_cmd_trail_export_article50)
 
     prec = tsub.add_parser(
         "receipt",

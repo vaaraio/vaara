@@ -7,6 +7,8 @@ and this project follows [Semantic Versioning](https://semver.org/spec/v2.0.0.ht
 
 ## [Unreleased]
 
+- EU AI Act Article 50 transparency evidence: `vaara.audit.article50.record_disclosure()` records a disclosure event (50(1) through 50(4), with channel, subject, and an optional notice hash) into the same signed hash-chained trail as the agent's actions, through the existing pipeline — no new event type or wire format. `vaara trail export-article50 --db|--trail --key --out [--system-meta] [--period]` writes the standard signed trail zip with `article50_report.md` and `article50_summary.json` folded in: per-paragraph counts, the events, and 50(1) session coverage with the 50(5) at-or-before-first-action timing check. The report states what it proves and what it does not.
+
 CLI usability, driven by first-run friction on the export path. No wire-format change.
 
 - `vaara trail export` and `vaara trail export-article12` accept `--db` to export straight from an audit SQLite DB (for example the Claude Code plugin's `~/.vaara/claude-code/audit.db`); `--trail` JSONL remains and the two are mutually exclusive. Previously the only DB-to-signed-zip route was a `trail rotate --dry-run` workaround.
