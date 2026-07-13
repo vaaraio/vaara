@@ -52,6 +52,7 @@ The config file, hand-editable:
 | `notifications` | `true` (default), `false` | Desktop popups on block/escalate. |
 | `agent_id` | string | Agent id written to the audit chain (default `claude-code`). |
 | `audit_db` | path | Audit DB path (default `~/.vaara/claude-code/audit.db`). |
+| `fail_open` | `false` (default), `true` | What happens to `mcp__*` calls in protect mode when the `vaara` package is not importable. Default: fail closed (block with an install hint). `true` passes them through unscored. |
 
 Environment variables override the file (useful for CI or a single session):
 
@@ -64,6 +65,7 @@ Environment variables override the file (useful for CI or a single session):
 | `VAARA_PLUGIN_AGENT_ID` | Override the agent_id written to the audit chain. |
 | `VAARA_PLUGIN_AUDIT_DB` | Override the audit DB path. |
 | `VAARA_PLUGIN_DENY_PATTERNS_FILE` | Replace the bundled `policies/default_deny.json` with your own. |
+| `VAARA_PLUGIN_FAIL_OPEN=1` | Same as `"fail_open": true`. |
 
 ## Extending the deny patterns
 
