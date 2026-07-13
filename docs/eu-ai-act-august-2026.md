@@ -21,7 +21,9 @@ This page states what applies from 2 August 2026, who it applies to, and what ev
 ## What moved
 
 - High-risk obligations (Articles 8 to 27, including [Article 12 record-keeping](eu-ai-act-article-12.md) and Article 14 human oversight): 2 December 2027 for stand-alone high-risk systems, 2 August 2028 when embedded in products.
-- National regulatory sandboxes: deadline postponed to 2 August 2027.
+- National regulatory sandboxes: deadline postponed to 2027 (reporting differs between August and December; the Official Journal text settles it).
+
+The new dates bind once the regulation is published in the Official Journal, expected before 2 August 2026; until publication the original timeline remains the legal baseline.
 
 Two years of runway on high-risk is time to build the record-keeping habit cheaply, not a reason to ignore it. The organisations that treat December 2027 the way most treated August 2026, as a surprise, will be buying evidence retroactively, which is precisely the thing evidence cannot be.
 
