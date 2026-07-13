@@ -132,3 +132,7 @@ tests/adversarial/traces/
 .reference/
 CLAUDE.md
 /AUDIT-*.md
+
+# Swift build artifacts for the macOS menu-bar app
+clients/macos/.build/
+clients/macos/dist/
