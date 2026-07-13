@@ -78,10 +78,14 @@ def main() -> int:
     try:
         import vaara
     except ImportError:
-        _emit(
+        # stdout on SessionStart is injected into the model's context, so
+        # the session itself learns governance is off and tells the user.
+        # A silent no-op is the one failure mode this plugin must not have.
+        print(
             "vaara-governance: vaara package not importable. "
-            "Run `pip install vaara>=0.40.1` to enable runtime governance. "
-            "Tool calls will pass through unchecked until then."
+            "Governance is NOT active: tool calls run unchecked and "
+            "unrecorded. Run `pip install vaara>=0.40.1` to enable it.",
+            flush=True,
         )
         return 0
 

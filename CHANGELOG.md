@@ -7,6 +7,9 @@ and this project follows [Semantic Versioning](https://semver.org/spec/v2.0.0.ht
 
 ## [Unreleased]
 
+## [1.28.0] - 2026-07-13
+
+- Claude Code plugin 0.6.1: a session whose governance cannot run announces it. When neither the `vaara` binary nor `python3` is on PATH, the SessionStart hook prints the warning to stdout (which Claude Code injects into the session context) instead of only stderr, so a dead install is stated in the session instead of failing silently. Plugin 0.6.0 expected `vaara hook` from an engine release that had not shipped yet; this release ships it.
 - `vaara hook pre-tool-use|post-tool-use|session-start`: the Claude Code hook logic now lives in the package (`vaara.integrations.claude_code_hooks`, default deny patterns bundled) and the plugin's hooks shell out to the `vaara` binary on PATH via a shim, falling back to the bundled `python3` scripts. Any CLI install — pip, pipx, Homebrew — is now a complete engine install; the split-brain where the CLI lived in one Python environment and the hooks ran another (silently ungoverned) is impossible by construction. Plugin 0.6.0.
 
 ## [1.27.0] - 2026-07-13

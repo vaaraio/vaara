@@ -12,8 +12,16 @@ if command -v vaara >/dev/null 2>&1 && vaara hook --help >/dev/null 2>&1; then
 fi
 
 if ! command -v python3 >/dev/null 2>&1; then
-  echo "vaara-governance: neither the vaara binary nor python3 is on PATH;" \
-       "governance is NOT active. Install with: pip install vaara" >&2
+  msg="vaara-governance: neither the vaara binary nor python3 is on PATH; \
+governance is NOT active. Tool calls run unchecked and unrecorded. \
+Install with: pip install vaara"
+  echo "$msg" >&2
+  # SessionStart stdout is injected into the model's context, so the
+  # session itself learns governance is off and can tell the user.
+  # Silence here is the one failure mode this plugin must never have.
+  if [ "$kind" = "session-start" ]; then
+    echo "$msg"
+  fi
   exit 0
 fi
 
