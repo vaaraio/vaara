@@ -7,7 +7,6 @@ and this project follows [Semantic Versioning](https://semver.org/spec/v2.0.0.ht
 
 ## [Unreleased]
 
-- Vaara for macOS (`clients/macos/`): a native SwiftUI menu-bar app that makes the gate visible. The mark tinted by the latest verdict with an activity sparkline; running agents with per-agent history; a full every-decision History across watched trails; Block/Shadow, presets, and custom thresholds wired to the plugin's real config with replayed would-have-decided stats; approvals dialogs; and a Setup tab that detects the engine, scans MCP client configs (Claude Desktop, Claude Code, Cursor, Windsurf), and rewrites ungoverned servers through `vaara-mcp-proxy` with one click, backup and restore included. Builds with `./build.sh` (Command Line Tools only) or `./build.sh dmg`.
 - `vaara hook pre-tool-use|post-tool-use|session-start`: the Claude Code hook logic now lives in the package (`vaara.integrations.claude_code_hooks`, default deny patterns bundled) and the plugin's hooks shell out to the `vaara` binary on PATH via a shim, falling back to the bundled `python3` scripts. Any CLI install — pip, pipx, Homebrew — is now a complete engine install; the split-brain where the CLI lived in one Python environment and the hooks ran another (silently ungoverned) is impossible by construction. Plugin 0.6.0.
 
 ## [1.27.0] - 2026-07-13
