@@ -5327,6 +5327,48 @@ def build_parser() -> argparse.ArgumentParser:
     )
     preload.set_defaults(func=_cmd_policy_reload)
 
+    phook = sub.add_parser(
+        "hook",
+        help=(
+            "Claude Code hook runner (called by the vaara-governance "
+            "plugin; reads the hook event JSON on stdin)"
+        ),
+    )
+    hooksub = phook.add_subparsers(dest="hook_cmd", metavar="COMMAND")
+    phook.set_defaults(func=_help_dispatch(phook))
+
+    phpre = hooksub.add_parser(
+        "pre-tool-use",
+        help="Two-layer gate: regex deny patterns, then the classifier on "
+             "mcp__* calls. Exit 2 blocks the call.",
+    )
+    phpre.add_argument(
+        "--deny-patterns", default=None,
+        help="Deny-patterns JSON (default: VAARA_PLUGIN_DENY_PATTERNS_FILE, "
+             "then $CLAUDE_PLUGIN_ROOT/policies/default_deny.json, then the "
+             "copy bundled with the package)",
+    )
+    phpre.set_defaults(func=lambda args: __import__(
+        "vaara.integrations.claude_code_hooks", fromlist=["run_pre_tool_use"]
+    ).run_pre_tool_use(args.deny_patterns))
+
+    phpost = hooksub.add_parser(
+        "post-tool-use",
+        help="Append the outcome record and feed the online learner",
+    )
+    phpost.set_defaults(func=lambda args: __import__(
+        "vaara.integrations.claude_code_hooks", fromlist=["run_post_tool_use"]
+    ).run_post_tool_use())
+
+    phss = hooksub.add_parser(
+        "session-start",
+        help="Print the governance status line and record the configured "
+             "Article 50(1) disclosure for the session",
+    )
+    phss.set_defaults(func=lambda args: __import__(
+        "vaara.integrations.claude_code_hooks", fromlist=["run_session_start"]
+    ).run_session_start())
+
     pmode = sub.add_parser(
         "mode",
         help=(

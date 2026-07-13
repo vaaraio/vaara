@@ -5,6 +5,10 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/)
 and this project follows [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
 
+## [Unreleased]
+
+- `vaara hook pre-tool-use|post-tool-use|session-start`: the Claude Code hook logic now lives in the package (`vaara.integrations.claude_code_hooks`, default deny patterns bundled) and the plugin's hooks shell out to the `vaara` binary on PATH via a shim, falling back to the bundled `python3` scripts. Any CLI install — pip, pipx, Homebrew — is now a complete engine install; the split-brain where the CLI lived in one Python environment and the hooks ran another (silently ungoverned) is impossible by construction. Plugin 0.6.0.
+
 ## [1.27.0] - 2026-07-13
 
 Dogfood release: everything in it came from one weekend of using Vaara on Vaara. EU AI Act Article 50 transparency evidence (record disclosures, export a signed regulator package), a gate that fails closed, custom thresholds, and the CLI export path that actually works from a plugin's SQLite trail.
