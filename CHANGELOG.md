@@ -13,6 +13,7 @@ CLI usability, driven by first-run friction on the export path. No wire-format c
 - A mistyped command now gets a did-you-mean suggestion (`vaara trail exoprt` suggests `export`) instead of only the choices list.
 - `vaara --help` and error usage lines show `COMMAND` instead of the full brace-wall of 33 subcommand names, at every level.
 - The Claude Code plugin README's export instructions now name a command that can read the plugin's own DB, and mention the `vaara[export]` extra.
+- Claude Code plugin 0.3.0: an optional `"thresholds": {"escalate": E, "deny": D}` in `~/.vaara/claude-code/config.json` overrides the protection preset's default decision thresholds (`0 <= E <= D <= 1`; malformed values are ignored, the preset still provides the rest of the policy shape). First test coverage for the plugin's config helpers (`tests/test_plugin_config.py`).
 
 ## [1.26.1] - 2026-07-12
 
