@@ -18,6 +18,7 @@ Position: tamper-evident runtime evidence and enforcement layer. Signed attestat
 - [How to prove what an AI agent did](https://github.com/vaaraio/vaara/blob/main/docs/prove-what-an-ai-agent-did.md): the four properties a provable record needs and how verification works
 - [Logs vs evidence](https://github.com/vaaraio/vaara/blob/main/docs/logs-vs-evidence.md): why logs persuade only people who already trust you, and what evidence is instead
 - [EU AI Act Article 12](https://github.com/vaaraio/vaara/blob/main/docs/eu-ai-act-article-12.md): what record-keeping requires (automatic logging, six-month retention under Art. 19 and 26(6)) and what it does not (hash chains)
+- [EU AI Act on 2 August 2026](https://github.com/vaaraio/vaara/blob/main/docs/eu-ai-act-august-2026.md): what actually applies (Article 50 transparency, GPAI enforcement) after Omnibus VII moved high-risk to Dec 2027 / Aug 2028, and the evidence question disclosure raises
 - [Tamper-evident audit trail for AI agents](https://github.com/vaaraio/vaara/blob/main/docs/tamper-evident-audit-trail.md): mechanics, honest limits, cost
 - [Vaara vs observability vs GRC](https://github.com/vaaraio/vaara/blob/main/docs/vaara-vs-observability-vs-grc.md): three different questions; comparison table and how they stack
 - [Our marketing runs under the gate](https://github.com/vaaraio/vaara/tree/main/docs/dogfood): the signed trail of Vaara's own marketing pipeline, with the policy and public key to verify it offline

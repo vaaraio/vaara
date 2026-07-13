@@ -1,0 +1,46 @@
+# EU AI Act on 2 August 2026: what actually applies, and what moved
+
+Much of what is written about "the August 2026 AI Act deadline" is now wrong. The Omnibus VII simplification regulation, given final approval by the Council on 29 June 2026, moved the high-risk obligations to 2 December 2027 (stand-alone systems) and 2 August 2028 (systems embedded in products). What it did **not** move is Article 50 transparency and the Commission's enforcement of the general-purpose AI rules. Those arrive on schedule. Source: [Council press release, 29 June 2026](https://www.consilium.europa.eu/en/press/press-releases/2026/06/29/artificial-intelligence-council-gives-final-green-light-to-simplify-and-streamline-rules/).
+
+This page states what applies from 2 August 2026, who it applies to, and what evidence a deployer of AI agents should be able to produce. As with [Article 12](eu-ai-act-article-12.md), precision matters in both directions: under-doing it is a compliance gap, over-claiming it is a credibility problem.
+
+## What applies from 2 August 2026
+
+**Article 50 transparency** ([full text](https://artificialintelligenceact.eu/article/50/)). Unlike the high-risk chapter, Article 50 is not gated on Annex III classification. It reaches ordinary chatbots, assistants, and agents:
+
+- **50(1), providers:** an AI system that interacts directly with people must inform them they are interacting with AI, unless that is obvious from context.
+- **50(2), providers:** systems generating synthetic audio, image, video, or text must mark outputs as artificially generated in a machine-readable format. For generative systems already on the market, Omnibus VII gives a grace period for this marking until 2 December 2026; new systems get none.
+- **50(3), deployers:** people exposed to emotion recognition or biometric categorisation must be informed.
+- **50(4), deployers:** deepfakes must be disclosed, and AI-generated text published to inform the public must be disclosed unless it went through human editorial review.
+- **50(5):** the information above must arrive at the latest at the first interaction or exposure, in a clear and distinguishable manner, meeting accessibility requirements.
+
+**General-purpose AI enforcement.** The obligations for general-purpose AI model providers have applied since 2 August 2025; what starts on 2 August 2026 is the Commission's power to enforce them, including fines. This concerns model providers, not agent deployers, but it keeps supervisory attention on exactly the question Article 50 asks deployers: can you show what your AI did and what the humans around it were told?
+
+**Already in force since February 2025:** the Article 5 prohibitions and the AI literacy duty. Omnibus VII also adds a new prohibition on generating non-consensual intimate content and child sexual abuse material, from December 2026.
+
+## What moved
+
+- High-risk obligations (Articles 8 to 27, including [Article 12 record-keeping](eu-ai-act-article-12.md) and Article 14 human oversight): 2 December 2027 for stand-alone high-risk systems, 2 August 2028 when embedded in products.
+- National regulatory sandboxes: deadline postponed to 2 August 2027.
+
+Two years of runway on high-risk is time to build the record-keeping habit cheaply, not a reason to ignore it. The organisations that treat December 2027 the way most treated August 2026, as a surprise, will be buying evidence retroactively, which is precisely the thing evidence cannot be.
+
+## The evidence question Article 50 raises
+
+Article 50 obligations are behavioral: inform, mark, disclose, at a defined time, in a defined manner. When a market-surveillance authority or a counterparty asks, the question becomes retrospective: **show that the disclosure happened.** A screenshot of a banner is a claim about today, not about the ten thousand sessions before it. The record that answers the question has the same properties Article 12 evidence needs:
+
+- recorded automatically at the moment of the interaction, not reconstructed;
+- carrying the fact of disclosure (which notice, shown when, in which interaction) next to the actions the AI then took;
+- tamper-evident and independently verifiable, because the reader is by definition someone questioning you.
+
+This is the same evidence problem Vaara already solves for tool calls: the [signed, hash-chained trail](tamper-evident-audit-trail.md) records events at the decision point, and an outside party [verifies the export offline](verifying-evidence.md). A disclosure event is one more event type in the same chain. The [logs vs evidence distinction](logs-vs-evidence.md) applies unchanged: a disclosure line in an application log persuades people who already trust you; a verifiable record persuades the ones who do not.
+
+## Questions
+
+**Does Article 50 apply to my internal-only agent?** 50(1) turns on interaction with natural persons; an internal tool where every user knows it is AI is typically covered by the "obvious from the context" carve-out. Document that reasoning; the assessment itself is worth recording.
+
+**We only deploy, we don't build. Which parts are ours?** 50(3) and 50(4) bind deployers directly. 50(1) and 50(2) bind providers, but if you substantially modify or white-label a system, provider duties can become yours. The provider/deployer line is the first thing to establish, not the last.
+
+**Is watermarking enough?** Watermarking addresses 50(2) marking. It does nothing for 50(1), 50(4), or 50(5), which are about informing people, and nothing about proving any of it happened. Marking is one obligation of five.
+
+**High-risk moved to 2027, so can this wait?** Article 50 cannot; it applies from 2 August 2026. And the high-risk delay is dated relief: an agent trail started now is two years of accumulated, cheap evidence by December 2027.
