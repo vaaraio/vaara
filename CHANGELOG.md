@@ -7,6 +7,8 @@ and this project follows [Semantic Versioning](https://semver.org/spec/v2.0.0.ht
 
 ## [Unreleased]
 
+- OpenTimestamps witness anchors for receipts (`vaara.audit.ots_anchor`, method `opentimestamps` in SPEC.md Section 4): submit the receipt's signed-payload sha256 digest to public OTS calendar servers for a Bitcoin-backed existence proof, stacked with (not replacing) the instant, legal-grade `rfc3161` anchor. Calendars accept in milliseconds; the anchor entry is written immediately with a pending proof and `upgrade_ots_anchor` later folds the Bitcoin attestation in, idempotently, with a network failure leaving the anchor pending. The `proof` field is a standard detached `.ots` file (base64), readable by the reference `ots` client; `verify_ots_anchor` pins anchoredDigest to the receipt's signed payload (Section 6 rule 3) and confirms the proof commits it, offline. CLI: `vaara receipt anchor-ots` and `vaara receipt upgrade-ots`. New optional extra: `pip install "vaara[ots]"` (the `opentimestamps` library, for `.ots` interop). Zero recurring cost, no account, no third party under contract.
+
 ## [1.28.0] - 2026-07-13
 
 - Claude Code plugin 0.6.1: a session whose governance cannot run announces it. When neither the `vaara` binary nor `python3` is on PATH, the SessionStart hook prints the warning to stdout (which Claude Code injects into the session context) instead of only stderr, so a dead install is stated in the session instead of failing silently. Plugin 0.6.0 expected `vaara hook` from an engine release that had not shipped yet; this release ships it.
