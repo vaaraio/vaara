@@ -11,7 +11,7 @@ This page states precisely what the text requires, what it does not, and what th
 - **Minimum content for remote biometric systems.** For the Annex III point 1(a) systems, Article 12(3) names specifics: period of each use, the reference database checked, the input data matched, and the identity of the persons who verified the results under Article 14(5).
 - **Retention.** Logs are kept "for a period appropriate to the intended purpose", of at least six months, by providers (Article 19(1)) and by deployers to the extent the logs are under their control (Article 26(6)). Union or national law, in particular data-protection law, can change that period.
 
-Timing caveat: the enforcement dates for high-risk obligations have been in legislative flux during 2026. Do not anchor a compliance plan to a hardcoded date from a blog post, this one included. Check the current consolidated text.
+Timing: the dates settled in June 2026. Under the Omnibus VII simplification regulation, given final approval by the Council on 29 June 2026, the high-risk obligations (including Article 12) apply from **2 December 2027** for stand-alone high-risk systems and **2 August 2028** for high-risk systems embedded in products. The Article 50 transparency obligations were not delayed and apply from **2 August 2026**, with a grace period to 2 December 2026 only for marking machine-generated content in systems already on the market. Source: [Council press release, 29 June 2026](https://www.consilium.europa.eu/en/press/press-releases/2026/06/29/artificial-intelligence-council-gives-final-green-light-to-simplify-and-streamline-rules/); confirm details against the consolidated text once published in the Official Journal.
 
 ## What the text does not require
 

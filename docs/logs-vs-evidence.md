@@ -29,7 +29,7 @@ Article 12 requires high-risk AI systems to automatically record events (logs) o
 
 So why produce evidence rather than logs? Because the obligation you are really preparing for is not "did you keep a log" but "prove what the system did" when it is challenged, under Article 12 record-keeping, Article 14 human oversight, an incident investigation, a liability claim, or a procurement review. A plain log answers the first and fails the second. Tamper-evident, independently verifiable evidence answers both. The hash chain is not a compliance checkbox. It is what makes the record hold up in front of someone who has every reason to doubt it.
 
-(Note on timing: the exact enforcement dates for high-risk obligations are in legislative flux and have shifted during 2026. Do not build a plan around a single hardcoded date; check the current text of the regulation.)
+(Note on timing: the dates settled in June 2026 with the Omnibus VII regulation. High-risk obligations apply from 2 December 2027 for stand-alone systems and 2 August 2028 for systems embedded in products; the Article 50 transparency obligations were not delayed and apply from 2 August 2026. Source: [Council press release, 29 June 2026](https://www.consilium.europa.eu/en/press/press-releases/2026/06/29/artificial-intelligence-council-gives-final-green-light-to-simplify-and-streamline-rules/).)
 
 ## How to produce evidence
 
