@@ -5,7 +5,10 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/)
 and this project follows [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
 
-## [Unreleased]
+## [1.27.0] - 2026-07-13
+
+Dogfood release: everything in it came from one weekend of using Vaara on Vaara. EU AI Act Article 50 transparency evidence (record disclosures, export a signed regulator package), a gate that fails closed, custom thresholds, and the CLI export path that actually works from a plugin's SQLite trail.
+
 
 - Claude Code plugin 0.5.0: set `"article50_statement"` in config.json (or `VAARA_PLUGIN_ARTICLE50_STATEMENT`) and every session start auto-records it as an EU AI Act Article 50(1) disclosure event into the audit trail, bound to the session id and timestamped before the session's first tool call — the 50(5) timing question answered by construction. The SessionStart status line reports it, and its version string now reads from plugin.json instead of a hardcoded constant (it said v0.2.0 since 0.3.0).
 
