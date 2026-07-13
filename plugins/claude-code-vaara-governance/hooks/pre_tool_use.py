@@ -83,11 +83,25 @@ def _classify_mcp(
         from vaara.audit.sqlite_backend import SQLiteAuditBackend
         from vaara.pipeline import InterceptionPipeline
     except ImportError:
+        # Fail CLOSED in protect mode: a gate that waves everything through
+        # when its engine is missing is not a gate. Shadow mode records
+        # nothing it can't score, so passing through there is honest; and
+        # `"fail_open": true` in config.json is the documented escape hatch
+        # for operators who prefer availability over enforcement.
+        if shadow or _config.fail_open(CFG):
+            _emit(
+                "vaara-governance: vaara package not importable. "
+                "Run `pip install vaara>=0.40.1`. Passing through this MCP call."
+            )
+            return 0
         _emit(
-            "vaara-governance: vaara package not importable. "
-            "Run `pip install vaara>=0.40.1`. Passing through this MCP call."
+            "vaara-governance: BLOCKED (fail-closed): the vaara package is "
+            "not importable, so this MCP call cannot be scored or recorded. "
+            "Run `pip install vaara>=0.40.1`, or set \"fail_open\": true in "
+            "~/.vaara/claude-code/config.json to pass through unscored."
         )
-        return 0
+        notify("BLOCKED", tool_name, "vaara not installed; failing closed")
+        return 2
 
     db_path = _audit_db_path()
     db_path.parent.mkdir(parents=True, exist_ok=True)

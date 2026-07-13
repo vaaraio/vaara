@@ -6,6 +6,9 @@ is the first test coverage for them; keep it dependency-free.
 from __future__ import annotations
 
 import importlib.util
+import json
+import os
+import subprocess
 import sys
 from pathlib import Path
 
@@ -73,3 +76,72 @@ def test_custom_thresholds_compose_into_policy(config_mod):
     policy["thresholds"]["default"] = {"escalate": escalate, "deny": deny}
     parsed = from_dict(policy)  # must validate
     assert parsed is not None
+
+
+def test_fail_open_default_false(config_mod, monkeypatch):
+    monkeypatch.delenv("VAARA_PLUGIN_FAIL_OPEN", raising=False)
+    assert config_mod.fail_open({}) is False
+    assert config_mod.fail_open({"fail_open": False}) is False
+    assert config_mod.fail_open({"fail_open": "yes"}) is False  # strict bool
+
+
+def test_fail_open_via_config_and_env(config_mod, monkeypatch):
+    monkeypatch.delenv("VAARA_PLUGIN_FAIL_OPEN", raising=False)
+    assert config_mod.fail_open({"fail_open": True}) is True
+    monkeypatch.setenv("VAARA_PLUGIN_FAIL_OPEN", "1")
+    assert config_mod.fail_open({}) is True
+
+
+# --- fail-closed integration: run the hook with the vaara import blocked ---
+
+
+def _run_hook_without_vaara(tmp_path, config: dict, extra_env: dict):
+    """Run pre_tool_use.py in a subprocess where importing vaara fails."""
+    blocker = tmp_path / "blocker"
+    blocker.mkdir(exist_ok=True)
+    (blocker / "sitecustomize.py").write_text(
+        "import sys\n"
+        "class _Block:\n"
+        "    def find_spec(self, name, path=None, target=None):\n"
+        "        if name == 'vaara' or name.startswith('vaara.'):\n"
+        "            raise ImportError('blocked for test: ' + name)\n"
+        "        return None\n"
+        "sys.meta_path.insert(0, _Block())\n"
+    )
+    home = tmp_path / "home"
+    cfg_dir = home / ".vaara" / "claude-code"
+    cfg_dir.mkdir(parents=True, exist_ok=True)
+    (cfg_dir / "config.json").write_text(json.dumps(config))
+    env = {
+        "HOME": str(home),
+        "PATH": os.environ.get("PATH", ""),
+        "PYTHONPATH": str(blocker),
+        **extra_env,
+    }
+    event = json.dumps({
+        "tool_name": "mcp__demo__write_file",
+        "tool_input": {"path": "/x"},
+        "session_id": "s1",
+    })
+    return subprocess.run(
+        [sys.executable, str(_HOOKS / "pre_tool_use.py")],
+        input=event, capture_output=True, text=True, env=env, timeout=60,
+    )
+
+
+
+def test_missing_vaara_fails_closed_in_protect_mode(tmp_path):
+    proc = _run_hook_without_vaara(tmp_path, {"mode": "protect"}, {})
+    assert proc.returncode == 2, proc.stderr
+    assert "fail-closed" in proc.stderr
+
+
+def test_missing_vaara_passes_through_with_fail_open(tmp_path):
+    proc = _run_hook_without_vaara(tmp_path, {"mode": "protect", "fail_open": True}, {})
+    assert proc.returncode == 0, proc.stderr
+    assert "Passing through" in proc.stderr
+
+
+def test_missing_vaara_passes_through_in_shadow(tmp_path):
+    proc = _run_hook_without_vaara(tmp_path, {"mode": "watch"}, {})
+    assert proc.returncode == 0, proc.stderr
