@@ -1959,6 +1959,25 @@ def _cmd_receipt_upgrade_ots(args: argparse.Namespace) -> int:
     return 0
 
 
+def _cmd_receipt_render(args: argparse.Namespace) -> int:
+    """Render a receipt to a self-contained static HTML evidence page."""
+    from vaara.audit.receipt_page import render_receipt_page
+    from vaara.audit.timeanchor import TimeAnchorError
+    receipt, path = _load_receipt_for_ots(args.receipt, "render")
+    if receipt is None or path is None:
+        return 2
+    try:
+        page = render_receipt_page(receipt, title=args.title)
+    except TimeAnchorError as exc:
+        print(f"vaara receipt render: {exc}", file=sys.stderr)
+        return 2
+    out = (Path(args.out).expanduser() if args.out
+           else path.with_suffix(".html"))
+    out.write_text(page, encoding="utf-8")
+    print(f"wrote {out}")
+    return 0
+
+
 def _cmd_verify_bundle(args: argparse.Namespace) -> int:
     """Verify a whole evidence bundle from disk in one command.
 
@@ -4632,6 +4651,24 @@ def build_parser() -> argparse.ArgumentParser:
         help="Write the upgraded receipt here instead of updating in place",
     )
     prc_uots.set_defaults(func=_cmd_receipt_upgrade_ots)
+
+    prc_render = rcsub.add_parser(
+        "render",
+        help="Render the receipt as a self-contained static HTML evidence "
+             "page: decision, anchors, commitment chain, and the commands a "
+             "skeptic runs to verify it without trusting the page.",
+    )
+    prc_render.add_argument(
+        "receipt", help="Path to a receipt JSON file (SPEC.md envelope)",
+    )
+    prc_render.add_argument(
+        "--out", default=None,
+        help="Output HTML path (default: the receipt path with .html)",
+    )
+    prc_render.add_argument(
+        "--title", default=None, help="Page <title> override",
+    )
+    prc_render.set_defaults(func=_cmd_receipt_render)
 
     pvb = sub.add_parser(
         "verify-bundle",
