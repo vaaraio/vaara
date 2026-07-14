@@ -344,6 +344,18 @@ def test_enable_auto_anchor_rejects_non_positive_cadence():
         trail.enable_auto_anchor(_local_tsa_client(), every_records=0)
 
 
+def test_enable_auto_anchor_has_default_cadence():
+    # Turning anchoring on should not require choosing a number: the default
+    # cadence (32 records) applies when every_records is omitted.
+    from vaara.audit.trail import AuditTrail
+    trail = AuditTrail()
+    trail.enable_auto_anchor(_local_tsa_client())
+    _add_actions(trail, 31)
+    assert trail.anchors == []
+    _add_actions(trail, 1)
+    assert len(trail.anchors) == 1
+
+
 def test_auto_anchor_fires_on_cadence():
     from vaara.audit.trail import AuditTrail
     trail = AuditTrail()

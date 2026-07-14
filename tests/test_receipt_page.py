@@ -51,6 +51,40 @@ def test_ots_anchor_status_is_reported(receipt: dict) -> None:
     assert "verified against this receipt offline" in page
 
 
+def test_qualified_anchor_renders_art41_line(receipt: dict) -> None:
+    pytest.importorskip("asn1crypto")
+    from tests.test_receipt_anchor import _endpoint_for
+    from vaara.audit.receipt_anchor import QualifiedTSA, SelfHostedTSA
+    from cryptography.hazmat.primitives import serialization
+
+    tsa = SelfHostedTSA.create("EU Test QTSP")
+    pin = tsa._cert.public_bytes(serialization.Encoding.PEM)
+    anchor = QualifiedTSA("https://qtsp.example/tsr", trusted_signer_cert=pin,
+                          transport=_endpoint_for(tsa)).anchor_receipt(receipt)
+    receipt["timestampAnchors"] = [anchor]
+    page = render_receipt_page(receipt)
+    assert "Qualified eIDAS timestamp" in page
+    assert "EU Test QTSP" in page
+    assert "eIDAS Art. 41" in page
+    assert "verified against this receipt offline" in page
+
+
+def test_tampered_qualified_anchor_shows_invalid(receipt: dict) -> None:
+    pytest.importorskip("asn1crypto")
+    from tests.test_receipt_anchor import _endpoint_for
+    from vaara.audit.receipt_anchor import QualifiedTSA, SelfHostedTSA
+    from cryptography.hazmat.primitives import serialization
+
+    tsa = SelfHostedTSA.create("EU Test QTSP")
+    pin = tsa._cert.public_bytes(serialization.Encoding.PEM)
+    anchor = QualifiedTSA("https://qtsp.example/tsr", trusted_signer_cert=pin,
+                          transport=_endpoint_for(tsa)).anchor_receipt(receipt)
+    receipt["timestampAnchors"] = [anchor]
+    receipt["decisionDerived"]["decision"] = "block"  # tamper after anchoring
+    page = render_receipt_page(receipt)
+    assert "INVALID" in page
+
+
 def test_tampered_receipt_shows_invalid_anchor(receipt: dict) -> None:
     pytest.importorskip("opentimestamps")
     from tests.test_ots_anchor import _pending_calendar_transport

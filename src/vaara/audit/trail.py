@@ -1307,7 +1307,7 @@ class AuditTrail:
             self._anchors.append(anchor)
         return anchor
 
-    def enable_auto_anchor(self, client: Any, *, every_records: int) -> None:
+    def enable_auto_anchor(self, client: Any, *, every_records: int = 32) -> None:
         """Anchor the chain head automatically every ``every_records`` records.
 
         ``client`` is a time-anchor backend (e.g.

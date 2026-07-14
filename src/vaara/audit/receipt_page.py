@@ -62,6 +62,35 @@ def _ots_detail(receipt: dict, anchor: dict) -> tuple[str, list[int], list[str],
             result["pending_calendars"], True)
 
 
+def _qualified_detail(receipt: dict, anchor: dict) -> tuple[str, str, bool]:
+    """(status, detail line, verified_here) for an eIDAS-qualified anchor.
+
+    Re-checks the token against the receipt in-process (internal consistency
+    and digest binding). The QTSP pin itself needs the certificate held out of
+    band, so the page states the authority as recorded; ``vaara verify-bundle``
+    with the pinned certificate is the full check.
+    """
+    try:
+        from vaara.audit.receipt_anchor import verify_receipt_anchor
+        from vaara.audit.timeanchor import TimeAnchorError
+    except ImportError:
+        return str(anchor.get("status", "recorded")), _qualified_line(anchor, ""), False
+    try:
+        attested = verify_receipt_anchor(receipt, anchor)
+    except TimeAnchorError as exc:
+        return f"INVALID: {exc}", _qualified_line(anchor, ""), True
+    when = attested.strftime("%Y-%m-%d %H:%M:%S UTC")
+    return "verified", _qualified_line(anchor, when), True
+
+
+def _qualified_line(anchor: dict, when: str) -> str:
+    parts = ["Qualified eIDAS timestamp",
+             str(anchor.get("authority", "?")), "eIDAS Art. 41"]
+    if when:
+        parts.append(when)
+    return " · ".join(parts)
+
+
 def _chain_steps(receipt: dict, digest_hex: str) -> list[tuple[str, str]]:
     """(label, value) pairs for the commitment-chain figure, in order."""
     steps: list[tuple[str, str]] = []
@@ -110,11 +139,17 @@ def render_receipt_page(receipt: dict, *, title: str | None = None) -> str:
                 detail = ""
             checked = ("verified against this receipt offline" if verified
                        else "status as recorded, not re-checked here")
+        elif method == "rfc3161-eidas-qualified":
+            status, line, verified = _qualified_detail(receipt, anchor)
+            detail = _esc(line)
+            checked = ("verified against this receipt offline" if verified
+                       else "status as recorded, not re-checked here")
         else:
             status = str(anchor.get("status", "recorded"))
             detail = _esc(anchor.get("tsa", anchor.get("anchoredDigest", "")))
             checked = "status as recorded, not re-checked here"
-        cls = "ok" if ("confirmed" in status or status == "recorded") else (
+        cls = "ok" if ("confirmed" in status or "verified" in status
+                       or status == "recorded") else (
             "bad" if "INVALID" in status else "wait")
         anchor_rows.append(
             f'<tr><td>{i}</td><td>{_esc(method)}</td>'

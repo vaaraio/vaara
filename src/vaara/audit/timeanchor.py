@@ -232,6 +232,7 @@ def verify_timestamp_token(
     *,
     hash_algorithm: str = "sha256",
     trusted_signer_cert: Optional[bytes] = None,
+    trusted_issuer_cert: Optional[bytes] = None,
 ) -> datetime:
     """Verify an RFC 3161 token and return the attested UTC time.
 
@@ -247,6 +248,12 @@ def verify_timestamp_token(
     ``trusted_signer_cert`` (PEM or DER of the TSA certificate you hold out of
     band, e.g. an eIDAS-qualified TSA) to require the token's signer to be that
     exact certificate; otherwise the returned time is not independently trusted.
+
+    ``trusted_issuer_cert`` pins the CA that issued the signer instead: the
+    embedded signer certificate must be directly issued (name and signature)
+    by that exact CA certificate. TSA signer certificates rotate while the
+    issuing CA is the stable entry on a trusted list, so this is the pin that
+    survives rotation. Both pins may be given; each is enforced.
     """
     _require_deps()
     try:
@@ -310,6 +317,18 @@ def verify_timestamp_token(
                 "token signer certificate does not match the pinned trusted TSA "
                 "certificate; the timestamp is not independently trusted"
             )
+    if trusted_issuer_cert is not None:
+        from cryptography import x509
+
+        issuer_der = _cert_der(trusted_issuer_cert)
+        issuer = x509.load_der_x509_certificate(issuer_der)
+        try:
+            signer_cert.verify_directly_issued_by(issuer)
+        except (ValueError, TypeError, InvalidSignature) as exc:
+            raise TimeAnchorError(
+                "token signer certificate was not issued by the pinned trusted "
+                f"CA; the timestamp is not independently trusted ({exc})"
+            ) from exc
 
     gen_time = tst_info["gen_time"].native
     if gen_time.tzinfo is None:
