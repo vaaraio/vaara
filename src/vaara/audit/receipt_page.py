@@ -63,12 +63,13 @@ def _ots_detail(receipt: dict, anchor: dict) -> tuple[str, list[int], list[str],
 
 
 def _qualified_detail(receipt: dict, anchor: dict) -> tuple[str, str, bool]:
-    """(status, detail line, verified_here) for an eIDAS-qualified anchor.
+    """(status, detail line, rechecked_here) for an eIDAS-qualified anchor.
 
-    Re-checks the token against the receipt in-process (internal consistency
-    and digest binding). The QTSP pin itself needs the certificate held out of
-    band, so the page states the authority as recorded; ``vaara verify-bundle``
-    with the pinned certificate is the full check.
+    Re-checks the token against the receipt in-process: internal consistency
+    and the digest binding only. The QTSP pin needs the certificate held out
+    of band, so this never claims the signer is the qualified authority; the
+    status says exactly what was checked and ``vaara verify-bundle`` with the
+    pinned certificate is the full check.
     """
     try:
         from vaara.audit.receipt_anchor import verify_receipt_anchor
@@ -80,7 +81,7 @@ def _qualified_detail(receipt: dict, anchor: dict) -> tuple[str, str, bool]:
     except TimeAnchorError as exc:
         return f"INVALID: {exc}", _qualified_line(anchor, ""), True
     when = attested.strftime("%Y-%m-%d %H:%M:%S UTC")
-    return "verified", _qualified_line(anchor, when), True
+    return "digest verified", _qualified_line(anchor, when), True
 
 
 def _qualified_line(anchor: dict, when: str) -> str:
@@ -140,13 +141,14 @@ def render_receipt_page(receipt: dict, *, title: str | None = None) -> str:
             checked = ("verified against this receipt offline" if verified
                        else "status as recorded, not re-checked here")
         elif method == "rfc3161-eidas-qualified":
-            status, line, verified = _qualified_detail(receipt, anchor)
-            detail = _esc(line)
-            checked = ("verified against this receipt offline" if verified
+            status, detail, rechecked = _qualified_detail(receipt, anchor)
+            checked = ("digest binding re-checked offline; the QTSP pin needs "
+                       "the certificate held out of band, not re-checked here"
+                       if rechecked
                        else "status as recorded, not re-checked here")
         else:
             status = str(anchor.get("status", "recorded"))
-            detail = _esc(anchor.get("tsa", anchor.get("anchoredDigest", "")))
+            detail = str(anchor.get("tsa", anchor.get("anchoredDigest", "")))
             checked = "status as recorded, not re-checked here"
         cls = "ok" if ("confirmed" in status or "verified" in status
                        or status == "recorded") else (

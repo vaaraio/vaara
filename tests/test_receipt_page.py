@@ -71,7 +71,27 @@ def test_qualified_anchor_renders_art41_line(receipt: dict) -> None:
     assert "Qualified eIDAS timestamp" in page
     assert "EU Test QTSP" in page
     assert "eIDAS Art. 41" in page
-    assert "verified against this receipt offline" in page
+    assert "digest binding re-checked offline" in page
+    # The page must not claim the pin: that needs the QTSP certificate
+    # held out of band, which a standalone rendering does not have.
+    assert "not re-checked here" in page
+
+
+def test_anchor_detail_is_escaped_exactly_once(receipt: dict) -> None:
+    pytest.importorskip("asn1crypto")
+    from cryptography.hazmat.primitives import serialization
+
+    from tests.test_receipt_anchor import _endpoint_for
+    from vaara.audit.receipt_anchor import QualifiedTSA, SelfHostedTSA
+
+    tsa = SelfHostedTSA.create("R&D <QTSP>")
+    pin = tsa._cert.public_bytes(serialization.Encoding.PEM)
+    anchor = QualifiedTSA("https://qtsp.example/tsr", trusted_signer_cert=pin,
+                          transport=_endpoint_for(tsa)).anchor_receipt(receipt)
+    receipt["timestampAnchors"] = [anchor]
+    page = render_receipt_page(receipt)
+    assert "R&amp;D &lt;QTSP&gt;" in page
+    assert "&amp;amp;" not in page  # double escape
 
 
 def test_tampered_qualified_anchor_shows_invalid(receipt: dict) -> None:
