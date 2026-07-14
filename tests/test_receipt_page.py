@@ -6,7 +6,12 @@ from pathlib import Path
 
 import pytest
 
-from vaara.audit.receipt_anchor import _signed_payload_digest
+# receipt_page renders anchors via receipt_anchor, which needs the
+# 'timeanchor' extra; skip cleanly where the extras are absent.
+pytest.importorskip("rfc8785")
+pytest.importorskip("asn1crypto")
+
+from vaara.audit.receipt_anchor import _signed_payload_digest  # noqa: E402
 from vaara.audit.receipt_page import render_receipt_page
 
 VECTOR = (Path(__file__).resolve().parents[1]
