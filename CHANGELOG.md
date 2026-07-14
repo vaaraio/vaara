@@ -7,6 +7,12 @@ and this project follows [Semantic Versioning](https://semver.org/spec/v2.0.0.ht
 
 ## [Unreleased]
 
+## [1.30.0] - 2026-07-14
+
+- eIDAS-qualified timestamp anchors on receipts: `vaara.audit.receipt_anchor.QualifiedTSA` obtains the RFC 3161 token from a qualified trust service provider over HTTP and records it as a SPEC.md Section 4 anchor with method `rfc3161-eidas-qualified` and the TSA URL. The pin is mandatory: the token's signer must match `trusted_signer_cert` (the exact TSU certificate) or `trusted_issuer_cert` (the issuing CA as listed on an EU trusted list, which survives signer rotation), checked before the anchor is recorded, so the method string is backed by a certificate held out of band instead of by whoever answered the URL. `verify_timestamp_token` and `verify_receipt_anchor` accept the same `trusted_issuer_cert` pin. Validated end to end: a receipt anchored this way against a qualified TSA yields indication `PASSED` with timestamp level `QTSA` ("Qualified timestamp") in the European Commission's DSS validator against the EU trusted lists, with the timestamped data being the receipt's JCS signed payload.
+- `vaara receipt render`: a receipt rendered to a self-contained static HTML evidence page — decision facts, the timestamp anchor table (OTS proofs and qualified anchors re-verified offline in-process), the commitment chain figure, and the commands a skeptic runs to check the receipt without trusting the page. No JavaScript, no external assets, no network. Qualified anchors render as "Qualified eIDAS timestamp · authority · eIDAS Art. 41 · attested time"; a tampered receipt renders the anchor as INVALID.
+- `AuditTrail.enable_auto_anchor` cadence now defaults to every 32 records; turning anchoring on no longer requires choosing a number. Anchoring itself remains opt-in and fail-open (chained `ANCHOR_GAP` marker on TSA failure), unchanged.
+
 ## [1.29.0] - 2026-07-13
 
 - OTS upgrade hardening (review findings): `upgrade_ots_anchor` no longer follows pending-attestation URIs straight out of the proof bytes — a crafted proof could point the upgrade fetch at internal endpoints (SSRF). Only https URIs whose origin matches the anchor's recorded calendars or the package defaults are fetched; anything else stays pending, untouched. `vaara receipt upgrade-ots` now persists upgrades already fetched for earlier anchors before reporting a later anchor's failure.
