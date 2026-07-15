@@ -11,7 +11,6 @@ still conforms; when present, every field is checked.
 
 from __future__ import annotations
 
-from vaara.attestation._receipt_conformance import REQUIRED
 from vaara.attestation._decision_conformance import check_decision_conformance
 
 

@@ -174,10 +174,9 @@ def _check_decision_proof(p: Any, binding: Any, add: Any) -> None:
         isinstance(p.get("proofSystem"), str) and bool(p.get("proofSystem")), REQUIRED,
         "decisionProof.proofSystem MUST be a non-empty string")
     pi = p.get("publicInputs")
-    pi_ok = isinstance(pi, dict)
-    add("decision_proof_public_inputs_object", pi_ok, REQUIRED,
+    add("decision_proof_public_inputs_object", isinstance(pi, dict), REQUIRED,
         "decisionProof.publicInputs MUST be an object")
-    bd = pi.get("bindingDigest") if pi_ok else None
+    bd = pi.get("bindingDigest") if isinstance(pi, dict) else None
     add("decision_proof_binding_digest_format",
         isinstance(bd, str) and bool(_DIGEST_RE.match(bd)), REQUIRED,
         "decisionProof.publicInputs.bindingDigest MUST be 'sha256:<64 lowercase hex>'")
