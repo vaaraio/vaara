@@ -56,6 +56,7 @@ class Point:
     def double(self) -> "Point":
         if self.is_infinity() or self.y == 0:
             return INF
+        assert self.x is not None and self.y is not None
         s = ((3 * self.x * self.x + A) * pow(2 * self.y, -1, P)) % P
         x3 = (s * s - 2 * self.x) % P
         y3 = (s * (self.x - x3) - self.y) % P
@@ -66,6 +67,8 @@ class Point:
             return other
         if other.is_infinity():
             return self
+        assert self.x is not None and self.y is not None
+        assert other.x is not None and other.y is not None
         if self.x == other.x:
             if (self.y + other.y) % P == 0:
                 return INF
@@ -90,6 +93,7 @@ class Point:
         """SEC1 compressed encoding (0x00 for the point at infinity)."""
         if self.is_infinity():
             return b"\x00"
+        assert self.x is not None and self.y is not None
         prefix = 0x02 | (self.y & 1)
         return bytes([prefix]) + self.x.to_bytes(32, "big")
 

@@ -75,22 +75,26 @@ def _or_prove(c: Point, bit: int, r: int, prefix: bytes) -> bytes:
     # Commit honestly on the true branch.
     k = random_scalar()
     a_t = scalar_mul(k, H)
-    a = [None, None]
-    a[t] = a_t
-    a[f] = a_f
-    e = _or_challenge(prefix, c, a[0], a[1])
+    a_list: list[Point | None] = [None, None]
+    a_list[t] = a_t
+    a_list[f] = a_f
+    a0, a1 = a_list
+    assert a0 is not None and a1 is not None
+    e = _or_challenge(prefix, c, a0, a1)
     e_t = (e - e_f) % N
     z_t = (k + e_t * r) % N
     e0 = e_t if t == 0 else e_f
-    z = [None, None]
-    z[t] = z_t
-    z[f] = z_f
+    z_list: list[int | None] = [None, None]
+    z_list[t] = z_t
+    z_list[f] = z_f
+    z0, z1 = z_list
+    assert z0 is not None and z1 is not None
     return (
-        a[0].to_bytes()
-        + a[1].to_bytes()
+        a0.to_bytes()
+        + a1.to_bytes()
         + _scalar_bytes(e0)
-        + _scalar_bytes(z[0])
-        + _scalar_bytes(z[1])
+        + _scalar_bytes(z0)
+        + _scalar_bytes(z1)
     )
 
 
