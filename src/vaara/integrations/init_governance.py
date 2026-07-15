@@ -377,6 +377,8 @@ def run_init(
     shadow: bool = False,
     govern_mcp: bool = True,
     proxy_service: bool = False,
+    proxy_enforce: bool = False,
+    proxy_allow: Optional[list[str]] = None,
     service_home: Optional[Path] = None,
     service_system: Optional[str] = None,
     service_runner: Any = None,
@@ -419,6 +421,8 @@ def run_init(
         service = install_proxy_service(
             vaara_bin=vaara_bin,
             trail_db=str(trail_db),
+            enforce=proxy_enforce,
+            allow=proxy_allow,
             home=service_home,
             system=service_system,
             runner=service_runner or subprocess.run,

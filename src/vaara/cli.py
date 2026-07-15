@@ -4090,6 +4090,13 @@ class _SuggestingParser(argparse.ArgumentParser):
 def _cmd_init(args: argparse.Namespace) -> int:
     from vaara.integrations import init_governance as ig
 
+    if (args.proxy_enforce or args.proxy_allow) and not args.proxy_service:
+        print(
+            "--proxy-enforce/--proxy-allow configure the installed proxy "
+            "service; add --proxy-service.",
+            file=sys.stderr,
+        )
+        return 2
     trail_db = (
         Path(args.trail_db).expanduser() if args.trail_db else ig.DEFAULT_TRAIL_DB
     )
@@ -4098,6 +4105,8 @@ def _cmd_init(args: argparse.Namespace) -> int:
         shadow=args.shadow,
         govern_mcp=not args.no_mcp,
         proxy_service=args.proxy_service,
+        proxy_enforce=args.proxy_enforce,
+        proxy_allow=args.proxy_allow,
     )
 
     if report.hooks_changed:
@@ -5795,6 +5804,18 @@ def build_parser() -> argparse.ArgumentParser:
         help="Also install the model proxy as a user service "
              "(launchd on macOS, systemd --user on Linux) so it survives "
              "logout. Removed by 'vaara ungovern'.",
+    )
+    pinit.add_argument(
+        "--proxy-enforce", action="store_true",
+        help="Install the proxy service gating instead of observing. "
+             "Without --proxy-allow the approvals directory defaults to "
+             "~/.vaara/approvals so escalations reach the approval surface "
+             "('vaara approvals' or any watcher).",
+    )
+    pinit.add_argument(
+        "--proxy-allow", action="append", default=None, metavar="PATTERN",
+        help="Tool-name glob the enforcing proxy service passes without "
+             "gating (repeatable). Implies nothing without --proxy-enforce.",
     )
     pinit.set_defaults(func=_cmd_init)
 

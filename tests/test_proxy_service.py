@@ -208,3 +208,89 @@ def test_uninstall_survives_missing_service_manager(tmp_path):
                                       runner=RecordingRunner(fail=True))
     assert removed
     assert not unit_path("linux", tmp_path).exists()
+
+
+# ---------------------------------------------------------------------------
+# Enforce mode in the installed service (the wall, not just the window)
+
+
+def test_launchd_plist_enforce_carries_gate_flags():
+    text = render_launchd_plist(
+        vaara_bin="/opt/venv/bin/vaara",
+        listen="127.0.0.1:8788",
+        upstream="http://127.0.0.1:11434",
+        trail_db="/home/op/.vaara/trail/audit.db",
+        log_dir="/home/op/.vaara/logs",
+        enforce=True,
+        allow=["mcp__github__*", "mcp__fs__read*"],
+        approvals_dir="/home/op/.vaara/approvals",
+    )
+    argv = plistlib.loads(text.encode())["ProgramArguments"]
+    assert "--enforce" in argv
+    assert argv[argv.index("--approvals-dir") + 1] == "/home/op/.vaara/approvals"
+    allow_values = [argv[i + 1] for i, a in enumerate(argv) if a == "--allow"]
+    assert allow_values == ["mcp__github__*", "mcp__fs__read*"]
+
+
+def test_systemd_unit_enforce_carries_gate_flags():
+    text = render_systemd_unit(
+        vaara_bin="/opt/venv/bin/vaara",
+        listen="127.0.0.1:8788",
+        upstream="http://127.0.0.1:11434",
+        trail_db="/home/op/.vaara/trail/audit.db",
+        enforce=True,
+        allow=["mcp__github__*"],
+        approvals_dir="/home/op/.vaara/approvals",
+    )
+    exec_line = next(l for l in text.splitlines() if l.startswith("ExecStart="))
+    assert "--enforce" in exec_line
+    assert "--allow mcp__github__*" in exec_line
+    assert "--approvals-dir /home/op/.vaara/approvals" in exec_line
+
+
+def test_observe_mode_units_carry_no_gate_flags():
+    text = render_launchd_plist(
+        vaara_bin="/opt/venv/bin/vaara",
+        listen="127.0.0.1:8788",
+        upstream="http://127.0.0.1:11434",
+        trail_db="/t.db",
+        log_dir="/logs",
+    )
+    argv = plistlib.loads(text.encode())["ProgramArguments"]
+    for flag in ("--enforce", "--allow", "--approvals-dir"):
+        assert flag not in argv
+
+
+def test_install_enforce_defaults_approvals_dir_to_the_approval_surface(tmp_path):
+    """--enforce with no allow list must still satisfy the proxy's own
+    refuse-to-start guard: the service defaults the approvals dir to
+    ~/.vaara/approvals, the directory approval watchers poll."""
+    runner = RecordingRunner()
+    report = install_proxy_service(
+        vaara_bin="/opt/venv/bin/vaara",
+        home=tmp_path,
+        system="darwin",
+        runner=runner,
+        enforce=True,
+    )
+    assert report.installed
+    argv = plistlib.loads(report.path.read_bytes())["ProgramArguments"]
+    assert "--enforce" in argv
+    assert argv[argv.index("--approvals-dir") + 1] == str(
+        tmp_path / ".vaara" / "approvals")
+
+
+def test_install_enforce_respects_explicit_approvals_dir(tmp_path):
+    runner = RecordingRunner()
+    report = install_proxy_service(
+        vaara_bin="/opt/venv/bin/vaara",
+        home=tmp_path,
+        system="linux",
+        runner=runner,
+        enforce=True,
+        allow=["mcp__github__*"],
+        approvals_dir="/custom/approvals",
+    )
+    text = report.path.read_text()
+    assert "--approvals-dir /custom/approvals" in text
+    assert "--allow mcp__github__*" in text

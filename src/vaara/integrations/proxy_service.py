@@ -50,14 +50,22 @@ class ServiceReport:
     warnings: list[str] = field(default_factory=list)
 
 
-def _proxy_argv(vaara_bin: str, listen: str, upstream: str,
-                trail_db: str) -> list[str]:
-    return [
+def _proxy_argv(vaara_bin: str, listen: str, upstream: str, trail_db: str,
+                enforce: bool = False, allow: Optional[list[str]] = None,
+                approvals_dir: Optional[str] = None) -> list[str]:
+    argv = [
         vaara_bin, "proxy",
         "--listen", listen,
         "--upstream", upstream,
         "--trail", trail_db,
     ]
+    if enforce:
+        argv.append("--enforce")
+    for pattern in allow or []:
+        argv.extend(["--allow", pattern])
+    if approvals_dir:
+        argv.extend(["--approvals-dir", approvals_dir])
+    return argv
 
 
 def render_launchd_plist(
@@ -67,10 +75,14 @@ def render_launchd_plist(
     upstream: str,
     trail_db: str,
     log_dir: str,
+    enforce: bool = False,
+    allow: Optional[list[str]] = None,
+    approvals_dir: Optional[str] = None,
 ) -> str:
     plist = {
         "Label": LAUNCHD_LABEL,
-        "ProgramArguments": _proxy_argv(vaara_bin, listen, upstream, trail_db),
+        "ProgramArguments": _proxy_argv(vaara_bin, listen, upstream, trail_db,
+                                        enforce, allow, approvals_dir),
         "RunAtLoad": True,
         "KeepAlive": True,
         "StandardOutPath": f"{log_dir}/proxy.out.log",
@@ -85,8 +97,12 @@ def render_systemd_unit(
     listen: str,
     upstream: str,
     trail_db: str,
+    enforce: bool = False,
+    allow: Optional[list[str]] = None,
+    approvals_dir: Optional[str] = None,
 ) -> str:
-    exec_start = " ".join(_proxy_argv(vaara_bin, listen, upstream, trail_db))
+    exec_start = " ".join(_proxy_argv(vaara_bin, listen, upstream, trail_db,
+                                      enforce, allow, approvals_dir))
     return (
         "[Unit]\n"
         "Description=Vaara model-endpoint governance proxy\n"
@@ -126,14 +142,26 @@ def install_proxy_service(
     listen: str = DEFAULT_LISTEN,
     upstream: str = DEFAULT_UPSTREAM,
     trail_db: Optional[str] = None,
+    enforce: bool = False,
+    allow: Optional[list[str]] = None,
+    approvals_dir: Optional[str] = None,
     home: Optional[Path] = None,
     system: Optional[str] = None,
     runner: Callable[..., Any] = subprocess.run,
 ) -> ServiceReport:
-    """Write the user service unit and activate it. Idempotent."""
+    """Write the user service unit and activate it. Idempotent.
+
+    ``enforce=True`` installs the gate, not just the observer. The proxy
+    itself refuses to enforce without an allow list or an approvals dir,
+    so when neither is given the approvals dir defaults to
+    ``~/.vaara/approvals`` — the directory approval watchers poll —
+    keeping the installed unit startable and escalations answerable.
+    """
     home = home or Path.home()
     system = system or sys.platform
     trail_db = trail_db or str(home / ".vaara" / "trail" / "audit.db")
+    if enforce and not approvals_dir:
+        approvals_dir = str(home / ".vaara" / "approvals")
     report = ServiceReport()
 
     path = unit_path(system, home)
@@ -150,6 +178,7 @@ def install_proxy_service(
         text = render_launchd_plist(
             vaara_bin=vaara_bin, listen=listen, upstream=upstream,
             trail_db=trail_db, log_dir=str(log_dir),
+            enforce=enforce, allow=allow, approvals_dir=approvals_dir,
         )
         activate = [
             ["launchctl", "unload", str(path)],  # replace any prior version
@@ -160,6 +189,7 @@ def install_proxy_service(
         text = render_systemd_unit(
             vaara_bin=vaara_bin, listen=listen, upstream=upstream,
             trail_db=trail_db,
+            enforce=enforce, allow=allow, approvals_dir=approvals_dir,
         )
         activate = [
             ["systemctl", "--user", "daemon-reload"],

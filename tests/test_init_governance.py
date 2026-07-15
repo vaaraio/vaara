@@ -342,3 +342,59 @@ def test_cli_ungovern_reports_service_removed(monkeypatch, capsys):
     monkeypatch.setattr(ig, "run_ungovern", lambda **kw: report)
     assert cli.main(["ungovern"]) == 0
     assert "proxy service removed" in capsys.readouterr().out.lower()
+
+
+# --- Enforce mode threaded through init to the installed service ------------
+
+
+def test_run_init_proxy_enforce_threads_gate_flags_into_unit(tmp_path, monkeypatch):
+    from vaara.integrations import proxy_service as ps
+    monkeypatch.setattr(ig, "KNOWN_MCP_CLIENTS", [])
+    monkeypatch.setattr(ig.shutil, "which", lambda name: "/usr/bin/" + name)
+
+    report = ig.run_init(
+        trail_db=tmp_path / "trail" / "audit.db",
+        settings_path=tmp_path / "settings.json",
+        config_path=tmp_path / "config.json",
+        vaara_bin="/usr/bin/vaara",
+        proxy_service=True,
+        proxy_enforce=True,
+        proxy_allow=["mcp__github__*"],
+        service_home=tmp_path, service_system="linux",
+        service_runner=lambda cmd, **kw: None,
+    )
+    text = ps.unit_path("linux", tmp_path).read_text()
+    assert report.service_path is not None
+    assert "--enforce" in text
+    assert "--allow mcp__github__*" in text
+    # no explicit approvals dir: defaults to the app's watch directory
+    assert f"--approvals-dir {tmp_path / '.vaara' / 'approvals'}" in text
+
+
+def test_cli_init_proxy_enforce_flags(monkeypatch):
+    from vaara import cli
+
+    captured = {}
+
+    def fake_run_init(**kwargs):
+        captured.update(kwargs)
+        return ig.InitReport()
+
+    monkeypatch.setattr(ig, "run_init", fake_run_init)
+    assert cli.main([
+        "init", "--proxy-service", "--proxy-enforce",
+        "--proxy-allow", "mcp__github__*",
+        "--proxy-allow", "mcp__fs__read*",
+    ]) == 0
+    assert captured["proxy_enforce"] is True
+    assert captured["proxy_allow"] == ["mcp__github__*", "mcp__fs__read*"]
+
+
+def test_cli_init_proxy_enforce_requires_proxy_service(monkeypatch, capsys):
+    from vaara import cli
+
+    monkeypatch.setattr(
+        ig, "run_init", lambda **kw: (_ for _ in ()).throw(AssertionError(
+            "run_init must not be called when flags are inconsistent")))
+    assert cli.main(["init", "--proxy-enforce"]) == 2
+    assert "--proxy-service" in capsys.readouterr().err
