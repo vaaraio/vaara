@@ -63,21 +63,39 @@ def build_decision_basis(
     """
     from vaara.attestation._decision_binding import build_binding, build_rationale
 
-    basis: dict[str, Any] = {
-        "rationale": build_rationale(rule, reason, declared_intent, intent_satisfied),
-        "binding": build_binding(
-            canonical_policy, declared_intent, canonical_inputs, verdict
-        ),
-    }
-    if with_proof:
-        if score_fp is None or deny_fp is None or escalate_fp is None:
-            raise ValueError("with_proof requires score_fp, deny_fp, and escalate_fp")
-        from vaara.attestation.zk._prove import build_proof_envelope
+    rationale = build_rationale(rule, reason, declared_intent, intent_satisfied)
 
-        basis["decisionProof"] = build_proof_envelope(
-            verdict, score_fp, deny_fp, escalate_fp, basis["binding"]["bindingDigest"]
-        )
-    return basis
+    if not with_proof:
+        return {
+            "rationale": rationale,
+            "binding": build_binding(
+                canonical_policy, declared_intent, canonical_inputs, verdict
+            ),
+        }
+
+    # Proof mode. The commitments are created first, hashed into the binding as the
+    # inputs (so the record's signed bindingDigest pins exactly these commitments),
+    # then the proof is produced against the same commitments. This binds the values
+    # the proof opens to the record; without it the committed values would float free
+    # of the record and the proof would attest a vacuous statement.
+    if score_fp is None or deny_fp is None or escalate_fp is None:
+        raise ValueError("with_proof requires score_fp, deny_fp, and escalate_fp")
+    from vaara.attestation.zk._commit import commit, random_scalar
+    from vaara.attestation.zk._prove import build_proof_envelope
+
+    gs, gd, ge = random_scalar(), random_scalar(), random_scalar()
+    vs, vd, ve = commit(score_fp, gs), commit(deny_fp, gd), commit(escalate_fp, ge)
+    zk_inputs = {
+        "scoreCommit": vs.to_bytes().hex(),
+        "denyCommit": vd.to_bytes().hex(),
+        "escalateCommit": ve.to_bytes().hex(),
+    }
+    binding = build_binding(canonical_policy, declared_intent, zk_inputs, verdict)
+    envelope = build_proof_envelope(
+        verdict, score_fp, deny_fp, escalate_fp, binding["bindingDigest"],
+        blinds=(gs, gd, ge),
+    )
+    return {"rationale": rationale, "binding": binding, "decisionProof": envelope}
 
 
 def _signing_payload(

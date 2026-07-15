@@ -104,6 +104,8 @@ class Point:
         if len(data) != 33 or data[0] not in (0x02, 0x03):
             raise ValueError("invalid compressed point encoding")
         x = int.from_bytes(data[1:33], "big")
+        if x >= P:
+            raise ValueError("non-canonical point: x >= field prime")
         rhs = (x * x * x + A * x + B) % P
         y = _mod_sqrt(rhs)
         if y is None:

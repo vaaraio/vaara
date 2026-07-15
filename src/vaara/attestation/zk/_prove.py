@@ -114,32 +114,52 @@ def _range_prove(w: int, gamma: int, prefix: bytes) -> bytes:
     return bytes(out)
 
 
+def commitments_from_proof(proof: bytes) -> tuple[Point, Point, Point]:
+    """Read the three published commitments (V_s, V_d, V_e) from a proof's prefix."""
+    vs = Point.from_bytes(proof[0:POINT_LEN])
+    vd = Point.from_bytes(proof[POINT_LEN : 2 * POINT_LEN])
+    ve = Point.from_bytes(proof[2 * POINT_LEN : 3 * POINT_LEN])
+    return vs, vd, ve
+
+
 def prove(
     verdict: str,
     score_fp: int,
     deny_fp: int,
     escalate_fp: int,
     binding_digest_hex: str,
+    blinds: tuple[int, int, int] | None = None,
 ) -> bytes:
     # Validate the verdict against the values; raises if inconsistent.
     ws = range_witnesses(verdict, score_fp, deny_fp, escalate_fp)
 
-    gs, gd, ge = random_scalar(), random_scalar(), random_scalar()
+    if blinds is None:
+        gs, gd, ge = random_scalar(), random_scalar(), random_scalar()
+    else:
+        gs, gd, ge = (b % N for b in blinds)
     vs = commit(score_fp, gs)
     vd = commit(deny_fp, gd)
     ve = commit(escalate_fp, ge)
 
     if verdict == "block":
-        blinds = [(gs - gd) % N]
+        diff_blinds = [(gs - gd) % N]
     elif verdict == "escalate":
-        blinds = [(gs - ge) % N, (gd - gs) % N]
+        diff_blinds = [(gs - ge) % N, (gd - gs) % N]
     else:  # allow
-        blinds = [(ge - gs) % N, (gd - gs) % N]
+        diff_blinds = [(ge - gs) % N, (gd - gs) % N]
 
     seed = _seed(binding_digest_hex, verdict, vs, vd, ve)
     out = bytearray()
     out += vs.to_bytes() + vd.to_bytes() + ve.to_bytes()
-    for j, (w, gamma) in enumerate(zip(ws, blinds)):
+    # Base range proofs: each committed value is in [0, 2**RANGE_BITS). This blocks
+    # a mod-N wraparound where an out-of-range value would still pass a difference
+    # proof, and it pins the committed values the record binds.
+    for i, (val, gamma) in enumerate(
+        [(score_fp, gs), (deny_fp, gd), (escalate_fp, ge)]
+    ):
+        out += _range_prove(val, gamma, seed + b"/base" + i.to_bytes(2, "big"))
+    # Difference range proofs: the verdict's non-negative differences.
+    for j, (w, gamma) in enumerate(zip(ws, diff_blinds)):
         out += _range_prove(w, gamma, seed + b"/w" + j.to_bytes(2, "big"))
     return bytes(out)
 
@@ -150,11 +170,18 @@ def build_proof_envelope(
     deny_fp: int,
     escalate_fp: int,
     binding_digest_hex: str,
+    blinds: tuple[int, int, int] | None = None,
 ) -> dict:
-    """Assemble the SEP-2828 ``decisionProof`` envelope around a fresh proof."""
+    """Assemble the SEP-2828 ``decisionProof`` envelope around a fresh proof.
+
+    ``blinds`` lets the caller pin the commitments (so the same V_s, V_d, V_e are
+    hashed into the record's binding), which is what ties the proof to the record.
+    """
     from ._params import PROOF_SYSTEM
 
-    raw = prove(verdict, score_fp, deny_fp, escalate_fp, binding_digest_hex)
+    raw = prove(
+        verdict, score_fp, deny_fp, escalate_fp, binding_digest_hex, blinds=blinds
+    )
     return {
         "proofSystem": PROOF_SYSTEM,
         "publicInputs": {"bindingDigest": binding_digest_hex, "verdict": verdict},
