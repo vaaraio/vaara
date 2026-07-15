@@ -4,7 +4,7 @@ build-backend = "setuptools.build_meta"
 
 [project]
 name = "vaara"
-version = "1.30.0"
+version = "1.31.0"
 description = "Runtime evidence layer for AI agents under the EU AI Act: policy-gated tool calls, hash-chained tamper-evident audit trails with external time anchoring, and independently verifiable attestation plus execution receipts per MCP tool call"
 requires-python = ">=3.10"
 license = "AGPL-3.0-or-later"
@@ -48,6 +48,7 @@ server = ["fastapi>=0.110", "uvicorn>=0.27"]
 attestation = ["cbor2>=5.4", "cryptography>=41.0", "rfc8785>=0.1.4"]
 timeanchor = ["asn1crypto>=1.5", "cryptography>=41.0"]
 ots = ["opentimestamps>=0.4", "rfc8785>=0.1.4", "asn1crypto>=1.5", "cryptography>=41.0"]
+proxy = ["fastapi>=0.110", "uvicorn>=0.29", "httpx>=0.27"]
 pq = ["dilithium-py>=1.4.0"]
 pdf = ["reportlab>=4.0"]
 bedrock = ["boto3>=1.34"]
