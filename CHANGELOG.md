@@ -7,6 +7,10 @@ and this project follows [Semantic Versioning](https://semver.org/spec/v2.0.0.ht
 
 ## [Unreleased]
 
+## [1.36.0] - 2026-07-15
+
+- The aggregate conformance runner (`scripts/conformance_runner.py`) grades clean in a base environment. A suite whose independent checker needs an optional dependency now returns the standard skip code (77) when that dependency is absent, and the runner reports it SKIP with a reason instead of FAIL. `pq_hybrid_v0`, which needs the post-quantum extra (`vaara[pq]`, i.e. `dilithium-py`), is skipped in a base install and still runs and passes where the extra is present. The public corpus reports 39 passed, 2 skipped, and exits 0 with no optional extras installed.
+
 ## [1.35.0] - 2026-07-15
 
 - Renamed the tool-call attestation modules and docs to Vaara's own names. The private `_sep2787_*` modules are now `_attest_*`, and the public module is `vaara.attestation.tool_call_attestation`; `vaara.attestation.sep2787` remains as a re-export shim and will be removed in a future release. `docs/sep2787-conformance.md` and `docs/sep2787-overt-mapping.md` are renamed to `docs/attestation-conformance.md` and `docs/attestation-overt-mapping.md`, and the docstrings, CLI help, and docs no longer describe the format as tracking an external spec. The origin record is in `docs/PRIOR_ART.md`.

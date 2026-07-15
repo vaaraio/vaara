@@ -44,6 +44,22 @@ def test_argument_only_suite_is_skipped_not_failed() -> None:
     assert row["returncode"] is None
 
 
+def test_optional_dependency_suite_skips_not_fails() -> None:
+    # pq_hybrid_v0's checker needs the post-quantum extra (dilithium-py). In a
+    # base env it must be reported SKIP with a reason (returncode 77), never
+    # FAIL; where the extra is installed it runs and passes.
+    pytest.importorskip("rfc8785")
+    runner = _load_runner()
+    row = runner.run_suite(VECTORS, "pq_hybrid_v0")
+    have_pq = importlib.util.find_spec("dilithium_py") is not None
+    if have_pq:
+        assert row["status"] == "PASS"
+    else:
+        assert row["status"] == "SKIP"
+        assert row["reason"]
+        assert row["returncode"] == runner.SKIP_EXIT_CODE
+
+
 def test_known_good_suite_passes_through_main() -> None:
     # Every suite's checker canonicalizes with rfc8785 (the `attestation`
     # extra). Where it is not installed (CI's base test env), the checker
