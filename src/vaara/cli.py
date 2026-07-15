@@ -179,6 +179,16 @@ Subcommands:
         than a moving target. The answer to "trust us": prove it against the
         neutral suite. Keyless. Exit 0 iff the statement conforms.
 
+    vaara conformance check PATH [--attestation ATT.json] [--glob '*.json'] [--json]
+        One keyless front door over the checks above. PATH is a record JSON
+        file (checked like verify-record) or a directory of them (checked
+        like verify-records); the kind is auto-detected. Reports every check,
+        pass or fail. Exit 0 iff it conforms.
+
+    vaara conformance statement [--corpus DIR] [--records DIR] [--out FILE] [--json]
+        Self-test this build against the published corpus and print one
+        reproducible statement (same check as conformance-statement). Keyless.
+
     vaara build-bundle (--receipt RECEIPT.json | --from-dir DIR) [piece flags]
             [--out BUNDLE.json]
         Assemble a complete evidence bundle on disk from the issuer's
@@ -3542,6 +3552,27 @@ def _cmd_conformance_statement(args: argparse.Namespace) -> int:
     return 0 if statement.conforms else 1
 
 
+def _cmd_conformance_check(args: argparse.Namespace) -> int:
+    """The one keyless SEP-2828 conformance front door: file or directory.
+
+    A single memorable command over the checks that already ship. When
+    ``path`` is a file it runs the single-record check (the same verdict as
+    ``verify-record``); when it is a directory it runs the set check (the
+    same roll-up and cross-record gaps as ``verify-records``). It owns no
+    conformance logic of its own, so the two paths never drift from the
+    commands they wrap. Keyless: runs in the base install.
+    """
+    path = Path(args.path).expanduser()
+    if path.is_file():
+        args.record = str(path)
+        return _cmd_verify_record(args)
+    if path.is_dir():
+        args.directory = str(path)
+        return _cmd_verify_records(args)
+    print(f"vaara conformance check: no such path: {path}", file=sys.stderr)
+    return 2
+
+
 def _cmd_verify_bundles(args: argparse.Namespace) -> int:
     """Run the full lens stack over a whole directory of evidence bundles.
 
@@ -5518,6 +5549,72 @@ def build_parser() -> argparse.ArgumentParser:
         help="Emit the full statement as JSON instead of Markdown",
     )
     pcs.set_defaults(func=_cmd_conformance_statement)
+
+    pconf = sub.add_parser(
+        "conformance",
+        help="Keyless SEP-2828 conformance: check a record or a whole set with "
+             "one command, or self-test this build against the published corpus.",
+    )
+    cfsub = pconf.add_subparsers(dest="conformance_cmd", metavar="COMMAND")
+    pconf.set_defaults(func=_help_dispatch(pconf))
+
+    pcc = cfsub.add_parser(
+        "check",
+        help="Conformance-check a SEP-2828 record (a JSON file) or a record set "
+             "(a directory of them). File or directory is auto-detected; the "
+             "verdict matches verify-record / verify-records. Keyless.",
+    )
+    pcc.add_argument(
+        "path",
+        help="A record JSON file, or a directory of record JSON files",
+    )
+    pcc.add_argument(
+        "--attestation", default=None,
+        help="SEP-2787 attestation the record answers, to also check the "
+             "back-link (single-file input only; still keyless)",
+    )
+    pcc.add_argument(
+        "--glob", default="*.json",
+        help="Glob for record files when path is a directory (default: *.json)",
+    )
+    pcc.add_argument(
+        "--json", action="store_true",
+        help="Emit the full conformance report as JSON",
+    )
+    pcc.set_defaults(func=_cmd_conformance_check)
+
+    pcst = cfsub.add_parser(
+        "statement",
+        help="Self-test this implementation against the published SEP-2828 "
+             "conformance corpus and print one reproducible statement. The same "
+             "check as the conformance-statement command. Keyless.",
+    )
+    pcst.add_argument(
+        "--corpus", default="conformance/sep2828",
+        help="Path to the published conformance corpus directory "
+             "(default: conformance/sep2828)",
+    )
+    pcst.add_argument(
+        "--records", default=None,
+        help="Directory of your own SEP-2828 records to check against the corpus",
+    )
+    pcst.add_argument(
+        "--glob", default="*.json",
+        help="Glob for record files within --records (default: *.json)",
+    )
+    pcst.add_argument(
+        "--as-of", default=None, dest="as_of",
+        help="A date echoed verbatim into the statement (never read from a clock)",
+    )
+    pcst.add_argument(
+        "--out", default=None,
+        help="Write the Markdown statement to this file instead of stdout",
+    )
+    pcst.add_argument(
+        "--json", action="store_true",
+        help="Emit the full statement as JSON instead of Markdown",
+    )
+    pcst.set_defaults(func=_cmd_conformance_statement)
 
     pvbs = sub.add_parser(
         "verify-bundles",
