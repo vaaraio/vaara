@@ -182,3 +182,250 @@ def _read_json(directory, suffix):
     matches = sorted(p for p in directory.iterdir() if p.name.endswith(suffix))
     assert matches, f"no file ending {suffix} in {directory}"
     return json.loads(matches[-1].read_text(encoding="utf-8"))
+
+
+# --- Phase 1 observe: tool calls the model requests land in the trail ------
+
+
+def _mock_ollama_with_tool_calls(request: httpx.Request) -> httpx.Response:
+    path = request.url.path
+    if path == "/api/show":
+        return httpx.Response(200, json={
+            "model_info": {"general.architecture": "qwen3"},
+            "details": {"quantization_level": "Q4_K_M", "parameter_size": "30.5B"},
+        })
+    if path == "/api/tags":
+        return httpx.Response(200, json={"models": [
+            {"name": "qwen3:30b-a3b", "digest": "deadbeef"},
+        ]})
+    if path == "/v1/chat/completions":
+        return httpx.Response(200, json={
+            "choices": [{"message": {
+                "role": "assistant", "content": None,
+                "tool_calls": [{
+                    "id": "call_1", "type": "function",
+                    "function": {"name": "send_payment",
+                                 "arguments": '{"to": "acme", "amount": 900}'},
+                }],
+            }}],
+            "usage": {"prompt_tokens": 10, "completion_tokens": 2},
+        })
+    return httpx.Response(404, json={"error": "unmocked"})
+
+
+def _observing_pipeline():
+    from vaara.pipeline import InterceptionPipeline
+
+    pipeline = InterceptionPipeline(enforce=False)  # observe-only, never block
+    return pipeline
+
+
+def test_e2e_buffered_records_requested_tool_calls(tmp_path):
+    emitter, _ = _es256_emitter(tmp_path)
+    upstream_client = httpx.AsyncClient(
+        transport=httpx.MockTransport(_mock_ollama_with_tool_calls))
+    pipeline = _observing_pipeline()
+    app = build_app(emitter=emitter, upstream="http://ollama",
+                    client=upstream_client, pipeline=pipeline)
+
+    async def drive():
+        transport = httpx.ASGITransport(app=app)
+        async with httpx.AsyncClient(transport=transport, base_url="http://proxy") as c:
+            return await c.post("/v1/chat/completions", json={
+                "model": "qwen3:30b-a3b", "messages": MESSAGES, "stream": False,
+            })
+
+    resp = asyncio.run(drive())
+    # Phase 1 is passthrough: the response reaches the caller unchanged.
+    assert resp.status_code == 200
+    assert resp.json()["choices"][0]["message"]["tool_calls"][0]["id"] == "call_1"
+    # ...and the requested tool call is in the audit trail with its params.
+    recorded = [
+        r for r in pipeline.trail._records if r.tool_name == "send_payment"
+    ]
+    assert recorded, "tool call the model requested was never recorded"
+    assert any(r.data.get("parameters", {}).get("amount") == 900
+               for r in recorded if isinstance(r.data, dict))
+
+
+def _mock_ollama_streaming_tool_calls(request: httpx.Request) -> httpx.Response:
+    path = request.url.path
+    if path == "/api/show":
+        return httpx.Response(200, json={"model_info": {}, "details": {}})
+    if path == "/api/tags":
+        return httpx.Response(200, json={"models": []})
+    if path == "/v1/chat/completions":
+        body = (
+            b'data: {"choices":[{"delta":{"tool_calls":[{"id":"call_9",'
+            b'"type":"function","function":{"name":"delete_file",'
+            b'"arguments":"{\\"path\\": \\"/etc\\"}"}}]}}]}\n\n'
+            b'data: {"choices":[],"usage":{"prompt_tokens":3,"completion_tokens":1}}\n\n'
+            b"data: [DONE]\n\n"
+        )
+        return httpx.Response(200, content=body,
+                              headers={"content-type": "text/event-stream"})
+    return httpx.Response(404, json={"error": "unmocked"})
+
+
+def test_e2e_streamed_records_requested_tool_calls(tmp_path):
+    emitter, _ = _es256_emitter(tmp_path)
+    upstream_client = httpx.AsyncClient(
+        transport=httpx.MockTransport(_mock_ollama_streaming_tool_calls))
+    pipeline = _observing_pipeline()
+    app = build_app(emitter=emitter, upstream="http://ollama",
+                    client=upstream_client, pipeline=pipeline)
+
+    async def drive():
+        transport = httpx.ASGITransport(app=app)
+        async with httpx.AsyncClient(transport=transport, base_url="http://proxy") as c:
+            resp = await c.post("/v1/chat/completions", json={
+                "model": "qwen3:30b-a3b", "messages": MESSAGES, "stream": True,
+            })
+            return resp.status_code, await resp.aread()
+
+    status, raw = asyncio.run(drive())
+    assert status == 200
+    assert b"call_9" in raw  # stream reached the caller intact
+    recorded = [r for r in pipeline.trail._records if r.tool_name == "delete_file"]
+    assert recorded, "streamed tool call was never recorded"
+
+
+def test_pipeline_recording_failure_never_breaks_passthrough(tmp_path):
+    emitter, _ = _es256_emitter(tmp_path)
+    upstream_client = httpx.AsyncClient(
+        transport=httpx.MockTransport(_mock_ollama_with_tool_calls))
+
+    class ExplodingPipeline:
+        def intercept(self, **kwargs):
+            raise RuntimeError("trail on fire")
+
+    app = build_app(emitter=emitter, upstream="http://ollama",
+                    client=upstream_client, pipeline=ExplodingPipeline())
+
+    async def drive():
+        transport = httpx.ASGITransport(app=app)
+        async with httpx.AsyncClient(transport=transport, base_url="http://proxy") as c:
+            return await c.post("/v1/chat/completions", json={
+                "model": "qwen3:30b-a3b", "messages": MESSAGES, "stream": False,
+            })
+
+    resp = asyncio.run(drive())
+    assert resp.status_code == 200
+
+
+def test_e2e_no_emitter_still_proxies_and_records(tmp_path):
+    # `vaara proxy` observe mode: no signing key, no receipts — passthrough
+    # plus trail recording must work on their own.
+    upstream_client = httpx.AsyncClient(
+        transport=httpx.MockTransport(_mock_ollama_with_tool_calls))
+    pipeline = _observing_pipeline()
+    app = build_app(emitter=None, upstream="http://ollama",
+                    client=upstream_client, pipeline=pipeline)
+
+    async def drive():
+        transport = httpx.ASGITransport(app=app)
+        async with httpx.AsyncClient(transport=transport, base_url="http://proxy") as c:
+            return await c.post("/v1/chat/completions", json={
+                "model": "qwen3:30b-a3b", "messages": MESSAGES, "stream": False,
+            })
+
+    resp = asyncio.run(drive())
+    assert resp.status_code == 200
+    assert any(r.tool_name == "send_payment" for r in pipeline.trail._records)
+
+
+# --- A2: Anthropic /v1/messages shape ---------------------------------------
+
+
+def _mock_anthropic(request: httpx.Request) -> httpx.Response:
+    path = request.url.path
+    if path == "/api/show":
+        return httpx.Response(404, json={})
+    if path == "/api/tags":
+        return httpx.Response(404, json={})
+    if path == "/v1/messages":
+        return httpx.Response(200, json={
+            "id": "msg_1", "type": "message", "role": "assistant",
+            "model": "claude-sonnet-5",
+            "content": [
+                {"type": "text", "text": "I'll check the weather."},
+                {"type": "tool_use", "id": "toolu_1", "name": "get_weather",
+                 "input": {"city": "Helsinki"}},
+            ],
+            "usage": {"input_tokens": 12, "output_tokens": 30},
+        })
+    return httpx.Response(404, json={"error": "unmocked"})
+
+
+def test_e2e_anthropic_buffered_records_tool_use(tmp_path):
+    upstream_client = httpx.AsyncClient(transport=httpx.MockTransport(_mock_anthropic))
+    pipeline = _observing_pipeline()
+    app = build_app(emitter=None, upstream="http://anthropic",
+                    client=upstream_client, pipeline=pipeline)
+
+    async def drive():
+        transport = httpx.ASGITransport(app=app)
+        async with httpx.AsyncClient(transport=transport, base_url="http://proxy") as c:
+            return await c.post("/v1/messages", json={
+                "model": "claude-sonnet-5", "max_tokens": 100,
+                "messages": MESSAGES, "stream": False,
+            })
+
+    resp = asyncio.run(drive())
+    assert resp.status_code == 200
+    assert resp.json()["content"][1]["id"] == "toolu_1"  # passthrough intact
+    recorded = [r for r in pipeline.trail._records if r.tool_name == "get_weather"]
+    assert recorded, "anthropic tool_use was never recorded"
+    assert any(r.data.get("parameters", {}).get("city") == "Helsinki"
+               for r in recorded if isinstance(r.data, dict))
+
+
+def _mock_anthropic_stream(request: httpx.Request) -> httpx.Response:
+    if request.url.path != "/v1/messages":
+        return httpx.Response(404, json={})
+    body = (
+        b'event: message_start\n'
+        b'data: {"type":"message_start","message":{"usage":{"input_tokens":5}}}\n\n'
+        b'event: content_block_start\n'
+        b'data: {"type":"content_block_start","index":0,"content_block":'
+        b'{"type":"tool_use","id":"toolu_9","name":"run_command","input":{}}}\n\n'
+        b'event: content_block_delta\n'
+        b'data: {"type":"content_block_delta","index":0,"delta":'
+        b'{"type":"input_json_delta","partial_json":"{\\"cmd\\": \\"rm"}}\n\n'
+        b'event: content_block_delta\n'
+        b'data: {"type":"content_block_delta","index":0,"delta":'
+        b'{"type":"input_json_delta","partial_json":" -rf /\\"}"}}\n\n'
+        b'event: content_block_stop\n'
+        b'data: {"type":"content_block_stop","index":0}\n\n'
+        b'event: message_delta\n'
+        b'data: {"type":"message_delta","delta":{},"usage":{"output_tokens":9}}\n\n'
+        b'event: message_stop\n'
+        b'data: {"type":"message_stop"}\n\n'
+    )
+    return httpx.Response(200, content=body,
+                          headers={"content-type": "text/event-stream"})
+
+
+def test_e2e_anthropic_streamed_records_tool_use(tmp_path):
+    upstream_client = httpx.AsyncClient(
+        transport=httpx.MockTransport(_mock_anthropic_stream))
+    pipeline = _observing_pipeline()
+    app = build_app(emitter=None, upstream="http://anthropic",
+                    client=upstream_client, pipeline=pipeline)
+
+    async def drive():
+        transport = httpx.ASGITransport(app=app)
+        async with httpx.AsyncClient(transport=transport, base_url="http://proxy") as c:
+            resp = await c.post("/v1/messages", json={
+                "model": "claude-sonnet-5", "max_tokens": 100,
+                "messages": MESSAGES, "stream": True,
+            })
+            return resp.status_code, await resp.aread()
+
+    status, raw = asyncio.run(drive())
+    assert status == 200
+    assert b"toolu_9" in raw  # stream intact
+    recorded = [r for r in pipeline.trail._records if r.tool_name == "run_command"]
+    assert recorded, "streamed anthropic tool_use was never recorded"
+    assert any(r.data.get("parameters", {}).get("cmd") == "rm -rf /"
+               for r in recorded if isinstance(r.data, dict))

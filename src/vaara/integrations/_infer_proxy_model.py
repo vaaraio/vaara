@@ -20,7 +20,7 @@ logger = logging.getLogger("vaara.infer_proxy")
 # Chat endpoints the proxy intercepts and signs; everything else passes
 # through. ``/v1/chat/completions`` is OpenAI-compatible, ``/api/chat`` is
 # ollama-native (Goose's ollama provider).
-CHAT_PATHS = frozenset({"/v1/chat/completions", "/api/chat"})
+CHAT_PATHS = frozenset({"/v1/chat/completions", "/api/chat", "/v1/messages"})
 
 
 def stable_hash(obj: Any) -> str:
