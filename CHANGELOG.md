@@ -7,6 +7,12 @@ and this project follows [Semantic Versioning](https://semver.org/spec/v2.0.0.ht
 
 ## [Unreleased]
 
+## [1.34.0] - 2026-07-15
+
+- The `decisionProof` on a SEP-2828 decision record is now produced and verified cryptographically, beyond the envelope-shape check it already carried. The proof shows in zero knowledge that the recorded verdict is the correct threshold output over committed values, without revealing the risk score or the thresholds. The risk score is a committed input to the proof rather than recomputed inside it; its integrity rests on the signed record as before. Proof system `vaara-p256-cap-v0` is a transparent commit-and-prove over P-256: Pedersen commitments with a bit-decomposition range proof and a Schnorr OR-proof per bit, and no trusted setup. Producing and verifying a proof is keyless and runs in the base install with no extra dependency.
+- `vaara.attestation.build_decision_basis(..., with_proof=True)` builds the `rationale`, `binding`, and `decisionProof` blocks together for a decision record. The proof is opt-in and a record without it still conforms. The `decisionDerived` block now carries `rationale`, `binding`, and `decisionProof` through emission and parsing.
+- `vaara verify-record FILE` routes a decision record to the decision checker and verifies a `decisionProof` when one is present, gating the result as required. Before this the decisionProof checks ran only on the directory path.
+
 ## [1.33.0] - 2026-07-15
 
 - The credential-grant and fallback-projection conformance suites are now first-class. They moved into `tests/vectors/` alongside the other suites, so the aggregate runner (`scripts/conformance_runner.py`) discovers and grades them with the rest rather than leaving them ungraded under `conformance/sep2828/`. The published SEP-2828 execution-record corpus is unchanged.
