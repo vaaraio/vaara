@@ -7,6 +7,11 @@ and this project follows [Semantic Versioning](https://semver.org/spec/v2.0.0.ht
 
 ## [Unreleased]
 
+## [1.33.0] - 2026-07-15
+
+- The credential-grant and fallback-projection conformance suites are now first-class. They moved into `tests/vectors/` alongside the other suites, so the aggregate runner (`scripts/conformance_runner.py`) discovers and grades them with the rest rather than leaving them ungraded under `conformance/sep2828/`. The published SEP-2828 execution-record corpus is unchanged.
+- `docs/PRIOR_ART.md` records the native decision basis (`decisionDerived.rationale`, `.binding`, and the `.decisionProof` envelope) shipped in 1.32.0, keeping the concept-timeline current against the tagged release history.
+
 ## [1.32.0] - 2026-07-15
 
 - `vaara conformance check PATH`: one keyless command for SEP-2828 conformance. When PATH is a file it checks a single execution record; when it is a directory it checks the whole set, including the cross-record gaps a single-record check cannot see (a call recorded twice, an executed action that committed no result). It reuses the existing `verify-record` and `verify-records` logic, so the verdicts match, and runs in the base install with no signing key. `vaara conformance statement` self-tests this build against the published conformance corpus.
