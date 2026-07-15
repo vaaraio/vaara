@@ -1,5 +1,5 @@
 from vaara.attestation.zk._group import G, N, scalar_mul
-from vaara.attestation.zk._commit import H, commit, gens, random_scalar
+from vaara.attestation.zk._commit import commit, gens, random_scalar
 
 
 def test_commit_homomorphic():
