@@ -13,7 +13,7 @@ pytest.importorskip("rfc8785")
 pytest.importorskip("cryptography")
 
 ROOT = Path(__file__).resolve().parents[2]
-VECTORS = ROOT / "conformance" / "sep2828" / "credential_grant_v0"
+VECTORS = ROOT / "tests" / "vectors" / "credential_grant_v0"
 
 
 def _cases():
