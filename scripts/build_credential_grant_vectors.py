@@ -17,7 +17,7 @@ import json
 from pathlib import Path
 from tempfile import TemporaryDirectory
 
-from vaara.attestation._sep2787_canonical import iso8601_to_epoch
+from vaara.attestation._attest_canonical import iso8601_to_epoch
 from vaara.attestation.receipt import attestation_digest
 from vaara.credential import GrantBinding, GrantScope, emit_grant
 from vaara.integrations._mcp_attest import build_attest_emitter

@@ -44,6 +44,10 @@ SOURCE_SEP2643 = "sep2643"
 SOURCE_SEP2787 = "sep2787"
 SOURCE_SEP2817 = "sep2817"
 SOURCE_UNKNOWN = "unknown"
+# De-branded alias for the tool-call attestation source id (the format is
+# Vaara's own). Accepted on input; the emitted sourceFormat stays "sep2787"
+# for one release so pinned outputs and vectors do not shift.
+SOURCE_VAARA_ATTEST = "vaara-attest"
 
 PLANE_OUTCOME = "outcome"
 PLANE_DECISION_ATTESTED = "decision-attested"
@@ -243,6 +247,8 @@ def normalize(doc: Any, *, source_format: str = "auto") -> NormalizedEvidence:
     force a reading. An unrecognized document, or a forced format with no
     registered profile, yields an unrecognized result with nothing normalized.
     """
+    if source_format == SOURCE_VAARA_ATTEST:
+        source_format = SOURCE_SEP2787
     fmt = detect_format(doc) if source_format == "auto" else source_format
     profile = SOURCE_PROFILE_REGISTRY.get(fmt)
     if profile is None:
@@ -429,7 +435,7 @@ def _back_link_from_attestation(
     """
     try:
         from vaara.attestation.receipt import make_back_link
-        from vaara.attestation.sep2787 import AttestationError, parse_attestation
+        from vaara.attestation.tool_call_attestation import AttestationError, parse_attestation
     except ImportError:
         return None, (
             "back-link digest needs the attestation extra "

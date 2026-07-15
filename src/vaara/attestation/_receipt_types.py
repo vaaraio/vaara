@@ -40,7 +40,7 @@ from __future__ import annotations
 from dataclasses import dataclass
 from typing import Any, Literal, Optional
 
-from vaara.attestation._sep2787_types import (
+from vaara.attestation._attest_types import (
     VALID_ALGS,
     Algorithm,
     ArgsCommitment,

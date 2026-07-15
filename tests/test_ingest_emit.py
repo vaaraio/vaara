@@ -169,7 +169,7 @@ def test_optional_evidence_ref_locator_is_bound():
 
 
 def test_unsupported_alg_is_rejected():
-    from vaara.attestation.sep2787 import AttestationError
+    from vaara.attestation.tool_call_attestation import AttestationError
 
     with pytest.raises(AttestationError):
         emit_ingest_receipt(

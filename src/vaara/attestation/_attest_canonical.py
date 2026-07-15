@@ -1,6 +1,6 @@
 """RFC 8785 (JCS) canonicalization and args-commitment helpers.
 
-Internal module. Public surface is in ``vaara.attestation.sep2787``.
+Internal module. Public surface is in ``vaara.attestation.tool_call_attestation``.
 
 JCS in principle handles floats per ECMAScript Number.toString, but
 cross-stack float behaviour is the most common source of signature
@@ -17,7 +17,7 @@ import secrets
 from datetime import datetime, timezone
 from typing import Any, Optional
 
-from vaara.attestation._sep2787_types import (
+from vaara.attestation._attest_types import (
     ArgsProjection,
     AttestationError,
 )

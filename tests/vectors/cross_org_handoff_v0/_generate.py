@@ -38,14 +38,14 @@ from vaara.attestation.receipt import (
     sign_manifest,
     verify_handoff,
 )
-from vaara.attestation.sep2787 import (
+from vaara.attestation.tool_call_attestation import (
     PayloadDerived,
     PlannerDeclared,
     ToolCallBinding,
     emit_attestation,
     make_args_digest,
 )
-from vaara.attestation._sep2787_canonical import canonical_json
+from vaara.attestation._attest_canonical import canonical_json
 
 HERE = Path(__file__).resolve().parent
 DID = "did:web:vendor-a.example:billing"

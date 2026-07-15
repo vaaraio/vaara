@@ -20,7 +20,7 @@ from collections import Counter
 from dataclasses import dataclass
 from typing import Any, Optional
 
-from vaara.attestation._sep2787_canonical import canonical_json
+from vaara.attestation._attest_canonical import canonical_json
 
 
 def evidence_binding_ok(receipt: dict[str, Any]) -> bool:

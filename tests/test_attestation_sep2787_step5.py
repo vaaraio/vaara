@@ -14,7 +14,7 @@ for _mod in ("rfc8785", "cryptography"):
             allow_module_level=True,
         )
 
-from vaara.attestation.sep2787 import (  # noqa: E402
+from vaara.attestation.tool_call_attestation import (  # noqa: E402
     ArgsProjection,
     ArgsRef,
     canonical_json,

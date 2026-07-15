@@ -137,7 +137,7 @@ def test_pair_files_share_nonce_prefix(monkeypatch, emitter, attest_receipts_dir
 # ---------------------------------------------------------------------------
 
 def test_attestation_signature_verifies(monkeypatch, emitter, attest_receipts_dir, attest_key):
-    from vaara.attestation.sep2787 import verify_attestation, parse_attestation
+    from vaara.attestation.tool_call_attestation import verify_attestation, parse_attestation
     p, _ = _make_proxy(monkeypatch, emitter=emitter)
     p._handle_tools_call({
         "jsonrpc": "2.0", "id": 1,
@@ -151,7 +151,7 @@ def test_attestation_signature_verifies(monkeypatch, emitter, attest_receipts_di
 
 
 def test_receipt_back_link_valid(monkeypatch, emitter, attest_receipts_dir, attest_key):
-    from vaara.attestation.sep2787 import parse_attestation
+    from vaara.attestation.tool_call_attestation import parse_attestation
     from vaara.attestation.receipt import parse_receipt, verify_back_link
     p, _ = _make_proxy(monkeypatch, emitter=emitter)
     p._handle_tools_call({

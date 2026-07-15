@@ -20,7 +20,7 @@ import hashlib
 import json
 from pathlib import Path
 
-from vaara.attestation._sep2787_canonical import make_args_digest
+from vaara.attestation._attest_canonical import make_args_digest
 from vaara.credential._grant_emit import emit_grant
 from vaara.credential._grant_types import GrantBinding, GrantScope
 

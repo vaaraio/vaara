@@ -129,7 +129,7 @@ The release scripts do not touch cross-repo work. After v0.39.2-style
 releases that ship a SEP-2787 reference impl, the follow-up is:
 
 - Regen `vaaraio/modelcontextprotocol#2789` v0 vectors against the new
-  envelope shape using `vaara.attestation.sep2787`.
+  envelope shape using `vaara.attestation.tool_call_attestation`.
 - Comment under `modelcontextprotocol/modelcontextprotocol#2787` with
   cross-repo provenance: `vaaraio/vaara@<merged-sha>` and
   `vaaraio/vaara#<pr-number>`.

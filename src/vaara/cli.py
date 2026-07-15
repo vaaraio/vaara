@@ -75,14 +75,14 @@ Subcommands:
         through ``vaara.policy.from_dict`` / ``from_json`` / ``from_yaml``.
 
     vaara keygen --attest --out PATH [--force]
-        Generate an EC P-256 (ES256) keypair for SEP-2787 attestation
+        Generate an EC P-256 (ES256) keypair for tool-call attestation
         signing with ``vaara-mcp-proxy --attest-signing-key``. Replaces
         the ``openssl ecparam | pkcs8`` pipe. Does not require --dev.
 
     vaara attest verify ENVELOPE.json
             (--pubkey-file PUB.pem | --hs256-secret-file SECRET)
             [--enforce-ttl]
-        Verify a SEP-2787 attestation envelope. Reports signature
+        Verify a tool-call attestation envelope. Reports signature
         validity and whether the TTL has expired; TTL is not enforced
         by default (a saved attestation is durable evidence). Exit 0
         iff the signature verifies.
@@ -138,7 +138,7 @@ Subcommands:
 
     vaara normalize RECORD.json [--format auto|sep2643|sep2787|sep2817] [--json]
         Map an adjacent MCP record onto the SEP-2828 evidence model. Reads a
-        SEP-2643 denial, a SEP-2787 attestation, or a SEP-2817 invocation
+        SEP-2643 denial, a tool-call attestation, or a SEP-2817 invocation
         audit context and reports which evidence plane it fills, which
         SEP-2828 fields it populates, and what is still missing for a
         complete signed record. Promotes nothing: an unsigned client claim
@@ -259,7 +259,7 @@ def _cmd_keygen(args: argparse.Namespace) -> int:
         return 2
 
     if args.attest:
-        # EC P-256 (ES256) key for SEP-2787 attestation signing. This is the
+        # EC P-256 (ES256) key for tool-call attestation signing. This is the
         # documented operator path for vaara-mcp-proxy --attest-signing-key, so
         # it does not gate on --dev the way the Ed25519 trail-signing key does.
         return _keygen_attest(out, pub_out)
@@ -314,7 +314,7 @@ def _cmd_keygen(args: argparse.Namespace) -> int:
 
 
 def _keygen_attest(out: Path, pub_out: Path) -> int:
-    """Generate an EC P-256 (ES256) keypair for SEP-2787 attestation signing.
+    """Generate an EC P-256 (ES256) keypair for tool-call attestation signing.
 
     Writes a PKCS8 PEM private key (0600) and a SubjectPublicKeyInfo PEM
     public key. The printed ``secretVersion`` is the first 8 hex of the
@@ -350,12 +350,12 @@ def _keygen_attest(out: Path, pub_out: Path) -> int:
         encoding=serialization.Encoding.DER,
         format=serialization.PublicFormat.SubjectPublicKeyInfo,
     )
-    # Despite the SEP-2787 field name "secretVersion", this value is a digest
+    # Despite the field name "secretVersion", this value is a digest
     # of the PUBLIC key and is safe to print and publish. It is named here for
     # what it is so it is not mistaken (by a reader or a scanner) for a secret.
     pubkey_version = hashlib.sha256(pub_der).hexdigest()[:8]
 
-    print("Generated EC P-256 keypair for SEP-2787 attestation signing (ES256)")
+    print("Generated EC P-256 keypair for tool-call attestation signing (ES256)")
     print(f"  private key:   {out}        (0600)")
     print(f"  public key:    {pub_out}")
     print(f"  secretVersion: {pubkey_version}")
@@ -1705,16 +1705,16 @@ def _attest_isolation_now(envelope: Any) -> float:
     unparseable iat yields 0.0, and the envelope then fails verification on
     its malformed iat regardless, which is the correct verdict.
     """
-    from vaara.attestation._sep2787_canonical import iso8601_to_epoch
+    from vaara.attestation._attest_canonical import iso8601_to_epoch
 
     epoch = iso8601_to_epoch(envelope.issuer_asserted.iat)
     return epoch if epoch is not None else 0.0
 
 
 def _cmd_attest_verify(args: argparse.Namespace) -> int:
-    """Verify a SEP-2787 attestation envelope's signature (and optionally TTL)."""
+    """Verify a tool-call attestation envelope's signature (and optionally TTL)."""
     try:
-        from vaara.attestation.sep2787 import (
+        from vaara.attestation.tool_call_attestation import (
             AttestationError,
             parse_attestation,
             verify_attestation,
@@ -1736,7 +1736,7 @@ def _cmd_attest_verify(args: argparse.Namespace) -> int:
         envelope = parse_attestation(data)
     except (AttestationError, KeyError, TypeError, ValueError) as exc:
         print(
-            f"vaara attest verify: not a valid SEP-2787 attestation: {exc}",
+            f"vaara attest verify: not a valid tool-call attestation: {exc}",
             file=sys.stderr,
         )
         return 1
@@ -1791,7 +1791,7 @@ def _cmd_receipt_verify(args: argparse.Namespace) -> int:
             verify_back_link,
             verify_receipt_signature,
         )
-        from vaara.attestation.sep2787 import (
+        from vaara.attestation.tool_call_attestation import (
             AttestationError,
             parse_attestation,
             verify_args_commitment,
@@ -2265,7 +2265,7 @@ def _record_back_link(attestation_path: str, doc: Any) -> dict[str, Any]:
     """
     try:
         from vaara.attestation.receipt import parse_receipt, verify_back_link
-        from vaara.attestation.sep2787 import AttestationError, parse_attestation
+        from vaara.attestation.tool_call_attestation import AttestationError, parse_attestation
     except ImportError:
         return {"ok": False, "skipped": True,
                 "detail": "back-link check needs the attestation extra "
@@ -2799,7 +2799,7 @@ def _receipt_signature_verifies(payload: dict, verifying_material: Any) -> bool:
         parse_decision_record,
         verify_decision_signature,
     )
-    from vaara.attestation.sep2787 import AttestationError
+    from vaara.attestation.tool_call_attestation import AttestationError
 
     try:
         record = parse_decision_record(payload["record"])
@@ -3209,7 +3209,7 @@ def _cmd_build_handoff(args: argparse.Namespace) -> int:
     """
     try:
         from vaara.attestation.receipt import build_handoff, verify_handoff
-        from vaara.attestation.sep2787 import AttestationError
+        from vaara.attestation.tool_call_attestation import AttestationError
     except ImportError:
         print(_ATTESTATION_HINT, file=sys.stderr)
         return 2
@@ -3263,7 +3263,7 @@ def _cmd_build_handoff(args: argparse.Namespace) -> int:
 def _cmd_normalize(args: argparse.Namespace) -> int:
     """Map a foreign MCP record onto the SEP-2828 evidence model.
 
-    Vaara is the receiving side: it reads a SEP-2643 denial, a SEP-2787
+    Vaara is the receiving side: it reads a SEP-2643 denial, a tool-call
     attestation, or a SEP-2817 invocation audit context and reports which
     SEP-2828 evidence plane it fills, which fields it populates, and what
     is still missing for a complete signed execution record. It promotes
@@ -3333,7 +3333,7 @@ def _cmd_ingest(args: argparse.Namespace) -> int:
     unrecognized record still seals, honestly marked as such.
     """
     from vaara.attestation.receipt import emit_ingest_receipt, normalize
-    from vaara.attestation.sep2787 import AttestationError
+    from vaara.attestation.tool_call_attestation import AttestationError
 
     path = Path(args.record).expanduser()
     if not path.is_file():
@@ -3864,7 +3864,7 @@ def _cmd_build_bundle(args: argparse.Namespace) -> int:
             load_bundle_pieces_from_dir,
             verify_evidence_bundle,
         )
-        from vaara.attestation.sep2787 import AttestationError
+        from vaara.attestation.tool_call_attestation import AttestationError
     except ImportError:
         print(_ATTESTATION_HINT, file=sys.stderr)
         return 2
@@ -4249,7 +4249,7 @@ def build_parser() -> argparse.ArgumentParser:
     pk.add_argument(
         "--attest",
         action="store_true",
-        help="Generate an EC P-256 (ES256) key for SEP-2787 attestation "
+        help="Generate an EC P-256 (ES256) key for tool-call attestation "
              "signing with vaara-mcp-proxy --attest-signing-key, instead of "
              "an Ed25519 trail-signing key. Does not require --dev.",
     )
@@ -4797,17 +4797,17 @@ def build_parser() -> argparse.ArgumentParser:
 
     pattest = sub.add_parser(
         "attest",
-        help="SEP-2787 tool-call attestation commands",
+        help="Vaara tool-call attestation commands",
     )
     asub = pattest.add_subparsers(dest="attest_cmd", metavar="COMMAND")
     pattest.set_defaults(func=_help_dispatch(pattest))
     pa_verify = asub.add_parser(
         "verify",
-        help="Verify a SEP-2787 attestation envelope's signature (and TTL). "
+        help="Verify a tool-call attestation envelope's signature (and TTL). "
              "Requires the attestation extra.",
     )
     pa_verify.add_argument(
-        "envelope", help="Path to a SEP-2787 attestation JSON file",
+        "envelope", help="Path to a tool-call attestation JSON file",
     )
     _add_jws_key_args(pa_verify)
     pa_verify.add_argument(
@@ -4820,7 +4820,7 @@ def build_parser() -> argparse.ArgumentParser:
 
     preceipt = sub.add_parser(
         "receipt",
-        help="Execution-receipt commands (post-execution sibling of SEP-2787)",
+        help="Execution-receipt commands (post-execution sibling of the tool-call attestation)",
     )
     rcsub = preceipt.add_subparsers(dest="receipt_cmd", metavar="COMMAND")
     preceipt.set_defaults(func=_help_dispatch(preceipt))
@@ -4835,7 +4835,7 @@ def build_parser() -> argparse.ArgumentParser:
     )
     prc_verify.add_argument(
         "--attestation", required=True,
-        help="Path to the SEP-2787 attestation JSON the receipt answers "
+        help="Path to the tool-call attestation JSON the receipt answers "
              "(needed to verify the back-link)",
     )
     _add_jws_key_args(prc_verify)
@@ -4988,7 +4988,7 @@ def build_parser() -> argparse.ArgumentParser:
     )
     pvr.add_argument(
         "--attestation", default=None,
-        help="Path to the SEP-2787 attestation the record answers; when given, "
+        help="Path to the tool-call attestation the record answers; when given, "
              "the back-link is verified (no key needed)",
     )
     pvr.add_argument(
@@ -5455,7 +5455,7 @@ def build_parser() -> argparse.ArgumentParser:
 
     pnz = sub.add_parser(
         "normalize",
-        help="Map an adjacent MCP record (SEP-2643 denial, SEP-2787 "
+        help="Map an adjacent MCP record (SEP-2643 denial, tool-call "
              "attestation, or SEP-2817 invocation audit context) onto the "
              "SEP-2828 evidence model: which plane it fills, which fields it "
              "populates, and what is still missing for a complete signed "
@@ -5463,11 +5463,11 @@ def build_parser() -> argparse.ArgumentParser:
     )
     pnz.add_argument(
         "record",
-        help="Path to a JSON file holding a SEP-2643, SEP-2787, or SEP-2817 record",
+        help="Path to a JSON file holding a SEP-2643, tool-call attestation, or SEP-2817 record",
     )
     pnz.add_argument(
         "--format", default="auto",
-        choices=("auto", "sep2643", "sep2787", "sep2817"),
+        choices=("auto", "sep2643", "vaara-attest", "sep2787", "sep2817"),
         help="Source format (default: auto-detect)",
     )
     pnz.add_argument(
@@ -5485,11 +5485,11 @@ def build_parser() -> argparse.ArgumentParser:
     )
     ping.add_argument(
         "record",
-        help="Path to a JSON file holding a SEP-2643, SEP-2787, or SEP-2817 record",
+        help="Path to a JSON file holding a SEP-2643, tool-call attestation, or SEP-2817 record",
     )
     ping.add_argument(
         "--format", default="auto",
-        choices=("auto", "sep2643", "sep2787", "sep2817"),
+        choices=("auto", "sep2643", "vaara-attest", "sep2787", "sep2817"),
         help="Source format (default: auto-detect)",
     )
     ping.add_argument(
@@ -5613,7 +5613,7 @@ def build_parser() -> argparse.ArgumentParser:
     )
     pcc.add_argument(
         "--attestation", default=None,
-        help="SEP-2787 attestation the record answers, to also check the "
+        help="tool-call attestation the record answers, to also check the "
              "back-link (single-file input only; still keyless)",
     )
     pcc.add_argument(
@@ -5718,7 +5718,7 @@ def build_parser() -> argparse.ArgumentParser:
     )
     pbb.add_argument(
         "--attestation", default=None,
-        help="Path to the SEP-2787 request attestation JSON (back-link lens).",
+        help="Path to the tool-call request attestation JSON (back-link lens).",
     )
     pbb.add_argument(
         "--inclusion", default=None,

@@ -39,7 +39,7 @@ from vaara.attestation.inference import (  # noqa: E402
     verify_inference_back_link,
     verify_inference_receipt_signature,
 )
-from vaara.attestation.sep2787 import verify_args_commitment  # noqa: E402
+from vaara.attestation.tool_call_attestation import verify_args_commitment  # noqa: E402
 
 HS_SECRET = b"\x42" * 32
 MESSAGES = [{"role": "user", "content": "Summarize the Q3 report."}]
@@ -237,7 +237,7 @@ def test_detail_tampered_fails_signature():
 
 
 def test_unknown_key_rejected():
-    from vaara.attestation._sep2787_types import AttestationError
+    from vaara.attestation._attest_types import AttestationError
 
     att = _attestation()
     forged = att.to_dict()
@@ -247,7 +247,7 @@ def test_unknown_key_rejected():
 
 
 def test_eval_stats_float_rejected():
-    from vaara.attestation._sep2787_types import AttestationError
+    from vaara.attestation._attest_types import AttestationError
 
     att = _attestation()
     receipt = _receipt(att)

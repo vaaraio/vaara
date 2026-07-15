@@ -41,7 +41,7 @@ from vaara.attestation.receipt import (  # noqa: E402
     verify_receipt_retained,
     within_validity,
 )
-from vaara.attestation.sep2787 import (  # noqa: E402
+from vaara.attestation.tool_call_attestation import (  # noqa: E402
     PayloadDerived,
     PlannerDeclared,
     ToolCallBinding,

@@ -35,7 +35,7 @@ def test_independent_checker_passes():
 @pytest.mark.parametrize("name", _cases())
 def test_in_tree_verifier_agrees_with_vectors(name):
     from vaara.attestation.receipt import attestation_digest
-    from vaara.attestation.sep2787 import parse_attestation
+    from vaara.attestation.tool_call_attestation import parse_attestation
     from vaara.credential import grant_from_dict, verify_grant
 
     d = VECTORS / "sets" / name

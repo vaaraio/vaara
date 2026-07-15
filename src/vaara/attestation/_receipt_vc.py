@@ -32,7 +32,7 @@ from __future__ import annotations
 from typing import Any
 
 from vaara.attestation._receipt_types import ExecutionReceipt, receipt_from_dict
-from vaara.attestation._sep2787_types import AttestationError
+from vaara.attestation._attest_types import AttestationError
 
 # VCDM 2.0 base context plus the Vaara term-definition document. Both are
 # declared in the credential; verification never fetches them (the trust

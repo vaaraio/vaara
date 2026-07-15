@@ -39,14 +39,14 @@ from vaara.attestation.receipt import (  # noqa: E402
     sign_manifest,
     verify_handoff,
 )
-from vaara.attestation.sep2787 import (  # noqa: E402
+from vaara.attestation.tool_call_attestation import (  # noqa: E402
     PayloadDerived,
     PlannerDeclared,
     ToolCallBinding,
     emit_attestation,
     make_args_digest,
 )
-from vaara.attestation._sep2787_canonical import canonical_json  # noqa: E402
+from vaara.attestation._attest_canonical import canonical_json  # noqa: E402
 
 VECTORS = Path(__file__).resolve().parent / "vectors" / "cross_org_handoff_v0"
 

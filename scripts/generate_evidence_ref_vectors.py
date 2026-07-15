@@ -41,7 +41,7 @@ from cryptography.hazmat.primitives.asymmetric import ec
 from vaara.attestation.decision import (
     DecisionDerived, EvidenceRef, emit_decision_record, make_back_link,
 )
-from vaara.attestation.sep2787 import (
+from vaara.attestation.tool_call_attestation import (
     PayloadDerived, PlannerDeclared, ToolCallBinding,
     emit_attestation, make_args_digest,
 )

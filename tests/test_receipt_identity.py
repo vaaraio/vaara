@@ -21,7 +21,7 @@ for _mod in ("rfc8785", "cryptography"):
 
 from cryptography.hazmat.primitives.asymmetric import ec, rsa  # noqa: E402
 
-from vaara.attestation._sep2787_types import AttestationError  # noqa: E402
+from vaara.attestation._attest_types import AttestationError  # noqa: E402
 from vaara.attestation.receipt import (  # noqa: E402
     OutcomeDerived,
     did_web_to_url,
@@ -29,7 +29,7 @@ from vaara.attestation.receipt import (  # noqa: E402
     make_back_link,
     verify_receipt_identity,
 )
-from vaara.attestation.sep2787 import (  # noqa: E402
+from vaara.attestation.tool_call_attestation import (  # noqa: E402
     PayloadDerived,
     PlannerDeclared,
     ToolCallBinding,

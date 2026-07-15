@@ -69,7 +69,7 @@ def _attests(receipts_dir: Path) -> list[dict]:
 
 def test_allowed_call_mints_and_injects_grant(monkeypatch, emitter, receipts_dir):
     from vaara.attestation.receipt import attestation_digest
-    from vaara.attestation.sep2787 import parse_attestation
+    from vaara.attestation.tool_call_attestation import parse_attestation
 
     p = _make_proxy(monkeypatch, emitter=emitter, mint=True)
     request = {
@@ -123,7 +123,7 @@ def test_allowed_call_emits_recomputable_authorization_receipt(
     authorization receipt an auditor confirms from the issuer key alone."""
     import hashlib
 
-    from vaara.attestation._sep2787_canonical import canonical_json
+    from vaara.attestation._attest_canonical import canonical_json
     from vaara.attestation.decision import (
         parse_decision_record,
         verify_decision_signature,

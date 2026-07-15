@@ -32,7 +32,7 @@ for _mod in ("rfc8785", "cryptography"):
 
 from cryptography.hazmat.primitives.asymmetric import ec, rsa  # noqa: E402
 
-from vaara.attestation.sep2787 import (  # noqa: E402
+from vaara.attestation.tool_call_attestation import (  # noqa: E402
     ArgsRef,
     AttestationError,
     PayloadDerived,
@@ -125,7 +125,7 @@ def test_wire_round_trip_args_projection():
     env = _emit()
     parsed = _wire(env)
     binding = parsed.payload_derived.tool_calls[0]
-    from vaara.attestation.sep2787 import ArgsProjection
+    from vaara.attestation.tool_call_attestation import ArgsProjection
     assert isinstance(binding.args, ArgsProjection)
     assert binding.args.projection_digest.startswith("sha256:")
 

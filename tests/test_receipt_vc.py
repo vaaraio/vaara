@@ -31,7 +31,7 @@ from vaara.attestation.receipt import (  # noqa: E402
     receipt_to_vc,
     verify_receipt_signature,
 )
-from vaara.attestation.sep2787 import (  # noqa: E402
+from vaara.attestation.tool_call_attestation import (  # noqa: E402
     PayloadDerived,
     PlannerDeclared,
     ToolCallBinding,
@@ -153,7 +153,7 @@ def test_context_resolves_offline():
 
 
 def test_from_vc_rejects_malformed():
-    from vaara.attestation._sep2787_types import AttestationError
+    from vaara.attestation._attest_types import AttestationError
     with pytest.raises(AttestationError):
         receipt_from_vc({"credentialSubject": {}})  # no proof
     with pytest.raises(AttestationError):

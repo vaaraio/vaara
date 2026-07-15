@@ -24,9 +24,9 @@ import json
 from pathlib import Path
 from typing import Any, Optional
 
-from vaara.attestation._sep2787_types import AttestationError
+from vaara.attestation._attest_types import AttestationError
 from vaara.attestation.receipt import attestation_digest
-from vaara.attestation.sep2787 import parse_attestation
+from vaara.attestation.tool_call_attestation import parse_attestation
 from vaara.credential._authorization_receipt import (
     AuthorizationReceipt,
     ReceiptSigner,

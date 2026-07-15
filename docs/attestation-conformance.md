@@ -1,24 +1,24 @@
-# SEP-2787 conformance surface
+# Vaara tool-call attestation — conformance surface
 
-This document states what Vaara's SEP-2787 verifier checks, what it leaves to
-the runtime, and which spec revision it tracks. It is the reference for the
-`vaara attest verify` and `vaara receipt verify` commands shipped in v0.44.0.
+This document states what Vaara's tool-call attestation verifier checks, what
+it leaves to the runtime, and where the envelope shape comes from. It is the
+reference for the `vaara attest verify` and `vaara receipt verify` commands
+shipped in v0.44.0.
 
-## Spec revision tracked
+## Origin of the envelope shape
 
-Vaara aligns to the SEP-2787 draft at commit `dd030d5b` on
-`soup-oss/sep-tool-call-attestation`, the revision whose envelope adopted the
-three trust-surface blocks (`plannerDeclared`, `issuerAsserted`,
-`payloadDerived`) and the four schema points Vaara raised in
-`modelcontextprotocol/modelcontextprotocol#2787`
-(`issuecomment-4557017068`): tool calls under `payloadDerived`,
-`argsProjection` as a JCS-stringified projection, no `kind` discriminator, and
-commitment-only audit via a hash-only-identity projection.
+The envelope is Vaara's own. Vaara published the first implementation
+(v0.42.0-0.44.0, 29-30 May 2026) and originated the three trust-surface blocks
+(`plannerDeclared`, `issuerAsserted`, `payloadDerived`) and four schema points:
+tool calls under `payloadDerived`, `argsProjection` as a JCS-stringified
+projection, no `kind` discriminator, and commitment-only audit via a
+hash-only-identity projection. The community SEP-2787 draft
+(`modelcontextprotocol/modelcontextprotocol#2787`, `issuecomment-4557017068`;
+`soup-oss/sep-tool-call-attestation` at `dd030d5b`) subsequently adopted them.
+Those references are historical lineage, not a parent spec.
 
-The reference implementation is pinned at tag `sep2787-ref-v2`
-(`src/vaara/attestation/sep2787.py` and helpers). The draft is community
-authored and at the time of writing carries `Sponsor: None`; this is a
-first-implementer position, not a maintainer endorsement.
+The implementation lives in `src/vaara/attestation/tool_call_attestation.py`
+(and helpers).
 
 ## Signing modes
 

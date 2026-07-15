@@ -45,7 +45,7 @@ from vaara.attestation._revocation import (
     check_receipt_revocation,
     receipt_leaf_bytes,
 )
-from vaara.attestation._sep2787_types import Attestation
+from vaara.attestation._attest_types import Attestation
 from vaara.attestation.transparency_log import (
     ConsistencyProof,
     InclusionProof,

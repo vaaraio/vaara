@@ -26,7 +26,7 @@ object). A receipt is a durable record rather than a time-bounded
 capability, so there is no TTL.
 
 Canonicalization (RFC 8785 JCS) and signing (HS256 / ES256 / RS256)
-are shared with ``vaara.attestation.sep2787`` unchanged. A verifier
+are shared with ``vaara.attestation.tool_call_attestation`` unchanged. A verifier
 that already checks SEP-2787 signatures needs no new crypto to check
 receipts.
 
@@ -230,7 +230,7 @@ from vaara.attestation._receipt_vc import (
 
 # Result commitments reuse the SEP-2787 argument-commitment builders.
 # Re-export under result-oriented names so call sites read naturally.
-from vaara.attestation._sep2787_canonical import (
+from vaara.attestation._attest_canonical import (
     make_args_digest as make_result_digest,
     make_args_projection as make_result_projection,
 )

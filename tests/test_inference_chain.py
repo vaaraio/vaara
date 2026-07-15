@@ -33,7 +33,7 @@ from vaara.attestation._inference_session import (  # noqa: E402
     session_manifest_covers_prefix,
     session_manifest_matches_receipts,
 )
-from vaara.attestation._sep2787_types import AttestationError  # noqa: E402
+from vaara.attestation._attest_types import AttestationError  # noqa: E402
 from vaara.attestation._tpm import (  # noqa: E402
     IMA_PCR,
     TPM_ALG_SHA256,

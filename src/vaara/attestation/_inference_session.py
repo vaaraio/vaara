@@ -42,8 +42,8 @@ from vaara.attestation._inference_types import (
     InferenceReceipt,
     inference_receipt_from_dict,
 )
-from vaara.attestation._sep2787_canonical import canonical_json
-from vaara.attestation._sep2787_types import AttestationError
+from vaara.attestation._attest_canonical import canonical_json
+from vaara.attestation._attest_types import AttestationError
 
 INFERENCE_SESSION_SCHEMA = "vaara.inference-session/v0"
 

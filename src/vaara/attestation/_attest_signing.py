@@ -6,7 +6,7 @@ DER), RS256 (RSASSA-PKCS1-v1_5 SHA-256). All signatures are encoded as
 hexadecimal strings to match the v1 draft's wire format.
 
 This is an internal helper module. The public surface is in
-``vaara.attestation.sep2787``.
+``vaara.attestation.tool_call_attestation``.
 """
 
 from __future__ import annotations

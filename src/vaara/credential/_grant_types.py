@@ -27,7 +27,7 @@ from __future__ import annotations
 from dataclasses import dataclass
 from typing import Any
 
-from vaara.attestation._sep2787_types import Algorithm
+from vaara.attestation._attest_types import Algorithm
 from vaara.credential._grant_capability import Capability, capability_to_dict
 
 GrantAlgorithm = Algorithm

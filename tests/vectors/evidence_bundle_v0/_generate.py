@@ -33,7 +33,7 @@ from vaara.attestation.receipt import (
     receipt_leaf_bytes,
     verify_evidence_bundle,
 )
-from vaara.attestation.sep2787 import (
+from vaara.attestation.tool_call_attestation import (
     PayloadDerived,
     PlannerDeclared,
     ToolCallBinding,

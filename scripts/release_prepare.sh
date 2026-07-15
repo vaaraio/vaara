@@ -15,7 +15,8 @@
 #   1. Pre-flight: required files exist, CHANGELOG entry present,
 #      working tree clean except for the staged release changes.
 #   2. Bumps version in pyproject.toml + clients/ts/package.json +
-#      src/vaara/__init__.py + server.json + server-vaara-server.json.
+#      src/vaara/__init__.py + server.json + server-vaara-server.json +
+#      the Claude Code plugin manifest.
 #   3. ruff check on changed Python paths.
 #   4. pytest --no-header on the full suite (skips adversarial dir;
 #      deselects pre-existing known-failing test).
@@ -75,12 +76,19 @@ sed -i -E "s/^__version__ = \"[0-9]+\.[0-9]+\.[0-9]+\"$/__version__ = \"${VERSIO
 # version equals the tag, so a stale manifest fails the publish gate.
 sed -i -E "s/(\"version\": \")[0-9]+\.[0-9]+\.[0-9]+(\")/\1${VERSION}\2/g" \
   server.json server-vaara-server.json
+# Claude Code plugin manifest: unified to the release version so the plugin
+# tracks the tag like the other planes. It is git-marketplace distributed, so
+# committing the bumped manifest to main is the publish.
+PLUGIN_MANIFEST="plugins/claude-code-vaara-governance/.claude-plugin/plugin.json"
+sed -i -E "s/^  \"version\": \"[0-9]+\.[0-9]+\.[0-9]+\",$/  \"version\": \"${VERSION}\",/" \
+  "$PLUGIN_MANIFEST"
 
 grep -E "^version = \"${VERSION}\"$" pyproject.toml >/dev/null
 grep -E "\"version\": \"${VERSION}\"" clients/ts/package.json >/dev/null
 grep -E "^__version__ = \"${VERSION}\"$" src/vaara/__init__.py >/dev/null
 grep -E "\"version\": \"${VERSION}\"" server.json >/dev/null
 grep -E "\"version\": \"${VERSION}\"" server-vaara-server.json >/dev/null
+grep -E "\"version\": \"${VERSION}\"" "$PLUGIN_MANIFEST" >/dev/null
 
 # 3. Lint changed paths (best-effort; lint all of src + tests if no
 # precise change list)
@@ -98,7 +106,9 @@ fi
 
 # 5. Stage explicit paths only
 git add CHANGELOG.md pyproject.toml clients/ts/package.json src/vaara/__init__.py \
-  server.json server-vaara-server.json
+  server.json server-vaara-server.json \
+  plugins/claude-code-vaara-governance/.claude-plugin/plugin.json \
+  scripts/release_prepare.sh
 # Re-add any other paths the caller has already staged
 git status --short
 

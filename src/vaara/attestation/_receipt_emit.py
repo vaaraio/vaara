@@ -23,12 +23,12 @@ from vaara.attestation._receipt_types import (
     outcome_to_dict,
     receipt_asserted_to_dict,
 )
-from vaara.attestation._sep2787_canonical import (
+from vaara.attestation._attest_canonical import (
     canonical_json,
     new_nonce,
     now_iso8601,
 )
-from vaara.attestation._sep2787_signing import (
+from vaara.attestation._attest_signing import (
     sign_es256,
     sign_hs256,
     sign_rs256,
@@ -36,7 +36,7 @@ from vaara.attestation._sep2787_signing import (
     verify_hs256,
     verify_rs256,
 )
-from vaara.attestation._sep2787_types import (
+from vaara.attestation._attest_types import (
     VALID_ALGS,
     Algorithm,
     AttestationError,

@@ -25,7 +25,7 @@ from pathlib import Path
 
 import rfc8785
 
-from vaara.attestation._sep2787_canonical import make_args_digest
+from vaara.attestation._attest_canonical import make_args_digest
 
 HERE = Path(__file__).resolve().parent
 

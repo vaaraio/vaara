@@ -29,8 +29,8 @@ from vaara.attestation._receipt_verifier import (
     BackLinkResult,
     attestation_digest,
 )
-from vaara.attestation._sep2787_canonical import canonical_json
-from vaara.attestation._sep2787_types import Attestation
+from vaara.attestation._attest_canonical import canonical_json
+from vaara.attestation._attest_types import Attestation
 
 
 def decision_digest(record: DecisionRecord) -> str:

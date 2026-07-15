@@ -144,7 +144,7 @@ def test_injected_unmodeled_field_is_rejected(world):
     verifier (and the independent checker) include, so Vaara could call a record
     hybrid-verified while carrying content neither signature covered.
     """
-    from vaara.attestation._sep2787_types import AttestationError
+    from vaara.attestation._attest_types import AttestationError
 
     es_key, pq_sec, _doc = world
     r = attach_pq_signature(_emit(es_key, "ES256+ML-DSA-65"),

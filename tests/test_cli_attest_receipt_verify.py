@@ -21,7 +21,7 @@ from vaara.attestation.receipt import (
     make_back_link,
     make_result_digest,
 )
-from vaara.attestation.sep2787 import (
+from vaara.attestation.tool_call_attestation import (
     PayloadDerived,
     PlannerDeclared,
     ToolCallBinding,
@@ -201,7 +201,7 @@ def test_attest_verify_valid_json_but_not_attestation(tmp_path, capsys):
     pub.write_bytes(b"x")
     rc = main(["attest", "verify", str(notatt), "--pubkey-file", str(pub)])
     assert rc == 1
-    assert "not a valid SEP-2787 attestation" in capsys.readouterr().err
+    assert "not a valid tool-call attestation" in capsys.readouterr().err
 
 
 # --- receipt verify -------------------------------------------------------

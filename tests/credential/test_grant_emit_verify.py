@@ -10,11 +10,11 @@ pytest.importorskip("cryptography")
 from cryptography.hazmat.primitives.asymmetric import ec  # noqa: E402
 
 from vaara.attestation import RevocationEntry, RevocationRegistry  # noqa: E402
-from vaara.attestation._sep2787_canonical import (  # noqa: E402
+from vaara.attestation._attest_canonical import (  # noqa: E402
     iso8601_to_epoch,
     make_args_digest,
 )
-from vaara.attestation._sep2787_types import AttestationError  # noqa: E402
+from vaara.attestation._attest_types import AttestationError  # noqa: E402
 from vaara.credential import (  # noqa: E402
     GrantBinding,
     GrantScope,

@@ -35,7 +35,7 @@ from vaara.attestation._inference_types import (  # noqa: E402
     ModelDerived,
     RequestDeclared,
 )
-from vaara.attestation._sep2787_types import AttestationError  # noqa: E402
+from vaara.attestation._attest_types import AttestationError  # noqa: E402
 from vaara.attestation.inference import (  # noqa: E402
     emit_inference_attestation,
     emit_inference_receipt,

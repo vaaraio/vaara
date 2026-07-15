@@ -1,6 +1,6 @@
 """Emit and verify for SEP-2787 envelopes.
 
-Internal module. Public surface is in ``vaara.attestation.sep2787``.
+Internal module. Public surface is in ``vaara.attestation.tool_call_attestation``.
 """
 
 from __future__ import annotations
@@ -8,13 +8,13 @@ from __future__ import annotations
 import time
 from typing import Any, Optional
 
-from vaara.attestation._sep2787_canonical import (
+from vaara.attestation._attest_canonical import (
     canonical_json,
     iso8601_to_epoch,
     new_nonce,
     now_iso8601,
 )
-from vaara.attestation._sep2787_signing import (
+from vaara.attestation._attest_signing import (
     sign_es256,
     sign_hs256,
     sign_rs256,
@@ -22,7 +22,7 @@ from vaara.attestation._sep2787_signing import (
     verify_hs256,
     verify_rs256,
 )
-from vaara.attestation._sep2787_types import (
+from vaara.attestation._attest_types import (
     VALID_ALGS,
     Algorithm,
     Attestation,

@@ -30,7 +30,7 @@ import time
 from dataclasses import dataclass
 from typing import Any, Optional
 
-from vaara.attestation._sep2787_canonical import iso8601_to_epoch, make_args_digest
+from vaara.attestation._attest_canonical import iso8601_to_epoch, make_args_digest
 from vaara.credential._grant_capability import evaluate
 from vaara.credential._grant_emit import verify_grant_signature
 from vaara.credential._grant_types import BrokeredCredential

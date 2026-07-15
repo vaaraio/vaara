@@ -76,7 +76,7 @@ class AttestPairEmitter:
         exp_seconds: int = 300,
         tool_constraints: "Optional[dict[str, tuple[Any, ...]]]" = None,
     ) -> None:
-        from vaara.attestation._sep2787_types import VALID_ALGS
+        from vaara.attestation._attest_types import VALID_ALGS
         if alg not in VALID_ALGS:
             raise AttestConfigError(f"unsupported alg: {alg!r}; use HS256, ES256, or RS256")
         self._signing_key = signing_key
@@ -144,7 +144,7 @@ class AttestPairEmitter:
         if current.startswith("manifest:sha256:"):
             return
         try:
-            from vaara.attestation._sep2787_canonical import canonical_json
+            from vaara.attestation._attest_canonical import canonical_json
             result = tools_list_response.get("result") or {}
             tools = result.get("tools") or []
             manifest_bytes = canonical_json({"tools": tools})
@@ -182,8 +182,8 @@ class AttestPairEmitter:
         The counter is passed to ``emit_receipt`` for paired filenames.
         """
         try:
-            from vaara.attestation.sep2787 import emit_attestation as _emit, make_args_digest
-            from vaara.attestation._sep2787_types import (
+            from vaara.attestation.tool_call_attestation import emit_attestation as _emit, make_args_digest
+            from vaara.attestation._attest_types import (
                 PayloadDerived, PlannerDeclared, ToolCallBinding,
             )
 
@@ -420,7 +420,7 @@ class AttestPairEmitter:
         try:
             from vaara.attestation.receipt import emit_receipt as _emit_receipt, make_back_link
             from vaara.attestation._receipt_types import OutcomeDerived
-            from vaara.attestation._sep2787_canonical import now_iso8601
+            from vaara.attestation._attest_canonical import now_iso8601
 
             status: str = "errored" if outcome_severity > 0.0 else "executed"
             back_link = make_back_link(attestation)
