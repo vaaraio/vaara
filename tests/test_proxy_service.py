@@ -5,8 +5,6 @@ launchctl/systemctl is ever invoked.
 """
 import plistlib
 
-import pytest
-
 from vaara.integrations.proxy_service import (
     LAUNCHD_LABEL,
     SYSTEMD_UNIT,
@@ -242,7 +240,9 @@ def test_systemd_unit_enforce_carries_gate_flags():
         allow=["mcp__github__*"],
         approvals_dir="/home/op/.vaara/approvals",
     )
-    exec_line = next(l for l in text.splitlines() if l.startswith("ExecStart="))
+    exec_line = next(
+        line for line in text.splitlines() if line.startswith("ExecStart=")
+    )
     assert "--enforce" in exec_line
     assert "--allow mcp__github__*" in exec_line
     assert "--approvals-dir /home/op/.vaara/approvals" in exec_line

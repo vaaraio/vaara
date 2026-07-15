@@ -16,7 +16,7 @@ for _mod in ("cryptography", "httpx", "fastapi"):
     if importlib.util.find_spec(_mod) is None:
         pytest.skip("proxy deps not installed", allow_module_level=True)
 
-from vaara.cli import main
+from vaara.cli import main  # noqa: E402
 
 
 @pytest.fixture
