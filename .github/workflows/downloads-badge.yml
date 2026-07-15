@@ -51,7 +51,7 @@ jobs:
           fi
 
           msg=$(awk -v n="$total" 'BEGIN{ if (n>=1000) printf "%.1fk all-time", n/1000; else printf "%d all-time", n }')
-          printf '{"schemaVersion":1,"label":"downloads","message":"%s","total":%d,"color":"1f6feb"}\n' "$msg" "$total" \
+          printf '{"schemaVersion":1,"label":"downloads","message":"%s","total":%d,"color":"78A08A"}\n' "$msg" "$total" \
             > installs.json
           cat installs.json
 
