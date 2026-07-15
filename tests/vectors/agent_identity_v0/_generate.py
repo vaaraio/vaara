@@ -35,7 +35,7 @@ from vaara.attestation.receipt import (
     emit_receipt,
     make_back_link,
 )
-from vaara.attestation.sep2787 import (
+from vaara.attestation.tool_call_attestation import (
     PayloadDerived,
     PlannerDeclared,
     ToolCallBinding,

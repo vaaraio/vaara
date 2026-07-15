@@ -38,7 +38,7 @@ from vaara.attestation._receipt_types import (
     CryptoPosture,
     ExecutionReceipt,
 )
-from vaara.attestation._sep2787_types import AttestationError
+from vaara.attestation._attest_types import AttestationError
 
 # alg -> (CycloneDX primitive, NIST post-quantum security category).
 # Classical suites carry no quantum resistance (level 0); ML-DSA-65 is FIPS 204

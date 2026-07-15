@@ -16,7 +16,7 @@ for _mod in ("rfc8785", "cryptography"):
 
 from cryptography.hazmat.primitives.asymmetric import ec, rsa  # noqa: E402
 
-from vaara.attestation.sep2787 import (  # noqa: E402
+from vaara.attestation.tool_call_attestation import (  # noqa: E402
     ArgsRef,
     Attestation,
     AttestationError,

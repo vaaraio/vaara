@@ -233,7 +233,7 @@ class RevocationRegistry:
 
     def canonical_bytes(self) -> bytes:
         """RFC 8785 JCS bytes over :meth:`to_dict`, for a stable digest."""
-        from vaara.attestation._sep2787_canonical import canonical_json
+        from vaara.attestation._attest_canonical import canonical_json
 
         return canonical_json(self.to_dict())
 
@@ -330,7 +330,7 @@ def receipt_leaf_bytes(receipt: ExecutionReceipt) -> bytes:
     The natural transparency-log leaf for a receipt: the complete signed
     record, so the logged bytes pin the exact receipt instance.
     """
-    from vaara.attestation._sep2787_canonical import canonical_json
+    from vaara.attestation._attest_canonical import canonical_json
 
     return canonical_json(receipt.to_dict())
 

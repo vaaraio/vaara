@@ -25,7 +25,7 @@ from dataclasses import dataclass
 from decimal import Decimal, InvalidOperation
 from typing import Any
 
-from vaara.attestation._sep2787_types import AttestationError
+from vaara.attestation._attest_types import AttestationError
 
 CAPABILITY_KEYS = frozenset({"arg", "op", "value"})
 NUMERIC_OPS = frozenset({"le", "ge"})

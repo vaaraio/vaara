@@ -68,7 +68,7 @@ vaara attest verify  0000000001-ab12cd34-attest.json  --pubkey-file attest_key.p
 vaara receipt verify 0000000001-ab12cd34-receipt.json --attestation 0000000001-ab12cd34-attest.json --pubkey-file attest_key.pem.pub
 ```
 
-Both verifiers exit non-zero on any failed check, so they drop straight into CI. Format in [execution-receipts.md](execution-receipts.md), conformance surface in [sep2787-conformance.md](sep2787-conformance.md).
+Both verifiers exit non-zero on any failed check, so they drop straight into CI. Format in [execution-receipts.md](execution-receipts.md), conformance surface in [attestation-conformance.md](attestation-conformance.md).
 
 ## HTTP API
 

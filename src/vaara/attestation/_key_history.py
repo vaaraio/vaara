@@ -198,7 +198,7 @@ class KeyHistory:
 
     def canonical_bytes(self) -> bytes:
         """RFC 8785 JCS bytes over :meth:`to_dict`, for a stable digest."""
-        from vaara.attestation._sep2787_canonical import canonical_json
+        from vaara.attestation._attest_canonical import canonical_json
 
         return canonical_json(self.to_dict())
 

@@ -24,7 +24,7 @@ import rfc8785
 from cryptography.hazmat.primitives import serialization
 from cryptography.hazmat.primitives.asymmetric import ec
 
-from vaara.attestation._sep2787_canonical import iso8601_to_epoch, make_args_digest
+from vaara.attestation._attest_canonical import iso8601_to_epoch, make_args_digest
 from vaara.credential import Capability, GrantBinding, GrantScope, emit_grant, verify_grant
 from vaara.credential._authorization_receipt import mint_authorization_receipt
 

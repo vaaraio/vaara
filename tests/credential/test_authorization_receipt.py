@@ -19,7 +19,7 @@ pytest.importorskip("cryptography")
 
 from cryptography.hazmat.primitives.asymmetric import ec  # noqa: E402
 
-from vaara.attestation._sep2787_canonical import (  # noqa: E402
+from vaara.attestation._attest_canonical import (  # noqa: E402
     canonical_json,
     iso8601_to_epoch,
     make_args_digest,

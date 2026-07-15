@@ -29,7 +29,7 @@ from pathlib import Path
 from cryptography.hazmat.primitives import serialization
 from cryptography.hazmat.primitives.asymmetric import ec, rsa
 
-from vaara.attestation.sep2787 import (
+from vaara.attestation.tool_call_attestation import (
     PayloadDerived,
     PlannerDeclared,
     ToolCallBinding,

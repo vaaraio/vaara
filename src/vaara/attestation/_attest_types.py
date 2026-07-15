@@ -1,6 +1,6 @@
 """Dataclasses and serialization helpers for SEP-2787 envelopes.
 
-Internal module. Public surface is in ``vaara.attestation.sep2787``.
+Internal module. Public surface is in ``vaara.attestation.tool_call_attestation``.
 
 v2 envelope shape lands the four changes Vaara committed to in
 ``modelcontextprotocol/modelcontextprotocol#2787`` after the trust-surface

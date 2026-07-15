@@ -36,7 +36,7 @@ from vaara.attestation.receipt import (  # noqa: E402
     verify_tpm_binding,
     verify_tpm_bundle,
 )
-from vaara.attestation.sep2787 import (  # noqa: E402
+from vaara.attestation.tool_call_attestation import (  # noqa: E402
     PayloadDerived,
     PlannerDeclared,
     ToolCallBinding,

@@ -50,7 +50,7 @@ from vaara.attestation._receipt_identity import (
 )
 from vaara.attestation._receipt_types import ExecutionReceipt
 from vaara.attestation._revocation import _parse_iso, revoked_in_time
-from vaara.attestation._sep2787_types import AttestationError
+from vaara.attestation._attest_types import AttestationError
 
 # A DID document is a small JSON file. Cap the read so a misbehaving or
 # hostile host cannot stream an unbounded body into the verifier.

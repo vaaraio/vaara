@@ -24,7 +24,7 @@ execution receipt that answers the same call. A decision record is a
 durable record rather than a time-bounded capability, so there is no TTL.
 
 Canonicalization (RFC 8785 JCS) and signing (HS256 / ES256 / RS256) are
-shared with ``vaara.attestation.sep2787`` and the receipt module
+shared with ``vaara.attestation.tool_call_attestation`` and the receipt module
 unchanged. A verifier that already checks SEP-2787 signatures needs no
 new crypto to check decision records.
 

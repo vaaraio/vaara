@@ -33,7 +33,7 @@ from vaara.attestation.decision import (
     emit_decision_record,
     make_back_link,
 )
-from vaara.attestation.sep2787 import (
+from vaara.attestation.tool_call_attestation import (
     PayloadDerived,
     PlannerDeclared,
     ToolCallBinding,

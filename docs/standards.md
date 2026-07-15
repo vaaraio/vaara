@@ -1,6 +1,6 @@
 # Standards and attestation
 
-Vaara's standards-aligned outputs: OVERT 1.0 envelopes, the SEP-2787 execution-receipt pair, and the sovereign inference harness. For the verifier trust model behind each, see [verifying-evidence.md](verifying-evidence.md). For the SEP-2787 request-attestation format and conformance surface, see [execution-receipts.md](execution-receipts.md) and [sep2787-conformance.md](sep2787-conformance.md).
+Vaara's standards-aligned outputs: OVERT 1.0 envelopes, the SEP-2787 execution-receipt pair, and the sovereign inference harness. For the verifier trust model behind each, see [verifying-evidence.md](verifying-evidence.md). For the SEP-2787 request-attestation format and conformance surface, see [execution-receipts.md](execution-receipts.md) and [attestation-conformance.md](attestation-conformance.md).
 
 ## OVERT 1.0 attestation
 

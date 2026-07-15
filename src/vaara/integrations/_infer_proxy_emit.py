@@ -37,7 +37,7 @@ class InferenceAttestEmitter:
         secret_version: str,
         exp_seconds: int = 300,
     ) -> None:
-        from vaara.attestation._sep2787_types import VALID_ALGS
+        from vaara.attestation._attest_types import VALID_ALGS
 
         if alg not in VALID_ALGS:
             raise InferProxyConfigError(
@@ -107,7 +107,7 @@ class InferenceAttestEmitter:
         """Build, sign, and persist the back-linked InferenceReceipt."""
         try:
             from vaara.attestation._inference_types import InferenceOutcome
-            from vaara.attestation._sep2787_canonical import now_iso8601
+            from vaara.attestation._attest_canonical import now_iso8601
             from vaara.attestation.inference import (
                 emit_inference_receipt, make_inference_back_link,
                 make_output_commitment,

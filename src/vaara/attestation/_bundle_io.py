@@ -116,7 +116,7 @@ def evidence_bundle_from_json(doc: dict[str, Any]) -> EvidenceBundle:
 
     attestation = None
     if doc.get("attestation") is not None:
-        from vaara.attestation._sep2787_types import attestation_from_dict
+        from vaara.attestation._attest_types import attestation_from_dict
 
         try:
             attestation = attestation_from_dict(

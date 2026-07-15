@@ -53,7 +53,7 @@ import hmac
 from dataclasses import dataclass
 from typing import Any, Optional
 
-from vaara.attestation._sep2787_canonical import canonical_json
+from vaara.attestation._attest_canonical import canonical_json
 from vaara.attestation.tee import (
     SIGNATURE_ALGO_ECDSA_P384_SHA384,
     TEEAttestationError,

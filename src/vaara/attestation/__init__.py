@@ -18,7 +18,7 @@ independently-operated log at the same call sites. As of v0.17.0,
 the ``vaara overt verify`` CLI validates any OVERT 1.0 Base Envelope
 produced by a conformant emitter, Vaara or otherwise.
 
-**SEP-2787 v2** (``vaara.attestation.sep2787``). Per-tool-call JSON
+**SEP-2787 v2** (``vaara.attestation.tool_call_attestation``). Per-tool-call JSON
 envelope carried inside MCP ``_meta``. Three trust-surface blocks
 (``plannerDeclared``, ``issuerAsserted``, ``payloadDerived``) plus a
 signature computed over the JCS-canonical encoding of those four
@@ -29,7 +29,7 @@ byte-identically. Reference implementation pinned at tag
 ``sep2787-ref-v2``.
 
 The two envelopes coexist. Field-level mapping lives in
-``docs/sep2787-overt-mapping.md``.
+``docs/attestation-overt-mapping.md``.
 
 Install: ``pip install 'vaara[attestation]'``.
 
@@ -81,7 +81,7 @@ from vaara.attestation.tee import (
     verify_envelope_binding,
     verify_sev_snp_report_signature,
 )
-from vaara.attestation.sep2787 import (
+from vaara.attestation.tool_call_attestation import (
     Algorithm as SEP2787Algorithm,
     ArgsCommitment as SEP2787ArgsCommitment,
     ArgsProjection,

@@ -45,7 +45,7 @@ from vaara.attestation._receipt_types import (
     receipt_asserted_from_dict,
     receipt_asserted_to_dict,
 )
-from vaara.attestation._sep2787_types import (
+from vaara.attestation._attest_types import (
     VALID_ALGS,
     Algorithm,
     ArgsCommitment,

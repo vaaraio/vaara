@@ -42,7 +42,7 @@ from vaara.attestation._receipt_types import (
     receipt_asserted_from_dict,
     receipt_asserted_to_dict,
 )
-from vaara.attestation._sep2787_types import VALID_ALGS, Algorithm, AttestationError
+from vaara.attestation._attest_types import VALID_ALGS, Algorithm, AttestationError
 
 # The governing server's issuer block is identical in shape to the
 # receipt's ``receiptAsserted`` (iss, sub, iat, nonce, secretVersion,

@@ -25,8 +25,8 @@ import hashlib
 from dataclasses import dataclass
 from typing import Any, Optional
 
-from vaara.attestation._sep2787_canonical import canonical_json, new_nonce
-from vaara.attestation._sep2787_types import AttestationError
+from vaara.attestation._attest_canonical import canonical_json, new_nonce
+from vaara.attestation._attest_types import AttestationError
 from vaara.audit.signer import Signer, Verifier
 
 SCHEMA = "vaara.data-locality/v0"

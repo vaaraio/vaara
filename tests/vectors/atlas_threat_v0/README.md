@@ -46,7 +46,7 @@ commitment = "sha256:" + hex(SHA256(JCS({"digest": step1})))
 ```
 
 JCS (RFC 8785) is the canonicalizer. The double-hash mirrors the
-`make_args_digest` derivation in `vaara.attestation._sep2787_canonical`.
+`make_args_digest` derivation in `vaara.attestation._attest_canonical`.
 
 ## Verification contract
 

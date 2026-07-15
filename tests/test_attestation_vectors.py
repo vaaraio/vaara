@@ -28,7 +28,7 @@ for _mod in ("rfc8785", "cryptography"):
 
 from cryptography.hazmat.primitives import serialization  # noqa: E402
 
-from vaara.attestation.sep2787 import (  # noqa: E402
+from vaara.attestation.tool_call_attestation import (  # noqa: E402
     AttestationError,
     parse_attestation,
     verify_args_commitment,

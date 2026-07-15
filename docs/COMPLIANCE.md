@@ -395,7 +395,7 @@ per-tool-call JSON envelope carried inside MCP transport. A
 deployment can run both: the OVERT envelope binds the action chain
 while the SEP-2787 envelope binds the specific tool-call payload.
 Field-level mapping between the two lives in
-[`sep2787-overt-mapping.md`](sep2787-overt-mapping.md).
+[`attestation-overt-mapping.md`](attestation-overt-mapping.md).
 
 `parse_attestation(d)` provides full wire round-trip: a third-party
 consumer of the published v0 test vectors can parse JSON bytes,

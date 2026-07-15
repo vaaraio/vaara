@@ -205,7 +205,7 @@ attestations encoded as deterministic CBOR. SEP-2787 v2 envelopes
 in MCP `_meta`. This audit-event schema is the full per-event
 lifecycle log. The three coexist: an OVERT or SEP-2787 envelope can
 back-link to the audit event that recorded the same action via
-`record_id`. See `docs/sep2787-overt-mapping.md` for the
+`record_id`. See `docs/attestation-overt-mapping.md` for the
 OVERT ↔ SEP-2787 field mapping.
 
 ## Reference implementation

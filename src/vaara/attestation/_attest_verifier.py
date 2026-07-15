@@ -1,6 +1,6 @@
 """SEP-2787 verifier step 5: argument commitment verification.
 
-Internal module. Public surface is in ``vaara.attestation.sep2787``.
+Internal module. Public surface is in ``vaara.attestation.tool_call_attestation``.
 
 Implements step 5 of the verification rules in the SEP-2787 draft:
 
@@ -30,8 +30,8 @@ import json
 from dataclasses import dataclass
 from typing import Any, Callable, Literal, Optional
 
-from vaara.attestation._sep2787_canonical import canonical_json
-from vaara.attestation._sep2787_types import (
+from vaara.attestation._attest_canonical import canonical_json
+from vaara.attestation._attest_types import (
     ArgsCommitment,
     ArgsProjection,
     ArgsRef,

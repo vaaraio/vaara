@@ -48,7 +48,7 @@ from vaara.attestation._inference_verify import (
     _pair_dir,
     _verify_one,
 )
-from vaara.attestation._sep2787_types import AttestationError
+from vaara.attestation._attest_types import AttestationError
 
 INFERENCE_CHAIN_SCHEMA = "vaara.inference-chain/v0"
 

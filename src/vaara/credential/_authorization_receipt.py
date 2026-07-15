@@ -37,7 +37,7 @@ import hashlib
 from dataclasses import dataclass
 from typing import Any, Literal, Optional, cast
 
-from vaara.attestation._sep2787_canonical import canonical_json, now_iso8601
+from vaara.attestation._attest_canonical import canonical_json, now_iso8601
 from vaara.attestation.decision import (
     BackLink,
     DecisionDerived,

@@ -21,8 +21,8 @@ from dataclasses import dataclass
 from typing import Literal, Optional
 
 from vaara.attestation._receipt_types import BackLink, ExecutionReceipt
-from vaara.attestation._sep2787_canonical import canonical_json
-from vaara.attestation._sep2787_types import Attestation
+from vaara.attestation._attest_canonical import canonical_json
+from vaara.attestation._attest_types import Attestation
 
 BACK_LINK_MISMATCH: Literal["back_link_mismatch"] = "back_link_mismatch"
 FALLBACK_BINDING_MALFORMED: Literal["fallback_binding_malformed"] = (

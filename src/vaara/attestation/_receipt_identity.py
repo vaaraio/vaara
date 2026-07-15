@@ -27,7 +27,7 @@ from typing import Any, Optional
 
 from vaara.attestation._receipt_emit import verify_receipt_signature
 from vaara.attestation._receipt_types import ExecutionReceipt
-from vaara.attestation._sep2787_types import AttestationError
+from vaara.attestation._attest_types import AttestationError
 
 _DID_WEB_PREFIX = "did:web:"
 

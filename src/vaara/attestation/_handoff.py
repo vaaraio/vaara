@@ -65,8 +65,8 @@ from vaara.attestation._receipt_retention import (
 )
 from vaara.attestation._receipt_types import receipt_from_dict
 from vaara.attestation._revocation import RevocationRegistry
-from vaara.attestation._sep2787_canonical import canonical_json
-from vaara.attestation._sep2787_types import AttestationError
+from vaara.attestation._attest_canonical import canonical_json
+from vaara.attestation._attest_types import AttestationError
 
 SCHEMA = "vaara.cross-org-handoff/v0"
 
@@ -296,7 +296,7 @@ def _verify_holder_attestation(
         return False
     try:
         from vaara.attestation._receipt_identity import _jwk_to_public_key
-        from vaara.attestation._sep2787_signing import verify_es256, verify_rs256
+        from vaara.attestation._attest_signing import verify_es256, verify_rs256
     except ImportError:
         return False
     try:
@@ -676,7 +676,7 @@ def sign_manifest(
     """
     if alg not in _HOLDER_ALGS:
         raise ValueError(f"holder attestation alg must be one of {_HOLDER_ALGS}")
-    from vaara.attestation._sep2787_signing import sign_es256, sign_rs256
+    from vaara.attestation._attest_signing import sign_es256, sign_rs256
 
     payload = canonical_json(manifest)
     if alg == "ES256":

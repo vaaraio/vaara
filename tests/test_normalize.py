@@ -74,6 +74,18 @@ def test_detect_each_format():
     assert detect_format(["not", "an", "object"]) == "unknown"
 
 
+def test_vaara_attest_alias_maps_to_the_attestation_source():
+    """`vaara-attest` is the de-branded name for the tool-call attestation
+    source; it maps to the same profile and leaves the emitted sourceFormat
+    unchanged for one release."""
+    pytest.importorskip("rfc8785")
+    doc = _input("sep2787_attestation")
+    aliased = normalize(doc, source_format="vaara-attest").to_dict()
+    canonical = normalize(doc, source_format="sep2787").to_dict()
+    assert aliased == canonical
+    assert aliased["sourceFormat"] == "sep2787"
+
+
 def test_bare_authorization_object_detected():
     bare = {"reason": "insufficient_authorization", "authorizationContextId": "x"}
     assert detect_format(bare) == "sep2643"

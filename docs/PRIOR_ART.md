@@ -49,7 +49,7 @@ verify against the PyPI history and the `vX.Y.Z` git tags regardless of license 
 | Destination-aware features (`dst__*`) and v7 production classifier | v0.36.0, 2026-05-25 | `src/vaara/adversarial_classifier.py`, `scripts/train_adversarial_classifier.py` |
 | MCP proxy HTTP transport with multi-upstream fan-out | v0.40.0, 2026-05-28 | `src/vaara/integrations/mcp_proxy.py`, `CHANGELOG.md` v0.40.0 |
 | Signed execution-receipt envelope paired with request attestation (three blocks: `backLink`, `receiptAsserted`, `outcomeDerived`) | v0.42.0, 2026-05-29 | `src/vaara/attestation/receipt.py`, `docs/execution-receipts.md` |
-| Standalone attestation-envelope verifier (`vaara attest verify`) | v0.44.0, 2026-05-30 | `src/vaara/attestation/`, `docs/sep2787-conformance.md` |
+| Standalone attestation-envelope verifier (`vaara attest verify`) | v0.44.0, 2026-05-30 | `src/vaara/attestation/`, `docs/attestation-conformance.md` |
 | Remote MCP upstream connector (`--upstream-url`) over Streamable HTTP | v0.45.0, 2026-05-30 | `src/vaara/integrations/mcp_proxy.py` |
 | External time anchoring of the audit hash chain (RFC 3161 / eIDAS existence-in-time) | v0.48.0, 2026-05-31 | `src/vaara/audit/timeanchor.py`, `README.md` |
 | `vaara.attestation.decision`: decision records with supersession resolution | v0.49.0, 2026-05-31 | `src/vaara/attestation/decision.py` |

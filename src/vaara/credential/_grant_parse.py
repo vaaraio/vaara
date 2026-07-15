@@ -12,7 +12,7 @@ from __future__ import annotations
 
 from typing import Any
 
-from vaara.attestation._sep2787_types import VALID_ALGS, AttestationError
+from vaara.attestation._attest_types import VALID_ALGS, AttestationError
 from vaara.credential._grant_capability import Capability, capability_from_dict
 from vaara.credential._grant_types import (
     ASSERTED_KEYS,
