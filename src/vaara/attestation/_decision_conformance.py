@@ -2,8 +2,12 @@
 
 The sibling of ``_receipt_conformance``. A decision record is the
 *before* half of an execution record: the governing server's verdict
-(``allow`` / ``block`` / ``escalate``) and the basis for it, pinned to the
-same SEP-2787 attestation the outcome record answers. This checks that a
+(``allow`` / ``block`` / ``escalate``) and the basis for it. The basis can
+be carried three ways, strongest to weakest for reading the "why": a
+native ``rationale`` (the rule that fired, a human reason, and the
+declared intent the call was judged against, all in this record); an
+optional content-addressed ``evidenceRef``; and a ``backLink`` digest to
+the prior attestation the outcome record answers. This checks that a
 candidate is a well-formed decision record, with no signing key and no
 matching attestation, so a neutral party can judge a record someone else
 produced.
@@ -20,6 +24,7 @@ it runs in the base install beside ``verify-records``.
 
 from __future__ import annotations
 
+import hashlib
 from typing import Any, Optional
 
 from vaara.attestation._receipt_conformance import (
@@ -135,7 +140,123 @@ def _check_decision_derived(dd: Any, add: Any) -> Optional[str]:
                 f"decisionDerived.{field} SHOULD be a decimal string, not a number")
     if "evidenceRef" in dd:
         _check_evidence_ref(dd["evidenceRef"], add)
+    if "rationale" in dd:
+        _check_rationale(dd["rationale"], add)
+    if "binding" in dd:
+        _check_binding(dd["binding"], dd.get("rationale"), add)
+    if "decisionProof" in dd:
+        _check_decision_proof(dd["decisionProof"], dd.get("binding"), add)
     return verdict if isinstance(verdict, str) else None
+
+
+def _check_decision_proof(p: Any, binding: Any, add: Any) -> None:
+    """Check the decisionProof envelope shape (keyless).
+
+    ``decisionProof`` is the wire format for a succinct proof that the
+    verdict is the correct output of the committed policy on the committed
+    intent and inputs, without revealing them. This checks the envelope
+    only: the proof system name, that ``publicInputs`` carries a
+    well-formed ``bindingDigest``, that the proof is hex, and that the
+    verifier parameters are pinned by digest so the proof names an exact
+    circuit. Verifying the proof itself needs the proving system and lives
+    behind the attestation extra, the same split signatures and anchors
+    use. Where a ``binding`` is present, the proof's public bindingDigest
+    MUST equal it, so the record self-attests the proof is about this exact
+    commitment with no proving system in the loop.
+    """
+    if not isinstance(p, dict):
+        add("decision_proof_object", False, REQUIRED,
+            "decisionDerived.decisionProof MUST be an object")
+        return
+    add("decision_proof_object", True, REQUIRED,
+        "decisionDerived.decisionProof is an object")
+    add("decision_proof_system",
+        isinstance(p.get("proofSystem"), str) and bool(p.get("proofSystem")), REQUIRED,
+        "decisionProof.proofSystem MUST be a non-empty string")
+    pi = p.get("publicInputs")
+    add("decision_proof_public_inputs_object", isinstance(pi, dict), REQUIRED,
+        "decisionProof.publicInputs MUST be an object")
+    bd = pi.get("bindingDigest") if isinstance(pi, dict) else None
+    add("decision_proof_binding_digest_format",
+        isinstance(bd, str) and bool(_DIGEST_RE.match(bd)), REQUIRED,
+        "decisionProof.publicInputs.bindingDigest MUST be 'sha256:<64 lowercase hex>'")
+    pf = p.get("proof")
+    add("decision_proof_bytes",
+        isinstance(pf, str) and bool(_HEX_RE.match(pf)) and len(pf) % 2 == 0, REQUIRED,
+        "decisionProof.proof MUST be an even-length lowercase hex string")
+    vpd = p.get("verifierParamsDigest")
+    add("decision_proof_params_digest",
+        isinstance(vpd, str) and bool(_DIGEST_RE.match(vpd)), REQUIRED,
+        "decisionProof.verifierParamsDigest MUST be 'sha256:<64 lowercase hex>'")
+    if isinstance(binding, dict) and isinstance(binding.get("bindingDigest"), str) \
+            and isinstance(bd, str):
+        add("decision_proof_binds_commitment", bd == binding["bindingDigest"], REQUIRED,
+            "decisionProof.publicInputs.bindingDigest MUST equal "
+            "decisionDerived.binding.bindingDigest")
+
+
+def _check_rationale(r: Any, add: Any) -> None:
+    """Check the optional native decision rationale.
+
+    The legible, in-record answer to "why this verdict": the rule that
+    fired, a human reason, and the declared intent the call was judged
+    against. Unlike ``evidenceRef`` (a content-addressed pointer) and the
+    ``backLink`` (a digest of a separate attestation), this carries the
+    intent and reason in the 2828 record itself, so the differential
+    between one call and another reads without dereferencing anything.
+    Fires only when present; every field is required once it does.
+    """
+    if not isinstance(r, dict):
+        add("rationale_object", False, REQUIRED,
+            "decisionDerived.rationale MUST be an object")
+        return
+    add("rationale_object", True, REQUIRED, "decisionDerived.rationale is an object")
+    add("rationale_rule",
+        isinstance(r.get("rule"), str) and bool(r.get("rule")), REQUIRED,
+        "rationale.rule MUST be a non-empty string (the policy rule that fired)")
+    add("rationale_reason",
+        isinstance(r.get("reason"), str) and bool(r.get("reason")), REQUIRED,
+        "rationale.reason MUST be a non-empty string (a human-legible reason)")
+    add("rationale_declared_intent",
+        isinstance(r.get("declaredIntent"), str) and bool(r.get("declaredIntent")),
+        REQUIRED,
+        "rationale.declaredIntent MUST be a non-empty string (the intent judged)")
+    if "intentSatisfied" in r:
+        add("rationale_intent_satisfied_type",
+            isinstance(r["intentSatisfied"], bool), ADVISORY,
+            "rationale.intentSatisfied SHOULD be a boolean when present")
+
+
+def _check_binding(b: Any, rationale: Any, add: Any) -> None:
+    """Check the optional decision binding: commitments that pin the verdict.
+
+    ``binding`` carries content-addressed commitments to the exact policy,
+    intent, and inputs a verdict was computed over, plus a single
+    ``bindingDigest`` a succinct proof of decision correctness (a later
+    layer) opens. Digest-only, so the sensitive policy or intent need not
+    ship. Where the declared intent is also in the record, its digest is
+    recomputed from the bytes here, keyless, the same self-proving pattern
+    the receipt uses for its projection digest. Fires only when present.
+    """
+    if not isinstance(b, dict):
+        add("binding_object", False, REQUIRED,
+            "decisionDerived.binding MUST be an object")
+        return
+    add("binding_object", True, REQUIRED, "decisionDerived.binding is an object")
+    for key, check_id in (
+        ("policyDigest", "binding_policy_digest"),
+        ("intentDigest", "binding_intent_digest"),
+        ("inputsDigest", "binding_inputs_digest"),
+        ("bindingDigest", "binding_commitment_digest"),
+    ):
+        val = b.get(key)
+        add(check_id, isinstance(val, str) and bool(_DIGEST_RE.match(val)), REQUIRED,
+            f"binding.{key} MUST be 'sha256:<64 lowercase hex>'")
+    declared = rationale.get("declaredIntent") if isinstance(rationale, dict) else None
+    if isinstance(declared, str) and isinstance(b.get("intentDigest"), str):
+        want = "sha256:" + hashlib.sha256(declared.encode("utf-8")).hexdigest()
+        add("binding_intent_self_consistent", b["intentDigest"] == want, REQUIRED,
+            "binding.intentDigest MUST equal sha256 over rationale.declaredIntent bytes")
 
 
 def _check_evidence_ref(er: Any, add: Any) -> None:

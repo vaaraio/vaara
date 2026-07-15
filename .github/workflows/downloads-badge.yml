@@ -1,9 +1,11 @@
 name: Downloads badge
 
 # Sums all-time PyPI + npm downloads and writes a shields.io endpoint JSON
-# (.github/badges/installs.json) that the README badge points at. Keyless:
-# PyPI total comes from the public ClickHouse pypi dataset, npm from the
-# registry downloads API. Runs weekly and on demand.
+# to the unprotected `badges` branch (installs.json at its root), which the
+# README badge and the website both read. Keyless: PyPI total comes from the
+# public ClickHouse pypi dataset, npm from the registry downloads API. Runs
+# weekly and on demand. It publishes to `badges` rather than `main` because
+# the main ruleset requires a pull request, which a bot push cannot satisfy.
 
 on:
   schedule:
@@ -21,7 +23,10 @@ jobs:
   refresh:
     runs-on: ubuntu-latest
     steps:
-      - uses: actions/checkout@v4
+      - name: Check out the badges branch
+        uses: actions/checkout@v4
+        with:
+          ref: badges
 
       - name: Compute combined all-time installs
         run: |
@@ -47,18 +52,18 @@ jobs:
 
           msg=$(awk -v n="$total" 'BEGIN{ if (n>=1000) printf "%.1fk all-time", n/1000; else printf "%d all-time", n }')
           printf '{"schemaVersion":1,"label":"downloads","message":"%s","total":%d,"color":"1f6feb"}\n' "$msg" "$total" \
-            > .github/badges/installs.json
-          cat .github/badges/installs.json
+            > installs.json
+          cat installs.json
 
       - name: Commit if changed
         run: |
           set -euo pipefail
           git config user.name "github-actions[bot]"
           git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
-          git add .github/badges/installs.json
+          git add installs.json
           if git diff --staged --quiet; then
             echo "no change"
           else
-            git commit -m "chore(badge): refresh combined install count [skip ci]"
-            git push
+            git commit -m "chore(badge): refresh combined install count"
+            git push origin HEAD:badges
           fi
