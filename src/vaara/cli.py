@@ -2199,6 +2199,9 @@ def _cmd_verify_record(args: argparse.Namespace) -> int:
         report = check_record_conformance(doc)
         proof = None
     back_link = _record_back_link(args.attestation, doc) if args.attestation else None
+    existence = _verify_single_existence_proof(
+        doc, getattr(args, "trusted_issuer_cert", None)
+    )
 
     if args.json:
         out: dict[str, Any] = {"conformance": report.to_dict()}
@@ -2206,6 +2209,8 @@ def _cmd_verify_record(args: argparse.Namespace) -> int:
             out["decisionProof"] = proof
         if back_link is not None:
             out["backLink"] = back_link
+        if existence is not None:
+            out["existenceProof"] = existence
         print(json.dumps(out, indent=2))
     else:
         print(f"conformance: {'CONFORMS' if report.conforms else 'NON-CONFORMING'}")
@@ -2225,12 +2230,24 @@ def _cmd_verify_record(args: argparse.Namespace) -> int:
             bstate = "n/a" if back_link.get("skipped") else (
                 "pass" if back_link["ok"] else "FAIL")
             print(f"  back-link: {bstate}  {back_link['detail']}")
+        if existence is not None:
+            if not existence["ran"]:
+                estate = "n/a"
+            elif not existence["ok"]:
+                estate = "FAIL"
+            else:
+                estate = "qualified" if existence["qualified"] else "self-asserted"
+            at = existence.get("attestedTime")
+            suffix = f"  @ {at}" if at else ""
+            print(f"  existence: {estate}{suffix}  {existence['detail']}")
 
     if not report.conforms:
         return 1
     if proof is not None and proof["ran"] and not proof["ok"]:
         return 1
     if back_link is not None and not back_link["ok"] and not back_link.get("skipped"):
+        return 1
+    if existence is not None and existence["ran"] and not existence["ok"]:
         return 1
     return 0
 
@@ -2253,6 +2270,42 @@ def _verify_single_decision_proof(doc: Any) -> Optional[dict[str, Any]]:
                 "detail": "proof engine unavailable; proof present but unverified"}
     ok, reason = verify_decision_proof(dd)
     return {"ran": True, "ok": ok, "detail": reason}
+
+
+def _verify_single_existence_proof(
+    doc: Any, trusted_issuer_cert_path: Optional[str]
+) -> Optional[dict[str, Any]]:
+    """Verify a record's existenceProof if it carries one.
+
+    Returns ``None`` when absent, else
+    ``{ran, ok, qualified, basis, attestedTime, detail}``. ``ran`` is False
+    when the timeanchor extra is missing, in which case the proof is reported
+    present-but-unverified rather than failing the record. A missing or
+    non-matching trusted-list pin makes the attested time self-asserted, not a
+    failure; only a broken or mis-imprinted token sets ``ok`` False.
+    """
+    if not (isinstance(doc, dict) and isinstance(doc.get("existenceProof"), dict)):
+        return None
+    from vaara.attestation.receipt import verify_existence_proof
+
+    pin = None
+    if trusted_issuer_cert_path:
+        try:
+            pin = Path(trusted_issuer_cert_path).expanduser().read_bytes()
+        except OSError as exc:
+            return {"ran": False, "ok": None, "qualified": False, "basis": None,
+                    "attestedTime": None,
+                    "detail": f"cannot read trusted issuer cert: {exc}"}
+    try:
+        res = verify_existence_proof(doc, trusted_issuer_cert=pin)
+    except ImportError:
+        return {"ran": False, "ok": None, "qualified": False, "basis": None,
+                "attestedTime": None,
+                "detail": "timeanchor extra unavailable; existence proof present "
+                          "but unverified"}
+    return {"ran": True, "ok": res.ok, "qualified": res.qualified,
+            "basis": res.basis, "attestedTime": res.attested_time,
+            "detail": res.reason}
 
 
 def _record_back_link(attestation_path: str, doc: Any) -> dict[str, Any]:
@@ -4990,6 +5043,14 @@ def build_parser() -> argparse.ArgumentParser:
         "--attestation", default=None,
         help="Path to the tool-call attestation the record answers; when given, "
              "the back-link is verified (no key needed)",
+    )
+    pvr.add_argument(
+        "--trusted-issuer-cert", default=None,
+        help="Path to a CA certificate (PEM or DER) you pin from a trusted list, "
+             "e.g. an EU-trusted-list eIDAS QTSA issuer. When given, a record's "
+             "existenceProof is graded QUALIFIED only if its timestamp signer "
+             "chains to this CA; otherwise the attested time is reported as "
+             "self-asserted. Needs the timeanchor extra.",
     )
     pvr.add_argument(
         "--json", action="store_true",

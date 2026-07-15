@@ -1,0 +1,154 @@
+{
+  "cases": [
+    {
+      "name": "qualified_ok",
+      "record": {
+        "version": 1,
+        "alg": "ES256",
+        "backLink": {
+          "attestationDigest": "sha256:aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+          "attestationNonce": "n-tool:read"
+        },
+        "outcomeDerived": {
+          "status": "executed",
+          "completedAt": "2026-07-15T08:59:00Z"
+        },
+        "receiptAsserted": {
+          "alg": "ES256",
+          "iat": "2026-07-15T08:59:00Z",
+          "iss": "did:web:issuer.example",
+          "nonce": "n-tool:read",
+          "secretVersion": "1",
+          "sub": "tool:read"
+        },
+        "signature": "ab12cd34",
+        "existenceProof": {
+          "backend": "rfc3161-eidas-qualified",
+          "hashAlgorithm": "sha256",
+          "recordDigest": "sha256:fccd719e6e57b55e3aa2d29c07d81d652df27401af0fafb495374802f5f841ea",
+          "token": "MIIC0QYJKoZIhvcNAQcCoIICwjCCAr4CAQMxDzANBglghkgBZQMEAgEFADBoBgsqhkiG9w0BCRABBKBZBFcwVQIBAQYJKwYBBAGGjR8BMDEwDQYJYIZIAWUDBAIBBQAEIPzNcZ5uV7VeOqLSnAfYHWUt8nQBrw+vtJU3SAL1+EHqAgEBGA8yMDI2MDcxNTA5MDAwMFqgggFCMIIBPjCB5aADAgECAhQEvG/aatnepMGkhEtcND1s7RWMHTAKBggqhkjOPQQDAjAlMSMwIQYDVQQDDBpWYWFyYSBUZXN0IFRydXN0ZWQtTGlzdCBDQTAeFw0yMDAxMDEwMDAwMDBaFw0zNTAxMDEwMDAwMDBaMBoxGDAWBgNVBAMMD1ZhYXJhIFRlc3QgUVRTQTBZMBMGByqGSM49AgEGCCqGSM49AwEHA0IABP1Y7P9r3rxWrtkW09FPgWCvfXULpJanUFA7jGdKNeFjFzVoAqQGfBTkmp/4ebdSkR13cirRTxneRMpiop9FDuUwCgYIKoZIzj0EAwIDSAAwRQIhAJMZyyWuIknbzHzACN6FIaQNPqsSFTdHRVXiqpHYK1bWAiAnNllQvWiYq+RQC/HlFZT3kYSLQ0UzEYFViEhbyJ2kNzGB9zCB9AIBATA9MCUxIzAhBgNVBAMMGlZhYXJhIFRlc3QgVHJ1c3RlZC1MaXN0IENBAhQEvG/aatnepMGkhEtcND1s7RWMHTANBglghkgBZQMEAgEFAKBNMBoGCSqGSIb3DQEJAzENBgsqhkiG9w0BCRABBDAvBgkqhkiG9w0BCQQxIgQgxaZjRUUPGO1rsDNvz5Zkvg0tD7pgvoCR7tB98ZWlO/UwCgYIKoZIzj0EAwIERjBEAiBQLsQPuYKDds1s8zTWZwT15eoJgc8Q/JmMj4R21u4xWgIgVCDkN6tYSzv5mQ92uD+uScARCwo6BzHAOk6CV9eE7lA="
+        }
+      }
+    },
+    {
+      "name": "self_asserted_untrusted_issuer",
+      "record": {
+        "version": 1,
+        "alg": "ES256",
+        "backLink": {
+          "attestationDigest": "sha256:aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+          "attestationNonce": "n-tool:write"
+        },
+        "outcomeDerived": {
+          "status": "executed",
+          "completedAt": "2026-07-15T08:59:00Z"
+        },
+        "receiptAsserted": {
+          "alg": "ES256",
+          "iat": "2026-07-15T08:59:00Z",
+          "iss": "did:web:issuer.example",
+          "nonce": "n-tool:write",
+          "secretVersion": "1",
+          "sub": "tool:write"
+        },
+        "signature": "ab12cd34",
+        "existenceProof": {
+          "backend": "rfc3161-eidas-qualified",
+          "hashAlgorithm": "sha256",
+          "recordDigest": "sha256:b3f0f20970639bc0ec55adefc8c5cf7595baeafda9c660fbee8982725395c1d1",
+          "token": "MIICygYJKoZIhvcNAQcCoIICuzCCArcCAQMxDzANBglghkgBZQMEAgEFADBoBgsqhkiG9w0BCRABBKBZBFcwVQIBAQYJKwYBBAGGjR8BMDEwDQYJYIZIAWUDBAIBBQAEILPw8glwY5vA7FWt78jFz3WVuur9qcZg++6JgnJTlcHRAgEBGA8yMDI2MDcxNTA5MDAwMFqgggE8MIIBODCB4KADAgECAhQuBARl4XbFFXZlyu/XueksGYLfzDAKBggqhkjOPQQDAjAiMSAwHgYDVQQDDBdWYWFyYSBUZXN0IFVudHJ1c3RlZCBDQTAeFw0yMDAxMDEwMDAwMDBaFw0zNTAxMDEwMDAwMDBaMBgxFjAUBgNVBAMMDVVudHJ1c3RlZCBUU0EwWTATBgcqhkjOPQIBBggqhkjOPQMBBwNCAAQCAllwSGzTbVuAiBsdNxFBPv+7JsAIcu6WLjxBQ1Qdpi9ZKEV/F0i55aT0nWB6zJTiaVz7KC8vDxtm8OnS+Jv1MAoGCCqGSM49BAMCA0cAMEQCIGRgGpFfxvMy8GILK5MyfBIMtViR9+61jU1k0GKM9+7RAiB/fMKynDWqwlC4KuapRZ241+amCT0HGFWVGnm/2LrQnTGB9jCB8wIBATA6MCIxIDAeBgNVBAMMF1ZhYXJhIFRlc3QgVW50cnVzdGVkIENBAhQuBARl4XbFFXZlyu/XueksGYLfzDANBglghkgBZQMEAgEFAKBNMBoGCSqGSIb3DQEJAzENBgsqhkiG9w0BCRABBDAvBgkqhkiG9w0BCQQxIgQgrUhl3XahSJKIsslT1ASkNUnD7QGu5wL5/TDp8l8zIREwCgYIKoZIzj0EAwIESDBGAiEAxRgw8NyHz4SbWNIjWLNoTrjQBRW3R138CFwT1pSlt4QCIQCB084kWSGY1nGBKhQiZ9oKWIOwAxDhBaOZ9yVJJmr7/Q=="
+        }
+      }
+    },
+    {
+      "name": "neg_wrong_digest",
+      "record": {
+        "version": 1,
+        "alg": "ES256",
+        "backLink": {
+          "attestationDigest": "sha256:aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+          "attestationNonce": "n-tool:list"
+        },
+        "outcomeDerived": {
+          "status": "executed",
+          "completedAt": "2026-07-15T08:59:00Z"
+        },
+        "receiptAsserted": {
+          "alg": "ES256",
+          "iat": "2026-07-15T08:59:00Z",
+          "iss": "did:web:issuer.example",
+          "nonce": "n-tool:list",
+          "secretVersion": "1",
+          "sub": "tool:list"
+        },
+        "signature": "ab12cd34",
+        "existenceProof": {
+          "backend": "rfc3161-eidas-qualified",
+          "hashAlgorithm": "sha256",
+          "recordDigest": "sha256:142a4d4e4a72a5fbd82d514c1b3bc6e50e60913fdd4e696746f7065cd729c9a5",
+          "token": "MIIC0gYJKoZIhvcNAQcCoIICwzCCAr8CAQMxDzANBglghkgBZQMEAgEFADBoBgsqhkiG9w0BCRABBKBZBFcwVQIBAQYJKwYBBAGGjR8BMDEwDQYJYIZIAWUDBAIBBQAEIC28GpCtWK9s/To5viBbRMc4NfO7s+LhcZf4fh06f+ZSAgEBGA8yMDI2MDcxNTA5MDAwMFqgggFCMIIBPjCB5aADAgECAhQEvG/aatnepMGkhEtcND1s7RWMHTAKBggqhkjOPQQDAjAlMSMwIQYDVQQDDBpWYWFyYSBUZXN0IFRydXN0ZWQtTGlzdCBDQTAeFw0yMDAxMDEwMDAwMDBaFw0zNTAxMDEwMDAwMDBaMBoxGDAWBgNVBAMMD1ZhYXJhIFRlc3QgUVRTQTBZMBMGByqGSM49AgEGCCqGSM49AwEHA0IABP1Y7P9r3rxWrtkW09FPgWCvfXULpJanUFA7jGdKNeFjFzVoAqQGfBTkmp/4ebdSkR13cirRTxneRMpiop9FDuUwCgYIKoZIzj0EAwIDSAAwRQIhAJMZyyWuIknbzHzACN6FIaQNPqsSFTdHRVXiqpHYK1bWAiAnNllQvWiYq+RQC/HlFZT3kYSLQ0UzEYFViEhbyJ2kNzGB+DCB9QIBATA9MCUxIzAhBgNVBAMMGlZhYXJhIFRlc3QgVHJ1c3RlZC1MaXN0IENBAhQEvG/aatnepMGkhEtcND1s7RWMHTANBglghkgBZQMEAgEFAKBNMBoGCSqGSIb3DQEJAzENBgsqhkiG9w0BCRABBDAvBgkqhkiG9w0BCQQxIgQg0DNGUT8yZLy0ny0ktR8/d/juiK3rkh53NTpuS3jjli8wCgYIKoZIzj0EAwIERzBFAiB6IbflO1xWAcCxkDKU1uOlGVoNzSMyZy+C83+3C8/AWQIhAIPdVJVOhjWdWaq08eWVXOAwGC+XAFMfPXY39hjBFaxt"
+        }
+      }
+    },
+    {
+      "name": "neg_tampered_record",
+      "record": {
+        "version": 1,
+        "alg": "ES256",
+        "backLink": {
+          "attestationDigest": "sha256:aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+          "attestationNonce": "n-tool:delete"
+        },
+        "outcomeDerived": {
+          "status": "refused",
+          "completedAt": "2026-07-15T08:59:00Z"
+        },
+        "receiptAsserted": {
+          "alg": "ES256",
+          "iat": "2026-07-15T08:59:00Z",
+          "iss": "did:web:issuer.example",
+          "nonce": "n-tool:delete",
+          "secretVersion": "1",
+          "sub": "tool:delete"
+        },
+        "signature": "ab12cd34",
+        "existenceProof": {
+          "backend": "rfc3161-eidas-qualified",
+          "hashAlgorithm": "sha256",
+          "recordDigest": "sha256:716e81b89861006b7389095066eb8ab85b4c66beb9f7932862bce3ed941ba533",
+          "token": "MIIC0gYJKoZIhvcNAQcCoIICwzCCAr8CAQMxDzANBglghkgBZQMEAgEFADBoBgsqhkiG9w0BCRABBKBZBFcwVQIBAQYJKwYBBAGGjR8BMDEwDQYJYIZIAWUDBAIBBQAEIHFugbiYYQBrc4kJUGbrirhbTGa+ufeTKGK84+2UG6UzAgEBGA8yMDI2MDcxNTA5MDAwMFqgggFCMIIBPjCB5aADAgECAhQEvG/aatnepMGkhEtcND1s7RWMHTAKBggqhkjOPQQDAjAlMSMwIQYDVQQDDBpWYWFyYSBUZXN0IFRydXN0ZWQtTGlzdCBDQTAeFw0yMDAxMDEwMDAwMDBaFw0zNTAxMDEwMDAwMDBaMBoxGDAWBgNVBAMMD1ZhYXJhIFRlc3QgUVRTQTBZMBMGByqGSM49AgEGCCqGSM49AwEHA0IABP1Y7P9r3rxWrtkW09FPgWCvfXULpJanUFA7jGdKNeFjFzVoAqQGfBTkmp/4ebdSkR13cirRTxneRMpiop9FDuUwCgYIKoZIzj0EAwIDSAAwRQIhAJMZyyWuIknbzHzACN6FIaQNPqsSFTdHRVXiqpHYK1bWAiAnNllQvWiYq+RQC/HlFZT3kYSLQ0UzEYFViEhbyJ2kNzGB+DCB9QIBATA9MCUxIzAhBgNVBAMMGlZhYXJhIFRlc3QgVHJ1c3RlZC1MaXN0IENBAhQEvG/aatnepMGkhEtcND1s7RWMHTANBglghkgBZQMEAgEFAKBNMBoGCSqGSIb3DQEJAzENBgsqhkiG9w0BCRABBDAvBgkqhkiG9w0BCQQxIgQgymPMCApj3KGsPn5mJek8IzlaNHK1cRBvHckCJKlKBYkwCgYIKoZIzj0EAwIERzBFAiBC1+18pIP3g5VeYZzsDfa+MD9++H5EEH0Z5v9g/DcxtwIhAP/39OR1CDol17fUn61aE841Lo4cQfJpf16qlRt3+mIK"
+        }
+      }
+    },
+    {
+      "name": "neg_malformed_token",
+      "record": {
+        "version": 1,
+        "alg": "ES256",
+        "backLink": {
+          "attestationDigest": "sha256:aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+          "attestationNonce": "n-tool:exec"
+        },
+        "outcomeDerived": {
+          "status": "executed",
+          "completedAt": "2026-07-15T08:59:00Z"
+        },
+        "receiptAsserted": {
+          "alg": "ES256",
+          "iat": "2026-07-15T08:59:00Z",
+          "iss": "did:web:issuer.example",
+          "nonce": "n-tool:exec",
+          "secretVersion": "1",
+          "sub": "tool:exec"
+        },
+        "signature": "ab12cd34",
+        "existenceProof": {
+          "backend": "rfc3161-eidas-qualified",
+          "hashAlgorithm": "sha256",
+          "recordDigest": "sha256:9e9863b6180accc95fda91454412568cd81c04414a7f13c7372f07b96b1c4249",
+          "token": "MIIC0QYJKoZIhvcNAQcCoIICwjCCAr4CAQMxDzANBglghkgBZQMEAgEFADBoBgsqhkiG9w0BCRABBKBZBFcwVQIBAQYJKwYBBAGGjR8BMDEwDQYJYIZIAWUDBAIBBQAEIJ6YY7YYCszJX9qRRUQSVozYHARBSn8TxzcvB7lrHEJJAgEBGA8yMDI2MDcxNTA5MDAwMFqgggFCMIIBPjCB5aADAgECAhQEvG/aatnepMGkhEtcND1s7RWMHTAKBggqhkjOPQQDAjAlMSMwIQYDVQQDDBpWYWFyYSBUZXN0IFRydXN0ZWQtTGlzdCBDQTAeFw0yMDAxMDEwMDAwMDBaFw0zNTAxMDEwMDAwMDBaMBoxGDAWBgNVBAMMD1ZhYXJhIFRlc3QgUVRTQTBZMBMGByqGSM49AgEGCCqGSM49AwEHA0IABP1Y7P9r3rxWrtkW09FPgWCvfXULpJanUFA7jGdKNeFjFzVoAqQGfBTkmp/4ebdSkR13cirRTxneRMpiop9FDuUwCgYIKoZIzj0EAwIDSAAwRQIhAJMZyyWuIknbzHzACN6FIaQNPqsSFTdHRVXiqpHYK1bWAiAnNllQvWiYq+RQC/HlFZT3kYSLQ0UzEYFViEhbyJ2kNzGB9zCB9AIBATA9MCUxIzAhBgNVBAMMGlZhYXJhIFRlc3QgVHJ1c3RlZC1MaXN0IENBAhQEvG/aatnepMGkhEtcND1s7RWMHTANBglghkgBZQMEAgEFAKBNMBoGCSqGSIb3DQEJAzENBgsqhkiG9w0BCRABBDAvBgkqhkiG9w0BCQQxIgQg+O0hm0IchuhYEJWsKf+W8ZpwHbAgjwexBH+owe9toicwCgYIKoZIzj0EAwIERjBEAiAkzR3SRZhE4Q4TWz+vUtvUVe8+LCf2+1iE6/btD9y/HQIgDM7gFOczmXeM/vzy9WflEYyXz4Z5kMAiAmRweOUtsxg="
+        }
+      }
+    }
+  ]
+}

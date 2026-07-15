@@ -7,6 +7,10 @@ and this project follows [Semantic Versioning](https://semver.org/spec/v2.0.0.ht
 
 ## [Unreleased]
 
+## [1.37.0] - 2026-07-15
+
+- Existence-in-time is now a property a SEP-2828 execution record can carry and a relying party can check on its own. A record may hold an `existenceProof`: an RFC 3161 trusted timestamp over the record's JCS-canonical bytes, attached outside the signed preimage like `pqSignature`. A conformant verifier recomputes the record digest, requires the token to imprint exactly that digest, verifies the timestamp signature, and grades the attested time qualified only when the signer chains to a CA pinned from a trusted list (for the `rfc3161-eidas-qualified` profile, an EU trusted-list QTSA). Absent a pin the time is reported as self-asserted, not qualified: the witness that matters sits outside the party that produced the record. `vaara verify-record` surfaces the verdict, with `--trusted-issuer-cert` to pin the list, and `vaara.attestation.receipt` exposes `attach_existence_proof` and `verify_existence_proof`. New conformance vectors and a dependency-free independent checker are in `tests/vectors/qualified_time_v0/`; the checker needs the `timeanchor` extra and is reported SKIP in a base install. See `docs/design/qualified-existence-spec.md`.
+
 ## [1.36.0] - 2026-07-15
 
 - The aggregate conformance runner (`scripts/conformance_runner.py`) grades clean in a base environment. A suite whose independent checker needs an optional dependency now returns the standard skip code (77) when that dependency is absent, and the runner reports it SKIP with a reason instead of FAIL. `pq_hybrid_v0`, which needs the post-quantum extra (`vaara[pq]`, i.e. `dilithium-py`), is skipped in a base install and still runs and passes where the extra is present. The public corpus reports 39 passed, 2 skipped, and exits 0 with no optional extras installed.
