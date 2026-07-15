@@ -28,12 +28,27 @@ import json
 import sys
 from pathlib import Path
 
-import rfc8785
-from cryptography.exceptions import InvalidSignature
-from cryptography.hazmat.primitives import hashes
-from cryptography.hazmat.primitives.asymmetric import ec, padding, rsa
-from cryptography.hazmat.primitives.asymmetric.utils import encode_dss_signature
-from dilithium_py.ml_dsa import ML_DSA_65
+# A conformant environment for this suite carries the post-quantum extra
+# (``vaara[pq]``). When an optional dependency is absent, exit with the standard
+# skip code (77) so the aggregate runner reports SKIP with a reason rather than a
+# false failure; the suite still runs and passes where the extra is installed.
+_SKIP_EXIT_CODE = 77
+try:
+    import rfc8785
+    from cryptography.exceptions import InvalidSignature
+    from cryptography.hazmat.primitives import hashes
+    from cryptography.hazmat.primitives.asymmetric import ec, padding, rsa
+    from cryptography.hazmat.primitives.asymmetric.utils import (
+        encode_dss_signature,
+    )
+    from dilithium_py.ml_dsa import ML_DSA_65
+except ModuleNotFoundError as exc:
+    print(
+        "SKIP: pq_hybrid_v0 needs an optional dependency not installed: "
+        f"{exc.name} (pip install 'vaara[pq]')",
+        file=sys.stderr,
+    )
+    raise SystemExit(_SKIP_EXIT_CODE) from None
 
 HERE = Path(__file__).resolve().parent
 _BLOCKS = ("version", "alg", "backLink", "outcomeDerived", "receiptAsserted")

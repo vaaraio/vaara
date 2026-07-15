@@ -21,8 +21,8 @@ says they should.
     python scripts/conformance_runner.py --vectors-dir ./their_vectors
 
 A suite that cannot run bare (it needs an external artifact passed as an
-argument) is reported SKIP, never silently dropped, and does not on its own fail
-the run.
+argument, or an optional dependency that is not installed) is reported SKIP,
+never silently dropped, and does not on its own fail the run.
 """
 
 from __future__ import annotations
@@ -39,6 +39,12 @@ from typing import Any, Optional
 REPO = Path(__file__).resolve().parent.parent
 DEFAULT_VECTORS = REPO / "tests" / "vectors"
 CHECKER = "_check_independent.py"
+
+# A checker returns this (the conventional automake skip code) when an optional
+# dependency it needs is not installed. Reported SKIP with a reason, never FAIL,
+# so a base environment grades clean; the suite still runs where the extra is
+# present.
+SKIP_EXIT_CODE = 77
 
 # Suites whose checker validates an artifact handed to it on the command line
 # rather than a bare directory of case files. Reported SKIP (with reason) in the
@@ -86,6 +92,17 @@ def run_suite(vectors_dir: Path, suite: str) -> dict[str, Any]:
         capture_output=True, text=True, cwd=str(suite_dir),
     )
     duration = round(time.perf_counter() - start, 3)
+    if proc.returncode == SKIP_EXIT_CODE:
+        # The checker declared it cannot run here (an optional dependency is
+        # absent). Take its own last stderr line as the reason.
+        lines = proc.stderr.strip().splitlines()
+        reason = lines[-1].removeprefix("SKIP: ") if lines else \
+            "optional dependency not installed"
+        return {
+            "suite": suite, "status": "SKIP", "reason": reason,
+            "cases": _case_count(suite_dir), "returncode": proc.returncode,
+            "duration_s": duration,
+        }
     status = "PASS" if proc.returncode == 0 else "FAIL"
     row: dict[str, Any] = {
         "suite": suite, "status": status, "cases": _case_count(suite_dir),
