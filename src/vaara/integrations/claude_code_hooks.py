@@ -75,6 +75,28 @@ def fail_open(cfg: dict) -> bool:
     return cfg.get("fail_open") is True
 
 
+def approvals_enabled(cfg: dict) -> bool:
+    if os.environ.get("VAARA_PLUGIN_APPROVALS") == "0":
+        return False
+    return cfg.get("approvals", True) is not False
+
+
+def approvals_dir(cfg: dict) -> Path:
+    override = os.environ.get("VAARA_PLUGIN_APPROVALS_DIR") or cfg.get("approvals_dir")
+    if override:
+        return Path(override).expanduser()
+    return Path.home() / ".vaara" / "approvals"
+
+
+def approvals_timeout(cfg: dict) -> float:
+    raw = os.environ.get("VAARA_PLUGIN_APPROVALS_TIMEOUT") or cfg.get("approvals_timeout")
+    try:
+        timeout = float(raw)  # type: ignore[arg-type]
+    except (TypeError, ValueError):
+        return 60.0
+    return timeout if timeout > 0 else 60.0
+
+
 def protection_preset(cfg: dict) -> Optional[str]:
     preset = os.environ.get("VAARA_PLUGIN_PROTECTION") or cfg.get("protection")
     return preset if isinstance(preset, str) and preset else None
@@ -293,12 +315,70 @@ def run_pre_tool_use(deny_patterns: Optional[str] = None) -> int:
                    f"risk {result.risk_score:.2f}: {result.reason}")
         return 0
 
+    if result.decision == "escalate":
+        return _handle_escalation(cfg, pipeline, result, tool_name)
+
     _emit(
         f"vaara-governance: BLOCKED {tool_name} "
         f"(risk {result.risk_score:.2f}, action_id={result.action_id}). "
         f"Reason: {result.reason}"
     )
     notify(cfg, "BLOCKED", tool_name, f"risk {result.risk_score:.2f}: {result.reason}")
+    return 2
+
+
+def _handle_escalation(cfg: dict, pipeline, result, tool_name: str) -> int:
+    """Block on the file-based approval handshake for an escalated action.
+
+    The approvals directory is watched by whatever surface fronts the
+    human. Approve is the only way through:
+    deny and timeout both keep the escalate fail-closed, so an unattended
+    machine behaves exactly as before this handshake existed.
+    """
+    detail = f"risk {result.risk_score:.2f}: {result.reason}"
+    if approvals_enabled(cfg):
+        notify(cfg, "APPROVAL NEEDED", tool_name, detail)
+        try:
+            from vaara.approvals import request_approval
+
+            human = request_approval(
+                result.action_id, tool_name, detail,
+                approvals_dir=approvals_dir(cfg),
+                timeout=approvals_timeout(cfg),
+            )
+        except Exception as exc:
+            _emit(f"vaara-governance: approval handshake failed ({exc!r}); "
+                  f"treating as unanswered.")
+            human = "timeout"
+        if human in ("approve", "deny"):
+            resolution = "allow" if human == "approve" else "deny"
+            try:
+                pipeline.resolve_escalation(
+                    result.action_id, resolution,
+                    reviewer="approvals-handshake",
+                    justification="human decision via ~/.vaara/approvals",
+                )
+            except Exception as exc:
+                _emit(f"vaara-governance: could not record resolution ({exc!r}).")
+        if human == "approve":
+            _emit(
+                f"vaara-governance: APPROVED {tool_name} by human "
+                f"(action_id={result.action_id})."
+            )
+            return 0
+        if human == "deny":
+            _emit(
+                f"vaara-governance: DENIED {tool_name} by human "
+                f"(action_id={result.action_id})."
+            )
+            notify(cfg, "DENIED", tool_name, detail)
+            return 2
+    _emit(
+        f"vaara-governance: ESCALATE {tool_name} blocked pending review "
+        f"(risk {result.risk_score:.2f}, action_id={result.action_id}). "
+        f"Reason: {result.reason}"
+    )
+    notify(cfg, "ESCALATE", tool_name, detail)
     return 2
 
 

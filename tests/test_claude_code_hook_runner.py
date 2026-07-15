@@ -118,3 +118,109 @@ def test_shim_prefers_vaara_binary(tmp_path):
     )
     assert proc.returncode == 2, proc.stderr
     assert "BLOCKED" in proc.stderr
+
+
+# ---------------------------------------------------------------------------
+# Approvals loop: an escalate blocks on ~/.vaara/approvals until the app
+# (played here by a responder thread) answers, or falls through on timeout.
+
+def _escalate_config(home: Path) -> None:
+    """Thresholds that make every scored mcp__ call an escalate."""
+    cfg_dir = home / ".vaara" / "claude-code"
+    cfg_dir.mkdir(parents=True, exist_ok=True)
+    (cfg_dir / "config.json").write_text(json.dumps(
+        {"thresholds": {"escalate": 0.0, "deny": 1.0}}
+    ))
+
+
+def _approval_responder(home: Path, decision: str):
+    import threading
+    import time as _time
+
+    approvals = home / ".vaara" / "approvals"
+
+    def responder():
+        deadline = _time.monotonic() + 60
+        while _time.monotonic() < deadline:
+            for req in approvals.glob("*.request.json") if approvals.exists() else []:
+                action_id = req.name.removesuffix(".request.json")
+                (approvals / f"{action_id}.decision.json").write_text(
+                    json.dumps({"decision": decision,
+                                "decided_at": _time.time()})
+                )
+                return
+            _time.sleep(0.05)
+
+    thread = threading.Thread(target=responder, daemon=True)
+    thread.start()
+    return thread
+
+
+def test_hook_pre_escalate_approved_by_human_allows(tmp_path):
+    _escalate_config(tmp_path)
+    thread = _approval_responder(tmp_path, "approve")
+    proc = _run_hook(
+        ["hook", "pre-tool-use"],
+        {"tool_name": "mcp__files__read", "tool_input": {"path": "notes.txt"}},
+        tmp_path,
+    )
+    thread.join(timeout=1)
+    assert proc.returncode == 0, proc.stderr
+    assert "APPROVED" in proc.stderr
+    conn = sqlite3.connect(tmp_path / ".vaara" / "claude-code" / "audit.db")
+    rows = conn.execute(
+        "SELECT data FROM audit_records WHERE event_type = 'escalation_resolved'"
+    ).fetchall()
+    assert len(rows) == 1
+    assert json.loads(rows[0][0])["resolution"] == "allow"
+
+
+def test_hook_pre_escalate_denied_by_human_blocks(tmp_path):
+    _escalate_config(tmp_path)
+    thread = _approval_responder(tmp_path, "deny")
+    proc = _run_hook(
+        ["hook", "pre-tool-use"],
+        {"tool_name": "mcp__files__read", "tool_input": {"path": "notes.txt"}},
+        tmp_path,
+    )
+    thread.join(timeout=1)
+    assert proc.returncode == 2, proc.stderr
+    assert "DENIED" in proc.stderr
+    conn = sqlite3.connect(tmp_path / ".vaara" / "claude-code" / "audit.db")
+    rows = conn.execute(
+        "SELECT data FROM audit_records WHERE event_type = 'escalation_resolved'"
+    ).fetchall()
+    assert len(rows) == 1
+    assert json.loads(rows[0][0])["resolution"] == "deny"
+
+
+def test_hook_pre_escalate_timeout_stays_blocked(tmp_path):
+    _escalate_config(tmp_path)
+    proc = _run_hook(
+        ["hook", "pre-tool-use"],
+        {"tool_name": "mcp__files__read", "tool_input": {"path": "notes.txt"}},
+        tmp_path, extra_env={"VAARA_PLUGIN_APPROVALS_TIMEOUT": "0.3"},
+    )
+    # Escalate stays fail-closed: no human answer means no execution.
+    assert proc.returncode == 2, proc.stderr
+    assert "ESCALATE" in proc.stderr
+    # No decision arrived, so nothing was resolved and no files linger.
+    approvals = tmp_path / ".vaara" / "approvals"
+    assert not approvals.exists() or list(approvals.iterdir()) == []
+
+
+def test_hook_pre_escalate_approvals_disabled_blocks_as_before(tmp_path):
+    _escalate_config(tmp_path)
+    proc = _run_hook(
+        ["hook", "pre-tool-use"],
+        {"tool_name": "mcp__files__read", "tool_input": {"path": "notes.txt"}},
+        tmp_path, extra_env={"VAARA_PLUGIN_APPROVALS": "0"},
+    )
+    # With the handshake off, prior behaviour is preserved: escalate blocks.
+    assert proc.returncode == 2, proc.stderr
+    assert "ESCALATE" in proc.stderr
+    conn = sqlite3.connect(tmp_path / ".vaara" / "claude-code" / "audit.db")
+    rows = conn.execute(
+        "SELECT data FROM audit_records WHERE event_type = 'escalation_resolved'"
+    ).fetchall()
+    assert rows == []
