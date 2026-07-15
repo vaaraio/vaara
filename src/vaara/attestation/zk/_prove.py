@@ -138,3 +138,22 @@ def prove(
     for j, (w, gamma) in enumerate(zip(ws, blinds)):
         out += _range_prove(w, gamma, seed + b"/w" + j.to_bytes(2, "big"))
     return bytes(out)
+
+
+def build_proof_envelope(
+    verdict: str,
+    score_fp: int,
+    deny_fp: int,
+    escalate_fp: int,
+    binding_digest_hex: str,
+) -> dict:
+    """Assemble the SEP-2828 ``decisionProof`` envelope around a fresh proof."""
+    from ._params import PROOF_SYSTEM
+
+    raw = prove(verdict, score_fp, deny_fp, escalate_fp, binding_digest_hex)
+    return {
+        "proofSystem": PROOF_SYSTEM,
+        "publicInputs": {"bindingDigest": binding_digest_hex, "verdict": verdict},
+        "proof": raw.hex(),
+        "verifierParamsDigest": params_digest(),
+    }
