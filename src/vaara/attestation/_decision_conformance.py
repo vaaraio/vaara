@@ -2,8 +2,12 @@
 
 The sibling of ``_receipt_conformance``. A decision record is the
 *before* half of an execution record: the governing server's verdict
-(``allow`` / ``block`` / ``escalate``) and the basis for it, pinned to the
-same SEP-2787 attestation the outcome record answers. This checks that a
+(``allow`` / ``block`` / ``escalate``) and the basis for it. The basis can
+be carried three ways, strongest to weakest for reading the "why": a
+native ``rationale`` (the rule that fired, a human reason, and the
+declared intent the call was judged against, all in this record); an
+optional content-addressed ``evidenceRef``; and a ``backLink`` digest to
+the prior attestation the outcome record answers. This checks that a
 candidate is a well-formed decision record, with no signing key and no
 matching attestation, so a neutral party can judge a record someone else
 produced.
@@ -135,7 +139,41 @@ def _check_decision_derived(dd: Any, add: Any) -> Optional[str]:
                 f"decisionDerived.{field} SHOULD be a decimal string, not a number")
     if "evidenceRef" in dd:
         _check_evidence_ref(dd["evidenceRef"], add)
+    if "rationale" in dd:
+        _check_rationale(dd["rationale"], add)
     return verdict if isinstance(verdict, str) else None
+
+
+def _check_rationale(r: Any, add: Any) -> None:
+    """Check the optional native decision rationale.
+
+    The legible, in-record answer to "why this verdict": the rule that
+    fired, a human reason, and the declared intent the call was judged
+    against. Unlike ``evidenceRef`` (a content-addressed pointer) and the
+    ``backLink`` (a digest of a separate attestation), this carries the
+    intent and reason in the 2828 record itself, so the differential
+    between one call and another reads without dereferencing anything.
+    Fires only when present; every field is required once it does.
+    """
+    if not isinstance(r, dict):
+        add("rationale_object", False, REQUIRED,
+            "decisionDerived.rationale MUST be an object")
+        return
+    add("rationale_object", True, REQUIRED, "decisionDerived.rationale is an object")
+    add("rationale_rule",
+        isinstance(r.get("rule"), str) and bool(r.get("rule")), REQUIRED,
+        "rationale.rule MUST be a non-empty string (the policy rule that fired)")
+    add("rationale_reason",
+        isinstance(r.get("reason"), str) and bool(r.get("reason")), REQUIRED,
+        "rationale.reason MUST be a non-empty string (a human-legible reason)")
+    add("rationale_declared_intent",
+        isinstance(r.get("declaredIntent"), str) and bool(r.get("declaredIntent")),
+        REQUIRED,
+        "rationale.declaredIntent MUST be a non-empty string (the intent judged)")
+    if "intentSatisfied" in r:
+        add("rationale_intent_satisfied_type",
+            isinstance(r["intentSatisfied"], bool), ADVISORY,
+            "rationale.intentSatisfied SHOULD be a boolean when present")
 
 
 def _check_evidence_ref(er: Any, add: Any) -> None:
