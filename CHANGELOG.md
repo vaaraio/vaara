@@ -7,6 +7,10 @@ and this project follows [Semantic Versioning](https://semver.org/spec/v2.0.0.ht
 
 ## [Unreleased]
 
+## [1.34.1] - 2026-07-15
+
+- Security fix for the decisionProof introduced in 1.34.0. In 1.34.0 the committed score and thresholds were not bound to the record, so a proof attested only that some committed values yield the verdict, which holds for any verdict, and the verifier's cross-checks were skipped when the `binding` or `decision` fields were absent. This release binds the proof to the record and fails closed. The Pedersen commitments are hashed into the signed `bindingDigest` through `binding.inputsDigest`, so the values the proof opens are exactly the ones the record commits to. The verifier now requires the `binding` and `decision` fields, requires `inputsDigest` to be the digest of the proof's commitments, and requires `bindingDigest` to be consistent with its components. The three committed values are each range-proven in `[0, 2**32)`, closing a modular wraparound, and point and scalar encodings must be canonical. A proof can no longer be lifted onto another record, presented under a relabelled verdict, or accepted on a record missing its binding. Anyone on 1.34.0 should upgrade.
+
 ## [1.34.0] - 2026-07-15
 
 - The `decisionProof` on a SEP-2828 decision record is now produced and verified cryptographically, beyond the envelope-shape check it already carried. The proof shows in zero knowledge that the recorded verdict is the correct threshold output over committed values, without revealing the risk score or the thresholds. The risk score is a committed input to the proof rather than recomputed inside it; its integrity rests on the signed record as before. Proof system `vaara-p256-cap-v0` is a transparent commit-and-prove over P-256: Pedersen commitments with a bit-decomposition range proof and a Schnorr OR-proof per bit, and no trusted setup. Producing and verifying a proof is keyless and runs in the base install with no extra dependency.

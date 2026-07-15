@@ -45,6 +45,9 @@ def _or_verify(c: Point, blob: bytes, prefix: bytes) -> bool:
     e0 = _read_scalar(blob[off : off + SCALAR_LEN])
     z0 = _read_scalar(blob[off + SCALAR_LEN : off + 2 * SCALAR_LEN])
     z1 = _read_scalar(blob[off + 2 * SCALAR_LEN : off + 3 * SCALAR_LEN])
+    # Reject non-canonical scalars (>= group order), so a proof has one encoding.
+    if e0 >= N or z0 >= N or z1 >= N:
+        return False
     y0 = c
     y1 = c + _neg(G)
     e = _or_challenge(prefix, c, a0, a1)
@@ -71,15 +74,22 @@ def _range_verify(target: Point, blob: bytes, prefix: bytes) -> bool:
 def verify(proof: bytes, verdict: str, binding_digest_hex: str) -> bool:
     try:
         n_wit = _witness_count(verdict)
-        expected = 3 * POINT_LEN + n_wit * _RANGE_LEN
+        expected = 3 * POINT_LEN + (3 + n_wit) * _RANGE_LEN
         if len(proof) != expected:
             return False
         vs = Point.from_bytes(proof[0:POINT_LEN])
         vd = Point.from_bytes(proof[POINT_LEN : 2 * POINT_LEN])
         ve = Point.from_bytes(proof[2 * POINT_LEN : 3 * POINT_LEN])
-        targets = _targets(verdict, vs, vd, ve)
         seed = _seed(binding_digest_hex, verdict, vs, vd, ve)
         off = 3 * POINT_LEN
+        # Base range proofs: each committed value is in [0, 2**RANGE_BITS).
+        for i, target in enumerate((vs, vd, ve)):
+            blob = proof[off + i * _RANGE_LEN : off + (i + 1) * _RANGE_LEN]
+            if not _range_verify(target, blob, seed + b"/base" + i.to_bytes(2, "big")):
+                return False
+        off += 3 * _RANGE_LEN
+        # Difference range proofs: the verdict's non-negative differences.
+        targets = _targets(verdict, vs, vd, ve)
         for j, target in enumerate(targets):
             blob = proof[off + j * _RANGE_LEN : off + (j + 1) * _RANGE_LEN]
             if not _range_verify(target, blob, seed + b"/w" + j.to_bytes(2, "big")):
