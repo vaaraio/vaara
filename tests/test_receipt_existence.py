@@ -41,8 +41,18 @@ try:
 except ImportError:  # pragma: no cover - base install
     _HAS_CRYPTO = False
 
+_HAS_CANON = True
+try:
+    import rfc8785  # noqa: F401 - JCS canonicalization, part of the attestation extra
+except ImportError:  # pragma: no cover - base install
+    _HAS_CANON = False
+
+requires_canon = pytest.mark.skipif(
+    not _HAS_CANON, reason="record digest needs the attestation extra (rfc8785)"
+)
 requires_crypto = pytest.mark.skipif(
-    not _HAS_CRYPTO, reason="qualified existence proof needs the timeanchor extra"
+    not (_HAS_CRYPTO and _HAS_CANON),
+    reason="qualified existence proof needs the timeanchor extra",
 )
 
 _GEN_TIME = datetime.datetime(2026, 5, 31, 9, 0, 0, tzinfo=datetime.timezone.utc)
@@ -73,6 +83,7 @@ def _minimal_record() -> dict:
     }
 
 
+@requires_canon
 def test_record_digest_excludes_existence_proof_and_is_sha256():
     """The digest the timestamp imprints covers the record but not the proof.
 
@@ -363,6 +374,7 @@ def test_receipt_schema_roundtrips_existence_proof():
     assert receipt.to_dict()["existenceProof"] == rec["existenceProof"]
 
 
+@requires_canon
 def test_existence_proof_stays_outside_the_signed_preimage():
     """Attaching a proof must not change the bytes the signature covers."""
     from vaara.attestation._receipt_emit import _signing_payload
