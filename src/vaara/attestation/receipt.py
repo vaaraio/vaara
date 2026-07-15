@@ -198,12 +198,19 @@ from vaara.attestation._receipt_types import (
     CryptoAlgorithm,
     CryptoPosture,
     ExecutionReceipt,
+    ExistenceProof,
     OutcomeDerived,
     PqSignature,
     ReceiptAsserted,
     ReceiptStatus,
     ResultCommitment,
     receipt_from_dict as parse_receipt,
+)
+from vaara.attestation._receipt_existence import (
+    ExistenceResult,
+    attach_existence_proof,
+    existence_record_digest,
+    verify_existence_proof,
 )
 from vaara.attestation._revocation import (
     LoggedReceiptVerdict,
@@ -279,6 +286,11 @@ __all__ = [
     "check_handoff_set",
     "check_record_conformance",
     "check_decision_conformance",
+    "ExistenceProof",
+    "ExistenceResult",
+    "attach_existence_proof",
+    "existence_record_digest",
+    "verify_existence_proof",
     "RecordSetEntry",
     "RecordSetReport",
     "SetFinding",

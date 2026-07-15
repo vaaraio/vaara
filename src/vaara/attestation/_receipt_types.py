@@ -197,6 +197,60 @@ def pq_signature_from_dict(d: dict[str, Any]) -> PqSignature:
 
 
 @dataclass(frozen=True)
+class ExistenceProof:
+    """A trusted-timestamp existence proof over the signed record.
+
+    ``backend`` names the timestamp regime (``"rfc3161-eidas-qualified"`` in
+    v0). ``record_digest`` is ``sha256:<hex>`` over the JCS-canonical record
+    excluding this block; ``token`` is the base64 DER RFC 3161 TimeStampToken
+    that imprints that digest. Like ``pqSignature`` it is attached after
+    signing and rides outside the signed preimage, so it is not covered by the
+    receipt signature: its integrity rests on the timestamp token, which
+    imprints the whole signed record. See
+    ``docs/design/qualified-existence-spec.md``.
+    """
+
+    backend: str
+    hash_algorithm: str
+    record_digest: str
+    token: str
+
+
+def existence_proof_to_dict(ep: "ExistenceProof") -> dict[str, Any]:
+    return {
+        "backend": ep.backend,
+        "hashAlgorithm": ep.hash_algorithm,
+        "recordDigest": ep.record_digest,
+        "token": ep.token,
+    }
+
+
+_EXISTENCE_PROOF_KEYS = frozenset(
+    {"backend", "hashAlgorithm", "recordDigest", "token"}
+)
+
+
+def existence_proof_from_dict(d: dict[str, Any]) -> "ExistenceProof":
+    _reject_unknown_keys(d, _EXISTENCE_PROOF_KEYS, "existenceProof")
+    for required in ("backend", "hashAlgorithm", "recordDigest", "token"):
+        value = d.get(required)
+        if not isinstance(value, str) or not value:
+            raise AttestationError(
+                f"existenceProof.{required} must be a non-empty string"
+            )
+    if not d["recordDigest"].startswith("sha256:"):
+        raise AttestationError(
+            "existenceProof.recordDigest MUST be a 'sha256:' digest"
+        )
+    return ExistenceProof(
+        backend=d["backend"],
+        hash_algorithm=d["hashAlgorithm"],
+        record_digest=d["recordDigest"],
+        token=d["token"],
+    )
+
+
+@dataclass(frozen=True)
 class CryptoAlgorithm:
     """One cryptographic algorithm protecting a receipt, CycloneDX-CBOM shaped.
 
@@ -342,6 +396,7 @@ class ExecutionReceipt:
     outcome_derived: OutcomeDerived
     signature: str
     pq_signature: Optional[PqSignature] = None
+    existence_proof: Optional[ExistenceProof] = None
 
     def to_dict(self) -> dict[str, Any]:
         out: dict[str, Any] = {
@@ -354,6 +409,8 @@ class ExecutionReceipt:
         }
         if self.pq_signature is not None:
             out["pqSignature"] = pq_signature_to_dict(self.pq_signature)
+        if self.existence_proof is not None:
+            out["existenceProof"] = existence_proof_to_dict(self.existence_proof)
         return out
 
 
@@ -407,7 +464,7 @@ _OUTCOME_KEYS = frozenset(
 )
 _RECEIPT_KEYS = frozenset(
     {"version", "alg", "backLink", "outcomeDerived", "receiptAsserted",
-     "signature", "pqSignature"}
+     "signature", "pqSignature", "existenceProof"}
 )
 
 
@@ -504,6 +561,12 @@ def receipt_from_dict(d: dict[str, Any]) -> ExecutionReceipt:
         if not isinstance(pq_raw, dict):
             raise AttestationError("pqSignature must be an object or absent")
         pq_signature = pq_signature_from_dict(pq_raw)
+    ep_raw = d.get("existenceProof")
+    existence_proof = None
+    if ep_raw is not None:
+        if not isinstance(ep_raw, dict):
+            raise AttestationError("existenceProof must be an object or absent")
+        existence_proof = existence_proof_from_dict(ep_raw)
     return ExecutionReceipt(
         version=d["version"],
         alg=d["alg"],
@@ -512,4 +575,5 @@ def receipt_from_dict(d: dict[str, Any]) -> ExecutionReceipt:
         outcome_derived=outcome_from_dict(d["outcomeDerived"]),
         signature=d["signature"],
         pq_signature=pq_signature,
+        existence_proof=existence_proof,
     )

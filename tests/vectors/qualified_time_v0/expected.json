@@ -1,0 +1,22 @@
+{
+  "qualified_ok": {
+    "ok": true,
+    "qualified": true
+  },
+  "self_asserted_untrusted_issuer": {
+    "ok": true,
+    "qualified": false
+  },
+  "neg_wrong_digest": {
+    "ok": false,
+    "qualified": false
+  },
+  "neg_tampered_record": {
+    "ok": false,
+    "qualified": false
+  },
+  "neg_malformed_token": {
+    "ok": false,
+    "qualified": false
+  }
+}
