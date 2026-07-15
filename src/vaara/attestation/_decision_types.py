@@ -111,6 +111,13 @@ class DecisionDerived:
     policy_id: Optional[str] = None
     client_turn_id: Optional[str] = None
     evidence_ref: Optional[EvidenceRef] = None
+    # Native decision basis (all optional, keyless by default): the legible
+    # rationale, the content-addressed binding commitments, and the
+    # zero-knowledge decisionProof envelope. Carried as plain dicts so the
+    # keyless path never depends on the proof engine.
+    rationale: Optional[dict[str, Any]] = None
+    binding: Optional[dict[str, Any]] = None
+    decision_proof: Optional[dict[str, Any]] = None
 
 
 @dataclass(frozen=True)
@@ -195,6 +202,12 @@ def decision_to_dict(dd: DecisionDerived) -> dict[str, Any]:
         out["clientTurnId"] = dd.client_turn_id
     if dd.evidence_ref is not None:
         out["evidenceRef"] = evidence_ref_to_dict(dd.evidence_ref)
+    if dd.rationale is not None:
+        out["rationale"] = dd.rationale
+    if dd.binding is not None:
+        out["binding"] = dd.binding
+    if dd.decision_proof is not None:
+        out["decisionProof"] = dd.decision_proof
     return out
 
 
@@ -219,6 +232,9 @@ def decision_from_dict(d: dict[str, Any]) -> DecisionDerived:
         policy_id=d.get("policyId"),
         client_turn_id=d.get("clientTurnId"),
         evidence_ref=evidence_ref,
+        rationale=d.get("rationale"),
+        binding=d.get("binding"),
+        decision_proof=d.get("decisionProof"),
     )
 
 

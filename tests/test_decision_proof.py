@@ -41,7 +41,7 @@ def _decision() -> dict:
 
 def _proof() -> dict:
     return {
-        "proofSystem": "halo2-ipa",
+        "proofSystem": "vaara-p256-cap-v0",
         "publicInputs": {"bindingDigest": BINDING_DIGEST, "verdict": "allow"},
         "proof": "ab" * 128,
         "verifierParamsDigest": _sha("policy-circuit@1"),

@@ -40,6 +40,46 @@ from vaara.attestation._sep2787_types import (
 )
 
 
+def build_decision_basis(
+    *,
+    rule: str,
+    reason: str,
+    declared_intent: str,
+    canonical_policy: dict[str, Any],
+    canonical_inputs: dict[str, Any],
+    verdict: str,
+    intent_satisfied: Optional[bool] = None,
+    score_fp: Optional[int] = None,
+    deny_fp: Optional[int] = None,
+    escalate_fp: Optional[int] = None,
+    with_proof: bool = False,
+) -> dict[str, Any]:
+    """Build the native decision basis: ``rationale`` and ``binding`` always,
+    and the zero-knowledge ``decisionProof`` envelope when ``with_proof`` is set.
+
+    Keyless by default. ``rationale`` and ``binding`` are pure stdlib. The proof
+    path is opt-in and imported lazily, so this stays importable without the
+    ``attestation`` extra; requesting a proof without the extra raises.
+    """
+    from vaara.attestation._decision_binding import build_binding, build_rationale
+
+    basis: dict[str, Any] = {
+        "rationale": build_rationale(rule, reason, declared_intent, intent_satisfied),
+        "binding": build_binding(
+            canonical_policy, declared_intent, canonical_inputs, verdict
+        ),
+    }
+    if with_proof:
+        if score_fp is None or deny_fp is None or escalate_fp is None:
+            raise ValueError("with_proof requires score_fp, deny_fp, and escalate_fp")
+        from vaara.attestation.zk._prove import build_proof_envelope
+
+        basis["decisionProof"] = build_proof_envelope(
+            verdict, score_fp, deny_fp, escalate_fp, basis["binding"]["bindingDigest"]
+        )
+    return basis
+
+
 def _signing_payload(
     *,
     version: int,

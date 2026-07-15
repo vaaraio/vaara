@@ -2172,8 +2172,6 @@ def _cmd_verify_record(args: argparse.Namespace) -> int:
     To also check the signature, use ``vaara receipt verify`` with the
     signer's key.
     """
-    from vaara.attestation.receipt import check_record_conformance
-
     path = Path(args.record).expanduser()
     if not path.is_file():
         print(f"vaara verify-record: not a file: {path}", file=sys.stderr)
@@ -2184,11 +2182,28 @@ def _cmd_verify_record(args: argparse.Namespace) -> int:
         print(f"vaara verify-record: cannot read record JSON: {exc}", file=sys.stderr)
         return 1
 
-    report = check_record_conformance(doc)
+    # Route by record kind. A record carrying decisionDerived is a decision
+    # record and is graded by the decision checker, which covers the native
+    # rationale, binding, and decisionProof envelope; everything else is an
+    # execution record. Without this the decisionProof checks only ran on the
+    # directory/set path.
+    is_decision = isinstance(doc, dict) and "decisionDerived" in doc
+    if is_decision:
+        from vaara.attestation._decision_conformance import check_decision_conformance
+
+        report = check_decision_conformance(doc)
+        proof = _verify_single_decision_proof(doc)
+    else:
+        from vaara.attestation.receipt import check_record_conformance
+
+        report = check_record_conformance(doc)
+        proof = None
     back_link = _record_back_link(args.attestation, doc) if args.attestation else None
 
     if args.json:
         out: dict[str, Any] = {"conformance": report.to_dict()}
+        if proof is not None:
+            out["decisionProof"] = proof
         if back_link is not None:
             out["backLink"] = back_link
         print(json.dumps(out, indent=2))
@@ -2200,6 +2215,12 @@ def _cmd_verify_record(args: argparse.Namespace) -> int:
             print(f"  [{state:4s}] {c.severity:8s} {c.id}")
             if not c.ok:
                 print(f"           {c.detail}")
+        if proof is not None:
+            if proof["ran"]:
+                pstate = "pass" if proof["ok"] else "FAIL"
+            else:
+                pstate = "n/a"
+            print(f"  decisionProof: {pstate}  {proof['detail']}")
         if back_link is not None:
             bstate = "n/a" if back_link.get("skipped") else (
                 "pass" if back_link["ok"] else "FAIL")
@@ -2207,9 +2228,31 @@ def _cmd_verify_record(args: argparse.Namespace) -> int:
 
     if not report.conforms:
         return 1
+    if proof is not None and proof["ran"] and not proof["ok"]:
+        return 1
     if back_link is not None and not back_link["ok"] and not back_link.get("skipped"):
         return 1
     return 0
+
+
+def _verify_single_decision_proof(doc: Any) -> Optional[dict[str, Any]]:
+    """Cryptographically verify a decisionProof if the record carries one.
+
+    Returns ``None`` when there is no proof to check, else
+    ``{ran, ok, detail}``. ``ran`` is False when the proof engine is not
+    importable, in which case the proof is reported present-but-unverified
+    rather than failing the record.
+    """
+    dd = doc.get("decisionDerived") if isinstance(doc, dict) else None
+    if not isinstance(dd, dict) or "decisionProof" not in dd:
+        return None
+    try:
+        from vaara.attestation._decision_proof_verify import verify_decision_proof
+    except ImportError:
+        return {"ran": False, "ok": None,
+                "detail": "proof engine unavailable; proof present but unverified"}
+    ok, reason = verify_decision_proof(dd)
+    return {"ran": True, "ok": ok, "detail": reason}
 
 
 def _record_back_link(attestation_path: str, doc: Any) -> dict[str, Any]:
