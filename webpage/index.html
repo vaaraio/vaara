@@ -250,7 +250,7 @@ conformance: <span class="ok">CONFORMS</span>
 (function(){
   function setText(id, value) { var el = document.getElementById(id); if (el) el.textContent = value; }
   function fmt(n) { return n.toLocaleString("en-US"); }
-  fetch("https://raw.githubusercontent.com/vaaraio/vaara/main/.github/badges/installs.json")
+  fetch("https://raw.githubusercontent.com/vaaraio/vaara/badges/installs.json")
     .then(function(r){ return r.ok ? r.json() : null; })
     .then(function(d){
       if (!d || typeof d.total !== "number") return;

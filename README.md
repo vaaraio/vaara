@@ -15,7 +15,7 @@
 </p>
 
 <p align="center">
-  <a href="https://pepy.tech/project/vaara"><img src="https://img.shields.io/endpoint?url=https://raw.githubusercontent.com/vaaraio/vaara/main/.github/badges/installs.json" alt="Downloads"></a>
+  <img src="https://img.shields.io/endpoint?url=https://raw.githubusercontent.com/vaaraio/vaara/badges/installs.json" alt="Downloads">
 </p>
 
 Your AI agent transferred the funds, wrote the file, called the tool. Later, someone who does not trust you asks you to prove exactly what it did and why: a regulator, an auditor, a customer after an incident. Your own logs will not settle it, because you could have edited them.
