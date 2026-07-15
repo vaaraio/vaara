@@ -144,7 +144,56 @@ def _check_decision_derived(dd: Any, add: Any) -> Optional[str]:
         _check_rationale(dd["rationale"], add)
     if "binding" in dd:
         _check_binding(dd["binding"], dd.get("rationale"), add)
+    if "decisionProof" in dd:
+        _check_decision_proof(dd["decisionProof"], dd.get("binding"), add)
     return verdict if isinstance(verdict, str) else None
+
+
+def _check_decision_proof(p: Any, binding: Any, add: Any) -> None:
+    """Check the decisionProof envelope shape (keyless).
+
+    ``decisionProof`` is the wire format for a succinct proof that the
+    verdict is the correct output of the committed policy on the committed
+    intent and inputs, without revealing them. This checks the envelope
+    only: the proof system name, that ``publicInputs`` carries a
+    well-formed ``bindingDigest``, that the proof is hex, and that the
+    verifier parameters are pinned by digest so the proof names an exact
+    circuit. Verifying the proof itself needs the proving system and lives
+    behind the attestation extra, the same split signatures and anchors
+    use. Where a ``binding`` is present, the proof's public bindingDigest
+    MUST equal it, so the record self-attests the proof is about this exact
+    commitment with no proving system in the loop.
+    """
+    if not isinstance(p, dict):
+        add("decision_proof_object", False, REQUIRED,
+            "decisionDerived.decisionProof MUST be an object")
+        return
+    add("decision_proof_object", True, REQUIRED,
+        "decisionDerived.decisionProof is an object")
+    add("decision_proof_system",
+        isinstance(p.get("proofSystem"), str) and bool(p.get("proofSystem")), REQUIRED,
+        "decisionProof.proofSystem MUST be a non-empty string")
+    pi = p.get("publicInputs")
+    pi_ok = isinstance(pi, dict)
+    add("decision_proof_public_inputs_object", pi_ok, REQUIRED,
+        "decisionProof.publicInputs MUST be an object")
+    bd = pi.get("bindingDigest") if pi_ok else None
+    add("decision_proof_binding_digest_format",
+        isinstance(bd, str) and bool(_DIGEST_RE.match(bd)), REQUIRED,
+        "decisionProof.publicInputs.bindingDigest MUST be 'sha256:<64 lowercase hex>'")
+    pf = p.get("proof")
+    add("decision_proof_bytes",
+        isinstance(pf, str) and bool(_HEX_RE.match(pf)) and len(pf) % 2 == 0, REQUIRED,
+        "decisionProof.proof MUST be an even-length lowercase hex string")
+    vpd = p.get("verifierParamsDigest")
+    add("decision_proof_params_digest",
+        isinstance(vpd, str) and bool(_DIGEST_RE.match(vpd)), REQUIRED,
+        "decisionProof.verifierParamsDigest MUST be 'sha256:<64 lowercase hex>'")
+    if isinstance(binding, dict) and isinstance(binding.get("bindingDigest"), str) \
+            and isinstance(bd, str):
+        add("decision_proof_binds_commitment", bd == binding["bindingDigest"], REQUIRED,
+            "decisionProof.publicInputs.bindingDigest MUST equal "
+            "decisionDerived.binding.bindingDigest")
 
 
 def _check_rationale(r: Any, add: Any) -> None:
