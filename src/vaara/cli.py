@@ -1978,6 +1978,96 @@ def _cmd_receipt_render(args: argparse.Namespace) -> int:
     return 0
 
 
+def _cmd_proxy(args: argparse.Namespace) -> int:
+    """Run the model-endpoint proxy in observe mode.
+
+    Fronts an OpenAI-compatible or ollama endpoint, passes every request
+    through unchanged, and records each tool call the model requests into
+    a hash-chained SQLite trail. This is the first-line capture layer:
+    point an agent's base_url here and its model traffic is governed
+    without any per-framework wiring. Signing (attestation/receipt pairs)
+    is optional via --signing-key/--receipts-dir.
+    """
+    try:
+        from vaara.audit.sqlite_backend import SQLiteAuditBackend
+        from vaara.integrations._infer_proxy_app import build_app
+        from vaara.integrations.infer_proxy import _parse_listen
+        from vaara.pipeline import InterceptionPipeline
+        import uvicorn  # noqa: F401  (needed at serve time below)
+    except ImportError as exc:
+        print(
+            f"vaara proxy: missing dependency ({exc.name}). "
+            "Install with: pip install 'vaara[proxy]'",
+            file=sys.stderr,
+        )
+        return 2
+
+    if args.enforce and not args.allow and not args.approvals_dir:
+        print(
+            "vaara proxy: --enforce needs --allow PATTERN (repeatable) "
+            "and/or --approvals-dir. Without an allow-list every tool call "
+            "is gated and clients appear to lose their tools (nothing is "
+            "damaged, but the session is unusable). Start with --allow "
+            "'mcp__*' and tighten from there, or run without --enforce to "
+            "observe first.",
+            file=sys.stderr,
+        )
+        return 2
+
+    try:
+        host, port = _parse_listen(args.listen)
+    except argparse.ArgumentTypeError as exc:
+        print(f"vaara proxy: {exc}", file=sys.stderr)
+        raise SystemExit(2)
+
+    trail_path = Path(args.trail).expanduser()
+    trail_path.parent.mkdir(parents=True, exist_ok=True)
+    backend = SQLiteAuditBackend(trail_path)
+    trail = backend.load_trail()
+    trail._on_record = backend.write_record
+    pipeline = InterceptionPipeline(trail=trail, enforce=args.enforce)
+
+    emitter = None
+    if args.signing_key:
+        from vaara.integrations._infer_proxy_emit import InferenceAttestEmitter
+        from vaara.integrations._infer_proxy_sign import (
+            InferProxyConfigError,
+            load_signing_key,
+        )
+        if not args.receipts_dir:
+            print("vaara proxy: --signing-key requires --receipts-dir",
+                  file=sys.stderr)
+            return 2
+        try:
+            material, alg, secret_version = load_signing_key(
+                Path(args.signing_key), None
+            )
+            emitter = InferenceAttestEmitter(
+                signing_key=material, alg=alg,
+                receipts_dir=Path(args.receipts_dir).expanduser(),
+                secret_version=secret_version,
+            )
+        except InferProxyConfigError as exc:
+            print(f"vaara proxy: {exc}", file=sys.stderr)
+            return 2
+
+    app = build_app(
+        emitter=emitter, upstream=args.upstream, pipeline=pipeline,
+        approvals_dir=(Path(args.approvals_dir).expanduser()
+                       if args.approvals_dir else None),
+        approvals_timeout=args.approvals_timeout,
+        allow_patterns=args.allow or [],
+    )
+    mode = "enforce" if args.enforce else "observe"
+    print(f"vaara proxy: listening on {host}:{port} -> {args.upstream}, "
+          f"trail {trail_path}, mode {mode}")
+
+    import uvicorn
+
+    uvicorn.run(app, host=host, port=port)
+    return 0
+
+
 def _cmd_verify_bundle(args: argparse.Namespace) -> int:
     """Verify a whole evidence bundle from disk in one command.
 
@@ -3997,6 +4087,64 @@ class _SuggestingParser(argparse.ArgumentParser):
         super().error(message)
 
 
+def _cmd_init(args: argparse.Namespace) -> int:
+    from vaara.integrations import init_governance as ig
+
+    trail_db = (
+        Path(args.trail_db).expanduser() if args.trail_db else ig.DEFAULT_TRAIL_DB
+    )
+    report = ig.run_init(
+        trail_db=trail_db,
+        shadow=args.shadow,
+        govern_mcp=not args.no_mcp,
+        proxy_service=args.proxy_service,
+    )
+
+    if report.hooks_changed:
+        print(f"Claude Code hooks written to {report.hooks_path}")
+    else:
+        print(f"Claude Code hooks already current at {report.hooks_path}")
+    print(f"Trail: {report.trail_db}")
+
+    for client in report.clients:
+        if not client.exists:
+            continue
+        rewritten = report.mcp_rewritten.get(client.name)
+        if rewritten:
+            print(f"  {client.name}: governed {rewritten} MCP server(s)")
+        elif client.ungoverned:
+            print(f"  {client.name}: {client.ungoverned} ungoverned (not rewritten)")
+        elif client.governed:
+            print(f"  {client.name}: already governed ({client.governed})")
+
+    if report.service_path is not None:
+        print(f"Proxy service installed: {report.service_path}")
+
+    for warning in report.warnings:
+        print(f"  warning: {warning}", file=sys.stderr)
+
+    print()
+    print("Governance active. Reverse with: vaara ungovern")
+    return 0
+
+
+def _cmd_ungovern(args: argparse.Namespace) -> int:
+    from vaara.integrations import init_governance as ig
+
+    report = ig.run_ungovern()
+    if report.hooks_changed:
+        print(f"Removed Vaara hooks from {report.hooks_path}")
+    else:
+        print(f"No Vaara hooks found in {report.hooks_path}")
+    for name in report.mcp_restored:
+        print(f"  {name}: MCP config restored from backup")
+    if not report.mcp_restored:
+        print("  no MCP configs to restore")
+    if report.service_removed:
+        print("  proxy service removed")
+    return 0
+
+
 def build_parser() -> argparse.ArgumentParser:
     p = _SuggestingParser(prog="vaara", description="Vaara AI Agent Execution Layer")
     sub = p.add_subparsers(dest="cmd", metavar="COMMAND")
@@ -4669,6 +4817,54 @@ def build_parser() -> argparse.ArgumentParser:
         "--title", default=None, help="Page <title> override",
     )
     prc_render.set_defaults(func=_cmd_receipt_render)
+
+    pproxy = sub.add_parser(
+        "proxy",
+        help="Model-endpoint proxy: front an OpenAI-compatible or ollama "
+             "server, pass traffic through unchanged, and record every tool "
+             "call the model requests into a hash-chained audit trail.",
+    )
+    pproxy.add_argument(
+        "--listen", default="127.0.0.1:8788",
+        help="HOST:PORT to bind (default 127.0.0.1:8788)",
+    )
+    pproxy.add_argument(
+        "--upstream", default="http://127.0.0.1:11434",
+        help="Model server base URL (default http://127.0.0.1:11434, ollama)",
+    )
+    pproxy.add_argument(
+        "--trail", default=str(Path.home() / ".vaara" / "proxy" / "audit.db"),
+        help="SQLite audit trail path (default ~/.vaara/proxy/audit.db)",
+    )
+    pproxy.add_argument(
+        "--enforce", action="store_true",
+        help="Gate instead of observe: denied tool calls are rewritten out "
+             "of the response; escalations block on the approvals handshake",
+    )
+    pproxy.add_argument(
+        "--allow", action="append", default=None, metavar="PATTERN",
+        help="Tool-name glob that passes without gating under --enforce "
+             "(repeatable, e.g. --allow 'mcp__github__*'). Allowed calls "
+             "are still recorded in the trail.",
+    )
+    pproxy.add_argument(
+        "--approvals-dir", default=None,
+        help="Approvals handshake directory for --enforce escalations "
+             "(default: none, escalations fail closed)",
+    )
+    pproxy.add_argument(
+        "--approvals-timeout", type=float, default=60.0,
+        help="Seconds to wait for a human decision (default 60)",
+    )
+    pproxy.add_argument(
+        "--signing-key", default=None,
+        help="Optional signing key to also emit attestation/receipt pairs",
+    )
+    pproxy.add_argument(
+        "--receipts-dir", default=None,
+        help="Directory for signed pairs (required with --signing-key)",
+    )
+    pproxy.set_defaults(func=_cmd_proxy)
 
     pvb = sub.add_parser(
         "verify-bundle",
@@ -5572,6 +5768,42 @@ def build_parser() -> argparse.ArgumentParser:
         help="Output path (default: stdout)",
     )
     pme.set_defaults(func=_cmd_mode_emit)
+
+    pinit = sub.add_parser(
+        "init",
+        help=(
+            "Set up local governance in one command: write the Claude Code "
+            "hooks, route known MCP clients through the proxy, point everything "
+            "at one trail. Idempotent and self-healing (safe to re-run)."
+        ),
+    )
+    pinit.add_argument(
+        "--trail-db", default=None,
+        help="Path to the single audit trail DB "
+             "(default: ~/.vaara/trail/audit.db)",
+    )
+    pinit.add_argument(
+        "--shadow", action="store_true",
+        help="Govern in watch-only (shadow) mode: record without blocking.",
+    )
+    pinit.add_argument(
+        "--no-mcp", action="store_true",
+        help="Only write the Claude Code hooks; leave MCP client configs alone.",
+    )
+    pinit.add_argument(
+        "--proxy-service", action="store_true",
+        help="Also install the model proxy as a user service "
+             "(launchd on macOS, systemd --user on Linux) so it survives "
+             "logout. Removed by 'vaara ungovern'.",
+    )
+    pinit.set_defaults(func=_cmd_init)
+
+    pungov = sub.add_parser(
+        "ungovern",
+        help="Reverse 'vaara init': remove the Vaara hooks and restore each "
+             "MCP config from its .vaara-backup.",
+    )
+    pungov.set_defaults(func=_cmd_ungovern)
 
     return p
 

@@ -69,6 +69,38 @@ def parse_ollama_response(obj: dict[str, Any]) -> "tuple[Any, dict[str, int]]":
     return output, stats
 
 
+def _normalize_tool_use(block: dict[str, Any]) -> dict[str, Any]:
+    """Anthropic tool_use block -> the OpenAI-ish toolCalls form the
+    governance layer already parses (arguments as a dict)."""
+    return {
+        "id": block.get("id"),
+        "type": "function",
+        "function": {"name": block.get("name"),
+                     "arguments": block.get("input") or {}},
+    }
+
+
+def parse_anthropic_response(obj: dict[str, Any]) -> "tuple[Any, dict[str, int]]":
+    parts: list[str] = []
+    tool_calls: list[Any] = []
+    for block in obj.get("content") or []:
+        if not isinstance(block, dict):
+            continue
+        if block.get("type") == "text":
+            parts.append(block.get("text", ""))
+        elif block.get("type") == "tool_use":
+            tool_calls.append(_normalize_tool_use(block))
+    output: dict[str, Any] = {"content": "".join(parts)}
+    if tool_calls:
+        output["toolCalls"] = tool_calls
+    usage = obj.get("usage") or {}
+    stats = _coerce_eval_stats({
+        "promptTokens": usage.get("input_tokens"),
+        "completionTokens": usage.get("output_tokens"),
+    })
+    return output, stats
+
+
 def parse_openai_response(obj: dict[str, Any]) -> "tuple[Any, dict[str, int]]":
     choices = obj.get("choices") or []
     message = (choices[0].get("message") if choices else None) or {}
@@ -87,13 +119,14 @@ def parse_openai_response(obj: dict[str, Any]) -> "tuple[Any, dict[str, int]]":
 class StreamAccumulator:
     """Buffers a streamed chat response to reconstruct output + eval stats.
 
-    Handles OpenAI SSE (``data: {json}`` ... ``data: [DONE]``) and ollama
-    NDJSON (one JSON object per line). Best-effort: a parse failure yields no
-    output commitment but never breaks the streamed bytes.
+    Handles OpenAI SSE (``data: {json}`` ... ``data: [DONE]``), ollama
+    NDJSON (one JSON object per line), and Anthropic SSE (typed events with
+    content blocks). Best-effort: a parse failure yields no output
+    commitment but never breaks the streamed bytes.
     """
 
-    def __init__(self, is_ollama: bool) -> None:
-        self._is_ollama = is_ollama
+    def __init__(self, is_ollama: bool = False, shape: Optional[str] = None) -> None:
+        self._shape = shape or ("ollama" if is_ollama else "openai")
         self._buf = bytearray()
 
     def feed(self, chunk: bytes) -> None:
@@ -102,14 +135,63 @@ class StreamAccumulator:
     def finalize(self) -> "tuple[Any, Optional[dict[str, int]]]":
         try:
             text = self._buf.decode("utf-8", errors="replace")
-            return (
-                self._finalize_ollama(text)
-                if self._is_ollama
-                else self._finalize_openai(text)
-            )
+            if self._shape == "ollama":
+                return self._finalize_ollama(text)
+            if self._shape == "anthropic":
+                return self._finalize_anthropic(text)
+            return self._finalize_openai(text)
         except Exception:
             logger.debug("Stream accumulation parse failed", exc_info=True)
             return None, None
+
+    def _finalize_anthropic(self, text: str) -> "tuple[Any, Optional[dict[str, int]]]":
+        parts: list[str] = []
+        blocks: dict[int, dict[str, Any]] = {}  # index -> {block, json parts}
+        tool_calls: list[Any] = []
+        stats: dict[str, int] = {}
+        for line in text.splitlines():
+            line = line.strip()
+            if not line.startswith("data:"):
+                continue
+            try:
+                obj = json.loads(line[len("data:"):].strip())
+            except json.JSONDecodeError:
+                continue
+            kind = obj.get("type")
+            if kind == "message_start":
+                usage = (obj.get("message") or {}).get("usage") or {}
+                stats.update(_coerce_eval_stats(
+                    {"promptTokens": usage.get("input_tokens")}))
+            elif kind == "content_block_start":
+                block = obj.get("content_block") or {}
+                if block.get("type") == "tool_use":
+                    blocks[obj.get("index", -1)] = {
+                        "block": block, "json_parts": []}
+            elif kind == "content_block_delta":
+                delta = obj.get("delta") or {}
+                if delta.get("type") == "text_delta":
+                    parts.append(delta.get("text", ""))
+                elif delta.get("type") == "input_json_delta":
+                    entry = blocks.get(obj.get("index", -1))
+                    if entry is not None:
+                        entry["json_parts"].append(delta.get("partial_json", ""))
+            elif kind == "message_delta":
+                usage = obj.get("usage") or {}
+                stats.update(_coerce_eval_stats(
+                    {"completionTokens": usage.get("output_tokens")}))
+        for entry in blocks.values():
+            block = dict(entry["block"])
+            raw = "".join(entry["json_parts"])
+            if raw:
+                try:
+                    block["input"] = json.loads(raw)
+                except json.JSONDecodeError:
+                    block["input"] = {"_raw_arguments": raw}
+            tool_calls.append(_normalize_tool_use(block))
+        output: dict[str, Any] = {"content": "".join(parts)}
+        if tool_calls:
+            output["toolCalls"] = tool_calls
+        return output, (stats or None)
 
     def _finalize_ollama(self, text: str) -> "tuple[Any, Optional[dict[str, int]]]":
         parts: list[str] = []
