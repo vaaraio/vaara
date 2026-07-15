@@ -24,6 +24,7 @@ it runs in the base install beside ``verify-records``.
 
 from __future__ import annotations
 
+import hashlib
 from typing import Any, Optional
 
 from vaara.attestation._receipt_conformance import (
@@ -141,6 +142,8 @@ def _check_decision_derived(dd: Any, add: Any) -> Optional[str]:
         _check_evidence_ref(dd["evidenceRef"], add)
     if "rationale" in dd:
         _check_rationale(dd["rationale"], add)
+    if "binding" in dd:
+        _check_binding(dd["binding"], dd.get("rationale"), add)
     return verdict if isinstance(verdict, str) else None
 
 
@@ -174,6 +177,38 @@ def _check_rationale(r: Any, add: Any) -> None:
         add("rationale_intent_satisfied_type",
             isinstance(r["intentSatisfied"], bool), ADVISORY,
             "rationale.intentSatisfied SHOULD be a boolean when present")
+
+
+def _check_binding(b: Any, rationale: Any, add: Any) -> None:
+    """Check the optional decision binding: commitments that pin the verdict.
+
+    ``binding`` carries content-addressed commitments to the exact policy,
+    intent, and inputs a verdict was computed over, plus a single
+    ``bindingDigest`` a succinct proof of decision correctness (a later
+    layer) opens. Digest-only, so the sensitive policy or intent need not
+    ship. Where the declared intent is also in the record, its digest is
+    recomputed from the bytes here, keyless, the same self-proving pattern
+    the receipt uses for its projection digest. Fires only when present.
+    """
+    if not isinstance(b, dict):
+        add("binding_object", False, REQUIRED,
+            "decisionDerived.binding MUST be an object")
+        return
+    add("binding_object", True, REQUIRED, "decisionDerived.binding is an object")
+    for key, check_id in (
+        ("policyDigest", "binding_policy_digest"),
+        ("intentDigest", "binding_intent_digest"),
+        ("inputsDigest", "binding_inputs_digest"),
+        ("bindingDigest", "binding_commitment_digest"),
+    ):
+        val = b.get(key)
+        add(check_id, isinstance(val, str) and bool(_DIGEST_RE.match(val)), REQUIRED,
+            f"binding.{key} MUST be 'sha256:<64 lowercase hex>'")
+    declared = rationale.get("declaredIntent") if isinstance(rationale, dict) else None
+    if isinstance(declared, str) and isinstance(b.get("intentDigest"), str):
+        want = "sha256:" + hashlib.sha256(declared.encode("utf-8")).hexdigest()
+        add("binding_intent_self_consistent", b["intentDigest"] == want, REQUIRED,
+            "binding.intentDigest MUST equal sha256 over rationale.declaredIntent bytes")
 
 
 def _check_evidence_ref(er: Any, add: Any) -> None:
