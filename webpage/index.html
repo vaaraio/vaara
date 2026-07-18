@@ -94,6 +94,7 @@
   .evidence .ok { color: var(--tri-bright); }
   .evidence .dim { color: var(--faint); }
   #installs { color: var(--tri-bright); font-weight: 600; font-family: var(--mono); }
+  .ago { opacity: .55; font-size: .85em; }
 </style>
 <script type="application/ld+json">
 {
@@ -220,7 +221,7 @@ conformance: <span class="ok">CONFORMS</span>
 
 <p class="stamp">Adoption (live)</p>
 <ul>
-  <li><span id="installs">-</span> total downloads, all time (PyPI and npm)</li>
+  <li><span id="installs">-</span> live downloads, all time (PyPI and npm) <span id="installs-ago" class="ago"></span></li>
 </ul>
 
 <p class="stamp">Acknowledged by</p>
@@ -250,11 +251,21 @@ conformance: <span class="ok">CONFORMS</span>
 (function(){
   function setText(id, value) { var el = document.getElementById(id); if (el) el.textContent = value; }
   function fmt(n) { return n.toLocaleString("en-US"); }
-  fetch("https://raw.githubusercontent.com/vaaraio/vaara/badges/installs.json")
+  function ago(iso) {
+    var t = Date.parse(iso); if (isNaN(t)) return "";
+    var s = Math.max(0, Math.round((Date.now() - t) / 1000));
+    if (s < 90) return "updated just now";
+    var m = Math.round(s / 60); if (m < 90) return "updated " + m + "m ago";
+    var h = Math.round(m / 60); if (h < 36) return "updated " + h + "h ago";
+    return "updated " + Math.round(h / 24) + "d ago";
+  }
+  // Cache-bust so the browser reads the freshest badge JSON, not a CDN copy.
+  fetch("https://raw.githubusercontent.com/vaaraio/vaara/badges/installs.json?_=" + Date.now())
     .then(function(r){ return r.ok ? r.json() : null; })
     .then(function(d){
       if (!d || typeof d.total !== "number") return;
       setText("installs", fmt(d.total));
+      if (d.generated) setText("installs-ago", ago(d.generated));
     })
     .catch(function(){});
 })();
