@@ -1,3 +1,5 @@
+# SPDX-FileCopyrightText: 2026 Henri Sirkkavaara
+# SPDX-License-Identifier: AGPL-3.0-or-later
 """Cross-org evidence handoff: hand one signed record to another org's regulator.
 
 Internal module. Public surface is re-exported from

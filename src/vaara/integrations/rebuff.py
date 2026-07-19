@@ -1,3 +1,5 @@
+# SPDX-FileCopyrightText: 2026 Henri Sirkkavaara
+# SPDX-License-Identifier: AGPL-3.0-or-later
 """Rebuff adapter. Upstream prompt-injection signal.
 
 Rebuff layers four checks: heuristic, LLM-based, vector-DB

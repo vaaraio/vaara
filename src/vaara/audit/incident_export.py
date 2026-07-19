@@ -1,3 +1,5 @@
+# SPDX-FileCopyrightText: 2026 Henri Sirkkavaara
+# SPDX-License-Identifier: AGPL-3.0-or-later
 """Article 73 EU AI Act serious-incident report export.
 
 INTERIM format pending publication of the Commission template promised by

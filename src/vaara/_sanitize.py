@@ -1,3 +1,5 @@
+# SPDX-FileCopyrightText: 2026 Henri Sirkkavaara
+# SPDX-License-Identifier: AGPL-3.0-or-later
 """Internal JSON-safe coercion for audit-trail hashing.
 
 Real agent tools routinely pass datetimes, bytes, dataclasses, and

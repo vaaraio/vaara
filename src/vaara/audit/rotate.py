@@ -1,3 +1,5 @@
+# SPDX-FileCopyrightText: 2026 Henri Sirkkavaara
+# SPDX-License-Identifier: AGPL-3.0-or-later
 """Retention rotation: export a signed archive, verify it, then purge.
 
 ``purge_older_than`` leaves a documented hash-chain seam at the retention

@@ -1,3 +1,5 @@
+# SPDX-FileCopyrightText: 2026 Henri Sirkkavaara
+# SPDX-License-Identifier: AGPL-3.0-or-later
 """Immutable audit trail with regulatory article mapping.
 
 Every action that passes through the Vaara execution layer gets an audit

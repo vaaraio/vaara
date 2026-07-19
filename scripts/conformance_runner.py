@@ -1,4 +1,6 @@
 #!/usr/bin/env python3
+# SPDX-FileCopyrightText: 2026 Henri Sirkkavaara
+# SPDX-License-Identifier: AGPL-3.0-or-later
 """Run every Vaara conformance suite and report a single pass/fail verdict.
 
 Each suite under ``tests/vectors/<name>/`` ships an independent checker

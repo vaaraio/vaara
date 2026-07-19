@@ -1,4 +1,6 @@
 #!/usr/bin/env python3
+# SPDX-FileCopyrightText: 2026 Henri Sirkkavaara
+# SPDX-License-Identifier: AGPL-3.0-or-later
 """PostToolUse hook: close the audit loop for the just-executed tool call.
 
 Appends an outcome record to the persistent SQLite audit trail so the

@@ -1,4 +1,6 @@
 #!/usr/bin/env python3
+# SPDX-FileCopyrightText: 2026 Henri Sirkkavaara
+# SPDX-License-Identifier: AGPL-3.0-or-later
 """Archive working-tree clutter that maps to shipped work.
 
 Default mode: --dry-run. Use --apply to move files to .shipped/YYYY-MM/.

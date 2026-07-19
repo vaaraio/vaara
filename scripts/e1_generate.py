@@ -1,3 +1,5 @@
+# SPDX-FileCopyrightText: 2026 Henri Sirkkavaara
+# SPDX-License-Identifier: AGPL-3.0-or-later
 """E1 - generate jailbreak variants via a vLLM OpenAI-compatible endpoint.
 
 Three styles per the v0.5.3 red-team notebook: roleplay (persona bypass),

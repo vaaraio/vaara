@@ -1,3 +1,5 @@
+# SPDX-FileCopyrightText: 2026 Henri Sirkkavaara
+# SPDX-License-Identifier: AGPL-3.0-or-later
 """Render a Vaara receipt as a self-contained static HTML evidence page.
 
 One receipt in, one HTML document out: the decision, the signed-payload

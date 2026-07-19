@@ -1,3 +1,5 @@
+# SPDX-FileCopyrightText: 2026 Henri Sirkkavaara
+# SPDX-License-Identifier: AGPL-3.0-or-later
 """Guardrails AI adapter. Upstream output-validation signal.
 
 Wraps a pre-configured ``guardrails.Guard``. Each validator on the

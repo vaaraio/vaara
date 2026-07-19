@@ -1,3 +1,5 @@
+# SPDX-FileCopyrightText: 2026 Henri Sirkkavaara
+# SPDX-License-Identifier: AGPL-3.0-or-later
 """External time anchoring for the audit hash chain (v0.48).
 
 The hash chain proves order and integrity, but not *when* it existed: every

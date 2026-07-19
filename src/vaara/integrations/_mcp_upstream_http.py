@@ -1,3 +1,5 @@
+# SPDX-FileCopyrightText: 2026 Henri Sirkkavaara
+# SPDX-License-Identifier: AGPL-3.0-or-later
 """Remote HTTP/SSE upstream MCP client for the proxy.
 
 Speaks the MCP Streamable HTTP transport (spec revisions 2025-03-26 and

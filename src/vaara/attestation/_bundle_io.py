@@ -1,3 +1,5 @@
+# SPDX-FileCopyrightText: 2026 Henri Sirkkavaara
+# SPDX-License-Identifier: AGPL-3.0-or-later
 """On-disk format for an evidence bundle: load a JSON document into a bundle.
 
 Internal module. Public surface is re-exported from

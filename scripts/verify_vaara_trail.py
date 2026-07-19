@@ -1,4 +1,6 @@
 #!/usr/bin/env python3
+# SPDX-FileCopyrightText: 2026 Henri Sirkkavaara
+# SPDX-License-Identifier: AGPL-3.0-or-later
 """Standalone verifier for a Vaara signed audit-trail export.
 
 No Vaara install required. Only dependency:

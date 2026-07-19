@@ -1,3 +1,5 @@
+# SPDX-FileCopyrightText: 2026 Henri Sirkkavaara
+# SPDX-License-Identifier: AGPL-3.0-or-later
 """Decision records: the pre-execution sibling of SEP-2787.
 
 SEP-2787 attests a ``tools/call`` *request* before it runs. The

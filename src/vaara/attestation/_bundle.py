@@ -1,3 +1,5 @@
+# SPDX-FileCopyrightText: 2026 Henri Sirkkavaara
+# SPDX-License-Identifier: AGPL-3.0-or-later
 """One-call evidence-bundle verification: the 0.6 trust-plane capstone.
 
 Internal module. Public surface is re-exported from

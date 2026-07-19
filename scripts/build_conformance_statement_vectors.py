@@ -1,4 +1,6 @@
 #!/usr/bin/env python3
+# SPDX-FileCopyrightText: 2026 Henri Sirkkavaara
+# SPDX-License-Identifier: AGPL-3.0-or-later
 """Regenerate the conformance-statement golden vectors from the live corpus.
 
 The ``conformance_statement_v0`` vectors pin what ``vaara conformance-statement``

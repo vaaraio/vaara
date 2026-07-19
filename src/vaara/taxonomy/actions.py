@@ -1,3 +1,5 @@
+# SPDX-FileCopyrightText: 2026 Henri Sirkkavaara
+# SPDX-License-Identifier: AGPL-3.0-or-later
 """Action taxonomy for AI agent execution layer.
 
 Classifies every action an AI agent can take by:

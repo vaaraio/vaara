@@ -1,3 +1,5 @@
+# SPDX-FileCopyrightText: 2026 Henri Sirkkavaara
+# SPDX-License-Identifier: AGPL-3.0-or-later
 """Runtime attestation envelopes: OVERT 1.0 and SEP-2787 v2.
 
 This package ships two coexisting attestation surfaces:

@@ -1,3 +1,5 @@
+# SPDX-FileCopyrightText: 2026 Henri Sirkkavaara
+# SPDX-License-Identifier: AGPL-3.0-or-later
 """MCP proxy: Vaara as a transparent runtime governance layer for MCP.
 
 Sits between an MCP client (Claude Code, Cursor, any MCP-capable host) and an

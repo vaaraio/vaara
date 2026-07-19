@@ -1,3 +1,5 @@
+# SPDX-FileCopyrightText: 2026 Henri Sirkkavaara
+# SPDX-License-Identifier: AGPL-3.0-or-later
 """Evaluate a classifier bundle on the v036_holdout fold.
 
 The held-out fold has no benign entries and no VAL; threshold is fixed at the

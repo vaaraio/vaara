@@ -1,4 +1,6 @@
 #!/usr/bin/env python3
+# SPDX-FileCopyrightText: 2026 Henri Sirkkavaara
+# SPDX-License-Identifier: AGPL-3.0-or-later
 """PAIR adaptive attacker — iterate jailbreak prompts against the Vaara stack.
 
 PAIR (Chao et al. 2023) iteratively refines attack prompts via an attacker

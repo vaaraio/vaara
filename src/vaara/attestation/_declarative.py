@@ -1,3 +1,5 @@
+# SPDX-FileCopyrightText: 2026 Henri Sirkkavaara
+# SPDX-License-Identifier: AGPL-3.0-or-later
 """Data-only source profiles: bind a foreign format without writing code.
 
 The built-in profiles in ``_normalize`` are Python because two of them must

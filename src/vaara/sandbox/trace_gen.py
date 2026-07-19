@@ -1,3 +1,5 @@
+# SPDX-FileCopyrightText: 2026 Henri Sirkkavaara
+# SPDX-License-Identifier: AGPL-3.0-or-later
 """Synthetic trace generation for cold-start training data.
 
 The MWU scorer (§4) starts cold — uniform expert weights, no calibration

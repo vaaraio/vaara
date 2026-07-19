@@ -1,3 +1,5 @@
+# SPDX-FileCopyrightText: 2026 Henri Sirkkavaara
+# SPDX-License-Identifier: AGPL-3.0-or-later
 """CycloneDX-CBOM crypto-posture derivation and verification (v0).
 
 Internal module. Public surface re-exports ``crypto_posture_for`` and

@@ -1,3 +1,5 @@
+# SPDX-FileCopyrightText: 2026 Henri Sirkkavaara
+# SPDX-License-Identifier: AGPL-3.0-or-later
 """Pydantic models matching docs/openapi.yaml v1 contract.
 
 These models are the wire format. The internal `AdaptiveScorer.evaluate(ctx)`

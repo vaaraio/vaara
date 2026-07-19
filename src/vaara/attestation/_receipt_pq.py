@@ -1,3 +1,5 @@
+# SPDX-FileCopyrightText: 2026 Henri Sirkkavaara
+# SPDX-License-Identifier: AGPL-3.0-or-later
 """Post-quantum hybrid signing for execution receipts (v0).
 
 Internal module. Public surface is re-exported from

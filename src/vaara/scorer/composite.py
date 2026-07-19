@@ -1,3 +1,5 @@
+# SPDX-FileCopyrightText: 2026 Henri Sirkkavaara
+# SPDX-License-Identifier: AGPL-3.0-or-later
 """CompositeScorer — run Vaara alongside external scorers, combine results.
 
 The composite implements the same ``evaluate(context) -> dict`` shape

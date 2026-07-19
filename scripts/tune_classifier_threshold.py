@@ -1,3 +1,5 @@
+# SPDX-FileCopyrightText: 2026 Henri Sirkkavaara
+# SPDX-License-Identifier: AGPL-3.0-or-later
 """Sweep classifier thresholds against the full corpus in a single pipeline pass.
 
 Computes (pipe_decision_pre_classifier, classifier_prob, expected, source) for

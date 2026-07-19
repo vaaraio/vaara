@@ -1,3 +1,5 @@
+# SPDX-FileCopyrightText: 2026 Henri Sirkkavaara
+# SPDX-License-Identifier: AGPL-3.0-or-later
 """v0.36 cross-model held-out generation via Claude (Anthropic SDK).
 
 Closed-weight RLHF-heavy attacker leg. Same prompt structure as the Mixtral

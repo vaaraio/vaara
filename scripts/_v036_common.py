@@ -1,3 +1,5 @@
+# SPDX-FileCopyrightText: 2026 Henri Sirkkavaara
+# SPDX-License-Identifier: AGPL-3.0-or-later
 """Shared helpers for v0.36 cross-model held-out generation.
 
 The Mixtral leg (generate_targeted_v036.py) and the Claude leg

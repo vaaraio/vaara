@@ -1,3 +1,5 @@
+# SPDX-FileCopyrightText: 2026 Henri Sirkkavaara
+# SPDX-License-Identifier: AGPL-3.0-or-later
 """Verifier for signed audit-trail exports produced by :mod:`vaara.audit.export`.
 
 This module is intentionally self-contained — it imports only the standard

@@ -1,3 +1,5 @@
+# SPDX-FileCopyrightText: 2026 Henri Sirkkavaara
+# SPDX-License-Identifier: AGPL-3.0-or-later
 """Interception pipeline — the main entry point for the Vaara execution layer.
 
 Wires the components together:

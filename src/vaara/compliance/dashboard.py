@@ -1,3 +1,5 @@
+# SPDX-FileCopyrightText: 2026 Henri Sirkkavaara
+# SPDX-License-Identifier: AGPL-3.0-or-later
 """Static HTML article-coverage dashboard renderer.
 
 Produces a single self-contained HTML page from a ``ConformityReport``.

@@ -1,3 +1,5 @@
+# SPDX-FileCopyrightText: 2026 Henri Sirkkavaara
+# SPDX-License-Identifier: AGPL-3.0-or-later
 """Normalize adjacent MCP records into the SEP-2828 evidence model.
 
 Vaara is the receiving side for agent execution evidence. A SEP-2828

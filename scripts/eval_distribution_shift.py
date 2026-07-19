@@ -1,4 +1,6 @@
 #!/usr/bin/env python3
+# SPDX-FileCopyrightText: 2026 Henri Sirkkavaara
+# SPDX-License-Identifier: AGPL-3.0-or-later
 """Distribution-shift split — hand-curated vs LLM-generated recall.
 
 v0.5.3's adversarial classifier was trained on a corpus that mixes:

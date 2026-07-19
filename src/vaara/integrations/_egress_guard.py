@@ -1,3 +1,5 @@
+# SPDX-FileCopyrightText: 2026 Henri Sirkkavaara
+# SPDX-License-Identifier: AGPL-3.0-or-later
 """SSRF egress guard for the remote MCP HTTP connector.
 
 The ``--upstream-url`` connector hands a user-supplied URL to ``urllib`` and

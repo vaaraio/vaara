@@ -1,4 +1,6 @@
 #!/usr/bin/env python3
+# SPDX-FileCopyrightText: 2026 Henri Sirkkavaara
+# SPDX-License-Identifier: AGPL-3.0-or-later
 """PreToolUse hook: two-layer governance for the proposed tool call.
 
 Layer 1 — regex deny patterns from ``policies/default_deny.json``. Applied

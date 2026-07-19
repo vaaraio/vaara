@@ -1,3 +1,5 @@
+# SPDX-FileCopyrightText: 2026 Henri Sirkkavaara
+# SPDX-License-Identifier: AGPL-3.0-or-later
 """Per-entry attribution of Pipeline.intercept + AdversarialClassifier.
 
 Runs every corpus entry through a fresh Pipeline (clean state) and the

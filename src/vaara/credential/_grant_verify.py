@@ -1,3 +1,5 @@
+# SPDX-FileCopyrightText: 2026 Henri Sirkkavaara
+# SPDX-License-Identifier: AGPL-3.0-or-later
 """Verify a brokered credential against the runtime call it claims to authorize.
 
 Internal module. Public surface is in ``vaara.credential``.

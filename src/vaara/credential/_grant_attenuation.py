@@ -1,3 +1,5 @@
+# SPDX-FileCopyrightText: 2026 Henri Sirkkavaara
+# SPDX-License-Identifier: AGPL-3.0-or-later
 """Delegated-privilege attenuation over capability grants.
 
 Internal module. Public surface is re-exported from ``vaara.credential``.

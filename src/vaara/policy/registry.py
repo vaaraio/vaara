@@ -1,3 +1,5 @@
+# SPDX-FileCopyrightText: 2026 Henri Sirkkavaara
+# SPDX-License-Identifier: AGPL-3.0-or-later
 """Per-tenant policy registry.
 
 A ``PolicyRegistry`` owns one ``PolicyController`` per tenant_id, with the

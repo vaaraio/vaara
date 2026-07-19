@@ -1,3 +1,5 @@
+# SPDX-FileCopyrightText: 2026 Henri Sirkkavaara
+# SPDX-License-Identifier: AGPL-3.0-or-later
 """Public surface: SCITT-compatible COSE Receipts over Vaara's transparency log.
 
 Keyless first. A Vaara COSE Receipt is an RFC 6962 inclusion proof serialised in

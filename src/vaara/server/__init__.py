@@ -1,3 +1,5 @@
+# SPDX-FileCopyrightText: 2026 Henri Sirkkavaara
+# SPDX-License-Identifier: AGPL-3.0-or-later
 """Vaara HTTP API reference server.
 
 Exposes the Vaara scorer and audit trail as a network service following the

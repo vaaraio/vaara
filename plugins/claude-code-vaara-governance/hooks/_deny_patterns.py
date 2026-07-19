@@ -1,3 +1,5 @@
+# SPDX-FileCopyrightText: 2026 Henri Sirkkavaara
+# SPDX-License-Identifier: AGPL-3.0-or-later
 """Layer-1 regex deny-pattern matching for the Vaara Claude Code plugin.
 
 Loaded by ``pre_tool_use.py`` BEFORE the Vaara ML classifier. Matches

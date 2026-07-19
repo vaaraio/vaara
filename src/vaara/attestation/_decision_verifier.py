@@ -1,3 +1,5 @@
+# SPDX-FileCopyrightText: 2026 Henri Sirkkavaara
+# SPDX-License-Identifier: AGPL-3.0-or-later
 """Back-link verification and pairing for decision records.
 
 Internal module. Public surface is in ``vaara.attestation.decision``.

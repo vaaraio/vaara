@@ -1,3 +1,5 @@
+# SPDX-FileCopyrightText: 2026 Henri Sirkkavaara
+# SPDX-License-Identifier: AGPL-3.0-or-later
 """Set-level conformance for a pile of SEP-2828 records.
 
 ``check_record_conformance`` answers a question about one record. An

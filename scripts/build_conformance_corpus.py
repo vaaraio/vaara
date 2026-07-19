@@ -1,4 +1,6 @@
 #!/usr/bin/env python3
+# SPDX-FileCopyrightText: 2026 Henri Sirkkavaara
+# SPDX-License-Identifier: AGPL-3.0-or-later
 """Assemble the standalone SEP-2828 conformance corpus from the source vectors.
 
 The canonical fixtures live under ``tests/vectors/`` where the test suite and

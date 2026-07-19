@@ -1,3 +1,5 @@
+# SPDX-FileCopyrightText: 2026 Henri Sirkkavaara
+# SPDX-License-Identifier: AGPL-3.0-or-later
 """Structured policy validation.
 
 `from_dict` / `from_json` / `from_yaml` raise PolicyError on the first

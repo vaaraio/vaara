@@ -1,3 +1,5 @@
+# SPDX-FileCopyrightText: 2026 Henri Sirkkavaara
+# SPDX-License-Identifier: AGPL-3.0-or-later
 """In-process Merkle transparency log for OVERT Phase 3 inclusion proofs.
 
 Reference log compatible with RFC 6962-style binary Merkle trees. The IAP

@@ -1,3 +1,5 @@
+# SPDX-FileCopyrightText: 2026 Henri Sirkkavaara
+# SPDX-License-Identifier: AGPL-3.0-or-later
 """Named detector aliases over Vaara's existing scoring surface.
 
 Three buyer-visible categories that the EU AI Act and the agentic-AI

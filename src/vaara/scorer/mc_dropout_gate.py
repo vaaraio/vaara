@@ -1,3 +1,5 @@
+# SPDX-FileCopyrightText: 2026 Henri Sirkkavaara
+# SPDX-License-Identifier: AGPL-3.0-or-later
 """MC dropout NN per-action-step gate.
 
 Alternative to TrainedGateScorer (GBM bootstrap). The MC dropout network

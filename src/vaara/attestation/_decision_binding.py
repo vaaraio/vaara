@@ -1,3 +1,5 @@
+# SPDX-FileCopyrightText: 2026 Henri Sirkkavaara
+# SPDX-License-Identifier: AGPL-3.0-or-later
 """Binding and rationale digests for the SEP-2828 decision record.
 
 Pure standard library (with a lazy, optional `rfc8785` for JCS canonicalization),

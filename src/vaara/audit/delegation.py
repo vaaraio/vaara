@@ -1,3 +1,5 @@
+# SPDX-FileCopyrightText: 2026 Henri Sirkkavaara
+# SPDX-License-Identifier: AGPL-3.0-or-later
 """Reconstruct multi-agent delegation chains from the audit trail.
 
 Read-side only. The delegation edge — ``parent_action_id`` — is captured at

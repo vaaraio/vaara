@@ -1,3 +1,5 @@
+# SPDX-FileCopyrightText: 2026 Henri Sirkkavaara
+# SPDX-License-Identifier: AGPL-3.0-or-later
 """The constrained decision predicate, compiled to a set of range statements.
 
 The runtime verdict is a threshold branch over a risk score. Proving membership

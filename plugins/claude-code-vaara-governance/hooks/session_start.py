@@ -1,4 +1,6 @@
 #!/usr/bin/env python3
+# SPDX-FileCopyrightText: 2026 Henri Sirkkavaara
+# SPDX-License-Identifier: AGPL-3.0-or-later
 """SessionStart hook: validate the Vaara install, print a one-line
 governance summary, and (when configured) record the EU AI Act
 Article 50(1) disclosure for this session into the audit trail.

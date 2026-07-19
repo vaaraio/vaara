@@ -1,3 +1,5 @@
+# SPDX-FileCopyrightText: 2026 Henri Sirkkavaara
+# SPDX-License-Identifier: AGPL-3.0-or-later
 """OpenAI Agents SDK integration — Vaara as a guardrail.
 
 OpenAI's Agents SDK (March 2025) uses a guardrails pattern where

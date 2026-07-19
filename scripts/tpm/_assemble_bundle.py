@@ -1,3 +1,5 @@
+# SPDX-FileCopyrightText: 2026 Henri Sirkkavaara
+# SPDX-License-Identifier: AGPL-3.0-or-later
 """Assemble a vaara.tpm-evidence-bundle/v0 from tpm2-tools capture outputs.
 
 Called by ``capture-tpm-binding.sh`` after it has driven the TPM. Kept separate

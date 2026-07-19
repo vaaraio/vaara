@@ -1,4 +1,6 @@
 #!/usr/bin/env python3
+# SPDX-FileCopyrightText: 2026 Henri Sirkkavaara
+# SPDX-License-Identifier: AGPL-3.0-or-later
 """Stack ablation — heuristic-only / classifier-only / full-stack comparison.
 
 v0.5.3 ships two stacking layers:

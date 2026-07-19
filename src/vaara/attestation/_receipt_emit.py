@@ -1,3 +1,5 @@
+# SPDX-FileCopyrightText: 2026 Henri Sirkkavaara
+# SPDX-License-Identifier: AGPL-3.0-or-later
 """Emit and verify-signature for execution-receipt envelopes.
 
 Internal module. Public surface is in ``vaara.attestation.receipt``.

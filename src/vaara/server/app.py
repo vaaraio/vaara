@@ -1,3 +1,5 @@
+# SPDX-FileCopyrightText: 2026 Henri Sirkkavaara
+# SPDX-License-Identifier: AGPL-3.0-or-later
 """FastAPI application factory for the Vaara HTTP API reference server.
 
 The server holds a single in-process `AdaptiveScorer` and `AuditTrail` for

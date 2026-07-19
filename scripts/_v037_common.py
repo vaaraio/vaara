@@ -1,3 +1,5 @@
+# SPDX-FileCopyrightText: 2026 Henri Sirkkavaara
+# SPDX-License-Identifier: AGPL-3.0-or-later
 """Shared helpers for v0.37 cross-family held-out generation.
 
 The Llama-3.3-70B-Instruct leg (generate_targeted_v037.py) imports from

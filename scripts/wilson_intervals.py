@@ -1,3 +1,5 @@
+# SPDX-FileCopyrightText: 2026 Henri Sirkkavaara
+# SPDX-License-Identifier: AGPL-3.0-or-later
 """Wilson 95% intervals on v0.31 headline numbers.
 
 The Wilson score interval is the conventional small-sample CI for a

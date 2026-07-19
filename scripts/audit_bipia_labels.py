@@ -1,3 +1,5 @@
+# SPDX-FileCopyrightText: 2026 Henri Sirkkavaara
+# SPDX-License-Identifier: AGPL-3.0-or-later
 """Audit the BIPIA auto-labeller: how many `reflects_injection=True` rows
 actually have signal carried by parameters, vs how many are example.com
 placeholders the labeller false-positived?

@@ -1,3 +1,5 @@
+# SPDX-FileCopyrightText: 2026 Henri Sirkkavaara
+# SPDX-License-Identifier: AGPL-3.0-or-later
 """Hardware TEE attestation hook for OVERT 1.0 Base Envelopes.
 
 Status: experimental. Adds an optional hardware-rooted attestation layer

@@ -1,3 +1,5 @@
+# SPDX-FileCopyrightText: 2026 Henri Sirkkavaara
+# SPDX-License-Identifier: AGPL-3.0-or-later
 """Pluggable signers for the audit-trail export envelope.
 
 Vaara's default signer is Ed25519 via ``cryptography``. v0.14.0 adds an

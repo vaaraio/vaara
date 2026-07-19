@@ -1,3 +1,5 @@
+# SPDX-FileCopyrightText: 2026 Henri Sirkkavaara
+# SPDX-License-Identifier: AGPL-3.0-or-later
 """TPM 2.0 quote structures, IMA log replay, and a mock quoter.
 
 The vendor-neutral, commodity-hardware twin of :mod:`vaara.attestation.tee`.

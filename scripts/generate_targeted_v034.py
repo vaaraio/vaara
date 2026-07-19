@@ -1,3 +1,5 @@
+# SPDX-FileCopyrightText: 2026 Henri Sirkkavaara
+# SPDX-License-Identifier: AGPL-3.0-or-later
 """v0.34 targeted adversarial generation via Qwen-2.5-72B / vLLM.
 
 Generalised over e1_generate.py: --category draws few-shot seeds from

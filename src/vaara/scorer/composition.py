@@ -1,3 +1,5 @@
+# SPDX-FileCopyrightText: 2026 Henri Sirkkavaara
+# SPDX-License-Identifier: AGPL-3.0-or-later
 """ExternalScorer — call a remote /v1/score endpoint as a scorer backend.
 
 The v0.10.0 HTTP API defines a stable wire contract for scorers; this

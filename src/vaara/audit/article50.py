@@ -1,3 +1,5 @@
+# SPDX-FileCopyrightText: 2026 Henri Sirkkavaara
+# SPDX-License-Identifier: AGPL-3.0-or-later
 """EU AI Act Article 50 transparency evidence: record it, then prove it.
 
 Article 50 duties are behavioral: inform the person they are interacting

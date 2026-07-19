@@ -1,3 +1,5 @@
+# SPDX-FileCopyrightText: 2026 Henri Sirkkavaara
+# SPDX-License-Identifier: AGPL-3.0-or-later
 """Prompt-injection detection over Vaara's adversarial classifier.
 
 Wraps the model that produced vaara-bench-v1's headline numbers

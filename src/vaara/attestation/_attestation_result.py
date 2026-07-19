@@ -1,3 +1,5 @@
+# SPDX-FileCopyrightText: 2026 Henri Sirkkavaara
+# SPDX-License-Identifier: AGPL-3.0-or-later
 """Express a Vaara attestation verdict as an IETF RATS EAR (Phase 2: neutral verify).
 
 Phases 0 and 1 of the hardware-governance layer bind a SEP-2828 record to a TPM

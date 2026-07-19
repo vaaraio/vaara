@@ -1,3 +1,5 @@
+# SPDX-FileCopyrightText: 2026 Henri Sirkkavaara
+# SPDX-License-Identifier: AGPL-3.0-or-later
 """Verify a retained execution record under a rotated or retired key.
 
 Internal module. Public surface is re-exported from

@@ -1,3 +1,5 @@
+# SPDX-FileCopyrightText: 2026 Henri Sirkkavaara
+# SPDX-License-Identifier: AGPL-3.0-or-later
 """AWS Bedrock Guardrails adapter — upstream content-safety signal.
 
 Wraps the Bedrock Runtime ``ApplyGuardrail`` API. Caller supplies a

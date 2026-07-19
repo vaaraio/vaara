@@ -1,4 +1,6 @@
 #!/usr/bin/env python3
+# SPDX-FileCopyrightText: 2026 Henri Sirkkavaara
+# SPDX-License-Identifier: AGPL-3.0-or-later
 """Anchor a receipt to a qualified TSA and validate the token in EU DSS.
 
 Reproduces the 1.30.0 claim end to end, against live services: obtains an

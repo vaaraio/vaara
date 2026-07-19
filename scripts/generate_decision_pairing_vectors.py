@@ -1,4 +1,6 @@
 #!/usr/bin/env python3
+# SPDX-FileCopyrightText: 2026 Henri Sirkkavaara
+# SPDX-License-Identifier: AGPL-3.0-or-later
 """Generate the SEP-2828 decision/outcome pairing conformance vectors.
 
 Writes signed fixtures under ``tests/vectors/decision_pairing_v0/``. Each

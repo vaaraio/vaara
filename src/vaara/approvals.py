@@ -1,3 +1,5 @@
+# SPDX-FileCopyrightText: 2026 Henri Sirkkavaara
+# SPDX-License-Identifier: AGPL-3.0-or-later
 """File-based approval handshake between the gate and a human surface.
 
 The pipeline (or a hook driving it) writes ``<action_id>.request.json``

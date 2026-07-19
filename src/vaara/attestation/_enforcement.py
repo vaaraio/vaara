@@ -1,3 +1,5 @@
+# SPDX-FileCopyrightText: 2026 Henri Sirkkavaara
+# SPDX-License-Identifier: AGPL-3.0-or-later
 """Attested enforcement: bind an AMD SEV-SNP report to a SEP-2828 record.
 
 The enforcement point that writes execution records can itself run inside an

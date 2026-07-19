@@ -1,3 +1,5 @@
+# SPDX-FileCopyrightText: 2026 Henri Sirkkavaara
+# SPDX-License-Identifier: AGPL-3.0-or-later
 """Adversarial tool-call classifier (opt-in ML scorer).
 
 Ships with a pre-trained XGBoost model trained on the v0.31 split's

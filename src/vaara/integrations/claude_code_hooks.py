@@ -1,3 +1,5 @@
+# SPDX-FileCopyrightText: 2026 Henri Sirkkavaara
+# SPDX-License-Identifier: AGPL-3.0-or-later
 """Claude Code hook runner: the plugin's governance logic, in the package.
 
 ``vaara hook pre-tool-use|post-tool-use|session-start`` reads the hook

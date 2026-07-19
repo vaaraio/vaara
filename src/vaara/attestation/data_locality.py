@@ -1,3 +1,5 @@
+# SPDX-FileCopyrightText: 2026 Henri Sirkkavaara
+# SPDX-License-Identifier: AGPL-3.0-or-later
 """Data-locality records: signed evidence of where an agent action's data went.
 
 When personal data leaves for a model endpoint, the accountability question is

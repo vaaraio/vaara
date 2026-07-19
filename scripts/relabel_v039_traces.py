@@ -1,3 +1,5 @@
+# SPDX-FileCopyrightText: 2026 Henri Sirkkavaara
+# SPDX-License-Identifier: AGPL-3.0-or-later
 """Re-label captured v0.39 BIPIA traces using the fixed labeller.
 
 The 2026-05-27 audit found `looks_like_injection_follow` had a 67%

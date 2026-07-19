@@ -1,3 +1,5 @@
+# SPDX-FileCopyrightText: 2026 Henri Sirkkavaara
+# SPDX-License-Identifier: AGPL-3.0-or-later
 """Vaara tool-call attestation envelope (v2 shape).
 
 Vaara's own per-tool-call attestation: a signed JSON envelope carried in

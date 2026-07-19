@@ -1,3 +1,5 @@
+# SPDX-FileCopyrightText: 2026 Henri Sirkkavaara
+# SPDX-License-Identifier: AGPL-3.0-or-later
 """Vaara. Runtime action governance for AI agents.
 
 Sits between AI agents and their execution environment.

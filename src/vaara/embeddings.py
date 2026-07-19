@@ -1,3 +1,5 @@
+# SPDX-FileCopyrightText: 2026 Henri Sirkkavaara
+# SPDX-License-Identifier: AGPL-3.0-or-later
 """Sentence-transformer embeddings for the adversarial classifier (v0.32+).
 
 Loads ``sentence-transformers/all-MiniLM-L6-v2`` lazily on first call and

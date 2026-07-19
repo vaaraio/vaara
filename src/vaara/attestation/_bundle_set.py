@@ -1,3 +1,5 @@
+# SPDX-FileCopyrightText: 2026 Henri Sirkkavaara
+# SPDX-License-Identifier: AGPL-3.0-or-later
 """Full-lens verification over a whole directory of evidence bundles.
 
 ``verify_evidence_bundle`` runs every lens over one bundle. An auditor who

@@ -1,4 +1,6 @@
 #!/usr/bin/env python3
+# SPDX-FileCopyrightText: 2026 Henri Sirkkavaara
+# SPDX-License-Identifier: AGPL-3.0-or-later
 """classifier_vs_heuristic.py — honest held-out test.
 Train on 200 original seeds + 50 benign. Test on 1945 unseen Qwen variants.
 Force labels from category-origin (not Qwen's `expected` field)."""

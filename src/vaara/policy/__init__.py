@@ -1,3 +1,5 @@
+# SPDX-FileCopyrightText: 2026 Henri Sirkkavaara
+# SPDX-License-Identifier: AGPL-3.0-or-later
 """Vaara policy schema — JSON-native, YAML via the optional `vaara[yaml]` extra.
 
 The policy expresses, in declarative form, the deployer's choices for:

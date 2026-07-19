@@ -1,4 +1,6 @@
 #!/usr/bin/env python3
+# SPDX-FileCopyrightText: 2026 Henri Sirkkavaara
+# SPDX-License-Identifier: AGPL-3.0-or-later
 """Generate the v0 execution-receipt conformance vectors.
 
 Writes pinned keys and signed fixtures under

@@ -1,3 +1,5 @@
+# SPDX-FileCopyrightText: 2026 Henri Sirkkavaara
+# SPDX-License-Identifier: AGPL-3.0-or-later
 """Typed capability constraints for capability-mode grants (Phase C).
 
 Internal module. Public surface is in ``vaara.credential``.

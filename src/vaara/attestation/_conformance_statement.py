@@ -1,3 +1,5 @@
+# SPDX-FileCopyrightText: 2026 Henri Sirkkavaara
+# SPDX-License-Identifier: AGPL-3.0-or-later
 """Conformance self-test and statement for the published SEP-2828 corpus.
 
 An emitter that claims SEP-2828 conformance answers "trust us" with "prove it

@@ -1,3 +1,5 @@
+# SPDX-FileCopyrightText: 2026 Henri Sirkkavaara
+# SPDX-License-Identifier: AGPL-3.0-or-later
 """Transport-aware notification routing for the Vaara MCP proxy.
 
 Upstream MCP servers can push notifications back to the client mid-call

@@ -1,3 +1,5 @@
+# SPDX-FileCopyrightText: 2026 Henri Sirkkavaara
+# SPDX-License-Identifier: AGPL-3.0-or-later
 """Handoff verification over a whole directory of cross-org packages.
 
 ``verify_handoff`` checks one self-contained handoff package: one org's record,

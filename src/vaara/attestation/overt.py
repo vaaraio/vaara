@@ -1,3 +1,5 @@
+# SPDX-FileCopyrightText: 2026 Henri Sirkkavaara
+# SPDX-License-Identifier: AGPL-3.0-or-later
 """OVERT 1.0 Protocol Profile 1.0 Base Envelope (Annex B.6).
 
 The Base Envelope is a 9-field closed-schema structure emitted for every
