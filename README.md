@@ -18,6 +18,8 @@
   <img src="https://img.shields.io/endpoint?url=https://raw.githubusercontent.com/vaaraio/vaara/badges/installs.json" alt="Downloads">
 </p>
 
+<p align="center"><b>Accountable Autonomy.</b> A verifiable receipt for every action your AI agents take, checkable by anyone.</p>
+
 Your AI agent transferred the funds, wrote the file, called the tool. Later, someone who does not trust you asks you to prove exactly what it did and why: a regulator, an auditor, a customer after an incident. Your own logs will not settle it, because you could have edited them.
 
 Vaara checks every agent tool call against your policy and writes the call and its outcome into a signed, hash-chained record an outside party can verify offline, with no access to your system and none of your software. It needs no special hardware, and binds to your machine's TPM 2.0 or confidential-VM root when you have one. It runs entirely in your own environment. No SaaS, no telemetry. It answers "show me what the agent actually did" wherever that question lands: after an incident, in procurement, in a dispute. And when EU AI Act record-keeping obligations reach your systems, the same trail is the Article 12 evidence, already running.
