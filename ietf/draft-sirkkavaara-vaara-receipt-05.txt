@@ -1,0 +1,1288 @@
+
+
+
+
+Independent Submission                                    H. Sirkkavaara
+Internet-Draft                                                     Vaara
+Intended status: Informational                              19 July 2026
+Expires: 20 January 2027
+
+
+  The Vaara Receipt: A Recomputable Receipt Format for Decisions About
+                             Agent Actions
+                   draft-sirkkavaara-vaara-receipt-05
+
+Abstract
+
+   This document specifies vaara.receipt/v1, a signed and independently
+   recomputable record that binds a decision about an agent action to
+   the evidence the decision was made on, and optionally to one or more
+   external timestamp anchors.  The format is canonicalized with the
+   JSON Canonicalization Scheme (JCS) so that any third party can
+   recompute its digests and verify its signature without access to the
+   issuer.
+
+   The receipt's trust is root-agnostic: the same record is verifiable
+   with or without a hardware trusted execution environment and is re-
+   expressible as an IETF RATS Entity Attestation Result.  Downstream
+   specifications (a payment rail, a compliance regime, a framework
+   integration) define profiles that pin to a version of this document
+   and add only their own evidence schema; they do not redefine the
+   envelope.  The format described here is deployed, and its receipts
+   are independently recomputable from public conformance vectors that
+   ship with standalone checkers importing no issuer code.  The minimal
+   profile is a governance decision over a single agent action, bound to
+   the action's own intent with no external rail; it is the floor of the
+   format, and a reference library offers a matching adoption floor at
+   the API layer as a one-line decorator over the governed function.
+
+Status of This Memo
+
+   This Internet-Draft is submitted in full conformance with the
+   provisions of BCP 78 and BCP 79.
+
+   Internet-Drafts are working documents of the Internet Engineering
+   Task Force (IETF).  Note that other groups may also distribute
+   working documents as Internet-Drafts.  The list of current Internet-
+   Drafts is at https://datatracker.ietf.org/drafts/current/.
+
+   Internet-Drafts are draft documents valid for a maximum of six months
+   and may be updated, replaced, or obsoleted by other documents at any
+   time.  It is inappropriate to use Internet-Drafts as reference
+   material or to cite them other than as "work in progress."
+
+
+
+Sirkkavaara              Expires 20 January 2027                [Page 1]
+
+Internet-Draft                Vaara Receipt                    July 2026
+
+
+   This Internet-Draft will expire on 20 January 2027.
+
+Copyright Notice
+
+   Copyright (c) 2026 IETF Trust and the persons identified as the
+   document authors.  All rights reserved.
+
+   This document is subject to BCP 78 and the IETF Trust's Legal
+   Provisions Relating to IETF Documents (https://trustee.ietf.org/
+   license-info) in effect on the date of publication of this document.
+   Please review these documents carefully, as they describe your rights
+   and restrictions with respect to this document.
+
+Table of Contents
+
+   1.  Introduction  . . . . . . . . . . . . . . . . . . . . . . . .   2
+     1.1.  Terminology . . . . . . . . . . . . . . . . . . . . . . .   3
+   2.  Canonicalization  . . . . . . . . . . . . . . . . . . . . . .   3
+   3.  The Receipt Envelope  . . . . . . . . . . . . . . . . . . . .   4
+     3.1.  Signed Payload  . . . . . . . . . . . . . . . . . . . . .   5
+   4.  Evidence Binding (decisionDerived.evidenceRef)  . . . . . . .   5
+   5.  Timestamp Anchors (timestampAnchors)  . . . . . . . . . . . .   6
+   6.  Profiles  . . . . . . . . . . . . . . . . . . . . . . . . . .   7
+     6.1.  Registry  . . . . . . . . . . . . . . . . . . . . . . . .   8
+     6.2.  Profile Example: Governance Decision (the floor)  . . . .  10
+     6.3.  Profile Example: x402 Settlement Binding  . . . . . . . .  11
+     6.4.  Profile Example: Authorization Decision . . . . . . . . .  12
+     6.5.  Profile Example: AP2 Checkout Binding . . . . . . . . . .  15
+     6.6.  Profile Example: TAP Request Binding  . . . . . . . . . .  15
+     6.7.  Profile: Generic External Execution Evidence  . . . . . .  16
+   7.  Conformance . . . . . . . . . . . . . . . . . . . . . . . . .  17
+   8.  Versioning  . . . . . . . . . . . . . . . . . . . . . . . . .  17
+   9.  Security Considerations . . . . . . . . . . . . . . . . . . .  18
+   10. Related Work  . . . . . . . . . . . . . . . . . . . . . . . .  19
+   11. IANA Considerations . . . . . . . . . . . . . . . . . . . . .  20
+   12. Normative References  . . . . . . . . . . . . . . . . . . . .  20
+   13. Informative References  . . . . . . . . . . . . . . . . . . .  21
+   Author's Address  . . . . . . . . . . . . . . . . . . . . . . . .  23
+
+1.  Introduction
+
+   A Vaara receipt is a signed, independently recomputable record that
+   binds a decision about an agent action to the evidence it was made
+   on, and optionally to one or more external timestamp anchors.  Any
+   system that emits or consumes Vaara receipts conforms to this
+   document.  Downstream specifications define profiles that pin to a
+   version of this document and add only their own evidence schema; they
+   do not redefine the envelope.
+
+
+
+Sirkkavaara              Expires 20 January 2027                [Page 2]
+
+Internet-Draft                Vaara Receipt                    July 2026
+
+
+   The receipt's trust is root-agnostic.  The same record is verifiable
+   with or without a hardware TEE and re-expressible as an IETF RATS
+   ([RFC9334]) Entity Attestation Result (an AR4SI vector,
+   [I-D.ietf-rats-ear]), whether rooted in a TPM 2.0 host, an AMD SEV-
+   SNP confidential VM, or software alone.  The signature and the
+   optional external time anchor carry the evidence, not a single trust
+   root.
+
+   This document packages a format that already ships and is
+   independently recomputable from public conformance vectors.  The
+   executable conformance fixtures live under tests/vectors/ in the
+   source repository ([VAARA-REPO]) with a dependency-light checker
+   (_check_independent.py) that imports only the standard library, a
+   signature library, and a JCS implementation.
+
+   The floor of the format is a governance decision over a single agent
+   action (Section 6.2): a verdict bound to the action's own intent,
+   with no payment rail, settlement artifact, or external evidence
+   record to join.  It is the smallest conforming receipt, and the entry
+   point a producer reaches for first.  A reference library offers a
+   matching adoption floor at the API layer, a one-line decorator over
+   the governed function; that decorator is an implementation
+   convenience, not part of this format, while the normative target is
+   the profile itself, which any producer can emit from the bytes alone.
+
+1.1.  Terminology
+
+   The key words "MUST", "MUST NOT", "REQUIRED", "SHALL", "SHALL NOT",
+   "SHOULD", "SHOULD NOT", "RECOMMENDED", "NOT RECOMMENDED", "MAY", and
+   "OPTIONAL" in this document are to be interpreted as described in BCP
+   14 [RFC2119] [RFC8174] when, and only when, they appear in all
+   capitals, as shown here.
+
+2.  Canonicalization
+
+   All digests and all signed payloads in this specification are
+   computed over the JSON Canonicalization Scheme (JCS, [RFC8785]).  The
+   canonicalization label for the evidenceRef.canonicalization field
+   (Section 4) is "jcs-rfc8785".  The values "JCS" and "jcs-json-v1" are
+   accepted aliases for the same algorithm; producers SHOULD emit "jcs-
+   rfc8785", and consumers MUST accept all three.
+
+   A digest is written "sha256:" followed by the lowercase hexadecimal
+   SHA-256 ([FIPS180-4]) of the JCS-canonical bytes of the referenced
+   object.
+
+
+
+
+
+
+Sirkkavaara              Expires 20 January 2027                [Page 3]
+
+Internet-Draft                Vaara Receipt                    July 2026
+
+
+3.  The Receipt Envelope
+
+   A receipt is a JSON object with these top-level members:
+
+   +==================+=========+==========+===========================+
+   | Field            | Type    | Required | Meaning                   |
+   +==================+=========+==========+===========================+
+   | version          | integer | MUST     | Envelope version. 1       |
+   |                  |         |          | for this document.        |
+   +------------------+---------+----------+---------------------------+
+   | alg              | string  | MUST     | Signature algorithm.      |
+   |                  |         |          | ES256 in v1; ML-DSA-65    |
+   |                  |         |          | MAY be offered as a       |
+   |                  |         |          | post-quantum scheme.      |
+   +------------------+---------+----------+---------------------------+
+   | backLink         | object  | MUST     | Binds this receipt to     |
+   |                  |         |          | its attestation/          |
+   |                  |         |          | predecessor:              |
+   |                  |         |          | attestationDigest,        |
+   |                  |         |          | attestationNonce.         |
+   +------------------+---------+----------+---------------------------+
+   | decisionDerived  | object  | MUST     | The decision and the      |
+   |                  |         |          | evidence it derives       |
+   |                  |         |          | from.  See Section 4.     |
+   +------------------+---------+----------+---------------------------+
+   | issuerAsserted   | object  | MUST     | Issuer-asserted           |
+   |                  |         |          | identity claims: iss,     |
+   |                  |         |          | sub, iat, nonce, alg,     |
+   |                  |         |          | secretVersion.            |
+   +------------------+---------+----------+---------------------------+
+   | signature        | string  | MUST     | Detached signature,       |
+   |                  |         |          | hex.  For ES256, the      |
+   |                  |         |          | 64-byte r||s pair (128    |
+   |                  |         |          | hex chars).               |
+   +------------------+---------+----------+---------------------------+
+   | timestampAnchors | array   | MAY      | External time             |
+   |                  |         |          | attestations over this    |
+   |                  |         |          | receipt.  See             |
+   |                  |         |          | Section 5.                |
+   +------------------+---------+----------+---------------------------+
+
+                     Table 1: Receipt envelope members
+
+   The ES256 algorithm label and its 64-byte r||s signature encoding are
+   as defined for "ES256" in JSON Web Algorithms ([RFC7518]).  The ML-
+   DSA-65 scheme is as defined in [FIPS204].
+
+
+
+
+
+Sirkkavaara              Expires 20 January 2027                [Page 4]
+
+Internet-Draft                Vaara Receipt                    July 2026
+
+
+3.1.  Signed Payload
+
+   The signature is computed over the JCS-canonical bytes of the object
+   containing exactly these members, in this set, with their receipt
+   values:
+
+   <CODE BEGINS>
+   ("version", "alg", "backLink", "decisionDerived", "issuerAsserted")
+   <CODE ENDS>
+
+   "signature" and "timestampAnchors" are NOT part of the signed
+   payload: a receipt can gain anchors after signing without
+   invalidating the signature.  A consumer MUST verify the signature by
+   reconstructing this payload, canonicalizing it, and checking it
+   against the public key under "alg".
+
+4.  Evidence Binding (decisionDerived.evidenceRef)
+
+   decisionDerived carries the decision (decision, decidedAt, policyId,
+   reason, riskScore, thresholdAllow, thresholdBlock) and one
+   evidenceRef object that binds the decision to a recomputable evidence
+   record:
+
+         +==================+====================================+
+         | Field            | Meaning                            |
+         +==================+====================================+
+         | canonicalization | The label from Section 2 (jcs-     |
+         |                  | rfc8785 / JCS / jcs-json-v1).      |
+         +------------------+------------------------------------+
+         | digest           | "sha256:" of the JCS-canonical     |
+         |                  | evidence record.                   |
+         +------------------+------------------------------------+
+         | ref              | An opaque locator for the evidence |
+         |                  | record (profile-defined).          |
+         +------------------+------------------------------------+
+         | schema           | The schema id of the evidence      |
+         |                  | record (profile-defined).          |
+         +------------------+------------------------------------+
+
+                        Table 2: evidenceRef members
+
+   The binding is recomputable: given the receipt and the evidence
+   record, a third party confirms that sha256(JCS(evidence_record))
+   equals evidenceRef.digest with no access to the issuer.  Any third
+   party recomputes this property from the public vectors, running
+   standard libraries and never the issuer's stack.
+
+
+
+
+
+Sirkkavaara              Expires 20 January 2027                [Page 5]
+
+Internet-Draft                Vaara Receipt                    July 2026
+
+
+5.  Timestamp Anchors (timestampAnchors)
+
+   A timestamp anchor is an external attestation that this receipt
+   existed no later than a stated time.  Anchors are additive and
+   optional.  Each anchor binds the anchored digest, which is "sha256:"
+   of the JCS-canonical signed payload (Section 3.1), so an anchor
+   commits to the exact signed receipt without depending on later
+   anchors.
+
+   <CODE BEGINS>
+   {
+     "method": "rfc3161",
+     "anchoredDigest": "sha256:...",
+     "token": "<method-specific time token>",
+     "authority": "<optional human-readable authority id>"
+   }
+   <CODE ENDS>
+
+   Registered methods (the registry is open; a profile MAY register
+   more):
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+Sirkkavaara              Expires 20 January 2027                [Page 6]
+
+Internet-Draft                Vaara Receipt                    July 2026
+
+
+   +=========================+================+========================+
+   | method                  | What it is     | Who can produce it     |
+   +=========================+================+========================+
+   | rfc3161                 | An RFC 3161    | Self-hostable          |
+   |                         | ([RFC3161])    | (e.g. OpenSSL ts);     |
+   |                         | timestamp      | needs no third         |
+   |                         | token from any | party.                 |
+   |                         | Time-Stamping  |                        |
+   |                         | Authority.     |                        |
+   +-------------------------+----------------+------------------------+
+   | rfc3161-eidas-qualified | An RFC 3161    | A qualified trust      |
+   |                         | token from a   | service provider.      |
+   |                         | qualified TSA  | Adds legal /           |
+   |                         | under eIDAS    | court-admissible       |
+   |                         | ([eIDAS]).     | weight; this is        |
+   |                         |                | the only thing the     |
+   |                         |                | qualification adds     |
+   |                         |                | over rfc3161.          |
+   +-------------------------+----------------+------------------------+
+   | ledger                  | A commitment   | Self-producible;       |
+   |                         | of the         | trust-minimized,       |
+   |                         | anchored       | no TSA.                |
+   |                         | digest to a    |                        |
+   |                         | public ledger; |                        |
+   |                         | the block time |                        |
+   |                         | bounds         |                        |
+   |                         | existence.     |                        |
+   +-------------------------+----------------+------------------------+
+
+                     Table 3: Timestamp anchor methods
+
+   A receipt MAY carry several anchors of different methods.  The
+   technical anchor (rfc3161, ledger) and the legal anchor (rfc3161-
+   eidas-qualified) are independent: a producer can stand up its own
+   time evidence and add qualified legal weight as a separate, swappable
+   method.  No single anchor method is load-bearing for the receipt's
+   integrity, which rests on the Section 3.1 signature.
+
+6.  Profiles
+
+   A profile is a downstream specification that uses this envelope
+   unchanged and defines only its own evidence record (the schema and
+   contents behind evidenceRef), plus any join keys it needs.  A profile
+   MUST state the vaara.receipt/vN version it pins to and SHOULD ship
+   recomputable vectors.
+
+
+
+
+
+
+Sirkkavaara              Expires 20 January 2027                [Page 7]
+
+Internet-Draft                Vaara Receipt                    July 2026
+
+
+   There is one binding mechanism, not one per plane.  Each named
+   profile (Section 6.3, Section 6.4, Section 6.5, Section 6.6) names an
+   external artifact by content address and binds it through this
+   envelope unchanged; they differ only in which artifact is hashed and
+   the evidenceRef.ref label.  Section 6.7 states that mechanism in
+   schema-agnostic form: a single binding that does not depend on what
+   is connected to it.  The named profiles are instances of it, kept
+   because a given ecosystem pins to a label it recognizes as its own.
+
+6.1.  Registry
+
+   The profiles below pin to vaara.receipt/v1.  Vector paths are
+   relative to the source repository ([VAARA-REPO]).
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+Sirkkavaara              Expires 20 January 2027                [Page 8]
+
+Internet-Draft                Vaara Receipt                    July 2026
+
+
+    +=============+===========================+=======================+
+    |Profile      |Evidence schema            |Vectors                |
+    +=============+===========================+=======================+
+    |governance   |vaara.governance_decision/ |tests/vectors/         |
+    |decision (the|v0                         |governance_decision_v0/|
+    |floor)       |                           |                       |
+    +-------------+---------------------------+-----------------------+
+    |x402         |x402.settlement.*/v0       |tests/vectors/         |
+    |settlement   |                           |x402_settlement_v0/    |
+    |binding      |                           |                       |
+    +-------------+---------------------------+-----------------------+
+    |authorization|vaara.authorization/v0     |tests/vectors/         |
+    |decision     |                           |authorization_v0/,     |
+    |             |                           |tests/vectors/         |
+    |             |                           |contiguity_v0/,        |
+    |             |                           |tests/vectors/         |
+    |             |                           |class_gate_v0/         |
+    +-------------+---------------------------+-----------------------+
+    |AP2 checkout |vaara.authorization/v0     |tests/vectors/ap2_v0/  |
+    |binding      |(names AP2 PEF frame_id)   |                       |
+    +-------------+---------------------------+-----------------------+
+    |TAP request  |tap.request/v0             |tests/vectors/tap_v0/  |
+    |binding      |                           |                       |
+    +-------------+---------------------------+-----------------------+
+    |generic      |vaara.authorization/v0     |tests/vectors/         |
+    |external     |(names an                  |external_evidence_v0/  |
+    |execution    |external_execution_evidence|                       |
+    |evidence     |slot)                      |                       |
+    +-------------+---------------------------+-----------------------+
+    |fallback     |vaara.fallback_projection/ |tests/vectors/sep2828/ |
+    |projection   |v0 (SEP-2828 observer-     |fallback_projection_v0/|
+    |             |stable binding)            |                       |
+    +-------------+---------------------------+-----------------------+
+    |credential   |vaara.credential_binding/v0|tests/vectors/         |
+    |binding      |(MCP gateway enforcement)  |credential_binding_v0/ |
+    +-------------+---------------------------+-----------------------+
+    |ATLAS threat |vaara.atlas_threat/v0      |tests/vectors/         |
+    |detection    |(MITRE ATLAS AI agent      |atlas_threat_v0/       |
+    |             |threat patterns)           |                       |
+    +-------------+---------------------------+-----------------------+
+
+                         Table 4: Profile registry
+
+
+
+
+
+
+
+
+
+Sirkkavaara              Expires 20 January 2027                [Page 9]
+
+Internet-Draft                Vaara Receipt                    July 2026
+
+
+6.2.  Profile Example: Governance Decision (the floor)
+
+   This is the floor profile, described first because it is the smallest
+   conforming receipt and the entry point a producer reaches for before
+   any rail.  It turns a single decision about an agent action into a
+   receipt with no external settlement, payment frame, or third-party
+   artifact to join: the evidence record it binds is the action's own
+   intent.  It adds a governance decision record (schema =
+   vaara.governance_decision/v0) whose JCS digest is the receipt's
+   evidenceRef.digest and which commits:
+
+   *  An intent_ref = sha256(JCS({schema, agentId, actionType,
+      normalizedScope, intentDigest})), where intentDigest binds the
+      action type, the normalized scope, and a params_hash over the call
+      params.  The intent_ref carries no timestamp, so the same
+      authorized intent recomputes to the same identity on a retry; that
+      is what lets a verifier tell a re-presented authorization from a
+      fresh one.
+
+   *  A target_state_digest over the asserted post-action state, and a
+      decision_context_hash = sha256(JCS({policyRefs, targetStateDigest,
+      continuationId, normalizationId})) binding the policy set and the
+      continuation the decision was made under.
+
+   *  A receipt_ref that carries seq, timestampMs, and an
+      idempotencyKey, so it is unique per execution attempt; a replayed
+      outcome that reuses a receipt_ref is detectable.  The params and
+      the target state never enter the record in cleartext; only their
+      committed digests do, so the receipt is publishable while the
+      inputs stay private.
+
+   The verdict is recomputed, never read from a trusted field.  A
+   verifier reaches the verdict by recomputing the mismatch: a candidate
+   whose intent_ref differs from the approved intent_ref is a deny; an
+   equal intent_ref with a drifted target_state_digest is a revise; an
+   equal intent_ref under a different continuation is a deny; two
+   outcomes sharing a receipt_ref and idempotencyKey are a duplicate, a
+   deny.  The decision and its machine reason live in
+   decisionDerived.decision and decisionDerived.reason under the receipt
+   signature.
+
+
+
+
+
+
+
+
+
+
+
+Sirkkavaara              Expires 20 January 2027               [Page 10]
+
+Internet-Draft                Vaara Receipt                    July 2026
+
+
+   The floor reuses the completeness layer of Section 6.4 unchanged: a
+   monotonic seq with runningCount per decision and a terminal seal (a
+   GovernanceSeal carrying the boundary total) make a dropped decision a
+   named gap.  A mid-stream drop is self-evident from the running count;
+   a dropped tail is caught only because the seal pins the total; an
+   unsealed prefix is the irreducible residual a timestamp anchor
+   closes.  The same layering as the authorization profile applies here,
+   on the smallest possible record.
+
+   Canonicalization is load-bearing at the floor as everywhere else.
+   The conformance vector cases/unicode_scope.json carries a normalized
+   scope with non-ASCII characters (an e with acute accent U+00E9, a U
+   with diaeresis U+00DC, an i with diaeresis U+00EF, and a euro sign
+   U+20AC).  Under RFC 8785 these are emitted as their raw UTF-8 bytes;
+   a producer that instead serializes sorted JSON, escaping each non-
+   ASCII character to its six-character \uXXXX form (U+00E9 becomes
+   \uXXXX with hex digits 00e9, and so on for U+00DC, U+00EF, and
+   U+20AC), canonicalizes different bytes and computes a different
+   intent_ref, so it fails the vector.  This is the cheapest way to
+   catch a canonicalizer that is sorted JSON but not JCS.  A third party
+   recomputes the four derived refs, the four fail-closed verdicts, the
+   sealed completeness, and this binding with no Vaara import, running
+   only a JCS library and a signature library.  See tests/vectors/
+   governance_decision_v0/_check_independent.py.
+
+   At the implementation layer, a reference library offers the same
+   floor as a one-line decorator over the governed function (import
+   vaara; @vaara.govern): it classifies the call, decides allow, deny,
+   or escalate, records the decision, and fails closed, raising before
+   the governed body runs on any non-allow verdict.  That decorator is
+   an API convenience, not part of this format.  The normative target is
+   the governance_decision/v0 record described above, which any producer
+   can emit and any third party can recompute from the bytes alone.
+
+6.3.  Profile Example: x402 Settlement Binding
+
+   This profile binds an x402 payment settlement to a Vaara receipt
+   across an action lifecycle, on a generic rail and on the Sui exact-
+   payment rail.  It adds:
+
+   *  A settlement record (schema = x402.settlement.<rail>/v0) whose JCS
+      digest is the receipt's evidenceRef.digest.
+
+   *  A join key actionRef = sha256(JCS({agentId, actionType, scope,
+      timestampMs, seq, terminal})), carried on the settlement, so an
+      in-progress receipt (terminal: false) cannot be presented where
+      the terminal one is required.
+
+
+
+
+Sirkkavaara              Expires 20 January 2027               [Page 11]
+
+Internet-Draft                Vaara Receipt                    July 2026
+
+
+   A third party recomputes three per-step verdicts (action-ref
+   recomputes, settlement binding resolves, signature verifies) and one
+   lifecycle verdict, with only the settlement and the receipt in hand.
+   See _check_independent.py in the vectors directory.
+
+6.4.  Profile Example: Authorization Decision
+
+   This profile turns an enforcement decision into a receipt.  A
+   credential broker authorizes a tool call against a signed,
+   attestation-bound grant with typed capability scopes; the gateway's
+   verdict, allow or deny, is minted as a receipt instead of being
+   discarded.  The decision maps onto the envelope verdict vocabulary:
+   an allowed call is "allow", a refused call is "block" carrying the
+   machine reason (capability_exceeded, binding_unknown,
+   missing_credential, ...) as decisionDerived.reason.  It adds:
+
+   *  An authorization record (schema = vaara.authorization/v0) whose
+      JCS digest is the receipt's evidenceRef.digest.  It binds
+      toolName, tenantId, the grant by content address (grantFingerprint
+      = sha256(JCS(signed grant))), the runtime argument commitment
+      (argsCommitment = sha256(JCS(args))), the evaluated capabilities,
+      and the verdict / reason.
+
+   *  The raw arguments never enter the record; only their commitment
+      does, so the receipt is publishable while the arguments stay
+      private.  An auditor holding the arguments out of band recomputes
+      the commitment and re-runs the verdict.
+
+   *  An optional coverage block names the observation boundary the
+      decision was made under, inside the record and therefore under the
+      signature.  It binds the boundary (the chokepoint identity), the
+      serverFingerprint (the exact capability surface in scope,
+      manifest:sha256(JCS(tools)) or the command hash), and a scope
+      literal stating that only calls routed through the chokepoint are
+      observed.  A tool reached on an out-of-band path is out of
+      coverage.  The block is absent when no boundary is asserted,
+      leaving the record byte-identical to a coverage-free decision.
+
+   *  An optional completeness block scopes a sequence to that boundary,
+      inside the record and therefore under the signature.  It binds the
+      boundaryId (the same boundary the coverage block names), a
+      monotonic seq starting at 0 with no gaps by construction, and a
+      runningCount equal to the total receipts issued under the boundary
+      up to and including this one (runningCount = seq + 1).  The block
+      is absent when no sequence is asserted, leaving the record byte-
+      identical to a completeness-free decision.
+
+
+
+
+
+Sirkkavaara              Expires 20 January 2027               [Page 12]
+
+Internet-Draft                Vaara Receipt                    July 2026
+
+
+   *  An optional sealing record finalizes the boundary: a terminal
+      completeness block ({boundaryId, sealed: true, total: N}) that
+      pins the boundary's final count independently of the per-record
+      sequence.  It is additive and emitted once the boundary is closed;
+      a boundary that is never sealed verifies exactly as before, with
+      the seal absent and the stream byte-identical.  The seal may also
+      carry maxClass, the highest action class the boundary authorized;
+      it bounds a gap's worst case and is itself optional.
+
+   A verdict is only as meaningful as what the issuer could see. "allow"
+   over an unbounded surface and "allow" over a stated one are identical
+   bytes with opposite meaning, so an absent refusal reads as fact only
+   against a declared scope: "not refused within this boundary", never
+   "not observed".  The coverage block carries that boundary in the
+   trace itself, so it is recomputable evidence rather than a separate
+   trust root.  The verdict stays a thin read over it.  The chokepoint
+   remains an observer of what passes through it, not a claim about what
+   does not.
+
+   The deny case is the point.  A refused call leaves a signed, content-
+   addressed, portable proof of the non-action: a third party recomputes
+   the verdict from the grant and the arguments and confirms the
+   refusal, trusting only the issuer's public key.  A third party
+   recomputes five verdicts per case (grant fingerprint, argument
+   commitment, capability verdict, evidence binding, signature) with
+   only the grant, the arguments, the evidence, and the receipt in hand.
+   See _check_independent.py.
+
+   Coverage states the boundary; completeness makes a gap inside it
+   provable.  With the per-boundary seq contiguous by construction and
+   the runningCount signed into each record, a dropped receipt is a
+   missing sequence number that any holder detects from the receipts
+   alone: the highest running count names how many exist, so a short set
+   is self-evidently incomplete and the absent seq is named.  This needs
+   no issuer access and no external witness.  The tests/vectors/
+   contiguity_v0/ vectors and the "vaara verify-contiguity" surface
+   carry that check.
+
+   The per-record running count alone cannot tell a pure tail truncation
+   (holding 0..k with nothing after) from a complete stream, since the
+   latest held count is then k + 1 and reads as whole.  The optional
+   sealing record closes that gap: when a boundary is finalized, the
+   holder expects max(seq + 1, runningCount, total) records, so a
+   dropped tail shows as the missing range up to the sealed total.  A
+   boundary that is never sealed verifies exactly as before.  One
+   residual remains, and it is irreducible from the held set alone: a
+   suffix drop that also suppresses the sealing record leaves nothing to
+   detect.  Closing that is the job of an rfc3161 anchor over the
+
+
+
+Sirkkavaara              Expires 20 January 2027               [Page 13]
+
+Internet-Draft                Vaara Receipt                    July 2026
+
+
+   running count (Section 5), which attests that at time T, N receipts
+   existed under the boundary.  The layering is seq for order, the hash
+   chain for tamper-evidence, the sealing record for a truncated tail,
+   and the timestamp anchor for the seal-suppressed residual.
+
+   A gap proves that a record is absent but not what it would have
+   authorized.  When worst-case-governs is the reading, the seal's
+   optional maxClass bounds it: it names the highest action class the
+   boundary authorized, so a missing record could have authorized an
+   action of at most that class.  The verifier surfaces this as
+   worstCaseClass, computed from the held set and the seal alone, with
+   no issuer.  The field is optional; absent it, a gap reports only that
+   a record is missing.
+
+   Beyond bounding a gap at audit time, the sealed maxClass is
+   consumable at enforcement time.  A chain recipient gating its own
+   next unattended action holds a policy set of action classes it will
+   proceed under and permits if and only if the sealed worst-case class
+   is a member of that set, failing closed when no class is sealed.
+   This is a membership test, not an ordering: this document computes no
+   ordering over class labels, so the recipient asks "is the sealed
+   class one I permit", never "is it at or below a ceiling".  Because
+   the seal bounds a gap's worst case at maxClass, a permitted class
+   permits even when the boundary has a gap: the recipient consumes the
+   committed bound and does not re-derive the chain or query a log.  The
+   bound is trustworthy under the honest issuer whose seal commits
+   before any tail is trimmed; a seal that under-states the class is a
+   reconciliation question against the issuer's log, not one this held-
+   set-alone gate answers.
+
+   maxClass lives in the unsigned evidence block, so a recipient MUST
+   NOT consume it raw.  It rides under signature only through the
+   binding: the seal's signed decisionDerived.evidenceRef.digest is
+   "sha256:" + JCS(evidence), so recomputing that digest proves the
+   class is the class that was signed.  Before gating, a recipient MUST
+   verify each receipt's signature and that its evidence recomputes to
+   the signed digest; a seal whose binding fails is not trusted,
+   contributes no class, and the gate fails closed.  Without this, an
+   agent loosens the gate by relabeling an irreversible action's class
+   into a permitted one while the record signature, which never covered
+   the evidence, still verifies.  The conformance vectors are in
+   tests/vectors/class_gate_v0/; the deny_relabeled case carries exactly
+   this attack and the independent checker rejects it.
+
+
+
+
+
+
+
+
+Sirkkavaara              Expires 20 January 2027               [Page 14]
+
+Internet-Draft                Vaara Receipt                    July 2026
+
+
+6.5.  Profile Example: AP2 Checkout Binding
+
+   This profile binds an AP2 checkout to the post-checkout agent actions
+   a credential broker authorizes, so the actions taken after a payment
+   settles carry the same recomputable, gap-evident record as the
+   authorization decisions in Section 6.4.  It reuses the
+   vaara.authorization/v0 evidence record unchanged and adds a join to
+   the AP2 Payment Evidence Frame (PEF, AP2 PR #274):
+
+   *  The AP2 checkout emits a PEF whose frame_id = sha256(JCS(frame)),
+      with frame_id and signature excluded from the preimage, and whose
+      receipt_hash = sha256(JCS(receipt)) content-addresses the wrapped
+      Checkout Receipt.  Canonicalization is
+      urn:x402:canonicalisation:jcs-rfc8785-v1 (JCS / RFC 8785), the
+      same as this envelope, so the address joins with no re-
+      canonicalization.
+
+   *  Each post-checkout authorization receipt names the checkout it
+      followed by content address: decisionDerived.evidenceRef.ref =
+      ap2:checkout/<frame_id>, under the receipt signature.  The AP2
+      task scope is the coverage.boundary (Section 6.4), and the
+      completeness block sequences the actions under it.
+
+   The identity of the checkout is the PEF frame_id, a content address
+   the payment side already computes; the completeness of the actions
+   taken under it is the vaara.authorization/v0 contiguity stream.  A
+   per-action hash says an action was recorded; the running count says
+   none inside the AP2 task boundary was dropped.  A third party
+   recomputes the frame address, confirms every receipt names that
+   checkout, resolves each evidence binding, verifies each signature,
+   and re-runs the gap check, with only the PEF and the held receipts in
+   hand.  See tests/vectors/ap2_v0/_check_independent.py.  AP2 can pin
+   from the point the Checkout Receipt ends rather than define a new
+   post-settlement primitive.
+
+6.6.  Profile Example: TAP Request Binding
+
+   This profile binds a Visa Trusted Agent Protocol (TAP) request to the
+   action a trusted agent takes under it, across the action lifecycle,
+   so the post-authorization record is the same recomputable evidence as
+   any other decision receipt.  It adds a TAP request evidence record
+   (schema = tap.request/v0) whose JCS digest is the receipt's
+   evidenceRef.digest, and the join key actionRef = sha256(JCS({agentId,
+   actionType, scope, timestampMs, seq, terminal})) carried on the
+   request:
+
+
+
+
+
+
+Sirkkavaara              Expires 20 January 2027               [Page 15]
+
+Internet-Draft                Vaara Receipt                    July 2026
+
+
+   *  The trusted agent presents the TAP request to the relying party.
+      The decision receipt names it by content address:
+      decisionDerived.evidenceRef.digest = sha256(JCS(request)),
+      decisionDerived.evidenceRef.ref = tap:request/<actionRef>, both
+      under the receipt signature.  Canonicalization is JCS / RFC 8785,
+      the same as this envelope, so the address joins with no re-
+      canonicalization.
+
+   *  The lifecycle lives in the join key.  Because the action tuple
+      covers terminal, the in-progress (terminal: false) request has a
+      different actionRef than the final (terminal: true) one, and the
+      in-progress receipt does not resolve against the terminal request.
+      A mid-action receipt cannot be presented where the final one is
+      required.
+
+   The verdict is recomputable offline.  A third party recomputes the
+   action ref, resolves the request binding, and verifies the signature
+   with only the TAP request, the held receipts, and the issuer's public
+   key, with the TAP service offline and no live verifier endpoint to
+   trust.  See tests/vectors/tap_v0/_check_independent.py.  TAP can pin
+   to vaara.receipt/v1 for the post-authorization record rather than
+   define a new primitive.
+
+6.7.  Profile: Generic External Execution Evidence
+
+   This is the schema-agnostic binding the named profiles above are
+   instances of.  It takes any external execution-evidence artifact,
+   content-addresses it, and binds it through this envelope unchanged,
+   with no field names that depend on what produced it.  A verifier
+   carrying an external_execution_evidence slot (linked_call_id /
+   evidence_hash / evidence_type) resolves that slot against a
+   vaara.receipt/v1 authorization receipt as the recomputable producer:
+
+   *  evidence_hash = sha256(JCS(evidence_record)), equal to the
+      receipt's decisionDerived.evidenceRef.digest, so the slot and the
+      receipt name the same recomputable artifact (JCS / RFC 8785, no
+      re-canonicalization).
+
+   *  linked_call_id is the call the receipt names:
+      decisionDerived.evidenceRef.ref = mcp:call/<linked_call_id>, under
+      the receipt signature.
+
+   *  evidence_type is the receipt's evidence schema
+      (vaara.authorization/v0).
+
+   The trace is the coverage.boundary, and each receipt carries a signed
+   completeness block (seq + runningCount), so the held set proves not
+   only that each named call's evidence resolves but that none inside
+
+
+
+Sirkkavaara              Expires 20 January 2027               [Page 16]
+
+Internet-Draft                Vaara Receipt                    July 2026
+
+
+   the boundary was dropped.  A slot's evidence_hash alone proves a
+   given record exists; the completeness block turns a silent drop into
+   a named gap.  The dropped vector withholds one record, slot and
+   receipt both, and the signed running count still proves it existed.
+
+   A third party recomputes every verdict offline with only the held
+   slots, the receipts, and the issuer's public key, with no live
+   verifier endpoint to trust.  See tests/vectors/
+   external_evidence_v0/_check_independent.py.  Any plane that emits
+   execution evidence pins here by naming its artifact through this
+   slot, rather than defining a new primitive or a profile of its own.
+
+7.  Conformance
+
+   An implementation conforms to vaara.receipt/v1 if, for every receipt
+   it emits:
+
+   1.  The Section 3.1 signature verifies against the stated alg and
+       key.
+
+   2.  evidenceRef.digest equals sha256(JCS(evidence_record)) for the
+       referenced record, under one of the Section 2 canonicalization
+       labels.
+
+   3.  Any timestampAnchors[].anchoredDigest equals the "sha256:" of the
+       JCS signed payload of the same receipt.
+
+   The committed vectors plus _check_independent.py are the reference
+   conformance suite; running the x402 profile checker and having it
+   exit 0 is a passing run for that profile.
+
+   The same vectors serve as recomputable test evidence for the
+   reversibility classification and enforcement controls in OWASP AISVS
+   1.0 ([AISVS2026]), specifically C9.2.3 (trusted reversibility
+   classification), C9.2.4 (runtime enforcement of reversibility), and
+   C9.2.10 (highest-impact class enforcement across multi-step chains).
+
+8.  Versioning
+
+   The envelope version is the integer "version" field and the
+   vaara.receipt/vN schema id.  Additive, backward-compatible changes
+   (new optional fields, new anchor methods, new profiles) do not bump
+   N.  A change to the signed-payload field set, the canonicalization,
+   or the signature construction bumps N.
+
+
+
+
+
+
+
+Sirkkavaara              Expires 20 January 2027               [Page 17]
+
+Internet-Draft                Vaara Receipt                    July 2026
+
+
+9.  Security Considerations
+
+   The integrity of a receipt rests on the Section 3.1 signature over
+   the JCS-canonical signed payload, not on any timestamp anchor or
+   trust root.  A consumer MUST verify that signature against the public
+   key named under "alg" before relying on any field.  Because the
+   signed payload excludes "signature" and "timestampAnchors", anchors
+   added after signing cannot alter the signed content; a consumer MUST
+   recompute each anchoredDigest from the signed payload rather than
+   trusting the anchor's stated value.
+
+   Recomputability depends entirely on canonicalization.  A producer and
+   a consumer that disagree on JCS output for the same JSON value will
+   compute different digests; implementations MUST use a conformant JCS
+   ([RFC8785]) implementation and MUST treat any of the three accepted
+   labels as the same algorithm.
+
+   The argument commitment in the authorization profile (Section 6.4)
+   lets a receipt be published while the raw arguments stay private, but
+   a low-entropy argument set is open to a dictionary attack against the
+   commitment.  Producers SHOULD ensure the committed object carries
+   sufficient entropy (for example a per-call nonce) where argument
+   confidentiality matters.
+
+   An absent refusal is evidence only within a declared coverage
+   boundary (Section 6.4).  A reader MUST NOT read a missing receipt as
+   "the action did not happen"; without a coverage block it means only
+   "not observed", and with one it means "not refused within this
+   boundary".  The completeness block makes a dropped receipt inside the
+   boundary detectable, but a pure tail truncation is not detectable by
+   sequence contiguity alone and requires a timestamp anchor over the
+   running count to close.
+
+   A recipient that consumes a sealed maxClass to gate its own next
+   action (Section 6.4) MUST bind the class to the signature before
+   acting on it. maxClass sits in the unsigned evidence block and is
+   covered by the signature only through the seal's
+   decisionDerived.evidenceRef.digest = "sha256:" + JCS(evidence).  A
+   recipient MUST verify each receipt's signature and that its evidence
+   recomputes to that signed digest; a seal whose binding fails
+   contributes no class and the gate fails closed.  A recipient that
+   reads maxClass raw, without recomputing the binding, can be made to
+   permit an irreversible action whose class an agent relabeled into a
+   permitted one while the record signature, which never covered the
+   evidence, still verifies.  The gate is also a membership test over
+   class labels, not an ordering; this document defines no ordering over
+   classes, and a recipient MUST NOT infer one.
+
+
+
+
+Sirkkavaara              Expires 20 January 2027               [Page 18]
+
+Internet-Draft                Vaara Receipt                    July 2026
+
+
+10.  Related Work
+
+   Several independent research efforts published in 2026 converge on
+   the same core observation this document implements: that governing
+   agent behavior requires binding decisions to individual actions
+   rather than to sessions or agents, using content-addressed,
+   independently verifiable records.
+
+   Salfeld [Salfeld2026] introduces a zero-trust execution framework
+   grounded in signed execution receipts with DSSE and Ed25519,
+   demonstrating the pattern on a proof-of-concept infrastructure (zta-
+   hub).  He and Yu [He2026SEB] propose a Sovereign Execution Broker
+   that interposes on tool calls with per-action attestation in cloud
+   environments.  He and Yu [He2026SAB] extend this to a Sovereign
+   Assurance Boundary covering multi-tenant and Kubernetes deployments.
+   Uchibeke [Uchibeke2026] examines pre-execution attestation and the
+   case for binding authorization evidence before a tool call is
+   dispatched.
+
+   All four independently adopt per-action signed records with content-
+   addressed evidence.  None defines the held-set completeness mechanism
+   specified in Section 6.4: the monotonic sequence with running count,
+   the optional sealing record, and the gap-detection property that lets
+   a third party prove a receipt is missing from a set without issuer
+   access.  None ships a recomputable conformance suite independent of
+   any library.  This document specifies both.
+
+   A parallel line of work in the IETF community addresses signed
+   receipts for agent actions taken over the Model Context Protocol
+   (MCP).  [ACTA-RECEIPTS] defines a base signed-receipt format for
+   machine-to-machine access-control decisions, canonicalized with JCS
+   ([RFC8785]) and verified against an issuer key resolved out of band;
+   it records a decision after it is made.  [ASQAV-COMPLIANCE] layers a
+   regulatory compliance profile on that base format, mapping fields to
+   obligations under the EU AI Act and DORA and tightening optional
+   fields to required ones for audit use.  [AGENTROA] places an
+   enforcement proxy outside the agent process that authorizes an action
+   before it runs, binds the MCP tool call by a hash of its canonical
+   arguments, and can register the authorization with a SCITT
+   transparency service ([RFC9943]).  [VCP] profiles the same SCITT
+   substrate for audit trails in algorithmic trading, a different
+   domain.
+
+   This document shares the per-action, content-addressed, recomputable
+   approach of these efforts and differs in three properties none of
+   them combine.  First, the held-set completeness mechanism of
+   Section 6.4: a monotonic sequence with a running count and an
+   optional sealing record lets a third party prove a receipt is missing
+
+
+
+Sirkkavaara              Expires 20 January 2027               [Page 19]
+
+Internet-Draft                Vaara Receipt                    July 2026
+
+
+   from a set, and a sealed worst-case class lets a chain recipient gate
+   its own next action on the held set alone, with no issuer access.
+   The receipts above are per-decision records without a held-set gap
+   proof.  Second, one profile-neutral envelope carries authorization,
+   settlement, checkout, and external-execution evidence through the
+   same binding (Section 6), where the efforts above each define a
+   single receipt shape.  Third, the envelope's backLink binds a
+   decision to its predecessor attestation, so a pre-execution
+   authorization and its post-execution record form one recomputable
+   pair rather than a single post-hoc entry; [AGENTROA] records the
+   authorization decision and states that it carries no paired post-
+   execution receipt.
+
+   The evidence surface is also broader.  A receipt is re-expressible as
+   a RATS Entity Attestation Result ([I-D.ietf-rats-ear]), and its
+   timestamp anchors admit an eIDAS-qualified timestamp (Section 5) as a
+   swappable method for legal weight.  The format is shipped, and its
+   receipts are independently recomputable from the public conformance
+   vectors that accompany this specification.  This work references the
+   formats above rather than profiling any of them, because the held-set
+   completeness mechanism and the profile-neutral envelope are
+   properties of the format that a field-level profile could not add.
+
+11.  IANA Considerations
+
+   This document has no IANA actions.  The timestamp anchor method
+   registry (Section 5) and the profile registry (Section 6.1) are
+   maintained by the specification, not by IANA, in this version.
+
+12.  Normative References
+
+   [FIPS180-4]
+              National Institute of Standards and Technology, "Secure
+              Hash Standard (SHS)", FIPS PUB 180-4, August 2015,
+              <https://nvlpubs.nist.gov/nistpubs/FIPS/
+              NIST.FIPS.180-4.pdf>.
+
+   [RFC2119]  Bradner, S., "Key words for use in RFCs to Indicate
+              Requirement Levels", BCP 14, RFC 2119,
+              DOI 10.17487/RFC2119, March 1997,
+              <https://www.rfc-editor.org/info/rfc2119>.
+
+   [RFC3161]  Adams, C., Cain, P., Pinkas, D., and R. Zuccherato,
+              "Internet X.509 Public Key Infrastructure Time-Stamp
+              Protocol (TSP)", RFC 3161, DOI 10.17487/RFC3161, August
+              2001, <https://www.rfc-editor.org/info/rfc3161>.
+
+
+
+
+
+Sirkkavaara              Expires 20 January 2027               [Page 20]
+
+Internet-Draft                Vaara Receipt                    July 2026
+
+
+   [RFC8174]  Leiba, B., "Ambiguity of Uppercase vs Lowercase in RFC
+              2119 Key Words", BCP 14, RFC 8174, DOI 10.17487/RFC8174,
+              May 2017, <https://www.rfc-editor.org/info/rfc8174>.
+
+   [RFC8785]  Rundgren, A., Jordan, B., and S. Erdtman, "JSON
+              Canonicalization Scheme (JCS)", RFC 8785,
+              DOI 10.17487/RFC8785, June 2020,
+              <https://www.rfc-editor.org/info/rfc8785>.
+
+13.  Informative References
+
+   [ACTA-RECEIPTS]
+              Farley, T., "Signed Decision Receipts for Machine-to-
+              Machine Access Control", Work in Progress, Internet-Draft,
+              draft-farley-acta-signed-receipts, June 2026,
+              <https://datatracker.ietf.org/doc/draft-farley-acta-
+              signed-receipts/>.
+
+   [AGENTROA] Michalak, J., "Agent Route Origin Authorization
+              (AgentROA): A Cryptographic Policy Enforcement Framework
+              for AI Agent Actions", Work in Progress, Internet-Draft,
+              draft-nivalto-agentroa-route-authorization, April 2026,
+              <https://datatracker.ietf.org/doc/draft-nivalto-agentroa-
+              route-authorization/>.
+
+   [AISVS2026]
+              OWASP Foundation, "OWASP AI Security Verification Standard
+              (AISVS) 1.0, Chapter 9: Orchestration and Agentic Action",
+              June 2026, <https://github.com/OWASP/AISVS/blob/main/1.0/
+              en/0x10-C09-Orchestration-and-Agentic-Action.md>.
+
+   [ASQAV-COMPLIANCE]
+              Marques, J., "Compliance Profile of Signed Action Receipts
+              for AI Agents", Work in Progress, Internet-Draft, draft-
+              marques-asqav-compliance-receipts, July 2026,
+              <https://datatracker.ietf.org/doc/draft-marques-asqav-
+              compliance-receipts/>.
+
+   [eIDAS]    European Parliament and Council, "Regulation (EU) No
+              910/2014 on electronic identification and trust services
+              for electronic transactions in the internal market
+              (eIDAS)", July 2014, <https://eur-lex.europa.eu/legal-
+              content/EN/TXT/?uri=CELEX:32014R0910>.
+
+   [FIPS204]  National Institute of Standards and Technology, "Module-
+              Lattice-Based Digital Signature Standard", FIPS PUB 204,
+              August 2024, <https://nvlpubs.nist.gov/nistpubs/FIPS/
+              NIST.FIPS.204.pdf>.
+
+
+
+Sirkkavaara              Expires 20 January 2027               [Page 21]
+
+Internet-Draft                Vaara Receipt                    July 2026
+
+
+   [He2026SAB]
+              He, J., "Sovereign Assurance Boundary: Certificate-Bound
+              Admission for Agentic Infrastructure", arXiv 2606.11632,
+              June 2026, <https://arxiv.org/abs/2606.11632>.
+
+   [He2026SEB]
+              He, J., "Sovereign Execution Broker: Enforcing
+              Certificate-Bound Authority in Agentic Control Planes",
+              arXiv 2606.20520, June 2026,
+              <https://arxiv.org/abs/2606.20520>.
+
+   [I-D.ietf-rats-ear]
+              Fossati, T. and S. Frost, "Attestation Results for Secure
+              Interactions", Work in Progress, Internet-Draft, draft-
+              ietf-rats-ear, 2026,
+              <https://datatracker.ietf.org/doc/draft-ietf-rats-ear/>.
+
+   [RFC7518]  Jones, M., "JSON Web Algorithms (JWA)", RFC 7518,
+              DOI 10.17487/RFC7518, May 2015,
+              <https://www.rfc-editor.org/info/rfc7518>.
+
+   [RFC9334]  Birkholz, H., Thaler, D., Richardson, M., Smith, N., and
+              W. Pan, "Remote ATtestation procedureS (RATS)
+              Architecture", RFC 9334, DOI 10.17487/RFC9334, January
+              2023, <https://www.rfc-editor.org/info/rfc9334>.
+
+   [RFC9943]  IETF SCITT Working Group, "An Architecture for Trustworthy
+              and Transparent Digital Supply Chains", RFC 9943,
+              DOI 10.17487/RFC9943, June 2026,
+              <https://www.rfc-editor.org/info/rfc9943>.
+
+   [Salfeld2026]
+              Salfeld-Nebgen, J., "Governing Actions, Not Agents:
+              Institutional Attestation as a Governance Model for
+              Autonomous AI Systems", arXiv 2606.26298, June 2026,
+              <https://arxiv.org/abs/2606.26298>.
+
+   [Uchibeke2026]
+              Uchibeke, U., "Before the Tool Call: Deterministic Pre-
+              Action Authorization for Autonomous AI Agents",
+              arXiv 2603.20953, March 2026,
+              <https://arxiv.org/abs/2603.20953>.
+
+   [VAARA-REPO]
+              Vaara, "Vaara Receipt Specification (vaara.receipt/v1) and
+              conformance vectors", 2026,
+              <https://github.com/vaaraio/vaara/blob/main/SPEC.md>.
+
+
+
+
+Sirkkavaara              Expires 20 January 2027               [Page 22]
+
+Internet-Draft                Vaara Receipt                    July 2026
+
+
+   [VCP]      Kamimura, T., "A SCITT Profile for Verifiable Audit Trails
+              in Algorithmic Trading: The VeritasChain Protocol (VCP)",
+              Work in Progress, Internet-Draft, draft-kamimura-scitt-
+              vcp, January 2026, <https://datatracker.ietf.org/doc/
+              draft-kamimura-scitt-vcp/>.
+
+Author's Address
+
+   Henri Sirkkavaara
+   Vaara
+   Email: hello@vaara.io
+   URI:   https://github.com/vaaraio/vaara
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+Sirkkavaara              Expires 20 January 2027               [Page 23]
