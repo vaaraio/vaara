@@ -6,7 +6,7 @@
 </p>
 
 <p align="center">
-  <a href="https://pypi.org/project/vaara/"><img src="https://img.shields.io/pypi/v/vaara.svg" alt="PyPI"></a>
+  <a href="https://pypi.org/project/vaara/"><img src="https://raw.githubusercontent.com/vaaraio/vaara/badges/pypi.svg" alt="PyPI"></a>
   <a href="https://github.com/vaaraio/vaara/blob/main/LICENSE"><img src="https://img.shields.io/pypi/l/vaara.svg" alt="License"></a>
   <a href="https://github.com/vaaraio/vaara/actions/workflows/ci.yml"><img src="https://github.com/vaaraio/vaara/actions/workflows/ci.yml/badge.svg" alt="CI"></a>
   <a href="https://scorecard.dev/viewer/?uri=github.com/vaaraio/vaara"><img src="https://github.com/vaaraio/vaara/actions/workflows/scorecard.yml/badge.svg" alt="OpenSSF Scorecard"></a>
@@ -15,10 +15,12 @@
 </p>
 
 <p align="center">
-  <img src="https://img.shields.io/endpoint?url=https://raw.githubusercontent.com/vaaraio/vaara/badges/installs.json" alt="Downloads">
+  <img src="https://raw.githubusercontent.com/vaaraio/vaara/badges/downloads.svg" alt="Downloads">
 </p>
 
-<p align="center"><b>Accountable Autonomy.</b> A verifiable receipt for every action your AI agents take, checkable by anyone.</p>
+<p align="center"><b>Accountable Autonomy.</b></p>
+
+<p align="center">A verifiable receipt for every action your AI agents take, checkable by anyone.</p>
 
 Your AI agent transferred the funds, wrote the file, called the tool. Later, someone who does not trust you asks you to prove exactly what it did and why: a regulator, an auditor, a customer after an incident. Your own logs will not settle it, because you could have edited them.
 

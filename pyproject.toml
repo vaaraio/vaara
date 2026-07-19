@@ -5,7 +5,7 @@ build-backend = "setuptools.build_meta"
 [project]
 name = "vaara"
 version = "1.37.0"
-description = "Runtime evidence layer for AI agents under the EU AI Act: policy-gated tool calls, hash-chained tamper-evident audit trails with external time anchoring, and independently verifiable attestation plus execution receipts per MCP tool call"
+description = "Accountable Autonomy for AI agents under the EU AI Act: policy-gated tool calls, hash-chained tamper-evident audit trails with external time anchoring, and independently verifiable attestation plus execution receipts per MCP tool call"
 requires-python = ">=3.10"
 license = "AGPL-3.0-or-later"
 authors = [{ name = "Henri Sirkkavaara", email = "hello@vaara.io" }]
