@@ -1,3 +1,5 @@
+# SPDX-FileCopyrightText: 2026 Henri Sirkkavaara
+# SPDX-License-Identifier: AGPL-3.0-or-later
 """Shared helpers for the v0.39 LLM-agent harness.
 
 v0.32-v0.38 scored adversarial entries already shaped like tool calls.

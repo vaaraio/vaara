@@ -1,3 +1,5 @@
+# SPDX-FileCopyrightText: 2026 Henri Sirkkavaara
+# SPDX-License-Identifier: AGPL-3.0-or-later
 """Canonical mapping from guardrail findings to EU AI Act articles.
 
 This module is the value, not the SDK glue around it. Each provider

@@ -1,4 +1,6 @@
 #!/usr/bin/env python3
+# SPDX-FileCopyrightText: 2026 Henri Sirkkavaara
+# SPDX-License-Identifier: AGPL-3.0-or-later
 """Anchor a Vaara release to a qualified RFC 3161 TSA — dogfoods vaara.audit.timeanchor.
 
 The release is already anchored by three independent registries (PyPI, npm,

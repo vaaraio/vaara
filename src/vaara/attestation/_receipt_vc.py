@@ -1,3 +1,5 @@
+# SPDX-FileCopyrightText: 2026 Henri Sirkkavaara
+# SPDX-License-Identifier: AGPL-3.0-or-later
 """W3C Verifiable Credential serialization for execution receipts (opt-in).
 
 Internal module. Public surface re-exports ``receipt_to_vc`` and

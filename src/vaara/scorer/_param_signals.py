@@ -1,3 +1,5 @@
+# SPDX-FileCopyrightText: 2026 Henri Sirkkavaara
+# SPDX-License-Identifier: AGPL-3.0-or-later
 """Deterministic parameter-content risk signals for the base rule scorer.
 
 Stdlib only, so it runs in a zero-config install with no ML extra and with no

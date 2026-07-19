@@ -1,3 +1,5 @@
+# SPDX-FileCopyrightText: 2026 Henri Sirkkavaara
+# SPDX-License-Identifier: AGPL-3.0-or-later
 """Calibrate + eval v9 across the v0.39 surfaces.
 
 Four surfaces in one pass, v8 + v9 side-by-side:

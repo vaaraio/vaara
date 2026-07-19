@@ -1,3 +1,5 @@
+# SPDX-FileCopyrightText: 2026 Henri Sirkkavaara
+# SPDX-License-Identifier: AGPL-3.0-or-later
 """Grid search XGBoost hparams for v0.32, ranked by TEST recall at calibrated FPR<=5% on VAL.
 
 Trains many XGBoost models on the v031_split TRAIN fold with MiniLM embeddings,

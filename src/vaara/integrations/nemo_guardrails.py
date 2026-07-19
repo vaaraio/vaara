@@ -1,3 +1,5 @@
+# SPDX-FileCopyrightText: 2026 Henri Sirkkavaara
+# SPDX-License-Identifier: AGPL-3.0-or-later
 """NVIDIA NeMo Guardrails adapter. Upstream rails signal.
 
 Wraps a pre-configured ``LLMRails`` instance. NeMo Guardrails runs

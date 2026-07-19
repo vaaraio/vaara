@@ -1,3 +1,5 @@
+# SPDX-FileCopyrightText: 2026 Henri Sirkkavaara
+# SPDX-License-Identifier: AGPL-3.0-or-later
 """Convert v0.39 BIPIA harness traces into classifier-shaped entries.
 
 Reads tests/adversarial/traces/bipia-s43-*.jsonl, shapes each emitted

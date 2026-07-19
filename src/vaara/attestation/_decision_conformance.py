@@ -1,3 +1,5 @@
+# SPDX-FileCopyrightText: 2026 Henri Sirkkavaara
+# SPDX-License-Identifier: AGPL-3.0-or-later
 """Producer-agnostic conformance check for SEP-2828 decision records.
 
 The sibling of ``_receipt_conformance``. A decision record is the

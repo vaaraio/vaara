@@ -1,3 +1,5 @@
+# SPDX-FileCopyrightText: 2026 Henri Sirkkavaara
+# SPDX-License-Identifier: AGPL-3.0-or-later
 """OVERT 1.0 Base Envelope emission for the Vaara MCP proxy.
 
 Internal helper that turns each governed MCP interaction (``tools/call``,

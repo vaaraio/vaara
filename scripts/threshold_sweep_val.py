@@ -1,3 +1,5 @@
+# SPDX-FileCopyrightText: 2026 Henri Sirkkavaara
+# SPDX-License-Identifier: AGPL-3.0-or-later
 """Classifier threshold sweep on VAL fold for v0.31 item 7.
 
 Reads the attribution JSON and sweeps classifier thresholds on the VAL

@@ -1,3 +1,5 @@
+# SPDX-FileCopyrightText: 2026 Henri Sirkkavaara
+# SPDX-License-Identifier: AGPL-3.0-or-later
 """Cross-stack revocation: one revocation-in-time rule for every lens.
 
 Internal module. Public surface is re-exported from

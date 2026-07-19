@@ -1,3 +1,5 @@
+# SPDX-FileCopyrightText: 2026 Henri Sirkkavaara
+# SPDX-License-Identifier: AGPL-3.0-or-later
 """Qualified existence-in-time proof over a SEP-2828 execution record.
 
 Internal module. Public surface is re-exported from

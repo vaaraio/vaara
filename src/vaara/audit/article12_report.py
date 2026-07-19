@@ -1,3 +1,5 @@
+# SPDX-FileCopyrightText: 2026 Henri Sirkkavaara
+# SPDX-License-Identifier: AGPL-3.0-or-later
 """EU AI Act Article 12 record-keeping report — pure builders and renderers.
 
 Turns an audit trail into a regulator-facing mapping against the Article 12

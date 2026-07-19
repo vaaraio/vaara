@@ -1,3 +1,5 @@
+# SPDX-FileCopyrightText: 2026 Henri Sirkkavaara
+# SPDX-License-Identifier: AGPL-3.0-or-later
 """Signing-mode helpers for SEP-2787 attestation envelopes.
 
 Three signing modes matching the v1 SEP-2787 draft: HS256 (HMAC-SHA256

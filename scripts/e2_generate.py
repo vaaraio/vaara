@@ -1,3 +1,5 @@
+# SPDX-FileCopyrightText: 2026 Henri Sirkkavaara
+# SPDX-License-Identifier: AGPL-3.0-or-later
 """E2 — generate benign read_file canonical-path entries via a vLLM endpoint.
 
 Produces BENIGN test fixtures: read_file calls on unambiguously safe paths

@@ -1,3 +1,5 @@
+# SPDX-FileCopyrightText: 2026 Henri Sirkkavaara
+# SPDX-License-Identifier: AGPL-3.0-or-later
 """The TPM evidence bundle: one self-contained file the verifier consumes.
 
 Phase-0 binds three things a regulator must check together: the signed SEP-2828

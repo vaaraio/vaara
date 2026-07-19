@@ -1,3 +1,5 @@
+# SPDX-FileCopyrightText: 2026 Henri Sirkkavaara
+# SPDX-License-Identifier: AGPL-3.0-or-later
 """Gap-evident completeness over a stream of authorization receipts.
 
 The per-boundary sequence assigned at issuance is contiguous by construction

@@ -1,3 +1,5 @@
+# SPDX-FileCopyrightText: 2026 Henri Sirkkavaara
+# SPDX-License-Identifier: AGPL-3.0-or-later
 """Vaara policy dataclasses.
 
 All types are frozen so a loaded Policy is a value object — passing it

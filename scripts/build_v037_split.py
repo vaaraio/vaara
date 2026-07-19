@@ -1,3 +1,5 @@
+# SPDX-FileCopyrightText: 2026 Henri Sirkkavaara
+# SPDX-License-Identifier: AGPL-3.0-or-later
 """Build tests/adversarial/v037_split.json.
 
 Composition per the v0.37 scope in STATE.md:

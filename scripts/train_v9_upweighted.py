@@ -1,3 +1,5 @@
+# SPDX-FileCopyrightText: 2026 Henri Sirkkavaara
+# SPDX-License-Identifier: AGPL-3.0-or-later
 """Retrain v9 with BIPIA follows upweighted via XGBoost sample_weight.
 
 Reuses build_features/build_labels/load_corpus_keyed from

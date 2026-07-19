@@ -1,3 +1,5 @@
+# SPDX-FileCopyrightText: 2026 Henri Sirkkavaara
+# SPDX-License-Identifier: AGPL-3.0-or-later
 """Adaptive risk scorer with conformal prediction and MWU learning.
 
 Complements declarative policy engines (rule-based / YAML / Rego) by

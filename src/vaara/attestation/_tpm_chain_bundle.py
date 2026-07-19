@@ -1,3 +1,5 @@
+# SPDX-FileCopyrightText: 2026 Henri Sirkkavaara
+# SPDX-License-Identifier: AGPL-3.0-or-later
 """The TPM evidence-chain bundle: one file carrying a whole attestation loop.
 
 The continuous-attestation counterpart of :mod:`vaara.attestation._tpm_bundle`.

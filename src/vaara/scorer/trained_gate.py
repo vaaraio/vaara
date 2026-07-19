@@ -1,3 +1,5 @@
+# SPDX-FileCopyrightText: 2026 Henri Sirkkavaara
+# SPDX-License-Identifier: AGPL-3.0-or-later
 """Trained per-action-step gate backend.
 
 Wraps a frozen action-gate bundle (bootstrap ensemble + conformal q_hat)

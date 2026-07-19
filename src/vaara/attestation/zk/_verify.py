@@ -1,3 +1,5 @@
+# SPDX-FileCopyrightText: 2026 Henri Sirkkavaara
+# SPDX-License-Identifier: AGPL-3.0-or-later
 """Verifier for the decisionProof.
 
 Rebuilds the published commitments and the verdict's homomorphic difference

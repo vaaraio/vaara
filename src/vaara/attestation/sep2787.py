@@ -1,3 +1,5 @@
+# SPDX-FileCopyrightText: 2026 Henri Sirkkavaara
+# SPDX-License-Identifier: AGPL-3.0-or-later
 """Deprecated alias for :mod:`vaara.attestation.tool_call_attestation`.
 
 Vaara's tool-call attestation was formerly exposed here under the SEP-2787

@@ -1,3 +1,5 @@
+# SPDX-FileCopyrightText: 2026 Henri Sirkkavaara
+# SPDX-License-Identifier: AGPL-3.0-or-later
 """API key authentication and role-based access control for Vaara.
 
 Enterprise deployments expose the MCP server and pipeline to untrusted

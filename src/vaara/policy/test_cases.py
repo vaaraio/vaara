@@ -1,3 +1,5 @@
+# SPDX-FileCopyrightText: 2026 Henri Sirkkavaara
+# SPDX-License-Identifier: AGPL-3.0-or-later
 """Policy test framework — Conftest analog for Vaara YAML/JSON policies.
 
 A test case is a synthetic action context plus an expected verdict.

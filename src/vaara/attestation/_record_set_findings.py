@@ -1,3 +1,5 @@
+# SPDX-FileCopyrightText: 2026 Henri Sirkkavaara
+# SPDX-License-Identifier: AGPL-3.0-or-later
 """Cross-record findings for a set of SEP-2828 records.
 
 The properties that only show up across records, factored out of

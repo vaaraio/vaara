@@ -1,3 +1,5 @@
+# SPDX-FileCopyrightText: 2026 Henri Sirkkavaara
+# SPDX-License-Identifier: AGPL-3.0-or-later
 """Deterministic stratified train/val/test split over the adversarial corpus.
 
 Ratio:        70 / 15 / 15

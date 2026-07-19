@@ -1,3 +1,5 @@
+# SPDX-FileCopyrightText: 2026 Henri Sirkkavaara
+# SPDX-License-Identifier: AGPL-3.0-or-later
 """Receipt-bound, scoped, short-lived credential broker (OAuth-for-agents).
 
 Vaara's authority layer: the proxy mints a signed, short-lived credential

@@ -1,3 +1,5 @@
+# SPDX-FileCopyrightText: 2026 Henri Sirkkavaara
+# SPDX-License-Identifier: AGPL-3.0-or-later
 """Zero-knowledge decisionProof engine (behind the attestation extra).
 
 Transparent commit-and-prove over P-256 (secp256r1). Proves that a SEP-2828

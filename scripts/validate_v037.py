@@ -1,3 +1,5 @@
+# SPDX-FileCopyrightText: 2026 Henri Sirkkavaara
+# SPDX-License-Identifier: AGPL-3.0-or-later
 """Validate v037 generated jsonl: schema + required-field + per-cat consistency.
 
 Mirrors validate_v036.py with the v037 glob. Fail-loud on any malformed entry

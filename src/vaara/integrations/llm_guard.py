@@ -1,3 +1,5 @@
+# SPDX-FileCopyrightText: 2026 Henri Sirkkavaara
+# SPDX-License-Identifier: AGPL-3.0-or-later
 """LLM Guard adapter. Upstream scanner-library signal.
 
 Wraps the ``llm_guard`` scanner pipeline. The deployer assembles a

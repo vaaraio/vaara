@@ -1,3 +1,5 @@
+# SPDX-FileCopyrightText: 2026 Henri Sirkkavaara
+# SPDX-License-Identifier: AGPL-3.0-or-later
 """Adaptive risk scorer — ML-based action risk scoring with conformal guarantees."""
 
 from vaara.scorer.adaptive import (

@@ -1,3 +1,5 @@
+# SPDX-FileCopyrightText: 2026 Henri Sirkkavaara
+# SPDX-License-Identifier: AGPL-3.0-or-later
 """v0.37 cross-family held-out generation via Llama-3.3-70B-Instruct / vLLM.
 
 Mirrors generate_targeted_v036.py with v037 IDs and Llama-family defaults.

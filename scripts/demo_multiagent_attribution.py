@@ -1,4 +1,6 @@
 #!/usr/bin/env python3
+# SPDX-FileCopyrightText: 2026 Henri Sirkkavaara
+# SPDX-License-Identifier: AGPL-3.0-or-later
 """Demo: reconstruct a multi-agent delegation chain and prove it can't be forged.
 
 Runs a three-agent chain through Vaara's governance pipeline:

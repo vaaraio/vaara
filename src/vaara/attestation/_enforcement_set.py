@@ -1,3 +1,5 @@
+# SPDX-FileCopyrightText: 2026 Henri Sirkkavaara
+# SPDX-License-Identifier: AGPL-3.0-or-later
 """Enforcement verification over a whole directory of (record, report, VCEK) triples.
 
 ``verify_enforcement`` binds one signed SEP-2828 record to one SEV-SNP report.

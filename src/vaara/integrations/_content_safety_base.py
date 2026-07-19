@@ -1,3 +1,5 @@
+# SPDX-FileCopyrightText: 2026 Henri Sirkkavaara
+# SPDX-License-Identifier: AGPL-3.0-or-later
 """Shared shape for cloud-guardrail content-safety adapters.
 
 Three adapters live alongside this module — Bedrock, Azure, GCP — and

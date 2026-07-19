@@ -1,3 +1,5 @@
+# SPDX-FileCopyrightText: 2026 Henri Sirkkavaara
+# SPDX-License-Identifier: AGPL-3.0-or-later
 """Cryptographic verification of a SEP-2828 ``decisionProof`` (behind the extra).
 
 The keyless conformance checker (``_decision_conformance``) validates the proof

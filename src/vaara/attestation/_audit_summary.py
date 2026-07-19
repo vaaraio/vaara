@@ -1,3 +1,5 @@
+# SPDX-FileCopyrightText: 2026 Henri Sirkkavaara
+# SPDX-License-Identifier: AGPL-3.0-or-later
 """The one-page audit summary: the record-set verdict a regulator reads.
 
 ``check_record_set`` answers the machine question and ``verify-records`` prints

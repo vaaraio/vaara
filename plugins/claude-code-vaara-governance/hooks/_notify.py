@@ -1,3 +1,5 @@
+# SPDX-FileCopyrightText: 2026 Henri Sirkkavaara
+# SPDX-License-Identifier: AGPL-3.0-or-later
 """Desktop notification for governance decisions. Fire-and-forget.
 
 Sends a native notification when the gate blocks or escalates a tool

@@ -1,3 +1,5 @@
+# SPDX-FileCopyrightText: 2026 Henri Sirkkavaara
+# SPDX-License-Identifier: AGPL-3.0-or-later
 """v0.36 cross-model held-out generation via Mixtral-8x7B-Instruct / vLLM.
 
 Mirrors generate_targeted_v034.py but with v036 IDs, a model-tag suffix on

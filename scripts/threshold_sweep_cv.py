@@ -1,3 +1,5 @@
+# SPDX-FileCopyrightText: 2026 Henri Sirkkavaara
+# SPDX-License-Identifier: AGPL-3.0-or-later
 """5-fold cross-validated threshold sweep on the adversarial corpus.
 
 For each fold, fits XGBoost on the training partition, collects out-of-fold

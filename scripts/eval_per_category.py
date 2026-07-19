@@ -1,3 +1,5 @@
+# SPDX-FileCopyrightText: 2026 Henri Sirkkavaara
+# SPDX-License-Identifier: AGPL-3.0-or-later
 """Per-category recall + FPR for a classifier bundle on the v031_split TEST fold.
 
 Calibrates the decision threshold on VAL at target FPR (default 5%), then

@@ -1,3 +1,5 @@
+# SPDX-FileCopyrightText: 2026 Henri Sirkkavaara
+# SPDX-License-Identifier: AGPL-3.0-or-later
 """Evaluate a classifier bundle on the v0.38 Phase 1 generation (Llama-3.3-70B, seed 43).
 
 Reads tests/adversarial/generated/{TM,PE,DE}-v038-llama33-s43.jsonl directly,

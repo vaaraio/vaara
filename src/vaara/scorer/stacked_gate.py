@@ -1,3 +1,5 @@
+# SPDX-FileCopyrightText: 2026 Henri Sirkkavaara
+# SPDX-License-Identifier: AGPL-3.0-or-later
 """Stacked GBM + MC dropout gate — composes both backends via a trained LR.
 
 The stacked ensemble evaluates both `TrainedGateScorer` (GBM bootstrap) and

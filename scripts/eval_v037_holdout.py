@@ -1,3 +1,5 @@
+# SPDX-FileCopyrightText: 2026 Henri Sirkkavaara
+# SPDX-License-Identifier: AGPL-3.0-or-later
 """Evaluate a classifier bundle on the v037 holdout fold.
 
 Holdout composition (from v037_split.json): v036 Mixtral DE + v036 Claude DE

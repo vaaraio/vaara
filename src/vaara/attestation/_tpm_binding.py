@@ -1,3 +1,5 @@
+# SPDX-FileCopyrightText: 2026 Henri Sirkkavaara
+# SPDX-License-Identifier: AGPL-3.0-or-later
 """TPM binding: bind a TPM 2.0 quote + IMA log to a SEP-2828 record.
 
 The vendor-neutral, commodity-hardware twin of

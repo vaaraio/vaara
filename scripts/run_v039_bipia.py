@@ -1,3 +1,5 @@
+# SPDX-FileCopyrightText: 2026 Henri Sirkkavaara
+# SPDX-License-Identifier: AGPL-3.0-or-later
 """v0.39 BIPIA harness driver.
 
 Runs an LLM agent against BIPIA injected prompts, captures tool calls,

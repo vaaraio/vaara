@@ -1,3 +1,5 @@
+# SPDX-FileCopyrightText: 2026 Henri Sirkkavaara
+# SPDX-License-Identifier: AGPL-3.0-or-later
 """Model Context Protocol (MCP) server for agent governance.
 
 Exposes Vaara's interception pipeline as an MCP server so that AI agents

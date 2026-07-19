@@ -1,3 +1,5 @@
+# SPDX-FileCopyrightText: 2026 Henri Sirkkavaara
+# SPDX-License-Identifier: AGPL-3.0-or-later
 """The shadow report: what would have been blocked, from the trail alone.
 
 Shadow mode (``InterceptionPipeline(enforce=False)``, or ``--shadow`` on the

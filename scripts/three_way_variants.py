@@ -1,3 +1,5 @@
+# SPDX-FileCopyrightText: 2026 Henri Sirkkavaara
+# SPDX-License-Identifier: AGPL-3.0-or-later
 """Three-way variant comparison for v0.31 item 6.
 
 Reads the attribution JSON produced by eval_pipeline_attribution.py and

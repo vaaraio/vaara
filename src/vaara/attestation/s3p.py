@@ -1,3 +1,5 @@
+# SPDX-FileCopyrightText: 2026 Henri Sirkkavaara
+# SPDX-License-Identifier: AGPL-3.0-or-later
 """OVERT 1.0 MEA-2 Statistical Safety Signal Protocol (S3P) emitter.
 
 S3P (OVERT Section 9, control MEA-2) is the normative auditor-reproducible

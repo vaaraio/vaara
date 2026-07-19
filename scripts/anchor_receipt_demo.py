@@ -1,4 +1,6 @@
 #!/usr/bin/env python3
+# SPDX-FileCopyrightText: 2026 Henri Sirkkavaara
+# SPDX-License-Identifier: AGPL-3.0-or-later
 """Mint and verify a self-hosted rfc3161 timestamp anchor over a Vaara receipt.
 
 Fully offline: stands up a local Time-Stamping Authority, anchors the receipt's

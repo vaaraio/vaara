@@ -1,3 +1,5 @@
+# SPDX-FileCopyrightText: 2026 Henri Sirkkavaara
+# SPDX-License-Identifier: AGPL-3.0-or-later
 """OVERT Phase 3 Independent Attestation Provider (IAP) reference.
 
 A Vaara AAL-3 ``BaseEnvelope`` is a Provisional Receipt signed by the

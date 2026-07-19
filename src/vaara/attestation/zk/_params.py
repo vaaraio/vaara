@@ -1,3 +1,5 @@
+# SPDX-FileCopyrightText: 2026 Henri Sirkkavaara
+# SPDX-License-Identifier: AGPL-3.0-or-later
 """Public parameters for the decisionProof engine and their digest.
 
 The setup is transparent: the only public parameters are the curve, the second

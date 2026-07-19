@@ -1,3 +1,5 @@
+# SPDX-FileCopyrightText: 2026 Henri Sirkkavaara
+# SPDX-License-Identifier: AGPL-3.0-or-later
 """v0.35 matched-benign generation via Qwen-2.5-72B / vLLM.
 
 Generates ALLOW-labeled benign tool calls that share surface vocabulary

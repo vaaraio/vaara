@@ -1,3 +1,5 @@
+# SPDX-FileCopyrightText: 2026 Henri Sirkkavaara
+# SPDX-License-Identifier: AGPL-3.0-or-later
 """GCP Model Armor adapter — upstream content-safety signal.
 
 Wraps google-cloud-modelarmor's ``sanitize_user_prompt`` /

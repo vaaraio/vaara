@@ -1,3 +1,5 @@
+# SPDX-FileCopyrightText: 2026 Henri Sirkkavaara
+# SPDX-License-Identifier: AGPL-3.0-or-later
 """Train an XGBoost adversarial classifier and save a deployable joblib bundle.
 
 Loads the corpus via ``train_adversarial_classifier.load_corpus_keyed``,

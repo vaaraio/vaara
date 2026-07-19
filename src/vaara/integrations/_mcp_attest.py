@@ -1,3 +1,5 @@
+# SPDX-FileCopyrightText: 2026 Henri Sirkkavaara
+# SPDX-License-Identifier: AGPL-3.0-or-later
 """SEP-2787 attestation + execution-receipt pairing for the Vaara MCP proxy.
 
 Internal helper. Off unless the operator wires the proxy with a signing key

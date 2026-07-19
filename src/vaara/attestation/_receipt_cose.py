@@ -1,3 +1,5 @@
+# SPDX-FileCopyrightText: 2026 Henri Sirkkavaara
+# SPDX-License-Identifier: AGPL-3.0-or-later
 """COSE Receipt (SCITT-compatible) emission over Vaara's transparency log.
 
 A SCITT / COSE *Receipt* (draft-ietf-cose-merkle-tree-proofs) is a cryptographic

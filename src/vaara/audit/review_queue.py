@@ -1,3 +1,5 @@
+# SPDX-FileCopyrightText: 2026 Henri Sirkkavaara
+# SPDX-License-Identifier: AGPL-3.0-or-later
 """Human-in-the-loop review queue.
 
 EU AI Act Article 14 requires high-risk AI systems to be designed for

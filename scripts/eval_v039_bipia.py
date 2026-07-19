@@ -1,3 +1,5 @@
+# SPDX-FileCopyrightText: 2026 Henri Sirkkavaara
+# SPDX-License-Identifier: AGPL-3.0-or-later
 """Evaluate v8 against captured BIPIA agent traces.
 
 Reads a JSONL trace file written by scripts/run_v039_bipia.py, shapes

@@ -1,3 +1,5 @@
+# SPDX-FileCopyrightText: 2026 Henri Sirkkavaara
+# SPDX-License-Identifier: AGPL-3.0-or-later
 """One-command local governance setup: ``vaara init`` / ``vaara ungovern``.
 
 Turns "install + N manual steps" into a single self-healing command. Between

@@ -1,3 +1,5 @@
+# SPDX-FileCopyrightText: 2026 Henri Sirkkavaara
+# SPDX-License-Identifier: AGPL-3.0-or-later
 """Reference gateway shim: refuse a tool call lacking a valid grant.
 
 Public surface for ``vaara.credential``.

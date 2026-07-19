@@ -1,3 +1,5 @@
+# SPDX-FileCopyrightText: 2026 Henri Sirkkavaara
+# SPDX-License-Identifier: AGPL-3.0-or-later
 """W3C PROV-DM export for the Vaara audit trail.
 
 Produces PROV-JSON (W3C Submission, 2013) so any PROV-aware consumer can

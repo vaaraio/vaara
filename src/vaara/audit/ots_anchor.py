@@ -1,3 +1,5 @@
+# SPDX-FileCopyrightText: 2026 Henri Sirkkavaara
+# SPDX-License-Identifier: AGPL-3.0-or-later
 """OpenTimestamps witness anchors for Vaara receipts (SPEC.md Section 4).
 
 The ``opentimestamps`` timestampAnchors method commits a receipt's

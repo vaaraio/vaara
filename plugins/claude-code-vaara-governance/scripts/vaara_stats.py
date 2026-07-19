@@ -1,4 +1,6 @@
 #!/usr/bin/env python3
+# SPDX-FileCopyrightText: 2026 Henri Sirkkavaara
+# SPDX-License-Identifier: AGPL-3.0-or-later
 """Vaara governance stats for the Claude Code audit trail.
 
 Reads ~/.vaara/claude-code/audit.db (or VAARA_PLUGIN_AUDIT_DB) and prints

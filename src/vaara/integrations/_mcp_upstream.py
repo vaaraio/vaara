@@ -1,3 +1,5 @@
+# SPDX-FileCopyrightText: 2026 Henri Sirkkavaara
+# SPDX-License-Identifier: AGPL-3.0-or-later
 """Upstream MCP subprocess client for the proxy.
 
 Owns the subprocess lifecycle of an upstream MCP server, demuxes responses

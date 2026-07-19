@@ -1,3 +1,5 @@
+# SPDX-FileCopyrightText: 2026 Henri Sirkkavaara
+# SPDX-License-Identifier: AGPL-3.0-or-later
 """TPM evidence chain: a continuous-attestation loop bound to a SEP-2828 record.
 
 Phase 1 of the hardware-governance binding, the continuous-attestation twin of the

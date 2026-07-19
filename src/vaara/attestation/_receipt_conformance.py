@@ -1,3 +1,5 @@
+# SPDX-FileCopyrightText: 2026 Henri Sirkkavaara
+# SPDX-License-Identifier: AGPL-3.0-or-later
 """Producer-agnostic conformance check for SEP-2828 execution records.
 
 Given any JSON that claims to be a SEP-2828 execution receipt, this

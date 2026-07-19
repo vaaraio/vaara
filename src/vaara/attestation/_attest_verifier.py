@@ -1,3 +1,5 @@
+# SPDX-FileCopyrightText: 2026 Henri Sirkkavaara
+# SPDX-License-Identifier: AGPL-3.0-or-later
 """SEP-2787 verifier step 5: argument commitment verification.
 
 Internal module. Public surface is in ``vaara.attestation.tool_call_attestation``.

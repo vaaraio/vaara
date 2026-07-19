@@ -1,3 +1,5 @@
+# SPDX-FileCopyrightText: 2026 Henri Sirkkavaara
+# SPDX-License-Identifier: AGPL-3.0-or-later
 """Self-hosted RFC 3161 timestamp anchors for Vaara receipts (SPEC.md Section 4).
 
 A receipt's signature proves who decided and what it bound to, not *when*. A

@@ -1,3 +1,5 @@
+# SPDX-FileCopyrightText: 2026 Henri Sirkkavaara
+# SPDX-License-Identifier: AGPL-3.0-or-later
 """v0.33 step 2 experiment: train v4 bundle with BAAI/bge-base-en-v1.5 and evaluate.
 
 Standalone A/B against v0.32's MiniLM-backed v3 bundle. Does NOT touch
