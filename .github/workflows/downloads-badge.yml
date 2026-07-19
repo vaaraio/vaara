@@ -35,7 +35,7 @@ jobs:
         with:
           ref: badges
 
-      - name: Compute combined all-time installs
+      - name: Compute installs and render self-hosted badge SVGs
         run: |
           set -euo pipefail
 
@@ -47,28 +47,54 @@ jobs:
           npm=$(curl -s -m 30 "https://api.npmjs.org/downloads/point/2020-01-01:$(date +%F)/@vaara/client" \
             | jq -r '.downloads // 0' || echo 0)
 
+          # PyPI current version (keyless public JSON API). Self-hosting this badge
+          # too removes the shields.io dependency that used to break the version pill.
+          version=$(curl -s -m 30 "https://pypi.org/pypi/vaara/json" | jq -r '.info.version // empty' || echo "")
+
           pypi=${pypi//[^0-9]/}; npm=${npm//[^0-9]/}
           pypi=${pypi:-0}; npm=${npm:-0}
           total=$(( pypi + npm ))
-          echo "pypi=$pypi npm=$npm total=$total"
+          echo "pypi=$pypi npm=$npm total=$total version=${version:-none}"
+
+          # Self-contained shields-style "flat" SVG, rendered in pure shell.
+          # textLength forces the text to fit the computed width, so we never need
+          # exact font glyph metrics. SVG attributes use single quotes so the outer
+          # double-quoted string can expand the shell vars. Inputs here are
+          # controlled (labels, a semver, a count), so no XML escaping is needed.
+          render_badge() { # $1=label $2=message $3=hexcolor $4=outfile
+            local label="$1" message="$2" color="$3" out="$4" lw mw W lx mx ltl mtl
+            lw=$(awk -v n=${#label}   'BEGIN{print int(n*6.5)+10}')
+            mw=$(awk -v n=${#message} 'BEGIN{print int(n*6.5)+10}')
+            W=$((lw + mw)); lx=$((lw * 5)); mx=$((lw * 10 + mw * 5))
+            ltl=$(((lw - 10) * 10)); mtl=$(((mw - 10) * 10))
+            printf '%s' "<svg xmlns='http://www.w3.org/2000/svg' width='$W' height='20' role='img' aria-label='$label: $message'><title>$label: $message</title><linearGradient id='s' x2='0' y2='100%'><stop offset='0' stop-color='#bbb' stop-opacity='.1'/><stop offset='1' stop-opacity='.1'/></linearGradient><clipPath id='r'><rect width='$W' height='20' rx='3' fill='#fff'/></clipPath><g clip-path='url(#r)'><rect width='$lw' height='20' fill='#555'/><rect x='$lw' width='$mw' height='20' fill='#$color'/><rect width='$W' height='20' fill='url(#s)'/></g><g fill='#fff' text-anchor='middle' font-family='Verdana,Geneva,DejaVu Sans,sans-serif' text-rendering='geometricPrecision' font-size='110'><text aria-hidden='true' x='$lx' y='150' transform='scale(.1)' fill='#000' fill-opacity='.3' textLength='$ltl'>$label</text><text x='$lx' y='140' transform='scale(.1)' textLength='$ltl'>$label</text><text aria-hidden='true' x='$mx' y='150' transform='scale(.1)' fill='#000' fill-opacity='.3' textLength='$mtl'>$message</text><text x='$mx' y='140' transform='scale(.1)' textLength='$mtl'>$message</text></g></svg>" > "$out"
+          }
+
+          # Version badge: render whenever PyPI returns a version, independent of
+          # the downloads fetch so a slow ClickHouse never staleness-locks it.
+          if [ -n "${version:-}" ]; then
+            render_badge "pypi" "v${version}" "007ec6" pypi.svg
+            echo "wrote pypi.svg (v${version})"
+          fi
 
           # Safety: never overwrite a good number with a failed fetch
           if [ "$total" -lt 1000 ]; then
-            echo "total=$total looks wrong, leaving the badge untouched"; exit 0
+            echo "total=$total looks wrong, leaving the downloads badge untouched"; exit 0
           fi
 
           # Only rewrite when the number actually moved. The timestamp is
           # bumped alongside the total, so "updated N ago" on the site tracks
           # when the count last changed instead of churning the branch hourly.
           old=$(jq -r '.total // 0' installs.json 2>/dev/null || echo 0)
-          if [ "$total" = "$old" ]; then
-            echo "total unchanged at $total, leaving the badge untouched"; exit 0
+          if [ "$total" = "$old" ] && [ -f downloads.svg ]; then
+            echo "total unchanged at $total, leaving the downloads badge untouched"; exit 0
           fi
 
           msg=$(awk -v n="$total" 'BEGIN{ if (n>=1000) printf "%.1fk all-time", n/1000; else printf "%d all-time", n }')
           gen=$(date -u +%Y-%m-%dT%H:%M:%SZ)
           printf '{"schemaVersion":1,"label":"downloads","message":"%s","total":%d,"color":"78A08A","generated":"%s"}\n' "$msg" "$total" "$gen" \
             > installs.json
+          render_badge "downloads" "$msg" "78A08A" downloads.svg
           cat installs.json
 
       - name: Commit if changed
@@ -76,10 +102,10 @@ jobs:
           set -euo pipefail
           git config user.name "github-actions[bot]"
           git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
-          git add installs.json
+          git add installs.json pypi.svg downloads.svg 2>/dev/null || git add installs.json
           if git diff --staged --quiet; then
             echo "no change"
           else
-            git commit -m "chore(badge): refresh combined install count"
+            git commit -m "chore(badge): refresh install count and version badges"
             git push origin HEAD:badges
           fi
