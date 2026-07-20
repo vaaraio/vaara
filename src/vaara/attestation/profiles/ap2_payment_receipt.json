@@ -1,0 +1,32 @@
+{
+  "sourceFormat": "ap2-payment-receipt",
+  "sourceTitle": "AP2 payment receipt",
+  "priority": 46,
+  "detect": {
+    "all": [
+      {"path": "payment_id", "exists": true},
+      {"path": "reference", "exists": true},
+      {"path": "status", "in": ["Success", "Error"]}
+    ]
+  },
+  "evidencePlane": "outcome",
+  "advisory": {
+    "status": "status",
+    "issuer": "iss",
+    "issuedAt": "iat",
+    "mandateRef": "reference",
+    "paymentId": "payment_id",
+    "pspConfirmationId": "psp_confirmation_id",
+    "networkConfirmationId": "network_confirmation_id",
+    "error": "error",
+    "errorDescription": "error_description"
+  },
+  "sep2828": {},
+  "missing": ["alg", "signature", "receiptAsserted"],
+  "notes": [
+    "an AP2 payment receipt is the post-settlement final state of an agent payment: a Success or Error status, the issuer (PSP or credentials provider), and on success the psp_confirmation_id and network_confirmation_id that evidence the settled transaction",
+    "unlike an x402 settlement or an ACP checkout, an AP2 receipt carries reference: a hash of the closed mandate that authorized the payment, a genuine back-link to what authorized the spend, lifted here to advisory.mandateRef",
+    "the receipt is issued as an ES256 SD-JWT-VC, so its signature and alg live in the JWT envelope, not in these decoded claims; a data-only mapping cannot promote a signature it does not carry, so alg and signature are reported missing and the mandate binding stays advisory rather than a proven back-link",
+    "the honest upgrade is a signature-verifying profile that validates the SD-JWT and checks reference against the issuer's closed mandate, promoting reference to a SEP-2828 back-link and asserting the receipt signature; that is a computed crypto step, deliberately out of scope for a declarative profile"
+  ]
+}

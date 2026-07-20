@@ -132,6 +132,8 @@ def test_builtin_profiles_registered_and_recognized():
     assert "slsa-provenance" in ids
     assert "c2pa-manifest" in ids
     assert "acp-checkout" in ids
+    assert "x402-settlement" in ids
+    assert "ap2-payment-receipt" in ids
 
 
 def test_slsa_recognized_end_to_end():
@@ -196,3 +198,79 @@ def test_acp_does_not_match_a_bare_order():
         "totals": [{"type": "total", "amount": 100}],
     }
     assert detect_format(order) != "acp-checkout"
+
+
+def test_x402_settlement_recognized_end_to_end():
+    # A successful x402 v2 settlement response: the settled-transaction face of
+    # an agent payment. transaction + network anchor it on-chain, but the
+    # response itself is unsigned, so signature stays in the honest gap.
+    doc = {
+        "success": True,
+        "payer": "0xabc0000000000000000000000000000000000001",
+        "transaction": "0xdeadbeef",
+        "network": "eip155:8453",
+        "amount": "1000000",
+    }
+    assert detect_format(doc) == "x402-settlement"
+    ev = normalize(doc).to_dict()
+    assert ev["recognized"] is True
+    assert ev["evidencePlane"] == "outcome"      # a settled-transaction outcome
+    assert ev["advisory"]["txHash"] == "0xdeadbeef"
+    assert ev["advisory"]["network"] == "eip155:8453"
+    assert ev["sep2828"] == {}                   # x402 settle carries no signed record field
+    assert "signature" in ev["missing"]          # honest gap: the response is unsigned
+    assert "backLink" in ev["missing"]           # no link to what authorized the spend
+
+
+def test_x402_does_not_match_a_payment_payload():
+    # An x402 PaymentPayload (client-signed authorization) carries x402Version
+    # and a nested payload, but no settled success/transaction/network at top
+    # level, so the settlement profile must not claim it.
+    payload = {
+        "x402Version": 2,
+        "accepted": {"scheme": "exact", "network": "eip155:8453"},
+        "payload": {
+            "signature": "0xsig",
+            "authorization": {
+                "from": "0xabc", "to": "0xdef", "value": "1000000",
+                "validAfter": "0", "validBefore": "99", "nonce": "0x01",
+            },
+        },
+    }
+    assert detect_format(payload) != "x402-settlement"
+
+
+def test_ap2_payment_receipt_recognized_end_to_end():
+    # AP2 post-settlement receipt (decoded SD-JWT claims). Its `reference` is a
+    # real back-link to the authorizing mandate, lifted to advisory; the JWS
+    # signature lives in the envelope, so signature stays an honest gap.
+    doc = {
+        "status": "Success",
+        "iss": "https://psp.example",
+        "iat": 1782000000,
+        "reference": "sha256:mandatehash",
+        "payment_id": "pay_123",
+        "psp_confirmation_id": "psp_abc",
+        "network_confirmation_id": "net_xyz",
+    }
+    assert detect_format(doc) == "ap2-payment-receipt"
+    ev = normalize(doc).to_dict()
+    assert ev["recognized"] is True
+    assert ev["evidencePlane"] == "outcome"      # the post-settlement final state
+    assert ev["advisory"]["mandateRef"] == "sha256:mandatehash"
+    assert ev["advisory"]["pspConfirmationId"] == "psp_abc"
+    assert ev["sep2828"] == {}                   # claims-only: no signed field promoted
+    assert "signature" in ev["missing"]          # JWS lives in the envelope, not the claims
+
+
+def test_ap2_checkout_receipt_not_claimed_as_payment_receipt():
+    # An AP2 checkout receipt carries reference + status but order_id, not
+    # payment_id, so the payment-receipt profile must not claim it.
+    checkout = {
+        "status": "Success",
+        "iss": "https://merchant.example",
+        "iat": 1782000000,
+        "reference": "sha256:mandatehash",
+        "order_id": "ord_789",
+    }
+    assert detect_format(checkout) != "ap2-payment-receipt"

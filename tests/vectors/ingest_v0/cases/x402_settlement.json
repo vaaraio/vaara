@@ -1,0 +1,54 @@
+{
+  "evidence": {
+    "advisory": {
+      "amount": "1000000",
+      "network": "eip155:8453",
+      "payer": "0x5f3ed1c9b7a04e2f9c1d6b8a3e0f4c7d21a98b60",
+      "success": true,
+      "txHash": "0x9a1bce34d7f0a2158b6c4e9d0f1a3b5c7e8d09f2a4b6c8d0e1f3a5b7c9d0e2f41"
+    },
+    "evidencePlane": "outcome",
+    "missing": [
+      "alg",
+      "signature",
+      "backLink",
+      "receiptAsserted",
+      "outcomeDerived"
+    ],
+    "notes": [
+      "an x402 settlement response is the settled-transaction face of an agent payment: success or failure, the on-chain transaction hash and CAIP-2 network that anchor it, the payer, and the atomic amount; it is the closest x402 analog to a settled-transaction record",
+      "the settlement response is an unsigned server assertion: transaction + network let a verifier independently confirm the payment on-chain, but the response object itself carries no signature over its own bytes, so alg, signature, and receiptAsserted are absent and it states an outcome it does not itself prove",
+      "x402 carries no SEP-2828 backLink or outcomeDerived: there is no attestationDigest pinning the payment authorization (the EIP-3009 signed from/to/value/validAfter/validBefore/nonce) or the authorizing decision that a conformant receipt must bind, so the settled amount is reported without a link to what authorized it",
+      "the optional offer-receipt extension adds a server EIP-712 signature over {network, resourceUrl, payer, issuedAt, transaction}; when present it is a signed receipt, but its issuedAt is issuance time, not block time, and it is still not the SEP-2828 execution record"
+    ],
+    "populated": [],
+    "recognized": true,
+    "sep2828": {},
+    "sourceFormat": "x402-settlement",
+    "sourceTitle": "x402 settlement response"
+  },
+  "record": {
+    "alg": "HS256",
+    "completeness": {
+      "runningCount": 1,
+      "seq": 1
+    },
+    "evidenceRef": {
+      "canonicalization": "JCS",
+      "digest": "sha256:8a96581d613cc0db512d987d8052a4b41786c4c267e28311f59f87ddc7006756",
+      "schema": "vaara.normalized-evidence/v0"
+    },
+    "ingestAsserted": {
+      "alg": "HS256",
+      "iat": "2026-06-23T00:00:00Z",
+      "iss": "did:web:vaara.io",
+      "nonce": "ingest-fixed-nonce-000000",
+      "secretVersion": "k1",
+      "sub": "sink"
+    },
+    "schema": "vaara.ingest/v0",
+    "signature": "b7e26d132a8f2ca082991884a3c2549f7a1e596c2ba48e0169faba5b8ba068bb",
+    "sourceFormat": "x402-settlement",
+    "version": 0
+  }
+}

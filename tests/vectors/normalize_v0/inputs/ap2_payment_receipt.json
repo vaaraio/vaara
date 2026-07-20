@@ -1,0 +1,9 @@
+{
+  "status": "Success",
+  "iss": "https://psp.example",
+  "iat": 1782000000,
+  "reference": "sha256:2f0a9c1d6b8a3e0f4c7d21a98b605f3ed1c9b7a04e2f9c1d6b8a3e0f4c7d21a9",
+  "payment_id": "pay_9YxTQ2",
+  "psp_confirmation_id": "psp_abc123",
+  "network_confirmation_id": "net_xyz789"
+}
