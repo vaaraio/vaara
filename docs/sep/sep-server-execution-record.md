@@ -1,20 +1,20 @@
-# SEP-XXXX: Server-Side Signed Execution Record for MCP Tool Calls
+# SEP-2828: Server-Side Signed Execution Record for MCP Tool Calls
 
-> **Note**: SEP number is a placeholder (`XXXX`) until a PR is opened against
-> `modelcontextprotocol/modelcontextprotocol`. On PR creation, rename the file
-> to `XXXX-server-side-signed-execution-record.md` and update the header and
-> the `PR` field below.
+> **Canonical home.** This is the maintained record of SEP-2828. It originated as
+> a proposal to `modelcontextprotocol/modelcontextprotocol` (PR #2828), which the
+> author withdrew by choice. The normative, living specification is now the IETF
+> Internet-Draft
+> [`draft-sirkkavaara-vaara-receipt`](https://datatracker.ietf.org/doc/draft-sirkkavaara-vaara-receipt/)
+> and [`SPEC.md`](../../SPEC.md) (`vaara.receipt/v1`). Citations of SEP-2828 resolve
+> here, and this page forwards to the living spec.
 
-- **Status**: Draft
-- **Type**: Standards Track (Extensions Track)
+- **Status**: Origin proposal withdrawn from MCP; maintained as the IETF Vaara Receipt Internet-Draft
+- **Type**: Standards Track
 - **Created**: 2026-05-31
-- **Author(s)**: Henri Sirkkavaara (@vaaraio), Vaara
-- **Sponsor**: None (seeking sponsor)
-- **PR**: https://github.com/modelcontextprotocol/modelcontextprotocol/pull/XXXX
-- **Requires**: SEP-2787 (Tool call attestation)
-- **Related**: SEP-2817 (AI Invocation Audit Context in Request `_meta`), SEP-414 (request `_meta`)
-- **Replaces**: None
-- **Discussions-To**: https://github.com/modelcontextprotocol/modelcontextprotocol/discussions/2704
+- **Author**: Henri Sirkkavaara (@vaaraio), Vaara
+- **Origin PR**: https://github.com/modelcontextprotocol/modelcontextprotocol/pull/2828 (closed, withdrawn)
+- **Living specification**: [`draft-sirkkavaara-vaara-receipt`](https://datatracker.ietf.org/doc/draft-sirkkavaara-vaara-receipt/) and [`SPEC.md`](../../SPEC.md) (`vaara.receipt/v1`)
+- **Related**: SEP-2787 (Tool call attestation), SEP-2817 (AI Invocation Audit Context in Request `_meta`)
 
 ## Abstract
 
@@ -685,10 +685,10 @@ independent consumer verifier (Rul1an/Assay) reproduces the Check-A subset today
 and the Check-B and supersession cases as it adopts the digest and ordering
 model.
 
-For Standards Track finalization, this SEP will add a `sep-XXXX.yaml`
-traceability file mapping each MUST / MUST NOT and SHOULD / SHOULD NOT in the
-Specification to a conformance check ID, as required for Standards Track SEPs
-reaching Final.
+Conformance traceability, mapping each MUST / MUST NOT and SHOULD / SHOULD NOT in
+the Specification to a conformance check ID, is maintained with the living
+specification (`SPEC.md` and the IETF Internet-Draft) and the published
+conformance vectors with their independent checkers.
 
 ## Acknowledgments
 
