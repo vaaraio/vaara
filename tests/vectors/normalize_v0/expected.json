@@ -35,6 +35,34 @@
     "sourceFormat": "agent-decision",
     "sourceTitle": "in-toto agent-decision/v0.1 policy decision"
   },
+  "ap2_payment_receipt": {
+    "advisory": {
+      "issuedAt": 1782000000,
+      "issuer": "https://psp.example",
+      "mandateRef": "sha256:2f0a9c1d6b8a3e0f4c7d21a98b605f3ed1c9b7a04e2f9c1d6b8a3e0f4c7d21a9",
+      "networkConfirmationId": "net_xyz789",
+      "paymentId": "pay_9YxTQ2",
+      "pspConfirmationId": "psp_abc123",
+      "status": "Success"
+    },
+    "evidencePlane": "outcome",
+    "missing": [
+      "alg",
+      "signature",
+      "receiptAsserted"
+    ],
+    "notes": [
+      "an AP2 payment receipt is the post-settlement final state of an agent payment: a Success or Error status, the issuer (PSP or credentials provider), and on success the psp_confirmation_id and network_confirmation_id that evidence the settled transaction",
+      "unlike an x402 settlement or an ACP checkout, an AP2 receipt carries reference: a hash of the closed mandate that authorized the payment, a genuine back-link to what authorized the spend, lifted here to advisory.mandateRef",
+      "the receipt is issued as an ES256 SD-JWT-VC, so its signature and alg live in the JWT envelope, not in these decoded claims; a data-only mapping cannot promote a signature it does not carry, so alg and signature are reported missing and the mandate binding stays advisory rather than a proven back-link",
+      "the honest upgrade is a signature-verifying profile that validates the SD-JWT and checks reference against the issuer's closed mandate, promoting reference to a SEP-2828 back-link and asserting the receipt signature; that is a computed crypto step, deliberately out of scope for a declarative profile"
+    ],
+    "populated": [],
+    "recognized": true,
+    "sep2828": {},
+    "sourceFormat": "ap2-payment-receipt",
+    "sourceTitle": "AP2 payment receipt"
+  },
   "c2pa_manifest": {
     "advisory": {
       "claimGenerator": "vaara/1.10.0 c2pa-rs/0.36.0",
@@ -327,5 +355,33 @@
     "sep2828": {},
     "sourceFormat": "unknown",
     "sourceTitle": "unrecognized record"
+  },
+  "x402_settlement": {
+    "advisory": {
+      "amount": "1000000",
+      "network": "eip155:8453",
+      "payer": "0x5f3ed1c9b7a04e2f9c1d6b8a3e0f4c7d21a98b60",
+      "success": true,
+      "txHash": "0x9a1bce34d7f0a2158b6c4e9d0f1a3b5c7e8d09f2a4b6c8d0e1f3a5b7c9d0e2f41"
+    },
+    "evidencePlane": "outcome",
+    "missing": [
+      "alg",
+      "signature",
+      "backLink",
+      "receiptAsserted",
+      "outcomeDerived"
+    ],
+    "notes": [
+      "an x402 settlement response is the settled-transaction face of an agent payment: success or failure, the on-chain transaction hash and CAIP-2 network that anchor it, the payer, and the atomic amount; it is the closest x402 analog to a settled-transaction record",
+      "the settlement response is an unsigned server assertion: transaction + network let a verifier independently confirm the payment on-chain, but the response object itself carries no signature over its own bytes, so alg, signature, and receiptAsserted are absent and it states an outcome it does not itself prove",
+      "x402 carries no SEP-2828 backLink or outcomeDerived: there is no attestationDigest pinning the payment authorization (the EIP-3009 signed from/to/value/validAfter/validBefore/nonce) or the authorizing decision that a conformant receipt must bind, so the settled amount is reported without a link to what authorized it",
+      "the optional offer-receipt extension adds a server EIP-712 signature over {network, resourceUrl, payer, issuedAt, transaction}; when present it is a signed receipt, but its issuedAt is issuance time, not block time, and it is still not the SEP-2828 execution record"
+    ],
+    "populated": [],
+    "recognized": true,
+    "sep2828": {},
+    "sourceFormat": "x402-settlement",
+    "sourceTitle": "x402 settlement response"
   }
 }

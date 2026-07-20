@@ -2,6 +2,7 @@
   "alg": "HS256",
   "cases": [
     "agent_decision",
+    "ap2_payment_receipt",
     "c2pa_manifest",
     "sep2643_rar_denial",
     "sep2643_scope_denial",
@@ -11,9 +12,10 @@
     "sep2817_multiturn",
     "sep2817_single",
     "slsa_provenance",
-    "unknown"
+    "unknown",
+    "x402_settlement"
   ],
-  "corpusDigest": "sha256:d2f90accaf6327be03774a46e790a8f2ebee109d384bb8706ba09adf3eb147f2",
+  "corpusDigest": "sha256:58038e9a690a0d528bbdcbe11d339a74b732d60de0d29ffef49da7d069e05ec1",
   "fixed": {
     "iat": "2026-06-23T00:00:00Z",
     "iss": "did:web:vaara.io",
@@ -25,6 +27,10 @@
     "agent_decision": {
       "evidenceDigest": "sha256:9cf19f4ceff14d68fa00e44a914e8c7bf91f5d3bfceae5d4dc55ccef5cf0de2d",
       "signature": "5fdc0ae4b9dead7af973261f832e00416e4652f325cfc3b79790f3032ae68dd6"
+    },
+    "ap2_payment_receipt": {
+      "evidenceDigest": "sha256:8e25821806176750c5c05761f0f2a41295e998e2ae77088296be34b41c771400",
+      "signature": "3a473787fa0a102a1ef926fb4a73eb96806acdd3a67734b10e8a32f6815f8528"
     },
     "c2pa_manifest": {
       "evidenceDigest": "sha256:3d02ab1236af269f497797fe75f08ec772fc1080e66c424a03d53ab54fbe5cf7",
@@ -65,6 +71,10 @@
     "unknown": {
       "evidenceDigest": "sha256:51699f76cdeb6fbedf45041ff60720aeaa3a74fe8c846b31990485897638ee69",
       "signature": "0226a4e0414e58956a822d8317f3130cd91defdac939863fc21a35da6239e646"
+    },
+    "x402_settlement": {
+      "evidenceDigest": "sha256:8a96581d613cc0db512d987d8052a4b41786c4c267e28311f59f87ddc7006756",
+      "signature": "b7e26d132a8f2ca082991884a3c2549f7a1e596c2ba48e0169faba5b8ba068bb"
     }
   },
   "schema": "vaara.ingest-conformance/v0",

@@ -1,6 +1,6 @@
 # Verifying the evidence
 
-Producing a trail is half the job. The other half is letting someone who does not trust you check it, with no key, no access to your system, and none of your software. Every command here reads the wire format, is fail-closed on authenticity, and ships with public conformance vectors plus a standalone checker that imports no Vaara code, so an independent party reproduces every verdict offline. That property is the point of the standards work behind [SEP-2828](https://github.com/modelcontextprotocol/modelcontextprotocol/pull/2828): the evidence is verifiable by someone who runs none of your software.
+Producing a trail is half the job. The other half is letting someone who does not trust you check it, with no key, no access to your system, and none of your software. Every command here reads the wire format, is fail-closed on authenticity, and ships with public conformance vectors plus a standalone checker that imports no Vaara code, so an independent party reproduces every verdict offline. That property is the point of the standards work behind [the Vaara Receipt Internet-Draft](https://datatracker.ietf.org/doc/draft-sirkkavaara-vaara-receipt/): the evidence is verifiable by someone who runs none of your software.
 
 The [README](../README.md#verify-the-evidence) carries the command table. This page carries the full trust model behind each one.
 

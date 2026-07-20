@@ -1,0 +1,31 @@
+{
+  "sourceFormat": "x402-settlement",
+  "sourceTitle": "x402 settlement response",
+  "priority": 46,
+  "detect": {
+    "all": [
+      {"path": "success", "exists": true},
+      {"path": "transaction", "exists": true},
+      {"path": "network", "exists": true}
+    ]
+  },
+  "evidencePlane": "outcome",
+  "advisory": {
+    "success": "success",
+    "errorReason": "errorReason",
+    "payer": "payer",
+    "txHash": "transaction",
+    "network": "network",
+    "amount": "amount",
+    "receiptResourceUrl": "extensions.offer-receipt.info.receipt.resourceUrl",
+    "receiptIssuedAt": "extensions.offer-receipt.info.receipt.issuedAt"
+  },
+  "sep2828": {},
+  "missing": ["alg", "signature", "backLink", "receiptAsserted", "outcomeDerived"],
+  "notes": [
+    "an x402 settlement response is the settled-transaction face of an agent payment: success or failure, the on-chain transaction hash and CAIP-2 network that anchor it, the payer, and the atomic amount; it is the closest x402 analog to a settled-transaction record",
+    "the settlement response is an unsigned server assertion: transaction + network let a verifier independently confirm the payment on-chain, but the response object itself carries no signature over its own bytes, so alg, signature, and receiptAsserted are absent and it states an outcome it does not itself prove",
+    "x402 carries no SEP-2828 backLink or outcomeDerived: there is no attestationDigest pinning the payment authorization (the EIP-3009 signed from/to/value/validAfter/validBefore/nonce) or the authorizing decision that a conformant receipt must bind, so the settled amount is reported without a link to what authorized it",
+    "the optional offer-receipt extension adds a server EIP-712 signature over {network, resourceUrl, payer, issuedAt, transaction}; when present it is a signed receipt, but its issuedAt is issuance time, not block time, and it is still not the SEP-2828 execution record"
+  ]
+}

@@ -77,7 +77,7 @@ Writing a trail is the easy half. The half that matters is letting someone who d
 vaara verify-bundle evidence-bundle.json
 ```
 
-`ok` only when a signature is actually established, not merely present in a log. The same property drives the standards work behind [SEP-2828](https://github.com/modelcontextprotocol/modelcontextprotocol/pull/2828): evidence that holds up for someone who runs none of your software. The full verifier set, the trust model for each verb, and where trust comes from in each case are in [docs/verifying-evidence.md](docs/verifying-evidence.md).
+`ok` only when a signature is actually established, not merely present in a log. The same property drives the standards work behind [the Vaara Receipt Internet-Draft](https://datatracker.ietf.org/doc/draft-sirkkavaara-vaara-receipt/): evidence that holds up for someone who runs none of your software. The full verifier set, the trust model for each verb, and where trust comes from in each case are in [docs/verifying-evidence.md](docs/verifying-evidence.md).
 
 To check that claim yourself, without installing Vaara, run the standalone checker against the published vectors. Its only dependencies are `cryptography` and `rfc8785`:
 

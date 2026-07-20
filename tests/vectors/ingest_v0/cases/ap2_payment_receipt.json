@@ -1,0 +1,54 @@
+{
+  "evidence": {
+    "advisory": {
+      "issuedAt": 1782000000,
+      "issuer": "https://psp.example",
+      "mandateRef": "sha256:2f0a9c1d6b8a3e0f4c7d21a98b605f3ed1c9b7a04e2f9c1d6b8a3e0f4c7d21a9",
+      "networkConfirmationId": "net_xyz789",
+      "paymentId": "pay_9YxTQ2",
+      "pspConfirmationId": "psp_abc123",
+      "status": "Success"
+    },
+    "evidencePlane": "outcome",
+    "missing": [
+      "alg",
+      "signature",
+      "receiptAsserted"
+    ],
+    "notes": [
+      "an AP2 payment receipt is the post-settlement final state of an agent payment: a Success or Error status, the issuer (PSP or credentials provider), and on success the psp_confirmation_id and network_confirmation_id that evidence the settled transaction",
+      "unlike an x402 settlement or an ACP checkout, an AP2 receipt carries reference: a hash of the closed mandate that authorized the payment, a genuine back-link to what authorized the spend, lifted here to advisory.mandateRef",
+      "the receipt is issued as an ES256 SD-JWT-VC, so its signature and alg live in the JWT envelope, not in these decoded claims; a data-only mapping cannot promote a signature it does not carry, so alg and signature are reported missing and the mandate binding stays advisory rather than a proven back-link",
+      "the honest upgrade is a signature-verifying profile that validates the SD-JWT and checks reference against the issuer's closed mandate, promoting reference to a SEP-2828 back-link and asserting the receipt signature; that is a computed crypto step, deliberately out of scope for a declarative profile"
+    ],
+    "populated": [],
+    "recognized": true,
+    "sep2828": {},
+    "sourceFormat": "ap2-payment-receipt",
+    "sourceTitle": "AP2 payment receipt"
+  },
+  "record": {
+    "alg": "HS256",
+    "completeness": {
+      "runningCount": 1,
+      "seq": 1
+    },
+    "evidenceRef": {
+      "canonicalization": "JCS",
+      "digest": "sha256:8e25821806176750c5c05761f0f2a41295e998e2ae77088296be34b41c771400",
+      "schema": "vaara.normalized-evidence/v0"
+    },
+    "ingestAsserted": {
+      "alg": "HS256",
+      "iat": "2026-06-23T00:00:00Z",
+      "iss": "did:web:vaara.io",
+      "nonce": "ingest-fixed-nonce-000000",
+      "secretVersion": "k1",
+      "sub": "sink"
+    },
+    "schema": "vaara.ingest/v0",
+    "signature": "3a473787fa0a102a1ef926fb4a73eb96806acdd3a67734b10e8a32f6815f8528",
+    "sourceFormat": "ap2-payment-receipt",
+    "version": 0
+  }
+}
