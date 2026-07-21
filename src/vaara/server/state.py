@@ -12,6 +12,8 @@ from vaara.audit.trail import AuditTrail
 from vaara.policy.controller import PolicyController
 from vaara.policy.registry import PolicyRegistry
 from vaara.scorer.adaptive import AdaptiveScorer
+from vaara.server.anchor import Anchorer
+from vaara.server.x402 import X402Gate
 
 
 @dataclass
@@ -32,6 +34,8 @@ class ServerState:
         audit: Optional[AuditTrail] = None,
         policy_controller: Optional[PolicyController] = None,
         policy_registry: Optional[PolicyRegistry] = None,
+        x402_gate: Optional[X402Gate] = None,
+        anchorer: Optional[Anchorer] = None,
     ) -> None:
         if policy_controller is not None and policy_registry is not None:
             raise ValueError(
@@ -72,6 +76,11 @@ class ServerState:
         # action_id to info captured at score time so outcome reports can
         # feed the MWU update without the client having to resend context.
         self._actions: dict[str, _ActionInfo] = {}
+        # Paid-anchor plumbing: an env-configured x402 gate (free/no-op until
+        # an operator enables it) and a lazily-initialised qualified anchorer.
+        # Neither does network I/O at construction, so tests stay offline.
+        self.x402 = x402_gate or X402Gate()
+        self.anchorer = anchorer or Anchorer()
 
     def remember_action(
         self,
