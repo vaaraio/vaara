@@ -1,0 +1,68 @@
+{
+  "enforced_deny": {
+    "decision": {
+      "record": {
+        "action_type": "fs.write_file",
+        "agent_id": "agent:crewai/checkout-bot",
+        "decision": "deny",
+        "decision_id": "crew:enforcement-demo/2026-07-21#0",
+        "intent_digest": "sha256:2cab2be7eb52ae96f0f3ad96f687c6127fa0856e407c3e9b9b3908a4bde35682",
+        "intent_ref": "sha256:675688a01b5b9a1bf5aca7512b75d700f1ffe744aa623591f48b588f6997e7a9",
+        "normalized_scope": "fs.write_file:/etc/*",
+        "params_hash": "sha256:865c6bc9eeb8a388c4d6b6bf9cd761a5c23ff07af234d44409779d80f67c1262",
+        "policy_refs": [
+          "policy:vaara/deny-untrusted-fs-write@v1"
+        ],
+        "receipt_ref": "sha256:01c8207675e7793211689bc6ce2262c568f4372c98f83d4cf335baba11c960c4",
+        "schema": "crewai.governance.decision/v1",
+        "seq": 0
+      },
+      "signature": "2204ad9131db97dcec1a0615235769ce1d84eff2837bf7c6e3b7978316875791a33d989df821e5c647e605514eff5436ee7d5b1d15a3a07cd91c37e9229eb3cc"
+    },
+    "outcome": {
+      "record": {
+        "decision_id": "crew:enforcement-demo/2026-07-21#0",
+        "executed": false,
+        "intent_ref": "sha256:675688a01b5b9a1bf5aca7512b75d700f1ffe744aa623591f48b588f6997e7a9",
+        "receipt_ref": "sha256:01c8207675e7793211689bc6ce2262c568f4372c98f83d4cf335baba11c960c4",
+        "schema": "crewai.governance.outcome/v1",
+        "seq": 0,
+        "status": "blocked"
+      },
+      "signature": "2690df04c9998865350c6783caa31c4735a3db3bb85b975530c14c8e5e0e28a037582a5bb76d50966581c9e2b08549776831b5e6aa86d63155c8ad26d1f406f8"
+    }
+  },
+  "violated_deny": {
+    "decision": {
+      "record": {
+        "action_type": "fs.write_file",
+        "agent_id": "agent:crewai/checkout-bot",
+        "decision": "deny",
+        "decision_id": "crew:enforcement-demo/2026-07-21#0",
+        "intent_digest": "sha256:2cab2be7eb52ae96f0f3ad96f687c6127fa0856e407c3e9b9b3908a4bde35682",
+        "intent_ref": "sha256:675688a01b5b9a1bf5aca7512b75d700f1ffe744aa623591f48b588f6997e7a9",
+        "normalized_scope": "fs.write_file:/etc/*",
+        "params_hash": "sha256:865c6bc9eeb8a388c4d6b6bf9cd761a5c23ff07af234d44409779d80f67c1262",
+        "policy_refs": [
+          "policy:vaara/deny-untrusted-fs-write@v1"
+        ],
+        "receipt_ref": "sha256:01c8207675e7793211689bc6ce2262c568f4372c98f83d4cf335baba11c960c4",
+        "schema": "crewai.governance.decision/v1",
+        "seq": 0
+      },
+      "signature": "1a6fb024e155f8772ace6ae8a34bd9347c29444ff2fd254e2ab5650988bda235f7268e2942b480843e04dd2e8e226176006538a28b533e5267b98547dcf7320d"
+    },
+    "outcome": {
+      "record": {
+        "decision_id": "crew:enforcement-demo/2026-07-21#0",
+        "executed": true,
+        "intent_ref": "sha256:675688a01b5b9a1bf5aca7512b75d700f1ffe744aa623591f48b588f6997e7a9",
+        "receipt_ref": "sha256:01c8207675e7793211689bc6ce2262c568f4372c98f83d4cf335baba11c960c4",
+        "schema": "crewai.governance.outcome/v1",
+        "seq": 0,
+        "status": "completed"
+      },
+      "signature": "8171c06ba22f0c1d63bff6486afdfce5f1ece10163fce73f2c5b65a7546076f5eb864d8dab2b45ae6c842fa591a5c295f704bd85d50c0d723478ed3c1d9847cb"
+    }
+  }
+}

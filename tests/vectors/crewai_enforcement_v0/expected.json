@@ -1,0 +1,10 @@
+{
+  "enforced_deny": {
+    "signatures_ok": true,
+    "verdict": "enforced"
+  },
+  "violated_deny": {
+    "signatures_ok": true,
+    "verdict": "violation"
+  }
+}
