@@ -9,12 +9,14 @@ import uuid
 from datetime import datetime, timezone
 from typing import Optional
 
-from fastapi import FastAPI, Header, HTTPException, status
+from fastapi import FastAPI, Header, HTTPException, Request, status
 from fastapi.responses import JSONResponse
 
 from vaara import __version__ as _vaara_version
+from vaara.audit.timeanchor import TimeAnchorError
 from vaara.audit.trail import AuditRecord, EventType
 from vaara.server import schemas as S
+from vaara.server.anchor import AnchorNotConfigured
 from vaara.server.state import ServerState
 
 
@@ -306,4 +308,37 @@ def register(app: FastAPI, state: ServerState) -> None:
             action_class_count=result.action_class_count,
             escalation_route_count=result.escalation_route_count,
             tenant_id=tenant_id,
+        )
+
+    @app.post("/v1/anchor")
+    async def anchor_receipt_endpoint(req: S.AnchorRequest, request: Request):
+        # Paid coin slot: x402-gated in front of the qualified eIDAS anchor.
+        # Free (no-op gate) until an operator sets VAARA_X402_ENABLED; a
+        # non-None challenge is the 402 payment-required response to return.
+        challenge = state.x402.check(
+            request,
+            resource="/v1/anchor",
+            description="Qualified eIDAS receipt anchor (rfc3161-eidas-qualified)",
+        )
+        if challenge is not None:
+            return challenge
+        try:
+            anchor = state.anchorer.anchor(req.receipt)
+            attested = state.anchorer.attested_time(req.receipt, anchor)
+        except AnchorNotConfigured as exc:
+            # No provider is baked in. The operator has not named a QTSP, so
+            # there is nothing to anchor against. Vaara ships no default.
+            raise _error(
+                "anchor_not_configured", str(exc),
+                status.HTTP_503_SERVICE_UNAVAILABLE,
+            )
+        except TimeAnchorError as exc:
+            # Upstream QTSP condition (refusal, timeout, pin mismatch) — the
+            # anchor is a dependency the server does not control.
+            raise _error(
+                "anchor_failed", str(exc), status.HTTP_502_BAD_GATEWAY,
+            )
+        return S.AnchorResponse(
+            anchor=S.TimestampAnchor(**anchor),
+            attested=attested,
         )
