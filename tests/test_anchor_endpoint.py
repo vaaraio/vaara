@@ -107,6 +107,21 @@ def test_enabled_gate_challenges_without_payment():
     assert accept["resource"] == "/v1/anchor"
 
 
+def test_no_provider_configured_returns_503(monkeypatch):
+    """No provider is baked in: with no operator-chosen QTSP, anchoring refuses
+    with 503 instead of routing traffic to a default provider nobody picked."""
+    monkeypatch.delenv("VAARA_ANCHOR_TSA_URL", raising=False)
+    from vaara.server.anchor import Anchorer
+
+    app = FastAPI()
+    state = ServerState(anchorer=Anchorer())  # real anchorer, no provider set
+    register(app, state)
+    client = TestClient(app)
+    r = client.post("/v1/anchor", json={"receipt": {"id": "r1"}})
+    assert r.status_code == 503, r.text
+    assert r.json()["error"]["code"] == "anchor_not_configured"
+
+
 def test_enabled_gate_without_facilitator_refuses_payment():
     """A presented payment with no facilitator can't be settled -> refused, never
     trusted. Guards the invariant: an enabled gate never admits unverified pay."""

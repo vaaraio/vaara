@@ -3,9 +3,10 @@
 """Qualified-anchor helper for the Vaara server.
 
 Wraps :class:`vaara.audit.receipt_anchor.QualifiedTSA` so a route turns a
-receipt into an ``rfc3161-eidas-qualified`` anchor with one call. Defaults to
-Sectigo's free qualified endpoint (validated PASSED/QTSA by the EU DSS demo
-validator).
+receipt into an ``rfc3161-eidas-qualified`` anchor with one call. No timestamp
+provider is baked in: the operator names their own QTSP endpoint via
+``VAARA_ANCHOR_TSA_URL``, and anchoring refuses until one is set. Vaara does not
+route anyone's traffic to a third-party provider the operator did not choose.
 
 The QTSP's issuing CA is pinned. In production, pin it from the EU trusted list
 (``VAARA_ANCHOR_CA_CERT`` = path to a PEM or DER CA certificate). Absent that,
@@ -28,7 +29,9 @@ from typing import TYPE_CHECKING, Any, Optional
 if TYPE_CHECKING:
     from vaara.audit.receipt_anchor import QualifiedTSA
 
-_DEFAULT_TSA = "http://timestamp.sectigo.com/qualified"
+
+class AnchorNotConfigured(RuntimeError):
+    """Raised when anchoring is attempted with no operator-chosen QTSP set."""
 
 
 def _issuing_ca_from_probe(tsa_url: str, timeout: float = 20.0) -> bytes:
@@ -76,9 +79,11 @@ class Anchorer:
         tsa_url: Optional[str] = None,
         ca_cert: Optional[bytes] = None,
     ) -> None:
+        # No provider is baked in. The operator names their own QTSP, or
+        # anchoring refuses (see _ensure). Choosing a provider for everyone is
+        # not ours to make.
         self.tsa_url = (
-            tsa_url
-            or os.environ.get("VAARA_ANCHOR_TSA_URL", _DEFAULT_TSA).strip()
+            tsa_url or os.environ.get("VAARA_ANCHOR_TSA_URL", "").strip() or None
         )
         self._ca = ca_cert
         if self._ca is None:
@@ -91,6 +96,11 @@ class Anchorer:
     def _ensure(self) -> "QualifiedTSA":
         if self._qtsa is not None:
             return self._qtsa
+        if not self.tsa_url:
+            raise AnchorNotConfigured(
+                "no qualified TSA configured: set VAARA_ANCHOR_TSA_URL to your "
+                "chosen QTSP endpoint. Vaara ships no default provider."
+            )
         from vaara.audit.receipt_anchor import QualifiedTSA
 
         with self._lock:
