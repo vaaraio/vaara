@@ -19,14 +19,14 @@ import hashlib
 import os
 import threading
 from pathlib import Path
-from typing import Any, Optional
+from typing import TYPE_CHECKING, Any, Optional
 
-from vaara.audit.receipt_anchor import QualifiedTSA, verify_receipt_anchor
-from vaara.audit.timeanchor import (
-    _urllib_transport,
-    build_timestamp_request,
-    extract_token_from_response,
-)
+# The receipt_anchor / timeanchor stack pulls the anchor extra (rfc8785, etc.),
+# which is not present in the base install. Import it lazily inside the methods
+# that anchor, so importing this module and constructing an Anchorer stay cheap
+# and dependency-free - core ServerState must not require the anchor extra.
+if TYPE_CHECKING:
+    from vaara.audit.receipt_anchor import QualifiedTSA
 
 _DEFAULT_TSA = "http://timestamp.sectigo.com/qualified"
 
@@ -38,6 +38,12 @@ def _issuing_ca_from_probe(tsa_url: str, timeout: float = 20.0) -> bytes:
     from the endpoint itself.
     """
     from asn1crypto import cms
+
+    from vaara.audit.timeanchor import (
+        _urllib_transport,
+        build_timestamp_request,
+        extract_token_from_response,
+    )
 
     probe = build_timestamp_request(
         hashlib.sha256(b"vaara-anchor-probe").digest()
@@ -82,9 +88,11 @@ class Anchorer:
         self._qtsa: Optional[QualifiedTSA] = None
         self._lock = threading.Lock()
 
-    def _ensure(self) -> QualifiedTSA:
+    def _ensure(self) -> "QualifiedTSA":
         if self._qtsa is not None:
             return self._qtsa
+        from vaara.audit.receipt_anchor import QualifiedTSA
+
         with self._lock:
             if self._qtsa is None:
                 ca = self._ca or _issuing_ca_from_probe(self.tsa_url)
@@ -100,6 +108,8 @@ class Anchorer:
 
     def attested_time(self, receipt: dict, anchor: dict) -> str:
         """ISO-8601 UTC time the pinned QTSP attested, verified against the pin."""
+        from vaara.audit.receipt_anchor import verify_receipt_anchor
+
         self._ensure()
         dt = verify_receipt_anchor(
             receipt, anchor, trusted_issuer_cert=self._ca
