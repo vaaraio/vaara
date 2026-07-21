@@ -24,12 +24,12 @@
 
 Your AI agent transferred the funds, wrote the file, called the tool. Later, someone who does not trust you asks you to prove exactly what it did and why: a regulator, an auditor, a customer after an incident. Your own logs will not settle it, because you could have edited them.
 
-Vaara checks every agent tool call against your policy and writes the call and its outcome into a signed, hash-chained record an outside party can verify offline, with no access to your system and none of your software. It needs no special hardware, and binds to your machine's TPM 2.0 or confidential-VM root when you have one. It runs entirely in your own environment. No SaaS, no telemetry. It answers "show me what the agent actually did" wherever that question lands: after an incident, in procurement, in a dispute. And when EU AI Act record-keeping obligations reach your systems, the same trail is the Article 12 evidence, already running.
-
 ## Quick start
 
 ```bash
-pip install vaara
+pip install vaara                            # Python: CLI, MCP proxy, server
+brew tap vaaraio/tap && brew install vaara   # CLI via Homebrew
+npm install @vaara/client                    # TypeScript client for the HTTP API
 ```
 
 ```python
@@ -41,8 +41,6 @@ def transfer_funds(to: str, amount: float) -> str:
 ```
 
 That is the whole thing. Every call to a governed function is risk-scored and decided against your policy before the body runs. A blocked call raises `vaara.Blocked`; an allowed call runs, and the decision, the call, and the outcome land in a signed record anyone can verify offline. Python 3.10+, zero runtime dependencies.
-
-Other ways in: Homebrew installs the CLI (`brew tap vaaraio/tap && brew install vaara`; newer brew asks you to `brew trust vaaraio/tap` first), and [`@vaara/client`](https://www.npmjs.com/package/@vaara/client) on npm is the TypeScript client for the HTTP API. The MCP proxy and server ship with the Python package.
 
 <details>
 <summary><b>Prefer the explicit pipeline?</b></summary>

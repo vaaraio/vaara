@@ -217,3 +217,26 @@ class PolicyReloadResponse(BaseModel):
     action_class_count: int
     escalation_route_count: int
     tenant_id: str = ""
+
+
+class AnchorRequest(BaseModel):
+    model_config = ConfigDict(extra="forbid")
+
+    receipt: dict[str, Any]
+
+
+class TimestampAnchor(BaseModel):
+    method: str
+    anchoredDigest: str
+    token: str
+    authority: str
+    tsaUrl: str
+
+
+class AnchorResponse(BaseModel):
+    anchor: TimestampAnchor
+    attested: str
+    dss_hint: str = (
+        "validate the token plus the JCS signed payload at the EU DSS demo "
+        "validator for the PASSED/QTSA verdict"
+    )
