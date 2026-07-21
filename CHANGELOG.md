@@ -7,6 +7,11 @@ and this project follows [Semantic Versioning](https://semver.org/spec/v2.0.0.ht
 
 ## [Unreleased]
 
+## [1.39.0] - 2026-07-21
+
+- `POST /v1/anchor` on the reference server turns a receipt into an `rfc3161-eidas-qualified` anchor behind an inbound x402 payment gate. The gate is configured entirely from the environment and off by default: with `VAARA_X402_ENABLED` unset every request is admitted, so tests and self-hosters get the full pipeline for free. When enabled it answers `HTTP 402` with x402 payment requirements and admits a request only once a valid `X-PAYMENT` header settles through the configured facilitator (`VAARA_X402_FACILITATOR`); with no facilitator a presented payment cannot be settled and is refused rather than trusted, so an enabled gate never admits an unverified payment. Receiving wallet, network, asset, and price are set by the `VAARA_X402_*` variables.
+- The anchor endpoint ships no default timestamp provider. The operator names their own QTSP through `VAARA_ANCHOR_TSA_URL`; with none set, anchoring raises and the endpoint returns `503 anchor_not_configured` rather than routing traffic to a provider the operator did not choose. The anchorer does no network I/O at construction and the receipt-anchor stack is imported lazily, so core `ServerState` imports and runs without the anchor extra installed.
+
 ## [1.38.0] - 2026-07-20
 
 - `vaara ingest` and `vaara normalize` recognize two agent-payment settlement formats and file them onto the SEP-2828 evidence model as declarative source profiles, with no new code on the ingest path. `x402-settlement` maps an x402 settlement response, lifting the payer, the atomic amount, and the on-chain transaction hash and CAIP-2 network that anchor it into advisory context on the outcome plane. The settlement response is an unsigned server assertion, so `signature`, `backLink`, and `outcomeDerived` are reported missing rather than asserted: the transaction and network let a relying party confirm the payment on-chain, but the object carries no signature over its own bytes.
