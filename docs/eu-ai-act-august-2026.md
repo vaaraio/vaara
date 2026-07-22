@@ -116,4 +116,6 @@ accessibility requirements). Verify offline with
 
 **Is watermarking enough?** Watermarking addresses 50(2) marking. It does nothing for 50(1), 50(4), or 50(5), which are about informing people, and nothing about proving any of it happened. Marking is one obligation of five.
 
+**Should we sign the Code of Practice on Transparency?** It covers 50(2) marking and 50(4) labelling for generative systems, and nothing else; agent disclosure under 50(1) has no code of practice at all. Either way an authority check ends at the same question: show the measures ran. See [the Code of Practice and the evidence you still need](article50-code-of-practice.md).
+
 **High-risk moved to 2027, so can this wait?** Article 50 cannot; it applies from 2 August 2026. And the high-risk delay is dated relief: an agent trail started now is two years of accumulated, cheap evidence by December 2027.
