@@ -285,7 +285,7 @@ final class ApprovalWindowManager {
         // it), so matching it exactly overhangs ~1px. Inset the card 1px
         // on each side (2 total) so it nests cleanly inside the cutout
         // with no overhang. Whole points only.
-        let inset: CGFloat = hasNotch ? 2 : 0
+        let inset: CGFloat = hasNotch ? 1 : 0
         let cardWidth = (hasNotch ? max(notch.width, 200) : 220).rounded(.down) - inset
 
         let host = NSHostingView(rootView: NotchApprovalView(
@@ -299,18 +299,17 @@ final class ApprovalWindowManager {
         let size = host.fittingSize
 
         let full = screen.frame
-        // Center on the NOTCH, not the screen. The notch is not always
-        // exactly at the screen midpoint (the left/right auxiliary areas
-        // can differ by a point), which showed as a 1px overhang on one
-        // side. Derive the notch's true center from the left auxiliary
-        // area, and snap x to a whole pixel to avoid sub-pixel bleed.
-        let centerX: CGFloat
+        // Anchor the LEFT edge exactly to the notch's left (from the left
+        // auxiliary area), snapped to a whole pixel. The width is shaved 1px
+        // so the right edge tucks just inside the cutout. Left-anchoring
+        // keeps that left edge pixel-flush rather than letting a centered
+        // width push a gap onto one side. Off notch, center on screen.
+        let x: CGFloat
         if hasNotch, let left = screen.auxiliaryTopLeftArea {
-            centerX = full.minX + left.width + notch.width / 2
+            x = (full.minX + left.width).rounded()
         } else {
-            centerX = full.midX
+            x = (full.midX - cardWidth / 2).rounded()
         }
-        let x = (centerX - cardWidth / 2).rounded()
         // Start with the top edge at the very top of the screen (the card
         // tucked in the notch), then lower it into place.
         let startY = full.maxY - size.height
