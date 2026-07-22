@@ -302,6 +302,69 @@ def test_cli_record_disclosure_generic(tmp_path, capsys):
     assert events[0]["profile"] == ""
 
 
+def test_pin_attestation_binds_by_hash(tmp_path):
+    import hashlib
+
+    from vaara.audit.article50 import pin_attestation
+
+    trail = _persistent_trail(tmp_path)
+    attestation = {"iss": "did:example:issuer", "sub": "agent-7", "authz": "book-travel"}
+    record_agent_disclosure(
+        trail, statement="AI agent notice", on_behalf_of="Example Oy",
+        step="authorisation", session_id="s1", attestation=attestation,
+    )
+    event = find_disclosures(trail._records)[0]
+    assert event["attestation_issuer"] == "did:example:issuer"
+    assert event["attestation_subject"] == "agent-7"
+    # The pin is reproducible from the attestation alone.
+    assert event["attestation_sha256"] == pin_attestation(attestation)["attestation_sha256"]
+    canonical = json.dumps(
+        attestation, sort_keys=True, separators=(",", ":"),
+    ).encode()
+    assert event["attestation_sha256"] == hashlib.sha256(canonical).hexdigest()
+
+    report = build_article50_report(trail._records, {"record_count": 0})
+    assert report["agent_disclosure_para31"]["carried_attestation"] == 1
+
+
+def test_cli_record_disclosure_with_attestation_file(tmp_path):
+    from vaara.cli import main as cli_main
+
+    att = tmp_path / "att.json"
+    att.write_text(json.dumps({"iss": "did:example:i", "sub": "agent-1"}))
+    db = tmp_path / "audit.db"
+    rc = cli_main([
+        "trail", "record-disclosure",
+        "--db", str(db),
+        "--statement", "AI agent notice",
+        "--on-behalf-of", "Example Oy",
+        "--attestation", str(att),
+    ])
+    assert rc == 0
+    event = find_disclosures(SQLiteAuditBackend(db).load_trail()._records)[0]
+    assert event["attestation_issuer"] == "did:example:i"
+    assert len(event["attestation_sha256"]) == 64
+
+
+def test_export_carries_authority_readme(tmp_path):
+    key = tmp_path / "key"
+    from vaara.cli import main as cli_main
+    assert cli_main(["keygen", "--dev", "--out", str(key)]) == 0
+
+    trail = _persistent_trail(tmp_path)
+    record_agent_disclosure(
+        trail, statement="AI agent notice", on_behalf_of="Example Oy",
+        step="first_interaction", session_id="s1",
+    )
+    out = tmp_path / "a50.zip"
+    export_article50(trail, out, signer_key=key)
+    with zipfile.ZipFile(out) as zf:
+        readme = zf.read("README_FOR_AUTHORITY.md").decode()
+    assert "Article 50" in readme
+    assert "vaara trail verify" in readme
+    assert "does not" in readme.lower()
+
+
 def test_disclosures_default_allow_and_never_blocked(tmp_path):
     """A disclosure record must never be blocked by the gate itself."""
     trail = _persistent_trail(tmp_path)

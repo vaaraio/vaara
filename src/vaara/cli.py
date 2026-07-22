@@ -894,6 +894,19 @@ def _cmd_trail_record_disclosure(args: argparse.Namespace) -> int:
     trail = backend.load_trail()
     trail._on_record = backend.write_record
 
+    attestation = None
+    if args.attestation:
+        att_path = Path(args.attestation).expanduser()
+        if not att_path.exists():
+            print(f"attestation file not found: {att_path}", file=sys.stderr)
+            return 2
+        raw = att_path.read_bytes()
+        try:
+            parsed = json.loads(raw)
+            attestation = parsed if isinstance(parsed, dict) else raw
+        except (json.JSONDecodeError, UnicodeDecodeError):
+            attestation = raw
+
     try:
         if args.on_behalf_of:
             if args.paragraph not in (None, "50(1)"):
@@ -914,6 +927,7 @@ def _cmd_trail_record_disclosure(args: argparse.Namespace) -> int:
                 subject=args.subject,
                 notice_sha256=args.notice_sha256,
                 authority_ref=args.authority_ref,
+                attestation=attestation,
             )
             shape = f"50(1) agent profile, step={args.step}"
         else:
@@ -4585,6 +4599,11 @@ def build_parser() -> argparse.ArgumentParser:
         "--authority-ref", default="",
         help="Mandate or attestation identifier backing the delegation "
              "(agent profile only)",
+    )
+    prd.add_argument(
+        "--attestation", default=None, metavar="FILE",
+        help="eIDAS-style attestation file to pin into the disclosure by "
+             "SHA-256 (agent profile only). JSON files also pin iss/sub.",
     )
     prd.add_argument("--agent-id", default="operator")
     prd.add_argument("--session-id", default="")

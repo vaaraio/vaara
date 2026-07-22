@@ -74,6 +74,8 @@ record_agent_disclosure(
     session_id=session_id,
     channel="chat_ui",
     authority_ref="mandate-2026-041",
+    attestation=attestation_claims,   # optional: pins an eIDAS-style
+                                      # attestation by SHA-256 (footnote 21)
 )
 ```
 
@@ -97,7 +99,10 @@ session coverage including whether each disclosure preceded the
 session's first action (the 50(5) timing question). Agent-profile
 disclosures get their own section: counts per key step, how many named
 the principal, how many carried an authority reference, and per-session
-step coverage. The report states
+step coverage. The zip also carries `README_FOR_AUTHORITY.md`: a cover
+note written for the market-surveillance officer receiving it — what is
+inside, how to verify it offline without trusting the operator, and what
+it does and does not establish. The report states
 plainly what it proves (the record was made then and has not been
 altered) and what it does not (that pixels rendered, or that wording met
 accessibility requirements). Verify offline with

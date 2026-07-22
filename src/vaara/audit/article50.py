@@ -114,6 +114,46 @@ def record_disclosure(
     return result.action_id
 
 
+def pin_attestation(attestation) -> dict:
+    """Pin an eIDAS-style attestation into disclosure parameters.
+
+    Footnote 21 of the guidance points at electronic attestations of
+    attributes (Reg 910/2014) and the EU Digital Identity / Business
+    Wallets to verify an AI agent's identity, attributes, and
+    authorisations. This helper binds such an attestation to a
+    disclosure without carrying the full document: the SHA-256 of the
+    exact attestation bytes lands in the hash-covered record, plus the
+    issuer and subject when the attestation is a JSON claims object
+    (``iss`` / ``sub``). Verifying the binding later means hashing the
+    presented attestation and comparing.
+
+    Accepts raw ``bytes``, a ``str``, or a ``dict`` of claims (hashed
+    over its canonical JSON). Returns the parameter fields to merge.
+    """
+    issuer = subject = ""
+    if isinstance(attestation, dict):
+        issuer = str(attestation.get("iss", ""))
+        subject = str(attestation.get("sub", ""))
+        raw = json.dumps(
+            attestation, sort_keys=True, separators=(",", ":"),
+        ).encode("utf-8")
+    elif isinstance(attestation, str):
+        raw = attestation.encode("utf-8")
+    elif isinstance(attestation, bytes):
+        raw = attestation
+    else:
+        raise TypeError(
+            f"attestation must be bytes, str, or dict, got {type(attestation)}"
+        )
+    import hashlib
+
+    return {
+        "attestation_sha256": hashlib.sha256(raw).hexdigest(),
+        "attestation_issuer": issuer,
+        "attestation_subject": subject,
+    }
+
+
 def record_agent_disclosure(
     trail,
     *,
@@ -126,6 +166,7 @@ def record_agent_disclosure(
     subject: str = "",
     notice_sha256: str = "",
     authority_ref: str = "",
+    attestation=None,
     parent_action_id: Optional[str] = None,
 ) -> str:
     """Record an Article 50(1) AI-agent disclosure (guidance para 31).
@@ -160,21 +201,25 @@ def record_agent_disclosure(
 
     from vaara.pipeline import InterceptionPipeline
 
+    parameters = {
+        "article": "50(1)",
+        "profile": AGENT_PROFILE,
+        "statement": statement,
+        "on_behalf_of": on_behalf_of,
+        "step": step,
+        "authority_ref": authority_ref,
+        "channel": channel,
+        "subject": subject,
+        "notice_sha256": notice_sha256,
+    }
+    if attestation is not None:
+        parameters.update(pin_attestation(attestation))
+
     pipeline = InterceptionPipeline(trail=trail, enforce=False)
     result = pipeline.intercept(
         agent_id=agent_id,
         tool_name=DISCLOSURE_TOOL,
-        parameters={
-            "article": "50(1)",
-            "profile": AGENT_PROFILE,
-            "statement": statement,
-            "on_behalf_of": on_behalf_of,
-            "step": step,
-            "authority_ref": authority_ref,
-            "channel": channel,
-            "subject": subject,
-            "notice_sha256": notice_sha256,
-        },
+        parameters=parameters,
         session_id=session_id,
         parent_action_id=parent_action_id,
         context={"vaara_article50": True},
@@ -211,6 +256,9 @@ def find_disclosures(records) -> list[dict]:
             "on_behalf_of": params.get("on_behalf_of", ""),
             "step": params.get("step", ""),
             "authority_ref": params.get("authority_ref", ""),
+            "attestation_sha256": params.get("attestation_sha256", ""),
+            "attestation_issuer": params.get("attestation_issuer", ""),
+            "attestation_subject": params.get("attestation_subject", ""),
         })
     return out
 
@@ -325,6 +373,9 @@ def build_article50_report(
             "carried_authority_ref": sum(
                 1 for d in agent_events if d["authority_ref"]
             ),
+            "carried_attestation": sum(
+                1 for d in agent_events if d["attestation_sha256"]
+            ),
             "sessions": {
                 sid: sorted(steps) for sid, steps in steps_by_session.items()
             },
@@ -404,7 +455,9 @@ def render_article50_md(report: dict) -> str:
             f"(profile `{agent['profile']}`). "
             f"{agent['named_principal']} name the person on whose behalf "
             f"the agent acted; {agent['carried_authority_ref']} carry an "
-            "authority reference (mandate / attestation).",
+            f"authority reference (mandate / attestation); "
+            f"{agent.get('carried_attestation', 0)} pin an eIDAS-style "
+            "attestation by hash (footnote 21 of the guidance).",
             "",
             "Disclosures by moment (paras 31 and 40: key steps, every new "
             "interaction, reliance on other AI systems' output, and "
@@ -457,6 +510,69 @@ def render_article50_md(report: dict) -> str:
     return "\n".join(lines)
 
 
+def render_authority_readme(report: dict) -> str:
+    """Render the cover note a market surveillance authority reads first.
+
+    Section 8.1 of the guidance: a provider outside the Code of Practice
+    must demonstrate compliance "through other adequate means" and may
+    face requests for information and access. This note tells the
+    officer receiving the package what is inside, how to verify it
+    independently, and what it does and does not establish — in plain
+    terms, assuming no knowledge of Vaara.
+    """
+    trail_info = report["trail"]
+    disc = report["disclosures"]
+    agent = report.get("agent_disclosure_para31") or {}
+    lines = [
+        "# How to read this evidence package",
+        "",
+        "This package answers a request to demonstrate compliance with the",
+        "transparency obligations of Article 50 of Regulation (EU) 2024/1689",
+        "(the AI Act). It contains the operator's tamper-evident record of",
+        "the disclosures their AI system made, exported as-is from the",
+        "system's audit trail.",
+        "",
+        "## What is inside",
+        "",
+        "- `trail.jsonl` — the full audit trail: every recorded event, in",
+        "  order, each linked to the previous one by a cryptographic hash.",
+        "- `manifest.json` and signature files — a digital signature over",
+        "  the trail, so any change to any record is detectable.",
+        "- `article50_report.md` — a human-readable summary: disclosure",
+        "  events per obligation, AI-agent disclosures per key step, and",
+        "  timing against the first interaction (Article 50(5)).",
+        "- `article50_summary.json` — the same summary, machine-readable.",
+        "",
+        f"This export: {disc['total']} disclosure events "
+        f"({agent.get('total', 0)} in the AI-agent profile) across "
+        f"{trail_info['records']} trail records, signed with "
+        f"{trail_info['algorithm']}, signer fingerprint "
+        f"`{trail_info['signer_pubkey_fingerprint']}`.",
+        "",
+        "## How to verify it, independently of the operator",
+        "",
+        "Verification is offline and needs no account or service:",
+        "",
+        "```",
+        "pip install vaara",
+        "vaara trail verify --zip <this file> --pubkey <the operator's public key>",
+        "```",
+        "",
+        "This checks that the signature is valid and that no record has",
+        "been altered, inserted, or deleted. The public key should reach",
+        "you through a channel other than this package. The verification",
+        "tool is open source (AGPL), so the check itself is inspectable.",
+        "",
+        "## What this establishes, and what it does not",
+        "",
+        report["what_this_proves"],
+        "",
+        report["what_this_does_not_prove"],
+        "",
+    ]
+    return "\n".join(lines)
+
+
 def export_article50(
     trail,
     out_path: Union[str, Path],
@@ -494,5 +610,6 @@ def export_article50(
             "article50_summary.json",
             json.dumps(report, indent=2, sort_keys=False).encode("utf-8"),
         )
+        zf.writestr("README_FOR_AUTHORITY.md", render_authority_readme(report))
 
     return result
