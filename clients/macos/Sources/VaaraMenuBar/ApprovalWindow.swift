@@ -107,11 +107,68 @@ struct ApprovalPanelView: View {
 /// what a person needs to answer: what the agent wants, and two buttons.
 /// The window slides it down; nothing expands. Always black so it reads
 /// as the notch itself, independent of the app's light/dark theme.
+/// The card outline that fuses to the notch. The two top corners are
+/// CONCAVE (scooped, centered on the outer corner) so they interlock with
+/// the notch's own rounded bottom corners instead of leaving triangular
+/// slivers. The bottom corners are ordinary convex rounds. Off notch,
+/// pass topConcave = 0 and topConvex > 0 for a normal rounded top.
+struct NotchFusedShape: Shape {
+    var topConcave: CGFloat = 0
+    var topConvex: CGFloat = 0
+    var bottom: CGFloat = 22
+
+    func path(in rect: CGRect) -> Path {
+        var p = Path()
+        let w = rect.width, h = rect.height, b = bottom
+        let tc = topConcave
+
+        if tc > 0 {
+            // Concave top corners (scooped toward the outer corner point).
+            p.move(to: CGPoint(x: tc, y: 0))
+            p.addLine(to: CGPoint(x: w - tc, y: 0))
+            p.addArc(center: CGPoint(x: w, y: 0), radius: tc,
+                     startAngle: .degrees(180), endAngle: .degrees(90),
+                     clockwise: true)
+            p.addLine(to: CGPoint(x: w, y: h - b))
+            p.addArc(center: CGPoint(x: w - b, y: h - b), radius: b,
+                     startAngle: .degrees(0), endAngle: .degrees(90),
+                     clockwise: false)
+            p.addLine(to: CGPoint(x: b, y: h))
+            p.addArc(center: CGPoint(x: b, y: h - b), radius: b,
+                     startAngle: .degrees(90), endAngle: .degrees(180),
+                     clockwise: false)
+            p.addLine(to: CGPoint(x: 0, y: tc))
+            p.addArc(center: CGPoint(x: 0, y: 0), radius: tc,
+                     startAngle: .degrees(90), endAngle: .degrees(0),
+                     clockwise: true)
+            p.closeSubpath()
+        } else {
+            let t = topConvex
+            p.move(to: CGPoint(x: t, y: 0))
+            p.addLine(to: CGPoint(x: w - t, y: 0))
+            p.addArc(center: CGPoint(x: w - t, y: t), radius: t,
+                     startAngle: .degrees(-90), endAngle: .degrees(0), clockwise: false)
+            p.addLine(to: CGPoint(x: w, y: h - b))
+            p.addArc(center: CGPoint(x: w - b, y: h - b), radius: b,
+                     startAngle: .degrees(0), endAngle: .degrees(90), clockwise: false)
+            p.addLine(to: CGPoint(x: b, y: h))
+            p.addArc(center: CGPoint(x: b, y: h - b), radius: b,
+                     startAngle: .degrees(90), endAngle: .degrees(180), clockwise: false)
+            p.addLine(to: CGPoint(x: 0, y: t))
+            p.addArc(center: CGPoint(x: t, y: t), radius: t,
+                     startAngle: .degrees(180), endAngle: .degrees(270), clockwise: false)
+            p.closeSubpath()
+        }
+        return p
+    }
+}
+
 struct NotchApprovalView: View {
     let pending: PendingApproval
     let onDecision: (Bool) -> Void
     let width: CGFloat
-    var topRadius: CGFloat = 0   // 0 fuses to a notch; rounded off-notch
+    var topRadius: CGFloat = 0    // convex top round, off-notch only
+    var notchCorner: CGFloat = 0  // concave top corners that hug the notch
 
     private let ink = Color(red: 0.90, green: 0.92, blue: 0.91)
     private let faint = Color(red: 0.60, green: 0.64, blue: 0.62)
@@ -159,11 +216,8 @@ struct NotchApprovalView: View {
         // top edge fuses with the physical notch: it reads as the notch
         // itself lowering. Only the bottom corners round.
         .background(Color.black)
-        .clipShape(.rect(
-            topLeadingRadius: topRadius,
-            bottomLeadingRadius: 22,
-            bottomTrailingRadius: 22,
-            topTrailingRadius: topRadius))
+        .clipShape(NotchFusedShape(
+            topConcave: notchCorner, topConvex: topRadius, bottom: 22))
         .environment(\.colorScheme, .dark)
     }
 }
@@ -233,7 +287,8 @@ final class ApprovalWindowManager {
             onDecision: { [weak self] ok in
                 self?.model.resolveApproval(pending.actionID, approve: ok) },
             width: cardWidth,
-            topRadius: hasNotch ? 0 : 20))
+            topRadius: hasNotch ? 0 : 20,
+            notchCorner: hasNotch ? 10 : 0))
         panel.contentView = host
         let size = host.fittingSize
 
