@@ -218,9 +218,16 @@ final class GateModel: ObservableObject {
         discoverTrails()
         UNUserNotificationCenter.current()
             .requestAuthorization(options: [.alert, .sound]) { _, _ in }
-        timer = Timer.scheduledTimer(withTimeInterval: 2, repeats: true) { [weak self] _ in
+        // Register in .common modes, not the default .scheduledTimer mode.
+        // A menu-bar accessory app does not reliably pump the default
+        // runloop mode while idle, so a .default timer stays frozen until
+        // the user opens the menu (which wakes the runloop). That is why
+        // the gate only reacted after a click. .common fires while idle.
+        let t = Timer(timeInterval: 2, repeats: true) { [weak self] _ in
             Task { @MainActor in self?.poll() }
         }
+        RunLoop.main.add(t, forMode: .common)
+        timer = t
         poll()
     }
 
