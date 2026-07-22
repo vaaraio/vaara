@@ -16,7 +16,7 @@ extension GateState {
     }
 }
 
-private struct Palette {
+struct Palette {
     let ink: Color, faint: Color, ghost: Color, hairline: Color, wash: Color
 
     // Dark mirrors the webpage: --bg #0F1417, --ink #DEE4E1,
@@ -37,7 +37,7 @@ private struct Palette {
 
 /// Bump on every source change; shown in the footer so a stale build is
 /// visible at a glance instead of masquerading as a bug.
-let BUILD_STAMP = "b21 · 2026-07-22"
+let BUILD_STAMP = "b22 · 2026-07-22"
 
 struct ContentView: View {
     @ObservedObject var model: GateModel

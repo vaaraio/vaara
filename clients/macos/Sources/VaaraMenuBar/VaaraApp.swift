@@ -7,11 +7,17 @@ import SwiftUI
 @main
 struct VaaraApp: App {
     @StateObject private var model = GateModel()
+    @State private var approvalWindows: ApprovalWindowManager?
 
     var body: some Scene {
         MenuBarExtra {
             ContentView(model: model)
-                .onAppear { model.start() }
+                .onAppear {
+                    model.start()
+                    if approvalWindows == nil {
+                        approvalWindows = ApprovalWindowManager(model: model)
+                    }
+                }
         } label: {
             Image(nsImage: menuImage())
         }
