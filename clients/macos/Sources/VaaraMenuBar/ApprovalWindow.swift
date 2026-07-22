@@ -156,8 +156,10 @@ struct NotchApprovalView: View {
         .frame(width: width)
         .background(Color.black)
         .clipShape(.rect(
-            topLeadingRadius: 8, topTrailingRadius: 8,
-            bottomLeadingRadius: 20, bottomTrailingRadius: 20))
+            topLeadingRadius: 8,
+            bottomLeadingRadius: 20,
+            bottomTrailingRadius: 20,
+            topTrailingRadius: 8))
         .shadow(color: .black.opacity(0.4), radius: 16, y: 6)
         .environment(\.colorScheme, .dark)
     }
