@@ -308,8 +308,8 @@ final class ApprovalWindowManager {
             onDecision: { [weak self] ok in
                 self?.model.resolveApproval(pending.actionID, approve: ok) },
             width: cardWidth,
-            topRadius: hasNotch ? 0 : 20,
-            notchCorner: 0))   // square top; the upward overlap fills the notch corners
+            topRadius: 0,       // square top: fuses to notch, or hangs from the menu bar off-notch
+            notchCorner: 0))
         panel.contentView = host
         let size = host.fittingSize
 
@@ -337,9 +337,12 @@ final class ApprovalWindowManager {
         // radius, so its black fills the slivers left at the notch's
         // rounded bottom corners (black card + black notch = seamless).
         let notchCornerFill: CGFloat = 10
+        // Off notch, rest with the top edge flush to the menu-bar bottom
+        // (a hair overlapped) so the square-top card hangs from the bar
+        // instead of floating detached below it.
         let restTop = hasNotch
             ? full.maxY - notch.height + notchCornerFill
-            : screen.visibleFrame.maxY
+            : screen.visibleFrame.maxY + 2
         let restY = restTop - size.height
 
         panel.setFrame(NSRect(x: x, y: startY, width: cardWidth, height: size.height),
