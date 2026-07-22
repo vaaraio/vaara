@@ -2,24 +2,34 @@
 // an optional live activity sparkline beside it. No numbers anywhere;
 // the bar heights are the pulse, the colors are the verdicts.
 
+import AppKit
 import SwiftUI
+
+/// Owns the model and starts monitoring at true app launch, not when the
+/// popover first opens. A MenuBarExtra's content onAppear fires only on
+/// first click, so anything started there (the poll timer, the approval
+/// window manager) would sit dead until the user happened to open the
+/// menu. applicationDidFinishLaunching always runs, so the gate watches
+/// and the approval HUD can raise itself with no interaction.
+final class AppDelegate: NSObject, NSApplicationDelegate {
+    let model = GateModel()
+    private var approvalWindows: ApprovalWindowManager?
+
+    func applicationDidFinishLaunching(_ notification: Notification) {
+        model.start()
+        approvalWindows = ApprovalWindowManager(model: model)
+    }
+}
 
 @main
 struct VaaraApp: App {
-    @StateObject private var model = GateModel()
-    @State private var approvalWindows: ApprovalWindowManager?
+    @NSApplicationDelegateAdaptor(AppDelegate.self) private var appDelegate
 
     var body: some Scene {
         MenuBarExtra {
-            ContentView(model: model)
-                .onAppear {
-                    model.start()
-                    if approvalWindows == nil {
-                        approvalWindows = ApprovalWindowManager(model: model)
-                    }
-                }
+            ContentView(model: appDelegate.model)
         } label: {
-            Image(nsImage: menuImage())
+            Image(nsImage: menuImage(appDelegate.model))
         }
         .menuBarExtraStyle(.window)
     }
@@ -49,7 +59,7 @@ struct VaaraApp: App {
 
     /// The full label: mark, plus (when enabled) a 12-bar sparkline of
     /// the last two minutes of activity.
-    private func menuImage() -> NSImage {
+    private func menuImage(_ model: GateModel) -> NSImage {
         let mark = markImage(for: model.state)
         let graphOn = model.config.menubar_graph
         let buckets = model.buckets

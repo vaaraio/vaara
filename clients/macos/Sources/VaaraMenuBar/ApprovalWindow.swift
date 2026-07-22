@@ -154,13 +154,15 @@ struct NotchApprovalView: View {
         .padding(.top, 10)
         .padding(.bottom, 12)
         .frame(width: width)
+        // Pure #000000, no shadow, no stroke, top corners square so the
+        // top edge fuses with the physical notch: it reads as the notch
+        // itself lowering. Only the bottom corners round.
         .background(Color.black)
         .clipShape(.rect(
-            topLeadingRadius: 8,
-            bottomLeadingRadius: 20,
-            bottomTrailingRadius: 20,
-            topTrailingRadius: 8))
-        .shadow(color: .black.opacity(0.4), radius: 16, y: 6)
+            topLeadingRadius: 0,
+            bottomLeadingRadius: 22,
+            bottomTrailingRadius: 22,
+            topTrailingRadius: 0))
         .environment(\.colorScheme, .dark)
     }
 }
@@ -261,7 +263,7 @@ final class ApprovalWindowManager {
             backing: .buffered, defer: false)
         panel.isOpaque = false
         panel.backgroundColor = .clear
-        panel.hasShadow = true
+        panel.hasShadow = false        // pure black card, no window chrome
         panel.isMovableByWindowBackground = true
         panel.level = .statusBar                // above menu-bar apps' windows
         panel.collectionBehavior = [.canJoinAllSpaces, .fullScreenAuxiliary]
