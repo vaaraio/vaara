@@ -40,6 +40,14 @@ struct DecisionEvent: Identifiable {
     let riskScore: Double?
 }
 
+struct PendingApproval: Identifiable, Equatable {
+    let actionID: String
+    let toolName: String
+    let reason: String
+    let requestedAt: Date
+    var id: String { actionID }
+}
+
 struct AgentSummary: Identifiable {
     let id: String          // agent_id
     let lastSeen: Date
@@ -92,6 +100,8 @@ struct Config: Codable {
     /// Basic sees mode, notifications, updates; professional adds
     /// thresholds and tuning; enterprise adds multi-trail sources.
     var user_level: String = "basic"
+    /// Override for the approvals watch directory. nil = ~/.vaara/approvals.
+    var approvals_dir: String?
 
     // Tolerate configs written before a field existed, including the
     // Python proto's single db_path key, which migrates into db_paths.
@@ -117,11 +127,12 @@ struct Config: Codable {
             notify_on = notifications ? base.notify_on : "off"
         }
         user_level = try c.decodeIfPresent(String.self, forKey: .user_level) ?? base.user_level
+        approvals_dir = try c.decodeIfPresent(String.self, forKey: .approvals_dir)
     }
 
     enum CodingKeys: String, CodingKey {
         case db_paths, alert_window_minutes, notifications, appearance, menubar_graph
-        case notify_on, user_level
+        case notify_on, user_level, approvals_dir
         case legacy_db_path = "db_path"
     }
 
@@ -134,6 +145,7 @@ struct Config: Codable {
         try c.encode(menubar_graph, forKey: .menubar_graph)
         try c.encode(notify_on, forKey: .notify_on)
         try c.encode(user_level, forKey: .user_level)
+        try c.encodeIfPresent(approvals_dir, forKey: .approvals_dir)
         // Keep the Python proto readable from the same file.
         if let first = db_paths.first {
             try c.encode(first, forKey: .legacy_db_path)
@@ -176,6 +188,9 @@ final class GateModel: ObservableObject {
     /// Menu-bar sparkline: last 12 buckets of 10 s, oldest first.
     /// Each bucket is (activity count, worst verdict in the bucket).
     @Published var buckets: [(Int, GateState)] = []
+    /// The escalated action currently awaiting the human's Approve/Block.
+    /// While set, the approval panel is shown over the popover.
+    @Published var pendingApproval: PendingApproval?
 
     /// How far back an agent still counts as "running" (seconds).
     static let runningWindow: Double = 15 * 60
@@ -183,8 +198,16 @@ final class GateModel: ObservableObject {
     private var cursors: [String: Int64] = [:]
     private var handledApprovals = Set<String>()
     private var timer: Timer?
-    private let approvalsDir = FileManager.default.homeDirectoryForCurrentUser
-        .appendingPathComponent(".vaara/approvals")
+    /// Where approval requests are watched. Defaults to ~/.vaara/approvals
+    /// (matching the hook), overridable in config for bridge/multi-machine
+    /// setups where the governed engine writes elsewhere.
+    private var approvalsDir: URL {
+        if let custom = config.approvals_dir, !custom.isEmpty {
+            return URL(fileURLWithPath: (custom as NSString).expandingTildeInPath)
+        }
+        return FileManager.default.homeDirectoryForCurrentUser
+            .appendingPathComponent(".vaara/approvals")
+    }
 
     func start() {
         for path in config.db_paths { cursors[path] = maxSeq(path) }  // start at now
@@ -711,29 +734,40 @@ final class GateModel: ObservableObject {
         return out
     }
 
+    /// Surface the oldest un-answered approval as published state so the
+    /// SwiftUI approval panel can render it on-brand. Answering is the
+    /// user's click (see resolveApproval); we no longer raise a modal
+    /// NSAlert, so the popover stays the single surface.
     private func handlePendingApprovals() {
+        if pendingApproval != nil { return }  // one at a time; panel is up
         for req in pendingApprovals() {
             guard let actionID = req["action_id"] as? String,
                   !actionID.isEmpty, !handledApprovals.contains(actionID) else { continue }
-            handledApprovals.insert(actionID)
-
-            let alert = NSAlert()
-            alert.messageText = "Vaara: approval needed"
-            alert.informativeText =
-                "\(req["tool_name"] as? String ?? "?")\n\n\(req["reason"] as? String ?? "")"
-            alert.alertStyle = .warning
-            alert.addButton(withTitle: "Deny")
-            alert.addButton(withTitle: "Approve")
+            let pending = PendingApproval(
+                actionID: actionID,
+                toolName: req["tool_name"] as? String ?? "?",
+                reason: req["reason"] as? String ?? "",
+                requestedAt: Date(timeIntervalSince1970:
+                    (req["requested_at"] as? Double) ?? Date().timeIntervalSince1970))
+            pendingApproval = pending
             NSApp.activate(ignoringOtherApps: true)
-            let decision = alert.runModal() == .alertSecondButtonReturn ? "approve" : "deny"
-
-            let payload: [String: Any] =
-                ["decision": decision, "decided_at": Date().timeIntervalSince1970]
-            if let data = try? JSONSerialization.data(withJSONObject: payload) {
-                try? data.write(to: approvalsDir
-                    .appendingPathComponent("\(actionID).decision.json"))
-            }
+            return
         }
+    }
+
+    /// Write the human's decision for an escalated action. The blocked
+    /// hook (or proxy) is polling for this file and proceeds or fails
+    /// closed the moment it lands. Approve is the only way through.
+    func resolveApproval(_ actionID: String, approve: Bool) {
+        handledApprovals.insert(actionID)
+        let payload: [String: Any] =
+            ["decision": approve ? "approve" : "deny",
+             "decided_at": Date().timeIntervalSince1970]
+        if let data = try? JSONSerialization.data(withJSONObject: payload) {
+            try? data.write(to: approvalsDir
+                .appendingPathComponent("\(actionID).decision.json"))
+        }
+        if pendingApproval?.actionID == actionID { pendingApproval = nil }
     }
 
     // MARK: - Update check (GitHub latest release, on demand only)

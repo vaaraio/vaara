@@ -37,7 +37,7 @@ private struct Palette {
 
 /// Bump on every source change; shown in the footer so a stale build is
 /// visible at a glance instead of masquerading as a bug.
-let BUILD_STAMP = "b18 · 2026-07-22"
+let BUILD_STAMP = "b19 · 2026-07-22"
 
 struct ContentView: View {
     @ObservedObject var model: GateModel
@@ -55,6 +55,20 @@ struct ContentView: View {
     private var p: Palette { dark ? .dark : .light }
 
     var body: some View {
+        Group {
+            if let pending = model.pendingApproval {
+                approvalPanel(pending)
+            } else {
+                mainBody
+            }
+        }
+        .frame(width: 400)
+        .background(p.wash)
+        .background(.ultraThinMaterial)
+        .environment(\.colorScheme, dark ? .dark : .light)
+    }
+
+    private var mainBody: some View {
         VStack(alignment: .leading, spacing: 0) {
             if let agent = selectedAgent {
                 agentDetail(agent)
@@ -71,10 +85,98 @@ struct ContentView: View {
             Rectangle().fill(p.hairline).frame(height: 1)
             footer
         }
-        .frame(width: 400)
-        .background(p.wash)
-        .background(.ultraThinMaterial)
-        .environment(\.colorScheme, dark ? .dark : .light)
+    }
+
+    // MARK: approval panel — the gate, made human. Shown over everything
+    // while an escalated action waits. The blocked hook is polling for the
+    // decision file; Block is the safe default, Approve is the only way
+    // through, and doing nothing lets the hook time out fail-closed.
+
+    private func approvalPanel(_ pending: PendingApproval) -> some View {
+        VStack(alignment: .leading, spacing: 0) {
+            HStack(spacing: 12) {
+                Circle()
+                    .fill(GateState.yellow.color)
+                    .frame(width: 11, height: 11)
+                    .shadow(color: GateState.yellow.color.opacity(0.6), radius: 7)
+                Text("Approval needed")
+                    .font(.system(size: 20, weight: .light))
+                    .foregroundStyle(p.ink)
+                Spacer()
+            }
+            .padding(.horizontal, 22)
+            .padding(.top, 24)
+            .padding(.bottom, 16)
+
+            Rectangle().fill(p.hairline).frame(height: 1)
+
+            VStack(alignment: .leading, spacing: 14) {
+                VStack(alignment: .leading, spacing: 4) {
+                    Text("AN AI AGENT WANTS TO")
+                        .font(.system(size: 9, weight: .medium))
+                        .tracking(1.2)
+                        .foregroundStyle(p.ghost)
+                    Text(pending.toolName)
+                        .font(.system(size: 15, design: .monospaced))
+                        .foregroundStyle(p.ink)
+                        .lineLimit(2).truncationMode(.middle)
+                }
+                if !pending.reason.isEmpty {
+                    VStack(alignment: .leading, spacing: 4) {
+                        Text("WHY IT WAS FLAGGED")
+                            .font(.system(size: 9, weight: .medium))
+                            .tracking(1.2)
+                            .foregroundStyle(p.ghost)
+                        Text(pending.reason)
+                            .font(.system(size: 12))
+                            .foregroundStyle(p.faint)
+                            .fixedSize(horizontal: false, vertical: true)
+                    }
+                }
+            }
+            .padding(.horizontal, 22)
+            .padding(.vertical, 18)
+
+            Rectangle().fill(p.hairline).frame(height: 1)
+
+            HStack(spacing: 12) {
+                Button {
+                    model.resolveApproval(pending.actionID, approve: false)
+                } label: {
+                    Text("Block")
+                        .font(.system(size: 13, weight: .semibold))
+                        .foregroundStyle(.white)
+                        .frame(maxWidth: .infinity)
+                        .padding(.vertical, 10)
+                        .background(GateState.red.color)
+                        .clipShape(RoundedRectangle(cornerRadius: 8))
+                }
+                .buttonStyle(.plain)
+                .keyboardShortcut(.cancelAction)
+
+                Button {
+                    model.resolveApproval(pending.actionID, approve: true)
+                } label: {
+                    Text("Approve")
+                        .font(.system(size: 13, weight: .semibold))
+                        .foregroundStyle(dark ? .black : .white)
+                        .frame(maxWidth: .infinity)
+                        .padding(.vertical, 10)
+                        .background(GateState.green.color)
+                        .clipShape(RoundedRectangle(cornerRadius: 8))
+                }
+                .buttonStyle(.plain)
+                .keyboardShortcut(.defaultAction)
+            }
+            .padding(.horizontal, 22)
+            .padding(.vertical, 16)
+
+            Text("Doing nothing blocks the action when the request times out.")
+                .font(.system(size: 10))
+                .foregroundStyle(p.ghost)
+                .frame(maxWidth: .infinity, alignment: .center)
+                .padding(.bottom, 16)
+        }
     }
 
     // MARK: history — the full shadow register, launch-independent
