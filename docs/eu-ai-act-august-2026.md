@@ -14,6 +14,8 @@ This page states what applies from 2 August 2026, who it applies to, and what ev
 - **50(4), deployers:** deepfakes must be disclosed, and AI-generated text published to inform the public must be disclosed unless it went through human editorial review.
 - **50(5):** the information above must arrive at the latest at the first interaction or exposure, in a clear and distinguishable manner, meeting accessibility requirements.
 
+**The Commission's guidance on Article 50** (C(2026) 5054 final, 20 July 2026) confirms the 2 August 2026 date for 50(1) with no grace period, and spells out what agent disclosure means in paragraph 31: an AI agent must disclose both its artificial nature and the person on whose behalf it acts, covering the delegation of authority and accountability for its actions, to the persons instructing it at key steps (authorisation, reporting, validation), at every new interaction, and when it relies on output from other AI systems rather than a person. Paragraph 40 adds that disclosure is due whenever the system is asked about its nature. The guidance is non-binding but is the Commission's own reading of the obligation.
+
 **General-purpose AI enforcement.** The obligations for general-purpose AI model providers have applied since 2 August 2025; what starts on 2 August 2026 is the Commission's power to enforce them, including fines. This concerns model providers, not agent deployers, but it keeps supervisory attention on exactly the question Article 50 asks deployers: can you show what your AI did and what the humans around it were told?
 
 **Already in force since February 2025:** the Article 5 prohibitions and the AI literacy duty. Omnibus VII also adds a new prohibition on generating non-consensual intimate content and child sexual abuse material, from December 2026.
@@ -55,6 +57,34 @@ record_disclosure(
 )
 ```
 
+For an AI agent, the guidance's paragraph 31 asks for more than "this is
+AI": on whose behalf the agent acts, and disclosure at the key steps of
+the delegation. The agent profile records exactly those fields, and can
+thread the disclosure into the delegation chain the trail already keeps:
+
+```python
+from vaara.audit.article50 import record_agent_disclosure
+
+record_agent_disclosure(
+    trail,
+    statement="I am an AI agent acting for Demo Oy.",
+    on_behalf_of="Demo Oy",
+    step="first_interaction",   # or authorisation, reporting, validation,
+                                # new_interaction, ai_output_received, on_inquiry
+    session_id=session_id,
+    channel="chat_ui",
+    authority_ref="mandate-2026-041",
+)
+```
+
+No Python required — the same record from the command line:
+
+```bash
+vaara trail record-disclosure --db audit.db \
+  --statement "I am an AI agent acting for Demo Oy." \
+  --on-behalf-of "Demo Oy" --step first_interaction
+```
+
 When someone asks, one command produces the package:
 
 ```bash
@@ -64,7 +94,10 @@ vaara trail export-article50 --db audit.db --out article50.zip --key signing.pem
 The zip is the standard signed trail with `article50_report.md` folded
 in: disclosure counts per paragraph, the events themselves, and 50(1)
 session coverage including whether each disclosure preceded the
-session's first action (the 50(5) timing question). The report states
+session's first action (the 50(5) timing question). Agent-profile
+disclosures get their own section: counts per key step, how many named
+the principal, how many carried an authority reference, and per-session
+step coverage. The report states
 plainly what it proves (the record was made then and has not been
 altered) and what it does not (that pixels rendered, or that wording met
 accessibility requirements). Verify offline with

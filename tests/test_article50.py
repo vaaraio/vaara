@@ -231,6 +231,77 @@ def test_report_para31_section(tmp_path):
     assert "first_interaction, validation" in md
 
 
+def test_report_para31_timing(tmp_path):
+    trail = _persistent_trail(tmp_path)
+    # s1: agent disclosed at first interaction BEFORE acting (timely)
+    record_agent_disclosure(
+        trail, statement="AI agent notice", on_behalf_of="Example Oy",
+        step="first_interaction", session_id="s1",
+    )
+    _agent_activity(trail, "s1")
+    # s2: acted first, disclosed late (not timely)
+    _agent_activity(trail, "s2")
+    record_agent_disclosure(
+        trail, statement="AI agent notice", on_behalf_of="Example Oy",
+        step="first_interaction", session_id="s2",
+    )
+
+    agent = build_article50_report(
+        trail._records, {"record_count": 0},
+    )["agent_disclosure_para31"]
+    assert agent["sessions_with_first_interaction_disclosure"] == 2
+    assert agent["first_interaction_at_or_before_first_action"] == 1
+
+
+def test_cli_record_disclosure_agent_profile(tmp_path, capsys):
+    from vaara.cli import main as cli_main
+
+    db = tmp_path / "audit.db"
+    rc = cli_main([
+        "trail", "record-disclosure",
+        "--db", str(db),
+        "--statement", "I am an AI agent acting for Example Oy.",
+        "--on-behalf-of", "Example Oy",
+        "--step", "authorisation",
+        "--session-id", "s1",
+        "--authority-ref", "grant-42",
+    ])
+    assert rc == 0
+    assert "agent profile" in capsys.readouterr().out
+
+    backend = SQLiteAuditBackend(db)
+    events = find_disclosures(backend.load_trail()._records)
+    assert events[0]["on_behalf_of"] == "Example Oy"
+    assert events[0]["step"] == "authorisation"
+
+    # Conflicting paragraph with the agent profile is rejected.
+    rc = cli_main([
+        "trail", "record-disclosure",
+        "--db", str(db),
+        "--statement", "x",
+        "--on-behalf-of", "Example Oy",
+        "--paragraph", "50(4)",
+    ])
+    assert rc == 2
+
+
+def test_cli_record_disclosure_generic(tmp_path, capsys):
+    from vaara.cli import main as cli_main
+
+    db = tmp_path / "audit.db"
+    rc = cli_main([
+        "trail", "record-disclosure",
+        "--db", str(db),
+        "--statement", "This image is AI-generated.",
+        "--paragraph", "50(4)",
+        "--subject", "img-1",
+    ])
+    assert rc == 0
+    events = find_disclosures(SQLiteAuditBackend(db).load_trail()._records)
+    assert events[0]["article"] == "50(4)"
+    assert events[0]["profile"] == ""
+
+
 def test_disclosures_default_allow_and_never_blocked(tmp_path):
     """A disclosure record must never be blocked by the gate itself."""
     trail = _persistent_trail(tmp_path)
