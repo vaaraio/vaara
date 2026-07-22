@@ -37,7 +37,7 @@ private struct Palette {
 
 /// Bump on every source change; shown in the footer so a stale build is
 /// visible at a glance instead of masquerading as a bug.
-let BUILD_STAMP = "b20 · 2026-07-22"
+let BUILD_STAMP = "b21 · 2026-07-22"
 
 struct ContentView: View {
     @ObservedObject var model: GateModel
@@ -620,6 +620,30 @@ struct ContentView: View {
                         .foregroundStyle(p.ghost)
                 }
             }
+
+            VStack(alignment: .leading, spacing: 8) {
+                sectionLabelPlain("APPROVALS FOLDER")
+                Text(model.config.approvals_dir ?? "~/.vaara/approvals (default)")
+                    .font(.system(size: 11, design: .monospaced))
+                    .foregroundStyle(p.faint)
+                    .lineLimit(1).truncationMode(.head)
+                HStack(spacing: 14) {
+                    Button("Choose folder...") { chooseApprovalsDir() }
+                    if model.config.approvals_dir != nil {
+                        Button("Reset to default") {
+                            model.config.approvals_dir = nil
+                        }
+                    }
+                }
+                .buttonStyle(.plain)
+                .font(.system(size: 11))
+                .foregroundStyle(p.ink.opacity(0.7))
+                Text("Where the app watches for escalations needing your "
+                     + "approval. Point it at the engine's approvals folder "
+                     + "for bridge or multi-machine setups.")
+                    .font(.system(size: 9))
+                    .foregroundStyle(p.ghost)
+            }
             }
         }
         .padding(20)
@@ -733,6 +757,18 @@ struct ContentView: View {
             .font(.system(size: 10, weight: .medium))
             .tracking(1.2)
             .foregroundStyle(p.ghost)
+    }
+
+    private func chooseApprovalsDir() {
+        let panel = NSOpenPanel()
+        panel.message = "Pick the folder the engine writes approval requests to"
+        panel.canChooseDirectories = true
+        panel.canChooseFiles = false
+        panel.showsHiddenFiles = true
+        NSApp.activate(ignoringOtherApps: true)
+        if panel.runModal() == .OK, let url = panel.url {
+            model.config.approvals_dir = url.path
+        }
     }
 
     private func chooseDB() {
