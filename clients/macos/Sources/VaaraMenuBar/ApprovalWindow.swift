@@ -280,11 +280,13 @@ final class ApprovalWindowManager {
         // It slides down as a unit; it does not expand.
         let notch = notchSize(screen)
         let hasNotch = notch.height > 0
-        // Floor to a whole point and never exceed the notch, so the card
-        // can't poke past the cutout on either side. The window width is
-        // this exact value (not the SwiftUI fittingSize, which can round a
-        // fraction wider and caused a 1px right overhang).
-        let cardWidth = (hasNotch ? max(notch.width, 200) : 220).rounded(.down)
+        // The display API reports the notch a hair wider than the visible
+        // black cutout (the auxiliary areas do not butt exactly against
+        // it), so matching it exactly overhangs ~1px. Inset the card 1px
+        // on each side (2 total) so it nests cleanly inside the cutout
+        // with no overhang. Whole points only.
+        let inset: CGFloat = hasNotch ? 2 : 0
+        let cardWidth = (hasNotch ? max(notch.width, 200) : 220).rounded(.down) - inset
 
         let host = NSHostingView(rootView: NotchApprovalView(
             pending: pending,
