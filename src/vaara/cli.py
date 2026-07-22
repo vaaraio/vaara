@@ -4359,12 +4359,29 @@ def _cmd_ungovern(args: argparse.Namespace) -> int:
     return 0
 
 
+def _cmd_menu(args: argparse.Namespace) -> int:
+    """Interactive numbered menu over the common commands."""
+    from vaara.menu import run_menu
+
+    try:
+        return run_menu()
+    except KeyboardInterrupt:
+        print()
+        return 0
+
+
 def build_parser() -> argparse.ArgumentParser:
     p = _SuggestingParser(prog="vaara", description="Vaara AI Agent Execution Layer")
     sub = p.add_subparsers(dest="cmd", metavar="COMMAND")
     p.set_defaults(func=_help_dispatch(p))
 
     sub.add_parser("version", help="Print Vaara version").set_defaults(func=_cmd_version)
+
+    sub.add_parser(
+        "menu",
+        help="Interactive menu over the common commands, gated by settings "
+             "depth (basic / professional / enterprise)",
+    ).set_defaults(func=_cmd_menu)
 
     pk = sub.add_parser(
         "keygen",

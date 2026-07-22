@@ -7,6 +7,35 @@ and this project follows [Semantic Versioning](https://semver.org/spec/v2.0.0.ht
 
 ## [Unreleased]
 
+## [1.50.0] - 2026-07-22
+
+Vaara for macOS enters public beta. The same governance engine the CLI
+runs, now with a menu-bar face.
+
+- The menu-bar app (SwiftPM, macOS 13+, zero third-party dependencies)
+  shows the live verdict of your AI agents: green when moves pass policy,
+  yellow on an escalation or a waiting approval, red on a deny. Click it
+  for the running agents, a live intervention feed, and a History tab
+  holding every allow, escalate, and deny on record.
+- An approval window surfaces escalated agent moves for a human decision
+  in the moment, instead of only after the fact in the audit trail.
+- The Setup tab wires your AI tools through Vaara's policy gate: it scans
+  the MCP client configs on the machine (Claude Desktop, Claude Code,
+  Cursor, Windsurf), backs up the original, and rewrites ungoverned
+  servers to run through `vaara-mcp-proxy`. Restore puts the pre-Vaara
+  config back.
+- The app reads the same on-machine SQLite audit trails the Claude Code
+  plugin and `vaara-mcp-proxy` write. No server, no telemetry; everything
+  stays on the machine.
+- Build from source: `xcode-select --install`, then `./build.sh` in
+  `clients/macos`. Locally built binaries run without Gatekeeper
+  quarantine, so no Developer ID is required to run the app you built.
+
+Qualified timestamp anchoring against any EU-qualified provider chosen
+from the EU trusted lists, operator-configured everywhere, carries
+forward from 1.41.0 unchanged. No shared qualified endpoint is baked in
+as a default.
+
 ## [1.41.0] - 2026-07-22
 
 - Qualified timestamp anchoring works with any EU-qualified timestamping

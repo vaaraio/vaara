@@ -1,35 +1,138 @@
 __pycache__/
 *.pyc
-*.egg
 *.egg-info/
-.coverage
 .pytest_cache/
-.mypy_cache/
-.ruff_cache/
-.hypothesis/
-.venv/
-venv/
-node_modules/
-/package-lock.json
 dist/
 build/
-dist_verify/
-.env
+*.egg
+.coverage
 *.bak
 *.db
+# SQLite sidecar files (WAL mode) — left behind by the TS client test harness
+# and CLI invocations; never part of the repo.
 *.db-wal
 *.db-shm
 *.db-journal
 *.sqlite3
+.venv/
+venv/
+.env
 .DS_Store
-.vscode/
-.idea/
+docs/blog/
+docs/grant/
+dist_verify/
+research/
+research/sfs_sr315/
 webpage/
-website/
-receipts/
-.parachute/
-tests/adversarial/v031/
-tests/adversarial/traces/
+**/sfs_sr315/
+.claude/
+
+# Private / internal, never publish
+*.tape
+.regwatch/
+scripts/regwatch*
+.shipped/
+.v0*_watch/
+application_*.pdf
+outbound_*.md
+site.py.live
+
+# CodeGraph index (local dev tool, not part of the repo)
+.codegraph/
+
+# Personal local tooling — distiller, offload store, SUSE demo container,
+# rootfs, dev signing keys. Never published with Vaara.
+tools/
 keys/
+
+# ...but the conformance-vector keys MUST ship so an independent party can
+# verify the published fixtures from a clean checkout. Publish the public
+# keys + the test-only HMAC secret used to sign the vectors; keep private
+# signing keys out.
 !tests/vectors/*/keys/
 tests/vectors/*/keys/*_private.pem
+
+# Bench output (PAIR runs, dist-shift, vLLM logs). Reproducible by rerun.
+tests/adversarial/v031/
+.parachute/
+claude-code-audit.db
+
+# Local scratch (per STATE.md)
+STATE.md
+STATE.draft.md
+tools/offload/state_archive/
+.application_*.md
+.outbound_*.md
+.commit_msg_*.txt
+.pr_body_*.md
+.issue_body_*.md
+.comment_body_*.md
+
+# Private scratch drafts (replies, research, proposals, BD) — never publish
+.recruiter_*
+.reply_*
+.research_*
+.proposal_*
+.tier1_*
+.brand_book.md
+
+# One-off ops/deploy scratch scripts and payloads — never publish
+.apply_*.sh
+.fix_*.sh
+.deploy_*.sh
+.restart_*.sh
+.style_*.sh
+.pr_create_*.sh
+.pr_comment_*.md
+.tag_payload.json
+.gen_evidence_pair.py
+.tmp_*.py
+
+# Local marketing site, generated runtime output, bench traces, local MCP
+# config — all reproducible or machine-local, never part of the repo.
+website/
+receipts/
+tests/adversarial/traces/
+.mcp.json
+/package-lock.json
+# Empty harness/sandbox bind-mount, not a real submodule manifest
+.gitmodules
+
+# Scratch PR/comment/thread drafts and one-off HTML exports — never publish
+.pr_*_body.md
+.pr*_thread.txt
+.mcp_*_comment.md
+.vaara_*.html
+
+# Stray shell/editor env dotfiles (not part of the repo)
+.vscode
+.bashrc
+.bash_profile
+.zshrc
+.zprofile
+.profile
+.gitconfig
+.ripgreprc
+.idea
+.idea/
+.vscode/
+
+# developer-local site source and scratch directories (never published)
+.vaara-site/
+.local-brain/
+
+# Local-only working dirs and docs that live in the workspace but must never
+# be published: competitive intel and cloned competitor repos, the private
+# file-exchange drop, Serena/tooling caches, reference material (PDFs), local
+# operating rules, and dated local audit notes. None are tracked; these rules
+# exist so an accidental `git add -A` cannot stage them.
+.intel/
+.shared/
+.serena/
+.reference/
+CLAUDE.md
+/AUDIT-*.md
+
+# Swift build artifacts for the macOS menu-bar app
+clients/macos/.build/
+clients/macos/dist/
