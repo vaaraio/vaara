@@ -37,7 +37,7 @@ struct Palette {
 
 /// Bump on every source change; shown in the footer so a stale build is
 /// visible at a glance instead of masquerading as a bug.
-let BUILD_STAMP = "b37 · 2026-07-22"
+let BUILD_STAMP = "b38 · 2026-07-22"
 
 struct ContentView: View {
     @ObservedObject var model: GateModel
@@ -53,6 +53,15 @@ struct ContentView: View {
 
     private var dark: Bool { model.config.appearance != "light" }
     private var p: Palette { dark ? .dark : .light }
+
+    /// Cap scrollable panes to the real screen height so the popover never
+    /// grows past the bottom of the display (which pushed the footer tabs
+    /// off-screen on short/low-resolution screens). Leave room for the
+    /// header, footer, and the menu bar itself.
+    private var paneMaxHeight: CGFloat {
+        let screenH = NSScreen.main?.visibleFrame.height ?? 800
+        return max(220, screenH - 200)
+    }
 
     var body: some View {
         Group {
@@ -210,7 +219,7 @@ struct ContentView: View {
                     }
                     .padding(.vertical, 8)
                 }
-                .frame(maxHeight: 560)
+                .frame(maxHeight: paneMaxHeight)
             }
         }
     }
@@ -291,7 +300,7 @@ struct ContentView: View {
             }
             .padding(.vertical, 8)
         }
-        .frame(maxHeight: 560)
+        .frame(maxHeight: paneMaxHeight)
     }
 
     // MARK: agent detail — who behaved
@@ -346,7 +355,7 @@ struct ContentView: View {
                     }
                     .padding(.vertical, 6)
                 }
-                .frame(maxHeight: 420)
+                .frame(maxHeight: paneMaxHeight)
             }
         }
     }
@@ -439,7 +448,7 @@ struct ContentView: View {
             .padding(20)
             .frame(maxWidth: .infinity, alignment: .leading)
         }
-        .frame(maxHeight: 520)
+        .frame(maxHeight: paneMaxHeight)
     }
 
     private func clientRow(_ client: MCPClient) -> some View {
@@ -679,7 +688,7 @@ struct ContentView: View {
         .padding(20)
         .frame(maxWidth: .infinity, alignment: .leading)
         }
-        .frame(maxHeight: 520)
+        .frame(maxHeight: paneMaxHeight)
     }
 
     private var customRow: some View {
