@@ -7,6 +7,14 @@ and this project follows [Semantic Versioning](https://semver.org/spec/v2.0.0.ht
 
 ## [Unreleased]
 
+## [1.41.0] - 2026-07-22
+
+- Qualified timestamp anchoring works with any EU-qualified timestamping
+  provider chosen from the EU trusted lists. The provider endpoint is
+  operator configuration everywhere: `VAARA_ANCHOR_TSA_URL` on the server
+  (since 1.39.0) and `VAARA_DEMO_TSA_URL` for the end-to-end DSS
+  validation script.
+
 ## [1.40.0] - 2026-07-22
 
 The Article 50 evidence update, built against a full read of the Commission
