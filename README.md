@@ -24,6 +24,12 @@
 
 Your AI agent transferred the funds, wrote the file, called the tool. Later, someone who does not trust you asks you to prove exactly what it did and why: a regulator, an auditor, a customer after an incident. Your own logs will not settle it, because you could have edited them.
 
+<p align="center">
+  <video src="https://raw.githubusercontent.com/vaaraio/vaara/main/docs/vaara-v150-launch.mp4" width="720" controls muted playsinline></video>
+</p>
+
+<p align="center"><a href="https://github.com/vaaraio/vaara/releases/tag/v1.50.0">Watch the launch video</a> &middot; Vaara for macOS is in public beta</p>
+
 ## Quick start
 
 ```bash
