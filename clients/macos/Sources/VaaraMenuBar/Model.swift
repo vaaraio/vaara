@@ -211,6 +211,11 @@ final class GateModel: ObservableObject {
 
     func start() {
         for path in config.db_paths { cursors[path] = maxSeq(path) }  // start at now
+        // Auto-add every Vaara trail under ~/.vaara on launch, so a normal
+        // user never has to hunt for or hand-add the audit DB. The default
+        // claude-code trail plus any MCP-proxy or older-install trails all
+        // light up on open. Explicit adds/removes still stick via config.
+        discoverTrails()
         UNUserNotificationCenter.current()
             .requestAuthorization(options: [.alert, .sound]) { _, _ in }
         timer = Timer.scheduledTimer(withTimeInterval: 2, repeats: true) { [weak self] _ in
