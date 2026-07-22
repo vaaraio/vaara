@@ -333,16 +333,36 @@ final class GateModel: ObservableObject {
         customThresholds = nil
     }
 
-    // MARK: - SQLite (read-only)
+    // MARK: - SQLite (read-only in intent, but WAL-aware)
 
+    /// Open a watched trail for reading. The engine writes in WAL mode, and
+    /// a pure SQLITE_OPEN_READONLY connection cannot read committed-but-
+    /// uncheckpointed rows from the -wal sidecar (it needs to build the
+    /// -shm shared index, which read-only forbids). So the newest events
+    /// stay invisible until a checkpoint happens on the writer's side.
+    ///
+    /// We open read-write so SQLite can attach the WAL, then immediately set
+    /// PRAGMA query_only = ON: the connection can never modify the trail, but
+    /// it sees every committed row. If the file is genuinely not writable, we
+    /// fall back to a plain read-only open (better a slightly stale view than
+    /// none).
     private func withDB<T>(_ path: String, _ body: (OpaquePointer) -> T) -> T? {
         var db: OpaquePointer?
-        guard sqlite3_open_v2(path, &db, SQLITE_OPEN_READONLY, nil) == SQLITE_OK,
-              let db else {
-            if db != nil { sqlite3_close(db) }
-            return nil
+        var flags: Int32 = SQLITE_OPEN_READWRITE
+        if sqlite3_open_v2(path, &db, flags, nil) != SQLITE_OK {
+            if db != nil { sqlite3_close(db); db = nil }
+            flags = SQLITE_OPEN_READONLY
+            guard sqlite3_open_v2(path, &db, flags, nil) == SQLITE_OK else {
+                if db != nil { sqlite3_close(db) }
+                return nil
+            }
         }
+        guard let db else { return nil }
         defer { sqlite3_close(db) }
+        if flags == SQLITE_OPEN_READWRITE {
+            sqlite3_exec(db, "PRAGMA query_only = ON", nil, nil, nil)
+        }
+        sqlite3_busy_timeout(db, 2000)
         return body(db)
     }
 
