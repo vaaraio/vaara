@@ -37,7 +37,7 @@ struct Palette {
 
 /// Bump on every source change; shown in the footer so a stale build is
 /// visible at a glance instead of masquerading as a bug.
-let BUILD_STAMP = "b36 · 2026-07-22"
+let BUILD_STAMP = "b37 · 2026-07-22"
 
 struct ContentView: View {
     @ObservedObject var model: GateModel
@@ -373,6 +373,7 @@ struct ContentView: View {
     // MARK: setup — the app wires the AIs in itself
 
     private var setupView: some View {
+        ScrollView {
             VStack(alignment: .leading, spacing: 16) {
                 VStack(alignment: .leading, spacing: 8) {
                     sectionLabelPlain("ENGINE")
@@ -437,6 +438,8 @@ struct ContentView: View {
             }
             .padding(20)
             .frame(maxWidth: .infinity, alignment: .leading)
+        }
+        .frame(maxHeight: 520)
     }
 
     private func clientRow(_ client: MCPClient) -> some View {
@@ -486,6 +489,7 @@ struct ContentView: View {
     private var enterprise: Bool { model.config.user_level == "enterprise" }
 
     private var settings: some View {
+        ScrollView {
         VStack(alignment: .leading, spacing: 18) {
             VStack(alignment: .leading, spacing: 8) {
                 sectionLabelPlain("SETTINGS FOR")
@@ -598,8 +602,8 @@ struct ContentView: View {
             }
 
             if enterprise {
-            VStack(alignment: .leading, spacing: 8) {
-                sectionLabelPlain("WATCHING")
+            DisclosureGroup {
+              VStack(alignment: .leading, spacing: 8) {
                 ForEach(model.config.db_paths, id: \.self) { path in
                     HStack {
                         Text(path)
@@ -635,10 +639,15 @@ struct ContentView: View {
                         .font(.system(size: 10))
                         .foregroundStyle(p.ghost)
                 }
+              }
+              .padding(.top, 6)
+            } label: {
+                sectionLabelPlain("WATCHED TRAILS (\(model.config.db_paths.count))")
             }
+            .tint(p.faint)
 
-            VStack(alignment: .leading, spacing: 8) {
-                sectionLabelPlain("APPROVALS FOLDER")
+            DisclosureGroup {
+              VStack(alignment: .leading, spacing: 8) {
                 Text(model.config.approvals_dir ?? "~/.vaara/approvals (default)")
                     .font(.system(size: 11, design: .monospaced))
                     .foregroundStyle(p.faint)
@@ -659,11 +668,18 @@ struct ContentView: View {
                      + "for bridge or multi-machine setups.")
                     .font(.system(size: 9))
                     .foregroundStyle(p.ghost)
+              }
+              .padding(.top, 6)
+            } label: {
+                sectionLabelPlain("APPROVALS FOLDER")
             }
+            .tint(p.faint)
             }
         }
         .padding(20)
         .frame(maxWidth: .infinity, alignment: .leading)
+        }
+        .frame(maxHeight: 520)
     }
 
     private var customRow: some View {
