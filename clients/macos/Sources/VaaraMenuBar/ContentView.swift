@@ -37,7 +37,7 @@ private struct Palette {
 
 /// Bump on every source change; shown in the footer so a stale build is
 /// visible at a glance instead of masquerading as a bug.
-let BUILD_STAMP = "b10 · 2026-07-22"
+let BUILD_STAMP = "b11 · 2026-07-22"
 
 struct ContentView: View {
     @ObservedObject var model: GateModel
@@ -69,7 +69,7 @@ struct ContentView: View {
             Rectangle().fill(p.hairline).frame(height: 1)
             footer
         }
-        .frame(width: 340)
+        .frame(width: 400)
         .background(p.wash)
         .background(.ultraThinMaterial)
         .environment(\.colorScheme, dark ? .dark : .light)
@@ -83,17 +83,17 @@ struct ContentView: View {
             if events.isEmpty {
                 VStack(spacing: 10) {
                     Text("The watched trails hold no interventions.")
-                        .font(.system(size: 11))
+                        .font(.system(size: 12))
                         .foregroundStyle(p.ghost)
                     Text("Other tools (an MCP proxy, an older install)\nkeep their own trails.")
-                        .font(.system(size: 10))
+                        .font(.system(size: 11))
                         .foregroundStyle(p.ghost)
                         .multilineTextAlignment(.center)
                     Button("Find trails in ~/.vaara") {
                         _ = model.discoverTrails()
                     }
                     .buttonStyle(.plain)
-                    .font(.system(size: 10))
+                    .font(.system(size: 11))
                     .foregroundStyle(p.faint)
                 }
                 .frame(maxWidth: .infinity)
@@ -106,7 +106,7 @@ struct ContentView: View {
                     }
                     .padding(.vertical, 8)
                 }
-                .frame(maxHeight: 380)
+                .frame(maxHeight: 440)
             }
         }
     }
@@ -122,10 +122,10 @@ struct ContentView: View {
                 .offset(y: -1)
             VStack(alignment: .leading, spacing: 3) {
                 Text(model.state.label)
-                    .font(.system(size: 22, weight: .light))
+                    .font(.system(size: 24, weight: .light))
                     .foregroundStyle(p.ink)
                 Text(model.state.detail)
-                    .font(.system(size: 11))
+                    .font(.system(size: 12))
                     .foregroundStyle(p.faint)
             }
             Spacer()
@@ -158,24 +158,24 @@ struct ContentView: View {
                 if model.feed.isEmpty && model.agents.isEmpty && model.history().isEmpty {
                     VStack(spacing: 12) {
                         Text("Nothing is governed yet.")
-                            .font(.system(size: 12))
+                            .font(.system(size: 13))
                             .foregroundStyle(p.faint)
                         Text("Open Setup, point your AI tools through\nVaara, and their moves show up here.")
-                            .font(.system(size: 10.5))
+                            .font(.system(size: 11.5))
                             .foregroundStyle(p.ghost)
                             .multilineTextAlignment(.center)
                         Button("Open Setup") {
                             withAnimation(.easeInOut(duration: 0.15)) { screen = .setup }
                         }
                         .buttonStyle(.plain)
-                        .font(.system(size: 11, weight: .medium))
+                        .font(.system(size: 12, weight: .medium))
                         .foregroundStyle(GateState.green.color)
                     }
                     .frame(maxWidth: .infinity)
                     .padding(.vertical, 32)
                 } else if model.feed.isEmpty {
                     Text("No interventions yet.\nAllowed moves pass in silence.")
-                        .font(.system(size: 11))
+                        .font(.system(size: 12))
                         .foregroundStyle(p.ghost)
                         .multilineTextAlignment(.center)
                         .frame(maxWidth: .infinity)
@@ -187,7 +187,7 @@ struct ContentView: View {
             }
             .padding(.vertical, 8)
         }
-        .frame(maxHeight: 360)
+        .frame(maxHeight: 420)
     }
 
     // MARK: agent detail — who behaved
@@ -198,14 +198,14 @@ struct ContentView: View {
                 Button {
                     withAnimation(.easeInOut(duration: 0.15)) { selectedAgent = nil }
                 } label: {
-                    Image(systemName: "chevron.left").font(.system(size: 11, weight: .medium))
+                    Image(systemName: "chevron.left").font(.system(size: 12, weight: .medium))
                 }
                 .buttonStyle(.plain)
                 .foregroundStyle(p.faint)
                 Circle().fill(agent.state.color).frame(width: 8, height: 8)
                     .shadow(color: agent.state.color.opacity(0.55), radius: 5)
                 Text(agent.id)
-                    .font(.system(size: 15, weight: .light))
+                    .font(.system(size: 16, weight: .light))
                     .foregroundStyle(p.ink)
                     .lineLimit(1).truncationMode(.middle)
                 Spacer()
@@ -220,7 +220,7 @@ struct ContentView: View {
                 stat(agent.denied, "denied", GateState.red.color)
                 Spacer()
                 Text(agent.lastSeen, format: .dateTime.hour().minute())
-                    .font(.system(size: 10, design: .monospaced))
+                    .font(.system(size: 11, design: .monospaced))
                     .foregroundStyle(p.ghost)
             }
             .padding(.horizontal, 20)
@@ -231,7 +231,7 @@ struct ContentView: View {
             let events = model.agentInterventions(agent.id)
             if events.isEmpty {
                 Text("Nothing was flagged for this agent.")
-                    .font(.system(size: 11))
+                    .font(.system(size: 12))
                     .foregroundStyle(p.ghost)
                     .frame(maxWidth: .infinity)
                     .padding(.vertical, 36)
@@ -242,7 +242,7 @@ struct ContentView: View {
                     }
                     .padding(.vertical, 6)
                 }
-                .frame(maxHeight: 280)
+                .frame(maxHeight: 320)
             }
         }
     }
@@ -252,13 +252,13 @@ struct ContentView: View {
             Text("\(n)")
                 .font(.system(size: 13, weight: .medium, design: .monospaced))
                 .foregroundStyle(n > 0 ? color : p.ghost)
-            Text(label).font(.system(size: 10)).foregroundStyle(p.faint)
+            Text(label).font(.system(size: 11)).foregroundStyle(p.faint)
         }
     }
 
     private func sectionLabel(_ text: String) -> some View {
         Text(text)
-            .font(.system(size: 9, weight: .medium))
+            .font(.system(size: 10, weight: .medium))
             .tracking(1.2)
             .foregroundStyle(p.ghost)
             .padding(.horizontal, 20)
@@ -280,7 +280,7 @@ struct ContentView: View {
                         Text(engine.ok
                              ? "vaara found: \(engine.vaaraPath ?? "")"
                              : "vaara not found. Install: brew install vaaraio/tap/vaara")
-                            .font(.system(size: 10, design: .monospaced))
+                            .font(.system(size: 11, design: .monospaced))
                             .foregroundStyle(p.faint)
                             .lineLimit(1).truncationMode(.middle)
                     }
@@ -293,7 +293,7 @@ struct ContentView: View {
                     }
                     if clients.filter(\.exists).isEmpty {
                         Text("No MCP client configs found.")
-                            .font(.system(size: 10))
+                            .font(.system(size: 11))
                             .foregroundStyle(p.ghost)
                     }
                 }
@@ -301,7 +301,7 @@ struct ContentView: View {
                 Text("Govern rewrites the client's MCP servers to run through "
                      + "vaara-mcp-proxy. The original config is backed up first "
                      + "and Restore puts it back. Restart the client to apply.")
-                    .font(.system(size: 9))
+                    .font(.system(size: 10))
                     .foregroundStyle(p.ghost)
 
                 Button("Rescan") {
@@ -309,12 +309,12 @@ struct ContentView: View {
                     clients = SetupScanner.scan()
                 }
                 .buttonStyle(.plain)
-                .font(.system(size: 10))
+                .font(.system(size: 11))
                 .foregroundStyle(p.faint)
             }
             .padding(20)
         }
-        .frame(maxHeight: 380)
+        .frame(maxHeight: 440)
     }
 
     private func clientRow(_ client: MCPClient) -> some View {
@@ -325,14 +325,14 @@ struct ContentView: View {
                       : GateState.yellow.color)
                 .frame(width: 7, height: 7)
             VStack(alignment: .leading, spacing: 1) {
-                Text(client.id).font(.system(size: 11.5)).foregroundStyle(p.ink)
+                Text(client.id).font(.system(size: 12.5)).foregroundStyle(p.ink)
                 Text(client.ungoverned == 0
                      ? (client.governed > 0
                         ? "\(client.governed) server\(client.governed == 1 ? "" : "s") governed"
                         : "no MCP servers configured")
                      : "\(client.ungoverned) ungoverned server\(client.ungoverned == 1 ? "" : "s")"
                        + (client.governed > 0 ? ", \(client.governed) governed" : ""))
-                    .font(.system(size: 9.5))
+                    .font(.system(size: 10.5))
                     .foregroundStyle(p.ghost)
             }
             Spacer()
@@ -342,7 +342,7 @@ struct ContentView: View {
                     clients = SetupScanner.scan()
                 }
                 .buttonStyle(.plain)
-                .font(.system(size: 10, weight: .medium))
+                .font(.system(size: 11, weight: .medium))
                 .foregroundStyle(GateState.green.color)
             }
             if client.hasBackup {
@@ -351,7 +351,7 @@ struct ContentView: View {
                     clients = SetupScanner.scan()
                 }
                 .buttonStyle(.plain)
-                .font(.system(size: 10))
+                .font(.system(size: 11))
                 .foregroundStyle(p.ghost)
             }
         }
@@ -380,7 +380,7 @@ struct ContentView: View {
                      : model.config.user_level == "professional"
                      ? "Adds thresholds and tuning."
                      : "Adds multiple trails and every control.")
-                    .font(.system(size: 9.5))
+                    .font(.system(size: 10.5))
                     .foregroundStyle(p.ghost)
             }
 
@@ -397,7 +397,7 @@ struct ContentView: View {
                 Text(model.enforcementMode == "watch"
                      ? "Recording only. Nothing gets blocked."
                      : "Enforcing. Deny decisions stop the call.")
-                    .font(.system(size: 9.5))
+                    .font(.system(size: 10.5))
                     .foregroundStyle(p.ghost)
             }
 
@@ -425,7 +425,7 @@ struct ContentView: View {
             if pro {
                 Toggle(isOn: $model.config.menubar_graph) {
                     Text("Activity graph in the menu bar")
-                        .font(.system(size: 12)).foregroundStyle(p.ink)
+                        .font(.system(size: 13)).foregroundStyle(p.ink)
                 }
                 .toggleStyle(.switch)
                 .controlSize(.mini)
@@ -446,11 +446,11 @@ struct ContentView: View {
                 HStack(spacing: 12) {
                     Button("Check for updates") { model.checkForUpdates() }
                         .buttonStyle(.plain)
-                        .font(.system(size: 10))
+                        .font(.system(size: 11))
                         .foregroundStyle(p.ink.opacity(0.7))
                     if let status = model.updateStatus {
                         Text(status)
-                            .font(.system(size: 9, design: .monospaced))
+                            .font(.system(size: 10, design: .monospaced))
                             .foregroundStyle(p.ghost)
                             .lineLimit(2)
                     }
@@ -463,7 +463,7 @@ struct ContentView: View {
                 ForEach(model.config.db_paths, id: \.self) { path in
                     HStack {
                         Text(path)
-                            .font(.system(size: 10, design: .monospaced))
+                            .font(.system(size: 11, design: .monospaced))
                             .foregroundStyle(p.faint)
                             .lineLimit(1)
                             .truncationMode(.head)
@@ -487,12 +487,12 @@ struct ContentView: View {
                     }
                 }
                 .buttonStyle(.plain)
-                .font(.system(size: 10))
+                .font(.system(size: 11))
                 .foregroundStyle(p.ink.opacity(0.7))
                 if let n = discoveredCount {
                     Text(n == 0 ? "No new trails found."
                                 : "Added \(n) trail\(n == 1 ? "" : "s").")
-                        .font(.system(size: 9))
+                        .font(.system(size: 10))
                         .foregroundStyle(p.ghost)
                 }
             }
@@ -500,7 +500,7 @@ struct ContentView: View {
         }
         .padding(20)
         }
-        .frame(maxHeight: 440)
+        .frame(maxHeight: 480)
     }
 
     private var customRow: some View {
@@ -522,7 +522,7 @@ struct ContentView: View {
                         .background(Circle().fill(active ? model.state.color : .clear))
                         .frame(width: 7, height: 7)
                     Text("Custom")
-                        .font(.system(size: 11, weight: active ? .medium : .regular))
+                        .font(.system(size: 12, weight: active ? .medium : .regular))
                         .foregroundStyle(active ? p.ink : p.faint)
                 }
                 .contentShape(Rectangle())
@@ -536,7 +536,7 @@ struct ContentView: View {
                         get: { escalate },
                         set: { model.setCustomThresholds(escalate: $0, deny: max($0, deny)) }),
                     in: 0...1, step: 0.05)
-                .font(.system(size: 9, design: .monospaced))
+                .font(.system(size: 10, design: .monospaced))
                 .foregroundStyle(active ? p.faint : p.ghost)
                 .controlSize(.mini)
             Stepper(String(format: "deny %.2f", deny),
@@ -544,7 +544,7 @@ struct ContentView: View {
                         get: { deny },
                         set: { model.setCustomThresholds(escalate: min(escalate, $0), deny: $0) }),
                     in: 0...1, step: 0.05)
-                .font(.system(size: 9, design: .monospaced))
+                .font(.system(size: 10, design: .monospaced))
                 .foregroundStyle(active ? p.faint : p.ghost)
                 .controlSize(.mini)
 
@@ -557,7 +557,7 @@ struct ContentView: View {
                     Text("\(stats.denied)")
                         .foregroundStyle(GateState.red.color.opacity(0.8))
                 }
-                .font(.system(size: 10, design: .monospaced))
+                .font(.system(size: 11, design: .monospaced))
             }
         }
         .padding(.vertical, 4)
@@ -577,15 +577,15 @@ struct ContentView: View {
                 VStack(alignment: .leading, spacing: 1) {
                     HStack(spacing: 6) {
                         Text(preset.id.capitalized)
-                            .font(.system(size: 11, weight: active ? .medium : .regular))
+                            .font(.system(size: 12, weight: active ? .medium : .regular))
                             .foregroundStyle(active ? p.ink : p.faint)
                         Text(String(format: "esc %.2f · deny %.2f",
                                     preset.escalate, preset.deny))
-                            .font(.system(size: 9, design: .monospaced))
+                            .font(.system(size: 10, design: .monospaced))
                             .foregroundStyle(p.ghost)
                     }
                     Text(preset.blurb)
-                        .font(.system(size: 9))
+                        .font(.system(size: 10))
                         .foregroundStyle(p.ghost)
                 }
                 Spacer()
@@ -597,7 +597,7 @@ struct ContentView: View {
                     Text("\(stats.denied)")
                         .foregroundStyle(GateState.red.color.opacity(0.8))
                 }
-                .font(.system(size: 10, design: .monospaced))
+                .font(.system(size: 11, design: .monospaced))
             }
             .padding(.vertical, 4)
             .contentShape(Rectangle())
@@ -607,7 +607,7 @@ struct ContentView: View {
 
     private func sectionLabelPlain(_ text: String) -> some View {
         Text(text)
-            .font(.system(size: 9, weight: .medium))
+            .font(.system(size: 10, weight: .medium))
             .tracking(1.2)
             .foregroundStyle(p.ghost)
     }
@@ -636,17 +636,17 @@ struct ContentView: View {
                 model.config.appearance = dark ? "light" : "dark"
             } label: {
                 Image(systemName: dark ? "sun.max" : "moon")
-                    .font(.system(size: 11))
+                    .font(.system(size: 12))
             }
             .help(dark ? "Switch to light" : "Switch to dark")
             Spacer()
             Text(BUILD_STAMP)
-                .font(.system(size: 9, design: .monospaced))
+                .font(.system(size: 10, design: .monospaced))
                 .foregroundStyle(p.ghost)
             Button("Quit") { NSApp.terminate(nil) }
         }
         .buttonStyle(.plain)
-        .font(.system(size: 11))
+        .font(.system(size: 12))
         .foregroundStyle(p.faint)
         .padding(.horizontal, 20)
         .padding(.vertical, 12)
@@ -674,20 +674,20 @@ private struct AgentRow: View {
                 .frame(width: 7, height: 7)
                 .shadow(color: agent.state.color.opacity(0.5), radius: 4)
             Text(agent.id)
-                .font(.system(size: 11.5))
+                .font(.system(size: 12.5))
                 .foregroundStyle(p.ink)
                 .lineLimit(1).truncationMode(.middle)
             Spacer()
             HStack(spacing: 8) {
                 if agent.denied > 0 {
-                    Text("\(agent.denied)").font(.system(size: 10, design: .monospaced))
+                    Text("\(agent.denied)").font(.system(size: 11, design: .monospaced))
                         .foregroundStyle(GateState.red.color)
                 }
                 if agent.escalated > 0 {
-                    Text("\(agent.escalated)").font(.system(size: 10, design: .monospaced))
+                    Text("\(agent.escalated)").font(.system(size: 11, design: .monospaced))
                         .foregroundStyle(GateState.yellow.color)
                 }
-                Text("\(agent.allowed)").font(.system(size: 10, design: .monospaced))
+                Text("\(agent.allowed)").font(.system(size: 11, design: .monospaced))
                     .foregroundStyle(p.ghost)
             }
             Image(systemName: "chevron.right")
@@ -714,23 +714,23 @@ private struct HistoryRow: View {
     var body: some View {
         HStack(spacing: 12) {
             Text(event.timestamp, format: .dateTime.day().month().hour().minute())
-                .font(.system(size: 9, design: .monospaced))
+                .font(.system(size: 10, design: .monospaced))
                 .foregroundStyle(p.ghost)
                 .frame(width: 78, alignment: .leading)
             Rectangle().fill(color).frame(width: 2, height: 22).cornerRadius(1)
             VStack(alignment: .leading, spacing: 1) {
                 Text(event.toolName)
-                    .font(.system(size: 11))
+                    .font(.system(size: 12))
                     .foregroundStyle(p.ink)
                     .lineLimit(1)
                     .truncationMode(.middle)
                 HStack(spacing: 6) {
                     Text(event.verdict.uppercased())
-                        .font(.system(size: 9, weight: .semibold))
+                        .font(.system(size: 10, weight: .semibold))
                         .foregroundStyle(color)
                     if let risk = event.riskScore {
                         Text(String(format: "risk %.2f", risk))
-                            .font(.system(size: 9, design: .monospaced))
+                            .font(.system(size: 10, design: .monospaced))
                             .foregroundStyle(p.ghost)
                     }
                 }
@@ -754,22 +754,22 @@ private struct FeedRow: View {
     var body: some View {
         HStack(spacing: 12) {
             Text(event.timestamp, format: .dateTime.hour().minute())
-                .font(.system(size: 10, design: .monospaced))
+                .font(.system(size: 11, design: .monospaced))
                 .foregroundStyle(p.ghost)
             Rectangle().fill(color).frame(width: 2, height: 22).cornerRadius(1)
             VStack(alignment: .leading, spacing: 1) {
                 Text(event.toolName)
-                    .font(.system(size: 11))
+                    .font(.system(size: 12))
                     .foregroundStyle(p.ink)
                     .lineLimit(1)
                     .truncationMode(.middle)
                 HStack(spacing: 6) {
                     Text(event.verdict.uppercased())
-                        .font(.system(size: 9, weight: .semibold))
+                        .font(.system(size: 10, weight: .semibold))
                         .foregroundStyle(color)
                     if let risk = event.riskScore {
                         Text(String(format: "risk %.2f", risk))
-                            .font(.system(size: 9, design: .monospaced))
+                            .font(.system(size: 10, design: .monospaced))
                             .foregroundStyle(p.ghost)
                     }
                 }
