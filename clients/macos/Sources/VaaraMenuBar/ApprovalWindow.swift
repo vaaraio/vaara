@@ -111,6 +111,7 @@ struct NotchApprovalView: View {
     let pending: PendingApproval
     let onDecision: (Bool) -> Void
     let width: CGFloat
+    var topRadius: CGFloat = 0   // 0 fuses to a notch; rounded off-notch
 
     private let ink = Color(red: 0.90, green: 0.92, blue: 0.91)
     private let faint = Color(red: 0.60, green: 0.64, blue: 0.62)
@@ -159,10 +160,10 @@ struct NotchApprovalView: View {
         // itself lowering. Only the bottom corners round.
         .background(Color.black)
         .clipShape(.rect(
-            topLeadingRadius: 0,
+            topLeadingRadius: topRadius,
             bottomLeadingRadius: 22,
             bottomTrailingRadius: 22,
-            topTrailingRadius: 0))
+            topTrailingRadius: topRadius))
         .environment(\.colorScheme, .dark)
     }
 }
@@ -214,7 +215,7 @@ final class ApprovalWindowManager {
                 pending: pending,
                 onDecision: { [weak self] ok in
                     self?.model.resolveApproval(pending.actionID, approve: ok) },
-                width: 260))
+                width: 260, topRadius: 20))
             panel.contentView = host
             panel.setContentSize(host.fittingSize)
             panel.center(); panel.orderFrontRegardless(); return
@@ -224,26 +225,30 @@ final class ApprovalWindowManager {
         // buttons stay readable (and used as-is on no-notch displays).
         // It slides down as a unit; it does not expand.
         let notch = notchSize(screen)
-        let cardWidth = notch.width > 0 ? max(notch.width, 200) : 220
+        let hasNotch = notch.height > 0
+        let cardWidth = hasNotch ? max(notch.width, 200) : 220
 
         let host = NSHostingView(rootView: NotchApprovalView(
             pending: pending,
             onDecision: { [weak self] ok in
                 self?.model.resolveApproval(pending.actionID, approve: ok) },
-            width: cardWidth))
+            width: cardWidth,
+            topRadius: hasNotch ? 0 : 20))
         panel.contentView = host
         let size = host.fittingSize
 
         let full = screen.frame
         let x = full.midX - size.width / 2
         // Start with the top edge at the very top of the screen (the card
-        // sits in the notch), then lower it so it clears the menu bar and
-        // floats just below, as if the notch itself slid down.
+        // tucked in the notch), then lower it into place.
         let startY = full.maxY - size.height
-        // Rest with the top edge flush to the menu-bar bottom, no gap, so
-        // the card reads as extending straight down from the notch rather
-        // than floating below it.
-        let restY = screen.visibleFrame.maxY - size.height
+        // Rest so the card's TOP edge sits at the notch's bottom edge, with
+        // a 2pt overlap up into it to kill any seam. The menu bar is a touch
+        // taller than the notch, so resting at visibleFrame.maxY left a
+        // small gap; anchoring to the notch height itself closes it. Off
+        // notch, rest just below the menu bar instead.
+        let restTop = hasNotch ? full.maxY - notch.height + 2 : screen.visibleFrame.maxY
+        let restY = restTop - size.height
 
         panel.setFrame(NSRect(x: x, y: startY, width: size.width, height: size.height),
                        display: true)
