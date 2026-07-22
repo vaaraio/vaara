@@ -2,25 +2,18 @@
 // an optional live activity sparkline beside it. No numbers anywhere;
 // the bar heights are the pulse, the colors are the verdicts.
 
-import AppKit
 import SwiftUI
 
 @main
 struct VaaraApp: App {
     @StateObject private var model = GateModel()
-    @State private var approvals: ApprovalWindowManager?
 
     var body: some Scene {
         MenuBarExtra {
             ContentView(model: model)
-                .onAppear {
-                    model.start()
-                    if approvals == nil {
-                        approvals = ApprovalWindowManager(model: model)
-                    }
-                }
+                .onAppear { model.start() }
         } label: {
-            Image(nsImage: menuImage(model))
+            Image(nsImage: menuImage())
         }
         .menuBarExtraStyle(.window)
     }
@@ -50,7 +43,7 @@ struct VaaraApp: App {
 
     /// The full label: mark, plus (when enabled) a 12-bar sparkline of
     /// the last two minutes of activity.
-    private func menuImage(_ model: GateModel) -> NSImage {
+    private func menuImage() -> NSImage {
         let mark = markImage(for: model.state)
         let graphOn = model.config.menubar_graph
         let buckets = model.buckets

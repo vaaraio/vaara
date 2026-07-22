@@ -16,7 +16,7 @@ extension GateState {
     }
 }
 
-struct Palette {
+private struct Palette {
     let ink: Color, faint: Color, ghost: Color, hairline: Color, wash: Color
 
     // Dark mirrors the webpage: --bg #0F1417, --ink #DEE4E1,
@@ -37,7 +37,7 @@ struct Palette {
 
 /// Bump on every source change; shown in the footer so a stale build is
 /// visible at a glance instead of masquerading as a bug.
-let BUILD_STAMP = "b39 · 2026-07-22"
+let BUILD_STAMP = "b40-diag (b21 UI) · 2026-07-22"
 
 struct ContentView: View {
     @ObservedObject var model: GateModel
@@ -53,15 +53,6 @@ struct ContentView: View {
 
     private var dark: Bool { model.config.appearance != "light" }
     private var p: Palette { dark ? .dark : .light }
-
-    /// Cap scrollable panes to the real screen height so the popover never
-    /// grows past the bottom of the display (which pushed the footer tabs
-    /// off-screen on short/low-resolution screens). Leave room for the
-    /// header, footer, and the menu bar itself.
-    private var paneMaxHeight: CGFloat {
-        let screenH = NSScreen.main?.visibleFrame.height ?? 800
-        return max(220, screenH - 200)
-    }
 
     var body: some View {
         Group {
@@ -219,7 +210,7 @@ struct ContentView: View {
                     }
                     .padding(.vertical, 8)
                 }
-                .frame(maxHeight: paneMaxHeight)
+                .frame(maxHeight: 560)
             }
         }
     }
@@ -300,7 +291,7 @@ struct ContentView: View {
             }
             .padding(.vertical, 8)
         }
-        .frame(maxHeight: paneMaxHeight)
+        .frame(maxHeight: 560)
     }
 
     // MARK: agent detail — who behaved
@@ -355,7 +346,7 @@ struct ContentView: View {
                     }
                     .padding(.vertical, 6)
                 }
-                .frame(maxHeight: paneMaxHeight)
+                .frame(maxHeight: 420)
             }
         }
     }
@@ -382,7 +373,6 @@ struct ContentView: View {
     // MARK: setup — the app wires the AIs in itself
 
     private var setupView: some View {
-        ScrollView {
             VStack(alignment: .leading, spacing: 16) {
                 VStack(alignment: .leading, spacing: 8) {
                     sectionLabelPlain("ENGINE")
@@ -447,8 +437,6 @@ struct ContentView: View {
             }
             .padding(20)
             .frame(maxWidth: .infinity, alignment: .leading)
-        }
-        .frame(maxHeight: paneMaxHeight)
     }
 
     private func clientRow(_ client: MCPClient) -> some View {
@@ -498,7 +486,6 @@ struct ContentView: View {
     private var enterprise: Bool { model.config.user_level == "enterprise" }
 
     private var settings: some View {
-        ScrollView {
         VStack(alignment: .leading, spacing: 18) {
             VStack(alignment: .leading, spacing: 8) {
                 sectionLabelPlain("SETTINGS FOR")
@@ -556,22 +543,6 @@ struct ContentView: View {
                 .labelsHidden()
             }
 
-            VStack(alignment: .leading, spacing: 8) {
-                sectionLabelPlain("APPROVAL POPUP")
-                Picker("", selection: $model.config.approval_style) {
-                    Text("Auto").tag("auto")
-                    Text("From notch").tag("notch")
-                    Text("Centered").tag("centered")
-                }
-                .pickerStyle(.segmented)
-                .labelsHidden()
-                Text("Auto drops from the notch on notched Macs, else "
-                     + "centered. Force one if you hide the notch "
-                     + "(e.g. BetterDisplay).")
-                    .font(.system(size: 9.5))
-                    .foregroundStyle(p.ghost)
-            }
-
             if pro {
                 Toggle(isOn: $model.config.menubar_graph) {
                     Text("Activity graph in the menu bar")
@@ -611,8 +582,8 @@ struct ContentView: View {
             }
 
             if enterprise {
-            DisclosureGroup {
-              VStack(alignment: .leading, spacing: 8) {
+            VStack(alignment: .leading, spacing: 8) {
+                sectionLabelPlain("WATCHING")
                 ForEach(model.config.db_paths, id: \.self) { path in
                     HStack {
                         Text(path)
@@ -648,15 +619,10 @@ struct ContentView: View {
                         .font(.system(size: 10))
                         .foregroundStyle(p.ghost)
                 }
-              }
-              .padding(.top, 6)
-            } label: {
-                sectionLabelPlain("WATCHED TRAILS (\(model.config.db_paths.count))")
             }
-            .tint(p.faint)
 
-            DisclosureGroup {
-              VStack(alignment: .leading, spacing: 8) {
+            VStack(alignment: .leading, spacing: 8) {
+                sectionLabelPlain("APPROVALS FOLDER")
                 Text(model.config.approvals_dir ?? "~/.vaara/approvals (default)")
                     .font(.system(size: 11, design: .monospaced))
                     .foregroundStyle(p.faint)
@@ -677,18 +643,11 @@ struct ContentView: View {
                      + "for bridge or multi-machine setups.")
                     .font(.system(size: 9))
                     .foregroundStyle(p.ghost)
-              }
-              .padding(.top, 6)
-            } label: {
-                sectionLabelPlain("APPROVALS FOLDER")
             }
-            .tint(p.faint)
             }
         }
         .padding(20)
         .frame(maxWidth: .infinity, alignment: .leading)
-        }
-        .frame(maxHeight: paneMaxHeight)
     }
 
     private var customRow: some View {
