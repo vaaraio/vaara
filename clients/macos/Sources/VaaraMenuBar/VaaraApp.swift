@@ -11,6 +11,7 @@ import SwiftUI
 /// window manager) would sit dead until the user happened to open the
 /// menu. applicationDidFinishLaunching always runs, so the gate watches
 /// and the approval HUD can raise itself with no interaction.
+@MainActor
 final class AppDelegate: NSObject, NSApplicationDelegate {
     let model = GateModel()
     private var approvalWindows: ApprovalWindowManager?
