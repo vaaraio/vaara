@@ -90,6 +90,31 @@ def test_hook_session_start_reports_and_discloses(tmp_path):
     assert json.loads(rows[0][0])["session_id"] == "sess-7"
 
 
+def test_hook_session_start_agent_profile_disclosure(tmp_path):
+    cfg_dir = tmp_path / ".vaara" / "claude-code"
+    cfg_dir.mkdir(parents=True)
+    (cfg_dir / "config.json").write_text(json.dumps({
+        "article50_statement": "You are interacting with an AI agent.",
+        "article50_on_behalf_of": "Example Oy",
+    }))
+    proc = _run_hook(
+        ["hook", "session-start"], {"session_id": "sess-8"}, tmp_path,
+    )
+    assert proc.returncode == 0, proc.stderr
+    assert "article50_disclosure=recorded" in proc.stderr
+
+    conn = sqlite3.connect(cfg_dir / "audit.db")
+    rows = conn.execute(
+        "SELECT data FROM audit_records WHERE tool_name = "
+        "'vaara.article50.disclosure' AND event_type = 'action_requested'"
+    ).fetchall()
+    assert len(rows) == 1
+    params = json.loads(rows[0][0])["parameters"]
+    assert params["profile"] == "art50-1-agent/v1"
+    assert params["on_behalf_of"] == "Example Oy"
+    assert params["step"] == "first_interaction"
+
+
 def test_hook_post_tool_use_never_fails(tmp_path):
     proc = _run_hook(
         ["hook", "post-tool-use"],

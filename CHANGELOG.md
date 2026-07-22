@@ -7,6 +7,47 @@ and this project follows [Semantic Versioning](https://semver.org/spec/v2.0.0.ht
 
 ## [Unreleased]
 
+## [1.40.0] - 2026-07-22
+
+The Article 50 evidence update, built against a full read of the Commission
+guidance on the Article 50 transparency obligations (C(2026) 5054 final,
+20 July 2026).
+
+- `record_agent_disclosure` records the Article 50(1) AI-agent disclosure the
+  guidance's paragraph 31 describes: the artificial-nature statement, the
+  person on whose behalf the agent acts (mandatory), the disclosure moment
+  (`first_interaction`, `authorisation`, `reporting`, `validation`,
+  `new_interaction`, plus `ai_output_received` from paragraph 31 and
+  `on_inquiry` from paragraph 40), an optional authority reference, and a
+  `parent_action_id` that threads the disclosure into the existing delegation
+  chain. No new wire format: the record is the same
+  `vaara.article50.disclosure` event, tagged `art50-1-agent/v1`, in the same
+  signed hash chain and exports.
+- `pin_attestation` binds an eIDAS-style attestation (footnote 21 of the
+  guidance) into the disclosure record by SHA-256 of the exact attestation
+  bytes, plus issuer and subject for JSON claims. Verifying the binding later
+  means hashing the presented attestation and comparing.
+- New CLI: `vaara trail record-disclosure` records a disclosure from the
+  command line. Generic paragraph records by default; `--on-behalf-of`
+  switches to the 50(1) agent profile, `--attestation FILE` pins an
+  attestation, and a conflicting `--paragraph` is rejected.
+- The Article 50 report gains a paragraph 31 section: counts per disclosure
+  moment, disclosures naming the principal, authority references, pinned
+  attestations, per-session step coverage, and the 50(5) timing check
+  (whether the `first_interaction` disclosure preceded the session's first
+  action). The export zip also carries `README_FOR_AUTHORITY.md`, a cover
+  note for the market surveillance officer receiving the package: what is
+  inside, how to verify it offline without trusting the operator, and what
+  it does and does not establish.
+- The Claude Code session-start hook upgrades its auto-disclosure to the
+  agent profile when `article50_on_behalf_of` is configured (config key or
+  `VAARA_PLUGIN_ARTICLE50_ON_BEHALF_OF`); without it the generic path is
+  unchanged.
+- Docs: `eu-ai-act-august-2026.md` cites the guidance and the hard
+  2 August 2026 date for 50(1); new `article50-code-of-practice.md` maps
+  where the signed trail sits next to the Code of Practice on Transparency
+  of AI-Generated Content for signatories and non-signatories.
+
 ## [1.39.0] - 2026-07-21
 
 - `POST /v1/anchor` on the reference server turns a receipt into an `rfc3161-eidas-qualified` anchor behind an inbound x402 payment gate. The gate is configured entirely from the environment and off by default: with `VAARA_X402_ENABLED` unset every request is admitted, so tests and self-hosters get the full pipeline for free. When enabled it answers `HTTP 402` with x402 payment requirements and admits a request only once a valid `X-PAYMENT` header settles through the configured facilitator (`VAARA_X402_FACILITATOR`); with no facilitator a presented payment cannot be settled and is refused rather than trusted, so an enabled gate never admits an unverified payment. Receiving wallet, network, asset, and price are set by the `VAARA_X402_*` variables.

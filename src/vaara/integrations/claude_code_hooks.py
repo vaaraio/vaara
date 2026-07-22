@@ -112,6 +112,19 @@ def article50_statement(cfg: dict) -> Optional[str]:
     return statement if isinstance(statement, str) and statement.strip() else None
 
 
+def article50_on_behalf_of(cfg: dict) -> Optional[str]:
+    """Principal the agent acts for (guidance C(2026) 5054 para 31).
+
+    When set, the session-start disclosure upgrades from a generic 50(1)
+    record to the agent-profile receipt naming the principal.
+    """
+    principal = (
+        os.environ.get("VAARA_PLUGIN_ARTICLE50_ON_BEHALF_OF")
+        or cfg.get("article50_on_behalf_of")
+    )
+    return principal if isinstance(principal, str) and principal.strip() else None
+
+
 def custom_thresholds(cfg: dict) -> Optional[tuple[float, float]]:
     raw = cfg.get("thresholds")
     if not isinstance(raw, dict):
@@ -459,13 +472,24 @@ def run_session_start() -> int:
     statement = article50_statement(cfg)
     if statement:
         try:
-            from vaara.audit.article50 import record_disclosure
+            principal = article50_on_behalf_of(cfg)
+            if principal:
+                from vaara.audit.article50 import record_agent_disclosure
 
-            record_disclosure(
-                _open_trail(cfg), paragraph="50(1)", statement=statement,
-                agent_id=agent_id(cfg), session_id=session_id,
-                channel="claude-code-session",
-            )
+                record_agent_disclosure(
+                    _open_trail(cfg), statement=statement,
+                    on_behalf_of=principal, step="first_interaction",
+                    agent_id=agent_id(cfg), session_id=session_id,
+                    channel="claude-code-session",
+                )
+            else:
+                from vaara.audit.article50 import record_disclosure
+
+                record_disclosure(
+                    _open_trail(cfg), paragraph="50(1)", statement=statement,
+                    agent_id=agent_id(cfg), session_id=session_id,
+                    channel="claude-code-session",
+                )
             status = "recorded"
         except Exception as exc:
             status = f"failed ({exc!r})"

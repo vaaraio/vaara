@@ -876,6 +876,82 @@ def _cmd_trail_export_article50(args: argparse.Namespace) -> int:
     return 0 if result.chain_intact else 1
 
 
+def _cmd_trail_record_disclosure(args: argparse.Namespace) -> int:
+    """Record an Article 50 disclosure event into the audit DB."""
+    try:
+        from vaara.audit.article50 import (
+            record_agent_disclosure,
+            record_disclosure,
+        )
+        from vaara.audit.sqlite_backend import SQLiteAuditBackend
+    except ImportError:
+        print(_INSTALL_HINT, file=sys.stderr)
+        return 2
+
+    db_path = Path(args.db).expanduser()
+    db_path.parent.mkdir(parents=True, exist_ok=True)
+    backend = SQLiteAuditBackend(db_path)
+    trail = backend.load_trail()
+    trail._on_record = backend.write_record
+
+    attestation = None
+    if args.attestation:
+        att_path = Path(args.attestation).expanduser()
+        if not att_path.exists():
+            print(f"attestation file not found: {att_path}", file=sys.stderr)
+            return 2
+        raw = att_path.read_bytes()
+        try:
+            parsed = json.loads(raw)
+            attestation = parsed if isinstance(parsed, dict) else raw
+        except (json.JSONDecodeError, UnicodeDecodeError):
+            attestation = raw
+
+    try:
+        if args.on_behalf_of:
+            if args.paragraph not in (None, "50(1)"):
+                print(
+                    "--on-behalf-of implies the 50(1) agent profile; "
+                    f"--paragraph {args.paragraph} conflicts",
+                    file=sys.stderr,
+                )
+                return 2
+            action_id = record_agent_disclosure(
+                trail,
+                statement=args.statement,
+                on_behalf_of=args.on_behalf_of,
+                step=args.step,
+                agent_id=args.agent_id,
+                session_id=args.session_id,
+                channel=args.channel,
+                subject=args.subject,
+                notice_sha256=args.notice_sha256,
+                authority_ref=args.authority_ref,
+                attestation=attestation,
+            )
+            shape = f"50(1) agent profile, step={args.step}"
+        else:
+            action_id = record_disclosure(
+                trail,
+                paragraph=args.paragraph or "50(1)",
+                statement=args.statement,
+                agent_id=args.agent_id,
+                session_id=args.session_id,
+                channel=args.channel,
+                subject=args.subject,
+                notice_sha256=args.notice_sha256,
+            )
+            shape = args.paragraph or "50(1)"
+    except ValueError as exc:
+        print(f"invalid disclosure: {exc}", file=sys.stderr)
+        return 2
+
+    print(f"Recorded Article {shape} disclosure")
+    print(f"  action_id: {action_id}")
+    print(f"  db:        {db_path}")
+    return 0
+
+
 def _cmd_trail_export_article12(args: argparse.Namespace) -> int:
     """Export a signed EU AI Act Article 12 regulator package from a trail."""
     try:
@@ -4490,6 +4566,60 @@ def build_parser() -> argparse.ArgumentParser:
              "trail stays whole.",
     )
     pa50.set_defaults(func=_cmd_trail_export_article50)
+
+    prd = tsub.add_parser(
+        "record-disclosure",
+        help="Record an EU AI Act Article 50 disclosure into the audit DB",
+    )
+    prd.add_argument("--db", required=True, help="Path to the audit SQLite DB")
+    prd.add_argument(
+        "--statement", required=True,
+        help="What was disclosed, in the operator's words",
+    )
+    prd.add_argument(
+        "--paragraph", default=None,
+        choices=["50(1)", "50(2)", "50(3)", "50(4)"],
+        help="Obligation paragraph for a generic disclosure (default 50(1))",
+    )
+    prd.add_argument(
+        "--on-behalf-of", default="",
+        help="Person the agent acts for. Setting this records the 50(1) "
+             "AI-agent profile (guidance C(2026) 5054 para 31).",
+    )
+    prd.add_argument(
+        "--step", default="first_interaction",
+        choices=[
+            "first_interaction", "authorisation", "reporting",
+            "validation", "new_interaction", "ai_output_received",
+            "on_inquiry",
+        ],
+        help="Key step the agent disclosed at (agent profile only)",
+    )
+    prd.add_argument(
+        "--authority-ref", default="",
+        help="Mandate or attestation identifier backing the delegation "
+             "(agent profile only)",
+    )
+    prd.add_argument(
+        "--attestation", default=None, metavar="FILE",
+        help="eIDAS-style attestation file to pin into the disclosure by "
+             "SHA-256 (agent profile only). JSON files also pin iss/sub.",
+    )
+    prd.add_argument("--agent-id", default="operator")
+    prd.add_argument("--session-id", default="")
+    prd.add_argument(
+        "--channel", default="",
+        help="Where the disclosure surfaced (chat_ui, api_response_header, ...)",
+    )
+    prd.add_argument(
+        "--subject", default="",
+        help="What the disclosure applies to (a session, a piece of content)",
+    )
+    prd.add_argument(
+        "--notice-sha256", default="",
+        help="SHA-256 of the exact notice bytes shown",
+    )
+    prd.set_defaults(func=_cmd_trail_record_disclosure)
 
     prec = tsub.add_parser(
         "receipt",
