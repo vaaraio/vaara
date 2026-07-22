@@ -37,7 +37,7 @@ private struct Palette {
 
 /// Bump on every source change; shown in the footer so a stale build is
 /// visible at a glance instead of masquerading as a bug.
-let BUILD_STAMP = "b15 · 2026-07-22"
+let BUILD_STAMP = "b16 · 2026-07-22"
 
 struct ContentView: View {
     @ObservedObject var model: GateModel
@@ -452,6 +452,9 @@ struct ContentView: View {
                             .lineLimit(2)
                     }
                 }
+                Text("app build \(BUILD_STAMP)")
+                    .font(.system(size: 10, design: .monospaced))
+                    .foregroundStyle(p.ghost)
             }
 
             if enterprise {
@@ -636,11 +639,6 @@ struct ContentView: View {
             }
             .help(dark ? "Switch to light" : "Switch to dark")
             Spacer()
-            Text(BUILD_STAMP)
-                .font(.system(size: 10, design: .monospaced))
-                .foregroundStyle(p.ghost)
-                .lineLimit(1)
-                .fixedSize()
             Button("Quit") { NSApp.terminate(nil) }
         }
         .buttonStyle(.plain)
