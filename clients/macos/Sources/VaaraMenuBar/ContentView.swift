@@ -16,7 +16,7 @@ extension GateState {
     }
 }
 
-private struct Palette {
+struct Palette {
     let ink: Color, faint: Color, ghost: Color, hairline: Color, wash: Color
 
     // Dark mirrors the webpage: --bg #0F1417, --ink #DEE4E1,
