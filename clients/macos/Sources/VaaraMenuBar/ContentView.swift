@@ -37,7 +37,7 @@ private struct Palette {
 
 /// Bump on every source change; shown in the footer so a stale build is
 /// visible at a glance instead of masquerading as a bug.
-let BUILD_STAMP = "b11 · 2026-07-22"
+let BUILD_STAMP = "b12 · 2026-07-22"
 
 struct ContentView: View {
     @ObservedObject var model: GateModel
@@ -106,7 +106,7 @@ struct ContentView: View {
                     }
                     .padding(.vertical, 8)
                 }
-                .frame(maxHeight: 440)
+                .frame(maxHeight: 560)
             }
         }
     }
@@ -187,7 +187,7 @@ struct ContentView: View {
             }
             .padding(.vertical, 8)
         }
-        .frame(maxHeight: 420)
+        .frame(maxHeight: 560)
     }
 
     // MARK: agent detail — who behaved
@@ -242,7 +242,7 @@ struct ContentView: View {
                     }
                     .padding(.vertical, 6)
                 }
-                .frame(maxHeight: 320)
+                .frame(maxHeight: 420)
             }
         }
     }
@@ -314,7 +314,7 @@ struct ContentView: View {
             }
             .padding(20)
         }
-        .frame(maxHeight: 440)
+        .frame(maxHeight: 560)
     }
 
     private func clientRow(_ client: MCPClient) -> some View {
@@ -500,7 +500,7 @@ struct ContentView: View {
         }
         .padding(20)
         }
-        .frame(maxHeight: 480)
+        .frame(maxHeight: 600)
     }
 
     private var customRow: some View {
