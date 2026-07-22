@@ -280,7 +280,11 @@ final class ApprovalWindowManager {
         // It slides down as a unit; it does not expand.
         let notch = notchSize(screen)
         let hasNotch = notch.height > 0
-        let cardWidth = hasNotch ? max(notch.width, 200) : 220
+        // Floor to a whole point and never exceed the notch, so the card
+        // can't poke past the cutout on either side. The window width is
+        // this exact value (not the SwiftUI fittingSize, which can round a
+        // fraction wider and caused a 1px right overhang).
+        let cardWidth = (hasNotch ? max(notch.width, 200) : 220).rounded(.down)
 
         let host = NSHostingView(rootView: NotchApprovalView(
             pending: pending,
@@ -304,7 +308,7 @@ final class ApprovalWindowManager {
         } else {
             centerX = full.midX
         }
-        let x = (centerX - size.width / 2).rounded()
+        let x = (centerX - cardWidth / 2).rounded()
         // Start with the top edge at the very top of the screen (the card
         // tucked in the notch), then lower it into place.
         let startY = full.maxY - size.height
@@ -322,7 +326,7 @@ final class ApprovalWindowManager {
             : screen.visibleFrame.maxY
         let restY = restTop - size.height
 
-        panel.setFrame(NSRect(x: x, y: startY, width: size.width, height: size.height),
+        panel.setFrame(NSRect(x: x, y: startY, width: cardWidth, height: size.height),
                        display: true)
         panel.orderFrontRegardless()
         NSApp.activate(ignoringOtherApps: true)
@@ -331,7 +335,7 @@ final class ApprovalWindowManager {
             ctx.duration = 0.34
             ctx.timingFunction = CAMediaTimingFunction(name: .easeOut)
             panel.animator().setFrame(
-                NSRect(x: x, y: restY, width: size.width, height: size.height),
+                NSRect(x: x, y: restY, width: cardWidth, height: size.height),
                 display: true)
         }
     }
