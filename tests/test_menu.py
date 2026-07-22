@@ -26,11 +26,11 @@ def test_levels_gate_items(cfg):
     basic = [label for label, _ in menu.visible_items("basic")]
     pro = [label for label, _ in menu.visible_items("professional")]
     ent = [label for label, _ in menu.visible_items("enterprise")]
-    assert any("Article 50 disclosure" in l for l in basic)
-    assert not any("Verify" in l for l in basic)
-    assert any("Verify" in l for l in pro)
-    assert not any("Article 12" in l for l in pro)
-    assert any("Article 12" in l for l in ent)
+    assert any("Article 50 disclosure" in item for item in basic)
+    assert not any("Verify" in item for item in basic)
+    assert any("Verify" in item for item in pro)
+    assert not any("Article 12" in item for item in pro)
+    assert any("Article 12" in item for item in ent)
     assert len(basic) < len(pro) < len(ent)
 
 
