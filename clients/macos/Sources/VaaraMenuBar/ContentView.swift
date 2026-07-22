@@ -37,7 +37,7 @@ private struct Palette {
 
 /// Bump on every source change; shown in the footer so a stale build is
 /// visible at a glance instead of masquerading as a bug.
-let BUILD_STAMP = "b12 · 2026-07-22"
+let BUILD_STAMP = "b13 · 2026-07-22"
 
 struct ContentView: View {
     @ObservedObject var model: GateModel
@@ -269,7 +269,6 @@ struct ContentView: View {
     // MARK: setup — the app wires the AIs in itself
 
     private var setupView: some View {
-        ScrollView {
             VStack(alignment: .leading, spacing: 16) {
                 VStack(alignment: .leading, spacing: 8) {
                     sectionLabelPlain("ENGINE")
@@ -313,8 +312,7 @@ struct ContentView: View {
                 .foregroundStyle(p.faint)
             }
             .padding(20)
-        }
-        .frame(maxHeight: 560)
+            .frame(maxWidth: .infinity, alignment: .leading)
     }
 
     private func clientRow(_ client: MCPClient) -> some View {
