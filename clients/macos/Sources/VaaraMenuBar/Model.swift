@@ -102,6 +102,11 @@ struct Config: Codable {
     var user_level: String = "basic"
     /// Override for the approvals watch directory. nil = ~/.vaara/approvals.
     var approvals_dir: String?
+    /// How the approval popup docks: "auto" detects a notch and drops from
+    /// it, else a centered HUD; "notch" and "centered" force one style
+    /// (e.g. when the notch is hidden via BetterDisplay and the OS reports
+    /// no safe area).
+    var approval_style: String = "auto"
 
     // Tolerate configs written before a field existed, including the
     // Python proto's single db_path key, which migrates into db_paths.
@@ -128,11 +133,12 @@ struct Config: Codable {
         }
         user_level = try c.decodeIfPresent(String.self, forKey: .user_level) ?? base.user_level
         approvals_dir = try c.decodeIfPresent(String.self, forKey: .approvals_dir)
+        approval_style = try c.decodeIfPresent(String.self, forKey: .approval_style) ?? base.approval_style
     }
 
     enum CodingKeys: String, CodingKey {
         case db_paths, alert_window_minutes, notifications, appearance, menubar_graph
-        case notify_on, user_level, approvals_dir
+        case notify_on, user_level, approvals_dir, approval_style
         case legacy_db_path = "db_path"
     }
 
@@ -146,6 +152,7 @@ struct Config: Codable {
         try c.encode(notify_on, forKey: .notify_on)
         try c.encode(user_level, forKey: .user_level)
         try c.encodeIfPresent(approvals_dir, forKey: .approvals_dir)
+        try c.encode(approval_style, forKey: .approval_style)
         // Keep the Python proto readable from the same file.
         if let first = db_paths.first {
             try c.encode(first, forKey: .legacy_db_path)

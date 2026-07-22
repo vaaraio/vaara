@@ -278,8 +278,23 @@ final class ApprovalWindowManager {
         // Card width hugs the notch, floored just enough that the two
         // buttons stay readable (and used as-is on no-notch displays).
         // It slides down as a unit; it does not expand.
-        let notch = notchSize(screen)
-        let hasNotch = notch.height > 0
+        // Style: auto detects a real notch; notch/centered force one way.
+        // When the user forces "notch" but the OS reports none (notch
+        // hidden via BetterDisplay), estimate a notch from the menu-bar
+        // height and ~8% of the display width so the drop still docks.
+        var notch = notchSize(screen)
+        let style = model.config.approval_style
+        let hasNotch: Bool
+        switch style {
+        case "notch":    hasNotch = true
+        case "centered": hasNotch = false
+        default:         hasNotch = notch.height > 0
+        }
+        if hasNotch && notch.height == 0 {
+            let h = max(NSApp.mainMenu?.menuBarHeight ?? 32, 24)
+            let w = min(max(screen.frame.width * 0.08, 180), 260)
+            notch = CGSize(width: w, height: h)
+        }
         // The display API reports the notch a hair wider than the visible
         // black cutout (the auxiliary areas do not butt exactly against
         // it), so matching it exactly overhangs ~1px. Inset the card 1px

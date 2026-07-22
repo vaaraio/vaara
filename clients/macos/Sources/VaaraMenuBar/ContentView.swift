@@ -37,7 +37,7 @@ struct Palette {
 
 /// Bump on every source change; shown in the footer so a stale build is
 /// visible at a glance instead of masquerading as a bug.
-let BUILD_STAMP = "b35 · 2026-07-22"
+let BUILD_STAMP = "b36 · 2026-07-22"
 
 struct ContentView: View {
     @ObservedObject var model: GateModel
@@ -541,6 +541,22 @@ struct ContentView: View {
                 }
                 .pickerStyle(.segmented)
                 .labelsHidden()
+            }
+
+            VStack(alignment: .leading, spacing: 8) {
+                sectionLabelPlain("APPROVAL POPUP")
+                Picker("", selection: $model.config.approval_style) {
+                    Text("Auto").tag("auto")
+                    Text("From notch").tag("notch")
+                    Text("Centered").tag("centered")
+                }
+                .pickerStyle(.segmented)
+                .labelsHidden()
+                Text("Auto drops from the notch on notched Macs, else "
+                     + "centered. Force one if you hide the notch "
+                     + "(e.g. BetterDisplay).")
+                    .font(.system(size: 9.5))
+                    .foregroundStyle(p.ghost)
             }
 
             if pro {
