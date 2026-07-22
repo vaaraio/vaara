@@ -97,15 +97,69 @@ struct ApprovalPanelView: View {
         .frame(width: 400)
         .background(p.wash)
         .background(.ultraThinMaterial)
-        // Top edge flush to the notch, bottom corners rounded: the card
-        // reads as lowering out of the menu bar itself.
-        .clipShape(.rect(bottomLeadingRadius: 18, bottomTrailingRadius: 18))
-        .overlay(
-            UnevenRoundedRectangle(bottomLeadingRadius: 18, bottomTrailingRadius: 18)
-                .stroke(p.hairline, lineWidth: 1)
-        )
-        .shadow(color: .black.opacity(0.35), radius: 18, y: 8)
         .environment(\.colorScheme, dark ? .dark : .light)
+    }
+}
+
+/// The notch, lowered. A compact black card matched to the notch width,
+/// square-ish at the top (flush, as if the cutout detached) and rounded
+/// wider at the bottom (the cutout flares wider there). It carries just
+/// what a person needs to answer: what the agent wants, and two buttons.
+/// The window slides it down; nothing expands. Always black so it reads
+/// as the notch itself, independent of the app's light/dark theme.
+struct NotchApprovalView: View {
+    let pending: PendingApproval
+    let onDecision: (Bool) -> Void
+    let width: CGFloat
+
+    private let ink = Color(red: 0.90, green: 0.92, blue: 0.91)
+    private let faint = Color(red: 0.60, green: 0.64, blue: 0.62)
+    private let green = GateState.green.color
+    private let red = GateState.red.color
+
+    var body: some View {
+        VStack(spacing: 9) {
+            HStack(spacing: 7) {
+                Circle().fill(GateState.yellow.color).frame(width: 7, height: 7)
+                Text("Approval needed")
+                    .font(.system(size: 11, weight: .medium))
+                    .foregroundStyle(ink)
+                Spacer(minLength: 0)
+            }
+            Text(pending.toolName)
+                .font(.system(size: 10, design: .monospaced))
+                .foregroundStyle(faint)
+                .lineLimit(1).truncationMode(.middle)
+                .frame(maxWidth: .infinity, alignment: .leading)
+            HStack(spacing: 8) {
+                Button { onDecision(false) } label: {
+                    Text("Block")
+                        .font(.system(size: 12, weight: .semibold))
+                        .foregroundStyle(.white)
+                        .frame(maxWidth: .infinity).padding(.vertical, 7)
+                        .background(red).clipShape(RoundedRectangle(cornerRadius: 7))
+                }
+                .buttonStyle(.plain).keyboardShortcut(.cancelAction)
+                Button { onDecision(true) } label: {
+                    Text("Approve")
+                        .font(.system(size: 12, weight: .semibold))
+                        .foregroundStyle(.black)
+                        .frame(maxWidth: .infinity).padding(.vertical, 7)
+                        .background(green).clipShape(RoundedRectangle(cornerRadius: 7))
+                }
+                .buttonStyle(.plain).keyboardShortcut(.defaultAction)
+            }
+        }
+        .padding(.horizontal, 14)
+        .padding(.top, 10)
+        .padding(.bottom, 12)
+        .frame(width: width)
+        .background(Color.black)
+        .clipShape(.rect(
+            topLeadingRadius: 8, topTrailingRadius: 8,
+            bottomLeadingRadius: 20, bottomTrailingRadius: 20))
+        .shadow(color: .black.opacity(0.4), radius: 16, y: 6)
+        .environment(\.colorScheme, .dark)
     }
 }
 
@@ -133,24 +187,56 @@ final class ApprovalWindowManager {
         }
     }
 
-    private func show(_ pending: PendingApproval) {
-        let host = NSHostingView(rootView: ApprovalPanelView(model: model, pending: pending))
-        let size = host.fittingSize
+    /// Notch geometry from the screen. Width is the gap between the two
+    /// auxiliary top areas; height is the safe-area top inset. Zero when
+    /// the Mac has no notch (safeAreaInsets.top == 0).
+    private func notchSize(_ screen: NSScreen) -> CGSize {
+        let h = screen.safeAreaInsets.top
+        guard h > 0 else { return .zero }
+        var w: CGFloat = 200
+        if let left = screen.auxiliaryTopLeftArea,
+           let right = screen.auxiliaryTopRightArea {
+            w = screen.frame.width - left.width - right.width
+        }
+        return CGSize(width: w, height: h)
+    }
 
+    private func show(_ pending: PendingApproval) {
         let panel = window ?? makePanel()
         window = panel
-        panel.contentView = host
 
         guard let screen = NSScreen.main else {
-            panel.setContentSize(size); panel.center()
-            panel.orderFrontRegardless(); return
+            let host = NSHostingView(rootView: NotchApprovalView(
+                pending: pending,
+                onDecision: { [weak self] ok in
+                    self?.model.resolveApproval(pending.actionID, approve: ok) },
+                width: 260))
+            panel.contentView = host
+            panel.setContentSize(host.fittingSize)
+            panel.center(); panel.orderFrontRegardless(); return
         }
-        // Centered horizontally under the notch; rest just below the menu
-        // bar. Start tucked up behind the bar, then slide down into place.
+
+        // Card width tracks the notch, floored so the two buttons stay
+        // readable on narrow (14") notches. It slides down as a unit; it
+        // does not expand.
+        let notch = notchSize(screen)
+        let cardWidth = max(notch.width, 240)
+
+        let host = NSHostingView(rootView: NotchApprovalView(
+            pending: pending,
+            onDecision: { [weak self] ok in
+                self?.model.resolveApproval(pending.actionID, approve: ok) },
+            width: cardWidth))
+        panel.contentView = host
+        let size = host.fittingSize
+
         let full = screen.frame
         let x = full.midX - size.width / 2
-        let restY = screen.visibleFrame.maxY - size.height   // just under menu bar
-        let startY = full.maxY - size.height                 // flush to top, hidden
+        // Start with the top edge at the very top of the screen (the card
+        // sits in the notch), then lower it so it clears the menu bar and
+        // floats just below, as if the notch itself slid down.
+        let startY = full.maxY - size.height
+        let restY = screen.visibleFrame.maxY - size.height - 6
 
         panel.setFrame(NSRect(x: x, y: startY, width: size.width, height: size.height),
                        display: true)
@@ -158,7 +244,7 @@ final class ApprovalWindowManager {
         NSApp.activate(ignoringOtherApps: true)
 
         NSAnimationContext.runAnimationGroup { ctx in
-            ctx.duration = 0.32
+            ctx.duration = 0.34
             ctx.timingFunction = CAMediaTimingFunction(name: .easeOut)
             panel.animator().setFrame(
                 NSRect(x: x, y: restY, width: size.width, height: size.height),
