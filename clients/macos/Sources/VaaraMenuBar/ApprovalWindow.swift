@@ -150,9 +150,9 @@ struct NotchApprovalView: View {
                 .buttonStyle(.plain).keyboardShortcut(.defaultAction)
             }
         }
-        .padding(.horizontal, 14)
-        .padding(.top, 10)
-        .padding(.bottom, 12)
+        .padding(.horizontal, 12)
+        .padding(.top, 9)
+        .padding(.bottom, 11)
         .frame(width: width)
         // Pure #000000, no shadow, no stroke, top corners square so the
         // top edge fuses with the physical notch: it reads as the notch
@@ -220,11 +220,11 @@ final class ApprovalWindowManager {
             panel.center(); panel.orderFrontRegardless(); return
         }
 
-        // Card width tracks the notch, floored so the two buttons stay
-        // readable on narrow (14") notches. It slides down as a unit; it
-        // does not expand.
+        // Card width hugs the notch, floored just enough that the two
+        // buttons stay readable (and used as-is on no-notch displays).
+        // It slides down as a unit; it does not expand.
         let notch = notchSize(screen)
-        let cardWidth = max(notch.width, 240)
+        let cardWidth = notch.width > 0 ? max(notch.width, 200) : 220
 
         let host = NSHostingView(rootView: NotchApprovalView(
             pending: pending,
@@ -240,7 +240,10 @@ final class ApprovalWindowManager {
         // sits in the notch), then lower it so it clears the menu bar and
         // floats just below, as if the notch itself slid down.
         let startY = full.maxY - size.height
-        let restY = screen.visibleFrame.maxY - size.height - 6
+        // Rest with the top edge flush to the menu-bar bottom, no gap, so
+        // the card reads as extending straight down from the notch rather
+        // than floating below it.
+        let restY = screen.visibleFrame.maxY - size.height
 
         panel.setFrame(NSRect(x: x, y: startY, width: size.width, height: size.height),
                        display: true)
