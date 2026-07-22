@@ -38,6 +38,22 @@ DISCLOSURE_TOOL = "vaara.article50.disclosure"
 #: The Article 50 paragraphs a disclosure record may claim.
 PARAGRAPHS = ("50(1)", "50(2)", "50(3)", "50(4)")
 
+#: Profile tag for the Article 50(1) AI-agent disclosure shape (guidance
+#: C(2026) 5054, para 31). Stored in the event parameters so a generic
+#: disclosure and an agent-profile disclosure stay distinguishable.
+AGENT_PROFILE = "art50-1-agent/v1"
+
+#: The interaction steps para 31 names for agent disclosure: at the first
+#: interaction and at "key steps (point of authorisation, reporting,
+#: validation)", repeated at every new interaction.
+KEY_STEPS = (
+    "first_interaction",
+    "authorisation",
+    "reporting",
+    "validation",
+    "new_interaction",
+)
+
 
 def record_disclosure(
     trail,
@@ -91,6 +107,74 @@ def record_disclosure(
     return result.action_id
 
 
+def record_agent_disclosure(
+    trail,
+    *,
+    statement: str,
+    on_behalf_of: str,
+    step: str,
+    agent_id: str = "operator",
+    session_id: str = "",
+    channel: str = "",
+    subject: str = "",
+    notice_sha256: str = "",
+    authority_ref: str = "",
+    parent_action_id: Optional[str] = None,
+) -> str:
+    """Record an Article 50(1) AI-agent disclosure (guidance para 31).
+
+    Para 31 requires an AI agent to disclose "both their artificial
+    nature and the person on whose behalf they are acting", covering
+    "the delegation of authority and accountability for the consequences
+    of their actions", at key steps (authorisation, reporting,
+    validation) and at every new interaction. This is the receipt of
+    exactly that: ``statement`` is the disclosure of artificial nature
+    in the operator's words, ``on_behalf_of`` names the principal the
+    agent acts for, ``step`` is one of :data:`KEY_STEPS`, and
+    ``authority_ref`` optionally pins the mandate (a grant id, contract
+    reference, or eIDAS attestation identifier). ``parent_action_id``
+    threads the disclosure into the delegation chain the trail already
+    reconstructs, so "who authorised this agent" and "the agent
+    disclosed itself" are one lineage.
+
+    The event is an ordinary :data:`DISCLOSURE_TOOL` record with
+    ``article="50(1)"`` and ``profile=art50-1-agent/v1`` — same wire,
+    same chain, same exports. Returns the recorded ``action_id``.
+    """
+    if step not in KEY_STEPS:
+        raise ValueError(f"step must be one of {KEY_STEPS}, got {step!r}")
+    if not statement:
+        raise ValueError("statement must not be empty")
+    if not on_behalf_of:
+        raise ValueError(
+            "on_behalf_of must name the person on whose behalf the agent "
+            "acts (guidance C(2026) 5054 para 31)"
+        )
+
+    from vaara.pipeline import InterceptionPipeline
+
+    pipeline = InterceptionPipeline(trail=trail, enforce=False)
+    result = pipeline.intercept(
+        agent_id=agent_id,
+        tool_name=DISCLOSURE_TOOL,
+        parameters={
+            "article": "50(1)",
+            "profile": AGENT_PROFILE,
+            "statement": statement,
+            "on_behalf_of": on_behalf_of,
+            "step": step,
+            "authority_ref": authority_ref,
+            "channel": channel,
+            "subject": subject,
+            "notice_sha256": notice_sha256,
+        },
+        session_id=session_id,
+        parent_action_id=parent_action_id,
+        context={"vaara_article50": True},
+    )
+    return result.action_id
+
+
 def _iso(ts: float) -> str:
     return datetime.fromtimestamp(ts, tz=timezone.utc).isoformat()
 
@@ -116,6 +200,10 @@ def find_disclosures(records) -> list[dict]:
             "channel": params.get("channel", ""),
             "subject": params.get("subject", ""),
             "notice_sha256": params.get("notice_sha256", ""),
+            "profile": params.get("profile", ""),
+            "on_behalf_of": params.get("on_behalf_of", ""),
+            "step": params.get("step", ""),
+            "authority_ref": params.get("authority_ref", ""),
         })
     return out
 
@@ -174,6 +262,16 @@ def build_article50_report(
             if first_disclosure_501[sid] <= first_action:
                 covered_before_first.append(sid)
 
+    # Para 31 agent-profile coverage: of the agent-profile disclosures,
+    # which key steps were disclosed at, per session, and did each one
+    # name the principal?
+    agent_events = [d for d in disclosures if d["profile"] == AGENT_PROFILE]
+    by_step = Counter(d["step"] for d in agent_events)
+    steps_by_session: dict[str, set] = {}
+    for d in agent_events:
+        if d["session_id"]:
+            steps_by_session.setdefault(d["session_id"], set()).add(d["step"])
+
     return {
         "standard": "EU AI Act Article 50 transparency evidence",
         "generated_utc": _iso(records[-1].timestamp) if records else "",
@@ -194,6 +292,20 @@ def build_article50_report(
             "sessions_with_agent_activity": len(session_first_action),
             "sessions_with_50_1_disclosure": len(covered),
             "disclosed_at_or_before_first_action": len(covered_before_first),
+        },
+        "agent_disclosure_para31": {
+            "profile": AGENT_PROFILE,
+            "total": len(agent_events),
+            "by_step": {s: by_step.get(s, 0) for s in KEY_STEPS},
+            "named_principal": sum(
+                1 for d in agent_events if d["on_behalf_of"]
+            ),
+            "carried_authority_ref": sum(
+                1 for d in agent_events if d["authority_ref"]
+            ),
+            "sessions": {
+                sid: sorted(steps) for sid, steps in steps_by_session.items()
+            },
         },
         "what_this_proves": (
             "Each disclosure event above was recorded into a signed, "
@@ -256,6 +368,31 @@ def render_article50_md(report: dict) -> str:
                 f"{event['channel']} | {event['session_id']} | {statement} |"
             )
         lines.append("")
+
+    agent = report.get("agent_disclosure_para31") or {}
+    if agent.get("total"):
+        lines += [
+            "## AI-agent disclosure (Article 50(1), guidance para 31)",
+            "",
+            f"Agent-profile disclosures recorded: {agent['total']} "
+            f"(profile `{agent['profile']}`). "
+            f"{agent['named_principal']} name the person on whose behalf "
+            f"the agent acted; {agent['carried_authority_ref']} carry an "
+            "authority reference (mandate / attestation).",
+            "",
+            "Disclosures by key step (para 31: authorisation, reporting, "
+            "validation, and every new interaction):",
+            "",
+        ]
+        for step in KEY_STEPS:
+            lines.append(f"- {step}: {agent['by_step'].get(step, 0)}")
+        lines.append("")
+        if agent.get("sessions"):
+            lines.append("Per session, the steps at which the agent disclosed:")
+            lines.append("")
+            for sid, steps in agent["sessions"].items():
+                lines.append(f"- `{sid}`: {', '.join(steps)}")
+            lines.append("")
 
     cov = report["session_coverage_50_1"]
     lines += [

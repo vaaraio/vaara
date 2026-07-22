@@ -9,10 +9,12 @@ import pytest
 pytest.importorskip("cryptography")
 
 from vaara.audit.article50 import (
+    AGENT_PROFILE,
     DISCLOSURE_TOOL,
     build_article50_report,
     export_article50,
     find_disclosures,
+    record_agent_disclosure,
     record_disclosure,
     render_article50_md,
 )
@@ -139,6 +141,94 @@ def test_cli_export_article50_from_db(tmp_path, capsys):
     assert rc == 0
     assert "Article 50 transparency package" in capsys.readouterr().out
     assert out.is_file()
+
+
+def test_record_agent_disclosure_para31_fields(tmp_path):
+    trail = _persistent_trail(tmp_path)
+    action_id = record_agent_disclosure(
+        trail,
+        statement="I am an AI agent acting for Example Oy.",
+        on_behalf_of="Example Oy",
+        step="first_interaction",
+        session_id="s1",
+        channel="chat_ui",
+        authority_ref="grant-42",
+    )
+    assert action_id
+    event = find_disclosures(trail._records)[0]
+    assert event["article"] == "50(1)"
+    assert event["profile"] == AGENT_PROFILE
+    assert event["on_behalf_of"] == "Example Oy"
+    assert event["step"] == "first_interaction"
+    assert event["authority_ref"] == "grant-42"
+
+
+def test_record_agent_disclosure_validates_input(tmp_path):
+    trail = _persistent_trail(tmp_path)
+    with pytest.raises(ValueError):
+        record_agent_disclosure(
+            trail, statement="x", on_behalf_of="p", step="whenever",
+        )
+    with pytest.raises(ValueError):
+        record_agent_disclosure(
+            trail, statement="x", on_behalf_of="", step="authorisation",
+        )
+    with pytest.raises(ValueError):
+        record_agent_disclosure(
+            trail, statement="", on_behalf_of="p", step="authorisation",
+        )
+
+
+def test_agent_disclosure_threads_delegation_edge(tmp_path):
+    from vaara.audit.delegation import graph_from_trail
+
+    trail = _persistent_trail(tmp_path)
+    pipeline = InterceptionPipeline(trail=trail, enforce=False)
+    parent = pipeline.intercept(
+        agent_id="orchestrator",
+        tool_name="mcp__demo__spawn",
+        session_id="s1",
+    )
+    child_id = record_agent_disclosure(
+        trail,
+        statement="AI agent notice",
+        on_behalf_of="Example Oy",
+        step="authorisation",
+        session_id="s1",
+        parent_action_id=parent.action_id,
+    )
+    graph = graph_from_trail(trail)
+    assert graph.chain_for(child_id) == [parent.action_id, child_id]
+
+
+def test_report_para31_section(tmp_path):
+    trail = _persistent_trail(tmp_path)
+    record_agent_disclosure(
+        trail, statement="AI agent notice", on_behalf_of="Example Oy",
+        step="first_interaction", session_id="s1",
+    )
+    record_agent_disclosure(
+        trail, statement="AI agent notice", on_behalf_of="Example Oy",
+        step="validation", session_id="s1", authority_ref="grant-42",
+    )
+    # A generic 50(1) disclosure must not count into the agent profile.
+    record_disclosure(
+        trail, paragraph="50(1)", statement="AI notice", session_id="s2",
+    )
+    _agent_activity(trail, "s1")
+
+    report = build_article50_report(trail._records, {"record_count": 0})
+    agent = report["agent_disclosure_para31"]
+    assert agent["total"] == 2
+    assert agent["by_step"]["first_interaction"] == 1
+    assert agent["by_step"]["validation"] == 1
+    assert agent["named_principal"] == 2
+    assert agent["carried_authority_ref"] == 1
+    assert agent["sessions"]["s1"] == ["first_interaction", "validation"]
+
+    md = render_article50_md(report)
+    assert "guidance para 31" in md
+    assert "first_interaction, validation" in md
 
 
 def test_disclosures_default_allow_and_never_blocked(tmp_path):
