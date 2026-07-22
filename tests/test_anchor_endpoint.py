@@ -30,8 +30,8 @@ _ANCHOR = {
     "method": "rfc3161-eidas-qualified",
     "anchoredDigest": "sha256:" + "ab" * 32,
     "token": "Zm9v",
-    "authority": "Sectigo Qualified Time Stamping CA",
-    "tsaUrl": "http://timestamp.sectigo.com/qualified",
+    "authority": "Example Qualified Time Stamping CA",
+    "tsaUrl": "https://qtsa.example.eu/qualified",
 }
 
 
@@ -73,7 +73,7 @@ def test_free_mode_anchors_the_receipt():
     assert r.status_code == 200, r.text
     body = r.json()
     assert body["anchor"]["method"] == "rfc3161-eidas-qualified"
-    assert body["anchor"]["authority"].startswith("Sectigo")
+    assert body["anchor"]["authority"].startswith("Example")
     assert body["attested"] == "2026-07-21T12:00:00+00:00"
     assert "DSS" in body["dss_hint"] or "dss" in body["dss_hint"]
 

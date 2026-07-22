@@ -4,25 +4,30 @@
 """Anchor a receipt to a qualified TSA and validate the token in EU DSS.
 
 Reproduces the 1.30.0 claim end to end, against live services: obtains an
-RFC 3161 token from an eIDAS-qualified TSA (default: Sectigo's qualified
-endpoint, listed as TSA/QTST with status granted on the Spanish trusted
-list), pins the signer's issuing CA out of the first reply, records the
+RFC 3161 token from an eIDAS-qualified TSA of YOUR choosing, pins the
+signer's issuing CA out of the first reply, records the
 ``rfc3161-eidas-qualified`` anchor, then submits the token plus the
 receipt's JCS signed payload to the European Commission's DSS demo
 validator and prints its verdict. Expected output ends with::
 
     DSS verdict: PASSED QTSA (Qualified timestamp)
 
-Needs the network (the TSA and the DSS demo webapp) and the 'timeanchor'
-extra. The TSA is a free public endpoint with no SLA; a refusal or
-timeout is a service condition, not a Vaara failure.
+No TSA is baked in; Vaara does not choose a trust service provider for
+you. Set ``VAARA_DEMO_TSA_URL`` to the RFC 3161 endpoint of a qualified
+timestamping authority you have selected from the EU trusted lists
+(https://eidas.ec.europa.eu/efda/tl-browser/), under that provider's own
+terms of use. Needs the network (the TSA and the DSS demo webapp) and
+the 'timeanchor' extra. A refusal or timeout is a service condition,
+not a Vaara failure.
 
-    python scripts/qualified_anchor_dss_demo.py [path/to/receipt.json]
+    VAARA_DEMO_TSA_URL=https://... \\
+        python scripts/qualified_anchor_dss_demo.py [path/to/receipt.json]
 """
 from __future__ import annotations
 
 import base64
 import json
+import os
 import sys
 import urllib.request
 from pathlib import Path
@@ -43,7 +48,7 @@ from vaara.audit.timeanchor import (
 
 DEFAULT = (Path(__file__).resolve().parents[1]
            / "tests/vectors/x402_settlement_v0/generic/step1/receipt.json")
-TSA_URL = "http://timestamp.sectigo.com/qualified"
+TSA_URL = os.environ.get("VAARA_DEMO_TSA_URL", "")
 DSS_URL = ("https://ec.europa.eu/digital-building-blocks/DSS/webapp-demo"
            "/services/rest/validation/validateSignature")
 
@@ -95,6 +100,13 @@ def dss_validate(token_der: bytes, payload: bytes) -> tuple[str, str, str]:
 
 
 def main() -> int:
+    if not TSA_URL:
+        raise SystemExit(
+            "Set VAARA_DEMO_TSA_URL to the RFC 3161 endpoint of a "
+            "qualified TSA you have chosen from the EU trusted lists "
+            "(https://eidas.ec.europa.eu/efda/tl-browser/). Vaara ships "
+            "no default provider."
+        )
     receipt_path = Path(sys.argv[1]) if len(sys.argv) > 1 else DEFAULT
     receipt = json.loads(receipt_path.read_text())
 

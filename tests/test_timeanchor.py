@@ -263,7 +263,6 @@ def test_verify_anchor_over_records_rejects_rewritten_chain():
 # do not control.
 _LIVE_TSAS = [
     "http://timestamp.digicert.com",
-    "http://timestamp.sectigo.com",
     "https://freetsa.org/tsr",
 ]
 
