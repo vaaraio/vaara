@@ -27,6 +27,7 @@ from __future__ import annotations
 
 import base64
 import json
+import os
 import sys
 import urllib.request
 from pathlib import Path
@@ -47,8 +48,6 @@ from vaara.audit.timeanchor import (
 
 DEFAULT = (Path(__file__).resolve().parents[1]
            / "tests/vectors/x402_settlement_v0/generic/step1/receipt.json")
-import os
-
 TSA_URL = os.environ.get("VAARA_DEMO_TSA_URL", "")
 DSS_URL = ("https://ec.europa.eu/digital-building-blocks/DSS/webapp-demo"
            "/services/rest/validation/validateSignature")
