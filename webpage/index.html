@@ -183,7 +183,8 @@
   <img src="https://raw.githubusercontent.com/vaaraio/vaara/main/docs/vaara-wordmark-dark.png" alt="Vaara">
 </div>
 <p style="text-align:center;text-transform:uppercase;letter-spacing:.14em;font-weight:600;opacity:.65;margin:.1rem 0 .6rem;font-size:.95rem;">Accountable Autonomy</p>
-<h1>Vaara is the tamper-evident runtime evidence layer for AI systems. It turns every action an agent takes into a record an outside party can verify without trusting you, then binds that record to the machine's own TPM 2.0 + IMA attestation. EU AI Act compliance, and any other case where you have to prove what an agent actually did.</h1>
+<h1>A verifiable receipt for every action your AI agents take, checkable by anyone.</h1>
+<p style="text-align:center;max-width:60ch;margin:0 auto 1rem;opacity:.82;line-height:1.5;">Your AI agent transferred the funds, wrote the file, called the tool. Later, someone who does not trust you asks you to prove exactly what it did and why: a regulator, an auditor, a customer after an incident. Your own logs will not settle it, because you could have edited them.</p>
 <p class="stance">Open source. No SaaS. No telemetry. No signup.</p>
 <div class="evidence">
   <div class="evidence-head">
@@ -203,14 +204,14 @@ conformance: <span class="ok">CONFORMS</span>
 </div>
 <p class="stamp">What's shipped</p>
 <ul>
-  <li>Check any record yourself: <code>vaara verify-record</code> tests any JSON against the published SEP-2828 format, including a record Vaara never produced, with no signing key and no access to the system that made it. <code>vaara verify-bundle</code> runs the full evidence set and prints a single pass or fail, fail-closed on authenticity.</li>
+  <li>Check any record yourself: <code>vaara verify-record</code> tests any JSON against the published vaara.receipt/v1 format, including a record Vaara never produced, with no signing key and no access to the system that made it. <code>vaara verify-bundle</code> runs the full evidence set and prints a single pass or fail, fail-closed on authenticity.</li>
   <li>One sink for any stack's evidence: <code>vaara ingest</code> seals a record from another format, an MCP execution record or a <code>did:web</code> catalog entry, into one canonical, content-addressed envelope with an honest gap report, so a dropped record is a provable hole. The conformance corpus is reproduced by a checker that imports no Vaara.</li>
   <li>Hash-chained, tamper-evident audit trail (SHA-256, optional Ed25519, optional post-quantum ML-DSA-65), anchored to an RFC 3161 / eIDAS qualified timestamp so a record cannot be backdated against a clock you do not control. An auditor verifies it offline with a public key.</li>
   <li>Hardware-rooted binding: <code>vaara verify-tpm-binding</code> and <code>vaara verify-tpm-chain</code> tie an execution record to the machine's own TPM 2.0 quote and IMA measurements.</li>
   <li>Sovereign inference: run a local model through Vaara and every answer carries a signed receipt bound to the machine's TPM. Open under AGPL-3.0.</li>
   <li>One-command regulator package: <code>vaara trail export-article12</code> writes the signed trail, per-article EU AI Act evidence, and the time anchor as Article 19 existence-in-time, in one file an authority checks offline.</li>
   <li>Policy gating on every tool call: allow, block, or escalate each agent action against your own policy before it runs, through a transparent MCP proxy with native hooks for LangChain, CrewAI, and the OpenAI Agents SDK. TypeScript client on npm, Claude Code plugin in the same repo.</li>
-  <li>Authored SEP-2828, the Model Context Protocol server-side execution-record proposal, reproduced in full by an independent developer from a clean checkout. Releases are SLSA Build Level 3 and Sigstore-signed, with continuous fuzzing on the decoder, audit, and policy loader.</li>
+  <li>Author of the Vaara Receipt Internet-Draft (<code>draft-sirkkavaara-vaara-receipt</code>) at the IETF, an offline-verifiable execution-record format reproduced in full by an independent developer from a clean checkout. Releases are SLSA Build Level 3 and Sigstore-signed, with continuous fuzzing on the decoder, audit, and policy loader.</li>
 </ul>
 <p class="stamp" id="pilots">Paid pilots</p>
 <ul>
@@ -238,7 +239,7 @@ conformance: <span class="ok">CONFORMS</span>
   <a href="https://pypi.org/project/vaara/"><span class="label">pypi</span><span class="target">pypi.org/project/vaara</span></a>
   <a href="https://www.npmjs.com/package/@vaara/client"><span class="label">npm</span><span class="target">@vaara/client</span></a>
   <a href="https://registry.modelcontextprotocol.io/v0.1/servers?search=io.github.vaaraio/vaara"><span class="label">mcp registry</span><span class="target">io.github.vaaraio/vaara</span></a>
-  <a href="https://github.com/modelcontextprotocol/modelcontextprotocol/pull/2828"><span class="label">proposal</span><span class="target">SEP-2828</span></a>
+  <a href="https://datatracker.ietf.org/doc/draft-sirkkavaara-vaara-receipt/"><span class="label">internet-draft</span><span class="target">draft-sirkkavaara-vaara-receipt</span></a>
   <a href="https://github.com/vaaraio/vaara/blob/main/COMPLIANCE.md"><span class="label">compliance</span><span class="target">COMPLIANCE.md</span></a>
   <a href="https://futurium.ec.europa.eu/en/apply-ai-alliance/community-content/article-12-and-difference-between-log-and-evidence"><span class="label">Article 12</span><span class="target">Log vs evidence (EU AI Alliance)</span></a>
   <a href="https://futurium.ec.europa.eu/en/apply-ai-alliance/community-content/article-14-runtime-why-oversight-agentic-ai-has-be-evidenced-action-not-model"><span class="label">Article 14</span><span class="target">Oversight as action (EU AI Alliance)</span></a>

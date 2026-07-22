@@ -24,12 +24,12 @@
 
 Your AI agent transferred the funds, wrote the file, called the tool. Later, someone who does not trust you asks you to prove exactly what it did and why: a regulator, an auditor, a customer after an incident. Your own logs will not settle it, because you could have edited them.
 
-Vaara checks every agent tool call against your policy and writes the call and its outcome into a signed, hash-chained record an outside party can verify offline, with no access to your system and none of your software. It needs no special hardware, and binds to your machine's TPM 2.0 or confidential-VM root when you have one. It runs entirely in your own environment. No SaaS, no telemetry. It answers "show me what the agent actually did" wherever that question lands: after an incident, in procurement, in a dispute. And when EU AI Act record-keeping obligations reach your systems, the same trail is the Article 12 evidence, already running.
-
 ## Quick start
 
 ```bash
-pip install vaara
+pip install vaara                            # Python: CLI, MCP proxy, server
+brew tap vaaraio/tap && brew install vaara   # CLI via Homebrew
+npm install @vaara/client                    # TypeScript client for the HTTP API
 ```
 
 ```python
@@ -41,8 +41,6 @@ def transfer_funds(to: str, amount: float) -> str:
 ```
 
 That is the whole thing. Every call to a governed function is risk-scored and decided against your policy before the body runs. A blocked call raises `vaara.Blocked`; an allowed call runs, and the decision, the call, and the outcome land in a signed record anyone can verify offline. Python 3.10+, zero runtime dependencies.
-
-Other ways in: Homebrew installs the CLI (`brew tap vaaraio/tap && brew install vaara`; newer brew asks you to `brew trust vaaraio/tap` first), and [`@vaara/client`](https://www.npmjs.com/package/@vaara/client) on npm is the TypeScript client for the HTTP API. The MCP proxy and server ship with the Python package.
 
 <details>
 <summary><b>Prefer the explicit pipeline?</b></summary>
@@ -179,7 +177,7 @@ Method and per-cell breakdown: [docs/architecture.md](docs/architecture.md) and 
 <summary><b>Standards and attestation</b></summary>
 
 - **[vaara.receipt/v1](SPEC.md)** is the canonical parent spec for the signed receipt format: hash-chained, canonicalized with JCS (RFC 8785), verifiable offline from a public key. The x402 settlement binding and an eIDAS qualified-timestamp profile are downstream profiles that pin to it rather than competing formats. Receipts can carry a self-hosted RFC 3161 timestamp that Vaara mints offline.
-- **[SEP-2828](https://github.com/modelcontextprotocol/modelcontextprotocol/pull/2828)** signed execution records and **SEP-2787** request-attestation test vectors, in the MCP standards process. A second independent implementation has reproduced the SEP-2828 conformance vectors from a clean checkout with no shared code. Published corpora with independent checkers cover the fallback binding path ([`conformance/sep2828/fallback_projection_v0/`](conformance/sep2828/fallback_projection_v0/)) and CrewAI governance decisions ([`tests/vectors/governance_decision_v0/`](tests/vectors/governance_decision_v0/)).
+- **[SEP-2828](docs/sep/sep-server-execution-record.md)** signed execution records, carried forward as the IETF Internet-Draft [`draft-sirkkavaara-vaara-receipt`](https://datatracker.ietf.org/doc/draft-sirkkavaara-vaara-receipt/). A second independent implementation has reproduced the SEP-2828 conformance vectors from a clean checkout with no shared code. Published corpora with independent checkers cover the fallback binding path ([`conformance/sep2828/fallback_projection_v0/`](conformance/sep2828/fallback_projection_v0/)) and CrewAI governance decisions ([`tests/vectors/governance_decision_v0/`](tests/vectors/governance_decision_v0/)).
 - **OVERT 1.0** ([overt.is](https://overt.is/)): Vaara is the Arbiter and emits Protocol Profile 1.0 Base Envelopes (canonical CBOR, Ed25519) alongside every record when attestation is on.
 - **Post-quantum**: an optional parallel ML-DSA-65 / FIPS 204 signature over the same preimage, so a stripped post-quantum signature is a detectable downgrade rather than a silent loss.
 - **Root-agnostic evidence**: the same Article 12 record is provable with or without a hardware TEE and re-expressible as an IETF RATS EAR (AR4SI vector), whether rooted in a TPM 2.0 host, an AMD SEV-SNP confidential VM, or no TEE at all.
