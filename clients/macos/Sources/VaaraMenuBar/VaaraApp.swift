@@ -5,32 +5,22 @@
 import AppKit
 import SwiftUI
 
-/// Owns the model and starts monitoring at true app launch, not when the
-/// popover first opens. A MenuBarExtra's content onAppear fires only on
-/// first click, so anything started there (the poll timer, the approval
-/// window manager) would sit dead until the user happened to open the
-/// menu. applicationDidFinishLaunching always runs, so the gate watches
-/// and the approval HUD can raise itself with no interaction.
-@MainActor
-final class AppDelegate: NSObject, NSApplicationDelegate {
-    let model = GateModel()
-    private var approvalWindows: ApprovalWindowManager?
-
-    func applicationDidFinishLaunching(_ notification: Notification) {
-        model.start()
-        approvalWindows = ApprovalWindowManager(model: model)
-    }
-}
-
 @main
 struct VaaraApp: App {
-    @NSApplicationDelegateAdaptor(AppDelegate.self) private var appDelegate
+    @StateObject private var model = GateModel()
+    @State private var approvals: ApprovalWindowManager?
 
     var body: some Scene {
         MenuBarExtra {
-            ContentView(model: appDelegate.model)
+            ContentView(model: model)
+                .onAppear {
+                    model.start()
+                    if approvals == nil {
+                        approvals = ApprovalWindowManager(model: model)
+                    }
+                }
         } label: {
-            Image(nsImage: menuImage(appDelegate.model))
+            Image(nsImage: menuImage(model))
         }
         .menuBarExtraStyle(.window)
     }

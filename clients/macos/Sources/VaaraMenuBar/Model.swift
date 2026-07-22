@@ -217,6 +217,7 @@ final class GateModel: ObservableObject {
     }
 
     func start() {
+        guard timer == nil else { return }   // idempotent: never double-start
         for path in config.db_paths { cursors[path] = maxSeq(path) }  // start at now
         // Auto-add every Vaara trail under ~/.vaara on launch, so a normal
         // user never has to hunt for or hand-add the audit DB. The default
