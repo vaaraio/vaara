@@ -37,7 +37,7 @@ private struct Palette {
 
 /// Bump on every source change; shown in the footer so a stale build is
 /// visible at a glance instead of masquerading as a bug.
-let BUILD_STAMP = "b17 · 2026-07-22"
+let BUILD_STAMP = "b18 · 2026-07-22"
 
 struct ContentView: View {
     @ObservedObject var model: GateModel
@@ -48,6 +48,8 @@ struct ContentView: View {
     enum Screen { case overview, settings, history, setup }
     @State private var engine = SetupScanner.engineStatus()
     @State private var clients: [MCPClient] = SetupScanner.scan()
+    @State private var installing = false
+    @State private var installLog: String?
 
     private var dark: Bool { model.config.appearance != "light" }
     private var p: Palette { dark ? .dark : .light }
@@ -278,10 +280,30 @@ struct ContentView: View {
                             .frame(width: 7, height: 7)
                         Text(engine.ok
                              ? "vaara found: \(engine.vaaraPath ?? "")"
-                             : "vaara not found. Install: brew install vaaraio/tap/vaara")
+                             : "vaara engine not installed on this Mac")
                             .font(.system(size: 11, design: .monospaced))
                             .foregroundStyle(p.faint)
                             .lineLimit(1).truncationMode(.middle)
+                    }
+                    if !engine.ok {
+                        HStack(spacing: 10) {
+                            Button(installing ? "Installing..." : "Install engine") {
+                                installEngine()
+                            }
+                            .buttonStyle(.plain)
+                            .font(.system(size: 11, weight: .medium))
+                            .foregroundStyle(installing ? p.ghost : GateState.green.color)
+                            .disabled(installing)
+                            Text("one-time, via Homebrew")
+                                .font(.system(size: 10))
+                                .foregroundStyle(p.ghost)
+                        }
+                        if let log = installLog {
+                            Text(log)
+                                .font(.system(size: 10, design: .monospaced))
+                                .foregroundStyle(p.ghost)
+                                .lineLimit(2).truncationMode(.middle)
+                        }
                     }
                 }
 
@@ -621,6 +643,22 @@ struct ContentView: View {
         if panel.runModal() == .OK, let url = panel.url {
             model.addSource(url.path)
         }
+    }
+
+    private func installEngine() {
+        installing = true
+        installLog = "starting Homebrew..."
+        SetupScanner.installEngine(
+            progress: { line in installLog = line },
+            done: { ok in
+                installing = false
+                engine = SetupScanner.engineStatus()
+                clients = SetupScanner.scan()
+                installLog = ok && engine.ok
+                    ? "engine installed: \(engine.vaaraPath ?? "")"
+                    : (ok ? "install finished; engine still not on PATH"
+                          : installLog)
+            })
     }
 
     // MARK: footer

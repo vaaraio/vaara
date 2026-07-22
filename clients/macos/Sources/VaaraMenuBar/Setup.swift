@@ -69,6 +69,48 @@ enum SetupScanner {
                      proxyPath: findBinary("vaara-mcp-proxy"))
     }
 
+    /// Install the engine with Homebrew, streaming progress lines back to
+    /// the caller. Runs only when the user clicks Install in Setup. If brew
+    /// is absent we do not silently fail: the completion message tells the
+    /// user the one manual step (install Homebrew) instead. The install is
+    /// the user's own machine, their own click, a public formula.
+    static func installEngine(
+        progress: @escaping (String) -> Void,
+        done: @escaping (Bool) -> Void
+    ) {
+        guard let brew = findBinary("brew") else {
+            progress("Homebrew not found. Install it from https://brew.sh, "
+                     + "then click Install again.")
+            done(false)
+            return
+        }
+        let proc = Process()
+        proc.executableURL = URL(fileURLWithPath: brew)
+        proc.arguments = ["install", "vaaraio/tap/vaara"]
+        let pipe = Pipe()
+        proc.standardOutput = pipe
+        proc.standardError = pipe
+        pipe.fileHandleForReading.readabilityHandler = { handle in
+            let chunk = handle.availableData
+            guard !chunk.isEmpty,
+                  let text = String(data: chunk, encoding: .utf8) else { return }
+            for line in text.split(separator: "\n") where !line.isEmpty {
+                let s = String(line)
+                DispatchQueue.main.async { progress(s) }
+            }
+        }
+        proc.terminationHandler = { p in
+            pipe.fileHandleForReading.readabilityHandler = nil
+            DispatchQueue.main.async { done(p.terminationStatus == 0) }
+        }
+        do {
+            try proc.run()
+        } catch {
+            progress("Could not start brew: \(error.localizedDescription)")
+            done(false)
+        }
+    }
+
     private static func isGoverned(_ server: [String: Any]) -> Bool {
         (server["command"] as? String)?.hasSuffix("vaara-mcp-proxy") == true
     }
