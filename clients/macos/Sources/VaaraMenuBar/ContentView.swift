@@ -37,7 +37,7 @@ struct Palette {
 
 /// Bump on every source change; shown in the footer so a stale build is
 /// visible at a glance instead of masquerading as a bug.
-let BUILD_STAMP = "b42 (b21+manager+HUD attach) · 2026-07-22"
+let BUILD_STAMP = "b43 (HUD from top border) · 2026-07-22"
 
 struct ContentView: View {
     @ObservedObject var model: GateModel

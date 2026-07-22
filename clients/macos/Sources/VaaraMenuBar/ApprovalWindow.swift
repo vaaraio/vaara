@@ -325,25 +325,22 @@ final class ApprovalWindowManager {
         } else {
             x = (full.midX - cardWidth / 2).rounded()
         }
-        // Start with the top edge at the very top of the screen (the card
-        // tucked in the notch), then lower it into place.
-        let startY = full.maxY - size.height
-        // Rest so the card's TOP edge sits at the notch's bottom edge, with
-        // a 2pt overlap up into it to kill any seam. The menu bar is a touch
-        // taller than the notch, so resting at visibleFrame.maxY left a
-        // small gap; anchoring to the notch height itself closes it. Off
-        // notch, rest just below the menu bar instead.
-        // Overlap the card's square top UP into the notch by ~a corner
-        // radius, so its black fills the slivers left at the notch's
-        // rounded bottom corners (black card + black notch = seamless).
+        // notch: start tucked in the notch (top at screen top), lower to
+        //   rest with the top overlapped up into the notch's black.
+        // no notch: start fully above the top border (hidden), slide down
+        //   to rest with the top edge FLUSH to the screen's top border, so
+        //   it reads as emerging from the top edge (covering the empty
+        //   center of the menu bar) rather than hanging off the bar bottom.
         let notchCornerFill: CGFloat = 10
-        // Off notch, rest with the top edge flush to the menu-bar bottom
-        // (a hair overlapped) so the square-top card hangs from the bar
-        // instead of floating detached below it.
-        let restTop = hasNotch
-            ? full.maxY - notch.height + notchCornerFill
-            : screen.visibleFrame.maxY + 2
-        let restY = restTop - size.height
+        let startY: CGFloat
+        let restY: CGFloat
+        if hasNotch {
+            startY = full.maxY - size.height
+            restY = (full.maxY - notch.height + notchCornerFill) - size.height
+        } else {
+            startY = full.maxY                       // fully above the border
+            restY = full.maxY - size.height           // top flush to the border
+        }
 
         panel.setFrame(NSRect(x: x, y: startY, width: cardWidth, height: size.height),
                        display: true)
