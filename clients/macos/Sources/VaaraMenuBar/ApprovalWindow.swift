@@ -293,7 +293,18 @@ final class ApprovalWindowManager {
         let size = host.fittingSize
 
         let full = screen.frame
-        let x = full.midX - size.width / 2
+        // Center on the NOTCH, not the screen. The notch is not always
+        // exactly at the screen midpoint (the left/right auxiliary areas
+        // can differ by a point), which showed as a 1px overhang on one
+        // side. Derive the notch's true center from the left auxiliary
+        // area, and snap x to a whole pixel to avoid sub-pixel bleed.
+        let centerX: CGFloat
+        if hasNotch, let left = screen.auxiliaryTopLeftArea {
+            centerX = full.minX + left.width + notch.width / 2
+        } else {
+            centerX = full.midX
+        }
+        let x = (centerX - size.width / 2).rounded()
         // Start with the top edge at the very top of the screen (the card
         // tucked in the notch), then lower it into place.
         let startY = full.maxY - size.height
