@@ -37,7 +37,7 @@ private struct Palette {
 
 /// Bump on every source change; shown in the footer so a stale build is
 /// visible at a glance instead of masquerading as a bug.
-let BUILD_STAMP = "b13 · 2026-07-22"
+let BUILD_STAMP = "b14 · 2026-07-22"
 
 struct ContentView: View {
     @ObservedObject var model: GateModel
@@ -362,7 +362,6 @@ struct ContentView: View {
     private var enterprise: Bool { model.config.user_level == "enterprise" }
 
     private var settings: some View {
-        ScrollView {
         VStack(alignment: .leading, spacing: 18) {
             VStack(alignment: .leading, spacing: 8) {
                 sectionLabelPlain("SETTINGS FOR")
@@ -497,8 +496,7 @@ struct ContentView: View {
             }
         }
         .padding(20)
-        }
-        .frame(maxHeight: 600)
+        .frame(maxWidth: .infinity, alignment: .leading)
     }
 
     private var customRow: some View {
