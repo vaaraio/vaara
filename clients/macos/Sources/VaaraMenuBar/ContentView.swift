@@ -155,7 +155,25 @@ struct ContentView: View {
                     Rectangle().fill(p.hairline).frame(height: 1)
                         .padding(.vertical, 6)
                 }
-                if model.feed.isEmpty {
+                if model.feed.isEmpty && model.agents.isEmpty && model.history().isEmpty {
+                    VStack(spacing: 12) {
+                        Text("Nothing is governed yet.")
+                            .font(.system(size: 12))
+                            .foregroundStyle(p.faint)
+                        Text("Open Setup, point your AI tools through\nVaara, and their moves show up here.")
+                            .font(.system(size: 10.5))
+                            .foregroundStyle(p.ghost)
+                            .multilineTextAlignment(.center)
+                        Button("Open Setup") {
+                            withAnimation(.easeInOut(duration: 0.15)) { screen = .setup }
+                        }
+                        .buttonStyle(.plain)
+                        .font(.system(size: 11, weight: .medium))
+                        .foregroundStyle(GateState.green.color)
+                    }
+                    .frame(maxWidth: .infinity)
+                    .padding(.vertical, 32)
+                } else if model.feed.isEmpty {
                     Text("No interventions yet.\nAllowed moves pass in silence.")
                         .font(.system(size: 11))
                         .foregroundStyle(p.ghost)
