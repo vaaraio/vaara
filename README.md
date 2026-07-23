@@ -26,6 +26,12 @@ Your AI agent transferred the funds, wrote the file, called the tool. Later, som
 
 Vaara checks every agent tool call against your policy and writes the call and its outcome into a signed, hash-chained record an outside party can verify offline, with no access to your system and none of your software. It needs no special hardware, and binds to your machine's TPM 2.0 or confidential-VM root when you have one. It runs entirely in your own environment. No SaaS, no telemetry. It answers "show me what the agent actually did" wherever that question lands: after an incident, in procurement, in a dispute. And when EU AI Act record-keeping obligations reach your systems, the same trail is the Article 12 evidence, already running.
 
+<p align="center">
+  <a href="https://github.com/vaaraio/vaara/releases/tag/v1.50.0"><img src="https://raw.githubusercontent.com/vaaraio/vaara/main/docs/vaara-v150-launch.gif" width="720" alt="Vaara launch demo"></a>
+</p>
+
+<p align="center"><a href="https://github.com/vaaraio/vaara/releases/tag/v1.50.0">Watch the full video with sound</a> &middot; Vaara for macOS is in public beta</p>
+
 ## Quick start
 
 ```bash
