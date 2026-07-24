@@ -9,7 +9,7 @@
 <meta name="author" content="Henri Sirkkavaara">
 <meta name="robots" content="index, follow, max-image-preview:large, max-snippet:-1, max-video-preview:-1">
 <meta name="googlebot" content="index, follow">
-<meta name="theme-color" content="#0F1417">
+<meta name="theme-color" content="#F8F9F7">
 <link rel="canonical" href="https://vaara.io/">
 <link rel="icon" type="image/svg+xml" href="/favicon.svg">
 <link rel="alternate icon" href="/favicon.ico">
@@ -34,10 +34,28 @@
 <meta name="twitter:description" content="Prove what an AI agent actually did, verifiable by an outside party without trusting you. EU AI Act Article 12. Open source, AGPL-3.0.">
 <meta name="twitter:image" content="https://raw.githubusercontent.com/vaaraio/vaara/main/docs/vaara-wordmark-light.png">
 <style>
-  /* Locked to the vaara_book / vaara_card grammar (research/vaara_visual_style.md).
-     Palette tokens are exact from research/vaara_book.html :root. Single dark
-     theme: the grammar is dark by construction. */
+  /* Derived from the vaara_book / vaara_card grammar (research/vaara_visual_style.md).
+     Light is the default theme; the original dark grammar is preserved verbatim
+     under html[data-theme="dark"]. Same identity, legible on paper: the sage green
+     is darkened for text so it passes contrast on white. */
   :root {
+    color-scheme: light;
+    --bg: #F8F9F7;
+    --panel: #FFFFFF;
+    --panel-2: #F1F4F0;
+    --deep: #ECEFEA;
+    --line: rgba(60,90,72,.18);
+    --ink: #1A2226;
+    --muted: #566159;
+    --faint: #7C857E;
+    --tri: #3E6B54;
+    --tri-bright: #2C523E;
+    --warn: #B4524F;
+    --mono: ui-monospace,'SFMono-Regular','JetBrains Mono','Fira Code',Menlo,Consolas,'Liberation Mono',monospace;
+    --sans: 'Inter',-apple-system,BlinkMacSystemFont,'Segoe UI',Helvetica,Arial,sans-serif;
+  }
+  html[data-theme="dark"] {
+    color-scheme: dark;
     --bg: #0F1417;
     --panel: #1A2226;
     --panel-2: #151D20;
@@ -49,8 +67,6 @@
     --tri: #78A08A;
     --tri-bright: #93B8A3;
     --warn: #D98B8B;
-    --mono: ui-monospace,'SFMono-Regular','JetBrains Mono','Fira Code',Menlo,Consolas,'Liberation Mono',monospace;
-    --sans: 'Inter',-apple-system,BlinkMacSystemFont,'Segoe UI',Helvetica,Arial,sans-serif;
   }
   * { box-sizing: border-box; }
   html, body {
@@ -95,6 +111,19 @@
   .evidence .dim { color: var(--faint); }
   #installs { color: var(--tri-bright); font-weight: 600; font-family: var(--mono); }
   .ago { opacity: .55; font-size: .85em; }
+  /* Theme toggle, top-right, in the mono label grammar (no icons). */
+  .theme-toggle { position: fixed; top: 14px; right: 16px; z-index: 10; display: inline-flex; gap: 2px; background: var(--panel); border: 1px solid var(--line); border-radius: 999px; padding: 4px; }
+  .theme-toggle button { appearance: none; background: none; border: 0; cursor: pointer; font-family: var(--mono); font-size: 11px; letter-spacing: 0.18em; text-transform: uppercase; color: var(--faint); padding: 4px 11px; border-radius: 999px; transition: color 0.15s ease, background 0.15s ease; }
+  .theme-toggle button[aria-pressed="true"] { color: var(--tri); background: var(--panel-2); }
+  .theme-toggle button:hover { color: var(--tri); }
+  .theme-toggle button:focus-visible { outline: 2px solid var(--tri); outline-offset: 2px; }
+  /* Launch video, sits under the problem paragraph. */
+  .hero-video { margin: 0 0 40px; border: 1px solid var(--line); border-radius: 12px; overflow: hidden; background: var(--panel-2); line-height: 0; }
+  .hero-video video { width: 100%; height: auto; display: block; }
+  /* Wordmark swaps with the theme: light-bg mark by default, dark-bg mark in dark. */
+  .wordmark .wm-dark { display: none; }
+  html[data-theme="dark"] .wordmark .wm-light { display: none; }
+  html[data-theme="dark"] .wordmark .wm-dark { display: inline-block; }
 </style>
 <script type="application/ld+json">
 {
@@ -176,14 +205,27 @@
   ]
 }
 </script>
+<script>
+  // Apply the stored theme before first paint so there is no flash. Light is
+  // the default; only an explicit dark choice sets the attribute.
+  (function(){ try { if (localStorage.getItem('vaara-theme') === 'dark') document.documentElement.setAttribute('data-theme','dark'); } catch(e){} })();
+</script>
 </head>
 <body>
+<div class="theme-toggle" role="group" aria-label="Color theme">
+  <button type="button" data-set-theme="light" aria-pressed="true">light</button>
+  <button type="button" data-set-theme="dark" aria-pressed="false">dark</button>
+</div>
 <main>
 <div class="wordmark">
-  <img src="https://raw.githubusercontent.com/vaaraio/vaara/main/docs/vaara-wordmark-dark.png" alt="Vaara">
+  <img class="wm-light" src="https://raw.githubusercontent.com/vaaraio/vaara/main/docs/vaara-wordmark-light.png" alt="Vaara">
+  <img class="wm-dark" src="https://raw.githubusercontent.com/vaaraio/vaara/main/docs/vaara-wordmark-dark.png" alt="Vaara">
 </div>
 <p style="text-align:center;text-transform:uppercase;letter-spacing:.14em;font-weight:600;opacity:.65;margin:.1rem 0 .6rem;font-size:.95rem;">Accountable Autonomy</p>
 <h1>Vaara is the tamper-evident runtime evidence layer for AI systems. It turns every action an agent takes into a record an outside party can verify without trusting you, then binds that record to the machine's own TPM 2.0 + IMA attestation. EU AI Act compliance, and any other case where you have to prove what an agent actually did.</h1>
+<div class="hero-video">
+  <video src="/vaara-launch.mp4" autoplay muted loop playsinline controls preload="metadata" aria-label="Vaara launch demo"></video>
+</div>
 <p class="stance">Open source. No SaaS. No telemetry. No signup.</p>
 <div class="evidence">
   <div class="evidence-head">
@@ -269,6 +311,24 @@ conformance: <span class="ok">CONFORMS</span>
       if (d.generated) setText("installs-ago", ago(d.generated));
     })
     .catch(function(){});
+})();
+</script>
+<script>
+(function(){
+  var root = document.documentElement;
+  var meta = document.querySelector('meta[name="theme-color"]');
+  var btns = document.querySelectorAll('.theme-toggle [data-set-theme]');
+  var COLORS = { light: "#F8F9F7", dark: "#0F1417" };
+  function apply(theme) {
+    if (theme === "dark") root.setAttribute("data-theme", "dark");
+    else root.removeAttribute("data-theme");
+    if (meta) meta.setAttribute("content", COLORS[theme] || COLORS.light);
+    btns.forEach(function(b){ b.setAttribute("aria-pressed", String(b.getAttribute("data-set-theme") === theme)); });
+    try { localStorage.setItem("vaara-theme", theme); } catch(e) {}
+  }
+  btns.forEach(function(b){ b.addEventListener("click", function(){ apply(b.getAttribute("data-set-theme")); }); });
+  // Sync button state and theme-color with whatever the head script already set.
+  apply(root.getAttribute("data-theme") === "dark" ? "dark" : "light");
 })();
 </script>
 </body>
