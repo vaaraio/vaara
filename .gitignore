@@ -37,6 +37,13 @@ application_*.pdf
 outbound_*.md
 site.py.live
 
+# Box/container recovery + toolchain rebuild notes — they name the private dev
+# rig (memory store, MCPs, container). Internal only, never publish.
+/restore.sh
+/restore*.sh
+/RECOVERY.md
+/RECOVERY*.md
+
 # CodeGraph index (local dev tool, not part of the repo)
 .codegraph/
 
