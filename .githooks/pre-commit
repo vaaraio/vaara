@@ -16,6 +16,8 @@ while IFS= read -r f; do
     research/*)              block+=("$f — research/ is internal");;
     docs/blog/*|docs/grant/*) block+=("$f — internal drafts directory");;
     *whole_picture*|*cold_read*) block+=("$f — private analytical doc pattern");;
+    restore.sh|restore*.sh|RECOVERY.md|RECOVERY*.md) block+=("$f — box/container recovery script, names the private dev rig");;
+    *claude-box*|*claude-home*) block+=("$f — private container/dev-rig reference");;
   esac
 done <<< "$staged"
 
