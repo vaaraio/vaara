@@ -4370,10 +4370,29 @@ def _cmd_menu(args: argparse.Namespace) -> int:
         return 0
 
 
+def _is_interactive() -> bool:
+    """True when a human is at the terminal (stdin and stdout are both TTYs)."""
+    return sys.stdin.isatty() and sys.stdout.isatty()
+
+
+def _default_entry(parser: argparse.ArgumentParser):
+    """Bare ``vaara`` with no subcommand: an interactive user is dropped into
+    the menu, while a non-interactive caller (pipe, script, CI) gets the usage
+    listing as before, so no automated caller changes behaviour."""
+    help_fn = _help_dispatch(parser)
+
+    def _run(args: argparse.Namespace) -> int:
+        if _is_interactive():
+            return _cmd_menu(args)
+        return help_fn(args)
+
+    return _run
+
+
 def build_parser() -> argparse.ArgumentParser:
     p = _SuggestingParser(prog="vaara", description="Vaara AI Agent Execution Layer")
     sub = p.add_subparsers(dest="cmd", metavar="COMMAND")
-    p.set_defaults(func=_help_dispatch(p))
+    p.set_defaults(func=_default_entry(p))
 
     sub.add_parser("version", help="Print Vaara version").set_defaults(func=_cmd_version)
 
