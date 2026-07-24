@@ -181,6 +181,18 @@ struct Config: Codable {
     }
 }
 
+/// One qualified timestamping provider from the EU trusted list, as emitted
+/// by `vaara anchor-providers --country CC --json`. The list almost never
+/// carries the RFC3161 endpoint, so it cannot be the identity: services under
+/// one provider are told apart by their service name.
+struct AnchorProvider: Codable, Identifiable {
+    let territory: String
+    let provider: String
+    let service_name: String
+    let endpoint: String
+    var id: String { "\(territory)|\(provider)|\(service_name)" }
+}
+
 @MainActor
 final class GateModel: ObservableObject {
     @Published var state: GateState = .green
@@ -841,6 +853,124 @@ final class GateModel: ObservableObject {
         let token = out.split(separator: " ").last.map(String.init)?
             .trimmingCharacters(in: .whitespacesAndNewlines)
         return (token?.isEmpty ?? true) ? nil : token
+    }
+
+    // MARK: - Qualified timestamp provider (EU trusted list)
+
+    /// The country whose trusted list the picker is showing.
+    @Published var anchorCountry: String = ""
+    /// Providers fetched for `anchorCountry`, empty until loaded.
+    @Published var anchorProviders: [AnchorProvider] = []
+    /// One-line status for the picker (loading / errors / count).
+    @Published var anchorStatus: String?
+    /// The endpoint currently set as the qualified anchor, nil when none.
+    @Published var configuredAnchorURL: String?
+    /// The display name of the chosen provider, for the summary.
+    @Published var configuredAnchorProvider: String?
+    /// The chosen provider's service name, to mark the right row selected.
+    @Published var configuredAnchorService: String?
+
+    /// Read whichever provider the operator has already chosen, so the pane
+    /// can show it and mark it selected in the list.
+    func loadConfiguredAnchor() {
+        guard let data = try? Data(contentsOf: pluginConfigURL),
+              let obj = try? JSONSerialization.jsonObject(with: data) as? [String: Any]
+        else { return }
+        configuredAnchorURL = obj["anchor_tsa_url"] as? String
+        configuredAnchorProvider = obj["anchor_provider"] as? String
+        configuredAnchorService = obj["anchor_service"] as? String
+        if let cc = obj["anchor_country"] as? String, anchorCountry.isEmpty {
+            anchorCountry = cc
+        }
+    }
+
+    /// Fetch a country's qualified TSAs by shelling to the engine's own
+    /// trusted-list picker, so the app and CLI share one source of truth
+    /// (the official LOTL) and one parser. No provider is defaulted.
+    func loadAnchorProviders(country: String) {
+        let cc = country.trimmingCharacters(in: .whitespaces).uppercased()
+        guard cc.count == 2 else {
+            anchorStatus = "Enter a two-letter country code (e.g. FI, AT, DE)."
+            return
+        }
+        guard let vaara = SetupScanner.engineStatus().vaaraPath else {
+            anchorStatus = "Vaara engine not found. Install it in Setup first."
+            return
+        }
+        anchorStatus = "loading the EU trusted list..."
+        anchorProviders = []
+        DispatchQueue.global().async {
+            let proc = Process()
+            proc.executableURL = URL(fileURLWithPath: vaara)
+            proc.arguments = ["anchor-providers", "--country", cc, "--json"]
+            let out = Pipe(), err = Pipe()
+            proc.standardOutput = out
+            proc.standardError = err
+            let ok = (try? proc.run()) != nil
+            if ok { proc.waitUntilExit() }
+            let data = out.fileHandleForReading.readDataToEndOfFile()
+            let errText = String(
+                data: err.fileHandleForReading.readDataToEndOfFile(),
+                encoding: .utf8) ?? ""
+            let list = (try? JSONDecoder().decode([AnchorProvider].self, from: data))
+            Task { @MainActor in
+                guard ok, proc.terminationStatus == 0, let list else {
+                    let low = errText.lowercased()
+                    if low.contains("invalid choice") || low.contains("usage:") {
+                        // The installed engine predates `anchor-providers`.
+                        self.anchorStatus =
+                            "Installed Vaara is too old for this. "
+                            + "Update the engine (brew upgrade vaara)."
+                    } else {
+                        self.anchorStatus = errText.isEmpty
+                            ? "could not load the trusted list"
+                            : errText.trimmingCharacters(in: .whitespacesAndNewlines)
+                    }
+                    return
+                }
+                self.anchorCountry = cc
+                self.anchorProviders = list
+                self.anchorStatus = list.isEmpty
+                    ? "no qualified providers listed for \(cc)"
+                    : "\(list.count) qualified provider\(list.count == 1 ? "" : "s")"
+            }
+        }
+    }
+
+    /// Choose a provider: record it as the qualified anchor immediately (a
+    /// click means the choice), writing to the shared config both the engine
+    /// and the hook read. The endpoint is prefilled when the trusted list
+    /// carries one (rare); otherwise it stays empty until the operator adds
+    /// the provider's request URL. Only the operator's own click writes here.
+    func chooseAnchorProvider(_ p: AnchorProvider) {
+        writePluginConfig(key: "anchor_provider", value: p.provider)
+        writePluginConfig(key: "anchor_service", value: p.service_name)
+        writePluginConfig(key: "anchor_country", value: p.territory)
+        let ep = p.endpoint.trimmingCharacters(in: .whitespacesAndNewlines)
+        writePluginConfig(key: "anchor_tsa_url", value: ep.isEmpty ? nil : ep)
+        configuredAnchorProvider = p.provider
+        configuredAnchorService = p.service_name
+        configuredAnchorURL = ep.isEmpty ? nil : ep
+    }
+
+    /// Set (or clear) the RFC3161 request URL for the chosen provider. The
+    /// trusted list rarely publishes it, so the operator supplies it; it is
+    /// what actually gets used when anchoring.
+    func setAnchorURL(_ url: String) {
+        let clean = url.trimmingCharacters(in: .whitespacesAndNewlines)
+        writePluginConfig(key: "anchor_tsa_url", value: clean.isEmpty ? nil : clean)
+        configuredAnchorURL = clean.isEmpty ? nil : clean
+    }
+
+    /// Clear the chosen provider (back to no configured anchor).
+    func clearAnchorProvider() {
+        writePluginConfig(key: "anchor_tsa_url", value: nil)
+        writePluginConfig(key: "anchor_provider", value: nil)
+        writePluginConfig(key: "anchor_service", value: nil)
+        writePluginConfig(key: "anchor_country", value: nil)
+        configuredAnchorURL = nil
+        configuredAnchorProvider = nil
+        configuredAnchorService = nil
     }
 
     // MARK: - Notifications
