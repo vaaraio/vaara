@@ -37,7 +37,7 @@ struct Palette {
 
 /// Bump on every source change; shown in the footer so a stale build is
 /// visible at a glance instead of masquerading as a bug.
-let BUILD_STAMP = "b44 (finalize settings) · 2026-07-22"
+let BUILD_STAMP = "b47 (anchor click-to-choose) · 2026-07-24"
 
 struct ContentView: View {
     @ObservedObject var model: GateModel
@@ -45,7 +45,7 @@ struct ContentView: View {
     @State private var selectedAgent: AgentSummary?
     @State private var discoveredCount: Int?
 
-    enum Screen { case overview, settings, history, setup }
+    enum Screen { case overview, settings, history, setup, anchor }
     @State private var engine = SetupScanner.engineStatus()
     @State private var clients: [MCPClient] = SetupScanner.scan()
     @State private var installing = false
@@ -80,6 +80,7 @@ struct ContentView: View {
                 case .settings: settings
                 case .history:  historyView
                 case .setup:    setupView
+                case .anchor:   anchorView
                 }
             }
             Rectangle().fill(p.hairline).frame(height: 1)
@@ -676,6 +677,119 @@ struct ContentView: View {
         .frame(maxWidth: .infinity, alignment: .leading)
     }
 
+    // MARK: anchor — the qualified timestamp provider (EU trusted list) picker
+
+    private var anchorView: some View {
+        VStack(alignment: .leading, spacing: 12) {
+            VStack(alignment: .leading, spacing: 4) {
+                sectionLabelPlain("QUALIFIED TIMESTAMP PROVIDER")
+                Text("Pick your eIDAS-qualified TSA. No default — you choose.")
+                    .font(.system(size: 10.5))
+                    .foregroundStyle(p.ghost)
+            }
+
+            // The chosen provider (click a row to choose). Its request URL
+            // sits here, editable — the trusted list rarely carries it, so
+            // add the provider's RFC3161 URL to actually anchor.
+            if let name = model.configuredAnchorProvider {
+                VStack(alignment: .leading, spacing: 6) {
+                    HStack(spacing: 8) {
+                        Image(systemName: "checkmark.seal.fill")
+                            .font(.system(size: 13))
+                            .foregroundStyle(model.state.color)
+                        Text(name)
+                            .font(.system(size: 13, weight: .medium))
+                            .foregroundStyle(p.ink)
+                        Spacer()
+                        Button("Clear") { model.clearAnchorProvider() }
+                            .buttonStyle(.plain)
+                            .font(.system(size: 11))
+                            .foregroundStyle(p.ghost)
+                    }
+                    TextField("request URL, e.g. https://tsa.provider.eu/tsr",
+                              text: Binding(
+                                get: { model.configuredAnchorURL ?? "" },
+                                set: { model.setAnchorURL($0) }))
+                        .textFieldStyle(.roundedBorder)
+                        .font(.system(size: 11, design: .monospaced))
+                    Text(model.configuredAnchorURL == nil
+                         ? "Add the provider's request URL to anchor."
+                         : "Anchoring against this URL.")
+                        .font(.system(size: 9))
+                        .foregroundStyle(p.ghost)
+                }
+                .padding(10)
+                .background(RoundedRectangle(cornerRadius: 8).fill(p.wash))
+            }
+
+            HStack(spacing: 8) {
+                TextField("Country (e.g. AT)", text: $model.anchorCountry)
+                    .textFieldStyle(.roundedBorder)
+                    .font(.system(size: 12))
+                    .frame(width: 140)
+                    .onSubmit { model.loadAnchorProviders(country: model.anchorCountry) }
+                Button("List providers") {
+                    model.loadAnchorProviders(country: model.anchorCountry)
+                }
+                .buttonStyle(.plain)
+                .font(.system(size: 12))
+                .foregroundStyle(p.ink.opacity(0.8))
+            }
+
+            if let status = model.anchorStatus {
+                Text(status)
+                    .font(.system(size: 10, design: .monospaced))
+                    .foregroundStyle(p.ghost)
+                    .lineLimit(2)
+                    .fixedSize(horizontal: false, vertical: true)
+            }
+
+            if !model.anchorProviders.isEmpty {
+                // A concrete height: a ScrollView in a popover that sizes to
+                // its content has no bounded height and would collapse, so
+                // pin it (capped) instead of relying on maxHeight.
+                let rows = CGFloat(model.anchorProviders.count)
+                ScrollView {
+                    VStack(alignment: .leading, spacing: 4) {
+                        ForEach(model.anchorProviders) { prov in
+                            let chosen = prov.provider == model.configuredAnchorProvider
+                                && prov.service_name == model.configuredAnchorService
+                            Button {
+                                model.chooseAnchorProvider(prov)
+                            } label: {
+                                HStack(alignment: .top, spacing: 8) {
+                                    Image(systemName: chosen
+                                          ? "largecircle.fill.circle" : "circle")
+                                        .font(.system(size: 13))
+                                        .foregroundStyle(chosen ? model.state.color : p.ghost)
+                                    VStack(alignment: .leading, spacing: 2) {
+                                        Text(prov.provider)
+                                            .font(.system(size: 13))
+                                            .foregroundStyle(p.ink)
+                                        if !prov.service_name.isEmpty {
+                                            Text(prov.service_name)
+                                                .font(.system(size: 10))
+                                                .foregroundStyle(p.faint)
+                                        }
+                                    }
+                                    Spacer()
+                                }
+                                .contentShape(Rectangle())
+                                .padding(.vertical, 4)
+                            }
+                            .buttonStyle(.plain)
+                        }
+                    }
+                    .frame(maxWidth: .infinity, alignment: .leading)
+                }
+                .frame(height: min(rows * 48 + 8, 200))
+            }
+        }
+        .padding(20)
+        .frame(maxWidth: .infinity, alignment: .leading)
+        .onAppear { model.loadConfiguredAnchor() }
+    }
+
     private var customRow: some View {
         let active = model.customThresholds != nil
         let escalate = model.customThresholds?.first ?? 0.55
@@ -828,9 +942,10 @@ struct ContentView: View {
     // MARK: footer
 
     private var footer: some View {
-        HStack(spacing: 16) {
+        HStack(spacing: 14) {
             footerTab("Now", .overview)
             footerTab("History", .history)
+            footerTab("Anchor", .anchor)
             footerTab("Setup", .setup)
             footerTab("Settings", .settings)
             Button {
