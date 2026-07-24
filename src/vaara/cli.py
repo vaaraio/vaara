@@ -4389,6 +4389,45 @@ def _default_entry(parser: argparse.ArgumentParser):
     return _run
 
 
+def _http_fetch(url: str) -> bytes:
+    """Fetch a trusted-list URL over HTTP(S). Refuses other schemes."""
+    import urllib.request
+
+    if not url.startswith(("https://", "http://")):
+        raise ValueError(f"refusing non-http url: {url!r}")
+    with urllib.request.urlopen(url, timeout=30) as resp:  # noqa: S310
+        return resp.read()
+
+
+def _cmd_anchor_providers(args: argparse.Namespace) -> int:
+    """List a country's EU qualified timestamping providers from the official
+    trusted list, so the operator can pick one for eIDAS-qualified anchoring.
+
+    It surfaces the public list and endorses no provider and sets no default:
+    the operator chooses, then passes the endpoint as the qualified TSA.
+    """
+    import json as _json
+    from dataclasses import asdict
+
+    from vaara.audit import eu_trusted_list
+
+    try:
+        tsas = eu_trusted_list.providers_for_country(args.country, fetch=_http_fetch)
+    except Exception as exc:  # noqa: BLE001 - network or parse, reported plainly
+        print(f"could not load the EU trusted list: {exc}", file=sys.stderr)
+        return 1
+
+    if args.json:
+        print(_json.dumps([asdict(t) for t in tsas], indent=2))
+        return 0
+    if not tsas:
+        print(f"no qualified timestamping providers found for {args.country!r}")
+        return 0
+    for t in tsas:
+        print(f"{t.provider}  |  {t.service_name}  |  {t.endpoint}")
+    return 0
+
+
 def build_parser() -> argparse.ArgumentParser:
     p = _SuggestingParser(prog="vaara", description="Vaara AI Agent Execution Layer")
     sub = p.add_subparsers(dest="cmd", metavar="COMMAND")
@@ -4401,6 +4440,16 @@ def build_parser() -> argparse.ArgumentParser:
         help="Interactive menu over the common commands, gated by settings "
              "depth (basic / professional / enterprise)",
     ).set_defaults(func=_cmd_menu)
+
+    pap = sub.add_parser(
+        "anchor-providers",
+        help="List EU qualified timestamping providers (QTSA) from the official "
+             "trusted list, to pick an eIDAS-qualified anchor",
+    )
+    pap.add_argument("--country", required=True, metavar="CC",
+                     help="ISO country code, e.g. AT, FI, DE")
+    pap.add_argument("--json", action="store_true", help="Emit JSON")
+    pap.set_defaults(func=_cmd_anchor_providers)
 
     pk = sub.add_parser(
         "keygen",
