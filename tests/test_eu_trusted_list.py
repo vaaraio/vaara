@@ -110,3 +110,20 @@ def test_providers_for_country_walks_lotl_to_national_list():
 
 def test_providers_for_country_unknown_country_is_empty():
     assert providers_for_country("ZZ", fetch=_fake_fetch) == []
+
+
+def test_parse_lotl_skips_non_https_pointers():
+    lotl = LOTL_XML.replace(
+        b"https://tl.example.at/tl.xml", b"http://tl.example.at/tl.xml"
+    )
+    assert parse_lotl(lotl) == []
+
+
+def test_xml_with_doctype_is_refused():
+    import pytest
+
+    hostile = b'<?xml version="1.0"?><!DOCTYPE x [<!ENTITY a "b">]>' + LOTL_XML.split(b"?>", 1)[1]
+    with pytest.raises(ValueError):
+        parse_lotl(hostile)
+    with pytest.raises(ValueError):
+        parse_trusted_list(hostile)

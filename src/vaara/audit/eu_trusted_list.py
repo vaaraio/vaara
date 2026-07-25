@@ -30,6 +30,19 @@ _XML_TL_MIME = "application/vnd.etsi.tsl+xml"
 _XML_LANG = "{http://www.w3.org/XML/1998/namespace}lang"
 
 
+def _parse_xml(data: bytes) -> ET.Element:
+    """Parse trusted-list XML with DTDs refused outright.
+
+    Genuine ETSI TS 119 612 lists carry no document type declaration, so any
+    DOCTYPE here is malformed or hostile (XXE, entity-expansion). Refusing it
+    up front keeps the stdlib parser safe without a new dependency.
+    """
+    head = data[:4096]
+    if b"<!DOCTYPE" in head or b"<!ENTITY" in head:
+        raise ValueError("trusted-list XML with a DTD is refused")
+    return ET.fromstring(data)
+
+
 @dataclass(frozen=True)
 class TSLPointer:
     """A pointer from the LOTL to one member state's national trusted list."""
@@ -85,7 +98,7 @@ def parse_lotl(data: bytes) -> list[TSLPointer]:
     Pointers to human-readable renderings (PDF) or other MIME types are
     skipped, so only machine-readable national lists remain.
     """
-    root = ET.fromstring(data)
+    root = _parse_xml(data)
     pointers: list[TSLPointer] = []
     for ptr in _iter(root, "OtherTSLPointer"):
         location = _text(_first(ptr, "TSLLocation"))
@@ -97,13 +110,17 @@ def parse_lotl(data: bytes) -> list[TSLPointer]:
                 break
         if not location or mime != _XML_TL_MIME:
             continue
+        # only https pointers are followed: a compromised or tampered LOTL must
+        # not be able to steer the fetcher at plain-http or non-web schemes
+        if not location.startswith("https://"):
+            continue
         pointers.append(TSLPointer(territory=territory, location=location))
     return pointers
 
 
 def parse_trusted_list(data: bytes, territory: str = "") -> list[QualifiedTSA]:
     """Return the granted qualified timestamping services in a national list."""
-    root = ET.fromstring(data)
+    root = _parse_xml(data)
     out: list[QualifiedTSA] = []
     for tsp in _iter(root, "TrustServiceProvider"):
         provider = _name_text(_first(tsp, "TSPName"))
