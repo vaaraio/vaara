@@ -152,7 +152,10 @@ class X402Gate:
             }
         ).encode("ascii")
         base = self.config.facilitator.rstrip("/")
-        for path in ("/verify", "/settle"):
+        # Each step must confirm with ITS OWN flags: a verify-shaped answer
+        # ("isValid") on /settle is not settlement and must not admit the call.
+        checks = (("/verify", ("isValid", "success")), ("/settle", ("settled", "success")))
+        for path, flags in checks:
             try:
                 req = urllib.request.Request(
                     base + path,
@@ -164,10 +167,6 @@ class X402Gate:
                     report = json.load(resp)
             except Exception:
                 return False
-            if not (
-                report.get("isValid")
-                or report.get("success")
-                or report.get("settled")
-            ):
+            if not any(report.get(flag) for flag in flags):
                 return False
         return True
