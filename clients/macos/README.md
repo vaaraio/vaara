@@ -22,7 +22,24 @@ It reads the same SQLite audit trails the
 `vaara-mcp-proxy` write. No server, no telemetry; everything stays on
 the machine.
 
-## Build
+## Install
+
+```bash
+brew tap vaaraio/tap && brew install vaara
+```
+
+This installs the CLI (`vaara`, `vaara-audit`, `vaara-mcp-proxy`, `vaara-mcp-server`)
+and the menu-bar app, both built from source on your machine. The app lands at
+`$(brew --prefix vaara)/Vaara.app`. Copy it to Applications:
+
+```bash
+cp -R "$(brew --prefix vaara)/Vaara.app" /Applications/
+open /Applications/Vaara.app
+```
+
+Add it to System Settings > General > Login Items to start with macOS.
+
+## Build from source
 
 Requires macOS 13+ and the Xcode Command Line Tools
 (`xcode-select --install`); no full Xcode needed.
