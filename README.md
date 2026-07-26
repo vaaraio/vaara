@@ -34,7 +34,7 @@ Your AI agent transferred the funds, wrote the file, called the tool. Later, som
 
 ```bash
 pip install vaara                            # Python: CLI, MCP proxy, server
-brew tap vaaraio/tap && brew install vaara   # CLI via Homebrew
+brew tap vaaraio/tap && brew install vaara   # macOS: CLI + menu-bar app (built from source)
 npm install @vaara/client                    # TypeScript client for the HTTP API
 ```
 
