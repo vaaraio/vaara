@@ -7,6 +7,14 @@ and this project follows [Semantic Versioning](https://semver.org/spec/v2.0.0.ht
 
 ## [Unreleased]
 
+## [1.51.1] - 2026-07-27
+
+### Added
+- Complete macOS App: Adds the `clients/macos/` directory, including the zero-dependency SwiftPM app and `build.sh` for Gatekeeper-free local builds.
+- Final UI Polish: Includes the latest refinements (notch-hugging approval windows, off-notch HUD emergence, and collapsible, screen-sized settings panes).
+- CLI Bridge: Adds `src/vaara/menu.py`, linking the existing governance engine to the graphical interface.
+- Live WAL Reading: Ensures the app correctly reads the live SQLite Write-Ahead Logs from the proxy and plugin.
+
 ## [1.51.0] - 2026-07-24
 
 ### Added
