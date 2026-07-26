@@ -7,6 +7,27 @@ and this project follows [Semantic Versioning](https://semver.org/spec/v2.0.0.ht
 
 ## [Unreleased]
 
+## [1.51.0] - 2026-07-24
+
+### Added
+
+- EU qualified timestamping provider picker, in the CLI and the macOS app.
+  `vaara anchor-providers --country CC` reads the official EU List of Trusted
+  Lists (LOTL, ETSI TS 119 612, Commission Implementing Decision 2015/1505),
+  finds the member state's national list, and shows its granted qualified
+  timestamping services (QTSA). Pick one interactively or with `--set N` and
+  it is written to the shared config as the anchor the engine and hook use
+  when `--anchor-tsa` is not passed. The macOS app gains an Anchor tab over
+  the same data: choose a country, list providers, click one to choose it.
+- The picker endorses no provider and sets no default. It shows the official
+  public list for the operator to choose from.
+
+### Notes
+
+- The trusted list attests which providers are qualified; it rarely carries
+  the RFC3161 request URL. Where the list omits it, the operator supplies the
+  provider's endpoint, prefilled on the rare entries that publish one.
+
 ## [1.50.0] - 2026-07-22
 
 Vaara for macOS enters public beta. The same governance engine the CLI

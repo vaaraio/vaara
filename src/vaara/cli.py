@@ -793,6 +793,10 @@ def _obtain_time_anchor(args: argparse.Namespace, trail):
     """
     anchor_tsa = getattr(args, "anchor_tsa", None)
     anchor_file = getattr(args, "anchor_file", None)
+    # Fall back to the provider the operator picked via `anchor-providers`,
+    # so a set qualified anchor is used without repeating --anchor-tsa.
+    if not anchor_tsa and not anchor_file:
+        anchor_tsa = _configured_anchor_tsa()
     if not anchor_tsa and not anchor_file:
         return None
 
@@ -4370,10 +4374,155 @@ def _cmd_menu(args: argparse.Namespace) -> int:
         return 0
 
 
+def _is_interactive() -> bool:
+    """True when a human is at the terminal (stdin and stdout are both TTYs)."""
+    return sys.stdin.isatty() and sys.stdout.isatty()
+
+
+def _default_entry(parser: argparse.ArgumentParser):
+    """Bare ``vaara`` with no subcommand: an interactive user is dropped into
+    the menu, while a non-interactive caller (pipe, script, CI) gets the usage
+    listing as before, so no automated caller changes behaviour."""
+    help_fn = _help_dispatch(parser)
+
+    def _run(args: argparse.Namespace) -> int:
+        if _is_interactive():
+            return _cmd_menu(args)
+        return help_fn(args)
+
+    return _run
+
+
+def _http_fetch(url: str) -> bytes:
+    """Fetch a trusted-list URL over HTTP(S). Refuses other schemes."""
+    import urllib.request
+
+    if not url.startswith(("https://", "http://")):
+        raise ValueError(f"refusing non-http url: {url!r}")
+    with urllib.request.urlopen(url, timeout=30) as resp:  # noqa: S310
+        return resp.read()
+
+
+def _set_configured_anchor(tsa, url: str) -> None:
+    """Write a chosen qualified TSA into the shared plugin config, next to the
+    keys the macOS app and the Claude Code hook already read. The operator's
+    choice becomes the anchor used when no ``--anchor-tsa`` is passed. Only the
+    operator's own selection is ever written: no provider is defaulted.
+
+    ``url`` is the RFC 3161 request endpoint. The EU trusted list rarely
+    publishes it (it attests who is qualified, not where to POST), so the
+    operator supplies it from the provider; where the list does carry one it
+    is prefilled."""
+    from vaara.menu import _load_config, _save_config
+
+    cfg = _load_config()
+    cfg["anchor_tsa_url"] = url
+    cfg["anchor_provider"] = tsa.provider
+    cfg["anchor_service"] = tsa.service_name
+    cfg["anchor_country"] = tsa.territory
+    _save_config(cfg)
+
+
+def _configured_anchor_tsa() -> str | None:
+    """The qualified TSA endpoint the operator picked, if any."""
+    from vaara.menu import _load_config
+
+    url = _load_config().get("anchor_tsa_url")
+    return url if isinstance(url, str) and url else None
+
+
+def _cmd_anchor_providers(args: argparse.Namespace) -> int:
+    """List a country's EU qualified timestamping providers from the official
+    trusted list and let the operator pick one as the eIDAS-qualified anchor.
+
+    It surfaces the public list and endorses no provider and sets no default.
+    The operator picks one and that endpoint is written to the shared config
+    as the anchor used when ``--anchor-tsa`` is not passed. ``--json`` emits the
+    raw list for another surface (the app) to render its own picker.
+    """
+    import json as _json
+    from dataclasses import asdict
+
+    from vaara.audit import eu_trusted_list
+
+    try:
+        tsas = eu_trusted_list.providers_for_country(args.country, fetch=_http_fetch)
+    except Exception as exc:  # noqa: BLE001 - network or parse, reported plainly
+        print(f"could not load the EU trusted list: {exc}", file=sys.stderr)
+        return 1
+
+    if args.json:
+        print(_json.dumps([asdict(t) for t in tsas], indent=2))
+        return 0
+    if not tsas:
+        print(f"no qualified timestamping providers found for {args.country!r}")
+        return 0
+
+    # Non-interactive scripted set: `--set N` picks the Nth provider (1-based).
+    if args.set is not None:
+        if args.set < 1 or args.set > len(tsas):
+            print(
+                f"no provider {args.set}: pick 1-{len(tsas)} for "
+                f"{args.country!r}",
+                file=sys.stderr,
+            )
+            return 1
+        chosen = tsas[args.set - 1]
+        url = (args.endpoint or chosen.endpoint or "").strip()
+        if not url:
+            print(
+                f"{chosen.provider} publishes no request URL in the trusted "
+                "list (it attests the provider, not the endpoint). Pass "
+                "--endpoint <RFC3161 URL> from the provider.",
+                file=sys.stderr,
+            )
+            return 1
+        _set_configured_anchor(chosen, url)
+        print(f"anchor set to {chosen.provider}  |  {url}")
+        return 0
+
+    for i, t in enumerate(tsas, 1):
+        shown = t.endpoint or "(request URL from the provider)"
+        print(f"{i}) {t.provider}  |  {t.service_name}  |  {shown}")
+
+    # At a terminal, offer to set one now; otherwise the numbered list stands
+    # (for piping, or `--set N`, or the app's own picker via `--json`).
+    if not sys.stdin.isatty():
+        return 0
+    answer = input(
+        f"\nSet which provider as the qualified anchor? [1-{len(tsas)}, "
+        "Enter to skip]: "
+    ).strip()
+    if not answer:
+        return 0
+    try:
+        pick = int(answer)
+    except ValueError:
+        print(f"not a number: {answer!r}", file=sys.stderr)
+        return 1
+    if pick < 1 or pick > len(tsas):
+        print(f"out of range: pick 1-{len(tsas)}", file=sys.stderr)
+        return 1
+    chosen = tsas[pick - 1]
+    url = (args.endpoint or chosen.endpoint or "").strip()
+    if not url:
+        # The list carries no endpoint for this provider; ask for it.
+        url = input(
+            f"RFC3161 request URL for {chosen.provider} "
+            "(from the provider, Enter to skip): "
+        ).strip()
+    if not url:
+        print("no URL given; nothing set", file=sys.stderr)
+        return 1
+    _set_configured_anchor(chosen, url)
+    print(f"anchor set to {chosen.provider}  |  {url}")
+    return 0
+
+
 def build_parser() -> argparse.ArgumentParser:
     p = _SuggestingParser(prog="vaara", description="Vaara AI Agent Execution Layer")
     sub = p.add_subparsers(dest="cmd", metavar="COMMAND")
-    p.set_defaults(func=_help_dispatch(p))
+    p.set_defaults(func=_default_entry(p))
 
     sub.add_parser("version", help="Print Vaara version").set_defaults(func=_cmd_version)
 
@@ -4382,6 +4531,23 @@ def build_parser() -> argparse.ArgumentParser:
         help="Interactive menu over the common commands, gated by settings "
              "depth (basic / professional / enterprise)",
     ).set_defaults(func=_cmd_menu)
+
+    pap = sub.add_parser(
+        "anchor-providers",
+        help="List EU qualified timestamping providers (QTSA) from the official "
+             "trusted list, to pick an eIDAS-qualified anchor",
+    )
+    pap.add_argument("--country", required=True, metavar="CC",
+                     help="ISO country code, e.g. AT, FI, DE")
+    pap.add_argument("--json", action="store_true",
+                     help="Emit the raw list as JSON (for another picker UI)")
+    pap.add_argument("--set", type=int, metavar="N", default=None,
+                     help="Set the Nth listed provider as the qualified anchor")
+    pap.add_argument("--endpoint", metavar="URL", default=None,
+                     help="RFC3161 request URL for the chosen provider "
+                          "(the trusted list rarely publishes it; get it "
+                          "from the provider)")
+    pap.set_defaults(func=_cmd_anchor_providers)
 
     pk = sub.add_parser(
         "keygen",
