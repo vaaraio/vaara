@@ -51,6 +51,8 @@ from datetime import datetime, timezone
 from pathlib import Path
 from typing import Any, Iterable, Optional
 
+from . import __version__
+
 
 # ── Trail loading helpers ─────────────────────────────────────────────
 
@@ -487,7 +489,7 @@ def build_parser() -> argparse.ArgumentParser:
         prog="vaara-audit",
         description="Third-party auditor CLI for Vaara signed trails.",
     )
-    p.add_argument("--version", action="version", version="vaara-audit 0.1.0")
+    p.add_argument("--version", action="version", version=f"vaara-audit {__version__}")
     sub = p.add_subparsers(dest="command", required=True)
 
     pv = sub.add_parser("verify", help="Verify signature + hash chain.")

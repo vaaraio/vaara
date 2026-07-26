@@ -7,6 +7,26 @@ and this project follows [Semantic Versioning](https://semver.org/spec/v2.0.0.ht
 
 ## [Unreleased]
 
+## [1.52.0] - 2026-07-27
+
+### Added
+- Homebrew formula now builds the CLI and macOS menu-bar app from source (`brew install vaaraio/tap/vaara`), no Apple Developer account or DMG required.
+- Webpage SEO: video poster image, structured VideoObject schema, correct Open Graph dimensions, `twitter:image:alt` for accessibility.
+
+### Fixed
+- macOS app uses `Bundle.main` instead of `Bundle.module` for resource loading, so swiftc builds (Homebrew) work alongside SwiftPM.
+- Anchor provider picker restored in the macOS app (was accidentally reverted in v1.51.1 merge).
+- `vaara-audit --version` now reads from `__version__` instead of a hardcoded `0.1.0`.
+- `MANIFEST.in` now includes `.joblib`, `py.typed`, and `*.json` profiles so sdist builds are functional.
+- Three broken doc links (`conformance/sep2828/fallback_projection_v0/` → `tests/vectors/fallback_projection_v0/`) corrected.
+- Wordmark image dimensions corrected to match actual aspect ratio (440×127), eliminating layout shift.
+- `og:image` height corrected (346) to match the actual wordmark dimensions.
+- TypeScript client `package-lock.json` regenerated to match `package.json` version.
+
+### Removed
+- Stale `clients/macos/packaging/vaara-app.rb` draft formula.
+- Video captions track removed (video is intentionally silent).
+
 ## [1.51.1] - 2026-07-27
 
 ### Added

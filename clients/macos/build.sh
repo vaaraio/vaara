@@ -20,8 +20,12 @@ if [ -n "$BUNDLE" ]; then
 fi
 
 cp AppIcon.icns "$APP/Contents/Resources/"
+cp -R Sources/VaaraMenuBar/Resources/icons "$APP/Contents/Resources/icons"
 
-cat > "$APP/Contents/Info.plist" <<'PLIST'
+# Read version from pyproject.toml
+VERSION=$(grep "^version = " ../../pyproject.toml | sed 's/version = "\(.*\)"/\1/')
+
+cat > "$APP/Contents/Info.plist" <<PLIST
 <?xml version="1.0" encoding="UTF-8"?>
 <!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN"
   "http://www.apple.com/DTDs/PropertyList-1.0.dtd">
@@ -30,8 +34,8 @@ cat > "$APP/Contents/Info.plist" <<'PLIST'
   <key>CFBundleName</key><string>Vaara</string>
   <key>CFBundleDisplayName</key><string>Vaara</string>
   <key>CFBundleIdentifier</key><string>io.vaara.menubar</string>
-  <key>CFBundleVersion</key><string>0.1.0</string>
-  <key>CFBundleShortVersionString</key><string>0.1.0</string>
+  <key>CFBundleVersion</key><string>${VERSION}</string>
+  <key>CFBundleShortVersionString</key><string>${VERSION}</string>
   <key>CFBundleExecutable</key><string>Vaara</string>
   <key>CFBundlePackageType</key><string>APPL</string>
   <key>LSMinimumSystemVersion</key><string>13.0</string>

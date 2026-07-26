@@ -1,4 +1,8 @@
 include LICENSE
 include README.md
 recursive-include src/vaara *.py
+recursive-include src/vaara/data *.joblib
+recursive-include src/vaara/attestation/profiles *.json
+recursive-include src/vaara/integrations *.json
+include src/vaara/py.typed
 recursive-include docs *.md

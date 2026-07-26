@@ -23,7 +23,6 @@ docs/grant/
 dist_verify/
 research/
 research/sfs_sr315/
-webpage/
 **/sfs_sr315/
 .claude/
 
@@ -126,13 +125,15 @@ tests/adversarial/traces/
 # file-exchange drop, Serena/tooling caches, reference material (PDFs), local
 # operating rules, and dated local audit notes. None are tracked; these rules
 # exist so an accidental `git add -A` cannot stage them.
-.intel/
-.shared/
-.serena/
-.reference/
 CLAUDE.md
 /AUDIT-*.md
 
 # Swift build artifacts for the macOS menu-bar app
 clients/macos/.build/
 clients/macos/dist/
+
+# Consolidated workspace (Serena, intel, shared, reference)
+.workspace/
+
+# opencode local config
+opencode.json

@@ -33,9 +33,10 @@ struct VaaraApp: App {
     }
 
     private func markImage(for state: GateState) -> NSImage {
-        if let url = Bundle.module.url(
-            forResource: "icons/vaara-\(state.rawValue)", withExtension: "png"),
-           let img = NSImage(contentsOf: url) {
+        let bundle = Bundle.main
+        let resourcePath = bundle.resourcePath ?? ""
+        let iconPath = "\(resourcePath)/icons/vaara-\(state.rawValue).png"
+        if let img = NSImage(contentsOfFile: iconPath) {
             return img
         }
         let color = stateColor(state)

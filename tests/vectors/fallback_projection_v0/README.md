@@ -67,7 +67,7 @@ receipt envelope, not in the projection preimage.
 ## Running the checker
 
 ```
-python3 conformance/sep2828/fallback_projection_v0/_check_independent.py
+python3 tests/vectors/fallback_projection_v0/_check_independent.py
 ```
 
 Standard library only (`hashlib`, `json`). Exit 0 means all 7 checks pass,
