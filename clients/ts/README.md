@@ -2,7 +2,7 @@
 
 Typed JavaScript / TypeScript HTTP client for the [Vaara](https://github.com/vaaraio/vaara) v1 API.
 
-Vaara is a runtime AI agent governance kernel: conformal risk scoring, hash-chained audit trail, EU AI Act article-evidence model, OVERT 1.0 attestation. This package is the JS/TS surface; the Python implementation runs the server.
+Vaara is the accountable autonomy layer: conformal risk scoring, hash-chained audit trail, and independently verifiable receipts for every autonomous action. This package is the JS/TS surface; the Python implementation runs the server.
 
 ## Install
 

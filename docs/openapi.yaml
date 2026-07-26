@@ -2,7 +2,7 @@ openapi: 3.1.0
 info:
   title: Vaara HTTP API
   version: "1.0.0"
-  summary: Conformal-scoring risk evaluation and hash-chained audit emission for AI agent actions.
+  summary: Conformal-scoring risk evaluation and hash-chained audit emission for autonomous actions.
   description: |
     The Vaara HTTP API exposes the Vaara runtime kernel as a network surface.
     Any agent runtime, control plane, or evaluation framework can call the

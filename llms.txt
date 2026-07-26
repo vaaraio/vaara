@@ -1,6 +1,6 @@
 # Vaara
 
-> Tamper-evident runtime evidence layer for AI agents. Covers EU AI Act compliance and any case where you need to prove what an agent actually did. Open source, no SaaS, no telemetry.
+> Accountable autonomy: a verifiable receipt for every autonomous action. Covers AI agents, agentic payments, supply chain, and any case where you need to prove what a system actually did. Open source, no SaaS, no telemetry.
 
 Vaara intercepts agent tool calls, scores each one with a conformal risk interval, and writes a hash-chained audit record. Online learning across five expert signals via Multiplicative Weight Update. Distribution-free conformal coverage on the score. An external auditor can verify these properties without trusting your stack.
 

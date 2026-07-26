@@ -6,7 +6,7 @@ your AI tools through Vaara's policy gate; from then on every agent
 move is decided by the rules you set and recorded in the signed audit
 trail, and the menu bar shows the verdicts as they happen.
 
-The Vaara mark sits in the menu bar tinted by your AI agents' latest
+The Vaara mark sits in the menu bar tinted by your latest
 verdict, with a small activity sparkline beside it:
 
 - green: moves are passing policy

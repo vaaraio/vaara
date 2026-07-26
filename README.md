@@ -20,7 +20,7 @@
 
 <p align="center"><b>Accountable Autonomy.</b></p>
 
-<p align="center">A verifiable receipt for every action your AI agents take, checkable by anyone.</p>
+<p align="center">A verifiable receipt for every autonomous action, checkable by anyone.</p>
 
 Your AI agent transferred the funds, wrote the file, called the tool. Later, someone who does not trust you asks you to prove exactly what it did and why: a regulator, an auditor, a customer after an incident. Your own logs will not settle it, because you could have edited them.
 
