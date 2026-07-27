@@ -5,13 +5,11 @@
   </picture>
 </p>
 
-<div align="center">
+<p align="center"><a href="https://pypi.org/project/vaara/"><img src="https://raw.githubusercontent.com/vaaraio/vaara/badges/pypi.svg" alt="PyPI"></a> <a href="https://github.com/vaaraio/vaara/blob/main/LICENSE"><img src="https://img.shields.io/pypi/l/vaara.svg" alt="License"></a> <a href="https://github.com/vaaraio/vaara/actions/workflows/ci.yml"><img src="https://github.com/vaaraio/vaara/actions/workflows/ci.yml/badge.svg" alt="CI"></a> <a href="https://scorecard.dev/viewer/?uri=github.com/vaaraio/vaara"><img src="https://github.com/vaaraio/vaara/actions/workflows/scorecard.yml/badge.svg" alt="OpenSSF Scorecard"></a> <a href="https://www.bestpractices.dev/projects/12612"><img src="https://www.bestpractices.dev/projects/12612/badge" alt="OpenSSF Best Practices"></a> <a href="https://huggingface.co/spaces/vaaraio/vaara"><img src="https://img.shields.io/badge/%F0%9F%A4%97%20Hugging%20Face-Space-blue" alt="Hugging Face Space"></a></p>
 
-[![PyPI](https://img.shields.io/pypi/v/vaara.svg)](https://pypi.org/project/vaara/) [![License](https://img.shields.io/pypi/l/vaara.svg)](https://github.com/vaaraio/vaara/blob/main/LICENSE) [![CI](https://github.com/vaaraio/vaara/actions/workflows/ci.yml/badge.svg)](https://github.com/vaaraio/vaara/actions/workflows/ci.yml) [![OpenSSF Scorecard](https://github.com/vaaraio/vaara/actions/workflows/scorecard.yml/badge.svg)](https://scorecard.dev/viewer/?uri=github.com/vaaraio/vaara) [![OpenSSF Best Practices](https://www.bestpractices.dev/projects/12612/badge)](https://www.bestpractices.dev/projects/12612) [![Hugging Face Space](https://img.shields.io/badge/%F0%9F%A4%97%20Hugging%20Face-Space-blue)](https://huggingface.co/spaces/vaaraio/vaara)
-
-![Downloads](https://raw.githubusercontent.com/vaaraio/vaara/badges/downloads.svg)
-
-</div>
+<p align="center">
+  <img src="https://raw.githubusercontent.com/vaaraio/vaara/badges/downloads.svg" alt="Downloads">
+</p>
 
 <p align="center"><b>Accountable Autonomy.</b></p>
 
