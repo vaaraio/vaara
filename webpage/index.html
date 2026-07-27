@@ -9,7 +9,7 @@
 <meta name="author" content="Henri Sirkkavaara">
 <meta name="robots" content="index, follow, max-image-preview:large, max-snippet:-1, max-video-preview:-1">
 <meta name="googlebot" content="index, follow">
-<meta name="theme-color" content="#F8F9F7">
+<meta name="theme-color" content="#ececec">
 <meta name="referrer" content="strict-origin-when-cross-origin">
 <link rel="canonical" href="https://vaara.io/">
 <link rel="icon" type="image/svg+xml" href="/favicon.svg">
@@ -53,7 +53,7 @@
      is darkened for text so it passes contrast on white. */
   :root {
     color-scheme: light;
-    --bg: #F8F9F7;
+    --bg: #ececec;
     --panel: #FFFFFF;
     --panel-2: #F1F4F0;
     --deep: #ECEFEA;
@@ -345,7 +345,7 @@ conformance: <span class="ok">CONFORMS</span>
   var root = document.documentElement;
   var meta = document.querySelector('meta[name="theme-color"]');
   var btns = document.querySelectorAll('.theme-toggle [data-set-theme]');
-  var COLORS = { light: "#F8F9F7", dark: "#0F1417" };
+  var COLORS = { light: "#ececec", dark: "#0F1417" };
   function apply(theme) {
     if (theme === "dark") root.setAttribute("data-theme", "dark");
     else root.removeAttribute("data-theme");
