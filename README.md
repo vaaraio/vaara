@@ -9,8 +9,7 @@
   <a href="https://pypi.org/project/vaara/"><img src="https://raw.githubusercontent.com/vaaraio/vaara/badges/pypi.svg" alt="PyPI"></a>
   <a href="https://github.com/vaaraio/vaara/blob/main/LICENSE"><img src="https://img.shields.io/pypi/l/vaara.svg" alt="License"></a>
   <a href="https://github.com/vaaraio/vaara/actions/workflows/ci.yml"><img src="https://github.com/vaaraio/vaara/actions/workflows/ci.yml/badge.svg" alt="CI"></a>
-</p>
-<p align="center">
+  <br>
   <img src="https://raw.githubusercontent.com/vaaraio/vaara/badges/downloads.svg" alt="Downloads">
 </p>
 
