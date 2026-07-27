@@ -5,9 +5,13 @@
   </picture>
 </p>
 
+<div align="center">
+
 [![PyPI](https://img.shields.io/pypi/v/vaara.svg)](https://pypi.org/project/vaara/) [![License](https://img.shields.io/pypi/l/vaara.svg)](https://github.com/vaaraio/vaara/blob/main/LICENSE) [![CI](https://github.com/vaaraio/vaara/actions/workflows/ci.yml/badge.svg)](https://github.com/vaaraio/vaara/actions/workflows/ci.yml) [![OpenSSF Scorecard](https://github.com/vaaraio/vaara/actions/workflows/scorecard.yml/badge.svg)](https://scorecard.dev/viewer/?uri=github.com/vaaraio/vaara) [![OpenSSF Best Practices](https://www.bestpractices.dev/projects/12612/badge)](https://www.bestpractices.dev/projects/12612) [![Hugging Face Space](https://img.shields.io/badge/%F0%9F%A4%97%20Hugging%20Face-Space-blue)](https://huggingface.co/spaces/vaaraio/vaara)
 
 ![Downloads](https://raw.githubusercontent.com/vaaraio/vaara/badges/downloads.svg)
+
+</div>
 
 <p align="center"><b>Accountable Autonomy.</b></p>
 
