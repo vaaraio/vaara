@@ -137,3 +137,4 @@ clients/macos/dist/
 
 # opencode local config
 opencode.json
+.shared/
