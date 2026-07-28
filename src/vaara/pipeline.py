@@ -41,6 +41,9 @@ from dataclasses import dataclass
 from typing import TYPE_CHECKING, Any, Optional, Sequence
 
 from vaara._sanitize import json_safe
+from pathlib import Path
+
+from vaara.audit.sqlite_backend import SQLiteAuditBackend
 from vaara.audit.trail import AuditTrail
 
 if TYPE_CHECKING:
@@ -240,7 +243,8 @@ class InterceptionPipeline:
             registry: Action taxonomy registry. Defaults to the built-in
                 set covering tx.*, data.*, id.*, etc.
             scorer: Risk scorer. Defaults to AdaptiveScorer().
-            trail: Audit trail sink. Defaults to in-memory AuditTrail().
+            trail: Audit trail sink. Defaults to a persistent SQLite trail
+                at ``~/.vaara/trail/audit.db``, auto-created on first use.
             compliance: Compliance reporter. Defaults to ComplianceEngine().
             enforce: When True (default), intercept() honours the scorer's
                 allow/deny/escalate decision. When False, the pipeline
@@ -260,7 +264,12 @@ class InterceptionPipeline:
         """
         self.registry = registry or create_default_registry()
         self.scorer = scorer or AdaptiveScorer()
-        self.trail = trail or AuditTrail()
+        if trail is None:
+            _db = Path.home() / ".vaara" / "trail" / "audit.db"
+            _db.parent.mkdir(parents=True, exist_ok=True)
+            self.trail = SQLiteAuditBackend(str(_db)).load_trail()
+        else:
+            self.trail = trail
         self.compliance = compliance or ComplianceEngine()
         self._enforce = enforce
         self._review_queue = review_queue
@@ -592,7 +601,22 @@ class InterceptionPipeline:
             regulatory_domains=action_type.regulatory_domains,
         )
 
-        # 8. If escalated, record escalation
+        # 8. If escalated, check for prior approval in the persistent trail.
+        #    When the same agent + tool_name was previously escalated and
+        #    approved, skip the escalation and auto-allow. The trail
+        #    remembers, so the operator is only asked once.
+        if decision_str == "escalate":
+            prior = self.trail.find_prior_approval(
+                agent_id=agent_id, tool_name=tool_name,
+            )
+            if prior is not None:
+                decision_str = "allow"
+                allowed = True
+                reason = (
+                    f"auto-allowed by prior approval "
+                    f"(action_id={prior.action_id}, {prior.timestamp})"
+                )
+
         if decision_str == "escalate":
             self.trail.record_escalation(
                 action_id=action_id,
