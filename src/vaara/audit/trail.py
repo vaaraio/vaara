@@ -934,23 +934,36 @@ class AuditTrail:
         ))
 
     def find_prior_approval(
-        self, agent_id: str, tool_name: str,
+        self, agent_id: str, tool_name: str, *,
+        args_digest: str = "", window_hours: float = 24,
     ) -> Optional[AuditRecord]:
-        """Check the trail for a prior escalation that was resolved as allow.
+        """Check the trail for a prior escalation resolved as allow.
 
-        Returns the matching resolution record, or None. This is the
-        persistence mechanism for "don't ask again" — the SQLite backend
-        survives restarts, so once an operator approves an action shape,
-        the pipeline auto-allows it on subsequent calls.
+        Matches on ``agent_id`` + ``tool_name`` within ``window_hours`` of
+        ``time.time()``. When ``args_digest`` is non-empty, also matches on
+        the SHA-256 hex digest of the tool arguments — so approving a
+        ``tx.transfer`` with amount 10 does not auto-allow amount 100000.
+        Returns the matching resolution record, or None.
+
+        The SQLite backend persists across restarts, so approved action
+        shapes survive process restarts within the time window.
         """
+        cutoff = time.time() - window_hours * 3600
         for r in reversed(self._records):
             if r.event_type != EventType.ESCALATION_RESOLVED:
+                continue
+            if r.timestamp < cutoff:
                 continue
             if r.agent_id != agent_id or r.tool_name != tool_name:
                 continue
             data = r.data or {}
-            if data.get("resolution") == "allow":
-                return r
+            if data.get("resolution") != "allow":
+                continue
+            if args_digest:
+                prior_digest = data.get("args_digest", "")
+                if prior_digest and prior_digest != args_digest:
+                    continue
+            return r
         return None
 
     # Length caps for caller-controlled free-text fields on this direct

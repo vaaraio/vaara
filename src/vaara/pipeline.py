@@ -33,6 +33,8 @@ Usage::
 
 from __future__ import annotations
 
+import hashlib
+import json
 import logging
 import threading
 import time
@@ -602,12 +604,17 @@ class InterceptionPipeline:
         )
 
         # 8. If escalated, check for prior approval in the persistent trail.
-        #    When the same agent + tool_name was previously escalated and
-        #    approved, skip the escalation and auto-allow. The trail
-        #    remembers, so the operator is only asked once.
+        #    When the same agent + tool_name (and args digest when available)
+        #    was escalated and approved within the last 24 hours, skip the
+        #    escalation and auto-allow. The time window and args digest
+        #    prevent a one-time approval from permanently opening the gate.
         if decision_str == "escalate":
+            args_digest = hashlib.sha256(
+                json.dumps(safe_params or {}, sort_keys=True).encode()
+            ).hexdigest() if safe_params else ""
             prior = self.trail.find_prior_approval(
                 agent_id=agent_id, tool_name=tool_name,
+                args_digest=args_digest, window_hours=24,
             )
             if prior is not None:
                 decision_str = "allow"
