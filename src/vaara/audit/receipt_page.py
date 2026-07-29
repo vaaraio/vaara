@@ -9,11 +9,10 @@ the page. No JavaScript, no external assets, no network; the file can be
 opened from disk, attached to an email, or hosted anywhere.
 
 The page never claims more than what is verifiable offline here: for
-``opentimestamps`` anchors it re-checks the proof against the receipt with
-:func:`vaara.audit.ots_anchor.verify_ots_anchor` when the ``ots`` extra is
-installed, and otherwise reports the anchor's recorded status as an
-unverified claim. Bitcoin block headers are never verified; the verify
-section tells the reader how to do that themselves.
+``scitt`` anchors it re-checks the inclusion proof against the receipt with
+:func:`vaara.audit.scitt_anchor.verify_scitt_anchor`, and otherwise reports
+the anchor's recorded status as an unverified claim. The verify section
+tells the reader how to run the full check themselves.
 
 Branding: edit ``BRAND`` (colors, name, tagline) to rebrand the page; the
 values below are the Vaara palette.
@@ -44,24 +43,23 @@ def _esc(value: Any) -> str:
     return html.escape(str(value), quote=True)
 
 
-def _ots_detail(receipt: dict, anchor: dict) -> tuple[str, list[int], list[str], bool]:
-    """(status, bitcoin block heights, pending calendars, verified_here).
+def _scitt_detail(receipt: dict, anchor: dict) -> tuple[str, str, bool]:
+    """(status, detail line, verified_here) for a SCITT anchor.
 
-    ``verified_here`` is True only when the proof was actually re-checked
-    against the receipt in this process; otherwise the status is whatever the
-    anchor claims.
+    Re-checks the inclusion proof against the receipt by recomputing the
+    Merkle root from (leaf, proof) — no key, no operator to trust.
     """
+    from vaara.audit.scitt_anchor import ScittAnchorError, verify_scitt_anchor
     try:
-        from vaara.audit.ots_anchor import verify_ots_anchor
-        from vaara.audit.timeanchor import TimeAnchorError
-    except ImportError:
-        return str(anchor.get("status", "unknown")), [], [], False
-    try:
-        result = verify_ots_anchor(receipt, anchor)
-    except TimeAnchorError as exc:
-        return f"INVALID: {exc}", [], [], True
-    return (result["status"], result["bitcoin_block_heights"],
-            result["pending_calendars"], True)
+        result = verify_scitt_anchor(receipt, anchor)
+    except ScittAnchorError as exc:
+        return f"INVALID: {exc}", "", True
+    if result["verified"]:
+        return ("verified",
+                f"leaf {result['leaf_index']} in tree of {result['tree_size']}",
+                True)
+    return (f"INVALID: {result['status']}",
+            f"leaf {result['leaf_index']}", True)
 
 
 def _qualified_detail(receipt: dict, anchor: dict) -> tuple[str, str, bool]:
@@ -110,9 +108,9 @@ def _chain_steps(receipt: dict, digest_hex: str) -> list[tuple[str, str]]:
         if not isinstance(anchor, dict):
             continue
         method = anchor.get("method", "?")
-        if method == "opentimestamps":
-            steps.append(("OpenTimestamps calendars",
-                          ", ".join(anchor.get("calendars") or ["?"])))
+        if method == "scitt":
+            steps.append(("SCITT transparency log",
+                          f"leaf {anchor.get('leafIndex', '?')}"))
         else:
             steps.append((f"{method} anchor",
                           anchor.get("anchoredDigest", "")))
@@ -128,19 +126,11 @@ def render_receipt_page(receipt: dict, *, title: str | None = None) -> str:
                if isinstance(a, dict)]
 
     anchor_rows = []
-    bitcoin_heights: list[int] = []
     for i, anchor in enumerate(anchors):
         method = anchor.get("method", "?")
-        if method == "opentimestamps":
-            status, heights, pending, verified = _ots_detail(receipt, anchor)
-            bitcoin_heights.extend(heights)
-            if heights:
-                detail = "Bitcoin block " + ", ".join(str(h) for h in heights)
-            elif pending:
-                detail = f"pending at {len(pending)} calendar(s)"
-            else:
-                detail = ""
-            checked = ("verified against this receipt offline" if verified
+        if method == "scitt":
+            status, detail, verified = _scitt_detail(receipt, anchor)
+            checked = ("inclusion proof re-checked by recomputation" if verified
                        else "status as recorded, not re-checked here")
         elif method == "rfc3161-eidas-qualified":
             status, detail, rechecked = _qualified_detail(receipt, anchor)
@@ -166,8 +156,7 @@ def render_receipt_page(receipt: dict, *, title: str | None = None) -> str:
         f'<div class="val">{_esc(value)}</div></div><div class="arrow">&#8595;</div>'
         for label, value in _chain_steps(receipt, digest_hex)
     )
-    final = ("Bitcoin block " + ", ".join(str(h) for h in sorted(set(bitcoin_heights)))
-             if bitcoin_heights else "witness anchors above")
+    final = "SCITT transparency log" if any(a.get("method") == "scitt" for a in anchors) else "witness anchors above"
     chain_html += (f'<div class="step final"><div class="lbl">public witness</div>'
                    f'<div class="val">{_esc(final)}</div></div>')
 
@@ -187,13 +176,11 @@ def render_receipt_page(receipt: dict, *, title: str | None = None) -> str:
 
     b = BRAND
     page_title = title or f'{b["name"]} receipt evidence'
-    has_ots = any(a.get("method") == "opentimestamps" for a in anchors)
+    has_scitt = any(a.get("method") == "scitt" for a in anchors)
     verify_cmds = _esc(
-        "vaara receipt upgrade-ots receipt.json   # fold in Bitcoin finality\n"
-        "ots verify payload.ots                   # reference client, against "
-        "a Bitcoin node\n"
-        "# or drop payload.ots on opentimestamps.org"
-    ) if has_ots else _esc("vaara verify-bundle bundle.json")
+        "vaara receipt anchor-scitt receipt.json  # add SCITT inclusion proof\n"
+        "vaara verify-bundle bundle.json           # full offline verification"
+    ) if has_scitt else _esc("vaara verify-bundle bundle.json")
 
     return f"""<!doctype html>
 <html lang="en">

@@ -386,9 +386,10 @@ class VaaraMCPProxy:
     def _is_filtered(name: object, allowlist: Optional[set[str]], denylist: set[str]) -> bool:
         if not isinstance(name, str):
             return True
-        if name in denylist:
+        name_lower = name.lower()
+        if any(d.lower() == name_lower for d in denylist):
             return True
-        if allowlist is not None and name not in allowlist:
+        if allowlist is not None and not any(a.lower() == name_lower for a in allowlist):
             return True
         return False
 
@@ -1009,11 +1010,11 @@ class VaaraMCPProxy:
                     "isError": True,
                 },
             }
-        # _vaara_agent_id is a proxy-side override for audit attribution;
-        # strip before forwarding so the upstream never sees Vaara metadata.
-        agent_id = arguments.pop("_vaara_agent_id", self._agent_id_default)
-        if not isinstance(agent_id, str):
-            agent_id = self._agent_id_default
+        # _vaara_agent_id from client input is not trusted — strip it so
+        # the upstream never sees Vaara metadata, and ignore the value
+        # for audit attribution. The proxy uses its configured default.
+        arguments.pop("_vaara_agent_id", None)
+        agent_id = self._agent_id_default
         # Unknown upstream tool names classify as generic high-risk in the
         # registry (fail-closed). Correct default for runtime governance.
         result = self._pipeline.intercept(

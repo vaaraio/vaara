@@ -933,6 +933,39 @@ class AuditTrail:
             tenant_id=self._tenant_for(action_id),
         ))
 
+    def find_prior_approval(
+        self, agent_id: str, tool_name: str, *,
+        args_digest: str = "", window_hours: float = 24,
+    ) -> Optional[AuditRecord]:
+        """Check the trail for a prior escalation resolved as allow.
+
+        Matches on ``agent_id`` + ``tool_name`` within ``window_hours`` of
+        ``time.time()``. When ``args_digest`` is non-empty, also matches on
+        the SHA-256 hex digest of the tool arguments — so approving a
+        ``tx.transfer`` with amount 10 does not auto-allow amount 100000.
+        Returns the matching resolution record, or None.
+
+        The SQLite backend persists across restarts, so approved action
+        shapes survive process restarts within the time window.
+        """
+        cutoff = time.time() - window_hours * 3600
+        for r in reversed(self._records):
+            if r.event_type != EventType.ESCALATION_RESOLVED:
+                continue
+            if r.timestamp < cutoff:
+                continue
+            if r.agent_id != agent_id or r.tool_name != tool_name:
+                continue
+            data = r.data or {}
+            if data.get("resolution") != "allow":
+                continue
+            if args_digest:
+                prior_digest = data.get("args_digest", "")
+                if prior_digest and prior_digest != args_digest:
+                    continue
+            return r
+        return None
+
     # Length caps for caller-controlled free-text fields on this direct
     # trail API. Mirrors the pipeline Loop 47 caps — record_policy_override
     # is a public surface that reaches the hash chain, narrative, export,

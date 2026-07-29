@@ -61,6 +61,7 @@ KNOWN_MCP_CLIENTS: list[tuple[str, str]] = [
     ("Claude Code", "~/.claude.json"),
     ("Cursor", "~/.cursor/mcp.json"),
     ("Windsurf", "~/.codeium/windsurf/mcp_config.json"),
+    ("OpenCode", "~/Projects/vaara/opencode.json"),
 ]
 
 _HOOK_EVENTS = (
