@@ -1985,7 +1985,8 @@ def _write_receipt_out(receipt: dict, args: argparse.Namespace,
     print(f"wrote {out}")
 
 
-def _cmd_receipt_anchor_scitt(args: argparse.Namespace) -> int:\n    """Add a SCITT transparency-log witness anchor to a receipt."""
+def _cmd_receipt_anchor_scitt(args: argparse.Namespace) -> int:
+    """Add a SCITT transparency-log witness anchor to a receipt."""
     from vaara.audit.scitt_anchor import ScittAnchor, ScittAnchorError
     receipt, path = _load_receipt(args.receipt, "anchor-scitt")
     if receipt is None or path is None:
