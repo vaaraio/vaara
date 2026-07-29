@@ -24,7 +24,6 @@ from datetime import datetime, timezone
 from pathlib import Path
 from typing import Any, Optional
 
-import rfc8785
 from asn1crypto import algos, cms, core, tsp
 from asn1crypto import x509 as asn1_x509
 from cryptography import x509
@@ -54,6 +53,7 @@ def _signed_payload_digest(receipt: dict) -> bytes:
         payload = {k: receipt[k] for k in _SIGNED_BLOCKS}
     except KeyError as exc:
         raise TimeAnchorError(f"receipt missing signed-payload block: {exc}") from exc
+    import rfc8785
     return hashlib.sha256(rfc8785.dumps(payload)).digest()
 
 
