@@ -2113,6 +2113,19 @@ def _cmd_proxy(args: argparse.Namespace) -> int:
     return 0
 
 
+def _cmd_proxy_shell(args: argparse.Namespace) -> int:
+    from vaara.integrations.shell_proxy import main as shell_main
+
+    cli_args = []
+    if args.db:
+        cli_args += ["--db", args.db]
+    if args.shell:
+        cli_args += ["--shell", args.shell]
+    if args.agent_id:
+        cli_args += ["--agent-id", args.agent_id]
+    return shell_main(cli_args)
+
+
 def _cmd_verify_bundle(args: argparse.Namespace) -> int:
     """Verify a whole evidence bundle from disk in one command.
 
@@ -4269,7 +4282,31 @@ def _cmd_init(args: argparse.Namespace) -> int:
         proxy_service=args.proxy_service,
         proxy_enforce=args.proxy_enforce,
         proxy_allow=args.proxy_allow,
+        auto=args.auto,
+        mode=args.mode,
     )
+
+    # Auto-discovery rendering.
+    if report.auto and report.discovery:
+        d = report.discovery
+        print("Environment discovery:")
+        running = [a for a in d.agents if a.running]
+        if running:
+            print(f"  AI agents running: {', '.join(a.display_name for a in running)}")
+        else:
+            print("  AI agents: none detected")
+        installed = [a for a in d.agents if not a.running]
+        if installed:
+            print(f"  Installed (not running): {', '.join(a.display_name for a in installed)}")
+        print(f"  Shell: {d.shell.path if d.shell else 'not detected'}")
+        print(f"  MCP clients: {sum(1 for c in d.mcp_clients if c.exists)} found")
+        print(f"  Sensitive paths: {len(d.sensitive_paths)} found")
+        print(f"  Known tools: {', '.join(sorted(d.known_tools.keys()))}")
+        if report.policy_path:
+            print(f"  Policy: {report.policy_path}")
+        if report.config_path:
+            print(f"  Config: {report.config_path}")
+        print()
 
     if report.hooks_changed:
         print(f"Claude Code hooks written to {report.hooks_path}")
@@ -4295,7 +4332,10 @@ def _cmd_init(args: argparse.Namespace) -> int:
         print(f"  warning: {warning}", file=sys.stderr)
 
     print()
-    print("Governance active. Reverse with: vaara ungovern")
+    govern_mode = "shadow (observing)" if args.shadow or args.auto else "enforcing"
+    mode_label = f" | Mode: {args.mode}" if hasattr(args, 'mode') and args.auto else ""
+    print(f"Vaara is governing. {govern_mode}{mode_label}")
+    print("Reverse with: vaara ungovern")
     return 0
 
 
@@ -5248,6 +5288,25 @@ def build_parser() -> argparse.ArgumentParser:
         help="Directory for signed pairs (required with --signing-key)",
     )
     pproxy.set_defaults(func=_cmd_proxy)
+
+    psh = sub.add_parser(
+        "proxy-shell",
+        help="Wrap any shell so every command goes through Vaara — block "
+             "dangerous commands, record everything in the trail.",
+    )
+    psh.add_argument(
+        "--db", default=None,
+        help="Trail database path (default ~/.vaara/trail/audit.db)",
+    )
+    psh.add_argument(
+        "--shell", default=None,
+        help="Shell to wrap (default $SHELL)",
+    )
+    psh.add_argument(
+        "--agent-id", default="shell",
+        help="Agent ID recorded in the trail (default 'shell')",
+    )
+    psh.set_defaults(func=_cmd_proxy_shell)
 
     pvb = sub.add_parser(
         "verify-bundle",
@@ -6244,6 +6303,16 @@ def build_parser() -> argparse.ArgumentParser:
         help="Govern in watch-only (shadow) mode: record without blocking.",
     )
     pinit.add_argument(
+        "--auto", action="store_true",
+        help="Auto-discover environment (agents, shell, MCP clients, sensitive"
+             " paths) and generate a default shadow-mode policy. One command"
+             " and vamos.",
+    )
+    pinit.add_argument(
+        "--mode", default="eco", choices=("eco", "balanced", "performance", "strict"),
+        help="Threshold preset for the auto-generated policy (default: eco).",
+    )
+    pinit.add_argument(
         "--no-mcp", action="store_true",
         help="Only write the Claude Code hooks; leave MCP client configs alone.",
     )
@@ -6280,7 +6349,44 @@ def build_parser() -> argparse.ArgumentParser:
 def main(argv: list[str] | None = None) -> int:
     parser = build_parser()
     args = parser.parse_args(argv)
+
+    # First-run auto-init: when the user runs *any* vaara command but has
+    # never initialised governance, offer to run ``init --auto`` in shadow
+    # mode.  This is the "brew install → governed" promise: no extra step,
+    # no config writing, just go.
+    if not _is_first_run_acknowledged() and _should_auto_init(args):
+        _run_first_time_setup()
+
     return args.func(args)
+
+
+def _is_first_run_acknowledged() -> bool:
+    """Check whether the user has already completed first-run setup."""
+    return (Path.home() / ".vaara" / "config.json").exists()
+
+
+def _should_auto_init(args: argparse.Namespace) -> bool:
+    """Decide whether to auto-init based on the subcommand.
+
+    We skip auto-init when the user is explicitly running ``init``,
+    ``ungovern``, ``help``, or a version query — those are intentional
+    governance gestures.
+    """
+    func_name = getattr(args.func, "__name__", "")
+    if func_name in ("_cmd_init", "_cmd_ungovern"):
+        return False
+    return True
+
+
+def _run_first_time_setup() -> None:
+    """Run auto-discovery silently on first use. No output, no command to remember."""
+    from vaara.integrations import init_governance as ig
+
+    try:
+        ig.run_init(shadow=True, auto=True, mode="balanced",
+                     trail_db=ig.DEFAULT_TRAIL_DB)
+    except Exception:
+        pass  # silent — next invocation will retry
 
 
 if __name__ == "__main__":

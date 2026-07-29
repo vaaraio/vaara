@@ -33,6 +33,13 @@ from dataclasses import dataclass, field
 from pathlib import Path
 from typing import Any, Optional
 
+from vaara.integrations.discovery import (
+    DiscoverReport,
+    run_discovery,
+    write_default_policy,
+    write_discovery_config,
+)
+
 # The single trail every local governance surface writes to. The hook runner
 # and MCP proxy are both pointed here so one canonical trail holds every
 # action (the mismatch that used to leave "only the demo showing up").
@@ -96,6 +103,11 @@ class InitReport:
     warnings: list[str] = field(default_factory=list)
     service_path: Optional[Path] = None
     service_removed: bool = False
+    # Auto-discovery fields (populated by ``--auto``).
+    auto: bool = False
+    discovery: Optional[DiscoverReport] = None
+    policy_path: Optional[Path] = None
+    config_path: Optional[Path] = None
 
 
 def resolve_vaara_bin() -> str:
@@ -383,16 +395,38 @@ def run_init(
     service_home: Optional[Path] = None,
     service_system: Optional[str] = None,
     service_runner: Any = None,
+    # Auto-discovery.
+    auto: bool = False,
+    mode: str = "eco",
 ) -> InitReport:
     """Set up (or self-heal) local governance in one call.
 
     With ``proxy_service=True`` the model proxy is also installed as a user
     service (launchd/systemd) so it survives logout — P2 of the plan. The
     ``service_*`` knobs exist for tests; production callers leave them None.
+
+    When ``auto=True`` the function runs full environment discovery and
+    generates a default shadow-mode policy and unified config before doing
+    the standard init steps — a true "one command and vamos" entry point.
     """
     vaara_bin = vaara_bin or resolve_vaara_bin()
     proxy_bin = proxy_bin or (shutil.which("vaara-mcp-proxy") or "vaara-mcp-proxy")
-    report = InitReport(hooks_path=settings_path, trail_db=trail_db)
+    report = InitReport(hooks_path=settings_path, trail_db=trail_db, auto=auto)
+
+    # Auto-discovery: scan environment, generate policy + config.
+    if auto:
+        discovery = run_discovery()
+        report.discovery = discovery
+        report.policy_path = write_default_policy(discovery, shadow=True,
+                                                   mode_name=mode)
+        report.config_path = write_discovery_config(discovery, shadow=True,
+                                                     trail_db=trail_db)
+        report.warnings.append(
+            f"Auto-discovery complete: {len(discovery.agents)} agent(s), "
+            f"{len(discovery.mcp_clients)} MCP client(s), "
+            f"{len(discovery.sensitive_paths)} sensitive path(s), "
+            f"{len(discovery.known_tools)} known tool(s)."
+        )
 
     report.hooks_changed = write_claude_hooks(settings_path, vaara_bin)
     write_hook_config(config_path, trail_db)
