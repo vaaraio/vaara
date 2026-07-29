@@ -122,9 +122,9 @@ def test_vaara_agent_id_override_is_stripped_before_forward(proxy):
     }
     p._handle_tools_call(request)
     intercept_kwargs = pipeline.intercept.call_args.kwargs
-    # Client-set _vaara_agent_id is no longer trusted (CVE fix).
+    # Client-set _vaara_agent_id is no longer trusted (CVE fix 2026-07-29).
     # Agent identity is pinned to the proxy's configured default.
-    assert intercept_kwargs["agent_id"] != "agent-007"
+    assert intercept_kwargs["agent_id"] == "mcp-proxy-client"
     # Forwarded arguments must not leak the Vaara-internal key.
     assert "_vaara_agent_id" not in intercept_kwargs["parameters"]
     forwarded = p._upstream.request.call_args.args[0]
