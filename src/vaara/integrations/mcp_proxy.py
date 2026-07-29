@@ -1018,6 +1018,10 @@ class VaaraMCPProxy:
         # to prevent agent identity spoofing (CVE-style).
         arguments = dict(arguments)  # shallow copy; pop must not touch caller's dict
         arguments.pop("_vaara_agent_id", None)
+        # Strip from the original request too — it is forwarded upstream at
+        # line ~1125 and must not carry Vaara-internal keys to the upstream.
+        if isinstance(params, dict) and isinstance(params.get("arguments"), dict):
+            params["arguments"].pop("_vaara_agent_id", None)
         agent_id = self._agent_id_default
         # Unknown upstream tool names classify as generic high-risk in the
         # registry (fail-closed). Correct default for runtime governance.

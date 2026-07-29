@@ -2,6 +2,7 @@
 
 import pytest
 
+from vaara.audit.sqlite_backend import SQLiteAuditBackend
 from vaara.pipeline import InterceptionPipeline
 from vaara.taxonomy.actions import (
     ActionCategory,
@@ -15,7 +16,10 @@ from vaara.taxonomy.actions import (
 
 @pytest.fixture
 def pipeline():
-    return InterceptionPipeline()
+    backend = SQLiteAuditBackend(":memory:")
+    trail = backend.load_trail()
+    trail._on_record = backend.write_record
+    return InterceptionPipeline(trail=trail)
 
 
 class TestInterceptionPipeline:

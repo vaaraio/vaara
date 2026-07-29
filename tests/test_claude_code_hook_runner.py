@@ -24,6 +24,12 @@ _SHIM = (
 
 
 def _run_hook(args, event: dict, home: Path, extra_env: dict | None = None):
+    # Prevent vaara.cli.main() from running auto-first-init which would
+    # overwrite the test's config.json with an audit_db path that points
+    # to .vaara/trail/audit.db instead of .vaara/claude-code/audit.db.
+    ack_dir = home / ".vaara"
+    ack_dir.mkdir(parents=True, exist_ok=True)
+    (ack_dir / "config.json").write_text("{}")
     env = {
         "HOME": str(home),
         "PATH": os.environ.get("PATH", ""),
