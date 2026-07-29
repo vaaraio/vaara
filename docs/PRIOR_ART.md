@@ -100,7 +100,7 @@ verify against the PyPI history and the `vX.Y.Z` git tags regardless of license 
 | Fail-closed governance hook: a Claude Code gate whose engine is not importable blocks `mcp__*` calls with an install hint instead of passing them through unscored (shadow mode exempt, documented `fail_open` opt-out), covered by subprocess tests that genuinely block the import | v1.27.0 (plugin 0.4.0), 2026-07-13 | `plugins/claude-code-vaara-governance/hooks/pre_tool_use.py`, `tests/test_plugin_config.py` |
 | Hook logic in the engine (`vaara hook pre-tool-use\|post-tool-use\|session-start`): any CLI install is a complete governance install, ending the split-brain where the CLI lived in one Python environment and the hooks silently ran another | v1.28.0 (plugin 0.6.0), 2026-07-13 | `src/vaara/integrations/claude_code_hooks.py`, `src/vaara/cli.py` |
 | A governance layer that announces its own death: when no runtime exists for the hooks (no `vaara` binary, no `python3`), SessionStart states on stdout, in the session's own context, that governance is not active and tool calls run unchecked, replacing the silent no-op failure mode | v1.28.0 (plugin 0.6.1), 2026-07-13 | `plugins/claude-code-vaara-governance/hooks/run.sh`, `plugins/claude-code-vaara-governance/hooks/session_start.py` |
-| Stacked receipt time anchoring: an OpenTimestamps witness anchor (method `opentimestamps`, standard detached `.ots` proof, pending-then-confirmed upgrade in place) over the same signed-payload digest the RFC 3161 / eIDAS anchor pins, so a receipt carries both an instant legal-grade timestamp and a zero-cost Bitcoin-backed public witness | v1.29.0, 2026-07-13 | `src/vaara/audit/ots_anchor.py`, `SPEC.md` Section 4, `tests/test_ots_anchor.py` |
+| Receipt time anchoring with SCITT transparency-log inclusion proof (method `scitt`) over the signed-payload digest, verifiable by recomputation with no key or operator to trust; stacks with the `rfc3161` instant anchor | v1.52.0, 2026-07-28 | `src/vaara/audit/scitt_anchor.py`, `SPEC.md` Section 4, `tests/test_scitt_anchor.py` |
 | Receipt evidence page: one receipt rendered to a self-contained static HTML document (decision facts, every timestamp anchor re-verified offline where possible, the commitment chain, and the exact commands a skeptic runs without trusting the page) — no JavaScript, no external assets, no network | v1.30.0, 2026-07-14 | `src/vaara/audit/receipt_page.py`, `tests/test_receipt_page.py` |
 | eIDAS-qualified timestamp anchors on receipts (method `rfc3161-eidas-qualified`): a producer that obtains the RFC 3161 token from a qualified trust service provider and refuses to record it unless the token's signer passes a mandatory certificate pin — the exact TSU certificate or the issuing CA listed on an EU trusted list — so the anchor carries Article 41's presumption of accuracy rather than a self-asserted method string; `scripts/qualified_anchor_dss_demo.py` reproduces the `QTSA` / `PASSED` verdict from the European Commission's DSS validator against the EU trusted lists over the bundled vector receipt | v1.30.0, 2026-07-14 | `src/vaara/audit/receipt_anchor.py`, `src/vaara/audit/timeanchor.py`, `scripts/qualified_anchor_dss_demo.py` |
 | Native decision basis carried in the SEP-2828 decision record itself: `decisionDerived.rationale` (the policy rule that fired, a human-legible reason, and the declared intent the call was judged against), `decisionDerived.binding` (content-addressed commitments to the policy, intent, and inputs, with the intent digest recomputable from the record where the declared intent is present), and the `decisionDerived.decisionProof` envelope (the wire format for a succinct proof that a verdict is the correct output of the committed policy on the committed intent and inputs), so the reason a call was decided reads from the record without a separate attestation | v1.32.0, 2026-07-15 | `src/vaara/attestation/_decision_conformance.py`, `tests/test_decision_rationale.py`, `CHANGELOG.md` v1.32.0 |
@@ -308,10 +308,12 @@ than a judgment of the work.
   tree whose root is committed to a Bitcoin transaction, so a detached
   `.ots` proof shows a digest existed no later than a block's time.
   The lineage runs back to Haber and Stornetta's linked timestamping
-  (1991). Vaara's `opentimestamps` receipt-anchor method
-  (`src/vaara/audit/ots_anchor.py`) produces standard `.ots` proofs
-  over the receipt's signed-payload digest, verifiable with the
-  reference `ots` client, stacked alongside the RFC 3161 anchor.
+  (1991). Vaara shipped an `opentimestamps` receipt-anchor method from
+  v1.29.0 to v1.51.x (`src/vaara/audit/ots_anchor.py`) which produced
+  standard `.ots` proofs over the receipt's signed-payload digest.
+  Superseded in v1.52.0 by the `scitt` transparency-log method
+  (`src/vaara/audit/scitt_anchor.py`), which provides the same
+  trust-minimized witness without Bitcoin finality latency.
 - **Linear Temporal Logic and runtime verification.** Pnueli (1977),
   Bauer, Leucker, Schallhart (2011). Background for the runtime-monitor
   literature cited above.

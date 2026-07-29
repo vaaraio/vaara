@@ -1964,7 +1964,7 @@ def _cmd_receipt_verify(args: argparse.Namespace) -> int:
     return 1 if failed else 0
 
 
-def _load_receipt_for_ots(path_str: str, verb: str) -> "tuple[Optional[dict], Optional[Path]]":
+def _load_receipt(path_str: str, verb: str) -> "tuple[Optional[dict], Optional[Path]]":
     path = Path(path_str).expanduser()
     if not path.is_file():
         print(f"vaara receipt {verb}: not a file: {path}", file=sys.stderr)
@@ -1985,69 +1985,22 @@ def _write_receipt_out(receipt: dict, args: argparse.Namespace,
     print(f"wrote {out}")
 
 
-def _cmd_receipt_anchor_ots(args: argparse.Namespace) -> int:
-    """Add an OpenTimestamps witness anchor to a receipt's timestampAnchors."""
-    try:
-        from vaara.audit.ots_anchor import DEFAULT_CALENDARS, ots_anchor_receipt
-        from vaara.audit.timeanchor import TimeAnchorError
-    except ImportError:
-        print("vaara receipt anchor-ots: requires the 'ots' extra "
-              "(pip install \"vaara[ots]\")", file=sys.stderr)
-        return 2
-    receipt, path = _load_receipt_for_ots(args.receipt, "anchor-ots")
+def _cmd_receipt_anchor_scitt(args: argparse.Namespace) -> int:
+    """Add a SCITT transparency-log witness anchor to a receipt."""
+    from vaara.audit.scitt_anchor import ScittAnchor, ScittAnchorError
+    receipt, path = _load_receipt(args.receipt, "anchor-scitt")
     if receipt is None or path is None:
         return 2
-    calendars = tuple(args.calendar) if args.calendar else DEFAULT_CALENDARS
+    anchorer = ScittAnchor()
     try:
-        anchor = ots_anchor_receipt(receipt, calendars=calendars)
-    except TimeAnchorError as exc:
-        print(f"vaara receipt anchor-ots: {exc}", file=sys.stderr)
+        anchor = anchorer.anchor_receipt(receipt)
+    except ScittAnchorError as exc:
+        print(f"vaara receipt anchor-scitt: {exc}", file=sys.stderr)
         return 2
     receipt.setdefault("timestampAnchors", []).append(anchor)
     _write_receipt_out(receipt, args, path)
-    print(f"opentimestamps anchor added: status={anchor['status']} "
-          f"calendars={len(anchor['calendars'])}")
-    print("Bitcoin finality typically lands in 1-6 hours; upgrade with: "
-          "vaara receipt upgrade-ots")
-    return 0
-
-
-def _cmd_receipt_upgrade_ots(args: argparse.Namespace) -> int:
-    """Upgrade a receipt's pending OpenTimestamps anchors to Bitcoin-final."""
-    try:
-        from vaara.audit.timeanchor import TimeAnchorError
-        from vaara.audit.ots_anchor import upgrade_ots_anchor
-    except ImportError:
-        print("vaara receipt upgrade-ots: requires the 'ots' extra "
-              "(pip install \"vaara[ots]\")", file=sys.stderr)
-        return 2
-    receipt, path = _load_receipt_for_ots(args.receipt, "upgrade-ots")
-    if receipt is None or path is None:
-        return 2
-    anchors = receipt.get("timestampAnchors") or []
-    ots_indices = [i for i, a in enumerate(anchors)
-                   if isinstance(a, dict) and a.get("method") == "opentimestamps"]
-    if not ots_indices:
-        print("vaara receipt upgrade-ots: receipt carries no opentimestamps "
-              "anchors", file=sys.stderr)
-        return 2
-    changed = False
-    for i in ots_indices:
-        try:
-            upgraded = upgrade_ots_anchor(anchors[i])
-        except TimeAnchorError as exc:
-            print(f"vaara receipt upgrade-ots: anchor {i}: {exc}", file=sys.stderr)
-            # A bad anchor must not discard upgrades already fetched for
-            # earlier anchors: persist those before reporting the failure.
-            if changed or args.out:
-                _write_receipt_out(receipt, args, path)
-            return 2
-        if upgraded != anchors[i]:
-            anchors[i] = upgraded
-            changed = True
-        print(f"anchor {i}: {upgraded['status']}")
-    if changed or args.out:
-        _write_receipt_out(receipt, args, path)
+    print(f"scitt anchor added: leafIndex={anchor['leafIndex']} "
+          f"treeSize={anchor['treeSize']}")
     return 0
 
 
@@ -2055,7 +2008,7 @@ def _cmd_receipt_render(args: argparse.Namespace) -> int:
     """Render a receipt to a self-contained static HTML evidence page."""
     from vaara.audit.receipt_page import render_receipt_page
     from vaara.audit.timeanchor import TimeAnchorError
-    receipt, path = _load_receipt_for_ots(args.receipt, "render")
+    receipt, path = _load_receipt(args.receipt, "render")
     if receipt is None or path is None:
         return 2
     try:
@@ -5214,42 +5167,21 @@ def build_parser() -> argparse.ArgumentParser:
     )
     prc_verify.set_defaults(func=_cmd_receipt_verify)
 
-    prc_aots = rcsub.add_parser(
-        "anchor-ots",
-        help="Add an OpenTimestamps witness anchor: submit the receipt's "
-             "signed-payload digest to public OTS calendars (pending "
-             "immediately, Bitcoin-final in hours). Stacks with rfc3161 "
-             "anchors. Requires the ots extra.",
+    prc_scitt = rcsub.add_parser(
+        "anchor-scitt",
+        help="Add a SCITT transparency-log witness anchor: append the "
+             "receipt's signed-payload digest to the in-process Merkle log "
+             "and record the inclusion proof. Instant, no third party, "
+             "verifiable by recomputation. Stacks with rfc3161 anchors.",
     )
-    prc_aots.add_argument(
+    prc_scitt.add_argument(
         "receipt", help="Path to a receipt JSON file (SPEC.md envelope)",
     )
-    prc_aots.add_argument(
-        "--calendar", action="append", default=None, metavar="URL",
-        help="OTS calendar server URL (repeatable; defaults to the public "
-             "alice/bob/finney calendars)",
-    )
-    prc_aots.add_argument(
+    prc_scitt.add_argument(
         "--out", default=None,
         help="Write the anchored receipt here instead of updating in place",
     )
-    prc_aots.set_defaults(func=_cmd_receipt_anchor_ots)
-
-    prc_uots = rcsub.add_parser(
-        "upgrade-ots",
-        help="Upgrade a receipt's pending OpenTimestamps anchors: fetch the "
-             "calendar upgrades and fold the Bitcoin attestation into the "
-             "proof in place. Idempotent; a network failure leaves the "
-             "anchor pending. Requires the ots extra.",
-    )
-    prc_uots.add_argument(
-        "receipt", help="Path to a receipt JSON file carrying OTS anchors",
-    )
-    prc_uots.add_argument(
-        "--out", default=None,
-        help="Write the upgraded receipt here instead of updating in place",
-    )
-    prc_uots.set_defaults(func=_cmd_receipt_upgrade_ots)
+    prc_scitt.set_defaults(func=_cmd_receipt_anchor_scitt)
 
     prc_render = rcsub.add_parser(
         "render",

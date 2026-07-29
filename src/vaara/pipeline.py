@@ -33,6 +33,8 @@ Usage::
 
 from __future__ import annotations
 
+import hashlib
+import json
 import logging
 import threading
 import time
@@ -41,6 +43,9 @@ from dataclasses import dataclass
 from typing import TYPE_CHECKING, Any, Optional, Sequence
 
 from vaara._sanitize import json_safe
+from pathlib import Path
+
+from vaara.audit.sqlite_backend import SQLiteAuditBackend
 from vaara.audit.trail import AuditTrail
 
 if TYPE_CHECKING:
@@ -240,7 +245,8 @@ class InterceptionPipeline:
             registry: Action taxonomy registry. Defaults to the built-in
                 set covering tx.*, data.*, id.*, etc.
             scorer: Risk scorer. Defaults to AdaptiveScorer().
-            trail: Audit trail sink. Defaults to in-memory AuditTrail().
+            trail: Audit trail sink. Defaults to a persistent SQLite trail
+                at ``~/.vaara/trail/audit.db``, auto-created on first use.
             compliance: Compliance reporter. Defaults to ComplianceEngine().
             enforce: When True (default), intercept() honours the scorer's
                 allow/deny/escalate decision. When False, the pipeline
@@ -260,7 +266,12 @@ class InterceptionPipeline:
         """
         self.registry = registry or create_default_registry()
         self.scorer = scorer or AdaptiveScorer()
-        self.trail = trail or AuditTrail()
+        if trail is None:
+            _db = Path.home() / ".vaara" / "trail" / "audit.db"
+            _db.parent.mkdir(parents=True, exist_ok=True)
+            self.trail = SQLiteAuditBackend(str(_db)).load_trail()
+        else:
+            self.trail = trail
         self.compliance = compliance or ComplianceEngine()
         self._enforce = enforce
         self._review_queue = review_queue
@@ -592,7 +603,27 @@ class InterceptionPipeline:
             regulatory_domains=action_type.regulatory_domains,
         )
 
-        # 8. If escalated, record escalation
+        # 8. If escalated, check for prior approval in the persistent trail.
+        #    When the same agent + tool_name (and args digest when available)
+        #    was escalated and approved within the last 24 hours, skip the
+        #    escalation and auto-allow. The time window and args digest
+        #    prevent a one-time approval from permanently opening the gate.
+        if decision_str == "escalate":
+            args_digest = hashlib.sha256(
+                json.dumps(safe_params or {}, sort_keys=True).encode()
+            ).hexdigest() if safe_params else ""
+            prior = self.trail.find_prior_approval(
+                agent_id=agent_id, tool_name=tool_name,
+                args_digest=args_digest, window_hours=24,
+            )
+            if prior is not None:
+                decision_str = "allow"
+                allowed = True
+                reason = (
+                    f"auto-allowed by prior approval "
+                    f"(action_id={prior.action_id}, {prior.timestamp})"
+                )
+
         if decision_str == "escalate":
             self.trail.record_escalation(
                 action_id=action_id,

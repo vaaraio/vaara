@@ -7,6 +7,24 @@ and this project follows [Semantic Versioning](https://semver.org/spec/v2.0.0.ht
 
 ## [Unreleased]
 
+## [1.53.0] - 2026-07-28
+
+### Added
+- SCITT transparency-log witness anchor (`vaara.audit.scitt_anchor`): append a receipt's signed-payload digest to a Merkle transparency log and record the inclusion proof as a `scitt` method entry in `timestampAnchors`. Verifiable by recomputation — no key, no operator, no third party. CLI: `vaara receipt anchor-scitt`. Replaces the `opentimestamps` method removed in this release.
+- Self-contained interactive HTML map of the eIDAS QTSP surveillance architecture at `.workspace/.shared/eidas/eidas-surveillance-map.html`.
+- Persistent trail by default: `@vaara.govern` with zero config auto-creates `~/.vaara/trail/audit.db` using SQLite. All actions survive process restarts — no more in-memory-only trail.
+- Prior approval auto-allow: when an escalated action is approved by the operator, the pipeline remembers. The same action shape from the same agent is auto-allowed next time, skipping the escalation. Persists across restarts via the SQLite trail.
+- OpenCode support in `vaara init`: OpenCode added to the known MCP clients list. `vaara init` now detects and governs OpenCode automatically.
+
+### Removed
+- OpenTimestamps (OTS) witness anchor method. The `opentimestamps` method, `ots_anchor.py`, `test_ots_anchor.py`, and the `[ots]` extras are removed. Superseded by the `scitt` method.
+- Default TSA/QTSP URLs removed from all anchor commands. Users must provide an explicit TSA URL; no provider is baked in. Added privacy-policy disclaimer on anchor subcommands.
+- In-memory-only default trail. Pipelines now default to persistent SQLite.
+
+### Changed
+- SPEC.md Section 4: `opentimestamps` method removed, `scitt` method registered. `rfc3161` and `rfc3161-eidas-qualified` unchanged.
+- `pyproject.toml`: `[ots]` extra removed, `[scitt]` extra added (`cbor2`, `cryptography`).
+
 ## [1.52.0] - 2026-07-27
 
 ### Added
