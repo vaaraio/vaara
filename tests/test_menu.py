@@ -1,4 +1,4 @@
-"""Tests for `vaara menu`: the tiered interactive menu."""
+"""Tests for `vaara menu`: the interactive menu."""
 from __future__ import annotations
 
 import json
@@ -22,63 +22,35 @@ def _feed(monkeypatch, answers):
     monkeypatch.setattr("builtins.input", lambda *a: next(it))
 
 
-def test_levels_gate_items(cfg):
-    basic = [label for label, _ in menu.visible_items("basic")]
-    pro = [label for label, _ in menu.visible_items("professional")]
-    ent = [label for label, _ in menu.visible_items("enterprise")]
-    assert any("Article 50 disclosure" in item for item in basic)
-    assert not any("Verify" in item for item in basic)
-    assert any("Verify" in item for item in pro)
-    assert not any("Article 12" in item for item in pro)
-    assert any("Article 12" in item for item in ent)
-    assert len(basic) < len(pro) < len(ent)
-
-
-def test_user_level_defaults_and_reads_config(cfg):
-    assert menu.user_level() == "basic"
-    cfg.write_text(json.dumps({"user_level": "enterprise"}))
-    assert menu.user_level() == "enterprise"
-    cfg.write_text(json.dumps({"user_level": "bogus"}))
-    assert menu.user_level() == "basic"
+def test_menu_has_expected_items():
+    labels = [label for label, _ in menu.ITEMS]
+    assert any("Status" in label for label in labels)
+    assert any("Shadow" in label for label in labels)
+    assert any("Shadow" in label for label in labels)
+    assert any("Export" in label for label in labels)
+    assert any("Verify" in label for label in labels)
+    assert any("Settings" in label for label in labels)
+    assert any("Check" in label for label in labels)
 
 
 def test_menu_renders_and_quits(cfg, monkeypatch, capsys):
     _feed(monkeypatch, ["q"])
     assert menu.run_menu() == 0
     out = capsys.readouterr().out
-    assert "settings depth: basic" in out
-    assert "Record an Article 50 disclosure" in out
-    assert "Verify" not in out
+    assert "vaara" in out
+    assert "Status" in out
 
 
-def test_settings_change_level_persists(cfg, monkeypatch, capsys):
-    _feed(monkeypatch, ["1", "professional"])
+def test_settings_gate_mode(cfg, monkeypatch, capsys):
+    _feed(monkeypatch, ["1", "watch"])
     menu._settings()
-    assert json.loads(cfg.read_text())["user_level"] == "professional"
-    assert "Saved" in capsys.readouterr().out
+    assert json.loads(cfg.read_text())["mode"] == "watch"
 
 
-def test_settings_sets_article50_principal(cfg, monkeypatch, capsys):
-    _feed(monkeypatch, ["4", "Example Oy"])
+def test_settings_protection_preset(cfg, monkeypatch, capsys):
+    _feed(monkeypatch, ["2", "strict"])
     menu._settings()
-    assert json.loads(cfg.read_text())["article50_on_behalf_of"] == "Example Oy"
-
-
-def test_record_disclosure_via_menu(cfg, monkeypatch, tmp_path, capsys):
-    db = tmp_path / "audit.db"
-    _feed(monkeypatch, [
-        str(db), "I am an AI agent acting for Example Oy.",
-        "Example Oy", "first_interaction",
-    ])
-    menu._record_disclosure()
-    out = capsys.readouterr().out
-    assert "agent profile" in out
-
-    from vaara.audit.article50 import find_disclosures
-    from vaara.audit.sqlite_backend import SQLiteAuditBackend
-
-    events = find_disclosures(SQLiteAuditBackend(db).load_trail()._records)
-    assert events[0]["on_behalf_of"] == "Example Oy"
+    assert json.loads(cfg.read_text())["protection"] == "strict"
 
 
 def test_status_without_trail(cfg, monkeypatch, tmp_path, capsys):
@@ -92,4 +64,4 @@ def test_cli_wires_menu(cfg, monkeypatch, capsys):
 
     _feed(monkeypatch, ["q"])
     assert main(["menu"]) == 0
-    assert "settings depth" in capsys.readouterr().out
+    assert "vaara" in capsys.readouterr().out

@@ -5,7 +5,37 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/)
 and this project follows [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
 
-## [Unreleased]
+## [1.54.0] - 2026-07-29
+
+### Added
+- `vaara proxy-shell`: wrap any shell so every command is governed.
+  Shell commands from Claude Code, Cursor, or any terminal AI hit the Vaara
+  pipeline — classified, scored, allowed or blocked, recorded in the trail.
+  Usage: `exec vaara proxy-shell` replaces your shell.
+- Auto-init on first use: the first `vaara` command silently discovers the
+  environment (running agents, MCP clients, shell, sensitive paths, known
+  tools), generates a default shadow-mode policy, and starts governing.
+  No commands to remember — install and it's ready.
+- Threshold presets for auto-init: `vaara init --auto --mode strict` selects
+  from eco (0.40/0.60), balanced (0.55/0.85), performance (0.70/0.92),
+  or strict (0.30/0.55) via the existing `policy.modes` system.
+- `vaara.integrations.discovery`: auto-discovery module that scans `ps`,
+  shell config, MCP client configs, and the filesystem to fingerprint the
+  governed environment.
+
+### Changed
+- `vaara menu`: rewritten to a flat list. No settings-depth tiers, no
+  Article 50 tunnel vision. Shows: status, shadow report, export, verify,
+  settings, updates. Every item delegates to the same CLI entry points.
+- Settings view in macOS app: two-column Grid layout. SETTINGS FOR, GATE,
+  PROTECTION, graph toggle, and UPDATES on the left; NOTIFY ON, SIGNAL
+  FADES, APPROVAL POPUP, GOVERN WHAT YOU CHOOSE, and APPROVALS FOLDER on
+  the right. Fits the 13" Air M3 screen at max HiDPI without vertical
+  scrolling.
+
+### Fixed
+- First-run no longer prints a "setup complete" message — silent auto-init
+  per the "one command and vamos" principle.
 
 ## [1.53.0] - 2026-07-28
 
