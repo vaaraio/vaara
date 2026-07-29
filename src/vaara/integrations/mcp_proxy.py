@@ -1011,8 +1011,12 @@ class VaaraMCPProxy:
                 },
             }
         # _vaara_agent_id from client input is not trusted — strip it so
-        # the upstream never sees Vaara metadata, and ignore the value
-        # for audit attribution. The proxy uses its configured default.
+        # the upstream never sees Vaara metadata, but use the proxy's own
+        # configured default for audit attribution. Only proxy operators
+        # can set VAARA_AGENT_ID to pin all calls through this proxy to a
+        # single identity; per-call overrides from the client are ignored
+        # to prevent agent identity spoofing (CVE-style).
+        arguments = dict(arguments)  # shallow copy; pop must not touch caller's dict
         arguments.pop("_vaara_agent_id", None)
         agent_id = self._agent_id_default
         # Unknown upstream tool names classify as generic high-risk in the
