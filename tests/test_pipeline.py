@@ -14,8 +14,13 @@ from vaara.taxonomy.actions import (
 
 
 @pytest.fixture
-def pipeline():
-    return InterceptionPipeline()
+def pipeline(tmp_path):
+    from pathlib import Path
+    from vaara.audit.sqlite_backend import SQLiteAuditBackend
+    db = tmp_path / "trail" / "audit.db"
+    db.parent.mkdir(parents=True, exist_ok=True)
+    trail = SQLiteAuditBackend(str(db)).load_trail()
+    return InterceptionPipeline(trail=trail)
 
 
 class TestInterceptionPipeline:
