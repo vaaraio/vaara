@@ -5,6 +5,20 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/)
 and this project follows [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
 
+## [1.55.0] - 2026-07-30
+
+### Added
+- `vaara llm-proxy`: govern LLM API calls from coding agents. Two modes:
+  `--mode relay` (blind route, no prompt inspection, audit=hash) and
+  `--mode govern` (inspect, scan, redact, full audit). Forwards to any
+  upstream provider — swap by changing `--upstream`. New optional extra:
+  `pip install 'vaara[llm-proxy]'`.
+
+### Fixed
+- Settings window width 400 → 520 (two-column Grid layout was cramped).
+- Check for Updates now sends `User-Agent` header (GitHub API was returning
+  403 without it).
+
 ## [1.54.0] - 2026-07-29
 
 ### Added
