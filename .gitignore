@@ -132,8 +132,9 @@ CLAUDE.md
 clients/macos/.build/
 clients/macos/dist/
 
-# Consolidated workspace (Serena, intel, shared, reference)
+# Workspace — internal docs, memory, intel, strategy
 .workspace/
+.shared/
 
 # opencode local config
 opencode.json

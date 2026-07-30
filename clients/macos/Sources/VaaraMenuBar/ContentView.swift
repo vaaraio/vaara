@@ -62,7 +62,7 @@ struct ContentView: View {
                 mainBody
             }
         }
-        .frame(width: 400)
+        .frame(width: 520)
         .background(p.wash)
         .background(.ultraThinMaterial)
         .environment(\.colorScheme, dark ? .dark : .light)

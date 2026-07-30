@@ -2126,6 +2126,48 @@ def _cmd_proxy_shell(args: argparse.Namespace) -> int:
     return shell_main(cli_args)
 
 
+def _cmd_llm_proxy(args: argparse.Namespace) -> int:
+    """Run the LLM API proxy.
+
+    Intercepts prompts from coding agents, strips secrets, enforces
+    model/rate policies, and forwards to the configured upstream provider.
+    """
+    from vaara.integrations.llm_proxy import main as llm_main
+
+    cli_args = []
+    cli_args += ["--upstream", args.upstream]
+    if args.api_key:
+        cli_args += ["--api-key", args.api_key]
+    if args.api_key_file:
+        cli_args += ["--api-key-file", args.api_key_file]
+    if args.api_key_header:
+        cli_args += ["--api-key-header", args.api_key_header]
+    if args.mode:
+        cli_args += ["--mode", args.mode]
+    if args.audit:
+        cli_args += ["--audit", args.audit]
+    if args.listen:
+        cli_args += ["--listen", args.listen]
+    if args.trail:
+        cli_args += ["--trail", args.trail]
+    if args.enforce:
+        cli_args.append("--enforce")
+    if args.model_allow:
+        for pat in args.model_allow:
+            cli_args += ["--model-allow", pat]
+    if args.model_deny:
+        for pat in args.model_deny:
+            cli_args += ["--model-deny", pat]
+    if args.rate_limit:
+        cli_args += ["--rate-limit", str(args.rate_limit)]
+    if args.redact:
+        for pat in args.redact:
+            cli_args += ["--redact", pat]
+    if args.agent_id_header:
+        cli_args += ["--agent-id-header", args.agent_id_header]
+    return llm_main(cli_args)
+
+
 def _cmd_verify_bundle(args: argparse.Namespace) -> int:
     """Verify a whole evidence bundle from disk in one command.
 
@@ -5307,6 +5349,51 @@ def build_parser() -> argparse.ArgumentParser:
         help="Agent ID recorded in the trail (default 'shell')",
     )
     psh.set_defaults(func=_cmd_proxy_shell)
+
+    pllp = sub.add_parser(
+        "llm-proxy",
+        help="Govern LLM API calls from coding agents: intercept prompts, "
+             "strip secrets, enforce model/rate policies, "
+             "record everything in the Vaara audit trail.",
+    )
+    pllp.add_argument("--upstream", required=True,
+                       help="Provider base URL, e.g. https://api.melious.ai/v1")
+    key_group = pllp.add_mutually_exclusive_group(required=True)
+    key_group.add_argument("--api-key", default=None,
+                           help="Upstream API key")
+    key_group.add_argument("--api-key-file", default=None,
+                           help="Path to file containing the upstream API key")
+    pllp.add_argument("--api-key-header", default="x-api-key",
+                       help="Header name for the API key (default: x-api-key)")
+    pllp.add_argument("--mode", default="relay",
+                       choices=["relay", "govern"],
+                       help="relay: blind route without inspecting prompts. "
+                            "govern: inspect, scan, redact (default: relay)")
+    pllp.add_argument("--audit", default="meta",
+                       choices=["meta", "hash", "full"],
+                       help="Audit level: meta (model/tokens/timestamp), "
+                            "hash (meta + sha256 of prompt), "
+                            "full (meta + redacted prompt). (default: meta)")
+    pllp.add_argument("--listen", default="127.0.0.1:8790",
+                       help="Bind address (default: 127.0.0.1:8790)")
+    pllp.add_argument("--trail", default=None,
+                       help="Trail database path")
+    pllp.add_argument("--enforce", action="store_true",
+                       help="Gate instead of observe-only (govern mode only)")
+    pllp.add_argument("--model-allow", action="append", default=None,
+                       metavar="GLOB",
+                       help="Allowed model name glob (repeatable)")
+    pllp.add_argument("--model-deny", action="append", default=None,
+                       metavar="GLOB",
+                       help="Denied model name glob (repeatable)")
+    pllp.add_argument("--rate-limit", type=int, default=0,
+                       help="Max requests per minute per agent (0 = unlimited)")
+    pllp.add_argument("--redact", action="append", default=None,
+                       metavar="REGEX",
+                       help="Additional regex pattern for redaction (repeatable)")
+    pllp.add_argument("--agent-id-header", default="x-agent-id",
+                       help="Header carrying agent identity (default: x-agent-id)")
+    pllp.set_defaults(func=_cmd_llm_proxy)
 
     pvb = sub.add_parser(
         "verify-bundle",

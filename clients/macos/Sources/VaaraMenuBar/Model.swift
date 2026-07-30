@@ -814,6 +814,7 @@ final class GateModel: ObservableObject {
         var req = URLRequest(
             url: URL(string: "https://api.github.com/repos/vaaraio/vaara/releases/latest")!)
         req.setValue("application/vnd.github+json", forHTTPHeaderField: "Accept")
+        req.setValue("VaaraMenuBar/1.55.0", forHTTPHeaderField: "User-Agent")
         URLSession.shared.dataTask(with: req) { data, _, _ in
             let latest: String? = data
                 .flatMap { try? JSONSerialization.jsonObject(with: $0) as? [String: Any] }
