@@ -120,7 +120,7 @@ def main(args: Optional[list[str]] = None) -> int:
     )
     p.add_argument(
         "--version", action="version",
-        version="vaara llm-proxy 1.55.0",
+        version="vaara llm-proxy 1.56.0",
     )
 
     parsed = p.parse_args(args)

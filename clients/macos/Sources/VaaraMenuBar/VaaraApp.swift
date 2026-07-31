@@ -9,11 +9,19 @@ struct VaaraApp: App {
     @StateObject private var model = GateModel()
     @State private var approvals: ApprovalWindowManager?
 
+    // XPC service for the WebKit Governance Network Extension.
+    private let policyService = PolicyServiceDelegate()
+    private let accessibilityObserver = AccessibilityObserver()
+
     var body: some Scene {
         MenuBarExtra {
             ContentView(model: model)
                 .onAppear {
                     model.start()
+                    // Start XPC listener for WebKit Governance extension.
+                    _ = policyService
+                    // Start Accessibility observer for UI context.
+                    accessibilityObserver.start()
                     if approvals == nil {
                         approvals = ApprovalWindowManager(model: model)
                     }

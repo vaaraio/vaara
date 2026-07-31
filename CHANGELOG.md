@@ -5,6 +5,21 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/)
 and this project follows [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
 
+## [1.56.0] - 2026-07-31
+
+### Added
+- `vaara check` and `vaara outcome` CLI commands — programmatic pipeline access
+  for external tools (macOS app, scripts, CI). Returns JSON decisions.
+- WebKit Governance (Phase 1-3): macOS Network Extension + Accessibility
+  observer + app UI. Intercepts AI traffic from Safari, Mail, Orion, and all
+  WKWebView-based apps at the system level. No browser extension required.
+  Requires Xcode build for the Network Extension target.
+- `vaara llm-proxy` --mode relay|govern and --audit meta|hash|full flags.
+
+### Fixed
+- macOS settings window width 400 → 520.
+- Check for Updates sends User-Agent header (GitHub API 403 fix).
+
 ## [1.55.0] - 2026-07-30
 
 ### Added

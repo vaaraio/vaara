@@ -645,7 +645,43 @@ struct ContentView: View {
                 }
             }
 
-            // Row 5: UPDATES  |  APPROVALS FOLDER (enterprise)
+            // Row 5: WEBKIT GOVERNANCE  |  status
+            GridRow {
+                VStack(alignment: .leading, spacing: 8) {
+                    sectionLabelPlain("WEBKIT GOVERNANCE")
+                    Toggle(isOn: $model.config.webkitGovernance) {
+                        Text("Govern WebKit actions")
+                            .font(.system(size: 13)).foregroundStyle(p.ink)
+                    }
+                    .toggleStyle(.switch)
+                    .controlSize(.mini)
+                    .tint(model.state.color)
+                    Text("Intercepts AI traffic from Safari, Mail, and all "
+                         + "WebKit-based apps. Requires Network Extension.")
+                        .font(.system(size: 9))
+                        .foregroundStyle(p.ghost)
+                }
+
+                VStack(alignment: .leading, spacing: 8) {
+                    if model.config.webkitGovernance {
+                        HStack(spacing: 6) {
+                            Circle().fill(Color.green).frame(width: 7, height: 7)
+                            Text("Active")
+                                .font(.system(size: 11))
+                                .foregroundStyle(p.ghost)
+                        }
+                    } else {
+                        HStack(spacing: 6) {
+                            Circle().fill(Color.gray).frame(width: 7, height: 7)
+                            Text("Inactive")
+                                .font(.system(size: 11))
+                                .foregroundStyle(p.ghost)
+                        }
+                    }
+                }
+            }
+
+            // Row 6: UPDATES  |  APPROVALS FOLDER (enterprise)
             GridRow {
                 VStack(alignment: .leading, spacing: 8) {
                     sectionLabelPlain("UPDATES")

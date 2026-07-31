@@ -9,6 +9,14 @@ let package = Package(
             name: "VaaraMenuBar",
             path: "Sources/VaaraMenuBar",
             resources: [.copy("Resources/icons")]
-        )
+        ),
+        .target(
+            name: "WebKitGovernance",
+            path: "Sources/WebKitGovernance",
+            linkerSettings: [
+                .linkedFramework("NetworkExtension"),
+                .linkedFramework("OSLog"),
+            ]
+        ),
     ]
 )

@@ -2168,6 +2168,60 @@ def _cmd_llm_proxy(args: argparse.Namespace) -> int:
     return llm_main(cli_args)
 
 
+def _cmd_check(args: argparse.Namespace) -> int:
+    """Check a single action through the pipeline and print the decision as JSON.
+    Used by the macOS WebKit Governance extension and other external tools.
+    """
+    import json
+
+    from vaara.audit.sqlite_backend import SQLiteAuditBackend
+    from vaara.pipeline import InterceptionPipeline
+    from vaara.taxonomy.actions import create_default_registry
+
+    registry = create_default_registry()
+    db = args.db or str(Path.home() / ".vaara" / "trail" / "audit.db")
+    Path(db).parent.mkdir(parents=True, exist_ok=True)
+    trail = SQLiteAuditBackend(db).load_trail()
+    pipeline = InterceptionPipeline(registry=registry, trail=trail)
+
+    params = {}
+    for p in args.param or []:
+        if "=" in p:
+            k, v = p.split("=", 1)
+            params[k] = v
+
+    result = pipeline.intercept(
+        agent_id=args.agent,
+        tool_name=args.tool,
+        parameters=params,
+    )
+
+    print(json.dumps({
+        "action_id": result.action_id,
+        "decision": result.decision,
+        "allowed": result.allowed,
+        "risk_score": result.risk_score,
+        "reason": result.reason,
+        "evaluation_ms": result.evaluation_ms,
+    }))
+    return 0 if result.allowed else 1
+
+
+def _cmd_outcome(args: argparse.Namespace) -> int:
+    """Record an outcome for a previously checked action."""
+    from vaara.audit.sqlite_backend import SQLiteAuditBackend
+    from vaara.pipeline import InterceptionPipeline
+    from vaara.taxonomy.actions import create_default_registry
+
+    registry = create_default_registry()
+    db = args.db or str(Path.home() / ".vaara" / "trail" / "audit.db")
+    trail = SQLiteAuditBackend(db).load_trail()
+    pipeline = InterceptionPipeline(registry=registry, trail=trail)
+
+    pipeline.report_outcome(args.action_id, outcome_severity=args.severity)
+    return 0
+
+
 def _cmd_verify_bundle(args: argparse.Namespace) -> int:
     """Verify a whole evidence bundle from disk in one command.
 
@@ -5394,6 +5448,29 @@ def build_parser() -> argparse.ArgumentParser:
     pllp.add_argument("--agent-id-header", default="x-agent-id",
                        help="Header carrying agent identity (default: x-agent-id)")
     pllp.set_defaults(func=_cmd_llm_proxy)
+
+    pchk = sub.add_parser(
+        "check",
+        help="Check a single action through the Vaara pipeline "
+             "(used by macOS WebKit Governance extension).",
+    )
+    pchk.add_argument("--tool", required=True, help="Tool/action name (e.g. web.navigate)")
+    pchk.add_argument("--agent", default="webkit", help="Agent identifier")
+    pchk.add_argument("--param", action="append", default=None, metavar="KEY=VALUE",
+                       help="Action parameters (repeatable)")
+    pchk.add_argument("--db", default=None, help="Trail database path")
+    pchk.set_defaults(func=_cmd_check)
+
+    pout = sub.add_parser(
+        "outcome",
+        help="Record an outcome for a previously checked action "
+             "(used by macOS WebKit Governance extension).",
+    )
+    pout.add_argument("--action-id", required=True, help="Action ID from vaara check")
+    pout.add_argument("--severity", type=float, default=0.0,
+                       help="Outcome severity 0.0 (safe) to 1.0 (catastrophic)")
+    pout.add_argument("--db", default=None, help="Trail database path")
+    pout.set_defaults(func=_cmd_outcome)
 
     pvb = sub.add_parser(
         "verify-bundle",

@@ -107,6 +107,7 @@ struct Config: Codable {
     /// (e.g. when the notch is hidden via BetterDisplay and the OS reports
     /// no safe area).
     var approval_style: String = "auto"
+    var webkitGovernance: Bool = false
 
     // Tolerate configs written before a field existed, including the
     // Python proto's single db_path key, which migrates into db_paths.
@@ -134,11 +135,12 @@ struct Config: Codable {
         user_level = try c.decodeIfPresent(String.self, forKey: .user_level) ?? base.user_level
         approvals_dir = try c.decodeIfPresent(String.self, forKey: .approvals_dir)
         approval_style = try c.decodeIfPresent(String.self, forKey: .approval_style) ?? base.approval_style
+        webkitGovernance = try c.decodeIfPresent(Bool.self, forKey: .webkitGovernance) ?? base.webkitGovernance
     }
 
     enum CodingKeys: String, CodingKey {
         case db_paths, alert_window_minutes, notifications, appearance, menubar_graph
-        case notify_on, user_level, approvals_dir, approval_style
+        case notify_on, user_level, approvals_dir, approval_style, webkitGovernance
         case legacy_db_path = "db_path"
     }
 
@@ -814,7 +816,7 @@ final class GateModel: ObservableObject {
         var req = URLRequest(
             url: URL(string: "https://api.github.com/repos/vaaraio/vaara/releases/latest")!)
         req.setValue("application/vnd.github+json", forHTTPHeaderField: "Accept")
-        req.setValue("VaaraMenuBar/1.55.0", forHTTPHeaderField: "User-Agent")
+        req.setValue("VaaraMenuBar/1.56.0", forHTTPHeaderField: "User-Agent")
         URLSession.shared.dataTask(with: req) { data, _, _ in
             let latest: String? = data
                 .flatMap { try? JSONSerialization.jsonObject(with: $0) as? [String: Any] }
