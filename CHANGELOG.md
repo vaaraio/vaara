@@ -5,6 +5,21 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/)
 and this project follows [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
 
+## [1.56.1] - 2026-08-02
+
+### Security
+- **x402 settlement binding**: `X402Gate._settle()` now captures the facilitator
+  settlement response and exposes it via `last_settlement_evidence`. The
+  `/v1/anchor` endpoint returns `settlement_evidence_digest` so callers can bind
+  the paid settlement artifact into a receipt's `evidenceRef.digest`.
+- **JCS canonicalization parity**: `_decision_binding.py` no longer silently
+  produces non-JCS digests via stdlib fallback. Now delegates to the canonical
+  `rfc8785.dumps()` first, then warns on divergence. Fixes a forgery/rejection
+  seam in the keyless decision-proof path.
+- **eIDAS TOFU guard**: `server/anchor.py` trust-on-first-use CA probing now
+  requires explicit `VAARA_ANCHOR_ALLOW_TOFU=1`. Previously ungated — production
+  operators could silently trust an endpoint's first response.
+
 ## [1.56.0] - 2026-07-31
 
 ### Added
