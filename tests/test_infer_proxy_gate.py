@@ -30,8 +30,9 @@ MESSAGES = [{"role": "user", "content": "Do the thing."}]
 def _pipeline(escalate: float, deny: float) -> InterceptionPipeline:
     from vaara.policy import from_dict
     from vaara.policy.modes import get_mode, to_policy_dict
+    from vaara.audit.trail import AuditTrail
 
-    pipeline = InterceptionPipeline(enforce=True)
+    pipeline = InterceptionPipeline(enforce=True, trail=AuditTrail())
     policy = to_policy_dict(get_mode("balanced"))
     policy["thresholds"]["default"] = {"escalate": escalate, "deny": deny}
     pipeline.scorer.apply_policy(from_dict(policy))

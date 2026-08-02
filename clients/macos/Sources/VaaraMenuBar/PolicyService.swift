@@ -40,7 +40,6 @@ final class PolicyServiceDelegate: NSObject, NSXPCListenerDelegate, VaaraPolicyS
             "--param", "url=\(url)",
             "--agent", "webkit",
             "--db", trailDB,
-            "--format", "json",
         ]
 
         let pipe = Pipe()

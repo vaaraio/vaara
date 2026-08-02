@@ -5,6 +5,16 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/)
 and this project follows [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
 
+## [1.57.2] - 2026-08-02
+
+### Fixed
+- macOS app: remove invalid `--format json` flag from `PolicyServiceDelegate`
+  that caused the WebKit governance extension to fail open (every web flow
+  was allowed by default).
+- Infer proxy gate: test isolation — use fresh in-memory `AuditTrail` to
+  prevent prior approval records from the default SQLite DB from leaking
+  between test runs.
+
 ## [1.57.1] - 2026-08-02
 
 ### Fixed
