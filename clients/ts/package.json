@@ -1,6 +1,6 @@
 {
   "name": "@vaara/client",
-  "version": "1.57.0",
+  "version": "1.57.1",
   "mcpName": "io.github.vaaraio/vaara",
   "description": "TypeScript client for the Vaara HTTP API: accountable autonomy for every autonomous action. Conformal risk scoring, policy gating, hash-chained tamper-evident audit, named detectors.",
   "main": "dist/index.js",

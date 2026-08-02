@@ -54,7 +54,7 @@ final class AccessibilityObserver {
         )
         AXObserverAddNotification(observer, appElement,
                                   kAXFocusedUIElementChangedNotification as CFString,
-                                  self)
+                                  Unmanaged.passUnretained(self).toOpaque())
 
         runLoopSource = AXObserverGetRunLoopSource(observer)
         if let source = runLoopSource {

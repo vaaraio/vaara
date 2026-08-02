@@ -5,6 +5,14 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/)
 and this project follows [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
 
+## [1.57.1] - 2026-08-02
+
+### Fixed
+- macOS app build: fix `AccessibilityObserver` type error
+  (`UnsafeMutableRawPointer` conversion for `AXObserverAddNotification`).
+- Move `VaaraPolicyClient` and `VaaraPolicyService` into the `VaaraMenuBar`
+  module so the Homebrew formula's `swiftc` invocation can resolve them.
+
 ## [1.57.0] - 2026-08-02
 
 ### Added (EU AI Act general application date — 2 Aug 2026)
