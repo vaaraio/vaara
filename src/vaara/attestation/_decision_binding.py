@@ -21,20 +21,23 @@ from typing import Any
 
 
 def _canonical_bytes(obj: dict[str, Any]) -> bytes:
-    """RFC 8785 JCS bytes via the canonical attestation path, with a
-    best-effort stdlib fallback that warns on divergence."""
-    # Prefer the same JCS implementation the signed attestation stack uses.
-    try:
-        from vaara.attestation._attest_canonical import canonical_json
+    """RFC 8785 JCS bytes via ``rfc8785``, with a warned stdlib fallback.
 
-        return canonical_json(obj)
-    except ImportError:
-        pass
+    Tries ``rfc8785.dumps`` directly first (the lightweight dep the keyless
+    path prefers), then falls back to the full attestation-canonical path,
+    then warns on pure-stdlib divergence.
+    """
     try:
         import rfc8785
 
         return rfc8785.dumps(obj)
     except ImportError:
+        pass
+    try:
+        from vaara.attestation._attest_canonical import canonical_json
+
+        return canonical_json(obj)
+    except (ImportError, Exception):
         pass
     warnings.warn(
         "rfc8785 not available; keyless decision binding digests use stdlib "
