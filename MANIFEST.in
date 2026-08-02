@@ -6,3 +6,6 @@ recursive-include src/vaara/attestation/profiles *.json
 recursive-include src/vaara/integrations *.json
 include src/vaara/py.typed
 recursive-include docs *.md
+recursive-include clients/macos/Sources *.swift *.plist *.png *.json
+include clients/macos/AppIcon.icns
+include clients/macos/project.yml

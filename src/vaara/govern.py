@@ -28,6 +28,7 @@ from __future__ import annotations
 
 import functools
 import inspect
+import os
 import threading
 from typing import Any, Callable, Optional, TypeVar, cast
 
@@ -67,13 +68,38 @@ _default_lock = threading.Lock()
 
 
 def default_pipeline() -> InterceptionPipeline:
-    """Return the lazily-built process-wide pipeline used by ``@govern``."""
+    """Return the lazily-built process-wide pipeline used by ``@govern``.
+
+    On first construction, records an Article 50(1) disclosure event if
+    ``VAARA_ARTICLE50_STATEMENT`` is set — so users of ``@vaara.govern``
+    get transparency evidence without running the Claude Code plugin.
+    """
     global _default_pipeline
     if _default_pipeline is None:
         with _default_lock:
             if _default_pipeline is None:
                 _default_pipeline = InterceptionPipeline()
+                _auto_article50_disclosure(_default_pipeline)
     return _default_pipeline
+
+
+def _auto_article50_disclosure(pipeline: InterceptionPipeline) -> None:
+    """Record an Article 50(1) disclosure from the env var, if set."""
+    statement = os.environ.get("VAARA_ARTICLE50_STATEMENT", "").strip()
+    if not statement:
+        return
+    try:
+        from vaara.audit.article50 import record_disclosure
+
+        record_disclosure(
+            pipeline.trail,
+            paragraph="50(1)",
+            statement=statement,
+            agent_id="vaara.govern",
+            channel="govern_decorator",
+        )
+    except Exception:
+        pass
 
 
 def set_default_pipeline(pipeline: InterceptionPipeline) -> None:

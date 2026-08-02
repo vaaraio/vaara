@@ -145,10 +145,10 @@ def build_delegation_graph(records: Iterable[AuditRecord]) -> DelegationGraph:
     for rec in records:
         aid = rec.action_id
         seen.setdefault(aid, None)
-        if rec.event_type == EventType.ACTION_REQUESTED:
-            # The action_requested event is authoritative for the edge and the
-            # originating agent. If two somehow exist for one action_id, the
-            # first wins (append order), matching the trail's own ordering.
+        if rec.event_type in (EventType.ACTION_REQUESTED, EventType.DISCLOSURE_RECORDED):
+            # Both ACTION_REQUESTED and DISCLOSURE_RECORDED carry the
+            # parent_action_id and originate from an agent. The first record
+            # wins (append order), matching the trail's own ordering.
             if aid not in raw_parent:
                 raw_parent[aid] = _parent_link(rec)
                 agent_of[aid] = rec.agent_id

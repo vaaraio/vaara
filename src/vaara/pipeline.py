@@ -46,7 +46,7 @@ from vaara._sanitize import json_safe
 from pathlib import Path
 
 from vaara.audit.sqlite_backend import SQLiteAuditBackend
-from vaara.audit.trail import AuditTrail
+from vaara.audit.trail import AuditTrail, EventType
 
 if TYPE_CHECKING:
     # Capability appears only in annotations, which `from __future__ import
@@ -306,6 +306,7 @@ class InterceptionPipeline:
         sequence_position: int = 0,
         tenant_id: str = "",
         capabilities: Optional[Sequence[Capability]] = None,
+        _event_type_override: Optional[EventType] = None,
     ) -> InterceptionResult:
         """Intercept an agent action request.
 
@@ -365,7 +366,9 @@ class InterceptionPipeline:
         )
 
         # 3. Record the request in audit trail
-        action_id = self.trail.record_action_requested(request)
+        action_id = self.trail.record_action_requested(
+            request, event_type_override=_event_type_override
+        )
 
         # 3b. Delegated-privilege attenuation. Record this action's grant for
         # its own children to check against, then verify this action does not

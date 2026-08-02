@@ -5,6 +5,28 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/)
 and this project follows [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
 
+## [1.57.0] - 2026-08-02
+
+### Added (EU AI Act general application date — 2 Aug 2026)
+- New event type `DISCLOSURE_RECORDED` for Article 50 transparency disclosure
+  events, distinguishable from ordinary action requests.
+- Compliance engine expanded to 14 articles: added **Article 50(1)**
+  (transparency disclosure), **Article 73(1)** (serious-incident reporting),
+  and **Article 26(10)** (deployer logging).
+- `@vaara.govern` now auto-records an Article 50(1) disclosure on first use
+  when `VAARA_ARTICLE50_STATEMENT` env var is set — same zero-config path
+  as the Claude Code plugin but for bare `@vaara.govern` users.
+- `vaara.check` and `vaara.outcome` CLI commands now available for external
+  tools (macOS WebKit Governance extension).
+- Homebrew sdist now includes `clients/macos/Sources` so the formula can
+  build the macOS menu-bar app from the PyPI source tarball.
+
+### Changed
+- `InterceptionPipeline.intercept()` accepts `_event_type_override` private
+  parameter for internal callers (Article 50 disclosure recording).
+- `AuditTrail.record_action_requested()` accepts optional
+  `event_type_override` parameter.
+
 ## [1.56.1] - 2026-08-02
 
 ### Security

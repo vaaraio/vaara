@@ -33,6 +33,8 @@ from datetime import datetime, timezone
 from pathlib import Path
 from typing import Optional, Union
 
+from vaara.audit.trail import EventType
+
 DISCLOSURE_TOOL = "vaara.article50.disclosure"
 
 #: The Article 50 paragraphs a disclosure record may claim.
@@ -83,10 +85,11 @@ def record_disclosure(
     content), and ``notice_sha256`` optionally pins the exact notice
     bytes shown. Returns the ``action_id`` of the recorded event.
 
-    The record flows through the normal interception pipeline, so it is
-    chained, signable, and exportable like any other action. Call it at
-    the moment the disclosure is made (50(5): at the latest at the first
-    interaction), not retroactively.
+    The record flows as a dedicated ``DISCLOSURE_RECORDED`` event type,
+    distinguishable from ordinary action requests, so the compliance
+    engine can target it independently. Call it at the moment the
+    disclosure is made (50(5): at the latest at the first interaction),
+    not retroactively.
     """
     if paragraph not in PARAGRAPHS:
         raise ValueError(
@@ -110,6 +113,7 @@ def record_disclosure(
         },
         session_id=session_id,
         context={"vaara_article50": True},
+        _event_type_override=EventType.DISCLOSURE_RECORDED,
     )
     return result.action_id
 
@@ -223,6 +227,7 @@ def record_agent_disclosure(
         session_id=session_id,
         parent_action_id=parent_action_id,
         context={"vaara_article50": True},
+        _event_type_override=EventType.DISCLOSURE_RECORDED,
     )
     return result.action_id
 
@@ -237,7 +242,7 @@ def find_disclosures(records) -> list[dict]:
     for rec in records:
         if rec.tool_name != DISCLOSURE_TOOL:
             continue
-        if rec.event_type.value != "action_requested":
+        if rec.event_type != EventType.DISCLOSURE_RECORDED:
             continue
         params = (rec.data or {}).get("parameters", {}) or {}
         out.append({
@@ -292,7 +297,7 @@ def build_article50_report(
     # session's first non-disclosure action?
     session_first_action: dict[str, float] = {}
     for rec in records:
-        if rec.event_type.value != "action_requested":
+        if rec.event_type not in (EventType.ACTION_REQUESTED, EventType.DISCLOSURE_RECORDED):
             continue
         if rec.tool_name == DISCLOSURE_TOOL:
             continue

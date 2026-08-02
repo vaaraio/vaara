@@ -58,6 +58,7 @@ class EventType(str, Enum):
     POLICY_OVERRIDE = "policy_override"     # Manual override of policy decision
     ANCHOR_GAP = "anchor_gap"               # Auto-anchor attempt failed (fail-open marker)
     KEY_LIFECYCLE = "key_lifecycle"         # Signing-key custodian rotated/revoked/added
+    DISCLOSURE_RECORDED = "disclosure_recorded"  # EU AI Act Art 50 transparency disclosure
 
 
 # ── Regulatory article mappings ───────────────────────────────────────────
@@ -161,6 +162,18 @@ EU_AI_ACT_MAPPINGS: dict[EventType, list[RegulatoryArticle]] = {
             "Every key-lifecycle change is captured as an immutable audit event pinned in the hash chain and the external time anchor",
         ),
     ],
+    EventType.DISCLOSURE_RECORDED: [
+        RegulatoryArticle(
+            RegulatoryDomain.EU_AI_ACT, "Article 50(1)",
+            "Transparency Obligation — AI System Disclosure",
+            "Every disclosure event is recorded as a dedicated DISCLOSURE_RECORDED audit event with the statement, paragraph, channel, and session context on the hash chain",
+        ),
+        RegulatoryArticle(
+            RegulatoryDomain.EU_AI_ACT, "Article 50(5)",
+            "Timing of Disclosure",
+            "The disclosure record proves the disclosure timestamp (50(5): at the latest at the first interaction), independently of the agent's subsequent action records",
+        ),
+    ],
 }
 
 DORA_MAPPINGS: dict[EventType, list[RegulatoryArticle]] = {
@@ -254,6 +267,11 @@ TRANSPARENCY_DEFAULTS: dict[EventType, dict[str, str]] = {
         "system_operation": "key_custodian_management",
         "data_usage": "custodian_fingerprint+quorum",
         "decision_making": "operator_action",
+    },
+    EventType.DISCLOSURE_RECORDED: {
+        "system_operation": "transparency_disclosure",
+        "data_usage": "disclosure_statement",
+        "decision_making": "policy_requirement",
     },
 }
 
@@ -447,6 +465,11 @@ class AuditRecord:
                 f"{prefix} signing-key custodian "
                 f"{_narrative_str(self.data.get('action', 'changed'), max_len=16)} "
                 f"({_narrative_str(self.data.get('fingerprint', 'unknown'), max_len=64)})"
+            ),
+            EventType.DISCLOSURE_RECORDED: (
+                f"{prefix} Article 50 disclosure: "
+                f"{_narrative_str(self.data.get('parameters', {}).get('article', '?'))}"
+                f" — {_narrative_str(self.data.get('parameters', {}).get('statement', ''), max_len=80)}"
             ),
         }
 
@@ -665,8 +688,14 @@ class AuditTrail:
     # contract — correct fail-soft behaviour.
     _MAX_ACTION_TENANT_MAP = 50_000
 
-    def record_action_requested(self, request: ActionRequest) -> str:
-        """Record that an agent requested an action.  Returns the action_id."""
+    def record_action_requested(self, request: ActionRequest, *, event_type_override: Optional[EventType] = None) -> str:
+        """Record that an agent requested an action.  Returns the action_id.
+
+        ``event_type_override`` allows callers (e.g. Article 50 disclosure)
+        to record under a different event type while reusing the same
+        action-request data shape.
+        """
+        event_type = event_type_override or EventType.ACTION_REQUESTED
         action_id = str(uuid.uuid4())
         tenant_id = getattr(request, "tenant_id", "") or ""
         if tenant_id:
@@ -679,7 +708,7 @@ class AuditTrail:
                 self._tenant_for_action[action_id] = tenant_id
 
         articles = self._get_regulatory_articles(
-            EventType.ACTION_REQUESTED,
+            event_type,
             request.action_type.regulatory_domains,
         )
 
@@ -696,7 +725,7 @@ class AuditTrail:
         self._append(AuditRecord(
             record_id=str(uuid.uuid4()),
             action_id=action_id,
-            event_type=EventType.ACTION_REQUESTED,
+            event_type=event_type,
             timestamp=time.time(),
             agent_id=safe_agent_id,
             tool_name=safe_tool_name,
