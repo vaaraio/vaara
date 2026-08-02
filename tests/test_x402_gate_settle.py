@@ -35,7 +35,7 @@ def _urlopen_returning(responses):
     return fake_urlopen
 
 
-def _settle_with(responses) -> bool:
+def _settle_with(responses) -> tuple[bool, dict | None]:
     with mock.patch(
         "vaara.server.x402.urllib.request.urlopen",
         _urlopen_returning(responses),
@@ -44,20 +44,24 @@ def _settle_with(responses) -> bool:
 
 
 def test_settled_when_both_steps_confirm():
-    assert _settle_with([{"isValid": True}, {"settled": True}]) is True
+    ok, ev = _settle_with([{"isValid": True}, {"settled": True}])
+    assert ok is True
+    assert ev == {"settled": True}
 
 
 def test_settle_success_flag_accepted():
-    assert _settle_with([{"isValid": True}, {"success": True}]) is True
+    ok, ev = _settle_with([{"isValid": True}, {"success": True}])
+    assert ok is True
+    assert ev == {"success": True}
 
 
 def test_verify_shaped_settle_answer_is_refused():
     # the audited leniency: isValid alone on /settle must NOT admit the call
-    assert _settle_with([{"isValid": True}, {"isValid": True}]) is False
+    assert _settle_with([{"isValid": True}, {"isValid": True}]) == (False, None)
 
 
 def test_failed_verify_refused():
-    assert _settle_with([{"isValid": False}, {"settled": True}]) is False
+    assert _settle_with([{"isValid": False}, {"settled": True}]) == (False, None)
 
 
 def test_no_facilitator_refuses():
@@ -67,4 +71,4 @@ def test_no_facilitator_refuses():
             asset="usdc", price="10", facilitator=None,
         )
     )
-    assert gate._settle("hdr", "/resource", "10") is False
+    assert gate._settle("hdr", "/resource", "10") == (False, None)

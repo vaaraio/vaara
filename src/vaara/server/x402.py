@@ -114,7 +114,13 @@ class X402Gate:
         description: str,
         amount: Optional[str] = None,
     ) -> Optional[JSONResponse]:
-        """Admit (return None) or challenge (return a 402 JSONResponse)."""
+        """Admit (return None) or challenge (return a 402 JSONResponse).
+
+        On admission after settlement, the settlement evidence is available
+        via :attr:`last_settlement_evidence` so callers can bind it into a
+        receipt's ``evidenceRef.digest``.
+        """
+        self._last_settlement = None
         if not self.config.enabled:
             return None
         need = amount or self.config.price
@@ -124,22 +130,37 @@ class X402Gate:
                 status_code=402,
                 content=self.requirements(resource, description, need),
             )
-        if not self._settle(header, resource, need):
+        ok, evidence = self._settle(header, resource, need)
+        if not ok:
             body = self.requirements(resource, description, need)
             body["error"] = "payment invalid or unsettled"
             return JSONResponse(status_code=402, content=body)
+        self._last_settlement = evidence
         return None
 
-    def _settle(self, payment_header: str, resource: str, amount: str) -> bool:
+    @property
+    def last_settlement_evidence(self) -> Optional[dict]:
+        """The most recently settled facilitator response, or None.
+
+        Only populated after a successful ``check()`` that admitted a paid
+        request.  Callers that create receipts can bind this into
+        ``decisionDerived.evidenceRef`` via
+        ``sha256(JCS(self.last_settlement_evidence))``.
+        """
+        return self._last_settlement
+
+    def _settle(
+        self, payment_header: str, resource: str, amount: str
+    ) -> tuple[bool, Optional[dict]]:
         """Verify and settle a presented payment through the facilitator.
 
-        Returns True only when the facilitator confirms settlement. With no
-        facilitator configured a presented payment cannot be settled, so the
-        call is refused rather than trusted: an enabled gate never admits an
-        unverifiable payment.
+        Returns ``(True, settle_response)`` when the facilitator confirms
+        settlement, or ``(False, None)`` on any failure.  With no facilitator
+        configured a presented payment cannot be settled, so the call is refused
+        rather than trusted: an enabled gate never admits an unverifiable payment.
         """
         if not self.config.facilitator:
-            return False
+            return False, None
         payload = json.dumps(
             {
                 "x402Version": _X402_VERSION,
@@ -155,6 +176,7 @@ class X402Gate:
         # Each step must confirm with ITS OWN flags: a verify-shaped answer
         # ("isValid") on /settle is not settlement and must not admit the call.
         checks = (("/verify", ("isValid", "success")), ("/settle", ("settled", "success")))
+        settle_data = None
         for path, flags in checks:
             try:
                 req = urllib.request.Request(
@@ -166,7 +188,9 @@ class X402Gate:
                 with urllib.request.urlopen(req, timeout=30) as resp:  # noqa: S310
                     report = json.load(resp)
             except Exception:
-                return False
+                return False, None
             if not any(report.get(flag) for flag in flags):
-                return False
-        return True
+                return False, None
+            if path == "/settle":
+                settle_data = report
+        return True, settle_data

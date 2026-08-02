@@ -22,7 +22,7 @@ def test_binding_digest_stable():
 
 
 def test_build_binding_self_consistent():
-    b = build_binding({"v": 1}, "do x", {"risk": 0.2, "deny": 0.8}, "allow")
+    b = build_binding({"v": 1}, "do x", {"risk": 20, "deny": 80}, "allow")
     assert b["intentDigest"] == intent_digest("do x")
     assert set(b) == {"policyDigest", "intentDigest", "inputsDigest", "bindingDigest"}
 

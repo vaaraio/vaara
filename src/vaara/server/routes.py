@@ -338,7 +338,18 @@ def register(app: FastAPI, state: ServerState) -> None:
             raise _error(
                 "anchor_failed", str(exc), status.HTTP_502_BAD_GATEWAY,
             )
+        settlement_digest = None
+        ev = getattr(state.x402, "last_settlement_evidence", None)
+        if ev is not None:
+            import hashlib
+
+            from vaara.attestation._attest_canonical import canonical_json
+
+            settlement_digest = "sha256:" + hashlib.sha256(
+                canonical_json(ev)
+            ).hexdigest()
         return S.AnchorResponse(
             anchor=S.TimestampAnchor(**anchor),
             attested=attested,
+            settlement_evidence_digest=settlement_digest,
         )

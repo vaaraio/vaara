@@ -2,29 +2,50 @@
 # SPDX-License-Identifier: AGPL-3.0-or-later
 """Binding and rationale digests for the SEP-2828 decision record.
 
-Pure standard library (with a lazy, optional `rfc8785` for JCS canonicalization),
-so the keyless conformance path imports this without the `attestation` extra. The
-digests here are the commitments the zero-knowledge decisionProof opens against:
-the policy, the declared intent, the evaluation inputs, and the resulting binding.
+Delegates to the canonical attestation JCS path when available (the
+``vaara[attestation]`` extra).  Falls back to a pure-stdlib approximation
+when neither the extra nor ``rfc8785`` is present, emitting a warning so
+callers know the digest is not RFC 8785-compliant across implementations.
+
+The digests here are the commitments the zero-knowledge decisionProof opens
+against: the policy, the declared intent, the evaluation inputs, and the
+resulting binding.
 """
 
 from __future__ import annotations
 
 import hashlib
 import json
+import warnings
 from typing import Any
 
 
 def _canonical_bytes(obj: dict[str, Any]) -> bytes:
-    """RFC 8785 JCS bytes when `rfc8785` is available, else a deterministic
-    stdlib fallback (sorted keys, compact separators). Both are stable within a
-    process; producers that emit proofs use the same path on both sides."""
+    """RFC 8785 JCS bytes via the canonical attestation path, with a
+    best-effort stdlib fallback that warns on divergence."""
+    # Prefer the same JCS implementation the signed attestation stack uses.
+    try:
+        from vaara.attestation._attest_canonical import canonical_json
+
+        return canonical_json(obj)
+    except ImportError:
+        pass
     try:
         import rfc8785
 
         return rfc8785.dumps(obj)
-    except Exception:
-        return json.dumps(obj, sort_keys=True, separators=(",", ":")).encode("utf-8")
+    except ImportError:
+        pass
+    warnings.warn(
+        "rfc8785 not available; keyless decision binding digests use stdlib "
+        "json (non-JCS-compatible number formatting) — install "
+        "'vaara[attestation]' for canonical RFC 8785 behaviour.",
+        stacklevel=2,
+    )
+    return json.dumps(
+        obj, sort_keys=True, separators=(",", ":"),
+        ensure_ascii=True, allow_nan=False,
+    ).encode("utf-8")
 
 
 def _sha(data: bytes) -> str:

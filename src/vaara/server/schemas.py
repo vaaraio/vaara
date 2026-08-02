@@ -240,3 +240,4 @@ class AnchorResponse(BaseModel):
         "validate the token plus the JCS signed payload at the EU DSS demo "
         "validator for the PASSED/QTSA verdict"
     )
+    settlement_evidence_digest: Optional[str] = None

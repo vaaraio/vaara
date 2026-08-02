@@ -10,8 +10,9 @@ route anyone's traffic to a third-party provider the operator did not choose.
 
 The QTSP's issuing CA is pinned. In production, pin it from the EU trusted list
 (``VAARA_ANCHOR_CA_CERT`` = path to a PEM or DER CA certificate). Absent that,
-the helper falls back to trust-on-first-use: one probe of the endpoint to learn
-the CA. That is fine for self-hosting and demos but is not a trusted-list pin.
+the helper falls back to trust-on-first-use (``VAARA_ANCHOR_ALLOW_TOFU=1``): one
+probe of the endpoint to learn the CA. TOFU is a conscious opt-in; without it
+and without a CA cert, anchoring refuses with ``AnchorNotConfigured``.
 """
 
 from __future__ import annotations
@@ -28,6 +29,12 @@ from typing import TYPE_CHECKING, Any, Optional
 # and dependency-free - core ServerState must not require the anchor extra.
 if TYPE_CHECKING:
     from vaara.audit.receipt_anchor import QualifiedTSA
+
+
+def _tofu_allowed() -> bool:
+    return (os.environ.get("VAARA_ANCHOR_ALLOW_TOFU") or "").strip().lower() in {
+        "1", "true", "yes", "on"
+    }
 
 
 class AnchorNotConfigured(RuntimeError):
@@ -105,7 +112,17 @@ class Anchorer:
 
         with self._lock:
             if self._qtsa is None:
-                ca = self._ca or _issuing_ca_from_probe(self.tsa_url)
+                ca = self._ca
+                if ca is None:
+                    if _tofu_allowed():
+                        ca = _issuing_ca_from_probe(self.tsa_url)
+                    else:
+                        raise AnchorNotConfigured(
+                            "no CA cert pinned for production QTSP. Either set "
+                            "VAARA_ANCHOR_CA_CERT to a PEM/DER CA path from the EU "
+                            "trusted list, or set VAARA_ANCHOR_ALLOW_TOFU=1 for "
+                            "self-hosting / demo trust-on-first-use."
+                        )
                 self._ca = ca
                 self._qtsa = QualifiedTSA(
                     self.tsa_url, trusted_issuer_cert=ca, timeout=20.0
