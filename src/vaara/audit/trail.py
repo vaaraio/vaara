@@ -624,6 +624,11 @@ class AuditTrail:
         self._anchor_cadence = 0
         self._records_since_anchor = 0
         self._anchor_lock = threading.Lock()
+        # Optional reference to the SQLite backend for cross-process features
+        # like pending outcomes. Set by SQLiteAuditBackend.load_trail() so the
+        # pipeline can persist/read pending outcomes to SQLite instead of memory.
+        # None when the trail is in-memory only (e.g., tests).
+        self._backend: Any = None
 
     @property
     def size(self) -> int:

@@ -3,62 +3,47 @@ import OSLog
 
 private let log = OSLog(subsystem: "io.vaara.menubar", category: "Accessibility")
 
-/// Known AI web interfaces we can detect and observe.
-private let aiSites: Set<String> = [
+private let aiSiteHosts: [String] = [
     "chatgpt.com",
     "claude.ai",
     "gemini.google.com",
     "chat.deepseek.com",
     "chat.mistral.ai",
     "perplexity.ai",
+    "copilot.microsoft.com",
+    "chat.openai.com",
 ]
 
-/// Detects AI interactions in WebKit-based apps using the Accessibility API.
-/// Runs as an observer in the main app process.
 final class AccessibilityObserver {
 
-    private var runLoopSource: CFRunLoopSource?
-    private var isRunning = false
+    static let shared = AccessibilityObserver()
 
-    /// Start observing UI interactions. Requires Accessibility permission.
+    private var observers: [pid_t: AXObserver] = [:]
+    private var isRunning = false
+    private var focusObserver: NSObjectProtocol?
+
     func start() {
         guard checkPermission() else {
             os_log(.info, log: log, "accessibility permission not granted")
             return
         }
 
-        let options: NSDictionary = [
-            kAXTrustedCheckOptionPrompt.takeRetainedValue(): true,
-        ]
-        guard AXIsProcessTrustedWithOptions(options) else {
+        let opts: NSDictionary = [kAXTrustedCheckOptionPrompt.takeRetainedValue(): true]
+        guard AXIsProcessTrustedWithOptions(opts) else {
             os_log(.info, log: log, "not trusted by accessibility API")
             return
         }
 
-        // Observe global app focus changes.
-        let pid = NSWorkspace.shared.frontmostApplication?.processIdentifier ?? 0
-        var obs: AXObserver?
-        let createErr = AXObserverCreate(pid, { observer, element, notification, refcon in
-            let selfPtr = Unmanaged<AccessibilityObserver>.fromOpaque(refcon!).takeUnretainedValue()
-            selfPtr.handleNotification(element: element, notification: notification as String)
-        }, &obs)
-
-        guard createErr == .success, let observer = obs else {
-            os_log(.error, log: log, "failed to create observer: %d", createErr.rawValue)
-            return
+        if let app = NSWorkspace.shared.frontmostApplication {
+            attachTo(pid: app.processIdentifier)
         }
 
-        // Watch for focused UI element changes in the frontmost app.
-        let appElement = AXUIElementCreateApplication(
-            NSWorkspace.shared.frontmostApplication?.processIdentifier ?? 0
-        )
-        AXObserverAddNotification(observer, appElement,
-                                  kAXFocusedUIElementChangedNotification as CFString,
-                                  Unmanaged.passUnretained(self).toOpaque())
-
-        runLoopSource = AXObserverGetRunLoopSource(observer)
-        if let source = runLoopSource {
-            CFRunLoopAddSource(CFRunLoopGetCurrent(), source, .commonModes)
+        focusObserver = NSWorkspace.shared.notificationCenter.addObserver(
+            forName: NSWorkspace.didActivateApplicationNotification,
+            object: nil, queue: .main
+        ) { [weak self] note in
+            guard let app = note.userInfo?[NSWorkspace.applicationUserInfoKey] as? NSRunningApplication else { return }
+            self?.handleAppSwitch(pid: app.processIdentifier)
         }
 
         isRunning = true
@@ -66,111 +51,200 @@ final class AccessibilityObserver {
     }
 
     func stop() {
-        guard isRunning, let source = runLoopSource else { return }
-        CFRunLoopRemoveSource(CFRunLoopGetCurrent(), source, .commonModes)
+        for (pid, obs) in observers {
+            detachObserver(obs, pid: pid)
+        }
+        observers.removeAll()
+
+        if let token = focusObserver {
+            NSWorkspace.shared.notificationCenter.removeObserver(token)
+            focusObserver = nil
+        }
         isRunning = false
     }
 
-    // ── Permission ────────────────────────────────────────────────────
+    // ── App switching ──────────────────────────────────────────────
+
+    private func handleAppSwitch(pid: pid_t) {
+        guard isBrowser(pid: pid) else { return }
+        if observers[pid] == nil {
+            attachTo(pid: pid)
+        }
+    }
+
+    private func isBrowser(pid: pid_t) -> Bool {
+        guard let app = NSRunningApplication(processIdentifier: pid) else { return false }
+        let bundle = app.bundleIdentifier ?? ""
+        let browserBundles = [
+            "com.apple.Safari",
+            "com.google.Chrome",
+            "org.mozilla.firefox",
+            "com.microsoft.edgemac",
+            "com.brave.Browser",
+            "company.thebrowser.Arc",
+        ]
+        return browserBundles.contains(bundle)
+    }
+
+    // ── AXObserver lifecycle ───────────────────────────────────────
+
+    private func attachTo(pid: pid) {
+        var obs: AXObserver?
+        let err = AXObserverCreate(pid, { observer, element, notification, refcon in
+            guard let refcon = refcon else { return }
+            let ptr = Unmanaged<AccessibilityObserver>.fromOpaque(refcon).takeUnretainedValue()
+            ptr.onFocusChange(element: element, notification: notification as String)
+        }, &obs)
+
+        guard err == .success, let observer = obs else {
+            os_log(.error, log: log, "AXObserverCreate failed pid=%d err=%d", pid, err.rawValue)
+            return
+        }
+
+        let appEl = AXUIElementCreateApplication(pid)
+        AXObserverAddNotification(observer, appEl,
+            kAXFocusedUIElementChangedNotification as CFString,
+            Unmanaged.passUnretained(self).toOpaque())
+        AXObserverAddNotification(observer, appEl,
+            kAXFocusedWindowChangedNotification as CFString,
+            Unmanaged.passUnretained(self).toOpaque())
+
+        let source = AXObserverGetRunLoopSource(observer)
+        CFRunLoopAddSource(CFRunLoopGetCurrent(), source, .commonModes)
+
+        observers[pid] = observer
+        os_log(.info, log: log, "attached AXObserver pid=%d", pid)
+    }
+
+    private func detachObserver(_ observer: AXObserver, pid: pid) {
+        let appEl = AXUIElementCreateApplication(pid)
+        AXObserverRemoveNotification(observer, appEl,
+            kAXFocusedUIElementChangedNotification as CFString)
+        AXObserverRemoveNotification(observer, appEl,
+            kAXFocusedWindowChangedNotification as CFString)
+        let source = AXObserverGetRunLoopSource(observer)
+        CFRunLoopRemoveSource(CFRunLoopGetCurrent(), source, .commonModes)
+    }
+
+    // ── Permission ─────────────────────────────────────────────────
 
     private func checkPermission() -> Bool {
         AXIsProcessTrusted()
     }
 
-    // ── Notification handler ──────────────────────────────────────────
+    // ── Notification handler ───────────────────────────────────────
 
-    private func handleNotification(element: AXUIElement, notification: String) {
-        // Get the URL of the frontmost browser tab.
+    private func onFocusChange(element: AXUIElement, notification: String) {
         guard let url = currentBrowserURL() else { return }
         guard let host = URL(string: url)?.host else { return }
+        guard isAISite(host: host) else { return }
 
-        // Check if this is an AI site.
-        guard aiSites.contains(where: { host.contains($0) }) else { return }
-
-        // Get the page title for context.
         let title = currentBrowserTitle() ?? ""
-
-        // Detect if the user is interacting with the chat input.
-        let isComposing = isComposingMessage(element: element)
+        let composing = isComposingMessage(element: element)
 
         os_log(.info, log: log,
-               "AI interaction detected: %{public}s — composing: %{public}s",
-               host, String(isComposing))
+               "AI interaction: %{public}s composing=%{public}s",
+               host, String(composing))
 
-        // Notify the Vaara pipeline when a user is about to send a message.
-        if isComposing {
+        if composing {
             VaaraPolicyClient.shared.notifyInteraction(
-                host: host,
-                url: url,
-                title: title,
-                action: "compose"
+                host: host, url: url, title: title, action: "compose"
             )
         }
     }
 
-    // ── Safari / browser introspection ────────────────────────────────
+    private func isAISite(host: String) -> Bool {
+        aiSiteHosts.contains { site in
+            host == site || host.hasSuffix("." + site)
+        }
+    }
+
+    // ── Browser URL extraction ─────────────────────────────────────
 
     private func currentBrowserURL() -> String? {
-        let app = NSWorkspace.shared.frontmostApplication
-        guard let pid = app?.processIdentifier else { return nil }
+        guard let app = NSWorkspace.shared.frontmostApplication else { return nil }
+        let pid = app.processIdentifier
+        let bundle = app.bundleIdentifier ?? ""
+        let appEl = AXUIElementCreateApplication(pid)
 
-        let appElement = AXUIElementCreateApplication(pid)
+        if bundle == "com.apple.Safari" {
+            return safariURL(appEl: appEl)
+        }
+        return genericBrowserURL(appEl: appEl)
+    }
 
-        // Try to get the URL via the browser's accessibility hierarchy.
-        // Safari exposes the current URL in the "value" attribute of the URL field.
-        var value: CFTypeRef?
-        let result = AXUIElementCopyAttributeValue(appElement,
-                                                    "AXURL" as CFString,
-                                                    &value)
-        if result == .success, let url = value as? String {
-            return url
+    private func safariURL(appEl: AXUIElement) -> String? {
+        var windowVal: CFTypeRef?
+        AXUIElementCopyAttributeValue(appEl, kAXMainWindowAttribute as CFString, &windowVal)
+        guard let window = windowVal as! AXUIElement? else { return nil }
+
+        var toolbarVal: CFTypeRef?
+        AXUIElementCopyAttributeValue(window, "AXToolbar" as CFString, &toolbarVal)
+        guard let toolbar = toolbarVal as! AXUIElement? else { return nil }
+
+        var childrenVal: CFTypeRef?
+        AXUIElementCopyAttributeValue(toolbar, kAXChildrenAttribute as CFString, &childrenVal)
+        guard let children = childrenVal as? [AXUIElement] else { return nil }
+
+        for child in children {
+            if let url = findURLInSubtree(element: child, depth: 0, maxDepth: 4) {
+                return url
+            }
+        }
+        return nil
+    }
+
+    private func genericBrowserURL(appEl: AXUIElement) -> String? {
+        var windowVal: CFTypeRef?
+        AXUIElementCopyAttributeValue(appEl, kAXMainWindowAttribute as CFString, &windowVal)
+        guard let window = windowVal as! AXUIElement? else { return nil }
+        return findURLInSubtree(element: window, depth: 0, maxDepth: 6)
+    }
+
+    private func findURLInSubtree(element: AXUIElement, depth: Int, maxDepth: Int) -> String? {
+        guard depth <= maxDepth else { return nil }
+
+        var roleVal: CFTypeRef?
+        AXUIElementCopyAttributeValue(element, kAXRoleAttribute as CFString, &roleVal)
+        let role = roleVal as? String ?? ""
+
+        if role == "AXTextField" {
+            var val: CFTypeRef?
+            AXUIElementCopyAttributeValue(element, kAXValueAttribute as CFString, &val)
+            if let str = val as? String, str.hasPrefix("http") {
+                return str
+            }
         }
 
-        // Fallback: check window title for known patterns.
-        var window: CFTypeRef?
-        AXUIElementCopyAttributeValue(appElement,
-                                       kAXMainWindowAttribute as CFString,
-                                       &window)
-        if let windowElement = window as! AXUIElement? {
-            var title: CFTypeRef?
-            AXUIElementCopyAttributeValue(windowElement,
-                                           kAXTitleAttribute as CFString,
-                                           &title)
-            return title as? String
-        }
+        var childrenVal: CFTypeRef?
+        AXUIElementCopyAttributeValue(element, kAXChildrenAttribute as CFString, &childrenVal)
+        guard let children = childrenVal as? [AXUIElement] else { return nil }
 
+        for child in children {
+            if let url = findURLInSubtree(element: child, depth: depth + 1, maxDepth: maxDepth) {
+                return url
+            }
+        }
         return nil
     }
 
     private func currentBrowserTitle() -> String? {
-        let app = NSWorkspace.shared.frontmostApplication
-        guard let pid = app?.processIdentifier else { return nil }
+        guard let app = NSWorkspace.shared.frontmostApplication else { return nil }
+        let appEl = AXUIElementCreateApplication(app.processIdentifier)
 
-        var window: CFTypeRef?
-        AXUIElementCopyAttributeValue(
-            AXUIElementCreateApplication(pid),
-            kAXMainWindowAttribute as CFString,
-            &window
-        )
+        var windowVal: CFTypeRef?
+        AXUIElementCopyAttributeValue(appEl, kAXMainWindowAttribute as CFString, &windowVal)
+        guard let window = windowVal as! AXUIElement? else { return nil }
 
-        guard let windowElement = window as! AXUIElement? else { return nil }
-        var title: CFTypeRef?
-        AXUIElementCopyAttributeValue(windowElement,
-                                       kAXTitleAttribute as CFString,
-                                       &title)
-        return title as? String
+        var titleVal: CFTypeRef?
+        AXUIElementCopyAttributeValue(window, kAXTitleAttribute as CFString, &titleVal)
+        return titleVal as? String
     }
 
-    /// Heuristic: detect if the currently focused element looks like
-    /// a chat message input field (multiline text area on an AI site).
     private func isComposingMessage(element: AXUIElement) -> Bool {
-        var role: CFTypeRef?
-        AXUIElementCopyAttributeValue(element,
-                                       kAXRoleAttribute as CFString,
-                                       &role)
-        guard let roleStr = role as? String else { return false }
-
-        // Chat inputs are typically text areas or rich text fields.
-        return roleStr == "AXTextArea" || roleStr == "AXComboBox"
+        var roleVal: CFTypeRef?
+        AXUIElementCopyAttributeValue(element, kAXRoleAttribute as CFString, &roleVal)
+        guard let role = roleVal as? String else { return false }
+        return role == "AXTextArea" || role == "AXTextField" || role == "AXComboBox"
     }
 }

@@ -277,6 +277,9 @@ class InterceptionPipeline:
         self._review_queue = review_queue
 
         # Track action_id to (predicted_risk, signals) for outcome feedback.
+        # When the trail has a SQLite backend, pending outcomes persist to
+        # the database for cross-process tracking (vaara check in one process,
+        # vaara outcome in another). Otherwise fall back to in-memory dict.
         # OrderedDict + bounded FIFO eviction — see _MAX_PENDING_OUTCOMES.
         self._pending_outcomes: OrderedDict[
             str, tuple[float, dict[str, float]]
@@ -665,6 +668,26 @@ class InterceptionPipeline:
                     )
 
         # 9. Store for outcome feedback with bounded FIFO eviction
+        # When the trail has a SQLite backend, persist to database for
+        # cross-process tracking (vaara check in one process, vaara outcome
+        # in another). Always keep in-memory dict as fallback for tests.
+        backend = getattr(self.trail, "_backend", None)
+        if backend is not None:
+            try:
+                backend.store_pending_outcome(
+                    action_id=action_id,
+                    agent_id=agent_id,
+                    tool_name=tool_name,
+                    risk_score=point_estimate,
+                    signals=signals,
+                )
+            except Exception:
+                logger.exception(
+                    "backend.store_pending_outcome failed for action_id=%s; "
+                    "falling back to in-memory dict",
+                    action_id,
+                )
+                backend = None
         with self._pending_outcomes_lock:
             self._pending_outcomes[action_id] = (point_estimate, signals)
             if len(self._pending_outcomes) > _MAX_PENDING_OUTCOMES:
@@ -738,8 +761,27 @@ class InterceptionPipeline:
         # a retry with the same action_id becomes a silent no-op and the
         # MWU/conformal learning signal is lost permanently. Only remove
         # the entry once we've confirmed we can complete the outcome write.
+        #
+        # Cross-process support: when the in-memory dict doesn't have the
+        # pending outcome, check the database (if a backend is available).
+        # This allows vaara check in one process and vaara outcome in another.
         with self._pending_outcomes_lock:
             pending = self._pending_outcomes.get(action_id)
+        if pending is None:
+            backend = getattr(self.trail, "_backend", None)
+            if backend is not None:
+                try:
+                    db_entry = backend.get_pending_outcome(action_id)
+                    if db_entry is not None:
+                        pending = (db_entry["risk_score"], db_entry["signals"])
+                        # Restore to in-memory dict so subsequent lookups are fast
+                        with self._pending_outcomes_lock:
+                            self._pending_outcomes[action_id] = pending
+                except Exception:
+                    logger.exception(
+                        "backend.get_pending_outcome failed for action_id=%s",
+                        action_id,
+                    )
         if pending is None:
             logger.warning("No pending outcome for action_id=%s", action_id)
             return
@@ -833,10 +875,19 @@ class InterceptionPipeline:
                 action_id,
             )
 
-        # Both writes attempted — pop regardless. A second
-        # report_outcome call after a successful trail write would
+        # Both writes attempted — remove from both database and in-memory dict.
+        # A second report_outcome call after a successful trail write would
         # otherwise append a duplicate OUTCOME_RECORDED row, inflating
         # Article 61(1) post-market monitoring evidence.
+        backend = getattr(self.trail, "_backend", None)
+        if backend is not None:
+            try:
+                backend.remove_pending_outcome(action_id)
+            except Exception:
+                logger.exception(
+                    "backend.remove_pending_outcome failed for action_id=%s",
+                    action_id,
+                )
         with self._pending_outcomes_lock:
             self._pending_outcomes.pop(action_id, None)
         with self._metrics_lock:

@@ -1,9 +1,0 @@
-SCITT witness anchor, persistent trail, prior-approval learning
-
-- New scitt_anchor: Merkle-log inclusion proofs as timestamp anchors
-- Removed ots_anchor, test_ots_anchor, [ots] extra entirely
-- Pipeline now defaults to persistent SQLite trail (~/.vaara/trail/audit.db)
-- Prior-approval auto-allow: once an escalation is approved, same action
-  shape from same agent is auto-allowed next time
-- vaara init now detects and governs OpenCode
-- SPEC.md: scitt method registered, opentimestamps removed

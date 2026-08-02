@@ -34,7 +34,7 @@ from vaara.auth import APIKey, Role, _hash_key, generate_api_key
 
 logger = logging.getLogger(__name__)
 
-SCHEMA_VERSION = 4
+SCHEMA_VERSION = 5
 
 
 def _scrub_nonfinite(obj: Any) -> Any:
@@ -114,6 +114,18 @@ CREATE TABLE IF NOT EXISTS api_keys (
     created_at   REAL NOT NULL,
     last_used_at REAL
 );
+
+-- Pending outcomes for cross-process tracking (v1.57.3).
+-- Allows vaara outcome to work across separate processes.
+CREATE TABLE IF NOT EXISTS pending_outcomes (
+    action_id     TEXT PRIMARY KEY,
+    agent_id      TEXT NOT NULL,
+    tool_name     TEXT NOT NULL,
+    risk_score    REAL NOT NULL,
+    signals       TEXT NOT NULL DEFAULT '{}',
+    created_at    REAL NOT NULL
+);
+CREATE INDEX IF NOT EXISTS idx_pending_created ON pending_outcomes(created_at);
 """
 
 # Incremental migrations applied when opening a DB with stored version < SCHEMA_VERSION.
@@ -152,6 +164,20 @@ _MIGRATIONS: dict[int, str] = {
     # keeps passing. New records are written with chain_version=2.
     3: """
     ALTER TABLE audit_records ADD COLUMN chain_version INTEGER NOT NULL DEFAULT 1;
+    """,
+    # v4 to v5: pending outcomes table for cross-process tracking (v1.57.3).
+    # Allows vaara outcome to work across separate processes by persisting
+    # pending outcomes to SQLite instead of in-memory dict.
+    4: """
+    CREATE TABLE IF NOT EXISTS pending_outcomes (
+        action_id     TEXT PRIMARY KEY,
+        agent_id      TEXT NOT NULL,
+        tool_name     TEXT NOT NULL,
+        risk_score    REAL NOT NULL,
+        signals       TEXT NOT NULL DEFAULT '{}',
+        created_at    REAL NOT NULL
+    );
+    CREATE INDEX IF NOT EXISTS idx_pending_created ON pending_outcomes(created_at);
     """,
 }
 
@@ -422,6 +448,9 @@ class SQLiteAuditBackend:
             ).fetchall()
 
         trail = AuditTrail(on_record=self.write_record)
+        # Expose the backend so the pipeline can use cross-process features
+        # like pending outcomes persistence.
+        trail._backend = self
 
         corrupt_rows = 0
         for row in rows:
@@ -896,6 +925,78 @@ class SQLiteAuditBackend:
                 created_at=row[3], last_used_at=row[4],
             ))
         return result
+
+    # ── Pending outcomes for cross-process tracking ────────────────
+
+    def store_pending_outcome(
+        self, action_id: str, agent_id: str, tool_name: str,
+        risk_score: float, signals: dict,
+    ) -> None:
+        """Store a pending outcome for cross-process tracking.
+
+        Allows ``vaara outcome`` to work when called from a separate process
+        than ``vaara check``. The pending outcome persists to SQLite instead
+        of an in-memory dict.
+        """
+        import json as _json
+        signals_json = _json.dumps(signals, sort_keys=True, separators=(",", ":"))
+        with self._lock:
+            self._conn.execute(
+                "INSERT OR REPLACE INTO pending_outcomes "
+                "(action_id, agent_id, tool_name, risk_score, signals, created_at) "
+                "VALUES (?, ?, ?, ?, ?, ?)",
+                (action_id, agent_id, tool_name, risk_score, signals_json, time.time()),
+            )
+
+    def get_pending_outcome(self, action_id: str) -> Optional[dict]:
+        """Retrieve a pending outcome by action_id. Returns None if not found."""
+        import json as _json
+        with self._lock:
+            row = self._conn.execute(
+                "SELECT action_id, agent_id, tool_name, risk_score, signals, created_at "
+                "FROM pending_outcomes WHERE action_id=?",
+                (action_id,),
+            ).fetchone()
+        if not row:
+            return None
+        try:
+            signals = _json.loads(row[4]) if row[4] else {}
+        except (ValueError, TypeError):
+            signals = {}
+        return {
+            "action_id": row[0],
+            "agent_id": row[1],
+            "tool_name": row[2],
+            "risk_score": row[3],
+            "signals": signals,
+            "created_at": row[5],
+        }
+
+    def remove_pending_outcome(self, action_id: str) -> bool:
+        """Remove a pending outcome after it has been reported. Returns True if removed."""
+        with self._lock:
+            cursor = self._conn.execute(
+                "DELETE FROM pending_outcomes WHERE action_id=?",
+                (action_id,),
+            )
+        return bool(cursor.rowcount)
+
+    def purge_stale_pending_outcomes(self, max_age_seconds: int = 86400) -> int:
+        """Remove pending outcomes older than max_age_seconds (default 24h).
+
+        Prevents unbounded growth if outcomes are never reported (crashes,
+        abandoned workflows). Returns count of purged entries.
+        """
+        cutoff = time.time() - max_age_seconds
+        with self._lock:
+            cursor = self._conn.execute(
+                "DELETE FROM pending_outcomes WHERE created_at < ?",
+                (cutoff,),
+            )
+        count = cursor.rowcount
+        if count > 0:
+            logger.info("Purged %d stale pending outcomes older than %d seconds", count, max_age_seconds)
+        return count
 
     def close(self) -> None:
         """Close the database connection."""

@@ -5,6 +5,18 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/)
 and this project follows [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
 
+## [1.57.3] - 2026-08-02
+
+### Fixed
+- Cross-process outcome reporting: pending outcomes now persist to SQLite
+  (`pending_outcomes` table, schema v5) so `vaara outcome` works when called
+  from a separate process than `vaara check`.
+- macOS `AccessibilityObserver` rewrite: proper multi-app focus tracking via
+  `NSWorkspace` notifications, correct Safari URL extraction through toolbar
+  AX hierarchy, broader AI site detection, and cleanup of stale observers.
+- Remove accidentally committed temporary release artifacts
+  (`.commit_msg_v1.53.0_release.txt`, `.pr_body_v1.53.0.md`).
+
 ## [1.57.2] - 2026-08-02
 
 ### Fixed
