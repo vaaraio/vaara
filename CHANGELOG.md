@@ -5,6 +5,12 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/)
 and this project follows [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
 
+## [1.57.4] - 2026-08-02
+
+### Fixed
+- macOS `AccessibilityObserver`: fix `pid_t` type annotation in `attachTo` and
+  `detachObserver` that broke Swift compilation.
+
 ## [1.57.3] - 2026-08-02
 
 ### Fixed
