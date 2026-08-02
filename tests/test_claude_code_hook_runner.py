@@ -90,7 +90,7 @@ def test_hook_session_start_reports_and_discloses(tmp_path):
     conn = sqlite3.connect(cfg_dir / "audit.db")
     rows = conn.execute(
         "SELECT data FROM audit_records WHERE tool_name = "
-        "'vaara.article50.disclosure' AND event_type = 'action_requested'"
+        "'vaara.article50.disclosure' AND event_type = 'disclosure_recorded'"
     ).fetchall()
     assert len(rows) == 1
     assert json.loads(rows[0][0])["session_id"] == "sess-7"
@@ -112,7 +112,7 @@ def test_hook_session_start_agent_profile_disclosure(tmp_path):
     conn = sqlite3.connect(cfg_dir / "audit.db")
     rows = conn.execute(
         "SELECT data FROM audit_records WHERE tool_name = "
-        "'vaara.article50.disclosure' AND event_type = 'action_requested'"
+        "'vaara.article50.disclosure' AND event_type = 'disclosure_recorded'"
     ).fetchall()
     assert len(rows) == 1
     params = json.loads(rows[0][0])["parameters"]
