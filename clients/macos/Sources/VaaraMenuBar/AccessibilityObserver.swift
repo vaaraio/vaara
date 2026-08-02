@@ -88,7 +88,7 @@ final class AccessibilityObserver {
 
     // ── AXObserver lifecycle ───────────────────────────────────────
 
-    private func attachTo(pid: pid) {
+    private func attachTo(pid: pid_t) {
         var obs: AXObserver?
         let err = AXObserverCreate(pid, { observer, element, notification, refcon in
             guard let refcon = refcon else { return }
