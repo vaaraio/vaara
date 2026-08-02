@@ -116,7 +116,7 @@ final class AccessibilityObserver {
         os_log(.info, log: log, "attached AXObserver pid=%d", pid)
     }
 
-    private func detachObserver(_ observer: AXObserver, pid: pid) {
+    private func detachObserver(_ observer: AXObserver, pid: pid_t) {
         let appEl = AXUIElementCreateApplication(pid)
         AXObserverRemoveNotification(observer, appEl,
             kAXFocusedUIElementChangedNotification as CFString)
