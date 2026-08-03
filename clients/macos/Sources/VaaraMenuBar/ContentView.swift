@@ -1027,7 +1027,9 @@ struct ContentView: View {
         .font(.system(size: 12))
         .foregroundStyle(p.faint)
         .padding(.horizontal, 20)
-        .padding(.vertical, 12)
+        .padding(.vertical, 14)
+        .frame(maxWidth: .infinity)
+        .background(p.wash.opacity(0.5))
     }
 
     private func footerTab(_ label: String, _ target: Screen) -> some View {

@@ -5,6 +5,16 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/)
 and this project follows [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
 
+## [1.58.3] - 2026-08-03
+
+macOS footer spacing: the footer hugged the window's bottom edge at 12pt
+vertical padding while every other element uses 16-22pt. It now uses 14pt
+plus a subtle wash so it reads as a footer with breathing room, matching the
+"unhurried spacing" of the rest of the popover.
+
+### Fixed
+- macOS footer vertical padding 12pt -> 14pt, with a hairline background wash.
+
 ## [1.58.2] - 2026-08-03
 
 Fixes the macOS version probe: the menu-bar footer ran `vaara --version`,
