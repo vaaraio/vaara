@@ -5,6 +5,16 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/)
 and this project follows [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
 
+## [1.58.2] - 2026-08-03
+
+Fixes the macOS version probe: the menu-bar footer ran `vaara --version`,
+which the CLI does not accept (the flag is `vaara version`), so the version
+display silently failed on every install. The footer now calls `vaara version`
+and correctly shows the installed engine version.
+
+### Fixed
+- macOS footer version probe: `vaara --version` -> `vaara version`.
+
 ## [1.58.1] - 2026-08-03
 
 Small macOS app release: the menu-bar footer no longer shows a stale,

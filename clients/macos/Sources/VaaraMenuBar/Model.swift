@@ -878,7 +878,7 @@ final class GateModel: ObservableObject {
         guard let vaara = SetupScanner.engineStatus().vaaraPath else { return nil }
         let proc = Process()
         proc.executableURL = URL(fileURLWithPath: vaara)
-        proc.arguments = ["--version"]
+        proc.arguments = ["version"]
         let pipe = Pipe()
         proc.standardOutput = pipe
         proc.standardError = Pipe()
