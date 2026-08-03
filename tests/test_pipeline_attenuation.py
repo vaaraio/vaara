@@ -57,7 +57,12 @@ def test_broadening_child_is_denied_fail_closed():
 
 
 def test_denial_is_recorded_in_audit_trail():
-    pipe = Pipeline()
+    from vaara.audit.sqlite_backend import SQLiteAuditBackend
+
+    backend = SQLiteAuditBackend(":memory:")
+    trail = backend.load_trail()
+    trail._on_record = backend.write_record
+    pipe = Pipeline(trail=trail)
     p = _parent(pipe)
     child = pipe.intercept(
         agent_id="worker", tool_name="read_document",
