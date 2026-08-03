@@ -4,6 +4,9 @@ import PackageDescription
 let package = Package(
     name: "VaaraMenuBar",
     platforms: [.macOS(.v13)],
+    products: [
+        .executable(name: "VaaraMenuBar", targets: ["VaaraMenuBar"]),
+    ],
     targets: [
         .executableTarget(
             name: "VaaraMenuBar",

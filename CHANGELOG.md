@@ -5,6 +5,22 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/)
 and this project follows [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
 
+## [1.58.4] - 2026-08-03
+
+macOS Settings screen: the Grid was the one screen without the bounded
+ScrollView every other tab uses, so tall content (enterprise rows) clipped
+against the popover's bottom edge and text hugged the border. It now scrolls
+inside a `maxHeight: 560` container like Overview and History, and the footer
+keeps the app-wide 20pt bottom padding instead of 14pt.
+
+Also fixes the SPM manifest: `VaaraMenuBar` was declared as an executable
+target but never listed under `products:`, so `swift build` compiled the code
+but never linked a runnable binary.
+
+### Fixed
+- macOS Settings screen: bounded ScrollView (maxHeight 560) + 20pt footer bottom padding.
+- `clients/macos/Package.swift`: added the `VaaraMenuBar` executable product.
+
 ## [1.58.3] - 2026-08-03
 
 macOS footer spacing: the footer hugged the window's bottom edge at 12pt
