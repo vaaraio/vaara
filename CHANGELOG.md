@@ -5,6 +5,28 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/)
 and this project follows [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
 
+## [1.59.0] - 2026-08-03
+
+macOS app consolidation release. Pulls the 1.58.x macOS fixes into one
+coherent release and corrects the settings layout regression.
+
+### Added
+- `clients/macos/Package.swift` declares the `VaaraMenuBar` executable
+  product, so `swift build` actually links a runnable binary.
+
+### Fixed
+- The menu-bar footer reads the installed engine version via `vaara version`
+  (the CLI rejects `--version`), so the on-screen version matches the binary
+  no matter how the app was installed.
+- The update-check User-Agent is derived from the installed version instead
+  of a hardcoded value.
+- Footer bottom padding is 20pt, matching the app-wide standard, so the
+  footer no longer hugs the window edge.
+- Settings screen is a plain `Grid` with 20pt padding — the bounded
+  ScrollView introduced in 1.58.4 (which added an unwanted scrollbar) is
+  removed; tall enterprise content no longer clips to the window edge.
+- Bumped `BUILD_STAMP` to `b57 · 2026-08-03`.
+
 ## [1.58.4] - 2026-08-03
 
 macOS Settings screen: the Grid was the one screen without the bounded

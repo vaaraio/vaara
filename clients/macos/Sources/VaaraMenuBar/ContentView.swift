@@ -490,8 +490,7 @@ struct ContentView: View {
     private var enterprise: Bool { model.config.user_level == "enterprise" }
 
     private var settings: some View {
-        ScrollView {
-            Grid(alignment: .topLeading, horizontalSpacing: 32, verticalSpacing: 18) {
+        Grid(alignment: .topLeading, horizontalSpacing: 32, verticalSpacing: 18) {
             // Row 1: SETTINGS FOR  |  NOTIFY ON
             GridRow {
                 VStack(alignment: .leading, spacing: 8) {
@@ -739,10 +738,8 @@ struct ContentView: View {
                     .tint(p.faint)
                 }
             }
-            }
-            .padding(20)
         }
-        .frame(maxHeight: 560)
+        .padding(20)
     }
 
     // MARK: anchor — the qualified timestamp provider (EU trusted list) picker
