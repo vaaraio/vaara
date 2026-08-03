@@ -140,8 +140,12 @@ def test_empty_trail():
 
 def test_pipeline_chain_reconstructs_and_tamper_is_caught():
     from vaara import Pipeline
+    from vaara.audit.sqlite_backend import SQLiteAuditBackend
 
-    pipe = Pipeline()
+    backend = SQLiteAuditBackend(":memory:")
+    trail = backend.load_trail()
+    trail._on_record = backend.write_record
+    pipe = Pipeline(trail=trail)
     a = pipe.intercept(agent_id="planner", tool_name="plan_task", parameters={})
     b = pipe.intercept(
         agent_id="researcher", tool_name="search_docs",
