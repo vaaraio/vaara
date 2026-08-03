@@ -835,16 +835,22 @@ final class GateModel: ObservableObject {
     // MARK: - Update check (GitHub latest release, on demand only)
 
     @Published var updateStatus: String?
+    /// The vaara engine version actually installed on this machine, read
+    /// from `vaara --version` at runtime so the footer never goes stale
+    /// regardless of which build (IDE/XcodeGen, Homebrew, /Applications
+    /// copy) is on disk. Nil until read, or when the engine is not found.
+    @Published var engineVersion: String?
 
     /// Compare the installed engine's version against the latest GitHub
     /// release tag. Runs only when the user clicks; no background phoning.
     func checkForUpdates() {
         updateStatus = "checking..."
         let installed = installedEngineVersion()
+        engineVersion = installed
         var req = URLRequest(
             url: URL(string: "https://api.github.com/repos/vaaraio/vaara/releases/latest")!)
         req.setValue("application/vnd.github+json", forHTTPHeaderField: "Accept")
-        req.setValue("VaaraMenuBar/1.56.0", forHTTPHeaderField: "User-Agent")
+        req.setValue("VaaraMenuBar/\(installed ?? "x")", forHTTPHeaderField: "User-Agent")
         URLSession.shared.dataTask(with: req) { data, _, _ in
             let latest: String? = data
                 .flatMap { try? JSONSerialization.jsonObject(with: $0) as? [String: Any] }

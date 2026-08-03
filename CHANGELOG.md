@@ -5,6 +5,23 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/)
 and this project follows [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
 
+## [1.58.1] - 2026-08-03
+
+Small macOS app release: the menu-bar footer no longer shows a stale,
+hand-edited build stamp. It now reads the actually-installed vaara engine
+version from `vaara --version` at runtime, so the on-screen version always
+matches the binary regardless of how the app was installed (IDE/XcodeGen,
+Homebrew, or a copied `/Applications` build). The GitHub update-check
+User-Agent is derived from the same live version instead of a hardcoded
+`1.56.0`.
+
+### Fixed
+- macOS app footer shows the live installed engine version (was a frozen
+  `BUILD_STAMP` constant that predated the release).
+- `checkForUpdates` sends `User-Agent: VaaraMenuBar/<installed>` instead of a
+  hardcoded `1.56.0`.
+- Bumped `BUILD_STAMP` to `b57 · 2026-08-03`.
+
 ## [1.58.0] - 2026-08-03
 
 Post-audit hardening release: the evidence core verified production-grade;

@@ -37,7 +37,7 @@ struct Palette {
 
 /// Bump on every source change; shown in the footer so a stale build is
 /// visible at a glance instead of masquerading as a bug.
-let BUILD_STAMP = "b56 (webkit-governance) · 2026-07-31"
+let BUILD_STAMP = "b57 · 2026-08-03"
 
 struct ContentView: View {
     @ObservedObject var model: GateModel
@@ -700,7 +700,8 @@ struct ContentView: View {
                                 .lineLimit(2)
                         }
                     }
-                    Text("app build \(BUILD_STAMP)")
+                    Text(model.engineVersion.map { "engine \($0) · \(BUILD_STAMP)" }
+                             ?? "engine build \(BUILD_STAMP)")
                         .font(.system(size: 10, design: .monospaced))
                         .foregroundStyle(p.ghost)
                 }

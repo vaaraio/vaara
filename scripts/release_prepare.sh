@@ -107,10 +107,14 @@ else
   .venv/bin/ruff check src/vaara tests
 fi
 
-# 4. Tests (full suite, deselect pre-existing known failure)
-.venv/bin/python -m pytest -q --no-header \
-  --ignore=tests/adversarial \
-  --deselect tests/test_adversarial_classifier_integration.py::test_known_bad_metadata_ssrf_scores_high
+# 4. Tests (full suite, deselect pre-existing known failure).
+# Skip when VAARA_SKIP_TESTS=1 is set — intended only for patch releases
+# whose diff contains no Python/engine changes (e.g. a macOS UI text fix).
+if [[ "${VAARA_SKIP_TESTS:-0}" != "1" ]]; then
+  .venv/bin/python -m pytest -q --no-header \
+    --ignore=tests/adversarial \
+    --deselect tests/test_adversarial_classifier_integration.py::test_known_bad_metadata_ssrf_scores_high
+fi
 
 # 5. Stage explicit paths only
 git add CHANGELOG.md pyproject.toml clients/ts/package.json src/vaara/__init__.py \
