@@ -8,13 +8,19 @@
     "url": "https://github.com/vaaraio/vaara",
     "source": "github"
   },
+<<<<<<< HEAD
   "version": "1.58.3",
+=======
+>>>>>>> origin/main
   "packages": [
     {
       "registryType": "pypi",
       "registryBaseUrl": "https://pypi.org",
       "identifier": "vaara",
+<<<<<<< HEAD
 "version": "1.58.3",
+=======
+>>>>>>> origin/main
       "runtimeHint": "uvx",
       "transport": {
         "type": "stdio"
