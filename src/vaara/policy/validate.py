@@ -114,6 +114,20 @@ def validate(policy: Policy) -> ValidationReport:
                     f"sequence step {step!r} does not name a declared action class "
                     f"— if this is a deployer-side tool name, ignore",
                 ))
+        if seq.window_seconds != 60:
+            # 60 is the loader default; any other value was explicitly
+            # declared by the operator and would otherwise be silently
+            # ignored: the runtime matcher uses a count-based lookback,
+            # not the declared time window (scorer SequencePattern).
+            issues.append(PolicyIssue(
+                IssueLevel.WARNING, "sequence_window_informational",
+                f"sequences.{seq.name}.window_seconds",
+                f"window_seconds={seq.window_seconds} is currently "
+                f"informational — sequence matching uses a count-based "
+                f"lookback (last max(len(pattern), 10) actions), not a "
+                f"time window. Do not rely on the seconds value for "
+                f"enforcement.",
+            ))
 
     emitted: set[str] = set()
     for ac in policy.action_classes.values():

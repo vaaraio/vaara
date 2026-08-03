@@ -62,10 +62,13 @@ Plus two init-related measurements:
 
 ## What it does not measure
 
-- Persistent audit backends. The default `AuditTrail` is in-memory. Writing
-  each record to SQLite or an append-only file adds I/O latency the
-  benchmark does not cover. A separate SQLite variant belongs in a
-  follow-up file once the primary number is established.
+- Persistent audit backends. The benchmark constructs pipelines with an
+  explicit in-memory `AuditTrail`, so the numbers describe the scoring
+  hot path itself. The library default since v1.53 is a SQLite-backed
+  trail at `~/.vaara/trail/audit.db`; that backend adds I/O latency
+  (grows with database size) the benchmark does not cover. A separate
+  SQLite variant belongs in a follow-up file once the primary number is
+  established.
 - Concurrent throughput under multi-threaded load. `intercept()` is
   documented as requiring per-agent serialisation by the caller, so a true
   throughput number belongs in a threaded harness.

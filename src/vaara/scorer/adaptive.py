@@ -1006,9 +1006,21 @@ class AdaptiveScorer:
         lower, upper = self._conformal.predict_interval(
             point_estimate, category=bucket,
         )
-        if upper < threshold_allow:
+
+        # Same deterministic content floor as the live evaluate path:
+        # a parameter pointing at a cloud-metadata endpoint must preview
+        # as deny, otherwise vaara_check / /v1/score can say allow where
+        # vaara_intercept denies — an inconsistent preview contract.
+        from vaara.scorer._param_signals import metadata_endpoint_risk
+        decision_score = upper
+        content_floor = metadata_endpoint_risk(context.get("parameters"))
+        if content_floor > decision_score:
+            decision_score = content_floor
+            signals["parameter_content"] = content_floor
+
+        if decision_score < threshold_allow:
             decision = Decision.ALLOW
-        elif upper > threshold_deny:
+        elif decision_score > threshold_deny:
             decision = Decision.DENY
         else:
             decision = Decision.ESCALATE

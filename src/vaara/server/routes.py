@@ -4,6 +4,7 @@
 
 from __future__ import annotations
 
+import secrets
 import time
 import uuid
 from datetime import datetime, timezone
@@ -51,6 +52,35 @@ def register(app: FastAPI, state: ServerState) -> None:
             status_code=exc.status_code,
             content={"error": {"code": "http_error", "message": str(exc.detail)}},
         )
+
+    # Bearer-key gate. When the operator configured an API key, EVERY
+    # endpoint except GET /v1/health requires it: the mutating endpoints
+    # (/v1/policy/reload, /v1/audit/events, /v1/score/outcome) are a
+    # governance-takeover / evidence-forgery / calibration-poisoning
+    # surface, and the read endpoints leak the evidence itself.
+    # compare_digest keeps the check constant-time.
+    @app.middleware("http")
+    async def _api_key_gate(request: Request, call_next):
+        expected = state.api_key
+        if expected is None or request.url.path == "/v1/health":
+            return await call_next(request)
+        auth = request.headers.get("authorization", "")
+        scheme, _, token = auth.partition(" ")
+        provided = token if scheme.lower() == "bearer" else ""
+        if not provided or not secrets.compare_digest(provided, expected):
+            return JSONResponse(
+                status_code=401,
+                content={
+                    "error": {
+                        "code": "unauthenticated",
+                        "message": (
+                            "This server requires an API key. Send "
+                            "`Authorization: Bearer <key>`."
+                        ),
+                    }
+                },
+            )
+        return await call_next(request)
 
     @app.get("/v1/health")
     async def health():
@@ -142,6 +172,16 @@ def register(app: FastAPI, state: ServerState) -> None:
             predicted_risk=info.predicted_risk,
             actual_outcome=req.outcome_severity,
             signals=info.signals,
+        )
+        # Write the outcome to the hash chain too — an outcome that only
+        # updates the scorer leaves no evidence record, unlike
+        # pipeline.report_outcome. Record and calibration must not diverge.
+        state.audit.record_outcome(
+            action_id=req.action_id,
+            agent_id=info.agent_id,
+            tool_name=info.tool_name,
+            outcome_severity=req.outcome_severity,
+            description=req.notes or "reported via HTTP /v1/score/outcome",
         )
         return None
 

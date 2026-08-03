@@ -217,10 +217,11 @@ class SQLiteAuditBackend:
         self._tenant_id = tenant_id
 
         # Warn loudly if the caller passed a path that traverses above its
-        # apparent parent (e.g. "../../tmp/evil.db"). Resolving removes the
-        # ".." segments; if the resolved path differs significantly from what
-        # a naive caller might expect, that is a signal worth surfacing.
-        if str(db_path) != ":memory:" and str(self._db_path) != str(raw_path.absolute()):
+        # apparent parent (e.g. "../../tmp/evil.db"). Only ".." segments in
+        # the RAW path count: resolve() also differs from .absolute() when a
+        # path component is a symlink (macOS /var -> /private/var), which
+        # made every tempdir DB false-positive as "path traversal".
+        if str(db_path) != ":memory:" and ".." in raw_path.parts:
             logger.warning(
                 "SQLiteAuditBackend: db_path %r resolved to %s — "
                 "path traversal detected. Ensure this location is intentional.",

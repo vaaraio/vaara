@@ -17,6 +17,14 @@ info:
 
     Versioning: paths are prefixed with `/v1/`. Breaking changes increment
     the path version. Additive changes do not.
+
+    Authentication: when the server is started with an API key
+    (`--api-key` / `VAARA_SERVER_API_KEY`), every endpoint except
+    `GET /v1/health` requires `Authorization: Bearer <key>`; unauthenticated
+    requests receive 401 with `error.code = "unauthenticated"`. The
+    reference server refuses a non-loopback bind without a key, because an
+    unauthenticated reachable instance allows policy hot-swap to
+    allow-all, forged audit-event append, and calibration poisoning.
   license:
     name: AGPL-3.0-or-later
     url: https://www.gnu.org/licenses/agpl-3.0.en.html
@@ -30,6 +38,9 @@ tags:
   - { name: score, description: Risk evaluation }
   - { name: audit, description: Hash-chained audit trail }
   - { name: server, description: Server identity and liveness }
+
+security:
+  - bearerAuth: []
 
 paths:
   /v1/score:
@@ -284,6 +295,11 @@ paths:
                   status: { type: string, enum: [ok] }
 
 components:
+  securitySchemes:
+    bearerAuth:
+      type: http
+      scheme: bearer
+      description: API key configured at server start; required on every endpoint except GET /v1/health when set.
   schemas:
     ScoreRequest:
       type: object

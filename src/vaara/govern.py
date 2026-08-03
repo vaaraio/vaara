@@ -28,11 +28,14 @@ from __future__ import annotations
 
 import functools
 import inspect
+import logging
 import os
 import threading
 from typing import Any, Callable, Optional, TypeVar, cast
 
 from vaara.pipeline import InterceptionPipeline, InterceptionResult
+
+logger = logging.getLogger(__name__)
 
 __all__ = ["govern", "Blocked", "default_pipeline", "set_default_pipeline"]
 
@@ -99,7 +102,13 @@ def _auto_article50_disclosure(pipeline: InterceptionPipeline) -> None:
             channel="govern_decorator",
         )
     except Exception:
-        pass
+        # Disclosure failure must never break the wrapped function, but a
+        # silent Article 50 evidence gap is worse than a log line.
+        logger.debug(
+            "Article 50 auto-disclosure failed (VAARA_ARTICLE50_STATEMENT "
+            "set but not recorded)",
+            exc_info=True,
+        )
 
 
 def set_default_pipeline(pipeline: InterceptionPipeline) -> None:

@@ -30,6 +30,7 @@ def create_app(
     audit: Optional[AuditTrail] = None,
     policy_controller: Optional[PolicyController] = None,
     policy_registry: Optional[PolicyRegistry] = None,
+    api_key: Optional[str] = None,
 ) -> FastAPI:
     """Build the FastAPI application.
 
@@ -45,12 +46,17 @@ def create_app(
             deployments. Mutually exclusive with ``policy_controller`` —
             single-controller callers are wrapped into a registry's ""
             slot automatically by ``ServerState``.
+        api_key: Bearer key required on every endpoint except
+            ``GET /v1/health`` when set. ``None`` means unauthenticated —
+            acceptable only on a loopback bind; the CLI refuses to start
+            a non-loopback server without one.
     """
     state = ServerState(
         scorer=scorer,
         audit=audit,
         policy_controller=policy_controller,
         policy_registry=policy_registry,
+        api_key=api_key,
     )
     app = FastAPI(
         title="Vaara HTTP API",

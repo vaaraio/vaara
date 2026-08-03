@@ -76,12 +76,15 @@ The same scorer and audit trail are available over HTTP for non-Python agents an
 
 ```bash
 pip install 'vaara[server]'
-vaara serve --host 0.0.0.0 --port 8000
+vaara serve --host 0.0.0.0 --port 8000 --api-key "$VAARA_SERVER_API_KEY"
 
 curl -sX POST http://localhost:8000/v1/score \
   -H 'content-type: application/json' \
+  -H "Authorization: Bearer $VAARA_SERVER_API_KEY" \
   -d '{"tool_name":"tx.transfer","agent_id":"agent-007","base_risk_score":0.5}'
 ```
+
+Authentication matters here: with no API key the server is loopback-only by default, and `vaara serve` refuses a non-loopback bind without `--api-key` (or the `VAARA_SERVER_API_KEY` env var) unless you pass `--allow-unauthenticated`. That refusal is deliberate — an unauthenticated reachable server lets any client swap the policy to allow-all (`POST /v1/policy/reload`), append forged audit events that still verify (`POST /v1/audit/events`), and poison calibration (`POST /v1/score/outcome`). When a key is configured, every endpoint except `GET /v1/health` requires `Authorization: Bearer <key>`.
 
 Wire contract in [openapi.yaml](openapi.yaml). Operator endpoints include `POST /v1/policy/reload` (atomic hot policy swap) and named detectors `POST /v1/detect/injection` and `POST /v1/detect/pii`, with matching CLI subcommands that exit non-zero on detection for CI gating.
 

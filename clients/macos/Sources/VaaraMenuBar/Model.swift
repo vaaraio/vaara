@@ -657,6 +657,14 @@ final class GateModel: ObservableObject {
     private let pluginConfigURL = FileManager.default.homeDirectoryForCurrentUser
         .appendingPathComponent(".vaara/claude-code/config.json")
 
+    /// The unified engine config (auto-init / `vaara menu` own its
+    /// shape). The GATE picker must flip BOTH files: writing only the
+    /// plugin config left every non-hook runtime (proxy, llm-proxy,
+    /// MCP server) on its previous mode — the settings UI then showed
+    /// "Block" while the engine was observing.
+    private let unifiedConfigURL = FileManager.default.homeDirectoryForCurrentUser
+        .appendingPathComponent(".vaara/config.json")
+
     private func readPluginPreset() -> String {
         guard let data = try? Data(contentsOf: pluginConfigURL),
               let obj = try? JSONSerialization.jsonObject(with: data) as? [String: Any],
@@ -666,11 +674,22 @@ final class GateModel: ObservableObject {
     }
 
     private func readPluginMode() -> String {
-        guard let data = try? Data(contentsOf: pluginConfigURL),
-              let obj = try? JSONSerialization.jsonObject(with: data) as? [String: Any],
-              let mode = obj["mode"] as? String, !mode.isEmpty
-        else { return "protect" }
-        return mode
+        // Unified engine config first (it governs the non-hook paths),
+        // plugin config as fallback. Normalise legacy vocabularies:
+        // auto-init wrote "shadow"/"enforce", the menu writes
+        // "protect"/"watch".
+        for url in [unifiedConfigURL, pluginConfigURL] {
+            guard let data = try? Data(contentsOf: url),
+                  let obj = try? JSONSerialization.jsonObject(with: data) as? [String: Any],
+                  let mode = obj["mode"] as? String, !mode.isEmpty
+            else { continue }
+            switch mode {
+            case "protect", "enforce": return "protect"
+            case "watch", "shadow":    return "watch"
+            default: break
+            }
+        }
+        return "protect"
     }
 
     /// Set the plugin's protection preset (and drop any custom override,
@@ -682,27 +701,36 @@ final class GateModel: ObservableObject {
         customThresholds = nil
     }
 
-    /// Flip the plugin between blocking (protect) and shadow (watch).
+    /// Flip the gate between blocking (protect) and shadow (watch) on
+    /// EVERY governed path: the Claude Code plugin config and the
+    /// unified engine config alike.
     func setMode(_ mode: String) {
         writePluginConfig(key: "mode", value: mode)
+        writeConfig(key: "mode", value: mode, to: unifiedConfigURL)
         enforcementMode = mode
     }
 
     /// Merge one key into config.json, preserving every other key
     /// (/vaara-setup owns the file's shape). nil removes the key.
     private func writePluginConfig(key: String, value: Any?) {
+        writeConfig(key: key, value: value, to: pluginConfigURL)
+    }
+
+    /// Merge one key into an arbitrary JSON config file, preserving
+    /// every other key. nil removes the key.
+    private func writeConfig(key: String, value: Any?, to url: URL) {
         var obj: [String: Any] = [:]
-        if let data = try? Data(contentsOf: pluginConfigURL),
+        if let data = try? Data(contentsOf: url),
            let existing = try? JSONSerialization.jsonObject(with: data) as? [String: Any] {
             obj = existing
         }
         if let value { obj[key] = value } else { obj.removeValue(forKey: key) }
         try? FileManager.default.createDirectory(
-            at: pluginConfigURL.deletingLastPathComponent(),
+            at: url.deletingLastPathComponent(),
             withIntermediateDirectories: true)
         if let data = try? JSONSerialization.data(
             withJSONObject: obj, options: [.prettyPrinted, .sortedKeys]) {
-            try? data.write(to: pluginConfigURL)
+            try? data.write(to: url)
         }
     }
 

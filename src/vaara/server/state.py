@@ -36,6 +36,7 @@ class ServerState:
         policy_registry: Optional[PolicyRegistry] = None,
         x402_gate: Optional[X402Gate] = None,
         anchorer: Optional[Anchorer] = None,
+        api_key: Optional[str] = None,
     ) -> None:
         if policy_controller is not None and policy_registry is not None:
             raise ValueError(
@@ -81,6 +82,11 @@ class ServerState:
         # Neither does network I/O at construction, so tests stay offline.
         self.x402 = x402_gate or X402Gate()
         self.anchorer = anchorer or Anchorer()
+        # Bearer key for the HTTP API. None = unauthenticated (loopback
+        # development default); the CLI refuses non-loopback binds in
+        # that state. Compared with secrets.compare_digest in the auth
+        # middleware — never log it.
+        self.api_key = api_key or None
 
     def remember_action(
         self,

@@ -598,7 +598,34 @@ class InterceptionPipeline:
                 _MAX_DECISION_REASON_LEN, "reason",
             )
 
-        # 7. Record the decision in audit
+        # 7. Prior-approval check, BEFORE the decision hits the chain.
+        #    When this tenant's agent + tool + argument shape was
+        #    escalated and approved within the last 24 hours, the
+        #    decision flips to allow here, so the recorded decision is
+        #    always the one the caller actually experienced. Recording
+        #    "escalate" and then silently allowing would be the worst-
+        #    case governance failure named in step 6: the record and
+        #    the behaviour disagree.
+        args_digest = ""
+        if decision_str == "escalate":
+            args_digest = hashlib.sha256(
+                json.dumps(safe_params or {}, sort_keys=True).encode()
+            ).hexdigest() if safe_params else ""
+            prior = self.trail.find_prior_approval(
+                agent_id=agent_id, tool_name=tool_name,
+                args_digest=args_digest, window_hours=24,
+                tenant_id=tenant_id,
+            )
+            if prior is not None:
+                decision_str = "allow"
+                allowed = True
+                reason = _cap_str(
+                    f"auto-allowed by prior approval "
+                    f"(action_id={prior.action_id}, {prior.timestamp})",
+                    _MAX_DECISION_REASON_LEN, "reason",
+                )
+
+        # 8. Record the decision in audit
         self.trail.record_decision(
             action_id=action_id,
             agent_id=agent_id,
@@ -609,27 +636,6 @@ class InterceptionPipeline:
             regulatory_domains=action_type.regulatory_domains,
         )
 
-        # 8. If escalated, check for prior approval in the persistent trail.
-        #    When the same agent + tool_name (and args digest when available)
-        #    was escalated and approved within the last 24 hours, skip the
-        #    escalation and auto-allow. The time window and args digest
-        #    prevent a one-time approval from permanently opening the gate.
-        if decision_str == "escalate":
-            args_digest = hashlib.sha256(
-                json.dumps(safe_params or {}, sort_keys=True).encode()
-            ).hexdigest() if safe_params else ""
-            prior = self.trail.find_prior_approval(
-                agent_id=agent_id, tool_name=tool_name,
-                args_digest=args_digest, window_hours=24,
-            )
-            if prior is not None:
-                decision_str = "allow"
-                allowed = True
-                reason = (
-                    f"auto-allowed by prior approval "
-                    f"(action_id={prior.action_id}, {prior.timestamp})"
-                )
-
         if decision_str == "escalate":
             self.trail.record_escalation(
                 action_id=action_id,
@@ -637,6 +643,7 @@ class InterceptionPipeline:
                 tool_name=tool_name,
                 escalation_target="human_reviewer",
                 risk_score=point_estimate,
+                args_digest=args_digest,
             )
             # Enqueue for operator review when a queue is wired in.
             # The conformal interval is what makes Article 14 oversight
@@ -967,6 +974,22 @@ class InterceptionPipeline:
         agent_id = trail[0].agent_id
         tool_name = trail[0].tool_name
 
+        # Carry the argument-shape digest from ESCALATION_SENT into the
+        # resolution record so find_prior_approval can require an exact
+        # shape match before auto-allowing. Records escalated before this
+        # field existed carry no digest; their resolutions simply never
+        # match a digested query (fail closed) and age out of the 24h
+        # window — no re-derivation from stored parameters, which could
+        # disagree with the intercept-time digest after caps/rounding.
+        args_digest = ""
+        for r in trail:
+            if r.event_type == EventType.ESCALATION_SENT:
+                data = r.data if isinstance(r.data, dict) else {}
+                digest = data.get("args_digest", "")
+                if isinstance(digest, str):
+                    args_digest = digest
+                break
+
         # Cap free-text fields: resolution is already normalised to
         # allow/deny above but a stray non-standard string gets a small
         # label cap so it can't balloon the audit record. reviewer and
@@ -986,6 +1009,7 @@ class InterceptionPipeline:
             resolution=resolution,
             reviewer=reviewer,
             justification=justification,
+            args_digest=args_digest,
         )
 
     def run_compliance_assessment(

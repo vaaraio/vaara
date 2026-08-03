@@ -9,9 +9,10 @@ internal types.
 
 from __future__ import annotations
 
+import json
 from typing import Any, Literal, Optional
 
-from pydantic import BaseModel, Field, ConfigDict
+from pydantic import BaseModel, Field, ConfigDict, field_validator
 
 
 _Reversibility = Literal["reversible", "partially_reversible", "irreversible"]
@@ -27,7 +28,15 @@ _EventType = Literal[
     "escalation_resolved",
     "outcome_recorded",
     "policy_override",
+    "anchor_gap",
+    "key_lifecycle",
+    "disclosure_recorded",
 ]
+
+# Mirror of the trail's 64KB per-record data cap at the HTTP boundary:
+# an unbounded payload dict would otherwise reach the hash chain through
+# POST /v1/audit/events with none of the pipeline's size caps applied.
+_MAX_PAYLOAD_JSON_BYTES = 64 * 1024
 
 
 class ScoreRequest(BaseModel):
@@ -78,7 +87,7 @@ class OutcomeRequest(BaseModel):
 
     action_id: str
     outcome_severity: float = Field(ge=0, le=1)
-    notes: Optional[str] = None
+    notes: Optional[str] = Field(default=None, max_length=8192)
 
 
 class AuditEventRequest(BaseModel):
@@ -90,6 +99,15 @@ class AuditEventRequest(BaseModel):
     tool_name: Optional[str] = None
     tenant_id: str = Field(default="", max_length=256)
     payload: dict[str, Any] = Field(default_factory=dict)
+
+    @field_validator("payload")
+    @classmethod
+    def _cap_payload(cls, v: dict[str, Any]) -> dict[str, Any]:
+        if len(json.dumps(v, default=str)) > _MAX_PAYLOAD_JSON_BYTES:
+            raise ValueError(
+                f"payload exceeds {_MAX_PAYLOAD_JSON_BYTES}-byte JSON cap"
+            )
+        return v
 
 
 class AuditEventResponse(BaseModel):

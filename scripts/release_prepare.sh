@@ -68,19 +68,27 @@ if git show-ref --verify --quiet "refs/heads/${BRANCH}"; then
 fi
 
 # 2. Bump versions (idempotent: only touches the version line)
-sed -i -E "s/^version = \"[0-9]+\.[0-9]+\.[0-9]+\"$/version = \"${VERSION}\"/" pyproject.toml
-sed -i -E "s/^  \"version\": \"[0-9]+\.[0-9]+\.[0-9]+\",$/  \"version\": \"${VERSION}\",/" clients/ts/package.json
-sed -i -E "s/^__version__ = \"[0-9]+\.[0-9]+\.[0-9]+\"$/__version__ = \"${VERSION}\"/" src/vaara/__init__.py
+# Portable in-place sed: GNU sed takes `-i -E`; BSD sed (macOS) takes
+# `-i '' -E` — with the GNU form BSD treats "-E" as a backup suffix and
+# silently runs BRE, which produced zero bumps plus stray *-E files.
+if sed --version >/dev/null 2>&1; then
+  SED_I=(-i -E)          # GNU
+else
+  SED_I=(-i '' -E)       # BSD (macOS)
+fi
+sed "${SED_I[@]}" "s/^version = \"[0-9]+\.[0-9]+\.[0-9]+\"$/version = \"${VERSION}\"/" pyproject.toml
+sed "${SED_I[@]}" "s/^  \"version\": \"[0-9]+\.[0-9]+\.[0-9]+\",$/  \"version\": \"${VERSION}\",/" clients/ts/package.json
+sed "${SED_I[@]}" "s/^__version__ = \"[0-9]+\.[0-9]+\.[0-9]+\"$/__version__ = \"${VERSION}\"/" src/vaara/__init__.py
 # MCP Registry manifests: bump every semver "version" value (root listing
 # + the pypi package entry). The release workflow asserts the live registry
 # version equals the tag, so a stale manifest fails the publish gate.
-sed -i -E "s/(\"version\": \")[0-9]+\.[0-9]+\.[0-9]+(\")/\1${VERSION}\2/g" \
+sed "${SED_I[@]}" "s/(\"version\": \")[0-9]+\.[0-9]+\.[0-9]+(\")/\1${VERSION}\2/g" \
   server.json server-vaara-server.json
 # Claude Code plugin manifest: unified to the release version so the plugin
 # tracks the tag like the other planes. It is git-marketplace distributed, so
 # committing the bumped manifest to main is the publish.
 PLUGIN_MANIFEST="plugins/claude-code-vaara-governance/.claude-plugin/plugin.json"
-sed -i -E "s/^  \"version\": \"[0-9]+\.[0-9]+\.[0-9]+\",$/  \"version\": \"${VERSION}\",/" \
+sed "${SED_I[@]}" "s/^  \"version\": \"[0-9]+\.[0-9]+\.[0-9]+\",$/  \"version\": \"${VERSION}\",/" \
   "$PLUGIN_MANIFEST"
 
 grep -E "^version = \"${VERSION}\"$" pyproject.toml >/dev/null

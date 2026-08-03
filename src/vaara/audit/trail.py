@@ -879,8 +879,15 @@ class AuditTrail:
         tool_name: str,
         escalation_target: str,
         risk_score: float,
+        args_digest: str = "",
     ) -> None:
-        """Record that an action was escalated for human review."""
+        """Record that an action was escalated for human review.
+
+        ``args_digest`` binds the exact argument shape that was escalated
+        into the hash chain, so a later resolution can be matched against
+        the same shape (see find_prior_approval) instead of opening the
+        gate for every shape of this agent + tool.
+        """
         articles = self._get_regulatory_articles(
             EventType.ESCALATION_SENT, frozenset({RegulatoryDomain.EU_AI_ACT}),
         )
@@ -897,6 +904,9 @@ class AuditTrail:
                     escalation_target, self._MAX_ESCALATION_TARGET_LEN,
                 ),
                 "risk_score": risk_score,
+                "args_digest": self._cap_record_str(
+                    args_digest, self._MAX_ARGS_DIGEST_LEN,
+                ),
             },
             regulatory_articles=articles,
             tenant_id=self._tenant_for(action_id),
@@ -910,8 +920,15 @@ class AuditTrail:
         resolution: str,
         reviewer: str,
         justification: str = "",
+        args_digest: str = "",
     ) -> None:
-        """Record human resolution of an escalation."""
+        """Record human resolution of an escalation.
+
+        ``args_digest`` is the argument-shape digest carried over from the
+        ESCALATION_SENT record. find_prior_approval requires it to match
+        before auto-allowing a later action, so approving ``tx.transfer``
+        with amount 10 does not auto-allow amount 100000.
+        """
         articles = self._get_regulatory_articles(
             EventType.ESCALATION_RESOLVED, frozenset({RegulatoryDomain.EU_AI_ACT}),
         )
@@ -927,6 +944,9 @@ class AuditTrail:
                 "resolution": self._cap_record_str(resolution, self._MAX_RESOLUTION_LEN),
                 "reviewer": self._cap_record_str(reviewer, self._MAX_REVIEWER_LEN),
                 "justification": self._cap_record_str(justification, self._MAX_JUSTIFICATION_LEN),
+                "args_digest": self._cap_record_str(
+                    args_digest, self._MAX_ARGS_DIGEST_LEN,
+                ),
             },
             regulatory_articles=articles,
             tenant_id=self._tenant_for(action_id),
@@ -970,23 +990,39 @@ class AuditTrail:
     def find_prior_approval(
         self, agent_id: str, tool_name: str, *,
         args_digest: str = "", window_hours: float = 24,
+        tenant_id: str = "",
     ) -> Optional[AuditRecord]:
         """Check the trail for a prior escalation resolved as allow.
 
         Matches on ``agent_id`` + ``tool_name`` within ``window_hours`` of
-        ``time.time()``. When ``args_digest`` is non-empty, also matches on
-        the SHA-256 hex digest of the tool arguments — so approving a
-        ``tx.transfer`` with amount 10 does not auto-allow amount 100000.
+        ``time.time()``. When ``args_digest`` is non-empty, the resolution
+        record must carry the SAME digest — so approving a ``tx.transfer``
+        with amount 10 does not auto-allow amount 100000. A resolution
+        record with no stored digest (recorded before this invariant was
+        enforced) never matches a digested query: fail closed, and it
+        ages out of the window within 24h anyway.
+
+        ``tenant_id`` scopes the search so one tenant's approval can never
+        auto-allow another tenant's same-named agent + tool.
+
         Returns the matching resolution record, or None.
 
         The SQLite backend persists across restarts, so approved action
         shapes survive process restarts within the time window.
         """
         cutoff = time.time() - window_hours * 3600
-        for r in reversed(self._records):
+        want_tenant = tenant_id or ""
+        # Snapshot under the chain lock — every other reader of _records
+        # does the same; iterating a list another thread is appending to
+        # is a data race even under the GIL.
+        with self._lock:
+            records = list(self._records)
+        for r in reversed(records):
             if r.event_type != EventType.ESCALATION_RESOLVED:
                 continue
             if r.timestamp < cutoff:
+                continue
+            if (r.tenant_id or "") != want_tenant:
                 continue
             if r.agent_id != agent_id or r.tool_name != tool_name:
                 continue
@@ -994,8 +1030,7 @@ class AuditTrail:
             if data.get("resolution") != "allow":
                 continue
             if args_digest:
-                prior_digest = data.get("args_digest", "")
-                if prior_digest and prior_digest != args_digest:
+                if data.get("args_digest", "") != args_digest:
                     continue
             return r
         return None
@@ -1009,6 +1044,10 @@ class AuditTrail:
     _MAX_OVERRIDER_LEN = 256
     _MAX_OVERRIDE_REASON_LEN = 8192
     _MAX_DECISION_LABEL_LEN = 64
+    # SHA-256 hex digests are 64 chars; 128 leaves headroom for future
+    # digest algorithms without letting a caller-controlled string balloon
+    # the ESCALATION_SENT/RESOLVED records on the hash chain.
+    _MAX_ARGS_DIGEST_LEN = 128
     # record_execution is public API too — a tool returning a multi-MB
     # result dict would otherwise balloon ACTION_EXECUTED records and
     # every regulator view that iterates the trail. Same L47 pattern

@@ -144,7 +144,7 @@ Let C(aₜ) = [f(aₜ) − q̂, f(aₜ) + q̂] be the conformal interval. The de
 
 This is **conservative by construction**: the decision is based on the worst-case risk within the 1 − α confidence set. If even the worst case is safe, allow. If even the best case is dangerous, deny. Between: escalate for human judgment.
 
-**Proposition 5.2**: Let θ_allow = 0.3 and θ_deny = 0.7 (defaults). Before calibration, the interval is [f(a) − 0.3, f(a) + 0.3]. A raw score of f(a) ≤ 0.0 is needed for auto-allow, and f(a) ≥ 0.4 for auto-deny. This means the pre-calibration scorer is maximally cautious - most actions will be escalated, which is the correct cold-start behavior.
+**Proposition 5.2**: Let θ_allow = 0.4 and θ_deny = 0.7 (the scorer defaults; the policy loader's own defaults are 0.55/0.85). With the seeded calibration prior (§8.3), the interval starts at [f(a) − 0.19, f(a) + 0.19]. A raw score of f(a) < 0.21 is then needed for auto-allow, and f(a) > 0.51 for auto-deny, with the band between routed to human review. Operators who disable the prior (`pre_seed_calibration=False`) get the strict cold start: the interval is [f(a) − 0.3, f(a) + 0.3] until ~30 real outcomes land, and most actions escalate — maximally cautious by design.
 
 ## 6. Temporal Sequence Scoring
 
@@ -158,11 +158,11 @@ The matching is **ordered but not contiguous** - interleaving benign actions doe
 
 ### 6.2 Compositional Risk
 
-The sequence risk boost δₚ is additive to the base score, not multiplicative:
+The sequence signal is **one of the K expert signals fused by MWU** (§5), not a post-hoc additive boost. When a pattern p matches, the sequence expert emits its elevated estimate (driven by the pattern's risk boost δₚ); the fused point estimate is the MWU-weighted combination of all experts, and the conformal interval applies to that fused score:
 
-    f_seq(aₜ) = f(aₜ) + max{δₚ : p matches}
+    s_seq(aₜ, hₜ) = max{δₚ : p matches},    f(aₜ) = Σₖ wₖ · sₖ(aₜ, hₜ)
 
-This ensures that a benign action (f(a) = 0.1) in a dangerous sequence (δ = 0.5) is scored as 0.6 - elevated but not automatically blocked. The conformal interval then widens to [0.3, 0.9], which triggers escalation.
+This ensures that a benign base action in a dangerous sequence is elevated by the fused score — through the same weighted-expert machinery as every other signal — rather than by an out-of-band override, so MWU can learn how predictive sequence matches actually are from outcome feedback.
 
 ## 7. Regulatory Compliance
 
@@ -176,12 +176,13 @@ An article has **sufficient evidence** if Coverage ≥ 1 and evidence is not sta
 
 ### 7.2 Hash Chain Integrity
 
-Records form a hash chain:
+Records form a hash chain. Each record carries a `previous_hash` field, and the record hash commits to that field — the link is *inside* the hashed payload:
 
     h₀ = ""
-    hₜ = SHA256(canonical_json(rₜ) || hₜ₋₁)
+    rₜ.previous_hash = hₜ₋₁
+    hₜ = SHA256(canonical_json(rₜ))
 
-where canonical_json uses sorted keys and no whitespace. **Proposition 7.1**: Tampering with any record rᵢ (i < t) changes hᵢ, which cascades to hₜ. Chain verification is O(n).
+where canonical_json uses sorted keys, no whitespace, and rejects non-finite numbers. (Chain v2 additionally binds `tenant_id` and `chain_version` into the same payload.) **Proposition 7.1**: Tampering with any record rᵢ (i < t) changes hᵢ, which cascades to hₜ through the committed previous_hash fields. Chain verification is O(n).
 
 This satisfies EU AI Act Article 12(1) requirement for tamper-evident logging and DORA Article 12(1) requirement for ICT incident detection with automated alert mechanisms.
 
@@ -205,11 +206,13 @@ The FACI adaptive alpha further tightens this under stationarity and maintains a
 
 ### 8.3 Cold Start Duration
 
-The system transitions from rule-based to calibrated mode after 30 outcomes (min_calibration). At 10 actions/hour (moderate agent activity), calibration takes ~3 hours. During cold start:
-- MWU weights are uniform to f(a) ≈ (s₁ + s₂ + s₃ + s₄ + s₅) / 5
-- Conformal interval is [f(a) − 0.3, f(a) + 0.3] to wide, conservative
-- Most actions route through ESCALATE to human review
-- This is **correct behavior**: new systems should have high human oversight
+A just-constructed scorer is **calibrated from birth**: 50 synthetic benign calibration points are seeded at construction (`pre_seed_calibration=True`, the default), so the conformal quantile lands at ~0.19 and the starting interval is [f(a) − 0.19, f(a) + 0.19] rather than the ±0.3 zero-residual fallback. Real outcome reports overwrite the prior within max_calibration = 2000 reports; no migration or warm-up period is needed. During the prior window:
+
+- MWU weights start uniform, f(a) ≈ (s₁ + s₂ + s₃ + s₄ + s₅) / 5, and adapt with every reported outcome
+- The decision band comes from the thresholds alone: with defaults (0.4 / 0.7), raw scores below ~0.21 auto-allow and above ~0.51 auto-deny
+- Operators who want the strict historical behaviour — ±0.3 intervals and most actions escalating until ~30 outcomes — pass `pre_seed_calibration=False`
+
+This is **correct behavior**: a first deployment is useful immediately, and the conservative choice remains available as an explicit operator decision.
 
 ## 9. Security Properties
 

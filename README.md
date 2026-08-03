@@ -46,7 +46,7 @@ def transfer_funds(to: str, amount: float) -> str:
     ...
 ```
 
-That is the whole thing. Every call to a governed function is risk-scored and decided against your policy before the body runs. A blocked call raises `vaara.Blocked`; an allowed call runs, and the decision, the call, and the outcome land in a signed record anyone can verify offline. Python 3.10+, zero runtime dependencies.
+That is the whole thing. Every call to a governed function is risk-scored and decided against your policy before the body runs. A blocked call raises `vaara.Blocked`; an allowed call runs, and the decision, the call, and the outcome land in a hash-chained, tamper-evident record anyone can verify offline — sign it at export (`vaara trail export`) for third-party proof. Records persist to `~/.vaara/trail/audit.db` by default, so evidence survives restarts. Python 3.10+, zero runtime dependencies.
 
 <details>
 <summary><b>Prefer the explicit pipeline?</b></summary>

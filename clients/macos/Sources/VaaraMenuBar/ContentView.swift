@@ -62,7 +62,10 @@ struct ContentView: View {
                 mainBody
             }
         }
-        .frame(width: 520)
+        // Settings uses a two-column Grid whose segmented pickers clip at
+        // the default 520pt width (cut on both sides) — give that screen
+        // more room; every other screen keeps the compact footprint.
+        .frame(width: screen == .settings && selectedAgent == nil ? 760 : 520)
         .background(p.wash)
         .background(.ultraThinMaterial)
         .environment(\.colorScheme, dark ? .dark : .light)

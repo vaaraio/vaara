@@ -67,8 +67,9 @@ import json
 import logging
 import math
 import os
+import secrets
 import sys
-from dataclasses import dataclass
+from dataclasses import dataclass, replace
 from pathlib import Path
 from typing import Any, Optional
 
@@ -416,7 +417,9 @@ class VaaraMCPServer:
 
         if self._required_api_key:
             provided = arguments.pop("_api_key", None)
-            if not isinstance(provided, str) or provided != self._required_api_key:
+            if not isinstance(provided, str) or not secrets.compare_digest(
+                provided, self._required_api_key
+            ):
                 raise _InvalidParams("Authentication required: missing or invalid _api_key")
 
         if tool_name == "vaara_check":
@@ -556,6 +559,17 @@ class VaaraMCPServer:
             session_id=session_id,
         )
 
+        # Human-in-the-loop: a gated escalate blocks on the file-based
+        # approvals handshake (~/.vaara/approvals), the same protocol the
+        # Claude Code hook uses — this is what drops the macOS app's
+        # notch approval panel for MCP-governed agents. Shadow mode
+        # (result.allowed with decision="escalate") deliberately skips
+        # it: nothing is gated, so there is nothing to approve.
+        # VAARA_PLUGIN_APPROVALS=0 disables; deny and timeout both fail
+        # closed, exactly like the hook.
+        if result.decision == "escalate" and not result.allowed:
+            result = self._approval_handshake(result, tool_name)
+
         return {
             "content": [{
                 "type": "text",
@@ -572,6 +586,73 @@ class VaaraMCPServer:
             }],
             "isError": not result.allowed and result.decision == "deny",
         }
+
+    @staticmethod
+    def _approvals_config() -> tuple[Path, float]:
+        """Env contract shared with the Claude Code hook."""
+        raw_dir = os.environ.get("VAARA_PLUGIN_APPROVALS_DIR", "")
+        approvals_dir = (
+            Path(raw_dir).expanduser()
+            if raw_dir else Path.home() / ".vaara" / "approvals"
+        )
+        raw_timeout = os.environ.get("VAARA_PLUGIN_APPROVALS_TIMEOUT", "")
+        try:
+            timeout = float(raw_timeout) if raw_timeout else 60.0
+        except ValueError:
+            timeout = 60.0
+        return approvals_dir, timeout if timeout > 0 else 60.0
+
+    def _approval_handshake(self, result, tool_name: str):
+        """Block an escalated action on the human's decision file.
+
+        Returns a result reflecting the human's answer: approve flips to
+        allowed (recorded as an escalation resolution on the trail), deny
+        blocks, timeout/error leaves the escalate fail-closed.
+        """
+        if os.environ.get("VAARA_PLUGIN_APPROVALS") == "0":
+            return result
+        approvals_dir, timeout = self._approvals_config()
+        detail = f"risk {result.risk_score:.2f}: {result.reason}"
+        try:
+            from vaara.approvals import request_approval
+
+            human = request_approval(
+                result.action_id, tool_name, detail,
+                approvals_dir=approvals_dir, timeout=timeout,
+            )
+        except Exception:
+            logger.warning(
+                "vaara_intercept: approval handshake failed; "
+                "treating as unanswered (fail-closed)",
+                exc_info=True,
+            )
+            return result
+        if human not in ("approve", "deny"):
+            return result
+        try:
+            self._pipeline.resolve_escalation(
+                result.action_id,
+                "allow" if human == "approve" else "deny",
+                reviewer="approvals-handshake",
+                justification="human decision via ~/.vaara/approvals",
+            )
+        except Exception:
+            logger.warning(
+                "vaara_intercept: could not record escalation resolution",
+                exc_info=True,
+            )
+        if human == "deny":
+            return result
+        # Approved: present the decision the caller experiences. The
+        # trail carries the original escalate + the human resolution.
+        return replace(
+            result,
+            allowed=True,
+            reason=(
+                f"approved by human via approvals handshake; "
+                f"original decision was escalate ({result.reason})"
+            ),
+        )
 
     def _call_report(self, args: dict) -> dict:
         """Report outcome for learning."""

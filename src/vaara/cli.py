@@ -217,7 +217,6 @@ import hashlib
 import json
 import os
 import re
-import stat
 import sys
 import time
 from pathlib import Path
@@ -289,11 +288,11 @@ def _cmd_keygen(args: argparse.Namespace) -> int:
     )
 
     out.parent.mkdir(parents=True, exist_ok=True)
-    out.write_bytes(priv_pem)
-    try:
-        os.chmod(out, stat.S_IRUSR | stat.S_IWUSR)  # 0600
-    except OSError:
-        pass
+    # O_CREAT with 0600 from the start: write-then-chmod leaves a window
+    # where the private key exists with umask permissions.
+    fd = os.open(out, os.O_WRONLY | os.O_CREAT | os.O_TRUNC, 0o600)
+    with os.fdopen(fd, "wb") as fh:
+        fh.write(priv_pem)
     pub_out.write_bytes(pub_pem)
 
     raw_pub = key.public_key().public_bytes(
@@ -339,13 +338,11 @@ def _keygen_attest(out: Path, pub_out: Path) -> int:
     )
 
     out.parent.mkdir(parents=True, exist_ok=True)
-    out.write_bytes(priv_pem)
-    try:
-        os.chmod(out, stat.S_IRUSR | stat.S_IWUSR)  # 0600
-    except OSError:
-        # Best-effort: filesystems without POSIX permission bits still get the
-        # key written; the operator owns the enclosing directory's perms.
-        pass
+    # O_CREAT with 0600 from the start: write-then-chmod leaves a window
+    # where the private key exists with umask permissions.
+    fd = os.open(out, os.O_WRONLY | os.O_CREAT | os.O_TRUNC, 0o600)
+    with os.fdopen(fd, "wb") as fh:
+        fh.write(priv_pem)
     pub_out.write_bytes(pub_pem)
 
     pub_der = key.public_key().public_bytes(
@@ -4170,6 +4167,42 @@ def _cmd_serve(args: argparse.Namespace) -> int:
         )
         return 2
 
+    # API key: --api-key wins, VAARA_SERVER_API_KEY is the env fallback.
+    api_key = getattr(args, "api_key", None) or os.environ.get(
+        "VAARA_SERVER_API_KEY"
+    ) or None
+
+    # Bind guard. The reference server has no other access control: an
+    # unauthenticated network-reachable listener lets ANY client hot-swap
+    # the policy to allow-all (POST /v1/policy/reload), append forged
+    # records that still verify (POST /v1/audit/events), and poison
+    # conformal calibration (POST /v1/score/outcome). Refuse non-loopback
+    # binds without a key unless the operator explicitly opts out.
+    host = (args.host or "").strip()
+    is_loopback = host in ("127.0.0.1", "localhost", "::1")
+    if not is_loopback and api_key is None:
+        if not getattr(args, "allow_unauthenticated", False):
+            print(
+                f"vaara serve: refusing to bind {host!r} without an API key.\n"
+                "An unauthenticated network-reachable server lets any client\n"
+                "  - swap the policy to allow-all  (POST /v1/policy/reload)\n"
+                "  - append forged audit events that still verify\n"
+                "    (POST /v1/audit/events)\n"
+                "  - poison risk calibration       (POST /v1/score/outcome)\n"
+                "Set --api-key (or VAARA_SERVER_API_KEY), or pass\n"
+                "--allow-unauthenticated if this bind is protected another way\n"
+                "(e.g. mTLS or a private network segment).",
+                file=sys.stderr,
+            )
+            return 2
+        print(
+            f"vaara serve: WARNING — binding {host!r} UNAUTHENTICATED. Any "
+            "client that can reach this port can swap the policy to "
+            "allow-all, forge audit events, and poison calibration. Set an "
+            "API key (--api-key / VAARA_SERVER_API_KEY) as soon as possible.",
+            file=sys.stderr,
+        )
+
     controller = None
     registry = None
     if policy_dir:
@@ -4202,7 +4235,10 @@ def _cmd_serve(args: argparse.Namespace) -> int:
             return 2
         controller = PolicyController(policy_obj)
 
-    app = create_app(policy_controller=controller, policy_registry=registry)
+    app = create_app(
+        policy_controller=controller, policy_registry=registry,
+        api_key=api_key,
+    )
     uvicorn.run(app, host=args.host, port=args.port, log_level=args.log_level)
     return 0
 
@@ -5137,6 +5173,25 @@ def build_parser() -> argparse.ArgumentParser:
     )
     pserve.add_argument("--host", default="127.0.0.1", help="Bind host")
     pserve.add_argument("--port", type=int, default=8000, help="Bind port")
+    pserve.add_argument(
+        "--api-key",
+        default=None,
+        help=(
+            "Bearer key required on every endpoint except /v1/health. "
+            "Default: VAARA_SERVER_API_KEY env var. Required for "
+            "non-loopback binds unless --allow-unauthenticated is passed."
+        ),
+    )
+    pserve.add_argument(
+        "--allow-unauthenticated",
+        action="store_true",
+        help=(
+            "Permit a non-loopback bind without an API key. Dangerous: "
+            "any reachable client can swap the policy to allow-all, forge "
+            "audit events, and poison calibration. Only use behind mTLS "
+            "or a private network segment."
+        ),
+    )
     pserve.add_argument(
         "--policy",
         default=None,

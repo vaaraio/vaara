@@ -5,6 +5,82 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/)
 and this project follows [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
 
+## [1.58.0] - 2026-08-03
+
+Post-audit hardening release: the evidence core verified production-grade;
+this release closes the boundary findings.
+
+### Security
+- **HTTP server authentication (C1)**: `vaara serve` now accepts
+  `--api-key` (or `VAARA_SERVER_API_KEY`). When set, every endpoint except
+  `GET /v1/health` requires `Authorization: Bearer <key>` (constant-time
+  compare). Non-loopback binds without a key are REFUSED unless
+  `--allow-unauthenticated` is passed: an unauthenticated reachable server
+  allowed policy hot-swap to allow-all (`POST /v1/policy/reload`), forged
+  audit-event append (`POST /v1/audit/events`), and calibration poisoning
+  (`POST /v1/score/outcome`). `docs/openapi.yaml` gains a `bearerAuth`
+  security scheme; `docs/adapters.md` documents the contract.
+- **Prior-approval auto-allow (C2)**: the argument-shape guard is now real.
+  `ESCALATION_SENT` and `ESCALATION_RESOLVED` records carry the
+  `args_digest`, `find_prior_approval` requires an exact digest match
+  (records without one never match a digested query — fail closed), is
+  tenant-scoped, and reads under the chain lock. Approving `tx.transfer`
+  amount=10 no longer auto-allows amount=999999.
+- MCP server API-key check is now constant-time (`secrets.compare_digest`).
+- `vaara keygen` writes private keys with `O_CREAT` mode 0600 from the
+  start (no umask window before chmod).
+
+### Fixed
+- **Trail/behaviour divergence on auto-allow**: the prior-approval check
+  now runs BEFORE the decision is recorded, so an auto-allowed action's
+  chain shows `decision=allow` with the auto-allow reason — never a
+  dangling `escalate` with no `ESCALATION_SENT` behind it. The record and
+  the behaviour always agree.
+- **Notch approval panel on the MCP path**: `vaara-mcp-server`'s
+  `vaara_intercept` now runs the file-based approvals handshake
+  (`~/.vaara/approvals`) on a gated escalate — the same protocol as the
+  Claude Code hook — so MCP-governed agents get the human-in-the-loop
+  surface. `VAARA_PLUGIN_APPROVALS=0` disables; deny/timeout fail closed.
+- **macOS app settings window** widened to 760pt on the settings screen
+  (the two-column Grid's segmented pickers clipped at 520pt).
+- **macOS GATE picker** now writes BOTH the Claude Code plugin config and
+  the unified `~/.vaara/config.json`; the status read normalises legacy
+  vocabularies (`shadow`/`enforce`). Previously the picker flipped only
+  the plugin config while non-hook runtimes kept the old mode.
+- `dry_run_evaluate` applies the cloud-metadata SSRF content floor, so
+  `vaara_check` / `/v1/score` previews cannot say allow where
+  `vaara_intercept` denies.
+- Policy validation warns when `sequences.*.window_seconds` is declared:
+  matching is count-based lookback, so the seconds value was silently
+  ignored (potential policy bypass by misconfiguration).
+- `/v1/score/outcome` writes `OUTCOME_RECORDED` to the hash chain
+  (outcomes reported over HTTP previously left no evidence record).
+- Server schema: `_EventType` accepts `anchor_gap`, `key_lifecycle`,
+  `disclosure_recorded`; `/v1/audit/events` payload capped at 64KB;
+  `OutcomeRequest.notes` capped.
+- macOS false "path traversal detected" warning on every tempdir DB
+  (macOS `/var` → `/private/var` symlink): warning now fires only on real
+  `..` segments.
+- Article 50 auto-disclosure failure in `@govern` logs at debug instead
+  of swallowing silently.
+
+### Documentation
+- `docs/formal_specification.md` corrected to match the code: scorer
+  defaults 0.4/0.7 (not 0.3/0.7), seeded ±0.19 starting interval, the
+  sequence signal is an MWU expert (not an additive boost), the hash
+  chain commits `previous_hash` inside the record payload, and cold start
+  is calibrated-from-birth (seeded prior) with the strict behaviour
+  behind `pre_seed_calibration=False`.
+- `bench/latency.py` + `bench/README.md`: the benchmark constructs an
+  explicit in-memory trail and says so; the library default is the
+  SQLite-backed trail at `~/.vaara/trail/audit.db` (persistent I/O grows
+  with DB size and is out of scope for the hot-path number).
+- README quick-start: records are hash-chained/tamper-evident (signing
+  happens at export), and the default persistent trail location is named.
+- `CAPABILITIES.md` current-line version refreshed (v1.37.0 → v1.57.4).
+- `docs/eu-ai-act-august-2026.md`: Omnibus timing sentence updated —
+  Regulation (EU) 2026/1744 published 24 July 2026, in force 27 July 2026.
+
 ## [1.57.4] - 2026-08-02
 
 ### Fixed

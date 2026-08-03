@@ -11,12 +11,14 @@ Run::
     python bench/latency.py --calls 50000       # longer run
     python bench/latency.py --json results.json # machine-readable dump
 
-The benchmark holds the scorer, registry, and audit trail at their
-library defaults so the number reported is what a user gets out of the
-box — no tuning, no pre-warmed calibration. Audit trail is in-memory
-(no persistence callback); persistent backends add their own I/O cost
-on top and are measured separately in bench/latency_sqlite.py if
-needed.
+The benchmark constructs each pipeline with an EXPLICIT in-memory
+AuditTrail, so the numbers describe the scoring hot path itself. The
+library default since v1.53 is a SQLite-backed trail at
+~/.vaara/trail/audit.db; that backend adds its own I/O cost on top
+(grows with database size) and is out of scope for this script —
+measure persistent-backend overhead separately if you need it. The
+scorer and registry stay at library defaults: no tuning, no pre-warmed
+calibration.
 """
 
 from __future__ import annotations
@@ -33,7 +35,18 @@ from pathlib import Path
 _REPO_ROOT = Path(__file__).resolve().parent.parent
 sys.path.insert(0, str(_REPO_ROOT / "src"))
 
+from vaara.audit.trail import AuditTrail  # noqa: E402
 from vaara.pipeline import InterceptionPipeline  # noqa: E402
+
+
+def _bench_pipeline() -> InterceptionPipeline:
+    """Pipeline with an explicit in-memory trail.
+
+    The library default is SQLite-backed (~/.vaara/trail/audit.db) since
+    v1.53; this benchmark measures the scoring hot path, so persistence
+    is deliberately excluded.
+    """
+    return InterceptionPipeline(trail=AuditTrail())
 
 
 @dataclass
@@ -151,7 +164,7 @@ def bench_first_call(n_trials: int) -> LatencyStats:
     samples_ms: list[float] = []
     spec = _WORKLOADS["tx.transfer"]
     for _ in range(n_trials):
-        pipeline = InterceptionPipeline()
+        pipeline = _bench_pipeline()
         t0 = time.perf_counter_ns()
         pipeline.intercept(
             agent_id="cold",
@@ -173,7 +186,7 @@ def bench_construction(n_trials: int) -> LatencyStats:
     samples_ms: list[float] = []
     for _ in range(n_trials):
         t0 = time.perf_counter_ns()
-        InterceptionPipeline()
+        _bench_pipeline()
         samples_ms.append((time.perf_counter_ns() - t0) / 1_000_000.0)
     return _summarize("pipeline_construction", samples_ms)
 
@@ -195,7 +208,7 @@ def main() -> int:
     # Steady-state: one pipeline reused across workloads, matching how
     # a long-running agent would use it. The scorer's MWU state evolves
     # across calls; this is intentional — it's the realistic shape.
-    pipeline = InterceptionPipeline()
+    pipeline = _bench_pipeline()
     for name in _WORKLOADS:
         stats = bench_workload(pipeline, name, args.calls, args.warmup)
         results.append(stats)
