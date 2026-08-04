@@ -28,6 +28,7 @@ from __future__ import annotations
 
 import argparse
 import contextvars
+import hmac
 import json
 import logging
 import os
@@ -199,7 +200,17 @@ class VaaraMCPProxy:
         router: Optional[NotificationRouter] = None,
         policy: Optional[Any] = None,
         shadow: bool = False,
+        api_key: Optional[str] = None,
     ) -> None:
+        # Bearer key for the Streamable HTTP transport. The stdio transport
+        # is not affected: it has no network surface. When set, EVERY /mcp
+        # request must carry it, and it is checked BEFORE X-Vaara-Tenant and
+        # X-Vaara-Upstream are read — those headers pick the audit tenant
+        # and the upstream, so trusting them from an unauthenticated caller
+        # is tenant spoofing plus weakest-policy shopping.
+        self._api_key = (
+            api_key or os.environ.get("VAARA_PROXY_API_KEY") or None
+        )
         if pipeline is not None:
             # An explicit pipeline carries its own enforce setting; shadow
             # only applies to the internally-built one.
@@ -465,6 +476,34 @@ class VaaraMCPProxy:
                 "tools/call."
             ),
         )
+
+        # Bearer gate. Runs before any route handler, so X-Vaara-Tenant and
+        # X-Vaara-Upstream are never read from an unauthenticated caller.
+        # /health stays open: it exposes no tenant data and load balancers
+        # need it. Constant-time compare — a timing oracle on the key is
+        # cheap to avoid.
+        @app.middleware("http")
+        async def _proxy_api_key_gate(request: _StarletteRequest, call_next):
+            expected = proxy._api_key
+            if expected and request.url.path != "/health":
+                supplied = request.headers.get("authorization", "")
+                scheme, _, token = supplied.partition(" ")
+                if scheme.lower() != "bearer" or not hmac.compare_digest(
+                    token.strip(), expected
+                ):
+                    return JSONResponse(
+                        status_code=401,
+                        content={"error": {
+                            "code": "unauthorized",
+                            "message": (
+                                "This proxy requires a bearer key. Send "
+                                "`Authorization: Bearer <key>`. Without it "
+                                "the X-Vaara-Tenant and X-Vaara-Upstream "
+                                "headers are not honoured."
+                            ),
+                        }},
+                    )
+            return await call_next(request)
 
         @app.get("/health")
         async def health() -> dict:
@@ -816,7 +855,10 @@ class VaaraMCPProxy:
 
         return app
 
-    def run_http(self, host: str, port: int, log_level: str = "info") -> None:
+    def run_http(
+        self, host: str, port: int, log_level: str = "info",
+        allow_unauthenticated: bool = False,
+    ) -> None:
         """Run the proxy on Streamable HTTP (MCP 2026 transport).
 
         POST /mcp accepts one JSON-RPC message and returns one JSON response.
@@ -836,10 +878,37 @@ class VaaraMCPProxy:
                 "vaara-mcp-proxy --transport http requires the 'server' "
                 "extra. Install with: pip install 'vaara[server]'"
             ) from exc
+        # Bind guard, same shape as `vaara serve`. X-Vaara-Tenant picks the
+        # audit tenant and X-Vaara-Upstream picks which upstream (and so
+        # which policy) a call is governed by. Unauthenticated on a
+        # network-reachable bind, that is tenant spoofing plus
+        # weakest-policy shopping by anyone who can reach the port.
+        _host = (host or "").strip()
+        _is_loopback = _host in ("127.0.0.1", "localhost", "::1")
+        if not _is_loopback and self._api_key is None:
+            if not allow_unauthenticated:
+                raise RuntimeError(
+                    f"vaara-mcp-proxy: refusing to bind {_host!r} without an "
+                    "API key.\nThe HTTP transport reads X-Vaara-Tenant and "
+                    "X-Vaara-Upstream from the caller, so an unauthenticated\n"
+                    "network-reachable proxy lets any client\n"
+                    "  - attribute its calls to another tenant's audit trail\n"
+                    "  - pick whichever upstream has the weakest policy\n"
+                    "Set --api-key (or VAARA_PROXY_API_KEY), or pass\n"
+                    "--allow-unauthenticated if this bind is protected another "
+                    "way (e.g. mTLS or a private network segment)."
+                )
+            logger.warning(
+                "binding %r UNAUTHENTICATED — any client that can reach this "
+                "port can spoof X-Vaara-Tenant and choose its upstream via "
+                "X-Vaara-Upstream. Set an API key as soon as possible.",
+                _host,
+            )
         app = self._build_http_app()
         logger.info(
-            "Vaara MCP proxy starting on http://%s:%d (%s, upstreams=%s)",
+            "Vaara MCP proxy starting on http://%s:%d (%s, upstreams=%s, auth=%s)",
             host, port, self.PROXY_NAME, sorted(self._upstreams.keys()),
+            "on" if self._api_key else "off",
         )
         uvicorn.run(app, host=host, port=port, log_level=log_level)
 
@@ -1104,6 +1173,45 @@ class VaaraMCPProxy:
                 arguments=arguments,
             )
             if not verdict.ok:
+                # The policy decision at step 1 already went into the chain,
+                # and for a constrained tool it can be `allow` while the
+                # gateway refuses here — runtime arguments that no longer
+                # match the digest the grant was minted for are the common
+                # case. Without this the trail would say the call was
+                # allowed and carry no record that it never executed:
+                # record and behaviour would disagree, which is exactly the
+                # failure the prior-approval path is written to avoid.
+                # Report the blocked outcome against the same action_id so
+                # the decision and its non-execution stay paired.
+                _denied_action_id = str(getattr(result, "action_id", "") or "")
+                if _denied_action_id:
+                    try:
+                        self._pipeline.report_outcome(
+                            action_id=_denied_action_id,
+                            outcome_severity=1.0,
+                            description=(
+                                f"blocked by credential gateway before "
+                                f"execution: {verdict.reason}"
+                            ),
+                        )
+                    except Exception:  # pragma: no cover - never mask the denial
+                        logger.exception(
+                            "failed to record blocked outcome for gateway "
+                            "denial (action_id=%s, tool=%s)",
+                            _denied_action_id, tool_name,
+                        )
+                self._overt_emit(
+                    surface="mcp.tool.call",
+                    identifier=tool_name,
+                    identifier_field="tool_name",
+                    request_obj={"tool": tool_name, "arguments": arguments},
+                    decision="DENY",
+                    reason=f"grant invalid: {verdict.reason}",
+                    extra={
+                        "agent_id": agent_id,
+                        "action_id": getattr(result, "action_id", None) or "",
+                    },
+                )
                 return self._error_response(
                     request_id,
                     -32603,
@@ -1620,6 +1728,23 @@ def main(argv: Optional[list[str]] = None) -> None:
         default="info",
         choices=["critical", "error", "warning", "info", "debug", "trace"],
     )
+    parser.add_argument(
+        "--api-key", default=None,
+        help=(
+            "Bearer key required on every /mcp request when --transport http. "
+            "Falls back to VAARA_PROXY_API_KEY. Without it the proxy refuses a "
+            "non-loopback bind, because X-Vaara-Tenant and X-Vaara-Upstream "
+            "would be honoured from any caller."
+        ),
+    )
+    parser.add_argument(
+        "--allow-unauthenticated",
+        action="store_true",
+        help=(
+            "Permit a non-loopback --transport http bind with no API key. Only "
+            "when the port is protected another way (mTLS, private segment)."
+        ),
+    )
     parser.add_argument("--db", type=Path, default=None,
                         help="Audit database path (default: $VAARA_DB or ./vaara_audit.db)")
     parser.add_argument("--policy", type=Path, default=None,
@@ -1761,6 +1886,7 @@ def main(argv: Optional[list[str]] = None) -> None:
             attest_emitter=attest_emitter,
             policy=policy_obj,
             shadow=args.shadow,
+            api_key=args.api_key,
         )
     except (ValueError, ProxyError) as e:
         # ProxyError here means a --upstream-url target was refused by the SSRF
@@ -1772,6 +1898,7 @@ def main(argv: Optional[list[str]] = None) -> None:
                 host=args.http_host,
                 port=args.http_port,
                 log_level=args.http_log_level,
+                allow_unauthenticated=args.allow_unauthenticated,
             )
         else:
             proxy.run()

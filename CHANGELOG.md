@@ -5,6 +5,44 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/)
 and this project follows [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
 
+## [1.60.0] - 2026-08-04
+
+Boundary hardening for the MCP proxy. Closes the two gaps between what the
+proxy does and what its audit trail says, both found by review rather than by
+tests.
+
+### Added
+- The Streamable HTTP transport takes an API key (`--api-key`, or
+  `VAARA_PROXY_API_KEY`). When set, every `/mcp` request must carry
+  `Authorization: Bearer <key>` or it is rejected with 401. The check runs
+  before any route handler, so `X-Vaara-Tenant` and `X-Vaara-Upstream` are
+  never read from an unauthenticated caller. Keys are compared in constant
+  time. `GET /health` stays open so load balancers keep working.
+- `--allow-unauthenticated` for operators whose bind is protected by other
+  means, such as mTLS or a private network segment.
+
+### Fixed
+- `vaara-mcp-proxy --transport http` now refuses to bind a non-loopback host
+  when no API key is configured. `X-Vaara-Tenant` selects the tenant a call is
+  attributed to and `X-Vaara-Upstream` selects the upstream, and therefore the
+  policy, that governs it. Read from an unauthenticated caller on a reachable
+  bind, those headers allow tenant spoofing and weakest-policy shopping. This
+  mirrors the guard `vaara serve` already applies. Loopback binds are
+  unaffected and still need no key.
+- A credential-gateway denial is now recorded as a blocked outcome against the
+  same `action_id` as the policy decision. For a constrained tool the policy
+  decision can be `allow` while the gateway then refuses, most often because
+  runtime arguments no longer match the digest the grant was minted for. The
+  trail previously kept the `allow` and carried nothing showing the call never
+  executed, so the record and the behaviour disagreed. A failure to write the
+  outcome is logged and never masks the denial.
+
+### Upgrading
+Operators running `vaara-mcp-proxy --transport http` on a non-loopback host
+without an API key will see the process refuse to start. Set `--api-key` or
+`VAARA_PROXY_API_KEY`, or pass `--allow-unauthenticated` if the port is
+protected another way.
+
 ## [1.59.0] - 2026-08-03
 
 macOS app consolidation release. Pulls the 1.58.x macOS fixes into one
