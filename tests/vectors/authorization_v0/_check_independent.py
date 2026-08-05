@@ -46,6 +46,10 @@ from cryptography.hazmat.primitives.asymmetric.utils import encode_dss_signature
 from cryptography.hazmat.primitives.serialization import load_pem_public_key
 from cryptography.hazmat.primitives import hashes
 
+# SPEC.md section 1: "jcs-rfc8785", "JCS" and "jcs-json-v1" are accepted
+# aliases for the same algorithm; consumers MUST accept all three.
+_JCS_ALIASES = ("jcs-rfc8785", "JCS", "jcs-json-v1")
+
 HERE = Path(__file__).resolve().parent
 _CASES = ("allow", "deny")
 _SIGNED_KEYS = ("version", "alg", "backLink", "decisionDerived", "issuerAsserted")
@@ -123,7 +127,7 @@ def _verdict_recomputes(grant, args, evidence, receipt) -> bool:
 
 def _evidence_binding_resolves(evidence, receipt) -> bool:
     ref = receipt.get("decisionDerived", {}).get("evidenceRef")
-    if not isinstance(ref, dict) or ref.get("canonicalization") != "JCS":
+    if not isinstance(ref, dict) or ref.get("canonicalization") not in _JCS_ALIASES:
         return False
     return _sha256_hex(_jcs(evidence)) == ref.get("digest")
 

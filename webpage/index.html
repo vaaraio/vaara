@@ -113,6 +113,12 @@
   .links .target { font-size: 14px; color: var(--ink); word-break: break-all; }
   .links a:hover .target { color: var(--tri-bright); }
   @media (max-width: 520px) { .links { grid-template-columns: 1fr; } }
+  /* The one buying action on the page. Same grammar as .links, weighted. */
+  .cta { display: inline-block; font-family: var(--mono); font-size: 14px; letter-spacing: 0.18em; text-transform: uppercase; font-weight: 600; color: var(--panel); background: var(--tri-bright); border: 1px solid var(--tri-bright); border-radius: 12px; padding: 14px 28px; text-decoration: none; transition: background 0.15s ease, border-color 0.15s ease, transform 0.06s ease; }
+  .cta:hover { background: var(--tri); border-color: var(--tri); transform: translate(0, -1px); }
+  .cta:active { transform: translate(0, 0); }
+  .cta:focus-visible { outline: 2px solid var(--tri); outline-offset: 3px; }
+  html[data-theme="dark"] .cta { color: var(--deep); }
   footer { margin-top: 64px; padding-top: 24px; border-top: 1px solid var(--line); font-family: var(--mono); font-size: 12px; color: var(--faint); letter-spacing: 0.04em; text-align: center; }
   .evidence { background: var(--panel); color: var(--ink); border: 1px solid var(--line); border-radius: 12px; margin: 0 0 48px; font-family: var(--mono); font-size: 14px; line-height: 1.65; overflow-x: auto; }
   .evidence-head { display: flex; justify-content: space-between; padding: 10px 18px; border-bottom: 1px solid var(--line); font-size: 12px; letter-spacing: 0.2em; text-transform: uppercase; color: var(--faint); }
@@ -156,7 +162,10 @@
       "isAccessibleForFree": true,
       "offers": [
         { "@type": "Offer", "name": "Open source (AGPL-3.0)", "price": "0", "priceCurrency": "EUR" },
-        { "@type": "Offer", "name": "Paid pilot and commercial license", "url": "https://vaara.io/#pilots", "availability": "https://schema.org/InStock" }
+        { "@type": "Offer", "name": "Article 12 evidence pack, per system", "url": "https://vaara.io/#pilots", "availability": "https://schema.org/InStock", "priceSpecification": { "@type": "PriceSpecification", "minPrice": "4500", "priceCurrency": "EUR", "valueAddedTaxIncluded": false } },
+        { "@type": "Offer", "name": "Four-week paid pilot", "url": "https://vaara.io/#pilots", "availability": "https://schema.org/InStock", "priceSpecification": { "@type": "PriceSpecification", "minPrice": "12000", "priceCurrency": "EUR", "valueAddedTaxIncluded": false } },
+        { "@type": "Offer", "name": "Advisory and standards work, per day", "url": "https://vaara.io/#pilots", "availability": "https://schema.org/InStock", "priceSpecification": { "@type": "UnitPriceSpecification", "price": "1400", "priceCurrency": "EUR", "unitCode": "DAY", "valueAddedTaxIncluded": false } },
+        { "@type": "Offer", "name": "Commercial license", "url": "https://github.com/vaaraio/vaara/blob/main/LICENSING.md", "availability": "https://schema.org/InStock" }
       ],
       "author": { "@type": "Person", "name": "Henri Sirkkavaara" },
       "keywords": "accountable autonomy, AI agent audit trail, agentic payments, autonomous actions, tamper-evident evidence, EU AI Act Article 12, TPM 2.0, RFC 3161, SEP-2828, verifiable AI",
@@ -223,7 +232,7 @@
         {
           "@type": "Question",
           "name": "Does Vaara offer paid pilots or a commercial license?",
-          "acceptedAnswer": { "@type": "Answer", "text": "Yes. A structured four-week pilot deploys Vaara in your environment against your own agent traffic and ends with a signed evidence bundle and an auditor-ready compliance report on that traffic. A commercial license is available for building on Vaara without the AGPL's source-disclosure obligations. Contact hello@vaara.io." }
+          "acceptedAnswer": { "@type": "Answer", "text": "Yes, and the prices are published. An Article 12 evidence pack for one system starts at EUR 4,500. A four-week pilot in your own infrastructure starts at EUR 12,000. Advisory and standards work is EUR 1,400 per day. A commercial license for building on Vaara without the AGPL's source-disclosure obligations is priced on request. All prices are fixed before the work starts and exclude VAT. Contact hello@vaara.io." }
         }
       ]
     }
@@ -247,8 +256,9 @@
   <img class="wm-dark" src="https://raw.githubusercontent.com/vaaraio/vaara/main/docs/vaara-wordmark-dark.png" alt="Vaara" width="440" height="127">
 </div>
 <p style="text-align:center;text-transform:uppercase;letter-spacing:.14em;font-weight:600;opacity:.65;margin:.1rem 0 .6rem;font-size:.95rem;">Accountable Autonomy</p>
-<h1>A verifiable receipt for every action your AI agents take, checkable by anyone.</h1>
-<p style="text-align:center;max-width:60ch;margin:0 auto 1rem;opacity:.82;line-height:1.5;">Your AI agent transferred the funds, wrote the file, called the tool. Later, someone who does not trust you asks you to prove exactly what it did and why: a regulator, an auditor, a customer after an incident. Your own logs will not settle it, because you could have edited them.</p>
+<h1>Stop an AI agent before it acts, and hold proof of every decision that anyone can check.</h1>
+<p style="text-align:center;max-width:60ch;margin:0 auto 1rem;opacity:.82;line-height:1.5;">Vaara sits in front of your agents and decides, on every single tool call, whether it runs: allow, block, or escalate to a human. Each of those decisions leaves a signed record. When someone who does not trust you asks what your agent did and why, you hand them the record instead of your word. Your own logs will not settle it, because you could have edited them.</p>
+<p style="text-align:center;max-width:62ch;margin:0 auto 1.6rem;font-size:15px;color:var(--muted);line-height:1.5;">From 9 December 2026 the EU Product Liability Directive treats software and AI as products under strict liability, and Article 10 lets a court presume your product defective if you cannot disclose the evidence. The burden of proof moves to you. This is the artifact that answers it.</p>
 <div class="hero-video">
   <video src="/vaara-launch.mp4" poster="/vaara-poster.jpg" autoplay muted loop playsinline preload="metadata" aria-label="Vaara launch demo">
   </video>
@@ -286,7 +296,27 @@ conformance: <span class="ok">CONFORMS</span>
   <li>Four weeks, your environment, your traffic. Week 1: the Vaara MCP proxy goes in front of your agents in shadow mode, observing and recording without blocking anything. Weeks 2 and 3: we read the shadow report together, tune a policy and tool perimeter to your actual traffic, and flip to enforcement. Week 4: you receive a signed evidence bundle and an auditor-ready compliance report generated from your own trail.</li>
   <li>Everything runs in your infrastructure and stays there. The trail, the policy, the reports, and the archive are yours, and they stay verifiable with the standalone checker even if you never talk to us again. The evidence does not depend on the vendor; that is the point of the design.</li>
   <li>Building Vaara into a closed-source product, or running a modified version as a hosted service without releasing your changes, needs a commercial license instead of the AGPL, granted directly by the sole copyright holder. See <a href="https://github.com/vaaraio/vaara/blob/main/LICENSING.md">LICENSING.md</a>.</li>
-  <li>Contact: <a href="mailto:hello@vaara.io">hello@vaara.io</a>. A fixed fee agreed up front, with no subscription.</li>
+</ul>
+
+<p class="stamp">What it costs</p>
+<ul>
+  <li><b>Paid evaluation, EUR 4,500.</b> Sixty days. The Vaara gate goes in front of your agents in shadow mode, recording every action it would have allowed, blocked, or escalated, without blocking anything yet. You end with a report on your real traffic and a signed evidence bundle from it. The full fee is credited against any engagement below if you continue.</li>
+  <li><b>Disclosure pack, from EUR 4,500 per system.</b> For the 9 December 2026 liability change. One AI system, documented as a disclosable evidence set: the signed decision trail, the record format specification, and a trusted time anchor, in a form your counsel or an outside expert can verify without involving us. Two to three weeks. If you can export your existing logs, you do not have to deploy anything.</li>
+  <li><b>Four-week deployment, from EUR 12,000.</b> Shadow mode, then a policy and tool perimeter tuned to your actual traffic, then enforcement. Runs entirely inside your infrastructure.</li>
+  <li><b>Retained access, from EUR 1,400 per day.</b> Direct access to the person who holds the receipt format, the conformance suites, and the standards seat. Used for liability and disclosure scoping, reviewing a logging design you already have, and getting your requirements into the European standards while they are still drafts.</li>
+  <li><b>Commercial license, priced on request.</b> Scope depends on what you are building. See <a href="https://github.com/vaaraio/vaara/blob/main/LICENSING.md">LICENSING.md</a>.</li>
+  <li>Every price is fixed and agreed before the work starts. VAT is not included. There is no subscription and no per-seat fee.</li>
+</ul>
+
+<p style="text-align:center;margin:28px 0 8px;">
+  <a class="cta" href="mailto:hello@vaara.io?subject=Vaara%20pilot%20enquiry&amp;body=Which%20one%3A%20evidence%20pack%20%2F%20four-week%20pilot%20%2F%20advisory%20%2F%20commercial%20license%0A%0AThe%20system%3A%20%0A%0AOur%20deadline%3A%20%0A%0ACountry%20and%20regulator%3A%20%0A">Start a pilot</a>
+</p>
+<p style="text-align:center;font-size:14px;color:var(--muted);margin:0 0 8px;">Opens a message to hello@vaara.io with the four things needed to quote you.</p>
+
+<p class="stamp">Buy support now</p>
+<ul>
+  <li>If you run Vaara in production and want the maintainer reachable without a contract cycle, the sponsor tiers are live and take a card immediately: <a href="https://github.com/sponsors/vaaraio">github.com/sponsors/vaaraio</a>. Monthly, cancel whenever, no procurement, no call. Companies expensing this against an OSS budget is the normal use.</li>
+  <li>Sponsoring is not a licence. Building Vaara into a closed product still needs a commercial exception, and the paid work above is still the paid work.</li>
 </ul>
 
 <p class="stamp">Adoption (live)</p>
