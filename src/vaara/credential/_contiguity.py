@@ -24,6 +24,10 @@ from typing import Any, Optional
 
 from vaara.attestation._attest_canonical import canonical_json
 
+# SPEC.md section 1: "jcs-rfc8785", "JCS" and "jcs-json-v1" are accepted
+# aliases for the same algorithm; consumers MUST accept all three.
+_JCS_ALIASES = ("jcs-rfc8785", "JCS", "jcs-json-v1")
+
 
 def evidence_binding_ok(receipt: dict[str, Any]) -> bool:
     """The receipt's ``evidence`` block binds to its signed ``evidenceRef.digest``.
@@ -52,7 +56,7 @@ def evidence_binding_ok(receipt: dict[str, Any]) -> bool:
         return False
     derived = record.get("decisionDerived")
     ref = derived.get("evidenceRef") if isinstance(derived, dict) else None
-    if not isinstance(ref, dict) or ref.get("canonicalization") != "JCS":
+    if not isinstance(ref, dict) or ref.get("canonicalization") not in _JCS_ALIASES:
         return False
     signed = ref.get("digest")
     if not isinstance(signed, str):
