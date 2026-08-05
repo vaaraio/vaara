@@ -5,6 +5,28 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/)
 and this project follows [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
 
+## [1.60.1] - 2026-08-05
+
+A conformance fix. SPEC.md section 1 and the Internet-Draft both say that
+`jcs-rfc8785`, `JCS` and `jcs-json-v1` are aliases for one algorithm, that
+producers SHOULD emit `jcs-rfc8785`, and that consumers MUST accept all three.
+Eight places tested for equality with `JCS` alone, so a document carrying the
+label the spec tells producers to emit was rejected.
+
+### Fixed
+
+- Seven independent conformance checkers (`ap2_v0`, `authorization_v0`,
+  `class_gate_v0`, `contiguity_v0`, `external_evidence_v0`, `tap_v0`,
+  `x402_settlement_v0`) now accept all three canonicalization aliases and
+  still reject an unknown label. Each keeps its own copy of the alias tuple,
+  so the checkers continue to import nothing shared.
+- `vaara.credential._contiguity` applied the same narrow test in the shipped
+  library and had the same effect on a conforming document.
+
+Reported against the x402 settlement suite by an outside implementer who
+reproduced the vectors from a clean-room second implementation. The report
+named one checker; the same defect was present in seven more.
+
 ## [1.60.0] - 2026-08-04
 
 Boundary hardening for the MCP proxy. Closes the two gaps between what the
