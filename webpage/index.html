@@ -113,6 +113,12 @@
   .links .target { font-size: 14px; color: var(--ink); word-break: break-all; }
   .links a:hover .target { color: var(--tri-bright); }
   @media (max-width: 520px) { .links { grid-template-columns: 1fr; } }
+  /* The one buying action on the page. Same grammar as .links, weighted. */
+  .cta { display: inline-block; font-family: var(--mono); font-size: 14px; letter-spacing: 0.18em; text-transform: uppercase; font-weight: 600; color: var(--panel); background: var(--tri-bright); border: 1px solid var(--tri-bright); border-radius: 12px; padding: 14px 28px; text-decoration: none; transition: background 0.15s ease, border-color 0.15s ease, transform 0.06s ease; }
+  .cta:hover { background: var(--tri); border-color: var(--tri); transform: translate(0, -1px); }
+  .cta:active { transform: translate(0, 0); }
+  .cta:focus-visible { outline: 2px solid var(--tri); outline-offset: 3px; }
+  html[data-theme="dark"] .cta { color: var(--deep); }
   footer { margin-top: 64px; padding-top: 24px; border-top: 1px solid var(--line); font-family: var(--mono); font-size: 12px; color: var(--faint); letter-spacing: 0.04em; text-align: center; }
   .evidence { background: var(--panel); color: var(--ink); border: 1px solid var(--line); border-radius: 12px; margin: 0 0 48px; font-family: var(--mono); font-size: 14px; line-height: 1.65; overflow-x: auto; }
   .evidence-head { display: flex; justify-content: space-between; padding: 10px 18px; border-bottom: 1px solid var(--line); font-size: 12px; letter-spacing: 0.2em; text-transform: uppercase; color: var(--faint); }
@@ -156,7 +162,10 @@
       "isAccessibleForFree": true,
       "offers": [
         { "@type": "Offer", "name": "Open source (AGPL-3.0)", "price": "0", "priceCurrency": "EUR" },
-        { "@type": "Offer", "name": "Paid pilot and commercial license", "url": "https://vaara.io/#pilots", "availability": "https://schema.org/InStock" }
+        { "@type": "Offer", "name": "Article 12 evidence pack, per system", "url": "https://vaara.io/#pilots", "availability": "https://schema.org/InStock", "priceSpecification": { "@type": "PriceSpecification", "minPrice": "4500", "priceCurrency": "EUR", "valueAddedTaxIncluded": false } },
+        { "@type": "Offer", "name": "Four-week paid pilot", "url": "https://vaara.io/#pilots", "availability": "https://schema.org/InStock", "priceSpecification": { "@type": "PriceSpecification", "minPrice": "12000", "priceCurrency": "EUR", "valueAddedTaxIncluded": false } },
+        { "@type": "Offer", "name": "Advisory and standards work, per day", "url": "https://vaara.io/#pilots", "availability": "https://schema.org/InStock", "priceSpecification": { "@type": "UnitPriceSpecification", "price": "1400", "priceCurrency": "EUR", "unitCode": "DAY", "valueAddedTaxIncluded": false } },
+        { "@type": "Offer", "name": "Commercial license", "url": "https://github.com/vaaraio/vaara/blob/main/LICENSING.md", "availability": "https://schema.org/InStock" }
       ],
       "author": { "@type": "Person", "name": "Henri Sirkkavaara" },
       "keywords": "accountable autonomy, AI agent audit trail, agentic payments, autonomous actions, tamper-evident evidence, EU AI Act Article 12, TPM 2.0, RFC 3161, SEP-2828, verifiable AI",
@@ -223,7 +232,7 @@
         {
           "@type": "Question",
           "name": "Does Vaara offer paid pilots or a commercial license?",
-          "acceptedAnswer": { "@type": "Answer", "text": "Yes. A structured four-week pilot deploys Vaara in your environment against your own agent traffic and ends with a signed evidence bundle and an auditor-ready compliance report on that traffic. A commercial license is available for building on Vaara without the AGPL's source-disclosure obligations. Contact hello@vaara.io." }
+          "acceptedAnswer": { "@type": "Answer", "text": "Yes, and the prices are published. An Article 12 evidence pack for one system starts at EUR 4,500. A four-week pilot in your own infrastructure starts at EUR 12,000. Advisory and standards work is EUR 1,400 per day. A commercial license for building on Vaara without the AGPL's source-disclosure obligations is priced on request. All prices are fixed before the work starts and exclude VAT. Contact hello@vaara.io." }
         }
       ]
     }
@@ -286,8 +295,21 @@ conformance: <span class="ok">CONFORMS</span>
   <li>Four weeks, your environment, your traffic. Week 1: the Vaara MCP proxy goes in front of your agents in shadow mode, observing and recording without blocking anything. Weeks 2 and 3: we read the shadow report together, tune a policy and tool perimeter to your actual traffic, and flip to enforcement. Week 4: you receive a signed evidence bundle and an auditor-ready compliance report generated from your own trail.</li>
   <li>Everything runs in your infrastructure and stays there. The trail, the policy, the reports, and the archive are yours, and they stay verifiable with the standalone checker even if you never talk to us again. The evidence does not depend on the vendor; that is the point of the design.</li>
   <li>Building Vaara into a closed-source product, or running a modified version as a hosted service without releasing your changes, needs a commercial license instead of the AGPL, granted directly by the sole copyright holder. See <a href="https://github.com/vaaraio/vaara/blob/main/LICENSING.md">LICENSING.md</a>.</li>
-  <li>Contact: <a href="mailto:hello@vaara.io">hello@vaara.io</a>. A fixed fee agreed up front, with no subscription.</li>
 </ul>
+
+<p class="stamp">What it costs</p>
+<ul>
+  <li><b>Evidence pack, from EUR 4,500 per system.</b> A fixed-price Article 12 record-keeping package for one AI system: the signed trail, the per-article evidence mapping, and the trusted time anchor, in a form an assessment body or your own auditor can verify offline. Two to three weeks. If you can export your existing logs, you do not have to deploy anything.</li>
+  <li><b>Four-week pilot, from EUR 12,000.</b> The four-week engagement described above, run against your own agent traffic inside your own infrastructure.</li>
+  <li><b>Advisory and standards work, EUR 1,400 per day.</b> Article 12 and Article 14 scoping, preparation for conformity assessment, and review of a logging design you already have against the draft European standards.</li>
+  <li><b>Commercial license, priced on request.</b> Scope depends on what you are building. See <a href="https://github.com/vaaraio/vaara/blob/main/LICENSING.md">LICENSING.md</a>.</li>
+  <li>Every price is fixed and agreed before the work starts. VAT is not included. There is no subscription and no per-seat fee. All four sit below the EU and national thresholds that force a public buyer into a tender, so a public authority can award any of them directly.</li>
+</ul>
+
+<p style="text-align:center;margin:28px 0 8px;">
+  <a class="cta" href="mailto:hello@vaara.io?subject=Vaara%20pilot%20enquiry&amp;body=Which%20one%3A%20evidence%20pack%20%2F%20four-week%20pilot%20%2F%20advisory%20%2F%20commercial%20license%0A%0AThe%20system%3A%20%0A%0AOur%20deadline%3A%20%0A%0ACountry%20and%20regulator%3A%20%0A">Start a pilot</a>
+</p>
+<p style="text-align:center;font-size:14px;color:var(--muted);margin:0 0 8px;">Opens a message to hello@vaara.io with the four things needed to quote you.</p>
 
 <p class="stamp">Adoption (live)</p>
 <ul>
