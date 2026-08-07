@@ -142,3 +142,6 @@ opencode.json
 # NIIS meeting prep materials
 niis/
 social/
+
+# Local clone of the formulae repo (vaaraio/homebrew-tap), not a submodule
+homebrew-tap/
