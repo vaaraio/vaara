@@ -5,6 +5,136 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/)
 and this project follows [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
 
+## [1.62.0] - 2026-08-08
+
+Twelve defects, found by running the adapters against the real provider SDKs
+instead of against fixtures Vaara wrote for itself. Six were fail-open: the
+guardrail returned "allow" when it should have blocked. Two governance
+surfaces recorded nothing at all on their pass-through path.
+
+The common cause is worth stating plainly, because it shaped every fix. Each
+adapter had a passing test suite, and every one of those tests built its
+fixture in the shape Vaara *assumed* the provider returns. A test like that
+proves only that Vaara agrees with itself. The new contract tests build their
+fixtures from the providers' own types instead: proto messages, the botocore
+service model, real client signatures, the actual pydantic response classes.
+
+### Fixed
+
+- GCP Model Armor returned "allow" for every input, including a HIGH
+  confidence dangerous-content match, and discarded the upstream response
+  entirely so nothing reached the audit trail. Three independent causes:
+  `_to_dict` tested `hasattr(instance, "to_dict")`, but proto-plus defines
+  `to_dict` on the metaclass, so the check failed and the response was
+  replaced with `{}`; the parser read camelCase keys while proto-plus emits
+  snake_case; and enum values arrive as integers, not the strings the match
+  test compared against. Confidence levels were also keyed on `"LOW"`, which
+  the API never emits (it is `LOW_AND_ABOVE`), so those hits were downgraded
+  from block to flag. Virus scan results had no handling at all and now map
+  to a `malicious_file` category under Art. 15.
+- Azure Content Safety raised on every scan. The adapter called
+  `analyze_text(text=...)`; the GA client takes a required positional
+  `options`. Separately, `shield_prompt`, `detect_text_protected_material`
+  and `detect_groundedness` do not exist on `ContentSafetyClient` at any
+  released version, and a missing method returned `None`, which reads
+  downstream as a clean result rather than a check that never ran. Those
+  endpoints now raise and name the missing method, `shield` is out of the
+  `scan_prompt` default set, and groundedness accepts the task and grounding
+  sources it requires.
+- Rebuff failed open on the self-hosted path. Rebuff ships two response types
+  whose field sets do not overlap: camelCase on the hosted API, snake_case on
+  the SDK, where the model layer is `openai_score` rather than `model_score`.
+  The adapter read the hosted spelling only, so an injection scoring 0.95
+  across all three layers came back as "allow". If the provider reports an
+  injection and no layer crosses its threshold, that disagreement now blocks.
+- NeMo Guardrails reported clean from its own `generate()` entry point.
+  `LLMRails` leaves `GenerationResponse.log` as `None` unless the caller asks
+  for it, and the adapter never did, so a generation a rail had stopped
+  produced an empty finding. The activated-rails log is now requested
+  explicitly, merging into caller-supplied options rather than replacing them.
+- Guardrails AI lost its article mapping. Guardrails reports
+  `validator.rail_alias`, so PII detection arrives as `detect-pii`, which
+  PascalCases to `DetectPii` and never matched the published `DetectPII` key.
+  `ValidJSON` had the same problem through `valid-json`. The category lookup
+  now falls back to a case and separator insensitive match, which covers every
+  provider whose vocabulary drifts the same way.
+- The OpenAI Agents guardrail governed nothing. It imported `GuardrailResult`
+  from `agents`; that symbol does not exist, the SDK's guardrail return type
+  is `GuardrailFunctionOutput`. The import sat inside a `try/except
+  ImportError` that logged "SDK not installed" and returned `None`, so with
+  the SDK correctly installed the failure branch fired on every call. The
+  except branch now raises and names the real requirement.
+- The LangChain callback handler crashed every streaming chain on
+  langchain-core 1.x. `on_stream_event` was missing, and the handler sets
+  `raise_error` deliberately, so LangChain re-raises rather than logging and
+  a missing method becomes an `AttributeError` that stops the chain.
+- Bedrock Guardrails gated on `detected`, which the AWS model marks optional
+  on all seven assessment shapes, rather than `action`, which is required. An
+  enforcing response without that key would have been skipped.
+- The Claude Code plugin never recorded an outcome, for any tool, since it
+  shipped. `PostToolUse` compared `record.event_type` against
+  `"ACTION_REQUESTED"`, but that is an `EventType` enum whose value is the
+  lowercase `'action_requested'`, so the comparison was always False and the
+  correlation loop never found a target. No `OUTCOME_RECORDED` events meant no
+  feedback to the online learner and an empty Article 15(1) and 61(1) evidence
+  set. Both the packaged hook module and the bundled scripts carried it.
+- The plugin's audit trail held only blocks. `PreToolUse` recorded a call only
+  when a deny rule matched, so an allowed shell, web or file call left no
+  trace and the trail could answer "what was blocked" but not "what did the
+  agent do". Every matched call is recorded now, with `enforce=False` so the
+  verdict still belongs to the deny rules. Measured at 4.6 ms to construct the
+  pipeline and 0.6 ms per call; the ML classifier stays on the `mcp__*` path.
+- MCP proxy: any JSON-RPC method the proxy does not model explicitly was
+  forwarded upstream with no audit entry, so `resources/subscribe`,
+  `completion/complete`, `logging/setLevel` and vendor extensions crossed the
+  perimeter leaving no evidence. Those are recorded now and still forwarded
+  unchanged. Handshake and keepalive traffic stays out of the trail.
+- Escalate was reported as a flat block on both hook paths. `allowed` is
+  `decision == "allow"`, so escalate fell past the branch written to handle it.
+  It still stops the call, which is correct, but now says which of the two
+  happened.
+- `brew install vaara` failed for every macOS user on 1.61.0. The tap formula
+  compiles with a raw `swiftc` over `Sources/VaaraMenuBar/*.swift`, and the
+  1.61.0 macOS work moved `VaaraPolicyClient` and `VaaraPolicyService` into a
+  new `Sources/Shared`, updating only the XcodeGen project. `Package.swift`
+  broke the same way. Both build paths are fixed and both are now built in CI
+  alongside the XcodeGen one.
+- Settings tab content taller than the popover clipped against the bottom
+  border instead of scrolling.
+
+### Added
+
+- Governance coverage for the file surface. The Claude Code plugin matched
+  `Bash|WebFetch|WebSearch|mcp__.*`, so an agent that could not run
+  `curl | sh` could write it to a file unobserved. `Write`, `Edit`,
+  `NotebookEdit`, `Task` and `SendMessage` are matched now, with eight deny
+  rules covering shell startup files, SSH `authorized_keys`, `/etc/shadow`
+  and sudoers, git hooks, cron, launchd and systemd units, and file content
+  carrying a remote-pipe-to-shell or reverse-shell body. Verified against
+  ordinary agent work, which stays allowed: source files, docs, CI configs,
+  tests, a normal build script.
+- Contract tests that build fixtures from each provider's own types, plus two
+  CI jobs that install the real SDKs and fail if any contract test skips,
+  since a skip means an SDK did not import and nothing was checked. They are
+  separate jobs because rebuff pins a langchain that cannot coexist with a
+  current langchain-core.
+- A test that diffs `docs/COMPLIANCE.md` against the compliance engine in both
+  directions, so a requirement cannot be enforced without a documented row and
+  a row cannot name an article nothing enforces.
+- A test asserting every plugin deny rule targets a tool the hook matcher
+  actually dispatches, so a rule cannot ship dead.
+
+### Changed
+
+- `docs/COMPLIANCE.md` was missing two EU AI Act requirements the engine
+  enforces as critical: Article 50(1) transparency and AI system disclosure,
+  backed by `DISCLOSURE_RECORDED`, and Article 26(10) deployer log-keeping.
+  The drift understated what Vaara produces. The serious-incident row is
+  corrected from 73(1-7) to 73(1), which is what the engine checks.
+- The README described tool-call gating as covering every tool call. It gates
+  what you route through it, and each adapter sees a different surface. The
+  line now says so.
+
 ## [1.61.0] - 2026-08-08
 
 Two things that were broken and one that had never been built at all. The
