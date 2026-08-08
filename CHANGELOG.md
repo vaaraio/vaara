@@ -5,6 +5,70 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/)
 and this project follows [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
 
+## [1.61.0] - 2026-08-08
+
+Two things that were broken and one that had never been built at all. The
+macOS section below corrects the record: entries under 1.56.0 and 1.57.x
+described the network filter as a working feature. It was not. Those entries
+are left as written rather than rewritten, and this is the correction.
+
+### Fixed
+
+- Remote MCP upstreams over HTTPS crashed on every request under Python 3.12
+  and 3.13. `_PinnedHTTPSHandler.https_open` forwarded
+  `check_hostname=self._check_hostname`; since 3.12 `HTTPSHandler` folds that
+  argument into the SSL context and keeps no such attribute, so every request
+  raised `AttributeError`. The `--upstream-url` connector was unusable against
+  any TLS upstream on those versions. Python 3.10 and 3.11 were unaffected.
+  Now passes `context` alone, matching CPython.
+- macOS network filter: the `WebKitGovernance` target had never compiled. It
+  referenced `VaaraPolicyClient` and `VaaraPolicyService`, both of which lived
+  only in the app target, produced no build product, and had nothing anywhere
+  that installed or enabled it. Shared sources now build into both targets, the
+  extension has an entry point, the bundle carries the system-extension shape
+  rather than the appex one, and `SystemExtensionManager` submits the
+  activation request and enables the content filter.
+- macOS XPC could never have resolved. The listener used the bare mach name
+  `io.vaara.policyengine`; a sandboxed system extension can only reach a
+  service prefixed with a shared app group. Both targets now hold
+  `group.io.vaara` and the service is `group.io.vaara.policyengine`.
+- `Sources/VaaraMenuBar/Info.plist` had never been committed, so the menu-bar
+  app could not be built from a clean checkout by anyone, including the
+  Homebrew formula that builds it from the source tarball.
+- An orphaned `homebrew-tap` gitlink (mode 160000 with no `.gitmodules`) made
+  every submodule-aware checkout abort with exit 128, failing the Scorecard
+  workflow on every push to main.
+
+### Changed
+
+- **macOS filter now fails closed.** An unreachable or slow policy engine
+  previously returned allow, making a filter that had lost its engine
+  indistinguishable from one that had approved the traffic. It now drops the
+  flow. Operators running the filter should expect governed hosts to be
+  blocked, not silently permitted, when the app is not running.
+- macOS governed hosts now cover chat front ends as well as API endpoints, and
+  match subdomains instead of exact strings. The previous list held API hosts
+  only, so a browser talking to a chat UI was never seen.
+- Operator additions to the governed-host list are read from shared app-group
+  defaults, which a code comment had promised while the list was a compile-time
+  constant.
+
+### Added
+
+- `.github/workflows/macos-client.yml` builds every macOS target on a real
+  runner and fails if the extension bundle is not produced. CI had been
+  ubuntu-only, so nothing had ever built this client, which is how the above
+  shipped.
+- `clients/macos/verify.sh` for the runtime checks CI cannot perform.
+
+### Known limitations
+
+- The macOS network filter **builds and links; it is not yet verified at
+  runtime.** CI cannot install a system extension or observe a network flow.
+  Loading it also requires signing with a Developer ID carrying the Network
+  Extension capability. Treat it as unproven until `clients/macos/verify.sh`
+  passes on a real machine.
+
 ## [1.60.1] - 2026-08-05
 
 A conformance fix. SPEC.md section 1 and the Internet-Draft both say that
