@@ -490,256 +490,259 @@ struct ContentView: View {
     private var enterprise: Bool { model.config.user_level == "enterprise" }
 
     private var settings: some View {
-        Grid(alignment: .topLeading, horizontalSpacing: 32, verticalSpacing: 18) {
-            // Row 1: SETTINGS FOR  |  NOTIFY ON
-            GridRow {
-                VStack(alignment: .leading, spacing: 8) {
-                    sectionLabelPlain("SETTINGS FOR")
-                    Picker("", selection: $model.config.user_level) {
-                        Text("Basic").tag("basic")
-                        Text("Professional").tag("professional")
-                        Text("Enterprise").tag("enterprise")
-                    }
-                    .pickerStyle(.segmented)
-                    .labelsHidden()
-                    Text(model.config.user_level == "basic"
-                         ? "The essentials. Everything else keeps its defaults."
-                         : model.config.user_level == "professional"
-                         ? "Adds thresholds and tuning."
-                         : "Adds multiple trails and every control.")
-                        .font(.system(size: 10.5))
-                        .foregroundStyle(p.ghost)
-                }
-
-                VStack(alignment: .leading, spacing: 8) {
-                    sectionLabelPlain("NOTIFY ON")
-                    Picker("", selection: $model.config.notify_on) {
-                        Text("Nothing").tag("off")
-                        Text("Denials").tag("deny")
-                        Text("All interventions").tag("interventions")
-                    }
-                    .pickerStyle(.segmented)
-                    .labelsHidden()
-                }
-            }
-
-            // Row 2: GATE  |  SIGNAL FADES (pro)
-            GridRow {
-                VStack(alignment: .leading, spacing: 8) {
-                    sectionLabelPlain("GATE")
-                    Picker("", selection: Binding(
-                        get: { model.enforcementMode },
-                        set: { model.setMode($0) })) {
-                        Text("Block").tag("protect")
-                        Text("Shadow").tag("watch")
-                    }
-                    .pickerStyle(.segmented)
-                    .labelsHidden()
-                    Text(model.enforcementMode == "watch"
-                         ? "Recording only. Nothing gets blocked."
-                         : "Enforcing. Deny decisions stop the call.")
-                        .font(.system(size: 10.5))
-                        .foregroundStyle(p.ghost)
-                }
-
-                if pro {
+        ScrollView {
+            Grid(alignment: .topLeading, horizontalSpacing: 32, verticalSpacing: 18) {
+                // Row 1: SETTINGS FOR  |  NOTIFY ON
+                GridRow {
                     VStack(alignment: .leading, spacing: 8) {
-                        sectionLabelPlain("SIGNAL FADES AFTER")
-                        Picker("", selection: $model.config.alert_window_minutes) {
-                            ForEach([1, 5, 15, 60], id: \.self) {
-                                Text("\($0) min").tag($0)
-                            }
+                        sectionLabelPlain("SETTINGS FOR")
+                        Picker("", selection: $model.config.user_level) {
+                            Text("Basic").tag("basic")
+                            Text("Professional").tag("professional")
+                            Text("Enterprise").tag("enterprise")
+                        }
+                        .pickerStyle(.segmented)
+                        .labelsHidden()
+                        Text(model.config.user_level == "basic"
+                             ? "The essentials. Everything else keeps its defaults."
+                             : model.config.user_level == "professional"
+                             ? "Adds thresholds and tuning."
+                             : "Adds multiple trails and every control.")
+                            .font(.system(size: 10.5))
+                            .foregroundStyle(p.ghost)
+                    }
+
+                    VStack(alignment: .leading, spacing: 8) {
+                        sectionLabelPlain("NOTIFY ON")
+                        Picker("", selection: $model.config.notify_on) {
+                            Text("Nothing").tag("off")
+                            Text("Denials").tag("deny")
+                            Text("All interventions").tag("interventions")
                         }
                         .pickerStyle(.segmented)
                         .labelsHidden()
                     }
                 }
-            }
 
-            // Row 3: PROTECTION (pro)  |  APPROVAL POPUP (enterprise)
-            if pro {
+                // Row 2: GATE  |  SIGNAL FADES (pro)
                 GridRow {
-                    VStack(alignment: .leading, spacing: 6) {
-                        sectionLabelPlain("PROTECTION · WOULD HAVE DECIDED (15 MIN)")
-                        ForEach(Preset.all) { preset in
-                            presetRow(preset)
+                    VStack(alignment: .leading, spacing: 8) {
+                        sectionLabelPlain("GATE")
+                        Picker("", selection: Binding(
+                            get: { model.enforcementMode },
+                            set: { model.setMode($0) })) {
+                            Text("Block").tag("protect")
+                            Text("Shadow").tag("watch")
                         }
-                        customRow
+                        .pickerStyle(.segmented)
+                        .labelsHidden()
+                        Text(model.enforcementMode == "watch"
+                             ? "Recording only. Nothing gets blocked."
+                             : "Enforcing. Deny decisions stop the call.")
+                            .font(.system(size: 10.5))
+                            .foregroundStyle(p.ghost)
                     }
 
-                    if enterprise {
+                    if pro {
                         VStack(alignment: .leading, spacing: 8) {
-                            sectionLabelPlain("APPROVAL POPUP")
-                            Picker("", selection: $model.config.approval_style) {
-                                Text("Auto").tag("auto")
-                                Text("From notch").tag("notch")
-                                Text("Centered").tag("centered")
+                            sectionLabelPlain("SIGNAL FADES AFTER")
+                            Picker("", selection: $model.config.alert_window_minutes) {
+                                ForEach([1, 5, 15, 60], id: \.self) {
+                                    Text("\($0) min").tag($0)
+                                }
                             }
                             .pickerStyle(.segmented)
                             .labelsHidden()
-                            Text("Auto detects a notch and drops from it, "
-                                 + "else from the top edge. Force one if "
-                                 + "you hide the notch (e.g. BetterDisplay).")
-                                .font(.system(size: 9))
-                                .foregroundStyle(p.ghost)
                         }
                     }
                 }
-            }
 
-            // Row 4: graph toggle (pro)  |  GOVERN WHAT (enterprise)
-            GridRow {
+                // Row 3: PROTECTION (pro)  |  APPROVAL POPUP (enterprise)
                 if pro {
-                    Toggle(isOn: $model.config.menubar_graph) {
-                        Text("Activity graph in the menu bar")
-                            .font(.system(size: 13)).foregroundStyle(p.ink)
-                    }
-                    .toggleStyle(.switch)
-                    .controlSize(.mini)
-                    .tint(model.state.color)
-                } else {
-                    Spacer().gridCellUnsizedAxes(.vertical)
-                }
+                    GridRow {
+                        VStack(alignment: .leading, spacing: 6) {
+                            sectionLabelPlain("PROTECTION · WOULD HAVE DECIDED (15 MIN)")
+                            ForEach(Preset.all) { preset in
+                                presetRow(preset)
+                            }
+                            customRow
+                        }
 
-                if enterprise {
-                    DisclosureGroup {
-                        VStack(alignment: .leading, spacing: 8) {
-                            ForEach(model.config.db_paths, id: \.self) { path in
-                                HStack {
-                                    Text(path)
-                                        .font(.system(size: 11, design: .monospaced))
-                                        .foregroundStyle(p.faint)
-                                        .lineLimit(1)
-                                        .truncationMode(.head)
-                                    Spacer()
-                                    if model.config.db_paths.count > 1 {
-                                        Button {
-                                            model.removeSource(path)
-                                        } label: {
-                                            Image(systemName: "xmark")
-                                                .font(.system(size: 8, weight: .medium))
-                                        }
-                                        .buttonStyle(.plain)
-                                        .foregroundStyle(p.ghost)
-                                    }
+                        if enterprise {
+                            VStack(alignment: .leading, spacing: 8) {
+                                sectionLabelPlain("APPROVAL POPUP")
+                                Picker("", selection: $model.config.approval_style) {
+                                    Text("Auto").tag("auto")
+                                    Text("From notch").tag("notch")
+                                    Text("Centered").tag("centered")
                                 }
-                            }
-                            HStack(spacing: 14) {
-                                Button("Add a trail...") { chooseDB() }
-                                Button("Find trails in ~/.vaara") {
-                                    discoveredCount = model.discoverTrails()
-                                }
-                            }
-                            .buttonStyle(.plain)
-                            .font(.system(size: 11))
-                            .foregroundStyle(p.ink.opacity(0.7))
-                            if let n = discoveredCount {
-                                Text(n == 0 ? "No new trails found."
-                                            : "Added \(n) trail\(n == 1 ? "" : "s").")
-                                    .font(.system(size: 10))
+                                .pickerStyle(.segmented)
+                                .labelsHidden()
+                                Text("Auto detects a notch and drops from it, "
+                                     + "else from the top edge. Force one if "
+                                     + "you hide the notch (e.g. BetterDisplay).")
+                                    .font(.system(size: 9))
                                     .foregroundStyle(p.ghost)
                             }
                         }
-                        .padding(.top, 6)
-                    } label: {
-                        sectionLabelPlain("GOVERN WHAT YOU CHOOSE (\(model.config.db_paths.count))")
                     }
-                    .tint(p.faint)
-                }
-            }
-
-            // Row 5: WEBKIT GOVERNANCE  |  status
-            GridRow {
-                VStack(alignment: .leading, spacing: 8) {
-                    sectionLabelPlain("WEBKIT GOVERNANCE")
-                    Toggle(isOn: $model.config.webkitGovernance) {
-                        Text("Govern WebKit actions")
-                            .font(.system(size: 13)).foregroundStyle(p.ink)
-                    }
-                    .toggleStyle(.switch)
-                    .controlSize(.mini)
-                    .tint(model.state.color)
-                    Text("Intercepts AI traffic from Safari, Mail, and all "
-                         + "WebKit-based apps. Requires Network Extension.")
-                        .font(.system(size: 9))
-                        .foregroundStyle(p.ghost)
                 }
 
-                VStack(alignment: .leading, spacing: 8) {
-                    if model.config.webkitGovernance {
-                        HStack(spacing: 6) {
-                            Circle().fill(Color.green).frame(width: 7, height: 7)
-                            Text("Active")
-                                .font(.system(size: 11))
-                                .foregroundStyle(p.ghost)
+                // Row 4: graph toggle (pro)  |  GOVERN WHAT (enterprise)
+                GridRow {
+                    if pro {
+                        Toggle(isOn: $model.config.menubar_graph) {
+                            Text("Activity graph in the menu bar")
+                                .font(.system(size: 13)).foregroundStyle(p.ink)
                         }
+                        .toggleStyle(.switch)
+                        .controlSize(.mini)
+                        .tint(model.state.color)
                     } else {
-                        HStack(spacing: 6) {
-                            Circle().fill(Color.gray).frame(width: 7, height: 7)
-                            Text("Inactive")
-                                .font(.system(size: 11))
-                                .foregroundStyle(p.ghost)
-                        }
+                        Spacer().gridCellUnsizedAxes(.vertical)
                     }
-                }
-            }
 
-            // Row 6: UPDATES  |  APPROVALS FOLDER (enterprise)
-            GridRow {
-                VStack(alignment: .leading, spacing: 8) {
-                    sectionLabelPlain("UPDATES")
-                    HStack(spacing: 12) {
-                        Button("Check for updates") { model.checkForUpdates() }
-                            .buttonStyle(.plain)
-                            .font(.system(size: 11))
-                            .foregroundStyle(p.ink.opacity(0.7))
-                        if let status = model.updateStatus {
-                            Text(status)
-                                .font(.system(size: 10, design: .monospaced))
-                                .foregroundStyle(p.ghost)
-                                .lineLimit(2)
-                        }
-                    }
-                    Text(model.engineVersion.map { "engine \($0) · \(BUILD_STAMP)" }
-                             ?? "engine build \(BUILD_STAMP)")
-                        .font(.system(size: 10, design: .monospaced))
-                        .foregroundStyle(p.ghost)
-                }
-
-                if enterprise {
-                    DisclosureGroup {
-                        VStack(alignment: .leading, spacing: 8) {
-                            Text(model.config.approvals_dir
-                                 ?? "~/.vaara/approvals (default)")
-                                .font(.system(size: 11, design: .monospaced))
-                                .foregroundStyle(p.faint)
-                                .lineLimit(1).truncationMode(.head)
-                            HStack(spacing: 14) {
-                                Button("Choose folder...") { chooseApprovalsDir() }
-                                if model.config.approvals_dir != nil {
-                                    Button("Reset to default") {
-                                        model.config.approvals_dir = nil
+                    if enterprise {
+                        DisclosureGroup {
+                            VStack(alignment: .leading, spacing: 8) {
+                                ForEach(model.config.db_paths, id: \.self) { path in
+                                    HStack {
+                                        Text(path)
+                                            .font(.system(size: 11, design: .monospaced))
+                                            .foregroundStyle(p.faint)
+                                            .lineLimit(1)
+                                            .truncationMode(.head)
+                                        Spacer()
+                                        if model.config.db_paths.count > 1 {
+                                            Button {
+                                                model.removeSource(path)
+                                            } label: {
+                                                Image(systemName: "xmark")
+                                                    .font(.system(size: 8, weight: .medium))
+                                            }
+                                            .buttonStyle(.plain)
+                                            .foregroundStyle(p.ghost)
+                                        }
                                     }
                                 }
+                                HStack(spacing: 14) {
+                                    Button("Add a trail...") { chooseDB() }
+                                    Button("Find trails in ~/.vaara") {
+                                        discoveredCount = model.discoverTrails()
+                                    }
+                                }
+                                .buttonStyle(.plain)
+                                .font(.system(size: 11))
+                                .foregroundStyle(p.ink.opacity(0.7))
+                                if let n = discoveredCount {
+                                    Text(n == 0 ? "No new trails found."
+                                                : "Added \(n) trail\(n == 1 ? "" : "s").")
+                                        .font(.system(size: 10))
+                                        .foregroundStyle(p.ghost)
+                                }
                             }
-                            .buttonStyle(.plain)
-                            .font(.system(size: 11))
-                            .foregroundStyle(p.ink.opacity(0.7))
-                            Text("Where the app watches for escalations. "
-                                 + "Point it at the engine's approvals folder "
-                                 + "for bridge or multi-machine setups.")
-                                .font(.system(size: 9))
-                                .foregroundStyle(p.ghost)
+                            .padding(.top, 6)
+                        } label: {
+                            sectionLabelPlain("GOVERN WHAT YOU CHOOSE (\(model.config.db_paths.count))")
                         }
-                        .padding(.top, 6)
-                    } label: {
-                        sectionLabelPlain("APPROVALS FOLDER")
+                        .tint(p.faint)
                     }
-                    .tint(p.faint)
+                }
+
+                // Row 5: WEBKIT GOVERNANCE  |  status
+                GridRow {
+                    VStack(alignment: .leading, spacing: 8) {
+                        sectionLabelPlain("WEBKIT GOVERNANCE")
+                        Toggle(isOn: $model.config.webkitGovernance) {
+                            Text("Govern WebKit actions")
+                                .font(.system(size: 13)).foregroundStyle(p.ink)
+                        }
+                        .toggleStyle(.switch)
+                        .controlSize(.mini)
+                        .tint(model.state.color)
+                        Text("Intercepts AI traffic from Safari, Mail, and all "
+                             + "WebKit-based apps. Requires Network Extension.")
+                            .font(.system(size: 9))
+                            .foregroundStyle(p.ghost)
+                    }
+
+                    VStack(alignment: .leading, spacing: 8) {
+                        if model.config.webkitGovernance {
+                            HStack(spacing: 6) {
+                                Circle().fill(Color.green).frame(width: 7, height: 7)
+                                Text("Active")
+                                    .font(.system(size: 11))
+                                    .foregroundStyle(p.ghost)
+                            }
+                        } else {
+                            HStack(spacing: 6) {
+                                Circle().fill(Color.gray).frame(width: 7, height: 7)
+                                Text("Inactive")
+                                    .font(.system(size: 11))
+                                    .foregroundStyle(p.ghost)
+                            }
+                        }
+                    }
+                }
+
+                // Row 6: UPDATES  |  APPROVALS FOLDER (enterprise)
+                GridRow {
+                    VStack(alignment: .leading, spacing: 8) {
+                        sectionLabelPlain("UPDATES")
+                        HStack(spacing: 12) {
+                            Button("Check for updates") { model.checkForUpdates() }
+                                .buttonStyle(.plain)
+                                .font(.system(size: 11))
+                                .foregroundStyle(p.ink.opacity(0.7))
+                            if let status = model.updateStatus {
+                                Text(status)
+                                    .font(.system(size: 10, design: .monospaced))
+                                    .foregroundStyle(p.ghost)
+                                    .lineLimit(2)
+                            }
+                        }
+                        Text(model.engineVersion.map { "engine \($0) · \(BUILD_STAMP)" }
+                                 ?? "engine build \(BUILD_STAMP)")
+                            .font(.system(size: 10, design: .monospaced))
+                            .foregroundStyle(p.ghost)
+                    }
+
+                    if enterprise {
+                        DisclosureGroup {
+                            VStack(alignment: .leading, spacing: 8) {
+                                Text(model.config.approvals_dir
+                                     ?? "~/.vaara/approvals (default)")
+                                    .font(.system(size: 11, design: .monospaced))
+                                    .foregroundStyle(p.faint)
+                                    .lineLimit(1).truncationMode(.head)
+                                HStack(spacing: 14) {
+                                    Button("Choose folder...") { chooseApprovalsDir() }
+                                    if model.config.approvals_dir != nil {
+                                        Button("Reset to default") {
+                                            model.config.approvals_dir = nil
+                                        }
+                                    }
+                                }
+                                .buttonStyle(.plain)
+                                .font(.system(size: 11))
+                                .foregroundStyle(p.ink.opacity(0.7))
+                                Text("Where the app watches for escalations. "
+                                     + "Point it at the engine's approvals folder "
+                                     + "for bridge or multi-machine setups.")
+                                    .font(.system(size: 9))
+                                    .foregroundStyle(p.ghost)
+                            }
+                            .padding(.top, 6)
+                        } label: {
+                            sectionLabelPlain("APPROVALS FOLDER")
+                        }
+                        .tint(p.faint)
+                    }
                 }
             }
+            .padding(20)
         }
-        .padding(20)
+        .frame(maxHeight: 560)
     }
 
     // MARK: anchor — the qualified timestamp provider (EU trusted list) picker

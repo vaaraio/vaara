@@ -1,5 +1,10 @@
 import NetworkExtension
 import OSLog
+// Shared is a separate module only under SwiftPM. The XcodeGen and
+// Homebrew builds compile Sources/Shared into this target directly.
+#if canImport(Shared)
+import Shared
+#endif
 
 let log = OSLog(subsystem: "io.vaara.menubar", category: "NetworkFilter")
 

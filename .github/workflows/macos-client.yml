@@ -76,6 +76,29 @@ jobs:
             CODE_SIGNING_REQUIRED=NO \
             CODE_SIGN_IDENTITY=""
 
+      - name: Build the SwiftPM path
+        working-directory: clients/macos
+        # project.yml is not the only way this client gets built. `swift build`
+        # is what a contributor reaches for first, and it went stale once
+        # already: Sources/Shared was added without a matching SwiftPM target,
+        # so every target referencing it stopped compiling while this job
+        # stayed green.
+        run: swift build --target VaaraMenuBar && swift build --target WebKitGovernance
+
+      - name: Build the Homebrew path
+        working-directory: clients/macos
+        # The tap formula compiles the app with a raw swiftc over a glob
+        # rather than through Xcode or SwiftPM. That glob missed
+        # Sources/Shared and shipped a formula that could not install.
+        # Mirror the formula's command so the tap cannot break unnoticed.
+        run: |
+          set -o pipefail
+          swift_files=$(ls Sources/VaaraMenuBar/*.swift Sources/Shared/*.swift)
+          echo "compiling:"; echo "$swift_files"
+          swiftc -O -target arm64-apple-macos13.0 \
+            -o "$RUNNER_TEMP/VaaraMenuBar" $swift_files
+          test -x "$RUNNER_TEMP/VaaraMenuBar"
+
       - name: Assert the network filter extension actually produced a binary
         working-directory: clients/macos
         run: |

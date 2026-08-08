@@ -1,4 +1,9 @@
 import Foundation
+// Shared is a separate module only under SwiftPM. The XcodeGen and
+// Homebrew builds compile Sources/Shared into this target directly.
+#if canImport(Shared)
+import Shared
+#endif
 
 /// XPC service listener — runs in the main Vaara app process.
 /// The Network Extension connects here to request policy decisions.
