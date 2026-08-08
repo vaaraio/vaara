@@ -131,7 +131,7 @@ Each verdict carries the threshold-versus-observed snapshot, the rationale, and 
 <details>
 <summary><b>What you get</b></summary>
 
-- **Gate every tool call** against your own policy: allow, block, or escalate.
+- **Gate every tool call you route through it** against your own policy: allow, block, or escalate. Coverage is whatever you wrap; each adapter documents the surface it sees, and the Claude Code plugin states its four explicitly.
 - **A tamper-evident trail** an outside party verifies without trusting your stack, with the chain head anchorable to an external RFC 3161 / eIDAS timestamp so its existence is provable against a clock you do not control.
 - **Article-level EU AI Act evidence**, honest about the gaps instead of papering over them.
 - **Governance of the model call itself**, not only the tools around it: a hardware-rooted inference receipt that a second, different local model cross-checks. This is the sovereign inference harness, new in v1.0.
