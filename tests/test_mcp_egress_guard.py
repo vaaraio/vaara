@@ -216,3 +216,39 @@ def test_authorization_not_leaked_cross_origin(redirect_server):
     finally:
         client.close()
         target.shutdown()
+
+
+def test_https_handler_opens_without_check_hostname_attribute():
+    """Regression: the HTTPS handler must not read ``self._check_hostname``.
+
+    Since Python 3.12, ``HTTPSHandler.__init__`` folds any ``check_hostname``
+    argument into the SSL context and keeps no ``_check_hostname`` attribute,
+    while its own ``https_open`` passes only ``context``. Forwarding a
+    ``check_hostname`` kwarg therefore raised ``AttributeError`` on every HTTPS
+    request under 3.12 and 3.13, taking out the ``--upstream-url`` remote-MCP
+    connector for TLS upstreams. On 3.10 and 3.11 the attribute still exists,
+    so the defect was version-specific rather than universal.
+
+    The assertion is behavioural, not version-specific: passing ``context``
+    alone is correct on every supported version, which is what CPython itself
+    does.
+    """
+    import urllib.request
+
+    from vaara.integrations._egress_guard import _PinnedHTTPSHandler
+
+    handler = _PinnedHTTPSHandler(allow_private=False)
+    assert hasattr(handler, "_context")
+
+    captured: dict = {}
+
+    def fake_do_open(http_class, req, **kwargs):
+        captured["kwargs"] = kwargs
+        return "opened"
+
+    handler.do_open = fake_do_open  # type: ignore[method-assign]
+    result = handler.https_open(urllib.request.Request("https://example.invalid/mcp"))
+
+    assert result == "opened"
+    assert set(captured["kwargs"]) == {"context"}
+    assert captured["kwargs"]["context"] is handler._context

@@ -285,9 +285,11 @@ class _PinnedHTTPSHandler(urllib.request.HTTPSHandler):
         def factory(host: str, **kwargs: Any) -> _PinnedHTTPSConnection:
             return _PinnedHTTPSConnection(host, _allow_private=allow_private, **kwargs)
 
-        return self.do_open(
-            factory, req, context=self._context, check_hostname=self._check_hostname
-        )
+        # Pass only the context, matching CPython's own HTTPSHandler.https_open.
+        # Since 3.12 the handler folds any check_hostname argument into the
+        # context at construction and keeps no _check_hostname attribute, so
+        # forwarding one here raises AttributeError on every HTTPS request.
+        return self.do_open(factory, req, context=self._context)
 
 
 def _same_origin(a: str, b: str) -> bool:
