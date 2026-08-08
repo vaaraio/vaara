@@ -152,6 +152,30 @@ def _protocol_version_supported(version: Optional[str]) -> bool:
     return stripped == "" or stripped in _SUPPORTED_HTTP_PROTOCOL_VERSIONS
 
 
+# Handshake and keepalive traffic. Recording these would bury the trail
+# in noise without telling a reviewer anything about what the agent did.
+_TRANSPORT_NOISE = frozenset({"initialize", "initialized", "ping", "shutdown", "exit"})
+
+
+def _is_transport_noise(method: str) -> bool:
+    return method in _TRANSPORT_NOISE or method.startswith("notifications/")
+
+
+def _passthrough_params(request: dict) -> dict:
+    """Params for a forwarded method, shaped for the audit trail.
+
+    Pipeline ingress sanitises and size-caps, so this only needs to hand
+    over a mapping. A non-dict ``params`` is wrapped rather than dropped,
+    because the point is to record what actually crossed the perimeter.
+    """
+    params = request.get("params")
+    if isinstance(params, dict):
+        return params
+    if params is None:
+        return {}
+    return {"_raw": params}
+
+
 def _accept_satisfies(accept: Optional[str], media_type: str) -> bool:
     """True iff an Accept header value can receive ``media_type``.
 
@@ -992,6 +1016,24 @@ class VaaraMCPProxy:
             except Exception:
                 logger.exception("Error in prompts/get interception")
                 return self._error_response(req_id, -32603, "Internal proxy error")
+        # Anything the proxy does not model explicitly still crosses the
+        # perimeter, so it is recorded before being forwarded. It used to
+        # pass through with no trail entry at all, which meant a
+        # resources/subscribe, a completion/complete or a
+        # logging/setLevel left no evidence it ever happened. The record
+        # is the point of the proxy; not modelling a method is not a
+        # reason to forget it occurred.
+        #
+        # Not blocked: these methods are forwarded exactly as before. The
+        # only change is that the chain now shows them.
+        if not _is_transport_noise(method):
+            self._record_perimeter_audit(
+                agent_id=self._agent_id_default,
+                tool_name=f"mcp.method.{method}" if method else "mcp.method.unknown",
+                parameters=_passthrough_params(request),
+                decision="allow",
+                reason="method not modelled by the proxy; forwarded and recorded",
+            )
         try:
             return self._upstream.request(request)
         except ProxyError as e:

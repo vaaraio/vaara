@@ -746,3 +746,95 @@ def test_attest_upstreams_multi_preserves_names():
     from vaara.integrations.mcp_proxy import _attest_upstreams_for_slots
     upstreams = {"github": ["gh-srv"], "fs": ["fs-srv"]}
     assert _attest_upstreams_for_slots(upstreams) == upstreams
+
+
+# --- Unmodelled methods: forwarded, but no longer forgotten ------------------
+#
+# Any method the proxy does not handle explicitly fell through to
+# `self._upstream.request(request)` with no interception and no audit
+# record, so a resources/subscribe, completion/complete or
+# logging/setLevel crossed the perimeter leaving no evidence it ever
+# happened. The proxy exists to produce the record; not modelling a
+# method is not a reason to forget it occurred.
+
+
+@pytest.mark.parametrize("method", [
+    "resources/subscribe",
+    "resources/unsubscribe",
+    "resources/templates/list",
+    "completion/complete",
+    "logging/setLevel",
+    "some/vendor/extension",
+])
+def test_unmodelled_methods_are_recorded_before_forwarding(proxy, monkeypatch, method):
+    p, _pipeline = proxy
+    recorded = []
+    monkeypatch.setattr(
+        p, "_record_perimeter_audit",
+        lambda **kwargs: recorded.append(kwargs),
+    )
+
+    p._handle_request({
+        "jsonrpc": "2.0", "id": 1, "method": method,
+        "params": {"uri": "file:///secret.txt"},
+    })
+
+    assert len(recorded) == 1, f"{method} left no audit record"
+    assert recorded[0]["tool_name"] == f"mcp.method.{method}"
+    assert recorded[0]["parameters"] == {"uri": "file:///secret.txt"}
+    # Recording must not change behaviour: it is still forwarded.
+    p._upstream.request.assert_called_once()
+
+
+@pytest.mark.parametrize("method", [
+    "initialize", "initialized", "ping", "shutdown", "exit",
+    "notifications/initialized", "notifications/cancelled",
+])
+def test_transport_noise_is_forwarded_without_a_record(proxy, monkeypatch, method):
+    """Recording keepalive and handshake traffic buries the real signal."""
+    p, _pipeline = proxy
+    recorded = []
+    monkeypatch.setattr(
+        p, "_record_perimeter_audit",
+        lambda **kwargs: recorded.append(kwargs),
+    )
+
+    p._handle_request({"jsonrpc": "2.0", "id": 1, "method": method})
+
+    assert recorded == []
+    p._upstream.request.assert_called_once()
+
+
+def test_unmodelled_method_with_non_dict_params_is_still_recorded(proxy, monkeypatch):
+    p, _pipeline = proxy
+    recorded = []
+    monkeypatch.setattr(
+        p, "_record_perimeter_audit",
+        lambda **kwargs: recorded.append(kwargs),
+    )
+
+    p._handle_request({
+        "jsonrpc": "2.0", "id": 1, "method": "vendor/thing", "params": ["a", "b"],
+    })
+
+    assert recorded[0]["parameters"] == {"_raw": ["a", "b"]}
+
+
+def test_modelled_methods_do_not_get_a_duplicate_passthrough_record(proxy, monkeypatch):
+    """tools/call has its own interception; it must not be double-recorded."""
+    p, pipeline = proxy
+    pipeline.intercept.return_value = _StubInterceptResult(
+        allowed=False, reason="nope", decision="DENY", action_id="a1",
+    )
+    recorded = []
+    monkeypatch.setattr(
+        p, "_record_perimeter_audit",
+        lambda **kwargs: recorded.append(kwargs),
+    )
+
+    p._handle_request({
+        "jsonrpc": "2.0", "id": 1, "method": "tools/call",
+        "params": {"name": "x", "arguments": {}},
+    })
+
+    assert not any(k["tool_name"].startswith("mcp.method.") for k in recorded)
