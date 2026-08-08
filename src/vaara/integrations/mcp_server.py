@@ -584,7 +584,14 @@ class VaaraMCPServer:
                     "evaluation_ms": round(result.evaluation_ms, 2),
                 }, indent=2),
             }],
-            "isError": not result.allowed and result.decision == "deny",
+            # Any outcome that did not allow the action is an error to the
+            # caller. Gating on decision == "deny" meant only a policy deny
+            # set the flag: a human who explicitly denied an escalation, an
+            # unanswered approval that timed out, and a handshake that
+            # failed all keep decision == "escalate", so they returned
+            # isError false. MCP clients routinely branch on isError, so a
+            # blocked action was being reported as a clean result.
+            "isError": not result.allowed,
         }
 
     @staticmethod

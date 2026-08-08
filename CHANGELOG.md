@@ -89,6 +89,12 @@ service model, real client signatures, the actual pydantic response classes.
   `completion/complete`, `logging/setLevel` and vendor extensions crossed the
   perimeter leaving no evidence. Those are recorded now and still forwarded
   unchanged. Handshake and keepalive traffic stays out of the trail.
+- The MCP server reported a blocked escalation as a clean result. `isError`
+  was gated on `decision == "deny"`, but the approvals handshake leaves
+  `decision` as `"escalate"` on human deny, on timeout, and on handshake
+  failure alike, so every one of those returned `isError: false`. MCP clients
+  routinely branch on that flag. It now tracks `allowed`, so anything that did
+  not permit the action reports an error.
 - Escalate was reported as a flat block on both hook paths. `allowed` is
   `decision == "allow"`, so escalate fell past the branch written to handle it.
   It still stops the call, which is correct, but now says which of the two

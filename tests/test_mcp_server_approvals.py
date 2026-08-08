@@ -143,3 +143,39 @@ class TestMCPServerApprovalHandshake:
         )
         assert payload["decision"] == "allow"
         assert payload["allowed"] is True
+
+    def test_human_deny_is_reported_as_an_error(self, server, escalate_payload,
+                                                monkeypatch):
+        """A denied escalation must not read as a clean result.
+
+        isError used to be gated on `decision == "deny"`, but the handshake
+        leaves decision == "escalate" on deny, timeout and failure alike, so
+        every blocked escalation returned isError false. MCP clients branch
+        on that flag.
+        """
+        monkeypatch.setattr(
+            vaara.approvals, "request_approval", lambda *a, **kw: "deny",
+        )
+        payload, result = _intercept(server)
+        assert payload["allowed"] is False
+        assert result.get("isError") is True
+
+    def test_timeout_is_reported_as_an_error(self, server, escalate_payload,
+                                             monkeypatch):
+        monkeypatch.setattr(
+            vaara.approvals, "request_approval", lambda *a, **kw: "timeout",
+        )
+        payload, result = _intercept(server)
+        assert payload["allowed"] is False
+        assert result.get("isError") is True
+
+    def test_handshake_failure_is_reported_as_an_error(self, server,
+                                                       escalate_payload,
+                                                       monkeypatch):
+        def _boom(*a, **kw):
+            raise RuntimeError("approvals dir unwritable")
+
+        monkeypatch.setattr(vaara.approvals, "request_approval", _boom)
+        payload, result = _intercept(server)
+        assert payload["allowed"] is False
+        assert result.get("isError") is True
