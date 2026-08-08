@@ -246,8 +246,54 @@ def _open_trail(cfg: dict):
     return trail
 
 
+def _event_name(event_type: object) -> str:
+    """Normalise an audit event type to its uppercase name.
+
+    ``record.event_type`` is an ``EventType`` enum whose value is the
+    lowercase string, so comparing it directly against
+    ``"ACTION_REQUESTED"`` is always False.
+    """
+    return str(getattr(event_type, "value", event_type)).upper()
+
+
+def _record_tool_name(record: object) -> str:
+    """Tool name from the column when present, else from the payload."""
+    direct = getattr(record, "tool_name", None)
+    if direct:
+        return str(direct)
+    data = getattr(record, "data", None) or {}
+    return str(data.get("tool_name", ""))
+
+
+def _record_call(cfg: dict, agent: str, tool_name: str, tool_input: dict,
+                 context: dict, session_id: str = "") -> None:
+    """Write an ACTION_REQUESTED record for a call on the regex path.
+
+    Every matched call is recorded, not only the denied ones. Recording
+    denials alone left allowed shell, web and file calls out of the trail
+    entirely, so it could answer "what was blocked" but not "what did the
+    agent do", and PostToolUse then had no ACTION_REQUESTED to correlate
+    its outcome against.
+
+    ``enforce=False``: the verdict on this path belongs to the deny
+    rules, and scoring here is for the record only. Roughly 5 ms to
+    construct and under a millisecond per call, which is the SQLite
+    append. The ML classifier stays on the ``mcp__*`` path.
+    """
+    try:
+        from vaara.pipeline import InterceptionPipeline
+
+        pipeline = InterceptionPipeline(trail=_open_trail(cfg), enforce=False)
+        pipeline.intercept(
+            agent_id=agent, tool_name=tool_name, parameters=tool_input,
+            context=context, session_id=session_id,
+        )
+    except Exception:
+        pass
+
+
 def run_pre_tool_use(deny_patterns: Optional[str] = None) -> int:
-    """PreToolUse: exit 0 allows/escalates, exit 2 blocks."""
+    """PreToolUse: exit 0 allows, exit 2 blocks or holds for review."""
     cfg = load_config()
     if plugin_disabled(cfg):
         return 0
@@ -263,19 +309,14 @@ def run_pre_tool_use(deny_patterns: Optional[str] = None) -> int:
     match = match_deny_rule(load_deny_rules(deny_patterns), tool_name, tool_input)
     if match is not None:
         rule_id, message = match
-        try:
-            from vaara.pipeline import InterceptionPipeline
-
-            pipeline = InterceptionPipeline(trail=_open_trail(cfg), enforce=False)
-            pipeline.intercept(
-                agent_id=agent, tool_name=tool_name, parameters=tool_input,
-                context={
-                    "vaara_governance_layer": "deny_pattern",
-                    "rule_id": rule_id, "rule_message": message,
-                },
-            )
-        except Exception:
-            pass
+        _record_call(
+            cfg, agent, tool_name, tool_input,
+            {
+                "vaara_governance_layer": "deny_pattern",
+                "rule_id": rule_id, "rule_message": message,
+            },
+            session_id,
+        )
         if shadow:
             _emit(f"vaara-governance: SHADOW deny on {tool_name} (rule={rule_id}): {message}")
             notify(cfg, "SHADOW deny", tool_name, message)
@@ -285,6 +326,14 @@ def run_pre_tool_use(deny_patterns: Optional[str] = None) -> int:
         return 2
 
     if not tool_name.startswith("mcp__"):
+        # Passed the deny rules. Record it anyway: a trail holding only
+        # the blocked calls cannot answer "what did the agent do", which
+        # is the question it exists for, and PostToolUse needs an
+        # ACTION_REQUESTED to correlate its outcome against.
+        _record_call(
+            cfg, agent, tool_name, tool_input,
+            {"vaara_governance_layer": "regex_pass"}, session_id,
+        )
         return 0
 
     from vaara.pipeline import InterceptionPipeline
@@ -320,16 +369,10 @@ def run_pre_tool_use(deny_patterns: Optional[str] = None) -> int:
         return 0
 
     if result.allowed:
-        if result.decision == "escalate":
-            _emit(
-                f"vaara-governance: ESCALATE on {tool_name} "
-                f"(risk {result.risk_score:.2f}, action_id={result.action_id}). "
-                f"Reason: {result.reason}"
-            )
-            notify(cfg, "ESCALATE", tool_name,
-                   f"risk {result.risk_score:.2f}: {result.reason}")
         return 0
 
+    # `allowed` is `decision == "allow"`, so escalate never reached the
+    # branch above; the handshake below is what actually handles it.
     if result.decision == "escalate":
         return _handle_escalation(cfg, pipeline, result, tool_name)
 
@@ -429,9 +472,9 @@ def run_post_tool_use() -> int:
         for record in reversed(trail._records):
             if record.agent_id != agent:
                 continue
-            if record.data.get("tool_name") != tool_name:
+            if _record_tool_name(record) != tool_name:
                 continue
-            if record.event_type == "ACTION_REQUESTED":
+            if _event_name(record.event_type) == "ACTION_REQUESTED":
                 target_action_id = record.action_id
                 break
         if target_action_id is None:
