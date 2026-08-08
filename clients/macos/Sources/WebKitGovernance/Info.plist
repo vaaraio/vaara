@@ -15,17 +15,21 @@
     <key>CFBundleName</key>
     <string>WebKitGovernance</string>
     <key>CFBundlePackageType</key>
-    <string>XPC!</string>
+    <string>SYSX</string>
     <key>CFBundleShortVersionString</key>
-    <string>1.56.0</string>
+    <string>1.60.1</string>
     <key>CFBundleVersion</key>
     <string>1</string>
-    <key>NSExtension</key>
+    <!-- System extension, not an appex. NSExtension/NSExtensionPrincipalClass
+         is the appex shape and is not read for a .systemextension bundle;
+         NEProvider.startSystemExtensionMode reads NEProviderClasses. -->
+    <key>NetworkExtension</key>
     <dict>
-        <key>NSExtensionPointIdentifier</key>
-        <string>com.apple.networkextension.filter-data</string>
-        <key>NSExtensionPrincipalClass</key>
-        <string>WebKitGovernance.FilterProvider</string>
+        <key>NEProviderClasses</key>
+        <dict>
+            <key>com.apple.networkextension.filter-data</key>
+            <string>WebKitGovernance.FilterProvider</string>
+        </dict>
     </dict>
 </dict>
 </plist>

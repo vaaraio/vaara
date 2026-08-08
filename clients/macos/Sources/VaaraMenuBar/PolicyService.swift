@@ -9,7 +9,9 @@ final class PolicyServiceDelegate: NSObject, NSXPCListenerDelegate, VaaraPolicyS
     private let trailDB: String
 
     override init() {
-        self.listener = NSXPCListener(machServiceName: "io.vaara.policyengine")
+        // App-group prefixed. A sandboxed system extension cannot reach a bare
+        // mach service name, so the extension's connection never resolved.
+        self.listener = NSXPCListener(machServiceName: vaaraPolicyMachService)
         self.trailDB = NSString(string: "~/.vaara/trail/audit.db").expandingTildeInPath
         super.init()
         listener.delegate = self

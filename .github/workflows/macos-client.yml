@@ -1,0 +1,92 @@
+name: macOS client
+
+# The Swift client under clients/macos was never built by CI, which is how a
+# target that could not compile shipped as a documented feature. This job
+# compiles every target on a real macOS runner so that cannot recur.
+#
+# Build only: code signing is disabled, so this proves the sources compile and
+# link against the real Apple frameworks. It does not produce a shippable,
+# notarised app, and it cannot verify runtime behaviour of a system extension.
+
+on:
+  push:
+    branches: [main]
+    paths:
+      - 'clients/macos/**'
+      - '.github/workflows/macos-client.yml'
+  pull_request:
+    paths:
+      - 'clients/macos/**'
+      - '.github/workflows/macos-client.yml'
+  workflow_dispatch:
+
+permissions: read-all
+
+concurrency:
+  group: macos-client-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  build:
+    name: Build macOS targets
+    runs-on: macos-latest
+    timeout-minutes: 25
+    steps:
+      - name: Checkout
+        uses: actions/checkout@08c6903cd8c0fde910a37f88322edcfb5dd907a8  # v5.0.0
+        with:
+          persist-credentials: false
+
+      - name: Show toolchain
+        run: |
+          sw_vers
+          xcodebuild -version
+          swift --version
+
+      - name: Install XcodeGen
+        run: brew install xcodegen
+
+      - name: Generate Xcode project
+        working-directory: clients/macos
+        run: xcodegen generate
+
+      - name: List targets
+        working-directory: clients/macos
+        run: xcodebuild -list -project VaaraMenuBar.xcodeproj
+
+      - name: Build every target
+        working-directory: clients/macos
+        run: |
+          set -o pipefail
+          xcodebuild build \
+            -project VaaraMenuBar.xcodeproj \
+            -scheme VaaraMenuBar \
+            -configuration Release \
+            -destination 'platform=macOS' \
+            CODE_SIGNING_ALLOWED=NO \
+            CODE_SIGNING_REQUIRED=NO \
+            CODE_SIGN_IDENTITY="" \
+            | xcbeautify --renderer github-actions || \
+          xcodebuild build \
+            -project VaaraMenuBar.xcodeproj \
+            -scheme VaaraMenuBar \
+            -configuration Release \
+            -destination 'platform=macOS' \
+            CODE_SIGNING_ALLOWED=NO \
+            CODE_SIGNING_REQUIRED=NO \
+            CODE_SIGN_IDENTITY=""
+
+      - name: Assert the network filter extension actually produced a binary
+        working-directory: clients/macos
+        run: |
+          # The original failure mode was a target that generated a build
+          # directory and no product. Grepping for the product is the check
+          # that would have caught it.
+          found=$(find ~/Library/Developer/Xcode/DerivedData build -type d \
+                    -name 'WebKitGovernance.systemextension' 2>/dev/null | head -1)
+          if [ -z "$found" ]; then
+            echo "::error::WebKitGovernance.systemextension was not produced. The extension did not build."
+            exit 1
+          fi
+          echo "built: $found"
+          ls -la "$found/Contents/MacOS" || true

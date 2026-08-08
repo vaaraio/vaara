@@ -1,0 +1,39 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN" "http://www.apple.com/DTDs/PropertyList-1.0.dtd">
+<plist version="1.0">
+<dict>
+    <key>CFBundleDevelopmentRegion</key>
+    <string>en</string>
+    <key>CFBundleDisplayName</key>
+    <string>Vaara</string>
+    <key>CFBundleExecutable</key>
+    <string>$(EXECUTABLE_NAME)</string>
+    <key>CFBundleIdentifier</key>
+    <string>io.vaara.menubar</string>
+    <key>CFBundleInfoDictionaryVersion</key>
+    <string>6.0</string>
+    <key>CFBundleName</key>
+    <string>VaaraMenuBar</string>
+    <key>CFBundlePackageType</key>
+    <string>APPL</string>
+    <key>CFBundleShortVersionString</key>
+    <string>1.60.1</string>
+    <key>CFBundleVersion</key>
+    <string>1</string>
+    <key>LSMinimumSystemVersion</key>
+    <string>13.0</string>
+    <!-- Menu-bar only: no Dock icon, no main window. -->
+    <key>LSUIElement</key>
+    <true/>
+    <key>NSHumanReadableCopyright</key>
+    <string>Copyright (C) 2026 Henri Sirkkavaara. AGPL-3.0-or-later.</string>
+    <!-- AccessibilityObserver reads window and focus state to record which AI
+         site a person is interacting with. macOS shows this string when it
+         asks for the permission. -->
+    <key>NSAccessibilityUsageDescription</key>
+    <string>Vaara records which AI site you are interacting with so the audit trail reflects what actually happened.</string>
+    <!-- The app installs and manages the network filter system extension. -->
+    <key>NSSystemExtensionUsageDescription</key>
+    <string>Vaara installs a network filter so AI traffic from every app can be governed and recorded.</string>
+</dict>
+</plist>
