@@ -8,6 +8,26 @@ Groundedness Detection are separate endpoints. The adapter exposes a
 single ``scan_prompt`` / ``scan_response`` pair and routes internally
 based on which endpoints the caller asks for via ``include``.
 
+Calling convention: every endpoint takes ONE positional mapping whose
+keys are the REST request body's keys. That is what the GA SDK does —
+``ContentSafetyClient.analyze_text`` takes a required positional
+``options`` argument, not ``text=`` — and injected sibling clients are
+expected to match it.
+
+Which endpoints the GA SDK actually has, verified against
+azure-ai-contentsafety 1.0.0 (the only non-preview release on PyPI):
+
+* ``analyze_text`` — present. This is the default for both scans.
+* ``shield_prompt``, ``detect_text_protected_material``,
+  ``detect_groundedness`` — NOT present on ``ContentSafetyClient`` at
+  any released version. They exist in the REST API only. To use them,
+  inject a client that exposes the method (``shield_client=``,
+  ``protected_client=``, ``groundedness_client=``).
+
+Asking for an endpoint whose client cannot serve it raises. It used to
+return ``None`` silently, which produced a clean-looking finding with
+no categories — a guardrail that reports "allow" because it never ran.
+
 Azure severity ladder 0/2/4/6 projects onto [0.0, 1.0]. Block
 threshold defaults to 4. Optional dep: ``pip install vaara[azure-content-safety]``.
 """
@@ -155,27 +175,74 @@ class AzureContentSafetyAdapter:
         self._block_threshold = block_threshold
 
     @staticmethod
-    def _call(fn_name: str, client: Any, **kwargs: Any) -> Optional[dict[str, Any]]:
+    def _call(
+        fn_name: str, client: Any, options: dict[str, Any], *, include_key: str,
+    ) -> dict[str, Any]:
+        """Invoke one endpoint with a single positional options mapping.
+
+        Raises when the client cannot serve the endpoint. A missing
+        method used to yield ``None`` and therefore zero categories,
+        which reads downstream as "nothing was wrong" rather than
+        "nothing was checked".
+        """
         fn = getattr(client, fn_name, None)
         if fn is None:
-            return None
-        result = fn(**kwargs)
+            raise RuntimeError(
+                f"AzureContentSafetyAdapter: {include_key!r} was requested but the "
+                f"supplied client has no {fn_name!r} method. The GA "
+                f"azure-ai-contentsafety ContentSafetyClient only exposes "
+                f"analyze_text; {fn_name} is REST-only. Pass a client that "
+                f"implements it, or drop {include_key!r} from `include`."
+            )
+        result = fn(options)
         if hasattr(result, "as_dict"):
             return result.as_dict()
-        return result if isinstance(result, dict) else None
+        if isinstance(result, dict):
+            return result
+        raise TypeError(
+            f"AzureContentSafetyAdapter: {fn_name} returned "
+            f"{type(result).__name__}, expected a mapping or an object with as_dict()."
+        )
 
-    def scan_prompt(self, text: str, *, include: Optional[set[str]] = None) -> ContentSafetyFinding:
-        include = include if include is not None else {"analyze_text", "shield"}
-        analyze = self._call("analyze_text", self._client, text=text) if "analyze_text" in include else None
-        shield = self._call("shield_prompt", self._shield_client, user_prompt=text, documents=None) if "shield" in include else None
+    def scan_prompt(
+        self, text: str, *, include: Optional[set[str]] = None,
+        documents: Optional[list[str]] = None,
+    ) -> ContentSafetyFinding:
+        # "shield" is not in the default set: the GA client cannot serve
+        # it, so defaulting it on made every out-of-the-box scan raise.
+        include = include if include is not None else {"analyze_text"}
+        analyze = shield = None
+        if "analyze_text" in include:
+            analyze = self._call("analyze_text", self._client, {"text": text},
+                                 include_key="analyze_text")
+        if "shield" in include:
+            shield = self._call(
+                "shield_prompt", self._shield_client,
+                {"userPrompt": text, "documents": list(documents or [])},
+                include_key="shield")
         return parse_responses(analyze_text=analyze, shield=shield,
                                scanned_role="prompt", block_threshold=self._block_threshold)
 
-    def scan_response(self, text: str, *, include: Optional[set[str]] = None) -> ContentSafetyFinding:
-        include = include if include is not None else {"analyze_text", "protected"}
-        analyze = self._call("analyze_text", self._client, text=text) if "analyze_text" in include else None
-        protected = self._call("detect_text_protected_material", self._protected_client, text=text) if "protected" in include else None
-        grounded = self._call("detect_groundedness", self._groundedness_client, text=text) if "grounded" in include else None
+    def scan_response(
+        self, text: str, *, include: Optional[set[str]] = None,
+        groundedness_options: Optional[dict[str, Any]] = None,
+    ) -> ContentSafetyFinding:
+        include = include if include is not None else {"analyze_text"}
+        analyze = protected = grounded = None
+        if "analyze_text" in include:
+            analyze = self._call("analyze_text", self._client, {"text": text},
+                                 include_key="analyze_text")
+        if "protected" in include:
+            protected = self._call("detect_text_protected_material",
+                                   self._protected_client, {"text": text},
+                                   include_key="protected")
+        if "grounded" in include:
+            # Groundedness needs the task, domain and grounding sources;
+            # text alone is not a valid request body.
+            options = dict(groundedness_options or {})
+            options.setdefault("text", text)
+            grounded = self._call("detect_groundedness", self._groundedness_client,
+                                  options, include_key="grounded")
         return parse_responses(analyze_text=analyze, protected=protected, grounded=grounded,
                                scanned_role="response", block_threshold=self._block_threshold)
 

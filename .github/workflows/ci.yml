@@ -39,6 +39,44 @@ jobs:
       - name: Run tests
         run: pytest -q
 
+  adapter-contracts:
+    name: Cloud adapter contracts
+    runs-on: ubuntu-latest
+    # The per-adapter tests in the main job build fixtures by hand, in the
+    # shape Vaara assumes the provider returns, so they pass even when the
+    # assumption is wrong. This job installs the real provider SDKs and
+    # checks the adapters against the contracts those SDKs describe about
+    # themselves. Offline: no credentials, no provider API calls.
+    #
+    # The SDKs are deliberately not in requirements-dev.txt. They are
+    # optional extras, and pulling boto3, azure-core and google-cloud into
+    # the hash-pinned dev lock would slow every matrix leg of the main job.
+    steps:
+      - uses: actions/checkout@9c091bb21b7c1c1d1991bb908d89e4e9dddfe3e0  # v7.0.0
+
+      - name: Set up Python 3.12
+        uses: actions/setup-python@5fda3b95a4ea91299a34e894583c3862153e4b97  # v7.0.0
+        with:
+          python-version: '3.12'
+
+      - name: Install Vaara and the provider SDKs
+        run: |
+          pip install -e . --no-deps
+          pip install pytest boto3 azure-ai-contentsafety google-cloud-modelarmor rebuff
+
+      - name: Run contract tests, failing on any skip
+        # Each contract class skips when its SDK is missing. In this job an
+        # SDK is always installed, so a skip means the import broke and the
+        # contracts went unchecked. Silence is exactly the failure mode this
+        # job exists to prevent, so a skip is an error here.
+        run: |
+          set -o pipefail
+          pytest tests/test_integrations_cloud_contracts.py -q -rs | tee result.txt
+          if grep -qE '[0-9]+ skipped' result.txt; then
+            echo "::error::A contract test skipped, so a provider SDK did not import."
+            exit 1
+          fi
+
   typecheck:
     name: Type check (mypy strict set)
     runs-on: ubuntu-latest

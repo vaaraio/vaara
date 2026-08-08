@@ -23,8 +23,10 @@ class _FakeAzure:
         self.calls: list[tuple[str, dict[str, Any]]] = []
 
     def _bind(self, fn_name: str):
-        def _call(**kwargs: Any) -> dict[str, Any]:
-            self.calls.append((fn_name, kwargs))
+        # Every Content Safety endpoint takes ONE positional options
+        # mapping, matching ContentSafetyClient.analyze_text(options).
+        def _call(options: dict[str, Any]) -> dict[str, Any]:
+            self.calls.append((fn_name, options))
             return self._responses[fn_name]
         return _call
 
@@ -126,31 +128,78 @@ class TestAzureContentSafetyAdapter:
         with pytest.raises(TypeError):
             AzureContentSafetyAdapter(client=object())
 
-    def test_scan_prompt_default_includes_analyze_and_shield(self):
-        client = _FakeAzure(
-            analyze_text=_analyze_response(("Hate", 4)),
-            shield_prompt={"userPromptAnalysis": {"attackDetected": False}},
-        )
+    def test_scan_prompt_defaults_to_analyze_text_only(self):
+        # shield_prompt does not exist on the GA ContentSafetyClient, so
+        # it must not be in the default include set. Defaulting it on
+        # made every out-of-the-box scan fail.
+        client = _FakeAzure(analyze_text=_analyze_response(("Hate", 4)))
         adapter = AzureContentSafetyAdapter(client)
         finding = adapter.scan_prompt("text")
-        called = {name for name, _ in client.calls}
-        assert called == {"analyze_text", "shield_prompt"}
+        assert {name for name, _ in client.calls} == {"analyze_text"}
         assert finding.scanned_role == "prompt"
         assert finding.verdict == "block"
 
-    def test_scan_response_default_includes_analyze_and_protected(self):
+    def test_endpoints_are_called_with_one_positional_options_mapping(self):
+        client = _FakeAzure(analyze_text=_analyze_response(("Hate", 0)))
+        AzureContentSafetyAdapter(client).scan_prompt("some text")
+        assert client.calls == [("analyze_text", {"text": "some text"})]
+
+    def test_shield_uses_rest_body_keys_when_a_client_supplies_it(self):
+        client = _FakeAzure(
+            analyze_text=_analyze_response(("Hate", 0)),
+            shield_prompt={"userPromptAnalysis": {"attackDetected": True}},
+        )
+        adapter = AzureContentSafetyAdapter(client)
+        finding = adapter.scan_prompt(
+            "text", include={"shield"}, documents=["doc one"],
+        )
+        assert client.calls == [
+            ("shield_prompt", {"userPrompt": "text", "documents": ["doc one"]}),
+        ]
+        assert finding.verdict == "block"
+
+    def test_missing_endpoint_raises_instead_of_silently_allowing(self):
+        # The regression this guards: a client without shield_prompt used
+        # to yield a finding with zero categories and verdict "allow" —
+        # a guardrail reporting clean because it never ran.
+        client = _FakeAzure(analyze_text=_analyze_response(("Hate", 0)))
+        adapter = AzureContentSafetyAdapter(client)
+        with pytest.raises(RuntimeError, match="shield_prompt"):
+            adapter.scan_prompt("text", include={"analyze_text", "shield"})
+
+    def test_scan_response_protected_material(self):
         client = _FakeAzure(
             analyze_text=_analyze_response(("Hate", 0)),
             detect_text_protected_material={"protectedMaterialAnalysis": {"detected": True}},
         )
         adapter = AzureContentSafetyAdapter(client)
-        finding = adapter.scan_response("text")
-        called = {name for name, _ in client.calls}
-        assert called == {"analyze_text", "detect_text_protected_material"}
+        finding = adapter.scan_response("text", include={"analyze_text", "protected"})
+        assert {name for name, _ in client.calls} == {
+            "analyze_text", "detect_text_protected_material",
+        }
         assert finding.verdict == "flag"
         triggered = finding.triggered_categories()
         assert len(triggered) == 1
         assert triggered[0].vaara_category == "protected_material"
+
+    def test_groundedness_options_are_merged_with_the_text(self):
+        client = _FakeAzure(
+            analyze_text=_analyze_response(("Hate", 0)),
+            detect_groundedness={"ungroundedDetected": False},
+        )
+        adapter = AzureContentSafetyAdapter(client)
+        adapter.scan_response(
+            "answer", include={"grounded"},
+            groundedness_options={
+                "domain": "Generic", "task": "QnA",
+                "groundingSources": ["source text"],
+            },
+        )
+        _, options = client.calls[0]
+        assert options == {
+            "domain": "Generic", "task": "QnA",
+            "groundingSources": ["source text"], "text": "answer",
+        }
 
     def test_include_filter_skips_endpoints(self):
         client = _FakeAzure(analyze_text=_analyze_response(("Hate", 4)))
@@ -165,9 +214,17 @@ class TestAzureContentSafetyAdapter:
             def as_dict(self): return self._payload
 
         class _SdkClient:
-            def analyze_text(self, **_kw):
+            def analyze_text(self, _options):
                 return _AsDict(_analyze_response(("Hate", 6)))
 
         adapter = AzureContentSafetyAdapter(_SdkClient())
         finding = adapter.scan_prompt("text", include={"analyze_text"})
         assert finding.verdict == "block"
+
+    def test_unparseable_response_raises_rather_than_allowing(self):
+        class _BadClient:
+            def analyze_text(self, _options):
+                return "not a mapping"
+
+        with pytest.raises(TypeError, match="expected a mapping"):
+            AzureContentSafetyAdapter(_BadClient()).scan_prompt("text")

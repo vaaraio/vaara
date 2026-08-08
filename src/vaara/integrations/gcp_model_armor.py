@@ -6,10 +6,23 @@ Wraps google-cloud-modelarmor's ``sanitize_user_prompt`` /
 ``sanitize_model_response``. Caller supplies a pre-configured client
 and a template path; the adapter returns a ``ContentSafetyFinding``.
 
-Confidence levels (LOW / MEDIUM_AND_ABOVE / HIGH) project onto
-[0.0, 1.0]. Responsible-AI block threshold defaults to
-``MEDIUM_AND_ABOVE``. CSAM, malicious URIs, prompt injection, and
-SDP findings always block regardless of confidence.
+Confidence levels (LOW_AND_ABOVE / MEDIUM_AND_ABOVE / HIGH) project
+onto [0.0, 1.0]. Responsible-AI block threshold defaults to
+``MEDIUM_AND_ABOVE``. CSAM, malicious URIs, prompt injection, virus
+scan, and SDP findings always block regardless of confidence.
+
+Two response encodings are accepted, because the same API is reachable
+two ways and they do not agree on spelling:
+
+* The Python SDK returns proto-plus messages. ``to_dict`` lives on the
+  message *metaclass*, not the instance, and its defaults emit
+  snake_case keys with integer enums.
+* The REST API returns JSON with camelCase keys and string enums.
+
+Every field read here tolerates both spellings and both enum
+encodings. Getting this wrong fails *open* — an unparsed response
+yields zero categories and a verdict of "allow" — so the parser is
+deliberately permissive about shape and strict about matching.
 
 Optional dep: ``pip install vaara[gcp-model-armor]``.
 """
@@ -23,16 +36,49 @@ from vaara.integrations._content_safety_base import (
 )
 
 _PROVIDER = "gcp-model-armor"
-_CONFIDENCE_ORDER = {"LOW": 0, "MEDIUM_AND_ABOVE": 1, "HIGH": 2}
-_CONFIDENCE_SEVERITY = {"LOW": 0.25, "MEDIUM_AND_ABOVE": 0.6, "HIGH": 0.9}
+
+# DetectionConfidenceLevel as the API actually spells it. "LOW" is kept
+# as an alias because earlier Vaara releases used that name.
+_CONFIDENCE_ORDER = {"LOW_AND_ABOVE": 0, "LOW": 0, "MEDIUM_AND_ABOVE": 1, "HIGH": 2}
+_CONFIDENCE_SEVERITY = {
+    "LOW_AND_ABOVE": 0.25, "LOW": 0.25, "MEDIUM_AND_ABOVE": 0.6, "HIGH": 0.9,
+}
+
+# FilterMatchState.MATCH_FOUND is 2. Integer enums arrive whenever a
+# caller converted the proto with library defaults.
+_MATCH_FOUND = ("MATCH_FOUND", 2)
+
+# DetectionConfidenceLevel by ordinal, for the same integer-enum case.
+_CONFIDENCE_BY_VALUE = {1: "LOW_AND_ABOVE", 2: "MEDIUM_AND_ABOVE", 3: "HIGH"}
 
 
 def _sev_str(v: float) -> str:
     return f"{max(0.0, min(1.0, v)):.4f}"
 
 
+def _get(node: Optional[dict[str, Any]], *names: str) -> Any:
+    """First present key among ``names``. Accepts snake_case or camelCase."""
+    if not isinstance(node, dict):
+        return None
+    for name in names:
+        if name in node:
+            return node[name]
+    return None
+
+
 def _matched(node: Optional[dict[str, Any]]) -> bool:
-    return bool(node) and node.get("matchState") == "MATCH_FOUND"
+    if not isinstance(node, dict):
+        return False
+    return _get(node, "match_state", "matchState") in _MATCH_FOUND
+
+
+def _confidence(node: Optional[dict[str, Any]], default: str = "MEDIUM_AND_ABOVE") -> str:
+    raw = _get(node or {}, "confidence_level", "confidenceLevel")
+    if raw in (None, "", 0, "DETECTION_CONFIDENCE_LEVEL_UNSPECIFIED"):
+        return default
+    if isinstance(raw, int):
+        return _CONFIDENCE_BY_VALUE.get(raw, default)
+    return str(raw)
 
 
 def _rai_action(confidence: str, block_threshold: str) -> str:
@@ -46,14 +92,15 @@ def _rai_action(confidence: str, block_threshold: str) -> str:
 def _rai_cats(rai: Optional[dict[str, Any]], block_threshold: str) -> list[FindingCategory]:
     if not rai:
         return []
-    inner = rai.get("raiFilterResult") or rai
+    inner = _get(rai, "rai_filter_result", "raiFilterResult") or rai
     if not _matched(inner):
         return []
     out: list[FindingCategory] = []
-    for filter_type, result in (inner.get("raiFilterTypeResults") or {}).items():
+    results = _get(inner, "rai_filter_type_results", "raiFilterTypeResults") or {}
+    for filter_type, result in results.items():
         if not _matched(result):
             continue
-        conf = result.get("confidenceLevel") or "MEDIUM_AND_ABOVE"
+        conf = _confidence(result)
         key = f"responsible_ai.{filter_type}"
         out.append(FindingCategory(
             provider_category=key, severity_label=conf,
@@ -68,10 +115,10 @@ def _rai_cats(rai: Optional[dict[str, Any]], block_threshold: str) -> list[Findi
 def _pi_cats(pi: Optional[dict[str, Any]]) -> list[FindingCategory]:
     if not pi:
         return []
-    inner = pi.get("piAndJailbreakFilterResult") or pi
+    inner = _get(pi, "pi_and_jailbreak_filter_result", "piAndJailbreakFilterResult") or pi
     if not _matched(inner):
         return []
-    conf = inner.get("confidenceLevel") or "MEDIUM_AND_ABOVE"
+    conf = _confidence(inner)
     return [FindingCategory(
         provider_category="pi_and_jailbreak", severity_label=conf,
         normalized_severity=_sev_str(_CONFIDENCE_SEVERITY.get(conf, 0.7)),
@@ -83,10 +130,10 @@ def _pi_cats(pi: Optional[dict[str, Any]]) -> list[FindingCategory]:
 def _malicious_cats(mu: Optional[dict[str, Any]]) -> list[FindingCategory]:
     if not mu:
         return []
-    inner = mu.get("maliciousUriFilterResult") or mu
+    inner = _get(mu, "malicious_uri_filter_result", "maliciousUriFilterResult") or mu
     if not _matched(inner):
         return []
-    items = inner.get("maliciousUriMatchedItems") or []
+    items = _get(inner, "malicious_uri_matched_items", "maliciousUriMatchedItems") or []
     return [FindingCategory(
         provider_category="malicious_uris", severity_label="MATCH_FOUND",
         normalized_severity=_sev_str(0.9), action="BLOCKED",
@@ -98,13 +145,26 @@ def _malicious_cats(mu: Optional[dict[str, Any]]) -> list[FindingCategory]:
 def _sdp_cats(sdp: Optional[dict[str, Any]]) -> list[FindingCategory]:
     if not sdp:
         return []
-    inner = sdp.get("sdpFilterResult") or sdp
-    inspect = inner.get("inspectResult") or inner.get("deidentifyResult") or {}
+    inner = _get(sdp, "sdp_filter_result", "sdpFilterResult") or sdp
+    inspect = (
+        _get(inner, "inspect_result", "inspectResult")
+        or _get(inner, "deidentify_result", "deidentifyResult")
+        or {}
+    )
     if not _matched(inspect):
         return []
     info_types = sorted({
-        f.get("infoType") for f in (inspect.get("findings") or []) if f.get("infoType")
+        it for it in (
+            _get(f, "info_type", "infoType")
+            for f in (_get(inspect, "findings") or [])
+        ) if it
     })
+    # deidentify_result reports its classes in a flat info_types list
+    # rather than per-finding.
+    if not info_types:
+        info_types = sorted({
+            it for it in (_get(inspect, "info_types", "infoTypes") or []) if it
+        })
     return [FindingCategory(
         provider_category="sdp", severity_label="MATCH_FOUND",
         normalized_severity=_sev_str(0.7), action="BLOCKED",
@@ -116,7 +176,11 @@ def _sdp_cats(sdp: Optional[dict[str, Any]]) -> list[FindingCategory]:
 def _csam_cats(csam: Optional[dict[str, Any]]) -> list[FindingCategory]:
     if not csam:
         return []
-    inner = csam.get("csamFilterFilterResult") or csam.get("csamFilterResult") or csam
+    inner = (
+        _get(csam, "csam_filter_filter_result", "csamFilterFilterResult")
+        or _get(csam, "csam_filter_result", "csamFilterResult")
+        or csam
+    )
     if not _matched(inner):
         return []
     return [FindingCategory(
@@ -126,19 +190,41 @@ def _csam_cats(csam: Optional[dict[str, Any]]) -> list[FindingCategory]:
     )]
 
 
+def _virus_cats(virus: Optional[dict[str, Any]]) -> list[FindingCategory]:
+    if not virus:
+        return []
+    inner = _get(virus, "virus_scan_filter_result", "virusScanFilterResult") or virus
+    if not _matched(inner):
+        return []
+    details = _get(inner, "virus_details", "virusDetails") or []
+    return [FindingCategory(
+        provider_category="virus_scan", severity_label="MATCH_FOUND",
+        normalized_severity=_sev_str(1.0), action="BLOCKED",
+        mapping=mapping_for(_PROVIDER, "virus_scan"),
+        evidence={
+            "virus_count": len(details),
+            "scanned_content_type": _get(inner, "scanned_content_type", "scannedContentType"),
+        },
+    )]
+
+
 def parse_sanitize_response(
     response: dict[str, Any], *, scanned_role: str = "",
     block_threshold: str = "MEDIUM_AND_ABOVE",
 ) -> ContentSafetyFinding:
-    """Parse a sanitize_* response into a Finding."""
-    sanit = response.get("sanitizationResult") or response
-    fr = sanit.get("filterResults") or {}
+    """Parse a sanitize_* response into a Finding.
+
+    Accepts SDK (snake_case) and REST (camelCase) encodings alike.
+    """
+    sanit = _get(response, "sanitization_result", "sanitizationResult") or response
+    fr = _get(sanit, "filter_results", "filterResults") or {}
     cats: list[FindingCategory] = []
-    cats.extend(_rai_cats(fr.get("rai"), block_threshold))
-    cats.extend(_pi_cats(fr.get("pi_and_jailbreak") or fr.get("piAndJailbreak")))
-    cats.extend(_malicious_cats(fr.get("malicious_uris") or fr.get("maliciousUris")))
-    cats.extend(_sdp_cats(fr.get("sdp")))
-    cats.extend(_csam_cats(fr.get("csam")))
+    cats.extend(_rai_cats(_get(fr, "rai"), block_threshold))
+    cats.extend(_pi_cats(_get(fr, "pi_and_jailbreak", "piAndJailbreak")))
+    cats.extend(_malicious_cats(_get(fr, "malicious_uris", "maliciousUris")))
+    cats.extend(_sdp_cats(_get(fr, "sdp")))
+    cats.extend(_csam_cats(_get(fr, "csam")))
+    cats.extend(_virus_cats(_get(fr, "virus_scan", "virusScan")))
     return build_finding(provider=_PROVIDER, categories=cats, raw=response, scanned_role=scanned_role)
 
 
@@ -161,9 +247,42 @@ class GcpModelArmorAdapter:
 
     @staticmethod
     def _to_dict(response: Any) -> dict[str, Any]:
-        if hasattr(response, "to_dict"):
-            return response.to_dict()
-        return response if isinstance(response, dict) else {}
+        """Normalise an SDK response to a plain dict.
+
+        proto-plus exposes ``to_dict`` on the metaclass, so
+        ``hasattr(instance, "to_dict")`` is False and an instance-first
+        check silently drops the entire response. Ask the type first,
+        and pin the conversion flags: library defaults emit integer
+        enums, which no downstream comparison here expects to be the
+        only encoding.
+        """
+        if isinstance(response, dict):
+            return response
+        message_type = type(response)
+        type_to_dict = getattr(message_type, "to_dict", None)
+        if callable(type_to_dict):
+            try:
+                return type_to_dict(
+                    response,
+                    preserving_proto_field_name=True,
+                    use_integers_for_enums=False,
+                )
+            except TypeError:
+                # Not proto-plus, or a signature that predates the flags.
+                try:
+                    return type_to_dict(response)
+                except TypeError:
+                    pass
+        instance_to_dict = getattr(response, "to_dict", None)
+        if callable(instance_to_dict):
+            result = instance_to_dict()
+            if isinstance(result, dict):
+                return result
+        raise TypeError(
+            "GcpModelArmorAdapter: cannot convert response of type "
+            f"{message_type.__name__!r} to a dict. Pass a "
+            "google-cloud-modelarmor response or a plain dict."
+        )
 
     def scan_prompt(self, text: str, **_: Any) -> ContentSafetyFinding:
         response = self._client.sanitize_user_prompt(request={

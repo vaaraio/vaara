@@ -102,6 +102,8 @@ GCP_MAPPINGS: tuple[CategoryMapping, ...] = (
          "Malicious URL detected. Robustness/cybersecurity signal."),
     _row(_GCP, "sdp", "pii", ("Art. 10",), ("LLM02",),
          "Sensitive Data Protection integration. infoType field carries the PII class."),
+    _row(_GCP, "virus_scan", "malicious_file", ("Art. 15",), ("LLM05",),
+         "Virus or malware found in scanned content. Robustness/cybersecurity signal."),
     _row(_GCP, "csam", "csam", ("Art. 5", "Digital Omnibus CSAM (effective 2 Dec 2026)"), (),
          "CSAM. Always hard-block per Art. 5 plus the CSAM-specific obligation from the Digital Omnibus."),
 )

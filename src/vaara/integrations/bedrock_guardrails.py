@@ -32,10 +32,29 @@ def _sev_str(value: float) -> str:
     return f"{max(0.0, min(1.0, value)):.4f}"
 
 
+# Actions that mean the guardrail did something. Anything else is inert.
+_INERT_ACTIONS = {"", "NONE"}
+
+
+def _triggered(entry: dict[str, Any]) -> bool:
+    """Did this assessment entry actually fire?
+
+    ``detected`` is optional in the AWS API model on every assessment
+    shape, while ``action`` is required on all of them. Gating solely on
+    ``detected`` therefore fails OPEN: a response reporting
+    ``action: BLOCKED`` with no ``detected`` key would be skipped and
+    the aggregate verdict would come back "allow". An explicit
+    ``detected: false`` is still honoured.
+    """
+    if "detected" in entry:
+        return bool(entry["detected"])
+    return str(entry.get("action") or "").upper() not in _INERT_ACTIONS
+
+
 def _topic_cats(assessment: dict[str, Any]) -> list[FindingCategory]:
     out: list[FindingCategory] = []
     for t in (assessment.get("topicPolicy") or {}).get("topics", []) or []:
-        if not t.get("detected"):
+        if not _triggered(t):
             continue
         out.append(FindingCategory(
             provider_category="topicPolicy",
@@ -51,7 +70,7 @@ def _topic_cats(assessment: dict[str, Any]) -> list[FindingCategory]:
 def _content_cats(assessment: dict[str, Any]) -> list[FindingCategory]:
     out: list[FindingCategory] = []
     for f in (assessment.get("contentPolicy") or {}).get("filters", []) or []:
-        if not f.get("detected"):
+        if not _triggered(f):
             continue
         ftype = (f.get("type") or "").upper()
         confidence = (f.get("confidence") or "NONE").upper()
@@ -71,7 +90,7 @@ def _word_cats(assessment: dict[str, Any]) -> list[FindingCategory]:
     out: list[FindingCategory] = []
     wp = assessment.get("wordPolicy") or {}
     for w in (wp.get("customWords") or []) + (wp.get("managedWordLists") or []):
-        if not w.get("detected"):
+        if not _triggered(w):
             continue
         out.append(FindingCategory(
             provider_category="wordPolicy",
@@ -88,7 +107,7 @@ def _pii_cats(assessment: dict[str, Any]) -> list[FindingCategory]:
     out: list[FindingCategory] = []
     sip = assessment.get("sensitiveInformationPolicy") or {}
     for p in (sip.get("piiEntities") or []) + (sip.get("regexes") or []):
-        if not p.get("detected"):
+        if not _triggered(p):
             continue
         # Bedrock returns ANONYMIZED for soft-redact; normalise to the
         # common REDACTED action so the verdict aggregator catches it.
@@ -109,7 +128,7 @@ def _pii_cats(assessment: dict[str, Any]) -> list[FindingCategory]:
 def _grounding_cats(assessment: dict[str, Any]) -> list[FindingCategory]:
     out: list[FindingCategory] = []
     for g in (assessment.get("contextualGroundingPolicy") or {}).get("filters", []) or []:
-        if not g.get("detected"):
+        if not _triggered(g):
             continue
         score = float(g.get("score") or 0.0)
         threshold = float(g.get("threshold") or 0.0)

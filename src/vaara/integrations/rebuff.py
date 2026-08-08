@@ -61,46 +61,101 @@ def _layer_category(
     )
 
 
+_MISSING = object()
+
+
+def _field(response: Any, *names: str, default: Any = None) -> Any:
+    """First present attribute or key among ``names``.
+
+    Rebuff ships TWO response shapes with different spellings, and they
+    disagree on more than case:
+
+    * ``rebuff.rebuff.DetectApiSuccessResponse`` (hosted ``Rebuff``) —
+      camelCase, and ``vectorScore`` is a ``Dict[str, float]``.
+    * ``rebuff.sdk.RebuffDetectionResponse`` (self-hosted ``RebuffSdk``)
+      — snake_case, ``vector_score`` is a plain float, and the model
+      layer is called ``openai_score``, not ``model_score``.
+
+    Reading only the camelCase names made every self-hosted field fall
+    back to its default, so all three layers scored 0.0 and a detected
+    injection came back as verdict "allow".
+    """
+    for name in names:
+        if isinstance(response, dict):
+            if name in response:
+                return response[name]
+            continue
+        value = getattr(response, name, _MISSING)
+        if value is not _MISSING:
+            return value
+    return default
+
+
+def _vector_score(response: Any) -> float:
+    raw = _field(response, "vectorScore", "vector_score", default=0.0)
+    if isinstance(raw, dict):
+        # Hosted API returns per-match scores; topScore is the max.
+        raw = raw.get("topScore", 0.0)
+    return float(raw or 0.0)
+
+
 def parse_detect_response(
     response: Any,
     *,
     scanned_role: str = "prompt",
 ) -> ContentSafetyFinding:
-    """Parse a Rebuff ``DetectResponse`` into a finding.
+    """Parse a Rebuff detection response into a finding.
 
-    Accepts the SDK object or a dict shape. Three layers are recorded
-    regardless of trigger so the audit trail reflects which checks
-    ran.
+    Accepts either SDK response object or a dict shape, in either
+    naming convention. Three layers are recorded regardless of trigger
+    so the audit trail reflects which checks ran.
     """
-    get = (lambda k, d=None: response.get(k, d)) if isinstance(response, dict) else (
-        lambda k, d=None: getattr(response, k, d)
-    )
     cats: list[FindingCategory] = [
         _layer_category(
             "heuristic_injection",
-            score=float(get("heuristicScore", 0.0) or 0.0),
-            threshold=float(get("maxHeuristicScore", 0.75) or 0.75),
-            ran=bool(get("runHeuristicCheck", True)),
+            score=float(_field(response, "heuristicScore", "heuristic_score",
+                               default=0.0) or 0.0),
+            threshold=float(_field(response, "maxHeuristicScore", "max_heuristic_score",
+                                   default=0.75) or 0.75),
+            ran=bool(_field(response, "runHeuristicCheck", "run_heuristic_check",
+                            default=True)),
         ),
         _layer_category(
             "model_injection",
-            score=float(get("modelScore", 0.0) or 0.0),
-            threshold=float(get("maxModelScore", 0.9) or 0.9),
-            ran=bool(get("runLanguageModelCheck", True)),
+            score=float(_field(response, "modelScore", "openai_score", "model_score",
+                               default=0.0) or 0.0),
+            threshold=float(_field(response, "maxModelScore", "max_model_score",
+                                   default=0.9) or 0.9),
+            ran=bool(_field(response, "runLanguageModelCheck", "run_language_model_check",
+                            default=True)),
         ),
         _layer_category(
             "vector_injection",
-            score=float(get("vectorScore", {}).get("topScore", 0.0)
-                        if isinstance(get("vectorScore"), dict)
-                        else (get("vectorScore", 0.0) or 0.0)),
-            threshold=float(get("maxVectorScore", 0.9) or 0.9),
-            ran=bool(get("runVectorCheck", True)),
+            score=_vector_score(response),
+            threshold=float(_field(response, "maxVectorScore", "max_vector_score",
+                                   default=0.9) or 0.9),
+            ran=bool(_field(response, "runVectorCheck", "run_vector_check",
+                            default=True)),
         ),
     ]
 
-    raw = response if isinstance(response, dict) else {
-        "injectionDetected": bool(get("injectionDetected", False)),
-    }
+    # Rebuff's own aggregate verdict. If it says injection and no layer
+    # threshold tripped, trust the provider rather than reporting clean:
+    # that disagreement is exactly what field drift looks like.
+    detected = bool(_field(response, "injectionDetected", "injection_detected",
+                           default=False))
+    if detected and all(c.action == "NONE" for c in cats):
+        cats.append(FindingCategory(
+            provider_category="injection_detected",
+            severity_label="BLOCKED",
+            normalized_severity=_sev_str(0.9),
+            action="BLOCKED",
+            mapping=mapping_for(_PROVIDER, "heuristic_injection"),
+            evidence={"reason": "provider reported injectionDetected "
+                                "with no layer above threshold"},
+        ))
+
+    raw = response if isinstance(response, dict) else {"injectionDetected": detected}
     return build_finding(
         provider=_PROVIDER,
         categories=cats,
