@@ -267,6 +267,12 @@ class VaaraCallbackHandler:
     def on_text(self, *args, **kwargs): pass
     def on_retry(self, *args, **kwargs): pass
     def on_custom_event(self, *args, **kwargs): pass
+    # Added in langchain-core 1.x for astream_events. Missing it crashed
+    # every streaming chain, which is the failure this block exists to
+    # prevent. tests/test_integrations_langchain_protocol.py diffs this
+    # class against the installed BaseCallbackHandler so the next event
+    # LangChain adds fails a test instead of a deployer's agent.
+    def on_stream_event(self, *args, **kwargs): pass
 
 
 # ── Tool wrapper ──────────────────────────────────────────────────────────

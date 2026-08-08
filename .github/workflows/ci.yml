@@ -77,6 +77,37 @@ jobs:
             exit 1
           fi
 
+  framework-contracts:
+    name: Agent framework contracts
+    runs-on: ubuntu-latest
+    # Separate from adapter-contracts on purpose. rebuff pins an old
+    # langchain that still ships langchain_core.pydantic_v1, so installing
+    # it alongside a current langchain-core resolves to a version where
+    # one of the two cannot import. Keeping the sets apart means each
+    # contract runs against the version a deployer would actually have.
+    steps:
+      - uses: actions/checkout@9c091bb21b7c1c1d1991bb908d89e4e9dddfe3e0  # v7.0.0
+
+      - name: Set up Python 3.12
+        uses: actions/setup-python@5fda3b95a4ea91299a34e894583c3862153e4b97  # v7.0.0
+        with:
+          python-version: '3.12'
+
+      - name: Install Vaara and the framework SDKs
+        run: |
+          pip install -e . --no-deps
+          pip install pytest langchain-core openai-agents
+
+      - name: Run framework contract tests, failing on any skip
+        run: |
+          set -o pipefail
+          pytest tests/test_integrations_langchain_protocol.py \
+                 tests/test_integrations_openai_agents_contract.py -q -rs | tee result.txt
+          if grep -qE '[0-9]+ skipped' result.txt; then
+            echo "::error::A contract test skipped, so a framework SDK did not import."
+            exit 1
+          fi
+
   typecheck:
     name: Type check (mypy strict set)
     runs-on: ubuntu-latest

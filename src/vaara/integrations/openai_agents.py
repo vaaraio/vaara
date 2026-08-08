@@ -85,7 +85,7 @@ class VaaraToolGuardrail:
     """OpenAI Agents SDK guardrail that intercepts tool calls.
 
     Implements the guardrail protocol: a callable that receives the
-    agent output and returns a GuardrailResult (or raises to block).
+    agent output and returns a GuardrailFunctionOutput (or raises to block).
 
     When used as an output_guardrail, it inspects the agent's planned
     tool calls and scores each one through Vaara before execution.
@@ -106,19 +106,30 @@ class VaaraToolGuardrail:
     def __call__(self, context: Any, agent: Any, output: Any) -> Any:
         """Guardrail evaluation — called by the Agents SDK runtime.
 
-        Inspects tool_calls in the output and scores each one.
-        Returns a GuardrailResult with tripwire_triggered=True to block.
+        Inspects tool_calls in the output and scores each one. Returns a
+        ``GuardrailFunctionOutput`` with ``tripwire_triggered=True`` to
+        block.
+
+        The SDK's guardrail return type is ``GuardrailFunctionOutput``.
+        This used to import ``GuardrailResult``, which the ``agents``
+        package does not export, so with the SDK correctly installed the
+        ImportError branch fired, logged "SDK not installed", and
+        returned None. Every tool call passed ungoverned while the log
+        blamed a missing dependency.
         """
         try:
-            from agents import GuardrailResult
-        except ImportError:
-            logger.warning("openai-agents SDK not installed, guardrail is a no-op")
-            return None
+            from agents import GuardrailFunctionOutput
+        except ImportError as exc:
+            raise ImportError(
+                "VaaraToolGuardrail requires the openai-agents SDK "
+                "(pip install openai-agents). Returning without a verdict "
+                "would let every tool call through ungoverned."
+            ) from exc
 
         # Extract tool calls from the agent output
         tool_calls = self._extract_tool_calls(output)
         if not tool_calls:
-            return GuardrailResult(tripwire_triggered=False, output_info={})
+            return GuardrailFunctionOutput(tripwire_triggered=False, output_info={})
 
         blocked = []
         for tc in tool_calls:
@@ -154,7 +165,7 @@ class VaaraToolGuardrail:
                 })
 
         if blocked:
-            return GuardrailResult(
+            return GuardrailFunctionOutput(
                 tripwire_triggered=True,
                 output_info={
                     "blocked_tools": blocked,
@@ -165,7 +176,7 @@ class VaaraToolGuardrail:
                 },
             )
 
-        return GuardrailResult(tripwire_triggered=False, output_info={})
+        return GuardrailFunctionOutput(tripwire_triggered=False, output_info={})
 
     @staticmethod
     def _extract_tool_calls(output: Any) -> list[dict]:

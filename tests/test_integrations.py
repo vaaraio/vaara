@@ -543,22 +543,30 @@ class _FakeGuardrailResult:
 
 
 def _install_fake_agents_module(monkeypatch):
-    """Install a fake `agents` module exposing GuardrailResult."""
+    """Install a fake `agents` module exposing GuardrailFunctionOutput.
+
+    The name matters. This stub used to expose ``GuardrailResult``, which
+    the real SDK does not have, so these tests passed against a contract
+    no installed SDK could satisfy. See
+    tests/test_integrations_openai_agents_contract.py, which runs against
+    the real package.
+    """
     import sys
     import types
 
     fake = types.ModuleType("agents")
-    fake.GuardrailResult = _FakeGuardrailResult
+    fake.GuardrailFunctionOutput = _FakeGuardrailResult
     monkeypatch.setitem(sys.modules, "agents", fake)
 
 
 class TestVaaraToolGuardrail:
-    def test_sdk_missing_returns_none(self, monkeypatch):
+    def test_sdk_missing_raises_rather_than_silently_allowing(self, monkeypatch):
         import sys
         # Force `agents` import to fail
         monkeypatch.setitem(sys.modules, "agents", None)
         gr = VaaraToolGuardrail(_FakePipeline("allow", True))
-        assert gr(None, None, object()) is None
+        with pytest.raises(ImportError, match="openai-agents"):
+            gr(None, None, object())
 
     def test_no_tool_calls_does_not_trigger(self, monkeypatch):
         _install_fake_agents_module(monkeypatch)
