@@ -216,3 +216,34 @@ def test_authorization_not_leaked_cross_origin(redirect_server):
     finally:
         client.close()
         target.shutdown()
+
+
+def test_https_handler_opens_without_check_hostname_attribute():
+    """Regression: the HTTPS handler must not read ``self._check_hostname``.
+
+    CPython's ``HTTPSHandler`` folds any ``check_hostname`` argument into the
+    SSL context at construction and keeps no ``_check_hostname`` attribute, and
+    its own ``https_open`` passes only ``context``. Forwarding a
+    ``check_hostname`` kwarg raised ``AttributeError`` on every HTTPS request,
+    which took out the whole ``--upstream-url`` remote-MCP connector over TLS.
+    """
+    import urllib.request
+
+    from vaara.integrations._egress_guard import _PinnedHTTPSHandler
+
+    handler = _PinnedHTTPSHandler(allow_private=False)
+    assert not hasattr(handler, "_check_hostname")
+    assert hasattr(handler, "_context")
+
+    captured: dict = {}
+
+    def fake_do_open(http_class, req, **kwargs):
+        captured["kwargs"] = kwargs
+        return "opened"
+
+    handler.do_open = fake_do_open  # type: ignore[method-assign]
+    result = handler.https_open(urllib.request.Request("https://example.invalid/mcp"))
+
+    assert result == "opened"
+    assert set(captured["kwargs"]) == {"context"}
+    assert captured["kwargs"]["context"] is handler._context
