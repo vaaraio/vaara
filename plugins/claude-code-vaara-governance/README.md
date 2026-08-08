@@ -6,11 +6,13 @@ Runtime tool-call governance for Claude Code. Wires the [Vaara](https://github.c
 
 PreToolUse runs a two-layer check before Claude executes a tool:
 
-**Layer 1: regex deny patterns** (Bash, WebFetch, WebSearch). A JSON deny-list (`policies/default_deny.json`) catches known-bad shapes: AWS / GCP / Azure metadata IPs, `/etc/shadow` reads, `curl | sh`, `rm -rf /`, fork bombs, `dd` to raw block devices, history purges, reverse shells, base64-piped exec, `~/.ssh/authorized_keys` writes. A match is a hard deny: fast, deterministic, no ML.
+**Layer 1: regex deny patterns** (Bash, WebFetch, WebSearch, Write, Edit, NotebookEdit). A JSON deny-list (`policies/default_deny.json`) catches known-bad shapes on the shell and web surface: AWS / GCP / Azure metadata IPs, `/etc/shadow` reads, `curl | sh`, `rm -rf /`, fork bombs, `dd` to raw block devices, history purges, reverse shells, base64-piped exec, `~/.ssh/authorized_keys` writes.
+
+The same layer covers the file surface, because an agent that cannot run `curl | sh` can still write it to a file: shell startup files (`.bashrc`, `.zshrc`, `.profile`), `~/.ssh/authorized_keys`, `/etc/shadow` and `/etc/sudoers`, git hooks, cron paths, launchd and systemd units, and file content carrying a remote-pipe-to-shell or reverse-shell payload. A match is a hard deny: fast, deterministic, no ML.
 
 **Layer 2: Vaara classifier** (`mcp__*` only). MCP tool calls carry structured taxonomy that Vaara's adaptive scorer is trained for; the conformal risk score is meaningful there. The classifier output drives the allow / escalate / deny decision against the loaded policy thresholds.
 
-PostToolUse appends an outcome record to the audit trail for every `mcp__*` call, correlating it back to the PreToolUse decision and feeding the MWU online learner.
+PostToolUse appends an outcome record to the audit trail, correlating it back to the PreToolUse decision and feeding the MWU online learner.
 
 Blocks and escalations also pop a native desktop notification (macOS via osascript, Linux via notify-send when present), so a decision is visible even when the terminal is buried. Notifications are fire-and-forget and can never break the hook.
 
@@ -18,8 +20,8 @@ SessionStart prints a one-line status (Vaara version, mode, protection preset, n
 
 | Hook | Matches | Mechanism |
 |---|---|---|
-| `PreToolUse` | `Bash`, `WebFetch`, `WebSearch`, `mcp__*` | Layer 1 regex on shell / web. Layer 2 ML on MCP. Desktop notification on block/escalate. |
-| `PostToolUse` | `mcp__*` | Audit outcome + MWU feedback. |
+| `PreToolUse` | `Bash`, `WebFetch`, `WebSearch`, `Write`, `Edit`, `NotebookEdit`, `Task`, `SendMessage`, `mcp__*` | Layer 1 regex on shell, web and file mutation. Layer 2 ML on MCP. Desktop notification on block/escalate. |
+| `PostToolUse` | same set | Audit outcome + MWU feedback. |
 | `SessionStart` | n/a | Validate install, print status. |
 
 ## Install

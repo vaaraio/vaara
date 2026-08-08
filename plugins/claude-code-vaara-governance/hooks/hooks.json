@@ -1,5 +1,5 @@
 {
-  "description": "Vaara runtime tool-call governance. Hooks run through the vaara binary on PATH when available (any CLI install method works: pip, pipx, Homebrew), falling back to the bundled python3 scripts. PreToolUse classifies, blocks on deny, warns on escalate. PostToolUse appends an audit record. SessionStart validates the install and records the configured Article 50(1) disclosure.",
+  "description": "Vaara runtime tool-call governance. Hooks run through the vaara binary on PATH when available (any CLI install method works: pip, pipx, Homebrew), falling back to the bundled python3 scripts. PreToolUse classifies, blocks on deny, warns on escalate. Covers shell, web, file mutation (Write/Edit/NotebookEdit), subagent spawning (Task), cross-session messaging (SendMessage) and MCP calls. PostToolUse appends an audit record. SessionStart validates the install and records the configured Article 50(1) disclosure.",
   "hooks": {
     "SessionStart": [
       {
@@ -21,7 +21,7 @@
             "timeout": 30
           }
         ],
-        "matcher": "Bash|WebFetch|WebSearch|mcp__.*"
+        "matcher": "Bash|WebFetch|WebSearch|Write|Edit|NotebookEdit|Task|SendMessage|mcp__.*"
       }
     ],
     "PostToolUse": [
@@ -33,7 +33,7 @@
             "timeout": 30
           }
         ],
-        "matcher": "Bash|WebFetch|WebSearch|mcp__.*"
+        "matcher": "Bash|WebFetch|WebSearch|Write|Edit|NotebookEdit|Task|SendMessage|mcp__.*"
       }
     ]
   }

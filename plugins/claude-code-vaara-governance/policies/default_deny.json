@@ -1,97 +1,259 @@
 {
   "version": "0.1",
-  "description": "Default deny-pattern policy for the Vaara Claude Code plugin. Regex matches against tool input fields are evaluated BEFORE the Vaara ML classifier. A match short-circuits to a hard deny with the rule's message. Operators extend or replace by pointing VAARA_PLUGIN_DENY_PATTERNS_FILE at their own JSON.",
+  "description": "Layer-1 regex deny patterns for the Vaara Claude Code plugin. Covers shell and web input plus file-mutation tools (Write, Edit, NotebookEdit), so persistence and remote-code paths are caught on the file surface as well as the shell surface.",
   "rules": [
     {
       "id": "ssrf_cloud_metadata_ipv4",
-      "tools": ["Bash", "WebFetch"],
-      "fields": ["command", "url"],
+      "tools": [
+        "Bash",
+        "WebFetch"
+      ],
+      "fields": [
+        "command",
+        "url"
+      ],
       "pattern": "169\\.254\\.169\\.254",
-      "message": "AWS/GCP/Azure instance-metadata IP — common SSRF / credential exfiltration target."
+      "message": "AWS/GCP/Azure instance-metadata IP \u2014 common SSRF / credential exfiltration target."
     },
     {
       "id": "ssrf_gcp_metadata_host",
-      "tools": ["Bash", "WebFetch"],
-      "fields": ["command", "url"],
+      "tools": [
+        "Bash",
+        "WebFetch"
+      ],
+      "fields": [
+        "command",
+        "url"
+      ],
       "pattern": "metadata\\.google\\.internal",
-      "message": "GCP metadata host — credential exfiltration target."
+      "message": "GCP metadata host \u2014 credential exfiltration target."
     },
     {
       "id": "ssrf_azure_imds_host",
-      "tools": ["Bash", "WebFetch"],
-      "fields": ["command", "url"],
+      "tools": [
+        "Bash",
+        "WebFetch"
+      ],
+      "fields": [
+        "command",
+        "url"
+      ],
       "pattern": "100\\.100\\.100\\.200|metadata\\.azure\\.com",
-      "message": "Azure IMDS / metadata host — credential exfiltration target."
+      "message": "Azure IMDS / metadata host \u2014 credential exfiltration target."
     },
     {
       "id": "etc_shadow_read",
-      "tools": ["Bash"],
-      "fields": ["command"],
+      "tools": [
+        "Bash"
+      ],
+      "fields": [
+        "command"
+      ],
       "pattern": "/etc/(shadow|gshadow|sudoers)\\b",
       "message": "Read of /etc/shadow or related privileged files."
     },
     {
       "id": "etc_passwd_exfil",
-      "tools": ["Bash"],
-      "fields": ["command"],
+      "tools": [
+        "Bash"
+      ],
+      "fields": [
+        "command"
+      ],
       "pattern": "(curl|wget|nc|netcat|scp)\\s[^|;&]*\\b/etc/passwd\\b",
       "message": "Exfiltration of /etc/passwd through a network tool."
     },
     {
       "id": "remote_pipe_to_shell",
-      "tools": ["Bash"],
-      "fields": ["command"],
+      "tools": [
+        "Bash"
+      ],
+      "fields": [
+        "command"
+      ],
       "pattern": "\\b(curl|wget|fetch)\\b[^|]+\\|\\s*(bash|sh|zsh|ksh|dash|fish)\\b",
-      "message": "Piping remote content directly into a shell — unverified code execution."
+      "message": "Piping remote content directly into a shell \u2014 unverified code execution."
     },
     {
       "id": "rm_rf_root",
-      "tools": ["Bash"],
-      "fields": ["command"],
+      "tools": [
+        "Bash"
+      ],
+      "fields": [
+        "command"
+      ],
       "pattern": "\\brm\\s+(-[rRf]+|--recursive|--force)[^|;]*\\s+/(\\s|$|;|&|\\|)",
-      "message": "rm -rf / or equivalent — non-recoverable filesystem destruction."
+      "message": "rm -rf / or equivalent \u2014 non-recoverable filesystem destruction."
     },
     {
       "id": "fork_bomb_classic",
-      "tools": ["Bash"],
-      "fields": ["command"],
+      "tools": [
+        "Bash"
+      ],
+      "fields": [
+        "command"
+      ],
       "pattern": ":\\(\\)\\s*\\{\\s*:\\s*\\|\\s*:\\s*&\\s*\\}\\s*;\\s*:",
       "message": "Classic shell fork bomb."
     },
     {
       "id": "dd_to_block_device",
-      "tools": ["Bash"],
-      "fields": ["command"],
+      "tools": [
+        "Bash"
+      ],
+      "fields": [
+        "command"
+      ],
       "pattern": "\\bdd\\b[^|;]*\\bof=/dev/(sd[a-z]|nvme\\d+n\\d+|disk\\d+|mmcblk\\d+)",
-      "message": "dd writing directly to a raw block device — disk destruction."
+      "message": "dd writing directly to a raw block device \u2014 disk destruction."
     },
     {
       "id": "history_purge",
-      "tools": ["Bash"],
-      "fields": ["command"],
+      "tools": [
+        "Bash"
+      ],
+      "fields": [
+        "command"
+      ],
       "pattern": "history\\s+-c|>\\s*~?/?\\.bash_history|\\bunset\\s+HISTFILE",
-      "message": "Shell history purge — common post-compromise covering of tracks."
+      "message": "Shell history purge \u2014 common post-compromise covering of tracks."
     },
     {
       "id": "ssh_authorized_keys_write",
-      "tools": ["Bash"],
-      "fields": ["command"],
+      "tools": [
+        "Bash"
+      ],
+      "fields": [
+        "command"
+      ],
       "pattern": "(>>?|tee)\\s+[^|;]*\\.ssh/authorized_keys",
-      "message": "Write to ~/.ssh/authorized_keys — persistent SSH backdoor."
+      "message": "Write to ~/.ssh/authorized_keys \u2014 persistent SSH backdoor."
     },
     {
       "id": "reverse_shell_bash_tcp",
-      "tools": ["Bash"],
-      "fields": ["command"],
+      "tools": [
+        "Bash"
+      ],
+      "fields": [
+        "command"
+      ],
       "pattern": "bash\\s+-i\\s+>&?\\s+/dev/tcp/",
       "message": "bash reverse shell over /dev/tcp."
     },
     {
       "id": "base64_piped_exec",
-      "tools": ["Bash"],
-      "fields": ["command"],
+      "tools": [
+        "Bash"
+      ],
+      "fields": [
+        "command"
+      ],
       "pattern": "\\bbase64\\s+(--decode|-d|-D)\\b[^|]*\\|\\s*(bash|sh|python|python3|perl|ruby)\\b",
-      "message": "Base64-decoded payload piped to an interpreter — common obfuscated execution."
+      "message": "Base64-decoded payload piped to an interpreter \u2014 common obfuscated execution."
+    },
+    {
+      "id": "shell_rc_persistence",
+      "tools": [
+        "Write",
+        "Edit",
+        "NotebookEdit"
+      ],
+      "fields": [
+        "file_path",
+        "notebook_path"
+      ],
+      "pattern": "(^|/)\\.(bashrc|bash_profile|zshrc|zprofile|profile|zshenv)$",
+      "message": "Write to a shell startup file - classic persistence: the payload re-runs on every new shell."
+    },
+    {
+      "id": "git_hooks_write",
+      "tools": [
+        "Write",
+        "Edit"
+      ],
+      "fields": [
+        "file_path"
+      ],
+      "pattern": "\\.git/hooks/(pre-commit|post-commit|pre-push|post-checkout|post-merge|prepare-commit-msg)",
+      "message": "Write to a git hook - executes on ordinary git commands and rides the repo to other machines."
+    },
+    {
+      "id": "cron_persistence_write",
+      "tools": [
+        "Write",
+        "Edit"
+      ],
+      "fields": [
+        "file_path"
+      ],
+      "pattern": "(/etc/cron|/var/spool/cron|/etc/crontab)",
+      "message": "Write to a cron location - schedules code to run unattended."
+    },
+    {
+      "id": "launch_persistence_write",
+      "tools": [
+        "Write",
+        "Edit"
+      ],
+      "fields": [
+        "file_path"
+      ],
+      "pattern": "(Library/Launch(Agents|Daemons)/|/etc/systemd/system/|\\.config/systemd/user/)",
+      "message": "Write to a launchd or systemd unit path - starts code at login or boot."
+    },
+    {
+      "id": "written_remote_pipe_to_shell",
+      "tools": [
+        "Write",
+        "Edit",
+        "NotebookEdit"
+      ],
+      "fields": [
+        "content",
+        "new_string",
+        "new_source"
+      ],
+      "pattern": "(curl|wget)[^\\n|]{0,200}\\|\\s*(sudo\\s+)?(ba)?sh",
+      "message": "File content pipes a remote download straight into a shell - executes unreviewed remote code."
+    },
+    {
+      "id": "written_reverse_shell",
+      "tools": [
+        "Write",
+        "Edit",
+        "NotebookEdit"
+      ],
+      "fields": [
+        "content",
+        "new_string",
+        "new_source"
+      ],
+      "pattern": "(bash\\s+-i\\s*>&\\s*/dev/tcp/|nc\\s+(-[a-z]*e[a-z]*\\s+)|socket\\.socket\\([^)]*\\)[\\s\\S]{0,120}connect\\()",
+      "message": "File content contains a reverse-shell pattern - hands an outside party an interactive session."
+    },
+    {
+      "id": "ssh_authorized_keys_file_write",
+      "tools": [
+        "Write",
+        "Edit"
+      ],
+      "fields": [
+        "file_path"
+      ],
+      "pattern": "\\.ssh/(authorized_keys|authorized_keys2)$",
+      "message": "Write to SSH authorized_keys - installs a login key for whoever holds the private half."
+    },
+    {
+      "id": "system_credential_file_write",
+      "tools": [
+        "Write",
+        "Edit"
+      ],
+      "fields": [
+        "file_path"
+      ],
+      "pattern": "/etc/(shadow|gshadow|passwd|sudoers)(\\.d/[^/]*)?$",
+      "message": "Write to a system credential or privilege file - changes who can log in or escalate."
     }
   ]
 }

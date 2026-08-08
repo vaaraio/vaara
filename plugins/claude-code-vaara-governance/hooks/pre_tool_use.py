@@ -4,8 +4,11 @@
 """PreToolUse hook: two-layer governance for the proposed tool call.
 
 Layer 1 — regex deny patterns from ``policies/default_deny.json``. Applied
-to Bash, WebFetch, and WebSearch input fields. A match short-circuits to
-a hard deny — no ML, no classifier load. Operators replace the file via
+to shell and web input fields (Bash, WebFetch, WebSearch) and to file
+mutation (Write, Edit, NotebookEdit), matching both the target path and
+the content being written: an agent that cannot run ``curl | sh`` can
+still write it to a file. A match short-circuits to a hard deny — no ML,
+no classifier load. Operators replace the file via
 ``VAARA_PLUGIN_DENY_PATTERNS_FILE``.
 
 Layer 2 — Vaara classifier. For ``mcp__*`` tools only. MCP tools carry
@@ -15,8 +18,9 @@ route through the ML classifier (documented baseline 2026-05-28: the
 classifier is not trained on shell command strings; output on raw bash
 is noise).
 
-Exit 0 on allow / escalate (escalate writes a warning to stderr). Exit
-2 on deny with the block reason on stderr.
+Exit 0 on allow. Exit 2 on deny and on escalate alike, each with its own
+reason on stderr: escalate holds the call for review rather than letting
+it proceed unreviewed.
 
 Env vars: VAARA_PLUGIN_DISABLE, VAARA_PLUGIN_SHADOW,
 VAARA_PLUGIN_AGENT_ID, VAARA_PLUGIN_AUDIT_DB,
@@ -49,9 +53,28 @@ def _audit_db_path() -> Path:
     return _config.audit_db_path(CFG)
 
 
-def _append_deny_audit(
-    tool_name: str, tool_input: dict, rule_id: str, message: str, agent_id: str
+def _record_call(
+    tool_name: str,
+    tool_input: dict,
+    agent_id: str,
+    context: dict,
+    session_id: str = "",
 ) -> None:
+    """Write an ACTION_REQUESTED record for a call on the regex path.
+
+    Every matched call is recorded, not only the denied ones. Recording
+    denials alone left allowed shell, web and file calls out of the trail
+    entirely, and PostToolUse then found no ACTION_REQUESTED to correlate
+    against and wrote no outcome either. The audit trail therefore held
+    MCP calls and blocks, and nothing else, while the plugin described it
+    as covering shell and web too.
+
+    ``enforce=False`` so this never changes the verdict: the decision on
+    this path belongs to the deny rules, and scoring here is for the
+    record only. Measured at roughly 5 ms to construct and 0.6 ms per
+    call, which is the SQLite append, not the ML classifier: that stays
+    on the ``mcp__*`` path.
+    """
     try:
         from vaara.audit.sqlite_backend import SQLiteAuditBackend
         from vaara.pipeline import InterceptionPipeline
@@ -68,11 +91,8 @@ def _append_deny_audit(
             agent_id=agent_id,
             tool_name=tool_name,
             parameters=tool_input,
-            context={
-                "vaara_governance_layer": "deny_pattern",
-                "rule_id": rule_id,
-                "rule_message": message,
-            },
+            context=context,
+            session_id=session_id,
         )
     except Exception:
         pass
@@ -145,16 +165,23 @@ def _classify_mcp(
         return 0
 
     if result.allowed:
-        if result.decision == "escalate":
-            _emit(
-                f"vaara-governance: ESCALATE on {tool_name} "
-                f"(risk {result.risk_score:.2f}, action_id={result.action_id}). "
-                f"Reason: {result.reason}"
-            )
-            notify(
-                "ESCALATE", tool_name, f"risk {result.risk_score:.2f}: {result.reason}"
-            )
         return 0
+
+    # `allowed` is `decision == "allow"`, so escalate lands here, not in the
+    # branch above. It used to be reported as a flat BLOCK, which told the
+    # operator a policy denied the call when in truth it needed review.
+    # Escalate still stops the call, because a gate that proceeds while
+    # waiting for a human is not a gate.
+    if result.decision == "escalate":
+        _emit(
+            f"vaara-governance: ESCALATE on {tool_name} — held pending review "
+            f"(risk {result.risk_score:.2f}, action_id={result.action_id}). "
+            f"Reason: {result.reason}"
+        )
+        notify(
+            "ESCALATE", tool_name, f"risk {result.risk_score:.2f}: {result.reason}"
+        )
+        return 2
 
     _emit(
         f"vaara-governance: BLOCKED {tool_name} "
@@ -186,7 +213,15 @@ def main() -> int:
     match = match_deny_rule(rules, tool_name, tool_input)
     if match is not None:
         rule_id, message = match
-        _append_deny_audit(tool_name, tool_input, rule_id, message, agent_id)
+        _record_call(
+            tool_name, tool_input, agent_id,
+            {
+                "vaara_governance_layer": "deny_pattern",
+                "rule_id": rule_id,
+                "rule_message": message,
+            },
+            session_id,
+        )
         if shadow:
             _emit(
                 f"vaara-governance: SHADOW deny on {tool_name} "
@@ -199,6 +234,16 @@ def main() -> int:
         return 2
 
     if not tool_name.startswith("mcp__"):
+        # Passed the deny rules. Record it anyway: an audit trail that
+        # holds only the blocked calls cannot answer "what did the agent
+        # do", which is the question the trail exists for. This also
+        # gives PostToolUse an ACTION_REQUESTED to correlate its outcome
+        # against, so the call and its result both land.
+        _record_call(
+            tool_name, tool_input, agent_id,
+            {"vaara_governance_layer": "regex_pass"},
+            session_id,
+        )
         return 0
 
     return _classify_mcp(tool_name, tool_input, agent_id, session_id, shadow)

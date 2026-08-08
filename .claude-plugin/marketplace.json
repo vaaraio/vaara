@@ -9,7 +9,7 @@
   "plugins": [
     {
       "name": "vaara-governance",
-      "description": "Runtime tool-call governance for Claude Code. Layer-1 regex deny on Bash/WebFetch/WebSearch. Layer-2 conformal risk classifier on mcp__* tools. Hash-chained SQLite audit trail at ~/.vaara/claude-code/audit.db.",
+      "description": "Runtime tool-call governance for Claude Code. Layer-1 regex deny on Bash/WebFetch/WebSearch plus file mutation (Write/Edit/NotebookEdit). Layer-2 conformal risk classifier on mcp__* tools. Hash-chained SQLite audit trail at ~/.vaara/claude-code/audit.db.",
       "author": {
         "name": "Henri Sirkkavaara",
         "email": "hello@vaara.io"

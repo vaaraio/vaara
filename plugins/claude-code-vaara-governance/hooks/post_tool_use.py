@@ -54,6 +54,31 @@ def _outcome_severity(tool_response: object) -> float:
     return 0.0
 
 
+def _event_name(event_type: object) -> str:
+    """Normalise an event type to its uppercase name.
+
+    ``record.event_type`` is an ``EventType`` enum whose value is the
+    lowercase string (``EventType.ACTION_REQUESTED`` is
+    ``'action_requested'``). Comparing it directly against
+    ``"ACTION_REQUESTED"`` is always False, so the correlation loop below
+    never found a target and this hook returned without recording an
+    outcome, for every tool including MCP. No OUTCOME_RECORDED events
+    meant no feedback to the online learner and no Article 15(1) or
+    61(1) evidence for anyone running the plugin.
+    """
+    value = getattr(event_type, "value", event_type)
+    return str(value).upper()
+
+
+def _record_tool_name(record: object) -> str:
+    """Tool name from the column when present, else from the payload."""
+    direct = getattr(record, "tool_name", None)
+    if direct:
+        return str(direct)
+    data = getattr(record, "data", None) or {}
+    return str(data.get("tool_name", ""))
+
+
 def main() -> int:
     if _config.plugin_disabled(CFG):
         return 0
@@ -85,9 +110,9 @@ def main() -> int:
     for record in reversed(trail._records):
         if record.agent_id != agent_id:
             continue
-        if record.data.get("tool_name") != tool_name:
+        if _record_tool_name(record) != tool_name:
             continue
-        if record.event_type == "ACTION_REQUESTED":
+        if _event_name(record.event_type) == "ACTION_REQUESTED":
             target_action_id = record.action_id
             break
 
