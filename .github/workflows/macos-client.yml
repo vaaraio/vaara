@@ -83,9 +83,9 @@ jobs:
           # directory and no product. Grepping for the product is the check
           # that would have caught it.
           found=$(find ~/Library/Developer/Xcode/DerivedData build -type d \
-                    -name 'WebKitGovernance.appex' 2>/dev/null | head -1)
+                    -name 'WebKitGovernance.systemextension' 2>/dev/null | head -1)
           if [ -z "$found" ]; then
-            echo "::error::WebKitGovernance.appex was not produced. The extension did not build."
+            echo "::error::WebKitGovernance.systemextension was not produced. The extension did not build."
             exit 1
           fi
           echo "built: $found"
