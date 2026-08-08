@@ -15,25 +15,49 @@ targets:
     type: application
     platform: macOS
     sources:
+      # Sources/Shared holds the XPC protocol, the policy client and the
+      # governed-host list. Both targets compile it. Previously the extension
+      # referenced symbols that existed only in this target, so it could not
+      # build at all.
       - path: Sources/VaaraMenuBar
+      - path: Sources/Shared
     settings:
       PRODUCT_BUNDLE_IDENTIFIER: io.vaara.menubar
       INFOPLIST_FILE: Sources/VaaraMenuBar/Info.plist
+    entitlements:
+      path: Sources/VaaraMenuBar/VaaraMenuBar.entitlements
+      properties:
+        # The app vends the mach service the extension connects to. Both sides
+        # need the same app group or a sandboxed extension cannot reach it.
+        com.apple.security.application-groups:
+          - group.io.vaara
+        com.apple.developer.networking.networkextension:
+          - content-filter-provider-system
+        com.apple.developer.system-extension.install: true
+        com.apple.security.app-sandbox: false
     dependencies:
       - target: WebKitGovernance
+        embed: true
+        codeSign: true
 
   WebKitGovernance:
     type: system-extension
     platform: macOS
     sources:
       - path: Sources/WebKitGovernance
+      - path: Sources/Shared
     settings:
       PRODUCT_BUNDLE_IDENTIFIER: io.vaara.webkit-governance
       INFOPLIST_FILE: Sources/WebKitGovernance/Info.plist
     entitlements:
-      com.apple.developer.networking.networkextension:
-        - content-filter-provider-system
-      com.apple.security.app-sandbox: true
-      com.apple.security.files.user-selected.read-only: true
+      path: Sources/WebKitGovernance/WebKitGovernance.entitlements
+      properties:
+        com.apple.developer.networking.networkextension:
+          - content-filter-provider-system
+        com.apple.security.app-sandbox: true
+        com.apple.security.network.client: true
+        # Must match the app. The mach service name is prefixed with this group.
+        com.apple.security.application-groups:
+          - group.io.vaara
     info:
       path: Sources/WebKitGovernance/Info.plist

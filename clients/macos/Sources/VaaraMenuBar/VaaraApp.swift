@@ -9,19 +9,26 @@ struct VaaraApp: App {
     @StateObject private var model = GateModel()
     @State private var approvals: ApprovalWindowManager?
 
-    // XPC service for the WebKit Governance Network Extension.
+    // XPC service the network filter extension connects to.
     private let policyService = PolicyServiceDelegate()
-    private let accessibilityObserver = AccessibilityObserver()
+    // Shared instance: AccessibilityObserver vends `.shared` and holds its own
+    // observer table, so constructing a second one left two observers running.
+    private let accessibilityObserver = AccessibilityObserver.shared
+    @StateObject private var systemExtension = SystemExtensionManager.shared
 
     var body: some Scene {
         MenuBarExtra {
             ContentView(model: model)
                 .onAppear {
                     model.start()
-                    // Start XPC listener for WebKit Governance extension.
+                    // Start the XPC listener the filter extension connects to.
                     _ = policyService
                     // Start Accessibility observer for UI context.
                     accessibilityObserver.start()
+                    // Report whether the filter extension is installed and
+                    // enabled. Activation itself is user-initiated from
+                    // settings; macOS prompts for approval.
+                    systemExtension.refresh()
                     if approvals == nil {
                         approvals = ApprovalWindowManager(model: model)
                     }
