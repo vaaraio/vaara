@@ -90,3 +90,44 @@ class TestAdapter:
     def test_construction_rejects_non_guard(self):
         with pytest.raises(TypeError):
             GuardrailsAIAdapter(object())
+
+
+class TestValidatorNameNormalisation:
+    """Guardrails reports validator.rail_alias, not the class name.
+
+    A rail alias like ``detect-pii`` PascalCases to ``DetectPii``, which
+    never matches the published ``DetectPII`` key, so the finding lost
+    its Art. 10 annotation and degraded to "unmapped".
+    """
+
+    @staticmethod
+    def _outcome(alias: str) -> dict:
+        return {
+            "validation_passed": False,
+            "validation_summaries": [
+                {"validator_name": alias, "validator_status": "fail",
+                 "failure_reason": "found"},
+            ],
+        }
+
+    @pytest.mark.parametrize("alias", [
+        "guardrails/detect_pii", "detect-pii", "detect_pii", "DetectPII",
+    ])
+    def test_every_pii_spelling_maps_to_article_10(self, alias):
+        finding = parse_validation_outcome(self._outcome(alias))
+        assert finding.categories[0].vaara_category == "pii"
+        assert "Art. 10" in finding.ai_act_articles()
+
+    @pytest.mark.parametrize("alias,expected", [
+        ("valid-json", "schema_violation"),
+        ("toxic-language", "hate"),
+        ("secrets-present", "secrets_leak"),
+        ("detect-prompt-injection", "adversarial"),
+    ])
+    def test_acronym_and_multiword_aliases_map(self, alias, expected):
+        finding = parse_validation_outcome(self._outcome(alias))
+        assert finding.categories[0].vaara_category == expected
+
+    def test_a_genuinely_unknown_validator_stays_unmapped(self):
+        finding = parse_validation_outcome(self._outcome("some-custom-validator"))
+        assert finding.categories[0].vaara_category == "unmapped"

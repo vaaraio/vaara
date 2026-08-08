@@ -94,6 +94,44 @@ def _activated_to_category(activated: dict[str, Any]) -> FindingCategory:
     )
 
 
+def _with_rails_log(options: Any) -> Any:
+    """Return generation options that request the activated-rails log.
+
+    Accepts ``None``, a dict, or a ``GenerationOptions``. Never imports
+    nemoguardrails: a plain dict is a valid ``options`` value, so the
+    optional dependency stays optional.
+    """
+    if options is None:
+        return {"log": {"activated_rails": True}}
+    if isinstance(options, dict):
+        merged = dict(options)
+        log = merged.get("log")
+        if isinstance(log, dict):
+            log = dict(log)
+            log["activated_rails"] = True
+            merged["log"] = log
+        elif log is None:
+            merged["log"] = {"activated_rails": True}
+        else:  # a GenerationLogOptions instance
+            try:
+                log.activated_rails = True
+            except (AttributeError, ValueError):
+                pass
+        return merged
+    log = getattr(options, "log", None)
+    try:
+        if log is None:
+            options.log = {"activated_rails": True}
+        else:
+            log.activated_rails = True
+    except (AttributeError, ValueError):
+        # Frozen or unexpected options object: leave it alone rather
+        # than fail the generation. parse_generation_response still
+        # handles an absent log.
+        pass
+    return options
+
+
 def parse_generation_response(
     response: Any,
     *,
@@ -149,7 +187,16 @@ class NemoGuardrailsAdapter:
         messages: list[dict[str, str]],
         **kwargs: Any,
     ) -> tuple[str, ContentSafetyFinding]:
-        """Run NeMo generation and return ``(response_text, finding)``."""
+        """Run NeMo generation and return ``(response_text, finding)``.
+
+        The activated-rails log is requested explicitly. NeMo returns
+        ``GenerationResponse.log = None`` unless the caller asks for it,
+        and without that log there are no rails to parse, so a blocked
+        generation would produce an empty finding and a verdict of
+        "allow". A caller passing its own ``options`` keeps them, but
+        gets ``log.activated_rails`` forced on for the same reason.
+        """
+        kwargs["options"] = _with_rails_log(kwargs.get("options"))
         response = self._rails.generate(messages=messages, **kwargs)
         text = response if isinstance(response, str) else (
             getattr(response, "response", None)
