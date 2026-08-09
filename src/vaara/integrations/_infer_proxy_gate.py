@@ -27,7 +27,21 @@ from vaara.integrations._infer_proxy_govern import _parse_one
 
 logger = logging.getLogger("vaara.infer_proxy")
 
-__all__ = ["gate_tool_calls", "rewrite_buffered", "synthesize_stream"]
+__all__ = [
+    "UNREADABLE_RESPONSE_DENIAL",
+    "gate_tool_calls",
+    "refusal_buffered",
+    "rewrite_buffered",
+    "synthesize_stream",
+]
+
+#: Denial used when the upstream reply could not be parsed at all. The gate
+#: can only decide tool calls it can read, so an unreadable reply is not
+#: evidence that there were none in it.
+UNREADABLE_RESPONSE_DENIAL = (
+    "upstream response: could not be read, so any tool call it contained "
+    "could not be decided"
+)
 
 
 async def gate_tool_calls(
@@ -51,6 +65,18 @@ async def gate_tool_calls(
     for tool_call in tool_calls:
         parsed = _parse_one(tool_call)
         if parsed is None:
+            # The observe path skips what it cannot name, because there is
+            # nothing to record. The gate must not: a call this does not
+            # recognise is still a call the downstream agent framework may
+            # well understand, and letting it through undecided is the one
+            # outcome the gate exists to prevent. Deny it.
+            logger.warning(
+                "gate: unrecognised tool-call shape, denying (fail closed)",
+            )
+            denials.append(
+                "unrecognised tool call: could not be read, so it could not "
+                "be decided",
+            )
             continue
         name, parameters = parsed
         if allow_patterns and any(
@@ -127,6 +153,42 @@ def rewrite_buffered(shape: str, parsed: dict, denials: "list[str]") -> dict:
             choice["message"] = message
             choice["finish_reason"] = "stop"
     return doc
+
+
+def refusal_buffered(shape: str, denials: "list[str]", model_name: str) -> dict:
+    """A minimal, shape-correct buffered reply carrying the policy text.
+
+    ``rewrite_buffered`` edits the upstream document in place, which needs a
+    document to edit. When the upstream reply could not be parsed there is
+    none, so build one from scratch rather than fall back to forwarding the
+    bytes the gate could not read.
+    """
+    text = _policy_text(denials)
+    if shape == "anthropic":
+        return {
+            "id": "vaara_policy_block",
+            "type": "message",
+            "role": "assistant",
+            "model": model_name,
+            "content": [{"type": "text", "text": text}],
+            "stop_reason": "end_turn",
+            "usage": {"input_tokens": 0, "output_tokens": 0},
+        }
+    if shape == "ollama":
+        return {
+            "model": model_name,
+            "message": {"role": "assistant", "content": text},
+            "done": True,
+        }
+    return {
+        "object": "chat.completion",
+        "model": model_name,
+        "choices": [{
+            "index": 0,
+            "message": {"role": "assistant", "content": text},
+            "finish_reason": "stop",
+        }],
+    }
 
 
 def synthesize_stream(shape: str, denials: "list[str]", model_name: str) -> bytes:

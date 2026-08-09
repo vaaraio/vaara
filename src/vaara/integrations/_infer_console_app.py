@@ -29,6 +29,7 @@ from fastapi import FastAPI, Request
 from fastapi.responses import HTMLResponse, JSONResponse, StreamingResponse
 
 from vaara.attestation._inference_verify import _verify_one
+from vaara.integrations._http_origin import install_origin_guard
 from vaara.integrations._infer_console_recall import ground_messages
 from vaara.integrations._infer_console_view import CONSOLE_HTML
 from vaara.integrations._infer_proxy_shape import StreamAccumulator, parse_ollama_response
@@ -211,6 +212,7 @@ def build_app(
     recall: Any = None,
     client: Any = None,
     judge_factory: Any = None,
+    allowed_origins: Any = None,
 ) -> Any:
     """Assemble the console.
 
@@ -246,6 +248,14 @@ def build_app(
     proxy_url = proxy_url.rstrip("/")
     receipts_dir = Path(receipts_dir).expanduser()
     app = FastAPI(title="vaara-console")
+    # The console is a real browser app, so its own page must keep working:
+    # a fetch from the page this server served carries an Origin equal to the
+    # host it was addressed as, which the guard treats as same-origin. Every
+    # other site is refused, which is what stops one of them driving
+    # /api/chat and /api/crosscheck through the operator's local models.
+    install_origin_guard(
+        app, allowed_origins=allowed_origins, surface="vaara-console",
+    )
     app.state.last_turn = None
 
     def _verify_latest(before: int) -> "Optional[dict[str, Any]]":

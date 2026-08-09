@@ -182,6 +182,14 @@ _MIGRATIONS: dict[int, str] = {
 }
 
 
+class AuditBackendUnreadable(RuntimeError):
+    """The audit database exists but SQLite cannot read it.
+
+    Subclasses RuntimeError so existing broad handlers keep catching it, but
+    carries a message that names the file and says what to do about it.
+    """
+
+
 class SQLiteAuditBackend:
     """Persistent audit trail backed by SQLite.
 
@@ -237,9 +245,26 @@ class SQLiteAuditBackend:
             check_same_thread=False,
         )
         self._lock = threading.Lock()
-        self._conn.execute("PRAGMA journal_mode=WAL")
-        self._conn.execute("PRAGMA synchronous=NORMAL")
-        self._conn.execute("PRAGMA foreign_keys=ON")
+        # sqlite3.connect() does not touch the file, so a damaged database
+        # first surfaces here, on the pragma that reads page 1. The raw
+        # DatabaseError ("file is not a database") names neither the path nor
+        # the fact that this is the audit trail, which sent more than one
+        # investigation after the wrong thing. Say what broke and where.
+        try:
+            self._conn.execute("PRAGMA journal_mode=WAL")
+            self._conn.execute("PRAGMA synchronous=NORMAL")
+            self._conn.execute("PRAGMA foreign_keys=ON")
+        except sqlite3.DatabaseError as exc:
+            self._conn.close()
+            raise AuditBackendUnreadable(
+                f"the audit trail at {self._db_path} could not be opened "
+                f"({exc}). The evidence chain is the product, so this fails "
+                "rather than starting with a fresh trail and a silent gap. "
+                "Move the file aside to start a new trail, or point VAARA_DB "
+                "at a known-good one. Do not delete it: `sqlite3 <file> "
+                "'PRAGMA integrity_check'` and `.recover` often get the "
+                "records back, and they are the evidence."
+            ) from exc
         self._init_schema()
         # Load GDPR redaction map into memory for O(1) read-time substitution.
         self._redaction_cache: dict[str, str] = self._load_redaction_cache()

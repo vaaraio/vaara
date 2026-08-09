@@ -25,6 +25,7 @@ import sys
 from pathlib import Path
 from typing import Optional
 
+from vaara import __version__ as _VAARA_VERSION
 from vaara.audit.sqlite_backend import SQLiteAuditBackend
 from vaara.pipeline import InterceptionPipeline
 from vaara.taxonomy.actions import create_default_registry
@@ -119,8 +120,19 @@ def main(args: Optional[list[str]] = None) -> int:
         help="Request header carrying the agent identity (default: x-agent-id)",
     )
     p.add_argument(
+        "--allow-origin", action="append", default=None, metavar="ORIGIN",
+        help="Browser origin permitted to call the proxy, e.g. "
+             "https://console.example (repeatable, matched exactly). By "
+             "default any request carrying an Origin header from another "
+             "site is refused, which is what stops a page you visit from "
+             "spending your upstream key. Native clients send no Origin.",
+    )
+    p.add_argument(
+        # Read from the package rather than restated here. The literal that
+        # used to sit in this line said 1.56.0 long after the package moved
+        # on, so --version reported a release this code is not.
         "--version", action="version",
-        version="vaara llm-proxy 1.56.0",
+        version=f"vaara llm-proxy {_VAARA_VERSION}",
     )
 
     parsed = p.parse_args(args)
@@ -168,6 +180,7 @@ def main(args: Optional[list[str]] = None) -> int:
         rate_limit_rpm=parsed.rate_limit,
         redact_patterns=parsed.redact,
         agent_id_header=parsed.agent_id_header,
+        allowed_origins=parsed.allow_origin,
     )
 
     host, _, port_str = parsed.listen.rpartition(":")

@@ -73,6 +73,13 @@ def main(argv: Optional[list[str]] = None) -> int:
         help="Override the secret-version label (defaults to a key fingerprint).")
     parser.add_argument("--exp-seconds", type=int, default=300,
         help="TTL for the pre-call attestation window (default 300).")
+    parser.add_argument("--allow-origin", action="append", default=None,
+        metavar="ORIGIN",
+        help="Browser origin permitted to call the proxy (repeatable, matched "
+             "exactly). By default a request carrying an Origin header from "
+             "another site is refused, so a page you visit cannot make this "
+             "proxy sign inference you never asked for. Native clients send "
+             "no Origin and are unaffected.")
     parser.add_argument("--log-level", default="INFO", help="Logging level.")
     args = parser.parse_args(argv)
 
@@ -102,7 +109,10 @@ def main(argv: Optional[list[str]] = None) -> int:
 
     import uvicorn
 
-    app = build_app(emitter=emitter, upstream=args.upstream)
+    app = build_app(
+        emitter=emitter, upstream=args.upstream,
+        allowed_origins=args.allow_origin,
+    )
     uvicorn.run(app, host=host, port=port, log_level=args.log_level.lower())
     return 0
 

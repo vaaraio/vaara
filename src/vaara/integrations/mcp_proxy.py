@@ -47,6 +47,11 @@ from vaara.integrations._mcp_notify import (
     NotificationRouter,
     StdioRouter,
 )
+from vaara.integrations._http_origin import (
+    install_origin_guard,
+    normalise_origins,
+    origins_from_env,
+)
 from vaara.integrations._mcp_attest import (
     AttestConfigError,
     AttestPairEmitter,
@@ -238,16 +243,9 @@ class VaaraMCPProxy:
         # default, which refuses every request that carries an Origin header at
         # all. Native MCP clients send none, so the default costs them nothing;
         # a browser-based client has to be opted in by exact origin.
-        env_origins = os.environ.get("VAARA_PROXY_ALLOWED_ORIGINS", "")
-        self._allowed_origins: set[str] = {
-            origin.strip()
-            for origin in (allowed_origins or set())
-            if origin and origin.strip()
-        } or {
-            origin.strip()
-            for origin in env_origins.split(",")
-            if origin.strip()
-        }
+        self._allowed_origins: set[str] = normalise_origins(allowed_origins) or (
+            origins_from_env(os.environ.get("VAARA_PROXY_ALLOWED_ORIGINS"))
+        )
         # Bearer key for the Streamable HTTP transport. The stdio transport
         # is not affected: it has no network surface. When set, EVERY /mcp
         # request must carry it, and it is checked BEFORE X-Vaara-Tenant and
@@ -559,48 +557,18 @@ class VaaraMCPProxy:
                     )
             return await call_next(request)
 
-        # Origin gate. Registered after the key gate, so it runs BEFORE it:
+        # Origin gate. Installed after the key gate, so it runs BEFORE it:
         # Starlette applies HTTP middleware in reverse registration order, and
         # a cross-site request should be refused without the key check even
-        # looking at it.
-        #
-        # The MCP Streamable HTTP transport requires servers to validate
-        # Origin, and the default bind here is loopback with no key, which is
-        # exactly the deployment a web page can reach. A cross-origin `fetch`
-        # with `Content-Type: text/plain` is a CORS-simple request: no
-        # preflight, so without this check the tool call executes. The page
-        # cannot read the reply, but the side effect has already happened,
-        # which for a governance proxy is the whole loss.
-        #
-        # Absent Origin is allowed: Claude Code, Cursor and every other native
-        # MCP client sends none. A present Origin must match an operator-listed
-        # value exactly — no prefix or suffix matching, so
-        # `https://console.example.evil.test` never passes for
-        # `https://console.example`. /health stays open for load balancers.
-        @app.middleware("http")
-        async def _proxy_origin_gate(request: _StarletteRequest, call_next):
-            origin = request.headers.get("origin")
-            if (
-                origin is not None
-                and request.url.path != "/health"
-                and origin not in proxy._allowed_origins
-            ):
-                logger.warning(
-                    "refused cross-origin MCP request from %s", _safe_log(origin),
-                )
-                return JSONResponse(
-                    status_code=403,
-                    content={"error": {
-                        "code": "origin_not_allowed",
-                        "message": (
-                            "This proxy refuses requests carrying an Origin "
-                            "header unless the origin is explicitly allowed. "
-                            "Pass --allow-origin (or VAARA_PROXY_ALLOWED_ORIGINS) "
-                            "for a browser-based MCP client."
-                        ),
-                    }},
-                )
-            return await call_next(request)
+        # looking at it. The MCP transport spec requires this check, and the
+        # default bind here is loopback with no key — exactly the deployment a
+        # web page can reach. See _http_origin for the full rule.
+        install_origin_guard(
+            app,
+            allowed_origins=self._allowed_origins,
+            exempt_paths={"/health"},
+            surface="vaara-mcp-proxy",
+        )
 
         @app.get("/health")
         async def health() -> dict:

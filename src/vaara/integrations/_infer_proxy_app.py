@@ -15,6 +15,7 @@ from typing import Any, Optional
 from fastapi import FastAPI, Request, Response
 from fastapi.responses import StreamingResponse
 
+from vaara.integrations._http_origin import install_origin_guard
 from vaara.integrations._infer_proxy_emit import InferenceAttestEmitter
 from vaara.integrations._infer_proxy_model import CHAT_PATHS, ModelResolver
 from vaara.integrations._infer_proxy_shape import (
@@ -34,7 +35,7 @@ def build_app(
     *, emitter: Optional[InferenceAttestEmitter], upstream: str,
     client: Any = None, pipeline: Any = None,
     approvals_dir: Any = None, approvals_timeout: float = 60.0,
-    allow_patterns: Any = None,
+    allow_patterns: Any = None, allowed_origins: Any = None,
 ) -> Any:
     """Build the FastAPI app fronting ``upstream`` and signing chat calls.
 
@@ -59,6 +60,12 @@ def build_app(
         client = httpx.AsyncClient(timeout=httpx.Timeout(None))
     resolver = ModelResolver(client, upstream)
     app = FastAPI(title="vaara-infer-proxy")
+    # Loopback bind, no inbound credential, and every chat call it signs
+    # becomes an attestation + receipt pair. A page that can post here mints
+    # signed evidence for inference the operator never asked for.
+    install_origin_guard(
+        app, allowed_origins=allowed_origins, surface="vaara-infer-proxy",
+    )
 
     def _record_requested_tools(output: Any, model_name: str) -> None:
         if pipeline is None or not isinstance(output, dict):
@@ -103,6 +110,7 @@ def build_app(
         output: Any = None
         eval_stats: Optional[dict[str, int]] = None
         parsed: Any = None
+        parse_failed = False
         if upstream_resp.is_success:
             try:
                 parsed = upstream_resp.json()
@@ -114,7 +122,14 @@ def build_app(
                     output, eval_stats = parse_openai_response(parsed)
                 eval_stats = eval_stats or None
             except Exception:
-                logger.debug("Buffered response parse failed", exc_info=True)
+                parse_failed = True
+                # Debug level is right when only recording is at stake. When
+                # the pipeline is enforcing, this is the gate going blind, so
+                # it is a warning and, below, a refusal.
+                logger.log(
+                    logging.WARNING if gating else logging.DEBUG,
+                    "Buffered response parse failed", exc_info=True,
+                )
         if emitted is not None:
             attestation, counter = emitted
             emitter.emit_receipt(
@@ -122,12 +137,27 @@ def build_app(
                 output=output, eval_stats=eval_stats,
             )
         if gating:
-            denials = await _gate(output, model_name)
-            if denials and isinstance(parsed, dict):
-                from vaara.integrations._infer_proxy_gate import rewrite_buffered
+            from vaara.integrations._infer_proxy_gate import (
+                UNREADABLE_RESPONSE_DENIAL,
+                refusal_buffered,
+                rewrite_buffered,
+            )
 
+            # A reply the proxy could not read is not a reply with no tool
+            # calls in it. Forwarding it because the gate found nothing to
+            # decide is a silent bypass of the whole enforcement path.
+            denials = (
+                [UNREADABLE_RESPONSE_DENIAL] if parse_failed
+                else await _gate(output, model_name)
+            )
+            if denials:
+                doc = (
+                    rewrite_buffered(shape, parsed, denials)
+                    if isinstance(parsed, dict)
+                    else refusal_buffered(shape, denials, model_name)
+                )
                 return Response(
-                    content=json.dumps(rewrite_buffered(shape, parsed, denials)),
+                    content=json.dumps(doc),
                     status_code=200, media_type="application/json",
                 )
         else:
@@ -183,10 +213,31 @@ def build_app(
                     attestation=attestation, counter=counter, status=status,
                     output=output, eval_stats=eval_stats,
                 )
-            denials = await _gate(output, model_name)
-            if denials:
-                from vaara.integrations._infer_proxy_gate import synthesize_stream
+            from vaara.integrations._infer_proxy_gate import (
+                UNREADABLE_RESPONSE_DENIAL,
+                synthesize_stream,
+            )
 
+            # Same rule as the buffered path, in the two ways a stream can be
+            # unreadable: finalize raised (output is None), or it completed
+            # without recognising a single message of the expected shape,
+            # which looks exactly like a clean stream carrying no tool calls.
+            # Replaying either would ship whatever the bytes contain with no
+            # decision behind it.
+            unreadable = (
+                200 <= status_code < 300
+                and (output is None or not (acc.recognised or acc.empty))
+            )
+            if unreadable:
+                logger.warning(
+                    "Streamed response could not be reconstructed; refusing "
+                    "rather than replaying it past the gate",
+                )
+            denials = (
+                [UNREADABLE_RESPONSE_DENIAL] if unreadable
+                else await _gate(output, model_name)
+            )
+            if denials:
                 return Response(
                     content=synthesize_stream(shape, denials, model_name),
                     status_code=200, media_type=media_type,

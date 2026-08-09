@@ -107,6 +107,14 @@ def main(argv: "list[str] | None" = None) -> int:
         "--no-recall", action="store_true",
         help="Disable memory grounding even when an index is present.",
     )
+    parser.add_argument(
+        "--allow-origin", action="append", default=None, metavar="ORIGIN",
+        help="Extra browser origin permitted to call the console API "
+             "(repeatable, matched exactly). The console's own page always "
+             "works; this is only needed when another site embeds it. "
+             "Everything else is refused, so a page you visit cannot drive "
+             "your local models through /api/chat.",
+    )
     parser.add_argument("--log-level", default="INFO")
     args = parser.parse_args(argv)
 
@@ -178,6 +186,7 @@ def main(argv: "list[str] | None" = None) -> int:
         chain_path=chain_path,
         crosscheck=crosscheck,
         recall=recall,
+        allowed_origins=args.allow_origin,
     )
     uvicorn.run(app, host=host, port=port, log_level=args.log_level.lower())
     return 0

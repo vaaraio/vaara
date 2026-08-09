@@ -25,6 +25,7 @@ from fastapi import FastAPI, Request, Response
 from fastapi.responses import JSONResponse, StreamingResponse
 
 from vaara.pipeline import InterceptionPipeline
+from ._http_origin import install_origin_guard
 from ._llm_proxy_shape import (
     extract_messages,
     extract_model_name,
@@ -60,10 +61,30 @@ def build_app(*, upstream: str, api_key: str, api_key_header: str,
               model_deny: Optional[list[str]] = None,
               rate_limit_rpm: int = 0,
               redact_patterns: Optional[list[str]] = None,
-              agent_id_header: str = "x-agent-id") -> FastAPI:
+              agent_id_header: str = "x-agent-id",
+              allowed_origins: Optional[list[str]] = None) -> FastAPI:
     app = FastAPI(title="Vaara LLM Proxy")
+    # This proxy holds the operator's upstream provider key and injects it
+    # into every forwarded call, and it binds loopback with no inbound
+    # credential. Without the guard, a page the operator visits can spend
+    # that key and land turns in the trail under whatever agent id it likes.
+    install_origin_guard(
+        app, allowed_origins=allowed_origins, surface="vaara llm-proxy",
+    )
     provider = _detect_provider(upstream)
-    client = httpx.AsyncClient(base_url=upstream, http2=True)
+    # HTTP/2 needs the optional `h2` package. The llm-proxy extra now pulls
+    # it in, but httpx can also arrive from somewhere else without it, and
+    # AsyncClient(http2=True) raises ImportError at construction — which
+    # took the whole proxy down at startup rather than costing it
+    # multiplexing. Fall back to HTTP/1.1, which every provider speaks.
+    try:
+        client = httpx.AsyncClient(base_url=upstream, http2=True)
+    except ImportError:
+        logger.info(
+            "h2 is not installed; llm-proxy is using HTTP/1.1. Install "
+            "'vaara[llm-proxy]' (or httpx[http2]) for HTTP/2 multiplexing.",
+        )
+        client = httpx.AsyncClient(base_url=upstream)
 
     _rate_buckets: dict[str, list[float]] = {}
     _model_allow_pats = _compile_glob_patterns(model_allow or [])

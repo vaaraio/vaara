@@ -128,6 +128,24 @@ class StreamAccumulator:
     def __init__(self, is_ollama: bool = False, shape: Optional[str] = None) -> None:
         self._shape = shape or ("ollama" if is_ollama else "openai")
         self._buf = bytearray()
+        self._recognised = False
+
+    @property
+    def recognised(self) -> bool:
+        """True once at least one message of the expected shape was parsed.
+
+        ``finalize`` is best-effort and returns an empty output for a body it
+        understood nothing of, which reads identically to a well-formed
+        stream that carried no tool calls. A caller that gates on the result
+        needs to tell those apart: an unrecognised body is missing
+        information, not evidence of absence.
+        """
+        return self._recognised
+
+    @property
+    def empty(self) -> bool:
+        """True when nothing was ever fed in."""
+        return not self._buf
 
     def feed(self, chunk: bytes) -> None:
         self._buf.extend(chunk)
@@ -157,6 +175,7 @@ class StreamAccumulator:
                 obj = json.loads(line[len("data:"):].strip())
             except json.JSONDecodeError:
                 continue
+            self._recognised = True
             kind = obj.get("type")
             if kind == "message_start":
                 usage = (obj.get("message") or {}).get("usage") or {}
@@ -205,6 +224,7 @@ class StreamAccumulator:
                 obj = json.loads(line)
             except json.JSONDecodeError:
                 continue
+            self._recognised = True
             msg = obj.get("message") or {}
             if msg.get("content"):
                 parts.append(msg["content"])
@@ -226,12 +246,16 @@ class StreamAccumulator:
             if not line.startswith("data:"):
                 continue
             payload = line[len("data:"):].strip()
-            if payload == "[DONE]" or not payload:
+            if payload == "[DONE]":
+                self._recognised = True  # a valid, if empty, OpenAI stream
+                continue
+            if not payload:
                 continue
             try:
                 obj = json.loads(payload)
             except json.JSONDecodeError:
                 continue
+            self._recognised = True
             choices = obj.get("choices") or []
             if choices:
                 delta = choices[0].get("delta") or {}
