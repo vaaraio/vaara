@@ -132,15 +132,12 @@ CLAUDE.md
 clients/macos/.build/
 clients/macos/dist/
 
-# Local workspace directories
-.workspace/
+# Everything private lives under one root, so there is exactly one rule
+# for it. Nothing private is ignored in place, because a rule naming a
+# path also publishes that the path exists.
 .shared/
 
-# opencode local config
 opencode.json
 
-niis/
-social/
-
-# Local clone, not a submodule
+# Local clone of a public repo, not a submodule
 homebrew-tap/
