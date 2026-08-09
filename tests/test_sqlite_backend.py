@@ -541,6 +541,82 @@ class TestWindowedTrailVerification:
         assert trail.verify_chain() is not None
 
 
+class TestAppendPathUsesTheSeqIndex:
+    """Writing a record must not get slower as the trail gets longer.
+
+    Both queries on the append path order by seq: the subquery that computes
+    the next seq inside the INSERT, and chain_head's ORDER BY seq DESC LIMIT
+    1. With no index on seq, SQLite scanned the whole table and built a temp
+    B-tree to sort it, on every single append. Measured cost of one record:
+    0.12 ms on an empty trail, 4.7 ms at 10k rows, 16 ms at 31k. With the
+    index, 0.13 ms at 31k.
+
+    This asserts the query plan rather than a wall-clock number, because a
+    timing assertion on a shared CI runner is a flake generator. The plan is
+    the thing that actually regressed.
+    """
+
+    def test_chain_head_seeks_instead_of_scanning(self, db_path):
+        backend = SQLiteAuditBackend(db_path)
+        try:
+            plan = " ".join(
+                str(row[-1]) for row in backend._conn.execute(
+                    "EXPLAIN QUERY PLAN "
+                    "SELECT record_hash FROM audit_records WHERE 1=1 "
+                    "ORDER BY seq DESC LIMIT 1"
+                ).fetchall()
+            )
+            assert "idx_seq" in plan, f"chain_head is not using the seq index: {plan}"
+            assert "TEMP B-TREE" not in plan, (
+                f"chain_head is sorting the whole table on every append: {plan}")
+        finally:
+            backend.close()
+
+    def test_seq_subquery_does_not_scan(self, db_path):
+        backend = SQLiteAuditBackend(db_path)
+        try:
+            plan = " ".join(
+                str(row[-1]) for row in backend._conn.execute(
+                    "EXPLAIN QUERY PLAN "
+                    "SELECT COALESCE(MAX(seq), -1) + 1 FROM audit_records"
+                ).fetchall()
+            )
+            assert "SCAN" not in plan, f"the seq subquery scans the table: {plan}"
+        finally:
+            backend.close()
+
+    def test_existing_trail_gains_the_index_on_open(self, db_path, sample_action_type):
+        """A v5 trail written before this release is migrated, not left slow."""
+        import sqlite3
+
+        first = SQLiteAuditBackend(db_path)
+        trail = first.load_trail()
+        trail.record_action_requested(ActionRequest(
+            agent_id="a", tool_name="tx.transfer", action_type=sample_action_type,
+        ))
+        first._conn.execute("DROP INDEX IF EXISTS idx_seq")
+        first._conn.execute(
+            "UPDATE audit_meta SET value='5' WHERE key='schema_version'")
+        first.close()
+
+        conn = sqlite3.connect(str(db_path))
+        before = conn.execute(
+            "SELECT 1 FROM sqlite_master WHERE type='index' AND name='idx_seq'"
+        ).fetchone()
+        conn.close()
+        assert before is None, "test setup failed to remove the index"
+
+        reopened = SQLiteAuditBackend(db_path)
+        try:
+            row = reopened._conn.execute(
+                "SELECT 1 FROM sqlite_master WHERE type='index' AND name='idx_seq'"
+            ).fetchone()
+            assert row is not None, "reopening a v5 trail did not add the seq index"
+            assert reopened.load_trail().verify_chain() is None
+        finally:
+            reopened.close()
+
+
 class TestConcurrentProcessAppend:
     """The claim, tested the way it is deployed: separate OS processes.
 

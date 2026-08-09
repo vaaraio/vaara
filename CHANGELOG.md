@@ -4,6 +4,41 @@ All notable changes to this project are documented here.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/)
 and this project follows [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [1.64.1] - 2026-08-09
+
+An index on `seq`, which the append path has needed since the backend was
+written and needed twice as much after 1.64.0.
+
+Two queries run on every append and both order by `seq`: the subquery inside
+the INSERT that computes the next sequence number, and `chain_head`, which
+1.64.0 added to read the chain head under the write lock. Neither had an index
+to use, so SQLite scanned the whole table and built a temporary B-tree to sort
+it, once per record. The cost of writing one record therefore grew with the
+number of records already in the trail.
+
+```
+                without index      with index
+empty                0.12 ms          0.09 ms
+10,000 rows          4.70 ms          0.13 ms
+30,800 rows         15.98 ms          0.13 ms
+40,000 rows         22.07 ms          0.14 ms
+```
+
+Flat instead of linear, and about 120 times faster at 31,000 records, which is
+an ordinary size for a trail that has been recording for a few weeks. Half the
+cost was already there in the `MAX(seq)` subquery and half arrived yesterday
+with `chain_head`, so this is both an old defect and a fresh regression closed
+by the same line.
+
+Schema version 5 becomes 6, and existing trails get the index when they are
+next opened. The migration is one pass over `seq` and runs once.
+
+The tests assert the query plan rather than a wall-clock number, because a
+timing assertion on a shared runner is a flake generator and the plan is what
+actually regressed. A third test drops the index, marks a trail back to
+version 5, and checks that reopening it restores both the index and a
+verifying chain.
+
 ## [1.64.0] - 2026-08-09
 
 Four defects, all on the same seam: two Vaara processes sharing one audit

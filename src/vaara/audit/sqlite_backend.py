@@ -35,7 +35,7 @@ from vaara.auth import APIKey, Role, _hash_key, generate_api_key
 
 logger = logging.getLogger(__name__)
 
-SCHEMA_VERSION = 5
+SCHEMA_VERSION = 6
 
 
 def _scrub_nonfinite(obj: Any) -> Any:
@@ -97,6 +97,13 @@ CREATE INDEX IF NOT EXISTS idx_event_type  ON audit_records(event_type);
 CREATE INDEX IF NOT EXISTS idx_timestamp   ON audit_records(timestamp);
 CREATE INDEX IF NOT EXISTS idx_tool_name   ON audit_records(tool_name);
 CREATE INDEX IF NOT EXISTS idx_tenant_id   ON audit_records(tenant_id);
+-- Both writes on the append path order by seq: the seq subquery inside the
+-- INSERT and chain_head's ORDER BY seq DESC LIMIT 1. Without this index each
+-- append scanned the whole table and built a temp B-tree to sort it, so the
+-- cost of writing one record grew with the number of records already there:
+-- 0.12 ms on an empty trail, 4.7 ms at 10k, 16 ms at 31k. With it, 0.13 ms
+-- at 31k and flat.
+CREATE INDEX IF NOT EXISTS idx_seq         ON audit_records(seq);
 
 -- GDPR Article 17 (Right to Erasure) redaction table.
 CREATE TABLE IF NOT EXISTS gdpr_redactions (
@@ -179,6 +186,14 @@ _MIGRATIONS: dict[int, str] = {
         created_at    REAL NOT NULL
     );
     CREATE INDEX IF NOT EXISTS idx_pending_created ON pending_outcomes(created_at);
+    """,
+    # v5 to v6: index on seq (v1.64.1). Every append orders by seq twice, once
+    # for the seq subquery inside the INSERT and once for chain_head. Without
+    # the index both scanned the whole table, so writing one record cost more
+    # the more records the trail already held. Existing trails get the index
+    # here; the build is a single pass over seq and runs once.
+    5: """
+    CREATE INDEX IF NOT EXISTS idx_seq ON audit_records(seq);
     """,
 }
 
