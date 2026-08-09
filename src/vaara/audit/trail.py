@@ -574,6 +574,14 @@ class AuditTrail:
         self._by_action: dict[str, list[AuditRecord]] = defaultdict(list)
         self._last_hash = ""
         self._on_record = on_record
+        # record_id -> the chain head the persistent store handed out for it,
+        # recorded only when that head was not this trail's own previous
+        # record. Once the store owns the head (see _chain_backend), _records
+        # is a window onto a chain other processes also write to, so two of
+        # our records are often not adjacent on disk. verify_chain consults
+        # this to tell a legitimate foreign predecessor from a real break,
+        # and accepts nothing it did not observe the store hand out.
+        self._store_anchors: dict[str, str] = {}
         # v0.40 multi-tenant: action_id -> tenant_id, seeded by
         # record_action_requested. Subsequent record_* calls (decision,
         # execution, escalation) look up the action_id so every record in
@@ -655,17 +663,42 @@ class AuditTrail:
         return self.verify_chain() is None
 
     def verify_chain(self) -> Optional[str]:
-        """Verify hash chain integrity.  Returns None if intact, error string if broken."""
+        """Verify hash chain integrity.  Returns None if intact, error string if broken.
+
+        A trail whose persistent store owns the chain head holds a *window*
+        onto that chain, not the whole of it: the store serializes appends
+        from every process sharing the database, so another writer's records
+        legitimately sit between two of ours. Those points are not breaks,
+        and reading them as breaks would be its own defect — ComplianceEngine
+        downgrades every article to EVIDENCE_INSUFFICIENT on a failed verify,
+        so a correctly chained trail would render BROKEN on every dashboard
+        and in every signed report.
+
+        The only discontinuities accepted are ones this trail watched the
+        store hand out, recorded in ``_store_anchors`` at write time. A
+        record re-parented onto any other hash is still a break, and every
+        record's hash is recomputed regardless — ``previous_hash`` is part of
+        the hashed content, so editing it to match an anchor breaks the hash
+        instead. An in-memory trail, or one loaded whole from the store, has
+        no anchors and is verified strictly from genesis as before.
+
+        This is the process's view. The complete chain is verified by
+        reloading it from the store, which is what ``load_trail`` does on
+        every open and what ``vaara verify`` and the export path use.
+        """
         with self._lock:
             snapshot = list(self._records)
+            anchors = dict(self._store_anchors)
         prev_hash = ""
         for i, record in enumerate(snapshot):
             if record.previous_hash != prev_hash:
-                return (
-                    f"Chain broken at record {i} ({record.record_id}): "
-                    f"expected previous_hash={prev_hash!r}, "
-                    f"got {record.previous_hash!r}"
-                )
+                anchor = anchors.get(record.record_id)
+                if anchor is None or record.previous_hash != anchor:
+                    return (
+                        f"Chain broken at record {i} ({record.record_id}): "
+                        f"expected previous_hash={prev_hash!r}, "
+                        f"got {record.previous_hash!r}"
+                    )
             expected = record.compute_hash()
             if record.record_hash != expected:
                 return (
@@ -1510,33 +1543,77 @@ class AuditTrail:
         if record.data:
             record.data = {str(k): json_safe(v) for k, v in record.data.items()}
         with self._lock:
-            record.previous_hash = self._last_hash
-            # Stamp the current chain format on every fresh record so its
-            # tenant_id is bound into the hash. Records reloaded from storage
-            # never pass through _append, so their stored version is left
-            # intact and old trails keep re-verifying.
-            record.chain_version = _CURRENT_CHAIN_VERSION
-            record.record_hash = record.compute_hash()
-            self._last_hash = record.record_hash
+            def _stamp(previous_hash: str) -> None:
+                record.previous_hash = previous_hash
+                # Stamp the current chain format on every fresh record so its
+                # tenant_id is bound into the hash. Records reloaded from
+                # storage never pass through _append, so their stored version
+                # is left intact and old trails keep re-verifying.
+                record.chain_version = _CURRENT_CHAIN_VERSION
+                record.record_hash = record.compute_hash()
 
-            self._records.append(record)
-            self._by_action[record.action_id].append(record)
-
-            if self._on_record:
+            backend = self._chain_backend()
+            if backend is not None:
+                # The store owns the head. It reads it and inserts inside one
+                # transaction, so a second writer on the same DB cannot chain
+                # off a head that is already stale. self._last_hash is a
+                # per-process cache and forks the chain when it is the
+                # authority (see SQLiteAuditBackend.append_record).
                 try:
-                    self._on_record(record)
+                    head = backend.append_record(record, _stamp)
+                    if head != self._last_hash:
+                        # Another writer appended between our previous record
+                        # and this one, so the two are not adjacent on disk.
+                        # Keep the head the store actually used: it is the
+                        # only evidence that this discontinuity is somebody
+                        # else's record rather than a missing one.
+                        self._store_anchors[record.record_id] = head
                 except Exception:
-                    # logger.exception preserves the stack trace so ops can
-                    # diagnose disk-full / locked-DB / permission errors
-                    # instead of seeing a bare error line.
+                    # Store rejected the write. Keep the in-memory chain
+                    # coherent off the local head and count the divergence,
+                    # exactly as the on_record path below does.
+                    _stamp(self._last_hash)
                     self._persistence_failures += 1
                     logger.exception(
-                        "on_record callback failed for record %s "
+                        "append_record failed for record %s "
                         "(persistent store now out of sync with in-memory "
                         "chain; failure count=%d)",
                         record.record_id,
                         self._persistence_failures,
                     )
+            else:
+                _stamp(self._last_hash)
+                if self._on_record:
+                    try:
+                        self._on_record(record)
+                    except Exception:
+                        # logger.exception preserves the stack trace so ops can
+                        # diagnose disk-full / locked-DB / permission errors
+                        # instead of seeing a bare error line.
+                        self._persistence_failures += 1
+                        logger.exception(
+                            "on_record callback failed for record %s "
+                            "(persistent store now out of sync with in-memory "
+                            "chain; failure count=%d)",
+                            record.record_id,
+                            self._persistence_failures,
+                        )
+
+            self._last_hash = record.record_hash
+            self._records.append(record)
+            self._by_action[record.action_id].append(record)
+
+    def _chain_backend(self):
+        """The store that owns the persistent chain head, or ``None``.
+
+        Exactly the object ``on_record`` would write to, and only when it can
+        append atomically. An in-memory trail, a plain callable sink, or a
+        backend predating ``append_record`` all keep the local-head path.
+        """
+        target = getattr(self._on_record, "__self__", None)
+        if target is not None and hasattr(target, "append_record"):
+            return target
+        return None
 
     def _get_regulatory_articles(
         self,

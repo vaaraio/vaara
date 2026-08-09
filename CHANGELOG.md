@@ -4,6 +4,116 @@ All notable changes to this project are documented here.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/)
 and this project follows [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [1.64.0] - 2026-08-09
+
+Four defects, all on the same seam: two Vaara processes sharing one audit
+database. That is the ordinary setup rather than an edge case. The Claude
+Code hook and an MCP server both govern the same tool call and both append to
+`~/.vaara/trail/audit.db`.
+
+The first one forked the hash chain.
+
+`AuditTrail._last_hash` is per-process memory guarded by a `threading.Lock`,
+and `_append_chained` took `previous_hash` from it without ever reading the
+database. Two writers each held their own copy of the head, so both appended
+children off the same parent. A third writer starting cold began at
+`previous_hash = ""` and opened a second genesis in the middle of a live
+trail. `verify_chain` then reports a broken chain on a trail whose entire
+claim is that it is not broken, and the same property the receipt draft rests
+on, that a record verifies without asking the issuer, goes with it.
+
+The backend already knew about this hazard. `write_record` computes `seq`
+inside the INSERT with a subquery precisely so that two processes cannot cache
+`MAX(seq)+1` and collide, and the comment there names the MCP server case.
+`previous_hash` needed the same treatment and was left on the in-process path.
+
+It now gets it. `SQLiteAuditBackend.append_record` reads the chain head and
+inserts inside one `BEGIN IMMEDIATE` transaction, so a second writer blocks
+rather than reading a head that is about to go stale. `AuditTrail` delegates
+to the store when the `on_record` target can append atomically and keeps the
+old local-head path otherwise, so in-memory trails and plain callable sinks
+are unchanged.
+
+This was found by carving a damaged database and diagnosing what came out,
+not by reading the code and imagining a race. The trail carried 34 forks with
+sibling records 57 to 168 milliseconds apart, and four genesis rows sitting in
+the middle of the sequence.
+
+Writes cost 0.253 ms per record where they used to cost 0.115, so roughly
+4,000 records a second instead of 8,700. On a path where one record is one
+tool call, that headroom is not the scarce resource and the chain is.
+
+Moving the head into the store then moved the problem, which is the second
+defect. Once another process's records sit between two of ours on disk, a
+process's own `_records` list is a window onto the chain rather than the
+whole of it, and `verify_chain` walked it as though it were the whole thing.
+Every long-running process holding an existing database would have reported
+its own correctly written chain as broken from the first record on, and
+`ComplianceEngine` downgrades every article to EVIDENCE_INSUFFICIENT when
+`verify_chain` fails, so a working trail would have rendered BROKEN across
+every dashboard and signed report. `AuditTrail` now keeps the head the store
+handed it whenever that head was not its own previous record, and accepts a
+discontinuity only where it holds that evidence. Records are re-hashed
+either way, so re-parenting one to match an anchor breaks its hash instead.
+
+The third and fourth defects are in opening the file rather than writing to
+it, and both take out the process at construction. Two processes creating the
+same database at once both saw no `audit_records` table, both ran the schema,
+and the second one's `INSERT INTO audit_meta` died on the primary key. The
+narrower window was worse: a process arriving between the other's CREATE and
+its version INSERT read a fresh current database as unversioned and ran every
+migration against it. Schema creation and migration now run inside one
+`BEGIN IMMEDIATE` transaction, and an already-current database returns before
+taking any lock, so the common open neither waits nor writes.
+
+The fourth is what that lock exposed. `PRAGMA journal_mode=WAL` needs a brief
+exclusive lock and SQLite answers SQLITE_BUSY for it without consulting the
+busy handler, so the connection timeout never covered it. A process that lost
+that race raised `AuditBackendUnreadable`: "the audit trail could not be
+opened (database is locked)", a message that tells an operator their evidence
+file is damaged. The file was fine. The process had arrived half a second
+early, while another one still held the lock. The pragma now retries for half
+a second and then opens in whatever journal mode the file is already in,
+which gives worse concurrency and still records.
+
+The last two were found by a new test that spawns four real processes against
+one database, rather than simulating writers inside one interpreter. Both had
+been reachable since the backend was written.
+
+One limitation is now written down rather than fixed, in `chain_head`: an
+unscoped backend serving several tenants writes them onto one interleaved
+chain, so reloading that database filtered to a single tenant does not
+verify. `vaara trail rotate --tenant` therefore refuses to purge, and a
+per-tenant export carries `chain_intact_at_export=False`. Fixing it means
+chaining per tenant, which existing rows would not re-verify under.
+Deployments that leave `tenant_id` empty, which is every single-tenant
+install, are unaffected.
+
+A fifth defect turned up on the way, in the approval handshake rather than
+the trail. `request_approval` created `<action_id>.request.json` with
+`Path.write_text`, which truncates and then writes, so between those two
+calls the file exists and is empty. A watcher polling the directory saw it
+and read nothing: 66 of 300 requests on a warm filesystem, which is not a
+rare race. A watcher that parses what it finds raises on the empty string,
+and if that ends its poll loop the request is never answered and the gate
+blocks for its whole timeout. The module already treats an unreadable
+decision file as no consent; the request file it writes itself had no such
+protection. It is now written under a temporary name in the same directory
+and renamed into place. This had been making `tests/test_approvals.py` fail
+about one run in three, which was being read as flakiness rather than as the
+product race it was reporting.
+
+Also in this release: the x402 settlement conformance gate now has tests for
+something it only claimed. `SPEC.md` section 1 says consumers MUST accept
+`jcs-rfc8785`, `JCS` and `jcs-json-v1` as the canonicalization label, and the
+checker was widened to all three, but nothing exercised the widening, so it
+could have regressed to a bare equality check without a single test going red.
+An issuer following the spec emits `jcs-rfc8785` and would have failed a gate
+the spec is cited as defining. The committed vectors keep their `JCS` label on
+purpose, and a test now pins that too: outside implementations reproduce those
+exact bytes, so relabelling a committed vector would invalidate every digest
+they have published.
+
 ## [1.63.0] - 2026-08-09
 
 Thirteen defects across the MCP proxy, the MCP server, the inference path,

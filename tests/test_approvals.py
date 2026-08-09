@@ -95,3 +95,46 @@ def test_creates_missing_approvals_dir(tmp_path):
     result = request_approval("a", "t", "r", approvals_dir=nested, timeout=0.2)
     assert result == "timeout"
     assert nested.is_dir()
+
+
+def test_watcher_never_sees_a_half_written_request(tmp_path):
+    """The request file appears with its content already in it.
+
+    ``Path.write_text`` truncates and then writes, so a watcher polling the
+    directory could find the file and read nothing: 66 of 300 requests on a
+    warm filesystem before this was fixed. A watcher that parses what it
+    finds raises on the empty string, and if that ends its poll loop the
+    request is never answered and the gate blocks for its whole timeout.
+    This is what made the tests above fail roughly one run in three, and it
+    would do the same to any real approval surface.
+    """
+    empty_reads = 0
+    for i in range(40):
+        run_dir = tmp_path / f"run-{i}"
+        run_dir.mkdir()
+        seen: list[str] = []
+
+        def watch(d=run_dir, seen=seen) -> None:
+            deadline = time.monotonic() + 10
+            while time.monotonic() < deadline:
+                for req in d.glob("*.request.json"):
+                    seen.append(req.read_text())
+                    action_id = req.name.removesuffix(".request.json")
+                    (d / f"{action_id}.decision.json").write_text(
+                        json.dumps({"decision": "approve", "decided_at": time.time()})
+                    )
+                    return
+
+        thread = threading.Thread(target=watch, daemon=True)
+        thread.start()
+        result = request_approval(
+            f"act-{i}", "t", "r",
+            approvals_dir=run_dir, timeout=10, poll_interval=0.01,
+        )
+        thread.join(timeout=10)
+        assert result == "approve"
+        empty_reads += sum(1 for raw in seen if raw == "")
+
+    assert empty_reads == 0, (
+        f"a watcher read an empty request file {empty_reads} time(s) in 40 requests"
+    )

@@ -26,6 +26,7 @@ import math
 import sqlite3
 import threading
 import time
+from contextlib import contextmanager
 from pathlib import Path
 from typing import Any, Optional
 
@@ -251,7 +252,7 @@ class SQLiteAuditBackend:
         # the fact that this is the audit trail, which sent more than one
         # investigation after the wrong thing. Say what broke and where.
         try:
-            self._conn.execute("PRAGMA journal_mode=WAL")
+            self._enable_wal()
             self._conn.execute("PRAGMA synchronous=NORMAL")
             self._conn.execute("PRAGMA foreign_keys=ON")
         except sqlite3.DatabaseError as exc:
@@ -268,6 +269,83 @@ class SQLiteAuditBackend:
         self._init_schema()
         # Load GDPR redaction map into memory for O(1) read-time substitution.
         self._redaction_cache: dict[str, str] = self._load_redaction_cache()
+
+    # Switching journal mode needs a brief exclusive lock, and SQLite answers
+    # SQLITE_BUSY for it without consulting the busy handler, so the
+    # connect() timeout does not cover this one statement. Half a second of
+    # retries covers a peer that is mid schema-init.
+    _WAL_RETRIES = 10
+    _WAL_RETRY_SLEEP = 0.05
+
+    def _enable_wal(self) -> None:
+        """Switch to WAL, tolerating another process opening the same file.
+
+        Two Vaara processes creating one audit.db at the same moment — the
+        Claude Code hook and an MCP server starting together — had one of
+        them lose this race and die at construction, reported as
+        ``AuditBackendUnreadable``: "the audit trail could not be opened
+        (database is locked)". That message says the evidence file is
+        damaged. It was not damaged, it was half a second early.
+
+        A file already in WAL answers this pragma without needing the lock,
+        so the retry only ever runs on first creation. If the lock is still
+        held after that, the database opens in the journal mode it is already
+        in: worse concurrency, but recording evidence beats refusing to.
+        """
+        last: Optional[sqlite3.OperationalError] = None
+        for _ in range(self._WAL_RETRIES):
+            try:
+                self._conn.execute("PRAGMA journal_mode=WAL")
+                return
+            except sqlite3.OperationalError as exc:
+                msg = str(exc).lower()
+                if "locked" not in msg and "busy" not in msg:
+                    raise
+                last = exc
+                time.sleep(self._WAL_RETRY_SLEEP)
+        logger.warning(
+            "audit DB %s stayed locked while enabling WAL (%s); continuing in "
+            "the existing journal mode. Another Vaara process is opening the "
+            "same file.",
+            self._db_path, last,
+        )
+
+    @contextmanager
+    def _rollback_on_failure(self):
+        """Commit the open transaction, and never leave one open on failure.
+
+        A COMMIT that fails, on a full disk or an I/O error, leaves the
+        transaction open. Every later ``BEGIN IMMEDIATE`` on this connection
+        then raises "cannot start a transaction within a transaction" for the
+        life of the process, so one bad write would stop the audit writer
+        permanently instead of losing one record. On this path that means the
+        rest of the session goes unrecorded.
+        """
+        try:
+            yield
+        except BaseException:
+            self._rollback_quietly()
+            raise
+        try:
+            self._conn.execute("COMMIT")
+        except BaseException:
+            self._rollback_quietly()
+            raise
+
+    def _rollback_quietly(self) -> None:
+        """Roll back, tolerating a transaction SQLite has already ended.
+
+        Some errors abort the transaction themselves, and rolling back then
+        raises "no transaction is active" — a second exception that would
+        replace the real one on its way up.
+        """
+        try:
+            self._conn.execute("ROLLBACK")
+        except sqlite3.Error as exc:
+            logger.debug(
+                "audit DB %s: rollback after failure was a no-op (%s)",
+                self._db_path, exc,
+            )
 
     def _table_exists(self, name: str) -> bool:
         row = self._conn.execute(
@@ -300,10 +378,40 @@ class SQLiteAuditBackend:
            is a no-op via IF NOT EXISTS.
         4. Existing DB pre-versioning (no audit_meta or no schema_version
            row): treated as v0 and migrated forward.
+
+        Two processes open the same database at the same time as a matter of
+        course — the Claude Code hook and an MCP server share one audit.db —
+        so the create/migrate path runs inside one ``BEGIN IMMEDIATE``
+        transaction. Without it both processes saw "no audit_records", both
+        ran SCHEMA_SQL, and the second one's ``INSERT INTO audit_meta`` died
+        on the primary key, taking the whole backend down at construction.
+        The narrower window was worse: a process that arrived between the
+        other's CREATE and its version INSERT read a fresh v5 database as
+        unversioned and ran every migration against it.
+
+        Case 3, which is every open after the first, returns before taking
+        the lock. That keeps the common path free of a write lock (four
+        processes starting together would otherwise queue on it) and leaves
+        an already-current database openable without writing to it.
         """
+        if self._schema_is_current():
+            return
+        self._conn.execute("BEGIN IMMEDIATE")
+        with self._rollback_on_failure():
+            self._init_schema_locked()
+
+    def _schema_is_current(self) -> bool:
+        return (
+            self._table_exists("audit_records")
+            and self._table_exists("audit_meta")
+            and self._stored_schema_version() == SCHEMA_VERSION
+        )
+
+    def _init_schema_locked(self) -> None:
+        """The create/migrate work. Caller holds the write lock."""
         if not self._table_exists("audit_records"):
             # Fresh DB
-            self._conn.executescript(SCHEMA_SQL)
+            self._exec_script(SCHEMA_SQL)
             self._conn.execute(
                 "INSERT INTO audit_meta (key, value) VALUES ('schema_version', ?)",
                 (str(SCHEMA_VERSION),),
@@ -331,18 +439,37 @@ class SQLiteAuditBackend:
             self._run_migrations(stored, SCHEMA_VERSION)
         # SCHEMA_SQL is now safe to run idempotently. All referenced
         # columns exist because migrations have brought the DB current.
-        self._conn.executescript(SCHEMA_SQL)
+        self._exec_script(SCHEMA_SQL)
+
+    def _exec_script(self, script: str) -> None:
+        """Run a multi-statement DDL script without ending the transaction.
+
+        ``executescript`` commits whatever transaction is open before it runs
+        its first statement, which would drop the write lock ``_init_schema``
+        holds and put two processes back inside the schema at once.
+        Statements are split with ``sqlite3.complete_statement`` rather than
+        on ``;`` so a semicolon inside a literal or a trigger body cannot cut
+        one in half.
+        """
+        buf = ""
+        for line in script.splitlines(keepends=True):
+            buf += line
+            if sqlite3.complete_statement(buf):
+                self._conn.execute(buf)
+                buf = ""
+        if buf.strip():
+            self._conn.execute(buf)
 
     def _run_migrations(self, from_version: int, to_version: int) -> None:
         """Apply incremental schema migrations from_version up to to_version.
 
-        Each statement runs individually because SQLite doesn't support
-        transactional DDL for ALTER TABLE. We swallow OperationalError ONLY
-        when the message indicates an already-applied statement (duplicate
-        column / table already exists), which keeps re-runs after a partial
-        migration idempotent. Any other error propagates so schema_version
-        stays at the LAST successfully completed version — the next open
-        retries cleanly without falsely advertising a half-migrated DB.
+        Each statement runs individually, and OperationalError is swallowed
+        ONLY when the message says the statement was already applied
+        (duplicate column / table already exists), which keeps a re-run
+        idempotent. Any other error propagates to ``_init_schema``, whose
+        transaction rolls the whole migration back — including the
+        per-migration version bumps below — so the next open starts from the
+        version the database was actually at rather than a half-migrated one.
         """
         for v in range(from_version, to_version):
             sql = _MIGRATIONS.get(v)
@@ -398,9 +525,18 @@ class SQLiteAuditBackend:
         load_trail and the hash-chain integrity check below it. SQLite
         serializes writers at the transaction boundary, so the subquery
         reads MAX(seq) at the same point the INSERT takes effect.
+
+        ``previous_hash`` needs the same treatment and gets it in
+        :meth:`append_record`, which is what ``AuditTrail`` calls. This
+        method takes the record's hashes as already stamped and is kept
+        for callers that own their own chaining (migrations, imports).
         """
         with self._lock:
-            self._conn.execute(
+            self._insert_record(record)
+
+    def _insert_record(self, record: AuditRecord) -> None:
+        """Emit the INSERT. Caller holds ``self._lock``."""
+        self._conn.execute(
                 """INSERT INTO audit_records
                    (record_id, action_id, event_type, timestamp, agent_id,
                     tool_name, data, regulatory, previous_hash, record_hash, seq,
@@ -442,6 +578,67 @@ class SQLiteAuditBackend:
                     record.chain_version,
                 ),
             )
+
+    def chain_head(self) -> str:
+        """``record_hash`` of the newest stored record, or ``""`` if empty.
+
+        Scoped with the same tenant clause ``load_trail`` reconstructs under,
+        so a backend opened for one tenant chains inside that tenant and its
+        filtered reload verifies.
+
+        KNOWN LIMITATION, older than this method and not fixed by it: an
+        *unscoped* backend serving several tenants writes them all onto one
+        interleaved chain, because ``_tenant_clause`` is then ``1=1`` and the
+        head is whatever record was written last, whoever it belonged to.
+        Reloading that database filtered to one tenant returns records that
+        are not adjacent, and ``verify_chain`` reports a break — so
+        ``vaara trail rotate --tenant`` refuses to purge (rotate.py checks
+        ``chain_intact`` before it deletes anything) and any per-tenant export
+        carries ``chain_intact_at_export=False``. Chaining per tenant would
+        fix it and is a chain-format change: existing rows were written under
+        global chaining and would not re-verify under per-tenant rules.
+        Single-tenant deployments, which is every deployment where
+        ``tenant_id`` is left at ``""``, are unaffected.
+        """
+        with self._lock:
+            return self._chain_head_locked()
+
+    def _chain_head_locked(self) -> str:
+        t_clause, t_params = self._tenant_clause()
+        row = self._conn.execute(
+            f"SELECT record_hash FROM audit_records WHERE {t_clause} "
+            "ORDER BY seq DESC LIMIT 1",
+            t_params,
+        ).fetchone()
+        return (row[0] or "") if row else ""
+
+    def append_record(self, record: AuditRecord, stamp) -> str:
+        """Read the chain head and insert, atomically against other writers.
+
+        ``stamp(previous_hash)`` is the trail's finaliser: it sets
+        ``previous_hash``/``chain_version`` on the record and computes
+        ``record_hash``. Running it between the head read and the INSERT, both
+        inside one ``BEGIN IMMEDIATE`` transaction, is what makes the chain
+        correct across processes rather than only across threads.
+
+        Without this the head came from ``AuditTrail._last_hash``, per-process
+        memory. Two writers on one DB (the common deployment: a hook process
+        and an MCP server governing the same tool call) each held their own
+        copy, so both appended children off the same parent. The result is a
+        forked chain that ``verify_chain`` reports as broken, on a trail whose
+        whole claim is that it is not.
+
+        ``BEGIN IMMEDIATE`` takes SQLite's write lock up front, so a second
+        writer blocks here instead of reading a head that is about to go stale.
+        Returns the ``previous_hash`` actually used.
+        """
+        with self._lock:
+            self._conn.execute("BEGIN IMMEDIATE")
+            with self._rollback_on_failure():
+                head = self._chain_head_locked()
+                stamp(head)
+                self._insert_record(record)
+            return head
 
     # ── Read path ─────────────────────────────────────────────────
 

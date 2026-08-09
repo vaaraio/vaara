@@ -1,5 +1,6 @@
 """Tests for the SQLite audit backend."""
 
+import multiprocessing
 import tempfile
 from pathlib import Path
 
@@ -27,6 +28,34 @@ def db_path():
     # Clean WAL files
     Path(str(path) + "-wal").unlink(missing_ok=True)
     Path(str(path) + "-shm").unlink(missing_ok=True)
+
+
+def _append_from_child(db_path: str, label: str, count: int) -> None:
+    """Write ``count`` records to ``db_path`` from a separate OS process.
+
+    Module level and picklable so this works under the spawn start method
+    (the default on macOS) as well as fork.
+    """
+    from vaara.audit.sqlite_backend import SQLiteAuditBackend
+    from vaara.taxonomy.actions import (
+        ActionCategory, ActionRequest, ActionType, BlastRadius, Reversibility,
+        UrgencyClass,
+    )
+
+    action_type = ActionType(
+        "tx.transfer", ActionCategory.FINANCIAL, Reversibility.IRREVERSIBLE,
+        BlastRadius.SHARED, UrgencyClass.IRREVOCABLE,
+    )
+    backend = SQLiteAuditBackend(db_path)
+    try:
+        trail = backend.load_trail()
+        for i in range(count):
+            trail.record_action_requested(ActionRequest(
+                agent_id=f"{label}-{i}", tool_name="tx.transfer",
+                action_type=action_type,
+            ))
+    finally:
+        backend.close()
 
 
 @pytest.fixture
@@ -343,3 +372,213 @@ class TestSkeletonRecordsCounter:
         status = p.status()
         assert "trail_skeleton_records" in status
         assert status["trail_skeleton_records"] == 0
+
+
+class TestCrossProcessChainHead:
+    """The hash chain must stay single-threaded across writers sharing one DB.
+
+    ``previous_hash`` came from ``AuditTrail._last_hash``, per-process memory
+    guarded by a ``threading.Lock``. Two writers on one ``audit.db`` each held
+    their own copy, so both appended children off the same parent and the chain
+    forked. ``seq`` was already immune (computed by subquery inside the INSERT,
+    see ``write_record``); ``previous_hash`` was not, and it is the half that
+    carries the tamper-evidence claim.
+
+    Observed live: 34 forks and 4 mid-trail genesis rows in a real trail, the
+    fork siblings 57-168 ms apart and split between the Claude Code hook and
+    the vaara-memory MCP server writing the same tool call.
+    """
+
+    def _write(self, trail, agent, action_type):
+        req = ActionRequest(
+            agent_id=agent, tool_name="tx.transfer", action_type=action_type,
+        )
+        return trail.record_action_requested(req)
+
+    def test_two_writers_sharing_a_db_do_not_fork_the_chain(
+            self, db_path, sample_action_type):
+        """Two backends on one file, both loaded, appending alternately."""
+        a = SQLiteAuditBackend(db_path)
+        trail_a = a.load_trail()
+        self._write(trail_a, "writer-a", sample_action_type)
+
+        # Second writer opens the same DB and loads the same head.
+        b = SQLiteAuditBackend(db_path)
+        trail_b = b.load_trail()
+
+        # Interleave. Each writer's in-process _last_hash goes stale the moment
+        # the other one appends.
+        for i in range(5):
+            self._write(trail_a, f"writer-a-{i}", sample_action_type)
+            self._write(trail_b, f"writer-b-{i}", sample_action_type)
+
+        a.close()
+        b.close()
+
+        reloaded = SQLiteAuditBackend(db_path).load_trail()
+        assert reloaded.verify_chain() is None, "chain forked across writers"
+
+    def test_second_writer_does_not_start_a_new_genesis(
+            self, db_path, sample_action_type):
+        """A trail built straight from ``on_record`` against a non-empty DB
+        must chain onto the stored tail, not restart at ``previous_hash=''``."""
+        first = SQLiteAuditBackend(db_path)
+        trail = first.load_trail()
+        self._write(trail, "writer-a", sample_action_type)
+        first.close()
+
+        second = SQLiteAuditBackend(db_path)
+        cold = AuditTrail(on_record=second.write_record)
+        self._write(cold, "writer-b", sample_action_type)
+        second.close()
+
+        reloaded = SQLiteAuditBackend(db_path).load_trail()
+        records = reloaded._records
+        assert len(records) == 2
+        assert records[1].previous_hash == records[0].record_hash, (
+            "second writer restarted the chain mid-trail")
+        assert reloaded.verify_chain() is None
+
+
+class TestWindowedTrailVerification:
+    """A live trail holds a window onto the chain, and must say so honestly.
+
+    Once the store owns the head, a process's own ``_records`` are no longer
+    the whole chain: another writer's records sit between them on disk. The
+    naive walk reads that as a break, which would be worse than the fork it
+    replaced — ``ComplianceEngine`` downgrades every article to
+    EVIDENCE_INSUFFICIENT on a failed ``verify_chain()``, so a correctly
+    chained trail would render as BROKEN on every dashboard.
+    """
+
+    def _write(self, trail, agent, action_type):
+        req = ActionRequest(
+            agent_id=agent, tool_name="tx.transfer", action_type=action_type,
+        )
+        return trail.record_action_requested(req)
+
+    def test_cold_writer_on_a_non_empty_db_verifies(
+            self, db_path, sample_action_type):
+        """The MCP server and proxy pattern: fresh trail, existing DB."""
+        first = SQLiteAuditBackend(db_path)
+        self._write(first.load_trail(), "writer-a", sample_action_type)
+        first.close()
+
+        second = SQLiteAuditBackend(db_path)
+        cold = AuditTrail(on_record=second.write_record)
+        self._write(cold, "writer-b", sample_action_type)
+
+        assert cold.verify_chain() is None
+        assert cold.chain_intact
+        second.close()
+
+    def test_interleaved_writers_each_verify_their_own_window(
+            self, db_path, sample_action_type):
+        a = SQLiteAuditBackend(db_path)
+        b = SQLiteAuditBackend(db_path)
+        trail_a = a.load_trail()
+        trail_b = b.load_trail()
+
+        for i in range(4):
+            self._write(trail_a, f"writer-a-{i}", sample_action_type)
+            self._write(trail_b, f"writer-b-{i}", sample_action_type)
+
+        assert trail_a.verify_chain() is None
+        assert trail_b.verify_chain() is None
+        a.close()
+        b.close()
+        assert SQLiteAuditBackend(db_path).load_trail().verify_chain() is None
+
+    def test_tampering_still_breaks_a_windowed_trail(
+            self, db_path, sample_action_type):
+        """The relaxation must not become a hole to hide edits in."""
+        a = SQLiteAuditBackend(db_path)
+        b = SQLiteAuditBackend(db_path)
+        trail_a = a.load_trail()
+        trail_b = b.load_trail()
+        for i in range(3):
+            self._write(trail_a, f"writer-a-{i}", sample_action_type)
+            self._write(trail_b, f"writer-b-{i}", sample_action_type)
+        assert trail_a.verify_chain() is None
+
+        trail_a._records[1].data["parameters"] = {"amount": 999_999}
+        assert trail_a.verify_chain() is not None
+        a.close()
+        b.close()
+
+    def test_forged_anchor_is_not_accepted(
+            self, db_path, sample_action_type):
+        """Only a head the store actually handed out excuses a discontinuity.
+
+        Rewriting ``previous_hash`` to an unobserved value has to break the
+        chain even where a legitimate anchor sits nearby, otherwise a record
+        could be re-parented onto any hash at all.
+        """
+        a = SQLiteAuditBackend(db_path)
+        b = SQLiteAuditBackend(db_path)
+        trail_a = a.load_trail()
+        trail_b = b.load_trail()
+        for i in range(3):
+            self._write(trail_a, f"writer-a-{i}", sample_action_type)
+            self._write(trail_b, f"writer-b-{i}", sample_action_type)
+
+        victim = trail_a._records[2]
+        victim.previous_hash = "f" * 64
+        victim.record_hash = victim.compute_hash()  # re-seal the forgery
+        assert trail_a.verify_chain() is not None
+        a.close()
+        b.close()
+
+    def test_in_memory_trail_still_verifies_strictly(self, sample_action_type):
+        """No store, no window: the genesis and every link stay mandatory."""
+        trail = AuditTrail()
+        for i in range(3):
+            self._write(trail, f"agent-{i}", sample_action_type)
+        assert trail.verify_chain() is None
+
+        trail._records[1].previous_hash = "0" * 64
+        trail._records[1].record_hash = trail._records[1].compute_hash()
+        assert trail.verify_chain() is not None
+
+
+class TestConcurrentProcessAppend:
+    """The claim, tested the way it is deployed: separate OS processes.
+
+    The tests above interleave two backends inside one interpreter, which
+    reproduces the stale-head mechanism but shares a GIL and a page cache.
+    This one spawns real processes contending for SQLite's write lock, which
+    is the only version of the claim a deployment cares about: the Claude
+    Code hook, an MCP server and `vaara check` all writing one audit.db.
+    """
+
+    def test_four_processes_writing_one_db_produce_one_chain(self, db_path):
+        writers, per_writer = 4, 15
+        ctx = multiprocessing.get_context("spawn")
+        procs = [
+            ctx.Process(
+                target=_append_from_child,
+                args=(str(db_path), f"proc-{n}", per_writer),
+            )
+            for n in range(writers)
+        ]
+        for p in procs:
+            p.start()
+        for p in procs:
+            p.join(timeout=120)
+
+        assert all(p.exitcode == 0 for p in procs), (
+            f"writer processes failed: {[p.exitcode for p in procs]}")
+
+        backend = SQLiteAuditBackend(db_path)
+        try:
+            trail = backend.load_trail()
+            assert trail.size == writers * per_writer, (
+                "records were lost to write-lock contention")
+            assert trail.verify_chain() is None, "chain forked across processes"
+            seqs = [
+                row[0] for row in backend._conn.execute(
+                    "SELECT seq FROM audit_records ORDER BY seq")
+            ]
+            assert seqs == list(range(len(seqs))), f"seq gaps or repeats: {seqs}"
+        finally:
+            backend.close()

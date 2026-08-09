@@ -98,3 +98,53 @@ def test_lifecycle_steps_have_distinct_action_refs():
         assert s0["terminal"] is False
         assert s1["terminal"] is True
         assert s0["actionRef"] != s1["actionRef"]
+
+
+def test_committed_vectors_keep_the_JCS_label():
+    """The committed label is pinned deliberately and must never be rewritten.
+
+    Five outside parties (agent-guard, nobulex, elara, payperbyte, and a live
+    Sui gasless run) reproduce these fixtures byte for byte against a
+    content-pinned copy of the checker. Relabelling a committed vector, even to
+    the SPEC-preferred ``jcs-rfc8785``, changes those bytes and invalidates
+    every digest they published. New labels belong in new vectors.
+    """
+    for rail in _RAILS:
+        for step in _STEPS:
+            ref = _load(rail, step, "receipt.json")["decisionDerived"][
+                "evidenceRef"]
+            assert ref["canonicalization"] == "JCS"
+
+
+def test_checker_accepts_every_spec_alias():
+    """SPEC.md section 1: producers SHOULD emit ``jcs-rfc8785``; consumers MUST
+    accept ``jcs-rfc8785``, ``JCS`` and ``jcs-json-v1``.
+
+    The checker was widened to all three, but nothing exercised the widening,
+    so it could regress to a bare ``== "JCS"`` and the suite would stay green.
+    That regression is not hypothetical: an issuer following our own spec emits
+    ``jcs-rfc8785`` and would fail a gate our spec is cited as defining.
+
+    Mutates in-memory copies only. The committed fixtures keep their ``JCS``
+    label (see ``test_committed_vectors_keep_the_JCS_label``).
+    """
+    checker = _load_checker()
+    settlement = _load("sui", "step1", "settlement.json")
+    receipt = _load("sui", "step1", "receipt.json")
+
+    for alias in ("jcs-rfc8785", "JCS", "jcs-json-v1"):
+        probe = json.loads(json.dumps(receipt))
+        probe["decisionDerived"]["evidenceRef"]["canonicalization"] = alias
+        assert checker.settlement_binding_resolves(probe, settlement) is True, (
+            f"consumer rejected the spec alias {alias!r}")
+
+
+def test_checker_rejects_an_unknown_canonicalization():
+    """Accepting all three aliases must not become accepting anything. A label
+    the spec does not define means the digest was computed some other way, so
+    the binding cannot be assumed to hold."""
+    checker = _load_checker()
+    settlement = _load("sui", "step1", "settlement.json")
+    probe = _load("sui", "step1", "receipt.json")
+    probe["decisionDerived"]["evidenceRef"]["canonicalization"] = "sorted-keys"
+    assert checker.settlement_binding_resolves(probe, settlement) is False
