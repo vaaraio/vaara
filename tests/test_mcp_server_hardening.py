@@ -13,7 +13,6 @@ Three gaps a passing suite left open:
 
 from __future__ import annotations
 
-import io
 import json
 from unittest.mock import MagicMock
 

@@ -15,7 +15,6 @@ from __future__ import annotations
 import plistlib
 import shlex
 
-import pytest
 
 from vaara.integrations.proxy_service import (
     render_launchd_plist,
