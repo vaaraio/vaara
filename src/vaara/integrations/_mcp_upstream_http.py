@@ -60,6 +60,22 @@ _SSE_READ_TIMEOUT_SECONDS = 30.0
 # upstream cannot blow up the proxy's logs or the downstream error message.
 _ERROR_BODY_SNIPPET = 200
 
+# Largest reply the proxy will read back from a remote upstream, for one
+# JSON-RPC response or for a whole SSE stream up to the reply it is waiting
+# for. The inbound /mcp endpoint caps a client message at 1 MiB; this side had
+# no cap at all, so one request answered with an endless body could exhaust
+# the proxy. A --upstream-url target is a remote server reached over the
+# network — the direction the egress floor exists to distrust — so it gets a
+# bound too. Larger than the inbound cap because a tools/list across a big
+# server, or a resources/read of a real document, is legitimately bigger than
+# the request that asked for it.
+_MCP_UPSTREAM_MAX_BODY_BYTES = 8 * 1024 * 1024
+
+# Ceiling on SSE events consumed while waiting for one reply. A stream that
+# stays under the byte cap by trickling notifications forever still has to
+# terminate.
+_MCP_UPSTREAM_MAX_SSE_EVENTS = 10_000
+
 
 class _ServerPushUnsupported(Exception):
     """The upstream offers no GET server-to-client SSE channel.
@@ -239,9 +255,16 @@ class HttpUpstreamClient:
     # -- reply extraction -------------------------------------------------
 
     def _reply_from_json(self, resp: Any) -> dict:
-        raw = resp.read()
+        # Read one byte past the cap so an oversized body is detected without
+        # buffering all of it.
+        raw = resp.read(_MCP_UPSTREAM_MAX_BODY_BYTES + 1)
         if not raw:
             raise ProxyError("Upstream MCP server returned an empty response body")
+        if len(raw) > _MCP_UPSTREAM_MAX_BODY_BYTES:
+            raise ProxyError(
+                "Upstream MCP server response is too large "
+                f"(over {_MCP_UPSTREAM_MAX_BODY_BYTES} bytes)",
+            )
         try:
             message = json.loads(raw)
         except json.JSONDecodeError as e:
@@ -253,18 +276,34 @@ class HttpUpstreamClient:
     def _reply_from_sse(self, resp: Any, want_id: Any) -> dict:
         # Stream events until the one bearing our id arrives; route anything
         # else (server notifications) onward. The server closes the stream
-        # after delivering the reply.
-        for message in self._iter_messages(resp):
+        # after delivering the reply — or claims to. Both bounds below exist
+        # because "the upstream will stop eventually" is the upstream's
+        # decision, not ours.
+        seen = 0
+        for message in self._iter_messages(resp, bounded=True):
             if message.get("id") == want_id:
                 return message
+            seen += 1
+            if seen > _MCP_UPSTREAM_MAX_SSE_EVENTS:
+                raise ProxyError(
+                    f"Upstream MCP server sent too many SSE events "
+                    f"({_MCP_UPSTREAM_MAX_SSE_EVENTS}) without replying to "
+                    f"id {want_id!r}",
+                )
             self._dispatch_unsolicited(message)
         raise ProxyError(
             f"Upstream MCP server closed the SSE stream before replying to id {want_id!r}",
         )
 
-    def _iter_messages(self, resp: Any) -> Iterator[dict]:
-        """Yield each JSON-RPC object carried by the SSE stream's data events."""
-        for event in self._iter_sse(resp):
+    def _iter_messages(self, resp: Any, *, bounded: bool = False) -> Iterator[dict]:
+        """Yield each JSON-RPC object carried by the SSE stream's data events.
+
+        ``bounded`` caps total bytes read, for the request/reply path where
+        the proxy is blocking a caller on the answer. The standing listener
+        channel is long-lived by design and stays unbounded in total, though
+        each individual event is still capped.
+        """
+        for event in self._iter_sse(resp, bounded=bounded):
             data = event.get("data", "")
             if not data:
                 continue
@@ -279,19 +318,32 @@ class HttpUpstreamClient:
                 logger.warning("Upstream emitted non-object JSON-RPC over SSE")
 
     @staticmethod
-    def _iter_sse(resp: Any) -> Iterator[dict]:
+    def _iter_sse(resp: Any, *, bounded: bool = False) -> Iterator[dict]:
         """Parse a server-sent-events byte stream into ``{data, id}`` events.
 
         Implements the subset of the SSE grammar MCP uses: ``data:`` (joined by
         newline when multi-line), ``id:`` (for ``Last-Event-ID`` resume),
         comment lines (``:`` prefix, heartbeats) ignored, ``event:``/``retry:``
         ignored. An empty line dispatches the accumulated event.
+
+        A single event's accumulated ``data`` is always capped: a multi-line
+        data field is just as unbounded as a single huge line. ``bounded``
+        additionally caps the total bytes read across the whole stream.
         """
         data_lines: list[str] = []
+        data_bytes = 0
+        total_bytes = 0
         event_id: Optional[str] = None
         for raw_line in resp:
+            total_bytes += len(raw_line)
+            if bounded and total_bytes > _MCP_UPSTREAM_MAX_BODY_BYTES:
+                raise ProxyError(
+                    "Upstream MCP server SSE stream is too large "
+                    f"(over {_MCP_UPSTREAM_MAX_BODY_BYTES} bytes)",
+                )
             line = raw_line.decode("utf-8", "replace").rstrip("\r\n")
             if line == "":
+                data_bytes = 0
                 if data_lines:
                     yield {"data": "\n".join(data_lines), "id": event_id}
                 data_lines = []
@@ -303,6 +355,12 @@ class HttpUpstreamClient:
             if value.startswith(" "):
                 value = value[1:]
             if field == "data":
+                data_bytes += len(value)
+                if data_bytes > _MCP_UPSTREAM_MAX_BODY_BYTES:
+                    raise ProxyError(
+                        "Upstream MCP server sent an SSE event that is too "
+                        f"large (over {_MCP_UPSTREAM_MAX_BODY_BYTES} bytes)",
+                    )
                 data_lines.append(value)
             elif field == "id":
                 event_id = value

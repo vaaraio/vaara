@@ -91,6 +91,22 @@ def render_launchd_plist(
     return plistlib.dumps(plist).decode()
 
 
+def _systemd_quote(value: str) -> str:
+    """Quote one ExecStart argument the way systemd parses them.
+
+    systemd splits ExecStart on whitespace and honours double-quoted strings
+    with C-style escapes, so an argument holding a space has to be quoted or
+    it silently becomes two arguments. launchd never had this problem: its
+    ProgramArguments is a real array. Values with nothing special in them are
+    left bare so the unit stays readable.
+    """
+    if value and not any(ch.isspace() for ch in value) and '"' not in value \
+            and "\\" not in value and "'" not in value:
+        return value
+    escaped = value.replace("\\", "\\\\").replace('"', '\\"')
+    return f'"{escaped}"'
+
+
 def render_systemd_unit(
     *,
     vaara_bin: str,
@@ -101,8 +117,11 @@ def render_systemd_unit(
     allow: Optional[list[str]] = None,
     approvals_dir: Optional[str] = None,
 ) -> str:
-    exec_start = " ".join(_proxy_argv(vaara_bin, listen, upstream, trail_db,
-                                      enforce, allow, approvals_dir))
+    exec_start = " ".join(
+        _systemd_quote(arg)
+        for arg in _proxy_argv(vaara_bin, listen, upstream, trail_db,
+                               enforce, allow, approvals_dir)
+    )
     return (
         "[Unit]\n"
         "Description=Vaara model-endpoint governance proxy\n"
