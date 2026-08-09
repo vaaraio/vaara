@@ -162,9 +162,7 @@
       "isAccessibleForFree": true,
       "offers": [
         { "@type": "Offer", "name": "Open source (AGPL-3.0)", "price": "0", "priceCurrency": "EUR" },
-        { "@type": "Offer", "name": "Article 12 evidence pack, per system", "url": "https://vaara.io/#pilots", "availability": "https://schema.org/InStock", "priceSpecification": { "@type": "PriceSpecification", "minPrice": "4500", "priceCurrency": "EUR", "valueAddedTaxIncluded": false } },
-        { "@type": "Offer", "name": "Four-week paid pilot", "url": "https://vaara.io/#pilots", "availability": "https://schema.org/InStock", "priceSpecification": { "@type": "PriceSpecification", "minPrice": "12000", "priceCurrency": "EUR", "valueAddedTaxIncluded": false } },
-        { "@type": "Offer", "name": "Advisory and standards work, per day", "url": "https://vaara.io/#pilots", "availability": "https://schema.org/InStock", "priceSpecification": { "@type": "UnitPriceSpecification", "price": "1400", "priceCurrency": "EUR", "unitCode": "DAY", "valueAddedTaxIncluded": false } },
+        { "@type": "Offer", "name": "Four-week paid pilot", "url": "https://vaara.io/#pilots", "availability": "https://schema.org/InStock" },
         { "@type": "Offer", "name": "Commercial license", "url": "https://github.com/vaaraio/vaara/blob/main/LICENSING.md", "availability": "https://schema.org/InStock" }
       ],
       "author": { "@type": "Person", "name": "Henri Sirkkavaara" },
@@ -232,7 +230,7 @@
         {
           "@type": "Question",
           "name": "Does Vaara offer paid pilots or a commercial license?",
-          "acceptedAnswer": { "@type": "Answer", "text": "Yes, and the prices are published. An Article 12 evidence pack for one system starts at EUR 4,500. A four-week pilot in your own infrastructure starts at EUR 12,000. Advisory and standards work is EUR 1,400 per day. A commercial license for building on Vaara without the AGPL's source-disclosure obligations is priced on request. All prices are fixed before the work starts and exclude VAT. Contact hello@vaara.io." }
+          "acceptedAnswer": { "@type": "Answer", "text": "Yes. Pilots run four weeks in your own infrastructure: shadow mode first, then a policy tuned to your real traffic, then enforcement, ending in a signed evidence bundle that stays verifiable without the vendor. A commercial license for building on Vaara without the AGPL's source-disclosure obligations is granted directly by the sole copyright holder. Scope and price are agreed before the work starts. Contact hello@vaara.io." }
         }
       ]
     }
@@ -298,20 +296,16 @@ conformance: <span class="ok">CONFORMS</span>
   <li>Building Vaara into a closed-source product, or running a modified version as a hosted service without releasing your changes, needs a commercial license instead of the AGPL, granted directly by the sole copyright holder. See <a href="https://github.com/vaaraio/vaara/blob/main/LICENSING.md">LICENSING.md</a>.</li>
 </ul>
 
-<p class="stamp">What it costs</p>
+<p class="stamp">Talk to the author</p>
 <ul>
-  <li><b>Paid evaluation, EUR 4,500.</b> Sixty days. The Vaara gate goes in front of your agents in shadow mode, recording every action it would have allowed, blocked, or escalated, without blocking anything yet. You end with a report on your real traffic and a signed evidence bundle from it. The full fee is credited against any engagement below if you continue.</li>
-  <li><b>Disclosure pack, from EUR 4,500 per system.</b> For the 9 December 2026 liability change. One AI system, documented as a disclosable evidence set: the signed decision trail, the record format specification, and a trusted time anchor, in a form your counsel or an outside expert can verify without involving us. Two to three weeks. If you can export your existing logs, you do not have to deploy anything.</li>
-  <li><b>Four-week deployment, from EUR 12,000.</b> Shadow mode, then a policy and tool perimeter tuned to your actual traffic, then enforcement. Runs entirely inside your infrastructure.</li>
-  <li><b>Retained access, from EUR 1,400 per day.</b> Direct access to the person who holds the receipt format, the conformance suites, and the standards seat. Used for liability and disclosure scoping, reviewing a logging design you already have, and getting your requirements into the European standards while they are still drafts.</li>
-  <li><b>Commercial license, priced on request.</b> Scope depends on what you are building. See <a href="https://github.com/vaaraio/vaara/blob/main/LICENSING.md">LICENSING.md</a>.</li>
-  <li>Every price is fixed and agreed before the work starts. VAT is not included. There is no subscription and no per-seat fee.</li>
+  <li>Running Vaara in production, or evaluating it for autonomous systems? I take on pilot deployments and can adapt Vaara to the stack you already have. Nothing here is gated: the code, the verifier, and the evidence format stay open whether we ever speak or not.</li>
+  <li>Scope and price are agreed before any work starts, fixed, and exclude VAT. There is no subscription and no per-seat fee. A commercial license for building Vaara into a closed product is granted directly by the sole copyright holder, see <a href="https://github.com/vaaraio/vaara/blob/main/LICENSING.md">LICENSING.md</a>.</li>
 </ul>
 
 <p style="text-align:center;margin:28px 0 8px;">
-  <a class="cta" href="mailto:hello@vaara.io?subject=Vaara%20pilot%20enquiry&amp;body=Which%20one%3A%20evidence%20pack%20%2F%20four-week%20pilot%20%2F%20advisory%20%2F%20commercial%20license%0A%0AThe%20system%3A%20%0A%0AOur%20deadline%3A%20%0A%0ACountry%20and%20regulator%3A%20%0A">Start a pilot</a>
+  <a class="cta" href="mailto:hello@vaara.io?subject=Vaara%20pilot&amp;body=Company%3A%20%0A%0AWhat%20you%20are%20using%20Vaara%20for%3A%20%0A%0AWhere%20you%20are%3A%20evaluating%20%2F%20testing%20%2F%20in%20production%0A%0AWhat%20you%20would%20like%20to%20achieve%3A%20%0A">Talk to me about a pilot</a>
 </p>
-<p style="text-align:center;font-size:14px;color:var(--muted);margin:0 0 46px;">Opens a message to hello@vaara.io with the four things needed to quote you.</p>
+<p style="text-align:center;font-size:14px;color:var(--muted);margin:0 0 46px;">Opens a message to hello@vaara.io. Four lines is plenty; I answer them myself.</p>
 
 <p class="stamp">Buy support now</p>
 <ul>
