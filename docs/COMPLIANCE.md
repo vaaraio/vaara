@@ -727,8 +727,10 @@ for article in report.articles:
 ### From the CLI
 
 ```bash
-# Signed regulator-handoff zip (Ed25519)
-vaara keygen --out-dir ./keys
+# Signed regulator-handoff zip (Ed25519).
+# keygen is for local evaluation only and refuses to run without --dev;
+# for production use keys from your KMS/HSM/Vault, see docs/signing-keys.md.
+vaara keygen --dev --out ./keys/signing_key.pem
 vaara trail export \
     --db ./vaara_audit.db \
     --key ./keys/signing_key.pem \
@@ -737,7 +739,7 @@ vaara trail export \
 # Regulator or auditor verifies
 vaara trail verify \
     --zip ./handoff-2026-04.zip \
-    --public-key ./keys/signing_key.pub
+    --pubkey ./keys/signing_key.pem.pub
 ```
 
 ## Audit trail integrity

@@ -76,8 +76,15 @@ export class VaaraClient {
     return this.post<ScoreResponse>("/v1/score", req);
   }
 
-  async reportOutcome(req: OutcomeRequest): Promise<{ ok: true }> {
-    return this.post<{ ok: true }>("/v1/score/outcome", req);
+  /**
+   * Record what actually happened after a scored action.
+   *
+   * The endpoint answers 204 with no body, so there is nothing to return.
+   * This used to be typed as `{ok: true}`, which meant callers reading
+   * `.ok` got a TypeError on undefined.
+   */
+  async reportOutcome(req: OutcomeRequest): Promise<void> {
+    await this.post<void>("/v1/score/outcome", req);
   }
 
   // ── Audit ────────────────────────────────────────────────────────

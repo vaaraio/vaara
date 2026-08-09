@@ -1,9 +1,14 @@
 /**
  * Wire types for the Vaara HTTP API (v1).
  *
- * Authoritative source: docs/openapi.yaml in the Vaara repository.
- * These types track the v1 contract; if a field is added there, it
- * lands here at the next minor release.
+ * Authoritative source: the Pydantic models in `src/vaara/server/schemas.py`,
+ * which are what the running server accepts and returns.
+ * `tests/test_ts_client_contract.py` drives the real app with the shapes
+ * declared here, so a field that drifts out of the server's models fails
+ * CI rather than reaching npm.
+ *
+ * Request models are `extra="forbid"` server-side: a field named here that
+ * the server does not have is a 422, not a field the server ignores.
  */
 
 export type Decision = "allow" | "escalate" | "deny";
@@ -37,6 +42,8 @@ export interface ScoreRequest {
   blast_radius?: BlastRadius;
   session_id?: string;
   parent_action_id?: string;
+  /** Tenant the call is attributed to on the audit trail. */
+  tenant_id?: string;
   context?: Record<string, unknown>;
 }
 
@@ -44,24 +51,34 @@ export interface RiskBlock {
   point: number;
   lower: number;
   upper: number;
+  /** Miscoverage level of the conformal interval. */
+  alpha: number;
+  bucket: string | null;
+}
+
+export interface Thresholds {
+  allow: number;
+  deny: number;
 }
 
 export interface ScoreResponse {
   action_id: string;
   decision: Decision;
   risk: RiskBlock;
-  signals?: Record<string, number>;
-  backend?: string;
-  composition?: {
-    members: string[];
-    mode: string;
-  };
+  signals: Record<string, number>;
+  mwu_weights: Record<string, number>;
+  thresholds: Thresholds;
+  sequence_risk: number;
+  calibration_size: number;
+  evaluation_ms: number;
+  explanation: string;
 }
 
 export interface OutcomeRequest {
   action_id: string;
   outcome_severity: number;
-  description?: string;
+  /** Free text stored with the outcome. The server field is `notes`. */
+  notes?: string;
 }
 
 export interface AuditEventRequest {
@@ -69,8 +86,8 @@ export interface AuditEventRequest {
   action_id: string;
   agent_id?: string;
   tool_name?: string;
-  data?: Record<string, unknown>;
-  regulatory_articles?: string[];
+  tenant_id?: string;
+  payload?: Record<string, unknown>;
 }
 
 export interface AuditEventResponse {

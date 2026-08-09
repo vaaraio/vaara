@@ -88,6 +88,9 @@ vaara = ["data/adversarial_classifier_v9.joblib", "py.typed"]
 
 [tool.pytest.ini_options]
 testpaths = ["tests"]
+markers = [
+    "network: reaches a public service (PyPI, npm); skips when unreachable",
+]
 
 [tool.ruff]
 line-length = 100

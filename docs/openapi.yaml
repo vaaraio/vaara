@@ -342,6 +342,10 @@ components:
         parent_action_id:
           type: string
           maxLength: 128
+        tenant_id:
+          type: string
+          maxLength: 256
+          description: Tenant the call is attributed to on the audit trail.
         context:
           type: object
           description: Arbitrary additional context. Not used by core scorer.
@@ -430,6 +434,10 @@ components:
         action_id: { type: string }
         agent_id: { type: string }
         tool_name: { type: string }
+        tenant_id:
+          type: string
+          maxLength: 256
+          description: Tenant the event is attributed to on the audit trail.
         payload:
           type: object
           description: Event-type-specific payload.

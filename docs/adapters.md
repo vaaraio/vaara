@@ -54,6 +54,8 @@ vaara-mcp-proxy \
   --upstream 'sap=npx -y @sap/mdk-mcp-server'
 ```
 
+The HTTP transport refuses any request carrying an `Origin` header from another site, which is what stops a web page you happen to visit from driving a loopback-bound proxy: a cross-origin `fetch` needs no preflight when it sends `Content-Type: text/plain`, and the page cannot read the reply but the tool call has already run. Native MCP clients send no `Origin` and are unaffected. For a browser-based client, allow its origin explicitly with `--allow-origin https://console.example` (repeatable, matched exactly) or `VAARA_PROXY_ALLOWED_ORIGINS`.
+
 Each `POST /mcp` reads two headers: `X-Vaara-Upstream` picks the upstream slot, `X-Vaara-Tenant` scopes the policy, audit chain, and OVERT envelope. Single-upstream deployments keep the silent-default contract; multi-upstream deployments require `X-Vaara-Upstream` per call and return 400 with the slot list when it is missing. `vaara serve --policy-dir DIR` loads one policy per file (filename stem becomes `tenant_id`, `default.yaml` is the fallback) and hot-reloads per tenant.
 
 ### Operator perimeter and request attestation
