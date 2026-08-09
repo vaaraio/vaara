@@ -33,6 +33,7 @@ import json
 import logging
 import os
 import re
+import shlex
 import sys
 import threading
 from pathlib import Path
@@ -128,6 +129,12 @@ _MCP_SESSION_ID_MAX_LEN = 128
 # MCP-Protocol-Version header arrived in 2025-06-18; per spec a request that
 # omits it is assumed to be 2025-03-26, and an unrecognised value is a 400.
 _SUPPORTED_HTTP_PROTOCOL_VERSIONS = frozenset({"2025-03-26", "2025-06-18"})
+
+# Largest JSON-RPC batch the proxy will unpack. Batching is part of the
+# 2025-03-26 revision, so it has to work, but one POST that fans out into
+# thousands of upstream calls is an amplifier: the cap keeps a batch to the
+# same order as the traffic a client could send unbatched anyway.
+_MCP_MAX_BATCH_SIZE = 100
 
 
 def _session_id_is_visible_ascii(value: str) -> bool:
@@ -225,7 +232,22 @@ class VaaraMCPProxy:
         policy: Optional[Any] = None,
         shadow: bool = False,
         api_key: Optional[str] = None,
+        allowed_origins: Optional[set[str]] = None,
     ) -> None:
+        # Browser origins permitted on the Streamable HTTP transport. Empty by
+        # default, which refuses every request that carries an Origin header at
+        # all. Native MCP clients send none, so the default costs them nothing;
+        # a browser-based client has to be opted in by exact origin.
+        env_origins = os.environ.get("VAARA_PROXY_ALLOWED_ORIGINS", "")
+        self._allowed_origins: set[str] = {
+            origin.strip()
+            for origin in (allowed_origins or set())
+            if origin and origin.strip()
+        } or {
+            origin.strip()
+            for origin in env_origins.split(",")
+            if origin.strip()
+        }
         # Bearer key for the Streamable HTTP transport. The stdio transport
         # is not affected: it has no network surface. When set, EVERY /mcp
         # request must carry it, and it is checked BEFORE X-Vaara-Tenant and
@@ -449,14 +471,22 @@ class VaaraMCPProxy:
             except json.JSONDecodeError:
                 self._write_to_client(self._error_response(None, -32700, "Parse error"))
                 continue
-            # Notifications (no id) forward silently per JSON-RPC 2.0 §4.1.
-            if isinstance(request, dict) and "id" not in request:
-                try:
-                    self._handle_client_notification(request)
-                except ProxyError:
-                    logger.exception("Failed to forward notification")
-                continue
-            self._write_to_client(self._handle_request(request))
+            # Nothing below may raise past this point. The proxy IS the
+            # governance layer; if one malformed line kills the process, the
+            # client loses its trail and its enforcement together, so an
+            # unforeseen handler failure owes the client -32603 and the loop
+            # has to keep reading.
+            try:
+                response = self._dispatch_message(request)
+            except Exception:
+                logger.exception("Unhandled error dispatching MCP message")
+                response = self._error_response(
+                    request.get("id") if isinstance(request, dict) else None,
+                    -32603,
+                    "Internal proxy error",
+                )
+            if response is not None:
+                self._write_to_client(response)
 
     def _build_http_app(self):
         """Construct the FastAPI app that backs the Streamable HTTP transport.
@@ -527,6 +557,49 @@ class VaaraMCPProxy:
                             ),
                         }},
                     )
+            return await call_next(request)
+
+        # Origin gate. Registered after the key gate, so it runs BEFORE it:
+        # Starlette applies HTTP middleware in reverse registration order, and
+        # a cross-site request should be refused without the key check even
+        # looking at it.
+        #
+        # The MCP Streamable HTTP transport requires servers to validate
+        # Origin, and the default bind here is loopback with no key, which is
+        # exactly the deployment a web page can reach. A cross-origin `fetch`
+        # with `Content-Type: text/plain` is a CORS-simple request: no
+        # preflight, so without this check the tool call executes. The page
+        # cannot read the reply, but the side effect has already happened,
+        # which for a governance proxy is the whole loss.
+        #
+        # Absent Origin is allowed: Claude Code, Cursor and every other native
+        # MCP client sends none. A present Origin must match an operator-listed
+        # value exactly — no prefix or suffix matching, so
+        # `https://console.example.evil.test` never passes for
+        # `https://console.example`. /health stays open for load balancers.
+        @app.middleware("http")
+        async def _proxy_origin_gate(request: _StarletteRequest, call_next):
+            origin = request.headers.get("origin")
+            if (
+                origin is not None
+                and request.url.path != "/health"
+                and origin not in proxy._allowed_origins
+            ):
+                logger.warning(
+                    "refused cross-origin MCP request from %s", _safe_log(origin),
+                )
+                return JSONResponse(
+                    status_code=403,
+                    content={"error": {
+                        "code": "origin_not_allowed",
+                        "message": (
+                            "This proxy refuses requests carrying an Origin "
+                            "header unless the origin is explicitly allowed. "
+                            "Pass --allow-origin (or VAARA_PROXY_ALLOWED_ORIGINS) "
+                            "for a browser-based MCP client."
+                        ),
+                    }},
+                )
             return await call_next(request)
 
         @app.get("/health")
@@ -691,21 +764,9 @@ class VaaraMCPProxy:
             session_token = _REQUEST_SESSION.set(session_value)
             intent_token = _REQUEST_INTENT.set((x_vaara_intent or "").strip())
             try:
-                if isinstance(payload, dict) and "id" not in payload:
-                    # _handle_client_notification forwards to the upstream via a
-                    # blocking sync notify(); offload it on the same copied
-                    # context as the request path so a slow upstream notify does
-                    # not park the event loop and serialise other HTTP traffic.
-                    nctx = contextvars.copy_context()
-                    try:
-                        await asyncio.to_thread(
-                            nctx.run, proxy._handle_client_notification, payload,
-                        )
-                    except ProxyError:
-                        logger.exception("Failed to forward HTTP notification")
-                    return Response(status_code=202)
-                # _handle_request is a blocking sync call that waits on the
-                # upstream (up to its request timeout). Running it inline would
+                # _dispatch_message is a blocking sync call that waits on the
+                # upstream (up to its request timeout), whether it forwards a
+                # notification, one request, or a batch. Running it inline would
                 # park the event loop for the whole call, serialising every
                 # other POST /mcp, GET /mcp drain, and /health to concurrency 1.
                 # Offload to a worker thread. The per-request ContextVars set
@@ -714,8 +775,14 @@ class VaaraMCPProxy:
                 # context and run the handler inside it on the worker thread.
                 ctx = contextvars.copy_context()
                 response = await asyncio.to_thread(
-                    ctx.run, proxy._handle_request, payload,
+                    ctx.run, proxy._dispatch_message, payload,
                 )
+                # Nothing to answer: the message was a notification, or a batch
+                # made up entirely of notifications. Per the transport spec
+                # that is 202 Accepted with an empty body, not an empty JSON
+                # object a client would try to correlate to a request id.
+                if response is None:
+                    return Response(status_code=202)
                 return JSONResponse(content=response)
             finally:
                 _REQUEST_UPSTREAM.reset(upstream_token)
@@ -966,11 +1033,78 @@ class VaaraMCPProxy:
         else:
             self._upstream.notify(payload)
 
-    def _handle_request(self, request: Any) -> dict:
+    def _dispatch_message(self, message: Any) -> Any:
+        """Route one inbound JSON-RPC message and return what to send back.
+
+        Returns ``None`` when there is nothing to answer: a notification, or a
+        batch made of nothing but notifications. Both transports treat that as
+        "write no reply" (stdio) / 202 Accepted (HTTP).
+        """
+        if isinstance(message, list):
+            return self._handle_batch(message)
+        # Notifications (no id) forward silently per JSON-RPC 2.0 §4.1.
+        if isinstance(message, dict) and "id" not in message:
+            try:
+                self._handle_client_notification(message)
+            except ProxyError:
+                logger.exception("Failed to forward notification")
+            return None
+        return self._handle_request(message)
+
+    def _handle_batch(self, batch: list) -> Any:
+        """Dispatch a JSON-RPC batch, per JSON-RPC 2.0 §6.
+
+        Batching is part of the MCP 2025-03-26 revision the transport
+        advertises (and the revision assumed when a client sends no
+        MCP-Protocol-Version at all), so rejecting an array outright refused
+        traffic the proxy claims to speak. Members are dispatched in order and
+        each one gets its own reply; notification members get none. A batch
+        whose members are all notifications produces no response array at all,
+        which is the spec's own wording.
+        """
+        if not batch:
+            return self._error_response(
+                None, -32600, "Invalid Request: empty batch",
+            )
+        if len(batch) > _MCP_MAX_BATCH_SIZE:
+            return self._error_response(
+                None, -32600,
+                f"Invalid Request: batch of {len(batch)} messages exceeds the "
+                f"{_MCP_MAX_BATCH_SIZE}-message limit",
+            )
+        responses: list[dict] = []
+        for member in batch:
+            if isinstance(member, list):
+                # JSON-RPC has no nested batches; answering per element keeps
+                # the reply correlatable instead of failing the whole batch.
+                responses.append(self._error_response(
+                    None, -32600, "Invalid Request: nested batch",
+                ))
+                continue
+            if isinstance(member, dict) and "id" not in member:
+                try:
+                    self._handle_client_notification(member)
+                except ProxyError:
+                    logger.exception("Failed to forward batched notification")
+                continue
+            responses.append(self._handle_request(member))
+        return responses or None
+
+    def _handle_request(self, request: Any) -> Any:
+        if isinstance(request, list):
+            return self._handle_batch(request)
         if not isinstance(request, dict):
             return self._error_response(None, -32600, "Invalid Request: not a JSON object")
         method = request.get("method", "")
         req_id = request.get("id")
+        if not isinstance(method, str):
+            # Every downstream branch compares or hashes this value, and
+            # _is_transport_noise calls .startswith on it. A non-string method
+            # used to raise out of here: over stdio that killed the proxy, over
+            # HTTP it surfaced as a 500 instead of a JSON-RPC error.
+            return self._error_response(
+                req_id, -32600, "Invalid Request: 'method' must be a string",
+            )
         if method == "tools/call":
             try:
                 return self._handle_tools_call(request)
@@ -1780,6 +1914,18 @@ def main(argv: Optional[list[str]] = None) -> None:
         ),
     )
     parser.add_argument(
+        "--allow-origin", action="append", default=[], dest="allow_origins",
+        metavar="ORIGIN",
+        help=(
+            "Browser origin permitted on --transport http, e.g. "
+            "https://console.example (repeatable, matched exactly). Falls back "
+            "to VAARA_PROXY_ALLOWED_ORIGINS (comma-separated). By default any "
+            "request carrying an Origin header is refused with 403, which is "
+            "what stops a web page from driving a loopback-bound proxy. Native "
+            "MCP clients send no Origin and are unaffected."
+        ),
+    )
+    parser.add_argument(
         "--allow-unauthenticated",
         action="store_true",
         help=(
@@ -1929,6 +2075,7 @@ def main(argv: Optional[list[str]] = None) -> None:
             policy=policy_obj,
             shadow=args.shadow,
             api_key=args.api_key,
+            allowed_origins=set(args.allow_origins) if args.allow_origins else None,
         )
     except (ValueError, ProxyError) as e:
         # ProxyError here means a --upstream-url target was refused by the SSRF
@@ -1961,10 +2108,20 @@ def _parse_upstream_specs(
 
     Each ``--upstream`` is either ``NAME=CMD`` (named — NAME is a short
     alphanumeric slug) or ``CMD`` (lands under "default"). Commands that
-    contain ``=`` (e.g. ``python -m foo --bar=baz``) stay intact because
+    contain ``=`` (e.g. ``python -m foo --bar=baz``) keep the ``=`` because
     the NAME-prefix check rejects anything whose left-of-``=`` half isn't
     a valid slug. Legacy ``--upstream-arg`` values append to the first
     named slot for back-compat with single-upstream callers.
+
+    The command is split the way a shell would (``shlex``), because the value
+    becomes the argv of ``subprocess.Popen`` with no shell. Keeping it as one
+    string made ``--upstream 'github=npx -y @github/mcp-server'`` — the form
+    docs/adapters.md shows for fan-out — look for a file literally named
+    ``npx -y @github/mcp-server`` and fail with FileNotFoundError.
+
+    Duplicate slots raise rather than overwrite. Two bare ``--upstream``
+    values both resolve to "default", so silently keeping the last one handed
+    the operator a one-member fleet when they asked for two.
     """
     upstreams: dict[str, list[str]] = {}
     first_name: Optional[str] = None
@@ -1979,11 +2136,23 @@ def _parse_upstream_specs(
                 name, command = "default", spec
         else:
             name, command = "default", spec
-        if not name or not command:
+        try:
+            argv = shlex.split(command)
+        except ValueError as exc:
+            raise SystemExit(
+                f"invalid --upstream value {spec!r}: {exc}",
+            ) from exc
+        if not name or not argv:
             raise SystemExit(
                 f"invalid --upstream value {spec!r}; expected NAME=CMD or CMD",
             )
-        upstreams[name] = [command]
+        if name in upstreams:
+            raise SystemExit(
+                f"duplicate --upstream slot {name!r}; each slot is one upstream "
+                "(two bare --upstream values both land under 'default', so name "
+                "them: --upstream a=CMD --upstream b=CMD)",
+            )
+        upstreams[name] = argv
         if first_name is None:
             first_name = name
     if legacy_args and first_name is not None:

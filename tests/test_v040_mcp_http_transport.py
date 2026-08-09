@@ -31,9 +31,13 @@ def test_parse_upstream_specs_named_slot():
 
 
 def test_parse_upstream_specs_command_with_equals_stays_intact():
-    """A command like `python -m foo --bar=baz` must NOT be split at '='."""
+    """A command like `python -m foo --bar=baz` must NOT be split at '='.
+
+    It is split into argv, because the value is handed to subprocess.Popen
+    with no shell, but the '=' inside the flag survives.
+    """
     result = _parse_upstream_specs(["python -m foo --bar=baz"], [])
-    assert result == {"default": ["python -m foo --bar=baz"]}
+    assert result == {"default": ["python", "-m", "foo", "--bar=baz"]}
 
 
 def test_parse_upstream_specs_legacy_args_join_first_slot():
@@ -50,8 +54,8 @@ def test_parse_upstream_specs_unknown_name_pattern_falls_to_default():
     """Names that aren't simple slugs aren't treated as NAME= prefix."""
     result = _parse_upstream_specs(["python -m srv=foo"], [])
     # The left side ("python -m srv") fails the slug regex, so the whole
-    # spec is treated as a bare command under "default".
-    assert result == {"default": ["python -m srv=foo"]}
+    # spec is treated as a bare command under "default" and split into argv.
+    assert result == {"default": ["python", "-m", "srv=foo"]}
 
 
 # ── VaaraMCPProxy multi-upstream constructor ───────────────────────────────

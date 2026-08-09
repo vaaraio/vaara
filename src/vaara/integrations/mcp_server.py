@@ -110,6 +110,17 @@ def _strict_json_dumps(obj: Any, **kwargs: Any) -> str:
     return json.dumps(_scrub_nonfinite(obj), allow_nan=False, **kwargs)
 
 
+# Largest JSON-RPC batch the server will unpack. Batching is part of
+# JSON-RPC 2.0 §6, so an array has to work, but one line of stdin that fans
+# out into thousands of scorer evaluations is an amplifier.
+_MCP_MAX_BATCH_SIZE = 100
+
+# Methods a client may legitimately send with no ``id``. Everything else
+# without an id is malformed: JSON-RPC forbids a reply, so executing it
+# anyway would run a governed tool whose decision nobody can read.
+_CLIENT_NOTIFICATION_PREFIX = "notifications/"
+
+
 class _InvalidParams(Exception):
     """Marker raised by tool handlers when params don't match the contract.
     handle_request maps this to JSON-RPC -32602 (Invalid params)."""
@@ -323,11 +334,18 @@ class VaaraMCPServer:
         if self._required_api_key:
             logger.info("VaaraMCPServer: API key authentication enabled")
 
-    def handle_request(self, request: Any) -> dict:
-        """Handle a single JSON-RPC 2.0 request."""
+    def handle_request(self, request: Any) -> Any:
+        """Handle one JSON-RPC 2.0 message: a single request or a batch.
+
+        Returns the response object, a list of them for a batch, or ``None``
+        when there is nothing to answer (a notification, or a batch made
+        entirely of notifications).
+        """
+        if isinstance(request, list):
+            return self._handle_batch(request)
         # JSON-RPC 2.0 §5: a non-object request is an Invalid Request.
-        # Lists (batches), strings, numbers, and null must not crash the
-        # server — return -32600 so the client sees a well-formed error.
+        # Strings, numbers, and null must not crash the server — return
+        # -32600 so the client sees a well-formed error.
         if not isinstance(request, dict):
             return self._error_response(None, -32600, "Invalid Request: not a JSON object")
 
@@ -335,10 +353,33 @@ class VaaraMCPServer:
         params = request.get("params", {})
         req_id = request.get("id")
 
+        # §4: method is a String. A non-string one is compared and prefixed
+        # below, so reject it here rather than let it reach str.startswith.
+        if not isinstance(method, str):
+            if "id" not in request:
+                return None
+            return self._error_response(
+                req_id, -32600, "Invalid Request: 'method' must be a string",
+            )
+
         # params must be a structured value (object or array) per §4.2.
         # A non-dict params coerces to empty for downstream dict access.
         if not isinstance(params, dict):
             params = {}
+
+        # A message with no id is a notification: §4.1 forbids a reply. Only
+        # notifications/* is a real one. Dispatching anything else here used
+        # to execute the method and discard the result, so a `tools/call`
+        # that omitted its id ran a full interception, wrote the decision to
+        # the trail, and returned nothing to act on — the trail claimed a
+        # verdict that never reached the caller.
+        if "id" not in request:
+            if not method.startswith(_CLIENT_NOTIFICATION_PREFIX):
+                logger.warning(
+                    "ignoring %r sent without an id; only %s* may be a "
+                    "notification", method, _CLIENT_NOTIFICATION_PREFIX,
+                )
+            return None
 
         try:
             if method == "initialize":
@@ -365,6 +406,55 @@ class VaaraMCPServer:
             return self._error_response(req_id, -32603, "Internal server error")
 
         return {"jsonrpc": "2.0", "id": req_id, "result": result}
+
+    def _handle_batch(self, batch: list) -> Any:
+        """Dispatch a JSON-RPC batch per §6.
+
+        Members are handled in order and each request gets its own response;
+        notification members get none. A batch of nothing but notifications
+        produces no response array at all, which is the spec's own wording.
+        """
+        if not batch:
+            return self._error_response(
+                None, -32600, "Invalid Request: empty batch",
+            )
+        if len(batch) > _MCP_MAX_BATCH_SIZE:
+            return self._error_response(
+                None, -32600,
+                f"Invalid Request: batch of {len(batch)} messages exceeds the "
+                f"{_MCP_MAX_BATCH_SIZE}-message limit",
+            )
+        responses = []
+        for member in batch:
+            if isinstance(member, list):
+                responses.append(self._error_response(
+                    None, -32600, "Invalid Request: nested batch",
+                ))
+                continue
+            response = self.handle_request(member)
+            if response is not None:
+                responses.append(response)
+        return responses or None
+
+    def _require_api_key(self, params: dict) -> None:
+        """Enforce the optional shared key on a data-bearing surface.
+
+        No-op when VAARA_API_KEY is unset, which is the single-tenant stdio
+        contract where process isolation is the boundary. When it IS set the
+        key gates every surface that returns Vaara's own state, not only
+        tools/call: vaara://compliance is the full assessment and
+        vaara://status carries scorer and calibration state, so leaving the
+        resource surface open made the key look like protection it was not.
+        """
+        if not self._required_api_key:
+            return
+        provided = params.pop("_api_key", None)
+        if not isinstance(provided, str) or not secrets.compare_digest(
+            provided, self._required_api_key
+        ):
+            raise _InvalidParams(
+                "Authentication required: missing or invalid _api_key",
+            )
 
     # ── Protocol handlers ────────────────────────────────────────
 
@@ -415,12 +505,9 @@ class VaaraMCPServer:
         if not isinstance(arguments, dict):
             arguments = {}
 
-        if self._required_api_key:
-            provided = arguments.pop("_api_key", None)
-            if not isinstance(provided, str) or not secrets.compare_digest(
-                provided, self._required_api_key
-            ):
-                raise _InvalidParams("Authentication required: missing or invalid _api_key")
+        # The key travels inside `arguments` for tool calls, which is where
+        # the documented clients put it.
+        self._require_api_key(arguments)
 
         if tool_name == "vaara_check":
             return self._call_check(arguments)
@@ -439,6 +526,7 @@ class VaaraMCPServer:
         }
 
     def _handle_resources_read(self, params: dict) -> dict:
+        self._require_api_key(params)
         uri = params.get("uri", "")
         if uri == "vaara://status":
             content = _strict_json_dumps(self._pipeline.status(), indent=2)
@@ -746,14 +834,21 @@ class VaaraMCPServer:
                 sys.stdout.flush()
                 continue
 
-            # JSON-RPC 2.0 §4.1: notifications (no "id") MUST NOT get a
-            # response. MCP sends notifications/initialized, notifications/
-            # cancelled, etc. — answering them confuses the client.
-            # Non-dict requests (lists, strings, null) get an Invalid
-            # Request error from handle_request and must be written back.
-            is_notification = isinstance(request, dict) and "id" not in request
-            response = self.handle_request(request)
-            if not is_notification:
+            # handle_request returns None when there is nothing to answer:
+            # JSON-RPC 2.0 §4.1 forbids a response to a notification, and a
+            # batch of nothing but notifications is the same case. Anything
+            # else — including the Invalid Request error for a string or a
+            # null — has to be written back. A handler crash must not take
+            # the loop down with it; the client is owed a reply either way.
+            try:
+                response = self.handle_request(request)
+            except Exception:
+                logger.exception("Unhandled error dispatching MCP message")
+                response = self._error_response(
+                    request.get("id") if isinstance(request, dict) else None,
+                    -32603, "Internal server error",
+                )
+            if response is not None:
                 sys.stdout.write(_strict_json_dumps(response) + "\n")
                 sys.stdout.flush()
 
