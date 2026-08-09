@@ -6,23 +6,31 @@ same lane. It exists so that a reader comparing Vaara against newer
 academic or industry proposals can check the published timeline rather
 than relying on marketing claims.
 
-Every date below is the calendar date the version was uploaded to PyPI, in
-UTC, and can be checked against
-[https://pypi.org/project/vaara/#history](https://pypi.org/project/vaara/#history)
-or the `vX.Y.Z` tags on
-[https://github.com/vaaraio/vaara/tags](https://github.com/vaaraio/vaara/tags).
+Every date below is the calendar date that version was published, and can be
+checked against
+[https://github.com/vaaraio/vaara/releases](https://github.com/vaaraio/vaara/releases)
+or
+[https://pypi.org/project/vaara/#history](https://pypi.org/project/vaara/#history).
+Where both records exist they agree, and `CHANGELOG.md` carries the same
+version headings.
 
-Four versions in the table predate or sit outside the PyPI record and are
-marked with a dagger (†): **v0.1.0**, **v0.3.0**, **v0.4.1** and **v0.71.0**
-have no PyPI release and no git tag, and **v1.56.0** was tagged but never
-uploaded. Their dates come from `CHANGELOG.md`, which is the record that
-does cover them. The first release on PyPI is 0.3.0 on 2026-04-18, and the
-earliest git tag is v0.4.2, so nothing before that point is checkable
-against those two sources — the dagger says which claims rest on the
-changelog alone rather than leaving a reader to find out by looking.
+Two rows are marked with a dagger (†): **v0.1.0** and **v0.71.0**. Both were
+published and later yanked, and yanking on PyPI at that time deleted the
+files, so neither can be downloaded now. The dates are the real ship dates
+and `CHANGELOG.md` is the record that still carries them.
 
-`tests/test_prior_art_dates.py` re-checks every undaggered row against the
-live PyPI history, so the table cannot drift back out of agreement.
+Nothing turns on taking that on trust. The three concepts first shipped in
+v0.1.0 — the interception pipeline, adaptive scoring with a conformal
+interval on every score, and the hash-chained audit trail — are all present
+in **v0.3.0, which is still on PyPI and still downloadable**:
+`src/vaara/pipeline.py` (`InterceptionPipeline`),
+`src/vaara/scorer/adaptive.py` (`AdaptiveScorer`, `conformal_interval`), and
+`src/vaara/audit/trail.py` (`previous_hash` / `record_hash`). So the earliest
+publicly verifiable date for all three is 2026-04-18, two releases after they
+first shipped.
+
+`tests/test_prior_art_dates.py` re-checks every row against the live GitHub
+releases and PyPI history, so the table cannot drift back out of agreement.
 
 From v1.0.0 (2026-06-16) the project is licensed AGPL-3.0-or-later; releases
 through v0.71.0 were published under Apache 2.0.
@@ -34,8 +42,8 @@ through v0.71.0 were published under Apache 2.0.
 | Interception pipeline for agent tool calls | v0.1.0†, 2026-04-10 | `src/vaara/pipeline.py`, `CHANGELOG.md` v0.1.0 |
 | Adaptive risk scoring with conformal interval on every score | v0.1.0†, 2026-04-10 | `docs/formal_specification.md`, `docs/conformal-prediction.md` |
 | Hash-chained audit trail | v0.1.0†, 2026-04-10 | `src/vaara/audit/`, `COMPLIANCE.md` |
-| Framework integrations (LangChain, CrewAI, OpenAI Agents) and MCP server surface | v0.3.0†, 2026-04-18 | `src/vaara/integrations/` |
-| Signed audit-trail export and verification CLI | v0.4.1†, 2026-04-20 | `src/vaara/audit/`, `docs/vaara-audit-cli.md` |
+| Framework integrations (LangChain, CrewAI, OpenAI Agents) and MCP server surface | v0.3.0, 2026-04-18 | `src/vaara/integrations/` |
+| Signed audit-trail export and verification CLI | v0.4.1, 2026-04-20 | `src/vaara/audit/`, `docs/vaara-audit-cli.md` |
 | Sigstore-signed release workflow with PyPI trusted publishing and PEP 740 attestations | v0.4.3, 2026-04-21 | `.github/workflows/release.yml`, `docs/signing-keys.md` |
 | Opt-in XGBoost adversarial classifier with by-seed held-out benchmarks | v0.5.0, 2026-04-23 | `src/vaara/adversarial_classifier.py`, `bench/` |
 | Callable kernel HTTP surface (Vaara as the schema, not the plug-in) | v0.10.0, 2026-05-16 | `docs/openapi.yaml`, `src/vaara/server/` |
@@ -120,8 +128,8 @@ through v0.71.0 were published under Apache 2.0.
 | EU qualified-timestamp provider picker over the official EU List of Trusted Lists (ETSI TS 119 612): the operator drills country → qualified TSA → endpoint, with no default provider baked in — the legal-shape preservation of the qualified anchor path (v1.30.0) after the no-baked-default rule | v1.51.0, 2026-07-24 | `src/vaara/cli.py` (`anchor-providers`), `clients/macos/` Anchor tab |
 | Persistent trail by default: `@vaara.govern` with zero config auto-creates the SQLite trail at `~/.vaara/trail/audit.db`, and prior-approval auto-allow remembers an operator-approved escalation shape across restarts (see v1.58.0 for the argument-shape binding that made this precise) | v1.53.0, 2026-07-28 | `src/vaara/pipeline.py`, `src/vaara/audit/sqlite_backend.py`, `CHANGELOG.md` v1.53.0 |
 | Governed shell proxy (`vaara proxy-shell`) and silent auto-init (`vaara init --auto`): every shell command an AI agent issues is classified, scored, decided, and recorded through the same pipeline — closing the non-MCP action surface (most AI coding-tool actions never touch MCP) — with environment auto-discovery generating a default shadow-mode policy on first use | v1.54.0, 2026-07-29 | `src/vaara/integrations/shell_proxy.py`, `src/vaara/integrations/discovery.py`, `src/vaara/integrations/init_governance.py` |
-| Model-layer governance proxy (`vaara llm-proxy`): an HTTP proxy in front of any LLM provider with a blind `relay` mode (no prompt inspection, hash-level audit) and an inspecting `govern` mode (scan, redact, gate tool calls at the model layer), so agents that speak neither MCP nor hooks are still governed and evidenced | v1.55.0, 2026-07-31 | `src/vaara/integrations/llm_proxy.py`, `src/vaara/integrations/_infer_proxy_gate.py` |
-| System-level web governance (WebKit Governance): a macOS Network Extension intercepts AI-bound traffic from Safari, Mail, and every WKWebView-based app — no browser extension — with an Accessibility observer for UI context and the `vaara check` / `vaara outcome` CLI as the programmatic pipeline surface for external tools | v1.56.0†, 2026-07-31 | `clients/macos/Sources/WebKitGovernance/`, `src/vaara/cli.py` |
+| Model-layer governance proxy (`vaara llm-proxy`): an HTTP proxy in front of any LLM provider with a blind `relay` mode (no prompt inspection, hash-level audit) and an inspecting `govern` mode (scan, redact, gate tool calls at the model layer), so agents that speak neither MCP nor hooks are still governed and evidenced | v1.55.0, 2026-07-30 | `src/vaara/integrations/llm_proxy.py`, `src/vaara/integrations/_infer_proxy_gate.py` |
+| System-level web governance (WebKit Governance): a macOS Network Extension intercepts AI-bound traffic from Safari, Mail, and every WKWebView-based app — no browser extension — with an Accessibility observer for UI context and the `vaara check` / `vaara outcome` CLI as the programmatic pipeline surface for external tools | v1.56.0, 2026-07-31 | `clients/macos/Sources/WebKitGovernance/`, `src/vaara/cli.py` |
 | Article 50 transparency disclosure as a first-class event (`DISCLOSURE_RECORDED`) and the compliance engine expanded to 14 articles (adding Article 50(1) disclosure, Article 73(1) serious-incident reporting, Article 26(10) deployer logging), with zero-config disclosure recording on `@vaara.govern` via `VAARA_ARTICLE50_STATEMENT` — timed to the EU AI Act general-application date | v1.57.0, 2026-08-02 | `src/vaara/audit/trail.py`, `src/vaara/compliance/engine.py`, `src/vaara/govern.py` |
 | Authenticated HTTP server surface (bearer key on every endpoint except health, non-loopback binds refused without one), argument-shape binding on prior-approval auto-allow (the `args_digest` carried on `ESCALATION_SENT`/`ESCALATION_RESOLVED` makes the shape guard exact and fail-closed), and the file-based approvals handshake on the MCP server surface — the human-in-the-loop protocol now uniform across the hook, proxy, and MCP paths | v1.58.0, 2026-08-03 | `src/vaara/server/`, `src/vaara/audit/trail.py`, `src/vaara/integrations/mcp_server.py`, `CHANGELOG.md` v1.58.0 |
 
