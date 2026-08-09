@@ -53,6 +53,8 @@ def _pypi_dates() -> dict[str, str]:
             releases = json.load(response)["releases"]
     except (urllib.error.URLError, TimeoutError, OSError) as exc:
         pytest.skip(f"PyPI unreachable: {exc}")
+        return {}  # unreachable: pytest.skip raises. Static analysers cannot
+                   # see that, and read `releases` below as possibly unbound.
     return {
         f"v{version}": files[0]["upload_time"][:10]
         for version, files in releases.items()
@@ -80,6 +82,7 @@ def _github_dates() -> dict[str, str]:
                 batch = json.load(response)
         except (urllib.error.URLError, TimeoutError, OSError) as exc:
             pytest.skip(f"GitHub releases unreachable: {exc}")
+            return {}  # unreachable, same reason as _pypi_dates
         if not batch:
             break
         for release in batch:
