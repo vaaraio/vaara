@@ -4,6 +4,112 @@ All notable changes to this project are documented here.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/)
 and this project follows [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [1.63.0] - 2026-08-09
+
+Thirteen defects across the MCP proxy, the MCP server, the inference path,
+and the outward artefacts. Same method as 1.62.0 and the same lesson: every
+one of these survived a passing suite because the tests asserted what the
+code assumed rather than what the protocol, the server, or the operating
+system actually does.
+
+The one to read first is the cross-site hole. Every local HTTP surface Vaara
+ships binds loopback and takes no inbound credential, on the reasoning that
+only the operator can reach the port. A browser breaks that reasoning. A page
+the operator visits can post to 127.0.0.1, and a cross-origin request sending
+`Content-Type: text/plain` is a CORS-simple request, so it goes out with no
+preflight to refuse. None of these surfaces checked Content-Type before
+parsing the body as JSON. The attacking page cannot read the reply, but the
+call already ran: a tool executed, an LLM call spent the operator's upstream
+key, a turn landed in the audit trail attributed to someone else. The MCP
+Streamable HTTP spec requires servers to validate the Origin header and Vaara
+was not doing it.
+
+The second one is the model-layer gate failing open. It promises that every
+tool call a model requests is decided before the agent sees it, and it broke
+that promise three ways, all the same mistake: treating "I could not read
+this" as "there was nothing here."
+
+### Security
+
+- The Streamable HTTP transport on `vaara-mcp-proxy`, `vaara llm-proxy`,
+  `vaara-infer-proxy` and the console now refuse any request carrying an
+  `Origin` header from another site. A missing Origin still passes, which is
+  what every native MCP client sends, and so does the server's own page, so
+  the console keeps working. Allow a browser client explicitly with
+  `--allow-origin https://example.com` (repeatable, matched exactly) or
+  `VAARA_PROXY_ALLOWED_ORIGINS`.
+- `VAARA_API_KEY` on the MCP server gated `tools/call` and nothing else, so
+  `vaara://compliance` and `vaara://status` stayed readable without the key.
+  Both surfaces go through one check now.
+- Remote upstream replies are bounded. The inbound endpoint stopped a client
+  message at 1 MiB, but `--upstream-url` replies were read with no cap and
+  the SSE reader looped until the upstream chose to stop. A remote upstream
+  is the direction the SSRF egress floor exists to distrust, and it could
+  exhaust the proxy by answering one request with an endless body.
+
+### Fixed
+
+- The model-layer gate forwarded a buffered response it could not parse,
+  replayed a stream it could not reconstruct, and skipped a tool call whose
+  shape it did not recognise. All three now refuse. Observe mode is
+  unchanged and stays byte-for-byte passthrough.
+- A `tools/call` sent to the MCP server without an `id` ran a full
+  interception and threw the decision away, so the trail recorded a verdict
+  the caller never received. Only `notifications/*` may omit an id now.
+- A non-string `method` raised out of the proxy's dispatcher. Over stdio that
+  killed the process, because the read loop had no guard, and one malformed
+  line took the governance layer down with it.
+- JSON-RPC batches were rejected with -32600 although the transport
+  advertises MCP 2025-03-26, where batching is part of the contract and is
+  the revision assumed when a client sends no version header.
+- `--upstream 'name=cmd with args'` produced a one-element argv, so
+  `subprocess.Popen` looked for a file whose name was the whole string. The
+  fan-out form printed in `docs/adapters.md` could never start an upstream.
+  Commands are split with `shlex` now, and a duplicate slot raises instead of
+  silently shrinking the fleet.
+- `vaara[llm-proxy]` could not start. The app builds its client with
+  `http2=True` and the extra installed plain `httpx`, so construction raised
+  ImportError. The extra pulls `httpx[http2]` now and the app drops to
+  HTTP/1.1 rather than dying when `h2` is missing.
+- The generated systemd unit joined the proxy argv into one `ExecStart` line,
+  which systemd re-splits on whitespace. A home directory with a space in it
+  produced a unit that started the proxy with the wrong arguments. The
+  launchd path was always correct because its ProgramArguments is a real
+  array; a test now asserts the two renderers agree.
+- A damaged audit database raised a bare "file is not a database" that named
+  neither the path nor what it was. The error says which file now, and says
+  not to delete it, because those records are the evidence.
+- `vaara llm-proxy --version` reported a hardcoded 1.56.0.
+
+### Changed
+
+- `@vaara/client` had two methods that could not work. `appendAuditEvent`
+  sent `data` and `regulatory_articles` where the server takes `payload` and
+  `tenant_id`, and `reportOutcome` sent `description` where the server takes
+  `notes`. Both server models forbid extra fields, so both calls were a 422.
+  `reportOutcome` was also typed as returning a body from an endpoint that
+  answers 204, so callers reading `.ok` got a TypeError. `ScoreRequest` had
+  no `tenant_id`, which left multi-tenant attribution unreachable from
+  TypeScript, and `ScoreResponse` omitted six fields the server always sends
+  while promising two it never sends.
+- `docs/openapi.yaml` was missing `tenant_id` on `ScoreRequest` and
+  `AuditEventRequest`.
+- `docs/PRIOR_ART.md` had twelve dates no public release record supported and
+  five evidence paths pointing at files that had moved or never existed, one
+  of them an npm package name that 404s. Dates are checked against the GitHub
+  releases and the PyPI history now. Two rows are marked as releases that
+  shipped and were later yanked, back when yanking on PyPI deleted the files.
+- `docs/COMPLIANCE.md` printed a regulator-handoff sequence in which three of
+  the four commands failed as written.
+
+### Added
+
+- Contract tests that drive the real thing instead of a fixture: the
+  published TypeScript types against the running FastAPI app, `openapi.yaml`
+  against the server models, every documented CLI flag against the real
+  argparse tree of each console script, and the `PRIOR_ART.md` dates against
+  the live GitHub releases and PyPI history.
+
 
 ## [1.62.0] - 2026-08-08
 
