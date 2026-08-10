@@ -6,28 +6,27 @@ V031 := $(ADV)/v031
 
 help:
 	@echo "Targets:"
-	@echo "  bench              reproduce the current bench doc numbers (v0.35)"
+	@echo "  bench              reproduce the current bench doc numbers (v0.39)"
 	@echo "  repro-v031-bench   reproduce the historical v0.31 bench numbers"
+	@echo ""
+	@echo "bench needs the ml extra: pip install 'vaara[ml]'"
+	@echo "The first run downloads the MiniLM embedding model, so it needs"
+	@echo "network access once. Everything after that is offline."
 
-# Current bench reproduction. Always points at the latest released
-# methodology (currently bench/vaara-bench-v0.35.md). Anyone cloning
-# at a tagged commit can run this and get the same SHAs and numbers.
+# Current bench reproduction, against bench/vaara-bench-v0.39.md and the v8
+# and v9 bundles that actually ship in src/vaara/data/.
+#
+# This target used to evaluate adversarial_classifier_v6 and _v3 against the
+# v0.35 split. Neither bundle is in the tree any more, so the target failed on
+# a missing file, while the README told a reader every published figure was
+# reproducible by running it. Pointing it at the script that produced the
+# published artifact keeps the two in step.
 bench:
-	@echo "[1/3] verify corpus integrity (includes v0.35 matched-benign additions)"
+	@echo "[1/2] verify corpus integrity"
 	cd $(ADV) && sha256sum -c MANIFEST.sha256 > /dev/null
-	@echo "[2/3] evaluate production v6 bundle on v035_split TEST"
-	$(PY) scripts/eval_v032.py \
-		--bundle src/vaara/data/adversarial_classifier_v6.joblib \
-		--split-manifest $(ADV)/v035_split.json \
-		--target-fpr 0.05 \
-		--json-out bench/v035_eval_v6.json
-	@echo "[3/3] cross-eval v3 on v035_split TEST (regression control)"
-	$(PY) scripts/eval_v032.py \
-		--bundle src/vaara/data/adversarial_classifier_v3.joblib \
-		--split-manifest $(ADV)/v035_split.json \
-		--target-fpr 0.05 \
-		--json-out bench/v035_eval_v3_cross.json
-	@echo "done. compare SHAs to bench/vaara-bench-v0.35.md."
+	@echo "[2/2] calibrate and evaluate v9 across the four v0.39 surfaces"
+	$(PY) scripts/eval_v039_v9.py --json-out bench/v039_v9_eval.json
+	@echo "done. compare against bench/vaara-bench-v0.39.md."
 
 # End-to-end reproduction of bench/vaara-bench-v0.31.md. Anyone cloning
 # the repo at a tagged commit can run this and get the same SHAs and

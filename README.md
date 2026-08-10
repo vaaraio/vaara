@@ -44,7 +44,9 @@ def transfer_funds(to: str, amount: float) -> str:
     ...
 ```
 
-That is the whole thing. Every call to a governed function is risk-scored and decided against your policy before the body runs. A blocked call raises `vaara.Blocked`; an allowed call runs, and the decision, the call, and the outcome land in a hash-chained, tamper-evident record anyone can verify offline — sign it at export (`vaara trail export`) for third-party proof. Records persist to `~/.vaara/trail/audit.db` by default, so evidence survives restarts. Python 3.10+, zero runtime dependencies.
+That is the whole thing. Every call to a governed function is risk-scored and decided against your policy before the body runs. An allowed call runs, and the decision, the call, and the outcome land in a hash-chained, tamper-evident record anyone can verify offline. Sign it at export (`vaara trail export`) for third-party proof. Records persist to `~/.vaara/trail/audit.db` by default, so evidence survives restarts. Python 3.10+, zero runtime dependencies.
+
+Both `deny` and `escalate` raise `vaara.Blocked`, since an escalation means a human has not answered yet. Run the example above on a fresh install and it will raise: with no outcome history the scorer's confidence interval is wide, and a `tx.transfer` escalates on the interval's upper bound even though its point estimate sits under the allow threshold. That is the intended direction to fail, and it settles. Feeding real outcomes back through `report_outcome` narrows the interval, and the same call starts allowing after a few dozen clean results. To watch decisions without acting on them while that happens, start with `@vaara.govern(shadow=True)`.
 
 <details>
 <summary><b>Prefer the explicit pipeline?</b></summary>
@@ -164,11 +166,11 @@ Start with `--shadow`: every call is classified, scored, and recorded, nothing i
 <details>
 <summary><b>How it scores</b></summary>
 
-Each risk score blends five expert signals and keeps adapting as outcomes come back, and it carries a confidence interval with a coverage guarantee that holds regardless of the input distribution. On a held-out adversarial corpus the classifier reaches **84.7%** recall (95% Wilson [82.4, 86.7]) at a **4.1%** false-positive rate, and **1.2%** FPR on benign calls under live injection pressure. The hot-path rule scorer adds 140 µs mean per call on commodity CPU; the ML classifier is opt-in (`vaara[ml]`) and off that path. Every figure is reproducible via `make bench`.
+Each risk score blends five expert signals and keeps adapting as outcomes come back, and it carries a confidence interval with a coverage guarantee that holds regardless of the input distribution. On a held-out adversarial corpus the classifier reaches **84.7%** recall (95% Wilson [82.4, 86.7]) at a **4.1%** false-positive rate, and **1.2%** FPR on benign calls under live injection pressure. The hot-path rule scorer adds 140 µs mean per call on commodity CPU; the ML classifier is opt-in (`vaara[ml]`) and off that path. `make bench` reproduces the classifier figures below against the bundles that ship in the repo; it needs `pip install 'vaara[ml]'` and downloads the embedding model on first run.
 
 - 12,155-entry adversarial corpus (250 hand-curated + 11,905 LLM-generated), 70/15/15 split stratified by (category, source).
 - Classifier v9 (236 hand-features + 384-dim MiniLM embeddings) at calibrated threshold 0.9150 on held-out TEST n=1,827: recall 84.7% [82.4, 86.7] at FPR 4.1% [2.9, 5.7].
-- Cross-model held-out recall 66.8% [64.9, 68.7] over n=2,277 with no eval-set attacker model in TRAIN; the weakest sub-cell is data_exfil against a closed-weight model at 38.9%. This is the honest worst case; the in-distribution number above is the easier denominator.
+- Cross-model held-out recall 66.8% [64.9, 68.7] over n=2,277 with no eval-set attacker model in TRAIN; the weakest sub-cell is data_exfil against a closed-weight model at 38.9%. Both figures are v8 on the v0.37 surface ([bench/vaara-bench-v0.37.md](bench/vaara-bench-v0.37.md)), which is the last release that measured this surface; v9 has not been run against it. This is the honest worst case, and the in-distribution number above is the easier denominator.
 - BIPIA-pressure FPR on benign tool calls 1.2% [0.4, 3.6] across four agent backends (Claude Haiku 4.5, Llama-3.1-8B, Mistral-7B, Qwen-2.5-7B). Down from 35.2% on v8.
 - Multi-attacker PAIR robustness: 0/25 successes per attacker across Qwen2.5-32B, Qwen2.5-72B, Llama-3.3-70B on identical seeds, Wilson upper 13.3%.
 - Distribution-free conformal coverage on the score; MWU regret bound O(sqrt(T log N)).

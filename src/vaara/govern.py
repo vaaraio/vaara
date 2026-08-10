@@ -167,9 +167,19 @@ def govern(
         @vaara.govern(agent_id="billing-agent", tool_name="tx.transfer")
         def transfer(to, amount): ...
 
-    Each call is classified, scored, and decided before the body runs. ``deny``
-    raises ``vaara.Blocked``; ``allow`` runs the function and reports the
-    outcome back to the scorer. Either way the decision lands in the trail.
+    Each call is classified, scored, and decided before the body runs. Only
+    ``allow`` runs the function and reports the outcome back to the scorer.
+    ``deny`` and ``escalate`` both raise ``vaara.Blocked``, because an
+    escalation means a human has not answered yet and the decorator has no
+    way to wait for one. Either way the decision lands in the trail.
+
+    On a fresh install the scorer has no outcome history, so its conformal
+    interval is wide and a call whose point estimate sits under the allow
+    threshold can still escalate on the interval's upper bound. Expect
+    ``Blocked`` from early calls on a sensitive taxonomy name such as
+    ``tx.transfer``. The interval narrows as ``report_outcome`` feeds real
+    outcomes back. Use ``shadow=True`` to record decisions without acting
+    on them while that happens.
 
     Args:
         agent_id: Identity recorded against the action ("default" if unset).
