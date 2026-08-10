@@ -23,7 +23,7 @@ reproduce the published verdicts under the same checker. The aggregate runner
 `scripts/conformance_runner.py` discovers every suite, runs each checker in a
 subprocess, and returns a single pass/fail.
 
-Profile v1 covers the 37 suites listed below, at the `v0` vector format. The
+Profile v1 covers the 43 suites listed below, at the `v0` vector format. The
 authoritative, always-current enumeration for any tagged release is the runner's
 own `--list` output at that tag.
 
@@ -38,9 +38,11 @@ pip install rfc8785 cryptography
 ```
 
 `rfc8785` is JCS canonicalization (RFC 8785); `cryptography` covers the Ed25519
-and ECDSA signature paths. The `pq_hybrid_v0` suite additionally needs
-`dilithium_py`. None of these is Vaara. The point of the profile is that you run
-standard public crypto, never the producer's stack.
+and ECDSA signature paths. Two suites need one more each: `pq_hybrid_v0` needs
+`dilithium_py` and `qualified_time_v0` needs `asn1crypto`. Both skip cleanly
+when their dependency is absent rather than failing the run. None of these is
+Vaara. The point of the profile is that you run standard public crypto, never
+the producer's stack.
 
 ## The one command
 
@@ -74,11 +76,17 @@ Inside a checker, two kinds of assertion are distinguished:
 - **Advisory** checks report a deviation without failing the suite (for example,
   a signature that is well-formed but not the expected length for its algorithm).
 
-One suite is reported `SKIP`, not pass, in an aggregate run:
+Suites reported `SKIP`, not pass, in an aggregate run:
 
 - `article12_fold_v0` validates a bundle handed to it on the command line rather
-  than a bare directory of case files. The runner lists it explicitly so the gap
-  reads as a gap, not as silent coverage.
+  than a bare directory of case files. It skips on every run. The runner lists
+  it explicitly so the gap reads as a gap, not as silent coverage.
+- `pq_hybrid_v0` and `qualified_time_v0` skip when their optional dependency is
+  missing, with the reason printed. Install `dilithium_py` and `asn1crypto` and
+  both run.
+
+So a clean checkout with `rfc8785` and `cryptography` alone grades 40 passed,
+0 failed, 3 skipped across the 43 suites.
 
 ## What a pass means, and what it does not
 
@@ -94,24 +102,28 @@ grows; conformance is always against a named version.
 ## Suites in Profile v1
 
 ```
-agent_identity_v0            enforcement_attestation_v0
-ap2_v0                       enforcement_set_v0
-article12_fold_v0            evidence_bundle_v0
-atlas_threat_v0              evidence_ref_v0
-attestation_result_v0        execution_receipt_v0
-audit_summary_v0             external_evidence_v0
-authorization_v0             governance_decision_v0
-build_bundle_v0              handoff_set_v0
-bundle_doc_v0                ingest_v0
-bundle_set_v0                key_rotation_v0
-capability_scope_v0          normalize_v0
-class_gate_v0                pq_hybrid_v0
+acp_checkout_v0              enforcement_attestation_v0
+agent_decision_v0            enforcement_set_v0
+agent_identity_v0            evidence_bundle_v0
+ap2_v0                       evidence_ref_v0
+article12_fold_v0            execution_receipt_v0
+atlas_threat_v0              external_evidence_v0
+attestation_result_v0        fallback_projection_v0
+audit_summary_v0             governance_decision_v0
+authorization_v0             handoff_set_v0
+build_bundle_v0              ingest_v0
+bundle_doc_v0                key_rotation_v0
+bundle_set_v0                normalize_v0
+capability_scope_v0          pq_hybrid_v0
+class_gate_v0                qualified_time_v0
 conformance_statement_v0     record_conformance_v0
 contiguity_v0                record_set_v0
 credential_binding_v0        sep2787_attestation_v0
-cross_org_handoff_v0         tap_v0
-cross_stack_revocation_v0    transparency_consistency_v0
-data_locality_v0             x402_settlement_v0
+credential_grant_v0          tap_v0
+crewai_enforcement_v0        transparency_consistency_v0
+cross_org_handoff_v0         x402_settlement_v0
+cross_stack_revocation_v0
+data_locality_v0
 decision_pairing_v0
 ```
 
