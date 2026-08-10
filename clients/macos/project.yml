@@ -24,6 +24,13 @@ targets:
     settings:
       PRODUCT_BUNDLE_IDENTIFIER: io.vaara.menubar
       INFOPLIST_FILE: Sources/VaaraMenuBar/Info.plist
+      # Ship as Vaara.app, which is the name Homebrew installs and the name
+      # a user sees. Without this the target name won, so a local build
+      # produced VaaraMenuBar.app, which sat in /Applications
+      # next to the Homebrew Vaara.app as a second copy with its own menu bar
+      # icon, both reading the same trail. CFBundleDisplayName was already
+      # "Vaara", so the two were indistinguishable in Finder and the menu bar.
+      PRODUCT_NAME: Vaara
     entitlements:
       path: Sources/VaaraMenuBar/VaaraMenuBar.entitlements
       properties:
