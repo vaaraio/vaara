@@ -107,8 +107,15 @@ def test_verify_rejects_tampered_envelope_cbor():
         envelope=_make_envelope(arbiter), notary_signing_key=notary,
         transparency_log=log, iap_identifier="iap-x",
     )
+    # Flip the final byte against itself. Writing a fixed 0xff there was a
+    # no-op whenever the envelope already ended in 0xff, and the last byte
+    # covers a random signature, so it did about once in 256 runs. The
+    # verifier then correctly accepted bytes it had genuinely signed and the
+    # assertion failed, which reads as a fail-open in the attestation
+    # verifier and is not one. XOR cannot produce the original byte.
     bad = Phase3Attestation(
-        envelope_cbor=att.envelope_cbor[:-1] + b"\xff",
+        envelope_cbor=att.envelope_cbor[:-1]
+        + bytes([att.envelope_cbor[-1] ^ 0xFF]),
         notary_signature=att.notary_signature,
         notary_key_identifier=att.notary_key_identifier,
         log_index=att.log_index,
