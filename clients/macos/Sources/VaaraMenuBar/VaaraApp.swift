@@ -8,6 +8,9 @@ import SwiftUI
 struct VaaraApp: App {
     @StateObject private var model = GateModel()
     @State private var approvals: ApprovalWindowManager?
+    /// Startup runs from two places (the menu bar label at launch, the
+    /// popover content on first open) and must happen once.
+    @State private var started = false
 
     // XPC service the network filter extension connects to.
     private let policyService = PolicyServiceDelegate()
@@ -19,24 +22,38 @@ struct VaaraApp: App {
     var body: some Scene {
         MenuBarExtra {
             ContentView(model: model)
-                .onAppear {
-                    model.start()
-                    // Start the XPC listener the filter extension connects to.
-                    _ = policyService
-                    // Start Accessibility observer for UI context.
-                    accessibilityObserver.start()
-                    // Report whether the filter extension is installed and
-                    // enabled. Activation itself is user-initiated from
-                    // settings; macOS prompts for approval.
-                    systemExtension.refresh()
-                    if approvals == nil {
-                        approvals = ApprovalWindowManager(model: model)
-                    }
-                }
+                .onAppear { startEverything() }
         } label: {
             Image(nsImage: menuImage())
+                // The label renders as soon as the menu bar item exists, so
+                // this is the launch path. Hanging startup off the content's
+                // onAppear alone meant nothing ran until the user clicked the
+                // icon: no trail polling, no XPC listener for the filter, no
+                // Accessibility observer and no approval window. A governance
+                // app that only governs while its popover is open is not
+                // governing. Both call sites go through the same guarded
+                // helper, so opening the popover afterwards is a no-op.
+                .onAppear { startEverything() }
         }
         .menuBarExtraStyle(.window)
+    }
+
+    /// Bring up every background piece exactly once.
+    private func startEverything() {
+        guard !started else { return }
+        started = true
+        model.start()
+        // Start the XPC listener the filter extension connects to.
+        _ = policyService
+        // Start Accessibility observer for UI context.
+        accessibilityObserver.start()
+        // Report whether the filter extension is installed and enabled.
+        // Activation itself is user-initiated from Setup; macOS prompts for
+        // approval.
+        systemExtension.refresh()
+        if approvals == nil {
+            approvals = ApprovalWindowManager(model: model)
+        }
     }
 
     private func stateColor(_ state: GateState) -> NSColor {
@@ -48,12 +65,29 @@ struct VaaraApp: App {
     }
 
     private func markImage(for state: GateState) -> NSImage {
-        let bundle = Bundle.main
-        let resourcePath = bundle.resourcePath ?? ""
-        let iconPath = "\(resourcePath)/icons/vaara-\(state.rawValue).png"
-        if let img = NSImage(contentsOfFile: iconPath) {
+        let name = "vaara-\(state.rawValue)"
+
+        // Xcode collapses a foo.png / foo@2x.png pair into a single
+        // foo.tiff written to the top of Contents/Resources, so the
+        // icons/ subdirectory and the .png names the file lookup below
+        // expects do not exist in an Xcode-built bundle. That lookup failed
+        // silently and the mark fell through to the plain coloured oval,
+        // which is why an Xcode build showed a green ball where the Homebrew
+        // build, which copies icons/ verbatim, showed the Vaara mark.
+        // Asking the bundle by name finds the tiff.
+        if let img = Bundle.main.image(forResource: name) {
             return img
         }
+
+        let bundle = Bundle.main
+        let resourcePath = bundle.resourcePath ?? ""
+        for candidate in ["\(resourcePath)/icons/\(name).png",
+                          "\(resourcePath)/\(name).png"] {
+            if let img = NSImage(contentsOfFile: candidate) {
+                return img
+            }
+        }
+
         let color = stateColor(state)
         let img = NSImage(size: NSSize(width: 18, height: 18), flipped: false) { rect in
             color.setFill()

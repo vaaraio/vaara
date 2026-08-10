@@ -28,6 +28,12 @@ final class AccessibilityObserver {
     private var focusObserver: NSObjectProtocol?
 
     func start() {
+        // Already running: do nothing. Without this every call re-ran the
+        // prompting check, and start() is called from onAppear, so clicking
+        // the menu bar icon asked for Accessibility again on an app that
+        // already had it. isRunning existed and was only ever written.
+        guard !isRunning else { return }
+
         // Ask first, then check. The prompting call has to come before any
         // early return, or the user is never asked and the observer never
         // runs again: AXIsProcessTrusted() is silent, so guarding on it and
