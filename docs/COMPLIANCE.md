@@ -131,7 +131,8 @@ article-mapping table at
 
 The adapter is thin. The mapping is the artefact. A deployer can read
 the table, dispute a row, and override mappings without touching
-adapter code. 27 rows total across the three vendors as of v0.19.0.
+adapter code. 28 rows total across the three vendors (10 Bedrock,
+9 Azure, 9 GCP).
 
 ### Category to article mapping
 
@@ -149,6 +150,7 @@ adapter code. 27 rows total across the three vendors as of v0.19.0.
 | `grounding` | Bedrock `contextualGroundingPolicy` · Azure `Groundedness` | Art. 13, Art. 15 | LLM09 |
 | `adversarial` | Bedrock `contentPolicy.PROMPT_ATTACK` · Azure `PromptShield.UserPrompt` / `Documents` · GCP `pi_and_jailbreak` | Art. 15 | LLM01 |
 | `malicious_uri` | GCP `malicious_uris` | Art. 15 | LLM05 |
+| `malicious_file` | GCP `virus_scan` | Art. 15 | LLM05 |
 | `csam` | GCP `csam` | Art. 5 + Digital Omnibus CSAM (effective 2 Dec 2026) | - |
 
 ### Where the finding lands
@@ -186,9 +188,8 @@ article-mapping table at
 OSS provider rows.
 
 41 OSS rows total across the four vendors (7 NeMo, 10 Guardrails AI,
-20 LLM Guard, 4 Rebuff) as of v0.20.0. Combined with v0.19.0's 27
-cloud rows, the published table covers 68 provider categories across
-seven upstream guardrails.
+20 LLM Guard, 4 Rebuff). Combined with the 28 cloud rows, the published
+table covers 69 provider categories across seven upstream guardrails.
 
 ### Category to article mapping (OSS providers)
 
@@ -777,8 +778,10 @@ problem:
 - **Retention policy.** Article 12(2) allows log retention periods set
   in accordance with the intended purpose and applicable law. The
   deployer picks the period. Vaara enforces it via
-  `vaara trail purge --db PATH --retention-days N` (or
-  `SQLiteAuditBackend.purge_older_than(seconds)` from Python). A
+  `vaara trail purge --db PATH --retention-days N --all-tenants` (or
+  `SQLiteAuditBackend.purge_older_than(seconds)` from Python). The
+  tenant selector is required, not optional: pass `--tenant ID` to purge
+  one tenant's records, `--all-tenants` to purge across the whole DB. A
   `--dry-run` flag reports the count without modifying the DB.
 
   **Hash-chain seam at the retention boundary.** Surviving records
@@ -810,7 +813,7 @@ Honest about the edges:
 
   | Source                                | Attack recall | Benign FPR |
   |---------------------------------------|--------------:|-----------:|
-  | Hand-curated (held-out, 250 entries)  |        97.1% |      70.0% |
+  | Hand-curated (held-out, 250 entries)  |        97.1% |      69.6% |
   | LLM-generated (in-sample, 5,705)      |        95.2% |      87.5% |
 
   Reading: full-stack = heuristic `ESCALATE`/`DENY` preserved + classifier
@@ -819,15 +822,17 @@ Honest about the edges:
   their numbers are in-sample fit, not generalization.
 
   The 1.9pp recall gap (97.1% > 95.2%) is small but goes against the
-  expected direction. The 18pp benign-FPR gap (70.0% < 87.5%) is the
+  expected direction. The 17.9pp benign-FPR gap (69.6% < 87.5%) is the
   dominant distribution-shift signal: the stack is much more confused
   about LLM-generated benigns than hand-curated ones.
 
   Note on FPR vs CHANGELOG headline: the CHANGELOG quotes "global benign
-  FPR 21.0%" which is classifier-alone 5-fold CV OOF. The full-stack
-  numbers above are dominated by the heuristic - most benign escalations
-  come from the heuristic `ESCALATE` branch, not from classifier upgrades
-  on heuristic-`ALLOW`ed entries.
+  FPR 21.0%" which is classifier-alone 5-fold CV OOF. Which layer
+  dominates the full-stack FPR depends on the source, and the ablation
+  artefact says so: on LLM-generated benigns the heuristic `ESCALATE`
+  branch does (67.4pp of a 91.3pp full-stack FPR), on hand-curated
+  benigns it is the other way round (heuristic 26.1pp of 69.6pp, the
+  rest classifier upgrades on heuristic-`ALLOW`ed entries).
 
   Detailed per-source/per-class breakdown: `tests/adversarial/distribution_shift_v0_5_3.json`.
   Reproducible via `scripts/eval_distribution_shift.py`. A proper OOF
@@ -837,10 +842,20 @@ Honest about the edges:
   decompose into independent layer contributions. `heuristic_only` recall
   is 35% / 63% (hand-curated / LLM-generated). `classifier_only` recall
   is 94% / 86%. Layers are not redundant - heuristic catches a small set
-  of attacks the classifier misses, justifying the ensemble. Most of the
-  full-stack benign FPR comes from heuristic ESCALATEs, not classifier
-  upgrades. Detailed breakdown: `tests/adversarial/stack_ablation_v0_5_3.json`.
+  of attacks the classifier misses, justifying the ensemble. The benign
+  FPR splits by source as described above: heuristic-dominated on
+  LLM-generated, classifier-dominated on hand-curated. Detailed
+  breakdown: `tests/adversarial/stack_ablation_v0_5_3.json`.
   Reproducible via `scripts/eval_stack_ablation.py`.
+
+  The two artefacts quote different full-stack figures for the
+  LLM-generated source (95.2% / 87.5% in the distribution-shift file
+  against 97.6% / 91.3% in the ablation file). That is the error
+  handling, not a disagreement about the stack:
+  `eval_distribution_shift.py` keeps ERROR outcomes in the denominator
+  (49 attack, 25 benign), `eval_stack_ablation.py` excludes them. The
+  table above quotes the distribution-shift file, which is the more
+  conservative of the two.
 - **Adaptive-attacker calibration (v0.6 measurement of v0.5.3 stack).**
   PAIR (Chao et al. 2023) iterative attacker against the full Vaara
   stack:

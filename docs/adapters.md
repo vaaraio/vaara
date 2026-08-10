@@ -15,7 +15,7 @@ Native adapters in `src/vaara/integrations/` route the major Python agent framew
 
 ## Upstream-signal adapters (cloud + OSS guardrails)
 
-Adapters route findings from cloud and OSS guardrails into Vaara's audit trail and OVERT envelope. The filter runs in the deployer's environment; Vaara records the verdict, normalises 68 provider categories onto a shared vocabulary, and tags each finding against the relevant AI Act articles. Each adapter returns a `ContentSafetyFinding` the deployer routes into `pipeline.intercept(context=finding.to_audit_context())`. Article-by-article mapping in [COMPLIANCE.md](COMPLIANCE.md).
+Adapters route findings from cloud and OSS guardrails into Vaara's audit trail and OVERT envelope. The filter runs in the deployer's environment; Vaara records the verdict, normalises 69 provider categories onto a shared vocabulary, and tags each finding against the relevant AI Act articles. Each adapter returns a `ContentSafetyFinding` the deployer routes into `pipeline.intercept(context=finding.to_audit_context())`. Article-by-article mapping in [COMPLIANCE.md](COMPLIANCE.md).
 
 | Provider | Adapter | Extra | Wraps |
 |---|---|---|---|
