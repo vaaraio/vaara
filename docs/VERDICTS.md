@@ -91,7 +91,10 @@ the engine.
 | 14(1) | Human Oversight: Design | 1 | 720 h | 2 | 180 h | yes |
 | 14(4)(d) | Human Oversight: Override Capability | 1 | 720 h | 2 | 180 h | no |
 | 15(1) | Accuracy, Robustness and Cybersecurity | 10 | 168 h (7 d) | 20 | 42 h | yes |
+| 26(10) | Deployer Obligations: Logging | 10 | 720 h | 20 | 180 h | yes |
+| 50(1) | Transparency Obligation: AI System Disclosure | 1 | 720 h | 2 | 180 h | yes |
 | 61(1) | Post-Market Monitoring | 20 | 720 h | 40 | 180 h | yes |
+| 73(1) | Serious Incident Reporting | 1 | 720 h | 2 | 180 h | no |
 
 Article 11(1) is the external-evidence row. It does not consume runtime
 events. The threshold table is intentionally blank.

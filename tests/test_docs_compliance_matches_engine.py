@@ -91,6 +91,109 @@ def test_article_50_disclosure_is_documented():
     assert "50(1)" in _table_articles("EU_AI_ACT")
 
 
+VERDICTS_DOC = DOC.parent / "VERDICTS.md"
+
+#: The row VERDICTS.md leaves blank on purpose: Article 11(1) consumes no
+#: runtime events, so its thresholds are printed as `n/a`.
+_EXTERNAL_EVIDENCE_ROWS = {"11(1)"}
+
+
+#: VERDICTS.md heading -> the heading that ends its threshold table. Both
+#: domains carry an Article 12(1) and an Article 13(1), so the tables have to
+#: be read one at a time or DORA silently overwrites the EU AI Act row.
+_VERDICTS_SECTIONS = {
+    "EU_AI_ACT": ("## EU AI Act per-article thresholds", "## DORA per-article thresholds"),
+    "DORA": ("## DORA per-article thresholds", "## What an auditor sees"),
+}
+
+
+def _verdicts_threshold_rows(domain: str = "EU_AI_ACT") -> dict[str, tuple[int, float]]:
+    """Article -> (min count, staleness hours) as VERDICTS.md prints them."""
+    whole = VERDICTS_DOC.read_text(encoding="utf-8")
+    start_heading, end_heading = _VERDICTS_SECTIONS[domain]
+    start = whole.index(start_heading)
+    text = whole[start:whole.index(end_heading, start)]
+    rows: dict[str, tuple[int, float]] = {}
+    for line in text.splitlines():
+        cells = [cell.strip() for cell in line.split("|")[1:-1]]
+        if len(cells) != 7 or not re.fullmatch(r"\d+\(\d+\)(\([a-z]\))?", cells[0]):
+            continue
+        if cells[0] in _EXTERNAL_EVIDENCE_ROWS:
+            continue
+        staleness = re.match(r"(\d+)\s*h", cells[3])
+        assert staleness, f"unreadable staleness cell for {cells[0]}: {cells[3]!r}"
+        rows[cells[0]] = (int(cells[2]), float(staleness.group(1)))
+    return rows
+
+
+@pytest.mark.parametrize("domain", sorted(_VERDICTS_SECTIONS))
+def test_verdicts_documents_every_requirement_the_engine_ships(domain):
+    """VERDICTS.md is the public reference for how the engine decides.
+
+    Its EU AI Act table omitted Articles 26(10), 50(1) and 73(1) while the
+    engine enforced all three, two of them as CRITICAL. The document states
+    that the overall report status is the worst status across all critical
+    articles, so a reader working from that table could not predict the
+    verdict they would get.
+    """
+    documented = set(_verdicts_threshold_rows(domain)) | (
+        _EXTERNAL_EVIDENCE_ROWS if domain == "EU_AI_ACT" else set()
+    )
+    real = _engine_articles(domain)
+    missing = real - documented
+    assert not missing, (
+        f"docs/VERDICTS.md has no {domain} threshold row for {sorted(missing)}, "
+        f"which the engine enforces"
+    )
+    invented = documented - real
+    assert not invented, (
+        f"docs/VERDICTS.md prints {domain} thresholds for {sorted(invented)}, "
+        f"which the engine does not enforce"
+    )
+
+
+@pytest.mark.parametrize("domain", sorted(_VERDICTS_SECTIONS))
+def test_verdicts_thresholds_are_the_engine_thresholds(domain):
+    """Every number in the tables, not just the article list."""
+    documented = _verdicts_threshold_rows(domain)
+    wrong = {}
+    for requirement in ComplianceEngine().requirements:
+        if domain not in str(requirement.domain):
+            continue
+        article = requirement.article.removeprefix("Article ")
+        if article not in documented:
+            continue
+        real = (requirement.min_evidence_count, float(requirement.staleness_hours))
+        if documented[article] != real:
+            wrong[article] = (documented[article], real)
+    assert not wrong, (
+        "docs/VERDICTS.md thresholds drifted from the engine "
+        "(article: documented -> real): "
+        + ", ".join(f"{a}: {d} -> {r}" for a, (d, r) in sorted(wrong.items()))
+    )
+
+
+def test_verdicts_strong_columns_are_twice_the_minimum():
+    """The strong-count column is derived, so it can drift on its own."""
+    text = VERDICTS_DOC.read_text(encoding="utf-8")
+    for line in text.splitlines():
+        cells = [cell.strip() for cell in line.split("|")[1:-1]]
+        if len(cells) != 7 or not re.fullmatch(r"\d+\(\d+\)(\([a-z]\))?", cells[0]):
+            continue
+        if cells[0] in _EXTERNAL_EVIDENCE_ROWS:
+            continue
+        minimum, strong = int(cells[2]), int(cells[4])
+        assert strong == 2 * minimum, (
+            f"VERDICTS.md {cells[0]}: strong-count {strong} is not 2x {minimum}"
+        )
+        staleness = float(re.match(r"(\d+)", cells[3]).group(1))
+        freshness = float(re.match(r"([\d.]+)", cells[5]).group(1))
+        assert freshness == staleness / 4, (
+            f"VERDICTS.md {cells[0]}: strong-freshness {freshness} is not "
+            f"{staleness}/4"
+        )
+
+
 def _documented_enum_values(enum_name: str) -> set[str]:
     """Values COMPLIANCE.md lists in the table under `enum_name`."""
     text = DOC.read_text()
