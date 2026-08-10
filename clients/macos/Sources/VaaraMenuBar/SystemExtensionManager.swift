@@ -33,6 +33,17 @@ final class SystemExtensionManager: NSObject, ObservableObject {
     // ── Public API ────────────────────────────────────────────────────────
 
     /// Reflect the current filter configuration into `state`.
+    ///
+    /// The saved `NEFilterManager` preference is not evidence that anything is
+    /// filtering. It survives the extension being removed, by an OS update, by
+    /// `systemextensionsctl reset`, or by the user deleting the app, and it is
+    /// written before macOS ever agrees to load the provider. Reporting
+    /// "filtering AI-bound traffic" from that alone is a status display that
+    /// fails open, which is the one direction this product must never fail.
+    ///
+    /// So the preference is only allowed to downgrade the verdict. The claim
+    /// that the filter is live has to come from the system's own list of
+    /// installed extensions.
     func refresh() {
         NEFilterManager.shared().loadFromPreferences { [weak self] error in
             Task { @MainActor in
@@ -41,13 +52,41 @@ final class SystemExtensionManager: NSObject, ObservableObject {
                     self.state = .failed(error.localizedDescription)
                     return
                 }
-                if NEFilterManager.shared().providerConfiguration == nil {
+                let configured = NEFilterManager.shared().providerConfiguration != nil
+                let enabled = NEFilterManager.shared().isEnabled
+                guard configured else {
                     self.state = .notInstalled
-                } else {
-                    self.state = NEFilterManager.shared().isEnabled ? .active : .installedDisabled
+                    return
+                }
+                self.confirmInstalled { installed in
+                    if !installed {
+                        // Configured but absent: say so rather than claiming
+                        // a filter that cannot possibly be running.
+                        self.state = .notInstalled
+                    } else {
+                        self.state = enabled ? .active : .installedDisabled
+                    }
                 }
             }
         }
+    }
+
+    /// Ask the system whether our extension is actually installed.
+    ///
+    /// A properties request also completes through
+    /// `OSSystemExtensionRequestDelegate`, and this class's delegate reacts to
+    /// completion by enabling the filter, so a refresh sharing that delegate
+    /// would turn the filter on as a side effect of looking at it. The query
+    /// gets its own delegate object for that reason.
+    private func confirmInstalled(_ done: @escaping @MainActor (Bool) -> Void) {
+        let probe = InstalledProbe(done: done)
+        let request = OSSystemExtensionRequest.propertiesRequest(
+            forExtensionWithIdentifier: extensionIdentifier,
+            queue: .main
+        )
+        request.delegate = probe
+        probe.retain = probe          // live until the delegate answers
+        OSSystemExtensionManager.shared.submitRequest(request)
     }
 
     /// Install the extension, then enable the content filter.
@@ -106,6 +145,55 @@ final class SystemExtensionManager: NSObject, ObservableObject {
                 }
             }
         }
+    }
+}
+
+/// Answers one question: does the system have this extension installed?
+///
+/// Kept apart from `SystemExtensionManager`'s own delegate so a read cannot
+/// trip the write path. `foundProperties` arrives before completion; an empty
+/// list, or a failure, both mean "not installed" and both must resolve, or a
+/// refresh would hang the status line on its previous value.
+private final class InstalledProbe: NSObject, OSSystemExtensionRequestDelegate {
+    private let done: @MainActor (Bool) -> Void
+    private var answered = false
+    var retain: InstalledProbe?
+
+    init(done: @escaping @MainActor (Bool) -> Void) {
+        self.done = done
+    }
+
+    private func answer(_ installed: Bool) {
+        guard !answered else { return }
+        answered = true
+        let done = self.done
+        Task { @MainActor in
+            done(installed)
+            self.retain = nil
+        }
+    }
+
+    func request(_ request: OSSystemExtensionRequest,
+                 foundProperties properties: [OSSystemExtensionProperties]) {
+        answer(properties.contains { $0.isEnabled || $0.isAwaitingUserApproval } )
+    }
+
+    func request(_ request: OSSystemExtensionRequest,
+                 didFinishWithResult result: OSSystemExtensionRequest.Result) {
+        answer(false)   // no properties arrived, so nothing is installed
+    }
+
+    func request(_ request: OSSystemExtensionRequest, didFailWithError error: Error) {
+        answer(false)
+    }
+
+    func requestNeedsUserApproval(_ request: OSSystemExtensionRequest) {}
+
+    func request(_ request: OSSystemExtensionRequest,
+                 actionForReplacingExtension existing: OSSystemExtensionProperties,
+                 withExtension new: OSSystemExtensionProperties)
+    -> OSSystemExtensionRequest.ReplacementAction {
+        return .cancel
     }
 }
 
