@@ -11,6 +11,7 @@ pip install 'vaara[attestation]'
 ```
 
 ```python
+from vaara.attestation import envelope_to_canonical_cbor
 from vaara.attestation.overt import emit_base_envelope, make_request_commitment, encoder_binary_identity
 
 envelope = emit_base_envelope(
@@ -21,9 +22,17 @@ envelope = emit_base_envelope(
     monotonic_counter=42,
     arbiter_instance_identifier=uuid_bytes,
 )
+
+# The wire form. envelope_to_canonical_cbor is the one that produces bytes the
+# verifier accepts: canonical CBOR over all 9 fields with the raw byte values.
+Path("receipt.cbor").write_bytes(envelope_to_canonical_cbor(envelope))
+Path("pub.bin").write_bytes(
+    key.public_key().public_bytes(Encoding.Raw, PublicFormat.Raw)
+)
 ```
 
-`vaara overt verify RECEIPT.cbor --pubkey-file PUB.bin` validates any canonical-CBOR Base Envelope. The verifier reads only the wire format and takes no dependency on Vaara's emitter, so any conformant implementation can route through it. Adjacent surfaces (`vaara.attestation.iap` notary + transparency log, `vaara.attestation.s3p` aggregate intervals, an experimental AMD SEV-SNP TEE hook) and the OVERT 1.0 Part 3 control walk are in [COMPLIANCE.md](COMPLIANCE.md). The OVERT control mapping is in [OVERT_CONTROLS.md](OVERT_CONTROLS.md).
+`vaara overt verify receipt.cbor --pubkey-file pub.bin` validates any
+canonical-CBOR Base Envelope. The public key is the raw 32 bytes, not PEM. The verifier reads only the wire format and takes no dependency on Vaara's emitter, so any conformant implementation can route through it. Adjacent surfaces (`vaara.attestation.iap` notary + transparency log, `vaara.attestation.s3p` aggregate intervals, an experimental AMD SEV-SNP TEE hook) and the OVERT 1.0 Part 3 control walk are in [COMPLIANCE.md](COMPLIANCE.md). The OVERT control mapping is in [OVERT_CONTROLS.md](OVERT_CONTROLS.md).
 
 ## Sovereign inference harness
 
