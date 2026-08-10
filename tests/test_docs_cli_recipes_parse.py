@@ -36,8 +36,13 @@ from vaara.cli import build_parser
 
 ROOT = Path(__file__).resolve().parent.parent
 
-DOCS = sorted(ROOT.glob("docs/*.md")) + [
-    ROOT / name for name in ("README.md", "SPEC.md", "CAPABILITIES.md", "PRIVACY.md")
+#: Only files that are actually in the checkout. CAPABILITIES.md, for one,
+#: is untracked in some working trees and absent on CI.
+DOCS = [
+    path
+    for path in sorted(ROOT.glob("docs/*.md"))
+    + [ROOT / name for name in ("README.md", "SPEC.md", "CAPABILITIES.md", "PRIVACY.md")]
+    if path.exists()
 ]
 
 _FENCE = re.compile(r"```(?:bash|sh|console|shell)\n(.*?)```", re.S)
