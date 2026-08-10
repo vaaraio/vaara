@@ -163,6 +163,29 @@ def parse_apply_guardrail_response(
         cats.extend(_word_cats(assessment))
         cats.extend(_pii_cats(assessment))
         cats.extend(_grounding_cats(assessment))
+
+    # Bedrock's own aggregate verdict. Same shape as the rebuff adapter's
+    # injectionDetected cross-check. The five policy parsers above cover the
+    # policy types that existed when they were written; "action" is what AWS
+    # sets whenever the guardrail intervened, whatever the reason. Reading
+    # only the per-policy assessments meant a new or renamed policy type
+    # produced no category, so a blocked call came back verdict "allow" and
+    # was written to the trail as an upstream pass. No exception, no warning.
+    if (response.get("action") or "").upper() == "GUARDRAIL_INTERVENED" and \
+            all(c.action == "NONE" for c in cats):
+        cats.append(FindingCategory(
+            provider_category="guardrail_intervened",
+            severity_label="BLOCKED",
+            normalized_severity=_sev_str(0.9),
+            action="BLOCKED",
+            mapping=None,
+            evidence={
+                "reason": "provider reported action=GUARDRAIL_INTERVENED with "
+                          "no assessment above threshold",
+                "parsed_assessments": str(len(response.get("assessments", []) or [])),
+            },
+        ))
+
     return build_finding(
         provider=_PROVIDER,
         categories=cats,

@@ -32,6 +32,8 @@ from vaara.integrations._content_safety_base import (
 
 _PROVIDER = "guardrails-ai"
 
+_ABSENT = object()
+
 
 def _sev_str(value: float) -> str:
     return f"{max(0.0, min(1.0, value)):.4f}"
@@ -97,6 +99,10 @@ def parse_validation_outcome(
     )
     summaries = get("validation_summaries") or []
     passed = bool(get("validation_passed"))
+    # Absent is not the same as false. Only an explicit false counts as the
+    # provider asserting failure; a missing field says nothing.
+    _raw_passed = get("validation_passed", _ABSENT)
+    explicitly_failed = _raw_passed is not _ABSENT and not bool(_raw_passed)
 
     cats: list[FindingCategory] = []
     if summaries:
@@ -110,6 +116,28 @@ def parse_validation_outcome(
             action="FLAGGED",
             mapping=None,
             evidence={"error": str(get("error") or "")},
+        ))
+
+    # Guardrails' own aggregate verdict. Same shape as the rebuff adapter's
+    # injectionDetected cross-check: when the Guard says validation failed and
+    # no per-validator summary reports a failure, trust the provider rather
+    # than reporting clean. A Guard fails for reasons no validator owns, such
+    # as reask exhaustion or output parsing, and while summaries existed the
+    # top-level verdict was never consulted at all, so those failures came out
+    # as verdict "allow" and landed in the trail as an upstream pass.
+    if summaries and explicitly_failed and all(c.action == "NONE" for c in cats):
+        cats.append(FindingCategory(
+            provider_category="validation_failed",
+            severity_label="FAIL",
+            normalized_severity=_sev_str(0.9),
+            action="FLAGGED",
+            mapping=None,
+            evidence={
+                "reason": "provider reported validation_passed=false with no "
+                          "failing validator summary",
+                "error": str(get("error") or ""),
+                "summary_count": len(summaries) if hasattr(summaries, "__len__") else 0,
+            },
         ))
 
     raw = outcome if isinstance(outcome, dict) else {

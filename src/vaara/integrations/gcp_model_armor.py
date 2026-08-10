@@ -225,6 +225,29 @@ def parse_sanitize_response(
     cats.extend(_sdp_cats(_get(fr, "sdp")))
     cats.extend(_csam_cats(_get(fr, "csam")))
     cats.extend(_virus_cats(_get(fr, "virus_scan", "virusScan")))
+
+    # Model Armor's own aggregate verdict. Same shape as the rebuff adapter's
+    # injectionDetected cross-check. The six parsers above cover the filter
+    # types that existed when they were written; filterMatchState is what
+    # Google sets whenever any filter matched, including one this module does
+    # not model. Reading only the known keys meant a new or renamed filter
+    # produced no category, so a blocked call came back verdict "allow" and
+    # was written to the trail as an upstream pass.
+    top_state = _get(sanit, "filter_match_state", "filterMatchState")
+    if top_state in _MATCH_FOUND and all(c.action == "NONE" for c in cats):
+        cats.append(FindingCategory(
+            provider_category="filter_match_state",
+            severity_label="MATCH_FOUND",
+            normalized_severity=_sev_str(0.9),
+            action="BLOCKED",
+            mapping=None,
+            evidence={
+                "reason": "provider reported filterMatchState=MATCH_FOUND with "
+                          "no recognised filter above threshold",
+                "parsed_filters": ",".join(sorted(fr.keys())) if isinstance(fr, dict) else "",
+            },
+        ))
+
     return build_finding(provider=_PROVIDER, categories=cats, raw=response, scanned_role=scanned_role)
 
 
