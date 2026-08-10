@@ -59,5 +59,11 @@ targets:
         # Must match the app. The mach service name is prefixed with this group.
         com.apple.security.application-groups:
           - group.io.vaara
-    info:
-      path: Sources/WebKitGovernance/Info.plist
+    # No `info:` block here on purpose. It made xcodegen treat this plist as
+    # generated, so every `xcodegen generate` (which verify.sh runs first)
+    # overwrote the hand-maintained file with a stock template and dropped
+    # CFBundlePackageType SYSX plus the whole NetworkExtension dict. Losing
+    # NEProviderClasses means NEProvider.startSystemExtensionMode has no
+    # filter class to instantiate and the extension cannot load. The file is
+    # referenced through INFOPLIST_FILE above, the same way VaaraMenuBar
+    # references its own, and that target was never clobbered.

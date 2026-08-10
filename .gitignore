@@ -14,7 +14,7 @@ build/
 *.db-shm
 *.db-journal
 *.sqlite3
-.venv/
+.venv*/
 venv/
 .env
 .DS_Store
@@ -128,9 +128,13 @@ tests/adversarial/traces/
 CLAUDE.md
 /AUDIT-*.md
 
-# Swift build artifacts for the macOS menu-bar app
+# Swift build artifacts for the macOS menu-bar app. The xcodeproj and the
+# entitlements are written by `xcodegen generate` from project.yml, so
+# project.yml is the source and these are output.
 clients/macos/.build/
 clients/macos/dist/
+clients/macos/VaaraMenuBar.xcodeproj/
+clients/macos/Sources/*/*.entitlements
 
 # Everything private lives under one root, so there is exactly one rule
 # for it. Nothing private is ignored in place, because a rule naming a

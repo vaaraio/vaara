@@ -113,3 +113,35 @@ jobs:
           fi
           echo "built: $found"
           ls -la "$found/Contents/MacOS" || true
+
+      - name: Assert the built extension can actually load as a content filter
+        working-directory: clients/macos
+        # Producing the bundle is not the same as producing a loadable one.
+        # `xcodegen generate` above used to overwrite Sources/WebKitGovernance/
+        # Info.plist with a stock template, dropping CFBundlePackageType SYSX
+        # and the whole NetworkExtension dict. The step above still passed,
+        # because the directory existed. NEProvider.startSystemExtensionMode
+        # reads NEProviderClasses to find the filter class, so without it the
+        # extension registers and never filters anything. Check the built
+        # product, not the source file, so a regeneration bug cannot hide.
+        run: |
+          found=$(find ~/Library/Developer/Xcode/DerivedData build -type d \
+                    -name 'WebKitGovernance.systemextension' 2>/dev/null | head -1)
+          plist="$found/Contents/Info.plist"
+          test -f "$plist" || { echo "::error::no Info.plist in the built extension"; exit 1; }
+
+          pkg=$(/usr/libexec/PlistBuddy -c "Print :CFBundlePackageType" "$plist" 2>/dev/null || echo "")
+          if [ "$pkg" != "SYSX" ]; then
+            echo "::error::CFBundlePackageType is '$pkg', expected SYSX. This is not a system extension bundle."
+            exit 1
+          fi
+
+          cls=$(/usr/libexec/PlistBuddy \
+                  -c "Print :NetworkExtension:NEProviderClasses:com.apple.networkextension.filter-data" \
+                  "$plist" 2>/dev/null || echo "")
+          if [ "$cls" != "WebKitGovernance.FilterProvider" ]; then
+            echo "::error::NEProviderClasses filter-data is '$cls', expected WebKitGovernance.FilterProvider. The extension would load and filter nothing."
+            exit 1
+          fi
+          echo "package type: $pkg"
+          echo "filter provider: $cls"
