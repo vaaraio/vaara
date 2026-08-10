@@ -3,6 +3,19 @@
 Four scripts under `scripts/`, run in order. Push remains gated; you
 keep the keystrokes that hit the network.
 
+## Which machine you run this on
+
+Releases are cut from the Linux box, not the Mac.
+
+`release_prepare.sh` calls `.venv/bin/ruff` and `.venv/bin/python` by path.
+The repo's `.venv` holds a Linux aarch64 interpreter, so those paths resolve
+inside the box and dangle anywhere else. On the Mac, step 3 and step 4 fail
+before they run a single check, which means the lint and the full suite are
+skipped rather than passed.
+
+A Mac checkout can still build and test through its own environment, but it
+must not be used to cut a release unless `.venv` is rebuilt for that host.
+
 ## Pre-flight (you do this by hand)
 
 Per release, write three files in the repo root:
@@ -33,8 +46,8 @@ What runs:
 2. Bumps `pyproject.toml`, `clients/ts/package.json`,
    `src/vaara/__init__.py` to `<VERSION>`.
 3. `ruff check` on changed Python paths.
-4. Full `pytest` (skips `tests/adversarial`, deselects the pre-existing
-   SSRF distribution-shift test).
+4. Full `pytest` (skips `tests/adversarial`, which is a data corpus with no
+   test modules in it).
 5. Stages explicit paths only (no `git add -A`).
 6. Commits via `-F`.
 7. Creates annotated tags `v<VERSION>` and (if passed) `<CO_TAG>` at

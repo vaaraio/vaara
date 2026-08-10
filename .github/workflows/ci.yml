@@ -108,6 +108,92 @@ jobs:
             exit 1
           fi
 
+  classifier:
+    name: Adversarial classifier (shipped model)
+    runs-on: ubuntu-latest
+    # The shipped bundle had zero executed pytest coverage anywhere. Every
+    # classifier test skips in the main matrix because requirements-dev.txt
+    # carries no xgboost and no joblib, and the only thing touching the model
+    # was four smoke cases in preflight.sh.
+    #
+    # They stay out of that lock on purpose. Loading the bundle needs xgboost
+    # and joblib, but scoring through it needs sentence-transformers too (v0.32
+    # and later bundles carry embedding features), and that pulls torch. Paying
+    # for torch on four matrix legs to exercise one artefact is not worth it,
+    # and xgboost alone pulls nvidia-nccl on linux x86_64.
+    #
+    # So the coverage lives here instead: real extras, the real shipped bundle,
+    # and no skip tolerated. Note this job reaches huggingface.co on the first
+    # score() to fetch all-MiniLM-L6-v2 at its pinned revision, the same
+    # exposure preflight.sh already has.
+    steps:
+      - uses: actions/checkout@9c091bb21b7c1c1d1991bb908d89e4e9dddfe3e0  # v7.0.0
+
+      - name: Set up Python 3.12
+        uses: actions/setup-python@5fda3b95a4ea91299a34e894583c3862153e4b97  # v7.0.0
+        with:
+          python-version: '3.12'
+
+      - name: Install Vaara with the ml extras
+        run: |
+          pip install -e '.[ml]'
+          pip install pytest
+
+      - name: Run classifier tests, failing on any skip
+        # With [ml] installed nothing in these two files has a reason to
+        # skip, so a skip means an import broke and the model went unchecked.
+        run: |
+          set -o pipefail
+          pytest tests/test_adversarial_classifier_integration.py \
+                 tests/test_bundle_integrity.py -q -rs | tee result.txt
+          if grep -qE '[0-9]+ skipped' result.txt; then
+            echo "::error::A classifier test skipped, so the shipped model went untested."
+            exit 1
+          fi
+
+  signing-extras:
+    name: Signing extras (attestation, scitt, timeanchor, pq, yaml)
+    runs-on: ubuntu-latest
+    # requirements-dev.txt is compiled --extra=dev --extra=export, and export
+    # is cryptography alone. So the main matrix installs almost no optional
+    # dependency and every test gated on one skips. Measured on a clean 3.12:
+    # 164 reported skips, but pytest counts a module-level skip as one, and 93
+    # test modules are guarded at import time. Those 93 hold 1061 test
+    # functions, so roughly a third of the suite never ran anywhere.
+    #
+    # This job covers the signing-critical part of that: canonicalization
+    # (rfc8785), attestation and SCITT (cbor2), RFC 3161 time anchors
+    # (asn1crypto), post-quantum signatures (dilithium-py) and policy YAML.
+    # 61 test files were gated on these. All are cheap, none pull torch.
+    #
+    # The check greps skip reasons rather than pinning a file list, so a new
+    # module gated on one of these dependencies is caught without editing the
+    # job, and the job cannot silently rot into passing on an empty run.
+    steps:
+      - uses: actions/checkout@9c091bb21b7c1c1d1991bb908d89e4e9dddfe3e0  # v7.0.0
+
+      - name: Set up Python 3.12
+        uses: actions/setup-python@5fda3b95a4ea91299a34e894583c3862153e4b97  # v7.0.0
+        with:
+          python-version: '3.12'
+
+      - name: Install pinned deps
+        run: pip install --require-hashes -r requirements-dev.txt
+
+      - name: Install Vaara with the signing extras
+        run: pip install -e '.[attestation,scitt,timeanchor,pq,yaml]'
+
+      - name: Run tests, failing on any skip these extras should have prevented
+        run: |
+          set -o pipefail
+          pytest -q -rs | tee result.txt
+          COVERED='rfc8785|cbor2|asn1crypto|dilithium|yaml|attestation extra|timeanchor extra|pq extra'
+          if grep '^SKIPPED' result.txt | grep -qiE "$COVERED"; then
+            echo "::error::A test skipped for a dependency this job installs, so signing-critical code went unexecuted."
+            grep '^SKIPPED' result.txt | grep -iE "$COVERED"
+            exit 1
+          fi
+
   typecheck:
     name: Type check (mypy strict set)
     runs-on: ubuntu-latest
