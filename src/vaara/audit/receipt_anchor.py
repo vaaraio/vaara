@@ -34,32 +34,22 @@ from cryptography.x509.oid import ExtendedKeyUsageOID, NameOID
 from vaara.audit.timeanchor import (
     TimeAnchorError,
     Transport,
+    _signed_payload_digest,
     _urllib_transport,
+    anchored_digest,
     build_timestamp_request,
     extract_token_from_response,
     verify_timestamp_token,
 )
 
-# Signed payload (SPEC.md 2.1): signature + timestampAnchors excluded, so a
-# receipt can gain anchors after signing without invalidating it.
-_SIGNED_BLOCKS = ("version", "alg", "backLink", "decisionDerived",
-                  "issuerAsserted")
+# _SIGNED_BLOCKS, _signed_payload_digest and anchored_digest moved to
+# vaara.audit.timeanchor so anchor methods that are not RFC 3161 can reach
+# them without importing asn1crypto. Re-exported here because both names are
+# part of this module's documented surface.
+__all__ = ["anchored_digest", "verify_receipt_anchor", "SelfHostedTSA"]
+
 # Unregistered policy OID: marks "self-hosted, not qualified" by construction.
 _TSA_POLICY_OID = "1.3.6.1.4.1.58530.3161.1"
-
-
-def _signed_payload_digest(receipt: dict) -> bytes:
-    try:
-        payload = {k: receipt[k] for k in _SIGNED_BLOCKS}
-    except KeyError as exc:
-        raise TimeAnchorError(f"receipt missing signed-payload block: {exc}") from exc
-    import rfc8785
-    return hashlib.sha256(rfc8785.dumps(payload)).digest()
-
-
-def anchored_digest(receipt: dict) -> str:
-    """The ``anchoredDigest`` a conforming anchor must carry for this receipt."""
-    return "sha256:" + _signed_payload_digest(receipt).hex()
 
 
 class SelfHostedTSA:

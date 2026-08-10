@@ -23,7 +23,7 @@ from __future__ import annotations
 import html
 from typing import Any
 
-from vaara.audit.receipt_anchor import _signed_payload_digest
+from vaara.audit.timeanchor import _signed_payload_digest
 
 # Edit these to rebrand the page. Colors are CSS values.
 BRAND: dict[str, str] = {

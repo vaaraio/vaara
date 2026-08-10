@@ -10,7 +10,7 @@ from vaara.attestation.transparency_log import (
     InclusionProof,
     verify_inclusion,
 )
-from vaara.audit.receipt_anchor import _signed_payload_digest
+from vaara.audit.timeanchor import _signed_payload_digest
 
 
 class ScittAnchorError(RuntimeError):

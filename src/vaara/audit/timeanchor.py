@@ -29,6 +29,7 @@ Optional dependencies (the ``timeanchor`` extra): ``asn1crypto`` and
 
 from __future__ import annotations
 
+import hashlib
 import secrets
 import urllib.request
 from dataclasses import asdict, dataclass
@@ -59,6 +60,33 @@ _DIGEST_LEN = {"sha256": 32, "sha384": 48, "sha512": 64}
 
 class TimeAnchorError(Exception):
     """Anchoring or anchor verification failed."""
+
+
+# Signed payload (SPEC.md 2.1): signature + timestampAnchors excluded, so a
+# receipt can gain anchors after signing without invalidating it.
+#
+# These two live here rather than in receipt_anchor because every anchor
+# method needs the digest and only the RFC 3161 producer needs asn1crypto.
+# While they sat in receipt_anchor, importing them pulled in that module's
+# TSA stack, so `pip install 'vaara[scitt]'` shipped a scitt_anchor that
+# raised ModuleNotFoundError on import. Nothing above this line leaves the
+# standard library, which is what keeps that from coming back.
+_SIGNED_BLOCKS = ("version", "alg", "backLink", "decisionDerived",
+                  "issuerAsserted")
+
+
+def _signed_payload_digest(receipt: dict) -> bytes:
+    try:
+        payload = {k: receipt[k] for k in _SIGNED_BLOCKS}
+    except KeyError as exc:
+        raise TimeAnchorError(f"receipt missing signed-payload block: {exc}") from exc
+    import rfc8785
+    return hashlib.sha256(rfc8785.dumps(payload)).digest()
+
+
+def anchored_digest(receipt: dict) -> str:
+    """The ``anchoredDigest`` a conforming anchor must carry for this receipt."""
+    return "sha256:" + _signed_payload_digest(receipt).hex()
 
 
 def _require_deps() -> None:
