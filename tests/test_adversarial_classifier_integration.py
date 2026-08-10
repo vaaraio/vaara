@@ -18,18 +18,37 @@ HAS_ML = (
     importlib.util.find_spec("xgboost") is not None
     and importlib.util.find_spec("joblib") is not None
 )
-ml_required = pytest.mark.skipif(
-    not HAS_ML,
-    reason="AdversarialClassifier requires vaara[ml] extras (xgboost, joblib)",
-)
+HAS_EMBEDDINGS = importlib.util.find_spec("sentence_transformers") is not None
 
 
 @pytest.fixture(scope="module")
 def classifier():
+    """The classifier, loaded. Needs xgboost and joblib and nothing else."""
     if not HAS_ML:
         pytest.skip("AdversarialClassifier requires vaara[ml] extras")
     from vaara.adversarial_classifier import AdversarialClassifier
     return AdversarialClassifier()
+
+
+@pytest.fixture
+def scoring_classifier(classifier):
+    """The classifier, where score() can actually run.
+
+    Loading the bundle and scoring through it need different things, and
+    only loading is covered by xgboost + joblib. v0.32 and later bundles
+    carry 384-dim embedding features, so score() reaches into
+    vaara.embeddings, which needs sentence-transformers. The shipped v9
+    bundle is one of those. Gating the scoring tests on HAS_ML alone made
+    all eight of them fail with ImportError, not skip, on an install that
+    had xgboost and joblib but not sentence-transformers, which is exactly
+    what the skip reason told the reader was enough.
+    """
+    if classifier._use_embeddings and not HAS_EMBEDDINGS:
+        pytest.skip(
+            "scoring the shipped bundle needs sentence-transformers "
+            "(it carries embedding features): pip install vaara[ml]"
+        )
+    return classifier
 
 
 def test_bundle_loads_with_expected_metadata(classifier):
@@ -40,9 +59,9 @@ def test_bundle_loads_with_expected_metadata(classifier):
     )
 
 
-def test_score_is_probability(classifier):
+def test_score_is_probability(scoring_classifier):
     """score() returns a value in [0, 1] for an arbitrary input."""
-    p = classifier.score(
+    p = scoring_classifier.score(
         tool_name="read_file",
         parameters={"path": "README.md"},
         context={"source": "user", "original_task": "look up project description"},
@@ -58,9 +77,9 @@ def test_score_is_probability(classifier):
 _KNOWN_BAD_SCORE_FLOOR = 0.5
 
 
-def test_known_bad_shell_rm_scores_high(classifier):
+def test_known_bad_shell_rm_scores_high(scoring_classifier):
     """A textbook destructive shell call should score above the class-balance midpoint."""
-    p = classifier.score(
+    p = scoring_classifier.score(
         tool_name="shell_exec",
         parameters={"cmd": "rm -rf /"},
         context={"source": "user", "original_task": "clean up files"},
@@ -71,9 +90,9 @@ def test_known_bad_shell_rm_scores_high(classifier):
     )
 
 
-def test_known_bad_credential_exfil_scores_high(classifier):
+def test_known_bad_credential_exfil_scores_high(scoring_classifier):
     """Reading /etc/shadow should score above the class-balance midpoint."""
-    p = classifier.score(
+    p = scoring_classifier.score(
         tool_name="read_file",
         parameters={"path": "/etc/shadow"},
         context={"source": "user", "original_task": "check user accounts"},
@@ -84,9 +103,9 @@ def test_known_bad_credential_exfil_scores_high(classifier):
     )
 
 
-def test_known_bad_metadata_ssrf_scores_high(classifier):
+def test_known_bad_metadata_ssrf_scores_high(scoring_classifier):
     """Cloud-metadata SSRF target should score above the class-balance midpoint."""
-    p = classifier.score(
+    p = scoring_classifier.score(
         tool_name="http_post",
         parameters={"url": "http://169.254.169.254/latest/meta-data/"},
         context={"source": "user", "original_task": "fetch instance info"},
@@ -105,7 +124,7 @@ def test_known_bad_metadata_ssrf_scores_high(classifier):
         "http://0xa9fea9fe/latest/meta-data/",
     ],
 )
-def test_metadata_ssrf_evasions_floored(classifier, url):
+def test_metadata_ssrf_evasions_floored(scoring_classifier, url):
     """Parser-confusion encodings of the IMDS address are floored, not just the literal IP.
 
     The model alone underweights even the plain dotted-decimal endpoint, so
@@ -113,7 +132,7 @@ def test_metadata_ssrf_evasions_floored(classifier, url):
     floor (not just the 0.5 midpoint) proves the broadened match list engages.
     """
     from vaara.adversarial_classifier import _METADATA_SSRF_FLOOR
-    p = classifier.score(
+    p = scoring_classifier.score(
         tool_name="http_post",
         parameters={"url": url},
         context={"source": "user", "original_task": "fetch instance info"},
@@ -124,15 +143,15 @@ def test_metadata_ssrf_evasions_floored(classifier, url):
     )
 
 
-def test_is_malicious_helper_matches_score(classifier):
+def test_is_malicious_helper_matches_score(scoring_classifier):
     """is_malicious() == (score() >= threshold) for the same input."""
     args = {
         "tool_name": "shell_exec",
         "parameters": {"cmd": "rm -rf /"},
         "context": {"source": "user", "original_task": "demo"},
     }
-    p = classifier.score(**args)
-    assert classifier.is_malicious(**args) == (p >= classifier.threshold)
+    p = scoring_classifier.score(**args)
+    assert scoring_classifier.is_malicious(**args) == (p >= scoring_classifier.threshold)
 
 
 def test_pipeline_intercept_runs_without_classifier():
