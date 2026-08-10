@@ -134,7 +134,13 @@ def test_checkers_pass_without_vaara_importable(directory, tmp_path):
         env={"PATH": "/usr/bin:/bin", "HOME": str(tmp_path)},
     )
     if done.returncode == SKIP:
-        pytest.skip(done.stdout.strip() or "optional dependency missing")
+        # The reason goes to stderr, prefixed "SKIP: ", which is the convention
+        # scripts/conformance_runner.py already reads. Reading stdout here meant
+        # every skip reported the generic fallback, so a third party running the
+        # corpus saw a suite decline to run and was told nothing about why.
+        lines = done.stderr.strip().splitlines()
+        reason = lines[-1].removeprefix("SKIP: ") if lines else ""
+        pytest.skip(reason or "optional dependency missing")
     # `cryptography` and `rfc8785` are the two the checkers are allowed to
     # need, and both are extras. On a base install they are absent, which is
     # the environment's business and not a claim failing.
