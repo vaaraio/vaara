@@ -37,10 +37,10 @@ final class AccessibilityObserver {
         // untrusted forever with only "permission not granted" in the log.
         let opts: NSDictionary = [kAXTrustedCheckOptionPrompt.takeRetainedValue(): true]
         guard AXIsProcessTrustedWithOptions(opts) else {
+            // os_log takes a StaticString, so this cannot be built by
+            // concatenation. One literal.
             os_log(.info, log: log,
-                   "accessibility permission not granted; prompted, "
-                   + "grant it in System Settings > Privacy & Security > "
-                   + "Accessibility and restart Vaara")
+                   "accessibility permission not granted; prompted. Grant it in System Settings > Privacy & Security > Accessibility, then restart Vaara")
             return
         }
 
