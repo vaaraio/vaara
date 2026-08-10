@@ -57,7 +57,14 @@ def test_usage_line_shows_metavar_not_command_wall(capsys):
     with pytest.raises(SystemExit):
         build_parser().parse_args(["--help"])
     out = capsys.readouterr().out
-    assert "usage: vaara [-h] COMMAND ..." in out.splitlines()[0]
+    first = out.splitlines()[0]
+    # The point of this test is the metavar: one word standing in for every
+    # subcommand, instead of argparse listing all of them across the usage
+    # line. Pinning the whole string made it fail the moment a top-level
+    # option was added, which is a different thing from the wall coming back.
+    assert first.startswith("usage: vaara [-h]")
+    assert first.rstrip().endswith("COMMAND ...")
+    assert "trail" not in first and "keygen" not in first
 
 
 def test_trail_export_from_sqlite_db(tmp_path, capsys):
