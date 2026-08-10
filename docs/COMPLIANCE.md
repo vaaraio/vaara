@@ -732,11 +732,20 @@ report = pipeline.run_compliance_assessment(
 
 for article in report.articles:
     print(article.requirement.article, article.status.value)
-    # Article 9(1): evidence_sufficient
-    # Article 12(1): evidence_sufficient
-    # Article 14(1): evidence_insufficient
+    # Article 9(1) evidence_insufficient
+    # Article 11(1) evidence_partial
+    # Article 12(1) evidence_insufficient
+    # Article 73(1) evidence_sufficient
     # ...
 ```
+
+That is the real output of the block above, run start to finish on an
+empty trail, and it is mostly `evidence_insufficient` on purpose. One
+intercepted action is one action. The default requirements want 10 to 20
+qualifying events inside a 30-day window before an article reads
+`evidence_sufficient`; Article 73(1) is the exception at a single
+`OUTCOME_RECORDED`. Thresholds and how to retune them are in
+[VERDICTS.md](VERDICTS.md).
 
 ### From the CLI
 
