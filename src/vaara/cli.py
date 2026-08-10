@@ -4646,6 +4646,12 @@ def _cmd_anchor_providers(args: argparse.Namespace) -> int:
 
 def build_parser() -> argparse.ArgumentParser:
     p = _SuggestingParser(prog="vaara", description="Vaara AI Agent Execution Layer")
+    # `vaara version` existed and `vaara --version` did not, so the first
+    # thing most people type to check an install exited 2 with "unrecognized
+    # arguments". That also silently breaks any script guarding on it, since
+    # `vaara --version >/dev/null && next-thing` never reaches next-thing.
+    # Both spellings now print the same string.
+    p.add_argument("--version", action="version", version=__version__)
     sub = p.add_subparsers(dest="cmd", metavar="COMMAND")
     p.set_defaults(func=_default_entry(p))
 

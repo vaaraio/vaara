@@ -802,6 +802,22 @@ final class GateModel: ObservableObject {
     /// NSAlert, so the popover stays the single surface.
     private func handlePendingApprovals() {
         if pendingApproval != nil { return }  // one at a time; panel is up
+
+        // Forget action ids whose request file is gone. request_approval()
+        // deletes both files once it has an answer, so a later request
+        // carrying the same id is a genuinely new ask, not the answered one
+        // arriving twice. Without this the set only ever grew and any reused
+        // id was silently skipped for the life of the process: the engine
+        // wrote its request, blocked for the full timeout, and no window ever
+        // appeared. Silent is the wrong failure for the one surface a human
+        // is supposed to see.
+        let live = Set(
+            ((try? FileManager.default.contentsOfDirectory(atPath: approvalsDir.path)) ?? [])
+                .filter { $0.hasSuffix(".request.json") }
+                .map { String($0.dropLast(".request.json".count)) }
+        )
+        handledApprovals.formIntersection(live)
+
         for req in pendingApprovals() {
             guard let actionID = req["action_id"] as? String,
                   !actionID.isEmpty, !handledApprovals.contains(actionID) else { continue }
