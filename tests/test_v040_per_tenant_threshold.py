@@ -145,7 +145,12 @@ def test_dry_run_evaluate_uses_per_tenant_thresholds():
 
 
 def test_server_state_wires_lookup_from_registry():
-    from vaara.server.state import ServerState
+    import pytest as _pytest
+    try:
+        from vaara.server.state import ServerState
+    except ImportError:
+        _pytest.skip("server extra not installed (pip install 'vaara[server]')")
+        return  # pytest.skip raises; the return keeps static analysers happy
 
     registry = PolicyRegistry()
     registry.register("", PolicyController(from_dict(_policy_dict(0.4, 0.7))))

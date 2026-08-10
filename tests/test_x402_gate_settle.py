@@ -5,7 +5,15 @@ import io
 import json
 from unittest import mock
 
-from vaara.server.x402 import X402Config, X402Gate
+import pytest
+
+try:
+    from vaara.server.x402 import X402Config, X402Gate
+except ImportError:
+    pytest.skip(
+        "server extra not installed (pip install 'vaara[server]')",
+        allow_module_level=True,
+    )
 
 
 def _gate() -> X402Gate:
