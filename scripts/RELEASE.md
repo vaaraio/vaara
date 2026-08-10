@@ -1,7 +1,10 @@
 # Release flow
 
-Four scripts under `scripts/`, run in order. Push remains gated; you
-keep the keystrokes that hit the network.
+Six scripts under `scripts/`. Three of them run in order on the normal
+path (prepare, push and PR, merge and tag). The other three are
+fallbacks: one for a PR that was merged somewhere else, two for when GH
+Actions cannot publish. Push remains gated; you keep the keystrokes that
+hit the network.
 
 ## Which machine you run this on
 
@@ -9,9 +12,14 @@ Releases are cut from the Linux box, not the Mac.
 
 `release_prepare.sh` calls `.venv/bin/ruff` and `.venv/bin/python` by path.
 The repo's `.venv` holds a Linux aarch64 interpreter, so those paths resolve
-inside the box and dangle anywhere else. On the Mac, step 3 and step 4 fail
-before they run a single check, which means the lint and the full suite are
-skipped rather than passed.
+inside the box and dangle anywhere else. The script runs under
+`set -euo pipefail`, so on the Mac step 3 exits 127 and the script stops
+there. It never reaches the lint, the test suite, the commit, the tags or
+the release branch.
+
+The version bumps in step 2 have already been written by then, so a Mac run
+leaves the six manifests bumped and uncommitted in the working tree. Reset
+them before cutting the release from the Linux box.
 
 A Mac checkout can still build and test through its own environment, but it
 must not be used to cut a release unless `.venv` is rebuilt for that host.
@@ -42,13 +50,19 @@ scripts/release_prepare.sh 0.39.2 sep2787-ref-v2
 
 What runs:
 
-1. Verifies the three pre-flight files exist and the CHANGELOG entry is
-   present.
-2. Bumps `pyproject.toml`, `clients/ts/package.json`,
-   `src/vaara/__init__.py` to `<VERSION>`.
-3. `ruff check` on changed Python paths.
+1. Verifies the three pre-flight files exist, the CHANGELOG entry is
+   present, and that `v<VERSION>`, the co-tag and `release/v<VERSION>`
+   do not already exist locally.
+2. Bumps six manifests to `<VERSION>`: `pyproject.toml`,
+   `clients/ts/package.json`, `src/vaara/__init__.py`, `server.json`,
+   `server-vaara-server.json`, and the Claude Code plugin manifest under
+   `plugins/claude-code-vaara-governance/`. Each one is read back with a
+   grep, so a sed that matched nothing fails the step.
+3. `ruff check` on changed Python paths, or on all of `src/vaara` and
+   `tests` when the diff has no Python in it.
 4. Full `pytest` (skips `tests/adversarial`, which is a data corpus with no
-   test modules in it).
+   test modules in it). `VAARA_SKIP_TESTS=1` skips this step, and is meant
+   only for a patch release whose diff contains no Python.
 5. Stages explicit paths only (no `git add -A`).
 6. Commits via `-F`.
 7. Creates annotated tags `v<VERSION>` and (if passed) `<CO_TAG>` at
