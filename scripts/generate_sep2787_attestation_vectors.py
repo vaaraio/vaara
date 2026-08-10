@@ -75,24 +75,24 @@ def _attest(*, alg, signing_material, args, nonce, iat=IAT):
 
 
 def _emit_keys() -> dict:
+    """Mint the signing keys and publish only their public halves.
+
+    The private halves stay in this process. Verifying a vector needs the
+    public key alone, so writing the private key to the vector directory
+    buys nothing and puts signing material one `git add` away from a public
+    repository. An earlier revision of this script did write them, and the
+    blobs are still reachable in history.
+    """
     es = ec.generate_private_key(ec.SECP256R1())
     rs = rsa.generate_private_key(public_exponent=65537, key_size=2048)
     keys = OUT / "keys"
     keys.mkdir(parents=True, exist_ok=True)
+    for stale in keys.glob("*_private.pem"):
+        stale.unlink()
     (keys / "hs256_secret.bin").write_bytes(HS_SECRET)
-    (keys / "es256_private.pem").write_bytes(es.private_bytes(
-        serialization.Encoding.PEM,
-        serialization.PrivateFormat.PKCS8,
-        serialization.NoEncryption(),
-    ))
     (keys / "es256_public.pem").write_bytes(es.public_key().public_bytes(
         serialization.Encoding.PEM,
         serialization.PublicFormat.SubjectPublicKeyInfo,
-    ))
-    (keys / "rs256_private.pem").write_bytes(rs.private_bytes(
-        serialization.Encoding.PEM,
-        serialization.PrivateFormat.PKCS8,
-        serialization.NoEncryption(),
     ))
     (keys / "rs256_public.pem").write_bytes(rs.public_key().public_bytes(
         serialization.Encoding.PEM,

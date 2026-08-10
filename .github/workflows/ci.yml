@@ -151,6 +151,43 @@ jobs:
             exit 1
           fi
 
+  no-private-keys:
+    name: No private key material in the history
+    runs-on: ubuntu-latest
+    # v0.42.0 committed four private conformance-vector keys. PR #201 deleted
+    # them from HEAD with the note "verification unaffected, public-key only",
+    # which was true of the checkout and missed that git keeps the blobs. They
+    # stayed pullable for 73 days and still matched the public keys shipping at
+    # HEAD, so anyone could mint a vector that verified against them.
+    #
+    # A check that reads the working tree would have passed every day of that.
+    # This one walks each commit the pull request adds and inspects the blobs
+    # that commit introduces, so adding a key and deleting it in the next
+    # commit fails the same way as leaving it in.
+    steps:
+      - uses: actions/checkout@9c091bb21b7c1c1d1991bb908d89e4e9dddfe3e0  # v7.0.0
+        with:
+          fetch-depth: 0  # the range walk needs the base commit
+
+      - name: Set up Python 3.12
+        uses: actions/setup-python@5fda3b95a4ea91299a34e894583c3862153e4b97  # v7.0.0
+        with:
+          python-version: '3.12'
+
+      - name: Install cryptography
+        # Detection parses the candidate rather than matching a header, so a
+        # deliberately malformed PEM in a negative test does not trip it.
+        run: pip install 'cryptography>=42'
+
+      - name: Scan the commits this pull request adds
+        if: github.event_name == 'pull_request'
+        run: |
+          python scripts/check_no_private_keys.py \
+            --range ${{ github.event.pull_request.base.sha }}..HEAD
+
+      - name: Scan the tree
+        run: python scripts/check_no_private_keys.py --tree
+
   signing-extras:
     name: Signing extras (attestation, scitt, timeanchor, pq, yaml)
     runs-on: ubuntu-latest

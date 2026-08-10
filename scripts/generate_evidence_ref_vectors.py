@@ -131,10 +131,12 @@ def main() -> None:
     es = ec.generate_private_key(ec.SECP256R1())
     keys = OUT / "keys"
     keys.mkdir(parents=True, exist_ok=True)
+    # The private half stays in this process. A verifier needs the public key
+    # alone, so writing the private key here would only put signing material
+    # one `git add` away from a public repository.
+    for stale in keys.glob("*_private.pem"):
+        stale.unlink()
     (keys / "hs256_secret.bin").write_bytes(HS)
-    (keys / "es256_private.pem").write_bytes(es.private_bytes(
-        serialization.Encoding.PEM, serialization.PrivateFormat.PKCS8,
-        serialization.NoEncryption()))
     (keys / "es256_public.pem").write_bytes(es.public_key().public_bytes(
         serialization.Encoding.PEM,
         serialization.PublicFormat.SubjectPublicKeyInfo))
