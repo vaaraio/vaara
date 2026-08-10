@@ -14,10 +14,14 @@ import importlib.util
 
 import pytest
 
+# Name the module that is actually absent. Reporting the whole dependency set
+# on every skip tells the reader the wrong thing when only one piece is
+# missing, and it makes the skip unreadable to a CI job that decides whether a
+# skip is acceptable by reading the reason.
 for _mod in ("rfc8785", "cryptography", "httpx", "fastapi"):
     if importlib.util.find_spec(_mod) is None:
         pytest.skip(
-            "inference-proxy deps not installed (attestation extra + httpx/fastapi)",
+            f"inference-proxy deps not installed: no {_mod}",
             allow_module_level=True,
         )
 
