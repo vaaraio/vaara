@@ -89,6 +89,7 @@ struct ContentView: View {
     @State private var clients: [MCPClient] = SetupScanner.scan()
     @State private var installing = false
     @State private var installLog: String?
+    @ObservedObject private var systemExtension = SystemExtensionManager.shared
 
     private var dark: Bool { model.config.appearance != "light" }
     private var p: Palette { dark ? .dark : .light }
@@ -447,6 +448,42 @@ struct ContentView: View {
                                 .lineLimit(2).truncationMode(.middle)
                         }
                     }
+                }
+
+                VStack(alignment: .leading, spacing: 8) {
+                    sectionLabelPlain("NETWORK FILTER")
+                    HStack(spacing: 8) {
+                        Circle()
+                            .fill(filterDotColor)
+                            .frame(width: 7, height: 7)
+                        Text(filterStatusText)
+                            .font(.system(size: 11, design: .monospaced))
+                            .foregroundStyle(p.faint)
+                            .lineLimit(2).truncationMode(.middle)
+                    }
+                    HStack(spacing: 10) {
+                        if systemExtension.state == .active {
+                            Button("Turn off") { systemExtension.deactivate() }
+                                .buttonStyle(.plain)
+                                .font(.system(size: 11, weight: .medium))
+                                .foregroundStyle(GateState.red.color)
+                        } else {
+                            Button("Install network filter") { systemExtension.activate() }
+                                .buttonStyle(.plain)
+                                .font(.system(size: 11, weight: .medium))
+                                .foregroundStyle(GateState.green.color)
+                                .disabled(systemExtension.state == .awaitingUserApproval)
+                        }
+                        Button("Recheck") { systemExtension.refresh() }
+                            .buttonStyle(.plain)
+                            .font(.system(size: 11))
+                            .foregroundStyle(p.ghost)
+                    }
+                    Text("Governs AI-bound traffic from Safari, Mail and every "
+                         + "WKWebView app. macOS asks for approval in System "
+                         + "Settings > General > Login Items & Extensions.")
+                        .font(.system(size: 10))
+                        .foregroundStyle(p.ghost)
                 }
 
                 VStack(alignment: .leading, spacing: 6) {
@@ -991,6 +1028,29 @@ struct ContentView: View {
             .contentShape(Rectangle())
         }
         .buttonStyle(.plain)
+    }
+
+    /// Colour for the network-filter dot. Amber while macOS is waiting on the
+    /// user in System Settings, since that is neither working nor broken.
+    private var filterDotColor: Color {
+        switch systemExtension.state {
+        case .active: return GateState.green.color
+        case .awaitingUserApproval, .installedDisabled: return GateState.yellow.color
+        case .failed: return GateState.red.color
+        case .notInstalled, .unknown: return GateState.red.color
+        }
+    }
+
+    private var filterStatusText: String {
+        switch systemExtension.state {
+        case .unknown: return "checking..."
+        case .notInstalled: return "network filter not installed"
+        case .awaitingUserApproval:
+            return "approve Vaara in System Settings, then Recheck"
+        case .installedDisabled: return "installed, filter not enabled"
+        case .active: return "filtering AI-bound traffic"
+        case .failed(let why): return "failed: \(why)"
+        }
     }
 
     private func sectionLabelPlain(_ text: String) -> some View {
