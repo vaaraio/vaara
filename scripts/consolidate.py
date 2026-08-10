@@ -27,6 +27,10 @@ import sys
 from pathlib import Path
 
 REPO = Path(__file__).resolve().parent.parent
+# Release drafts live under the private root. They used to sit in the repo
+# root, which meant an ignore rule per pattern, and a rule naming a path also
+# publishes that the path exists.
+RELEASE_DIR = REPO / ".shared" / "release"
 SHIPPED = REPO / ".shipped"
 MANIFESTS = SHIPPED / "manifests"
 
@@ -92,7 +96,9 @@ def classify(path, tags, commits, merged_prs):
 
 
 def candidates():
-    return sorted(p for p in REPO.iterdir() if p.is_file()
+    if not RELEASE_DIR.is_dir():
+        return []
+    return sorted(p for p in RELEASE_DIR.iterdir() if p.is_file()
                   and p.name.startswith((".pr_body_", ".commit_msg_",
                                           ".pr_comment_", ".tag_payload")))
 

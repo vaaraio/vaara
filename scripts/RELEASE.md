@@ -18,14 +18,15 @@ must not be used to cut a release unless `.venv` is rebuilt for that host.
 
 ## Pre-flight (you do this by hand)
 
-Per release, write three files in the repo root:
+Per release, write three files:
 
-- `.commit_msg_v<VERSION>_release.txt`: commit message body.
-- `.pr_body_v<VERSION>.md`: PR body, send-ready-prose audited.
-- `CHANGELOG.md`: add a `## [<VERSION>] - YYYY-MM-DD` entry.
+- `.shared/release/.commit_msg_v<VERSION>_release.txt`: commit message body.
+- `.shared/release/.pr_body_v<VERSION>.md`: PR body, send-ready-prose audited.
+- `CHANGELOG.md`: add a `## [<VERSION>] - YYYY-MM-DD` entry, in the repo root.
 
-These stay local (gitignored by convention) and feed the scripts via
-`-F` / `--body-file` so you never paste prose into the terminal.
+The two drafts live under `.shared/` because that is the one ignored root.
+They feed the scripts via `-F` / `--body-file` so you never paste prose into
+the terminal.
 
 ## 1. Prepare the commit + tags + branch
 
@@ -63,7 +64,8 @@ scripts/release_push_and_pr.sh <VERSION>
 ```
 
 This pushes `release/v<VERSION>` and opens a PR against `main` using
-the commit subject as PR title and `.pr_body_v<VERSION>.md` as body.
+the commit subject as PR title and `.shared/release/.pr_body_v<VERSION>.md`
+as body.
 Prints the PR URL and the next-step command.
 
 ## 3. After CI is green, merge and re-tag

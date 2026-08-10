@@ -7,8 +7,8 @@
 #            (e.g., sep2787-ref-v2)
 #
 # Expects:
-#   .commit_msg_v<VERSION>_release.txt  (commit message body)
-#   .pr_body_v<VERSION>.md              (PR body)
+#   .shared/release/.commit_msg_v<VERSION>_release.txt  (commit message body)
+#   .shared/release/.pr_body_v<VERSION>.md              (PR body)
 #   CHANGELOG.md                        (entry for [<VERSION>])
 #
 # What it does:
@@ -18,8 +18,7 @@
 #      src/vaara/__init__.py + server.json + server-vaara-server.json +
 #      the Claude Code plugin manifest.
 #   3. ruff check on changed Python paths.
-#   4. pytest --no-header on the full suite (skips adversarial dir;
-#      deselects pre-existing known-failing test).
+#   4. pytest --no-header on the full suite (skips the adversarial data dir).
 #   5. Stages explicit paths (no `git add -A`).
 #   6. Commits via -F.
 #   7. Creates annotated tag v<VERSION>; if CO_TAG passed, also that.
@@ -37,8 +36,12 @@ fi
 VERSION="$1"
 CO_TAG="${2:-}"
 
-COMMIT_MSG=".commit_msg_v${VERSION}_release.txt"
-PR_BODY=".pr_body_v${VERSION}.md"
+# Drafts live under the private root, not the repo root. A scratch file in
+# the repo root needs an ignore rule, and a rule naming a path also publishes
+# that the path exists.
+RELEASE_DIR=".shared/release"
+COMMIT_MSG="${RELEASE_DIR}/.commit_msg_v${VERSION}_release.txt"
+PR_BODY="${RELEASE_DIR}/.pr_body_v${VERSION}.md"
 BRANCH="release/v${VERSION}"
 
 # 1. Pre-flight
@@ -107,13 +110,19 @@ else
   .venv/bin/ruff check src/vaara tests
 fi
 
-# 4. Tests (full suite, deselect pre-existing known failure).
+# 4. Tests (full suite).
+# tests/adversarial is a data corpus, 331 files and no .py, so --ignore only
+# stops pytest walking it during collection; it excludes nothing executable.
+#
+# The deselect that used to sit here, for
+# test_known_bad_metadata_ssrf_scores_high, landed 2026-05-27 and was stale
+# from 2026-05-29, when the deterministic IMDS floor that makes it pass landed.
+# Verified passing with vaara[ml] installed, and it skips cleanly without.
+#
 # Skip when VAARA_SKIP_TESTS=1 is set — intended only for patch releases
 # whose diff contains no Python/engine changes (e.g. a macOS UI text fix).
 if [[ "${VAARA_SKIP_TESTS:-0}" != "1" ]]; then
-  .venv/bin/python -m pytest -q --no-header \
-    --ignore=tests/adversarial \
-    --deselect tests/test_adversarial_classifier_integration.py::test_known_bad_metadata_ssrf_scores_high
+  .venv/bin/python -m pytest -q --no-header --ignore=tests/adversarial
 fi
 
 # 5. Stage explicit paths only

@@ -8,12 +8,12 @@
 #
 # Expects scripts/release_prepare.sh has already run:
 #   - branch release/v<VERSION> exists locally
-#   - .pr_body_v<VERSION>.md exists
+#   - .shared/release/.pr_body_v<VERSION>.md exists
 #   - HEAD is the release commit
 #
 # What it does:
 #   1. git push -u origin release/v<VERSION>
-#   2. gh pr create --title <subject> --body-file .pr_body_v<VERSION>.md
+#   2. gh pr create --title <subject> --body-file .shared/release/.pr_body_v<VERSION>.md
 #                   --base main --head release/v<VERSION>
 #   3. Prints the PR URL and the next-step command.
 
@@ -26,7 +26,7 @@ fi
 
 VERSION="$1"
 BRANCH="release/v${VERSION}"
-PR_BODY=".pr_body_v${VERSION}.md"
+PR_BODY=".shared/release/.pr_body_v${VERSION}.md"
 
 [[ -f "$PR_BODY" ]] || { echo "missing: $PR_BODY" >&2; exit 1; }
 [[ "$(git branch --show-current)" == "$BRANCH" ]] || \
