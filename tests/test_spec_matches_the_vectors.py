@@ -135,6 +135,12 @@ def test_checkers_pass_without_vaara_importable(directory, tmp_path):
     )
     if done.returncode == SKIP:
         pytest.skip(done.stdout.strip() or "optional dependency missing")
+    # `cryptography` and `rfc8785` are the two the checkers are allowed to
+    # need, and both are extras. On a base install they are absent, which is
+    # the environment's business and not a claim failing.
+    missing = re.search(r"No module named '([\w.]+)'", done.stderr)
+    if missing and missing.group(1).split(".")[0] in ALLOWED_THIRD_PARTY:
+        pytest.skip(f"{missing.group(1)} not installed in this environment")
     assert done.returncode == 0, (
         f"{directory.name}/_check_independent.py exited {done.returncode}\n"
         f"{done.stdout[-2000:]}\n{done.stderr[-2000:]}"
