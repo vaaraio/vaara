@@ -182,14 +182,21 @@ def test_signature_matches_second_key_in_document():
 def test_tampered_signature_does_not_bind():
     priv = ec.generate_private_key(ec.SECP256R1())
     receipt = _emit(alg="ES256", signing_material=priv)
+    # Overwriting the first byte with a constant does not tamper with anything
+    # when the signature already starts with that constant, which is roughly 1
+    # run in 256. The receipt then verifies correctly and the assertion below
+    # fails against a verifier that did nothing wrong. Inverting the byte always
+    # changes it, and the guard makes a silent no-op impossible.
+    flipped = f"{int(receipt.signature[:2], 16) ^ 0xFF:02x}"
     tampered = receipt.__class__(
         version=receipt.version,
         alg=receipt.alg,
         back_link=receipt.back_link,
         receipt_asserted=receipt.receipt_asserted,
         outcome_derived=receipt.outcome_derived,
-        signature="00" + receipt.signature[2:],
+        signature=flipped + receipt.signature[2:],
     )
+    assert tampered.signature != receipt.signature
     doc = _did_document(_ec_jwk(priv.public_key()))
     assert verify_receipt_identity(tampered, doc).bound is False
 
