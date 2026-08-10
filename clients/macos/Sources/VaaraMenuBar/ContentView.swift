@@ -37,7 +37,46 @@ struct Palette {
 
 /// Bump on every source change; shown in the footer so a stale build is
 /// visible at a glance instead of masquerading as a bug.
-let BUILD_STAMP = "b57 · 2026-08-03"
+let BUILD_STAMP = "b58 · 2026-08-09"
+
+/// Height of a scroll view's content, reported up from the content itself.
+private struct ContentHeightKey: PreferenceKey {
+    static var defaultValue: CGFloat = 0
+    static func reduce(value: inout CGFloat, nextValue: () -> CGFloat) {
+        value = max(value, nextValue())
+    }
+}
+
+/// A scroll view exactly as tall as what is inside it, up to `cap`.
+///
+/// SwiftUI's ScrollView is greedy along its scroll axis: given `maxHeight`
+/// it takes the whole allowance, so three rows rendered a full-height box
+/// with the rest empty, and the popover never ended where the content did.
+/// Measuring the content and pinning the frame to that height is what makes
+/// the panel fit. The cap is the only reason to scroll at all, and the
+/// indicators stay hidden because the panel edge already shows the bound.
+private struct FittingScrollView<Content: View>: View {
+    let cap: CGFloat
+    @ViewBuilder let content: Content
+    @State private var contentHeight: CGFloat = 0
+
+    var body: some View {
+        ScrollView(.vertical, showsIndicators: false) {
+            content
+                .background(
+                    GeometryReader { geo in
+                        Color.clear.preference(
+                            key: ContentHeightKey.self, value: geo.size.height
+                        )
+                    }
+                )
+        }
+        .onPreferenceChange(ContentHeightKey.self) { contentHeight = $0 }
+        // Before the first measurement the height is 0, which would collapse
+        // the view and stop it ever being measured. Fall back to the cap.
+        .frame(height: contentHeight > 0 ? min(contentHeight, cap) : cap)
+    }
+}
 
 struct ContentView: View {
     @ObservedObject var model: GateModel
@@ -207,14 +246,13 @@ struct ContentView: View {
                 .frame(maxWidth: .infinity)
                 .padding(.vertical, 36)
             } else {
-                ScrollView {
+                FittingScrollView(cap: 560) {
                     VStack(alignment: .leading, spacing: 0) {
                         sectionLabel("EVERY DECISION ON RECORD")
                         ForEach(events) { HistoryRow(event: $0, p: p) }
                     }
                     .padding(.vertical, 8)
                 }
-                .frame(maxHeight: 560)
             }
         }
     }
@@ -247,7 +285,7 @@ struct ContentView: View {
     // MARK: overview — running agents, then the intervention feed
 
     private var overview: some View {
-        ScrollView {
+        FittingScrollView(cap: 560) {
             VStack(alignment: .leading, spacing: 0) {
                 if !model.agents.isEmpty {
                     sectionLabel("RUNNING NOW")
@@ -295,7 +333,6 @@ struct ContentView: View {
             }
             .padding(.vertical, 8)
         }
-        .frame(maxHeight: 560)
     }
 
     // MARK: agent detail — who behaved
@@ -344,13 +381,12 @@ struct ContentView: View {
                     .frame(maxWidth: .infinity)
                     .padding(.vertical, 36)
             } else {
-                ScrollView {
+                FittingScrollView(cap: 420) {
                     VStack(spacing: 0) {
                         ForEach(events) { FeedRow(event: $0, p: p) }
                     }
                     .padding(.vertical, 6)
                 }
-                .frame(maxHeight: 420)
             }
         }
     }
@@ -490,7 +526,7 @@ struct ContentView: View {
     private var enterprise: Bool { model.config.user_level == "enterprise" }
 
     private var settings: some View {
-        ScrollView {
+        FittingScrollView(cap: 560) {
             Grid(alignment: .topLeading, horizontalSpacing: 32, verticalSpacing: 18) {
                 // Row 1: SETTINGS FOR  |  NOTIFY ON
                 GridRow {
@@ -742,7 +778,6 @@ struct ContentView: View {
             }
             .padding(20)
         }
-        .frame(maxHeight: 560)
     }
 
     // MARK: anchor — the qualified timestamp provider (EU trusted list) picker
@@ -813,11 +848,10 @@ struct ContentView: View {
             }
 
             if !model.anchorProviders.isEmpty {
-                // A concrete height: a ScrollView in a popover that sizes to
-                // its content has no bounded height and would collapse, so
-                // pin it (capped) instead of relying on maxHeight.
-                let rows = CGFloat(model.anchorProviders.count)
-                ScrollView {
+                // Was a row-count estimate (rows * 48 + 8), which guessed the
+                // row height and left a gap under short lists. The measured
+                // height is the real one.
+                FittingScrollView(cap: 200) {
                     VStack(alignment: .leading, spacing: 4) {
                         ForEach(model.anchorProviders) { prov in
                             let chosen = prov.provider == model.configuredAnchorProvider
@@ -850,7 +884,6 @@ struct ContentView: View {
                     }
                     .frame(maxWidth: .infinity, alignment: .leading)
                 }
-                .frame(height: min(rows * 48 + 8, 200))
             }
         }
         .padding(20)
