@@ -4,6 +4,122 @@ All notable changes to this project are documented here.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/)
 and this project follows [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [1.65.0] - 2026-08-10
+
+When a cloud or OSS guardrail blocks on something Vaara's parser does not model,
+the audit trail now records the disagreement instead of recording `allow`. The
+full test suite runs on a clean checkout, including the 1061 test functions that
+optional extras were hiding, and a test run no longer writes into a real audit
+trail. The macOS menu bar app can install the network filter and ask for the
+accessibility permission it needs. And every command line, file path, threshold
+and measured number the documentation prints is now checked against the code on
+every commit.
+
+### Evidence correctness
+
+Bedrock, GCP Model Armor and Guardrails AI each parsed per-category detail and
+then ignored the one top-level field the provider sets when it intervened:
+`action`, `filterMatchState` and `validation_passed` respectively. When a
+provider blocked on a policy type the parser did not model, no category was
+produced, `aggregate_verdict` saw an empty action set, and the finding came back
+`allow`. That was written to the hash-chained trail as "upstream guardrail:
+allow" while the provider had actually blocked, with no exception and no warning.
+
+The Rebuff adapter already cross-checked its own top-level signal against the
+per-layer parse. The other three now do the same: when the provider states it
+intervened and no parsed category did, the adapter records a category naming the
+disagreement rather than reporting clean. A provider verdict that agrees with the
+parse adds nothing, so a modelled block is not double-reported.
+`aggregate_verdict` gets its first test, having had none while every adapter
+resolves ambiguity through it.
+
+### Packaging and the test suite
+
+`pip install 'vaara[scitt]'` shipped a module it could not import.
+`vaara.audit.scitt_anchor` pulled a helper from `vaara.audit.receipt_anchor`,
+which imports `asn1crypto` at module level for its RFC 3161 path, and
+`asn1crypto` belongs to the `timeanchor` extra. The helper needs neither
+dependency and now lives in `vaara.audit.timeanchor`, whose module level is
+standard library only. `receipt_anchor` re-exports both names, so the documented
+import path is unchanged.
+
+`requirements-dev.txt` is compiled with `--extra=dev --extra=export`, and
+`export` is `cryptography` alone, so the main matrix installed almost no optional
+dependency. 93 test modules were skipped at import time, holding 1061 test
+functions. Installing attestation, scitt, timeanchor, pq and yaml takes the suite
+from 1733 passed to 2697 passed with no failures. A signing-extras job now covers
+that set and greps skip reasons rather than pinning a file list, so a new module
+gated on one of them is caught without editing the job.
+
+There was no `conftest.py`, so `pytest` on a machine that also runs Vaara
+appended test records to the live evidence chain: `InterceptionPipeline()` with
+no trail resolves `~/.vaara/trail/audit.db`, and a dozen further modules bind
+`Path.home()` into module-level constants. The redirect runs at conftest import
+time rather than in a fixture, because those constants bind at their own import.
+`VAARA_TEST_USE_REAL_HOME=1` opts out for deliberate debugging.
+
+### macOS client
+
+The menu bar app was never broken. It had never been launched and observed.
+
+`SystemExtensionManager.activate()` had no call site anywhere in the app, so
+nothing could submit the `OSSystemExtensionRequest` that installs the filter.
+Setup now carries a NETWORK FILTER section: Install wired to `activate()`, Turn
+off to `deactivate()`, Recheck to `refresh()`, and the five states the manager
+already published rendered as a dot and a line of text.
+
+`AccessibilityObserver.start()` guarded on `AXIsProcessTrusted()`, which never
+prompts, and returned early. The call that shows the System Settings prompt was
+therefore unreachable on exactly the machines that had not granted the
+permission, and macOS shows that prompt once per app, so an untrusted first
+launch stayed untrusted forever.
+
+`xcodegen` overwrote the system extension's `Info.plist` on every run, because
+the target declared both `INFOPLIST_FILE` and an `info:` block pointing at the
+same file. Each regeneration dropped `CFBundlePackageType SYSX` and the whole
+NetworkExtension dictionary, so the extension registered and filtered nothing.
+The workflow now asserts those keys on the built product rather than the source
+file. `clients/macos/build.sh` also could not run in any clone.
+
+Known limit, unchanged: the filter's entitlements are Apple-restricted and need a
+provisioning profile that only a paid Apple Developer Program membership issues.
+`./build.sh local` ad-hoc signs without them, so everything except the filter
+runs, and no traffic has yet reached `handleNewFlow`. `docs/PRIOR_ART.md` states
+that the traffic path is unproven.
+
+### Documentation checked against behaviour
+
+Twelve claims across the documents an evaluator opens first were checked by
+running what they point at, and did not survive it. Four are worth naming:
+
+- The Article 12(2) retention recipe exits 2 as printed. `vaara trail purge`
+  requires a tenant selector the document never mentioned.
+- VERDICTS.md listed 11 of the 14 EU AI Act requirements the engine enforces,
+  omitting 26(10), 50(1) and 73(1), two of them critical, in a document whose
+  job is to let a reader predict the verdict.
+- SPEC.md, which calls itself normative, offered `ML-DSA-65` as a receipt `alg`.
+  Nothing emits it and the reference checkers require `ES256`. The post-quantum
+  path that ships is an additive `pqSignature` block under a hybrid suite, now
+  Section 2.2.
+- conformance-profile.md fixed Profile v1 at 37 suites while 43 ship, so six
+  were absent from the target an outside implementer builds against.
+
+The rest: a lost adapter mapping row and two stale category counts, a
+conformity-report example showing output it does not produce, two verdict enum
+values that have never existed and three real ones undocumented, an OVERT
+example that skipped the step producing the file it then verifies, an ingest
+sequence that counts from 1 where the neighbouring section counts from 0, a
+benign FPR quoted 0.4 points above the artefact, a per-source attribution stated
+as if it held for both sources, and three documents citing a `research/` tree
+that has never been in the repository.
+
+Nine guards now run on every commit, each confirmed to fail on the text it
+replaced: documented command lines against the real CLI parser, documented paths
+against the checkout, measured percentages against the JSON they cite, adapter
+tables and counts against the mapping module, engine thresholds against both
+requirement bundles, the vector suite list against the vectors, and two
+documented examples executed end to end.
+
 ## [1.64.1] - 2026-08-09
 
 An index on `seq`, which the append path has needed since the backend was
