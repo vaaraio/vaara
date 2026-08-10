@@ -646,7 +646,7 @@ relevant measurement primitive that ties everything above together.
 
 The [MIT AI Risk Repository v4](https://airisk.mit.edu/) (MIT FutureTech, Slattery et al., updated 2025-12-03, CC BY 4.0) is a meta-taxonomy of 1,835 risk-bearing entries drawn from 74 source papers, organised into 7 domains. Vaara has direct runtime evidence shape against roughly 740 of those entries (~46% of the sub-domain-tagged set), concentrated in Privacy & Security, Malicious Actors & Misuse, Human-Computer Interaction, parts of AI System Safety, and the Governance Failure sub-domain. Vaara does not cover the model-side, content-level, and structural risks that live elsewhere in the taxonomy.
 
-The full per-sub-domain map lives at [mit_ai_risk_repository_mapping.md](mit_ai_risk_repository_mapping.md). Local copies of the v4 database and the companion AI Risk Mitigations sheet are tracked under `../research/external/` for reproducibility.
+The full per-sub-domain map lives at [mit_ai_risk_repository_mapping.md](mit_ai_risk_repository_mapping.md). The v4 database and the companion AI Risk Mitigations sheet are not redistributed here; download them from [airisk.mit.edu](https://airisk.mit.edu/) to reproduce the mapping against the same release.
 
 ## EU Product Liability Directive 2024/2853
 

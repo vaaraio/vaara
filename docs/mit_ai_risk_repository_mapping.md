@@ -117,4 +117,4 @@ The MIT AI Risk Repository is published under CC BY 4.0. The work cited here is:
 
 > Slattery, P., Saeri, A. K., Grundy, E. A. C., Graham, J., Noetel, M., Uuk, R., Dao, J., Pour, S., Casper, S., Thompson, N. (2024). "The AI Risk Repository: A Comprehensive Meta-Review, Database, and Taxonomy of Risks From Artificial Intelligence." arXiv:2408.12622.
 
-Database last updated 2025-12-03. Local copies of the v4 database and the companion AI Risk Mitigations sheet are tracked under `research/external/` for reproducibility.
+Database last updated 2025-12-03. The v4 database and the companion AI Risk Mitigations sheet are not redistributed here; download them from [airisk.mit.edu](https://airisk.mit.edu/) to reproduce the mapping against the same release.

@@ -335,8 +335,9 @@ than a judgment of the work.
   `.ots` proof shows a digest existed no later than a block's time.
   The lineage runs back to Haber and Stornetta's linked timestamping
   (1991). Vaara shipped an `opentimestamps` receipt-anchor method from
-  v1.29.0 to v1.52.0 (`src/vaara/audit/ots_anchor.py`) which produced
-  standard `.ots` proofs over the receipt's signed-payload digest.
+  v1.29.0 to v1.52.0, which produced standard `.ots` proofs over the
+  receipt's signed-payload digest. The module went with the method, so
+  that is history rather than a path to open in the tree.
   Superseded in v1.53.0 by the `scitt` transparency-log method
   (`src/vaara/audit/scitt_anchor.py`), which provides the same
   trust-minimized witness without Bitcoin finality latency.

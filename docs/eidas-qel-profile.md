@@ -67,4 +67,6 @@ qualified.
 ## Sources
 
 - Reg (EU) 2024/1183 (eIDAS 2.0), Art. 45k / 45l: https://eur-lex.europa.eu/eli/reg/2024/1183
-- Status watch list and Stage 0 verdict: `research/eidas2_roadmap_20260627.md`
+- EU Trusted List of qualified trust service providers (the authoritative
+  source for whether a given QTSP holds qualified status):
+  https://eidas.ec.europa.eu/efda/tl-browser/
