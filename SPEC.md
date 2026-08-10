@@ -44,7 +44,7 @@ A receipt is a JSON object with these top-level members:
 | Field | Type | Required | Meaning |
 |---|---|---|---|
 | `version` | integer | MUST | Envelope version. `1` for this document. |
-| `alg` | string | MUST | Signature algorithm. `ES256` in v1; `ML-DSA-65` MAY be offered as a post-quantum scheme. |
+| `alg` | string | MUST | Signature algorithm. `ES256` in v1. A receipt that names anything else is rejected by the reference checkers. |
 | `backLink` | object | MUST | Binds this receipt to its attestation/predecessor: `attestationDigest`, `attestationNonce`. |
 | `decisionDerived` | object | MUST | The decision and the evidence it derives from. See Section 3. |
 | `issuerAsserted` | object | MUST | Issuer-asserted identity claims: `iss`, `sub`, `iat`, `nonce`, `alg`, `secretVersion`. |
@@ -64,6 +64,18 @@ exactly these members, in this set, with their receipt values:
 can gain anchors after signing without invalidating the signature. A consumer
 MUST verify the signature by reconstructing this payload, canonicalizing it, and
 checking it against the public key under `alg`.
+
+### 2.2 Post-quantum protection
+
+There is no post-quantum `alg` value in v1. What ships is additive and lives
+next to the classical signature rather than replacing it: an execution record
+MAY carry a `pqSignature` sibling block (`alg`, `keyid`, `sig`) under a
+registered hybrid suite, `ES256+ML-DSA-65` or `RS256+ML-DSA-65`, so a verifier
+that cannot do ML-DSA still verifies the classical signature and a verifier
+that can sees a stripped block as the downgrade it is. Vectors at
+`tests/vectors/pq_hybrid_v0/`, which needs `dilithium_py` (`vaara[pq]`) and
+skips without it. The signed handoff zip is separate again: it signs Ed25519 by
+default and ML-DSA-65 under the same extra.
 
 ## 3. Evidence binding (`decisionDerived.evidenceRef`)
 
@@ -374,7 +386,10 @@ unchanged. The signed payload is:
   optional non-authoritative `ref` locator.
 - `ingestAsserted`: `iss` / `sub` / `iat` / `nonce` / `secretVersion` / `alg`.
 - `completeness`: a per-stream `seq` and `runningCount`; a lone ingest is `seq 1`
-  of a one-record stream.
+  of a one-record stream. Note the difference from Section 5.3: the ingest
+  stream counts from 1, so `runningCount` equals `seq` here, where an
+  authorization stream counts from 0 and `runningCount` is `seq + 1`. A
+  contiguity checker written for one is wrong by one on the other.
 
 `signature` is appended over the JCS encoding of that payload.
 
