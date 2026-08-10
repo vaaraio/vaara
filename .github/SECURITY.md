@@ -30,11 +30,12 @@ unless anonymity is requested.
 
 | Version | Supported |
 | ------- | --------- |
-| 0.4.x   | Yes       |
-| < 0.4   | No        |
+| 1.65.x  | Yes       |
+| < 1.65  | No        |
 
 Only the latest minor release receives security fixes. Older minor lines may
-receive patches at our discretion for severe issues.
+receive patches at our discretion for severe issues. Releases are frequent, so
+treat this table as naming the current line rather than a long-term window.
 
 ## Scope
 
@@ -62,8 +63,9 @@ receive patches at our discretion for severe issues.
 ## Security Considerations for Users
 
 - Always pin vaara to a specific version in production.
-- Verify PyPI artefacts against published checksums and (future) Sigstore
-  attestations.
+- Verify PyPI artefacts against published checksums and the Sigstore
+  attestations, which ship with every release and are produced by the
+  release workflow alongside SLSA provenance.
 - When deploying signed audit exports, protect the signing private key using
   OS-level key management (hardware-backed keystore or HSM recommended).
 

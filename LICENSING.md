@@ -27,9 +27,10 @@ terms directly. Contact: hello@vaara.io.
 
 ## History
 
-Releases up to and including v0.71.0 were published under the Apache
-License 2.0 and remain available under those terms. From the next
-release onward, Vaara is licensed under AGPL-3.0-or-later.
+Releases up to and including v0.70.0 were published under the Apache
+License 2.0 and remain available under those terms. The relicensing
+commit landed after that tag, and v1.0.0 is the first release published
+under AGPL-3.0-or-later. Every release from v1.0.0 onward is AGPL.
 
 ## Contributions
 

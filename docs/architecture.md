@@ -1,6 +1,6 @@
 # Architecture
 
-How Vaara processes a tool call, how it scores, and how the audit trail is anchored in time. The formal guarantees (MWU regret bound, conformal coverage, security properties) are in [formal_specification.md](formal_specification.md); the benchmark numbers are in the project [README](../README.md#how-it-scores) and under [bench/](../bench/).
+How Vaara processes a tool call, how it scores, and how the audit trail is anchored in time. The formal guarantees (MWU regret bound, conformal coverage, security properties) are in [formal_specification.md](formal_specification.md); the benchmark numbers are under [bench/](../bench/).
 
 ## How it works
 
