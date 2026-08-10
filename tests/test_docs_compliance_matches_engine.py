@@ -22,7 +22,9 @@ from pathlib import Path
 
 import pytest
 
-from vaara.compliance.engine import ComplianceEngine
+from vaara.compliance.engine import (
+    ComplianceEngine, EvidenceStatus, EvidenceStrength,
+)
 
 DOC = Path(__file__).resolve().parent.parent / "docs" / "COMPLIANCE.md"
 
@@ -87,3 +89,41 @@ def test_critical_requirements_are_all_documented():
 def test_article_50_disclosure_is_documented():
     """Regression: Article 50 is the transparency obligation in force."""
     assert "50(1)" in _table_articles("EU_AI_ACT")
+
+
+def _documented_enum_values(enum_name: str) -> set[str]:
+    """Values COMPLIANCE.md lists in the table under `enum_name`."""
+    text = DOC.read_text()
+    header = re.search(rf"\|\s*`{enum_name}`\s*\|[^\n]*\n\|[-\s|]+\n", text)
+    assert header, f"no table found for {enum_name} in docs/COMPLIANCE.md"
+    values = set()
+    for line in text[header.end():].splitlines():
+        if not line.startswith("|"):
+            break
+        cell = line.split("|")[1].strip()
+        values.add(cell.strip("`"))
+    return values
+
+
+@pytest.mark.parametrize("enum_name,enum_cls", [
+    ("EvidenceStatus", EvidenceStatus),
+    ("EvidenceStrength", EvidenceStrength),
+])
+def test_documented_verdict_vocabulary_matches_the_engine(enum_name, enum_cls):
+    """The words the report can print have to be the words the doc lists.
+
+    COMPLIANCE.md described EvidenceStatus as "sufficient, insufficient,
+    stale, error". Neither `stale` nor `error` has ever existed, and
+    `evidence_partial` and `not_applicable`, both of which a report does
+    print, were missing. EvidenceStrength omitted `absent`, which the
+    README's own example output shows. An auditor reading the mapping
+    document is reading it to learn what the verdicts mean, so inventing two
+    and hiding three is the wrong direction to be wrong in.
+    """
+    documented = _documented_enum_values(enum_name)
+    real = {member.value for member in enum_cls}
+    assert documented == real, (
+        f"docs/COMPLIANCE.md {enum_name} table drifted from the engine.\n"
+        f"  documented but not real: {sorted(documented - real)}\n"
+        f"  real but not documented: {sorted(real - documented)}"
+    )

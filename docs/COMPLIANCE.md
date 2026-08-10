@@ -283,9 +283,22 @@ its predecessor. Any insertion, deletion, or edit breaks the chain and
 is detected by `vaara trail verify`.
 
 **2. The conformity report.** A structured per-article rollup. Each
-article gets an `EvidenceStatus` (sufficient, insufficient, stale,
-error) and an `EvidenceStrength` (strong, moderate, weak) based on
+article gets an `EvidenceStatus` and an `EvidenceStrength`, based on
 how many qualifying events exist and how recent they are.
+
+| `EvidenceStatus` | Meaning |
+|---|---|
+| `evidence_sufficient` | Evidence present and within the freshness window |
+| `evidence_partial` | Some evidence, gaps remain |
+| `evidence_insufficient` | No evidence, or critical gaps |
+| `not_applicable` | The article does not apply to this system |
+
+| `EvidenceStrength` | Meaning |
+|---|---|
+| `strong` | Continuous, automated, verifiable |
+| `moderate` | Present but manual or intermittent |
+| `weak` | Indirect or insufficient |
+| `absent` | No evidence |
 
 **3. The signed regulator handoff zip.** Produced by `vaara trail
 export`. Contains the trail, a manifest, and an Ed25519 signature.
