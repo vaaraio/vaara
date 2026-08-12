@@ -164,6 +164,23 @@ Start with `--shadow`: every call is classified, scored, and recorded, nothing i
 </details>
 
 <details>
+<summary><b>In CI</b></summary>
+
+A policy is code, so it belongs in the pull request that changes it. The action validates the policy, runs its cases, and fails the build on a policy that does not parse, a failing case, or a trail whose chain or signature does not hold.
+
+```yaml
+- uses: vaaraio/vaara@v1
+  with:
+    policy: policies/production.yaml
+    cases: policies/production.cases.yaml
+```
+
+Point `trail` at a signed zip to verify one a job produced. Without a `pubkey` that checks the trail is internally intact; pass a key you obtained separately to bind the signer too, and the run says which of the two it did. Inputs, outputs and pinning are in [docs/github-action.md](docs/github-action.md).
+
+This checks artifacts. Gating the agent is the runtime's job, at the moment of the tool call.
+</details>
+
+<details>
 <summary><b>How it scores</b></summary>
 
 Each risk score blends five expert signals and keeps adapting as outcomes come back, and it carries a confidence interval with a coverage guarantee that holds regardless of the input distribution. On a held-out adversarial corpus the classifier reaches **84.7%** recall (95% Wilson [82.4, 86.7]) at a **4.1%** false-positive rate, and **1.2%** FPR on benign calls under live injection pressure. The hot-path rule scorer adds 140 µs mean per call on commodity CPU; the ML classifier is opt-in (`vaara[ml]`) and off that path. `make bench` reproduces the classifier figures below against the bundles that ship in the repo; it needs `pip install 'vaara[ml]'` and downloads the embedding model on first run.
