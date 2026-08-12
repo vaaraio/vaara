@@ -21,13 +21,24 @@ import sys
 from pathlib import Path
 
 import pytest
-import rfc8785
 from hypothesis import HealthCheck, given, settings
 from hypothesis import strategies as st
 
 VECTORS = Path(__file__).resolve().parent / "vectors" / "governance_decision_v0"
 ZERODEP = VECTORS / "_check_zerodep.py"
 REFERENCE = VECTORS / "_check_independent.py"
+
+
+def _rfc8785():
+    """The reference canonicalizer, skipped when absent.
+
+    ``rfc8785`` and ``cryptography`` live in the ``attestation`` extra, so the base test
+    matrix does not have them. Importing either at module scope would make the tests for a
+    zero-install checker depend on the packages that checker exists to avoid, which is the
+    wrong shape as well as a collection error. Every test below that needs one asks for it
+    here; the tests that need nothing keep running everywhere.
+    """
+    return pytest.importorskip("rfc8785")
 
 
 def _load_zerodep():
@@ -45,6 +56,9 @@ zd = _load_zerodep()
 
 @pytest.mark.parametrize("checker", [REFERENCE, ZERODEP], ids=["reference", "zerodep"])
 def test_checker_exits_zero(checker: Path) -> None:
+    if checker is REFERENCE:
+        _rfc8785()
+        pytest.importorskip("cryptography")
     proc = subprocess.run([sys.executable, str(checker)], capture_output=True, text=True)
     assert proc.returncode == 0, proc.stdout + proc.stderr
     assert "all verdicts matched expected" in proc.stdout
@@ -56,6 +70,7 @@ def test_zerodep_passes_with_no_third_party_packages_reachable() -> None:
     This is the property the file exists for: a reviewer with a bare Python reproduces
     every verdict. If an import of either package ever creeps in, this goes red.
     """
+    _rfc8785()  # with no rfc8785 installed anywhere, the -S probe below proves nothing
     probe = subprocess.run(
         [sys.executable, "-S", "-c", "import rfc8785"], capture_output=True, text=True)
     assert probe.returncode != 0, "site-packages still reachable under -S, test is not proving anything"
@@ -74,6 +89,7 @@ def _corpus_objects():
 
 
 def test_jcs_matches_rfc8785_over_the_whole_corpus() -> None:
+    rfc8785 = _rfc8785()
     seen = 0
     for path, obj in _corpus_objects():
         assert zd.jcs(obj) == rfc8785.dumps(obj), f"canonicalization differs on {path.name}"
@@ -109,7 +125,7 @@ _JSON = st.recursive(
 @given(_JSON)
 def test_jcs_matches_rfc8785_on_generated_data(value) -> None:
     """Covers what the corpus cannot: control characters, astral-plane keys, key ordering."""
-    assert zd.jcs(value) == rfc8785.dumps(value)
+    assert zd.jcs(value) == _rfc8785().dumps(value)
 
 
 @pytest.mark.parametrize(
@@ -130,7 +146,7 @@ def test_jcs_matches_rfc8785_on_the_subtle_cases(value) -> None:
     ordering it sorts BEFORE ``"\\uffff"`` even though its code point is higher. Sorting by
     code point instead would reverse these two keys and change the digest.
     """
-    assert zd.jcs(value) == rfc8785.dumps(value)
+    assert zd.jcs(value) == _rfc8785().dumps(value)
 
 
 def test_utf16_ordering_is_not_codepoint_ordering() -> None:
@@ -185,6 +201,7 @@ def test_es256_rejects_malformed_signatures(bad: str) -> None:
 @given(st.binary(min_size=1, max_size=200))
 def test_es256_agrees_with_cryptography_on_fresh_keys(message: bytes) -> None:
     """Independent accept and reject agreement against OpenSSL's implementation."""
+    pytest.importorskip("cryptography")
     from cryptography.hazmat.primitives import hashes, serialization
     from cryptography.hazmat.primitives.asymmetric import ec
     from cryptography.hazmat.primitives.asymmetric.utils import decode_dss_signature
