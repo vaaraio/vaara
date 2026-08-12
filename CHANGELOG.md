@@ -4,6 +4,26 @@ All notable changes to this project are documented here.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/)
 and this project follows [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [1.66.2] - 2026-08-12
+
+### Fixed
+
+- **The documented way to use the action did not work.** The README and
+  `docs/github-action.md` tell consumers `uses: vaaraio/vaara@v1`, which is the
+  GitHub Actions convention, but no `v1` tag existed. Anyone copying that line
+  got "unable to resolve action vaaraio/vaara@v1". A floating `v1` tag now
+  exists and moves with each release.
+- The release workflow triggered on `v*`, which would have fired it for the
+  floating `v1` tag, derived version "1", and failed looking for a changelog
+  entry that cannot exist. It now triggers only on full version tags.
+- One example in `docs/github-action.md` pinned `v1.65.0`, a release that
+  predates the action existing.
+
+### Changed
+
+- The action's display name is now "Vaara Policy Check". This is the title
+  GitHub Marketplace shows. The listing URL is unaffected.
+
 ## [1.66.1] - 2026-08-12
 
 ### Fixed

@@ -79,7 +79,7 @@ also writes a summary to the job page listing every issue and every failing case
 to reproduce later, pin both the action and the package:
 
 ```yaml
-      - uses: vaaraio/vaara@v1.65.0
+      - uses: vaaraio/vaara@v1.66.1
         with:
           policy: policies/production.yaml
           version: 1.65.0
