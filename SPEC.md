@@ -87,12 +87,25 @@ default and ML-DSA-65 under the same extra.
 |---|---|
 | `canonicalization` | The label from Section 1 (`jcs-rfc8785` / `JCS` / `jcs-json-v1`). |
 | `digest` | `sha256:` of the JCS-canonical evidence record. |
-| `ref` | An opaque locator for the evidence record (profile-defined). |
+| `ref` | An advisory, profile-defined locator for the evidence record. Not an identifier: see below. |
 | `schema` | The schema id of the evidence record (profile-defined). |
 
 The binding is recomputable: given the receipt and the evidence record, a third
 party confirms `sha256(JCS(evidence_record)) == evidenceRef.digest` with no
 access to the issuer. This is the property independent implementers verify today.
+
+`digest` is the binding; `ref` is advisory. Earlier revisions called `ref` an
+opaque *locator*, which implies it names exactly one record. It does not. A
+profile MAY assign the same `ref` to more than one evidence record, and profiles
+in use already do: where a single action settles to several parties, each party's
+record is a separate evidence record under one shared `ref`. Those records differ
+under `digest` because their contents differ.
+
+A consumer therefore MUST NOT resolve an evidence record by `ref` alone, and MUST
+confirm `sha256(JCS(evidence_record)) == evidenceRef.digest` before treating the
+record as the one the receipt decided over. Resolving by `ref` alone admits a
+record that shares the locator but is not the record the issuer signed over, and
+no check in this document fails when it happens.
 
 ## 4. Timestamp anchors (`timestampAnchors`)
 
