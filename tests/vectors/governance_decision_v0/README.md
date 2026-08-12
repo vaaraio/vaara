@@ -12,6 +12,24 @@ sequence, the terminal seal, and the fail-closed verdicts.
 property of the committed bytes, not of the generator. `_generate.py` rebuilds
 the fixtures; the keys are a fixed test scalar so the bytes are stable.
 
+`_check_zerodep.py` reaches the same verdicts with **nothing installed**. It is a
+single self-contained file importing only the standard library: RFC 8785
+canonicalization, ES256 verification and SPKI key parsing are implemented in it
+against the specifications. Copy that one file next to the vectors and run it.
+
+```
+python3 _check_zerodep.py      # 23 checks, no pip install, no network
+```
+
+`_check_independent.py` stays the reference checker, and downstream specifications
+pin its bytes, so the zero-install file is a sibling and never a replacement. Two
+implementations are worth having only if a disagreement is loud:
+`tests/test_zerodep_checker.py` compares the canonicalizer against `rfc8785` over
+the corpus and over generated data (including the astral-plane keys where UTF-16
+code unit ordering and code point ordering disagree), compares the verifier
+against `cryptography` on fresh keys, and runs the zero-install checker under
+`python -S` so a dependency creeping back in fails CI.
+
 ## Signed bytes
 
 Each record is wrapped as `{"record": {...}, "signature": "<128 hex>"}`. The
