@@ -4,6 +4,52 @@ All notable changes to this project are documented here.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/)
 and this project follows [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [1.66.0] - 2026-08-12
+
+Vaara can now run as a step in someone else's build, and its conformance vectors
+can be checked on a machine with nothing installed at all.
+
+### Added
+
+- **GitHub Action.** `action.yml` at the repository root validates a policy, runs
+  its test cases, and verifies a signed audit trail, failing the build on a
+  policy error, a failing case, or a broken trail. A self-test in CI asserts that
+  it fails closed on a policy that does not parse. That self-test caught a real
+  defect on its first run: a bare `pip install vaara` cannot read a YAML policy,
+  because the package has no base dependencies, so the action installs the extras
+  the documented features need.
+- **Zero-install checker for the `governance_decision_v0` vectors.**
+  `_check_zerodep.py` reproduces all 23 verdicts with nothing installed. One
+  self-contained file importing only the standard library, with RFC 8785
+  canonicalization, ES256 verification and RFC 5280 SPKI parsing implemented
+  against the specifications. `_check_independent.py` remains the reference
+  checker whose bytes downstream specifications pin, so this is a sibling and
+  never a replacement. A test compares the canonicalizer against `rfc8785` over
+  the corpus and over generated data, including astral-plane keys where UTF-16
+  code unit ordering and code point ordering disagree, compares the verifier
+  against `cryptography` on fresh keys, and runs the checker under `python -S` so
+  a dependency creeping back in fails CI.
+
+### Changed
+
+- **`decisionDerived.evidenceRef.ref` is advisory, not an identifier.** Revisions
+  up to -06 called it an opaque locator, which implies it names exactly one
+  record. It does not: where a single action settles to several parties, each
+  party's record is a separate evidence record under one shared ref, and the
+  records differ only under `digest`. A consumer resolving evidence by `ref`
+  alone could therefore bind the wrong record to a receipt with nothing failing.
+  `SPEC.md` now states that `digest` is the binding, that a profile MAY assign
+  one ref to several records, and that a consumer MUST NOT resolve by ref alone.
+  Carried into a new `ietf/draft-sirkkavaara-vaara-receipt-07.xml`. The published
+  `-06` source is unchanged. Verification behaviour does not change and no
+  vectors move.
+
+### Fixed
+
+- Two tests reported the wrong thing while passing.
+- Four documents described behaviour the code does not have.
+- `RELEASE.md` described a macOS release step as untested when it aborts.
+
 ## [1.65.0] - 2026-08-10
 
 When a cloud or OSS guardrail blocks on something Vaara's parser does not model,
