@@ -31,6 +31,10 @@ inputs:
     description: 'Version of the vaara package to install, for example 1.65.0. Defaults to the latest release. Pin this if you want reproducible runs.'
     required: false
     default: ''
+  extras:
+    description: 'Comma-separated extras to install. The default covers both features of this action: yaml so a YAML policy can be read at all, export for the Ed25519 verification a signed trail needs. Vaara has no base dependencies, so dropping these leaves those features unavailable.'
+    required: false
+    default: 'yaml,export'
   python-version:
     description: 'Python version used to run the check.'
     required: false
@@ -70,13 +74,22 @@ runs:
 
     - name: Install Vaara
       shell: bash
+      # Inputs arrive through env rather than being interpolated into the script, so a value
+      # containing shell metacharacters is data instead of code.
+      env:
+        VAARA_VERSION: ${{ inputs.version }}
+        VAARA_EXTRAS: ${{ inputs.extras }}
       run: |
         set -euo pipefail
-        if [ -n "${{ inputs.version }}" ]; then
-          python -m pip install --quiet "vaara==${{ inputs.version }}"
-        else
-          python -m pip install --quiet vaara
+        spec="vaara"
+        if [ -n "${VAARA_EXTRAS}" ]; then
+          spec="vaara[${VAARA_EXTRAS}]"
         fi
+        if [ -n "${VAARA_VERSION}" ]; then
+          spec="${spec}==${VAARA_VERSION}"
+        fi
+        echo "Installing ${spec}"
+        python -m pip install --quiet "${spec}"
         vaara version
 
     - name: Run checks

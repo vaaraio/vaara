@@ -53,6 +53,7 @@ The action says which of the two it did.
 | `pubkey` | | Ed25519 public key (PEM) for trail verification. |
 | `fail-on-warnings` | `false` | Treat validation warnings as failures. |
 | `version` | latest | Version of the `vaara` package to install. Pin it for reproducible runs. |
+| `extras` | `yaml,export` | Extras to install. Vaara has no base dependencies, so `yaml` is what lets a YAML policy be read at all and `export` provides the Ed25519 verification a signed trail needs. |
 | `python-version` | `3.12` | Python used to run the check. |
 | `working-directory` | `.` | Directory the paths are relative to. |
 
