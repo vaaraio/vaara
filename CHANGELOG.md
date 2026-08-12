@@ -4,6 +4,14 @@ All notable changes to this project are documented here.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/)
 and this project follows [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [1.66.1] - 2026-08-12
+
+### Fixed
+
+- The action's description was 147 characters. GitHub Marketplace rejects
+  anything from 125, so publishing the action was blocked. Shortened to 114.
+  The long form stays in the README.
+
 ## [1.66.0] - 2026-08-12
 
 Vaara can now run as a step in someone else's build, and its conformance vectors

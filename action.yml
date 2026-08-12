@@ -1,5 +1,7 @@
 name: 'Vaara policy check'
-description: 'Validate a Vaara policy, run its test cases, and verify a signed audit trail. Fails the build on a policy error, a failing case, or a broken trail.'
+# GitHub Marketplace rejects a description of 125 characters or more, so this
+# stays short deliberately. The long form lives in the README.
+description: 'Validate a Vaara policy, run its test cases, and verify a signed audit trail. Fails the build on any of the three.'
 author: 'Vaara'
 
 branding:
