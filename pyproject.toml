@@ -13,14 +13,22 @@ readme = "README.md"
 dependencies = []
 classifiers = [
     "Development Status :: 4 - Beta",
+    "Environment :: Console",
     "Intended Audience :: Developers",
+    "Intended Audience :: Information Technology",
+    "Intended Audience :: Legal Industry",
+    "Intended Audience :: System Administrators",
+    "Operating System :: OS Independent",
     "Programming Language :: Python :: 3",
     "Programming Language :: Python :: 3.10",
     "Programming Language :: Python :: 3.11",
     "Programming Language :: Python :: 3.12",
     "Programming Language :: Python :: 3.13",
     "Topic :: Security",
+    "Topic :: Security :: Cryptography",
     "Topic :: Software Development :: Libraries :: Python Modules",
+    "Topic :: Software Development :: Quality Assurance",
+    "Topic :: System :: Monitoring",
     "Typing :: Typed",
 ]
 keywords = ["ai", "ai-agents", "ai-governance", "agent-governance", "ai-act", "eu-ai-act", "article-14", "compliance", "audit-trail", "risk-scoring", "conformal-prediction", "overt", "attestation", "runtime-monitoring"]

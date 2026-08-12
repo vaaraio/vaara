@@ -1,0 +1,204 @@
+name: 'Vaara policy check'
+description: 'Validate a Vaara policy, run its test cases, and verify a signed audit trail. Fails the build on a policy error, a failing case, or a broken trail.'
+author: 'Vaara'
+
+branding:
+  icon: 'shield'
+  color: 'green'
+
+inputs:
+  policy:
+    description: 'Path to the policy file (YAML or JSON) to validate.'
+    required: false
+    default: ''
+  cases:
+    description: 'Path to a cases file to run against the policy. Requires policy.'
+    required: false
+    default: ''
+  trail:
+    description: 'Path to a signed trail zip to verify.'
+    required: false
+    default: ''
+  pubkey:
+    description: 'Ed25519 public key (PEM) for trail verification. Defaults to the key inside the zip, which proves integrity but not who signed it.'
+    required: false
+    default: ''
+  fail-on-warnings:
+    description: 'Treat policy validation warnings as failures.'
+    required: false
+    default: 'false'
+  version:
+    description: 'Version of the vaara package to install, for example 1.65.0. Defaults to the latest release. Pin this if you want reproducible runs.'
+    required: false
+    default: ''
+  extras:
+    description: 'Comma-separated extras to install. The default covers both features of this action: yaml so a YAML policy can be read at all, export for the Ed25519 verification a signed trail needs. Vaara has no base dependencies, so dropping these leaves those features unavailable.'
+    required: false
+    default: 'yaml,export'
+  python-version:
+    description: 'Python version used to run the check.'
+    required: false
+    default: '3.12'
+  working-directory:
+    description: 'Directory the paths above are relative to.'
+    required: false
+    default: '.'
+
+outputs:
+  errors:
+    description: 'Policy validation errors.'
+    value: ${{ steps.run.outputs.errors }}
+  warnings:
+    description: 'Policy validation warnings.'
+    value: ${{ steps.run.outputs.warnings }}
+  cases-total:
+    description: 'Cases run.'
+    value: ${{ steps.run.outputs.cases-total }}
+  cases-passed:
+    description: 'Cases passed.'
+    value: ${{ steps.run.outputs.cases-passed }}
+  cases-failed:
+    description: 'Cases failed.'
+    value: ${{ steps.run.outputs.cases-failed }}
+  trail-verified:
+    description: 'true when a trail was given and verified, false when it failed, empty when no trail was given.'
+    value: ${{ steps.run.outputs.trail-verified }}
+
+runs:
+  using: 'composite'
+  steps:
+    - name: Set up Python
+      uses: actions/setup-python@v5
+      with:
+        python-version: ${{ inputs.python-version }}
+
+    - name: Install Vaara
+      shell: bash
+      # Inputs arrive through env rather than being interpolated into the script, so a value
+      # containing shell metacharacters is data instead of code.
+      env:
+        VAARA_VERSION: ${{ inputs.version }}
+        VAARA_EXTRAS: ${{ inputs.extras }}
+      run: |
+        set -euo pipefail
+        spec="vaara"
+        if [ -n "${VAARA_EXTRAS}" ]; then
+          spec="vaara[${VAARA_EXTRAS}]"
+        fi
+        if [ -n "${VAARA_VERSION}" ]; then
+          spec="${spec}==${VAARA_VERSION}"
+        fi
+        echo "Installing ${spec}"
+        python -m pip install --quiet "${spec}"
+        vaara version
+
+    - name: Run checks
+      id: run
+      shell: bash
+      working-directory: ${{ inputs.working-directory }}
+      env:
+        VAARA_POLICY: ${{ inputs.policy }}
+        VAARA_CASES: ${{ inputs.cases }}
+        VAARA_TRAIL: ${{ inputs.trail }}
+        VAARA_PUBKEY: ${{ inputs.pubkey }}
+        VAARA_FAIL_ON_WARNINGS: ${{ inputs.fail-on-warnings }}
+      run: |
+        set -uo pipefail
+        python - <<'PY'
+        import json, os, pathlib, subprocess, sys
+
+        policy = os.environ.get("VAARA_POLICY", "").strip()
+        cases = os.environ.get("VAARA_CASES", "").strip()
+        trail = os.environ.get("VAARA_TRAIL", "").strip()
+        pubkey = os.environ.get("VAARA_PUBKEY", "").strip()
+        strict = os.environ.get("VAARA_FAIL_ON_WARNINGS", "false").lower() == "true"
+
+        if not policy and not trail:
+            print("Nothing to check: give at least one of `policy` or `trail`.", file=sys.stderr)
+            sys.exit(2)
+        if cases and not policy:
+            print("`cases` needs `policy`: cases are run against a policy.", file=sys.stderr)
+            sys.exit(2)
+
+        out, summary, failed = {}, [], False
+
+        def run(args):
+            return subprocess.run(["vaara", *args], capture_output=True, text=True)
+
+        if policy:
+            proc = run(["policy", "validate", policy, "--json"])
+            try:
+                report = json.loads(proc.stdout)
+            except json.JSONDecodeError:
+                # A crash or an unreadable file: surface the tool's own words, do not guess.
+                print(proc.stdout + proc.stderr, file=sys.stderr)
+                summary.append(f"**Policy validation failed to run** for `{policy}`.")
+                failed = True
+                report = None
+            if report is not None:
+                issues = report.get("issues") or []
+                error_count = report.get("error_count", 0)
+                warning_count = report.get("warning_count", 0)
+                out["errors"], out["warnings"] = error_count, warning_count
+                summary.append(
+                    f"**Policy** `{policy}`: {error_count} error(s), {warning_count} warning(s)")
+                for item in issues:
+                    summary.append(
+                        f"  - {item.get('level', '?')}: {item.get('code', '')} "
+                        f"at {item.get('path', '?')}: {item.get('message', '')}")
+                if error_count or (warning_count and strict):
+                    failed = True
+
+        if cases:
+            proc = run(["policy", "test", policy, "--cases", cases, "--json"])
+            try:
+                report = json.loads(proc.stdout)
+            except json.JSONDecodeError:
+                print(proc.stdout + proc.stderr, file=sys.stderr)
+                summary.append(f"**Policy cases failed to run** for `{cases}`.")
+                failed = True
+                report = None
+            if report is not None:
+                out["cases-total"] = report.get("total", 0)
+                out["cases-passed"] = report.get("passed", 0)
+                out["cases-failed"] = report.get("failed", 0)
+                summary.append(
+                    f"**Cases** `{cases}`: {report.get('passed', 0)}/{report.get('total', 0)} passed")
+                for result in report.get("results", []):
+                    if not result.get("passed"):
+                        summary.append(f"  - FAIL {result.get('name')}: {result.get('diagnostic')}")
+                if report.get("failed"):
+                    failed = True
+
+        if trail:
+            args = ["trail", "verify", "--zip", trail]
+            if pubkey:
+                args += ["--pubkey", pubkey]
+            proc = run(args)
+            ok = proc.returncode == 0
+            out["trail-verified"] = "true" if ok else "false"
+            summary.append(f"**Trail** `{trail}`: {'verified' if ok else 'FAILED'}")
+            if not ok:
+                print(proc.stdout + proc.stderr, file=sys.stderr)
+                failed = True
+            elif not pubkey:
+                summary.append(
+                    "  - note: verified against the key inside the zip, which shows the trail is "
+                    "internally intact. Pass `pubkey` to also bind it to a signer you chose.")
+
+        github_output = os.environ.get("GITHUB_OUTPUT")
+        if github_output:
+            with open(github_output, "a", encoding="utf-8") as fh:
+                for key, value in out.items():
+                    fh.write(f"{key}={value}\n")
+
+        text = "## Vaara policy check\n\n" + "\n".join(summary) + "\n"
+        print(text)
+        step_summary = os.environ.get("GITHUB_STEP_SUMMARY")
+        if step_summary:
+            # Append: the job's summary file is shared, and an earlier step may have written to it.
+            with open(step_summary, "a", encoding="utf-8") as fh:
+                fh.write(text)
+
+        sys.exit(1 if failed else 0)
+        PY

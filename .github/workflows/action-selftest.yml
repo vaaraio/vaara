@@ -1,0 +1,76 @@
+name: Action self-test
+
+# Runs the repository's own composite action against the shipped example policy, so the thing
+# offered on the Marketplace is exercised on every change rather than only described. It installs
+# vaara from PyPI, which is what a user gets, so this also catches a released package that no
+# longer satisfies the action's inputs.
+
+on:
+  pull_request:
+    paths:
+      - 'action.yml'
+      - 'examples/policies/**'
+      - '.github/workflows/action-selftest.yml'
+  push:
+    branches: [main]
+    paths:
+      - 'action.yml'
+      - 'examples/policies/**'
+      - '.github/workflows/action-selftest.yml'
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  policy-and-cases:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Validate the example policy and run its cases
+        id: check
+        uses: ./
+        with:
+          policy: examples/policies/full.yaml
+          cases: examples/policies/test_cases.yaml
+
+      - name: The action must report what it found
+        shell: bash
+        run: |
+          set -euo pipefail
+          echo "errors=${{ steps.check.outputs.errors }}"
+          echo "warnings=${{ steps.check.outputs.warnings }}"
+          echo "cases: ${{ steps.check.outputs.cases-passed }}/${{ steps.check.outputs.cases-total }}"
+          test "${{ steps.check.outputs.errors }}" = "0"
+          test "${{ steps.check.outputs.cases-failed }}" = "0"
+          test "${{ steps.check.outputs.cases-total }}" -gt 0
+
+  fails-closed-on-a-broken-policy:
+    # A gate that cannot fail is not a gate. This asserts the action exits non-zero on a policy
+    # that does not parse, which is the property every other use of it depends on.
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Write a policy that does not parse
+        shell: bash
+        run: |
+          printf 'not: [valid\n' > broken.yaml
+
+      - name: Run the action, expecting failure
+        id: broken
+        continue-on-error: true
+        uses: ./
+        with:
+          policy: broken.yaml
+
+      - name: The previous step must have failed
+        shell: bash
+        run: |
+          set -euo pipefail
+          if [ "${{ steps.broken.outcome }}" != "failure" ]; then
+            echo "The action passed a policy that does not parse. It is not fail-closed." >&2
+            exit 1
+          fi
+          echo "Fail-closed on a broken policy, as required."
