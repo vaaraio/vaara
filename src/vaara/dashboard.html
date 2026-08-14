@@ -22,15 +22,22 @@
     --mono:ui-monospace,'SFMono-Regular','JetBrains Mono',Menlo,Consolas,monospace;
     --sans:'Inter',-apple-system,BlinkMacSystemFont,'Segoe UI',Helvetica,Arial,sans-serif;
   }
-  @media (prefers-color-scheme: dark) {
-    :root {
-      color-scheme: dark;
-      --bg:#0F1417; --panel:#1A2226; --panel-2:#151D20;
-      --line:rgba(123,156,138,.16); --ink:#DEE4E1; --dim:#8B9792; --faint:#5E6A66;
-      --tri:#78A08A; --accent:#93B8A3;
-      --allow:#78A08A; --escalate:#D9A441; --deny:#D98B8B;
-    }
+  /* Light is the default, as on vaara.io. The dark grammar is preserved
+     verbatim under data-theme so the two surfaces stay one identity. */
+  html[data-theme="dark"] {
+    color-scheme: dark;
+    --bg:#0F1417; --panel:#1A2226; --panel-2:#151D20;
+    --line:rgba(123,156,138,.16); --ink:#DEE4E1; --dim:#8B9792; --faint:#5E6A66;
+    --tri:#78A08A; --accent:#93B8A3;
+    --allow:#78A08A; --escalate:#D9A441; --deny:#D98B8B;
   }
+  .theme-toggle{position:fixed;top:14px;right:16px;z-index:10;display:inline-flex;
+    gap:2px;background:var(--panel);border:1px solid var(--line);border-radius:999px;padding:4px}
+  .theme-toggle button{appearance:none;background:none;border:0;cursor:pointer;
+    font-family:var(--mono);font-size:11px;letter-spacing:.18em;text-transform:uppercase;
+    color:var(--faint);padding:4px 11px;border-radius:999px}
+  .theme-toggle button[aria-pressed="true"]{color:var(--tri);background:var(--panel-2)}
+  .theme-toggle button:hover{color:var(--tri)}
   *{box-sizing:border-box}
   body{margin:0;background:var(--bg);color:var(--ink);font-family:var(--sans);
        font-size:16px;line-height:1.65;-webkit-font-smoothing:antialiased;
@@ -64,10 +71,8 @@
   .wordmark{text-align:center;margin:8px auto 0}
   .wordmark img{width:min(58vw,300px);height:auto;display:inline-block}
   .wordmark .wm-dark{display:none}
-  @media (prefers-color-scheme: dark){
-    .wordmark .wm-light{display:none}
-    .wordmark .wm-dark{display:inline-block}
-  }
+  html[data-theme="dark"] .wordmark .wm-light{display:none}
+  html[data-theme="dark"] .wordmark .wm-dark{display:inline-block}
   .stance{font-family:var(--mono);font-size:12px;letter-spacing:.22em;
           text-transform:uppercase;color:var(--tri);margin:.1rem 0 0}
   .panel{border:1px solid var(--line);border-radius:12px;background:var(--panel);
@@ -85,6 +90,10 @@
 </style>
 </head>
 <body>
+<div class="theme-toggle" role="group" aria-label="Color theme">
+  <button type="button" data-set-theme="light" aria-pressed="true">light</button>
+  <button type="button" data-set-theme="dark" aria-pressed="false">dark</button>
+</div>
 <main>
   <!-- Served from the installed package, not fetched from the internet. The
        real wordmark, and it still renders with the network off. A local
@@ -121,6 +130,12 @@
     <div class="tile"><div class="k">last head</div><div class="v" id="last-head" style="font-size:12px">—</div></div>
   </div>
   <p class="muted" style="font-size:.8rem;margin-top:10px" id="gap-note"></p>
+  <p class="muted" style="font-size:.8rem;margin-top:6px">
+    Heads you publish land in the <a href="https://vaara.io/verify.html"
+    target="_blank" rel="noopener">Vaara Resin</a>, where anyone can look one up
+    and check a receipt in their own browser. Publishing is opt-in and off until
+    you run <code>vaara trail publish-head</code>.
+  </p>
 
   <p class="stamp">Settings</p>
   <div id="settings" class="panel"></div>
@@ -264,6 +279,25 @@ async function loadSettings() {
       saveSetting(sel.dataset.key, sel.value, $("s-" + sel.dataset.key)));
   });
 }
+
+(function(){
+  var root = document.documentElement;
+  var btns = document.querySelectorAll('.theme-toggle [data-set-theme]');
+  function apply(theme){
+    if (theme === "dark") root.setAttribute("data-theme","dark");
+    else root.removeAttribute("data-theme");
+    btns.forEach(function(b){
+      b.setAttribute("aria-pressed", String(b.getAttribute("data-set-theme") === theme));
+    });
+    try { localStorage.setItem("vaara-theme", theme); } catch(e) {}
+  }
+  btns.forEach(function(b){
+    b.addEventListener("click", function(){ apply(b.getAttribute("data-set-theme")); });
+  });
+  var saved = "light";
+  try { saved = localStorage.getItem("vaara-theme") === "dark" ? "dark" : "light"; } catch(e) {}
+  apply(saved);
+})();
 
 load();
 loadSettings();
