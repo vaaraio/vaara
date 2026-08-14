@@ -731,6 +731,20 @@ def _parse_period(spec: Optional[str]) -> Optional[tuple]:
 _EU_OPERATED_LOGS: tuple[str, ...] = ("localhost", "127.0.0.1", ".eu/", ".eu:")
 
 
+def _cmd_dashboard(args: argparse.Namespace) -> int:
+    """Serve the local read-only dashboard."""
+    from vaara.dashboard import free_port, serve
+
+    port = args.port if args.port else free_port()
+    return serve(
+        db=args.db,
+        trail=args.trail,
+        host=args.host,
+        port=port,
+        open_browser=not args.no_browser,
+    )
+
+
 def _cmd_trail_publish_head(args: argparse.Namespace) -> int:
     """Publish the trail's head digest to a public transparency log.
 
@@ -4806,6 +4820,19 @@ def build_parser() -> argparse.ArgumentParser:
              "an Ed25519 trail-signing key. Does not require --dev.",
     )
     pk.set_defaults(func=_cmd_keygen)
+
+    pdash = sub.add_parser(
+        "dashboard",
+        help="Serve a local read-only dashboard (any OS, no extra dependencies)",
+    )
+    _add_trail_source_args(pdash)
+    pdash.add_argument("--host", default="127.0.0.1",
+                       help="Bind address. Defaults to loopback only.")
+    pdash.add_argument("--port", type=int, default=0,
+                       help="Port. Defaults to 7517, or a free one if taken.")
+    pdash.add_argument("--no-browser", action="store_true",
+                       help="Do not open a browser window")
+    pdash.set_defaults(func=_cmd_dashboard)
 
     pt = sub.add_parser("trail", help="Audit-trail commands")
     tsub = pt.add_subparsers(dest="trail_cmd", metavar="COMMAND")
