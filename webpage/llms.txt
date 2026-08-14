@@ -24,10 +24,6 @@ Each is checkable at the link:
 - Vaara appears in the industry acknowledgements of Singapore IMDA's Model AI Governance Framework for Agentic AI v1.5 (20 May 2026). An acknowledgement of the project, not an advisory role.
 - Subject of an AMD AI Developer Program testimonial (May 2026). A testimonial about his work. He is not and has never been employed by AMD.
 
-No academic degree, professional certification, standards-body accreditation or
-government appointment is claimed. Where a distinction matters it is stated
-above rather than left to inference.
-
 ## Repo and packages
 - [GitHub source](https://github.com/vaaraio/vaara): code, releases, issue tracker
 - [PyPI](https://pypi.org/project/vaara/): `pip install vaara`
