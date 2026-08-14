@@ -724,6 +724,13 @@ def _parse_period(spec: Optional[str]) -> Optional[tuple]:
     return (_epoch(start_s, end_of_day=False), _epoch(end_s, end_of_day=True))
 
 
+# Logs whose operator sits inside the EU, so publishing is not a third-country
+# transfer for an EU deployer. Sigstore's public Rekor is US-operated (Linux
+# Foundation), which is fine for many users and is a disclosure duty for the
+# rest. A self-hosted or EU-operated log keeps the whole chain in-jurisdiction.
+_EU_OPERATED_LOGS: tuple[str, ...] = ("localhost", "127.0.0.1", ".eu/", ".eu:")
+
+
 def _cmd_trail_publish_head(args: argparse.Namespace) -> int:
     """Publish the trail's head digest to a public transparency log.
 
@@ -770,11 +777,39 @@ def _cmd_trail_publish_head(args: argparse.Namespace) -> int:
         os.chmod(key_path, 0o600)
         print(f"generated a publishing key at {key_path}")
 
+    # Publishing cannot be undone, so the facts belong in front of the act
+    # rather than in documentation. GDPR Art 13 transparency, Art 17 erasure
+    # (impossible here by design), and Art 44 transfer if the log is outside
+    # the EU. Not legal advice; these are the facts a person needs to decide.
+    eu_operated = any(h in args.log for h in _EU_OPERATED_LOGS)
+    print("Publishing to a public transparency log. Before it happens:")
+    print(f"  what goes    the digest {head[:16]}… and a signature over it")
+    print("  what stays   every record, payload, tool name, identity, and the")
+    print("               number of entries in this trail")
+    print(f"  where        {args.log}")
+    if not eu_operated:
+        print("  transfer     this log is operated outside the EU. For an EU")
+        print("               deployer that is a third-country transfer of")
+        print("               whatever the key and timing reveal.")
+    print("  erasure      permanent and irreversible. It cannot be withdrawn,")
+    print("               deleted or corrected once integrated.")
+    print("  linkability  every head published with this key is groupable by")
+    print("               anyone. Use a separate --key per context to keep")
+    print("               different trails from sharing one pseudonym.")
+    print()
+
     if args.dry_run:
         print("dry run, nothing published")
-        print(f"  head       {head}")
-        print(f"  would go to {args.log}")
         return 0
+
+    if not args.yes and sys.stdin.isatty():
+        try:
+            if input("Publish? [y/N] ").strip().lower() not in ("y", "yes"):
+                print("nothing published")
+                return 0
+        except (EOFError, KeyboardInterrupt):
+            print("\nnothing published")
+            return 0
 
     try:
         pub = publish_head(head, signer, log_url=args.log)
@@ -4829,7 +4864,13 @@ def build_parser() -> argparse.ArgumentParser:
     pph.add_argument(
         "--dry-run",
         action="store_true",
-        help="Show the head that would be published without publishing it",
+        help="Show the head and the disclosure without publishing anything",
+    )
+    pph.add_argument(
+        "--yes",
+        action="store_true",
+        help="Skip the confirmation prompt (for non-interactive use). The "
+             "disclosure is still printed, because it cannot be undone.",
     )
     pph.set_defaults(func=_cmd_trail_publish_head)
 

@@ -145,11 +145,24 @@
     </div>
     <div id="rolls" style="margin-top:.9rem"></div>
     <p class="sub" style="margin:1rem 0 0">
-      Before you opt in: a published head is <em>public to everyone, permanently</em>.
-      Anyone can see that a digest was published and when, and that includes us. It is
-      the only usage signal Vaara ever receives, and it exists because you switched it
-      on. A digest reveals no content, no size and no identity, but the timing is
-      visible to anybody watching the log.
+      <strong>Before you opt in.</strong> A digest reveals no content, no size and no
+      identity. What it does reveal is that something was published, and when.
+      <br><br>
+      Entries carry a public key that generates on your own machine, so they are
+      pseudonymous rather than anonymous: everything published with one key can be
+      grouped by anyone, and the moment you point someone at an entry, that key is
+      publicly yours. Use a separate key per context if you do not want two trails
+      sharing one pseudonym.
+      <br><br>
+      Publication is <em>permanent and irreversible</em>. It cannot be withdrawn,
+      deleted or corrected once the log integrates it, so there is no erasure to
+      request afterwards. The default log, Sigstore Rekor, is operated in the United
+      States by the Linux Foundation; for an EU deployer that is a third-country
+      transfer of whatever the key and timing reveal. Vaara can publish to a
+      self-hosted or EU-operated log instead.
+      <br><br>
+      Publishing is also the only usage signal Vaara ever receives, and it exists
+      because you switched it on, not because anything here collects it.
     </p>
   </section>
 
