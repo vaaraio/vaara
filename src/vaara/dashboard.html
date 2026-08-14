@@ -82,7 +82,15 @@
   a{color:var(--accent)}
   code{font-family:var(--mono);font-size:.8rem}
   .wordmark{text-align:center;margin:8px auto 0}
-  .wordmark img{width:min(58vw,300px);height:auto;display:inline-block}
+  /* Same size as index.html and verify.html. All three surfaces are one brand,
+     so the wordmark cannot change size depending on which one you opened. */
+  .wordmark img{width:min(60vw,440px);height:auto;display:inline-block}
+  .nav-jump{position:fixed;top:14px;left:16px;z-index:10;display:inline-flex;
+    background:var(--panel);border:1px solid var(--line);border-radius:999px;padding:4px}
+  .nav-jump a{font-family:var(--mono);font-size:11px;letter-spacing:.18em;
+    text-transform:uppercase;color:var(--faint);padding:4px 11px;border-radius:999px;
+    text-decoration:none}
+  .nav-jump a:hover{color:var(--tri);background:var(--panel-2)}
   .wordmark .wm-dark{display:none}
   html[data-theme="dark"] .wordmark .wm-light{display:none}
   html[data-theme="dark"] .wordmark .wm-dark{display:inline-block}
@@ -101,8 +109,21 @@
          border:1px solid var(--line);border-radius:8px}
   .saved{color:var(--allow);font-size:.78rem;margin-left:8px}
 </style>
+<script>
+  // Apply the stored theme before first paint, same as the two web pages.
+  // Without this the dashboard renders in the OS colorway and then snaps to
+  // the saved choice when the body script runs.
+  (function(){ try { var t = localStorage.getItem('vaara-theme');
+    if (t === 'dark' || t === 'light') document.documentElement.setAttribute('data-theme', t);
+  } catch(e){} })();
+</script>
 </head>
 <body>
+<!-- Same corner pill as the other two surfaces. It leaves the machine, which
+     nothing else on this page does, so it is marked as an outbound link and
+     the dashboard keeps working when it cannot be reached. -->
+<nav class="nav-jump"><a href="https://vaara.io/verify.html" target="_blank"
+  rel="noopener noreferrer" title="Opens vaara.io in a new tab">Resin &#8599;</a></nav>
 <div class="theme-toggle" role="group" aria-label="Color theme">
   <button type="button" data-set-theme="light" aria-pressed="true">light</button>
   <button type="button" data-set-theme="dark" aria-pressed="false">dark</button>
@@ -113,8 +134,8 @@
        dashboard reaching out for its own logo would be exactly the kind of
        quiet call this product argues against. -->
   <div class="wordmark">
-    <img class="wm-light" src="/vaara-wordmark-light.png" alt="Vaara" width="300" height="86">
-    <img class="wm-dark" src="/vaara-wordmark-dark.png" alt="Vaara" width="300" height="86">
+    <img class="wm-light" src="/vaara-wordmark-light.png" alt="Vaara" width="440" height="127">
+    <img class="wm-dark" src="/vaara-wordmark-dark.png" alt="Vaara" width="440" height="127">
     <p class="stance">Accountable Autonomy</p>
   </div>
   <p class="sub" id="source" style="text-align:center">reading…</p>

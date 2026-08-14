@@ -125,9 +125,43 @@
   .entry { border:1px solid var(--line); border-radius:6px; padding:.6rem .75rem;
            margin-bottom:.5rem; font-size:.8rem; }
   .entry a { color:var(--accent); }
+  .entry details { margin-top:.45rem; }
+  .entry summary { cursor:pointer; color:var(--accent); font-size:.79rem;
+                   list-style:none; }
+  .entry summary::-webkit-details-marker { display:none; }
+  .entry summary::before { content:"\25b8\00a0"; }
+  .entry details[open] summary::before { content:"\25be\00a0"; }
+  .entry dl { margin-top:.55rem; }
+  .keyblock { font-family:var(--mono); font-size:.71rem; background:var(--panel);
+              border:1px solid var(--line); border-radius:6px; padding:.5rem .6rem;
+              margin:.45rem 0 .4rem; white-space:pre-wrap; word-break:break-all; }
+  .entry .foot { margin-top:.55rem; display:flex; gap:.9rem; flex-wrap:wrap;
+                 align-items:center; }
+  .linkish { appearance:none; background:none; border:0; padding:0; cursor:pointer;
+             font:inherit; font-size:.79rem; color:var(--accent); }
+  /* The search is the reason most people open this page, so it gets its own
+     card at the top rather than sitting inside the explanatory section. */
+  #search h2 { font-size:.95rem; text-transform:none; letter-spacing:0;
+               color:var(--ink); margin-bottom:.25rem; }
+  .search-by { color:var(--dim); font-size:.82rem; margin:0 0 .8rem; }
+  .searchrow { display:flex; gap:.5rem; align-items:stretch; }
+  .searchrow input { flex:1 1 auto; min-width:0; font-size:13px; padding:.7rem .8rem; }
+  .searchrow button { margin-top:0; white-space:nowrap; }
+  @media (max-width:560px) {
+    .searchrow { flex-wrap:wrap; }
+    .searchrow input { flex:1 1 100%; }
+  }
   footer { margin-top:2rem; color:var(--dim); font-size:.76rem; line-height:1.7; }
   code { background:var(--panel); padding:.1rem .3rem; border-radius:3px; }
 </style>
+<script>
+  // Apply the stored theme before first paint, same as index.html. Without
+  // this the page renders in the OS colorway and then snaps to the saved
+  // choice when the body script runs.
+  (function(){ try { var t = localStorage.getItem('vaara-theme');
+    if (t === 'dark' || t === 'light') document.documentElement.setAttribute('data-theme', t);
+  } catch(e){} })();
+</script>
 </head>
 <body>
 <nav class="nav-jump"><a href="/">Home</a></nav>
@@ -150,6 +184,23 @@
     verify it here in your tab, or look one up in the public log underneath.
   </p>
 
+  <section id="search">
+    <h2>Search the Resin</h2>
+    <p class="search-by">by receipt digest, entry digest, or public key</p>
+    <div class="searchrow">
+      <input id="q" spellcheck="false" placeholder="sha256 digest, or paste your public key to see everything you published">
+      <button id="look">Look up</button>
+      <button id="latest" class="ghost">Latest entries</button>
+    </div>
+    <p class="sub" style="margin:.7rem 0 0">
+      Paste a public key and the log returns every head published with it. No
+      account, no sign-in: the key is the identity, and the answer comes from the
+      log rather than from us. Your private key is never involved and must never
+      be pasted anywhere.
+    </p>
+    <div id="rolls" style="margin-top:.9rem"></div>
+  </section>
+
   <section id="explorer">
     <h2>The Resin</h2>
     <p class="sub" style="margin:0 0 .8rem">
@@ -163,18 +214,6 @@
       <div class="tile"><div class="k">entries</div><div class="v" id="t-size">—</div></div>
       <div class="tile"><div class="k">root</div><div class="v" id="t-root">—</div></div>
     </div>
-    <input id="q" spellcheck="false" placeholder="sha256 digest, or paste your public key to see everything you published">
-    <div>
-      <button id="look">Look up</button>
-      <button id="latest" class="ghost">Latest entries</button>
-    </div>
-    <p class="sub" style="margin:.7rem 0 0">
-      Paste a public key and the log returns every head published with it. No
-      account, no sign-in: the key is the identity, and the answer comes from the
-      log rather than from us. Your private key is never involved and must never
-      be pasted anywhere.
-    </p>
-    <div id="rolls" style="margin-top:.9rem"></div>
     <p class="sub" style="margin:1rem 0 0">
       <strong>Before you opt in.</strong> A digest reveals no content, no size and no
       identity. What it does reveal is that something was published, and when.
@@ -348,6 +387,13 @@ function renderStatement(st) {
   put("principal", p.principal);
   put("decided at", p.decided_at);
   put("predicate type", st.predicateType);
+  // The predicate sits under the in-toto namespace because Vaara proposed it
+  // there. Saying so keeps the reader from taking the URL as in-toto's
+  // endorsement of a predicate that is still an open proposal.
+  if (st.predicateType === "https://in-toto.io/attestation/agent-decision/v0.1") {
+    put("predicate status",
+      "proposed by Vaara on in-toto/attestation#554, not yet a registered in-toto predicate");
+  }
   if (Array.isArray(p.policy_evaluations)) {
     p.policy_evaluations.forEach(e =>
       put(`policy ${e.policy_id || ""}`, `${e.result || "?"}${e.rule ? "  (" + e.rule + ")" : ""}`));
@@ -483,16 +529,40 @@ async function rekorSearchByHash(hexDigest) {
   return res.json();
 }
 
+// The log hands back the entry as base64 JSON. Decode the fields here, in one
+// place, so the page can lay them out itself instead of sending the reader to a
+// raw API response and asking them to read it. Both lookup paths and the latest
+// listing share this, so every route shows the same panel.
+function decodeEntry(uuid, e) {
+  let digest = null, hashAlg = null, kind = null, apiVersion = null, keyPem = null;
+  try {
+    const decoded = JSON.parse(atob(e.body));
+    kind = decoded.kind;
+    apiVersion = decoded.apiVersion;
+    const spec = decoded.spec || {};
+    const hash = (spec.data && spec.data.hash) || {};
+    digest = hash.value || null;
+    hashAlg = hash.algorithm || null;
+    const sig = spec.signature || {};
+    if (sig.publicKey && sig.publicKey.content) keyPem = atob(sig.publicKey.content).trim();
+  } catch (_) { /* an entry shape this page does not decode; fields stay null */ }
+  const verification = e.verification || {};
+  const proof = verification.inclusionProof || {};
+  return {
+    uuid, digest, hashAlg, kind, apiVersion, keyPem,
+    logIndex: e.logIndex, integratedTime: e.integratedTime, logID: e.logID,
+    treeSize: proof.treeSize, rootHash: proof.rootHash,
+    proofPath: Array.isArray(proof.hashes) ? proof.hashes.length : null,
+    hasCheckpoint: Boolean(proof.checkpoint),
+    hasSet: Boolean(verification.signedEntryTimestamp),
+  };
+}
+
 async function rekorEntry(uuid) {
   const res = await fetch(`${REKOR}/api/v1/log/entries/${uuid}`);
   if (!res.ok) throw new Error(`entry fetch returned ${res.status}`);
   const body = await res.json();
-  const e = body[uuid];
-  let digest = null;
-  try {
-    digest = JSON.parse(atob(e.body)).spec.data.hash.value;
-  } catch (_) { /* not a hashedrekord; leave null */ }
-  return { uuid, digest, logIndex: e.logIndex, integratedTime: e.integratedTime };
+  return decodeEntry(uuid, body[uuid]);
 }
 
 function renderEntries(list, total) {
@@ -508,16 +578,74 @@ function renderEntries(list, total) {
     ? row("warn", `Showing ${list.length} of ${total} entries`,
         "This digest appears many times in the log. The rest are not listed here.")
     : "";
-  $("rolls").innerHTML = note + list.map(e => `
+  SHOWN = {};
+  list.forEach(e => { SHOWN[e.uuid] = e; });
+  $("rolls").innerHTML = note + list.map(entryCard).join("");
+}
+
+// The log's own entry view is a raw API response. Everything a reader would
+// take from it is laid out here in the page's own shape instead, with the raw
+// response still one click away because that is the authority, not this render.
+function entryCard(e) {
+  const pairs = [];
+  const put = (k, v) => { if (v !== undefined && v !== null && v !== "") pairs.push([k, v]); };
+  put("log index", e.logIndex);
+  put("integrated", e.integratedTime
+    ? new Date(e.integratedTime * 1000).toISOString() : null);
+  put("entry type", [e.kind, e.apiVersion].filter(Boolean).join(" "));
+  put("data digest", e.digest ? `${e.hashAlg || "sha256"}:${e.digest}` : null);
+  put("log id", e.logID);
+  put("tree size at inclusion", e.treeSize);
+  put("root hash", e.rootHash);
+  put("inclusion proof", e.rootHash
+    ? `present, ${e.proofPath === null ? "path not returned" : e.proofPath + " hashes"}`
+    : "not returned");
+  put("checkpoint", e.hasCheckpoint ? "present" : "absent");
+  put("signed entry timestamp", e.hasSet ? "present" : "absent");
+  put("entry uuid", e.uuid);
+
+  const key = e.keyPem ? `
+      <div class="detail" style="margin-top:.7rem">public key carried on this entry</div>
+      <div class="keyblock">${esc(e.keyPem)}</div>
+      <button type="button" class="linkish" data-search-key="${esc(e.uuid)}">Search everything published under this key</button>` : "";
+
+  return `
     <div class="entry">
       <div>${esc(e.digest || "(not a hashedrekord)")}</div>
       <div class="detail">
         log index ${esc(e.logIndex)} ·
-        integrated ${new Date(e.integratedTime * 1000).toISOString()} ·
-        <a href="${REKOR}/api/v1/log/entries/${esc(e.uuid)}" rel="noopener">entry</a>
+        integrated ${e.integratedTime
+          ? esc(new Date(e.integratedTime * 1000).toISOString()) : "(unknown)"}
       </div>
-    </div>`).join("");
+      <details>
+        <summary>details</summary>
+        <dl>${pairs.map(([k, v]) =>
+          `<dt>${esc(k)}</dt><dd>${esc(v)}</dd>`).join("")}</dl>
+        ${key}
+        <div class="detail" style="margin-top:.7rem">
+          An entry shows this digest was in the log at that index and time. It
+          says nothing about who put it there, and nothing about whether the
+          statement behind the digest is true.
+        </div>
+        <div class="foot">
+          <a href="${REKOR}/api/v1/log/entries/${esc(e.uuid)}" rel="noopener">Raw response from the log</a>
+        </div>
+      </details>
+    </div>`;
 }
+
+// Entries currently on screen, so the key button can reach the PEM without
+// round-tripping a multi-line value through an HTML attribute.
+let SHOWN = {};
+
+$("rolls").addEventListener("click", ev => {
+  const btn = ev.target.closest("[data-search-key]");
+  if (!btn) return;
+  const entry = SHOWN[btn.getAttribute("data-search-key")];
+  if (!entry || !entry.keyPem) return;
+  $("q").value = entry.keyPem;
+  lookup(entry.keyPem);
+});
 
 async function lookup(input) {
   const raw = (input || "").trim();
@@ -591,14 +719,7 @@ async function entryAtIndex(i) {
   if (!res.ok) throw new Error(`index ${i} returned ${res.status}`);
   const body = await res.json();
   const uuid = Object.keys(body)[0];
-  const e = body[uuid];
-  let digest = null, kind = null;
-  try {
-    const b = JSON.parse(atob(e.body));
-    kind = b.kind;
-    digest = b.spec && b.spec.data && b.spec.data.hash && b.spec.data.hash.value;
-  } catch (_) { /* leave null */ }
-  return { uuid, digest, kind, logIndex: e.logIndex, integratedTime: e.integratedTime };
+  return decodeEntry(uuid, body[uuid]);
 }
 
 // Latest N rather than an endless list. An explorer's job is to show that the
