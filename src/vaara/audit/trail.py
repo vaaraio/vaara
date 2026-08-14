@@ -632,6 +632,16 @@ class AuditTrail:
         self._anchor_cadence = 0
         self._records_since_anchor = 0
         self._anchor_lock = threading.Lock()
+        # Publishing the head to a public log is a separate cadence from
+        # time-anchoring. A TSA round trip is cheap, so anchoring can be
+        # frequent; a public-log entry is the non-equivocation layer and is
+        # usually sparser. Both default to off.
+        self._publish_signer: Any = None
+        self._publish_log_url = ""
+        self._publish_cadence = 0
+        self._records_since_publish = 0
+        self._publications: list[dict] = []
+        self._publish_lock = threading.Lock()
         # Optional reference to the SQLite backend for cross-process features
         # like pending outcomes. Set by SQLiteAuditBackend.load_trail() so the
         # pipeline can persist/read pending outcomes to SQLite instead of memory.
@@ -1474,6 +1484,49 @@ class AuditTrail:
             self._anchor_cadence = every_records
             self._records_since_anchor = 0
 
+    def enable_auto_publish(
+        self, signer: Any, *, every_records: int = 256,
+        log_url: str = "https://rekor.sigstore.dev",
+    ) -> None:
+        """Publish the chain head to a public log every ``every_records``.
+
+        This bounds the window in which an operator could still drop or
+        reorder records that no third party has seen. Once a head is in a log
+        the operator does not run, everything before it is fixed. The window
+        is therefore ``every_records`` wide, and a verifier can read that
+        bound rather than guess it.
+
+        It does not, and cannot, prove that a record which was never created
+        and never sequenced once existed. Nothing can. What it removes is the
+        operator's ability to revise history after the fact.
+
+        ``signer`` is an ``EllipticCurvePrivateKey``. Every head published
+        with one key is groupable by anyone, so use a separate key per
+        context if two trails should not share a pseudonym.
+
+        Opt-in and off by default. Publication is permanent, world-readable
+        and cannot be withdrawn; see ``vaara trail publish-head`` for the full
+        disclosure a deployer should read before turning this on.
+
+        Fail-open like auto-anchor: an unreachable log records a chained
+        ``ANCHOR_GAP`` marker naming the log, so an unpublished window is
+        itself visible in the chain instead of being silent.
+
+        Raises ``ValueError`` if ``every_records`` is not a positive integer.
+        """
+        if every_records < 1:
+            raise ValueError("every_records must be a positive integer")
+        with self._publish_lock:
+            self._publish_signer = signer
+            self._publish_log_url = log_url
+            self._publish_cadence = every_records
+            self._records_since_publish = 0
+
+    def publications(self) -> list[dict]:
+        """Heads published to a public log, oldest first."""
+        with self._publish_lock:
+            return list(self._publications)
+
     # ── Internal ──────────────────────────────────────────────────
 
     def _append(self, record: AuditRecord) -> None:
@@ -1485,6 +1538,49 @@ class AuditTrail:
         """
         self._append_chained(record)
         self._maybe_auto_anchor()
+        self._maybe_auto_publish()
+
+    def _maybe_auto_publish(self) -> None:
+        """Publish the head when the cadence is reached (fail-open)."""
+        if self._publish_signer is None:
+            return
+        with self._publish_lock:
+            self._records_since_publish += 1
+            if self._records_since_publish < self._publish_cadence:
+                return
+            self._records_since_publish = 0
+            signer = self._publish_signer
+            log_url = self._publish_log_url
+        with self._lock:
+            if not self._records:
+                return
+            position = len(self._records) - 1
+            head_hash = self._records[-1].record_hash
+        try:
+            from vaara.attestation.rekor_log import publish_head
+            pub = publish_head(head_hash, signer, log_url=log_url)
+        except Exception as exc:  # fail-open: a log fault must not stop recording
+            logger.warning(
+                "auto-publish failed at chain position %d (%r); recording gap marker",
+                position, exc,
+            )
+            self._append_chained(AuditRecord(
+                record_id=str(uuid.uuid4()),
+                action_id="anchor-gap",
+                event_type=EventType.ANCHOR_GAP,
+                timestamp=time.time(),
+                agent_id="vaara",
+                tool_name="transparency-log",
+                data={
+                    "reason": self._cap_record_str(repr(exc), 512),
+                    "attempted_chain_position": position,
+                    "chain_head_hash": head_hash,
+                    "log_url": log_url,
+                },
+            ))
+            return
+        with self._publish_lock:
+            self._publications.append(pub.to_dict())
 
     def _maybe_auto_anchor(self) -> None:
         """Anchor the head when the per-record cadence is reached (fail-open)."""
