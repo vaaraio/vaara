@@ -724,6 +724,75 @@ def _parse_period(spec: Optional[str]) -> Optional[tuple]:
     return (_epoch(start_s, end_of_day=False), _epoch(end_s, end_of_day=True))
 
 
+def _cmd_trail_publish_head(args: argparse.Namespace) -> int:
+    """Publish the trail's head digest to a public transparency log.
+
+    Opt-in and off by default. What leaves the machine is one digest and a
+    signature over it: no record, no payload, no count of entries. A log the
+    operator runs proves the chain is internally consistent; a head in a log
+    somebody else runs is what stops the operator quietly keeping two
+    histories.
+    """
+    try:
+        from vaara.attestation.rekor_log import RekorError, publish_head
+    except ImportError:
+        print(_INSTALL_HINT, file=sys.stderr)
+        return 2
+    from cryptography.hazmat.primitives import serialization
+    from cryptography.hazmat.primitives.asymmetric import ec
+
+    trail, err = _load_trail_source(args)
+    if err is not None:
+        return err
+    records = trail._records
+    if not records:
+        print("trail is empty, nothing to publish", file=sys.stderr)
+        return 2
+    head = records[-1].record_hash
+    if not head:
+        print("head record carries no record_hash", file=sys.stderr)
+        return 2
+
+    key_path = Path(args.key).expanduser()
+    if key_path.exists():
+        signer = serialization.load_pem_private_key(key_path.read_bytes(), password=None)
+    else:
+        # One long-lived key whose public half travels with every entry, so a
+        # verifier can tie a signer's published heads together without any
+        # identity provider being involved.
+        signer = ec.generate_private_key(ec.SECP256R1())
+        key_path.parent.mkdir(parents=True, exist_ok=True)
+        key_path.write_bytes(signer.private_bytes(
+            encoding=serialization.Encoding.PEM,
+            format=serialization.PrivateFormat.PKCS8,
+            encryption_algorithm=serialization.NoEncryption(),
+        ))
+        os.chmod(key_path, 0o600)
+        print(f"generated a publishing key at {key_path}")
+
+    if args.dry_run:
+        print("dry run, nothing published")
+        print(f"  head       {head}")
+        print(f"  would go to {args.log}")
+        return 0
+
+    try:
+        pub = publish_head(head, signer, log_url=args.log)
+    except RekorError as exc:
+        print(f"publish failed: {exc}", file=sys.stderr)
+        return 1
+
+    print(f"published head {head}")
+    print(f"  log         {pub.log_url}")
+    print(f"  log index   {pub.log_index}")
+    print(f"  integrated  {pub.integrated_at.isoformat()}")
+    print(f"  entry       {pub.to_dict()['entry_url']}")
+    print()
+    print("  public: one sha256 and a signature over it, permanently.")
+    print("  not public: any record, payload, identity or entry count.")
+    return 0
+
+
 def _cmd_trail_verify_anchor(args: argparse.Namespace) -> int:
     """Verify the external time anchor folded into an Article 12 package."""
     import zipfile
@@ -4741,6 +4810,28 @@ def build_parser() -> argparse.ArgumentParser:
         help="Path to Ed25519 public key (PEM). If omitted, uses signer_pubkey.pem from inside the zip.",
     )
     pv.set_defaults(func=_cmd_trail_verify)
+
+    pph = tsub.add_parser(
+        "publish-head",
+        help="Publish the trail head digest to a public transparency log (opt-in)",
+    )
+    _add_trail_source_args(pph)
+    pph.add_argument(
+        "--key",
+        default=str(Path.home() / ".vaara" / "resin-publishing-key.pem"),
+        help="Ed25519/P-256 publishing key (PEM). Generated on first use.",
+    )
+    pph.add_argument(
+        "--log",
+        default="https://rekor.sigstore.dev",
+        help="Transparency log base URL (default: public Sigstore Rekor)",
+    )
+    pph.add_argument(
+        "--dry-run",
+        action="store_true",
+        help="Show the head that would be published without publishing it",
+    )
+    pph.set_defaults(func=_cmd_trail_publish_head)
 
     pva = tsub.add_parser(
         "verify-anchor",
