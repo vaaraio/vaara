@@ -13,8 +13,10 @@ Deliberate constraints, each of them the reason this exists:
   can run it.
 - Binds 127.0.0.1 by default. The trail is the most sensitive thing on the box
   and nothing here should be reachable from the network by accident.
-- Read-only. It reports what the trail and the config say. Changing enforcement
-  from a web page is a bigger decision than it looks and is not in this version.
+- Settings are editable, because a Linux or Windows user should not be reading
+  a window while a macOS user changes the same values. Writes go through the
+  same vaara.menu helpers the macOS client uses, so the two cannot drift, and
+  only declared keys with declared values are accepted.
 
 What stays native: the always-on traffic light and the approval prompt, because
 both have to exist when no browser is open.
@@ -23,6 +25,7 @@ both have to exist when no browser is open.
 from __future__ import annotations
 
 import json
+import secrets
 import socket
 import threading
 import webbrowser
@@ -95,9 +98,41 @@ def _history(trail: Any, limit: int) -> list[dict]:
     return out
 
 
+# Settings a non-macOS user was previously locked out of. Same config.json the
+# macOS client writes, via the same helpers, so the two cannot drift.
+# macOS-only keys (menubar_graph, webkitGovernance) are deliberately absent
+# rather than shown and ignored.
+_SETTINGS: dict[str, dict] = {
+    "user_level": {
+        "label": "Detail level",
+        "options": ["basic", "professional", "enterprise"],
+        "help": "How much a notification explains before you decide.",
+    },
+    "notify_on": {
+        "label": "Notify on",
+        "options": ["off", "deny", "escalate", "all"],
+        "help": "Which decisions raise a notification. Allowed moves pass in silence.",
+    },
+    "approval_style": {
+        "label": "Approval style",
+        "options": ["blocking", "timeout"],
+        "help": "Whether an escalation waits for you, or denies when it times out.",
+    },
+    "alert_window_minutes": {
+        "label": "Alert window (minutes)",
+        "options": ["5", "15", "60", "1440"],
+        "help": "How far back the dashboard counts recent interventions.",
+    },
+}
+
+
 class _Handler(BaseHTTPRequestHandler):
     db_path: Optional[Path] = None
     trail_path: Optional[Path] = None
+    # A page in another tab can POST to 127.0.0.1 without ever reading the
+    # response. It cannot read this token, which is only in the page we serve,
+    # so requiring it on writes closes that door.
+    token: str = ""
 
     def _send(self, body: bytes, ctype: str, code: int = 200) -> None:
         self.send_response(code)
@@ -128,9 +163,57 @@ class _Handler(BaseHTTPRequestHandler):
                 trail = _load_trail(self.db_path, self.trail_path)
                 self._json(_history(trail, 200))
                 return
+            if path == "/api/config":
+                from vaara.menu import CONFIG_PATH, _load_config
+
+                self._json({
+                    "path": str(CONFIG_PATH),
+                    "values": _load_config(),
+                    "fields": _SETTINGS,
+                    "token": self.token,
+                })
+                return
             self._json({"error": "not found"}, 404)
         except Exception as exc:  # a dashboard must not take the process down
             self._json({"error": repr(exc)}, 500)
+
+    def do_POST(self) -> None:  # noqa: N802  (BaseHTTPRequestHandler API)
+        path = self.path.split("?", 1)[0]
+        if path != "/api/config":
+            self._json({"error": "not found"}, 404)
+            return
+        if self.headers.get("X-Vaara-Token", "") != self.token:
+            self._json({"error": "bad or missing token"}, 403)
+            return
+        try:
+            length = int(self.headers.get("Content-Length", "0"))
+            payload = json.loads(self.rfile.read(length) or b"{}")
+        except Exception as exc:
+            self._json({"error": f"unreadable body: {exc!r}"}, 400)
+            return
+
+        from vaara.menu import CONFIG_PATH, _load_config, _save_config
+
+        cfg = _load_config()
+        changed = {}
+        for key, spec in _SETTINGS.items():
+            if key not in payload:
+                continue
+            value = str(payload[key])
+            # Only known keys, only declared values. A settings page should not
+            # be a way to write arbitrary JSON into the config the gate reads.
+            if value not in spec["options"]:
+                self._json({"error": f"{key}: {value!r} is not one of "
+                                     f"{spec['options']}"}, 400)
+                return
+            cfg[key] = value
+            changed[key] = value
+        try:
+            _save_config(cfg)
+        except Exception as exc:
+            self._json({"error": f"could not write {CONFIG_PATH}: {exc!r}"}, 500)
+            return
+        self._json({"saved": changed, "path": str(CONFIG_PATH)})
 
     def log_message(self, *args: Any) -> None:
         """Silence the default stderr access log; this is a desktop tool."""
@@ -150,6 +233,7 @@ def serve(
 
     _Handler.db_path = Path(db).expanduser() if db else None
     _Handler.trail_path = Path(trail).expanduser() if trail else None
+    _Handler.token = secrets.token_urlsafe(24)
 
     try:
         httpd = ThreadingHTTPServer((host, port), _Handler)

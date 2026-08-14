@@ -81,6 +81,18 @@
   .verdict { font-size:1.05rem; font-weight:600; padding:.15rem .5rem;
              border-radius:4px; display:inline-block; }
   .hide { display:none; }
+  /* Same wordmark treatment as index.html. This page uses the OS preference
+     rather than index's data-theme toggle, so the swap keys off that. */
+  .wordmark { margin:8px auto 0; text-align:center; }
+  .wordmark img { width:min(60vw,340px); height:auto; display:inline-block; }
+  .wordmark .wm-dark { display:none; }
+  @media (prefers-color-scheme: dark) {
+    .wordmark .wm-light { display:none; }
+    .wordmark .wm-dark { display:inline-block; }
+  }
+  .stance { font-family:var(--mono); font-size:12px; letter-spacing:.22em;
+            text-transform:uppercase; color:var(--tri); text-align:center;
+            margin:.1rem 0 2rem; }
   input { width:100%; padding:.6rem .75rem; background:var(--panel); color:var(--ink);
           border:1px solid var(--line); border-radius:6px; font:inherit; font-size:12px; }
   .entry { border:1px solid var(--line); border-radius:6px; padding:.6rem .75rem;
@@ -92,6 +104,12 @@
 </head>
 <body>
 <main>
+  <div class="wordmark">
+    <a href="/"><img class="wm-light" src="https://raw.githubusercontent.com/vaaraio/vaara/main/docs/vaara-wordmark-light.png" alt="Vaara" width="340" height="98"></a>
+    <a href="/"><img class="wm-dark" src="https://raw.githubusercontent.com/vaaraio/vaara/main/docs/vaara-wordmark-dark.png" alt="Vaara" width="340" height="98"></a>
+  </div>
+  <p class="stance">Accountable Autonomy</p>
+
   <h1>Explore the Vaara Resin</h1>
   <p class="sub">
     Resin is Vaara's chain of autonomous-action receipts. Every allow, escalate and

@@ -61,11 +61,40 @@
          color:var(--dim);background:var(--panel)}
   a{color:var(--accent)}
   code{font-family:var(--mono);font-size:.8rem}
+  .brand{display:flex;gap:12px;align-items:center;margin-bottom:4px}
+  .brand h1{margin:0}
+  .stance{font-family:var(--mono);font-size:11px;letter-spacing:.22em;
+          text-transform:uppercase;color:var(--tri);margin:0}
+  .panel{border:1px solid var(--line);border-radius:12px;background:var(--panel);
+         padding:4px 16px}
+  .field{display:flex;gap:16px;align-items:center;padding:12px 0;
+         border-bottom:1px solid var(--line)}
+  .field:last-child{border-bottom:0}
+  .field .lbl{flex:1}
+  .field .lbl .n{font-size:.9rem}
+  .field .lbl .h{color:var(--dim);font-size:.78rem}
+  select{font-family:var(--mono);font-size:.82rem;padding:6px 10px;
+         background:var(--panel-2);color:var(--ink);
+         border:1px solid var(--line);border-radius:8px}
+  .saved{color:var(--allow);font-size:.78rem;margin-left:8px}
 </style>
 </head>
 <body>
 <main>
-  <h1>Vaara</h1>
+  <!-- Inline rather than fetched: this tool has to look right with the
+       network off, and a local dashboard reaching out for its own logo would
+       be exactly the kind of quiet call the product argues against. -->
+  <div class="brand">
+    <svg viewBox="0 0 64 64" role="img" aria-label="Vaara" width="30" height="30">
+      <rect x="4" y="4" width="56" height="56" rx="11" ry="11"
+            fill="#1A2226" stroke="#7B9C8A" stroke-width="1.5"/>
+      <polygon points="32,22 44,42 20,42" fill="#78A08A"/>
+    </svg>
+    <div>
+      <h1>Vaara</h1>
+      <p class="stance">Accountable Autonomy</p>
+    </div>
+  </div>
   <p class="sub" id="source">reading…</p>
 
   <div class="light">
@@ -92,6 +121,10 @@
     <div class="tile"><div class="k">last head</div><div class="v" id="last-head" style="font-size:12px">—</div></div>
   </div>
   <p class="muted" style="font-size:.8rem;margin-top:10px" id="gap-note"></p>
+
+  <p class="stamp">Settings</p>
+  <div id="settings" class="panel"></div>
+  <p class="muted" style="font-size:.78rem;margin-top:8px" id="cfg-path"></p>
 
   <p class="stamp">History</p>
   <div id="history"></div>
@@ -182,7 +215,56 @@ async function load() {
     + `</tbody></table>`;
 }
 
+let TOKEN = "";
+
+async function saveSetting(key, value, el) {
+  try {
+    const res = await fetch("/api/config", {
+      method: "POST",
+      headers: { "Content-Type": "application/json", "X-Vaara-Token": TOKEN },
+      body: JSON.stringify({ [key]: value }),
+    });
+    const r = await res.json();
+    el.textContent = r.error ? r.error : "saved";
+    el.style.color = r.error ? "var(--deny)" : "var(--allow)";
+  } catch (e) {
+    el.textContent = e.message;
+    el.style.color = "var(--deny)";
+  }
+  setTimeout(() => { el.textContent = ""; }, 2500);
+}
+
+async function loadSettings() {
+  let c;
+  try { c = await (await fetch("/api/config")).json(); }
+  catch (e) { $("settings").textContent = "could not read config: " + e.message; return; }
+  if (c.error) { $("settings").textContent = c.error; return; }
+  TOKEN = c.token;
+  $("cfg-path").textContent = "Written to " + c.path
+    + ". The macOS app reads the same file.";
+
+  $("settings").innerHTML = Object.entries(c.fields).map(([key, f]) => {
+    const cur = c.values[key] !== undefined ? String(c.values[key]) : f.options[0];
+    return `<div class="field">
+      <div class="lbl"><div class="n">${esc(f.label)}</div>
+        <div class="h">${esc(f.help)}</div></div>
+      <select data-key="${esc(key)}">
+        ${f.options.map(o =>
+          `<option value="${esc(o)}"${o === cur ? " selected" : ""}>${esc(o)}</option>`
+        ).join("")}
+      </select>
+      <span class="saved" id="s-${esc(key)}"></span>
+    </div>`;
+  }).join("");
+
+  $("settings").querySelectorAll("select").forEach(sel => {
+    sel.addEventListener("change", () =>
+      saveSetting(sel.dataset.key, sel.value, $("s-" + sel.dataset.key)));
+  });
+}
+
 load();
+loadSettings();
 setInterval(load, 5000);
 </script>
 </body>
