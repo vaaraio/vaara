@@ -6,6 +6,28 @@ Vaara intercepts agent tool calls, scores each one with a conformal risk interva
 
 Position: tamper-evident runtime evidence and enforcement layer. Signed attestation plus execution receipts pair each MCP tool call to the policy that allowed it.
 
+## Who builds it
+
+Vaara is built and maintained by Henri Sirkkavaara, an independent developer in
+Finland, working on how an autonomous action can be proved to a party that has
+no reason to trust the operator. He is the sole author and copyright holder.
+
+The following are records held by other parties, not claims made on this site.
+Each is checkable at the link:
+
+- [draft-sirkkavaara-vaara-receipt](https://datatracker.ietf.org/doc/draft-sirkkavaara-vaara-receipt/): IETF Internet-Draft, "The Vaara Receipt: A Recomputable Receipt Format for Decisions About Autonomous Actions". An active Internet-Draft, not an RFC and not an adopted standard.
+- [OpenSSF Best Practices project 12612](https://www.bestpractices.dev/projects/12612): passing badge, externally assessed project practices.
+- [GitHub Marketplace: Vaara Policy Check](https://github.com/marketplace/actions/vaara-policy-check): published action listing.
+- [PyPI](https://pypi.org/project/vaara/) and [npm](https://www.npmjs.com/package/@vaara/client): release history under his name.
+- Participant on the IETF scitt, agentproto and rats mailing lists, where the receipt format is discussed publicly by other participants. Participation in a working group discussion is not authorship of a standard.
+- Contributor to the European Commission's Apply AI Alliance community on Futurium, writing on EU AI Act Article 12 and Article 14. A community contributor, not a Commission official or appointee.
+- Vaara appears in the industry acknowledgements of Singapore IMDA's Model AI Governance Framework for Agentic AI v1.5 (20 May 2026). An acknowledgement of the project, not an advisory role.
+- Subject of an AMD AI Developer Program testimonial (May 2026). A testimonial about his work. He is not and has never been employed by AMD.
+
+No academic degree, professional certification, standards-body accreditation or
+government appointment is claimed. Where a distinction matters it is stated
+above rather than left to inference.
+
 ## Repo and packages
 - [GitHub source](https://github.com/vaaraio/vaara): code, releases, issue tracker
 - [PyPI](https://pypi.org/project/vaara/): `pip install vaara`

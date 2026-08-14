@@ -174,6 +174,42 @@
   "@context": "https://schema.org",
   "@graph": [
     {
+      "@type": "Person",
+      "@id": "https://vaara.io/#henri",
+      "name": "Henri Sirkkavaara",
+      "url": "https://vaara.io/",
+      "email": "hello@vaara.io",
+      "jobTitle": "Founder and maintainer, Vaara",
+      "nationality": {
+        "@type": "Country",
+        "name": "Finland"
+      },
+      "workLocation": {
+        "@type": "Place",
+        "address": {
+          "@type": "PostalAddress",
+          "addressCountry": "FI"
+        }
+      },
+      "knowsAbout": [
+        "Accountable autonomy",
+        "Verifiable execution records for autonomous actions",
+        "Tamper-evident audit trails",
+        "Remote attestation",
+        "Transparency logs",
+        "EU AI Act Article 12 and Article 50",
+        "IETF standards development"
+      ],
+      "sameAs": [
+        "https://github.com/vaaraio",
+        "https://datatracker.ietf.org/doc/draft-sirkkavaara-vaara-receipt/",
+        "https://pypi.org/user/vaaraio/",
+        "https://www.bestpractices.dev/projects/12612",
+        "https://github.com/marketplace/actions/vaara-policy-check",
+        "https://www.linkedin.com/in/sirkkavaara"
+      ]
+    },
+    {
       "@type": "SoftwareApplication",
       "name": "Vaara",
       "applicationCategory": "DeveloperApplication",
@@ -186,11 +222,28 @@
       "license": "https://www.gnu.org/licenses/agpl-3.0.html",
       "isAccessibleForFree": true,
       "offers": [
-        { "@type": "Offer", "name": "Open source (AGPL-3.0)", "price": "0", "priceCurrency": "EUR" },
-        { "@type": "Offer", "name": "Four-week paid pilot", "url": "https://vaara.io/#pilots", "availability": "https://schema.org/InStock" },
-        { "@type": "Offer", "name": "Commercial license", "url": "https://github.com/vaaraio/vaara/blob/main/LICENSING.md", "availability": "https://schema.org/InStock" }
+        {
+          "@type": "Offer",
+          "name": "Open source (AGPL-3.0)",
+          "price": "0",
+          "priceCurrency": "EUR"
+        },
+        {
+          "@type": "Offer",
+          "name": "Four-week paid pilot",
+          "url": "https://vaara.io/#pilots",
+          "availability": "https://schema.org/InStock"
+        },
+        {
+          "@type": "Offer",
+          "name": "Commercial license",
+          "url": "https://github.com/vaaraio/vaara/blob/main/LICENSING.md",
+          "availability": "https://schema.org/InStock"
+        }
       ],
-      "author": { "@type": "Person", "name": "Henri Sirkkavaara" },
+      "author": {
+        "@id": "https://vaara.io/#henri"
+      },
       "keywords": "accountable autonomy, AI agent audit trail, agentic payments, autonomous actions, tamper-evident evidence, EU AI Act Article 12, TPM 2.0, RFC 3161, SEP-2828, verifiable AI",
       "sameAs": [
         "https://github.com/vaaraio/vaara",
@@ -203,7 +256,9 @@
       "name": "Vaara",
       "url": "https://vaara.io/",
       "logo": "https://vaara.io/vaara-wordmark-light.png",
-      "founder": { "@type": "Person", "name": "Henri Sirkkavaara" },
+      "founder": {
+        "@id": "https://vaara.io/#henri"
+      },
       "sameAs": [
         "https://github.com/vaaraio/vaara",
         "https://www.linkedin.com/in/sirkkavaara",
@@ -235,27 +290,42 @@
         {
           "@type": "Question",
           "name": "What is Vaara?",
-          "acceptedAnswer": { "@type": "Answer", "text": "Vaara is an open-source tamper-evident runtime evidence layer for AI agents. It turns every action an agent takes into a signed, hash-chained record that an outside party can verify without trusting the operator, and binds that record to the machine's own TPM 2.0 and IMA attestation." }
+          "acceptedAnswer": {
+            "@type": "Answer",
+            "text": "Vaara is an open-source tamper-evident runtime evidence layer for AI agents. It turns every action an agent takes into a signed, hash-chained record that an outside party can verify without trusting the operator, and binds that record to the machine's own TPM 2.0 and IMA attestation."
+          }
         },
         {
           "@type": "Question",
           "name": "Does Vaara help with EU AI Act compliance?",
-          "acceptedAnswer": { "@type": "Answer", "text": "Yes. Vaara produces EU AI Act Article 12 record-keeping evidence and a one-command regulator package (vaara trail export-article12) that writes the signed trail, per-article evidence, and a trusted time anchor an authority can verify offline." }
+          "acceptedAnswer": {
+            "@type": "Answer",
+            "text": "Yes. Vaara produces EU AI Act Article 12 record-keeping evidence and a one-command regulator package (vaara trail export-article12) that writes the signed trail, per-article evidence, and a trusted time anchor an authority can verify offline."
+          }
         },
         {
           "@type": "Question",
           "name": "Does Vaara require a trusted execution environment or special hardware?",
-          "acceptedAnswer": { "@type": "Answer", "text": "No. Vaara is root-agnostic: it recomputes verification from the recorded bytes, so no trusted execution environment is required. When a TPM 2.0 or IMA root is present, Vaara binds records to it as an optional upgrade." }
+          "acceptedAnswer": {
+            "@type": "Answer",
+            "text": "No. Vaara is root-agnostic: it recomputes verification from the recorded bytes, so no trusted execution environment is required. When a TPM 2.0 or IMA root is present, Vaara binds records to it as an optional upgrade."
+          }
         },
         {
           "@type": "Question",
           "name": "Is Vaara free and open source?",
-          "acceptedAnswer": { "@type": "Answer", "text": "Yes. Vaara is licensed under AGPL-3.0, with no SaaS, no telemetry, and no signup. It ships on PyPI, npm, and the MCP registry, with SLSA Build Level 3 and Sigstore-signed releases." }
+          "acceptedAnswer": {
+            "@type": "Answer",
+            "text": "Yes. Vaara is licensed under AGPL-3.0, with no SaaS, no telemetry, and no signup. It ships on PyPI, npm, and the MCP registry, with SLSA Build Level 3 and Sigstore-signed releases."
+          }
         },
         {
           "@type": "Question",
           "name": "Does Vaara offer paid pilots or a commercial license?",
-          "acceptedAnswer": { "@type": "Answer", "text": "Yes. Pilots run four weeks in your own infrastructure: shadow mode first, then a policy tuned to your real traffic, then enforcement, ending in a signed evidence bundle that stays verifiable without the vendor. A commercial license for building on Vaara without the AGPL's source-disclosure obligations is granted directly by the sole copyright holder. Scope and price are agreed before the work starts. Contact hello@vaara.io." }
+          "acceptedAnswer": {
+            "@type": "Answer",
+            "text": "Yes. Pilots run four weeks in your own infrastructure: shadow mode first, then a policy tuned to your real traffic, then enforcement, ending in a signed evidence bundle that stays verifiable without the vendor. A commercial license for building on Vaara without the AGPL's source-disclosure obligations is granted directly by the sole copyright holder. Scope and price are agreed before the work starts. Contact hello@vaara.io."
+          }
         }
       ]
     }
