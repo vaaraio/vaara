@@ -98,7 +98,7 @@
   /* Same wordmark treatment as index.html, keyed off the same data-theme
      attribute the shared toggle sets. */
   .wordmark { margin:8px auto 0; text-align:center; }
-  .wordmark img { width:min(60vw,340px); height:auto; display:inline-block; }
+  .wordmark img { width:min(60vw,440px); height:auto; display:inline-block; }
   .wordmark .wm-dark { display:none; }
   html[data-theme="dark"] .wordmark .wm-light { display:none; }
   html[data-theme="dark"] .wordmark .wm-dark { display:inline-block; }
@@ -137,8 +137,8 @@
 </div>
 <main>
   <div class="wordmark">
-    <a href="/"><img class="wm-light" src="https://raw.githubusercontent.com/vaaraio/vaara/main/docs/vaara-wordmark-light.png" alt="Vaara" width="340" height="98"></a>
-    <a href="/"><img class="wm-dark" src="https://raw.githubusercontent.com/vaaraio/vaara/main/docs/vaara-wordmark-dark.png" alt="Vaara" width="340" height="98"></a>
+    <a href="/"><img class="wm-light" src="https://raw.githubusercontent.com/vaaraio/vaara/main/docs/vaara-wordmark-light.png" alt="Vaara" width="440" height="127"></a>
+    <a href="/"><img class="wm-dark" src="https://raw.githubusercontent.com/vaaraio/vaara/main/docs/vaara-wordmark-dark.png" alt="Vaara" width="440" height="127"></a>
   </div>
   <p class="stance">Accountable Autonomy</p>
 
@@ -163,11 +163,17 @@
       <div class="tile"><div class="k">entries</div><div class="v" id="t-size">—</div></div>
       <div class="tile"><div class="k">root</div><div class="v" id="t-root">—</div></div>
     </div>
-    <input id="q" spellcheck="false" placeholder="sha256 digest, or verify a receipt above first">
+    <input id="q" spellcheck="false" placeholder="sha256 digest, or paste your public key to see everything you published">
     <div>
       <button id="look">Look up</button>
       <button id="latest" class="ghost">Latest entries</button>
     </div>
+    <p class="sub" style="margin:.7rem 0 0">
+      Paste a public key and the log returns every head published with it. No
+      account, no sign-in: the key is the identity, and the answer comes from the
+      log rather than from us. Your private key is never involved and must never
+      be pasted anywhere.
+    </p>
     <div id="rolls" style="margin-top:.9rem"></div>
     <p class="sub" style="margin:1rem 0 0">
       <strong>Before you opt in.</strong> A digest reveals no content, no size and no
@@ -454,6 +460,19 @@ function esc(s) {
     ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;" }[c]));
 }
 
+async function rekorSearchByKey(pem) {
+  const b64 = btoa(pem.trim());
+  const res = await fetch(`${REKOR}/api/v1/index/retrieve`, {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    // format must be one of pgp/x509/minisign/ssh/tuf; a SubjectPublicKeyInfo
+    // PEM is x509 here, and the content is that PEM base64-encoded again.
+    body: JSON.stringify({ publicKey: { format: "x509", content: b64 } }),
+  });
+  if (!res.ok) throw new Error(`index/retrieve returned ${res.status}`);
+  return res.json();
+}
+
 async function rekorSearchByHash(hexDigest) {
   const res = await fetch(`${REKOR}/api/v1/index/retrieve`, {
     method: "POST",
@@ -500,11 +519,37 @@ function renderEntries(list, total) {
     </div>`).join("");
 }
 
-async function lookup(hexDigest) {
-  const clean = (hexDigest || "").trim().replace(/^sha256:/i, "").toLowerCase();
+async function lookup(input) {
+  const raw = (input || "").trim();
+
+  // A pasted public key means "show me everything I published". Refuse a
+  // private key outright: nobody should ever be typing one into a web page,
+  // and a tool that quietly accepts it teaches a dangerous habit.
+  if (/-----BEGIN [A-Z ]*PRIVATE KEY-----/.test(raw)) {
+    $("rolls").innerHTML = row("no", "That is a private key. Do not paste it anywhere",
+      "Only the public half is needed here, and nothing on this page ever needs "
+      + "a private key. Close this tab and treat that key as compromised.");
+    $("q").value = "";
+    return;
+  }
+  if (/-----BEGIN PUBLIC KEY-----/.test(raw)) {
+    $("rolls").innerHTML = row("dim", "Asking the public log…");
+    try {
+      const uuids = (await rekorSearchByKey(raw)) || [];
+      const entries = [];
+      for (const u of uuids.slice(0, 20)) entries.push(await rekorEntry(u));
+      entries.sort((a, b) => b.integratedTime - a.integratedTime);
+      renderEntries(entries, uuids.length);
+    } catch (e) {
+      $("rolls").innerHTML = row("warn", "Could not reach the public log", esc(e.message));
+    }
+    return;
+  }
+
+  const clean = raw.replace(/^sha256:/i, "").toLowerCase();
   if (!/^[0-9a-f]{64}$/.test(clean)) {
-    $("rolls").innerHTML = row("no", "That is not a sha256 digest",
-      "Expecting 64 hex characters.");
+    $("rolls").innerHTML = row("no", "That is not a sha256 digest or a public key",
+      "Expecting 64 hex characters, or a PEM public key block.");
     return;
   }
   $("rolls").innerHTML = row("dim", "Asking the public log…");

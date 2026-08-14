@@ -12,6 +12,7 @@
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
 <title>Vaara</title>
+<link rel="icon" type="image/svg+xml" href="/favicon.svg">
 <style>
   :root {
     color-scheme: light;
@@ -149,6 +150,10 @@
     you run <code>vaara trail publish-head</code>.
   </p>
 
+  <p class="stamp">Rules</p>
+  <div id="rules" class="panel"></div>
+  <p class="muted" style="font-size:.78rem;margin-top:8px" id="pol-path"></p>
+
   <p class="stamp">Settings</p>
   <div id="settings" class="panel"></div>
   <p class="muted" style="font-size:.78rem;margin-top:8px" id="cfg-path"></p>
@@ -263,6 +268,68 @@ async function saveSetting(key, value, el) {
   setTimeout(() => { el.textContent = ""; }, 2500);
 }
 
+async function loadRules() {
+  let p;
+  try { p = await (await fetch("/api/policy")).json(); }
+  catch (e) { $("rules").innerHTML = "could not read policy: " + esc(e.message); return; }
+
+  if (!p.loaded) {
+    $("rules").innerHTML =
+      `<div class="field"><div class="lbl"><div class="n">No policy loaded</div>`
+      + `<div class="h">${esc(p.reason || "")}</div></div></div>`;
+    $("pol-path").textContent = p.path
+      ? "Tried " + p.path : "Start with --policy PATH to read and edit the rules here.";
+    return;
+  }
+
+  // Thresholds decide whether an agent is stopped, so they are edited against
+  // the same validator the pipeline loads with, and refused if it objects.
+  $("rules").innerHTML = `
+    <div class="field">
+      <div class="lbl"><div class="n">Escalate above</div>
+        <div class="h">A score above this asks a human instead of allowing.</div></div>
+      <input id="th-esc" type="number" step="0.01" min="0" max="1"
+             value="${esc(p.escalate)}" style="width:6.5rem">
+      <span class="saved" id="s-th"></span>
+    </div>
+    <div class="field">
+      <div class="lbl"><div class="n">Deny above</div>
+        <div class="h">A score above this is refused outright. Must be higher than escalate.</div></div>
+      <input id="th-deny" type="number" step="0.01" min="0" max="1"
+             value="${esc(p.deny)}" style="width:6.5rem">
+      <button id="th-save" style="margin:0">Save</button>
+    </div>
+    <div class="field">
+      <div class="lbl"><div class="n">Action classes</div>
+        <div class="h">${esc(p.action_class_count)} declared${
+          p.issues && p.issues.length ? " · " + esc(p.issues.length) + " validator note(s)" : ""}</div></div>
+    </div>`;
+  $("pol-path").textContent = "Rules live in " + p.path
+    + ". A backup is written beside it before any change, and an edit the "
+    + "validator rejects is never written.";
+
+  $("th-save").addEventListener("click", async () => {
+    const el = $("s-th");
+    try {
+      const res = await fetch("/api/policy", {
+        method: "POST",
+        headers: { "Content-Type": "application/json", "X-Vaara-Token": TOKEN },
+        body: JSON.stringify({
+          escalate: parseFloat($("th-esc").value),
+          deny: parseFloat($("th-deny").value),
+        }),
+      });
+      const r = await res.json();
+      el.textContent = r.error ? r.error : "saved";
+      el.style.color = r.error ? "var(--deny)" : "var(--allow)";
+      if (!r.error) loadRules();
+    } catch (e) {
+      el.textContent = e.message; el.style.color = "var(--deny)";
+    }
+    setTimeout(() => { el.textContent = ""; }, 4000);
+  });
+}
+
 async function loadSettings() {
   let c;
   try { c = await (await fetch("/api/config")).json(); }
@@ -320,7 +387,7 @@ async function loadSettings() {
 })();
 
 load();
-loadSettings();
+loadSettings().then(loadRules);
 setInterval(load, 5000);
 </script>
 </body>

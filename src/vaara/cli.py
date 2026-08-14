@@ -739,6 +739,7 @@ def _cmd_dashboard(args: argparse.Namespace) -> int:
     return serve(
         db=args.db,
         trail=args.trail,
+        policy=args.policy,
         host=args.host,
         port=port,
         open_browser=not args.no_browser,
@@ -4826,6 +4827,9 @@ def build_parser() -> argparse.ArgumentParser:
         help="Serve a local read-only dashboard (any OS, no extra dependencies)",
     )
     _add_trail_source_args(pdash)
+    pdash.add_argument("--policy", default=None,
+                       help="Policy file to show and edit thresholds in "
+                            "(.yaml/.yml/.json). Read-only without it.")
     pdash.add_argument("--host", default="127.0.0.1",
                        help="Bind address. Defaults to loopback only.")
     pdash.add_argument("--port", type=int, default=0,

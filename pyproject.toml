@@ -91,7 +91,7 @@ where = ["src"]
 # dashboard.html is read at runtime by dashboard.py. include-package-data is
 # false, so without this line `vaara dashboard` works from a checkout and fails
 # for everyone who installed the wheel.
-vaara = ["data/adversarial_classifier_v9.joblib", "py.typed", "dashboard.html", "assets/*.png"]
+vaara = ["data/adversarial_classifier_v9.joblib", "py.typed", "dashboard.html", "assets/*.png", "assets/*.svg"]
 # Declarative source-profile specs loaded at runtime by _declarative.py.
 "vaara.attestation" = ["profiles/*.json"]
 # Default deny patterns for the Claude Code hook runner (vaara hook).
