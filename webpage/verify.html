@@ -1,0 +1,314 @@
+<!DOCTYPE html>
+<!--
+  SPDX-FileCopyrightText: 2026 Henri Sirkkavaara
+  SPDX-License-Identifier: AGPL-3.0-or-later
+
+  Vaara receipt verifier. One file, no build step, no dependencies.
+
+  The receipt never leaves the browser. Everything below runs locally: the
+  DSSE pre-authentication encoding is recomputed, its digest taken, and the
+  Ed25519 signature checked with WebCrypto. Nothing is uploaded, so this page
+  learns nothing about you and you do not have to trust whoever served it.
+
+  Save it and open it with the network off. It still works. That is the point:
+  a verifier you have to be online to run is a service, and a service is a
+  party you trust.
+
+  It mirrors tests/vectors/*/\_check_independent.py, which imports no Vaara
+  code either. Producer and verifier share no implementation, so agreement
+  between them means the bytes stand on their own.
+-->
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Verify a Vaara receipt</title>
+<style>
+  :root {
+    --bg: #10131a; --panel: #161a23; --line: #232936;
+    --ink: #d7dbe3; --dim: #8b93a3; --ok: #5fd0a0; --no: #e2686d;
+    --warn: #d9a441; --accent: #7aa2f7;
+  }
+  @media (prefers-color-scheme: light) {
+    :root { --bg:#f7f8fa; --panel:#fff; --line:#e2e5ea; --ink:#1d2430;
+            --dim:#5d6572; --ok:#137a52; --no:#b3282d; --warn:#8a6100;
+            --accent:#2d5bb9; }
+  }
+  * { box-sizing: border-box; }
+  body { margin:0; background:var(--bg); color:var(--ink);
+         font:15px/1.55 ui-monospace,"SF Mono",Menlo,Consolas,monospace;
+         padding:2rem 1.25rem; }
+  main { max-width: 900px; margin: 0 auto; }
+  h1 { font-size:1.15rem; font-weight:600; margin:0 0 .25rem; letter-spacing:.01em; }
+  .sub { color:var(--dim); margin:0 0 1.75rem; font-size:.85rem; }
+  .drop { border:1px dashed var(--line); border-radius:8px; padding:1.5rem;
+          background:var(--panel); text-align:center; color:var(--dim);
+          transition:border-color .15s; }
+  .drop.over { border-color:var(--accent); color:var(--ink); }
+  textarea { width:100%; min-height:150px; margin-top:.75rem; padding:.75rem;
+             background:var(--panel); color:var(--ink); border:1px solid var(--line);
+             border-radius:6px; font:inherit; font-size:12px; resize:vertical; }
+  button { margin-top:.75rem; padding:.55rem 1.1rem; background:var(--accent);
+           color:#fff; border:0; border-radius:6px; font:inherit; cursor:pointer; }
+  button.ghost { background:transparent; color:var(--dim); border:1px solid var(--line); }
+  section { margin-top:1.75rem; background:var(--panel); border:1px solid var(--line);
+            border-radius:8px; padding:1rem 1.15rem; }
+  section h2 { font-size:.72rem; text-transform:uppercase; letter-spacing:.09em;
+               color:var(--dim); margin:0 0 .8rem; font-weight:600; }
+  .row { display:flex; gap:.7rem; padding:.32rem 0; align-items:baseline; }
+  .mark { width:1.15rem; flex:none; font-weight:700; }
+  .ok{color:var(--ok)} .no{color:var(--no)} .warn{color:var(--warn)} .dim{color:var(--dim)}
+  .what { flex:1; }
+  .detail { color:var(--dim); font-size:.79rem; word-break:break-all; }
+  dl { margin:0; display:grid; grid-template-columns:max-content 1fr; gap:.3rem .9rem; }
+  dt { color:var(--dim); font-size:.82rem; }
+  dd { margin:0; word-break:break-all; font-size:.82rem; }
+  .verdict { font-size:1.05rem; font-weight:600; padding:.15rem .5rem;
+             border-radius:4px; display:inline-block; }
+  .hide { display:none; }
+  footer { margin-top:2rem; color:var(--dim); font-size:.76rem; line-height:1.7; }
+  code { background:var(--panel); padding:.1rem .3rem; border-radius:3px; }
+</style>
+</head>
+<body>
+<main>
+  <h1>Verify a Vaara receipt</h1>
+  <p class="sub">Runs entirely in this tab. Nothing is uploaded. Save the page and it works offline.</p>
+
+  <div class="drop" id="drop">
+    Drop <code>envelope.json</code> here, or paste it below
+    <textarea id="input" spellcheck="false" placeholder='{"payload":"...","payloadType":"application/vnd.in-toto+json","signatures":[{"keyid":"...","sig":"..."}]}'></textarea>
+    <div>
+      <button id="go">Verify</button>
+      <button id="demo" class="ghost">Load an example</button>
+    </div>
+  </div>
+
+  <section id="out" class="hide">
+    <h2>Result</h2>
+    <div id="verdict"></div>
+    <div id="checks" style="margin-top:.9rem"></div>
+  </section>
+
+  <section id="content" class="hide">
+    <h2>What the receipt says</h2>
+    <dl id="fields"></dl>
+  </section>
+
+  <section id="nonclaims" class="hide">
+    <h2>What this does not establish</h2>
+    <div id="nc"></div>
+  </section>
+
+  <footer>
+    A passing signature proves the payload is byte-identical to what the holder
+    of that key signed. It says nothing about whether the key belongs to who you
+    think, or whether the statement is true. Pin the public key from a source
+    the signer does not control before treating a pass as meaningful.
+    <br><br>
+    AGPL-3.0-or-later. The independent Python checker this mirrors ships in the
+    repository under <code>tests/vectors/</code>.
+  </footer>
+</main>
+
+<script>
+"use strict";
+
+const $ = (id) => document.getElementById(id);
+const enc = new TextEncoder();
+
+function b64ToBytes(s) {
+  const bin = atob(s.replace(/-/g, "+").replace(/_/g, "/"));
+  const out = new Uint8Array(bin.length);
+  for (let i = 0; i < bin.length; i++) out[i] = bin.charCodeAt(i);
+  return out;
+}
+
+function hex(buf) {
+  return [...new Uint8Array(buf)].map(b => b.toString(16).padStart(2, "0")).join("");
+}
+
+// DSSE v1 pre-authentication encoding. The signature is over this, never over
+// the raw payload, so a payload cannot be lifted into a different payloadType
+// and still verify.
+function pae(payloadType, payloadBytes) {
+  const head = enc.encode(`DSSEv1 ${payloadType.length} ${payloadType} ${payloadBytes.length} `);
+  const out = new Uint8Array(head.length + payloadBytes.length);
+  out.set(head, 0);
+  out.set(payloadBytes, head.length);
+  return out;
+}
+
+// SubjectPublicKeyInfo for Ed25519 is a fixed 12-byte prefix then the 32-byte
+// key, so the raw key can be read out without a full ASN.1 parser.
+function pemToSpki(pem) {
+  const body = pem.replace(/-----[^-]+-----/g, "").replace(/\s+/g, "");
+  return b64ToBytes(body);
+}
+
+async function importEd25519(spki) {
+  return crypto.subtle.importKey("spki", spki, { name: "Ed25519" }, false, ["verify"]);
+}
+
+function row(state, what, detail) {
+  const marks = { ok: ["ok", "✓"], no: ["no", "✗"], warn: ["warn", "!"], dim: ["dim", "·"] };
+  const [cls, ch] = marks[state] || marks.dim;
+  const d = detail ? `<div class="detail">${detail}</div>` : "";
+  return `<div class="row"><div class="mark ${cls}">${ch}</div><div class="what">${what}${d}</div></div>`;
+}
+
+async function verify(envelope, publicKeyPem) {
+  const checks = [];
+  let allOk = true;
+
+  if (!envelope.payload || !envelope.payloadType || !Array.isArray(envelope.signatures)) {
+    return { checks: [row("no", "Not a DSSE envelope",
+      "Needs payload, payloadType and signatures.")], allOk: false, statement: null };
+  }
+
+  const payloadBytes = b64ToBytes(envelope.payload);
+  const preauth = pae(envelope.payloadType, payloadBytes);
+  const paeDigest = hex(await crypto.subtle.digest("SHA-256", preauth));
+  checks.push(row("ok", "Pre-authentication encoding recomputed",
+    `sha256 ${paeDigest}`));
+
+  let statement = null;
+  try {
+    statement = JSON.parse(new TextDecoder().decode(payloadBytes));
+    checks.push(row("ok", "Payload parses as the declared type", envelope.payloadType));
+  } catch (e) {
+    checks.push(row("no", "Payload is not valid JSON", String(e)));
+    allOk = false;
+  }
+
+  if (!publicKeyPem) {
+    checks.push(row("warn", "No public key supplied, signature not checked",
+      "Paste the signer's PEM to complete the check. Without it this page has "
+      + "confirmed the encoding only."));
+    allOk = false;
+  } else if (!crypto.subtle || !("Ed25519" in { Ed25519: 1 })) {
+    checks.push(row("warn", "This browser has no Ed25519 in WebCrypto",
+      "Chrome 137+, Safari 17+ or Firefox 129+ can complete the check."));
+    allOk = false;
+  } else {
+    for (const s of envelope.signatures) {
+      try {
+        const key = await importEd25519(pemToSpki(publicKeyPem));
+        const ok = await crypto.subtle.verify("Ed25519", key, b64ToBytes(s.sig), preauth);
+        checks.push(row(ok ? "ok" : "no",
+          ok ? "Signature verifies over the pre-authentication encoding"
+             : "Signature does NOT verify",
+          `keyid ${s.keyid || "(none)"}`));
+        if (!ok) allOk = false;
+      } catch (e) {
+        checks.push(row("no", "Signature could not be checked", String(e)));
+        allOk = false;
+      }
+    }
+  }
+  return { checks, allOk, statement, paeDigest };
+}
+
+function renderStatement(st) {
+  const p = (st && st.predicate) || {};
+  const pairs = [];
+  const put = (k, v) => { if (v !== undefined && v !== null && v !== "") pairs.push([k, v]); };
+  put("decision", p.decision);
+  put("agent", p.agent_id);
+  put("principal", p.principal);
+  put("decided at", p.decided_at);
+  put("predicate type", st.predicateType);
+  if (Array.isArray(p.policy_evaluations)) {
+    p.policy_evaluations.forEach(e =>
+      put(`policy ${e.policy_id || ""}`, `${e.result || "?"}${e.rule ? "  (" + e.rule + ")" : ""}`));
+  }
+  if (Array.isArray(p.tool_calls)) {
+    p.tool_calls.forEach(t =>
+      put(`tool ${t.name || "?"}`, t.args_state === "present"
+        ? `args ${t.args_hash || "(no hash)"}`
+        : `args ${t.args_state || "unknown"}`));
+  }
+  if (Array.isArray(st.subject)) {
+    st.subject.forEach(s => {
+      const dg = s.digest && (s.digest.sha256 || Object.values(s.digest)[0]);
+      put(`subject ${s.name || ""}`.trim(), dg || "(no digest)");
+    });
+  }
+  $("fields").innerHTML = pairs.map(([k, v]) =>
+    `<dt>${k}</dt><dd>${String(v)}</dd>`).join("");
+  $("content").classList.remove("hide");
+}
+
+// Stating the boundary is part of the product. A verifier that only shows
+// green invites the reader to believe things the maths never established.
+function renderNonClaims(st) {
+  const p = (st && st.predicate) || {};
+  const items = [
+    ["that the key belongs to the party you think it does",
+     "the signature binds the payload to a key, not to an organisation"],
+    ["that the statement is true",
+     "a signed claim of a deny is evidence the agent recorded a deny, not that a deny occurred"],
+    ["when this happened",
+     `decided_at is asserted by the signer${p.decided_at ? " (" + p.decided_at + ")" : ""}. `
+     + "an external timestamp authority is what makes a time independent"],
+    ["that this is the whole history",
+     "one receipt shows one decision. only a chain, and a head somebody else witnessed, "
+     + "shows nothing was removed"],
+  ];
+  $("nc").innerHTML = items.map(([a, b]) => row("dim", a, b)).join("");
+  $("nonclaims").classList.remove("hide");
+}
+
+async function run() {
+  const raw = $("input").value.trim();
+  if (!raw) return;
+  let envelope, pem = null;
+
+  // Accept either a bare envelope, or an object carrying both so a single
+  // paste can complete the whole check.
+  try {
+    const parsed = JSON.parse(raw);
+    envelope = parsed.envelope || parsed;
+    pem = parsed.publicKey || parsed.public_key || null;
+  } catch (e) {
+    $("out").classList.remove("hide");
+    $("verdict").innerHTML = `<span class="verdict no">NOT JSON</span>`;
+    $("checks").innerHTML = row("no", "Input is not valid JSON", String(e));
+    return;
+  }
+  if (!pem) {
+    const m = raw.match(/-----BEGIN PUBLIC KEY-----[\s\S]+?-----END PUBLIC KEY-----/);
+    if (m) pem = m[0];
+  }
+
+  const { checks, allOk, statement } = await verify(envelope, pem);
+  $("out").classList.remove("hide");
+  $("verdict").innerHTML = allOk
+    ? `<span class="verdict ok">SIGNATURE VERIFIES</span>`
+    : `<span class="verdict warn">INCOMPLETE</span>`;
+  $("checks").innerHTML = checks.join("");
+  if (statement) { renderStatement(statement); renderNonClaims(statement); }
+}
+
+$("go").addEventListener("click", run);
+
+const drop = $("drop");
+["dragover", "dragenter"].forEach(e =>
+  drop.addEventListener(e, ev => { ev.preventDefault(); drop.classList.add("over"); }));
+["dragleave", "drop"].forEach(e =>
+  drop.addEventListener(e, () => drop.classList.remove("over")));
+drop.addEventListener("drop", async ev => {
+  ev.preventDefault();
+  const f = ev.dataTransfer.files[0];
+  if (f) { $("input").value = await f.text(); run(); }
+});
+
+$("demo").addEventListener("click", () => {
+  $("input").value = JSON.stringify(DEMO, null, 1);
+  run();
+});
+
+const DEMO = {"envelope": {"payload": "eyJfdHlwZSI6Imh0dHBzOi8vaW4tdG90by5pby9TdGF0ZW1lbnQvdjEiLCJwcmVkaWNhdGUiOnsiYWdlbnRfaWQiOiJhZ2VudDphY21lL2NoZWNrb3V0LWJvdC8xIiwiZGVjaWRlZF9hdCI6IjIwMjYtMDYtMjNUMTI6MDA6MDVaIiwiZGVjaXNpb24iOiJkZW55IiwicG9saWN5X2V2YWx1YXRpb25zIjpbeyJwb2xpY3lfaWQiOiJwb2xpY3k6c3BlbmQtY2FwL2V1ci01MDAiLCJyZXN1bHQiOiJkZW55IiwicnVsZSI6ImFtb3VudC5sZS41MDAwMCJ9XSwicHJpbmNpcGFsIjoidGVuYW50OmFjbWUtZXUiLCJ0b29sX2NhbGxzIjpbeyJhcmdzX2Nhbm9uaWNhbGl6YXRpb24iOiJKQ1MiLCJhcmdzX2hhc2giOiJzaGEyNTY6OTFjMGMyMTVjY2UzZjVlN2M0OWQyZGRmMGE1NDBlYjIyNTU1NTRlYTNlN2E4ODUwNjdkMzkxNjhiM2FjODU2NCIsImFyZ3Nfc3RhdGUiOiJwcmVzZW50IiwibmFtZSI6InBheW1lbnRzLnRyYW5zZmVyIn0seyJhcmdzX3N0YXRlIjoiYXJnc19yZWRhY3RlZCIsIm5hbWUiOiJjdXN0b21lci5sb29rdXAifV19LCJwcmVkaWNhdGVUeXBlIjoiaHR0cHM6Ly9pbi10b3RvLmlvL2F0dGVzdGF0aW9uL2FnZW50LWRlY2lzaW9uL3YwLjEiLCJzdWJqZWN0IjpbeyJkaWdlc3QiOnsic2hhMjU2IjoiYTI3MmUzMGM4NzY4NzI4NWQ3YThkY2Q2YzVlMjMyNTRjZDVkYjJjNjgyMDI1NGRmNTQyYzI5MThlMDAxMTdiZCJ9LCJuYW1lIjoidG9vbDpwYXltZW50cy50cmFuc2ZlciJ9XX0=", "payloadType": "application/vnd.in-toto+json", "signatures": [{"keyid": "vaara-agent-decision-conformance-ed25519-k1", "sig": "mW5uAfYeWoUkc7Co6ehJ21y9vnoajFvmCGj1SkXJgZOgLGH6tfquZcoZL5Z+yMhip3zFWSA5s6Rd+oqL9me2AQ=="}]}, "publicKey": "-----BEGIN PUBLIC KEY-----\nMCowBQYDK2VwAyEAvHy8tWNjdfodgkNNRmck2SN39TuYBpXdSdJtDOEiBaU=\n-----END PUBLIC KEY-----"};
+</script>
+</body>
+</html>
