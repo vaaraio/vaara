@@ -33,11 +33,25 @@
     --mono: ui-monospace,'SFMono-Regular','JetBrains Mono','Fira Code',Menlo,Consolas,monospace;
     --sans: 'Inter',-apple-system,BlinkMacSystemFont,'Segoe UI',Helvetica,Arial,sans-serif;
   }
+  /* Light is the default across every Vaara surface; the dark grammar is
+     preserved verbatim under data-theme. Same tokens, same toggle, same
+     localStorage key as vaara.io and the local dashboard. */
   html[data-theme="dark"] {
     color-scheme: dark;
     --bg: #0F1417; --panel: #1A2226; --panel-2: #151D20;
     --line: rgba(123,156,138,.16); --ink: #DEE4E1; --dim: #8B9792; --faint: #5E6A66;
     --tri: #78A08A; --accent: #93B8A3; --ok: #78A08A; --no: #D98B8B; --warn: #D9A441;
+  }
+  /* Default follows the OS. An explicit choice from the toggle sets
+     data-theme and wins over it, which is why this is scoped to
+     :not([data-theme]) rather than applied unconditionally. */
+  @media (prefers-color-scheme: dark) {
+    html:not([data-theme]) {
+        color-scheme: dark;
+        --bg: #0F1417; --panel: #1A2226; --panel-2: #151D20;
+        --line: rgba(123,156,138,.16); --ink: #DEE4E1; --dim: #8B9792; --faint: #5E6A66;
+        --tri: #78A08A; --accent: #93B8A3; --ok: #78A08A; --no: #D98B8B; --warn: #D9A441;
+    }
   }
   * { box-sizing: border-box; }
   body { margin:0; background:var(--bg); color:var(--ink);
@@ -81,15 +95,20 @@
   .verdict { font-size:1.05rem; font-weight:600; padding:.15rem .5rem;
              border-radius:4px; display:inline-block; }
   .hide { display:none; }
-  /* Same wordmark treatment as index.html. This page uses the OS preference
-     rather than index's data-theme toggle, so the swap keys off that. */
+  /* Same wordmark treatment as index.html, keyed off the same data-theme
+     attribute the shared toggle sets. */
   .wordmark { margin:8px auto 0; text-align:center; }
   .wordmark img { width:min(60vw,340px); height:auto; display:inline-block; }
   .wordmark .wm-dark { display:none; }
-  @media (prefers-color-scheme: dark) {
-    .wordmark .wm-light { display:none; }
-    .wordmark .wm-dark { display:inline-block; }
-  }
+  html[data-theme="dark"] .wordmark .wm-light { display:none; }
+  html[data-theme="dark"] .wordmark .wm-dark { display:inline-block; }
+  .theme-toggle{position:fixed;top:14px;right:16px;z-index:10;display:inline-flex;
+    gap:2px;background:var(--panel);border:1px solid var(--line);border-radius:999px;padding:4px}
+  .theme-toggle button{appearance:none;background:none;border:0;cursor:pointer;
+    font-family:var(--mono);font-size:11px;letter-spacing:.18em;text-transform:uppercase;
+    color:var(--faint);padding:4px 11px;border-radius:999px}
+  .theme-toggle button[aria-pressed="true"]{color:var(--tri);background:var(--panel-2)}
+  .theme-toggle button:hover{color:var(--tri)}
   .stance { font-family:var(--mono); font-size:12px; letter-spacing:.22em;
             text-transform:uppercase; color:var(--tri); text-align:center;
             margin:.1rem 0 2rem; }
@@ -103,6 +122,10 @@
 </style>
 </head>
 <body>
+<div class="theme-toggle" role="group" aria-label="Color theme">
+  <button type="button" data-set-theme="light" aria-pressed="true">light</button>
+  <button type="button" data-set-theme="dark" aria-pressed="false">dark</button>
+</div>
 <main>
   <div class="wordmark">
     <a href="/"><img class="wm-light" src="https://raw.githubusercontent.com/vaaraio/vaara/main/docs/vaara-wordmark-light.png" alt="Vaara" width="340" height="98"></a>
@@ -377,6 +400,34 @@ async function run() {
   $("checks").innerHTML = checks.join("");
   if (statement) { renderStatement(statement); renderNonClaims(statement); }
 }
+
+(function(){
+  var root = document.documentElement;
+  var btns = document.querySelectorAll('.theme-toggle [data-set-theme]');
+  function apply(theme){
+    if (theme === "dark") root.setAttribute("data-theme","dark");
+    else root.removeAttribute("data-theme");
+    btns.forEach(function(b){
+      b.setAttribute("aria-pressed", String(b.getAttribute("data-set-theme") === theme));
+    });
+    try { localStorage.setItem("vaara-theme", theme); } catch(e) {}
+  }
+  // No stored choice: leave data-theme off so the OS decides, and show which
+  // side the OS landed on so the toggle is not lying about the current state.
+  function reflectAuto(){
+    root.removeAttribute("data-theme");
+    var dark = window.matchMedia && window.matchMedia("(prefers-color-scheme: dark)").matches;
+    btns.forEach(function(b){
+      b.setAttribute("aria-pressed", String(b.getAttribute("data-set-theme") === (dark ? "dark" : "light")));
+    });
+  }
+  btns.forEach(function(b){
+    b.addEventListener("click", function(){ apply(b.getAttribute("data-set-theme")); });
+  });
+  var saved = null;
+  try { saved = localStorage.getItem("vaara-theme"); } catch(e) {}
+  if (saved === "dark" || saved === "light") apply(saved); else reflectAuto();
+})();
 
 $("go").addEventListener("click", run);
 

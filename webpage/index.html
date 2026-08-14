@@ -81,6 +81,25 @@
     --tri-bright: #93B8A3;
     --warn: #D98B8B;
   }
+  /* Default follows the OS. An explicit choice from the toggle sets
+     data-theme and wins over it, which is why this is scoped to
+     :not([data-theme]) rather than applied unconditionally. */
+  @media (prefers-color-scheme: dark) {
+    html:not([data-theme]) {
+        color-scheme: dark;
+        --bg: #0F1417;
+        --panel: #1A2226;
+        --panel-2: #151D20;
+        --deep: #0B1012;
+        --line: rgba(123,156,138,.16);
+        --ink: #DEE4E1;
+        --muted: #8B9792;
+        --faint: #5E6A66;
+        --tri: #78A08A;
+        --tri-bright: #93B8A3;
+        --warn: #D98B8B;
+    }
+  }
   * { box-sizing: border-box; }
   html, body {
     margin: 0; padding: 0;
@@ -379,8 +398,17 @@ conformance: <span class="ok">CONFORMS</span>
     btns.forEach(function(b){ b.setAttribute("aria-pressed", String(b.getAttribute("data-set-theme") === theme)); });
     try { localStorage.setItem("vaara-theme", theme); } catch(e) {}
   }
+  function reflectAuto(){
+    root.removeAttribute("data-theme");
+    var dark = window.matchMedia && window.matchMedia("(prefers-color-scheme: dark)").matches;
+    btns.forEach(function(b){
+      b.setAttribute("aria-pressed", String(b.getAttribute("data-set-theme") === (dark ? "dark" : "light")));
+    });
+  }
   btns.forEach(function(b){ b.addEventListener("click", function(){ apply(b.getAttribute("data-set-theme")); }); });
-  apply(root.getAttribute("data-theme") === "dark" ? "dark" : "light");
+  var saved = null;
+  try { saved = localStorage.getItem("vaara-theme"); } catch(e) {}
+  if (saved === "dark" || saved === "light") apply(saved); else reflectAuto();
 })();
 </script>
 </body>
