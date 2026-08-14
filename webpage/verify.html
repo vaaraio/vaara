@@ -102,9 +102,17 @@
   .wordmark .wm-dark { display:none; }
   html[data-theme="dark"] .wordmark .wm-light { display:none; }
   html[data-theme="dark"] .wordmark .wm-dark { display:inline-block; }
+  .nav-jump{position:fixed;top:14px;left:16px;z-index:10;display:inline-flex;
+    background:var(--panel);border:1px solid var(--line);border-radius:999px;padding:4px}
+  .nav-jump a{font-family:var(--mono);font-size:11px;letter-spacing:.18em;
+    text-transform:uppercase;color:var(--faint);padding:4px 11px;border-radius:999px;
+    text-decoration:none}
+  .nav-jump a:hover{color:var(--tri);background:var(--panel-2)}
+  .stamp-lead{font-family:var(--mono);font-size:12px;letter-spacing:.24em;
+    text-transform:uppercase;color:var(--tri);font-weight:600;margin:2rem 0 .8rem}
   .theme-toggle{position:fixed;top:14px;right:16px;z-index:10;display:inline-flex;
     gap:2px;background:var(--panel);border:1px solid var(--line);border-radius:999px;padding:4px}
-  .theme-toggle button{appearance:none;background:none;border:0;cursor:pointer;
+  .theme-toggle button{appearance:none;background:none;border:0;cursor:pointer;margin:0;
     font-family:var(--mono);font-size:11px;letter-spacing:.18em;text-transform:uppercase;
     color:var(--faint);padding:4px 11px;border-radius:999px}
   .theme-toggle button[aria-pressed="true"]{color:var(--tri);background:var(--panel-2)}
@@ -122,6 +130,7 @@
 </style>
 </head>
 <body>
+<nav class="nav-jump"><a href="/">Home</a></nav>
 <div class="theme-toggle" role="group" aria-label="Color theme">
   <button type="button" data-set-theme="light" aria-pressed="true">light</button>
   <button type="button" data-set-theme="dark" aria-pressed="false">dark</button>
@@ -140,31 +149,6 @@
     checkable by someone who does not trust whoever ran it. Drop a receipt below to
     verify it here in your tab, or look one up in the public log underneath.
   </p>
-
-  <div class="drop" id="drop">
-    Drop <code>envelope.json</code> here, or paste it below
-    <textarea id="input" spellcheck="false" placeholder='{"payload":"...","payloadType":"application/vnd.in-toto+json","signatures":[{"keyid":"...","sig":"..."}]}'></textarea>
-    <div>
-      <button id="go">Verify</button>
-      <button id="demo" class="ghost">Load an example</button>
-    </div>
-  </div>
-
-  <section id="out" class="hide">
-    <h2>Result</h2>
-    <div id="verdict"></div>
-    <div id="checks" style="margin-top:.9rem"></div>
-  </section>
-
-  <section id="content" class="hide">
-    <h2>What the receipt says</h2>
-    <dl id="fields"></dl>
-  </section>
-
-  <section id="nonclaims" class="hide">
-    <h2>What this does not establish</h2>
-    <div id="nc"></div>
-  </section>
 
   <section id="explorer">
     <h2>The Resin</h2>
@@ -208,6 +192,35 @@
       because you switched it on, not because anything here collects it.
     </p>
   </section>
+
+  <p class="stamp-lead">Have a receipt? Check it here</p>
+  <p class="sub" style="margin:0 0 .8rem">Optional. The Resin above needs nothing from you.</p>
+  <div class="drop" id="drop">
+    Drop a receipt file here, or paste one below. It is read in this tab and
+    never sent anywhere, so there is nothing to upload and no account to make.
+    <textarea id="input" spellcheck="false" placeholder='{"payload":"...","payloadType":"application/vnd.in-toto+json","signatures":[{"keyid":"...","sig":"..."}]}'></textarea>
+    <div>
+      <button id="go">Verify</button>
+      <button id="demo" class="ghost">Load an example</button>
+    </div>
+  </div>
+
+  <section id="out" class="hide">
+    <h2>Result</h2>
+    <div id="verdict"></div>
+    <div id="checks" style="margin-top:.9rem"></div>
+  </section>
+
+  <section id="content" class="hide">
+    <h2>What the receipt says</h2>
+    <dl id="fields"></dl>
+  </section>
+
+  <section id="nonclaims" class="hide">
+    <h2>What this does not establish</h2>
+    <div id="nc"></div>
+  </section>
+
 
   <footer>
     A passing signature proves the payload is byte-identical to what the holder
@@ -405,8 +418,7 @@ async function run() {
   var root = document.documentElement;
   var btns = document.querySelectorAll('.theme-toggle [data-set-theme]');
   function apply(theme){
-    if (theme === "dark") root.setAttribute("data-theme","dark");
-    else root.removeAttribute("data-theme");
+    root.setAttribute("data-theme", theme === "dark" ? "dark" : "light");
     btns.forEach(function(b){
       b.setAttribute("aria-pressed", String(b.getAttribute("data-set-theme") === theme));
     });

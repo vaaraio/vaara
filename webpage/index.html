@@ -150,6 +150,12 @@
   #installs { color: var(--tri-bright); font-weight: 600; font-family: var(--mono); }
   .ago { opacity: .55; font-size: .85em; }
   /* Theme toggle, top-right, in the mono label grammar (no icons). */
+  .nav-jump{position:fixed;top:14px;left:16px;z-index:10;display:inline-flex;
+    background:var(--panel);border:1px solid var(--line);border-radius:999px;padding:4px}
+  .nav-jump a{font-family:var(--mono);font-size:11px;letter-spacing:.18em;
+    text-transform:uppercase;color:var(--faint);padding:4px 11px;border-radius:999px;
+    text-decoration:none}
+  .nav-jump a:hover{color:var(--tri);background:var(--panel-2)}
   .theme-toggle { position: fixed; top: 14px; right: 16px; z-index: 10; display: inline-flex; gap: 2px; background: var(--panel); border: 1px solid var(--line); border-radius: 999px; padding: 4px; }
   .theme-toggle button { appearance: none; background: none; border: 0; cursor: pointer; font-family: var(--mono); font-size: 11px; letter-spacing: 0.18em; text-transform: uppercase; color: var(--faint); padding: 4px 11px; border-radius: 999px; transition: color 0.15s ease, background 0.15s ease; }
   .theme-toggle button[aria-pressed="true"] { color: var(--tri); background: var(--panel-2); }
@@ -259,10 +265,13 @@
 <script>
   // Apply the stored theme before first paint so there is no flash. Light is
   // the default; only an explicit dark choice sets the attribute.
-  (function(){ try { if (localStorage.getItem('vaara-theme') === 'dark') document.documentElement.setAttribute('data-theme','dark'); } catch(e){} })();
+  (function(){ try { var t = localStorage.getItem('vaara-theme');
+    if (t === 'dark' || t === 'light') document.documentElement.setAttribute('data-theme', t);
+  } catch(e){} })();
 </script>
 </head>
 <body>
+<nav class="nav-jump"><a href="/verify.html">Explorer</a></nav>
 <div class="theme-toggle" role="group" aria-label="Color theme">
   <button type="button" data-set-theme="light" aria-pressed="true">light</button>
   <button type="button" data-set-theme="dark" aria-pressed="false">dark</button>
@@ -392,8 +401,7 @@ conformance: <span class="ok">CONFORMS</span>
   var btns = document.querySelectorAll('.theme-toggle [data-set-theme]');
   var COLORS = { light: "#ececec", dark: "#0F1417" };
   function apply(theme) {
-    if (theme === "dark") root.setAttribute("data-theme", "dark");
-    else root.removeAttribute("data-theme");
+    root.setAttribute("data-theme", theme === "dark" ? "dark" : "light");
     if (meta) meta.setAttribute("content", COLORS[theme] || COLORS.light);
     btns.forEach(function(b){ b.setAttribute("aria-pressed", String(b.getAttribute("data-set-theme") === theme)); });
     try { localStorage.setItem("vaara-theme", theme); } catch(e) {}
