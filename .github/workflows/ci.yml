@@ -268,14 +268,26 @@ jobs:
       - name: Install Vaara (editable, no deps)
         run: pip install -e . --no-deps
 
-      # tests/test_helm_chart.py skips the render checks when helm is absent,
-      # which is right for a laptop and wrong for CI: a silent skip here would
-      # report a green build for a chart nobody rendered.
+      - name: Install the yaml extra (the chart tests parse the render)
+        run: pip install 'pyyaml>=6.0'
+
+      # tests/test_helm_chart.py skips checks whose tools are absent, which is
+      # right for a laptop and wrong for CI: a silent skip here would report a
+      # green build for a chart nobody rendered. Fail loudly if the runner
+      # image stops shipping helm.
       - name: Require helm
         run: helm version
 
+      # -p no:randomly and -rs so the summary lists anything skipped; the next
+      # line fails the job if the count is not zero.
       - name: Chart tests
-        run: pytest -q tests/test_helm_chart.py
+        run: |
+          set -euo pipefail
+          pytest -q -rs tests/test_helm_chart.py | tee /tmp/chart-tests.txt
+          if grep -qE "[0-9]+ skipped" /tmp/chart-tests.txt; then
+            echo "chart tests skipped in CI, which defeats the point of this job" >&2
+            exit 1
+          fi
 
   preflight:
     name: Pre-release smoke test (wheel + classifier)

@@ -3,6 +3,13 @@
 # this repository carries hundreds of megabytes of it: virtualenvs, a Swift
 # build tree, model bundles, and the private .shared exchange.
 #
+# This file is shared with the ClusterFuzzLite build, which uses the same
+# root context and a different Dockerfile (.clusterfuzzlite/Dockerfile). That
+# build does `COPY . $SRC/vaara` and then compiles every fuzz/fuzz_*.py, so
+# .clusterfuzzlite/ and fuzz/ have to stay in the context even though the
+# image below does not read them. Excluding them fails the fuzz build with
+# "/.clusterfuzzlite/build.sh: not found".
+#
 # .shared is first on purpose. It is gitignored and must never reach an image
 # layer either.
 .shared/
@@ -15,7 +22,6 @@
 .serena/
 .claude/
 .claude-plugin/
-.clusterfuzzlite/
 .githooks/
 
 bench/
@@ -25,7 +31,6 @@ core/
 deploy/
 docs/
 examples/
-fuzz/
 homebrew-tap/
 ietf/
 plugins/

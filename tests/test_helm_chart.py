@@ -8,8 +8,11 @@ flags the CLI accepts, the route a probe polls. Every one of those can drift
 without anything failing until an operator installs the chart and reads a
 crash loop.
 
-Most of these checks are plain text and run everywhere. The two that shell out
-to ``helm`` skip when the binary is absent and do the real render in CI.
+Some of these checks are plain text and run everywhere. The rest need pyyaml
+(an optional extra) or the helm binary, and skip without them. The
+``helm-chart`` CI job installs both and fails if either is missing, so the
+render is verified on every pull request rather than skipped into a green
+build.
 """
 
 from __future__ import annotations
@@ -21,7 +24,6 @@ import subprocess
 from pathlib import Path
 
 import pytest
-import yaml
 
 import vaara
 
@@ -39,12 +41,21 @@ EXPECTED_UID = 10001
 BUILTIN_PREFIXES = ("Values.nameOverride", "Values.fullnameOverride")
 
 
+def _yaml():
+    """pyyaml is an optional extra, so the main test job does not have it.
+
+    The dedicated `helm-chart` CI job installs it alongside helm, which is
+    where these checks are guaranteed to run rather than skip.
+    """
+    return pytest.importorskip("yaml")
+
+
 def _chart() -> dict:
-    return yaml.safe_load((CHART / "Chart.yaml").read_text(encoding="utf-8"))
+    return _yaml().safe_load((CHART / "Chart.yaml").read_text(encoding="utf-8"))
 
 
 def _values() -> dict:
-    return yaml.safe_load((CHART / "values.yaml").read_text(encoding="utf-8"))
+    return _yaml().safe_load((CHART / "values.yaml").read_text(encoding="utf-8"))
 
 
 def _template_text() -> str:
@@ -191,7 +202,7 @@ def test_default_render_is_valid_yaml_and_holds_one_replica():
         capture_output=True, text=True, timeout=120,
     )
     assert done.returncode == 0, done.stderr
-    docs = [doc for doc in yaml.safe_load_all(done.stdout) if doc]
+    docs = [doc for doc in _yaml().safe_load_all(done.stdout) if doc]
     kinds = {doc["kind"] for doc in docs}
     assert {"StatefulSet", "Service", "ServiceAccount"} <= kinds
     sts = next(doc for doc in docs if doc["kind"] == "StatefulSet")
@@ -233,7 +244,7 @@ def test_signing_mounts_the_named_secret_read_only():
     )
     assert done.returncode == 0, done.stderr
     sts = next(
-        doc for doc in yaml.safe_load_all(done.stdout)
+        doc for doc in _yaml().safe_load_all(done.stdout)
         if doc and doc["kind"] == "StatefulSet"
     )
     spec = sts["spec"]["template"]["spec"]
@@ -252,7 +263,7 @@ def test_the_helm_test_pod_checks_vaara_not_the_model():
     )
     assert done.returncode == 0, done.stderr
     pod = next(
-        doc for doc in yaml.safe_load_all(done.stdout)
+        doc for doc in _yaml().safe_load_all(done.stdout)
         if doc and doc["kind"] == "Pod"
     )
     assert pod["metadata"]["annotations"]["helm.sh/hook"] == "test"
