@@ -22,7 +22,7 @@
 <head>
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
-<title>Verify a Vaara receipt</title>
+<title>Verify a receipt, or explore the Resin — Vaara</title>
 <style>
   /* Same tokens as vaara.io/index.html so this reads as one site. */
   :root {
@@ -92,8 +92,8 @@
 </head>
 <body>
 <main>
-  <h1>Verify a Vaara receipt</h1>
-  <p class="sub">Runs entirely in this tab. Nothing is uploaded. Save the page and it works offline.</p>
+  <h1>Verify a receipt, or explore the Resin</h1>
+  <p class="sub">Verification runs entirely in this tab. Nothing is uploaded. Save the page and it works offline.</p>
 
   <div class="drop" id="drop">
     Drop <code>envelope.json</code> here, or paste it below
@@ -121,11 +121,12 @@
   </section>
 
   <section id="explorer">
-    <h2>Explorer</h2>
+    <h2>The Resin</h2>
     <p class="sub" style="margin:0 0 .8rem">
-      The public log Vaara publishes heads to. Publishing is opt-in and off by
-      default, so an absence here means nothing was published, not that nothing
-      happened.
+      Resin sets around what it caught and keeps it exactly as it was, checkable
+      by whoever finds it later without trusting whoever left it there. This is the
+      public log Vaara publishes heads to. Publishing is opt-in and off by default,
+      so an absence here means nothing was published, not that nothing happened.
     </p>
     <div class="tiles">
       <div class="tile"><div class="k">log</div><div class="v" id="t-log">rekor.sigstore.dev</div></div>
