@@ -36,9 +36,43 @@ from typing import Any, Optional
 _PAGE = Path(__file__).with_name("dashboard.html")
 _ASSET_DIR = Path(__file__).with_name("assets")
 _ASSETS = {
-    "/vaara-wordmark-light.png": _ASSET_DIR / "vaara-wordmark-light.png",
-    "/vaara-wordmark-dark.png": _ASSET_DIR / "vaara-wordmark-dark.png",
+    "/vaara-wordmark-light.png": (_ASSET_DIR / "vaara-wordmark-light.png", "image/png"),
+    "/vaara-wordmark-dark.png": (_ASSET_DIR / "vaara-wordmark-dark.png", "image/png"),
+    "/favicon.svg": (_ASSET_DIR / "favicon.svg", "image/svg+xml"),
 }
+
+
+def _policy_state(path: Optional[Path]) -> dict:
+    """Read the active policy and validate it, without importing the pipeline.
+
+    Rules are the sharpest thing on this page: they decide what an agent is
+    allowed to do. So the dashboard reports what is loaded, what the validator
+    says about it, and where it came from, rather than showing thresholds with
+    no indication of whether the file is even sound.
+    """
+    if not path or not path.exists():
+        return {"path": str(path) if path else "", "loaded": False,
+                "reason": "no policy file configured (--policy)"}
+    try:
+        from vaara.policy.validate import validate_source
+
+        policy, report = validate_source(path)
+        if policy is None:
+            return {"path": str(path), "loaded": False,
+                    "reason": "policy did not parse",
+                    "issues": [str(i) for i in report.issues][:20]}
+        th = policy.thresholds_default
+        return {
+            "path": str(path),
+            "loaded": True,
+            "escalate": th.escalate,
+            "deny": th.deny,
+            "action_classes": sorted(policy.action_classes)[:40],
+            "action_class_count": len(policy.action_classes),
+            "issues": [str(i) for i in report.issues][:20],
+        }
+    except Exception as exc:
+        return {"path": str(path), "loaded": False, "reason": repr(exc)}
 
 
 def _load_trail(db_path: Optional[Path], trail_path: Optional[Path]) -> Any:
@@ -134,6 +168,7 @@ _SETTINGS: dict[str, dict] = {
 class _Handler(BaseHTTPRequestHandler):
     db_path: Optional[Path] = None
     trail_path: Optional[Path] = None
+    policy_path: Optional[Path] = None
     # A page in another tab can POST to 127.0.0.1 without ever reading the
     # response. It cannot read this token, which is only in the page we serve,
     # so requiring it on writes closes that door.
@@ -162,8 +197,9 @@ class _Handler(BaseHTTPRequestHandler):
                 return
             if path in _ASSETS:
                 # Served from the installed package, not fetched. The real
-                # wordmark, and it still renders with the network off.
-                self._send(_ASSETS[path].read_bytes(), "image/png")
+                # assets, and they still render with the network off.
+                asset, ctype = _ASSETS[path]
+                self._send(asset.read_bytes(), ctype)
                 return
             if path == "/api/summary":
                 trail = _load_trail(self.db_path, self.trail_path)
@@ -172,6 +208,9 @@ class _Handler(BaseHTTPRequestHandler):
             if path == "/api/history":
                 trail = _load_trail(self.db_path, self.trail_path)
                 self._json(_history(trail, 200))
+                return
+            if path == "/api/policy":
+                self._json(_policy_state(self.policy_path))
                 return
             if path == "/api/config":
                 from vaara.menu import CONFIG_PATH, _load_config
@@ -189,7 +228,7 @@ class _Handler(BaseHTTPRequestHandler):
 
     def do_POST(self) -> None:  # noqa: N802  (BaseHTTPRequestHandler API)
         path = self.path.split("?", 1)[0]
-        if path != "/api/config":
+        if path not in ("/api/config", "/api/policy"):
             self._json({"error": "not found"}, 404)
             return
         if self.headers.get("X-Vaara-Token", "") != self.token:
@@ -200,6 +239,10 @@ class _Handler(BaseHTTPRequestHandler):
             payload = json.loads(self.rfile.read(length) or b"{}")
         except Exception as exc:
             self._json({"error": f"unreadable body: {exc!r}"}, 400)
+            return
+
+        if path == "/api/policy":
+            self._write_thresholds(payload)
             return
 
         from vaara.menu import CONFIG_PATH, _load_config, _save_config
@@ -225,6 +268,66 @@ class _Handler(BaseHTTPRequestHandler):
             return
         self._json({"saved": changed, "path": str(CONFIG_PATH)})
 
+    def _write_thresholds(self, payload: dict) -> None:
+        """Write escalate/deny back to the policy file, validator-gated.
+
+        A threshold decides whether an agent is stopped, so this refuses
+        anything the policy validator would reject rather than writing a file
+        the pipeline will then fail to load.
+        """
+        import json as _json
+
+        path = self.policy_path
+        if not path or not path.exists():
+            self._json({"error": "no policy file configured (--policy)"}, 400)
+            return
+        try:
+            esc = float(payload["escalate"]); deny = float(payload["deny"])
+        except Exception:
+            self._json({"error": "escalate and deny must be numbers"}, 400)
+            return
+        if not (0.0 <= esc <= 1.0 and 0.0 <= deny <= 1.0):
+            self._json({"error": "thresholds must be in [0,1]"}, 400)
+            return
+        if esc >= deny:
+            self._json({"error": f"escalate ({esc}) must be below deny ({deny})"}, 400)
+            return
+
+        text = path.read_text()
+        is_yaml = path.suffix in (".yaml", ".yml")
+        if is_yaml:
+            try:
+                import yaml
+            except ImportError:
+                self._json({"error": "editing a YAML policy needs the yaml extra"}, 400)
+                return
+            data = yaml.safe_load(text) or {}
+        else:
+            data = _json.loads(text or "{}")
+
+        # The document key is thresholds.default. thresholds_default is the
+        # dataclass field name, and writing that instead produced a block the
+        # loader ignored while the write reported success.
+        th = data.setdefault("thresholds", {}).setdefault("default", {})
+        th["escalate"], th["deny"] = esc, deny
+
+        # Validate the whole edited document before it replaces anything.
+        from vaara.policy.validate import validate_source
+
+        policy, report = validate_source(data)
+        if policy is None:
+            self._json({"error": "the edit would not validate",
+                        "issues": [str(i) for i in report.issues][:10]}, 400)
+            return
+
+        new_text = (yaml.safe_dump(data, sort_keys=False) if is_yaml
+                    else _json.dumps(data, indent=2) + "\n")
+        backup = path.with_suffix(path.suffix + ".bak")
+        backup.write_text(text)
+        path.write_text(new_text)
+        self._json({"saved": {"escalate": esc, "deny": deny},
+                    "path": str(path), "backup": str(backup)})
+
     def log_message(self, *args: Any) -> None:
         """Silence the default stderr access log; this is a desktop tool."""
 
@@ -233,6 +336,7 @@ def serve(
     *,
     db: Optional[str] = None,
     trail: Optional[str] = None,
+    policy: Optional[str] = None,
     host: str = "127.0.0.1",
     port: int = 7517,
     open_browser: bool = True,
@@ -243,6 +347,7 @@ def serve(
 
     _Handler.db_path = Path(db).expanduser() if db else None
     _Handler.trail_path = Path(trail).expanduser() if trail else None
+    _Handler.policy_path = Path(policy).expanduser() if policy else None
     _Handler.token = secrets.token_urlsafe(24)
 
     try:

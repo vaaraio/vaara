@@ -1,0 +1,6 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 64 64" role="img" aria-label="Vaara">
+  <rect x="4" y="4" width="56" height="56" rx="11" ry="11"
+        fill="#1A2226" stroke="#7B9C8A" stroke-width="1.5"/>
+  <polygon points="32,22 44,42 20,42" fill="#78A08A"/>
+</svg>
