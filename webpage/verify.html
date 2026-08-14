@@ -24,23 +24,38 @@
 <meta name="viewport" content="width=device-width, initial-scale=1">
 <title>Verify a Vaara receipt</title>
 <style>
+  /* Same tokens as vaara.io/index.html so this reads as one site. */
   :root {
-    --bg: #10131a; --panel: #161a23; --line: #232936;
-    --ink: #d7dbe3; --dim: #8b93a3; --ok: #5fd0a0; --no: #e2686d;
-    --warn: #d9a441; --accent: #7aa2f7;
+    color-scheme: light;
+    --bg: #ececec; --panel: #FFFFFF; --panel-2: #F1F4F0;
+    --line: rgba(60,90,72,.18); --ink: #1A2226; --dim: #566159; --faint: #7C857E;
+    --tri: #3E6B54; --accent: #2C523E; --ok: #3E6B54; --no: #B4524F; --warn: #8A6100;
+    --mono: ui-monospace,'SFMono-Regular','JetBrains Mono','Fira Code',Menlo,Consolas,monospace;
+    --sans: 'Inter',-apple-system,BlinkMacSystemFont,'Segoe UI',Helvetica,Arial,sans-serif;
   }
-  @media (prefers-color-scheme: light) {
-    :root { --bg:#f7f8fa; --panel:#fff; --line:#e2e5ea; --ink:#1d2430;
-            --dim:#5d6572; --ok:#137a52; --no:#b3282d; --warn:#8a6100;
-            --accent:#2d5bb9; }
+  html[data-theme="dark"] {
+    color-scheme: dark;
+    --bg: #0F1417; --panel: #1A2226; --panel-2: #151D20;
+    --line: rgba(123,156,138,.16); --ink: #DEE4E1; --dim: #8B9792; --faint: #5E6A66;
+    --tri: #78A08A; --accent: #93B8A3; --ok: #78A08A; --no: #D98B8B; --warn: #D9A441;
   }
   * { box-sizing: border-box; }
   body { margin:0; background:var(--bg); color:var(--ink);
-         font:15px/1.55 ui-monospace,"SF Mono",Menlo,Consolas,monospace;
-         padding:2rem 1.25rem; }
-  main { max-width: 900px; margin: 0 auto; }
-  h1 { font-size:1.15rem; font-weight:600; margin:0 0 .25rem; letter-spacing:.01em; }
+         font-family:var(--sans); font-size:16px; line-height:1.65;
+         -webkit-font-smoothing:antialiased; padding:20px 28px 96px; }
+  main { max-width: 760px; margin: 0 auto; }
+  h1 { font-family:var(--sans); font-size:18px; font-weight:500; margin:24px 0 12px;
+       letter-spacing:-0.01em; }
   .sub { color:var(--dim); margin:0 0 1.75rem; font-size:.85rem; }
+  /* Stat tiles, explorer-style: the shape of the log before any detail. */
+  .tiles { display:grid; grid-template-columns:repeat(3,1fr); gap:12px; margin:0 0 18px; }
+  .tile { border:1px solid var(--line); border-radius:12px; padding:14px 16px;
+          background:var(--panel); }
+  .tile .k { font-family:var(--mono); font-size:11px; letter-spacing:.2em;
+             text-transform:uppercase; color:var(--faint); font-weight:600; }
+  .tile .v { font-family:var(--mono); font-size:15px; color:var(--ink); margin-top:6px;
+             word-break:break-all; }
+  @media (max-width:560px){ .tiles{grid-template-columns:1fr} }
   .drop { border:1px dashed var(--line); border-radius:8px; padding:1.5rem;
           background:var(--panel); text-align:center; color:var(--dim);
           transition:border-color .15s; }
@@ -108,14 +123,19 @@
   <section id="explorer">
     <h2>Explorer</h2>
     <p class="sub" style="margin:0 0 .8rem">
-      Look up whether a digest was published to a public transparency log, and when.
-      Publishing is opt-in and off by default, so an absence here means nothing was
-      published, not that nothing happened.
+      The public log Vaara publishes heads to. Publishing is opt-in and off by
+      default, so an absence here means nothing was published, not that nothing
+      happened.
     </p>
-    <input id="q" spellcheck="false" placeholder="sha256 digest, or paste a receipt above and verify first">
+    <div class="tiles">
+      <div class="tile"><div class="k">log</div><div class="v" id="t-log">rekor.sigstore.dev</div></div>
+      <div class="tile"><div class="k">entries</div><div class="v" id="t-size">—</div></div>
+      <div class="tile"><div class="k">root</div><div class="v" id="t-root">—</div></div>
+    </div>
+    <input id="q" spellcheck="false" placeholder="sha256 digest, or verify a receipt above first">
     <div>
       <button id="look">Look up</button>
-      <button id="latest" class="ghost">Show the log's own head</button>
+      <button id="latest" class="ghost">Latest entries</button>
     </div>
     <div id="rolls" style="margin-top:.9rem"></div>
     <p class="sub" style="margin:1rem 0 0">
@@ -398,18 +418,60 @@ async function lookup(hexDigest) {
 $("look").addEventListener("click", () => lookup($("q").value));
 $("q").addEventListener("keydown", ev => { if (ev.key === "Enter") lookup($("q").value); });
 
+async function logInfo() {
+  const res = await fetch(`${REKOR}/api/v1/log`);
+  if (!res.ok) throw new Error(`log returned ${res.status}`);
+  return res.json();
+}
+
+// The tiles are the shape of the log before any detail: how big it is now and
+// what root that size hashes to. Both come from the log, not from us.
+async function fillTiles() {
+  try {
+    const info = await logInfo();
+    $("t-size").textContent = Number(info.treeSize).toLocaleString("en");
+    $("t-root").textContent = String(info.rootHash).slice(0, 16) + "…";
+  } catch (e) {
+    $("t-size").textContent = "unreachable";
+    $("t-root").textContent = "—";
+  }
+}
+
+async function entryAtIndex(i) {
+  const res = await fetch(`${REKOR}/api/v1/log/entries?logIndex=${i}`);
+  if (!res.ok) throw new Error(`index ${i} returned ${res.status}`);
+  const body = await res.json();
+  const uuid = Object.keys(body)[0];
+  const e = body[uuid];
+  let digest = null, kind = null;
+  try {
+    const b = JSON.parse(atob(e.body));
+    kind = b.kind;
+    digest = b.spec && b.spec.data && b.spec.data.hash && b.spec.data.hash.value;
+  } catch (_) { /* leave null */ }
+  return { uuid, digest, kind, logIndex: e.logIndex, integratedTime: e.integratedTime };
+}
+
+// Latest N rather than an endless list. An explorer's job is to show that the
+// thing is alive and moving, not to page through two billion rows.
+const LATEST_N = 6;
+
 $("latest").addEventListener("click", async () => {
   $("rolls").innerHTML = row("dim", "Asking the public log…");
   try {
-    const res = await fetch(`${REKOR}/api/v1/log`);
-    const info = await res.json();
-    $("rolls").innerHTML = row("ok", "The log is live and append-only",
-      `tree size ${esc(info.treeSize)} · root ${esc(String(info.rootHash).slice(0, 32))}…`
-      + " — every published head sits inside this tree, and the tree only grows.");
+    const info = await logInfo();
+    const top = Number(info.treeSize) - 1;
+    const out = [];
+    for (let i = top; i > top - LATEST_N && i >= 0; i--) {
+      try { out.push(await entryAtIndex(i)); } catch (_) { /* skip a gap */ }
+    }
+    renderEntries(out, out.length);
   } catch (e) {
     $("rolls").innerHTML = row("warn", "Could not reach the public log", esc(e.message));
   }
 });
+
+fillTiles();
 
 const drop = $("drop");
 ["dragover", "dragenter"].forEach(e =>
