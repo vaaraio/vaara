@@ -40,6 +40,13 @@ NOT_OURS = {
     "--vectors-dir",  # scripts/conformance_runner.py
     "--list",         # scripts/conformance_runner.py
     "--skip-invalid",  # article12-export-spec.md says there is no such flag
+    # helm and kubectl, in docs/kubernetes-rancher.md. The deployment guide
+    # has to show the commands that install the chart, and those belong to
+    # other tools. Keep this list to flags a reader types into helm/kubectl,
+    # never a Vaara flag that "should" exist.
+    "--create-namespace",  # helm install
+    "--namespace",         # helm, kubectl
+    "--from-file",         # kubectl create secret generic
 }
 
 

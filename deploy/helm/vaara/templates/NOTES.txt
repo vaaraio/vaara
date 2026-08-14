@@ -1,0 +1,41 @@
+Vaara {{ .Chart.AppVersion }} is installed as {{ include "vaara.fullname" . }}.
+
+Mode: {{ .Values.proxy.mode }}{{ if eq .Values.proxy.mode "observe" }} (records every tool call the model requests, changes nothing){{ else }} (gates: denied tool calls are rewritten out of the response){{ end }}
+Upstream: {{ .Values.upstream.url }}
+Trail: {{ .Values.trail.path }}{{ if not .Values.persistence.enabled }}  <-- on an emptyDir, discarded when the pod restarts{{ end }}
+Signing: {{ if .Values.signing.enabled }}on, key from secret {{ .Values.signing.existingSecret }}{{ else }}off (no attestation or receipt pairs are produced){{ end }}
+
+1. Point your agents at Vaara instead of at the model:
+
+     base_url = http://{{ include "vaara.fullname" . }}.{{ .Release.Namespace }}.svc.cluster.local:{{ .Values.service.port }}
+
+2. Confirm the proxy is answering:
+
+     kubectl -n {{ .Release.Namespace }} port-forward svc/{{ include "vaara.fullname" . }} {{ .Values.service.port }}:{{ .Values.service.port }}
+     curl -s localhost:{{ .Values.service.port }}/healthz
+
+3. The trail is a SQLite file on the volume. To hand it to someone who does
+   not have cluster access, export it signed and let them verify the export:
+
+     kubectl -n {{ .Release.Namespace }} exec {{ include "vaara.fullname" . }}-0 -- vaara trail export --db {{ .Values.trail.path }} --out /var/lib/vaara/handoff.zip --key KEY
+     vaara-audit verify handoff.zip
+
+{{ if not .Values.persistence.enabled }}
+WARNING: persistence.enabled is false. The audit trail is on an emptyDir and
+every pod restart starts a new chain with no history. Use this for a smoke
+test only.
+{{ end }}
+{{- if eq .Values.proxy.mode "observe" }}
+Nothing is being blocked. Run in observe until the trail shows you what your
+agents actually call, then set proxy.mode=enforce with an allow list.
+{{- end }}
+{{- if not .Values.signing.enabled }}
+
+Receipts are off. In observe mode Vaara records what happened; with
+signing.enabled it also emits signed attestation and receipt pairs a third
+party can verify without access to this cluster. Create the key with
+`vaara keygen`, put it in a Secret, and set signing.existingSecret.
+{{- end }}
+
+Supported platforms and the versions this release was tested against:
+https://github.com/vaaraio/vaara/blob/main/docs/supported-platforms.md

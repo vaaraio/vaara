@@ -1,0 +1,48 @@
+# The image build copies only pyproject.toml, MANIFEST.in, README.md, LICENSE
+# and src/. Everything else is context the daemon would still transfer, and
+# this repository carries hundreds of megabytes of it: virtualenvs, a Swift
+# build tree, model bundles, and the private .shared exchange.
+#
+# .shared is first on purpose. It is gitignored and must never reach an image
+# layer either.
+.shared/
+.venv/
+.venv-mac/
+.git/
+.github/
+.hypothesis/
+.ruff_cache/
+.serena/
+.claude/
+.claude-plugin/
+.clusterfuzzlite/
+.githooks/
+
+bench/
+clients/
+conformance/
+core/
+deploy/
+docs/
+examples/
+fuzz/
+homebrew-tap/
+ietf/
+plugins/
+release-anchors/
+scripts/
+tests/
+webpage/
+
+**/__pycache__/
+**/*.pyc
+**/*.pyo
+*.egg-info/
+build/
+dist/
+*.db
+*.sqlite
+*.sqlite3
+.coverage
+.pytest_cache/
+.mypy_cache/

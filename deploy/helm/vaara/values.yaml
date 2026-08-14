@@ -1,0 +1,127 @@
+# SPDX-FileCopyrightText: 2026 Henri Sirkkavaara
+# SPDX-License-Identifier: AGPL-3.0-or-later
+#
+# Default values for the Vaara chart.
+# Every key here is read by a template; the test suite fails the build if a
+# template reads a key this file does not define.
+
+# Object naming. Empty means the chart name and the release name decide.
+nameOverride: ""
+fullnameOverride: ""
+
+image:
+  repository: ghcr.io/vaaraio/vaara
+  # Empty means "use the chart's appVersion". Pin a digest in production.
+  tag: ""
+  pullPolicy: IfNotPresent
+  pullSecrets: []
+
+# The model endpoint Vaara sits in front of. Point this at the in-cluster
+# service, not at an external address: Vaara is the thing that decides what
+# leaves, so it should be the only workload that can reach the model directly.
+upstream:
+  url: http://ollama.suse-ai.svc.cluster.local:11434
+
+proxy:
+  listenPort: 8788
+
+  # observe records every tool call the model requests and changes nothing.
+  # enforce also gates: denied calls are rewritten out of the response and
+  # escalations block on the approvals handshake.
+  # Start on observe. An enforce deployment with no allow list gates every
+  # tool call, and clients see their tools vanish.
+  mode: observe
+
+  # Tool-name globs that pass without gating under enforce. Ignored in
+  # observe mode. Allowed calls are still recorded.
+  allow: []
+
+  approvals:
+    # Mounts a directory a human decision writes into. Without it, an
+    # escalation under enforce fails closed when it times out.
+    enabled: false
+    timeoutSeconds: 60
+    # Subdirectory of the data volume. Must be on the volume: the root
+    # filesystem is read-only.
+    path: /var/lib/vaara/approvals
+
+# The hash-chained SQLite trail. One chain has exactly one writer, which is
+# why this chart deploys a StatefulSet with a single replica and refuses to
+# scale. See docs/multi-replica-deployment.md.
+trail:
+  path: /var/lib/vaara/audit.db
+
+# Signed attestation and receipt pairs for every chat call.
+# The chart never generates a key: a template-generated key would rotate on
+# every upgrade and land in the release secret. Create the Secret yourself
+# from `vaara keygen` output and name it here.
+signing:
+  enabled: false
+  existingSecret: ""
+  secretKey: signing_key.pem
+  receiptsDir: /var/lib/vaara/receipts
+
+persistence:
+  enabled: true
+  # Empty uses the cluster default. On RKE2 that is usually local-path.
+  storageClass: ""
+  size: 8Gi
+  accessMode: ReadWriteOnce
+  # Kept on uninstall so the evidence outlives the release. Set to Delete
+  # only if you have exported the trail first.
+  retainOnDelete: true
+
+service:
+  type: ClusterIP
+  port: 8788
+  annotations: {}
+
+serviceAccount:
+  create: true
+  name: ""
+  annotations: {}
+
+# Modest by default: the proxy is I/O bound and holds one SQLite connection.
+# Raise limits.memory if you enable signing on high request volume.
+resources:
+  requests:
+    cpu: 100m
+    memory: 192Mi
+  limits:
+    cpu: "1"
+    memory: 512Mi
+
+podSecurityContext:
+  runAsNonRoot: true
+  runAsUser: 10001
+  runAsGroup: 10001
+  # Must match the image's UID or an existing volume becomes unwritable.
+  fsGroup: 10001
+  seccompProfile:
+    type: RuntimeDefault
+
+securityContext:
+  allowPrivilegeEscalation: false
+  readOnlyRootFilesystem: true
+  capabilities:
+    drop:
+      - ALL
+
+livenessProbe:
+  initialDelaySeconds: 5
+  periodSeconds: 20
+  timeoutSeconds: 3
+  failureThreshold: 3
+
+readinessProbe:
+  initialDelaySeconds: 3
+  periodSeconds: 10
+  timeoutSeconds: 3
+  failureThreshold: 3
+
+podAnnotations: {}
+podLabels: {}
+nodeSelector: {}
+tolerations: []
+affinity: {}
+priorityClassName: ""

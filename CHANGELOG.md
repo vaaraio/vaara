@@ -4,6 +4,44 @@ All notable changes to this project are documented here.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/)
 and this project follows [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [Unreleased]
+
+### Added
+
+- **A Helm chart and a container image, so Vaara can be deployed on
+  Kubernetes.** `deploy/helm/vaara` installs the model-endpoint proxy in front
+  of an in-cluster model endpoint: a StatefulSet with one replica, a
+  ClusterIP Service, a ServiceAccount with no API token mounted, and a
+  PersistentVolumeClaim holding the trail. The image is built on
+  `registry.suse.com/bci/python:3.12`, runs as UID 10001 with a read-only root
+  filesystem, and is published to `ghcr.io/vaaraio/vaara` on release for
+  linux/amd64 and linux/arm64.
+
+  The chart has no replica count. One hash chain has exactly one writer, and a
+  second pod appending to the same volume produces a chain neither pod can
+  verify, so the invariant is enforced by the shape of the chart rather than
+  documented next to a knob that breaks it.
+
+  Three configurations that would fail in the cluster now fail at template
+  time with the reason: `enforce` mode with no allow list and no approvals
+  directory (every tool call gated, clients appear to lose their tools),
+  signing with no Secret named (the chart will not mint a key that rotates on
+  every upgrade), and signing without persistence (signed evidence discarded
+  on restart).
+
+- **`GET /healthz` on the model-endpoint proxy.** Every other path on the
+  proxy forwards upstream, so a liveness probe had no way to ask about the
+  proxy rather than about the model: an orchestrator would restart Vaara
+  whenever the model was slow to load, and bill a request per probe. The route
+  answers locally with status, version and mode, names no internal host, and
+  does not shadow the `/health` that vLLM serves.
+
+- **`docs/kubernetes-rancher.md`** covering install, storage, turning on
+  enforcement, signed receipts, and the NetworkPolicy that makes the proxy the
+  only route to the model. **`docs/supported-platforms.md`** lists the Python,
+  container and Kubernetes versions Vaara supports, and separately records
+  which platform versions a release has actually been run against.
+
 ## [1.67.1] - 2026-08-14
 
 Everything here was found by opening the pages and looking at them.

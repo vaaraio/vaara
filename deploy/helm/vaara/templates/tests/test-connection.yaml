@@ -1,0 +1,48 @@
+{{/*
+SPDX-FileCopyrightText: 2026 Henri Sirkkavaara
+SPDX-License-Identifier: AGPL-3.0-or-later
+
+`helm test` target. Reads the proxy's own health endpoint, which answers
+locally, so the check passes or fails on Vaara and does not depend on the
+model server being loaded.
+*/}}
+apiVersion: v1
+kind: Pod
+metadata:
+  name: {{ include "vaara.fullname" . }}-test-connection
+  labels:
+    {{- include "vaara.labels" . | nindent 4 }}
+  annotations:
+    helm.sh/hook: test
+    helm.sh/hook-delete-policy: before-hook-creation,hook-succeeded
+spec:
+  restartPolicy: Never
+  securityContext:
+    runAsNonRoot: true
+    runAsUser: 10001
+    seccompProfile:
+      type: RuntimeDefault
+  containers:
+    - name: healthz
+      image: {{ include "vaara.image" . }}
+      imagePullPolicy: {{ .Values.image.pullPolicy }}
+      securityContext:
+        allowPrivilegeEscalation: false
+        readOnlyRootFilesystem: true
+        capabilities:
+          drop:
+            - ALL
+      command:
+        - python3
+        - -c
+        - |
+          import json, sys, urllib.request
+          url = "http://{{ include "vaara.fullname" . }}:{{ .Values.service.port }}/healthz"
+          with urllib.request.urlopen(url, timeout=10) as response:
+              body = json.load(response)
+          print(json.dumps(body))
+          if body.get("status") != "ok":
+              sys.exit(1)
+          if body.get("mode") != "{{ .Values.proxy.mode }}":
+              print("running mode does not match the release values", file=sys.stderr)
+              sys.exit(1)

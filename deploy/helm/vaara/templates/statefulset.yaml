@@ -1,0 +1,163 @@
+{{/*
+SPDX-FileCopyrightText: 2026 Henri Sirkkavaara
+SPDX-License-Identifier: AGPL-3.0-or-later
+
+A StatefulSet with one replica, not a Deployment.
+
+The audit trail is a hash chain: every record binds to its predecessor, so a
+chain has exactly one writer. Two pods appending to one volume interleave
+records and produce a chain neither can verify. A StatefulSet gives stable
+identity and a volume that is not reattached to a second pod while the first
+still holds it, and there is no replicaCount value to raise.
+
+Read docs/multi-replica-deployment.md before reaching for horizontal scale:
+the answer is one chain per proxy, verified independently, not one chain
+shared by several.
+*/}}
+{{- include "vaara.validate" . -}}
+apiVersion: apps/v1
+kind: StatefulSet
+metadata:
+  name: {{ include "vaara.fullname" . }}
+  labels:
+    {{- include "vaara.labels" . | nindent 4 }}
+spec:
+  replicas: 1
+  serviceName: {{ include "vaara.fullname" . }}
+  podManagementPolicy: OrderedReady
+  updateStrategy:
+    type: RollingUpdate
+  selector:
+    matchLabels:
+      {{- include "vaara.selectorLabels" . | nindent 6 }}
+  {{- if .Values.persistence.enabled }}
+  persistentVolumeClaimRetentionPolicy:
+    whenDeleted: {{ if .Values.persistence.retainOnDelete }}Retain{{ else }}Delete{{ end }}
+    whenScaled: Retain
+  {{- end }}
+  template:
+    metadata:
+      labels:
+        {{- include "vaara.selectorLabels" . | nindent 8 }}
+        {{- with .Values.podLabels }}
+        {{- toYaml . | nindent 8 }}
+        {{- end }}
+      {{- with .Values.podAnnotations }}
+      annotations:
+        {{- toYaml . | nindent 8 }}
+      {{- end }}
+    spec:
+      serviceAccountName: {{ include "vaara.serviceAccountName" . }}
+      {{- with .Values.image.pullSecrets }}
+      imagePullSecrets:
+        {{- toYaml . | nindent 8 }}
+      {{- end }}
+      {{- with .Values.priorityClassName }}
+      priorityClassName: {{ . }}
+      {{- end }}
+      securityContext:
+        {{- toYaml .Values.podSecurityContext | nindent 8 }}
+      containers:
+        - name: proxy
+          image: {{ include "vaara.image" . }}
+          imagePullPolicy: {{ .Values.image.pullPolicy }}
+          securityContext:
+            {{- toYaml .Values.securityContext | nindent 12 }}
+          args:
+            - proxy
+            - --listen
+            - 0.0.0.0:{{ .Values.proxy.listenPort }}
+            - --upstream
+            - {{ .Values.upstream.url | quote }}
+            - --trail
+            - {{ .Values.trail.path | quote }}
+            {{- if eq .Values.proxy.mode "enforce" }}
+            - --enforce
+            {{- range .Values.proxy.allow }}
+            - --allow
+            - {{ . | quote }}
+            {{- end }}
+            {{- if .Values.proxy.approvals.enabled }}
+            - --approvals-dir
+            - {{ .Values.proxy.approvals.path | quote }}
+            - --approvals-timeout
+            - {{ .Values.proxy.approvals.timeoutSeconds | quote }}
+            {{- end }}
+            {{- end }}
+            {{- if .Values.signing.enabled }}
+            - --signing-key
+            - {{ printf "/etc/vaara/signing/%s" .Values.signing.secretKey | quote }}
+            - --receipts-dir
+            - {{ .Values.signing.receiptsDir | quote }}
+            {{- end }}
+          ports:
+            - name: http
+              containerPort: {{ .Values.proxy.listenPort }}
+              protocol: TCP
+          livenessProbe:
+            httpGet:
+              path: /healthz
+              port: http
+            {{- toYaml .Values.livenessProbe | nindent 12 }}
+          readinessProbe:
+            httpGet:
+              path: /healthz
+              port: http
+            {{- toYaml .Values.readinessProbe | nindent 12 }}
+          resources:
+            {{- toYaml .Values.resources | nindent 12 }}
+          volumeMounts:
+            - name: data
+              mountPath: /var/lib/vaara
+            # readOnlyRootFilesystem is on, and Python wants somewhere to
+            # write temporary files.
+            - name: tmp
+              mountPath: /tmp
+            {{- if .Values.signing.enabled }}
+            - name: signing-key
+              mountPath: /etc/vaara/signing
+              readOnly: true
+            {{- end }}
+      volumes:
+        - name: tmp
+          emptyDir: {}
+        {{- if not .Values.persistence.enabled }}
+        # No PVC: the trail lives and dies with the pod. Acceptable for a
+        # smoke test, never for a deployment whose output is evidence.
+        - name: data
+          emptyDir: {}
+        {{- end }}
+        {{- if .Values.signing.enabled }}
+        - name: signing-key
+          secret:
+            secretName: {{ .Values.signing.existingSecret | quote }}
+            defaultMode: 0400
+        {{- end }}
+      {{- with .Values.nodeSelector }}
+      nodeSelector:
+        {{- toYaml . | nindent 8 }}
+      {{- end }}
+      {{- with .Values.tolerations }}
+      tolerations:
+        {{- toYaml . | nindent 8 }}
+      {{- end }}
+      {{- with .Values.affinity }}
+      affinity:
+        {{- toYaml . | nindent 8 }}
+      {{- end }}
+  {{- if .Values.persistence.enabled }}
+  volumeClaimTemplates:
+    - metadata:
+        name: data
+        labels:
+          {{- include "vaara.labels" . | nindent 10 }}
+      spec:
+        accessModes:
+          - {{ .Values.persistence.accessMode }}
+        resources:
+          requests:
+            storage: {{ .Values.persistence.size }}
+        {{- if .Values.persistence.storageClass }}
+        storageClassName: {{ .Values.persistence.storageClass | quote }}
+        {{- end }}
+  {{- end }}

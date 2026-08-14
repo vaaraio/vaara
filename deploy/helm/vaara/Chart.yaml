@@ -1,0 +1,42 @@
+# SPDX-FileCopyrightText: 2026 Henri Sirkkavaara
+# SPDX-License-Identifier: AGPL-3.0-or-later
+apiVersion: v2
+name: vaara
+description: >-
+  Governance and receipt layer for AI agents. Fronts an in-cluster model
+  endpoint, passes traffic through unchanged, and records every tool call the
+  model requests into a hash-chained, independently verifiable audit trail.
+type: application
+
+# Chart version, bumped when the templates change.
+version: 0.1.0
+
+# Application version. tests/test_helm_chart.py asserts this equals
+# vaara.__version__, so a release that bumps the package without bumping the
+# chart fails the build instead of shipping a chart that installs an older
+# image than it claims.
+appVersion: "1.67.1"
+
+# StatefulSet apps/v1, the PersistentVolumeClaim retention fields are not used,
+# and probes use plain HTTP. 1.27 is conservative: RKE2 1.27 reached end of
+# upstream support, but nothing here needs anything newer.
+kubeVersion: ">=1.27.0-0"
+
+home: https://vaara.io
+icon: https://vaara.io/vaara-wordmark-dark.png
+sources:
+  - https://github.com/vaaraio/vaara
+keywords:
+  - ai
+  - governance
+  - audit
+  - eu-ai-act
+  - receipts
+  - accountable-autonomy
+maintainers:
+  - name: Henri Sirkkavaara
+    email: hello@vaara.io
+    url: https://vaara.io
+annotations:
+  artifacthub.io/license: AGPL-3.0-or-later
+  artifacthub.io/containsSecurityUpdates: "false"

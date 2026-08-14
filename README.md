@@ -241,6 +241,8 @@ The public surface is fixed: the signed envelope (`vaara.receipt/v1`), capabilit
 | [docs/adapters.md](docs/adapters.md) | Framework and cloud/OSS guardrail adapters, multi-tenant proxy |
 | [docs/COMPLIANCE.md](docs/COMPLIANCE.md) | EU AI Act and DORA article mapping, eval numbers |
 | [docs/multi-replica-deployment.md](docs/multi-replica-deployment.md) | Scaling past one proxy process: per-replica chains, rotation, archive index |
+| [docs/kubernetes-rancher.md](docs/kubernetes-rancher.md) | Running the proxy on Kubernetes with Rancher: chart, storage, enforcement, network isolation |
+| [docs/supported-platforms.md](docs/supported-platforms.md) | Python, container and Kubernetes versions Vaara supports, and which have been verified |
 | [CHANGELOG.md](CHANGELOG.md) | Version-by-version evolution |
 | [docs/PRIOR_ART.md](docs/PRIOR_ART.md) | When each concept first shipped, plus adjacent work |
 </details>

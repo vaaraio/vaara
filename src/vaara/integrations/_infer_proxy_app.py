@@ -67,6 +67,28 @@ def build_app(
         app, allowed_origins=allowed_origins, surface="vaara-infer-proxy",
     )
 
+    # Registered before the catch-all below, because Starlette matches routes
+    # in registration order and every path on this app otherwise forwards
+    # upstream. A probe that forwards reports the MODEL's health, not the
+    # proxy's, so an orchestrator would restart Vaara whenever the model was
+    # slow to load. "/healthz" rather than "/health": vLLM serves /health and
+    # shadowing it would hide the upstream's own check from anyone routing
+    # through the proxy. The path is in the origin guard's exempt set, so a
+    # probe arriving with a foreign Origin is not refused.
+    @app.get("/healthz")
+    async def healthz() -> dict:
+        from vaara import __version__
+
+        return {
+            "status": "ok",
+            "version": __version__,
+            "mode": "enforce" if gating else "observe",
+            # No upstream URL: this answers to anything that can reach the
+            # port, and naming an internal model host is free reconnaissance.
+            "upstream_configured": bool(upstream),
+            "signing": emitter is not None,
+        }
+
     def _record_requested_tools(output: Any, model_name: str) -> None:
         if pipeline is None or not isinstance(output, dict):
             return

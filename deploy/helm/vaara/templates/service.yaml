@@ -1,0 +1,28 @@
+{{/*
+SPDX-FileCopyrightText: 2026 Henri Sirkkavaara
+SPDX-License-Identifier: AGPL-3.0-or-later
+
+ClusterIP by default. Agents inside the cluster point their base_url here
+instead of at the model service, and a NetworkPolicy should make that the
+only route to the model. A LoadBalancer or NodePort puts an unauthenticated
+governance surface on the network, so change the type deliberately.
+*/}}
+apiVersion: v1
+kind: Service
+metadata:
+  name: {{ include "vaara.fullname" . }}
+  labels:
+    {{- include "vaara.labels" . | nindent 4 }}
+  {{- with .Values.service.annotations }}
+  annotations:
+    {{- toYaml . | nindent 4 }}
+  {{- end }}
+spec:
+  type: {{ .Values.service.type }}
+  ports:
+    - name: http
+      port: {{ .Values.service.port }}
+      targetPort: http
+      protocol: TCP
+  selector:
+    {{- include "vaara.selectorLabels" . | nindent 4 }}

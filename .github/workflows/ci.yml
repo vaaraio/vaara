@@ -251,6 +251,32 @@ jobs:
       - name: mypy
         run: mypy src/vaara/policy/
 
+  helm-chart:
+    name: Helm chart renders
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@9c091bb21b7c1c1d1991bb908d89e4e9dddfe3e0  # v7.0.0
+
+      - name: Set up Python 3.12
+        uses: actions/setup-python@5fda3b95a4ea91299a34e894583c3862153e4b97  # v7.0.0
+        with:
+          python-version: '3.12'
+
+      - name: Install pinned deps
+        run: pip install --require-hashes -r requirements-dev.txt
+
+      - name: Install Vaara (editable, no deps)
+        run: pip install -e . --no-deps
+
+      # tests/test_helm_chart.py skips the render checks when helm is absent,
+      # which is right for a laptop and wrong for CI: a silent skip here would
+      # report a green build for a chart nobody rendered.
+      - name: Require helm
+        run: helm version
+
+      - name: Chart tests
+        run: pytest -q tests/test_helm_chart.py
+
   preflight:
     name: Pre-release smoke test (wheel + classifier)
     runs-on: ubuntu-latest
