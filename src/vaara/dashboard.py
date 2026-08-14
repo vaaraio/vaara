@@ -34,6 +34,11 @@ from pathlib import Path
 from typing import Any, Optional
 
 _PAGE = Path(__file__).with_name("dashboard.html")
+_ASSET_DIR = Path(__file__).with_name("assets")
+_ASSETS = {
+    "/vaara-wordmark-light.png": _ASSET_DIR / "vaara-wordmark-light.png",
+    "/vaara-wordmark-dark.png": _ASSET_DIR / "vaara-wordmark-dark.png",
+}
 
 
 def _load_trail(db_path: Optional[Path], trail_path: Optional[Path]) -> Any:
@@ -154,6 +159,11 @@ class _Handler(BaseHTTPRequestHandler):
         try:
             if path in ("/", "/index.html"):
                 self._send(_PAGE.read_bytes(), "text/html; charset=utf-8")
+                return
+            if path in _ASSETS:
+                # Served from the installed package, not fetched. The real
+                # wordmark, and it still renders with the network off.
+                self._send(_ASSETS[path].read_bytes(), "image/png")
                 return
             if path == "/api/summary":
                 trail = _load_trail(self.db_path, self.trail_path)
