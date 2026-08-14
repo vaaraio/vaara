@@ -361,7 +361,8 @@ def serve(
     print(f"Vaara dashboard on {url}")
     print(f"  reading   {source}")
     print(f"  bound to  {host} only, not reachable from the network")
-    print("  read-only, Ctrl-C to stop")
+    print("  settings and policy thresholds are writable from the page")
+    print("  writes need a token served only in that page, Ctrl-C to stop")
     if open_browser:
         threading.Timer(0.4, lambda: webbrowser.open(url)).start()
     try:

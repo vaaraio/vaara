@@ -36,6 +36,21 @@ and this project follows [Semantic Versioning](https://semver.org/spec/v2.0.0.ht
   log the emitter operates proves the chain is internally consistent; it cannot
   prove the emitter kept one history. What leaves the machine is one digest and
   a signature over it. Offline verification never calls it.
+- **`AuditTrail.enable_auto_publish`** does for publication what
+  `enable_auto_anchor` does for anchoring: publish the head every
+  `every_records` appends, default 256, to a log the operator does not run.
+  The window in which records could still be dropped or reordered is then a
+  configured number a verifier reads rather than guesses. Opt-in, and an
+  unreachable log records a chained `ANCHOR_GAP` marker instead of raising,
+  so the unpublished stretch is itself visible in the chain.
+- **`vaara dashboard`** serves a local dashboard on any OS with nothing beyond
+  the standard library, bound to loopback. It shows the current gate verdict,
+  trail and witness counts with their gaps, and history, reading the same
+  `config.json` the macOS client writes. Settings and the escalate/deny policy
+  thresholds can be written from the page: writes carry a per-run token that
+  exists only in the page served, accept declared keys with declared values
+  only, and a threshold edit is refused unless the same validator the pipeline
+  uses accepts it.
 
 ## [1.66.2] - 2026-08-12
 

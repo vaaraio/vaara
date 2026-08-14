@@ -732,7 +732,7 @@ _EU_OPERATED_LOGS: tuple[str, ...] = ("localhost", "127.0.0.1", ".eu/", ".eu:")
 
 
 def _cmd_dashboard(args: argparse.Namespace) -> int:
-    """Serve the local read-only dashboard."""
+    """Serve the local dashboard."""
     from vaara.dashboard import free_port, serve
 
     port = args.port if args.port else free_port()
@@ -4824,7 +4824,7 @@ def build_parser() -> argparse.ArgumentParser:
 
     pdash = sub.add_parser(
         "dashboard",
-        help="Serve a local read-only dashboard (any OS, no extra dependencies)",
+        help="Serve a local dashboard (any OS, no extra dependencies)",
     )
     _add_trail_source_args(pdash)
     pdash.add_argument("--policy", default=None,
