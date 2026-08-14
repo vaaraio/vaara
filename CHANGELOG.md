@@ -4,6 +4,39 @@ All notable changes to this project are documented here.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/)
 and this project follows [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [1.67.0] - 2026-08-14
+
+### Added
+
+- **Anyone can now verify a receipt without installing anything.**
+  `webpage/verify.html` is a single file with no build step and no
+  dependencies. It recomputes the DSSE pre-authentication encoding, takes its
+  digest, and checks the Ed25519 signature with WebCrypto. The receipt never
+  leaves the browser, nothing is uploaded, and the page works with the network
+  off, so verification is not a service and not a party anyone has to trust.
+  It mirrors the independent Python checker under `tests/vectors/`, which
+  imports no Vaara code either; both were run against `agent_decision_v0` and
+  agree on the PAE digest, the signature and the decision.
+- The page also states what a passing check does **not** establish: that the
+  key belongs to the expected party, that the signed statement is true, that
+  `decided_at` means anything without an external time authority, or that one
+  receipt is a whole history.
+- **`vaara trail publish-head`** publishes a trail's head digest to a public
+  transparency log. Takes the same `--trail` / `--db` source as the other trail
+  commands, plus `--dry-run`, `--log` for a self-hosted or EU-operated
+  endpoint, and `--yes` for non-interactive use. Opt-in and off by default.
+- The command prints, on every run, what leaves the machine and what does not,
+  that publication is permanent with no erasure available afterwards, that the
+  log is public and enumerable rather than visible only to its operator, and
+  that everything published under one key can be grouped by anyone. An
+  interactive run confirms before publishing; `--yes` skips the prompt, never
+  the disclosure.
+- **`vaara.attestation.rekor_log`** backs that with Sigstore Rekor, the adapter
+  `transparency_log.py` has described in its docstring since it was written. A
+  log the emitter operates proves the chain is internally consistent; it cannot
+  prove the emitter kept one history. What leaves the machine is one digest and
+  a signature over it. Offline verification never calls it.
+
 ## [1.66.2] - 2026-08-12
 
 ### Fixed
