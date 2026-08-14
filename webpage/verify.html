@@ -66,6 +66,11 @@
   .verdict { font-size:1.05rem; font-weight:600; padding:.15rem .5rem;
              border-radius:4px; display:inline-block; }
   .hide { display:none; }
+  input { width:100%; padding:.6rem .75rem; background:var(--panel); color:var(--ink);
+          border:1px solid var(--line); border-radius:6px; font:inherit; font-size:12px; }
+  .entry { border:1px solid var(--line); border-radius:6px; padding:.6rem .75rem;
+           margin-bottom:.5rem; font-size:.8rem; }
+  .entry a { color:var(--accent); }
   footer { margin-top:2rem; color:var(--dim); font-size:.76rem; line-height:1.7; }
   code { background:var(--panel); padding:.1rem .3rem; border-radius:3px; }
 </style>
@@ -98,6 +103,28 @@
   <section id="nonclaims" class="hide">
     <h2>What this does not establish</h2>
     <div id="nc"></div>
+  </section>
+
+  <section id="explorer">
+    <h2>Explorer</h2>
+    <p class="sub" style="margin:0 0 .8rem">
+      Look up whether a digest was published to a public transparency log, and when.
+      Publishing is opt-in and off by default, so an absence here means nothing was
+      published, not that nothing happened.
+    </p>
+    <input id="q" spellcheck="false" placeholder="sha256 digest, or paste a receipt above and verify first">
+    <div>
+      <button id="look">Look up</button>
+      <button id="latest" class="ghost">Show the log's own head</button>
+    </div>
+    <div id="rolls" style="margin-top:.9rem"></div>
+    <p class="sub" style="margin:1rem 0 0">
+      Before you opt in: a published head is <em>public to everyone, permanently</em>.
+      Anyone can see that a digest was published and when, and that includes us. It is
+      the only usage signal Vaara ever receives, and it exists because you switched it
+      on. A digest reveals no content, no size and no identity, but the timing is
+      visible to anybody watching the log.
+    </p>
   </section>
 
   <footer>
@@ -291,6 +318,98 @@ async function run() {
 }
 
 $("go").addEventListener("click", run);
+
+// ---- explorer ----------------------------------------------------------
+// Queries the public log straight from this tab. Rekor serves
+// access-control-allow-origin: *, so no Vaara server sits in the middle and
+// there is nothing here that could log who looked something up.
+const REKOR = "https://rekor.sigstore.dev";
+
+function esc(s) {
+  return String(s).replace(/[&<>"]/g, c =>
+    ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;" }[c]));
+}
+
+async function rekorSearchByHash(hexDigest) {
+  const res = await fetch(`${REKOR}/api/v1/index/retrieve`, {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify({ hash: `sha256:${hexDigest}` }),
+  });
+  if (!res.ok) throw new Error(`index/retrieve returned ${res.status}`);
+  return res.json();
+}
+
+async function rekorEntry(uuid) {
+  const res = await fetch(`${REKOR}/api/v1/log/entries/${uuid}`);
+  if (!res.ok) throw new Error(`entry fetch returned ${res.status}`);
+  const body = await res.json();
+  const e = body[uuid];
+  let digest = null;
+  try {
+    digest = JSON.parse(atob(e.body)).spec.data.hash.value;
+  } catch (_) { /* not a hashedrekord; leave null */ }
+  return { uuid, digest, logIndex: e.logIndex, integratedTime: e.integratedTime };
+}
+
+function renderEntries(list, total) {
+  if (!list.length) {
+    $("rolls").innerHTML = row("dim", "Not in the log",
+      "Either it was never published, or it was published under a different digest. "
+      + "Absence is not evidence of anything.");
+    return;
+  }
+  // Never show a partial set as if it were the whole set. A digest can carry
+  // thousands of entries, and quietly rendering ten reads as "there are ten".
+  const note = total > list.length
+    ? row("warn", `Showing ${list.length} of ${total} entries`,
+        "This digest appears many times in the log. The rest are not listed here.")
+    : "";
+  $("rolls").innerHTML = note + list.map(e => `
+    <div class="entry">
+      <div>${esc(e.digest || "(not a hashedrekord)")}</div>
+      <div class="detail">
+        log index ${esc(e.logIndex)} ·
+        integrated ${new Date(e.integratedTime * 1000).toISOString()} ·
+        <a href="${REKOR}/api/v1/log/entries/${esc(e.uuid)}" rel="noopener">entry</a>
+      </div>
+    </div>`).join("");
+}
+
+async function lookup(hexDigest) {
+  const clean = (hexDigest || "").trim().replace(/^sha256:/i, "").toLowerCase();
+  if (!/^[0-9a-f]{64}$/.test(clean)) {
+    $("rolls").innerHTML = row("no", "That is not a sha256 digest",
+      "Expecting 64 hex characters.");
+    return;
+  }
+  $("rolls").innerHTML = row("dim", "Asking the public log…");
+  try {
+    const uuids = (await rekorSearchByHash(clean)) || [];
+    const entries = [];
+    for (const u of uuids.slice(0, 10)) entries.push(await rekorEntry(u));
+    renderEntries(entries, uuids.length);
+  } catch (e) {
+    $("rolls").innerHTML = row("warn", "Could not reach the public log", esc(e.message)
+      + ". Signature verification above is unaffected: it never needs the network.");
+  }
+}
+
+$("look").addEventListener("click", () => lookup($("q").value));
+$("q").addEventListener("keydown", ev => { if (ev.key === "Enter") lookup($("q").value); });
+
+$("latest").addEventListener("click", async () => {
+  $("rolls").innerHTML = row("dim", "Asking the public log…");
+  try {
+    const res = await fetch(`${REKOR}/api/v1/log`);
+    const info = await res.json();
+    $("rolls").innerHTML = row("ok", "The log is live and append-only",
+      `tree size ${esc(info.treeSize)} · root ${esc(String(info.rootHash).slice(0, 32))}…`
+      + " — every published head sits inside this tree, and the tree only grows.");
+  } catch (e) {
+    $("rolls").innerHTML = row("warn", "Could not reach the public log", esc(e.message));
+  }
+});
 
 const drop = $("drop");
 ["dragover", "dragenter"].forEach(e =>
