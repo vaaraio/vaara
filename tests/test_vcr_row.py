@@ -183,9 +183,62 @@ def test_withdrawing_a_row_takes_its_badge_down(tmp_path):
     assert render.badge_drift(data, tmp_path) == []
 
     data["reproductions"].clear()
-    assert render.badge_drift(data, tmp_path) == [f"{row['slug']}.svg"]
+    assert render.badge_drift(data, tmp_path) == sorted(
+        [f"{row['slug']}.svg", f"{row['slug']}.json"]
+    )
     render.write_badges(data, tmp_path)
-    assert not list(tmp_path.glob("*.svg"))
+    assert not list(tmp_path.iterdir())
+
+
+def test_a_badge_commits_to_its_own_row(tmp_path):
+    """The badge carries a digest a stranger can recompute from published bytes.
+
+    This is the corpus property turned on the badge itself. A reader who trusts
+    neither the listed party nor Vaara downloads the row, hashes it, and
+    compares. Nothing in that path needs a key or a Vaara install.
+    """
+    import hashlib
+
+    data = {"terms_version": "2026-08-15", "reproductions": []}
+    row = vcr.add_row(row_from(form()), "2026-08-14", data)
+    render.write_badges(data, tmp_path)
+
+    served = (tmp_path / f"{row['slug']}.json").read_bytes()
+    svg = (tmp_path / f"{row['slug']}.svg").read_text(encoding="utf-8")
+    assert f"sha256:{hashlib.sha256(served).hexdigest()}" in svg
+    assert json.loads(served) == row
+
+
+def test_the_served_row_is_canonical_bytes_and_nothing_else():
+    """One command has to answer it, so the file cannot carry stray formatting."""
+    row = {"b": 2, "a": 1}
+    assert render.row_bytes(row) == b'{"a":1,"b":2}'
+
+
+def test_editing_a_row_changes_its_digest(tmp_path):
+    data = {"terms_version": "2026-08-15", "reproductions": []}
+    row = vcr.add_row(row_from(form()), "2026-08-14", data)
+    before = render.row_digest(row)
+    row["result"] = "43 of 43, actually"
+    assert render.row_digest(row) != before
+    render.write_badges(data, tmp_path)
+    assert render.badge_drift(data, tmp_path) == []
+
+
+def test_a_row_records_which_terms_it_agreed_to():
+    """Terms can change for later rows and never reach back to an earlier yes."""
+    data = {"terms_version": "2026-08-15", "reproductions": []}
+    first = vcr.add_row(row_from(form()), "2026-08-14", data)
+    assert first["terms_version"] == "2026-08-15"
+
+    data["terms_version"] = "2027-01-01"
+    second = vcr.add_row(
+        row_from(form(party="Someone Else", record="https://example.com/run")),
+        "2027-01-02",
+        data,
+    )
+    assert second["terms_version"] == "2027-01-01"
+    assert first["terms_version"] == "2026-08-15"
 
 
 def test_the_committed_table_ships_with_no_rows_and_no_badges():

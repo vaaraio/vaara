@@ -184,14 +184,23 @@ def add_row(row: dict, date: str, data: dict) -> dict:
 
     Numbers are never reused. A withdrawn row leaves a gap, because the number
     is the one thing a listed party holds that nobody can be given later.
+
+    The row also records which version of the terms it was listed under. Terms
+    can change for rows added afterwards, and a change never reaches back to
+    somebody who agreed to a different text.
     """
     rows = data.setdefault("reproductions", [])
     if any(r.get("record") == row["record"] for r in rows):
         raise Rejected("That record is already listed.")
     highest = max((int(r.get("id", 0)) for r in rows), default=0)
     next_id = max(highest, int(data.get("issued", highest))) + 1
-    row = {"id": next_id, "slug": slugify(row["party"], {r["slug"] for r in rows}),
-           "date": date, **row}
+    row = {
+        "id": next_id,
+        "slug": slugify(row["party"], {r["slug"] for r in rows}),
+        "date": date,
+        "terms_version": data.get("terms_version", "unversioned"),
+        **row,
+    }
     rows.append(row)
     data["issued"] = next_id
     return row

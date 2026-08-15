@@ -14,7 +14,14 @@
     "A party asks for a row with the conformance-row issue form, which records",
     "the agreement in rule 4 and cannot be submitted without it. The rendered",
     "page is generated from this file plus the runner's own report, so neither",
-    "can drift from the other."
+    "can drift from the other.",
+    "",
+    "`terms_version` below is the version a new row agrees to. Bump it when the",
+    "terms on the page change, and never edit a published version in place.",
+    "Every row stores the version it was listed under, so a change reaches rows",
+    "added afterwards and never reaches back to somebody who agreed to",
+    "something else."
   ],
+  "terms_version": "2026-08-15",
   "reproductions": []
 }

@@ -23,10 +23,13 @@ Usage:
 """
 from __future__ import annotations
 
+import hashlib
 import html
 import json
 import sys
 from pathlib import Path
+
+import rfc8785
 
 REPO = Path(__file__).resolve().parent.parent
 REPRODUCTIONS = REPO / "conformance" / "reproductions.json"
@@ -34,6 +37,14 @@ DEFAULT_OUT = REPO / "webpage" / "conformance.html"
 BADGE_DIR = REPO / "webpage" / "badge"
 
 TITLE = "Vaara Conformance Results"
+
+# The terms a party agrees to when they ask for a row live in reproductions.json
+# under ``terms_version``, so the desk and the page cannot disagree about which
+# version is current. Bump it there when the text changes, never edit a version
+# in place. Each row carries the version it agreed to, so a later change reaches
+# new rows only. Somebody who said yes to one set of terms is never moved onto
+# another set by an edit they never saw.
+FALLBACK_TERMS_VERSION = "unversioned"
 
 # One badge per listed party, named for that party's slug. There is no generic
 # badge on purpose: a single shared URL is copyable by anyone who never ran
@@ -47,6 +58,14 @@ height="20" role="img" aria-label="{alt}">
     <stop offset="0" stop-color="#bbb" stop-opacity=".1"/>
     <stop offset="1" stop-opacity=".1"/>
   </linearGradient>
+  <metadata>
+    <vcr xmlns="https://vaara.io/ns/vcr/v1">
+      <row>{row_id}</row>
+      <digest>{digest}</digest>
+      <over>https://vaara.io/badge/{slug}.json</over>
+      <recompute>sha256 of those bytes, which are JCS-canonical per RFC 8785</recompute>
+    </vcr>
+  </metadata>
   <clipPath id="r"><rect width="{w}" height="20" rx="3" fill="#fff"/></clipPath>
   <g clip-path="url(#r)">
     <rect width="{lw}" height="20" fill="#1A2226"/>
@@ -69,6 +88,20 @@ lengthAdjust="spacingAndGlyphs">{message}</text>
 
 def esc(value: object) -> str:
     return html.escape(str(value), quote=True)
+
+
+def row_bytes(row: dict) -> bytes:
+    """The published row, JCS-canonical (RFC 8785), exactly as it is served.
+
+    The file at ``/badge/<slug>.json`` holds these bytes and nothing else, so
+    checking a badge is ``sha256sum`` on a downloaded file. No parser, no
+    canonicaliser and no Vaara install stands between a reader and the answer.
+    """
+    return rfc8785.dumps(row)
+
+
+def row_digest(row: dict) -> str:
+    return "sha256:" + hashlib.sha256(row_bytes(row)).hexdigest()
 
 
 def badge_svg(row: dict) -> str:
@@ -94,6 +127,9 @@ def badge_svg(row: dict) -> str:
         label=esc(label),
         message=esc(message),
         alt=esc(alt),
+        row_id=esc(row["id"]),
+        slug=esc(row["slug"]),
+        digest=esc(row_digest(row)),
     )
 
 
@@ -105,16 +141,17 @@ def write_badges(repro: dict, badge_dir: Path = BADGE_DIR) -> list[Path]:
     too, otherwise removal from the page is cosmetic.
     """
     badge_dir.mkdir(parents=True, exist_ok=True)
-    wanted = {}
+    wanted: dict[str, bytes] = {}
     for row in repro.get("reproductions", []):
-        wanted[f"{row['slug']}.svg"] = badge_svg(row)
-    for stale in badge_dir.glob("*.svg"):
+        wanted[f"{row['slug']}.svg"] = badge_svg(row).encode("utf-8")
+        wanted[f"{row['slug']}.json"] = row_bytes(row)
+    for stale in list(badge_dir.glob("*.svg")) + list(badge_dir.glob("*.json")):
         if stale.name not in wanted:
             stale.unlink()
     written = []
-    for name, svg in wanted.items():
+    for name, blob in wanted.items():
         path = badge_dir / name
-        path.write_text(svg, encoding="utf-8")
+        path.write_bytes(blob)
         written.append(path)
     return written
 
@@ -164,6 +201,8 @@ def reproduction_blocks(data: dict) -> str:
             <dt>At commit</dt><dd class="mono">{esc(r.get('at_commit', ''))}</dd>
             <dt>Their scoping</dt><dd class="scoping">{esc(r.get('their_scoping', ''))}</dd>
             <dt>Record</dt><dd><a href="{esc(r.get('record', ''))}" rel="noopener">{esc(r.get('record_held_by', 'record'))}</a></dd>
+            <dt>Listed under terms</dt><dd class="mono">{esc(r.get('terms_version', 'unversioned'))}</dd>
+            <dt>Row digest</dt><dd class="mono">{esc(row_digest(r))}<br>over <a href="/badge/{esc(r['slug'])}.json">/badge/{esc(r['slug'])}.json</a></dd>
             <dt>Badge</dt><dd><img src="{esc(badge)}" alt="{esc('VCR row ' + str(r['id']))}" height="20"><br><code class="snippet">{esc(snippet)}</code></dd>
           </dl>
         </article>""")
@@ -311,6 +350,37 @@ python scripts/conformance_runner.py</code></pre>
   own badge, carrying that number, the date and the commit. A badge says the
   party ran the checkers at that commit on that date. It never says currently
   passing, and it is not a certification.</p>
+
+  <h3>Checking a badge without trusting this page</h3>
+  <p>Each badge carries the digest of its own row inside the SVG, and the row
+  it commits to is served as JCS-canonical bytes (RFC 8785) next to it. The
+  file holds those bytes and nothing else, so verifying a badge is one command
+  and needs no parser, no canonicaliser and no Vaara installed.</p>
+<pre><code>curl -s https://vaara.io/badge/&lt;slug&gt;.json | sha256sum
+curl -s https://vaara.io/badge/&lt;slug&gt;.svg | grep digest</code></pre>
+  <p class="note">The two agree or the badge is not describing that row. This
+  is the same property the corpus runs on, applied to the badge itself: a
+  claim that recomputes from bytes, checkable by someone who trusts neither
+  the party nor Vaara.</p>
+
+  <h3>Terms for a listed party, version {esc(repro.get('terms_version', FALLBACK_TERMS_VERSION))}</h3>
+  <p class="note">Stated before there is anything to sell, so that anyone
+  deciding whether to be listed can read the commercial position at the moment
+  they decide rather than learn it afterwards.</p>
+  <ul class="terms">
+    <li>A row and its badge are free, and stay free. There is no paid tier of
+    being listed and no version of a row that counts for more.</li>
+    <li>Vaara may sell services built on these same vectors, including a
+    countersigned result. Being listed here is never a condition of buying
+    anything, and buying something is never a condition of being listed.</li>
+    <li>No listed party's name, affiliation or badge is used to sell anything.
+    Rows are a record, not a customer list and not a reference.</li>
+    <li>Each row records the version of these terms it agreed to. Terms may
+    change for rows added later. A row already listed keeps the terms it was
+    listed under, and a change is never applied backwards.</li>
+    <li>Anyone listed can ask to be removed, and is removed, with no reason
+    asked and no reason given. The badge file goes with the row.</li>
+  </ul>
 {reproduction_blocks(repro)}
 
   <h2>Suites</h2>
@@ -375,12 +445,17 @@ def main(argv: list[str]) -> int:
 
 def badge_drift(repro: dict, badge_dir: Path = BADGE_DIR) -> list[str]:
     """Names of badge files that do not match the rows, in either direction."""
-    wanted = {f"{r['slug']}.svg": badge_svg(r) for r in repro.get("reproductions", [])}
-    on_disk = {p.name for p in badge_dir.glob("*.svg")} if badge_dir.exists() else set()
+    wanted: dict[str, bytes] = {}
+    for r in repro.get("reproductions", []):
+        wanted[f"{r['slug']}.svg"] = badge_svg(r).encode("utf-8")
+        wanted[f"{r['slug']}.json"] = row_bytes(r)
+    on_disk: set[str] = set()
+    if badge_dir.exists():
+        on_disk = {p.name for p in badge_dir.iterdir() if p.is_file()}
     drift = sorted(on_disk - set(wanted))
-    for name, svg in wanted.items():
+    for name, blob in wanted.items():
         path = badge_dir / name
-        if not path.exists() or path.read_text(encoding="utf-8") != svg:
+        if not path.exists() or path.read_bytes() != blob:
             drift.append(name)
     return sorted(set(drift))
 

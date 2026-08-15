@@ -104,7 +104,7 @@
     <div class="stat"><b>2</b><span>skipped</span></div>
     <div class="stat"><b>45</b><span>cases</span></div>
   </div>
-  <p class="mono" style="color:var(--faint)">generated 2026-08-15T07:08:00Z</p>
+  <p class="mono" style="color:var(--faint)">generated 2026-08-15T07:54:17Z</p>
 
   <h2>Run it yourself</h2>
   <p>Nothing here needs Vaara installed. The checkers use the standard library
@@ -136,6 +136,37 @@ python scripts/conformance_runner.py</code></pre>
   own badge, carrying that number, the date and the commit. A badge says the
   party ran the checkers at that commit on that date. It never says currently
   passing, and it is not a certification.</p>
+
+  <h3>Checking a badge without trusting this page</h3>
+  <p>Each badge carries the digest of its own row inside the SVG, and the row
+  it commits to is served as JCS-canonical bytes (RFC 8785) next to it. The
+  file holds those bytes and nothing else, so verifying a badge is one command
+  and needs no parser, no canonicaliser and no Vaara installed.</p>
+<pre><code>curl -s https://vaara.io/badge/&lt;slug&gt;.json | sha256sum
+curl -s https://vaara.io/badge/&lt;slug&gt;.svg | grep digest</code></pre>
+  <p class="note">The two agree or the badge is not describing that row. This
+  is the same property the corpus runs on, applied to the badge itself: a
+  claim that recomputes from bytes, checkable by someone who trusts neither
+  the party nor Vaara.</p>
+
+  <h3>Terms for a listed party, version 2026-08-15</h3>
+  <p class="note">Stated before there is anything to sell, so that anyone
+  deciding whether to be listed can read the commercial position at the moment
+  they decide rather than learn it afterwards.</p>
+  <ul class="terms">
+    <li>A row and its badge are free, and stay free. There is no paid tier of
+    being listed and no version of a row that counts for more.</li>
+    <li>Vaara may sell services built on these same vectors, including a
+    countersigned result. Being listed here is never a condition of buying
+    anything, and buying something is never a condition of being listed.</li>
+    <li>No listed party's name, affiliation or badge is used to sell anything.
+    Rows are a record, not a customer list and not a reference.</li>
+    <li>Each row records the version of these terms it agreed to. Terms may
+    change for rows added later. A row already listed keeps the terms it was
+    listed under, and a change is never applied backwards.</li>
+    <li>Anyone listed can ask to be removed, and is removed, with no reason
+    asked and no reason given. The badge file goes with the row.</li>
+  </ul>
 <p class="none">No independent reproduction has been recorded yet. A row appears here when someone other than the maintainer runs the checkers, reports the result somewhere public, and asks to be listed.</p>
 
   <h2>Suites</h2>
