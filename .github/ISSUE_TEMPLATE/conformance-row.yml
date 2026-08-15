@@ -101,11 +101,13 @@ body:
         endorse Vaara.
 
         Once your row is up you get a badge for your README, your site, or
-        wherever you like:
+        wherever you like. It is yours alone, and it carries your row number,
+        the date and the commit you ran at. Row numbers are permanent and are
+        never reissued. The badge will be posted here when the row goes up.
 
-        ```
-        [![Vaara Conformance: reproduced](https://vaara.io/vcr-badge.svg)](https://vaara.io/conformance.html)
-        ```
+        This is answered by a bot, usually within a minute. If something in the
+        form does not check out it says which field and why, and you can edit
+        the issue to try again.
   - type: checkboxes
     id: consent
     attributes:

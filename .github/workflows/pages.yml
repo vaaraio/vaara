@@ -29,6 +29,27 @@ jobs:
       url: ${{ steps.deployment.outputs.page_url }}
     steps:
       - uses: actions/checkout@9c091bb21b7c1c1d1991bb908d89e4e9dddfe3e0  # v7.0.0
+      # Conformance rows arrive by issue form and land on the unprotected `vcr`
+      # branch, so nobody needs write access, a fork or a pull request to get
+      # onto the results table. Overlay them here at publish time. If the
+      # branch does not exist yet the site ships the committed page unchanged.
+      - name: Overlay conformance rows and badges
+        run: |
+          set -euo pipefail
+          if git ls-remote --exit-code --heads origin vcr >/dev/null 2>&1; then
+            git fetch --depth 1 origin vcr
+            git --work-tree=/tmp checkout FETCH_HEAD -- vcr || true
+            if [ -f /tmp/vcr/conformance.html ]; then
+              cp /tmp/vcr/conformance.html webpage/conformance.html
+            fi
+            if [ -d /tmp/vcr/badge ]; then
+              rm -rf webpage/badge
+              cp -r /tmp/vcr/badge webpage/badge
+            fi
+            echo "overlaid $(ls /tmp/vcr/badge 2>/dev/null | wc -l) badges"
+          else
+            echo "no vcr branch yet, publishing the committed page"
+          fi
       - uses: actions/configure-pages@983d7736d9b0ae728b81ab479565c72886d7745b  # v5
       - uses: actions/upload-pages-artifact@fc324d3547104276b827a68afc52ff2a11cc49c9  # v5.0.0
         with:

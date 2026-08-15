@@ -1,0 +1,176 @@
+name: Conformance desk
+
+# Self-service desk for Vaara Conformance Results.
+#
+# Someone runs the independent checkers, files the conformance-row issue form,
+# and this decides the row. Nothing reaches a human unless it argues back.
+#
+# It writes to the unprotected `vcr` branch rather than to main, for the same
+# reason downloads-badge.yml writes to `badges`: the main ruleset requires a
+# pull request, and a submitter should never need write access, a fork, or a
+# PR to appear on a results table. Main holds the code and the rules. The `vcr`
+# branch holds submitted rows, their badges and the rendered page, and the
+# Pages job overlays them at publish time.
+#
+# Every field is checked by scripts/vcr_row.py before anything is written. What
+# it cannot check is whether the linked record honestly says what the submitter
+# claims, and it does not pretend to: a row is that party's claim, quoted, next
+# to their own public link, on a page where every verdict recomputes from
+# committed bytes. A reader who doubts a row can disprove it without asking.
+
+on:
+  issues:
+    types: [opened, edited]
+  workflow_dispatch:
+    inputs:
+      issue:
+        description: Issue number to process again
+        required: true
+
+permissions:
+  contents: write
+  issues: write
+
+concurrency:
+  group: conformance-desk
+  cancel-in-progress: false
+
+jobs:
+  desk:
+    if: >
+      github.event_name == 'workflow_dispatch' ||
+      contains(github.event.issue.labels.*.name, 'conformance-row')
+    runs-on: ubuntu-latest
+    steps:
+      - name: Check out main for the scripts, the suites and the history
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      - name: Bring the live rows over from the vcr branch
+        run: |
+          set -euo pipefail
+          if git ls-remote --exit-code --heads origin vcr >/dev/null 2>&1; then
+            git fetch origin vcr:vcr
+            git show vcr:vcr/reproductions.json > conformance/reproductions.json
+            echo "existing rows carried over"
+          else
+            echo "no vcr branch yet, starting from the committed baseline"
+          fi
+
+      - name: Set up Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+
+      - name: Install what the runner needs
+        run: pip install cryptography rfc8785
+
+      - name: Read the issue
+        id: issue
+        env:
+          GH_TOKEN: ${{ github.token }}
+          NUMBER: ${{ github.event.inputs.issue || github.event.issue.number }}
+        run: |
+          set -euo pipefail
+          gh issue view "$NUMBER" --json body,author \
+            --jq '.body' > /tmp/issue.md
+          author=$(gh issue view "$NUMBER" --json author --jq '.author.login')
+          echo "number=$NUMBER" >> "$GITHUB_OUTPUT"
+          echo "author=$author" >> "$GITHUB_OUTPUT"
+
+      - name: Decide the row
+        id: decide
+        run: |
+          set +e
+          row=$(python scripts/vcr_row.py \
+            --body /tmp/issue.md \
+            --author "${{ steps.issue.outputs.author }}" \
+            --date "$(date -u +%Y-%m-%d)" \
+            --write 2>/tmp/why)
+          code=$?
+          set -e
+          {
+            echo "code=$code"
+            echo "row<<ROW"; echo "$row"; echo "ROW"
+            echo "why<<WHY"; cat /tmp/why; echo "WHY"
+          } >> "$GITHUB_OUTPUT"
+
+      - name: Say why it did not go up
+        if: steps.decide.outputs.code != '0'
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          gh issue comment "${{ steps.issue.outputs.number }}" --body "$(cat <<'EOF'
+          This one did not go up:
+
+          > ${{ steps.decide.outputs.why }}
+
+          Edit the issue and it will be checked again. Nothing here is a
+          judgement on your run, only on what the form can verify.
+          EOF
+          )"
+
+      - name: Render the page and the badges
+        if: steps.decide.outputs.code == '0'
+        run: |
+          set -euo pipefail
+          python scripts/conformance_runner.py --json /tmp/report.json
+          python scripts/render_conformance_page.py /tmp/report.json webpage/conformance.html
+
+      - name: Publish to the vcr branch
+        if: steps.decide.outputs.code == '0'
+        env:
+          SLUG: ${{ fromJSON(steps.decide.outputs.row).slug }}
+          ID: ${{ fromJSON(steps.decide.outputs.row).id }}
+          PARTY: ${{ fromJSON(steps.decide.outputs.row).party }}
+        run: |
+          set -euo pipefail
+          mkdir -p /tmp/vcr/vcr
+          cp conformance/reproductions.json /tmp/vcr/vcr/reproductions.json
+          cp webpage/conformance.html /tmp/vcr/vcr/conformance.html
+          cp -r webpage/badge /tmp/vcr/vcr/badge
+          git config user.name "vaara-desk"
+          git config user.email "hello@vaara.io"
+          if git ls-remote --exit-code --heads origin vcr >/dev/null 2>&1; then
+            git checkout vcr
+          else
+            git checkout --orphan vcr
+            git rm -rf --cached . >/dev/null 2>&1 || true
+          fi
+          rm -rf vcr
+          cp -r /tmp/vcr/vcr vcr
+          git add -A vcr
+          git commit -m "vcr: row #${ID}, ${PARTY}, from issue #${{ steps.issue.outputs.number }}"
+          git push origin vcr
+
+      - name: Hand over the badge and close it
+        if: steps.decide.outputs.code == '0'
+        env:
+          GH_TOKEN: ${{ github.token }}
+          SLUG: ${{ fromJSON(steps.decide.outputs.row).slug }}
+          ID: ${{ fromJSON(steps.decide.outputs.row).id }}
+        run: |
+          gh issue comment "${{ steps.issue.outputs.number }}" --body "$(cat <<EOF
+          You are row #${ID} at https://vaara.io/conformance.html
+
+          Your badge, which carries your row number, the date and the commit
+          you ran at:
+
+          \`\`\`
+          [![Vaara Conformance Results row ${ID}](https://vaara.io/badge/${SLUG}.svg)](https://vaara.io/conformance.html)
+          \`\`\`
+
+          The number is permanent and is never reissued. The badge says you ran
+          the checkers at that commit on that date, which is all it will ever
+          say. To come down, one line here or to hello@vaara.io, no reason
+          needed.
+          EOF
+          )"
+          gh issue close "${{ steps.issue.outputs.number }}" --reason completed
+
+      - name: Publish the site
+        if: steps.decide.outputs.code == '0'
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: gh workflow run pages.yml --ref main

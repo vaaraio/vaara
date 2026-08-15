@@ -31,12 +31,92 @@ from pathlib import Path
 REPO = Path(__file__).resolve().parent.parent
 REPRODUCTIONS = REPO / "conformance" / "reproductions.json"
 DEFAULT_OUT = REPO / "webpage" / "conformance.html"
+BADGE_DIR = REPO / "webpage" / "badge"
 
 TITLE = "Vaara Conformance Results"
+
+# One badge per listed party, named for that party's slug. There is no generic
+# badge on purpose: a single shared URL is copyable by anyone who never ran
+# anything, and the copy is indistinguishable from the real thing. A per-party
+# badge points at a specific row, so a stranger pasting it is claiming to be a
+# named person whose record is one click away.
+BADGE_TEMPLATE = """<svg xmlns="http://www.w3.org/2000/svg" width="{w}" \
+height="20" role="img" aria-label="{alt}">
+  <title>{alt}</title>
+  <linearGradient id="s" x2="0" y2="100%">
+    <stop offset="0" stop-color="#bbb" stop-opacity=".1"/>
+    <stop offset="1" stop-opacity=".1"/>
+  </linearGradient>
+  <clipPath id="r"><rect width="{w}" height="20" rx="3" fill="#fff"/></clipPath>
+  <g clip-path="url(#r)">
+    <rect width="{lw}" height="20" fill="#1A2226"/>
+    <rect x="{lw}" width="{mw}" height="20" fill="#78A08A"/>
+    <rect width="{w}" height="20" fill="url(#s)"/>
+  </g>
+  <g font-family="Verdana,DejaVu Sans,Geneva,sans-serif" font-size="11">
+    <text x="6" y="15" fill="#000" fill-opacity=".3" textLength="{lt}" \
+lengthAdjust="spacingAndGlyphs">{label}</text>
+    <text x="6" y="14" fill="#fff" textLength="{lt}" \
+lengthAdjust="spacingAndGlyphs">{label}</text>
+    <text x="{mx}" y="15" fill="#000" fill-opacity=".3" textLength="{mt}" \
+lengthAdjust="spacingAndGlyphs">{message}</text>
+    <text x="{mx}" y="14" fill="#1A2226" textLength="{mt}" \
+lengthAdjust="spacingAndGlyphs">{message}</text>
+  </g>
+</svg>
+"""
 
 
 def esc(value: object) -> str:
     return html.escape(str(value), quote=True)
+
+
+def badge_svg(row: dict) -> str:
+    """A badge that dates itself, so nobody has to police staleness.
+
+    The row number, the date and the short commit are baked into the pixels.
+    A badge earned two years ago reads as two years old wherever it is pasted,
+    without the badge ever calling home to say so.
+    """
+    label = f"VCR #{row['id']}"
+    message = f"reproduced {row.get('date', '')} {str(row.get('at_commit', ''))[:7]}"
+    # 6.2px per character at 11px Verdana, plus 6px padding either side.
+    lw = int(len(label) * 6.2) + 12
+    mw = int(len(message) * 6.2) + 12
+    alt = f"Vaara Conformance Results row {row['id']}: {row.get('party', '')}"
+    return BADGE_TEMPLATE.format(
+        w=lw + mw,
+        lw=lw,
+        mw=mw,
+        lt=lw - 12,
+        mt=mw - 12,
+        mx=lw + 6,
+        label=esc(label),
+        message=esc(message),
+        alt=esc(alt),
+    )
+
+
+def write_badges(repro: dict, badge_dir: Path = BADGE_DIR) -> list[Path]:
+    """Regenerate the badge directory from the rows, and only from the rows.
+
+    Stale files are deleted rather than left behind, so a badge URL stops
+    resolving the moment its row comes down. Withdrawal has to reach the badge
+    too, otherwise removal from the page is cosmetic.
+    """
+    badge_dir.mkdir(parents=True, exist_ok=True)
+    wanted = {}
+    for row in repro.get("reproductions", []):
+        wanted[f"{row['slug']}.svg"] = badge_svg(row)
+    for stale in badge_dir.glob("*.svg"):
+        if stale.name not in wanted:
+            stale.unlink()
+    written = []
+    for name, svg in wanted.items():
+        path = badge_dir / name
+        path.write_text(svg, encoding="utf-8")
+        written.append(path)
+    return written
 
 
 def suite_rows(report: dict) -> str:
@@ -65,9 +145,15 @@ def reproduction_blocks(data: dict) -> str:
     out = []
     for r in rows:
         suites = ", ".join(r.get("suites", []))
+        badge = f"/badge/{r['slug']}.svg"
+        snippet = (
+            f"[![Vaara Conformance Results row {r['id']}]"
+            f"(https://vaara.io{badge})](https://vaara.io/conformance.html)"
+        )
         out.append(f"""
         <article class="repro">
           <div class="repro-head">
+            <span class="num mono">#{esc(r['id'])}</span>
             <span class="date mono">{esc(r.get('date', ''))}</span>
             <span class="who">{esc(r.get('party', ''))}</span>
             <span class="aff">{esc(r.get('affiliation', ''))}</span>
@@ -78,6 +164,7 @@ def reproduction_blocks(data: dict) -> str:
             <dt>At commit</dt><dd class="mono">{esc(r.get('at_commit', ''))}</dd>
             <dt>Their scoping</dt><dd class="scoping">{esc(r.get('their_scoping', ''))}</dd>
             <dt>Record</dt><dd><a href="{esc(r.get('record', ''))}" rel="noopener">{esc(r.get('record_held_by', 'record'))}</a></dd>
+            <dt>Badge</dt><dd><img src="{esc(badge)}" alt="{esc('VCR row ' + str(r['id']))}" height="20"><br><code class="snippet">{esc(snippet)}</code></dd>
           </dl>
         </article>""")
     return "\n".join(out)
@@ -220,11 +307,10 @@ python scripts/conformance_runner.py</code></pre>
   asked to be listed, and anyone listed can ask to be removed and is removed.
   To add your own run, <a
   href="https://github.com/vaaraio/vaara/issues/new?template=conformance-row.yml">open
-  a row request</a>. Listed parties get a badge:</p>
-  <p class="badge-offer">
-    <img src="/vcr-badge.svg" alt="Vaara Conformance: reproduced" width="210" height="20">
-  </p>
-  <pre><code>[![Vaara Conformance: reproduced](https://vaara.io/vcr-badge.svg)](https://vaara.io/conformance.html)</code></pre>
+  a row request</a>. Row numbers are permanent and each listed party gets its
+  own badge, carrying that number, the date and the commit. A badge says the
+  party ran the checkers at that commit on that date. It never says currently
+  passing, and it is not a certification.</p>
 {reproduction_blocks(repro)}
 
   <h2>Suites</h2>
@@ -265,9 +351,11 @@ def main(argv: list[str]) -> int:
         strip = lambda s: "\n".join(  # noqa: E731
             ln for ln in s.splitlines() if "generated " not in ln
         )
-        if strip(current) != strip(page):
+        stale_badges = badge_drift(repro)
+        if strip(current) != strip(page) or stale_badges:
+            detail = f" Badges out of sync: {', '.join(stale_badges)}." if stale_badges else ""
             print(
-                f"{out} is stale. Regenerate:\n"
+                f"{out} is stale.{detail} Regenerate:\n"
                 "  python scripts/conformance_runner.py --json /tmp/report.json\n"
                 f"  python scripts/render_conformance_page.py /tmp/report.json {out}",
                 file=sys.stderr,
@@ -277,8 +365,24 @@ def main(argv: list[str]) -> int:
         return 0
 
     out.write_text(page, encoding="utf-8")
-    print(f"wrote {out} ({t_len(page)} bytes, {report['totals']['suites']} suites)")
+    badges = write_badges(repro)
+    print(
+        f"wrote {out} ({t_len(page)} bytes, {report['totals']['suites']} suites, "
+        f"{len(badges)} badges)"
+    )
     return 0
+
+
+def badge_drift(repro: dict, badge_dir: Path = BADGE_DIR) -> list[str]:
+    """Names of badge files that do not match the rows, in either direction."""
+    wanted = {f"{r['slug']}.svg": badge_svg(r) for r in repro.get("reproductions", [])}
+    on_disk = {p.name for p in badge_dir.glob("*.svg")} if badge_dir.exists() else set()
+    drift = sorted(on_disk - set(wanted))
+    for name, svg in wanted.items():
+        path = badge_dir / name
+        if not path.exists() or path.read_text(encoding="utf-8") != svg:
+            drift.append(name)
+    return sorted(set(drift))
 
 
 def t_len(s: str) -> int:
