@@ -63,7 +63,8 @@ Validates the pinned independent vector lanes.
 ### Consent
 
 - [{c1}] I read the section above and I agree to be listed.
-- [{c2}] The link I gave is my own public record of this run.
+- [{c2}] I understand the row is permanent.
+- [{c3}] The link I gave is my own public record of this run.
 """
 
 
@@ -75,6 +76,7 @@ def form(**over) -> str:
         "record": "https://mailarchive.ietf.org/arch/msg/scitt/fE4RYzpmR440PVrZaknTvVKjUoI/",
         "c1": "X",
         "c2": "X",
+        "c3": "X",
     }
     values.update(over)
     return FORM.format(**values)
@@ -92,11 +94,14 @@ def test_a_complete_form_becomes_a_row():
     assert row["submitted_by"] == "someone"
 
 
-@pytest.mark.parametrize("c1,c2", [(" ", "X"), ("X", " "), (" ", " ")])
-def test_an_unticked_consent_box_stops_the_row(c1, c2):
-    """Consent is the whole basis for publishing a name. No box, no row."""
+@pytest.mark.parametrize(
+    "c1,c2,c3",
+    [(" ", "X", "X"), ("X", " ", "X"), ("X", "X", " "), (" ", " ", " ")],
+)
+def test_an_unticked_consent_box_stops_the_row(c1, c2, c3):
+    """A permanent row is only fair if they knew before asking. No box, no row."""
     with pytest.raises(vcr.Rejected, match="consent"):
-        row_from(form(c1=c1, c2=c2))
+        row_from(form(c1=c1, c2=c2, c3=c3))
 
 
 def test_the_record_has_to_be_reachable_by_a_reader():
@@ -137,22 +142,16 @@ def test_the_same_record_cannot_be_listed_twice():
         vcr.add_row(row_from(form(party="Someone Else")), "2026-08-15", data)
 
 
-def test_a_number_is_never_reissued_after_a_withdrawal():
-    """The number is the one thing a listed party holds that cannot be given away.
-
-    A withdrawn row leaves a gap on purpose. Reusing the gap would hand a
-    newcomer somebody else's position in the order.
-    """
+def test_numbers_run_forward_and_are_never_reissued():
+    """Position in the order is the one thing a row holds that cannot be given."""
     data = {"reproductions": []}
     first = vcr.add_row(row_from(form()), "2026-08-14", data)
-    assert first["id"] == 1
-    data["reproductions"].clear()  # they asked to come down
     second = vcr.add_row(
         row_from(form(party="Someone Else", record="https://example.com/run")),
         "2026-08-15",
         data,
     )
-    assert second["id"] == 2
+    assert (first["id"], second["id"]) == (1, 2)
 
 
 def test_two_parties_with_the_same_name_get_different_badges():
@@ -174,23 +173,6 @@ def test_a_badge_carries_the_number_the_date_and_the_commit():
     assert "2026-08-14" in svg
     assert HEAD[:7] in svg
     assert "http://" not in svg.replace('xmlns="http://www.w3.org/2000/svg"', "")
-
-
-def test_withdrawing_a_row_takes_its_badge_down(tmp_path):
-    """Removal from the page is cosmetic if the badge URL still resolves."""
-    pytest.importorskip("rfc8785", reason="ships in the attestation extra")
-    data = {"reproductions": []}
-    row = vcr.add_row(row_from(form()), "2026-08-14", data)
-    render.write_badges(data, tmp_path)
-    assert (tmp_path / f"{row['slug']}.svg").exists()
-    assert render.badge_drift(data, tmp_path) == []
-
-    data["reproductions"].clear()
-    assert render.badge_drift(data, tmp_path) == sorted(
-        [f"{row['slug']}.{ext}" for ext in ("svg", "json", "html")]
-    )
-    render.write_badges(data, tmp_path)
-    assert not list(tmp_path.iterdir())
 
 
 def test_a_badge_commits_to_its_own_row(tmp_path):
@@ -240,18 +222,6 @@ def test_the_printable_sheet_carries_the_scoping_and_the_limit(tmp_path):
     assert row["record"] in sheet
 
 
-def test_a_withdrawal_takes_the_printable_sheet_too(tmp_path):
-    pytest.importorskip("rfc8785", reason="ships in the attestation extra")
-    data = {"terms_version": "2026-08-15", "reproductions": []}
-    row = vcr.add_row(row_from(form()), "2026-08-14", data)
-    render.write_badges(data, tmp_path)
-    assert (tmp_path / f"{row['slug']}.html").exists()
-
-    data["reproductions"].clear()
-    render.write_badges(data, tmp_path)
-    assert not list(tmp_path.iterdir())
-
-
 def test_the_served_row_is_canonical_bytes_and_nothing_else():
     """One command has to answer it, so the file cannot carry stray formatting."""
     pytest.importorskip("rfc8785", reason="ships in the attestation extra")
@@ -291,3 +261,69 @@ def test_the_committed_table_ships_with_no_rows_and_no_badges():
     data = json.loads((ROOT / "conformance" / "reproductions.json").read_text())
     assert data["reproductions"] == []
     assert render.badge_drift(data) == []
+
+
+def test_the_chain_catches_a_removed_row():
+    """The promise that nothing comes down has to be checkable, not just made.
+
+    The person who would quietly drop a row is the person publishing the
+    promise, so the promise is worth nothing on its own. Removing an entry
+    breaks every link after it, and the break names the row.
+    """
+    pytest.importorskip("rfc8785", reason="ships in the attestation extra")
+    data = {"genesis": "sha256:" + "0" * 64, "reproductions": []}
+    for i, party in enumerate(["A Party", "B Party", "C Party"]):
+        vcr.add_row(
+            row_from(form(party=party, record=f"https://example.com/{i}")),
+            f"2026-08-{14 + i}",
+            data,
+        )
+    assert vcr.verify_chain(data) == []
+
+    del data["reproductions"][1]
+    problems = vcr.verify_chain(data)
+    assert problems, "dropping the middle row went unnoticed"
+    assert "C Party" in problems[0] or "3" in problems[0]
+
+
+def test_the_chain_catches_an_edited_row():
+    """A published row is not rewritten. A correction is a new row."""
+    pytest.importorskip("rfc8785", reason="ships in the attestation extra")
+    data = {"genesis": "sha256:" + "0" * 64, "reproductions": []}
+    vcr.add_row(row_from(form()), "2026-08-14", data)
+    vcr.add_row(
+        row_from(form(party="Second", record="https://example.com/second")),
+        "2026-08-15",
+        data,
+    )
+    assert vcr.verify_chain(data) == []
+
+    data["reproductions"][0]["result"] = "43 of 43, actually"
+    assert vcr.verify_chain(data), "an edited row still verified"
+
+
+def test_the_chain_catches_a_reordering():
+    pytest.importorskip("rfc8785", reason="ships in the attestation extra")
+    data = {"genesis": "sha256:" + "0" * 64, "reproductions": []}
+    vcr.add_row(row_from(form()), "2026-08-14", data)
+    vcr.add_row(
+        row_from(form(party="Second", record="https://example.com/second")),
+        "2026-08-15",
+        data,
+    )
+    data["reproductions"].reverse()
+    assert vcr.verify_chain(data), "a swapped pair still verified"
+
+
+def test_the_first_row_links_to_the_declared_genesis():
+    pytest.importorskip("rfc8785", reason="ships in the attestation extra")
+    data = {"genesis": "sha256:" + "0" * 64, "reproductions": []}
+    first = vcr.add_row(row_from(form()), "2026-08-14", data)
+    assert first["prev"] == data["genesis"]
+
+
+def test_the_committed_file_declares_a_genesis_and_verifies():
+    """Whatever ships has to pass its own checker, empty or not."""
+    data = json.loads((ROOT / "conformance" / "reproductions.json").read_text())
+    assert data.get("genesis", "").startswith("sha256:")
+    assert vcr.verify_chain(data) == []

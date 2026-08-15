@@ -111,6 +111,14 @@ jobs:
           EOF
           )"
 
+      - name: Check the chain before anything is published
+        if: steps.decide.outputs.code == '0'
+        # Nothing is ever removed from this table, and the desk is the only
+        # thing that writes to it, so a break here means the file it carried
+        # over was already damaged. Publishing over that would bury the
+        # evidence of it, which is the one failure this table cannot survive.
+        run: python scripts/vcr_chain.py
+
       - name: Render the page and the badges
         if: steps.decide.outputs.code == '0'
         run: |
@@ -169,10 +177,13 @@ jobs:
           \`curl -s <that url> | sha256sum\` checks either artifact against it
           without trusting us or installing anything.
 
-          The number is permanent and is never reissued. The badge says you ran
-          the checkers at that commit on that date, which is all it will ever
-          say. To come down, one line here or to hello@vaara.io, no reason
-          needed.
+          The number is permanent and is never reissued, and so is the row.
+          This records a run that happened, so it is not taken down later and
+          nobody can take it down, including us. Rows are chained, so a removal
+          would break every digest after it in public.
+
+          The badge says you ran the checkers at that commit on that date,
+          which is all it will ever say.
           EOF
           )"
           gh issue close "${{ steps.issue.outputs.number }}" --reason completed

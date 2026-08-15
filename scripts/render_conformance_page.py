@@ -210,7 +210,9 @@ CERTIFICATE_TEMPLATE = """<!doctype html>
     it does not say the party above endorses Vaara. These vectors have no
     ratification process behind them and the maintainer decides what a verdict
     means. Every case recomputes from committed bytes, so anyone may disagree
-    and show their work. Check this sheet against
+    and show their work. This row is a permanent record of a run on a date and
+    is never removed or edited, by anyone, including Vaara. Check this sheet
+    against
     https://vaara.io/badge/{slug}.json, whose sha256 is the row digest above.
   </footer>
 </div>
@@ -458,7 +460,7 @@ python scripts/conformance_runner.py</code></pre>
   <h2>Independent reproductions</h2>
   <p>Parties other than the maintainer who ran the checkers and reported the
   outcome in public. Claims are quoted as each party scoped them. Everyone here
-  asked to be listed, and anyone listed can ask to be removed and is removed.
+  asked to be listed, knowing the entry is permanent.
   To add your own run, <a
   href="https://github.com/vaaraio/vaara/issues/new?template=conformance-row.yml">open
   a row request</a>. Row numbers are permanent and each listed party gets its
@@ -472,7 +474,9 @@ python scripts/conformance_runner.py</code></pre>
   file holds those bytes and nothing else, so verifying a badge is one command
   and needs no parser, no canonicaliser and no Vaara installed.</p>
 <pre><code>curl -s https://vaara.io/badge/&lt;slug&gt;.json | sha256sum
-curl -s https://vaara.io/badge/&lt;slug&gt;.svg | grep digest</code></pre>
+curl -s https://vaara.io/badge/&lt;slug&gt;.svg | grep digest
+
+python scripts/vcr_chain.py            # nothing removed from the table</code></pre>
   <p class="note">The two agree or the badge is not describing that row. This
   is the same property the corpus runs on, applied to the badge itself: a
   claim that recomputes from bytes, checkable by someone who trusts neither
@@ -483,6 +487,13 @@ curl -s https://vaara.io/badge/&lt;slug&gt;.svg | grep digest</code></pre>
   deciding whether to be listed can read the commercial position at the moment
   they decide rather than learn it afterwards.</p>
   <ul class="terms">
+    <li><strong>A row is permanent.</strong> This records something that
+    happened. A run took place on a date at a commit, and that stays true, so
+    the entry stays. Asking will not remove it, and the maintainer cannot
+    remove it either. Rows are chained, so a deletion or a reordering breaks
+    every digest after it and anybody can see the break.</li>
+    <li>Nothing is edited after the fact. A correction is a new row referring
+    to the earlier one, never a rewrite of it.</li>
     <li>A row and its badge are free, and stay free. There is no paid tier of
     being listed and no version of a row that counts for more.</li>
     <li>Vaara may sell services built on these same vectors, including a
@@ -493,8 +504,6 @@ curl -s https://vaara.io/badge/&lt;slug&gt;.svg | grep digest</code></pre>
     <li>Each row records the version of these terms it agreed to. Terms may
     change for rows added later. A row already listed keeps the terms it was
     listed under, and a change is never applied backwards.</li>
-    <li>Anyone listed can ask to be removed, and is removed, with no reason
-    asked and no reason given. The badge file goes with the row.</li>
   </ul>
 {reproduction_blocks(repro)}
 

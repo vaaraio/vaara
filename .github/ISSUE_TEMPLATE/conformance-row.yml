@@ -82,19 +82,34 @@ body:
   - type: markdown
     attributes:
       value: |
-        ## What listing you means
+        ## What listing you means, and it is permanent
+
+        **Read this part before you tick anything.**
 
         The page at vaara.io/conformance.html is public and indexed. A row
         carries the name you gave above, your affiliation if you gave one, the
         suites, the commit, the result, your scoping quoted as you wrote it,
         and a link to your public record.
 
-        Vaara publishes it because you asked to be listed here. That agreement
-        is what this form records, and it stands until you withdraw it.
+        **A row is permanent. It does not come down, and asking will not take
+        it down.** This is a record of something that happened, not a list of
+        current members. Your run happened on a date at a commit, and that does
+        not stop being true later, so the entry does not stop existing later.
 
-        Withdrawing takes one line, in an issue or an email to hello@vaara.io.
-        No reason needed and none will be asked for. The row comes down and the
-        entry is deleted from `conformance/reproductions.json`.
+        The maintainer cannot remove it either. Rows are chained, each one
+        carrying the digest of the row before it, so deleting or reordering an
+        entry breaks every digest after it and anybody can see the break with
+        `python scripts/vcr_chain.py`. That constraint is the reason the table
+        is worth reading: one its owner could quietly edit would just be the
+        owner's opinion.
+
+        Nothing is edited after the fact either. A correction is a new row that
+        refers to the earlier one.
+
+        So decide now rather than later. If you would rather not have your name
+        on a permanent public record, close this form and run the checkers
+        anyway. The vectors are free either way and nothing is lost by staying
+        off the table.
 
         A row states what your checkers returned. It is not a certification, it
         does not say Vaara is compliant with anything, and it does not say you
@@ -116,6 +131,10 @@ body:
         - label: >
             I read the section above and I agree to be listed on the public
             Vaara Conformance Results page on these terms.
+          required: true
+        - label: >
+            I understand the row is permanent, that asking will not remove it,
+            and that the maintainer cannot remove it either.
           required: true
         - label: >
             The link I gave is my own public record of this run, and the result

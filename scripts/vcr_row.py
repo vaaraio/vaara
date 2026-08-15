@@ -117,10 +117,12 @@ def known_suites() -> set[str]:
 def validate(fields: dict, author: str) -> dict:
     """Return the row to publish, or raise Rejected with a readable reason."""
     consent = fields.get("consent") or []
-    if len(consent) < 2 or not all(consent):
+    if len(consent) < 3 or not all(consent):
         raise Rejected(
-            "Both consent boxes have to be ticked. Nothing goes on the page "
-            "without them, so this one stops here."
+            "All three consent boxes have to be ticked, including the one "
+            "about the row being permanent. A row that cannot come down is "
+            "only fair if you knew that before you asked for it, so this one "
+            "stops here."
         )
 
     for name, limit in LIMITS.items():
@@ -179,31 +181,63 @@ def validate(fields: dict, author: str) -> dict:
     }
 
 
+def row_digest(row: dict) -> str:
+    """sha256 over the JCS-canonical row, the same bytes that get served."""
+    import hashlib
+
+    import rfc8785
+
+    return "sha256:" + hashlib.sha256(rfc8785.dumps(row)).hexdigest()
+
+
 def add_row(row: dict, date: str, data: dict) -> dict:
-    """Append the row, assigning the next permanent number and a free slug.
+    """Append the row, chaining it to the one before it.
 
-    Numbers are never reused. A withdrawn row leaves a gap, because the number
-    is the one thing a listed party holds that nobody can be given later.
+    The table records occurrences rather than memberships. A run happened, on a
+    date, at a commit, and that does not stop being true later, so nothing here
+    ever removes a row. ``prev`` carries the digest of the previous entry, which
+    turns that from a promise into something a stranger can check: drop a row or
+    reorder two and every digest after the change stops matching.
 
-    The row also records which version of the terms it was listed under. Terms
-    can change for rows added afterwards, and a change never reaches back to
-    somebody who agreed to a different text.
+    The maintainer is bound by this as much as anyone. That is the useful part.
+    A table its owner can quietly edit is the owner's opinion, and the answer to
+    "why is that name still up" becomes a fact rather than a decision.
+
+    Numbers are never reused. The row also records which version of the terms it
+    was listed under, so a later change to the terms reaches later rows only.
     """
     rows = data.setdefault("reproductions", [])
     if any(r.get("record") == row["record"] for r in rows):
         raise Rejected("That record is already listed.")
     highest = max((int(r.get("id", 0)) for r in rows), default=0)
     next_id = max(highest, int(data.get("issued", highest))) + 1
+    genesis = data.get("genesis", "sha256:" + "0" * 64)
     row = {
         "id": next_id,
         "slug": slugify(row["party"], {r["slug"] for r in rows}),
         "date": date,
         "terms_version": data.get("terms_version", "unversioned"),
+        "prev": row_digest(rows[-1]) if rows else genesis,
         **row,
     }
     rows.append(row)
     data["issued"] = next_id
     return row
+
+
+def verify_chain(data: dict) -> list[str]:
+    """Every place the chain says a row was removed, reordered or rewritten."""
+    genesis = data.get("genesis", "sha256:" + "0" * 64)
+    problems = []
+    expected = genesis
+    for position, row in enumerate(data.get("reproductions", [])):
+        if row.get("prev") != expected:
+            problems.append(
+                f"row {row.get('id', '?')} at position {position} links to "
+                f"{row.get('prev')!r}, but the chain reaches it at {expected!r}"
+            )
+        expected = row_digest(row)
+    return problems
 
 
 def main(argv: list[str]) -> int:
