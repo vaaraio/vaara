@@ -99,6 +99,13 @@ body:
         A row states what your checkers returned. It is not a certification, it
         does not say Vaara is compliant with anything, and it does not say you
         endorse Vaara.
+
+        Once your row is up you get a badge for your README, your site, or
+        wherever you like:
+
+        ```
+        [![Vaara Conformance: reproduced](https://vaara.io/vcr-badge.svg)](https://vaara.io/conformance.html)
+        ```
   - type: checkboxes
     id: consent
     attributes:

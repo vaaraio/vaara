@@ -220,7 +220,11 @@ python scripts/conformance_runner.py</code></pre>
   asked to be listed, and anyone listed can ask to be removed and is removed.
   To add your own run, <a
   href="https://github.com/vaaraio/vaara/issues/new?template=conformance-row.yml">open
-  a row request</a>.</p>
+  a row request</a>. Listed parties get a badge:</p>
+  <p class="badge-offer">
+    <img src="/vcr-badge.svg" alt="Vaara Conformance: reproduced" width="210" height="20">
+  </p>
+  <pre><code>[![Vaara Conformance: reproduced](https://vaara.io/vcr-badge.svg)](https://vaara.io/conformance.html)</code></pre>
 {reproduction_blocks(repro)}
 
   <h2>Suites</h2>
