@@ -11,6 +11,7 @@ from __future__ import annotations
 
 import importlib.util
 import json
+import re
 import subprocess
 from pathlib import Path
 
@@ -186,7 +187,7 @@ def test_withdrawing_a_row_takes_its_badge_down(tmp_path):
 
     data["reproductions"].clear()
     assert render.badge_drift(data, tmp_path) == sorted(
-        [f"{row['slug']}.svg", f"{row['slug']}.json"]
+        [f"{row['slug']}.{ext}" for ext in ("svg", "json", "html")]
     )
     render.write_badges(data, tmp_path)
     assert not list(tmp_path.iterdir())
@@ -210,6 +211,45 @@ def test_a_badge_commits_to_its_own_row(tmp_path):
     svg = (tmp_path / f"{row['slug']}.svg").read_text(encoding="utf-8")
     assert f"sha256:{hashlib.sha256(served).hexdigest()}" in svg
     assert json.loads(served) == row
+
+
+def test_the_printable_sheet_carries_the_scoping_and_the_limit(tmp_path):
+    """The wall version has to state what it does not claim, same as the page.
+
+    A framed sheet outlives the conversation around it, so it travels with the
+    limit written on it rather than a link to where the limit lives.
+    """
+    pytest.importorskip("rfc8785", reason="ships in the attestation extra")
+    data = {"terms_version": "2026-08-15", "reproductions": []}
+    row = vcr.add_row(row_from(form()), "2026-08-14", data)
+    sheet = render.certificate_html(row)
+
+    assert "Validates the pinned independent vector lanes." in sheet
+    assert "not a certification" in sheet
+    # the template wraps, so match on words rather than a phrase spanning a line
+    assert "ratification" in sheet
+    assert "recomputes from committed bytes" in " ".join(sheet.split())
+    assert render.row_digest(row) in sheet
+    assert row["at_commit"] in sheet
+    # The party's own record URL is printed as text and has to be, since a
+    # framed sheet that cannot be traced back to the public record is decor.
+    # What must not appear is a fetched resource, so the sheet still renders
+    # with the network off.
+    loads = re.findall(r'(?:src|href)\s*=\s*"(https?://[^"]+)"', sheet)
+    assert not loads, f"the sheet fetches something off-origin: {loads}"
+    assert row["record"] in sheet
+
+
+def test_a_withdrawal_takes_the_printable_sheet_too(tmp_path):
+    pytest.importorskip("rfc8785", reason="ships in the attestation extra")
+    data = {"terms_version": "2026-08-15", "reproductions": []}
+    row = vcr.add_row(row_from(form()), "2026-08-14", data)
+    render.write_badges(data, tmp_path)
+    assert (tmp_path / f"{row['slug']}.html").exists()
+
+    data["reproductions"].clear()
+    render.write_badges(data, tmp_path)
+    assert not list(tmp_path.iterdir())
 
 
 def test_the_served_row_is_canonical_bytes_and_nothing_else():

@@ -161,6 +161,14 @@ jobs:
           [![Vaara Conformance Results row ${ID}](https://vaara.io/badge/${SLUG}.svg)](https://vaara.io/conformance.html)
           \`\`\`
 
+          A printable sheet of the same row, if you want one for a wall:
+          https://vaara.io/badge/${SLUG}.html
+
+          Both carry the digest of your row, and the row itself is served at
+          https://vaara.io/badge/${SLUG}.json as JCS-canonical bytes, so
+          \`curl -s <that url> | sha256sum\` checks either artifact against it
+          without trusting us or installing anything.
+
           The number is permanent and is never reissued. The badge says you ran
           the checkers at that commit on that date, which is all it will ever
           say. To come down, one line here or to hello@vaara.io, no reason

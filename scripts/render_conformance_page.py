@@ -138,6 +138,114 @@ def badge_svg(row: dict) -> str:
     )
 
 
+CERTIFICATE_TEMPLATE = """<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<title>Vaara Conformance Results, row {row_id}</title>
+<meta name="robots" content="noindex">
+<style>
+  @page {{ size: A4 landscape; margin: 18mm; }}
+  :root {{ --ink:#1A2226; --green:#78A08A; --faint:#8B9792; --rule:#DEE4E1; }}
+  * {{ box-sizing:border-box; }}
+  body {{
+    margin:0; padding:28mm 24mm; color:var(--ink); background:#fff;
+    font:16px/1.55 Georgia, "Times New Roman", serif;
+  }}
+  .sheet {{ border:2px solid var(--ink); padding:16mm 18mm; height:100%; }}
+  .kicker {{
+    font:600 11px/1 ui-sans-serif, system-ui, sans-serif;
+    letter-spacing:.22em; text-transform:uppercase; color:var(--faint);
+  }}
+  h1 {{ font-size:31px; margin:10px 0 2px; letter-spacing:.01em; }}
+  .num {{ color:var(--green); font-weight:700; }}
+  .party {{ font-size:26px; margin:18px 0 2px; }}
+  .aff {{ color:var(--faint); font-size:15px; margin:0; }}
+  .claim {{ margin:16px 0 0; max-width:58ch; }}
+  .scoping {{
+    margin:12px 0 0; padding-left:12px; border-left:3px solid var(--rule);
+    color:#3d474b; font-style:italic; max-width:62ch;
+  }}
+  dl {{
+    display:grid; grid-template-columns:auto 1fr; gap:3px 14px;
+    margin:18px 0 0; font:12px/1.5 ui-monospace, SFMono-Regular, Menlo, monospace;
+  }}
+  dt {{ color:var(--faint); }}
+  dd {{ margin:0; word-break:break-all; }}
+  footer {{
+    margin-top:16px; padding-top:10px; border-top:1px solid var(--rule);
+    font:11px/1.5 ui-sans-serif, system-ui, sans-serif; color:var(--faint);
+    max-width:74ch;
+  }}
+  @media print {{ body {{ padding:0; }} .noprint {{ display:none; }} }}
+</style>
+</head>
+<body>
+<div class="sheet">
+  <p class="kicker">Vaara Conformance Results</p>
+  <h1>Independent reproduction <span class="num">#{row_id}</span></h1>
+
+  <p class="party">{party}</p>
+  <p class="aff">{affiliation}</p>
+
+  <p class="claim">ran the independent checkers listed below, from a clean
+  checkout at the commit recorded here, with no Vaara installed, and reported
+  the outcome in public. The result they reported was {result}.</p>
+
+  <p class="scoping">{scoping}</p>
+
+  <dl>
+    <dt>Suites</dt><dd>{suites}</dd>
+    <dt>At commit</dt><dd>{at_commit}</dd>
+    <dt>Date</dt><dd>{date}</dd>
+    <dt>Row digest</dt><dd>{digest}</dd>
+    <dt>Record</dt><dd>{record}</dd>
+    <dt>Terms</dt><dd>{terms_version}</dd>
+  </dl>
+
+  <footer>
+    This states what those checkers returned on that date at that commit. It is
+    not a certification, it does not say Vaara is compliant with anything, and
+    it does not say the party above endorses Vaara. These vectors have no
+    ratification process behind them and the maintainer decides what a verdict
+    means. Every case recomputes from committed bytes, so anyone may disagree
+    and show their work. Check this sheet against
+    https://vaara.io/badge/{slug}.json, whose sha256 is the row digest above.
+  </footer>
+</div>
+</body>
+</html>
+"""
+
+
+def certificate_html(row: dict) -> str:
+    """The wall version of the badge, printable without any dependency.
+
+    A browser turns this into a PDF, so nothing here needs a rendering library
+    and the sheet keeps the property the rest of the site has: no off-origin
+    load, readable with the network off. It carries the digest, so the thing
+    somebody pins to a wall can still be checked against the published row.
+    """
+    scoping = row.get("their_scoping") or (
+        "No scoping was given beyond the result recorded here."
+    )
+    return CERTIFICATE_TEMPLATE.format(
+        row_id=esc(row["id"]),
+        slug=esc(row["slug"]),
+        party=esc(row.get("party", "")),
+        affiliation=esc(row.get("affiliation", "")),
+        result=esc(row.get("result", "")),
+        scoping=esc(scoping),
+        suites=esc(", ".join(row.get("suites", []))),
+        at_commit=esc(row.get("at_commit", "")),
+        date=esc(row.get("date", "")),
+        digest=esc(row_digest(row)),
+        record=esc(row.get("record", "")),
+        terms_version=esc(row.get("terms_version", "unversioned")),
+    )
+
+
 def write_badges(repro: dict, badge_dir: Path = BADGE_DIR) -> list[Path]:
     """Regenerate the badge directory from the rows, and only from the rows.
 
@@ -150,7 +258,8 @@ def write_badges(repro: dict, badge_dir: Path = BADGE_DIR) -> list[Path]:
     for row in repro.get("reproductions", []):
         wanted[f"{row['slug']}.svg"] = badge_svg(row).encode("utf-8")
         wanted[f"{row['slug']}.json"] = row_bytes(row)
-    for stale in list(badge_dir.glob("*.svg")) + list(badge_dir.glob("*.json")):
+        wanted[f"{row['slug']}.html"] = certificate_html(row).encode("utf-8")
+    for stale in [p for p in badge_dir.iterdir() if p.is_file()]:
         if stale.name not in wanted:
             stale.unlink()
     written = []
@@ -209,6 +318,7 @@ def reproduction_blocks(data: dict) -> str:
             <dt>Listed under terms</dt><dd class="mono">{esc(r.get('terms_version', 'unversioned'))}</dd>
             <dt>Row digest</dt><dd class="mono">{esc(row_digest(r))}<br>over <a href="/badge/{esc(r['slug'])}.json">/badge/{esc(r['slug'])}.json</a></dd>
             <dt>Badge</dt><dd><img src="{esc(badge)}" alt="{esc('VCR row ' + str(r['id']))}" height="20"><br><code class="snippet">{esc(snippet)}</code></dd>
+            <dt>Certificate</dt><dd><a href="/badge/{esc(r['slug'])}.html">printable sheet</a></dd>
           </dl>
         </article>""")
     return "\n".join(out)
@@ -454,6 +564,7 @@ def badge_drift(repro: dict, badge_dir: Path = BADGE_DIR) -> list[str]:
     for r in repro.get("reproductions", []):
         wanted[f"{r['slug']}.svg"] = badge_svg(r).encode("utf-8")
         wanted[f"{r['slug']}.json"] = row_bytes(r)
+        wanted[f"{r['slug']}.html"] = certificate_html(r).encode("utf-8")
     on_disk: set[str] = set()
     if badge_dir.exists():
         on_disk = {p.name for p in badge_dir.iterdir() if p.is_file()}
