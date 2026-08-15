@@ -59,7 +59,8 @@ def reproduction_blocks(data: dict) -> str:
         return (
             '<p class="none">No independent reproduction has been recorded yet. '
             "A row appears here when someone other than the maintainer runs the "
-            "checkers and reports the result somewhere public.</p>"
+            "checkers, reports the result somewhere public, and asks to be "
+            "listed.</p>"
         )
     out = []
     for r in rows:
@@ -215,8 +216,11 @@ python scripts/conformance_runner.py</code></pre>
 
   <h2>Independent reproductions</h2>
   <p>Parties other than the maintainer who ran the checkers and reported the
-  outcome in public. Claims are quoted as each party scoped them. Anyone listed
-  can ask to be removed and is removed.</p>
+  outcome in public. Claims are quoted as each party scoped them. Everyone here
+  asked to be listed, and anyone listed can ask to be removed and is removed.
+  To add your own run, <a
+  href="https://github.com/vaaraio/vaara/issues/new?template=conformance-row.yml">open
+  a row request</a>.</p>
 {reproduction_blocks(repro)}
 
   <h2>Suites</h2>

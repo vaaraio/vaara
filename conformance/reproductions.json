@@ -11,8 +11,10 @@
     "     agreement to appear on this page.",
     "  5. Anyone listed can ask to be removed and is removed, no questions.",
     "",
-    "Add a row by pull request. The rendered page is generated from this file",
-    "plus the runner's own report, so neither can drift from the other."
+    "A party asks for a row with the conformance-row issue form, which records",
+    "the agreement in rule 4 and cannot be submitted without it. The rendered",
+    "page is generated from this file plus the runner's own report, so neither",
+    "can drift from the other."
   ],
   "reproductions": []
 }

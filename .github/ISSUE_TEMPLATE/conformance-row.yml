@@ -1,0 +1,114 @@
+name: Add my result to Vaara Conformance Results
+description: You ran the conformance checkers yourself and want the result listed at vaara.io/conformance.html
+title: "VCR: reproduction by "
+labels: ["conformance-row"]
+body:
+  - type: markdown
+    attributes:
+      value: |
+        This form is for parties other than the maintainer who ran the
+        independent checkers and reported the result somewhere public.
+
+        Run them first. No Vaara install is needed:
+
+        ```
+        git clone https://github.com/vaaraio/vaara
+        cd vaara
+        pip install cryptography rfc8785
+        python scripts/conformance_runner.py
+        ```
+  - type: input
+    id: party
+    attributes:
+      label: Name to publish
+      description: A personal name, a handle, or an organisation. Whatever you want on the page.
+      placeholder: "Your name or handle"
+    validations:
+      required: true
+  - type: input
+    id: affiliation
+    attributes:
+      label: Affiliation
+      description: Optional. Listed as description, never as endorsement of Vaara.
+      placeholder: "Project or company, or leave blank"
+    validations:
+      required: false
+  - type: input
+    id: suites
+    attributes:
+      label: Which suites you ran
+      placeholder: "transparency_consistency_v0, evidence_bundle_v0"
+    validations:
+      required: true
+  - type: input
+    id: at-commit
+    attributes:
+      label: Commit you ran at
+      description: Full SHA, so anyone can rerun exactly what you ran.
+      placeholder: "12ff4666e738eaccd55c283483dc2e642af65e6b"
+    validations:
+      required: true
+  - type: input
+    id: result
+    attributes:
+      label: Result
+      description: The counts, including which negatives were exercised.
+      placeholder: "9 of 9 and 8 of 8, including the tampered-proof and forked-root negatives"
+    validations:
+      required: true
+  - type: textarea
+    id: scoping
+    attributes:
+      label: Your own scoping
+      description: >
+        What your run establishes and what it does not. This is published word
+        for word and is never widened. If you leave it blank the row says only
+        that you ran the checkers and got the counts above.
+      placeholder: >
+        Validates the pinned independent vector lanes. Does not establish
+        hosted-service interoperability or official SCITT conformance.
+    validations:
+      required: false
+  - type: input
+    id: record
+    attributes:
+      label: Link to where you reported it
+      description: >
+        A mailing list archive, an issue, a post, a repository. It has to be
+        public and linkable. Private mail and screenshots do not qualify.
+      placeholder: "https://mailarchive.ietf.org/arch/msg/..."
+    validations:
+      required: true
+  - type: markdown
+    attributes:
+      value: |
+        ## What listing you means
+
+        The page at vaara.io/conformance.html is public and indexed. A row
+        carries the name you gave above, your affiliation if you gave one, the
+        suites, the commit, the result, your scoping quoted as you wrote it,
+        and a link to your public record.
+
+        Vaara publishes it because you asked to be listed here. That agreement
+        is what this form records, and it stands until you withdraw it.
+
+        Withdrawing takes one line, in an issue or an email to hello@vaara.io.
+        No reason needed and none will be asked for. The row comes down and the
+        entry is deleted from `conformance/reproductions.json`.
+
+        A row states what your checkers returned. It is not a certification, it
+        does not say Vaara is compliant with anything, and it does not say you
+        endorse Vaara.
+  - type: checkboxes
+    id: consent
+    attributes:
+      label: Consent
+      options:
+        - label: >
+            I read the section above and I agree to be listed on the public
+            Vaara Conformance Results page on these terms.
+          required: true
+        - label: >
+            The link I gave is my own public record of this run, and the result
+            and scoping above are mine.
+          required: true
