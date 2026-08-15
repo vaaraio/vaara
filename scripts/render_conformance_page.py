@@ -29,8 +29,6 @@ import json
 import sys
 from pathlib import Path
 
-import rfc8785
-
 REPO = Path(__file__).resolve().parent.parent
 REPRODUCTIONS = REPO / "conformance" / "reproductions.json"
 DEFAULT_OUT = REPO / "webpage" / "conformance.html"
@@ -96,7 +94,14 @@ def row_bytes(row: dict) -> bytes:
     The file at ``/badge/<slug>.json`` holds these bytes and nothing else, so
     checking a badge is ``sha256sum`` on a downloaded file. No parser, no
     canonicaliser and no Vaara install stands between a reader and the answer.
+
+    Imported here rather than at module scope because ``rfc8785`` ships in the
+    ``attestation`` extra, and this page has to render from a checkout that
+    installed nothing. With no rows there is no digest to compute, so the
+    dependency is only reached once somebody is actually listed.
     """
+    import rfc8785
+
     return rfc8785.dumps(row)
 
 

@@ -176,6 +176,7 @@ def test_a_badge_carries_the_number_the_date_and_the_commit():
 
 def test_withdrawing_a_row_takes_its_badge_down(tmp_path):
     """Removal from the page is cosmetic if the badge URL still resolves."""
+    pytest.importorskip("rfc8785", reason="ships in the attestation extra")
     data = {"reproductions": []}
     row = vcr.add_row(row_from(form()), "2026-08-14", data)
     render.write_badges(data, tmp_path)
@@ -199,6 +200,7 @@ def test_a_badge_commits_to_its_own_row(tmp_path):
     """
     import hashlib
 
+    pytest.importorskip("rfc8785", reason="ships in the attestation extra")
     data = {"terms_version": "2026-08-15", "reproductions": []}
     row = vcr.add_row(row_from(form()), "2026-08-14", data)
     render.write_badges(data, tmp_path)
@@ -211,6 +213,7 @@ def test_a_badge_commits_to_its_own_row(tmp_path):
 
 def test_the_served_row_is_canonical_bytes_and_nothing_else():
     """One command has to answer it, so the file cannot carry stray formatting."""
+    pytest.importorskip("rfc8785", reason="ships in the attestation extra")
     row = {"b": 2, "a": 1}
     assert render.row_bytes(row) == b'{"a":1,"b":2}'
 
@@ -219,6 +222,7 @@ def test_editing_a_row_changes_its_digest(tmp_path):
     data = {"terms_version": "2026-08-15", "reproductions": []}
     row = vcr.add_row(row_from(form()), "2026-08-14", data)
     before = render.row_digest(row)
+    pytest.importorskip("rfc8785", reason="ships in the attestation extra")
     row["result"] = "43 of 43, actually"
     assert render.row_digest(row) != before
     render.write_badges(data, tmp_path)
