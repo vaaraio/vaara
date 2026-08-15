@@ -165,6 +165,7 @@ def test_two_parties_with_the_same_name_get_different_badges():
 
 def test_a_badge_carries_the_number_the_date_and_the_commit():
     """Baked into the pixels so the badge dates itself without phoning home."""
+    pytest.importorskip("rfc8785", reason="ships in the attestation extra")
     svg = render.badge_svg(
         {"id": 7, "slug": "x", "date": "2026-08-14", "at_commit": HEAD, "party": "X"}
     )
@@ -219,10 +220,10 @@ def test_the_served_row_is_canonical_bytes_and_nothing_else():
 
 
 def test_editing_a_row_changes_its_digest(tmp_path):
+    pytest.importorskip("rfc8785", reason="ships in the attestation extra")
     data = {"terms_version": "2026-08-15", "reproductions": []}
     row = vcr.add_row(row_from(form()), "2026-08-14", data)
     before = render.row_digest(row)
-    pytest.importorskip("rfc8785", reason="ships in the attestation extra")
     row["result"] = "43 of 43, actually"
     assert render.row_digest(row) != before
     render.write_badges(data, tmp_path)
