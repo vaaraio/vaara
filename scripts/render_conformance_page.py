@@ -1,0 +1,281 @@
+#!/usr/bin/env python3
+# SPDX-FileCopyrightText: 2026 Henri Sirkkavaara
+# SPDX-License-Identifier: AGPL-3.0-or-later
+"""Render Vaara Conformance Results from the runner's own report.
+
+The page is generated rather than written, for one reason: a hand-maintained
+results table drifts from the checkers within a release or two, and a stale
+conformance claim is worse than none. Everything numeric here comes from
+``scripts/conformance_runner.py --json``. The only hand-maintained input is
+``conformance/reproductions.json``, which records parties other than the
+maintainer who ran the checkers and said so in public.
+
+The page states its own authorship limit. The vectors are Vaara's and there is
+no ratification body behind them, which a reader is entitled to know before
+weighing a pass. What the page offers instead is that every verdict recomputes
+from committed bytes with no Vaara import, so a stranger can disagree and show
+their work.
+
+Usage:
+    python scripts/conformance_runner.py --json report.json
+    python scripts/render_conformance_page.py report.json webpage/conformance.html
+    python scripts/render_conformance_page.py report.json --check   # CI: fail if stale
+"""
+from __future__ import annotations
+
+import html
+import json
+import sys
+from pathlib import Path
+
+REPO = Path(__file__).resolve().parent.parent
+REPRODUCTIONS = REPO / "conformance" / "reproductions.json"
+DEFAULT_OUT = REPO / "webpage" / "conformance.html"
+
+TITLE = "Vaara Conformance Results"
+
+
+def esc(value: object) -> str:
+    return html.escape(str(value), quote=True)
+
+
+def suite_rows(report: dict) -> str:
+    out = []
+    for suite in sorted(report["suites"], key=lambda s: s["suite"]):
+        status = suite["status"]
+        cls = {"PASS": "ok", "FAIL": "bad", "SKIP": "skip"}.get(status, "skip")
+        reason = suite.get("reason") or ""
+        out.append(
+            f'<tr><td class="mono">{esc(suite["suite"])}</td>'
+            f'<td class="{cls}">{esc(status)}</td>'
+            f'<td class="why">{esc(reason)}</td></tr>'
+        )
+    return "\n".join(out)
+
+
+def reproduction_blocks(data: dict) -> str:
+    rows = data.get("reproductions", [])
+    if not rows:
+        return (
+            '<p class="none">No independent reproduction has been recorded yet. '
+            "A row appears here when someone other than the maintainer runs the "
+            "checkers and reports the result somewhere public.</p>"
+        )
+    out = []
+    for r in rows:
+        suites = ", ".join(r.get("suites", []))
+        out.append(f"""
+        <article class="repro">
+          <div class="repro-head">
+            <span class="date mono">{esc(r.get('date', ''))}</span>
+            <span class="who">{esc(r.get('party', ''))}</span>
+            <span class="aff">{esc(r.get('affiliation', ''))}</span>
+          </div>
+          <p class="result">{esc(r.get('result', ''))}</p>
+          <dl>
+            <dt>Suites</dt><dd class="mono">{esc(suites)}</dd>
+            <dt>At commit</dt><dd class="mono">{esc(r.get('at_commit', ''))}</dd>
+            <dt>Their scoping</dt><dd class="scoping">{esc(r.get('their_scoping', ''))}</dd>
+            <dt>Record</dt><dd><a href="{esc(r.get('record', ''))}" rel="noopener">{esc(r.get('record_held_by', 'record'))}</a></dd>
+          </dl>
+        </article>""")
+    return "\n".join(out)
+
+
+def render(report: dict, repro: dict) -> str:
+    t = report["totals"]
+    generated = report.get("generated_at", "")
+    return f"""<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<title>{TITLE} | Vaara</title>
+<meta name="description" content="Every Vaara conformance suite, its verdict, and every independent party who reproduced the vectors and said so in public. Generated from the runner's own report.">
+<meta name="robots" content="index, follow">
+<link rel="canonical" href="https://vaara.io/conformance.html">
+<link rel="icon" type="image/svg+xml" href="/favicon.svg">
+<meta property="og:type" content="website">
+<meta property="og:title" content="{TITLE}">
+<meta property="og:description" content="Every suite, every verdict, every independent reproduction. Recomputable from committed bytes with no Vaara import.">
+<meta property="og:url" content="https://vaara.io/conformance.html">
+<style>
+  :root {{
+    color-scheme: light;
+    --bg:#ececec; --panel:#FFFFFF; --panel-2:#F1F4F0; --line:rgba(60,90,72,.18);
+    --ink:#1A2226; --muted:#566159; --faint:#7C857E;
+    --tri:#3E6B54; --tri-bright:#2C523E; --warn:#B4524F;
+    --mono:ui-monospace,'SFMono-Regular','JetBrains Mono',Menlo,Consolas,monospace;
+    --sans:'Inter',-apple-system,BlinkMacSystemFont,'Segoe UI',Helvetica,Arial,sans-serif;
+  }}
+  html[data-theme="dark"], html:not([data-theme]) {{}}
+  @media (prefers-color-scheme: dark) {{
+    html:not([data-theme]) {{
+      color-scheme: dark;
+      --bg:#0F1417; --panel:#1A2226; --panel-2:#151D20; --line:rgba(123,156,138,.16);
+      --ink:#DEE4E1; --muted:#8B9792; --faint:#5E6A66;
+      --tri:#78A08A; --tri-bright:#93B8A3; --warn:#D98B8B;
+    }}
+  }}
+  *{{box-sizing:border-box}}
+  body{{margin:0;background:var(--bg);color:var(--ink);font-family:var(--sans);
+       line-height:1.55;-webkit-font-smoothing:antialiased}}
+  .wrap{{max-width:940px;margin:0 auto;padding:56px 22px 96px}}
+  a{{color:var(--tri-bright);text-decoration:none;border-bottom:1px solid var(--line)}}
+  a:hover{{border-bottom-color:var(--tri)}}
+  .back{{font-family:var(--mono);font-size:11px;letter-spacing:.18em;text-transform:uppercase;
+        color:var(--muted);border:0}}
+  h1{{font-size:clamp(28px,4.2vw,40px);line-height:1.12;margin:26px 0 6px;letter-spacing:-.02em}}
+  .kicker{{font-family:var(--mono);font-size:11px;letter-spacing:.2em;text-transform:uppercase;
+          color:var(--tri);margin:0}}
+  h2{{font-size:19px;margin:52px 0 10px;letter-spacing:-.01em}}
+  p{{margin:0 0 14px;max-width:74ch}}
+  .lede{{font-size:17px;color:var(--muted)}}
+  .mono{{font-family:var(--mono);font-size:12.5px}}
+  .stats{{display:flex;flex-wrap:wrap;gap:10px;margin:24px 0 8px}}
+  .stat{{background:var(--panel);border:1px solid var(--line);border-radius:10px;
+        padding:12px 16px;min-width:104px}}
+  .stat b{{display:block;font-family:var(--mono);font-size:23px;color:var(--tri-bright);
+          line-height:1.1}}
+  .stat span{{font-size:11px;letter-spacing:.12em;text-transform:uppercase;color:var(--faint)}}
+  table{{width:100%;border-collapse:collapse;margin:14px 0 8px;background:var(--panel);
+        border:1px solid var(--line);border-radius:10px;overflow:hidden}}
+  th,td{{text-align:left;padding:8px 14px;border-bottom:1px solid var(--line);font-size:13.5px;
+        vertical-align:top}}
+  th{{font-family:var(--mono);font-size:10.5px;letter-spacing:.16em;text-transform:uppercase;
+     color:var(--faint);background:var(--panel-2)}}
+  tr:last-child td{{border-bottom:0}}
+  td.ok{{color:var(--tri-bright);font-family:var(--mono);font-size:12px}}
+  td.bad{{color:var(--warn);font-family:var(--mono);font-size:12px;font-weight:600}}
+  td.skip{{color:var(--faint);font-family:var(--mono);font-size:12px}}
+  td.why{{color:var(--muted);font-size:12.5px}}
+  .repro{{background:var(--panel);border:1px solid var(--line);border-radius:10px;
+         padding:18px 20px;margin:14px 0}}
+  .repro-head{{display:flex;flex-wrap:wrap;gap:12px;align-items:baseline;margin-bottom:8px}}
+  .repro-head .who{{font-weight:600}}
+  .repro-head .aff{{color:var(--faint);font-size:13px}}
+  .repro .result{{margin:0 0 12px}}
+  dl{{display:grid;grid-template-columns:auto 1fr;gap:5px 16px;margin:0;font-size:13px}}
+  dt{{font-family:var(--mono);font-size:10.5px;letter-spacing:.14em;text-transform:uppercase;
+     color:var(--faint);padding-top:2px}}
+  dd{{margin:0;overflow-wrap:anywhere}}
+  .scoping{{color:var(--muted);font-style:italic}}
+  .none{{color:var(--muted)}}
+  .note{{border-left:2px solid var(--line);padding-left:16px;color:var(--muted);
+        font-size:14px;margin:18px 0}}
+  code{{font-family:var(--mono);font-size:12.5px;background:var(--panel-2);
+       padding:1px 5px;border-radius:4px}}
+  pre{{background:var(--panel);border:1px solid var(--line);border-radius:10px;
+      padding:14px 16px;overflow-x:auto}}
+  pre code{{background:none;padding:0}}
+  footer{{margin-top:64px;padding-top:20px;border-top:1px solid var(--line);
+         color:var(--faint);font-size:12.5px}}
+</style>
+</head>
+<body>
+<div class="wrap">
+  <a class="back" href="/">&larr; vaara.io</a>
+
+  <p class="kicker">Vaara Conformance Results</p>
+  <h1>Every suite, every verdict, and everyone who checked it themselves.</h1>
+
+  <p class="lede">Each suite below ships an independent checker that imports no
+  Vaara code and recomputes its verdicts from the bytes of its own case files.
+  This page is generated from the runner's report, so it says what the checkers
+  did rather than what a document claims they do.</p>
+
+  <div class="stats">
+    <div class="stat"><b>{t['suites']}</b><span>suites</span></div>
+    <div class="stat"><b>{t['passed']}</b><span>passed</span></div>
+    <div class="stat"><b>{t['failed']}</b><span>failed</span></div>
+    <div class="stat"><b>{t['skipped']}</b><span>skipped</span></div>
+    <div class="stat"><b>{t['cases_passed']}</b><span>cases</span></div>
+  </div>
+  <p class="mono" style="color:var(--faint)">generated {esc(generated)}</p>
+
+  <h2>Run it yourself</h2>
+  <p>Nothing here needs Vaara installed. The checkers use the standard library
+  plus <code>cryptography</code> and <code>rfc8785</code>.</p>
+<pre><code>git clone https://github.com/vaaraio/vaara
+cd vaara
+pip install cryptography rfc8785
+python scripts/conformance_runner.py</code></pre>
+  <p>Point <code>--vectors-dir</code> at a directory laid out the same way and it
+  grades those bytes instead. The runner collects; the checkers decide.</p>
+
+  <h2>What a pass does not establish</h2>
+  <p>These vectors are Vaara's and there is no ratification process behind them.
+  The maintainer adds the cases and decides what a verdict means, and nobody else
+  has a vote. That is a real limit on any neutrality claim and it is stated here
+  rather than argued around.</p>
+  <p class="note">What the corpus does give is narrower and checkable: every case
+  recomputes from committed bytes with no Vaara import, so anyone can disagree
+  with an expected result and show their work. Recompute is checkable by
+  strangers. Authorship is not.</p>
+
+  <h2>Independent reproductions</h2>
+  <p>Parties other than the maintainer who ran the checkers and reported the
+  outcome in public. Claims are quoted as each party scoped them. Anyone listed
+  can ask to be removed and is removed.</p>
+{reproduction_blocks(repro)}
+
+  <h2>Suites</h2>
+  <table>
+    <thead><tr><th>Suite</th><th>Verdict</th><th>Note</th></tr></thead>
+    <tbody>
+{suite_rows(report)}
+    </tbody>
+  </table>
+
+  <footer>
+    Generated by <code>scripts/render_conformance_page.py</code> from
+    <code>scripts/conformance_runner.py --json</code>. Independent reproductions
+    are maintained in <code>conformance/reproductions.json</code> and added by
+    pull request. Vaara is AGPL-3.0-or-later.
+  </footer>
+</div>
+</body>
+</html>
+"""
+
+
+def main(argv: list[str]) -> int:
+    if not argv:
+        print(__doc__)
+        return 2
+    report_path = Path(argv[0])
+    check = "--check" in argv
+    out = Path(argv[1]) if len(argv) > 1 and not argv[1].startswith("-") else DEFAULT_OUT
+
+    report = json.loads(report_path.read_text(encoding="utf-8"))
+    repro = json.loads(REPRODUCTIONS.read_text(encoding="utf-8"))
+    page = render(report, repro)
+
+    if check:
+        # The generated timestamp changes every run, so compare everything else.
+        current = out.read_text(encoding="utf-8") if out.exists() else ""
+        strip = lambda s: "\n".join(  # noqa: E731
+            ln for ln in s.splitlines() if "generated " not in ln
+        )
+        if strip(current) != strip(page):
+            print(
+                f"{out} is stale. Regenerate:\n"
+                "  python scripts/conformance_runner.py --json /tmp/report.json\n"
+                f"  python scripts/render_conformance_page.py /tmp/report.json {out}",
+                file=sys.stderr,
+            )
+            return 1
+        print(f"{out} is current.")
+        return 0
+
+    out.write_text(page, encoding="utf-8")
+    print(f"wrote {out} ({t_len(page)} bytes, {report['totals']['suites']} suites)")
+    return 0
+
+
+def t_len(s: str) -> int:
+    return len(s.encode("utf-8"))
+
+
+if __name__ == "__main__":
+    sys.exit(main(sys.argv[1:]))

@@ -1,0 +1,28 @@
+{
+  "_comment": [
+    "Independent reproductions of the Vaara conformance vectors: parties other",
+    "than the maintainer who ran the checkers and reported the result in public.",
+    "",
+    "Rules for a row, so this stays a record rather than a marketing page:",
+    "  1. The party is not the maintainer.",
+    "  2. The report is public and linkable. No private mail, no screenshots.",
+    "  3. The claim is quoted as they scoped it, never widened.",
+    "  4. Anyone listed can ask to be removed and is removed, no questions.",
+    "",
+    "Add a row by pull request. The rendered page is generated from this file",
+    "plus the runner's own report, so neither can drift from the other."
+  ],
+  "reproductions": [
+    {
+      "date": "2026-08-14",
+      "party": "Iman Schrock",
+      "affiliation": "EMILIA Protocol",
+      "suites": ["transparency_consistency_v0", "evidence bundle checker"],
+      "result": "9 of 9 and 8 of 8, including the tampered-proof, forked-root, revoked, broken-back-link, unauthenticated and wrong-key negatives",
+      "at_commit": "12ff4666e738eaccd55c283483dc2e642af65e6b",
+      "their_scoping": "Validates the pinned independent vector lanes. Does not establish hosted-service interoperability or official SCITT conformance.",
+      "record": "https://mailarchive.ietf.org/arch/msg/scitt/fE4RYzpmR440PVrZaknTvVKjUoI/",
+      "record_held_by": "IETF mail archive"
+    }
+  ]
+}
