@@ -17,6 +17,11 @@ from pathlib import Path
 
 import pytest
 
+# Chaining a row computes a digest over its JCS-canonical bytes, so the whole
+# desk needs rfc8785 from the attestation extra. A checkout without it cannot
+# exercise any of this, and the extras job in CI covers it properly.
+pytest.importorskip("rfc8785", reason="the desk needs the attestation extra")
+
 ROOT = Path(__file__).resolve().parent.parent
 spec = importlib.util.spec_from_file_location("vcr_row", ROOT / "scripts" / "vcr_row.py")
 vcr = importlib.util.module_from_spec(spec)
@@ -165,7 +170,6 @@ def test_two_parties_with_the_same_name_get_different_badges():
 
 def test_a_badge_carries_the_number_the_date_and_the_commit():
     """Baked into the pixels so the badge dates itself without phoning home."""
-    pytest.importorskip("rfc8785", reason="ships in the attestation extra")
     svg = render.badge_svg(
         {"id": 7, "slug": "x", "date": "2026-08-14", "at_commit": HEAD, "party": "X"}
     )
@@ -184,7 +188,6 @@ def test_a_badge_commits_to_its_own_row(tmp_path):
     """
     import hashlib
 
-    pytest.importorskip("rfc8785", reason="ships in the attestation extra")
     data = {"terms_version": "2026-08-15", "reproductions": []}
     row = vcr.add_row(row_from(form()), "2026-08-14", data)
     render.write_badges(data, tmp_path)
@@ -201,7 +204,6 @@ def test_the_printable_sheet_carries_the_scoping_and_the_limit(tmp_path):
     A framed sheet outlives the conversation around it, so it travels with the
     limit written on it rather than a link to where the limit lives.
     """
-    pytest.importorskip("rfc8785", reason="ships in the attestation extra")
     data = {"terms_version": "2026-08-15", "reproductions": []}
     row = vcr.add_row(row_from(form()), "2026-08-14", data)
     sheet = render.certificate_html(row)
@@ -224,13 +226,11 @@ def test_the_printable_sheet_carries_the_scoping_and_the_limit(tmp_path):
 
 def test_the_served_row_is_canonical_bytes_and_nothing_else():
     """One command has to answer it, so the file cannot carry stray formatting."""
-    pytest.importorskip("rfc8785", reason="ships in the attestation extra")
     row = {"b": 2, "a": 1}
     assert render.row_bytes(row) == b'{"a":1,"b":2}'
 
 
 def test_editing_a_row_changes_its_digest(tmp_path):
-    pytest.importorskip("rfc8785", reason="ships in the attestation extra")
     data = {"terms_version": "2026-08-15", "reproductions": []}
     row = vcr.add_row(row_from(form()), "2026-08-14", data)
     before = render.row_digest(row)
@@ -270,7 +270,6 @@ def test_the_chain_catches_a_removed_row():
     promise, so the promise is worth nothing on its own. Removing an entry
     breaks every link after it, and the break names the row.
     """
-    pytest.importorskip("rfc8785", reason="ships in the attestation extra")
     data = {"genesis": "sha256:" + "0" * 64, "reproductions": []}
     for i, party in enumerate(["A Party", "B Party", "C Party"]):
         vcr.add_row(
@@ -288,7 +287,6 @@ def test_the_chain_catches_a_removed_row():
 
 def test_the_chain_catches_an_edited_row():
     """A published row is not rewritten. A correction is a new row."""
-    pytest.importorskip("rfc8785", reason="ships in the attestation extra")
     data = {"genesis": "sha256:" + "0" * 64, "reproductions": []}
     vcr.add_row(row_from(form()), "2026-08-14", data)
     vcr.add_row(
@@ -303,7 +301,6 @@ def test_the_chain_catches_an_edited_row():
 
 
 def test_the_chain_catches_a_reordering():
-    pytest.importorskip("rfc8785", reason="ships in the attestation extra")
     data = {"genesis": "sha256:" + "0" * 64, "reproductions": []}
     vcr.add_row(row_from(form()), "2026-08-14", data)
     vcr.add_row(
@@ -316,7 +313,6 @@ def test_the_chain_catches_a_reordering():
 
 
 def test_the_first_row_links_to_the_declared_genesis():
-    pytest.importorskip("rfc8785", reason="ships in the attestation extra")
     data = {"genesis": "sha256:" + "0" * 64, "reproductions": []}
     first = vcr.add_row(row_from(form()), "2026-08-14", data)
     assert first["prev"] == data["genesis"]
