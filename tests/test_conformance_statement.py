@@ -34,18 +34,27 @@ EXPECTED = json.loads((VECTORS / "expected.json").read_text(encoding="utf-8"))
 
 SCENARIO_RECORDS = {
     "selftest_only": None, "clean": "clean", "flawed": "flawed", "duplicate": "duplicate",
+    "unproved": "unproved",
 }
 
 
 def _records(scenario: str):
+    """Mirror how the CLI reads a real directory: unparseable files stay visible."""
     sub = SCENARIO_RECORDS[scenario]
     if sub is None:
-        return None
-    return [(p.name, json.loads(p.read_text())) for p in sorted((EMITTER / sub).glob("*.json"))]
+        return None, []
+    records, unreadable = [], []
+    for p in sorted((EMITTER / sub).glob("*.json")):
+        try:
+            records.append((p.name, json.loads(p.read_text())))
+        except (json.JSONDecodeError, OSError) as exc:
+            unreadable.append((p.name, type(exc).__name__))
+    return records, unreadable
 
 
 def _build(scenario: str):
-    return build_conformance_statement(CORPUS, records=_records(scenario))
+    records, unreadable = _records(scenario)
+    return build_conformance_statement(CORPUS, records=records, unreadable=unreadable)
 
 
 # ── Goldens ───────────────────────────────────────────────────────────────────
@@ -64,8 +73,47 @@ def test_render_matches_golden_page(scenario):
 
 def test_all_scenarios_present():
     assert sorted(p.stem for p in PAGES.glob("*.md")) == [
-        "clean", "duplicate", "flawed", "selftest_only"
+        "clean", "duplicate", "flawed", "selftest_only", "unproved"
     ]
+
+
+# ── The three states ──────────────────────────────────────────────────────────
+
+
+def test_grades_separate_a_failed_check_from_an_unreached_one():
+    """The distinction a boolean cannot carry, pinned end to end."""
+    assert _build("clean").grade == "proved"
+    assert _build("flawed").grade == "false"
+    assert _build("unproved").grade == "unproved"
+
+
+def test_unproved_run_does_not_claim_the_records_failed():
+    statement = _build("unproved")
+    assert statement.records is not None
+    # Nothing that was read disagreed with the spec.
+    assert statement.records.nonconforming == ()
+    assert statement.records.conforming == statement.records.total
+    # The unread file is why, and it is named rather than folded into a failure.
+    assert [n for n, _ in statement.records.unreadable] == ["broken.json"]
+    assert statement.records.grade == "unproved"
+    assert statement.conforms is False
+
+
+def test_unproved_page_never_says_non_conforming():
+    page = render_conformance_statement(_build("unproved"))
+    assert "**Statement: UNPROVED**" in page
+    assert "NON-CONFORMING" not in page
+    assert "do NOT conform" not in page
+
+
+def test_a_real_failure_outranks_an_unreached_check():
+    from vaara.attestation.receipt import combine_grades
+
+    assert combine_grades(["proved", "unproved", "false"]) == "false"
+    assert combine_grades(["proved", "unproved"]) == "unproved"
+    assert combine_grades(["proved", "proved"]) == "proved"
+    # Nothing checked establishes nothing.
+    assert combine_grades([]) == "unproved"
 
 
 def test_independent_checker_confirms_statements():

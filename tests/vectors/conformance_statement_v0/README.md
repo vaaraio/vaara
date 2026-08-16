@@ -21,6 +21,17 @@ pages/<scenario>.md           the rendered Markdown statement (deterministic)
 _check_independent.py         stdlib only, no Vaara import
 ```
 
+## Grades
+
+Every part of a statement grades to one of three states rather than a boolean:
+`proved` (the check ran and the property holds), `unproved` (the check could not
+be reached, so nothing is asserted), and `false` (the check ran and the property
+does not hold). Worst wins when a run mixes them.
+
+`unproved` comes only from an execution state the runner recorded, such as a
+suite it could not place or a record file it could not read. It is never
+inferred from a primary check that failed.
+
 ## Scenarios
 
 - `selftest_only`: no emitter records, just the corpus self-test. Conforms.
@@ -28,6 +39,12 @@ _check_independent.py         stdlib only, no Vaara import
 - `flawed`: emitter records with one non-conforming record. NON-CONFORMING,
   even though the corpus self-test passes, because the supplied records do not
   all conform.
+- `duplicate`: records that each conform but fail a required set property, so
+  the set does not conform.
+- `unproved`: the `clean` records plus `broken.json`, which will not parse.
+  Nothing read disagrees with the spec and the set check never saw the third
+  file, so the statement is UNPROVED rather than NON-CONFORMING. This is the
+  case the old boolean could not express.
 
 The `clean` and `flawed` records are byte copies of the `proper_pair` and
 `mixed_nonconforming` sets from the `record_set_v0` vectors, so their set

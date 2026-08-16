@@ -44,7 +44,18 @@ HEX_RE = re.compile(r"^[0-9a-f]+$")
 
 SCENARIO_RECORDS = {
     "selftest_only": None, "clean": "clean", "flawed": "flawed", "duplicate": "duplicate",
+    "unproved": "unproved",
 }
+
+PROVED, UNPROVED, FALSE = "proved", "unproved", "false"
+
+
+def combine(grades):
+    """Worst first, independently of Vaara's own fold."""
+    for g in (FALSE, UNPROVED, PROVED):
+        if g in grades:
+            return g
+    return UNPROVED
 
 
 # ── Independent corpus + self-test derivation ─────────────────────────────────
@@ -154,7 +165,14 @@ def records_facts(scenario):
     sub = SCENARIO_RECORDS[scenario]
     if sub is None:
         return None
-    docs = [(p.name, json.loads(p.read_text())) for p in sorted((EMITTER / sub).glob("*.json"))]
+    docs = []
+    unreadable = []
+    for p in sorted((EMITTER / sub).glob("*.json")):
+        try:
+            docs.append((p.name, json.loads(p.read_text())))
+        except (json.JSONDecodeError, OSError):
+            # Never seen by the set check, so nothing is established about it.
+            unreadable.append(p.name)
     conforming = 0
     outcomes = []
     for _name, d in docs:
@@ -169,23 +187,39 @@ def records_facts(scenario):
         key = (bl["attestationDigest"], bl["attestationNonce"])
         by_call[key] = by_call.get(key, 0) + 1
     duplicate = any(count > 1 for count in by_call.values())
+    read_all_conform = conforming == len(docs) and not duplicate
+    if not read_all_conform:
+        grade = FALSE
+    elif unreadable or not docs:
+        grade = UNPROVED
+    else:
+        grade = PROVED
     return {
         "total": len(docs),
         "conforming": conforming,
-        "conforms": conforming == len(docs) and not duplicate,
+        "conforms": read_all_conform and not unreadable,
+        "unreadable": unreadable,
+        "grade": grade,
     }
 
 
 # ── Page parsing ──────────────────────────────────────────────────────────────
 
-_VERDICT = re.compile(r"^\*\*Statement: (CONFORMS|NON-CONFORMING)\*\*$", re.M)
+_VERDICT = re.compile(r"^\*\*Statement: (CONFORMS|NON-CONFORMING|UNPROVED)\*\*$", re.M)
 _CORPUS = re.compile(
     r"^Checked against corpus `(.+?)` version (\S+) \(corpusDigest `(sha256:[0-9a-f]{64})`\)\.$",
     re.M)
 _VERIFIED = re.compile(r"^Verified: all (\d+) fixture files match", re.M)
 _SUITE = re.compile(r"^- `(\S+?)`: (\d+)/(\d+) reproduced", re.M)
 _RECORDS = re.compile(
-    r"^(\d+) records? checked, (\d+) conforms?; your records (CONFORM|do NOT conform)\.$", re.M)
+    r"^(\d+) records? checked, (\d+) conforms?; your records "
+    r"(CONFORM|do NOT conform|are unproved)[^.]*\.$", re.M)
+_UNREAD = re.compile(r"^> Unproved: (\d+) file\(s\) could not be read", re.M)
+
+_PAGE_GRADE = {"CONFORMS": PROVED, "NON-CONFORMING": FALSE, "UNPROVED": UNPROVED}
+_RECORD_WORD_GRADE = {
+    "CONFORM": PROVED, "do NOT conform": FALSE, "are unproved": UNPROVED,
+}
 
 
 def parse_page(text):
@@ -202,6 +236,8 @@ def parse_page(text):
         "has_records": "## Your records" in text,
         "records": (int(rec.group(1)), int(rec.group(2)), rec.group(3) == "CONFORM")
         if rec else None,
+        "recordsGrade": _RECORD_WORD_GRADE[rec.group(3)] if rec else None,
+        "unreadCount": int(unread.group(1)) if (unread := _UNREAD.search(text)) else 0,
     }
 
 
@@ -216,9 +252,15 @@ def main() -> int:
 
     for scenario in sorted(SCENARIO_RECORDS):
         rec = records_facts(scenario)
-        want_verdict = "CONFORMS" if (
-            corpus["verified"] and reproduces_all and (rec is None or rec["conforms"])
-        ) else "NON-CONFORMING"
+        # Grade every in-scope check independently, then fold worst-first.
+        corpus_grade = PROVED if corpus["verified"] else FALSE
+        selftest_grade = PROVED if reproduces_all else FALSE
+        grades = [corpus_grade, selftest_grade]
+        if rec is not None:
+            grades.append(rec["grade"])
+        want_grade = combine(grades)
+        want_verdict = {PROVED: "CONFORMS", FALSE: "NON-CONFORMING",
+                        UNPROVED: "UNPROVED"}[want_grade]
 
         page = parse_page((PAGES / f"{scenario}.md").read_text())
         problems = []
@@ -236,11 +278,30 @@ def main() -> int:
         if rec is not None and page["records"] != (
                 rec["total"], rec["conforming"], rec["conforms"]):
             problems.append(f"records line {page['records']} != {rec}")
+        if rec is not None and page["recordsGrade"] != rec["grade"]:
+            problems.append(f"records grade {page['recordsGrade']} != {rec['grade']}")
+        want_unread = len(rec["unreadable"]) if rec is not None else 0
+        if page["unreadCount"] != want_unread:
+            problems.append(f"unreadable count {page['unreadCount']} != {want_unread}")
+        # An unproved page must never carry the words for a failed check.
+        page_text = (PAGES / f"{scenario}.md").read_text()
+        if want_grade == UNPROVED and (
+            "NON-CONFORMING" in page_text or "do NOT conform" in page_text
+        ):
+            problems.append("unproved page claims non-conformance")
 
         # The structured expected.json must agree with the same derivation.
         exp = expected[scenario]
         if exp["conforms"] != (want_verdict == "CONFORMS"):
             problems.append("expected.json conforms disagrees")
+        if exp.get("grade") != want_grade:
+            problems.append(f"expected.json grade {exp.get('grade')} != {want_grade}")
+        if exp["corpus"].get("grade") != corpus_grade:
+            problems.append("expected.json corpus grade disagrees")
+        if exp["selfTest"].get("grade") != selftest_grade:
+            problems.append("expected.json selfTest grade disagrees")
+        if rec is not None and exp["records"].get("grade") != rec["grade"]:
+            problems.append("expected.json records grade disagrees")
         if exp["corpus"]["corpusDigest"] != corpus["corpusDigest"]:
             problems.append("expected.json corpusDigest disagrees")
         if exp["selfTest"]["reproduced"] != sum(r for _c, r in per_suite.values()):

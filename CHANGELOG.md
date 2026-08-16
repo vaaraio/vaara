@@ -8,6 +8,34 @@ and this project follows [Semantic Versioning](https://semver.org/spec/v2.0.0.ht
 
 ### Added
 
+- **A conformance statement now grades every check as `proved`, `unproved` or
+  `false` instead of true or false.** A boolean cannot tell a reader whether a
+  check ran and failed or was never reached, and those need different repairs.
+  A suite the runner cannot place and a record file that will not parse both
+  used to land on `conforms: false`, next to a genuine disagreement with the
+  spec, which reports more than the run established.
+
+  `unproved` is only ever produced by an execution state the runner recorded,
+  never inferred from a primary check that failed. A suite reports `runnable`;
+  an unreadable record is listed by name. Where a run mixes states the worst
+  one wins, because a check that ran and failed is a stronger claim than one
+  that never ran. Records stay optional: supplying none leaves the section
+  absent and contributes no grade, which is a different statement from
+  supplying records that could not be read.
+
+  The rendered page no longer prints NON-CONFORMING over an unreached check.
+  It prints UNPROVED, names which check could not be reached, and says the
+  statement establishes nothing either way.
+
+  `schemaVersion` goes to 2. The change is additive: `conforms` keeps its
+  meaning and every previously conforming statement still conforms.
+
+  A fifth vector scenario, `unproved`, carries records that all conform plus one
+  file that will not parse, which is the case a boolean cannot express. The
+  Vaara-free checker re-derives the grade itself with its own worst-first fold
+  and fails if a page or golden ever claims `proved` where it derived
+  `unproved`, so the new field is checked rather than asserted.
+
 - **A Helm chart and a container image, so Vaara can be deployed on
   Kubernetes.** `deploy/helm/vaara` installs the model-endpoint proxy in front
   of an in-cluster model endpoint: a StatefulSet with one replica, a

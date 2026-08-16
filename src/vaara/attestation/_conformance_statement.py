@@ -20,6 +20,19 @@ The statement has three parts:
 * **Records** (optional) - the emitter's own records run through the same
   keyless set check, with the verdict reported beside the self-test.
 
+Every part grades to one of three states rather than a boolean:
+
+* ``proved`` - the check ran and the property holds.
+* ``unproved`` - the check could not be reached, so nothing is asserted.
+* ``false`` - the check ran and the property does not hold.
+
+A boolean cannot tell a reader whether a check failed or was never reached, and
+those call for different repairs. ``unproved`` is only ever produced by an
+explicit execution state the runner recorded (a suite it could not place, a
+record file it could not read), never inferred from a primary check that failed.
+Where a run mixes states, the worst one wins: a check that ran and failed
+outranks one that never ran.
+
 Deterministic and keyless. There is no clock: an ``as_of`` date is echoed
 verbatim when the caller supplies one and is never read from the system, so the
 same inputs render the same statement byte for byte. The whole check needs no
@@ -41,7 +54,30 @@ from vaara.attestation._record_set_conformance import check_record_set
 from vaara.attestation._record_set_findings import SetFinding
 
 STATEMENT_SCHEMA = "sep2828-conformance-statement"
-STATEMENT_SCHEMA_VERSION = 1
+STATEMENT_SCHEMA_VERSION = 2
+
+#: The check ran and the property holds.
+PROVED = "proved"
+#: The check could not be reached, so the statement asserts nothing either way.
+UNPROVED = "unproved"
+#: The check ran and the property does not hold.
+FALSE = "false"
+
+#: Worst-first. A check that ran and failed outranks one that never ran, because
+#: a known failure is a stronger claim than an absence of evidence.
+_GRADE_ORDER = (FALSE, UNPROVED, PROVED)
+
+
+def combine_grades(grades: Sequence[str]) -> str:
+    """Fold sub-grades into one, worst first.
+
+    ``FALSE`` dominates ``UNPROVED`` dominates ``PROVED``. An empty sequence is
+    ``UNPROVED``: nothing was checked, so nothing is asserted.
+    """
+    for grade in _GRADE_ORDER:
+        if grade in grades:
+            return grade
+    return UNPROVED
 
 
 class ConformanceCorpusError(ValueError):
@@ -63,6 +99,11 @@ class CorpusIntegrity:
     verified: bool
     problems: tuple[str, ...]
 
+    @property
+    def grade(self) -> str:
+        """Corpus integrity is always reachable: the bytes are here or they are not."""
+        return PROVED if self.verified else FALSE
+
     def to_dict(self) -> dict[str, Any]:
         return {
             "name": self.name,
@@ -71,6 +112,7 @@ class CorpusIntegrity:
             "corpusDigest": self.corpus_digest,
             "fileCount": self.file_count,
             "verified": self.verified,
+            "grade": self.grade,
             "problems": list(self.problems),
         }
 
@@ -85,10 +127,24 @@ class SuiteResult:
     reproduced: int
     mismatches: tuple[str, ...]
 
+    @property
+    def grade(self) -> str:
+        """``UNPROVED`` when the suite could not be run at all.
+
+        ``runnable`` is an execution state recorded by the runner, not an
+        inference drawn from a failed check. A suite it cannot place never
+        reaches a verdict, so the statement asserts nothing about it rather than
+        reporting it as a disagreement.
+        """
+        if not self.runnable:
+            return UNPROVED
+        return FALSE if self.mismatches else PROVED
+
     def to_dict(self) -> dict[str, Any]:
         return {
             "name": self.name,
             "runnable": self.runnable,
+            "grade": self.grade,
             "cases": self.cases,
             "reproduced": self.reproduced,
             "mismatches": list(self.mismatches),
@@ -104,9 +160,15 @@ class SelfTest:
     reproduced: int
     suites: tuple[SuiteResult, ...]
 
+    @property
+    def grade(self) -> str:
+        """Worst suite grade wins; no suites at all is ``UNPROVED``."""
+        return combine_grades([s.grade for s in self.suites])
+
     def to_dict(self) -> dict[str, Any]:
         return {
             "conforms": self.conforms,
+            "grade": self.grade,
             "cases": self.cases,
             "reproduced": self.reproduced,
             "suites": [s.to_dict() for s in self.suites],
@@ -124,9 +186,27 @@ class RecordsResult:
     nonconforming: tuple[tuple[str, tuple[str, ...]], ...]
     unreadable: tuple[tuple[str, str], ...]
 
+    @property
+    def grade(self) -> str:
+        """A file that could not be read is ``UNPROVED``, never ``FALSE``.
+
+        Being unreadable is an execution state: the set check never saw the
+        record, so nothing is established about it. Grading it as a failure
+        would claim more than the run supports. A record that was read and did
+        not conform, or a required finding across the set, is ``FALSE``.
+        """
+        if self.nonconforming or any(f.severity == "required" for f in self.findings):
+            return FALSE
+        if self.unreadable:
+            return UNPROVED
+        if self.total == 0:
+            return UNPROVED
+        return PROVED
+
     def to_dict(self) -> dict[str, Any]:
         return {
             "conforms": self.conforms,
+            "grade": self.grade,
             "total": self.total,
             "conforming": self.conforming,
             "findings": [
@@ -150,11 +230,26 @@ class ConformanceStatement:
     conforms: bool
     as_of: Optional[str]
 
+    @property
+    def grade(self) -> str:
+        """Worst grade across the checks that were in scope for this run.
+
+        Records are optional. When none were supplied the section is absent
+        entirely and contributes no grade, which is different from supplying
+        records that could not be read. Not requested and not reachable are not
+        the same claim.
+        """
+        grades = [self.corpus.grade, self.self_test.grade]
+        if self.records is not None:
+            grades.append(self.records.grade)
+        return combine_grades(grades)
+
     def to_dict(self) -> dict[str, Any]:
         return {
             "schema": STATEMENT_SCHEMA,
             "schemaVersion": STATEMENT_SCHEMA_VERSION,
             "conforms": self.conforms,
+            "grade": self.grade,
             "asOf": self.as_of,
             "corpus": self.corpus.to_dict(),
             "selfTest": self.self_test.to_dict(),
@@ -386,15 +481,22 @@ def build_conformance_statement(
         _records_result(records, unreadable) if records is not None else None
     )
 
-    conforms = (
-        corpus.verified
-        and self_test.conforms
-        and (records_result is None or records_result.conforms)
+    # One source of truth: the statement conforms exactly when every in-scope
+    # check reached a verdict and that verdict held. An unreachable check leaves
+    # the statement not-conforming without claiming the property is false.
+    provisional = ConformanceStatement(corpus, self_test, records_result, False, as_of)
+    return ConformanceStatement(
+        corpus, self_test, records_result, provisional.grade == PROVED, as_of
     )
-    return ConformanceStatement(corpus, self_test, records_result, conforms, as_of)
 
 
 # ── Render ────────────────────────────────────────────────────────────────────
+
+_VERDICT_WORD = {
+    PROVED: "CONFORMS",
+    UNPROVED: "UNPROVED",
+    FALSE: "NON-CONFORMING",
+}
 
 _HOW = (
     "This statement is keyless and reproducible. Anyone holding the same corpus "
@@ -414,10 +516,17 @@ def render_conformance_statement(statement: ConformanceStatement) -> str:
     inputs render byte-identical every time.
     """
     c = statement.corpus
-    verdict = "CONFORMS" if statement.conforms else "NON-CONFORMING"
+    verdict = _VERDICT_WORD[statement.grade]
     lines: list[str] = ["# SEP-2828 conformance statement", ""]
     lines.append(f"**Statement: {verdict}**")
     lines.append("")
+    if statement.grade == UNPROVED:
+        lines.append(
+            "At least one check could not be reached, so this statement does not "
+            "establish the property either way. That is a different result from a "
+            "check that ran and failed, and the sections below name which."
+        )
+        lines.append("")
     lines.append(
         f"Checked against corpus `{_safe(c.name)}` version {_safe(c.version)} "
         f"(corpusDigest `{_safe(c.corpus_digest)}`)."
@@ -450,7 +559,10 @@ def render_conformance_statement(statement: ConformanceStatement) -> str:
     lines.append("")
     for s in st.suites:
         if not s.runnable:
-            lines.append(f"- `{s.name}`: not runnable ({_names(s.mismatches)})")
+            lines.append(
+                f"- `{s.name}`: unproved, the suite could not be run "
+                f"({_names(s.mismatches)}). No verdict is claimed for it."
+            )
         else:
             tail = "" if not s.mismatches else f"; mismatched {_names(s.mismatches)}"
             lines.append(f"- `{s.name}`: {s.reproduced}/{s.cases} reproduced{tail}")
@@ -469,9 +581,15 @@ def render_conformance_statement(statement: ConformanceStatement) -> str:
 def _render_records(r: RecordsResult, lines: list[str]) -> None:
     lines.append("## Your records")
     lines.append("")
-    rv = "CONFORM" if r.conforms else "do NOT conform"
+    rv = {
+        PROVED: "CONFORM",
+        FALSE: "do NOT conform",
+        UNPROVED: "are unproved: what was read conformed, but the set was not complete",
+    }[r.grade]
     if r.total == 0:
-        lines.append("No records were supplied to this run.")
+        lines.append(
+            "No readable records were supplied to this run, so nothing is established."
+        )
     else:
         lines.append(
             f"{r.total} record{_s(r.total)} checked, {r.conforming} "
@@ -505,7 +623,10 @@ def _render_records(r: RecordsResult, lines: list[str]) -> None:
 
     if r.unreadable:
         names = ", ".join(_safe(n) for n, _ in r.unreadable)
-        lines.append(f"> Note: {len(r.unreadable)} file(s) could not be read: {names}")
+        lines.append(
+            f"> Unproved: {len(r.unreadable)} file(s) could not be read, so the set "
+            f"check never saw them and claims nothing about them: {names}"
+        )
         lines.append("")
 
 

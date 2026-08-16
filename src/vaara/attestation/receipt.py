@@ -59,7 +59,10 @@ from vaara.attestation._audit_summary import (
     render_record_set_summary,
 )
 from vaara.attestation._conformance_statement import (
+    FALSE,
+    PROVED,
     STATEMENT_SCHEMA,
+    UNPROVED,
     ConformanceCorpusError,
     ConformanceStatement,
     CorpusIntegrity,
@@ -67,6 +70,7 @@ from vaara.attestation._conformance_statement import (
     SelfTest,
     SuiteResult,
     build_conformance_statement,
+    combine_grades,
     render_conformance_statement,
     verify_corpus_integrity,
 )
@@ -305,6 +309,10 @@ __all__ = [
     "SUMMARY_SCHEMA",
     "render_record_set_summary",
     "STATEMENT_SCHEMA",
+    "PROVED",
+    "UNPROVED",
+    "FALSE",
+    "combine_grades",
     "ConformanceCorpusError",
     "ConformanceStatement",
     "CorpusIntegrity",
