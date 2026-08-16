@@ -249,7 +249,7 @@ The public surface is fixed: the signed envelope (`vaara.receipt/v1`), capabilit
 
 Vaara helps deployers assemble evidence for their own conformity work. It does not certify compliance or constitute legal advice. Deployers own their obligations under the EU AI Act and other applicable law.
 
-Commercial license and paid pilots available: see [vaara.io](https://vaara.io/#pilots) or contact [hello@vaara.io](mailto:hello@vaara.io). Licensing terms are in [LICENSING.md](LICENSING.md).
+Commercial license and paid pilots available: see [vaara.io](https://vaara.io/#pilots) or contact [hello@vaara.io](mailto:hello@vaara.io). Licensing terms are in [LICENSING.md](LICENSING.md), and the commercial licence is described in [COMMERCIAL.md](COMMERCIAL.md).
 
 ## Acknowledgements
 
