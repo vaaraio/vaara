@@ -8,6 +8,51 @@ and this project follows [Semantic Versioning](https://semver.org/spec/v2.0.0.ht
 
 ### Added
 
+- **Northern Lights: a decision now carries the route it actually took, and an
+  outcome travels back along that route.** Routing a decision forward is
+  ordinary. Without a return path the record is write-only, so the next
+  decision is made in the same ignorance as the last one.
+
+  Trust moves at two scales under one rule. A criterion carries a prior that
+  decides whether its signal counts at a node; a node carries a weight that
+  decides whether its vote counts in a panel. Outcomes move both, both stop
+  counting below a floor, and both decay back toward trust so one bad week
+  does not become permanent policy. Only what actually voted is moved, so a
+  criterion that failed a check is never blamed for the result.
+
+  In a panel, standing follows being right rather than agreeing. A majority
+  that carries a call which turns out wrong loses weight while the objector
+  gains it, until the lone voice cannot be outvoted. Dissent stays in the
+  record instead of being discarded at the tally.
+
+  Four channels carry the return path: relay hop by hop, direct to the origin
+  from any point on the route, local closing at the node, and lateral between
+  neighbours without the origin hearing it. Four messages stay distinct on
+  them: an outcome, a refusal with its reason, a capability probe, and a
+  retraction. Hop counts bound the backward wave, a backward message never
+  spawns a forward one, and decisions carry a sequence because the two
+  directions cross.
+
+  Three shapes of walk share one structure: an ordered route, a broadcast
+  where which nodes answered is itself the signal, and a route discovered one
+  handoff at a time with no list written in advance.
+
+  Nodes measure their own firing rate against their own baseline, so a node
+  that objects constantly is not elevated when it objects. Simultaneous
+  elevation across nodes produces conclusions no single node reached.
+  Anti-nodes carry what must be un-true for such a conclusion to hold and veto
+  it outright, which is not a vote and cannot be outvoted; a blocked
+  conclusion is recorded with what stopped it.
+
+  Standard library only, no new dependencies. `docs/northern-lights.md`,
+  `src/vaara/northern_lights.py`, 44 tests.
+
+- **`COMMERCIAL.md` states the commercial side of the dual licence.** Vaara has
+  been dual-licensed since v1.0.0 and `LICENSING.md` carried the structure and
+  the relicensing history. This is the buyer-facing half: when the commercial
+  licence is needed, when it is not, and what it does not include. It states
+  plainly that AGPL compliance costs nothing and is not a lesser tier.
+
 - **A conformance statement now grades every check as `proved`, `unproved` or
   `false` instead of true or false.** A boolean cannot tell a reader whether a
   check ran and failed or was never reached, and those need different repairs.
