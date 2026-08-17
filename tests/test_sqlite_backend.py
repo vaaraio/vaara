@@ -6,7 +6,7 @@ from pathlib import Path
 
 import pytest
 
-from vaara.audit.sqlite_backend import SQLiteAuditBackend
+from vaara.audit.sqlite_backend import CORRUPT_ROW_LOG_LIMIT, SQLiteAuditBackend
 from vaara.audit.trail import AuditTrail, EventType
 from vaara.taxonomy.actions import (
     ActionCategory,
@@ -364,6 +364,120 @@ class TestSkeletonRecordsCounter:
         fresh = AuditTrail()
         assert fresh.skeleton_records == 0
         assert fresh.persistence_failures == 0
+
+    def test_corrupt_row_logging_is_capped(
+        self, db_path, sample_action_type, caplog
+    ):
+        """A trail damaged by an older writer holds tens of thousands of bad
+        rows. One ERROR line each turned every reload into megabytes of
+        stderr, and hook-driven callers persist stderr to disk, so the log
+        itself became the bigger failure. Cap the detail, keep the count.
+        """
+        import logging
+        import sqlite3
+
+        backend = SQLiteAuditBackend(db_path)
+        trail = AuditTrail(on_record=backend.write_record)
+        for i in range(12):
+            trail.record_action_requested(
+                ActionRequest(
+                    agent_id=f"agent-{i}", tool_name="tx.transfer",
+                    action_type=sample_action_type,
+                )
+            )
+
+        conn = sqlite3.connect(str(db_path))
+        conn.execute("UPDATE audit_records SET data = 'not-json'")
+        conn.commit()
+        conn.close()
+
+        with caplog.at_level(logging.ERROR, logger="vaara.audit.sqlite_backend"):
+            reloaded = backend.load_trail()
+
+        per_row = [
+            r for r in caplog.records
+            if r.getMessage().startswith("load_trail: corrupt record row")
+        ]
+        summary = [
+            r for r in caplog.records
+            if "corrupt record rows" in r.getMessage()
+        ]
+        assert reloaded.skeleton_records == 12   # every bad row still counted
+        assert len(per_row) == CORRUPT_ROW_LOG_LIMIT
+        assert len(summary) == 1
+        assert "12" in summary[0].getMessage()   # the total is not lost
+
+    def test_query_corrupt_row_logging_is_capped(
+        self, db_path, sample_action_type, caplog
+    ):
+        """Same defect on the query path: _safe_row_to_record logged once per
+        bad row, on every query, for the life of the process.
+        """
+        import logging
+        import sqlite3
+
+        backend = SQLiteAuditBackend(db_path)
+        trail = AuditTrail(on_record=backend.write_record)
+        for i in range(12):
+            trail.record_action_requested(
+                ActionRequest(
+                    agent_id="agent", tool_name="tx.transfer",
+                    action_type=sample_action_type,
+                )
+            )
+
+        conn = sqlite3.connect(str(db_path))
+        conn.execute("UPDATE audit_records SET data = 'not-json'")
+        conn.commit()
+        conn.close()
+
+        with caplog.at_level(logging.ERROR, logger="vaara.audit.sqlite_backend"):
+            backend.query_by_agent("agent")      # 12 bad rows, 5 logged
+            backend.query_by_agent("agent")      # second query stays quiet
+
+        per_row = [
+            r for r in caplog.records
+            if r.getMessage().startswith("query: corrupt record row")
+        ]
+        assert len(per_row) == CORRUPT_ROW_LOG_LIMIT
+        assert backend.corrupt_query_rows >= 12   # the count keeps rising
+
+    def test_blob_text_columns_do_not_crash_load(self, db_path, sample_action_type):
+        """A writer that bound bytes instead of str leaves every TEXT column
+        holding a BLOB. Those values reached the skeleton record unchanged and
+        compute_hash() then died on json.dumps(bytes), so load_trail raised
+        TypeError instead of degrading — the opposite of the guarantee. Seen
+        on a real trail: 19,417 rows, every text column a BLOB.
+        """
+        import sqlite3
+
+        backend = SQLiteAuditBackend(db_path)
+        trail = AuditTrail(on_record=backend.write_record)
+        for i in range(3):
+            trail.record_action_requested(
+                ActionRequest(
+                    agent_id=f"agent-{i}", tool_name="tx.transfer",
+                    action_type=sample_action_type,
+                )
+            )
+
+        conn = sqlite3.connect(str(db_path))
+        for col in ("record_id", "action_id", "event_type", "agent_id",
+                    "tool_name", "data", "regulatory", "previous_hash",
+                    "record_hash"):
+            conn.execute(
+                f"UPDATE audit_records SET {col} = CAST({col} AS BLOB)"
+            )
+        conn.commit()
+        conn.close()
+
+        reloaded = backend.load_trail()          # must not raise
+        assert reloaded.skeleton_records == 3
+        # The damage stays visible rather than crashing the reader.
+        assert reloaded.verify_chain() is not None
+        # Skeletons carry decoded identifiers, not b'...' repr noise.
+        assert isinstance(reloaded._records[0].record_id, str)
+        assert not reloaded._records[0].record_id.startswith("b'")
 
     def test_pipeline_status_exposes_skeleton_count(self):
         # Fresh pipeline has zero skeletons

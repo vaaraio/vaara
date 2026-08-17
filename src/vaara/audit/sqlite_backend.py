@@ -39,6 +39,29 @@ logger = logging.getLogger(__name__)
 
 SCHEMA_VERSION = 6
 
+# How many individual corrupt rows get a detailed log line before the rest
+# collapse into a single count. A trail damaged by an older writer holds tens
+# of thousands of bad rows at once, and one line each turns every reload into
+# megabytes of stderr — which hook-driven callers persist to disk, so the
+# logging becomes a larger failure than the corruption it reports. The count
+# is always exact; only the per-row detail is capped.
+CORRUPT_ROW_LOG_LIMIT = 5
+
+
+def _as_text(value: Any) -> str:
+    """Coerce a column value to str, decoding bytes.
+
+    A writer that bound Python ``bytes`` instead of ``str`` leaves TEXT
+    columns holding BLOBs. Those values reach skeleton records unchanged, and
+    ``AuditRecord.compute_hash`` then dies on ``json.dumps`` of bytes — so a
+    reload that was supposed to degrade gracefully takes the whole process
+    down instead. Decode here so the skeleton is hashable and the chain
+    verification can report the damage rather than crash on it.
+    """
+    if isinstance(value, bytes):
+        return value.decode("utf-8", "replace")
+    return value if isinstance(value, str) else ""
+
 
 def _scrub_nonfinite(obj: Any) -> Any:
     # Strict JSON (RFC 8259) forbids NaN/Infinity tokens. Python's default
@@ -372,6 +395,7 @@ class SQLiteAuditBackend:
             check_same_thread=False,
         )
         self._lock = threading.Lock()
+        self._corrupt_query_rows = 0
         # sqlite3.connect() does not touch the file, so a damaged database
         # first surfaces here, on the pragma that reads page 1. The raw
         # DatabaseError ("file is not a database") names neither the path nor
@@ -815,33 +839,34 @@ class SQLiteAuditBackend:
         for row in rows:
             try:
                 record = self._row_to_record(row)
-            except (json.JSONDecodeError, ValueError, KeyError) as exc:
+            except (json.JSONDecodeError, ValueError, KeyError, TypeError) as exc:
                 # Single-row corruption must not destroy the rest of the
                 # audit reload. Reconstruct a "skeleton" record with empty
                 # dicts and the raw hashes preserved; verify_chain() will
                 # then flag the row via hash mismatch (original data was
                 # part of the hash input), so corruption stays visible.
                 corrupt_rows += 1
-                logger.error(
-                    "load_trail: corrupt record row seq=%s record_id=%s (%s: %s) — "
-                    "loading skeleton; hash-chain verification will flag it",
-                    row[10], row[0], type(exc).__name__, exc,
-                )
+                if corrupt_rows <= CORRUPT_ROW_LOG_LIMIT:
+                    logger.error(
+                        "load_trail: corrupt record row seq=%s record_id=%s (%s: %s) — "
+                        "loading skeleton; hash-chain verification will flag it",
+                        row[10], row[0], type(exc).__name__, exc,
+                    )
                 try:
-                    skeleton_event_type = EventType(row[2])
+                    skeleton_event_type = EventType(_as_text(row[2]))
                 except (ValueError, KeyError):
                     skeleton_event_type = EventType.ACTION_REQUESTED
                 record = AuditRecord(
-                    record_id=row[0],
-                    action_id=row[1],
+                    record_id=_as_text(row[0]),
+                    action_id=_as_text(row[1]),
                     event_type=skeleton_event_type,
                     timestamp=row[3] if isinstance(row[3], (int, float)) else 0.0,
-                    agent_id=row[4] or "",
-                    tool_name=row[5] or "",
+                    agent_id=_as_text(row[4]),
+                    tool_name=_as_text(row[5]),
                     data={"_corrupt": True, "_error": str(exc)},
                     regulatory_articles=[],
-                    previous_hash=row[8] or "",
-                    record_hash=row[9] or "",
+                    previous_hash=_as_text(row[8]),
+                    record_hash=_as_text(row[9]),
                 )
             # Inject directly into the trail (bypass on_record to avoid re-write)
             trail._records.append(record)
@@ -854,6 +879,14 @@ class SQLiteAuditBackend:
         # (write side). Regulator-facing dashboards / Article 12(2)
         # monitoring should surface both.
         trail._skeleton_records = corrupt_rows
+        if corrupt_rows > CORRUPT_ROW_LOG_LIMIT:
+            logger.error(
+                "load_trail: %d corrupt record rows in %s (%d detailed above, "
+                "%d not logged) — loaded as skeletons; run `vaara verify-chain` "
+                "for the full picture",
+                corrupt_rows, self._db_path, CORRUPT_ROW_LOG_LIMIT,
+                corrupt_rows - CORRUPT_ROW_LOG_LIMIT,
+            )
 
         chain_error = trail.verify_chain()
         if chain_error:
@@ -879,16 +912,45 @@ class SQLiteAuditBackend:
             ).fetchone()
         return row[0]
 
+    @property
+    def corrupt_query_rows(self) -> int:
+        """Corrupt rows skipped by the query path over this backend's life.
+
+        The read-path analogue of ``AuditTrail.skeleton_records``. Per-row
+        logging is capped (see ``CORRUPT_ROW_LOG_LIMIT``), so this counter is
+        the reliable signal for ops dashboards.
+        """
+        return self._corrupt_query_rows
+
     def _safe_row_to_record(self, row: tuple) -> Optional[AuditRecord]:
         """Convert a DB row to AuditRecord, returning None on corrupt rows."""
         try:
             return self._row_to_record(row)
         except (json.JSONDecodeError, ValueError, KeyError, TypeError) as exc:
-            logger.error(
-                "query: corrupt record row seq=%s record_id=%s (%s: %s) — skipped",
-                row[10] if len(row) > 10 else "?", row[0] if row else "?",
-                type(exc).__name__, exc,
-            )
+            # Unlike load_trail, this runs once per row per query, so the cap
+            # has to hold for the life of the backend rather than one call —
+            # otherwise a damaged trail re-floods the log on every query.
+            self._corrupt_query_rows += 1
+            seen = self._corrupt_query_rows
+            if seen <= CORRUPT_ROW_LOG_LIMIT:
+                logger.error(
+                    "query: corrupt record row seq=%s record_id=%s (%s: %s) — skipped",
+                    row[10] if len(row) > 10 else "?", row[0] if row else "?",
+                    type(exc).__name__, exc,
+                )
+                if seen == CORRUPT_ROW_LOG_LIMIT:
+                    logger.error(
+                        "query: further corrupt rows in %s will be counted but not "
+                        "logged (see backend.corrupt_query_rows); enable DEBUG for "
+                        "per-row detail",
+                        self._db_path,
+                    )
+            else:
+                logger.debug(
+                    "query: corrupt record row seq=%s record_id=%s (%s: %s) — skipped",
+                    row[10] if len(row) > 10 else "?", row[0] if row else "?",
+                    type(exc).__name__, exc,
+                )
             return None
 
     def query_by_action(self, action_id: str) -> list[AuditRecord]:
