@@ -17,6 +17,11 @@ body:
         pip install cryptography rfc8785
         python scripts/conformance_runner.py
         ```
+
+        The runner prints a link at the end that opens this form with your
+        commit, suites and totals already filled in, so you only add your name
+        and where you reported it. A result that failed is as welcome as one
+        that passed.
   - type: input
     id: party
     attributes:

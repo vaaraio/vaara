@@ -34,6 +34,7 @@ import json
 import subprocess
 import sys
 import time
+import urllib.parse
 from datetime import datetime, timezone
 from pathlib import Path
 from typing import Any, Optional
@@ -144,6 +145,75 @@ def build_report(rows: list[dict[str, Any]], vectors_dir: Path, stamp: str) -> d
     }
 
 
+#: Where a reproduction gets listed. The issue form is a self-service desk: a
+#: workflow reads the issue, validates it, publishes the row and comments back
+#: with a badge. Nothing is merged and no maintainer approves anything.
+VCR_FORM = "https://github.com/vaaraio/vaara/issues/new"
+VCR_TEMPLATE = "conformance-row.yml"
+
+
+def _head_commit(repo_root: Path) -> str:
+    """The commit these bytes were graded at, or "" outside a git checkout."""
+    try:
+        out = subprocess.run(["git", "-C", str(repo_root), "rev-parse", "HEAD"],
+                             capture_output=True, text=True, timeout=10)
+        return out.stdout.strip() if out.returncode == 0 else ""
+    except Exception:  # noqa: BLE001
+        return ""
+
+
+def submit_link(report: dict, repo_root: Path, selected=None) -> str:
+    """A one-click link that opens the listing form already filled in.
+
+    Added 2026-08-17. The runner used to print a table and stop, so anyone who
+    wanted their result listed had to read numbers off a terminal and retype
+    them into a web form. Everything the form needs except the person's own
+    name and their public write-up is already known here, so it is filled in
+    for them. GitHub issue forms accept prefill through query parameters keyed
+    by field id.
+    """
+    totals = report["totals"]
+    result = (f"{totals['passed']} passed, {totals['failed']} failed, "
+              f"{totals['skipped']} skipped, {totals['cases_passed']} cases")
+    suites = report.get("suites") or []
+    # A skipped suite is still part of a full run, so a whole-corpus run says
+    # so rather than listing forty-two names because one suite skipped.
+    if selected is None:
+        which = f"all {len(suites)} suites"
+    else:
+        names = [r["suite"] for r in suites]
+        which = ", ".join(names[:6]) + (f" and {len(names) - 6} more"
+                                        if len(names) > 6 else "")
+    fields = {
+        "template": VCR_TEMPLATE,
+        "title": "VCR: reproduction by ",
+        "suites": which,
+        "result": result,
+    }
+    commit = _head_commit(repo_root)
+    if commit:
+        fields["at-commit"] = commit
+    return VCR_FORM + "?" + urllib.parse.urlencode(fields)
+
+
+def print_submit_block(report: dict, repo_root: Path, selected=None) -> None:
+    """Two lines and a link. Shown for a failing run too.
+
+    A run that does not pass is still a legitimate row, and an honest one. On
+    2026-08-16 Pablo Play reported 0 of 9 on this corpus with a stated reason,
+    and that reason was more informative than the count. Hiding the link
+    behind a green run would collect only the flattering half.
+    """
+    link = submit_link(report, repo_root, selected)
+    print()
+    print("Want this result listed at vaara.io/conformance.html?")
+    print("Open this link. Your commit, suites and totals are already filled in;")
+    print("add your name and where you reported it, then submit. No install, no PR,")
+    print("no approval step. A row that failed is as welcome as one that passed.")
+    print()
+    print(f"  {link}")
+
+
 def main(argv: Optional[list[str]] = None) -> int:
     parser = argparse.ArgumentParser(
         description="Aggregate runner over the Vaara conformance vector corpus."
@@ -155,6 +225,8 @@ def main(argv: Optional[list[str]] = None) -> int:
     parser.add_argument("--list", action="store_true", help="list discovered suites and exit")
     parser.add_argument("--json", type=Path, metavar="PATH",
                         help="write a machine-readable conformance report to this path")
+    parser.add_argument("--no-submit-link", action="store_true",
+                        help="omit the listing link (for CI and scripted runs)")
     args = parser.parse_args(argv)
 
     vectors_dir = args.vectors_dir.resolve()
@@ -188,11 +260,20 @@ def main(argv: Optional[list[str]] = None) -> int:
     t = report["totals"]
     print(f"\n{t['passed']} passed, {t['failed']} failed, {t['skipped']} skipped "
           f"({t['cases_passed']} cases) across {t['suites']} suites.")
-    if t["failed"]:
+    failed = bool(t["failed"])
+    if failed:
         print(f"FAIL: {', '.join(r['suite'] for r in rows if r['status'] == 'FAIL')}")
-        return 1
-    print("PASS: every suite that ran matched its expected verdicts.")
-    return 0
+    else:
+        print("PASS: every suite that ran matched its expected verdicts.")
+
+    # Shown last so it is the thing still on screen when the run ends, and
+    # shown whether or not the run passed. Deliberately not gated on isatty:
+    # a piped or tee'd run is still a person reading the output, and the whole
+    # value here is that nobody has to go looking for the form.
+    if not args.no_submit_link:
+        print_submit_block(report, Path(__file__).resolve().parent.parent, args.corpus)
+
+    return 1 if failed else 0
 
 
 if __name__ == "__main__":
