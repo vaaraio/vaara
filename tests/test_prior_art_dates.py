@@ -67,6 +67,12 @@ def _github_dates() -> dict[str, str]:
 
     Unauthenticated and paginated; a rate-limited or offline run skips
     rather than failing, same as the PyPI check.
+
+    An empty first page is treated the same way. On 2026-08-17 this endpoint
+    answered HTTP 200 with ``[]`` for a repository holding more than eighty
+    releases, while the per-tag endpoint served every one of them. Reading
+    that as "these releases do not exist" turned a service fault into a
+    failed date claim.
     """
     dates: dict[str, str] = {}
     for page in range(1, 4):
@@ -84,6 +90,11 @@ def _github_dates() -> dict[str, str]:
             pytest.skip(f"GitHub releases unreachable: {exc}")
             return {}  # unreachable, same reason as _pypi_dates
         if not batch:
+            if page == 1:
+                pytest.skip(
+                    "GitHub returned an empty releases list; this repository "
+                    "has many releases, so the endpoint is not answering"
+                )
             break
         for release in batch:
             stamp = release.get("published_at") or release.get("created_at")
