@@ -4,7 +4,7 @@ All notable changes to this project are documented here.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/)
 and this project follows [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
-## [Unreleased]
+## [1.68.0] - 2026-08-17
 
 ### Added
 
@@ -115,9 +115,19 @@ and this project follows [Semantic Versioning](https://semver.org/spec/v2.0.0.ht
   container and Kubernetes versions Vaara supports, and separately records
   which platform versions a release has actually been run against.
 
-## [1.67.1] - 2026-08-14
+- **The conformance runner prints one link that opens the results form with
+  the run already in it.** The runner printed a table of verdicts and stopped
+  there, so anyone who wanted their reproduction listed had to read the numbers
+  off a terminal and retype them. The commit, the suites and the totals are all
+  known at the end of a run, so they are now carried into the form. The link is
+  printed for a failing run as well, because a result that did not pass is a
+  legitimate row and gating the link behind a green run would collect only the
+  results that passed. `--no-submit-link` omits it for CI and scripted runs.
 
-Everything here was found by opening the pages and looking at them.
+- **The rendered text of `draft-sirkkavaara-vaara-receipt-07` is in the tree.**
+  The `ietf/` directory carried 00 through 06 and the -07 text lived only on
+  the datatracker, so the readable timeline of the format had a hole in it at
+  the newest revision.
 
 ### Fixed
 
@@ -144,6 +154,13 @@ Everything here was found by opening the pages and looking at them.
   readable on macOS or Windows without platform calls. Those keep WAL, and
   `docs/supported-platforms.md` states that limit. 12 tests in
   `tests/test_journal_mode_shared_fs.py`.
+
+## [1.67.1] - 2026-08-14
+
+Everything here was found by opening the pages and looking at them.
+
+### Fixed
+
 - **The dashboard called itself read-only in three places and is not.**
   The startup banner, the command docstring and the `--help` line all said so,
   while `/api/config` writes the `config.json` the gate reads and `/api/policy`

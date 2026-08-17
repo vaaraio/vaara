@@ -16,7 +16,8 @@
 #      working tree clean except for the staged release changes.
 #   2. Bumps version in pyproject.toml + clients/ts/package.json +
 #      src/vaara/__init__.py + server.json + server-vaara-server.json +
-#      the Claude Code plugin manifest.
+#      the Claude Code plugin manifest + the Helm chart appVersion +
+#      docs/supported-platforms.md.
 #   3. ruff check on changed Python paths.
 #   4. pytest --no-header on the full suite (skips the adversarial data dir).
 #   5. Stages explicit paths (no `git add -A`).
@@ -93,6 +94,13 @@ sed "${SED_I[@]}" "s/(\"version\": \")[0-9]+\.[0-9]+\.[0-9]+(\")/\1${VERSION}\2/
 PLUGIN_MANIFEST="plugins/claude-code-vaara-governance/.claude-plugin/plugin.json"
 sed "${SED_I[@]}" "s/^  \"version\": \"[0-9]+\.[0-9]+\.[0-9]+\",$/  \"version\": \"${VERSION}\",/" \
   "$PLUGIN_MANIFEST"
+# Helm chart appVersion and the platform support page. tests/test_helm_chart.py
+# asserts both equal vaara.__version__, so leaving them out of the bump fails
+# the suite at step 4 after eight minutes rather than at the sed above.
+CHART="deploy/helm/vaara/Chart.yaml"
+PLATFORMS="docs/supported-platforms.md"
+sed "${SED_I[@]}" "s/^appVersion: \"[0-9]+\.[0-9]+\.[0-9]+\"$/appVersion: \"${VERSION}\"/" "$CHART"
+sed "${SED_I[@]}" "s/^Vaara [0-9]+\.[0-9]+\.[0-9]+, Helm chart/Vaara ${VERSION}, Helm chart/" "$PLATFORMS"
 
 grep -E "^version = \"${VERSION}\"$" pyproject.toml >/dev/null
 grep -E "\"version\": \"${VERSION}\"" clients/ts/package.json >/dev/null
@@ -100,6 +108,8 @@ grep -E "^__version__ = \"${VERSION}\"$" src/vaara/__init__.py >/dev/null
 grep -E "\"version\": \"${VERSION}\"" server.json >/dev/null
 grep -E "\"version\": \"${VERSION}\"" server-vaara-server.json >/dev/null
 grep -E "\"version\": \"${VERSION}\"" "$PLUGIN_MANIFEST" >/dev/null
+grep -E "^appVersion: \"${VERSION}\"$" "$CHART" >/dev/null
+grep -E "^Vaara ${VERSION}, Helm chart" "$PLATFORMS" >/dev/null
 
 # 3. Lint changed paths (best-effort; lint all of src + tests if no
 # precise change list)
@@ -129,6 +139,7 @@ fi
 git add CHANGELOG.md pyproject.toml clients/ts/package.json src/vaara/__init__.py \
   server.json server-vaara-server.json \
   plugins/claude-code-vaara-governance/.claude-plugin/plugin.json \
+  deploy/helm/vaara/Chart.yaml docs/supported-platforms.md \
   scripts/release_prepare.sh
 # Re-add any other paths the caller has already staged
 git status --short

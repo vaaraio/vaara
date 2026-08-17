@@ -1,6 +1,6 @@
 {
   "name": "vaara-governance",
-  "version": "1.67.1",
+  "version": "1.68.0",
   "description": "Accountable autonomy for Claude Code. PreToolUse runs a two-layer check on Bash, WebFetch, WebSearch, Write, Edit, NotebookEdit, Task, SendMessage and MCP calls (regex deny patterns on shell, web and file mutation; conformal risk scorer on MCP). PostToolUse writes a hash-chained SQLite audit record across the same set, so file writes and subagent spawns land in the trail. Blocks and escalations pop a desktop notification (macOS/Linux). /vaara-setup configures mode, protection level, and notifications in plain language via ~/.vaara/claude-code/config.json; /vaara-stats prints a summary of the audit trail.",
   "author": {
     "name": "Vaara",
