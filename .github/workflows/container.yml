@@ -6,8 +6,17 @@ name: Container image
 #
 # Kept out of release.yml on purpose: a failure here must not be able to abort
 # a PyPI or npm publish that has already started.
+#
+# The trigger is the tag push, not the published release. release.yml creates
+# the GitHub Release with the default GITHUB_TOKEN, and a release created that
+# way does not start other workflows, so `release: published` never fired here
+# and no versioned image was ever pushed. The `release` trigger is kept for a
+# release published by hand.
 
 on:
+  push:
+    tags:
+      - "v*"
   release:
     types: [published]
   workflow_dispatch:
@@ -71,7 +80,7 @@ jobs:
           images: ghcr.io/${{ github.repository_owner }}/vaara
           tags: |
             type=raw,value=${{ inputs.tag || steps.version.outputs.version }}
-            type=raw,value=latest,enable=${{ github.event_name == 'release' }}
+            type=raw,value=latest,enable=${{ github.event_name == 'release' || startsWith(github.ref, 'refs/tags/v') }}
 
       # arm64 is not decoration: Rancher clusters on Ampere and on Apple
       # silicon development machines are both common, and SUSE publishes BCI
