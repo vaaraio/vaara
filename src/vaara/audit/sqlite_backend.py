@@ -7,7 +7,8 @@ to SQLite as it arrives (via on_record callback) and can reconstruct the
 full trail from disk.
 
 Design principles:
-- **WAL mode** for concurrent read/write (readers never block writers)
+- **WAL mode** for concurrent read/write (readers never block writers), except
+  on filesystems that cannot support it — see ``_journal_mode_for``
 - **Append-only** — no UPDATE or DELETE, matching the immutability guarantee
 - **Hash chain verified on load** — detects on-disk tampering
 - **Regulatory domain indexed** — fast compliance queries by regulation
@@ -23,6 +24,7 @@ from __future__ import annotations
 import json
 import logging
 import math
+import os
 import sqlite3
 import threading
 import time
@@ -57,6 +59,115 @@ def _scrub_nonfinite(obj: Any) -> Any:
 
 def _strict_json_dumps(obj: Any) -> str:
     return json.dumps(_scrub_nonfinite(obj), allow_nan=False, default=str)
+
+
+# WAL coordinates readers and writers through an mmap'd shared-memory segment,
+# the "-shm" file. SQLite's documentation is explicit that WAL needs coherent
+# shared memory and working file locking, and that it does not work on network
+# filesystems. Where those are missing the failure is not a refused write: the
+# database corrupts. That is the worst possible outcome for the one file whose
+# purpose is being evidence, so on these filesystems the trail uses DELETE
+# journalling instead, which needs no shared memory at all.
+_WAL_UNSAFE_FSTYPES = frozenset({
+    "9p",           # QEMU / WSL1 style host shares
+    "afpfs",
+    "ceph",
+    "cifs",
+    "glusterfs",
+    "lustre",
+    "ncpfs",
+    "nfs",
+    "nfs4",
+    "smb2",
+    "smb3",
+    "smbfs",
+    "virtiofs",     # Docker Desktop, Rancher Desktop, Colima, Lima, OrbStack
+    "vboxsf",
+    "vmhgfs",
+})
+
+# Every FUSE filesystem goes through a userspace server, and none of them
+# promise SQLite's shared-memory semantics. gRPC-FUSE (Docker Desktop's other
+# mount type), sshfs, s3fs and gcsfuse all land here.
+_FUSE_PREFIX = "fuse"
+
+_PROC_MOUNTS = Path("/proc/mounts")
+
+_JOURNAL_MODE_ENV = "VAARA_TRAIL_JOURNAL_MODE"
+
+
+def _unescape_mount_field(field: str) -> str:
+    # /proc/mounts octal-escapes space, tab, newline and backslash.
+    for escape, char in (
+        (r"\040", " "), (r"\011", "\t"), (r"\012", "\n"), (r"\134", "\\"),
+    ):
+        field = field.replace(escape, char)
+    return field
+
+
+def _fstype_for(path: Path) -> Optional[str]:
+    """Return the filesystem type ``path`` sits on, or None if unknown.
+
+    Linux only, deliberately. ``/proc/mounts`` is the one place a filesystem
+    type is available without ctypes or a subprocess, and Linux is where the
+    real-world exposure is: containers with the home directory bind-mounted
+    in, WSL2 writing to /mnt/c, and NFS home directories. On macOS and
+    Windows this returns None and the caller keeps the old behaviour rather
+    than pretending to a coverage it does not have.
+    """
+    try:
+        raw = _PROC_MOUNTS.read_text()
+    except OSError:
+        return None
+
+    target = str(path)
+    best_len, best_fstype = -1, None
+    for line in raw.splitlines():
+        fields = line.split()
+        if len(fields) < 3:
+            continue
+        mount_point = _unescape_mount_field(fields[1])
+        # A mount at /home covers /home/x but not /homework.
+        if target == mount_point or target.startswith(mount_point.rstrip("/") + "/"):
+            if len(mount_point) > best_len:
+                best_len, best_fstype = len(mount_point), _unescape_mount_field(fields[2])
+    return best_fstype
+
+
+def _is_wal_unsafe(fstype: Optional[str]) -> bool:
+    if not fstype:
+        return False
+    return fstype in _WAL_UNSAFE_FSTYPES or fstype.split(".")[0] == _FUSE_PREFIX
+
+
+def _journal_mode_for(db_path: Path, in_memory: bool = False) -> str:
+    """Pick WAL or DELETE for this trail, and say so once if it is not WAL."""
+    override = os.environ.get(_JOURNAL_MODE_ENV, "").strip().lower()
+    if override in {"wal", "delete"}:
+        fstype = None if in_memory else _fstype_for(db_path)
+        if override == "wal" and _is_wal_unsafe(fstype):
+            logger.warning(
+                "%s=wal forces WAL journalling for the audit trail at %s, which "
+                "is on %s. That filesystem cannot provide the shared memory WAL "
+                "needs, and the trail may corrupt. Unset the variable to let "
+                "Vaara choose.",
+                _JOURNAL_MODE_ENV, db_path, fstype,
+            )
+        return override
+
+    if in_memory:
+        return "wal"
+
+    fstype = _fstype_for(db_path)
+    if _is_wal_unsafe(fstype):
+        logger.warning(
+            "the audit trail at %s is on a %s filesystem, which cannot support "
+            "the shared memory WAL journalling needs; using DELETE journal mode "
+            "instead to keep the trail intact. Set %s=wal to override.",
+            db_path, fstype, _JOURNAL_MODE_ENV,
+        )
+        return "delete"
+    return "wal"
 
 # Schema v2 — full DDL for fresh databases.
 # Migrations for v1 to v2 upgrades are in _MIGRATIONS below.
@@ -267,7 +378,9 @@ class SQLiteAuditBackend:
         # the fact that this is the audit trail, which sent more than one
         # investigation after the wrong thing. Say what broke and where.
         try:
-            self._enable_wal()
+            self._set_journal_mode(
+                _journal_mode_for(self._db_path, in_memory=str(db_path) == ":memory:")
+            )
             self._conn.execute("PRAGMA synchronous=NORMAL")
             self._conn.execute("PRAGMA foreign_keys=ON")
         except sqlite3.DatabaseError as exc:
@@ -292,8 +405,14 @@ class SQLiteAuditBackend:
     _WAL_RETRIES = 10
     _WAL_RETRY_SLEEP = 0.05
 
-    def _enable_wal(self) -> None:
-        """Switch to WAL, tolerating another process opening the same file.
+    @property
+    def journal_mode(self) -> str:
+        """The journal mode this trail is actually running in, lowercased."""
+        with self._lock:
+            return str(self._conn.execute("PRAGMA journal_mode").fetchone()[0]).lower()
+
+    def _set_journal_mode(self, mode: str) -> None:
+        """Switch journal mode, tolerating another process opening the file.
 
         Two Vaara processes creating one audit.db at the same moment — the
         Claude Code hook and an MCP server starting together — had one of
@@ -302,15 +421,17 @@ class SQLiteAuditBackend:
         (database is locked)". That message says the evidence file is
         damaged. It was not damaged, it was half a second early.
 
-        A file already in WAL answers this pragma without needing the lock,
-        so the retry only ever runs on first creation. If the lock is still
-        held after that, the database opens in the journal mode it is already
-        in: worse concurrency, but recording evidence beats refusing to.
+        A file already in the requested mode answers this pragma without
+        needing the lock, so the retry only ever runs on first creation or on
+        a real change of mode. If the lock is still held after that, the
+        database opens in the journal mode it is already in: worse
+        concurrency, but recording evidence beats refusing to.
         """
+        statement = f"PRAGMA journal_mode={mode.upper()}"
         last: Optional[sqlite3.OperationalError] = None
         for _ in range(self._WAL_RETRIES):
             try:
-                self._conn.execute("PRAGMA journal_mode=WAL")
+                self._conn.execute(statement)
                 return
             except sqlite3.OperationalError as exc:
                 msg = str(exc).lower()
@@ -319,10 +440,10 @@ class SQLiteAuditBackend:
                 last = exc
                 time.sleep(self._WAL_RETRY_SLEEP)
         logger.warning(
-            "audit DB %s stayed locked while enabling WAL (%s); continuing in "
-            "the existing journal mode. Another Vaara process is opening the "
-            "same file.",
-            self._db_path, last,
+            "audit DB %s stayed locked while setting journal mode %s (%s); "
+            "continuing in the existing journal mode. Another Vaara process is "
+            "opening the same file.",
+            self._db_path, mode.upper(), last,
         )
 
     @contextmanager

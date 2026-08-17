@@ -121,6 +121,29 @@ Everything here was found by opening the pages and looking at them.
 
 ### Fixed
 
+- **The audit trail turned on WAL journalling everywhere, including on
+  filesystems that cannot support it, and corrupted itself there.** SQLite's
+  WAL journal coordinates readers and writers through a shared-memory segment,
+  and SQLite's documentation states that WAL needs coherent shared memory and
+  working file locking. virtiofs, 9p, NFS, SMB and FUSE mounts provide neither.
+  There the write still goes through and the database corrupts, in the one file
+  whose purpose is being evidence.
+
+  This is the ordinary way people try the tool. The trail defaults to
+  `~/.vaara/trail/audit.db`, and a container with the host home directory bind
+  mounted in puts that on virtiofs or FUSE without anyone choosing it. Docker
+  Desktop, Rancher Desktop, Colima, Lima and OrbStack all mount that way, as do
+  WSL2 writing to `/mnt/c` and NFS or SMB network homes. On one such machine
+  the trail was damaged four times in twelve days.
+
+  Vaara now reads `/proc/mounts` when it opens a trail, and on a filesystem
+  that cannot support WAL it uses the DELETE journal instead and logs one line
+  naming the path, the filesystem type and what it did. Everywhere else is
+  unchanged. `VAARA_TRAIL_JOURNAL_MODE=wal|delete` overrides the choice in
+  either direction. Detection is Linux-only, because a filesystem type is not
+  readable on macOS or Windows without platform calls. Those keep WAL, and
+  `docs/supported-platforms.md` states that limit. 12 tests in
+  `tests/test_journal_mode_shared_fs.py`.
 - **The dashboard called itself read-only in three places and is not.**
   The startup banner, the command docstring and the `--help` line all said so,
   while `/api/config` writes the `config.json` the gate reads and `/api/policy`

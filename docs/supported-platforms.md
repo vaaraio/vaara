@@ -51,6 +51,40 @@ pod appending to the same volume produces a chain neither pod can verify.
 [multi-replica-deployment.md](multi-replica-deployment.md) covers what to do
 instead when one proxy is not enough.
 
+## Filesystems for the audit trail
+
+SQLite's WAL journal coordinates readers and writers through a shared-memory
+segment, and SQLite's own documentation states that WAL needs coherent shared
+memory and working file locking. Several filesystems people mount a home
+directory from provide neither. On those the write still goes through and the
+database corrupts.
+
+Vaara reads `/proc/mounts` when it opens a trail and, if the file sits on one
+of these, uses the DELETE journal instead and logs one line saying so:
+
+`9p`, `afpfs`, `ceph`, `cifs`, `glusterfs`, `lustre`, `ncpfs`, `nfs`, `nfs4`,
+`smb2`, `smb3`, `smbfs`, `vboxsf`, `virtiofs`, `vmhgfs`, and any `fuse*`
+filesystem.
+
+That covers the common cases: a container with the host home directory bind
+mounted in (Docker Desktop, Rancher Desktop, Colima, Lima, OrbStack all use
+virtiofs or FUSE), WSL2 writing to `/mnt/c`, and NFS or SMB network homes.
+
+| | |
+| --- | --- |
+| Detection | Linux only; `/proc/mounts` is the only portable source of a filesystem type |
+| Elsewhere | macOS and Windows keep WAL, since the type is not readable without platform calls |
+| Override | `VAARA_TRAIL_JOURNAL_MODE=wal` or `=delete`, in either direction |
+
+DELETE journalling costs concurrency. Readers block writers where WAL would let
+them run together, and durability is unaffected. For a trail written by one
+process, which is what the hash chain requires anyway, the difference does not
+show.
+
+If the trail lives on a network or virtual filesystem, the better answer is to
+move it. In a container, put it on a named volume rather than a bind mount, so
+it sits on the container runtime's own filesystem with real POSIX locking.
+
 ## Verified releases
 
 A row here means the listed Vaara version was installed on the listed platform
