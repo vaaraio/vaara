@@ -89,6 +89,35 @@
     "sourceFormat": "c2pa-manifest",
     "sourceTitle": "C2PA content provenance manifest"
   },
+  "caep_security_event": {
+    "advisory": {
+      "audience": "https://sp.example.com/caep",
+      "eventId": "24c63fb56e5a2d77a6b512616ca9fa24",
+      "framework": "openid-caep-1.0",
+      "issuedAt": 1615305159,
+      "issuer": "https://idp.example.com/123456789/"
+    },
+    "evidencePlane": "decision-input",
+    "missing": [
+      "alg",
+      "signature",
+      "backLink",
+      "receiptAsserted",
+      "outcomeDerived"
+    ],
+    "notes": [
+      "a CAEP Security Event Token reports a change in session, credential, assurance or device state at an identity provider; it is a signal a relying party may act on, not a record of an action taken",
+      "the plane is decision-input: the event is evidence available before a decision, and asserts nothing about what was decided or executed",
+      "SET signing (RFC 8417 carries these as a signed JWT) is a separate envelope and is not modeled here, so alg, signature and receiptAsserted remain a separate signing event",
+      "per-event members (subject, initiating_entity, reason_admin, reason_user, event_timestamp) sit under a key that is the event-type URI; resolve_path splits on '.' and those URIs contain dots, so they cannot be lifted into advisory today. Detection reaches them via anyKeyStartsWith; lifting them needs key-addressable paths",
+      "the detector pins the CAEP namespace specifically, so a RISC event under https://schemas.openid.net/secevent/risc/event-type/ does not match"
+    ],
+    "populated": [],
+    "recognized": true,
+    "sep2828": {},
+    "sourceFormat": "caep-security-event",
+    "sourceTitle": "OpenID CAEP Security Event Token"
+  },
   "sep2643_rar_denial": {
     "advisory": {
       "authorizationContextId": "authzctx_pay_9f2c",

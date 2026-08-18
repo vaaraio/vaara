@@ -4,6 +4,14 @@ All notable changes to this project are documented here.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/)
 and this project follows [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [Unreleased]
+
+### Added
+
+- Declarative source profiles can detect on object keys. New `anyKeyStartsWith` operator tests whether the object at `path` carries any key with the given prefix. Every operator before this one read values only, and `resolve_path` splits on `.`, so a format whose discriminator is a URI-shaped key was impossible to express: the whole Security Event Token family (CAEP, RISC) and anything keyed by namespace URI. Implemented in the engine and in `tests/vectors/normalize_v0/_check_independent.py`, which reimplements the operators without importing Vaara, so a third party reproduces the same detection.
+- `caep-security-event` source profile: OpenID CAEP Security Event Tokens ingest as `decision-input`. The detector pins the CAEP namespace, so a RISC event does not match. Per-event members sit under the event-type URI key and cannot be lifted into advisory yet; the profile says so in its notes rather than implying coverage it does not have.
+- `test_every_normalize_input_has_an_expected_entry` guards the normalize corpus against silent gaps. `_check_independent.py` iterates `expected.json` and loads the input each key names, so an input with no expected entry was never exercised while the suite still reported every case matched. The ingest corpus already had a guard of this shape; normalize did not, and 14 inputs sat against 13 entries.
+
 ## [1.68.0] - 2026-08-17
 
 ### Added

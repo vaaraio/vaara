@@ -1,0 +1,55 @@
+{
+  "evidence": {
+    "advisory": {
+      "audience": "https://sp.example.com/caep",
+      "eventId": "24c63fb56e5a2d77a6b512616ca9fa24",
+      "framework": "openid-caep-1.0",
+      "issuedAt": 1615305159,
+      "issuer": "https://idp.example.com/123456789/"
+    },
+    "evidencePlane": "decision-input",
+    "missing": [
+      "alg",
+      "signature",
+      "backLink",
+      "receiptAsserted",
+      "outcomeDerived"
+    ],
+    "notes": [
+      "a CAEP Security Event Token reports a change in session, credential, assurance or device state at an identity provider; it is a signal a relying party may act on, not a record of an action taken",
+      "the plane is decision-input: the event is evidence available before a decision, and asserts nothing about what was decided or executed",
+      "SET signing (RFC 8417 carries these as a signed JWT) is a separate envelope and is not modeled here, so alg, signature and receiptAsserted remain a separate signing event",
+      "per-event members (subject, initiating_entity, reason_admin, reason_user, event_timestamp) sit under a key that is the event-type URI; resolve_path splits on '.' and those URIs contain dots, so they cannot be lifted into advisory today. Detection reaches them via anyKeyStartsWith; lifting them needs key-addressable paths",
+      "the detector pins the CAEP namespace specifically, so a RISC event under https://schemas.openid.net/secevent/risc/event-type/ does not match"
+    ],
+    "populated": [],
+    "recognized": true,
+    "sep2828": {},
+    "sourceFormat": "caep-security-event",
+    "sourceTitle": "OpenID CAEP Security Event Token"
+  },
+  "record": {
+    "alg": "HS256",
+    "completeness": {
+      "runningCount": 1,
+      "seq": 1
+    },
+    "evidenceRef": {
+      "canonicalization": "JCS",
+      "digest": "sha256:b7dc7deffc0dd1118a56e7afd0522bde1d7eebf7d5a4f3bfbdc6cc898b9f2b96",
+      "schema": "vaara.normalized-evidence/v0"
+    },
+    "ingestAsserted": {
+      "alg": "HS256",
+      "iat": "2026-06-23T00:00:00Z",
+      "iss": "did:web:vaara.io",
+      "nonce": "ingest-fixed-nonce-000000",
+      "secretVersion": "k1",
+      "sub": "sink"
+    },
+    "schema": "vaara.ingest/v0",
+    "signature": "9ca0d8fdc2c5a92af73015c91714c64957ae6a0fb3fdb9cb6b6bb0aa8e9452e5",
+    "sourceFormat": "caep-security-event",
+    "version": 0
+  }
+}

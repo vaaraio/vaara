@@ -77,7 +77,7 @@ def _split_indices(segment: str) -> tuple[str, list[int]]:
     return key, indices
 
 
-_KNOWN_OPS = ("equals", "startsWith", "in", "exists")
+_KNOWN_OPS = ("equals", "startsWith", "in", "exists", "anyKeyStartsWith")
 
 
 def _validate_rule(rule: Any) -> None:
@@ -105,6 +105,16 @@ def _eval_rule(doc: Any, rule: dict[str, Any]) -> bool:
         return value in rule["in"]
     if "exists" in rule:
         return (value is not None) == bool(rule["exists"])
+    if "anyKeyStartsWith" in rule:
+        # Tests the object's KEYS rather than its value. Some formats put the
+        # discriminator in the key: a CAEP Security Event Token names its event
+        # type as a URI key under "events". resolve_path splits on ".", and
+        # those URIs contain dots, so no path can address them and every
+        # value-only operator is blind to the whole SET family.
+        prefix = rule["anyKeyStartsWith"]
+        if not isinstance(value, dict):
+            return False
+        return any(isinstance(k, str) and k.startswith(prefix) for k in value)
     raise ProfileSpecError(f"detect rule has no known operator: {rule!r}")
 
 
