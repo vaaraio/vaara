@@ -3463,17 +3463,18 @@ def _print_tpm_chain_report(v: Any) -> None:
 
 
 def _cmd_export_attestation_result(args: argparse.Namespace) -> int:
-    """Re-express a Vaara attestation verdict as an IETF RATS EAR (Phase 2).
+    """Re-express a Vaara attestation verdict in IETF RATS EAR claims (Phase 2).
 
     Reads the JSON a ``verify-tpm-binding``, ``verify-tpm-chain``, or
     ``verify-enforcement`` ``--json`` run produced and emits a
-    ``vaara.attestation-result/v0`` document: an EAR (draft-ietf-rats-ear) carrying
-    an AR4SI trustworthiness vector, root-agnostic so a Relying Party reads a TPM and
-    a SEV-SNP appraisal the same way. The mapping never claims more than the verdict:
-    while the hardware root is trusted as supplied, the result tops out at the
-    ``warning`` tier and ``affirming`` stays out of reach. The EAR is unsigned (it is
-    the verifier's appraisal result; the evidence it appraises carries its own
-    signatures). Pure standard library; no attestation extra needed.
+    ``vaara.attestation-result/v0`` document: an unprotected claims set carrying the
+    EAR claims (draft-ietf-rats-ear) and an AR4SI trustworthiness vector,
+    root-agnostic so a Relying Party reads a TPM and a SEV-SNP appraisal the same
+    way. It is not an EAR and not an EAT, because both require JWT or CWT protection
+    and this document is keyless by design. The mapping never claims more than the
+    verdict: while the hardware root is trusted as supplied, the result tops out at
+    the ``warning`` tier and ``affirming`` stays out of reach. Pure standard library;
+    no attestation extra needed.
     """
     # Imported from the leaf module so the export path stays base-install (it does
     # not parse evidence, only re-shapes a verdict the verify commands produced).
@@ -6094,15 +6095,17 @@ def build_parser() -> argparse.ArgumentParser:
 
     pear = sub.add_parser(
         "export-attestation-result",
-        help="Re-express an attestation verdict as an IETF RATS EAR "
-             "(draft-ietf-rats-ear) carrying an AR4SI trustworthiness vector "
+        help="Re-express an attestation verdict in IETF RATS EAR claims "
+             "(draft-ietf-rats-ear) with an AR4SI trustworthiness vector "
              "(draft-ietf-rats-ar4si). Reads the JSON a verify-tpm-binding, "
              "verify-tpm-chain, or verify-enforcement --json run produced and emits a "
              "vaara.attestation-result/v0 document, root-agnostic so a Relying Party "
-             "reads a TPM and a SEV-SNP appraisal the same way. The mapping never "
+             "reads a TPM and a SEV-SNP appraisal the same way. The output is an "
+             "unprotected claims set, not an EAR and not an EAT, because both require "
+             "JWT or CWT protection and this document is keyless. The mapping never "
              "claims more than the verdict: while the hardware root is trusted as "
              "supplied the result tops out at the warning tier and affirming stays "
-             "out of reach. The EAR is unsigned. Pure stdlib; no attestation extra.",
+             "out of reach. Pure stdlib; no attestation extra.",
     )
     pear.add_argument(
         "verdict",
@@ -6111,7 +6114,7 @@ def build_parser() -> argparse.ArgumentParser:
     )
     pear.add_argument(
         "--out", default=None,
-        help="Write the EAR document here instead of stdout",
+        help="Write the claim set here instead of stdout",
     )
     pear.add_argument(
         "--iat", type=int, default=None,
@@ -6120,7 +6123,7 @@ def build_parser() -> argparse.ArgumentParser:
     )
     pear.add_argument(
         "--submod", default=None,
-        help="Override the EAR submodule label (defaults to the root type: tpm or "
+        help="Override the submodule label (defaults to the root type: tpm or "
              "sev-snp)",
     )
     pear.set_defaults(func=_cmd_export_attestation_result)
