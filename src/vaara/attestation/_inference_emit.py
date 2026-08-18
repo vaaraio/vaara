@@ -281,19 +281,42 @@ def verify_inference_attestation(
 
 
 def inference_attestation_digest(att: InferenceAttestation) -> str:
-    """``sha256:<hex>`` over the full attestation wire bytes (signature included)."""
-    return "sha256:" + hashlib.sha256(canonical_json(att.to_dict())).hexdigest()
+    """``sha256:<hex>`` over the attestation's signed blocks, signature excluded.
+
+    See :func:`inference_receipt_digest` for why the signature is out.
+    """
+    return "sha256:" + hashlib.sha256(
+        _attestation_signing_payload(att)
+    ).hexdigest()
 
 
 def inference_receipt_digest(receipt: InferenceReceipt) -> str:
-    """``sha256:<hex>`` over the full receipt wire bytes (signature included).
+    """``sha256:<hex>`` over the receipt's signed blocks, signature excluded.
 
     The receipt twin of :func:`inference_attestation_digest`. A session
-    manifest pins both digests per inference, so the same JCS-over-wire formula
-    is used for both: binding the manifest to a hardware root transitively pins
-    every receipt byte-for-byte.
+    manifest pins both digests per inference, so both use the same formula.
+
+    These hashed the full wire bytes with the signature included until
+    2026-08-18, to pin every receipt byte-for-byte. An ES256 signature is not
+    byte-unique for one signing act: given a valid ``(r, s)`` over P-256,
+    ``(r, n - s)`` is also valid over the same payload and the same key, and
+    ``verify_es256`` accepts it because it decodes the pair and re-encodes to
+    DER. Measured here: 200 of 200 signatures produced a verifying twin.
+
+    So the byte-for-byte pin was not achievable, and taking identity from
+    those bytes meant one signing act could yield two receipts that both
+    verify and disagree about which receipt they are. Anyone in transit could
+    produce the second without holding the key. Hashing the signed blocks
+    gives one identity per signing act and still moves whenever signed content
+    moves, which is the property the manifest actually needs.
+
+    ``vaara.audit.timeanchor._signed_payload_digest`` has always worked this
+    way, which is why ``anchoredDigest`` was never exposed. Raised on the SCITT
+    list by Anton Sokolov, 2026-08-18.
     """
-    return "sha256:" + hashlib.sha256(canonical_json(receipt.to_dict())).hexdigest()
+    return "sha256:" + hashlib.sha256(
+        _receipt_signing_payload(receipt)
+    ).hexdigest()
 
 
 def make_inference_back_link(att: InferenceAttestation) -> BackLink:

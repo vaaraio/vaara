@@ -1,0 +1,14 @@
+{
+  "apk": "M/fdl1OvPVU9B8p/YMlC2+zTDO8Du//2oVOIt6i+HuM=",
+  "code": {
+    "alg": "sha-256",
+    "artifact": "cvm-launch-measurement",
+    "digest": "FXtMQ1AcS3mwj8YxafFvrxudqXzka93j2NFXI9vtGGk="
+  },
+  "limits": {
+    "currency": "USD",
+    "scale": 2,
+    "per_payment": 50000
+  },
+  "rails": ["eip155:8453"]
+}

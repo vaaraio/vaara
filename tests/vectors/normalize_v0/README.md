@@ -26,9 +26,37 @@ Each input is a verbatim or near-verbatim example from the source spec.
 | `slsa_provenance.json` | SLSA v1 in-toto provenance (declarative profile) | n/a | nothing required (advisory) |
 | `c2pa_manifest.json` | C2PA content provenance manifest (declarative profile) | n/a | nothing required (advisory) |
 | `agent_decision.json` | in-toto agent-decision/v0.1 policy decision (declarative profile) | decision-attested | nothing required (advisory) |
+| `x402_settlement.json` | x402 settlement response (declarative profile) | outcome | nothing required (advisory) |
+| `ap2_payment_receipt.json` | AP2 payment receipt (declarative profile) | outcome | nothing required (advisory) |
+| `caep_security_event.json` | OpenID CAEP Security Event Token (declarative profile) | decision-input | nothing required (advisory) |
+| `attested_agent_payment.json` | attested agent payment Authorization Scope (declarative profile) | decision-input | nothing required (advisory) |
+| `attested_agent_payment_no_expiry.json` | the same scope with `expiry` dropped | n/a | nothing (not recognized) |
+| `attested_agent_payment_aggregate_no_executor.json` | an aggregate bound with no `executor` | decision-input | nothing required (advisory) |
 | `unknown.json` | unrecognized object | n/a | nothing |
 
 `expected.json` holds the normalized mapping for each input.
+
+## What the attested-agent-payment rows prove
+
+The three payment-scope rows are one positive and two boundary cases against
+draft-hawkins-scitt-attested-agent-payment-01 Section 3.
+
+Dropping `expiry`, a required member of the Section 3 CDDL, drops the document
+out of detection entirely: it normalizes as unrecognized and is still sealed,
+which is the sink's behaviour for any unknown format.
+
+The aggregate case is the more useful one, because it is recognized and should
+not be read as a conformance verdict. Section 3 makes `executor` REQUIRED when
+`limits` carries an aggregate bound, since an aggregate bound is only an
+aggregate if one party serializes spending against it. That is a conditional
+requirement, and the declarative detect grammar has no way to express one: rules
+are flat predicates over paths. So a scope that violates it is still recognized
+and mapped. The profile's notes say so, and this vector is what keeps that
+statement honest.
+
+The scope is deterministic CBOR (RFC 8949 Section 4.2.1) and its scope digest is
+computed over those bytes. Vaara ingests the decoded map, so these vectors pin
+the field mapping and never the scope digest.
 
 The `agent-decision` row covers the closest foreign format to a native signed
 decision record: an in-toto predicate that names the policy verdict, the

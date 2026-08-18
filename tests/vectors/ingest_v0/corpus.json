@@ -3,7 +3,11 @@
   "cases": [
     "agent_decision",
     "ap2_payment_receipt",
+    "attested_agent_payment",
+    "attested_agent_payment_aggregate_no_executor",
+    "attested_agent_payment_no_expiry",
     "c2pa_manifest",
+    "caep_security_event",
     "sep2643_rar_denial",
     "sep2643_scope_denial",
     "sep2643_url_denial",
@@ -15,7 +19,7 @@
     "unknown",
     "x402_settlement"
   ],
-  "corpusDigest": "sha256:58038e9a690a0d528bbdcbe11d339a74b732d60de0d29ffef49da7d069e05ec1",
+  "corpusDigest": "sha256:a66e79b097bfae6539a5ad7b6c69cd0d9e9059c3253e970b144555fe947c94a4",
   "fixed": {
     "iat": "2026-06-23T00:00:00Z",
     "iss": "did:web:vaara.io",
@@ -32,9 +36,25 @@
       "evidenceDigest": "sha256:8e25821806176750c5c05761f0f2a41295e998e2ae77088296be34b41c771400",
       "signature": "3a473787fa0a102a1ef926fb4a73eb96806acdd3a67734b10e8a32f6815f8528"
     },
+    "attested_agent_payment": {
+      "evidenceDigest": "sha256:492354006b6a96c3bc0078fa93d86c7c3e27505a2deb232f580debb6eb0b951e",
+      "signature": "4855bd87ef0c7603cb4a97325e56fb6d65b8fcb90bb007ece6e333761367b3b5"
+    },
+    "attested_agent_payment_aggregate_no_executor": {
+      "evidenceDigest": "sha256:63365d779b0066450edb7cf48210a3df17f54e24732319afce47b0ec2fbdd3f5",
+      "signature": "4af0c1bc6da584680b5f5ec87409a78c088de1deb6957799951627fbb68e9b13"
+    },
+    "attested_agent_payment_no_expiry": {
+      "evidenceDigest": "sha256:51699f76cdeb6fbedf45041ff60720aeaa3a74fe8c846b31990485897638ee69",
+      "signature": "0226a4e0414e58956a822d8317f3130cd91defdac939863fc21a35da6239e646"
+    },
     "c2pa_manifest": {
       "evidenceDigest": "sha256:3d02ab1236af269f497797fe75f08ec772fc1080e66c424a03d53ab54fbe5cf7",
       "signature": "ffb1f8ab39b6436811fd8d969a679fdcb5ee83cfcdf8a2cf804913a9542ca604"
+    },
+    "caep_security_event": {
+      "evidenceDigest": "sha256:b7dc7deffc0dd1118a56e7afd0522bde1d7eebf7d5a4f3bfbdc6cc898b9f2b96",
+      "signature": "9ca0d8fdc2c5a92af73015c91714c64957ae6a0fb3fdb9cb6b6bb0aa8e9452e5"
     },
     "sep2643_rar_denial": {
       "evidenceDigest": "sha256:06e748273802ade556dac8d705c291af7dc6504ab15f25a31cd9ef102cfe245d",

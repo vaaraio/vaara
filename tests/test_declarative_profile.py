@@ -274,3 +274,100 @@ def test_ap2_checkout_receipt_not_claimed_as_payment_receipt():
         "order_id": "ord_789",
     }
     assert detect_format(checkout) != "ap2-payment-receipt"
+
+
+# --- anyKeyStartsWith: detecting on object keys ------------------------------
+#
+# Some formats put their discriminator in an object KEY rather than a value.
+# A CAEP Security Event Token carries its event type as a URI key:
+#
+#   {"events": {"https://schemas.openid.net/secevent/caep/event-type/
+#                session-revoked": {...}}}
+#
+# resolve_path splits on ".", and that key contains dots, so no path can reach
+# it. Every operator before this one tested values only, which left the whole
+# SET family (CAEP, RISC) and anything keyed by namespace URI impossible to
+# express declaratively. Found 2026-08-18 while writing the CAEP profile.
+
+
+def test_any_key_starts_with_matches_a_uri_keyed_event():
+    from vaara.attestation._declarative import compile_profile
+
+    profile = compile_profile({
+        "sourceFormat": "caep-test",
+        "sourceTitle": "CAEP test",
+        "detect": {"all": [
+            {"path": "events",
+             "anyKeyStartsWith": "https://schemas.openid.net/secevent/caep/event-type/"}
+        ]},
+    })
+    doc = {"events": {
+        "https://schemas.openid.net/secevent/caep/event-type/session-revoked": {}
+    }}
+    assert profile.detector(doc) is True
+
+
+def test_any_key_starts_with_rejects_a_different_namespace():
+    from vaara.attestation._declarative import compile_profile
+
+    profile = compile_profile({
+        "sourceFormat": "caep-test",
+        "sourceTitle": "CAEP test",
+        "detect": {"all": [
+            {"path": "events",
+             "anyKeyStartsWith": "https://schemas.openid.net/secevent/caep/event-type/"}
+        ]},
+    })
+    risc = {"events": {
+        "https://schemas.openid.net/secevent/risc/event-type/account-disabled": {}
+    }}
+    assert profile.detector(risc) is False
+
+
+def test_any_key_starts_with_on_a_missing_or_non_dict_path():
+    from vaara.attestation._declarative import compile_profile
+
+    profile = compile_profile({
+        "sourceFormat": "caep-test",
+        "sourceTitle": "CAEP test",
+        "detect": {"all": [{"path": "events", "anyKeyStartsWith": "https://"}]},
+    })
+    assert profile.detector({}) is False
+    assert profile.detector({"events": "not-an-object"}) is False
+    assert profile.detector({"events": []}) is False
+
+
+def test_any_key_starts_with_is_a_known_operator():
+    """A rule carrying only this operator must compile rather than be rejected
+    as operator-less."""
+    from vaara.attestation._declarative import compile_profile
+
+    compile_profile({
+        "sourceFormat": "k", "sourceTitle": "k",
+        "detect": {"all": [{"path": "events", "anyKeyStartsWith": "x"}]},
+    })
+
+
+def test_every_normalize_input_has_an_expected_entry():
+    """No input may sit in the corpus without being checked.
+
+    ``_check_independent.py`` iterates ``expected.json`` and loads the input
+    named by each key, so an input file with no expected entry is never
+    exercised and the suite still reports every case matched. On 2026-08-18 a
+    CAEP fixture was added and the checker reported 13 of 13 matched while
+    silently ignoring it: 14 inputs, 13 entries.
+
+    The ingest corpus already has a drift guard of this shape
+    (``test_corpus_tracks_the_full_input_registry``) and it caught the same
+    fixture immediately. This is that guard for normalize.
+    """
+    import json
+    from pathlib import Path
+
+    root = Path(__file__).resolve().parent / "vectors" / "normalize_v0"
+    inputs = {p.stem for p in (root / "inputs").glob("*.json")}
+    expected = set(json.loads((root / "expected.json").read_text()))
+    assert inputs == expected, (
+        f"inputs without an expected entry: {sorted(inputs - expected)}; "
+        f"expected entries without an input: {sorted(expected - inputs)}"
+    )

@@ -87,7 +87,7 @@ through v0.71.0 were published under Apache 2.0.
 | Post-quantum hybrid-signed execution receipts with the signature suite committed in the signed preimage (a stripped PQC signature is a detectable downgrade) | v0.69.0, 2026-06-11 | `src/vaara/attestation/`, `docs/design/pq-hybrid-signing-spec.md` |
 | TPM 2.0 plus IMA binding of a signed SEP-2828 record, offline-verifiable on commodity hardware (`verify-tpm-binding`) | v0.70.0, 2026-06-12 | `src/vaara/attestation/`, `scripts/tpm/` |
 | Continuous TPM 2.0 plus IMA attestation chain bound to the per-action record (`verify-tpm-chain`) | v0.70.0, 2026-06-12 | `src/vaara/attestation/`, `tests/test_tpm_chain.py` |
-| RATS EAR neutral verify: a Vaara attestation verdict re-expressed as an IETF RATS EAR (draft-ietf-rats-ear) carrying an AR4SI trustworthiness vector (draft-ietf-rats-ar4si), root-agnostic across TPM binding, TPM chain, and SEV-SNP (`export-attestation-result`) | v0.71.0†, 2026-06-16 | `src/vaara/attestation/`, `docs/design/attestation-result-spec.md` |
+| RATS EAR neutral verify: a Vaara attestation verdict re-expressed in IETF RATS EAR claims (draft-ietf-rats-ear) as an unprotected claims set carrying an AR4SI trustworthiness vector (draft-ietf-rats-ar4si), root-agnostic across TPM binding, TPM chain, and SEV-SNP (`export-attestation-result`) | v0.71.0†, 2026-06-16 | `src/vaara/attestation/`, `docs/design/attestation-result-spec.md` |
 | Sovereign inference harness: a local model emits a signed, hardware-rooted inference receipt that a second local model independently cross-checks, with session, chain, cross-check, and determinism verifiers (first public release, AGPL-3.0-or-later) | v1.0.0, 2026-06-16 | `src/vaara/`, `CHANGELOG.md` v1.0.0 |
 | evidenceRef worked example recomputes end to end from real tool-surface bytes (surface bytes to surface hash to drift record to content-addressed `evidenceRef`), so a second implementation can reproduce the whole chain | v1.0.2, 2026-06-17 | `tests/vectors/evidence_ref_v0/`, `CHANGELOG.md` v1.0.2 |
 | Receipt-bound credential broker (the authority layer): the proxy mints a signed, short-lived credential bound to an attestation digest and scoped to one tool plus an args commitment plus tenant, and a gateway refuses any call lacking a valid, unexpired, non-revoked, attestation-bound grant (off by default) | v1.1.0, 2026-06-18 | `src/vaara/credential/`, `docs/design/credential-broker-spec.md` |
@@ -319,7 +319,7 @@ than a judgment of the work.
   tier does not by itself meet EU AI Act Article 12 or DORA, and that
   compliance-grade trust requires a hardware TEE. Vaara's comparable evidence
   is root-agnostic: an Article-12 record is provable with or without a TEE and
-  re-expressible as an IETF RATS EAR carrying an AR4SI vector (v0.71.0,
+  re-expressible in IETF RATS EAR claims carrying an AR4SI vector (v0.71.0,
   2026-06-16), externally time-anchored over RFC 3161 / eIDAS (v0.48.0,
   2026-05-31; self-hosted v1.2.0, 2026-06-19), with gap-evident completeness
   verifiable from the held receipts alone (v1.4.0, 2026-06-21). A TRACE

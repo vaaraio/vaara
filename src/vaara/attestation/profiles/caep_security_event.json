@@ -1,0 +1,29 @@
+{
+  "sourceFormat": "caep-security-event",
+  "sourceTitle": "OpenID CAEP Security Event Token",
+  "priority": 55,
+  "detect": {
+    "all": [
+      {"path": "iss", "exists": true},
+      {"path": "jti", "exists": true},
+      {"path": "iat", "exists": true},
+      {"path": "events", "anyKeyStartsWith": "https://schemas.openid.net/secevent/caep/event-type/"}
+    ]
+  },
+  "evidencePlane": "decision-input",
+  "advisory": {
+    "issuer": "iss",
+    "eventId": "jti",
+    "issuedAt": "iat",
+    "audience": "aud",
+    "framework": {"const": "openid-caep-1.0"}
+  },
+  "missing": ["alg", "signature", "backLink", "receiptAsserted", "outcomeDerived"],
+  "notes": [
+    "a CAEP Security Event Token reports a change in session, credential, assurance or device state at an identity provider; it is a signal a relying party may act on, not a record of an action taken",
+    "the plane is decision-input: the event is evidence available before a decision, and asserts nothing about what was decided or executed",
+    "SET signing (RFC 8417 carries these as a signed JWT) is a separate envelope and is not modeled here, so alg, signature and receiptAsserted remain a separate signing event",
+    "per-event members (subject, initiating_entity, reason_admin, reason_user, event_timestamp) sit under a key that is the event-type URI; resolve_path splits on '.' and those URIs contain dots, so they cannot be lifted into advisory today. Detection reaches them via anyKeyStartsWith; lifting them needs key-addressable paths",
+    "the detector pins the CAEP namespace specifically, so a RISC event under https://schemas.openid.net/secevent/risc/event-type/ does not match"
+  ]
+}
