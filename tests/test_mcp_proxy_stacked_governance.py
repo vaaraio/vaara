@@ -25,8 +25,6 @@ from __future__ import annotations
 
 import json
 
-import pytest
-
 from vaara.integrations.mcp_proxy import detect_stacked_governance
 
 
