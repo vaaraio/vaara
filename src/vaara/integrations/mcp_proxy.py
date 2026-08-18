@@ -1804,6 +1804,68 @@ class VaaraMCPProxy:
             self._backend.close()
 
 
+_STACKED_HOOK_MARKER = "vaara hook pre-tool-use"
+
+
+def _vaara_deciding_hook(path: Path) -> Optional[str]:
+    """Return the PreToolUse command that runs Vaara in ``path``, or None.
+
+    Only PreToolUse counts. PostToolUse reports an outcome for a call that
+    was already decided, so it is not a second decision point.
+    """
+    try:
+        data = json.loads(path.read_text())
+    except Exception:
+        return None  # advisory only; see detect_stacked_governance
+    if not isinstance(data, dict):
+        return None
+    for entry in (data.get("hooks") or {}).get("PreToolUse") or []:
+        if not isinstance(entry, dict):
+            continue
+        for hook in entry.get("hooks") or []:
+            command = (hook or {}).get("command") if isinstance(hook, dict) else None
+            if isinstance(command, str) and _STACKED_HOOK_MARKER in command:
+                return command
+    return None
+
+
+def detect_stacked_governance(env: Optional[dict[str, str]] = None) -> Optional[str]:
+    """Detect a second Vaara governance layer in front of this proxy.
+
+    Returns a human-readable "<settings file>: <command>" when the client is
+    Claude Code and a Vaara PreToolUse hook is registered, else None.
+
+    Why this exists. The hook decides every tool call the client makes; this
+    proxy decides the MCP wire traffic. Both are correct in isolation, and
+    running both means one action is decided twice and written to the trail
+    twice under two names — namespaced (``mcp__serena__find_symbol``) from
+    the hook, bare (``find_symbol``) from here. The chain stays valid and
+    every verifier still passes. It just counts one thing as two, and no
+    line of code is wrong, which is why a code-level audit walks past it.
+
+    Advisory by construction. This never raises and never changes what gets
+    recorded, because this proxy owns the upstream MCP server's process:
+    anything that can abort here takes the operator's tooling down with it.
+    Detection reports; the operator removes a layer.
+    """
+    env = dict(os.environ) if env is None else env
+    if not env.get("CLAUDECODE"):
+        return None
+    candidates: list[Path] = []
+    home = env.get("HOME")
+    if home:
+        candidates.append(Path(home) / ".claude" / "settings.json")
+    project_dir = env.get("CLAUDE_PROJECT_DIR")
+    if project_dir:
+        candidates.append(Path(project_dir) / ".claude" / "settings.json")
+        candidates.append(Path(project_dir) / ".claude" / "settings.local.json")
+    for path in candidates:
+        command = _vaara_deciding_hook(path)
+        if command is not None:
+            return f"{path}: {command}"
+    return None
+
+
 def main(argv: Optional[list[str]] = None) -> None:
     parser = argparse.ArgumentParser(
         prog="vaara-mcp-proxy",
@@ -1966,10 +2028,41 @@ def main(argv: Optional[list[str]] = None) -> None:
                         help="Directory to write OVERT Base Envelopes into "
                              "(one canonical-CBOR file per envelope). Required when "
                              "--overt-signing-key is set.")
+    parser.add_argument(
+        "--stacked", choices=("warn", "fail", "ignore"), default="warn",
+        help="What to do when a second Vaara governance layer is detected in "
+             "front of this proxy (the Claude Code PreToolUse hook): 'warn' "
+             "names it on stderr and continues (default), 'fail' refuses to "
+             "start, 'ignore' says nothing. Detection never changes what is "
+             "recorded.")
     args = parser.parse_args(argv)
     logging.basicConfig(level=logging.INFO,
                         format="%(asctime)s %(name)s %(levelname)s %(message)s",
                         stream=sys.stderr)
+    if args.stacked != "ignore":
+        stacked = detect_stacked_governance()
+        if stacked is not None:
+            print(
+                "vaara-mcp-proxy: a second Vaara governance layer is already "
+                "in front of this proxy.\n"
+                f"  found: {stacked}\n"
+                "  That hook decides every tool call the client makes, "
+                "including MCP ones.\n"
+                "  Running both means each MCP call is decided twice and "
+                "written to the trail\n"
+                "  twice, under two names: namespaced from the hook "
+                "(mcp__server__tool) and bare\n"
+                "  from this proxy (tool). The chain stays valid and "
+                "verification still passes;\n"
+                "  the trail counts one action as two.\n"
+                "  Pick one layer. Under Claude Code the hook already covers "
+                "MCP, so the proxy\n"
+                "  is for clients that have no hook to sit in. Silence this "
+                "with --stacked ignore.",
+                file=sys.stderr,
+            )
+            if args.stacked == "fail":
+                sys.exit(2)
     tool_allow = set(args.allow_tools) if args.allow_tools else None
     tool_deny = set(args.deny_tools) if args.deny_tools else set()
     resource_allow = set(args.allow_resources) if args.allow_resources else None
