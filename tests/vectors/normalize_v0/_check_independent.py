@@ -143,6 +143,14 @@ def _rule_ok(doc: Any, rule: dict[str, Any]) -> bool:
         return value in rule["in"]
     if "exists" in rule:
         return (value is not None) == bool(rule["exists"])
+    if "anyKeyStartsWith" in rule:
+        # Tests the object's keys rather than its value. A CAEP Security Event
+        # Token names its event type as a URI key under "events", and _resolve
+        # splits paths on ".", so those keys are unreachable by any path.
+        if not isinstance(value, dict):
+            return False
+        prefix = rule["anyKeyStartsWith"]
+        return any(isinstance(k, str) and k.startswith(prefix) for k in value)
     return False
 
 
