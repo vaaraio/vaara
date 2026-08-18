@@ -4,6 +4,7 @@
     "agent_decision",
     "ap2_payment_receipt",
     "c2pa_manifest",
+    "caep_security_event",
     "sep2643_rar_denial",
     "sep2643_scope_denial",
     "sep2643_url_denial",
@@ -15,7 +16,7 @@
     "unknown",
     "x402_settlement"
   ],
-  "corpusDigest": "sha256:58038e9a690a0d528bbdcbe11d339a74b732d60de0d29ffef49da7d069e05ec1",
+  "corpusDigest": "sha256:83e52f6bcf8364144911a5be989c0f9ed27b1dd25bf8a427681c0644f449e21c",
   "fixed": {
     "iat": "2026-06-23T00:00:00Z",
     "iss": "did:web:vaara.io",
@@ -35,6 +36,10 @@
     "c2pa_manifest": {
       "evidenceDigest": "sha256:3d02ab1236af269f497797fe75f08ec772fc1080e66c424a03d53ab54fbe5cf7",
       "signature": "ffb1f8ab39b6436811fd8d969a679fdcb5ee83cfcdf8a2cf804913a9542ca604"
+    },
+    "caep_security_event": {
+      "evidenceDigest": "sha256:b7dc7deffc0dd1118a56e7afd0522bde1d7eebf7d5a4f3bfbdc6cc898b9f2b96",
+      "signature": "9ca0d8fdc2c5a92af73015c91714c64957ae6a0fb3fdb9cb6b6bb0aa8e9452e5"
     },
     "sep2643_rar_denial": {
       "evidenceDigest": "sha256:06e748273802ade556dac8d705c291af7dc6504ab15f25a31cd9ef102cfe245d",

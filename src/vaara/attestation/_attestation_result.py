@@ -1,15 +1,27 @@
 # SPDX-FileCopyrightText: 2026 Henri Sirkkavaara
 # SPDX-License-Identifier: AGPL-3.0-or-later
-"""Express a Vaara attestation verdict as an IETF RATS EAR (Phase 2: neutral verify).
+"""Express a Vaara attestation verdict in EAR claims (Phase 2: neutral verify).
 
 Phases 0 and 1 of the hardware-governance layer bind a SEP-2828 record to a TPM
 2.0 quote, to the kernel's IMA log, and to a continuous chain of quotes. The
 verdict those verifiers return is Vaara-shaped (``tier``, the ``*_basis`` honesty
-fields). This module re-expresses one such verdict as an **EAR** -- the EAT-based
-Attestation Result of draft-ietf-rats-ear -- carrying an **AR4SI** trustworthiness
-vector (draft-ietf-rats-ar4si). That makes the verifier's output standards-aligned
-and root-agnostic: a TPM binding, a TPM chain, and a SEV-SNP enforcement report all
-collapse to the same EAR shape a RATS Relying Party already knows how to read.
+fields). This module re-expresses one such verdict using the **EAR claims** of
+draft-ietf-rats-ear (``ear_status``, ``ear_trustworthiness_vector``,
+``ear_verifier_id``, ``ear_verifier_claims``), carrying an **AR4SI**
+trustworthiness vector (draft-ietf-rats-ar4si). That makes the verifier's output
+standards-aligned and root-agnostic: a TPM binding, a TPM chain, and a SEV-SNP
+enforcement report all reduce to one claim set a RATS Relying Party already knows
+how to read.
+
+WHAT THIS DOCUMENT IS NOT. It is not an EAR, and it is not an EAT. EAR-04 defines
+exactly two serializations, JWT (section 3.2) and CWT (section 3.3), and EAT
+(RFC 9711 section 3) requires that "An EAT MUST have authenticity and integrity
+protection". The document emitted here is a keyless JSON map, so it satisfies
+neither. The accurate name for it is an **unprotected claims set** that reuses the
+EAR claims. The registered CBOR-side analogue is UCCS (RFC 9781); on the JSON side
+no equivalent term is registered, the nearest reference being the Unsecured JWT of
+RFC 7519 section 6, which EAT cites in section 6.3.6. Signing this claim set as a
+JWT or CWT would make it an EAR; nothing here does that.
 
 The mapping is conservative and honest. It asserts only the three AR4SI tier anchors
 whose meaning is fixed by the spec -- ``2`` affirming, ``32`` warning, ``96``
@@ -19,18 +31,18 @@ VCEK chain are not validated), so the ``hardware`` and ``instance-identity`` cla
 top out at ``warning`` and the overall ``ear_status`` can never read ``affirming``
 on the shipped capture path. ``affirming`` is reachable only when a basis reports a
 validated root (``ek_chain_verified`` / ``kds_verified``) -- the same un-forgeable-
-root capability the reserved ``attested`` tier waits on. The EAR never claims more
-than the verdict it was built from.
+root capability the reserved ``attested`` tier waits on. The claim set never claims
+more than the verdict it was built from.
 
 The decision-semantics limit carries through unchanged: IMA and the launch
 measurement attest the *platform*, not that the agent decided X for reason Y. There
 is no AR4SI claim for decision semantics, so it is not fabricated as one; it is
 recorded as a Vaara verifier-claim and the decision content stays in the signed
-SEP-2828 record the EAR references by digest.
+SEP-2828 record the claim set references by digest.
 
-The EAR produced here is the unprotected JSON serialization (a plain map, keyless).
 The underlying evidence carries its own signatures; this document is the verifier's
-appraisal *result*, not a fresh attestation, and says so in its verifier-claims.
+appraisal *result*, not a fresh attestation, and says so in its verifier-claims via
+``result_is_unsigned``.
 
 Pure standard library. Consumes the ``to_dict()`` of a verdict, so it needs neither
 the attestation extra nor any hardware present.
@@ -42,10 +54,12 @@ from typing import Any, Optional
 
 SCHEMA = "vaara.attestation-result/v0"
 
-# The EAR profile this document conforms to (draft-ietf-rats-ear-04), and the
+# The EAR claims vocabulary this document borrows (draft-ietf-rats-ear-04), and the
 # Vaara profile (the submodule eat_profile) that names the schema its
 # ear_verifier_claims follow. The verifier-claims ride in the standard EAR
-# ear_verifier_claims field (CBOR 1006), not a custom key.
+# ear_verifier_claims field (CBOR 1006), not a custom key. The eat_profile value
+# below identifies the claims vocabulary in use; it does not assert that this
+# unprotected map is an EAT, which it is not (see the module docstring).
 EAR_PROFILE = "tag:ietf.org,2026:rats/ear#04"
 VAARA_PROFILE = "tag:vaara.io,2026:attestation-result#v0"
 VERIFIER_CLAIMS_KEY = "ear_verifier_claims"
@@ -240,7 +254,10 @@ def build_attestation_result(
     verifier_build: str,
     submod_label: Optional[str] = None,
 ) -> "dict[str, Any]":
-    """Build a ``vaara.attestation-result/v0`` EAR document from a Vaara verdict.
+    """Build a ``vaara.attestation-result/v0`` claim set from a Vaara verdict.
+
+    The result is an unprotected claims set carrying the EAR claims, not an EAR and
+    not an EAT; see the module docstring for why that distinction is load-bearing.
 
     ``verdict`` is the ``to_dict()`` of a TPM-binding, TPM-chain, or SEV-SNP
     enforcement verdict (it is recognised by its ``schema`` field). ``issued_at`` is
