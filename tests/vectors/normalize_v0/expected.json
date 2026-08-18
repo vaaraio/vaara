@@ -63,6 +63,109 @@
     "sourceFormat": "ap2-payment-receipt",
     "sourceTitle": "AP2 payment receipt"
   },
+  "attested_agent_payment": {
+    "advisory": {
+      "aggregateLimit": 250000,
+      "aggregateWindowSeconds": 86400,
+      "attestedPaymentKeyThumbprint": "M/fdl1OvPVU9B8p/YMlC2+zTDO8Du//2oVOIt6i+HuM=",
+      "codeAlg": "sha-256",
+      "codeArtifact": "cvm-launch-measurement",
+      "codeDigest": "FXtMQ1AcS3mwj8YxafFvrxudqXzka93j2NFXI9vtGGk=",
+      "critical": [
+        "payees"
+      ],
+      "currency": "USD",
+      "executor": "urn:example:executor:eu-north-1",
+      "expiry": 1787140800,
+      "framework": "draft-hawkins-scitt-attested-agent-payment-01",
+      "onIndeterminateDeadline": 1787137200,
+      "onIndeterminateMode": "hold",
+      "payees": [
+        "urn:example:payee:acme-supplies"
+      ],
+      "perPaymentLimit": 50000,
+      "rails": [
+        "eip155:8453"
+      ],
+      "scale": 2
+    },
+    "evidencePlane": "decision-input",
+    "missing": [
+      "alg",
+      "signature",
+      "backLink",
+      "receiptAsserted",
+      "outcomeDerived"
+    ],
+    "notes": [
+      "an Authorization Scope states the bounds under which an attested agent may spend before any payment happens: the endorsed software identity the attestation must report, the per-payment and aggregate limits, the expiry, and optionally the executor, rails and payees",
+      "the plane is decision-input: the scope is authorization evidence available before the executor decides, and it asserts nothing about any payment that settled under it",
+      "the scope is a CBOR map in the deterministic encoding of RFC 8949 Section 4.2.1, and Section 3 computes the scope digest over exactly those bytes. Vaara ingests the decoded map, so this profile establishes the field mapping and never the scope digest; a digest recomputed from Vaara's JCS bytes would be a different value over a different encoding",
+      "apk and code.digest are CBOR byte strings, carried base64 in the decoded map this profile reads, and lifted verbatim without decoding or re-encoding",
+      "the scope carries no format identifier, so detection here is structural over the required members of the Section 3 CDDL. A scope registered as a Signed Statement is disambiguated by its payload type in the envelope, which is outside the decoded map",
+      "Section 3 makes executor REQUIRED when limits carries an aggregate bound, and a declarative detector cannot express a conditional requirement of that shape. A scope carrying aggregate with no executor is still recognized here, so recognition by this profile is not a conformance verdict on the scope",
+      "Section 4 Checks 1 to 4 are satisfied by transaction-time attestation evidence that is a separate artifact from this scope, so nothing here establishes that the key was never extractable, that the software matched, or that the evidence was fresh",
+      "this scope is the grant and carries nothing about settlement. The execution digest of Section 5.1 is computed over a settled payment's amount, payee, settlement timestamp and scope digest, and no member of it appears here",
+      "on_indeterminate selects the issuer's disposition when the supersession check of Check 9 cannot complete. Absent the member the disposition is refuse, and this profile lifts the member when present rather than asserting the default"
+    ],
+    "populated": [],
+    "recognized": true,
+    "sep2828": {},
+    "sourceFormat": "attested-agent-payment-scope",
+    "sourceTitle": "SCITT attested agent payment Authorization Scope (draft-hawkins-scitt-attested-agent-payment-01)"
+  },
+  "attested_agent_payment_aggregate_no_executor": {
+    "advisory": {
+      "aggregateLimit": 250000,
+      "aggregateWindowSeconds": 86400,
+      "attestedPaymentKeyThumbprint": "M/fdl1OvPVU9B8p/YMlC2+zTDO8Du//2oVOIt6i+HuM=",
+      "codeAlg": "sha-256",
+      "codeArtifact": "cvm-launch-measurement",
+      "codeDigest": "FXtMQ1AcS3mwj8YxafFvrxudqXzka93j2NFXI9vtGGk=",
+      "currency": "USD",
+      "expiry": 1787140800,
+      "framework": "draft-hawkins-scitt-attested-agent-payment-01",
+      "perPaymentLimit": 50000,
+      "scale": 2
+    },
+    "evidencePlane": "decision-input",
+    "missing": [
+      "alg",
+      "signature",
+      "backLink",
+      "receiptAsserted",
+      "outcomeDerived"
+    ],
+    "notes": [
+      "an Authorization Scope states the bounds under which an attested agent may spend before any payment happens: the endorsed software identity the attestation must report, the per-payment and aggregate limits, the expiry, and optionally the executor, rails and payees",
+      "the plane is decision-input: the scope is authorization evidence available before the executor decides, and it asserts nothing about any payment that settled under it",
+      "the scope is a CBOR map in the deterministic encoding of RFC 8949 Section 4.2.1, and Section 3 computes the scope digest over exactly those bytes. Vaara ingests the decoded map, so this profile establishes the field mapping and never the scope digest; a digest recomputed from Vaara's JCS bytes would be a different value over a different encoding",
+      "apk and code.digest are CBOR byte strings, carried base64 in the decoded map this profile reads, and lifted verbatim without decoding or re-encoding",
+      "the scope carries no format identifier, so detection here is structural over the required members of the Section 3 CDDL. A scope registered as a Signed Statement is disambiguated by its payload type in the envelope, which is outside the decoded map",
+      "Section 3 makes executor REQUIRED when limits carries an aggregate bound, and a declarative detector cannot express a conditional requirement of that shape. A scope carrying aggregate with no executor is still recognized here, so recognition by this profile is not a conformance verdict on the scope",
+      "Section 4 Checks 1 to 4 are satisfied by transaction-time attestation evidence that is a separate artifact from this scope, so nothing here establishes that the key was never extractable, that the software matched, or that the evidence was fresh",
+      "this scope is the grant and carries nothing about settlement. The execution digest of Section 5.1 is computed over a settled payment's amount, payee, settlement timestamp and scope digest, and no member of it appears here",
+      "on_indeterminate selects the issuer's disposition when the supersession check of Check 9 cannot complete. Absent the member the disposition is refuse, and this profile lifts the member when present rather than asserting the default"
+    ],
+    "populated": [],
+    "recognized": true,
+    "sep2828": {},
+    "sourceFormat": "attested-agent-payment-scope",
+    "sourceTitle": "SCITT attested agent payment Authorization Scope (draft-hawkins-scitt-attested-agent-payment-01)"
+  },
+  "attested_agent_payment_no_expiry": {
+    "advisory": {},
+    "evidencePlane": null,
+    "missing": [],
+    "notes": [
+      "not a SEP-2643 denial, SEP-2787 attestation, or SEP-2817 invocation audit context; nothing to normalize"
+    ],
+    "populated": [],
+    "recognized": false,
+    "sep2828": {},
+    "sourceFormat": "unknown",
+    "sourceTitle": "unrecognized record"
+  },
   "c2pa_manifest": {
     "advisory": {
       "claimGenerator": "vaara/1.10.0 c2pa-rs/0.36.0",
