@@ -4,6 +4,14 @@ All notable changes to this project are documented here.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/)
 and this project follows [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [Unreleased]
+
+### Fixed
+
+- `inference_receipt_digest` and `inference_attestation_digest` now hash the signed blocks, with the signature excluded, using the module's existing `_receipt_signing_payload` and `_attestation_signing_payload`. Both previously hashed the full wire bytes with the signature included, to pin every receipt byte-for-byte. An ES256 signature is not byte-unique for one signing act: given a valid `(r, s)` over P-256, `(r, n - s)` is also valid over the same payload and the same key, and `verify_es256` accepts it because it decodes the pair and re-encodes to DER. Measured against this implementation, 200 of 200 signatures produced a verifying twin. So the byte-for-byte pin was not achievable, and one signing act could yield two receipts that both verify and carry different identities, with the second producible in transit by anyone holding no key. Those digests are used as `receiptDigest` in the session manifest and `subject_receipt_digest` in the crosscheck. `vaara.audit.timeanchor._signed_payload_digest` has always hashed the signed payload, which is why `anchoredDigest` was never affected. Raised on the SCITT list by Anton Sokolov, 2026-08-18.
+
+  **Compatibility:** a `receiptDigest` or attestation digest recorded before this change will not match one computed after it. Signature verification is unaffected and no signature is invalidated.
+
 ## [1.68.0] - 2026-08-17
 
 ### Added
