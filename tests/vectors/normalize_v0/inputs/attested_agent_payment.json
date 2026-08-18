@@ -1,0 +1,24 @@
+{
+  "apk": "M/fdl1OvPVU9B8p/YMlC2+zTDO8Du//2oVOIt6i+HuM=",
+  "code": {
+    "alg": "sha-256",
+    "artifact": "cvm-launch-measurement",
+    "digest": "FXtMQ1AcS3mwj8YxafFvrxudqXzka93j2NFXI9vtGGk="
+  },
+  "limits": {
+    "currency": "USD",
+    "scale": 2,
+    "per_payment": 50000,
+    "aggregate": 250000,
+    "window": 86400
+  },
+  "executor": "urn:example:executor:eu-north-1",
+  "expiry": 1787140800,
+  "rails": ["eip155:8453"],
+  "payees": ["urn:example:payee:acme-supplies"],
+  "on_indeterminate": {
+    "mode": "hold",
+    "deadline": 1787137200
+  },
+  "crit": ["payees"]
+}
