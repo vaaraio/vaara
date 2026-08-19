@@ -120,7 +120,12 @@ def _verdict_json(verdict: BundleVerdict) -> dict[str, object]:
         "ok": verdict.ok,
         "authenticity_established": verdict.authenticity_established,
         "lenses": {
-            r.lens: {"applicable": r.applicable, "ok": r.ok} for r in verdict.lenses
+            # Serialize through LensResult.to_dict so the committed vectors
+            # carry exactly what a caller sees, including ok=None for a lens
+            # that did not apply. Building the dict by hand here is what let
+            # the vectors and the reference drift on that field.
+            r.lens: {k: v for k, v in r.to_dict().items() if k in ("applicable", "ok")}
+            for r in verdict.lenses
         },
     }
 

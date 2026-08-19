@@ -72,10 +72,29 @@ class LensResult:
     """Result of one lens over the bundle.
 
     ``applicable`` is True when the bundle carried the evidence the lens
-    needs. ``ok`` is True only when the lens applied AND passed; a lens that
-    did not apply has ``applicable=False`` and ``ok=False`` and does not
-    count against the verdict. ``reason`` is a short human string for audit
-    logs.
+    needs. ``ok`` is True only when the lens applied AND passed, and a lens
+    that did not apply does not count against the verdict. ``reason`` is a
+    short human string for audit logs.
+
+    SERIALIZED ``ok`` IS ``None`` WHEN THE LENS DID NOT APPLY, and that is
+    the point of the field rather than a detail of it. The aggregation here
+    has always been correct: :func:`verify_evidence_bundle` counts a lens
+    only when ``applicable`` is true, so an inapplicable lens never produced
+    a failure. What the serialization did was emit ``ok: false`` beside
+    ``applicable: false``, which states a verdict on a check that never ran.
+    A consumer reading ``ok`` on its own, which is the field whose name
+    invites being read on its own, saw a failure everywhere nothing was
+    evaluated.
+
+    Two booleans can be half read and a single terminal value cannot, so the
+    absent case now serializes as null. Raised on the IETF SCITT list on
+    2026-08-19 in the CHAP thread, where the working group is settling a
+    NOT_EVALUATED state that is terminal and mutually exclusive with pass and
+    fail. This is the same distinction, and the argument was made there
+    against Vaara's own committed expectations rather than in the abstract.
+
+    The in-memory field stays a bool so callers that already branch on it are
+    unaffected; only the JSON crossing a trust boundary changes.
     """
 
     lens: str
@@ -84,11 +103,14 @@ class LensResult:
     reason: str
 
     def to_dict(self) -> dict[str, Any]:
-        """Plain-dict form for JSON output (CLI, logs)."""
+        """Plain-dict form for JSON output (CLI, logs).
+
+        ``ok`` is ``None`` for an inapplicable lens. See the class docstring.
+        """
         return {
             "lens": self.lens,
             "applicable": self.applicable,
-            "ok": self.ok,
+            "ok": self.ok if self.applicable else None,
             "reason": self.reason,
         }
 

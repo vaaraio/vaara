@@ -51,7 +51,12 @@ def test_loader_reproduces_vector_verdict(name):
     verdict = verify_evidence_bundle(evidence_bundle_from_json(doc))
     assert verdict.ok is want["ok"]
     assert verdict.authenticity_established is want["authenticity_established"]
-    got = {r.lens: {"applicable": r.applicable, "ok": r.ok} for r in verdict.lenses}
+    # Through to_dict, so this compares what a caller receives rather than the
+    # in-memory bool. See LensResult: an inapplicable lens serializes ok=None.
+    got = {
+        r.lens: {k: v for k, v in r.to_dict().items() if k in ("applicable", "ok")}
+        for r in verdict.lenses
+    }
     assert got == want["lenses"]
 
 

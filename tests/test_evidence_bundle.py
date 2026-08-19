@@ -234,7 +234,14 @@ def test_vaara_reproduces_vector_verdict(case):
     verdict = verify_evidence_bundle(_bundle_from_json(case["bundle"]))
     assert verdict.ok is want["ok"]
     assert verdict.authenticity_established is want["authenticity_established"]
-    got = {r.lens: {"applicable": r.applicable, "ok": r.ok} for r in verdict.lenses}
+    # Compare what a caller actually receives. Reading r.ok off the dataclass
+    # bypasses to_dict, which is where an inapplicable lens reports ok as
+    # None, and that bypass is how the vectors and the reference drifted on
+    # this field in the first place.
+    got = {
+        r.lens: {k: v for k, v in r.to_dict().items() if k in ("applicable", "ok")}
+        for r in verdict.lenses
+    }
     assert got == want["lenses"]
 
 

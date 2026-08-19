@@ -174,7 +174,15 @@ def _verify_consistency(first_size, first_root, second_size, second_root, proof)
 
 
 def _lens(applicable: bool, ok: bool) -> dict:
-    return {"applicable": applicable, "ok": ok}
+    """An inapplicable lens reports ``ok`` as None, never as False.
+
+    False here would be a verdict on a check that never ran, and a consumer
+    reading ``ok`` alone would see a failure where nothing was evaluated. The
+    aggregation below counts a lens only when ``applicable`` is true, so the
+    verdict is unchanged either way; what changes is that the absent case can
+    no longer be misread as a refusal.
+    """
+    return {"applicable": applicable, "ok": ok if applicable else None}
 
 
 def _identity_lens(bundle: dict):
@@ -271,12 +279,18 @@ def _evaluate(bundle: dict) -> dict:
         "consistency": _consistency_lens(bundle),
         "revocation": _revocation_lens(bundle, keyid),
     }
-    authenticity = lenses["identity"]["ok"] or lenses["signature"]["ok"]
+    # bool() on each side, because an inapplicable lens now reports ok as
+    # None and ``None or None`` is None rather than False. Without this the
+    # aggregate leaks a null into authenticity_established and into the
+    # overall verdict, which would be the exact defect this change is fixing,
+    # one level up. Caught by running the checker against the regenerated
+    # vectors rather than by reading the diff.
+    authenticity = bool(lenses["identity"]["ok"]) or bool(lenses["signature"]["ok"])
     failures = [
         name for name, res in lenses.items() if res["applicable"] and not res["ok"]
     ]
     return {
-        "ok": authenticity and not failures,
+        "ok": bool(authenticity and not failures),
         "authenticity_established": authenticity,
         "lenses": lenses,
     }

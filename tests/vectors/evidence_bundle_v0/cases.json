@@ -117,7 +117,7 @@
           },
           "signature": {
             "applicable": false,
-            "ok": false
+            "ok": null
           }
         },
         "ok": true
@@ -222,7 +222,7 @@
           },
           "consistency": {
             "applicable": false,
-            "ok": false
+            "ok": null
           },
           "identity": {
             "applicable": true,
@@ -238,7 +238,7 @@
           },
           "signature": {
             "applicable": false,
-            "ok": false
+            "ok": null
           }
         },
         "ok": false
@@ -336,7 +336,7 @@
           },
           "consistency": {
             "applicable": false,
-            "ok": false
+            "ok": null
           },
           "identity": {
             "applicable": true,
@@ -352,7 +352,7 @@
           },
           "signature": {
             "applicable": false,
-            "ok": false
+            "ok": null
           }
         },
         "ok": false
@@ -413,7 +413,7 @@
         "lenses": {
           "back_link": {
             "applicable": false,
-            "ok": false
+            "ok": null
           },
           "consistency": {
             "applicable": true,
@@ -425,15 +425,15 @@
           },
           "inclusion": {
             "applicable": false,
-            "ok": false
+            "ok": null
           },
           "revocation": {
             "applicable": false,
-            "ok": false
+            "ok": null
           },
           "signature": {
             "applicable": false,
-            "ok": false
+            "ok": null
           }
         },
         "ok": false
@@ -518,7 +518,7 @@
           },
           "consistency": {
             "applicable": false,
-            "ok": false
+            "ok": null
           },
           "identity": {
             "applicable": true,
@@ -526,15 +526,15 @@
           },
           "inclusion": {
             "applicable": false,
-            "ok": false
+            "ok": null
           },
           "revocation": {
             "applicable": false,
-            "ok": false
+            "ok": null
           },
           "signature": {
             "applicable": false,
-            "ok": false
+            "ok": null
           }
         },
         "ok": false
@@ -576,23 +576,23 @@
         "lenses": {
           "back_link": {
             "applicable": false,
-            "ok": false
+            "ok": null
           },
           "consistency": {
             "applicable": false,
-            "ok": false
+            "ok": null
           },
           "identity": {
             "applicable": false,
-            "ok": false
+            "ok": null
           },
           "inclusion": {
             "applicable": false,
-            "ok": false
+            "ok": null
           },
           "revocation": {
             "applicable": false,
-            "ok": false
+            "ok": null
           },
           "signature": {
             "applicable": true,
@@ -645,15 +645,15 @@
         "lenses": {
           "back_link": {
             "applicable": false,
-            "ok": false
+            "ok": null
           },
           "consistency": {
             "applicable": false,
-            "ok": false
+            "ok": null
           },
           "identity": {
             "applicable": false,
-            "ok": false
+            "ok": null
           },
           "inclusion": {
             "applicable": true,
@@ -665,7 +665,7 @@
           },
           "signature": {
             "applicable": false,
-            "ok": false
+            "ok": null
           }
         },
         "ok": false
@@ -707,23 +707,23 @@
         "lenses": {
           "back_link": {
             "applicable": false,
-            "ok": false
+            "ok": null
           },
           "consistency": {
             "applicable": false,
-            "ok": false
+            "ok": null
           },
           "identity": {
             "applicable": false,
-            "ok": false
+            "ok": null
           },
           "inclusion": {
             "applicable": false,
-            "ok": false
+            "ok": null
           },
           "revocation": {
             "applicable": false,
-            "ok": false
+            "ok": null
           },
           "signature": {
             "applicable": true,
