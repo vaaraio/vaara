@@ -44,6 +44,15 @@ TITLE = "Vaara Conformance Results"
 # another set by an edit they never saw.
 FALLBACK_TERMS_VERSION = "unversioned"
 
+# COLOURS. The left cap is brand dark #1A2226 carrying the mark in brand green
+# #78A08A. The message side is a deeper green, #4A6E5C, rather than the brand
+# green itself, and that is a readability decision. White on brand green
+# measures 2.92:1, which fails WCAG AA for normal text at this size. Dark text
+# on brand green passes at 5.53:1 but reads as inverted beside every other
+# shield in a README row. #4A6E5C carries white at 5.71:1, so the badge looks
+# like an ordinary shield and stays legible. The brand green is still on the
+# badge, in the mark, where nothing has to be read off it.
+#
 # One badge per listed party, named for that party's slug. There is no generic
 # badge on purpose: a single shared URL is copyable by anyone who never ran
 # anything, and the copy is indistinguishable from the real thing. A per-party
@@ -67,7 +76,7 @@ height="20" role="img" aria-label="{alt}">
   <clipPath id="r"><rect width="{w}" height="20" rx="3" fill="#fff"/></clipPath>
   <g clip-path="url(#r)">
     <rect width="{lw}" height="20" fill="#1A2226"/>
-    <rect x="{lw}" width="{mw}" height="20" fill="#78A08A"/>
+    <rect x="{lw}" width="{mw}" height="20" fill="#4A6E5C"/>
     <rect width="{w}" height="20" fill="url(#s)"/>
   </g>
   <polygon points="12,5.5 17.5,15 6.5,15" fill="#78A08A"/>
@@ -78,7 +87,7 @@ lengthAdjust="spacingAndGlyphs">{label}</text>
 lengthAdjust="spacingAndGlyphs">{label}</text>
     <text x="{mx}" y="15" fill="#000" fill-opacity=".3" textLength="{mt}" \
 lengthAdjust="spacingAndGlyphs">{message}</text>
-    <text x="{mx}" y="14" fill="#1A2226" textLength="{mt}" \
+    <text x="{mx}" y="14" fill="#fff" textLength="{mt}" \
 lengthAdjust="spacingAndGlyphs">{message}</text>
   </g>
 </svg>
@@ -109,11 +118,17 @@ def corpus_badge_svg(report: dict) -> str:
     """
     totals = report["totals"]
     label = "VAARA CONFORMANCE"
-    message = f"{totals['suites']} suites, {totals['passed']} passing"
+    # Counting passes against the suite total reads as a failure that is not
+    # there. The corpus has suites the aggregate runner cannot execute from a
+    # bare case directory, article12_fold_v0 being one: its checker validates a
+    # bundle zip. Those skip, and a "42 of 43 passing" badge invites a reader to
+    # assume the missing one is broken, on the maintainer's own README. Failures
+    # are the number that carries meaning here, and the honest one is zero.
+    message = f"{totals['suites']} suites, {totals['failed']} failing"
     lw = int(len(label) * 5.6) + 32
     mw = int(len(message) * 6.2) + 12
     alt = (f"Vaara conformance corpus: {totals['suites']} suites, "
-           f"{totals['passed']} passing")
+           f"{totals['failed']} failing")
     return BADGE_TEMPLATE.format(
         w=lw + mw,
         lw=lw,
