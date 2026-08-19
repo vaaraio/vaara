@@ -30,6 +30,13 @@ on:
 permissions:
   contents: write
   issues: write
+  # The last step dispatches pages.yml so the row this run just published is
+  # actually served. Dispatching a workflow needs `actions: write`, which was
+  # missing, so on row #1 the API returned 403, the site was never rebuilt, and
+  # the submitter got a comment congratulating him next to a badge URL that
+  # returned 404 for an hour and a half. The desk had otherwise worked end to
+  # end. Publishing is part of the handover, so the token has to carry it.
+  actions: write
 
 concurrency:
   group: conformance-desk
