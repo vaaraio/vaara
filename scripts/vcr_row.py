@@ -114,6 +114,52 @@ def known_suites() -> set[str]:
     return {p.name for p in VECTORS.iterdir() if p.is_dir()} if VECTORS.exists() else set()
 
 
+#: What scripts/conformance_runner.py writes into the prefilled issue link after
+#: a whole-corpus run: `all 43 suites`. It says so rather than listing every
+#: name, both because the row reads better and because the names do not fit the
+#: 200-character field.
+WHOLE_CORPUS = re.compile(r"^all\s+(\d+)\s+suites$", re.IGNORECASE)
+
+
+def parse_suites(raw: str) -> list[str]:
+    """The suites a row claims, from either the tool's words or the party's.
+
+    Two accepted forms, and nothing else:
+
+    * ``all <N> suites``, exactly as the runner prints it, where N has to match
+      the corpus actually in this repository. A whole-corpus claim that names
+      the wrong size is a claim about some other run.
+    * a comma or newline separated list of suite directory names.
+
+    The first form existed on the printing side from 2026-08-17 and was never
+    taught to this validator, so the single path we tell people to walk was
+    refused here. Issue #587, the first real application, hit it. Kept narrow on
+    purpose: it accepts what our own tool emits and still refuses a hand-written
+    paragraph, because a row is quoted onto a public page and free prose in a
+    field with a fixed meaning is how that page stops meaning one thing.
+    """
+    known = known_suites()
+    text = raw.strip()
+    whole = WHOLE_CORPUS.match(text)
+    if whole:
+        claimed = int(whole.group(1))
+        if claimed != len(known):
+            raise Rejected(
+                f"This repository has {len(known)} suites, and the row claims a "
+                f"run over {claimed}. Rerun `python scripts/conformance_runner.py` "
+                "at the commit you are listing and use the link it prints."
+            )
+        return sorted(known)
+
+    names = [s.strip() for s in text.replace("\n", ",").split(",") if s.strip()]
+    if not names:
+        raise Rejected("Name at least one suite you ran.")
+    unknown = sorted(set(names) - known)
+    if unknown:
+        raise Rejected(f"These are not suites in this repository: {', '.join(unknown)}")
+    return names
+
+
 def validate(fields: dict, author: str) -> dict:
     """Return the row to publish, or raise Rejected with a readable reason."""
     consent = fields.get("consent") or []
@@ -157,13 +203,7 @@ def validate(fields: dict, author: str) -> dict:
     if not commit_exists(sha):
         raise Rejected(f"Commit `{sha}` is not in this repository.")
 
-    raw_suites = [s.strip() for s in str(fields.get("suites", "")).replace("\n", ",").split(",")]
-    suites = [s for s in raw_suites if s]
-    if not suites:
-        raise Rejected("Name at least one suite you ran.")
-    unknown = sorted(set(suites) - known_suites())
-    if unknown:
-        raise Rejected(f"These are not suites in this repository: {', '.join(unknown)}")
+    suites = parse_suites(str(fields.get("suites", "")))
 
     result = str(fields.get("result", "")).strip()
     if not result:

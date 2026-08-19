@@ -120,6 +120,34 @@ def test_a_suite_that_does_not_exist_is_refused():
         row_from(form(suites="totally_made_up_v0"))
 
 
+def test_the_runners_own_whole_corpus_value_is_accepted():
+    """The desk has to accept what our own tool tells people to submit.
+
+    scripts/conformance_runner.py ends every full run by printing a prefilled
+    issue link carrying `suites=all <N> suites`, deliberately, so a whole-corpus
+    run says so instead of listing forty-three names. The validator only knew
+    directory names, so the one path we actively tell people to walk was refused
+    by our own gate. Found 2026-08-19 on the first real application, issue #587.
+    """
+    n = len(vcr.known_suites())
+    row = row_from(form(suites=f"all {n} suites"))
+    assert row["suites"] == sorted(vcr.known_suites())
+
+
+def test_a_whole_corpus_claim_has_to_match_the_corpus():
+    """`all 9 suites` against a 43-suite corpus is a claim about a different run."""
+    n = len(vcr.known_suites())
+    with pytest.raises(vcr.Rejected, match="suites"):
+        row_from(form(suites=f"all {n - 1} suites"))
+
+
+def test_prose_around_the_suites_is_still_refused():
+    """Liberal enough for the tool's output, not for a hand-written paragraph."""
+    n = len(vcr.known_suites())
+    with pytest.raises(vcr.Rejected, match="not suites"):
+        row_from(form(suites=f"all {n} suites (full default run, my own venv)"))
+
+
 def test_the_commit_has_to_be_in_this_repository():
     """A row nobody can rerun is an assertion. The SHA is what makes it checkable."""
     with pytest.raises(vcr.Rejected, match="not in this repository"):
@@ -168,15 +196,41 @@ def test_two_parties_with_the_same_name_get_different_badges():
     assert a["slug"] != b["slug"]
 
 
-def test_a_badge_carries_the_number_the_date_and_the_commit():
+def test_a_badge_dates_itself_without_phoning_home():
     """Baked into the pixels so the badge dates itself without phoning home."""
     svg = render.badge_svg(
         {"id": 7, "slug": "x", "date": "2026-08-14", "at_commit": HEAD, "party": "X"}
     )
-    assert "VCR #7" in svg
     assert "2026-08-14" in svg
     assert HEAD[:7] in svg
     assert "http://" not in svg.replace('xmlns="http://www.w3.org/2000/svg"', "")
+
+
+def test_the_badge_face_does_not_rank_the_holder():
+    """The row number is a chain index, never a placing.
+
+    Rows are chained, so an order exists and the number has to live in the row,
+    the served bytes and the metadata a reader recomputes against. Putting it on
+    the face turns that index into a standing: row 1 and row 250 are the
+    identical claim, and only one of them reads as an achievement. The table
+    pays off on volume and on strangers walking in years later, so a badge that
+    quietly tells the fiftieth party their sticker is worth less is working
+    against the thing it was built for.
+    """
+    import xml.etree.ElementTree as ET
+
+    svg = render.badge_svg(
+        {"id": 7, "slug": "x", "date": "2026-08-14", "at_commit": HEAD, "party": "X"}
+    )
+    root = ET.fromstring(svg)
+    ns = "{http://www.w3.org/2000/svg}"
+    face = " ".join((el.text or "") for el in root.iter(f"{ns}text"))
+    assert "#7" not in face
+    assert "7" not in face.replace("2026-08-14", "").replace(HEAD[:7], "")
+    assert "reproduced" in face
+
+    # It still has to be recoverable, or the badge stops pointing at a row.
+    assert root.find(".//{https://vaara.io/ns/vcr/v1}row").text == "7"
 
 
 def test_a_badge_commits_to_its_own_row(tmp_path):
