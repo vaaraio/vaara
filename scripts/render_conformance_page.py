@@ -70,10 +70,11 @@ height="20" role="img" aria-label="{alt}">
     <rect x="{lw}" width="{mw}" height="20" fill="#78A08A"/>
     <rect width="{w}" height="20" fill="url(#s)"/>
   </g>
-  <g font-family="Verdana,DejaVu Sans,Geneva,sans-serif" font-size="11">
-    <text x="6" y="15" fill="#000" fill-opacity=".3" textLength="{lt}" \
+  <polygon points="12,5.5 17.5,15 6.5,15" fill="#78A08A"/>
+  <g font-family="Verdana,DejaVu Sans,Geneva,sans-serif" font-size="10">
+    <text x="24" y="15" fill="#000" fill-opacity=".3" textLength="{lt}" \
 lengthAdjust="spacingAndGlyphs">{label}</text>
-    <text x="6" y="14" fill="#fff" textLength="{lt}" \
+    <text x="24" y="14" fill="#fff" textLength="{lt}" \
 lengthAdjust="spacingAndGlyphs">{label}</text>
     <text x="{mx}" y="15" fill="#000" fill-opacity=".3" textLength="{mt}" \
 lengthAdjust="spacingAndGlyphs">{message}</text>
@@ -84,8 +85,69 @@ lengthAdjust="spacingAndGlyphs">{message}</text>
 """
 
 
+#: The project's own shield, as opposed to a listed party's badge. It states
+#: what the corpus is, never that anybody reproduced anything, which is the
+#: line that keeps it honest: the per-party badges say "reproduced" and are
+#: earned, this one says "43 suites" and is just a fact about the repository.
+#: Lives at a fixed name so the README can hotlink it and the URL never moves.
+CORPUS_BADGE = "conformance.svg"
+
+
 def esc(value: object) -> str:
     return html.escape(str(value), quote=True)
+
+
+def corpus_badge_svg(report: dict) -> str:
+    """The shield for our own README, pointing at the results page.
+
+    Deliberately not a party badge. There is no generic reproduction badge, for
+    the reason stated above ``BADGE_TEMPLATE``: a shared "reproduced" URL is
+    copyable by anyone who never ran anything. This one makes no claim on
+    anyone's behalf. It reports the size of the corpus and how much of it
+    passes, which is a property of the repository the reader is already looking
+    at, and it links to the page where every one of those verdicts recomputes.
+    """
+    totals = report["totals"]
+    label = "VAARA CONFORMANCE"
+    message = f"{totals['suites']} suites, {totals['passed']} passing"
+    lw = int(len(label) * 5.6) + 32
+    mw = int(len(message) * 6.2) + 12
+    alt = (f"Vaara conformance corpus: {totals['suites']} suites, "
+           f"{totals['passed']} passing")
+    return BADGE_TEMPLATE.format(
+        w=lw + mw,
+        lw=lw,
+        mw=mw,
+        lt=lw - 32,
+        mt=mw - 12,
+        mx=lw + 6,
+        label=esc(label),
+        message=esc(message),
+        alt=esc(alt),
+        row_id="",
+        slug="",
+        digest="",
+    ).replace(
+        # A corpus shield commits to no row, so it carries no row metadata to
+        # recompute. Empty elements would read as a row that hashes to nothing.
+        """  <metadata>
+    <vcr xmlns="https://vaara.io/ns/vcr/v1">
+      <row></row>
+      <digest></digest>
+      <over>https://vaara.io/badge/.json</over>
+      <recompute>sha256 of those bytes, which are JCS-canonical per RFC 8785</recompute>
+    </vcr>
+  </metadata>
+""",
+        """  <metadata>
+    <vcr xmlns="https://vaara.io/ns/vcr/v1">
+      <corpus>https://vaara.io/conformance.html</corpus>
+      <note>Corpus status, not a reproduction. This badge is not evidence \
+that any party ran anything.</note>
+    </vcr>
+  </metadata>
+""",
+    )
 
 
 def row_bytes(row: dict) -> bytes:
@@ -112,21 +174,33 @@ def row_digest(row: dict) -> str:
 def badge_svg(row: dict) -> str:
     """A badge that dates itself, so nobody has to police staleness.
 
-    The row number, the date and the short commit are baked into the pixels.
-    A badge earned two years ago reads as two years old wherever it is pasted,
-    without the badge ever calling home to say so.
+    The date and the short commit are baked into the pixels. A badge earned two
+    years ago reads as two years old wherever it is pasted, without the badge
+    ever calling home to say so.
+
+    THE ROW NUMBER IS NOT ON THE FACE, and that is deliberate. Rows are chained,
+    so an order exists and the number stays in the row, in the served bytes and
+    in the metadata above, where a reader needs it to find what this badge
+    commits to. On the face it stops being an index and becomes a placing. Row 1
+    and row 250 carry the identical claim, and only one of them reads like an
+    achievement. This table pays off on volume and on strangers walking in years
+    later, so a badge that quietly tells the fiftieth party their sticker is
+    worth less works against the thing it exists for. Decided 2026-08-19, when
+    the first application arrived from a party who had no idea a number was on
+    offer, which is fairly good evidence nobody is here for the number.
     """
-    label = f"VCR #{row['id']}"
+    label = "VAARA CONFORMANCE"
     message = f"reproduced {row.get('date', '')} {str(row.get('at_commit', ''))[:7]}"
-    # 6.2px per character at 11px Verdana, plus 6px padding either side.
-    lw = int(len(label) * 6.2) + 12
+    # 5.6px per character at 10px Verdana for the label, 6.2px at 11px for the
+    # message, plus the 24px the mark and its padding take on the left cap.
+    lw = int(len(label) * 5.6) + 32
     mw = int(len(message) * 6.2) + 12
     alt = f"Vaara Conformance Results row {row['id']}: {row.get('party', '')}"
     return BADGE_TEMPLATE.format(
         w=lw + mw,
         lw=lw,
         mw=mw,
-        lt=lw - 12,
+        lt=lw - 32,
         mt=mw - 12,
         mx=lw + 6,
         label=esc(label),
@@ -545,7 +619,7 @@ def main(argv: list[str]) -> int:
         strip = lambda s: "\n".join(  # noqa: E731
             ln for ln in s.splitlines() if "generated " not in ln
         )
-        stale_badges = badge_drift(repro)
+        stale_badges = badge_drift(repro, report=report)
         if strip(current) != strip(page) or stale_badges:
             detail = f" Badges out of sync: {', '.join(stale_badges)}." if stale_badges else ""
             print(
@@ -560,16 +634,20 @@ def main(argv: list[str]) -> int:
 
     out.write_text(page, encoding="utf-8")
     badges = write_badges(repro)
+    BADGE_DIR.mkdir(parents=True, exist_ok=True)
+    (BADGE_DIR / CORPUS_BADGE).write_text(corpus_badge_svg(report), encoding="utf-8")
     print(
         f"wrote {out} ({t_len(page)} bytes, {report['totals']['suites']} suites, "
-        f"{len(badges)} badges)"
+        f"{len(badges)} badges) and {CORPUS_BADGE}"
     )
     return 0
 
 
-def badge_drift(repro: dict, badge_dir: Path = BADGE_DIR) -> list[str]:
+def badge_drift(repro: dict, badge_dir: Path = BADGE_DIR, report: dict | None = None) -> list[str]:
     """Names of badge files that do not match the rows, in either direction."""
     wanted: dict[str, bytes] = {}
+    if report is not None:
+        wanted[CORPUS_BADGE] = corpus_badge_svg(report).encode("utf-8")
     for r in repro.get("reproductions", []):
         wanted[f"{r['slug']}.svg"] = badge_svg(r).encode("utf-8")
         wanted[f"{r['slug']}.json"] = row_bytes(r)
@@ -577,7 +655,12 @@ def badge_drift(repro: dict, badge_dir: Path = BADGE_DIR) -> list[str]:
     on_disk: set[str] = set()
     if badge_dir.exists():
         on_disk = {p.name for p in badge_dir.iterdir() if p.is_file()}
-    drift = sorted(on_disk - set(wanted))
+    extra = on_disk - set(wanted)
+    if report is None:
+        # Without a report there is nothing to check the corpus shield against,
+        # so its presence is not drift. Callers that hold a report get it graded.
+        extra -= {CORPUS_BADGE}
+    drift = sorted(extra)
     for name, blob in wanted.items():
         path = badge_dir / name
         if not path.exists() or path.read_bytes() != blob:
