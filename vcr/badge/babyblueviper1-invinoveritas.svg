@@ -1,0 +1,28 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="318" height="20" role="img" aria-label="Vaara Conformance Results row 1: babyblueviper1 (invinoveritas)">
+  <title>Vaara Conformance Results row 1: babyblueviper1 (invinoveritas)</title>
+  <linearGradient id="s" x2="0" y2="100%">
+    <stop offset="0" stop-color="#bbb" stop-opacity=".1"/>
+    <stop offset="1" stop-opacity=".1"/>
+  </linearGradient>
+  <metadata>
+    <vcr xmlns="https://vaara.io/ns/vcr/v1">
+      <row>1</row>
+      <digest>sha256:2682d581d86fc18156386c716c38d9c63ea34264ecb2dc31938ae30d20a55693</digest>
+      <over>https://vaara.io/badge/babyblueviper1-invinoveritas.json</over>
+      <recompute>sha256 of those bytes, which are JCS-canonical per RFC 8785</recompute>
+    </vcr>
+  </metadata>
+  <clipPath id="r"><rect width="318" height="20" rx="3" fill="#fff"/></clipPath>
+  <g clip-path="url(#r)">
+    <rect width="127" height="20" fill="#1A2226"/>
+    <rect x="127" width="191" height="20" fill="#78A08A"/>
+    <rect width="318" height="20" fill="url(#s)"/>
+  </g>
+  <polygon points="12,5.5 17.5,15 6.5,15" fill="#78A08A"/>
+  <g font-family="Verdana,DejaVu Sans,Geneva,sans-serif" font-size="10">
+    <text x="24" y="15" fill="#000" fill-opacity=".3" textLength="95" lengthAdjust="spacingAndGlyphs">VAARA CONFORMANCE</text>
+    <text x="24" y="14" fill="#fff" textLength="95" lengthAdjust="spacingAndGlyphs">VAARA CONFORMANCE</text>
+    <text x="133" y="15" fill="#000" fill-opacity=".3" textLength="179" lengthAdjust="spacingAndGlyphs">reproduced 2026-08-19 cc5df5d</text>
+    <text x="133" y="14" fill="#1A2226" textLength="179" lengthAdjust="spacingAndGlyphs">reproduced 2026-08-19 cc5df5d</text>
+  </g>
+</svg>

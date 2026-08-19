@@ -1,0 +1,256 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<title>Vaara Conformance Results | Vaara</title>
+<meta name="description" content="Every Vaara conformance suite, its verdict, and every independent party who reproduced the vectors and said so in public. Generated from the runner's own report.">
+<meta name="robots" content="index, follow">
+<link rel="canonical" href="https://vaara.io/conformance.html">
+<link rel="icon" type="image/svg+xml" href="/favicon.svg">
+<meta property="og:type" content="website">
+<meta property="og:title" content="Vaara Conformance Results">
+<meta property="og:description" content="Every suite, every verdict, every independent reproduction. Recomputable from committed bytes with no Vaara import.">
+<meta property="og:url" content="https://vaara.io/conformance.html">
+<style>
+  :root {
+    color-scheme: light;
+    --bg:#ececec; --panel:#FFFFFF; --panel-2:#F1F4F0; --line:rgba(60,90,72,.18);
+    --ink:#1A2226; --muted:#566159; --faint:#7C857E;
+    --tri:#3E6B54; --tri-bright:#2C523E; --warn:#B4524F;
+    --mono:ui-monospace,'SFMono-Regular','JetBrains Mono',Menlo,Consolas,monospace;
+    --sans:'Inter',-apple-system,BlinkMacSystemFont,'Segoe UI',Helvetica,Arial,sans-serif;
+  }
+  html[data-theme="dark"], html:not([data-theme]) {}
+  @media (prefers-color-scheme: dark) {
+    html:not([data-theme]) {
+      color-scheme: dark;
+      --bg:#0F1417; --panel:#1A2226; --panel-2:#151D20; --line:rgba(123,156,138,.16);
+      --ink:#DEE4E1; --muted:#8B9792; --faint:#5E6A66;
+      --tri:#78A08A; --tri-bright:#93B8A3; --warn:#D98B8B;
+    }
+  }
+  *{box-sizing:border-box}
+  body{margin:0;background:var(--bg);color:var(--ink);font-family:var(--sans);
+       line-height:1.55;-webkit-font-smoothing:antialiased}
+  .wrap{max-width:940px;margin:0 auto;padding:56px 22px 96px}
+  a{color:var(--tri-bright);text-decoration:none;border-bottom:1px solid var(--line)}
+  a:hover{border-bottom-color:var(--tri)}
+  .back{font-family:var(--mono);font-size:11px;letter-spacing:.18em;text-transform:uppercase;
+        color:var(--muted);border:0}
+  h1{font-size:clamp(28px,4.2vw,40px);line-height:1.12;margin:26px 0 6px;letter-spacing:-.02em}
+  .kicker{font-family:var(--mono);font-size:11px;letter-spacing:.2em;text-transform:uppercase;
+          color:var(--tri);margin:0}
+  h2{font-size:19px;margin:52px 0 10px;letter-spacing:-.01em}
+  p{margin:0 0 14px;max-width:74ch}
+  .lede{font-size:17px;color:var(--muted)}
+  .mono{font-family:var(--mono);font-size:12.5px}
+  .stats{display:flex;flex-wrap:wrap;gap:10px;margin:24px 0 8px}
+  .stat{background:var(--panel);border:1px solid var(--line);border-radius:10px;
+        padding:12px 16px;min-width:104px}
+  .stat b{display:block;font-family:var(--mono);font-size:23px;color:var(--tri-bright);
+          line-height:1.1}
+  .stat span{font-size:11px;letter-spacing:.12em;text-transform:uppercase;color:var(--faint)}
+  table{width:100%;border-collapse:collapse;margin:14px 0 8px;background:var(--panel);
+        border:1px solid var(--line);border-radius:10px;overflow:hidden}
+  th,td{text-align:left;padding:8px 14px;border-bottom:1px solid var(--line);font-size:13.5px;
+        vertical-align:top}
+  th{font-family:var(--mono);font-size:10.5px;letter-spacing:.16em;text-transform:uppercase;
+     color:var(--faint);background:var(--panel-2)}
+  tr:last-child td{border-bottom:0}
+  td.ok{color:var(--tri-bright);font-family:var(--mono);font-size:12px}
+  td.bad{color:var(--warn);font-family:var(--mono);font-size:12px;font-weight:600}
+  td.skip{color:var(--faint);font-family:var(--mono);font-size:12px}
+  td.why{color:var(--muted);font-size:12.5px}
+  .repro{background:var(--panel);border:1px solid var(--line);border-radius:10px;
+         padding:18px 20px;margin:14px 0}
+  .repro-head{display:flex;flex-wrap:wrap;gap:12px;align-items:baseline;margin-bottom:8px}
+  .repro-head .who{font-weight:600}
+  .repro-head .aff{color:var(--faint);font-size:13px}
+  .repro .result{margin:0 0 12px}
+  dl{display:grid;grid-template-columns:auto 1fr;gap:5px 16px;margin:0;font-size:13px}
+  dt{font-family:var(--mono);font-size:10.5px;letter-spacing:.14em;text-transform:uppercase;
+     color:var(--faint);padding-top:2px}
+  dd{margin:0;overflow-wrap:anywhere}
+  .scoping{color:var(--muted);font-style:italic}
+  .none{color:var(--muted)}
+  .note{border-left:2px solid var(--line);padding-left:16px;color:var(--muted);
+        font-size:14px;margin:18px 0}
+  code{font-family:var(--mono);font-size:12.5px;background:var(--panel-2);
+       padding:1px 5px;border-radius:4px}
+  pre{background:var(--panel);border:1px solid var(--line);border-radius:10px;
+      padding:14px 16px;overflow-x:auto}
+  pre code{background:none;padding:0}
+  footer{margin-top:64px;padding-top:20px;border-top:1px solid var(--line);
+         color:var(--faint);font-size:12.5px}
+</style>
+</head>
+<body>
+<div class="wrap">
+  <a class="back" href="/">&larr; vaara.io</a>
+
+  <p class="kicker">Vaara Conformance Results</p>
+  <h1>Every suite, every verdict, and everyone who checked it themselves.</h1>
+
+  <p class="lede">Each suite below ships an independent checker that imports no
+  Vaara code and recomputes its verdicts from the bytes of its own case files.
+  This page is generated from the runner's report, so it says what the checkers
+  did rather than what a document claims they do.</p>
+
+  <div class="stats">
+    <div class="stat"><b>43</b><span>suites</span></div>
+    <div class="stat"><b>40</b><span>passed</span></div>
+    <div class="stat"><b>0</b><span>failed</span></div>
+    <div class="stat"><b>3</b><span>skipped</span></div>
+    <div class="stat"><b>49</b><span>cases</span></div>
+  </div>
+  <p class="mono" style="color:var(--faint)">generated 2026-08-19T09:57:58Z</p>
+
+  <h2>Run it yourself</h2>
+  <p>Nothing here needs Vaara installed. The checkers use the standard library
+  plus <code>cryptography</code> and <code>rfc8785</code>.</p>
+<pre><code>git clone https://github.com/vaaraio/vaara
+cd vaara
+pip install cryptography rfc8785
+python scripts/conformance_runner.py</code></pre>
+  <p>Point <code>--vectors-dir</code> at a directory laid out the same way and it
+  grades those bytes instead. The runner collects; the checkers decide.</p>
+
+  <h2>What a pass does not establish</h2>
+  <p>These vectors are Vaara's and there is no ratification process behind them.
+  The maintainer adds the cases and decides what a verdict means, and nobody else
+  has a vote. That is a real limit on any neutrality claim and it is stated here
+  rather than argued around.</p>
+  <p class="note">What the corpus does give is narrower and checkable: every case
+  recomputes from committed bytes with no Vaara import, so anyone can disagree
+  with an expected result and show their work. Recompute is checkable by
+  strangers. Authorship is not.</p>
+
+  <h2>Independent reproductions</h2>
+  <p>Parties other than the maintainer who ran the checkers and reported the
+  outcome in public. Claims are quoted as each party scoped them. Everyone here
+  asked to be listed, knowing the entry is permanent.
+  To add your own run, <a
+  href="https://github.com/vaaraio/vaara/issues/new?template=conformance-row.yml">open
+  a row request</a>. Row numbers are permanent and each listed party gets its
+  own badge, carrying that number, the date and the commit. A badge says the
+  party ran the checkers at that commit on that date. It never says currently
+  passing, and it is not a certification.</p>
+
+  <h3>Checking a badge without trusting this page</h3>
+  <p>Each badge carries the digest of its own row inside the SVG, and the row
+  it commits to is served as JCS-canonical bytes (RFC 8785) next to it. The
+  file holds those bytes and nothing else, so verifying a badge is one command
+  and needs no parser, no canonicaliser and no Vaara installed.</p>
+<pre><code>curl -s https://vaara.io/badge/&lt;slug&gt;.json | sha256sum
+curl -s https://vaara.io/badge/&lt;slug&gt;.svg | grep digest
+
+python scripts/vcr_chain.py            # nothing removed from the table</code></pre>
+  <p class="note">The two agree or the badge is not describing that row. This
+  is the same property the corpus runs on, applied to the badge itself: a
+  claim that recomputes from bytes, checkable by someone who trusts neither
+  the party nor Vaara.</p>
+
+  <h3>Terms for a listed party, version 2026-08-15</h3>
+  <p class="note">Stated before there is anything to sell, so that anyone
+  deciding whether to be listed can read the commercial position at the moment
+  they decide rather than learn it afterwards.</p>
+  <ul class="terms">
+    <li><strong>A row is permanent.</strong> This records something that
+    happened. A run took place on a date at a commit, and that stays true, so
+    the entry stays. Asking will not remove it, and the maintainer cannot
+    remove it either. Rows are chained, so a deletion or a reordering breaks
+    every digest after it and anybody can see the break.</li>
+    <li>Nothing is edited after the fact. A correction is a new row referring
+    to the earlier one, never a rewrite of it.</li>
+    <li>A row and its badge are free, and stay free. There is no paid tier of
+    being listed and no version of a row that counts for more.</li>
+    <li>Vaara may sell services built on these same vectors, including a
+    countersigned result. Being listed here is never a condition of buying
+    anything, and buying something is never a condition of being listed.</li>
+    <li>No listed party's name, affiliation or badge is used to sell anything.
+    Rows are a record, not a customer list and not a reference.</li>
+    <li>Each row records the version of these terms it agreed to. Terms may
+    change for rows added later. A row already listed keeps the terms it was
+    listed under, and a change is never applied backwards.</li>
+  </ul>
+
+        <article class="repro">
+          <div class="repro-head">
+            <span class="num mono">#1</span>
+            <span class="date mono">2026-08-19</span>
+            <span class="who">babyblueviper1 (invinoveritas)</span>
+            <span class="aff">invinoveritas</span>
+          </div>
+          <p class="result">40 passed, 0 failed, 3 skipped, 49 cases</p>
+          <dl>
+            <dt>Suites</dt><dd class="mono">acp_checkout_v0, agent_decision_v0, agent_identity_v0, ap2_v0, article12_fold_v0, atlas_threat_v0, attestation_result_v0, audit_summary_v0, authorization_v0, build_bundle_v0, bundle_doc_v0, bundle_set_v0, capability_scope_v0, class_gate_v0, conformance_statement_v0, contiguity_v0, credential_binding_v0, credential_grant_v0, crewai_enforcement_v0, cross_org_handoff_v0, cross_stack_revocation_v0, data_locality_v0, decision_pairing_v0, enforcement_attestation_v0, enforcement_set_v0, evidence_bundle_v0, evidence_ref_v0, execution_receipt_v0, external_evidence_v0, fallback_projection_v0, governance_decision_v0, handoff_set_v0, ingest_v0, key_rotation_v0, normalize_v0, pq_hybrid_v0, qualified_time_v0, record_conformance_v0, record_set_v0, sep2787_attestation_v0, tap_v0, transparency_consistency_v0, x402_settlement_v0</dd>
+            <dt>At commit</dt><dd class="mono">cc5df5d2938cb9a26e820c1b8b5ac3b7d398ab1e</dd>
+            <dt>Their scoping</dt><dd class="scoping">Ran the independent checkers exactly as documented (git clone, pip install cryptography rfc8785, python scripts/conformance_runner.py) in an isolated venv, no Vaara install. Establishes that the checkers reproduce their own stated verdicts against the shipped case files at this commit. Does not establish interoperability between Vaara&#x27;s proofs and our own (invinoveritas) proof format.</dd>
+            <dt>Record</dt><dd><a href="https://github.com/crewAIInc/crewAI/issues/4877#issuecomment-5339555715" rel="noopener">record</a></dd>
+            <dt>Listed under terms</dt><dd class="mono">2026-08-15</dd>
+            <dt>Row digest</dt><dd class="mono">sha256:2682d581d86fc18156386c716c38d9c63ea34264ecb2dc31938ae30d20a55693<br>over <a href="/badge/babyblueviper1-invinoveritas.json">/badge/babyblueviper1-invinoveritas.json</a></dd>
+            <dt>Badge</dt><dd><img src="/badge/babyblueviper1-invinoveritas.svg" alt="VCR row 1" height="20"><br><code class="snippet">[![Vaara Conformance Results row 1](https://vaara.io/badge/babyblueviper1-invinoveritas.svg)](https://vaara.io/conformance.html)</code></dd>
+            <dt>Certificate</dt><dd><a href="/badge/babyblueviper1-invinoveritas.html">printable sheet</a></dd>
+          </dl>
+        </article>
+
+  <h2>Suites</h2>
+  <table>
+    <thead><tr><th>Suite</th><th>Verdict</th><th>Note</th></tr></thead>
+    <tbody>
+<tr><td class="mono">acp_checkout_v0</td><td class="ok">PASS</td><td class="why"></td></tr>
+<tr><td class="mono">agent_decision_v0</td><td class="ok">PASS</td><td class="why"></td></tr>
+<tr><td class="mono">agent_identity_v0</td><td class="ok">PASS</td><td class="why"></td></tr>
+<tr><td class="mono">ap2_v0</td><td class="ok">PASS</td><td class="why"></td></tr>
+<tr><td class="mono">article12_fold_v0</td><td class="skip">SKIP</td><td class="why">checker validates a passed-in bundle zip, not a bare case directory</td></tr>
+<tr><td class="mono">atlas_threat_v0</td><td class="ok">PASS</td><td class="why"></td></tr>
+<tr><td class="mono">attestation_result_v0</td><td class="ok">PASS</td><td class="why"></td></tr>
+<tr><td class="mono">audit_summary_v0</td><td class="ok">PASS</td><td class="why"></td></tr>
+<tr><td class="mono">authorization_v0</td><td class="ok">PASS</td><td class="why"></td></tr>
+<tr><td class="mono">build_bundle_v0</td><td class="ok">PASS</td><td class="why"></td></tr>
+<tr><td class="mono">bundle_doc_v0</td><td class="ok">PASS</td><td class="why"></td></tr>
+<tr><td class="mono">bundle_set_v0</td><td class="ok">PASS</td><td class="why"></td></tr>
+<tr><td class="mono">capability_scope_v0</td><td class="ok">PASS</td><td class="why"></td></tr>
+<tr><td class="mono">class_gate_v0</td><td class="ok">PASS</td><td class="why"></td></tr>
+<tr><td class="mono">conformance_statement_v0</td><td class="ok">PASS</td><td class="why"></td></tr>
+<tr><td class="mono">contiguity_v0</td><td class="ok">PASS</td><td class="why"></td></tr>
+<tr><td class="mono">credential_binding_v0</td><td class="ok">PASS</td><td class="why"></td></tr>
+<tr><td class="mono">credential_grant_v0</td><td class="ok">PASS</td><td class="why"></td></tr>
+<tr><td class="mono">crewai_enforcement_v0</td><td class="ok">PASS</td><td class="why"></td></tr>
+<tr><td class="mono">cross_org_handoff_v0</td><td class="ok">PASS</td><td class="why"></td></tr>
+<tr><td class="mono">cross_stack_revocation_v0</td><td class="ok">PASS</td><td class="why"></td></tr>
+<tr><td class="mono">data_locality_v0</td><td class="ok">PASS</td><td class="why"></td></tr>
+<tr><td class="mono">decision_pairing_v0</td><td class="ok">PASS</td><td class="why"></td></tr>
+<tr><td class="mono">enforcement_attestation_v0</td><td class="ok">PASS</td><td class="why"></td></tr>
+<tr><td class="mono">enforcement_set_v0</td><td class="ok">PASS</td><td class="why"></td></tr>
+<tr><td class="mono">evidence_bundle_v0</td><td class="ok">PASS</td><td class="why"></td></tr>
+<tr><td class="mono">evidence_ref_v0</td><td class="ok">PASS</td><td class="why"></td></tr>
+<tr><td class="mono">execution_receipt_v0</td><td class="ok">PASS</td><td class="why"></td></tr>
+<tr><td class="mono">external_evidence_v0</td><td class="ok">PASS</td><td class="why"></td></tr>
+<tr><td class="mono">fallback_projection_v0</td><td class="ok">PASS</td><td class="why"></td></tr>
+<tr><td class="mono">governance_decision_v0</td><td class="ok">PASS</td><td class="why"></td></tr>
+<tr><td class="mono">handoff_set_v0</td><td class="ok">PASS</td><td class="why"></td></tr>
+<tr><td class="mono">ingest_v0</td><td class="ok">PASS</td><td class="why"></td></tr>
+<tr><td class="mono">key_rotation_v0</td><td class="ok">PASS</td><td class="why"></td></tr>
+<tr><td class="mono">normalize_v0</td><td class="ok">PASS</td><td class="why"></td></tr>
+<tr><td class="mono">pq_hybrid_v0</td><td class="skip">SKIP</td><td class="why">pq_hybrid_v0 needs an optional dependency not installed: dilithium_py (pip install &#x27;vaara[pq]&#x27;)</td></tr>
+<tr><td class="mono">qualified_time_v0</td><td class="skip">SKIP</td><td class="why">qualified_time_v0 needs an optional dependency not installed: asn1crypto (pip install &#x27;vaara[timeanchor]&#x27;)</td></tr>
+<tr><td class="mono">record_conformance_v0</td><td class="ok">PASS</td><td class="why"></td></tr>
+<tr><td class="mono">record_set_v0</td><td class="ok">PASS</td><td class="why"></td></tr>
+<tr><td class="mono">sep2787_attestation_v0</td><td class="ok">PASS</td><td class="why"></td></tr>
+<tr><td class="mono">tap_v0</td><td class="ok">PASS</td><td class="why"></td></tr>
+<tr><td class="mono">transparency_consistency_v0</td><td class="ok">PASS</td><td class="why"></td></tr>
+<tr><td class="mono">x402_settlement_v0</td><td class="ok">PASS</td><td class="why"></td></tr>
+    </tbody>
+  </table>
+
+  <footer>
+    Generated by <code>scripts/render_conformance_page.py</code> from
+    <code>scripts/conformance_runner.py --json</code>. Independent reproductions
+    are maintained in <code>conformance/reproductions.json</code> and added by
+    pull request. Vaara is AGPL-3.0-or-later.
+  </footer>
+</div>
+</body>
+</html>
