@@ -33,6 +33,7 @@ import argparse
 import json
 import subprocess
 import sys
+import tempfile
 import time
 import urllib.parse
 from datetime import datetime, timezone
@@ -52,8 +53,23 @@ SKIP_EXIT_CODE = 77
 # Suites whose checker validates an artifact handed to it on the command line
 # rather than a bare directory of case files. Reported SKIP (with reason) in the
 # aggregate run; an explicit list so the gap reads as a gap, not as coverage.
+#
+# The skip is a consequence of this runner's promise rather than a hole in the
+# corpus. article12_fold_v0 validates a produced EU AI Act Article 12 regulator
+# package, so something has to build the package first, and building it needs
+# Vaara installed. The runner's whole point is that a stranger can grade the
+# corpus with `pip install cryptography rfc8785` and no Vaara. Those two cannot
+# both hold, so it skips, and `--with-vaara` is for the environment where the
+# install already exists: our own CI, and anyone who happens to have it.
 NEEDS_ARGUMENT = {
     "article12_fold_v0": "checker validates a passed-in bundle zip, not a bare case directory",
+}
+
+#: How to build the artifact a NEEDS_ARGUMENT suite grades, when Vaara is
+#: importable. Each entry names the generator callable and the scenario it
+#: builds; the runner hands the result to the suite's own checker unchanged.
+BUILDABLE = {
+    "article12_fold_v0": "full",
 }
 
 
@@ -80,13 +96,57 @@ def _case_count(suite_dir: Path) -> Optional[int]:
     return None
 
 
-def run_suite(vectors_dir: Path, suite: str) -> dict[str, Any]:
+def _build_artifact(suite_dir: Path, suite: str, work: Path) -> Path | None:
+    """Build the artifact a NEEDS_ARGUMENT suite grades. None if not possible.
+
+    Imports the suite's own generator, which imports Vaara, so this only works
+    where Vaara is installed. Any failure returns None and the suite falls back
+    to being skipped with its usual reason: a runner that turned a missing
+    optional install into a red suite would punish exactly the stranger this
+    corpus is built for.
+    """
+    import importlib.util
+
+    try:
+        spec = importlib.util.spec_from_file_location(
+            f"_gen_{suite}", suite_dir / "_generate.py"
+        )
+        gen = importlib.util.module_from_spec(spec)
+        spec.loader.exec_module(gen)
+        hcases = {c["name"]: c for c in json.loads(
+            (gen.HANDOFF / "cases.json").read_text())["cases"]}
+        ecases = {c["name"]: c for c in json.loads(
+            (gen.ENFORCEMENT / "cases.json").read_text())["cases"]}
+        return gen._build(gen.SCENARIOS[BUILDABLE[suite]], hcases, ecases, work)
+    except Exception:  # noqa: BLE001
+        return None
+
+
+def run_suite(vectors_dir: Path, suite: str, with_vaara: bool = False) -> dict[str, Any]:
     """Run one suite's checker and return a structured result row."""
     suite_dir = vectors_dir / suite
     if suite in NEEDS_ARGUMENT:
+        artifact = None
+        if with_vaara and suite in BUILDABLE:
+            work = Path(tempfile.mkdtemp(prefix=f"{suite}-"))
+            artifact = _build_artifact(suite_dir, suite, work)
+        if artifact is None:
+            return {
+                "suite": suite, "status": "SKIP", "reason": NEEDS_ARGUMENT[suite],
+                "cases": _case_count(suite_dir), "returncode": None, "duration_s": 0.0,
+            }
+        start = time.perf_counter()
+        proc = subprocess.run(
+            [sys.executable, str(suite_dir / CHECKER), str(artifact)],
+            capture_output=True, text=True, cwd=str(suite_dir),
+        )
+        duration = round(time.perf_counter() - start, 3)
         return {
-            "suite": suite, "status": "SKIP", "reason": NEEDS_ARGUMENT[suite],
-            "cases": _case_count(suite_dir), "returncode": None, "duration_s": 0.0,
+            "suite": suite,
+            "status": "PASS" if proc.returncode == 0 else "FAIL",
+            "reason": "" if proc.returncode == 0 else proc.stderr.strip()[-400:],
+            "cases": _case_count(suite_dir), "returncode": proc.returncode,
+            "duration_s": duration,
         }
 
     start = time.perf_counter()
@@ -227,6 +287,9 @@ def main(argv: Optional[list[str]] = None) -> int:
                         help="write a machine-readable conformance report to this path")
     parser.add_argument("--no-submit-link", action="store_true",
                         help="omit the listing link (for CI and scripted runs)")
+    parser.add_argument("--with-vaara", action="store_true",
+                        help="also grade suites whose checker needs a built artifact "
+                             "(requires Vaara installed; skipped silently if not)")
     args = parser.parse_args(argv)
 
     vectors_dir = args.vectors_dir.resolve()
@@ -249,7 +312,7 @@ def main(argv: Optional[list[str]] = None) -> int:
         suites = [s for s in suites if s in args.corpus]
 
     stamp = datetime.now(timezone.utc).strftime("%Y-%m-%dT%H:%M:%SZ")
-    rows = [run_suite(vectors_dir, s) for s in suites]
+    rows = [run_suite(vectors_dir, s, with_vaara=args.with_vaara) for s in suites]
     _print_table(rows)
 
     report = build_report(rows, vectors_dir, stamp)

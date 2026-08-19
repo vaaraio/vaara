@@ -66,6 +66,25 @@ def main(argv: list[str]) -> int:
     head = digest(rows[-1]) if rows else data.get("genesis", ZERO)
     print(f"{len(rows)} row(s), chain intact.")
     print(f"head: {head}")
+
+    # A checkout of main ships this file EMPTY on purpose: rows arrive by issue
+    # form and land on the unprotected `vcr` branch, which is what lets a
+    # submitter appear on the table without write access, a fork or a PR. The
+    # published page therefore shows rows that this file does not have.
+    #
+    # Without the note below, a stranger who follows the page's own instruction
+    # to verify with this script reads "0 row(s), chain intact" against a page
+    # listing rows, and the honest conclusion available to them is that the
+    # tool is lying. Saying where the rows actually live costs four lines and
+    # removes the only reading that makes this table look dishonest.
+    if not rows and path == DEFAULT:
+        print(
+            "\nThis is the committed baseline on main, which ships with no rows.\n"
+            "Published rows live on the `vcr` branch. To check those:\n"
+            "  git fetch origin vcr && git show origin/vcr:vcr/reproductions.json > rows.json\n"
+            "  python scripts/vcr_chain.py rows.json\n"
+            "Each row is also served standalone at https://vaara.io/badge/<slug>.json"
+        )
     return 0
 
 
