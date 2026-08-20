@@ -176,7 +176,7 @@ def corpus_badge_svg(report: dict) -> str:
     at, and it links to the page where every one of those verdicts recomputes.
     """
     totals = report["totals"]
-    label = "VAARA CONFORMANCE"
+    label = "Vaara Conformance"
     # Counting passes against the suite total reads as a failure that is not
     # there. The corpus has suites the aggregate runner cannot execute from a
     # bare case directory, article12_fold_v0 being one: its checker validates a
@@ -266,7 +266,7 @@ def badge_svg(row: dict) -> str:
     the first application arrived from a party who had no idea a number was on
     offer, which is fairly good evidence nobody is here for the number.
     """
-    label = "VAARA CONFORMANCE"
+    label = "Vaara Conformance"
     message = f"reproduced {row.get('date', '')} {str(row.get('at_commit', ''))[:7]}"
     lwid = text_width(label)
     mwid = text_width(message)
