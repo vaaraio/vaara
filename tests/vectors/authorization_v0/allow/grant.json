@@ -37,6 +37,6 @@
     "tenantId": "tenant-a",
     "toolName": "pay.send"
   },
-  "signature": "b37c978bf6288cbd1ae291dbaed6878df01fbe93676859b136d8c6cdb4c7deda01a4aae019060cfbea13ddd938bdf29e28b48d5c5b38db623690aff5861f48ab",
+  "signature": "82e1e620f48b556f8ab0c4974a2a3fc8c91ff8e07e1491847a38541af1b38e2629f5a8d6ff75cd8cf8c705cb4fba2e155acc43dadbbb327d1e5349772561f93e",
   "version": 1
 }

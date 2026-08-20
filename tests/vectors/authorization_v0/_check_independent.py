@@ -108,7 +108,21 @@ def _evaluate(capabilities, args):
 
 
 def _grant_fingerprint_recomputes(grant, evidence) -> bool:
-    return _sha256_hex(_jcs(grant)) == evidence.get("grantFingerprint")
+    """Recompute over what the grant signed, with the signature excluded.
+
+    An ES256 signature is not byte-unique for one signing act: given a valid
+    ``(r, s)`` over P-256, ``(r, n - s)`` verifies over the same payload under
+    the same key. A fingerprint taken over bytes that include the signature
+    therefore gives one authorization two identities, and a verifier
+    recomputing from the grant it holds can fail to match a receipt for an
+    authorization that did govern.
+
+    The excluded member is the signature alone. ``asserted`` carries ``iss``,
+    ``sub`` and ``secretVersion``, and ``scope`` and ``binding`` carry the rest,
+    so a re-minted grant still produces a different fingerprint.
+    """
+    signed_blocks = {k: v for k, v in grant.items() if k != "signature"}
+    return _sha256_hex(_jcs(signed_blocks)) == evidence.get("grantFingerprint")
 
 
 def _args_commitment_recomputes(args, evidence) -> bool:

@@ -30,7 +30,7 @@
       "boundary": "chain:agent-handoff-7a1d",
       "scope": "only steps in this handoff chain are observed"
     },
-    "grantFingerprint": "sha256:b9fbf6799abf499a35a97dd82073cf25b891362a832fc19eea07658771e2e9b4",
+    "grantFingerprint": "sha256:6cba6279f111609c8cbabf33c104d099defd7394cc87dcc263a617d985e4028f",
     "reason": "ok",
     "schema": "vaara.authorization/v0",
     "tenantId": "tenant-a",
@@ -48,7 +48,7 @@
       "decision": "allow",
       "evidenceRef": {
         "canonicalization": "JCS",
-        "digest": "sha256:8aef67334562f65ce5ea731a6136f9066b74b854d8e6e5f6bf925081f24522d8",
+        "digest": "sha256:285c72ebc44ef1caebd1e9948aa42302f2e197234337479e650d6975744141e7",
         "ref": "mcp:call/call-7a1d-0002",
         "schema": "vaara.authorization/v0"
       },
@@ -57,13 +57,13 @@
     },
     "issuerAsserted": {
       "alg": "ES256",
-      "iat": "2026-06-22T17:02:54Z",
+      "iat": "2026-08-20T06:41:42Z",
       "iss": "vaara-mcp-proxy",
       "nonce": "decision-nonce-2",
       "secretVersion": "key-v1",
       "sub": "tenant-a/upstream"
     },
-    "signature": "5cb973fc636d9177a48599375cfeeb4808e75ba91014e0556f5dd92100c783a9b9016b6e9b9a82ebab510a28804f9fce4aab12a701a978f4d8fbdde7775ba902",
+    "signature": "1919a656a416c95827b3bc04eddf5d831c948990a64d9442f955da835a9dfbd6cb8f5744db53657609dcdf103aef9057d6bc542571638c182687ac04ce10c293",
     "version": 1
   }
 }

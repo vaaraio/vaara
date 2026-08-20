@@ -9,7 +9,7 @@
     "decision": "allow",
     "evidenceRef": {
       "canonicalization": "JCS",
-      "digest": "sha256:dcb6414b61802a87e84ab9fc8889d43c148d83ff4f6333ccd797b29bab557420",
+      "digest": "sha256:2e39fd4ae2af76b13397a6ca8ee6044a9260943b4b72e59c69943b5b08603163",
       "ref": "vaara:authorization/pay.send",
       "schema": "vaara.authorization/v0"
     },
@@ -18,12 +18,12 @@
   },
   "issuerAsserted": {
     "alg": "ES256",
-    "iat": "2026-06-19T20:41:49Z",
+    "iat": "2026-08-20T06:40:23Z",
     "iss": "vaara-mcp-proxy",
     "nonce": "decision-nonce-allow",
     "secretVersion": "key-v1",
     "sub": "tenant-a/upstream"
   },
-  "signature": "d3979cb6162eb0f76fc02b2ab100e2d331ca9ac9a1465e12ead11a925f88859ac96a923e419442252416012aa3a9d5dd71d69aaf3b91649a708c2afcf57e033c",
+  "signature": "f4d4d999dbccaad07bd3b0414fbc32982b11d7ebfd27a4a05d5ca0d0ca56a4fda131d87d294951140fc5503612ceb5c18124ae876c4e01e2502c00016f94002f",
   "version": 1
 }

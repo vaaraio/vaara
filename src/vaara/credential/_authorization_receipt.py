@@ -48,6 +48,7 @@ from vaara.attestation.decision import (
     emit_decision_record,
 )
 from vaara.credential._grant_capability import capability_to_dict
+from vaara.credential._grant_emit import signing_payload
 from vaara.credential._grant_types import BrokeredCredential
 from vaara.credential._grant_verify import GrantVerdict
 
@@ -65,13 +66,26 @@ def _digest(obj: Any) -> str:
 
 
 def grant_fingerprint(credential: BrokeredCredential) -> str:
-    """Content address of the exact signed grant (signature included).
+    """Content address of the exact signed grant, over what the grant signed.
 
-    Pins the precise credential the decision rested on: a re-minted or
-    tampered grant produces a different fingerprint, so the receipt cannot be
-    replayed against a different authorization.
+    Pins the precise credential the decision rested on: a re-minted or tampered
+    grant produces a different fingerprint, so the receipt cannot be replayed
+    against a different authorization. ``asserted`` carries ``iss``, ``sub`` and
+    ``secretVersion``, so a re-mint under a different key moves the value, and
+    ``scope`` and ``binding`` carry the rest of what a re-mint would change.
+
+    The signature itself is excluded, and that is a change from the original
+    construction. ES256 is an accepted grant algorithm and neither
+    ``sign_es256`` nor ``verify_es256`` constrains ``s``, so one signing act has
+    two valid encodings. Hashing them gave one authorization two fingerprints,
+    and a verifier recomputing from the grant it held could fail to match a
+    receipt for an authorization that did govern. A false miss on identity reads
+    as a tampering signal.
+
+    Fingerprints computed before this change do not compare against ones
+    computed after it. See ``tests/credential/test_grant_fingerprint_malleability.py``.
     """
-    return _digest(credential.to_dict())
+    return "sha256:" + hashlib.sha256(signing_payload(credential)).hexdigest()
 
 
 def args_commitment(runtime_args: Any) -> str:

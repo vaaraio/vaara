@@ -20,7 +20,7 @@
       "value": "0xABC"
     }
   ],
-  "grantFingerprint": "sha256:5b47b43cbca316d5ef074886038b1c9a4d8654a499f74845476e4335db94d6ea",
+  "grantFingerprint": "sha256:b45ee28037978ddec1513875d47edc2f63cf3581f0e6026bbd7cf67950908175",
   "reason": "ok",
   "schema": "vaara.authorization/v0",
   "tenantId": "tenant-a",

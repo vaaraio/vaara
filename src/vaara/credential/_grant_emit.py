@@ -142,6 +142,25 @@ def emit_grant(
     )
 
 
+def signing_payload(credential: BrokeredCredential) -> bytes:
+    """The exact bytes this grant's signature was computed over.
+
+    One authority for the question "what did this grant sign?", because the
+    alternative is what Anton Sokolov's malleability thread found in three
+    codebases: the shape gets assembled in more than one place, each assembly
+    is individually reasonable, and the copies drift. Signature verification
+    and grant identity both come through here.
+    """
+    return _signing_payload(
+        version=credential.version,
+        alg=credential.alg,
+        scope=credential.scope,
+        binding=credential.binding,
+        asserted=credential.asserted,
+        capabilities=credential.capabilities,
+    )
+
+
 def verify_grant_signature(
     credential: BrokeredCredential,
     *,
@@ -153,14 +172,7 @@ def verify_grant_signature(
     grant blocks under ``verifying_material`` (bytes shared secret for HS256,
     public-key object for ES256 / RS256).
     """
-    payload = _signing_payload(
-        version=credential.version,
-        alg=credential.alg,
-        scope=credential.scope,
-        binding=credential.binding,
-        asserted=credential.asserted,
-        capabilities=credential.capabilities,
-    )
+    payload = signing_payload(credential)
 
     if credential.alg == "HS256":
         if not isinstance(verifying_material, (bytes, bytearray)):

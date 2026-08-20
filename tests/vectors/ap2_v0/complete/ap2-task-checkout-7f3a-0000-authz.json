@@ -31,7 +31,7 @@
       "scope": "only post-checkout actions routed through the AP2 task are observed",
       "serverFingerprint": "manifest:sha256:cdcdcdcdcdcdcdcdcdcdcdcdcdcdcdcdcdcdcdcdcdcdcdcdcdcdcdcdcdcdcdcd"
     },
-    "grantFingerprint": "sha256:ff0f339e695965374e8dfa3ec3771f9486acaa542037ecf757ab7e9db3553799",
+    "grantFingerprint": "sha256:782c36c40a7ebdd8ca93e038159657a0753469d3a1d69ccf0ab727064071db73",
     "reason": "ok",
     "schema": "vaara.authorization/v0",
     "tenantId": "tenant-a",
@@ -49,7 +49,7 @@
       "decision": "allow",
       "evidenceRef": {
         "canonicalization": "JCS",
-        "digest": "sha256:9f4331e7b23ec03aee1523cdc48038d30c3b2aa020b485bf9f28fa7f47f55af2",
+        "digest": "sha256:9b6bd1cac27ab1d17b0d46a48a76ca19b7b0be190c994a66289bdd045973610a",
         "ref": "ap2:checkout/sha256:5a48376bf026870c5ceeffb2f8e0a9436094b999c0b0685712f75005141118cd",
         "schema": "vaara.authorization/v0"
       },
@@ -58,13 +58,13 @@
     },
     "issuerAsserted": {
       "alg": "ES256",
-      "iat": "2026-06-21T08:46:26Z",
+      "iat": "2026-08-20T06:41:41Z",
       "iss": "vaara-mcp-proxy",
       "nonce": "decision-nonce-0",
       "secretVersion": "key-v1",
       "sub": "tenant-a/upstream"
     },
-    "signature": "f7ea0238354694312fe7514b594d5463837495a4c27413de6dad9bf529b447f07140bacce17c4957127389de951e0ee3239ec0e102da4b3328889c1cf1375528",
+    "signature": "27fee943e92755dbe1aff3117355f98c29bf3512358aa35b20c98536f38d0735dbdd49a211b83d0d41b95bcc934382a023d4bf247d35004707a54953b6de3ec6",
     "version": 1
   }
 }
