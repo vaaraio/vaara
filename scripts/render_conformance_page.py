@@ -587,7 +587,15 @@ def render(report: dict, repro: dict) -> str:
     --mono:ui-monospace,'SFMono-Regular','JetBrains Mono',Menlo,Consolas,monospace;
     --sans:'Inter',-apple-system,BlinkMacSystemFont,'Segoe UI',Helvetica,Arial,sans-serif;
   }}
-  html[data-theme="dark"], html:not([data-theme]) {{}}
+  /* Light is the default across every Vaara surface. The dark grammar is the
+     same set of tokens under data-theme, the same as verify.html and
+     index.html, so the three pages cannot drift apart. */
+  html[data-theme="dark"] {{
+    color-scheme: dark;
+    --bg:#0F1417; --panel:#1A2226; --panel-2:#151D20; --line:rgba(123,156,138,.16);
+    --ink:#DEE4E1; --muted:#8B9792; --faint:#5E6A66;
+    --tri:#78A08A; --tri-bright:#93B8A3; --warn:#D98B8B;
+  }}
   @media (prefers-color-scheme: dark) {{
     html:not([data-theme]) {{
       color-scheme: dark;
@@ -649,12 +657,36 @@ def render(report: dict, repro: dict) -> str:
   pre code{{background:none;padding:0}}
   footer{{margin-top:64px;padding-top:20px;border-top:1px solid var(--line);
          color:var(--faint);font-size:12.5px}}
+  .nav-jump{{position:fixed;top:14px;left:16px;z-index:10;display:inline-flex;
+    background:var(--panel);border:1px solid var(--line);border-radius:999px;padding:4px}}
+  .nav-jump a{{font-family:var(--mono);font-size:11px;letter-spacing:.18em;
+    text-transform:uppercase;color:var(--faint);padding:4px 11px;border-radius:999px;
+    text-decoration:none;border:0}}
+  .nav-jump a:hover{{color:var(--tri);background:var(--panel-2)}}
+  .theme-toggle{{position:fixed;top:14px;right:16px;z-index:10;display:inline-flex;
+    gap:2px;background:var(--panel);border:1px solid var(--line);border-radius:999px;padding:4px}}
+  .theme-toggle button{{appearance:none;background:none;border:0;cursor:pointer;margin:0;
+    font-family:var(--mono);font-size:11px;letter-spacing:.18em;text-transform:uppercase;
+    color:var(--faint);padding:4px 11px;border-radius:999px}}
+  .theme-toggle button[aria-pressed="true"]{{color:var(--tri);background:var(--panel-2)}}
+  .theme-toggle button:hover{{color:var(--tri)}}
 </style>
+<script>
+  // Apply the stored theme before first paint, the same as index.html and
+  // verify.html. Without this the page renders in the OS colourway and snaps
+  // to the saved choice when the body script runs.
+  (function(){{ try {{ var t = localStorage.getItem('vaara-theme');
+    if (t === 'dark' || t === 'light') document.documentElement.setAttribute('data-theme', t);
+  }} catch(e){{}} }})();
+</script>
 </head>
 <body>
+<nav class="nav-jump"><a href="/">Home</a></nav>
+<div class="theme-toggle" role="group" aria-label="Color theme">
+  <button type="button" data-set-theme="light" aria-pressed="true">light</button>
+  <button type="button" data-set-theme="dark" aria-pressed="false">dark</button>
+</div>
 <div class="wrap">
-  <a class="back" href="/">&larr; vaara.io</a>
-
   <p class="kicker">Vaara Conformance Results</p>
   <h1>Every suite, every verdict, and everyone who checked it themselves.</h1>
 
@@ -757,6 +789,34 @@ python scripts/vcr_chain.py            # nothing removed from the table</code></
     pull request. Vaara is AGPL-3.0-or-later.
   </footer>
 </div>
+<script>
+(function(){{
+  var root = document.documentElement;
+  var btns = document.querySelectorAll('.theme-toggle [data-set-theme]');
+  function apply(theme){{
+    root.setAttribute("data-theme", theme === "dark" ? "dark" : "light");
+    btns.forEach(function(b){{
+      b.setAttribute("aria-pressed", String(b.getAttribute("data-set-theme") === theme));
+    }});
+    try {{ localStorage.setItem("vaara-theme", theme); }} catch(e) {{}}
+  }}
+  // No stored choice: leave data-theme off so the OS decides, and show which
+  // side the OS landed on so the toggle is not lying about the current state.
+  function reflectAuto(){{
+    root.removeAttribute("data-theme");
+    var dark = window.matchMedia && window.matchMedia("(prefers-color-scheme: dark)").matches;
+    btns.forEach(function(b){{
+      b.setAttribute("aria-pressed", String(b.getAttribute("data-set-theme") === (dark ? "dark" : "light")));
+    }});
+  }}
+  btns.forEach(function(b){{
+    b.addEventListener("click", function(){{ apply(b.getAttribute("data-set-theme")); }});
+  }});
+  var saved = null;
+  try {{ saved = localStorage.getItem("vaara-theme"); }} catch(e) {{}}
+  if (saved === "dark" || saved === "light") apply(saved); else reflectAuto();
+}})();
+</script>
 </body>
 </html>
 """

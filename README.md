@@ -57,6 +57,19 @@ It also states what a passing check does not establish: that the key belongs to 
 
 The explorer on the same page reads the public transparency log straight from your browser. Look a trail head up by digest, or paste a public key to see everything published under it. No account and no sign-in, because the key is the identity. Publishing to that log is opt-in and off by default (`vaara trail publish-head`), so an absence there means nothing was published rather than nothing happened.
 
+### See who else has checked it
+
+[vaara.io/conformance.html](https://vaara.io/conformance.html) is the results page. It carries every suite and its verdict, and every party other than the maintainer who ran the checkers and reported what they found in public. Rows are chained, each holding the digest of the row before it, so removing or reordering one breaks every digest after it and the break is visible to anyone. The maintainer cannot take a row down either. A run that disagrees with ours is a row too, with the reason stated, and there is no blacklist.
+
+The aggregate runner grades every suite at once, and grades another implementation's vectors the same way:
+
+```bash
+python scripts/conformance_runner.py                                 # grade the reference corpus
+python scripts/conformance_runner.py --vectors-dir ./your_vectors    # grade your own
+```
+
+It prints a prefilled link at the end of every run, so asking for a row takes one click. The named, versioned rule set, what a pass does and does not establish, and the full suite list are in [docs/conformance-profile.md](docs/conformance-profile.md).
+
 <details>
 <summary><b>Prefer the explicit pipeline?</b></summary>
 
@@ -104,15 +117,6 @@ python tests/vectors/external_evidence_v0/_check_independent.py
 It re-derives every verdict from the receipt bytes and the public key alone. The output shows the property the trail is built for: a receipt dropped from inside a declared boundary is a provable gap from the held set, with no issuer access and no external witness.
 
 For the whole loop in one runnable file, produce a signed record, verify it yourself, then watch a single forged byte get caught, see [examples/prove-it-yourself/](examples/prove-it-yourself/). The logs-versus-evidence argument behind it is in [docs/logs-vs-evidence.md](docs/logs-vs-evidence.md).
-
-The aggregate runner grades every suite at once, and grades another implementation's vectors the same way:
-
-```bash
-python scripts/conformance_runner.py                                 # grade the reference corpus
-python scripts/conformance_runner.py --vectors-dir ./your_vectors    # grade your own
-```
-
-The named, versioned rule set, what a pass does and does not establish, and the full suite list are in [docs/conformance-profile.md](docs/conformance-profile.md).
 </details>
 
 <details>
