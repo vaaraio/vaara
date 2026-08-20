@@ -152,3 +152,83 @@ def test_page_is_linked_from_the_site():
     sitemap = (ROOT / "webpage" / "sitemap.xml").read_text(encoding="utf-8")
     assert "/conformance.html" in index, "nothing on the front page links to it"
     assert "conformance.html" in sitemap, "not in the sitemap, so it will not be indexed"
+
+
+# ---------------------------------------------------------------------------
+# Badge geometry.
+#
+# The badge is the only part of this work that travels: it gets pasted into
+# other people's READMEs, next to CI, licence and Scorecard shields that all
+# share one geometry. A badge that renders differently from its neighbours
+# reads as homemade, whatever it says.
+#
+# The faults these lock down were all live on the published row #1 badge:
+# glyphs squeezed by a forced textLength, a mark sitting low in the plate, and
+# a corpus shield that stayed green no matter how many suites failed.
+# ---------------------------------------------------------------------------
+
+
+def renderer():
+    """Import the renderer by path, since scripts/ is not an importable package."""
+    import importlib.util
+
+    spec = importlib.util.spec_from_file_location("render_conformance_page", RENDERER)
+    module = importlib.util.module_from_spec(spec)
+    spec.loader.exec_module(module)
+    return module
+
+
+# shields.io states the rendered width of its own text in `textLength`, at ten
+# times scale. These two came off live badges and are what the table is
+# calibrated against, so a drift here means our plates stopped matching every
+# other shield in the row.
+SHIELDS_WIDTHS = {"license": 37.0, "AGPL-3.0": 51.0}
+
+
+@pytest.mark.parametrize("text,expected", sorted(SHIELDS_WIDTHS.items()))
+def test_text_width_matches_shields_own_metrics(text, expected):
+    got = renderer().text_width(text)
+    assert abs(got - expected) / expected < 0.02, (
+        f"{text!r} measures {got:.1f}px against shields.io's {expected}px. "
+        "The plate padding will not match neighbouring badges."
+    )
+
+
+def test_nothing_forces_the_glyph_width():
+    """textLength plus lengthAdjust is what squeezed the label out of shape.
+
+    The width table is an estimate, so pinning text to it distorts the type
+    whenever the estimate is off. Sizing the plate from the estimate and
+    letting the text render naturally costs a little uneven padding instead.
+    """
+    module = renderer()
+    svg = module.corpus_badge_svg({"totals": {"suites": 43, "failed": 0}})
+    assert "textLength" not in svg
+    assert "lengthAdjust" not in svg
+
+
+def test_corpus_shield_turns_red_when_a_suite_fails():
+    module = renderer()
+    clean = module.corpus_badge_svg({"totals": {"suites": 43, "failed": 0}})
+    broken = module.corpus_badge_svg({"totals": {"suites": 43, "failed": 3}})
+    assert module._OK in clean and module._FAIL not in clean
+    assert module._FAIL in broken and module._OK not in broken, (
+        "a failing corpus rendered in the same green as a clean one"
+    )
+
+
+def test_the_mark_is_centred_in_the_plate():
+    """A 20px badge centres its logo slot on y=10. The mark sat at 5.5 to 15."""
+    svg = renderer().corpus_badge_svg({"totals": {"suites": 43, "failed": 0}})
+    points = re.search(r'<polygon points="([^"]+)"', svg).group(1)
+    ys = [float(p.split(",")[1]) for p in points.split()]
+    assert abs((min(ys) + max(ys)) / 2 - 10) < 0.01, f"mark is off centre: {points}"
+
+
+def test_text_centres_sit_inside_their_own_plates():
+    svg = renderer().corpus_badge_svg({"totals": {"suites": 43, "failed": 0}})
+    plate = float(re.search(r'<rect width="([0-9.]+)" height="20" fill="#1A2226"', svg).group(1))
+    # x is at ten times scale, to match the scale(.1) the text group carries.
+    label_cx, message_cx = (int(x) / 10 for x in re.findall(r'<text x="(\d+)" y="140"', svg))
+    assert 0 < label_cx < plate, "the label is centred outside its own plate"
+    assert message_cx > plate, "the message is centred over the label plate"

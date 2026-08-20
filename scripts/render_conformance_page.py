@@ -61,6 +61,7 @@ FALLBACK_TERMS_VERSION = "unversioned"
 BADGE_TEMPLATE = """<svg xmlns="http://www.w3.org/2000/svg" width="{w}" \
 height="20" role="img" aria-label="{alt}">
   <title>{alt}</title>
+  <filter id="blur"><feGaussianBlur stdDeviation="16"/></filter>
   <linearGradient id="s" x2="0" y2="100%">
     <stop offset="0" stop-color="#bbb" stop-opacity=".1"/>
     <stop offset="1" stop-opacity=".1"/>
@@ -76,22 +77,80 @@ height="20" role="img" aria-label="{alt}">
   <clipPath id="r"><rect width="{w}" height="20" rx="3" fill="#fff"/></clipPath>
   <g clip-path="url(#r)">
     <rect width="{lw}" height="20" fill="#1A2226"/>
-    <rect x="{lw}" width="{mw}" height="20" fill="#4A6E5C"/>
+    <rect x="{lw}" width="{mw}" height="20" fill="{mcolor}"/>
     <rect width="{w}" height="20" fill="url(#s)"/>
   </g>
-  <polygon points="12,5.5 17.5,15 6.5,15" fill="#78A08A"/>
-  <g font-family="Verdana,DejaVu Sans,Geneva,sans-serif" font-size="10">
-    <text x="24" y="15" fill="#000" fill-opacity=".3" textLength="{lt}" \
-lengthAdjust="spacingAndGlyphs">{label}</text>
-    <text x="24" y="14" fill="#fff" textLength="{lt}" \
-lengthAdjust="spacingAndGlyphs">{label}</text>
-    <text x="{mx}" y="15" fill="#000" fill-opacity=".3" textLength="{mt}" \
-lengthAdjust="spacingAndGlyphs">{message}</text>
-    <text x="{mx}" y="14" fill="#fff" textLength="{mt}" \
-lengthAdjust="spacingAndGlyphs">{message}</text>
+  <polygon points="12,3.5 18.5,16.5 5.5,16.5" fill="#78A08A"/>
+  <g fill="#fff" text-anchor="middle" \
+font-family="Verdana,Geneva,DejaVu Sans,sans-serif" \
+text-rendering="geometricPrecision" font-size="110">
+    <g transform="scale(.1)">
+      <g aria-hidden="true" fill="#010101">
+        <text x="{lcx}" y="150" fill-opacity=".8" filter="url(#blur)">{label}</text>
+        <text x="{lcx}" y="150" fill-opacity=".3">{label}</text>
+      </g>
+      <text x="{lcx}" y="140">{label}</text>
+    </g>
+    <g transform="scale(.1)">
+      <g aria-hidden="true" fill="#010101">
+        <text x="{mcx}" y="150" fill-opacity=".8" filter="url(#blur)">{message}</text>
+        <text x="{mcx}" y="150" fill-opacity=".3">{message}</text>
+      </g>
+      <text x="{mcx}" y="140">{message}</text>
+    </g>
   </g>
 </svg>
 """
+
+#: Verdana advance widths at font-size 10, in px, for the characters these
+#: badges actually carry. The previous geometry multiplied the character count
+#: by one flat constant and then pinned the result onto the glyphs with
+#: ``textLength`` and ``lengthAdjust="spacingAndGlyphs"``. Capitals in Verdana
+#: run near 7px, so "VAARA CONFORMANCE" wanted about 120px and was forced into
+#: 95, and every letter in the label was squeezed to make it fit.
+#:
+#: Nothing pins the width now. The table sizes the plates and the text renders
+#: at its natural width, so an entry that is slightly off costs a little padding
+#: instead of deforming the type.
+_VERDANA_10 = {
+    " ": 3.5, ",": 3.2, ".": 3.2, "-": 4.2, ":": 3.5, "(": 4.2, ")": 4.2,
+    "/": 4.6, "0": 6.4, "1": 6.4, "2": 6.4, "3": 6.4, "4": 6.4, "5": 6.4,
+    "6": 6.4, "7": 6.4, "8": 6.4, "9": 6.4,
+    "A": 7.0, "B": 6.9, "C": 6.9, "D": 7.3, "E": 6.3, "F": 5.8, "G": 7.5,
+    "H": 7.2, "I": 4.2, "J": 4.9, "K": 6.9, "L": 5.7, "M": 8.4, "N": 7.2,
+    "O": 7.7, "P": 6.3, "Q": 7.7, "R": 6.9, "S": 6.6, "T": 6.2, "U": 7.1,
+    "V": 6.9, "W": 9.9, "X": 6.7, "Y": 6.3, "Z": 6.4,
+    "a": 6.0, "b": 6.3, "c": 5.3, "d": 6.3, "e": 6.0, "f": 3.9, "g": 6.3,
+    "h": 6.2, "i": 2.7, "j": 3.5, "k": 5.9, "l": 2.7, "m": 9.5, "n": 6.2,
+    "o": 6.2, "p": 6.3, "q": 6.3, "r": 4.3, "s": 5.2, "t": 4.1, "u": 6.2,
+    "v": 5.7, "w": 8.1, "x": 5.7, "y": 5.7, "z": 5.2,
+}
+
+#: Calibration against shields.io's own published metrics, so plates here are
+#: sized the way every other shield in a README row is sized. Their SVGs carry
+#: the rendered width directly in ``textLength``: "license" is 37.0px and
+#: "AGPL-3.0" is 51.0px, against 34.1 and 46.7 from the table above. The table
+#: runs uniformly narrow by 1.085 and 1.092, so one constant corrects it.
+_VERDANA_CAL = 1.09
+
+#: Where the label plate ends and its text begins. The mark occupies the
+#: shields.io logo slot, a 14px box centred in the 20px height.
+_LOGO_SPAN = 24.0
+#: Padding either side of a text run. shields.io pads a 37px label into a 47px
+#: plate and a 51px message into a 61px plate, so 5px per side.
+_PAD = 5.0
+
+#: The message plate is green while nothing fails and red once something does.
+#: A hardcoded green rendered "43 suites, 3 failing" in the same calm colour as
+#: a clean corpus, which is the one state where a reader glancing at a shield
+#: instead of reading it would be misled.
+_OK = "#4A6E5C"
+_FAIL = "#B03A2E"
+
+
+def text_width(s: str) -> float:
+    """Natural rendered width of ``s`` at 10px Verdana, in px."""
+    return sum(_VERDANA_10.get(c, 6.2) for c in s) * _VERDANA_CAL
 
 
 #: The project's own shield, as opposed to a listed party's badge. It states
@@ -125,17 +184,20 @@ def corpus_badge_svg(report: dict) -> str:
     # assume the missing one is broken, on the maintainer's own README. Failures
     # are the number that carries meaning here, and the honest one is zero.
     message = f"{totals['suites']} suites, {totals['failed']} failing"
-    lw = int(len(label) * 5.6) + 32
-    mw = int(len(message) * 6.2) + 12
+    lwid = text_width(label)
+    mwid = text_width(message)
+    # Integers, the way every shields.io badge states its plate widths.
+    lw = round(_LOGO_SPAN + lwid + _PAD)
+    mw = round(_PAD + mwid + _PAD)
     alt = (f"Vaara conformance corpus: {totals['suites']} suites, "
            f"{totals['failed']} failing")
     return BADGE_TEMPLATE.format(
         w=lw + mw,
         lw=lw,
         mw=mw,
-        lt=lw - 32,
-        mt=mw - 12,
-        mx=lw + 6,
+        mcolor=_OK if not totals["failed"] else _FAIL,
+        lcx=round((_LOGO_SPAN + lwid / 2) * 10),
+        mcx=round((lw + _PAD + mwid / 2) * 10),
         label=esc(label),
         message=esc(message),
         alt=esc(alt),
@@ -206,18 +268,21 @@ def badge_svg(row: dict) -> str:
     """
     label = "VAARA CONFORMANCE"
     message = f"reproduced {row.get('date', '')} {str(row.get('at_commit', ''))[:7]}"
-    # 5.6px per character at 10px Verdana for the label, 6.2px at 11px for the
-    # message, plus the 24px the mark and its padding take on the left cap.
-    lw = int(len(label) * 5.6) + 32
-    mw = int(len(message) * 6.2) + 12
+    lwid = text_width(label)
+    mwid = text_width(message)
+    # Integers, the way every shields.io badge states its plate widths.
+    lw = round(_LOGO_SPAN + lwid + _PAD)
+    mw = round(_PAD + mwid + _PAD)
     alt = f"Vaara Conformance Results row {row['id']}: {row.get('party', '')}"
     return BADGE_TEMPLATE.format(
         w=lw + mw,
         lw=lw,
         mw=mw,
-        lt=lw - 32,
-        mt=mw - 12,
-        mx=lw + 6,
+        # A party badge records that a run happened. It carries no verdict on
+        # the corpus, so it never turns red.
+        mcolor=_OK,
+        lcx=round((_LOGO_SPAN + lwid / 2) * 10),
+        mcx=round((lw + _PAD + mwid / 2) * 10),
         label=esc(label),
         message=esc(message),
         alt=esc(alt),

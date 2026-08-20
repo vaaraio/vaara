@@ -1,5 +1,6 @@
-<svg xmlns="http://www.w3.org/2000/svg" width="263" height="20" role="img" aria-label="Vaara conformance corpus: 43 suites, 0 failing">
+<svg xmlns="http://www.w3.org/2000/svg" width="267" height="20" role="img" aria-label="Vaara conformance corpus: 43 suites, 0 failing">
   <title>Vaara conformance corpus: 43 suites, 0 failing</title>
+  <filter id="blur"><feGaussianBlur stdDeviation="16"/></filter>
   <linearGradient id="s" x2="0" y2="100%">
     <stop offset="0" stop-color="#bbb" stop-opacity=".1"/>
     <stop offset="1" stop-opacity=".1"/>
@@ -10,17 +11,27 @@
       <note>Corpus status, not a reproduction. This badge is not evidence that any party ran anything.</note>
     </vcr>
   </metadata>
-  <clipPath id="r"><rect width="263" height="20" rx="3" fill="#fff"/></clipPath>
+  <clipPath id="r"><rect width="267" height="20" rx="3" fill="#fff"/></clipPath>
   <g clip-path="url(#r)">
-    <rect width="127" height="20" fill="#1A2226"/>
-    <rect x="127" width="136" height="20" fill="#4A6E5C"/>
-    <rect width="263" height="20" fill="url(#s)"/>
+    <rect width="156" height="20" fill="#1A2226"/>
+    <rect x="156" width="111" height="20" fill="#4A6E5C"/>
+    <rect width="267" height="20" fill="url(#s)"/>
   </g>
-  <polygon points="12,5.5 17.5,15 6.5,15" fill="#78A08A"/>
-  <g font-family="Verdana,DejaVu Sans,Geneva,sans-serif" font-size="10">
-    <text x="24" y="15" fill="#000" fill-opacity=".3" textLength="95" lengthAdjust="spacingAndGlyphs">VAARA CONFORMANCE</text>
-    <text x="24" y="14" fill="#fff" textLength="95" lengthAdjust="spacingAndGlyphs">VAARA CONFORMANCE</text>
-    <text x="133" y="15" fill="#000" fill-opacity=".3" textLength="124" lengthAdjust="spacingAndGlyphs">43 suites, 0 failing</text>
-    <text x="133" y="14" fill="#fff" textLength="124" lengthAdjust="spacingAndGlyphs">43 suites, 0 failing</text>
+  <polygon points="12,3.5 18.5,16.5 5.5,16.5" fill="#78A08A"/>
+  <g fill="#fff" text-anchor="middle" font-family="Verdana,Geneva,DejaVu Sans,sans-serif" text-rendering="geometricPrecision" font-size="110">
+    <g transform="scale(.1)">
+      <g aria-hidden="true" fill="#010101">
+        <text x="874" y="150" fill-opacity=".8" filter="url(#blur)">VAARA CONFORMANCE</text>
+        <text x="874" y="150" fill-opacity=".3">VAARA CONFORMANCE</text>
+      </g>
+      <text x="874" y="140">VAARA CONFORMANCE</text>
+    </g>
+    <g transform="scale(.1)">
+      <g aria-hidden="true" fill="#010101">
+        <text x="2116" y="150" fill-opacity=".8" filter="url(#blur)">43 suites, 0 failing</text>
+        <text x="2116" y="150" fill-opacity=".3">43 suites, 0 failing</text>
+      </g>
+      <text x="2116" y="140">43 suites, 0 failing</text>
+    </g>
   </g>
 </svg>
