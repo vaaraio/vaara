@@ -1,0 +1,40 @@
+{
+  "title": "Vaara: Accountable Autonomy for AI agents",
+  "description": "<p>Vaara is a runtime execution layer for AI agents. It gates tool calls against a policy, scores each one, and writes the decision, the call and the outcome into a hash-chained, tamper-evident record that a third party can verify offline without the operator's keys and without running Vaara's code.</p><p>The repository publishes a conformance corpus of 43 suites. Every suite ships an independent checker that imports no Vaara code and recomputes its verdicts from the bytes of its own case files, so a reproduction can disagree and show its work. Independent reproductions are recorded at https://vaara.io/conformance.html on a chained table whose rows cannot be removed or reordered without breaking every digest after them.</p><p>The receipt format is specified in the IETF Internet-Draft draft-sirkkavaara-vaara-receipt.</p>",
+  "upload_type": "software",
+  "license": "AGPL-3.0-or-later",
+  "access_right": "open",
+  "creators": [
+    {
+      "name": "Sirkkavaara, Henri"
+    }
+  ],
+  "keywords": [
+    "AI agents",
+    "agent governance",
+    "audit trail",
+    "tamper-evident logging",
+    "conformance vectors",
+    "independent verification",
+    "EU AI Act",
+    "provenance",
+    "transparency log"
+  ],
+  "related_identifiers": [
+    {
+      "identifier": "https://datatracker.ietf.org/doc/draft-sirkkavaara-vaara-receipt/",
+      "relation": "isDocumentedBy",
+      "scheme": "url"
+    },
+    {
+      "identifier": "https://vaara.io/conformance.html",
+      "relation": "references",
+      "scheme": "url"
+    },
+    {
+      "identifier": "https://github.com/vaaraio/vaara",
+      "relation": "isSupplementTo",
+      "scheme": "url"
+    }
+  ]
+}
