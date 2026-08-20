@@ -227,7 +227,10 @@ def test_the_mark_is_centred_in_the_plate():
 
 def test_text_centres_sit_inside_their_own_plates():
     svg = renderer().corpus_badge_svg({"totals": {"suites": 43, "failed": 0}})
-    plate = float(re.search(r'<rect width="([0-9.]+)" height="20" fill="#1A2226"', svg).group(1))
+    module = renderer()
+    svg = module.corpus_badge_svg({"totals": {"suites": 43, "failed": 0}})
+    plate = float(re.search(
+        rf'<rect width="([0-9.]+)" height="20" fill="{module._LABEL}"', svg).group(1))
     # x is at ten times scale, to match the scale(.1) the text group carries.
     label_cx, message_cx = (int(x) / 10 for x in re.findall(r'<text x="(\d+)" y="140"', svg))
     assert 0 < label_cx < plate, "the label is centred outside its own plate"
