@@ -102,6 +102,10 @@
   .wordmark .wm-dark { display:none; }
   html[data-theme="dark"] .wordmark .wm-light { display:none; }
   html[data-theme="dark"] .wordmark .wm-dark { display:inline-block; }
+  @media (prefers-color-scheme: dark) {
+    html:not([data-theme]) .wordmark .wm-light { display: none; }
+    html:not([data-theme]) .wordmark .wm-dark { display: inline-block; }
+  }
   .nav-jump{position:fixed;top:14px;left:16px;z-index:10;display:inline-flex;
     background:var(--panel);border:1px solid var(--line);border-radius:999px;padding:4px}
   .nav-jump a{font-family:var(--mono);font-size:11px;letter-spacing:.18em;

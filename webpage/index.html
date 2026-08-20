@@ -168,6 +168,10 @@
   .wordmark .wm-dark { display: none; }
   html[data-theme="dark"] .wordmark .wm-light { display: none; }
   html[data-theme="dark"] .wordmark .wm-dark { display: inline-block; }
+  @media (prefers-color-scheme: dark) {
+    html:not([data-theme]) .wordmark .wm-light { display: none; }
+    html:not([data-theme]) .wordmark .wm-dark { display: inline-block; }
+  }
 </style>
 <script type="application/ld+json">
 {

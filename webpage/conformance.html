@@ -91,6 +91,20 @@
   pre code{background:none;padding:0}
   footer{margin-top:64px;padding-top:20px;border-top:1px solid var(--line);
          color:var(--faint);font-size:12.5px}
+  /* Same wordmark treatment as index.html and verify.html, keyed off the same
+     data-theme. Those two handle only the explicit choice, so on an OS-dark
+     machine with nothing saved they serve the light wordmark onto a dark
+     background. The prefers-color-scheme pair below closes that. */
+  .wordmark{margin:8px auto 0;text-align:center}
+  .wordmark img{width:min(60vw,440px);height:auto;display:inline-block}
+  .wordmark a{border:0}
+  .wordmark .wm-dark{display:none}
+  html[data-theme="dark"] .wordmark .wm-light{display:none}
+  html[data-theme="dark"] .wordmark .wm-dark{display:inline-block}
+  @media (prefers-color-scheme: dark) {
+    html:not([data-theme]) .wordmark .wm-light{display:none}
+    html:not([data-theme]) .wordmark .wm-dark{display:inline-block}
+  }
   .nav-jump{position:fixed;top:14px;left:16px;z-index:10;display:inline-flex;
     background:var(--panel);border:1px solid var(--line);border-radius:999px;padding:4px}
   .nav-jump a{font-family:var(--mono);font-size:11px;letter-spacing:.18em;
@@ -121,6 +135,11 @@
   <button type="button" data-set-theme="dark" aria-pressed="false">dark</button>
 </div>
 <div class="wrap">
+  <div class="wordmark">
+    <a href="/"><img class="wm-light" src="/vaara-wordmark-light.png" alt="Vaara" width="440" height="127"></a>
+    <a href="/"><img class="wm-dark" src="/vaara-wordmark-dark.png" alt="Vaara" width="440" height="127"></a>
+  </div>
+
   <p class="kicker">Vaara Conformance Results</p>
   <h1>Every suite, every verdict, and everyone who checked it themselves.</h1>
 
