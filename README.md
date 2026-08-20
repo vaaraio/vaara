@@ -11,6 +11,7 @@
   <a href="https://github.com/vaaraio/vaara/actions/workflows/ci.yml"><img src="https://github.com/vaaraio/vaara/actions/workflows/ci.yml/badge.svg" alt="CI"></a>
   <a href="https://scorecard.dev/viewer/?uri=github.com/vaaraio/vaara"><img src="https://github.com/vaaraio/vaara/actions/workflows/scorecard.yml/badge.svg" alt="OpenSSF Scorecard"></a>
   <a href="https://vaara.io/conformance.html"><img src="https://raw.githubusercontent.com/vaaraio/vaara/main/webpage/badge/conformance.svg" alt="Vaara Conformance: 43 suites, 0 failing"></a>
+  <a href="https://doi.org/10.5281/zenodo.22027975"><img src="https://raw.githubusercontent.com/vaaraio/vaara/main/webpage/badge/doi.svg" alt="DOI 10.5281/zenodo.22027975"></a>
   <a href="https://www.bestpractices.dev/projects/12612"><img src="https://www.bestpractices.dev/projects/12612/badge" alt="OpenSSF Best Practices"></a>
   <a href="https://huggingface.co/spaces/vaaraio/vaara"><img src="https://img.shields.io/badge/%F0%9F%A4%97%20Hugging%20Face-Space-blue" alt="Hugging Face Space"></a>
 </p>
@@ -269,6 +270,8 @@ Commercial license and paid pilots available: see [vaara.io](https://vaara.io/#p
 If you build on Vaara or its receipt format, cite the repository (see [CITATION.cff](CITATION.cff)) and the specification it implements:
 
 Henri Sirkkavaara. *The Vaara Receipt: A Recomputable Receipt Format for Decisions About Agent Actions.* IETF Internet-Draft [draft-sirkkavaara-vaara-receipt](https://datatracker.ietf.org/doc/draft-sirkkavaara-vaara-receipt/).
+
+Every tagged release is archived by Zenodo and minted a DOI. Cite [10.5281/zenodo.22027975](https://doi.org/10.5281/zenodo.22027975) for the software as a whole, which always resolves to the newest version, or the version DOI printed on a specific release for the exact bytes you ran.
 
 ## License
 
