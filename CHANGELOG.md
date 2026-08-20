@@ -47,6 +47,21 @@ and this project follows [Semantic Versioning](https://semver.org/spec/v2.0.0.ht
 
 ## [Unreleased]
 
+## [1.70.0] - 2026-08-20
+
+### Added
+
+- The repository is archived by Zenodo, so every tagged release from this one on is preserved and minted a DOI. `.zenodo.json` carries the record's title, description, licence, keywords and related identifiers pointing at the IETF Internet-Draft and the conformance results page, so the DOI arrives with its citation links already attached. Zenodo is operated by CERN as an OpenAIRE service, which puts the record in the EOSC graph. `CITATION.cff` drops the pinned draft revision, because the datatracker series URL resolves to the current one and a pinned number goes stale on every post.
+
+### Fixed
+
+- Badge geometry matches shields.io. The label was sized by one flat constant, 5.6px per character, and pinned there with `textLength` and `lengthAdjust="spacingAndGlyphs"`. Verdana capitals run near 7px, so the label wanted about 120px, got 95, and every glyph was squeezed to fit. A per-character width table sizes the plate now and nothing pins the text. The table is calibrated against shields.io's own published `textLength` values and matches within 0.5%.
+- The corpus shield turns red when a suite fails. It carried one hardcoded green, so "43 suites, 3 failing" rendered in the same colour as a clean corpus.
+- The corpus shield tracks the corpus. It regenerated only when somebody filed a conformance row, so adding a suite left the published count stale until the next submission. A push to main touching `tests/vectors` or either rendering script now re-renders the page and every badge.
+- The conformance desk and the refresh job can switch to the `vcr` branch over a dirty working tree. Both render before switching, so `git checkout vcr` aborted one step from publishing. Row #1 did not hit this because the branch did not exist yet and the orphan path keeps the tree.
+- One renderer produces every shield the project publishes. The downloads and version badges came from a second implementation written in shell, which still put white on brand green at 2.92:1 and forced the glyph width the same way.
+- The results page carries the light and dark toggle, the home control and the wordmark, matching index.html and verify.html. Its `html[data-theme="dark"]` rule was empty, so an explicit choice did nothing. All three surfaces switched the wordmark on `data-theme` alone, so an OS-dark machine with nothing saved served the light wordmark onto a dark background.
+
 ## [1.68.0] - 2026-08-17
 
 ### Added
