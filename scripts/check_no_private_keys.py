@@ -29,6 +29,7 @@ import argparse
 import re
 import subprocess
 import sys
+from pathlib import Path
 
 from cryptography.hazmat.primitives import serialization
 
@@ -85,14 +86,30 @@ def _findings(blob: bytes, path: str) -> list[str]:
 
 
 def _check_tree() -> list[tuple[str, str, str]]:
+    """Scan every tracked file as it stands now, staged content included.
+
+    Reads each path from the working tree. It used to read ``HEAD:<path>``,
+    which raised on the first file that ``ls-files`` reports and ``HEAD`` does
+    not, so the scan died on any newly staged file. That is precisely when this
+    check is run: a fresh vector suite with a key in it is the case it exists to
+    catch, and a crash is not a pass but it is just as easy to wave through.
+    """
     hits = []
     for path in _git("ls-files", "-z").split(b"\0"):
         if not path:
             continue
         name = path.decode("utf-8", "surrogateescape")
-        blob = _git("show", f"HEAD:{name}")
+        try:
+            blob = Path(name).read_bytes()
+        except OSError:
+            # Tracked but not on disk (a staged deletion, a sparse checkout).
+            # Fall back to what is committed; skip if that is absent too.
+            try:
+                blob = _git("show", f"HEAD:{name}")
+            except subprocess.CalledProcessError:
+                continue
         for why in _findings(blob, name):
-            hits.append(("HEAD", name, why))
+            hits.append(("tree", name, why))
     return hits
 
 
@@ -128,7 +145,8 @@ def main() -> int:
     ap = argparse.ArgumentParser(description=__doc__)
     group = ap.add_mutually_exclusive_group(required=True)
     group.add_argument("--tree", action="store_true",
-                       help="scan every file tracked at HEAD")
+                       help="scan every tracked file as it stands in the "
+                            "working tree, staged content included")
     group.add_argument("--range", dest="rev_range",
                        help="scan blobs added by each commit in a rev range")
     args = ap.parse_args()

@@ -1,0 +1,32 @@
+{
+  "condition": {
+    "alg": "Ed25519",
+    "conditionId": "release-condition-v0",
+    "holds": {
+      "amount": "1000000",
+      "asset": "USDC",
+      "network": "base",
+      "payee": "0x1111111111111111111111111111111111111111"
+    },
+    "issuer": "escrow.example",
+    "notAfter": "2026-09-01T00:00:00Z",
+    "requires": {
+      "actionDigest": "sha256:492a2f108a63a3ed574aa0eaba5c8810feaf9df1564a51ad855d481c44375416",
+      "decision": "allow",
+      "evidenceSchema": "vaara.authorization/v0",
+      "grantFingerprint": "sha256:c5892158b5af7a33b1dafa494c6a4f43571818c9df683454485f72ae56436d96",
+      "receiptIssuer": "gateway.example",
+      "receiptKeyFingerprint": "sha256:ff0d89f3ef858d7b62a722ee5d814427b34ff1e4353070a26628bfdd985875a9"
+    },
+    "schema": "vaara.release-condition/v0",
+    "signature": "74951e8113c3c0f13df84c87b2b32c52afa1e678cc0e2104a2f157bcbbfe0daf5f60cf0fa4f24e7cd0ceee865f9dfb1f86242931511de131325437e2871b8402",
+    "version": 1
+  },
+  "condition_key": "keys/ed25519_public.pem",
+  "evidence": null,
+  "expected_reason": "receipt_absent",
+  "expected_state": "held",
+  "now": "2026-08-21T12:00:00Z",
+  "receipt": null,
+  "receipt_key": null
+}

@@ -3104,6 +3104,116 @@ def _cmd_verify_contiguity(args: argparse.Namespace) -> int:
     return 0 if ok else 1
 
 
+def _cmd_release_check(args: argparse.Namespace) -> int:
+    """Decide whether a held value releases against a signed release condition.
+
+    The inversion of the x402 gate: instead of a payment buying access, a receipt
+    releases a payment. Exit 0 when the condition releases, 1 when it does not
+    (held, expired or refused), 2 on a usage or input error. The distinction
+    between the three non-release states is in the printed reason, never in the
+    exit code, because a settlement agent acts the same way on all three: the
+    money stays where it is.
+    """
+    from vaara.attestation._attest_canonical import now_iso8601
+    from vaara.audit.signer import Ed25519Verifier
+    from vaara.settlement.release import ReleaseBundle, evaluate
+
+    def _read_json(path_str: str, label: str):
+        try:
+            return json.loads(Path(path_str).expanduser().read_text(encoding="utf-8"))
+        except (OSError, json.JSONDecodeError) as exc:
+            print(f"vaara release-check: {label}: {exc}", file=sys.stderr)
+            return None
+
+    condition = receipt = evidence = None
+    now = args.now
+    if args.bundle:
+        payload = _read_json(args.bundle, args.bundle)
+        if payload is None:
+            return 2
+        if not isinstance(payload, dict):
+            print("vaara release-check: bundle must be a JSON object", file=sys.stderr)
+            return 2
+        condition = payload.get("condition")
+        receipt = payload.get("receipt")
+        evidence = payload.get("evidence")
+        now = now or payload.get("now")
+
+    for flag, label in (("condition", "--condition"), ("receipt", "--receipt"),
+                        ("evidence", "--evidence")):
+        path_str = getattr(args, flag, None)
+        if not path_str:
+            continue
+        loaded = _read_json(path_str, label)
+        if loaded is None:
+            return 2
+        if flag == "condition":
+            condition = loaded
+        elif flag == "receipt":
+            receipt = loaded
+        else:
+            evidence = loaded
+
+    if condition is None:
+        print(
+            "vaara release-check: no release condition given; pass a bundle file "
+            "or --condition <file>",
+            file=sys.stderr,
+        )
+        return 2
+
+    condition_verifier = None
+    if args.condition_key:
+        from cryptography.exceptions import UnsupportedAlgorithm
+        from cryptography.hazmat.primitives import serialization
+
+        try:
+            key = serialization.load_pem_public_key(
+                Path(args.condition_key).expanduser().read_bytes()
+            )
+            condition_verifier = Ed25519Verifier(key.public_bytes_raw())
+        except (OSError, ValueError, TypeError, AttributeError, UnsupportedAlgorithm) as exc:
+            print(f"vaara release-check: --condition-key: {exc}", file=sys.stderr)
+            return 2
+
+    receipt_key_pem = None
+    if args.receipt_key:
+        try:
+            receipt_key_pem = Path(args.receipt_key).expanduser().read_bytes()
+        except OSError as exc:
+            print(f"vaara release-check: --receipt-key: {exc}", file=sys.stderr)
+            return 2
+
+    bundle = ReleaseBundle(
+        now=now or now_iso8601(),
+        receipt=receipt,
+        evidence=evidence,
+        condition_verifier=condition_verifier,
+        receipt_public_key_pem=receipt_key_pem,
+    )
+    try:
+        decision = evaluate(condition, bundle)
+    except Exception as exc:  # noqa: BLE001 — a bad input is a usage error, not a crash
+        print(f"vaara release-check: {exc}", file=sys.stderr)
+        return 2
+
+    if args.json:
+        print(json.dumps(decision.to_dict(), indent=2))
+    else:
+        print(f"{decision.state.value.upper()}  {decision.reason.value}")
+        print(f"  condition  {decision.condition_digest}")
+        if decision.receipt_digest:
+            print(f"  receipt    {decision.receipt_digest}")
+        print(f"  evaluated  {decision.evaluated_at}")
+        if condition_verifier is None:
+            print(
+                "vaara release-check: NOTE no --condition-key given, so the "
+                "condition could not be verified and nothing can release",
+                file=sys.stderr,
+            )
+    return 0 if decision.released else 1
+
+
 def _receipt_signature_verifies(payload: dict, verifying_material: Any) -> bool:
     """The receipt's ES256 record signature verifies under ``verifying_material``.
 
@@ -5973,6 +6083,62 @@ def build_parser() -> argparse.ArgumentParser:
              "is keyless/structural (integrity only).",
     )
     pvc.set_defaults(func=_cmd_verify_contiguity)
+
+    prc = sub.add_parser(
+        "release-check",
+        help=(
+            "Decide whether held value releases against a signed release "
+            "condition: the receipt gates the payment, not the other way round. "
+            "Answers released / held / expired / refused with a reason from a "
+            "closed set, so absence of proof never reads as green and never "
+            "reads as the same false as a forgery. Exit 0 released, 1 not."
+        ),
+    )
+    prc.add_argument(
+        "bundle",
+        nargs="?",
+        default=None,
+        help=(
+            "JSON file holding what was presented: a 'condition' object plus "
+            "optional 'receipt', 'evidence' and 'now'. Individual documents can "
+            "be passed with the flags below instead, or on top of it."
+        ),
+    )
+    prc.add_argument(
+        "--condition", default=None,
+        help="Signed vaara.release-condition/v0 document (JSON file)",
+    )
+    prc.add_argument(
+        "--receipt", default=None,
+        help="The vaara.receipt/v1 envelope presented as proof (JSON file)",
+    )
+    prc.add_argument(
+        "--evidence", default=None,
+        help="The evidence record the receipt's evidenceRef pins (JSON file)",
+    )
+    prc.add_argument(
+        "--condition-key", default=None, dest="condition_key",
+        help="Condition issuer's Ed25519 public key (PEM), held OUT OF BAND. "
+             "Without it nothing releases: a document cannot vouch for the key "
+             "that signed it, so an unverifiable condition is refused rather "
+             "than left sitting in the same state as one still awaiting proof.",
+    )
+    prc.add_argument(
+        "--receipt-key", default=None, dest="receipt_key",
+        help="Public key (PEM) the presented receipt was signed under, held OUT "
+             "OF BAND. It is checked against the fingerprint the condition pins, "
+             "so a receipt from anyone else is refused.",
+    )
+    prc.add_argument(
+        "--now", default=None,
+        help="Evaluation instant, ISO 8601 UTC (default: the current time). The "
+             "condition's notAfter is inclusive.",
+    )
+    prc.add_argument(
+        "--json", action="store_true",
+        help="Emit the release decision as JSON",
+    )
+    prc.set_defaults(func=_cmd_release_check)
 
     pec = sub.add_parser(
         "enforce-by-class",

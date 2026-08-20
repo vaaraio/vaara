@@ -154,6 +154,11 @@ label. Section 5.6 states that mechanism in schema-agnostic form: a single bindi
 that does not depend on what is connected to it. The named profiles are instances
 of it, kept because a given ecosystem pins to a label it recognizes as its own.
 
+Section 5.7 is the one profile that runs the other way. It does not bind an
+artifact into a receipt; it names a receipt as the condition on which something
+external happens. It is listed here because it pins to the same envelope and
+ships recomputable vectors, not because it is another instance of the binding.
+
 ### 5.1 Registry
 
 | Profile | Evidence schema | Pins to | Vectors |
@@ -163,6 +168,7 @@ of it, kept because a given ecosystem pins to a label it recognizes as its own.
 | AP2 checkout binding | `vaara.authorization/v0` (names AP2 PEF `frame_id`) | `vaara.receipt/v1` | `tests/vectors/ap2_v0/` |
 | TAP request binding | `tap.request/v0` | `vaara.receipt/v1` | `tests/vectors/tap_v0/` |
 | generic external execution evidence | `vaara.authorization/v0` (names an `external_execution_evidence` slot) | `vaara.receipt/v1` | `tests/vectors/external_evidence_v0/` |
+| release condition | `vaara.release-condition/v0` (consumes `vaara.authorization/v0`) | `vaara.receipt/v1` | `tests/vectors/release_condition_v0/` |
 
 ### 5.2 Profile example: x402 settlement binding
 
@@ -376,6 +382,67 @@ receipts, and the issuer's public key, with no live verifier endpoint to trust. 
 `tests/vectors/external_evidence_v0/_check_independent.py`. Any plane that emits
 execution evidence pins here by naming its artifact through this slot, rather than
 defining a new primitive or a profile of its own.
+
+### 5.7 Profile: release condition (`vaara.release-condition/v0`)
+
+Every profile above runs one direction: something external happens, and the
+receipt records it. Section 5.2 is the clearest case, where a payment gates access
+and the settlement lands inside a receipt. In this profile the receipt gates the
+payment.
+
+A release condition is a signed, content-addressed statement made by whoever holds
+value: what is held, exactly what must be proved before it moves, and when the
+offer closes. Unlike the profiles above it does not sit behind an `evidenceRef`;
+it *names* a `vaara.receipt/v1` receipt as its release trigger. It adds:
+
+- A condition document (`schema` = `vaara.release-condition/v0`) carrying
+  `holds` (amount as a decimal string, asset, network, payee), `requires`, and an
+  inclusive `notAfter`. The signature is over `JCS(condition without "signature")`,
+  the same rule the receipt envelope uses, so it needs no new cryptography.
+- A `requires` block that is matched exactly, never approximately: `actionDigest`
+  (the `argsCommitment` of the authorised call), `grantFingerprint` (the
+  authorization that governed it), `receiptIssuer`, `receiptKeyFingerprint`
+  (`sha256` over the SubjectPublicKeyInfo DER of the one key whose receipts
+  count), `decision`, and `evidenceSchema`.
+- A decision (`vaara.release-decision/v0`) naming the `conditionDigest` it was
+  computed against, so a decision cannot be replayed against a re-issued
+  condition.
+
+The document holds no key belonging to a payer, signs no transaction, and reaches
+no chain or custodian. It answers one question about bytes, a settlement agent
+acts on the answer, and the verifier sits in the settlement path holding nothing.
+
+Evaluation returns one of four states, each carrying a reason from a closed set:
+
+| state | meaning |
+|---|---|
+| `released` | the authorised action is proved |
+| `held` | the evidence is sound and insufficient, or none has been presented |
+| `expired` | the window closed |
+| `refused` | the presented artifact fails as evidence |
+
+A verifier that proved nothing MUST NOT read as green, and MUST NOT read as the
+same false as a genuine failure. `held` because no receipt arrived and `refused`
+because a receipt was tampered with are different facts, and one boolean for both
+discards the difference between "not yet" and "no". Implementations MUST
+partition the reason space so that each reason belongs to exactly one state. A
+third boolean beside a pass/fail does not satisfy this: the partition is what
+keeps the two negatives from collapsing.
+
+The axis is soundness, then sufficiency. A broken condition signature, a receipt
+signed under a key the condition does not pin, a broken receipt signature, or
+evidence that does not resolve to the digest the receipt signed are all failures
+*as evidence*: `refused`. A missing receipt, a receipt for another action, another
+authorization, another issuer, or one that soundly proves a *refusal* are sound
+and insufficient: `held`. Checks MUST run soundness before the clock, so an
+expired window cannot swallow a tampering finding, and the clock before
+sufficiency, so a closed window is reported as the reason the value is not
+moving.
+
+A third party recomputes every verdict from the condition, the receipt, the
+evidence and the two public keys, with no issuer access. See
+`tests/vectors/release_condition_v0/_check_independent.py`; the `vaara
+release-check` verb is the same evaluation at the command line.
 
 ## 6. The ingest envelope (`vaara.ingest/v0`)
 

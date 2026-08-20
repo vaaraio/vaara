@@ -495,6 +495,13 @@ def write_badges(repro: dict, badge_dir: Path = BADGE_DIR) -> list[Path]:
     Stale files are deleted rather than left behind, so a badge URL stops
     resolving the moment its row comes down. Withdrawal has to reach the badge
     too, otherwise removal from the page is cosmetic.
+
+    Two files in this directory do not come from the rows and are left alone:
+    the corpus shield, written from the report immediately after this call, and
+    the badges in ``UNMANAGED_BADGES``. ``badge_drift`` already excludes both, so
+    without this the writer and the ``--check`` pass disagreed: rendering the
+    page deleted the DOI badge the README links to, and the staleness check
+    reported the page current afterwards.
     """
     badge_dir.mkdir(parents=True, exist_ok=True)
     wanted: dict[str, bytes] = {}
@@ -502,8 +509,9 @@ def write_badges(repro: dict, badge_dir: Path = BADGE_DIR) -> list[Path]:
         wanted[f"{row['slug']}.svg"] = badge_svg(row).encode("utf-8")
         wanted[f"{row['slug']}.json"] = row_bytes(row)
         wanted[f"{row['slug']}.html"] = certificate_html(row).encode("utf-8")
+    keep = set(wanted) | UNMANAGED_BADGES | {CORPUS_BADGE}
     for stale in [p for p in badge_dir.iterdir() if p.is_file()]:
-        if stale.name not in wanted:
+        if stale.name not in keep:
             stale.unlink()
     written = []
     for name, blob in wanted.items():

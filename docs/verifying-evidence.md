@@ -108,3 +108,17 @@ vaara verify-enforcement record.json --report report.bin --vcek vcek.pem \
 ```
 
 A pass means a SEV-SNP report carrying `sha512(jcs(record))` verifies against the VCEK you supplied, so this record's bytes were hashed inside some SEV-SNP confidential VM whose VCEK you chose to trust. The verdict is blunt about the rest. It does not validate the VCEK chain to AMD's ARK (that fetch is deferred), so a mock report with no AMD provenance passes the same check, and `vcek_chain_basis` stays `caller_supplied_unverified`. It does not prove the decision logic ran in the enclave, so `enforcement_logic_basis` is always `not_established`. Pinning the launch measurement with `--expected-measurement` tells you which image ran and lifts the tier to `measurement_pinned`; without it the measurement is reported but unpinned. The binding is over the whole record including its signature, so a report for one record never verifies another, and a signature-stripped variant never rides a genuine report. The word `attested`, and a `--strict` pass, are reserved for a future release that validates the AMD chain; v0 publishes that bar without pretending to clear it. A Vaara-free checker in `tests/vectors/enforcement_attestation_v0/` reproduces every verdict.
+
+## `release-check`: does this receipt release the money
+
+The verbs above ask whether a record holds up. This one asks what a record buys. A release condition (`vaara.release-condition/v0`, SPEC.md Section 5.7) is a signed statement by whoever holds value: what is held, exactly what must be proved before it moves, and when the offer closes. `release-check` decides whether what has been presented satisfies it.
+
+```bash
+vaara release-check presented.json --condition-key escrow.pem --receipt-key gateway.pem
+```
+
+The answer is one of four states, each carrying a reason from a closed set. `released` means the authorised action is proved. `held` means the evidence is sound and does not satisfy the condition, or none has arrived yet. `expired` means the window closed. `refused` means the presented artifact fails as evidence: a broken signature, a receipt under a key the condition never pinned, or evidence that does not resolve to the digest the receipt signed.
+
+A boolean would not carry this. A verifier that proved nothing must not read as green, and must not read as the same false as a genuine failure. `held` because no receipt arrived and `refused` because a receipt was forged are different facts, and answering both the same way discards the difference between "not yet" and "no". Soundness is checked before the clock, so an expired window cannot swallow a tampering finding.
+
+Without `--condition-key` nothing releases, and the answer is `refused` rather than `held`, because a document cannot vouch for the key that signed it and an unverifiable condition must not sit in the same state as one still awaiting proof. Exit is 0 when the value releases and 1 when it does not; all three non-release states share an exit code because a settlement agent acts on them the same way. The reason is where the difference is recorded, and it is what a person or a ledger entry reads. A Vaara-free checker in `tests/vectors/release_condition_v0/` reproduces every verdict.

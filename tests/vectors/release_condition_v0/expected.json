@@ -1,0 +1,36 @@
+{
+  "cases": {
+    "neg_absent_receipt": {
+      "expected_reason": "receipt_absent",
+      "expected_state": "held"
+    },
+    "neg_authorization_mismatch": {
+      "expected_reason": "authorization_mismatch",
+      "expected_state": "held"
+    },
+    "neg_blocked_decision": {
+      "expected_reason": "decision_not_accepted",
+      "expected_state": "held"
+    },
+    "neg_expired_condition": {
+      "expected_reason": "condition_expired",
+      "expected_state": "expired"
+    },
+    "neg_other_action": {
+      "expected_reason": "action_digest_mismatch",
+      "expected_state": "held"
+    },
+    "neg_tampered_receipt": {
+      "expected_reason": "receipt_signature_invalid",
+      "expected_state": "refused"
+    },
+    "neg_untrusted_key": {
+      "expected_reason": "receipt_key_untrusted",
+      "expected_state": "refused"
+    },
+    "pos_matching_receipt": {
+      "expected_reason": "receipt_matches",
+      "expected_state": "released"
+    }
+  }
+}

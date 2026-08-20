@@ -4,6 +4,49 @@ All notable changes to this project are documented here.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/)
 and this project follows [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [Unreleased]
+
+## [1.71.0] - 2026-08-21
+
+### Added
+
+- `vaara.settlement.release`: a release condition holds value against a signed statement of what must be proved before it moves, and a Vaara receipt proving the authorised action happened is what releases it. Everything in the tree until now ran one direction, a payment gating access with the settlement evidence landing inside a receipt, which is the x402 gate and SPEC.md Section 5.2. Here the receipt gates the payment. The module holds no key belonging to a payer, signs no transaction, and reaches no chain or custodian. It answers one question about bytes, a settlement agent acts on the answer, and the verifier sits in the settlement path holding nothing.
+
+- `vaara.release-condition/v0`, a signed, content-addressed, JCS-canonical document carrying what is held, an exact `requires` block, and an inclusive `notAfter`. The signature is Ed25519 over the document with its own `signature` field removed, the same rule the receipt envelope uses, so it adds no cryptography and no dependency. `requires` is matched exactly rather than approximately: the action digest, the grant fingerprint that authorised it, the accepted receipt issuer, and the fingerprint of the one key whose receipts count, taken over the SubjectPublicKeyInfo DER so PEM formatting cannot move it.
+
+- `evaluate(condition, bundle)` returns one of four states, each carrying a reason from a closed set: `released`, `held`, `expired`, `refused`. A verifier that proved nothing must not read as green, and must not read as the same false as a genuine failure. `held` because no receipt has arrived and `refused` because a receipt was tampered with are different facts, and one boolean for both discards the difference between "not yet" and "no". The reason space is partitioned in `REASON_STATE`, as data rather than as control flow, so no code path can file a forgery under a hold. The distinction came out of a SCITT list thread on 2026-08-19.
+
+  The axis is soundness, then sufficiency. A broken condition signature, a receipt under a key the condition does not pin, a broken receipt signature, or evidence that does not resolve to the digest the receipt signed all fail as evidence and refuse. A missing receipt, a receipt for another action, another authorization, another issuer, or one that soundly proves a refusal are sound and insufficient, and hold. Soundness runs before the clock, so an expired window cannot swallow a tampering finding, and the clock runs before sufficiency, so a closed window is reported as the reason the value is not moving.
+
+- `vaara release-check` decides the same question at the command line, taking a presented bundle or the three documents separately. Exit 0 when the value releases and 1 when it does not, because a settlement agent acts on held, expired and refused the same way. The distinction lives in the printed reason. Without `--condition-key` nothing releases and the answer is `refused`, not `held`: a document cannot vouch for the key that signed it, so an unverifiable condition never sits in the same state as one still awaiting proof.
+
+- `tests/vectors/release_condition_v0/`, the 44th conformance suite, with eight cases and a checker that imports no Vaara and recomputes every verdict from the case bytes. All four states appear in the shipped cases, including a receipt that soundly proves the action was blocked, a condition whose window has closed, a receipt tampered one second after signing, and a receipt signed under a key the condition never pinned. The checker also asserts the reason-to-state mapping is a partition covering all four states, because a corpus of only the positive case would still pass with two of them merged into one. SPEC.md Section 5.7 and `docs/conformance-profile.md` carry the profile and the suite count.
+
+- `mint_authorization_receipt` and `mint_for_signer` accept `iat`, pinning the issuer block's issued-at instant instead of taking the wall clock. Production leaves it alone. A vector generator sets it so regenerating a corpus changes only the signature and not the record it signs.
+
+### Fixed
+
+- Rendering the conformance page no longer deletes the badges it does not own. `write_badges` swept the whole badge directory against the reproduction rows, while `badge_drift` exempted the corpus shield and the badges named in `UNMANAGED_BADGES`. The two disagreed, so a render removed the DOI badge the README links to and the `--check` pass then reported the page current, which would have carried a broken image to the site with nothing failing.
+
+- `check_no_private_keys.py --tree` scans tracked files from the working tree instead of reading each one back from `HEAD`. It raised on the first path `git ls-files` reports that `HEAD` does not carry, so the scan died on any newly staged file. CI never hit it, because a fresh checkout has every tracked file at both. Running it by hand before a commit did, which is exactly when it is wanted: a new vector suite carrying a key is the case it exists to catch.
+
+- The 1.69.0 and 1.70.0 entries were in the wrong order, with 1.69.0 above `## [Unreleased]` and 1.70.0 below it. The releases themselves were correct and the tags are unaffected; only the file read out of sequence. `ship-guard` reads the first versioned heading to decide whether a declared version is missing its tag, so the stranded ordering also left it grading 1.69.0 on every turn instead of the newest entry.
+
+## [1.70.0] - 2026-08-20
+
+### Added
+
+- The repository is archived by Zenodo, so every tagged release from this one on is preserved and minted a DOI. `.zenodo.json` carries the record's title, description, licence, keywords and related identifiers pointing at the IETF Internet-Draft and the conformance results page, so the DOI arrives with its citation links already attached. Zenodo is operated by CERN as an OpenAIRE service, which puts the record in the EOSC graph. `CITATION.cff` drops the pinned draft revision, because the datatracker series URL resolves to the current one and a pinned number goes stale on every post.
+
+### Fixed
+
+- Badge geometry matches shields.io. The label was sized by one flat constant, 5.6px per character, and pinned there with `textLength` and `lengthAdjust="spacingAndGlyphs"`. Verdana capitals run near 7px, so the label wanted about 120px, got 95, and every glyph was squeezed to fit. A per-character width table sizes the plate now and nothing pins the text. The table is calibrated against shields.io's own published `textLength` values and matches within 0.5%.
+- The corpus shield turns red when a suite fails. It carried one hardcoded green, so "43 suites, 3 failing" rendered in the same colour as a clean corpus.
+- The corpus shield tracks the corpus. It regenerated only when somebody filed a conformance row, so adding a suite left the published count stale until the next submission. A push to main touching `tests/vectors` or either rendering script now re-renders the page and every badge.
+- The conformance desk and the refresh job can switch to the `vcr` branch over a dirty working tree. Both render before switching, so `git checkout vcr` aborted one step from publishing. Row #1 did not hit this because the branch did not exist yet and the orphan path keeps the tree.
+- One renderer produces every shield the project publishes. The downloads and version badges came from a second implementation written in shell, which still put white on brand green at 2.92:1 and forced the glyph width the same way.
+- The results page carries the light and dark toggle, the home control and the wordmark, matching index.html and verify.html. Its `html[data-theme="dark"]` rule was empty, so an explicit choice did nothing. All three surfaces switched the wordmark on `data-theme` alone, so an OS-dark machine with nothing saved served the light wordmark onto a dark background.
+
 ## [1.69.0] - 2026-08-20
 
 ### Added
@@ -44,23 +87,6 @@ and this project follows [Semantic Versioning](https://semver.org/spec/v2.0.0.ht
 - The conformance badge carries white on `#4A6E5C` at 5.71:1. The message side was brand green `#78A08A` with dark text, where white measures 2.92:1 and fails WCAG AA at this size, and dark text read as inverted beside every other shield in a README row. Brand green stays in the mark, where nothing is read off it. The corpus shield now reports failures instead of passes: it read "43 suites, 42 passing", which invites a reader to assume one suite is broken on the maintainer's own README, and nothing fails.
 
 - The container image builds when the version tag is pushed. `container.yml` listened for a published release, so ghcr held no versioned image and no `latest` at all. This release is the first to exercise the repaired trigger.
-
-## [Unreleased]
-
-## [1.70.0] - 2026-08-20
-
-### Added
-
-- The repository is archived by Zenodo, so every tagged release from this one on is preserved and minted a DOI. `.zenodo.json` carries the record's title, description, licence, keywords and related identifiers pointing at the IETF Internet-Draft and the conformance results page, so the DOI arrives with its citation links already attached. Zenodo is operated by CERN as an OpenAIRE service, which puts the record in the EOSC graph. `CITATION.cff` drops the pinned draft revision, because the datatracker series URL resolves to the current one and a pinned number goes stale on every post.
-
-### Fixed
-
-- Badge geometry matches shields.io. The label was sized by one flat constant, 5.6px per character, and pinned there with `textLength` and `lengthAdjust="spacingAndGlyphs"`. Verdana capitals run near 7px, so the label wanted about 120px, got 95, and every glyph was squeezed to fit. A per-character width table sizes the plate now and nothing pins the text. The table is calibrated against shields.io's own published `textLength` values and matches within 0.5%.
-- The corpus shield turns red when a suite fails. It carried one hardcoded green, so "43 suites, 3 failing" rendered in the same colour as a clean corpus.
-- The corpus shield tracks the corpus. It regenerated only when somebody filed a conformance row, so adding a suite left the published count stale until the next submission. A push to main touching `tests/vectors` or either rendering script now re-renders the page and every badge.
-- The conformance desk and the refresh job can switch to the `vcr` branch over a dirty working tree. Both render before switching, so `git checkout vcr` aborted one step from publishing. Row #1 did not hit this because the branch did not exist yet and the orphan path keeps the tree.
-- One renderer produces every shield the project publishes. The downloads and version badges came from a second implementation written in shell, which still put white on brand green at 2.92:1 and forced the glyph width the same way.
-- The results page carries the light and dark toggle, the home control and the wordmark, matching index.html and verify.html. Its `html[data-theme="dark"]` rule was empty, so an explicit choice did nothing. All three surfaces switched the wordmark on `data-theme` alone, so an OS-dark machine with nothing saved served the light wordmark onto a dark background.
 
 ## [1.68.0] - 2026-08-17
 

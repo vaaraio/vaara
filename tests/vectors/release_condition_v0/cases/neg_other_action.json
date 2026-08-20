@@ -1,0 +1,75 @@
+{
+  "condition": {
+    "alg": "Ed25519",
+    "conditionId": "release-condition-v0",
+    "holds": {
+      "amount": "1000000",
+      "asset": "USDC",
+      "network": "base",
+      "payee": "0x1111111111111111111111111111111111111111"
+    },
+    "issuer": "escrow.example",
+    "notAfter": "2026-09-01T00:00:00Z",
+    "requires": {
+      "actionDigest": "sha256:492a2f108a63a3ed574aa0eaba5c8810feaf9df1564a51ad855d481c44375416",
+      "decision": "allow",
+      "evidenceSchema": "vaara.authorization/v0",
+      "grantFingerprint": "sha256:c5892158b5af7a33b1dafa494c6a4f43571818c9df683454485f72ae56436d96",
+      "receiptIssuer": "gateway.example",
+      "receiptKeyFingerprint": "sha256:ff0d89f3ef858d7b62a722ee5d814427b34ff1e4353070a26628bfdd985875a9"
+    },
+    "schema": "vaara.release-condition/v0",
+    "signature": "74951e8113c3c0f13df84c87b2b32c52afa1e678cc0e2104a2f157bcbbfe0daf5f60cf0fa4f24e7cd0ceee865f9dfb1f86242931511de131325437e2871b8402",
+    "version": 1
+  },
+  "condition_key": "keys/ed25519_public.pem",
+  "evidence": {
+    "argsCommitment": "sha256:dc21615ee69de53a5675fa148fb9849e5864fde7ec7a2db8c84150613cf63faa",
+    "capabilities": [
+      {
+        "arg": "amount",
+        "op": "le",
+        "value": "500"
+      }
+    ],
+    "grantFingerprint": "sha256:c5892158b5af7a33b1dafa494c6a4f43571818c9df683454485f72ae56436d96",
+    "reason": "ok",
+    "schema": "vaara.authorization/v0",
+    "tenantId": "mcp-tenant-01",
+    "toolName": "transfer_funds",
+    "verdict": "allow"
+  },
+  "expected_reason": "action_digest_mismatch",
+  "expected_state": "held",
+  "now": "2026-08-21T12:00:00Z",
+  "receipt": {
+    "alg": "ES256",
+    "backLink": {
+      "attestationDigest": "sha256:aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+      "attestationNonce": "nonce-release-v0-01"
+    },
+    "decisionDerived": {
+      "decidedAt": "2026-08-20T09:00:05Z",
+      "decision": "allow",
+      "evidenceRef": {
+        "canonicalization": "JCS",
+        "digest": "sha256:3d7d69c0fd7bc7321fca45740b4c529be0e67a24b65469e79519c51f0f847231",
+        "ref": "vaara:authorization/transfer_funds",
+        "schema": "vaara.authorization/v0"
+      },
+      "policyId": "policy:vaara-credential-broker/1",
+      "reason": "ok"
+    },
+    "issuerAsserted": {
+      "alg": "ES256",
+      "iat": "2026-08-20T09:00:05Z",
+      "iss": "gateway.example",
+      "nonce": "receipt-nonce-other-action",
+      "secretVersion": "corpus-key-v0",
+      "sub": "mcp-tenant-01"
+    },
+    "signature": "ffcbfa4289d617f9e1a79bba3d8f8adf28b04121e7eb0a1a28185744a61e5287c38065c001e0a263f7e636e130fab5c210d066bf4a59695bcad4879b5a35169d",
+    "version": 1
+  },
+  "receipt_key": "keys/es256_public.pem"
+}

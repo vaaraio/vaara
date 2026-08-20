@@ -195,6 +195,7 @@ def mint_authorization_receipt(
     signing_material: Any,
     decided_at: Optional[str] = None,
     nonce: Optional[str] = None,
+    iat: Optional[str] = None,
     policy_id: Optional[str] = None,
     ref: Optional[str] = None,
     coverage: Optional[dict[str, Any]] = None,
@@ -214,6 +215,10 @@ def mint_authorization_receipt(
     travels under the same signature. ``completeness`` carries the per-boundary
     ``seq`` and ``runningCount`` for the same purpose, making a dropped receipt
     inside the boundary a provable gap.
+
+    ``iat`` pins the issuer block's issued-at instant instead of taking the wall
+    clock. Production leaves it alone; a vector generator sets it so regenerating
+    a corpus changes only the signature and not the record it signs.
     """
     evidence = build_authorization_evidence(
         credential=credential,
@@ -248,6 +253,7 @@ def mint_authorization_receipt(
         alg=cast(Literal["HS256", "ES256", "RS256"], alg),
         signing_material=signing_material,
         nonce=nonce,
+        iat=iat,
     )
     return AuthorizationReceipt(record=record, evidence=evidence)
 
@@ -260,6 +266,7 @@ def mint_for_signer(
     verdict: GrantVerdict,
     decided_at: Optional[str] = None,
     nonce: Optional[str] = None,
+    iat: Optional[str] = None,
     policy_id: Optional[str] = None,
     ref: Optional[str] = None,
     coverage: Optional[dict[str, Any]] = None,
@@ -277,6 +284,7 @@ def mint_for_signer(
         signing_material=signer.signing_material,
         decided_at=decided_at,
         nonce=nonce,
+        iat=iat,
         policy_id=policy_id,
         ref=ref,
         coverage=coverage,

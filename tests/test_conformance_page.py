@@ -235,3 +235,27 @@ def test_text_centres_sit_inside_their_own_plates():
     label_cx, message_cx = (int(x) / 10 for x in re.findall(r'<text x="(\d+)" y="140"', svg))
     assert 0 < label_cx < plate, "the label is centred outside its own plate"
     assert message_cx > plate, "the message is centred over the label plate"
+
+
+def test_rendering_does_not_delete_the_badges_it_does_not_own(tmp_path):
+    """The writer and the staleness check have to agree on what is managed.
+
+    ``badge_drift`` exempts ``UNMANAGED_BADGES`` and the corpus shield, but the
+    writer swept the whole directory: rendering the page deleted the DOI badge
+    the README links to, and ``--check`` then reported the page current, so the
+    removal travelled to a broken image on the site with nothing failing.
+    """
+    module = renderer()
+    badge_dir = tmp_path / "badge"
+    badge_dir.mkdir()
+    for name in (*module.UNMANAGED_BADGES, module.CORPUS_BADGE):
+        (badge_dir / name).write_text("<svg/>", encoding="utf-8")
+    (badge_dir / "withdrawn-row.svg").write_text("<svg/>", encoding="utf-8")
+
+    module.write_badges({"reproductions": []}, badge_dir=badge_dir)
+
+    survivors = {p.name for p in badge_dir.iterdir()}
+    assert module.UNMANAGED_BADGES <= survivors
+    assert module.CORPUS_BADGE in survivors
+    # A row that came down still takes its badge with it.
+    assert "withdrawn-row.svg" not in survivors
