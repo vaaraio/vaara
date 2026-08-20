@@ -91,8 +91,7 @@ height="20" role="img" aria-label="{alt}">
     <rect x="{lw}" width="{mw}" height="20" fill="{mcolor}"/>
     <rect width="{w}" height="20" fill="url(#s)"/>
   </g>
-  <polygon points="12,5 18,15 6,15" fill="#78A08A"/>
-  <g fill="#fff" text-anchor="middle" \
+{mark}  <g fill="#fff" text-anchor="middle" \
 font-family="Verdana,Geneva,DejaVu Sans,sans-serif" \
 text-rendering="geometricPrecision" font-size="110">
     <g transform="scale(.1)">
@@ -162,6 +161,15 @@ _FAIL = "#B03A2E"
 #: instead of by hex, which broke them the first time this colour moved.
 _LABEL = "#45565E"
 
+#: The mark. It fills the shields.io logo slot, which every badge carrying a
+#: logo uses: x=5, 14 wide, centred in the 20px height. Inside that slot it
+#: keeps the wordmark's own 1.2:1 hill (points 32,22 44,42 20,42 on the site),
+#: so 14 by 11.6 rather than the 13 by 13 that first stood in for it and read
+#: as a pine. The conformance badge always carries it. The downloads shield
+#: makes no conformance claim, so it carries no mark and takes the ordinary
+#: shields left padding, which keeps the mark a signal instead of decoration.
+_MARK = '  <polygon points="12,4.2 19,15.8 5,15.8" fill="#78A08A"/>\n'
+
 
 def text_width(s: str) -> float:
     """Natural rendered width of ``s`` at 10px Verdana, in px."""
@@ -178,6 +186,60 @@ CORPUS_BADGE = "conformance.svg"
 
 def esc(value: object) -> str:
     return html.escape(str(value), quote=True)
+
+
+#: The row metadata every badge carries by default. A badge that commits to no
+#: row swaps this out, because empty elements read as a row hashing to nothing.
+_ROW_METADATA = """  <metadata>
+    <vcr xmlns="https://vaara.io/ns/vcr/v1">
+      <row></row>
+      <digest></digest>
+      <over>https://vaara.io/badge/.json</over>
+      <recompute>sha256 of those bytes, which are JCS-canonical per RFC 8785</recompute>
+    </vcr>
+  </metadata>
+"""
+
+
+def plain_badge_svg(label: str, message: str, color: str, alt: str | None = None) -> str:
+    """A shield in the Vaara colourway that commits to no conformance claim.
+
+    The downloads and version shields used to be rendered by a second
+    implementation, written in shell inside downloads-badge.yml. The two drifted:
+    that one still carried white on brand green #78A08A at 2.92:1, the contrast
+    failure this file fixed in August, and it forced the glyph width the same way
+    the badges here used to. One renderer means a colour or geometry decision
+    reaches every shield the project publishes.
+    """
+    lwid = text_width(label)
+    mwid = text_width(message)
+    lw = round(_PAD + lwid + _PAD)
+    mw = round(_PAD + mwid + _PAD)
+    return BADGE_TEMPLATE.format(
+        w=lw + mw,
+        lw=lw,
+        mw=mw,
+        mcolor=color,
+        lcolor=_LABEL,
+        mark="",
+        lcx=round((_PAD + lwid / 2) * 10),
+        mcx=round((lw + _PAD + mwid / 2) * 10),
+        label=esc(label),
+        message=esc(message),
+        alt=esc(alt or f"{label}: {message}"),
+        row_id="",
+        slug="",
+        digest="",
+    ).replace(
+        _ROW_METADATA,
+        """  <metadata>
+    <vcr xmlns="https://vaara.io/ns/vcr/v1">
+      <note>Project status. This badge is not evidence that any party ran \
+anything.</note>
+    </vcr>
+  </metadata>
+""",
+    )
 
 
 def corpus_badge_svg(report: dict) -> str:
@@ -212,6 +274,7 @@ def corpus_badge_svg(report: dict) -> str:
         mw=mw,
         mcolor=_OK if not totals["failed"] else _FAIL,
         lcolor=_LABEL,
+        mark=_MARK,
         lcx=round((_LOGO_SPAN + lwid / 2) * 10),
         mcx=round((lw + _PAD + mwid / 2) * 10),
         label=esc(label),
@@ -298,6 +361,7 @@ def badge_svg(row: dict) -> str:
         # the corpus, so it never turns red.
         mcolor=_OK,
         lcolor=_LABEL,
+        mark=_MARK,
         lcx=round((_LOGO_SPAN + lwid / 2) * 10),
         mcx=round((lw + _PAD + mwid / 2) * 10),
         label=esc(label),
@@ -702,6 +766,20 @@ def main(argv: list[str]) -> int:
     if not argv:
         print(__doc__)
         return 2
+
+    # Used by downloads-badge.yml so the project publishes one badge geometry
+    # rather than two implementations that drift apart.
+    if argv[0] == "--badge":
+        if len(argv) != 5:
+            print("usage: --badge LABEL MESSAGE COLOR OUT", file=sys.stderr)
+            return 2
+        _, label, message, color, out_path = argv
+        Path(out_path).write_text(
+            plain_badge_svg(label, message, color), encoding="utf-8"
+        )
+        print(f"wrote {out_path} ({label}: {message})")
+        return 0
+
     report_path = Path(argv[0])
     check = "--check" in argv
     out = Path(argv[1]) if len(argv) > 1 and not argv[1].startswith("-") else DEFAULT_OUT

@@ -35,6 +35,18 @@ jobs:
         with:
           ref: badges
 
+      # The badge geometry lives in scripts/render_conformance_page.py on main.
+      # This job used to carry a second renderer written in shell, and the two
+      # drifted: this one still put white on brand green at 2.92:1, the contrast
+      # failure the Python one fixed in August, and it forced the glyph width.
+      - name: Check out main for the badge renderer
+        uses: actions/checkout@v4
+        with:
+          ref: main
+          path: .renderer
+          sparse-checkout: scripts/render_conformance_page.py
+          sparse-checkout-cone-mode: false
+
       - name: Compute installs and render self-hosted badge SVGs
         run: |
           set -euo pipefail
@@ -56,18 +68,10 @@ jobs:
           total=$(( pypi + npm ))
           echo "pypi=$pypi npm=$npm total=$total version=${version:-none}"
 
-          # Self-contained shields-style "flat" SVG, rendered in pure shell.
-          # textLength forces the text to fit the computed width, so we never need
-          # exact font glyph metrics. SVG attributes use single quotes so the outer
-          # double-quoted string can expand the shell vars. Inputs here are
-          # controlled (labels, a semver, a count), so no XML escaping is needed.
+          # One renderer for every shield the project publishes.
           render_badge() { # $1=label $2=message $3=hexcolor $4=outfile
-            local label="$1" message="$2" color="$3" out="$4" lw mw W lx mx ltl mtl
-            lw=$(awk -v n=${#label}   'BEGIN{print int(n*6.5)+10}')
-            mw=$(awk -v n=${#message} 'BEGIN{print int(n*6.5)+10}')
-            W=$((lw + mw)); lx=$((lw * 5)); mx=$((lw * 10 + mw * 5))
-            ltl=$(((lw - 10) * 10)); mtl=$(((mw - 10) * 10))
-            printf '%s' "<svg xmlns='http://www.w3.org/2000/svg' width='$W' height='20' role='img' aria-label='$label: $message'><title>$label: $message</title><linearGradient id='s' x2='0' y2='100%'><stop offset='0' stop-color='#bbb' stop-opacity='.1'/><stop offset='1' stop-opacity='.1'/></linearGradient><clipPath id='r'><rect width='$W' height='20' rx='3' fill='#fff'/></clipPath><g clip-path='url(#r)'><rect width='$lw' height='20' fill='#555'/><rect x='$lw' width='$mw' height='20' fill='#$color'/><rect width='$W' height='20' fill='url(#s)'/></g><g fill='#fff' text-anchor='middle' font-family='Verdana,Geneva,DejaVu Sans,sans-serif' text-rendering='geometricPrecision' font-size='110'><text aria-hidden='true' x='$lx' y='150' transform='scale(.1)' fill='#000' fill-opacity='.3' textLength='$ltl'>$label</text><text x='$lx' y='140' transform='scale(.1)' textLength='$ltl'>$label</text><text aria-hidden='true' x='$mx' y='150' transform='scale(.1)' fill='#000' fill-opacity='.3' textLength='$mtl'>$message</text><text x='$mx' y='140' transform='scale(.1)' textLength='$mtl'>$message</text></g></svg>" > "$out"
+            python3 .renderer/scripts/render_conformance_page.py \
+              --badge "$1" "$2" "#$3" "$4"
           }
 
           # Version badge: render whenever PyPI returns a version, independent of
@@ -92,9 +96,9 @@ jobs:
 
           msg=$(awk -v n="$total" 'BEGIN{ if (n>=1000) printf "%.1fk all-time", n/1000; else printf "%d all-time", n }')
           gen=$(date -u +%Y-%m-%dT%H:%M:%SZ)
-          printf '{"schemaVersion":1,"label":"downloads","message":"%s","total":%d,"color":"78A08A","generated":"%s"}\n' "$msg" "$total" "$gen" \
+          printf '{"schemaVersion":1,"label":"downloads","message":"%s","total":%d,"color":"4A6E5C","generated":"%s"}\n' "$msg" "$total" "$gen" \
             > installs.json
-          render_badge "downloads" "$msg" "78A08A" downloads.svg
+          render_badge "downloads" "$msg" "4A6E5C" downloads.svg
           cat installs.json
 
       - name: Commit if changed

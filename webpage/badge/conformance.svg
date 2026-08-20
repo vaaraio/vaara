@@ -17,7 +17,7 @@
     <rect x="137" width="111" height="20" fill="#4A6E5C"/>
     <rect width="248" height="20" fill="url(#s)"/>
   </g>
-  <polygon points="12,5 18,15 6,15" fill="#78A08A"/>
+  <polygon points="12,4.2 19,15.8 5,15.8" fill="#78A08A"/>
   <g fill="#fff" text-anchor="middle" font-family="Verdana,Geneva,DejaVu Sans,sans-serif" text-rendering="geometricPrecision" font-size="110">
     <g transform="scale(.1)">
       <g aria-hidden="true" fill="#010101">
