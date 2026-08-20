@@ -171,8 +171,14 @@ jobs:
           cp -r webpage/badge /tmp/vcr/vcr/badge
           git config user.name "vaara-desk"
           git config user.email "hello@vaara.io"
+          # -f because the working tree still holds the regenerated page and the
+          # rows carried over from vcr, and a plain checkout refuses to switch
+          # over them. Everything this job publishes was copied to /tmp/vcr
+          # above, so discarding the tree here loses nothing. Row #1 did not hit
+          # this: the branch did not exist yet, so it took the orphan path, which
+          # keeps the working tree. The next submission would have failed.
           if git ls-remote --exit-code --heads origin vcr >/dev/null 2>&1; then
-            git checkout vcr
+            git checkout -f vcr
           else
             git checkout --orphan vcr
             git rm -rf --cached . >/dev/null 2>&1 || true
@@ -276,8 +282,14 @@ jobs:
           cp -r webpage/badge /tmp/vcr/vcr/badge
           git config user.name "vaara-desk"
           git config user.email "hello@vaara.io"
+          # -f because the working tree still holds the regenerated page and the
+          # rows carried over from vcr, and a plain checkout refuses to switch
+          # over them. Everything this job publishes was copied to /tmp/vcr
+          # above, so discarding the tree here loses nothing. Row #1 did not hit
+          # this: the branch did not exist yet, so it took the orphan path, which
+          # keeps the working tree. The next submission would have failed.
           if git ls-remote --exit-code --heads origin vcr >/dev/null 2>&1; then
-            git checkout vcr
+            git checkout -f vcr
           else
             git checkout --orphan vcr
             git rm -rf --cached . >/dev/null 2>&1 || true
