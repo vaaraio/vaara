@@ -54,7 +54,17 @@
   ],
   "terms_version": "2026-08-21",
   "genesis": "sha256:0000000000000000000000000000000000000000000000000000000000000000",
-  "witnessed_heads": [],
+  "witnessed_heads": [
+    {
+      "head": "sha256:2682d581d86fc18156386c716c38d9c63ea34264ecb2dc31938ae30d20a55693",
+      "rows": 1,
+      "uuid": "108e9186e8c5677ae28c7150fc9e75fac63c18e6418181e11970a366a60f28995ec08c026d2dc608",
+      "logIndex": 2549350104,
+      "integratedTime": 1787317963,
+      "logUrl": "https://rekor.sigstore.dev",
+      "published": "2026-08-21T13:12:43Z"
+    }
+  ],
   "reproductions": [
     {
       "id": 1,
