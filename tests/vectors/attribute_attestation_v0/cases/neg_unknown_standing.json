@@ -1,0 +1,50 @@
+{
+  "attestation": {
+    "alg": "Ed25519",
+    "attestationId": "att-b17-0413",
+    "attributes": [
+      {
+        "name": "confidence",
+        "source": "measured",
+        "sourceDetail": "fauna-classifier v3.1.0",
+        "value": "0.94"
+      },
+      {
+        "name": "operatorNote",
+        "source": "certified_by_us",
+        "value": "toistuva"
+      },
+      {
+        "name": "sensorId",
+        "source": "protocol_defined",
+        "value": "PIR-B17-04"
+      },
+      {
+        "name": "triggerClass",
+        "source": "measured",
+        "sourceDetail": "fauna-classifier v3.1.0",
+        "value": "animal"
+      }
+    ],
+    "issuer": "kiinteistoautomaatio.example",
+    "notAfter": "2026-09-21T04:13:00Z",
+    "notBefore": "2026-08-21T04:13:00Z",
+    "schema": "vaara.attribute-attestation/v0",
+    "signature": "f09612d52914decbadf0064f3cd16e21f13a206c4a649da140d2b95190da2a30258d5bb13c3220f77ce845c5d35b6528aa5f2eae264a3d92eaae7fea53d55206",
+    "subject": {
+      "id": "alarm-2026-08-21-0413-b17",
+      "kind": "detection-event"
+    },
+    "version": 1
+  },
+  "expected_reason": "attestation_malformed",
+  "expected_state": "refused",
+  "issuer_key": "keys/ed25519_public.pem",
+  "now": "2026-08-21T06:00:00Z",
+  "query": {
+    "accepted_issuers": null,
+    "minimum_source": "measured",
+    "name": "triggerClass",
+    "subject_id": null
+  }
+}

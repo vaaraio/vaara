@@ -25,6 +25,18 @@ What they share is a trust model: the record must hold up on its own, because th
 
 **Independently verifiable.** The other party must be able to re-derive every verdict from the bytes and a public key, offline, ideally with a checker that is not your software. If verification requires your code or your infrastructure, the trust problem has just moved, not gone away.
 
+## What this does not prove
+
+A record like this settles four questions for a stranger: these bytes were signed by this key, they have not changed since, nothing was removed from the run, and with a timestamp anchor they existed before a given moment. All four are recomputable from the bytes with public libraries and none of the producer's software.
+
+It settles a fifth question only partly. A hash chain makes a **deleted** entry provable, because the tail stops verifying. It says nothing about an action that was never written down in the first place, because the sequence is assigned by the issuer and the issuer is the party that benefits from the omission. Adding a sealing record closes the truncated-tail case. A suffix drop that also suppresses the seal is outside what any held set can detect.
+
+So the accurate claim is narrower than it first sounds. The record proves what was recorded, and proves it was not altered afterwards. It does not by itself prove that the recording is complete.
+
+What closes that gap is not cryptography. An external anchor over the run fixes what existed at a point in time and stops backdating. A second party who knows an answer was owed catches the rest: a counterparty holding their own copy, a principal who signed the authorisation, or someone withholding a payment until the record arrives. That last case is why a release condition (SPEC.md Section 5.7) is more than a payment feature. The party waiting for the receipt is not the party writing it.
+
+Anyone selling you a record format that claims to prove an unrecorded action did not happen is selling something that does not exist.
+
 ## The verification step, concretely
 
 Whoever receives the record runs three checks: the signature verifies against the published public key, each entry's hash chain re-derives from the entry bytes, and the manifest digests match the files in hand. Any failed check names what broke. With Vaara that is one command against an exported bundle:

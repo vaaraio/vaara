@@ -6,6 +6,24 @@ and this project follows [Semantic Versioning](https://semver.org/spec/v2.0.0.ht
 
 ## [Unreleased]
 
+## [1.72.0] - 2026-08-21
+
+### Added
+
+- `vaara.attestation.attribute`: an attribute attestation binds a subject to attribute values, states where each value came from, and says how long it holds. Any signed record can assert an attribute. Whether the assertion is evidence depends on its source, so every attribute names its own, drawn from a closed and totally ordered set: `undeclared`, `operator_declared`, `measured`, `protocol_defined`. `protocol_defined` outranks `measured` because a value fixed by a specification cannot be wrong, while a measurement can come from a faulty sensor.
+
+  The field carries the design. A building alarm classified as an animal by the supplier paid to reduce alarms is `operator_declared`. The same classification produced by a model whose identity and version ride inside the attestation is `measured`. Both are signed, both verify, and only one is evidence. A format that cannot express the difference lets a supplier reclassify its way to a target with every signature intact.
+
+- `evaluate(attestation, query)` returns `accepted`, `withheld`, `expired` or `refused`, each carrying a reason from a closed set, partitioned in `REASON_STATE` exactly as the release condition partitions its own. A value below the floor a relying party named is sound evidence of a claim and no evidence of a fact: it withholds, and it never reports the same way as a broken signature. Checks run soundness, then the clock, then sufficiency, so an expired window cannot swallow a forgery. A standing outside the closed set is malformed rather than floored to `undeclared`, because a verifier that quietly downgrades what it does not recognise hands a forger a way to introduce a standing of its own.
+
+- `tests/vectors/attribute_attestation_v0/`, the 45th conformance suite. Eight cases, all four states, and a checker that imports no Vaara. It also asserts two structural properties before grading any case: that the reason-to-state mapping covers all four states, and that the standing ladder is a total order floored at `undeclared`. A corpus of cases alone would still pass with two states merged or two standings tied. Ed25519 signing is deterministic, so a regeneration test pins the committed bytes exactly.
+
+- SPEC.md Section 5.8 carries the profile, and states normatively that a `vaara.attribute-attestation/v0` document is not a qualified electronic attestation of attributes under Regulation (EU) 910/2014 and must not be described as one. Those terms are tied to a supervised entry on a Member State trusted list, and no cryptographic property substitutes for the listing. An attestation issued and signed by the party it describes proves integrity and never independence.
+
+### Changed
+
+- `docs/prove-what-an-ai-agent-did.md` states what such a record does not prove. A hash chain makes a deleted entry provable because the tail stops verifying, and says nothing about an action that was never written down, because the sequence is issuer-assigned and the issuer benefits from the omission. A sealing record closes the truncated tail; a suffix drop that also suppresses the seal is outside what any held set can detect. The document now says so, names the two things that close the gap (an external anchor, and a second party who knows an answer was owed), and points at the release condition as an instance of the second. `llms.txt` drops "prove what a system actually did" for "a checkable record of what a system did".
+
 ## [1.71.0] - 2026-08-21
 
 ### Added
