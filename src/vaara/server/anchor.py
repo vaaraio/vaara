@@ -13,6 +13,12 @@ The QTSP's issuing CA is pinned. In production, pin it from the EU trusted list
 the helper falls back to trust-on-first-use (``VAARA_ANCHOR_ALLOW_TOFU=1``): one
 probe of the endpoint to learn the CA. TOFU is a conscious opt-in; without it
 and without a CA cert, anchoring refuses with ``AnchorNotConfigured``.
+
+``VAARA_ANCHOR_BLIND=1`` salts the digest sent to the QTSP (SPEC.md Section 4.1)
+and emits ``rfc3161-eidas-qualified-blinded``. The QTSP is a third party keeping
+a request log with an account behind every entry, and unblinded that log records
+the exact digest the receipt publishes. Off by default because it changes the
+anchor's ``method``.
 """
 
 from __future__ import annotations
@@ -33,6 +39,20 @@ if TYPE_CHECKING:
 
 def _tofu_allowed() -> bool:
     return (os.environ.get("VAARA_ANCHOR_ALLOW_TOFU") or "").strip().lower() in {
+        "1", "true", "yes", "on"
+    }
+
+
+def _blind_enabled() -> bool:
+    """Whether to salt the digest sent to the QTSP (SPEC.md Section 4.1).
+
+    Off by default, because it changes the anchor's ``method`` and a consumer
+    pinned to ``rfc3161-eidas-qualified`` should not start seeing a new one
+    without the operator asking. Worth turning on: the QTSP is a third party
+    holding a request log with an account behind every entry, and unblinded it
+    logs the exact digest the receipt publishes.
+    """
+    return (os.environ.get("VAARA_ANCHOR_BLIND") or "").strip().lower() in {
         "1", "true", "yes", "on"
     }
 
@@ -85,6 +105,7 @@ class Anchorer:
         self,
         tsa_url: Optional[str] = None,
         ca_cert: Optional[bytes] = None,
+        blind: Optional[bool] = None,
     ) -> None:
         # No provider is baked in. The operator names their own QTSP, or
         # anchoring refuses (see _ensure). Choosing a provider for everyone is
@@ -92,6 +113,7 @@ class Anchorer:
         self.tsa_url = (
             tsa_url or os.environ.get("VAARA_ANCHOR_TSA_URL", "").strip() or None
         )
+        self.blind = _blind_enabled() if blind is None else blind
         self._ca = ca_cert
         if self._ca is None:
             path = os.environ.get("VAARA_ANCHOR_CA_CERT", "").strip()
@@ -130,8 +152,13 @@ class Anchorer:
             return self._qtsa
 
     def anchor(self, receipt: dict) -> dict[str, Any]:
-        """Return an ``rfc3161-eidas-qualified`` anchor for ``receipt``."""
-        return self._ensure().anchor_receipt(receipt)
+        """Return a qualified anchor for ``receipt``.
+
+        ``rfc3161-eidas-qualified``, or ``rfc3161-eidas-qualified-blinded`` when
+        ``VAARA_ANCHOR_BLIND`` is set. Blinding changes only what the QTSP is
+        shown; the attested time and its legal weight are unaffected.
+        """
+        return self._ensure().anchor_receipt(receipt, blind=self.blind)
 
     def attested_time(self, receipt: dict, anchor: dict) -> str:
         """ISO-8601 UTC time the pinned QTSP attested, verified against the pin."""

@@ -37,10 +37,24 @@ from vaara.audit.timeanchor import (
     _signed_payload_digest,
     _urllib_transport,
     anchored_digest,
+    blinded_anchor_digest,
     build_timestamp_request,
     extract_token_from_response,
+    new_anchor_salt,
     verify_timestamp_token,
 )
+
+#: The blinded sibling of each method. Blinding changes only what the TSA is
+#: shown, so it gets its own method name rather than an optional field on the
+#: existing ones: a verifier that did not know about the salt would otherwise
+#: read a blinded anchor as a plain one and report a digest mismatch, which is
+#: a confusing failure for a correct anchor. An unknown method is a clean one.
+_BLINDED_METHOD = {
+    "rfc3161": "rfc3161-blinded",
+    "rfc3161-eidas-qualified": "rfc3161-eidas-qualified-blinded",
+}
+_PLAIN_METHODS = frozenset(_BLINDED_METHOD)
+_BLIND_METHODS = frozenset(_BLINDED_METHOD.values())
 
 # _SIGNED_BLOCKS, _signed_payload_digest and anchored_digest moved to
 # vaara.audit.timeanchor so anchor methods that are not RFC 3161 can reach
@@ -165,15 +179,29 @@ class SelfHostedTSA:
         return cms.ContentInfo(
             {"content_type": "signed_data", "content": signed_data}).dump()
 
-    def anchor_receipt(self, receipt: dict) -> dict[str, Any]:
-        """Produce a SPEC.md Section 4 ``timestampAnchors`` entry for ``receipt``."""
+    def anchor_receipt(self, receipt: dict, *, blind: bool = False,
+                       salt: Optional[bytes] = None) -> dict[str, Any]:
+        """Produce a SPEC.md Section 4 ``timestampAnchors`` entry for ``receipt``.
+
+        With ``blind`` the authority is shown a salted digest instead of the one
+        the receipt publishes, so its log cannot be matched against a corpus of
+        published receipts. ``salt`` exists so a vector generator can reproduce
+        an anchor byte for byte; production leaves it unset.
+        """
         raw = _signed_payload_digest(receipt)
-        return {
+        entry: dict[str, Any] = {
             "method": "rfc3161",
             "anchoredDigest": "sha256:" + raw.hex(),
-            "token": base64.b64encode(self.issue_token(raw)).decode("ascii"),
-            "authority": self.authority,
         }
+        imprint = raw
+        if blind:
+            salt = new_anchor_salt() if salt is None else salt
+            imprint = blinded_anchor_digest(raw, salt)
+            entry["method"] = _BLINDED_METHOD["rfc3161"]
+            entry["anchorSalt"] = bytes(salt).hex()
+        entry["token"] = base64.b64encode(self.issue_token(imprint)).decode("ascii")
+        entry["authority"] = self.authority
+        return entry
 
 
 class QualifiedTSA:
@@ -223,10 +251,22 @@ class QualifiedTSA:
         self._issuer_pin = trusted_issuer_cert
         self._transport = transport or _urllib_transport
 
-    def anchor_receipt(self, receipt: dict) -> dict[str, Any]:
-        """Fetch, pin-verify, and return a qualified anchor for ``receipt``."""
+    def anchor_receipt(self, receipt: dict, *, blind: bool = False,
+                       salt: Optional[bytes] = None) -> dict[str, Any]:
+        """Fetch, pin-verify, and return a qualified anchor for ``receipt``.
+
+        ``blind`` matters more here than on the self-hosted path. A qualified
+        TSA is a third party with a customer account behind every request, so
+        its log is the one that can be sold, breached or subpoenaed. Blinding
+        leaves the qualified time intact and stops the log from being matched
+        against published receipts.
+        """
         raw = _signed_payload_digest(receipt)
-        request = build_timestamp_request(raw)
+        imprint = raw
+        if blind:
+            salt = new_anchor_salt() if salt is None else salt
+            imprint = blinded_anchor_digest(raw, salt)
+        request = build_timestamp_request(imprint)
         try:
             response = self._transport(self.tsa_url, request, self.timeout)
         except Exception as exc:  # network, TLS, HTTP error
@@ -235,16 +275,20 @@ class QualifiedTSA:
         token = extract_token_from_response(response)
         # Refuse before recording: the anchor must never carry a token whose
         # signer fails the pin (exact signer certificate and/or issuing CA).
-        verify_timestamp_token(token, raw, trusted_signer_cert=self._pin,
+        verify_timestamp_token(token, imprint, trusted_signer_cert=self._pin,
                                trusted_issuer_cert=self._issuer_pin)
         authority = self.authority or self._token_signer_cn(token)
-        return {
+        entry: dict[str, Any] = {
             "method": "rfc3161-eidas-qualified",
             "anchoredDigest": "sha256:" + raw.hex(),
-            "token": base64.b64encode(token).decode("ascii"),
-            "authority": authority,
-            "tsaUrl": self.tsa_url,
         }
+        if blind:
+            entry["method"] = _BLINDED_METHOD["rfc3161-eidas-qualified"]
+            entry["anchorSalt"] = bytes(salt).hex()  # type: ignore[arg-type]
+        entry["token"] = base64.b64encode(token).decode("ascii")
+        entry["authority"] = authority
+        entry["tsaUrl"] = self.tsa_url
+        return entry
 
     def _token_signer_cn(self, token: bytes) -> str:
         from asn1crypto import cms as _cms
@@ -272,21 +316,41 @@ def verify_receipt_anchor(
     certificate you hold out of band to require the token's signer to be that
     exact certificate before the time is treated as independently anchored.
     """
-    if anchor.get("method") not in ("rfc3161", "rfc3161-eidas-qualified"):
-        raise TimeAnchorError(f"not an rfc3161 anchor: method={anchor.get('method')!r}")
+    method = anchor.get("method")
+    if method not in _PLAIN_METHODS | _BLIND_METHODS:
+        raise TimeAnchorError(f"not an rfc3161 anchor: method={method!r}")
     expected = "sha256:" + _signed_payload_digest(receipt).hex()
     if anchor.get("anchoredDigest") != expected:
         raise TimeAnchorError(
             "anchoredDigest does not match the receipt's signed payload")
+    payload = bytes.fromhex(expected.split(":", 1)[1])
+
+    raw_salt = anchor.get("anchorSalt")
+    if method in _BLIND_METHODS:
+        if not isinstance(raw_salt, str):
+            raise TimeAnchorError("a blinded anchor must carry anchorSalt")
+        try:
+            salt = bytes.fromhex(raw_salt)
+        except ValueError as exc:
+            raise TimeAnchorError("anchorSalt is not hex") from exc
+        imprint = blinded_anchor_digest(payload, salt)
+    else:
+        # A salt sitting on an unblinded method would be ignored, and a verifier
+        # that ignores it reads a blinded anchor as a plain one. Refuse instead.
+        if raw_salt is not None:
+            raise TimeAnchorError(
+                f"anchorSalt present on unblinded method {method!r}")
+        imprint = payload
+
     try:
         token_der = base64.b64decode(anchor["token"])
     except Exception as exc:
         raise TimeAnchorError(f"anchor token is not valid base64: {exc}") from exc
     return verify_timestamp_token(
-        token_der, bytes.fromhex(expected.split(":", 1)[1]),
+        token_der, imprint,
         hash_algorithm="sha256", trusted_signer_cert=trusted_signer_cert,
         trusted_issuer_cert=trusted_issuer_cert)
 
 
 __all__ = ["QualifiedTSA", "SelfHostedTSA", "anchored_digest",
-           "verify_receipt_anchor"]
+           "blinded_anchor_digest", "new_anchor_salt", "verify_receipt_anchor"]
