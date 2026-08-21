@@ -1,7 +1,7 @@
 #!/usr/bin/env python3
 # SPDX-FileCopyrightText: 2026 Henri Sirkkavaara
 # SPDX-License-Identifier: AGPL-3.0-or-later
-"""Check that nothing has been removed from Vaara Conformance Results.
+"""Check what has and has not been removed from Vaara Conformance Results.
 
 The table records occurrences. A run happened, on a date, at a commit, and that
 does not stop being true afterwards, so rows are never taken down or edited.
@@ -9,34 +9,42 @@ Saying so is worth little on its own, because the person who would quietly edit
 the table is the person publishing the promise. So each row carries ``prev``,
 the digest of the row before it, and this script recomputes the whole chain.
 
-Drop a row, reorder two, or change a single character of a published one, and
-every digest after the change stops matching. The break names the row.
+Change or reorder a published row and every digest after it stops matching. The
+break names the row.
 
-WHAT THE CHAIN ALONE GIVES, stated exactly. A break is detectable to someone
-holding an earlier head. It is not detectable to someone who does not, because
-the maintainer controls both the file and the published page and could rewrite
-the chain and republish it consistently. The earlier wording said the maintainer
-"cannot" remove a row on the strength of the chain, which was an overclaim. Iman
-Schrock raised it on the SCITT list on 2026-08-21 and was right.
+WHAT A CHAIN DOES NOT DO, and this is the part that matters. It says nothing
+about rows removed from the END, because what remains is a perfectly valid
+shorter chain. Dropping the last row leaves a file this script would once have
+called "chain intact" while exiting 0. Emek Can Dogru put it exactly right on
+the SCITT list on 2026-08-21: a reader holding one file has been told something
+true and something useless, and telling them which is the whole job.
 
-So each published head is recorded in a public transparency log the maintainer
-does not operate. ``--check-witness`` fetches those entries and confirms each
-witnessed head is the head this file actually reaches, so a rewritten chain is
-caught by anyone, not only by someone who kept an old copy. The residual is
-narrow: a row added after the last witnessing carries only the chain until the
-next head is published.
+So the tail is either pinned or it is not, and the output says which:
+
+  * ``--expect-count`` and ``--expect-last-hash`` let a caller who retained an
+    earlier head pin it. A mismatch exits the same way a mid-chain break does,
+    because a chain that is not the chain you pinned is not the chain you
+    pinned.
+  * ``--check-witness`` fetches the heads recorded in a public transparency log
+    the maintainer does not operate. A head the log carries and this file no
+    longer reaches is a removal, visible without having retained anything.
+  * With neither, ``tailPinned`` is false, it is said on stderr, and it is in
+    the JSON, so nothing downstream can read *verified* as *verified to be
+    complete*.
 
 This imports no Vaara code, so it checks the maintainer as readily as anyone
 else. It needs ``rfc8785`` and nothing more; the witness check uses the standard
 library.
 
 Usage:
-    python scripts/vcr_chain.py                       # check the committed file
-    python scripts/vcr_chain.py path/to/rows.json     # or one you downloaded
-    python scripts/vcr_chain.py --check-witness       # also verify the log
+    python scripts/vcr_chain.py
+    python scripts/vcr_chain.py rows.json --check-witness
+    python scripts/vcr_chain.py rows.json --expect-count 7 --expect-last-hash sha256:...
+    python scripts/vcr_chain.py rows.json --json
 """
 from __future__ import annotations
 
+import argparse
 import base64
 import hashlib
 import json
@@ -72,53 +80,54 @@ def check(data: dict) -> list[str]:
 
 
 def heads(data: dict) -> list[str]:
-    """Every head this file passes through, oldest first, ending at the current."""
-    out, current = [], data.get("genesis", ZERO)
-    for row in data.get("reproductions", []):
-        current = digest(row)
-        out.append(current)
-    return out
+    """Every head this file passes through, oldest first."""
+    return [digest(row) for row in data.get("reproductions", [])]
 
 
-def check_witness(data: dict) -> list[str]:
-    """Confirm each recorded head really is in the public log it names.
+def head_of(data: dict) -> str:
+    rows = data.get("reproductions", [])
+    return digest(rows[-1]) if rows else data.get("genesis", ZERO)
 
-    Fetches the log entry by uuid and reads back the digest it committed to. A
-    head the log does not carry, or carries with a different digest, is the
-    failure this exists to surface. Network trouble is reported as unchecked
-    rather than as a pass, because an unreachable log proves nothing either way.
+
+def fetch_entry(log_url: str, uuid: str) -> dict | None:
+    """The log entry, or None when the log could not be reached or read."""
+    url = f"{log_url.rstrip('/')}/api/v1/log/entries/{uuid}"
+    try:
+        with urllib.request.urlopen(url, timeout=TIMEOUT) as response:  # noqa: S310
+            payload = json.load(response)
+    except (urllib.error.URLError, TimeoutError, OSError, ValueError):
+        return None
+    return payload.get(uuid) or next(iter(payload.values()), None)
+
+
+def check_witness(data: dict) -> tuple[list[str], list[dict], list[str]]:
+    """Verify each recorded head against the log it names.
+
+    Returns (problems, confirmed entries, unreachable heads). A log that cannot
+    be reached is reported as unchecked and never as a pass, because an
+    unreachable log proves nothing in either direction.
     """
     problems: list[str] = []
-    witnessed = data.get("witnessed_heads", [])
-    if not witnessed:
-        problems.append(
-            "no witnessed heads recorded, so the chain is only checkable by "
-            "someone holding an earlier head"
-        )
-        return problems
-
+    confirmed: list[dict] = []
+    unreachable: list[str] = []
     reachable = set(heads(data)) | {data.get("genesis", ZERO)}
-    for entry in witnessed:
+
+    for entry in data.get("witnessed_heads", []):
         head = entry.get("head")
         uuid = entry.get("uuid")
-        log_url = (entry.get("logUrl") or "").rstrip("/")
+        log_url = entry.get("logUrl") or ""
         if not (head and uuid and log_url):
             problems.append(f"witnessed head entry is incomplete: {entry!r}")
             continue
         if head not in reachable:
             problems.append(
                 f"witnessed head {head} is not a head this file reaches. A row "
-                f"before it was removed, reordered or rewritten."
+                f"it covered was removed, reordered or rewritten."
             )
-        url = f"{log_url}/api/v1/log/entries/{uuid}"
-        try:
-            with urllib.request.urlopen(url, timeout=TIMEOUT) as response:  # noqa: S310
-                payload = json.load(response)
-        except (urllib.error.URLError, TimeoutError, OSError, ValueError) as exc:
-            print(f"  UNCHECKED  {head[:23]}...  log unreachable: {exc}",
-                  file=sys.stderr)
+        record = fetch_entry(log_url, uuid)
+        if record is None:
+            unreachable.append(head)
             continue
-        record = payload.get(uuid) or next(iter(payload.values()), {})
         try:
             body = json.loads(base64.b64decode(record["body"]))
             logged = body["spec"]["data"]["hash"]["value"]
@@ -130,64 +139,122 @@ def check_witness(data: dict) -> list[str]:
                 f"log entry {uuid} commits to sha256:{logged}, not {head}"
             )
             continue
-        print(f"  WITNESSED  {head}  logIndex={record.get('logIndex')} "
-              f"integratedTime={record.get('integratedTime')}")
-    return problems
+        confirmed.append({
+            "head": head,
+            "logIndex": record.get("logIndex"),
+            "integratedTime": record.get("integratedTime"),
+            "logUrl": log_url,
+        })
+    return problems, confirmed, unreachable
 
 
 def main(argv: list[str]) -> int:
-    argv = list(argv)
-    want_witness = "--check-witness" in argv
-    argv = [a for a in argv if a != "--check-witness"]
-    path = Path(argv[0]) if argv else DEFAULT
+    parser = argparse.ArgumentParser(
+        description="Recompute the VCR row chain and say whether the tail is pinned.")
+    parser.add_argument("path", nargs="?", default=str(DEFAULT))
+    parser.add_argument("--check-witness", action="store_true",
+                        help="Verify recorded heads against the public log")
+    parser.add_argument("--expect-count", type=int, default=None,
+                        help="Row count you retained earlier. A mismatch fails.")
+    parser.add_argument("--expect-last-hash", default=None,
+                        help="Head you retained earlier. A mismatch fails.")
+    parser.add_argument("--json", action="store_true", dest="as_json",
+                        help="Machine-readable result, including tailPinned")
+    args = parser.parse_args(argv)
+
+    path = Path(args.path)
     data = json.loads(path.read_text(encoding="utf-8"))
     rows = data.get("reproductions", [])
+    head = head_of(data)
     problems = check(data)
+
+    # A retained head is the only thing that turns a valid shorter chain into a
+    # detectable truncation for a reader holding nothing else. A mismatch is the
+    # same failure as a break in the middle, deliberately: a chain that is not
+    # the chain you pinned is not the chain you pinned.
+    pinned_by_caller = False
+    if args.expect_count is not None:
+        if len(rows) != args.expect_count:
+            problems.append(
+                f"expected {args.expect_count} row(s), found {len(rows)}. Rows "
+                f"were removed from the end, which leaves a valid shorter chain."
+            )
+        else:
+            pinned_by_caller = True
+    if args.expect_last_hash is not None:
+        if head != args.expect_last_hash:
+            problems.append(
+                f"expected head {args.expect_last_hash}, found {head}."
+            )
+        else:
+            pinned_by_caller = True
+
+    witness_problems: list[str] = []
+    confirmed: list[dict] = []
+    unreachable: list[str] = []
+    if args.check_witness:
+        witness_problems, confirmed, unreachable = check_witness(data)
+        if not data.get("witnessed_heads"):
+            witness_problems.append(
+                "no witnessed heads recorded, so nothing here pins the tail")
+    problems += witness_problems
+
+    pinned_by_witness = any(c["head"] == head for c in confirmed)
+    tail_pinned = pinned_by_caller or pinned_by_witness
+
+    result = {
+        "rows": len(rows),
+        "head": head,
+        "chainIntact": not check(data),
+        "tailPinned": tail_pinned,
+        "tailPinnedBy": (
+            ["caller"] * pinned_by_caller + ["witness"] * pinned_by_witness
+        ),
+        "witnessedHeadsRecorded": len(data.get("witnessed_heads", [])),
+        "witnessedHeadsConfirmed": confirmed,
+        "witnessUnreachable": unreachable,
+        "problems": problems,
+    }
+
+    if args.as_json:
+        print(json.dumps(result, indent=2))
+        return 1 if problems else 0
 
     for problem in problems:
         print(problem, file=sys.stderr)
     if problems:
-        print(f"\n{len(problems)} break(s) in the chain.", file=sys.stderr)
+        print(f"\n{len(problems)} problem(s).", file=sys.stderr)
         return 1
 
-    head = digest(rows[-1]) if rows else data.get("genesis", ZERO)
     print(f"{len(rows)} row(s), chain intact.")
     print(f"head: {head}")
+    for c in confirmed:
+        print(f"  WITNESSED  {c['head']}  logIndex={c['logIndex']} "
+              f"integratedTime={c['integratedTime']}")
+    for h in unreachable:
+        print(f"  UNCHECKED  {h}  log unreachable", file=sys.stderr)
 
-    witnessed = data.get("witnessed_heads", [])
-    if want_witness:
-        print(f"\nchecking {len(witnessed)} witnessed head(s) against the log:")
-        witness_problems = check_witness(data)
-        for problem in witness_problems:
-            print(f"  {problem}", file=sys.stderr)
-        if witness_problems:
-            print(f"\n{len(witness_problems)} witness problem(s).", file=sys.stderr)
-            return 1
-        unwitnessed = [h for h in heads(data)
-                       if h not in {w.get("head") for w in witnessed}]
-        if unwitnessed:
-            print(f"\n{len(unwitnessed)} row(s) added since the last witnessing "
-                  f"carry only the chain until the next head is published.")
-    elif witnessed:
-        print(f"{len(witnessed)} witnessed head(s) recorded. Run with "
-              f"--check-witness to verify them against the public log.")
+    if tail_pinned:
+        print(f"tail pinned by: {', '.join(result['tailPinnedBy'])}")
+    else:
+        # Said on stderr rather than buried in a document nobody reads at
+        # verification time. Chain intact and tail unpinned are different
+        # findings and a reader is entitled to both.
+        print(
+            "\ntail NOT pinned. The chain proves nothing about rows removed "
+            "from the end,\nbecause what remains is a valid shorter chain. To "
+            "pin it, either:\n"
+            "  --expect-count N --expect-last-hash sha256:...  (a head you kept)\n"
+            "  --check-witness                                 (the public log)",
+            file=sys.stderr,
+        )
 
-    # A checkout of main ships this file EMPTY on purpose: rows arrive by issue
-    # form and land on the unprotected `vcr` branch, which is what lets a
-    # submitter appear on the table without write access, a fork or a PR. The
-    # published page therefore shows rows that this file does not have.
-    #
-    # Without the note below, a stranger who follows the page's own instruction
-    # to verify with this script reads "0 row(s), chain intact" against a page
-    # listing rows, and the honest conclusion available to them is that the
-    # tool is lying. Saying where the rows actually live costs four lines and
-    # removes the only reading that makes this table look dishonest.
     if not rows and path == DEFAULT:
         print(
             "\nThis is the committed baseline on main, which ships with no rows.\n"
             "Published rows live on the `vcr` branch. To check those:\n"
             "  git fetch origin vcr && git show origin/vcr:vcr/reproductions.json > rows.json\n"
-            "  python scripts/vcr_chain.py rows.json\n"
+            "  python scripts/vcr_chain.py rows.json --check-witness\n"
             "Each row is also served standalone at https://vaara.io/badge/<slug>.json"
         )
     return 0

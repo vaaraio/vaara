@@ -105,12 +105,19 @@ body:
         removing or reordering an entry changes every digest after it, and you
         can recompute the whole chain with `python scripts/vcr_chain.py`.
 
-        **What the chain alone gives, stated exactly.** A break is detectable to
-        someone holding an earlier head. It is not detectable to someone who
-        does not, because the maintainer controls both the file and the page and
-        could rewrite the chain and republish it consistently. Saying the
-        maintainer "cannot" remove a row on the strength of the chain alone was
-        an overclaim, and it sat here, in the form you are consenting through.
+        **What the chain gives, and what it does not.** Rewriting or reordering
+        a published row changes every digest after it, and anyone recomputing
+        sees the break. Removing rows from the *end* is a different thing: what
+        remains is a perfectly valid shorter chain, and a reader holding only
+        the file cannot tell. So removal is detectable relative to a retained
+        head. Saying the maintainer "cannot" remove a row was an overclaim, and
+        it sat here, in the form you are consenting through.
+
+        `vcr_chain.py` now reports whether the tail is pinned on every run, and
+        carries `tailPinned` in its JSON, so nothing reading the result can take
+        *verified* for *verified to be complete*. If you keep your own copy of
+        the head, `--expect-count` and `--expect-last-hash` pin it, and a
+        mismatch fails the same way a break in the middle does.
 
         So each published head is also recorded in a public transparency log the
         maintainer does not operate. A rewritten chain reaches a head that
