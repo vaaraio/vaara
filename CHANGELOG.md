@@ -6,6 +6,20 @@ and this project follows [Semantic Versioning](https://semver.org/spec/v2.0.0.ht
 
 ## [Unreleased]
 
+### Fixed
+
+- The Vaara Conformance Results terms said the maintainer cannot remove a row because rows are chained. A chain makes a break detectable to someone holding an earlier head. It does not make removal impossible when one operator controls both the file and the published page, who could rewrite the chain and republish it consistently. The claim was wrong, and it sat in the consent form a party agrees through, which is worse than sitting in marketing. Iman Schrock raised it on the SCITT list on 2026-08-21 before filing a row, and he was right to hold it.
+
+  The wording on the page, in `conformance/reproductions.json` and in the issue form now says what a chain gives, and states the residual: a row added after the last witnessing carries only the chain until the next head is published. `terms_version` is bumped to `2026-08-21`; the row already listed keeps the terms it agreed to.
+
+### Added
+
+- `scripts/vcr_publish_head.py` records the current chain head in a public transparency log the maintainer does not operate, so a rewritten chain reaches a head that matches no witnessed entry. It publishes one digest and a signature over it, nothing else, and prints what leaves the machine before it does anything.
+
+- `scripts/vcr_chain.py --check-witness` fetches those entries and confirms each witnessed head is one this file actually reaches. It still imports no Vaara code, so it checks the maintainer as readily as anyone else.
+
+- A term stating what an outside suggestion can change. Wording changes when it is shown to be false, and anyone may show that, including a party that competes with Vaara. A case, an expected verdict or a checker changes only on evidence that the current one is wrong, never on request and never to make a party pass, and every such change is a commit anyone can diff.
+
 ## [1.74.0] - 2026-08-21
 
 ### Added
