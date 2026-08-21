@@ -1,6 +1,6 @@
 # Vaara
 
-> Accountable autonomy: a verifiable receipt for every autonomous action. Covers AI agents, agentic payments, supply chain, and any case where you need to prove what a system actually did. Open source, no SaaS, no telemetry.
+> Accountable autonomy: a verifiable receipt for every autonomous action. Covers AI agents, agentic payments, supply chain, and any case where you need a checkable record of what a system did. Open source, no SaaS, no telemetry.
 
 Vaara intercepts agent tool calls, scores each one with a conformal risk interval, and writes a hash-chained audit record. Online learning across five expert signals via Multiplicative Weight Update. Distribution-free conformal coverage on the score. An external auditor can verify these properties without trusting your stack.
 
@@ -15,7 +15,7 @@ Position: tamper-evident runtime evidence and enforcement layer. Signed attestat
 - [README](https://github.com/vaaraio/vaara/blob/main/README.md): install, quick start, evidence specimen, integrations
 - [AGENTS.md](https://github.com/vaaraio/vaara/blob/main/AGENTS.md): instructions for coding agents integrating or contributing to Vaara
 - [Prove it yourself](https://github.com/vaaraio/vaara/tree/main/examples/prove-it-yourself): one runnable file; produce a signed hash-chained trail, verify it offline, watch a forged byte get caught
-- [How to prove what an AI agent did](https://github.com/vaaraio/vaara/blob/main/docs/prove-what-an-ai-agent-did.md): the four properties a provable record needs and how verification works
+- [How to prove what an AI agent did](https://github.com/vaaraio/vaara/blob/main/docs/prove-what-an-ai-agent-did.md): the four properties a provable record needs, how verification works, and what such a record does not prove
 - [Logs vs evidence](https://github.com/vaaraio/vaara/blob/main/docs/logs-vs-evidence.md): why logs persuade only people who already trust you, and what evidence is instead
 - [EU AI Act Article 12](https://github.com/vaaraio/vaara/blob/main/docs/eu-ai-act-article-12.md): what record-keeping requires (automatic logging, six-month retention under Art. 19 and 26(6)) and what it does not (hash chains)
 - [Tamper-evident audit trail for AI agents](https://github.com/vaaraio/vaara/blob/main/docs/tamper-evident-audit-trail.md): mechanics, honest limits, cost

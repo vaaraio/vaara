@@ -1,0 +1,36 @@
+{
+  "cases": {
+    "neg_attribute_absent": {
+      "expected_reason": "attribute_absent",
+      "expected_state": "withheld"
+    },
+    "neg_expired_window": {
+      "expected_reason": "outside_validity_window",
+      "expected_state": "expired"
+    },
+    "neg_issuer_not_accepted": {
+      "expected_reason": "issuer_not_accepted",
+      "expected_state": "withheld"
+    },
+    "neg_operator_declared_below": {
+      "expected_reason": "source_below_floor",
+      "expected_state": "withheld"
+    },
+    "neg_subject_mismatch": {
+      "expected_reason": "subject_mismatch",
+      "expected_state": "withheld"
+    },
+    "neg_tampered_value": {
+      "expected_reason": "signature_invalid",
+      "expected_state": "refused"
+    },
+    "neg_unknown_standing": {
+      "expected_reason": "attestation_malformed",
+      "expected_state": "refused"
+    },
+    "pos_measured_clears_floor": {
+      "expected_reason": "attribute_attested",
+      "expected_state": "accepted"
+    }
+  }
+}
