@@ -170,6 +170,7 @@ ships recomputable vectors, not because it is another instance of the binding.
 | generic external execution evidence | `vaara.authorization/v0` (names an `external_execution_evidence` slot) | `vaara.receipt/v1` | `tests/vectors/external_evidence_v0/` |
 | release condition | `vaara.release-condition/v0` (consumes `vaara.authorization/v0`) | `vaara.receipt/v1` | `tests/vectors/release_condition_v0/` |
 | attribute attestation | `vaara.attribute-attestation/v0` | `vaara.receipt/v1` | `tests/vectors/attribute_attestation_v0/` |
+| hidden-value attribute attestation | `vaara.attribute-attestation-zk/v0` (proved by `vaara.attribute-predicate/v0`) | `vaara.receipt/v1` | `tests/vectors/attribute_attestation_zk_v0/` |
 
 ### 5.2 Profile example: x402 settlement binding
 
@@ -498,6 +499,123 @@ standing of its contents.
 Vectors are in `tests/vectors/attribute_attestation_v0/`, whose checker also
 asserts that the reason-to-state mapping covers all four states and that the
 standing ladder is a total order.
+
+### 5.9 Profile: hidden-value attribute attestation (`vaara.attribute-attestation-zk/v0`)
+
+Section 5.8 asks what a value is worth. This one asks what an issuer has to keep
+in order to say it.
+
+An attestation provider that vouches for an attribute has to hold the attribute.
+Anything held can be sold, subpoenaed, breached or repurposed, and a policy
+statement does not change what the holder is capable of. This profile commits to
+the value at issuance and hands the opening to the holder, so what remains on the
+issuer's side is a commitment and a signature over it.
+
+One field changes from Section 5.8:
+
+```
+5.8:   {name, value,      source, sourceDetail}
+5.9:   {name, commitment, source, sourceDetail}
+```
+
+`source` and `sourceDetail` stay in the clear and stay on the same closed,
+totally ordered ladder, with the same floor rule and the same prohibition on
+flooring a standing a verifier does not recognise. A relying party is entitled to
+judge how strongly a value was sourced, and is entitled to nothing further.
+
+#### The issuance ritual
+
+An issuer conforming to this profile MUST, for each attribute:
+
+1. draw a fresh blind, uniform over the scalar field, and compute the commitment
+2. sign the document containing the commitment
+3. hand the value and the blind to the holder
+4. retain neither
+
+Step 4 is the property the profile exists for. A blind MUST NOT be reused across
+issuances: two commitments to the same value under the same blind are equal, and
+a relying party holding both learns that the values match.
+
+#### Commitments and predicates
+
+Commitments are Pedersen commitments `C = v*G + r*H` over NIST P-256. `H` is
+derived by hash-to-curve from a fixed public label, so its discrete logarithm to
+`G` is unknown by construction, there is no trusted setup, and any party
+recomputes `H` from the published label. Commitments are perfectly hiding and
+computationally binding.
+
+A relying party asks whether a predicate holds over the hidden value. Three kinds
+are defined, and all three reduce to the same range argument over a shifted
+commitment, because Pedersen commitments add:
+
+| predicate | prover shows | verifier target |
+|---|---|---|
+| `at_least` | `value - lower` is in range | `C - lower*G` |
+| `at_most` | `upper - value` is in range | `upper*G - C` |
+| `in_range` | both, in that order | both, in that order |
+
+The blind follows the shift: it stays as issued for the `at_least` direction and
+negates for the `at_most` direction. A witness outside the proved interval has no
+valid bit decomposition, so a predicate that does not hold has no proof, and a
+conforming prover MUST refuse to emit one rather than emit something that will
+not verify.
+
+Each proof's Fiat-Shamir transcript MUST be seeded with the attestation digest,
+the attribute name, the JCS encoding of the predicate, and the direction, so a
+proof does not transfer to another document, another attribute or another
+threshold. A verifier MUST reject a proof whose envelope names an attestation
+digest, attribute or predicate other than the one being asked about, and MUST
+report that rejection separately from a proof that is bound and fails to verify.
+
+#### Evaluation
+
+Evaluation returns `accepted`, `withheld`, `expired` or `refused`, each carrying a
+reason from a closed set, partitioned as in Sections 5.7 and 5.8. Checks run in
+the order soundness, clock, sufficiency, and within sufficiency the presented
+proof is judged before the standing floor, so a forged proof is reported as
+forged rather than as merely weaker than what was asked for.
+
+A presented proof that is absent and a presented proof that is invalid MUST NOT
+share a state. Nothing proved is not the same fact as something forged, and one
+boolean for both discards the difference between "not yet" and "no".
+
+#### Limits, stated rather than implied
+
+**This is not selective disclosure.** One signature covers every commitment in
+the document. A holder cannot present three attributes out of ten from a single
+signed credential; that requires a signature scheme built for it and is outside
+this profile. Per-attribute commitment covers the model above and nothing wider.
+
+**This is not qualified.** A `vaara.attribute-attestation-zk/v0` document is not a
+qualified electronic attestation of attributes under Regulation (EU) 910/2014 and
+MUST NOT be described as one, or as qualified, in any conforming implementation
+or its documentation. Those terms are tied to a supervised, audited entry on a
+Member State trusted list, and no cryptographic property substitutes for the
+listing.
+
+**The issuer is still trusted for the value at issuance.** Hiding the value
+protects it from the relying party and from anyone the issuer might later sell
+to. It says nothing about whether the issuer committed to the truth. This is the
+same residual documented in `docs/prove-what-an-ai-agent-did.md`: a record proves
+what was recorded and does not prove that the recording was honest.
+
+**Discarding is structural, not physical.** A conforming implementation removes
+the reason to retain a value, which is what a subpoena, a breach or a change of
+ownership reaches. It does not and cannot guarantee that no copy survives in
+process memory, in a backup, or in whatever produced the value upstream.
+
+**Values are bounded integers.** Every committed value and every predicate bound
+MUST lie in `[0, 2**32)`, which is the interval the range argument proves
+membership of. A value outside it MUST be refused at issuance. String attributes
+are not carried by this version; they would require a membership proof against a
+committed set.
+
+Vectors are in `tests/vectors/attribute_attestation_zk_v0/`, whose checker rebuilds
+the curve arithmetic, the commitments and the range argument from the published
+parameters and imports no Vaara. It also asserts, before grading any case, that
+`H` recomputes from its label, that commitments are additively homomorphic, that
+the same value under two blinds gives two different commitments, and that a
+missing proof and a broken proof land in different states.
 
 ## 6. The ingest envelope (`vaara.ingest/v0`)
 

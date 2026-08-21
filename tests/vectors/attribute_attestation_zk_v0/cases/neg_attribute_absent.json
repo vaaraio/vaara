@@ -1,0 +1,51 @@
+{
+  "attestation": {
+    "alg": "Ed25519",
+    "attestationId": "att-holder-7f3c",
+    "attributes": [
+      {
+        "commitment": "03baa2e3c176924e2088b4ffbea96b7c150f42257032ce57ffd9ce0f8d9de43645",
+        "name": "age",
+        "source": "protocol_defined",
+        "sourceDetail": "passport MRZ"
+      },
+      {
+        "commitment": "0299c829a79d7cf962c84686276d28693b14eda1ba5e431839d2a49a4431a04e03",
+        "name": "residencyYears",
+        "source": "measured",
+        "sourceDetail": "population register"
+      },
+      {
+        "commitment": "032ed39290b36f65406bd2e9c1026bbc952b0d433f123bf63eb40e1f2571bfab60",
+        "name": "selfReportedIncome",
+        "source": "operator_declared"
+      }
+    ],
+    "issuer": "henkilotodistus.example",
+    "notAfter": "2026-09-21T04:13:00Z",
+    "notBefore": "2026-08-21T04:13:00Z",
+    "proofSystem": "vaara-p256-cap-v0",
+    "schema": "vaara.attribute-attestation-zk/v0",
+    "signature": "0c4faa9becaa34a94a5bf8ab94406b8b57991f0c7bae506b118ed846e92097de0be0f806a35b416d5fe3607b1a4680d2d36759b83fbefe7bd28e5a9c60454605",
+    "subject": {
+      "id": "holder-7f3c",
+      "kind": "person-pseudonym"
+    },
+    "version": 1
+  },
+  "expected_reason": "attribute_absent",
+  "expected_state": "withheld",
+  "issuer_key": "keys/ed25519_public.pem",
+  "now": "2026-08-21T06:00:00Z",
+  "proof": null,
+  "query": {
+    "accepted_issuers": null,
+    "minimum_source": "measured",
+    "name": "creditScore",
+    "predicate": {
+      "kind": "at_least",
+      "lower": 18
+    },
+    "subject_id": null
+  }
+}
