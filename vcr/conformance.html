@@ -163,12 +163,12 @@
 
   <div class="stats">
     <div class="stat"><b>46</b><span>suites</span></div>
-    <div class="stat"><b>45</b><span>passed</span></div>
+    <div class="stat"><b>43</b><span>passed</span></div>
     <div class="stat"><b>0</b><span>failed</span></div>
-    <div class="stat"><b>1</b><span>skipped</span></div>
+    <div class="stat"><b>3</b><span>skipped</span></div>
     <div class="stat"><b>75</b><span>cases</span></div>
   </div>
-  <p class="mono" style="color:var(--faint)">generated 2026-08-21T12:39:37Z</p>
+  <p class="mono" style="color:var(--faint)">generated 2026-08-21T13:35:08Z</p>
 
   <h2>Run it yourself</h2>
   <p>Nothing here needs Vaara installed. The checkers use the standard library
@@ -227,12 +227,19 @@ python scripts/vcr_chain.py            # nothing removed from the table</code></
     recorded in a public transparency log the maintainer does not operate, so a
     rewritten chain reaches a head that matches no witnessed entry. Both halves
     are checkable by you rather than promised by us.</li>
-    <li><strong>What the chain alone gives, stated exactly.</strong> A break is
-    detectable to someone holding an earlier head, and not to someone who does
-    not hold one, because an operator controlling both the file and this page
-    could rewrite the chain and republish it consistently. That is why the heads
-    are witnessed. The residual is narrow and real: a row added after the last
-    witnessing carries only the chain until the next head is published.</li>
+    <li><strong>What the chain gives, and what it does not.</strong> Rewriting
+    or reordering a published row changes every digest after it, and anyone
+    recomputing the chain sees the break. Removing rows from the <em>end</em> is
+    a different thing: what remains is a perfectly valid shorter chain, and a
+    reader holding only this file cannot tell. So removal is detectable relative
+    to a retained head. <code>vcr_chain.py</code> says on every run whether the
+    tail is pinned instead of leaving it to be assumed, and reports
+    <code>tailPinned</code> in its JSON so nothing downstream reads
+    <em>verified</em> as <em>verified to be complete</em>. Each published head is
+    also recorded in a public transparency log the maintainer does not operate,
+    which pins the tail for a reader who retained nothing of their own. The
+    residual is narrow and real: a row added after the last witnessing carries
+    only the chain until the next head is published.</li>
     <li>Nothing is edited after the fact. A correction is a new row referring
     to the earlier one, never a rewrite of it.</li>
     <li><strong>What an outside suggestion can change.</strong> Wording here
@@ -313,8 +320,8 @@ python scripts/vcr_chain.py            # nothing removed from the table</code></
 <tr><td class="mono">ingest_v0</td><td class="ok">PASS</td><td class="why"></td></tr>
 <tr><td class="mono">key_rotation_v0</td><td class="ok">PASS</td><td class="why"></td></tr>
 <tr><td class="mono">normalize_v0</td><td class="ok">PASS</td><td class="why"></td></tr>
-<tr><td class="mono">pq_hybrid_v0</td><td class="ok">PASS</td><td class="why"></td></tr>
-<tr><td class="mono">qualified_time_v0</td><td class="ok">PASS</td><td class="why"></td></tr>
+<tr><td class="mono">pq_hybrid_v0</td><td class="skip">SKIP</td><td class="why">pq_hybrid_v0 needs an optional dependency not installed: dilithium_py (pip install &#x27;vaara[pq]&#x27;)</td></tr>
+<tr><td class="mono">qualified_time_v0</td><td class="skip">SKIP</td><td class="why">qualified_time_v0 needs an optional dependency not installed: asn1crypto (pip install &#x27;vaara[timeanchor]&#x27;)</td></tr>
 <tr><td class="mono">record_conformance_v0</td><td class="ok">PASS</td><td class="why"></td></tr>
 <tr><td class="mono">record_set_v0</td><td class="ok">PASS</td><td class="why"></td></tr>
 <tr><td class="mono">release_condition_v0</td><td class="ok">PASS</td><td class="why"></td></tr>
