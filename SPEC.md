@@ -169,6 +169,7 @@ ships recomputable vectors, not because it is another instance of the binding.
 | TAP request binding | `tap.request/v0` | `vaara.receipt/v1` | `tests/vectors/tap_v0/` |
 | generic external execution evidence | `vaara.authorization/v0` (names an `external_execution_evidence` slot) | `vaara.receipt/v1` | `tests/vectors/external_evidence_v0/` |
 | release condition | `vaara.release-condition/v0` (consumes `vaara.authorization/v0`) | `vaara.receipt/v1` | `tests/vectors/release_condition_v0/` |
+| attribute attestation | `vaara.attribute-attestation/v0` | `vaara.receipt/v1` | `tests/vectors/attribute_attestation_v0/` |
 
 ### 5.2 Profile example: x402 settlement binding
 
@@ -443,6 +444,60 @@ A third party recomputes every verdict from the condition, the receipt, the
 evidence and the two public keys, with no issuer access. See
 `tests/vectors/release_condition_v0/_check_independent.py`; the `vaara
 release-check` verb is the same evaluation at the command line.
+
+### 5.8 Profile: attribute attestation (`vaara.attribute-attestation/v0`)
+
+Section 5.7 asks what a receipt is worth when money is waiting. This one asks
+what a *value* is worth. An attribute attestation binds a subject to attribute
+values, states where each value came from, and says how long it holds.
+
+Any signed record can assert an attribute. Whether the assertion is evidence
+depends entirely on its source, so every attribute MUST name its own, drawn from
+a closed and totally ordered set:
+
+| standing | meaning |
+|---|---|
+| `undeclared` | nothing is claimed about where the value came from |
+| `operator_declared` | the party being judged supplied it |
+| `measured` | the issuer observed it directly |
+| `protocol_defined` | the value is fixed by a specification and cannot differ |
+
+`protocol_defined` outranks `measured` because a value fixed by a specification
+cannot be wrong, while a measurement can come from a faulty sensor. `undeclared`
+is the floor and MUST NOT convert upward. A verifier that encounters a standing
+outside this set MUST treat the attestation as malformed and MUST NOT floor it to
+`undeclared`, because a verifier that silently downgrades what it does not
+recognise lets an issuer introduce a standing of its own.
+
+A relying party states the floor it requires. Evaluation returns one of
+`accepted`, `withheld`, `expired` or `refused`, each carrying a reason from a
+closed set, with the reason space partitioned exactly as in Section 5.7. A value
+below the floor is sound evidence of a claim and no evidence of a fact: it
+`withheld`s, and it MUST NOT be reported the same way as a broken signature.
+
+Checks run in the order soundness, clock, sufficiency. Soundness MUST precede the
+clock so an expired window cannot swallow a broken signature.
+
+The signature is over the JCS encoding of the document with its own `signature`
+member removed, the same rule as Section 5.7 and the data-locality record, so a
+verifier that checks one checks all three with no new code. Attributes are
+emitted sorted by name so two issuers building the same statement produce the
+same bytes. Both ends of the validity window are inclusive.
+
+**What this is not.** A `vaara.attribute-attestation/v0` document is not a
+qualified electronic attestation of attributes under Regulation (EU) 910/2014 and
+MUST NOT be described as one, or as qualified, in any conforming implementation
+or its documentation. Those terms are tied to a supervised, audited entry on a
+Member State trusted list, and no cryptographic property substitutes for the
+listing. An attestation issued and signed by the party it describes proves
+integrity and never independence; implementations SHOULD surface that standing
+rather than omit it. A qualified timestamp anchor (Section 4) raises the
+confidence in *when* the attestation existed and changes nothing about the
+standing of its contents.
+
+Vectors are in `tests/vectors/attribute_attestation_v0/`, whose checker also
+asserts that the reason-to-state mapping covers all four states and that the
+standing ladder is a total order.
 
 ## 6. The ingest envelope (`vaara.ingest/v0`)
 
