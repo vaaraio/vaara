@@ -101,12 +101,25 @@ body:
         current members. Your run happened on a date at a commit, and that does
         not stop being true later, so the entry does not stop existing later.
 
-        The maintainer cannot remove it either. Rows are chained, each one
-        carrying the digest of the row before it, so deleting or reordering an
-        entry breaks every digest after it and anybody can see the break with
-        `python scripts/vcr_chain.py`. That constraint is the reason the table
-        is worth reading: one its owner could quietly edit would just be the
-        owner's opinion.
+        Rows are chained, each one carrying the digest of the row before it, so
+        removing or reordering an entry changes every digest after it, and you
+        can recompute the whole chain with `python scripts/vcr_chain.py`.
+
+        **What the chain alone gives, stated exactly.** A break is detectable to
+        someone holding an earlier head. It is not detectable to someone who
+        does not, because the maintainer controls both the file and the page and
+        could rewrite the chain and republish it consistently. Saying the
+        maintainer "cannot" remove a row on the strength of the chain alone was
+        an overclaim, and it sat here, in the form you are consenting through.
+
+        So each published head is also recorded in a public transparency log the
+        maintainer does not operate. A rewritten chain reaches a head that
+        matches no witnessed entry, and you check that against the log rather
+        than against our word. `python scripts/vcr_chain.py --check-witness`
+        does it for you.
+
+        The residual is narrow and real: a row added after the last witnessing
+        carries only the chain until the next head is published.
 
         Nothing is edited after the fact either. A correction is a new row that
         refers to the earlier one.
@@ -139,7 +152,8 @@ body:
           required: true
         - label: >
             I understand the row is permanent, that asking will not remove it,
-            and that the maintainer cannot remove it either.
+            and that removal by the maintainer is detectable against a witnessed
+            head rather than impossible.
           required: true
         - label: >
             The link I gave is my own public record of this run, and the result

@@ -41,7 +41,20 @@
   *{box-sizing:border-box}
   body{margin:0;background:var(--bg);color:var(--ink);font-family:var(--sans);
        line-height:1.55;-webkit-font-smoothing:antialiased}
-  .wrap{max-width:940px;margin:0 auto;padding:56px 22px 96px}
+  /* Fixed controls sit against the viewport edge. The centred column is capped
+     so it leaves the control plus the same edge gap again on each side, which
+     means it can never run under them at any width or scroll position. Below
+     the breakpoint the controls return to normal flow, where the overlap
+     cannot happen at all. */
+  .wrap{max-width:min(940px, calc(100vw - 2*(2*var(--edge) + var(--ctrl))));margin:0 auto;padding:56px 22px 96px}
+  :root{--edge:16px;--ctrl:11.5rem}
+  @media (max-width:900px){
+    .nav-jump,.theme-toggle{position:static;top:auto;left:auto;right:auto}
+    .nav-jump{margin:14px 0 0 16px}
+    .theme-toggle{margin:14px 16px 0;justify-content:flex-end}
+    .wrap{max-width:940px}
+  }
+
   a{color:var(--tri-bright);text-decoration:none;border-bottom:1px solid var(--line)}
   a:hover{border-bottom-color:var(--tri)}
   .back{font-family:var(--mono);font-size:11px;letter-spacing:.18em;text-transform:uppercase;
@@ -155,7 +168,7 @@
     <div class="stat"><b>1</b><span>skipped</span></div>
     <div class="stat"><b>75</b><span>cases</span></div>
   </div>
-  <p class="mono" style="color:var(--faint)">generated 2026-08-21T09:52:07Z</p>
+  <p class="mono" style="color:var(--faint)">generated 2026-08-21T12:01:28Z</p>
 
   <h2>Run it yourself</h2>
   <p>Nothing here needs Vaara installed. The checkers use the standard library
@@ -202,18 +215,31 @@ python scripts/vcr_chain.py            # nothing removed from the table</code></
   claim that recomputes from bytes, checkable by someone who trusts neither
   the party nor Vaara.</p>
 
-  <h3>Terms for a listed party, version 2026-08-15</h3>
+  <h3>Terms for a listed party, version 2026-08-21</h3>
   <p class="note">Stated before there is anything to sell, so that anyone
   deciding whether to be listed can read the commercial position at the moment
   they decide rather than learn it afterwards.</p>
   <ul class="terms">
     <li><strong>A row is permanent.</strong> This records something that
     happened. A run took place on a date at a commit, and that stays true, so
-    the entry stays. Asking will not remove it, and the maintainer cannot
-    remove it either. Rows are chained, so a deletion or a reordering breaks
-    every digest after it and anybody can see the break.</li>
+    the entry stays. Asking will not remove it. Rows are chained, so removing
+    or reordering one changes every digest after it, and each published head is
+    recorded in a public transparency log the maintainer does not operate, so a
+    rewritten chain reaches a head that matches no witnessed entry. Both halves
+    are checkable by you rather than promised by us.</li>
+    <li><strong>What the chain alone gives, stated exactly.</strong> A break is
+    detectable to someone holding an earlier head, and not to someone who does
+    not hold one, because an operator controlling both the file and this page
+    could rewrite the chain and republish it consistently. That is why the heads
+    are witnessed. The residual is narrow and real: a row added after the last
+    witnessing carries only the chain until the next head is published.</li>
     <li>Nothing is edited after the fact. A correction is a new row referring
     to the earlier one, never a rewrite of it.</li>
+    <li><strong>What an outside suggestion can change.</strong> Wording here
+    changes when it is shown to be false, and anyone may show that, including a
+    party that competes with Vaara. A case, an expected verdict or a checker
+    changes only on evidence that the current one is wrong, never on request and
+    never to make a party pass. Every such change is a commit anyone can diff.</li>
     <li>A row and its badge are free, and stay free. There is no paid tier of
     being listed and no version of a row that counts for more.</li>
     <li>Vaara may sell services built on these same vectors, including a

@@ -12,8 +12,8 @@
   </metadata>
   <clipPath id="r"><rect width="190" height="20" rx="3" fill="#fff"/></clipPath>
   <g clip-path="url(#r)">
-    <rect width="31" height="20" fill="#45565E"/>
-    <rect x="31" width="159" height="20" fill="#4A6E5C"/>
+    <rect width="31" height="20" fill="#555"/>
+    <rect x="31" width="159" height="20" fill="#007ec6"/>
     <rect width="190" height="20" fill="url(#s)"/>
   </g>
   <g fill="#fff" text-anchor="middle" font-family="Verdana,Geneva,DejaVu Sans,sans-serif" text-rendering="geometricPrecision" font-size="110">
