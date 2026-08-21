@@ -3214,6 +3214,146 @@ def _cmd_release_check(args: argparse.Namespace) -> int:
     return 0 if decision.released else 1
 
 
+def _cmd_attribute_check(args: argparse.Namespace) -> int:
+    """Decide a predicate over an attribute whose value nobody is carrying.
+
+    The relying party learns two things and no more: whether the predicate holds
+    over the hidden value, and how strongly that value was sourced. Exit 0 when
+    the predicate is accepted, 1 when it is not (withheld, expired or refused),
+    2 on a usage or input error. The three non-accepting states are separated in
+    the printed reason and never in the exit code, because a caller acts the same
+    way on all three: it does not proceed.
+    """
+    from vaara.attestation._attest_canonical import now_iso8601
+    from vaara.attestation.attribute_zk import (
+        Predicate,
+        PredicateKind,
+        PredicateQuery,
+        SourceStanding,
+        evaluate,
+    )
+    from vaara.audit.signer import Ed25519Verifier
+
+    def _read_json(path_str: str, label: str):
+        try:
+            return json.loads(Path(path_str).expanduser().read_text(encoding="utf-8"))
+        except (OSError, json.JSONDecodeError) as exc:
+            print(f"vaara attribute-check: {label}: {exc}", file=sys.stderr)
+            return None
+
+    attestation = proof = None
+    now = args.now
+    if args.bundle:
+        payload = _read_json(args.bundle, args.bundle)
+        if payload is None:
+            return 2
+        if not isinstance(payload, dict):
+            print("vaara attribute-check: bundle must be a JSON object", file=sys.stderr)
+            return 2
+        attestation = payload.get("attestation")
+        proof = payload.get("proof")
+        now = now or payload.get("now")
+
+    for flag, label in (("attestation", "--attestation"), ("proof", "--proof")):
+        path_str = getattr(args, flag, None)
+        if not path_str:
+            continue
+        loaded = _read_json(path_str, label)
+        if loaded is None:
+            return 2
+        if flag == "attestation":
+            attestation = loaded
+        else:
+            proof = loaded
+
+    if attestation is None:
+        print(
+            "vaara attribute-check: no attestation given; pass a bundle file or "
+            "--attestation <file>",
+            file=sys.stderr,
+        )
+        return 2
+
+    if args.at_least is None and args.at_most is None:
+        print(
+            "vaara attribute-check: state the predicate with --at-least, "
+            "--at-most, or both for a range",
+            file=sys.stderr,
+        )
+        return 2
+    if args.at_least is not None and args.at_most is not None:
+        kind = PredicateKind.IN_RANGE
+    elif args.at_least is not None:
+        kind = PredicateKind.AT_LEAST
+    else:
+        kind = PredicateKind.AT_MOST
+    try:
+        predicate = Predicate(kind=kind, lower=args.at_least, upper=args.at_most)
+    except Exception as exc:  # noqa: BLE001 — a bad bound is a usage error
+        print(f"vaara attribute-check: {exc}", file=sys.stderr)
+        return 2
+
+    verifier = None
+    if args.key:
+        from cryptography.exceptions import UnsupportedAlgorithm
+        from cryptography.hazmat.primitives import serialization
+
+        try:
+            key = serialization.load_pem_public_key(
+                Path(args.key).expanduser().read_bytes()
+            )
+            verifier = Ed25519Verifier(key.public_bytes_raw())
+        except (OSError, ValueError, TypeError, AttributeError, UnsupportedAlgorithm) as exc:
+            print(f"vaara attribute-check: --key: {exc}", file=sys.stderr)
+            return 2
+
+    query = PredicateQuery(
+        name=args.name,
+        predicate=predicate,
+        minimum_source=SourceStanding(args.min_source),
+        subject_id=args.subject_id,
+        accepted_issuers=frozenset(args.accepted_issuers)
+        if args.accepted_issuers
+        else None,
+    )
+    try:
+        decision = evaluate(
+            attestation, query, proof=proof, now=now or now_iso8601(),
+            verifier=verifier,
+        )
+    except Exception as exc:  # noqa: BLE001 — a bad input is a usage error, not a crash
+        print(f"vaara attribute-check: {exc}", file=sys.stderr)
+        return 2
+
+    if args.json:
+        print(json.dumps(decision.to_dict(), indent=2))
+    else:
+        print(f"{decision.state.value.upper()}  {decision.reason.value}")
+        print(f"  attestation  {decision.attestation_digest}")
+        print(f"  attribute    {args.name}")
+        if decision.predicate:
+            bounds = "  ".join(
+                f"{k}={v}" for k, v in sorted(decision.predicate.items())
+            )
+            print(f"  predicate    {bounds}")
+        if decision.source:
+            print(f"  source       {decision.source.value}")
+        print(f"  evaluated    {decision.evaluated_at}")
+        if verifier is None:
+            print(
+                "vaara attribute-check: NOTE no --key given, so the issuer "
+                "signature could not be checked and nothing can be accepted",
+                file=sys.stderr,
+            )
+        elif proof is None:
+            print(
+                "vaara attribute-check: NOTE no proof was presented, so the "
+                "predicate is unanswered rather than false",
+                file=sys.stderr,
+            )
+    return 0 if decision.accepted else 1
+
+
 def _receipt_signature_verifies(payload: dict, verifying_material: Any) -> bool:
     """The receipt's ES256 record signature verifies under ``verifying_material``.
 
@@ -6139,6 +6279,91 @@ def build_parser() -> argparse.ArgumentParser:
         help="Emit the release decision as JSON",
     )
     prc.set_defaults(func=_cmd_release_check)
+
+    pac = sub.add_parser(
+        "attribute-check",
+        help=(
+            "Decide a predicate over an attribute whose value the issuer no "
+            "longer holds: the document carries a commitment, not the value, "
+            "and a proof shows the predicate holds without opening it. Answers "
+            "accepted / withheld / expired / refused with a reason from a closed "
+            "set, so a proof that was never presented never reads as a forged "
+            "one. Exit 0 accepted, 1 not."
+        ),
+    )
+    pac.add_argument(
+        "bundle",
+        nargs="?",
+        default=None,
+        help=(
+            "JSON file holding what was presented: an 'attestation' object plus "
+            "an optional 'proof' and 'now'. Individual documents can be passed "
+            "with the flags below instead, or on top of it."
+        ),
+    )
+    pac.add_argument(
+        "--attestation", default=None,
+        help="Signed vaara.attribute-attestation-zk/v0 document (JSON file)",
+    )
+    pac.add_argument(
+        "--proof", default=None,
+        help="The vaara.attribute-predicate/v0 envelope the holder presented "
+             "(JSON file). Without it the predicate is unanswered, which is "
+             "withheld and is not the same answer as a proof that failed.",
+    )
+    pac.add_argument(
+        "--key", default=None, metavar="PEM",
+        help="Issuer's Ed25519 public key (PEM), held OUT OF BAND. Without it "
+             "nothing is accepted: a document cannot vouch for the key that "
+             "signed it.",
+    )
+    pac.add_argument(
+        "--name", required=True, metavar="ATTRIBUTE",
+        help="The attribute to ask about, by name",
+    )
+    pac.add_argument(
+        "--at-least", type=int, default=None, metavar="N",
+        help="Require the hidden value to be at least N",
+    )
+    pac.add_argument(
+        "--at-most", type=int, default=None, metavar="N",
+        help="Require the hidden value to be at most N. Give both bounds for a "
+             "range.",
+    )
+    pac.add_argument(
+        "--min-source",
+        dest="min_source",
+        required=True,
+        choices=["undeclared", "operator_declared", "measured", "protocol_defined"],
+        help=(
+            "The floor the caller will accept for where the value came from. "
+            "Required on purpose: a caller that genuinely accepts anything says "
+            "so by naming undeclared, which is a decision on the record rather "
+            "than an omission."
+        ),
+    )
+    pac.add_argument(
+        "--subject", default=None, dest="subject_id", metavar="ID",
+        help="Require the attestation to be about this subject id",
+    )
+    pac.add_argument(
+        "--issuer",
+        action="append",
+        default=None,
+        dest="accepted_issuers",
+        metavar="NAME",
+        help="An issuer the caller accepts; repeat to accept several",
+    )
+    pac.add_argument(
+        "--now", default=None,
+        help="Evaluation instant, ISO 8601 UTC (default: the current time). "
+             "Both ends of the validity window are inclusive.",
+    )
+    pac.add_argument(
+        "--json", action="store_true",
+        help="Emit the decision as JSON",
+    )
+    pac.set_defaults(func=_cmd_attribute_check)
 
     pec = sub.add_parser(
         "enforce-by-class",

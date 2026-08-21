@@ -6,6 +6,32 @@ and this project follows [Semantic Versioning](https://semver.org/spec/v2.0.0.ht
 
 ## [Unreleased]
 
+## [1.73.0] - 2026-08-21
+
+### Added
+
+- `vaara.attestation.attribute_zk`: an attribute attestation that commits to the value instead of carrying it. Section 5.8 asks what a value is worth. This asks what an issuer has to keep in order to say it. An attestation provider that vouches for an attribute has to hold the attribute, and anything held can be sold, subpoenaed, breached or repurposed. Committing at issuance and handing the opening to the holder means the asset stops existing, which is a different claim from a promise not to sell it.
+
+  One field changes from Section 5.8. `{name, value, source, sourceDetail}` becomes `{name, commitment, source, sourceDetail}`. The standing stays in the clear and stays on the same closed, totally ordered ladder, because judging the strength of evidence is the relying party's job.
+
+- `issue()` performs the ritual in the order that makes the claim true: draw a fresh blind, commit, sign the commitment, hand the value and the blind to the holder, retain neither. `IssuedAttestation.release_to_holder()` returns the openings and empties itself, so after it returns the issuer's object cannot produce them again. The guarantee is structural, over the object. Process memory sits outside what a garbage-collected runtime can promise, and SPEC.md says so instead of leaving a reader to assume the stronger thing.
+
+- `open_predicate()` and `verify_predicate()` prove and check `at_least`, `at_most` and `in_range` over a hidden value. No new cryptography and no new dependency: the transparent P-256 commit-and-prove engine already in the tree covers it, and a comparison is the existing range argument over a shifted commitment, because Pedersen commitments add. A witness outside the proved interval has no valid bit decomposition, so a predicate that does not hold has no proof and the prover refuses to emit one rather than hand back something that will not verify.
+
+  Each proof's Fiat-Shamir transcript is seeded with the attestation digest, the attribute name, the JCS of the predicate and the direction, so a proof does not move to another document, another attribute or another threshold.
+
+- `evaluate()` returns `accepted`, `withheld`, `expired` or `refused`, each carrying a reason from a closed set partitioned in `REASON_STATE`. `proof_absent` withholds and `proof_invalid` refuses. Nothing proved is not the same fact as something forged, and one boolean for both discards the difference between "not yet" and "no". Soundness runs before the clock, and within sufficiency the presented proof is judged before the standing floor, so a forged proof is reported as forged rather than leaving as merely weaker than what was asked for.
+
+- `vaara attribute-check` decides the same question at the command line. Exit 0 accepted, 1 otherwise, because a caller acts the same way on withheld, expired and refused: it does not proceed. `--min-source` is required, so a caller that genuinely accepts anything says so by naming `undeclared`, which is a decision on the record rather than an omission.
+
+- `tests/vectors/attribute_attestation_zk_v0/`, the 46th conformance suite. Ten cases, all four states, and a checker that imports no Vaara and rebuilds the field arithmetic, the group law, the hash-to-curve, the commitments, the OR-proofs and the range argument from the published parameters. It asserts six structural properties before grading any case, including that `H` recomputes from its public label, that commitments are additively homomorphic, and that a missing proof and a broken proof land in different states. One case is a proof of a statement that is untrue, which the shipped prover refuses to build, so the generator constructs it the way a forger would have to.
+
+- SPEC.md Section 5.9 carries the profile and states its limits as words rather than implications: this is not selective disclosure, since one signature covers every commitment and a holder cannot present three attributes out of ten; it is not a qualified electronic attestation of attributes under Regulation (EU) 910/2014 and must not be described as one; hiding the value says nothing about whether the issuer committed to the truth; and every committed value and predicate bound must lie in `[0, 2**32)`, which is the interval the range argument proves membership of.
+
+### Changed
+
+- `docs/PRIOR_ART.md` carries rows for the release condition (v1.71.0) and the attribute attestation (v1.72.0), which the chronology had not recorded, and two citation paths now point at `docs/` where the files have lived since v0.29.0.
+
 ## [1.72.0] - 2026-08-21
 
 ### Added

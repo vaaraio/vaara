@@ -1,0 +1,44 @@
+{
+  "cases": {
+    "neg_attribute_absent": {
+      "expected_reason": "attribute_absent",
+      "expected_state": "withheld"
+    },
+    "neg_expired_window": {
+      "expected_reason": "outside_validity_window",
+      "expected_state": "expired"
+    },
+    "neg_predicate_false": {
+      "expected_reason": "proof_invalid",
+      "expected_state": "refused"
+    },
+    "neg_proof_absent": {
+      "expected_reason": "proof_absent",
+      "expected_state": "withheld"
+    },
+    "neg_proof_replayed": {
+      "expected_reason": "proof_not_bound",
+      "expected_state": "refused"
+    },
+    "neg_source_below_floor": {
+      "expected_reason": "source_below_floor",
+      "expected_state": "withheld"
+    },
+    "neg_tampered_commitment": {
+      "expected_reason": "signature_invalid",
+      "expected_state": "refused"
+    },
+    "neg_tampered_standing": {
+      "expected_reason": "signature_invalid",
+      "expected_state": "refused"
+    },
+    "pos_at_least_holds": {
+      "expected_reason": "predicate_proven",
+      "expected_state": "accepted"
+    },
+    "pos_in_range_holds": {
+      "expected_reason": "predicate_proven",
+      "expected_state": "accepted"
+    }
+  }
+}
