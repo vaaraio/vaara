@@ -168,7 +168,7 @@
     <div class="stat"><b>3</b><span>skipped</span></div>
     <div class="stat"><b>75</b><span>cases</span></div>
   </div>
-  <p class="mono" style="color:var(--faint)">generated 2026-08-21T13:35:08Z</p>
+  <p class="mono" style="color:var(--faint)">generated 2026-08-21T21:54:16Z</p>
 
   <h2>Run it yourself</h2>
   <p>Nothing here needs Vaara installed. The checkers use the standard library
@@ -276,6 +276,26 @@ python scripts/vcr_chain.py            # nothing removed from the table</code></
             <dt>Row digest</dt><dd class="mono">sha256:2682d581d86fc18156386c716c38d9c63ea34264ecb2dc31938ae30d20a55693<br>over <a href="/badge/babyblueviper1-invinoveritas.json">/badge/babyblueviper1-invinoveritas.json</a></dd>
             <dt>Badge</dt><dd><img src="/badge/babyblueviper1-invinoveritas.svg" alt="VCR row 1" height="20"><br><code class="snippet">[![Vaara Conformance Results row 1](https://vaara.io/badge/babyblueviper1-invinoveritas.svg)](https://vaara.io/conformance.html)</code></dd>
             <dt>Certificate</dt><dd><a href="/badge/babyblueviper1-invinoveritas.html">printable sheet</a></dd>
+          </dl>
+        </article>
+
+        <article class="repro">
+          <div class="repro-head">
+            <span class="num mono">#2</span>
+            <span class="date mono">2026-08-21</span>
+            <span class="who">Nenad Vasic / Elara Protocol</span>
+            <span class="aff">Elara Protocol — AI-agent-maintained (disclosed), independent of Vaara</span>
+          </div>
+          <p class="result">45 passed, 0 failed, 1 skipped, 75 cases. Runner exit 0. The skip is `article12_fold_v0` (checker wants a bundle zip argument rather than a bare case directory — structural, not environmental). An earlier same-day run at f0dbf4d8 gave 44/45, 65 cases, 0 failures, before the corpus grew.</p>
+          <dl>
+            <dt>Suites</dt><dd class="mono">acp_checkout_v0, agent_decision_v0, agent_identity_v0, ap2_v0, article12_fold_v0, atlas_threat_v0, attestation_result_v0, attribute_attestation_v0, attribute_attestation_zk_v0, audit_summary_v0, authorization_v0, build_bundle_v0, bundle_doc_v0, bundle_set_v0, capability_scope_v0, class_gate_v0, conformance_statement_v0, contiguity_v0, credential_binding_v0, credential_grant_v0, crewai_enforcement_v0, cross_org_handoff_v0, cross_stack_revocation_v0, data_locality_v0, decision_pairing_v0, enforcement_attestation_v0, enforcement_set_v0, evidence_bundle_v0, evidence_ref_v0, execution_receipt_v0, external_evidence_v0, fallback_projection_v0, governance_decision_v0, handoff_set_v0, ingest_v0, key_rotation_v0, normalize_v0, pq_hybrid_v0, qualified_time_v0, record_conformance_v0, record_set_v0, release_condition_v0, sep2787_attestation_v0, tap_v0, transparency_consistency_v0, x402_settlement_v0</dd>
+            <dt>At commit</dt><dd class="mono">a209864e11fc14f0ac3466dd33d668d9c156208f</dd>
+            <dt>Their scoping</dt><dd class="scoping">This is a reproduction of the author-supplied checkers and vectors at commit a209864e. It is not an independent implementation of draft-sirkkavaara-vaara-receipt and not a validation of the specification text. The figures match row #612 at the same commit on a different machine and OS (Linux, Python 3.12, clean venv), making this an independent confirmation of that row&#x27;s byte-stability. pq_hybrid_v0 and qualified_time_v0 ran with their optional dependencies installed rather than skipped.</dd>
+            <dt>Record</dt><dd><a href="https://mailarchive.ietf.org/arch/msg/scitt/HOKZT8J06zB3JaNxOfAEasNty1Q/" rel="noopener">record</a></dd>
+            <dt>Listed under terms</dt><dd class="mono">2026-08-21</dd>
+            <dt>Row digest</dt><dd class="mono">sha256:79e05e18a3214b9ada4bcf31ce25141640982b461a4fe655a14017f1f410bb33<br>over <a href="/badge/nenad-vasic-elara-protocol.json">/badge/nenad-vasic-elara-protocol.json</a></dd>
+            <dt>Badge</dt><dd><img src="/badge/nenad-vasic-elara-protocol.svg" alt="VCR row 2" height="20"><br><code class="snippet">[![Vaara Conformance Results row 2](https://vaara.io/badge/nenad-vasic-elara-protocol.svg)](https://vaara.io/conformance.html)</code></dd>
+            <dt>Certificate</dt><dd><a href="/badge/nenad-vasic-elara-protocol.html">printable sheet</a></dd>
           </dl>
         </article>
 

@@ -1,0 +1,39 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="330" height="20" role="img" aria-label="Vaara Conformance Results row 2: Nenad Vasic / Elara Protocol">
+  <title>Vaara Conformance Results row 2: Nenad Vasic / Elara Protocol</title>
+  <filter id="blur"><feGaussianBlur stdDeviation="16"/></filter>
+  <linearGradient id="s" x2="0" y2="100%">
+    <stop offset="0" stop-color="#bbb" stop-opacity=".1"/>
+    <stop offset="1" stop-opacity=".1"/>
+  </linearGradient>
+  <metadata>
+    <vcr xmlns="https://vaara.io/ns/vcr/v1">
+      <row>2</row>
+      <digest>sha256:79e05e18a3214b9ada4bcf31ce25141640982b461a4fe655a14017f1f410bb33</digest>
+      <over>https://vaara.io/badge/nenad-vasic-elara-protocol.json</over>
+      <recompute>sha256 of those bytes, which are JCS-canonical per RFC 8785</recompute>
+    </vcr>
+  </metadata>
+  <clipPath id="r"><rect width="330" height="20" rx="3" fill="#fff"/></clipPath>
+  <g clip-path="url(#r)">
+    <rect width="137" height="20" fill="#45565E"/>
+    <rect x="137" width="193" height="20" fill="#4A6E5C"/>
+    <rect width="330" height="20" fill="url(#s)"/>
+  </g>
+  <polygon points="12,4.2 19,15.8 5,15.8" fill="#78A08A"/>
+  <g fill="#fff" text-anchor="middle" font-family="Verdana,Geneva,DejaVu Sans,sans-serif" text-rendering="geometricPrecision" font-size="110">
+    <g transform="scale(.1)">
+      <g aria-hidden="true" fill="#010101">
+        <text x="782" y="150" fill-opacity=".8" filter="url(#blur)">Vaara Conformance</text>
+        <text x="782" y="150" fill-opacity=".3">Vaara Conformance</text>
+      </g>
+      <text x="782" y="140">Vaara Conformance</text>
+    </g>
+    <g transform="scale(.1)">
+      <g aria-hidden="true" fill="#010101">
+        <text x="2337" y="150" fill-opacity=".8" filter="url(#blur)">reproduced 2026-08-21 a209864</text>
+        <text x="2337" y="150" fill-opacity=".3">reproduced 2026-08-21 a209864</text>
+      </g>
+      <text x="2337" y="140">reproduced 2026-08-21 a209864</text>
+    </g>
+  </g>
+</svg>
