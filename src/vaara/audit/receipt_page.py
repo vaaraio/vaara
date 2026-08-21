@@ -132,7 +132,12 @@ def render_receipt_page(receipt: dict, *, title: str | None = None) -> str:
             status, detail, verified = _scitt_detail(receipt, anchor)
             checked = ("inclusion proof re-checked by recomputation" if verified
                        else "status as recorded, not re-checked here")
-        elif method == "rfc3161-eidas-qualified":
+        elif method in ("rfc3161-eidas-qualified",
+                        "rfc3161-eidas-qualified-blinded"):
+            # The blinded method is the same qualified token over a salted
+            # digest (SPEC.md 4.1). It renders the same way, or a blinded
+            # anchor would drop to the generic branch and stop reading as
+            # qualified on the page a relying party is shown.
             status, detail, rechecked = _qualified_detail(receipt, anchor)
             checked = ("digest binding re-checked offline; the QTSP pin needs "
                        "the certificate held out of band, not re-checked here"

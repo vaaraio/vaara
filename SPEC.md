@@ -132,6 +132,43 @@ Registered methods (the registry is open; a profile MAY register more):
 | `rfc3161-eidas-qualified` | An RFC 3161 token from a *qualified* TSA under eIDAS. | A qualified trust service provider. Adds legal / court-admissible weight; this is the only thing the qualification adds over `rfc3161`. |
 | `ledger` | A commitment of the anchored digest to a public ledger; the block time bounds existence. | Self-producible; trust-minimized, no TSA. |
 | `scitt` | A transparency-log inclusion proof: the anchored digest is appended to a SCITT-compatible Merkle transparency log, and the entry carries the inclusion proof (sibling hashes) and the log's root hash at the time of append. The verifier recomputes the root from leaf + proof alone — no key, no operator to trust. The entry carries `logId` (base64 of the log identity digest), `leafIndex`, `treeSize`, `inclusionProof` (array of base64 sibling hashes), and `rootHash` (base64 Merkle root). | Self-hostable via the in-process transparency log (producer: `vaara.audit.scitt_anchor`), or against a remote SCITT log (e.g. Sigstore Rekor). |
+| `rfc3161-blinded` | `rfc3161`, with the authority shown a salted digest instead of the anchored digest. The entry additionally carries `anchorSalt` (64 lowercase hex characters, 32 bytes). See Section 4.1. | Same as `rfc3161`. |
+| `rfc3161-eidas-qualified-blinded` | `rfc3161-eidas-qualified`, blinded as above. The qualified time is unaffected. | Same as `rfc3161-eidas-qualified`. |
+
+### 4.1 Blinded anchors
+
+An unblinded anchor sends the timestamping authority exactly the value the
+receipt then publishes as `anchoredDigest`. An authority keeps a request log,
+every entry in it sits behind a customer account, and a log that is sold,
+breached or produced under compulsion lets whoever holds it match its entries
+against any corpus of published receipts. That match reveals which receipts a
+named customer anchored and when, without breaking any signature.
+
+A blinded anchor closes that match. The producer draws a fresh 32-byte salt,
+sends the authority
+
+```
+sha256( "vaara/anchor-blind/v1" || salt || anchoredDigest_bytes )
+```
+
+and carries the salt in the anchor entry as `anchorSalt`. `anchoredDigest`
+still names the Section 2.1 signed payload, so the receipt binding is unchanged.
+
+A producer using a blinded method MUST draw the salt from a cryptographic
+random source and MUST NOT reuse a salt across anchors, since two anchors under
+one salt are linkable to each other. A verifier MUST recompute the imprint from
+`anchoredDigest` and `anchorSalt` and MUST reject a blinded anchor whose
+`anchorSalt` is absent or is not 32 bytes of hex. A verifier MUST reject an
+unblinded method that carries `anchorSalt`, because a verifier that ignores the
+member would read a blinded anchor as a plain one.
+
+**What this does and does not buy.** It stops a party holding only the
+authority's log from matching that log against receipts it was not given. It
+does not make the anchor unlinkable to anyone holding the receipt: the salt
+travels with the receipt precisely so a holder can verify, and any holder can
+therefore recompute the imprint and find the log entry. It also does not hide
+the fact, timing or volume of anchoring from the authority itself, which sees
+the request as it happens.
 
 A receipt MAY carry several anchors of different methods. The technical anchor
 (`rfc3161`, `scitt`) and the legal anchor (`rfc3161-eidas-qualified`) are

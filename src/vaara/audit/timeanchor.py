@@ -89,6 +89,47 @@ def anchored_digest(receipt: dict) -> str:
     return "sha256:" + _signed_payload_digest(receipt).hex()
 
 
+#: Domain separation for the blinded anchor methods, so a blinded imprint can
+#: never collide with a digest computed for any other purpose in this tree.
+ANCHOR_BLIND_LABEL = b"vaara/anchor-blind/v1"
+
+#: Salt width. 32 bytes because a salt narrow enough to enumerate is not a salt.
+SALT_LEN = 32
+
+
+def new_anchor_salt() -> bytes:
+    """A fresh blinding salt from the system CSPRNG."""
+    return secrets.token_bytes(SALT_LEN)
+
+
+def blinded_anchor_digest(payload_digest: bytes, salt: bytes) -> bytes:
+    """What a blinded anchor sends the TSA instead of the receipt's own digest.
+
+    An unblinded anchor hands the authority exactly the value the receipt then
+    publishes in ``anchoredDigest``. A TSA keeps a log, every request in it sits
+    behind a customer account, and a log that is sold, breached or subpoenaed
+    lets whoever holds it match its entries against any corpus of published
+    receipts. Anchoring ``sha256(label || salt || payload_digest)`` and carrying
+    the salt in the anchor removes that match: the value the TSA holds appears
+    nowhere else.
+
+    The property is narrow and stated that way on purpose. Anyone given the
+    receipt holds the salt too and can still link it to the log entry, because
+    that is exactly what verification requires. What changes is that the log
+    alone is no longer enough.
+    """
+    if not isinstance(salt, (bytes, bytearray)) or len(salt) != SALT_LEN:
+        raise TimeAnchorError(
+            f"anchor salt must be {SALT_LEN} bytes, got "
+            f"{len(salt) if isinstance(salt, (bytes, bytearray)) else type(salt).__name__}"
+        )
+    if not isinstance(payload_digest, (bytes, bytearray)) or len(payload_digest) != 32:
+        raise TimeAnchorError("payload digest must be a 32-byte sha256 digest")
+    return hashlib.sha256(
+        ANCHOR_BLIND_LABEL + bytes(salt) + bytes(payload_digest)
+    ).digest()
+
+
 def _require_deps() -> None:
     if not _HAS_DEPS:
         raise TimeAnchorError(_INSTALL_HINT)
@@ -492,9 +533,14 @@ def verify_anchor_over_records(anchor: TimeAnchor, record_hashes: list[str]) -> 
 
 
 __all__ = [
+    "ANCHOR_BLIND_LABEL",
+    "SALT_LEN",
     "TimeAnchor",
     "TimeAnchorError",
     "RFC3161TimeAnchorClient",
+    "anchored_digest",
+    "blinded_anchor_digest",
+    "new_anchor_salt",
     "build_timestamp_request",
     "extract_token_from_response",
     "verify_timestamp_token",
