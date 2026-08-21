@@ -807,12 +807,19 @@ python scripts/vcr_chain.py            # nothing removed from the table</code></
     recorded in a public transparency log the maintainer does not operate, so a
     rewritten chain reaches a head that matches no witnessed entry. Both halves
     are checkable by you rather than promised by us.</li>
-    <li><strong>What the chain alone gives, stated exactly.</strong> A break is
-    detectable to someone holding an earlier head, and not to someone who does
-    not hold one, because an operator controlling both the file and this page
-    could rewrite the chain and republish it consistently. That is why the heads
-    are witnessed. The residual is narrow and real: a row added after the last
-    witnessing carries only the chain until the next head is published.</li>
+    <li><strong>What the chain gives, and what it does not.</strong> Rewriting
+    or reordering a published row changes every digest after it, and anyone
+    recomputing the chain sees the break. Removing rows from the <em>end</em> is
+    a different thing: what remains is a perfectly valid shorter chain, and a
+    reader holding only this file cannot tell. So removal is detectable relative
+    to a retained head. <code>vcr_chain.py</code> says on every run whether the
+    tail is pinned instead of leaving it to be assumed, and reports
+    <code>tailPinned</code> in its JSON so nothing downstream reads
+    <em>verified</em> as <em>verified to be complete</em>. Each published head is
+    also recorded in a public transparency log the maintainer does not operate,
+    which pins the tail for a reader who retained nothing of their own. The
+    residual is narrow and real: a row added after the last witnessing carries
+    only the chain until the next head is published.</li>
     <li>Nothing is edited after the fact. A correction is a new row referring
     to the earlier one, never a rewrite of it.</li>
     <li><strong>What an outside suggestion can change.</strong> Wording here

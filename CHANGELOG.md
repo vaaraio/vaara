@@ -18,6 +18,10 @@ and this project follows [Semantic Versioning](https://semver.org/spec/v2.0.0.ht
 
 - `scripts/vcr_chain.py --check-witness` fetches those entries and confirms each witnessed head is one this file actually reaches. It still imports no Vaara code, so it checks the maintainer as readily as anyone else.
 
+- `scripts/vcr_chain.py` reports `tailPinned` on every run, and `--json` carries it, so nothing downstream can read *verified* as *verified to be complete*. `--expect-count` and `--expect-last-hash` let a reader who retained a head pin the tail, and a mismatch exits the same way a break in the middle does, because a chain that is not the chain you pinned is not the chain you pinned.
+
+  This closes a hole the first version left open. A chain says nothing about rows removed from the end, because what remains is a valid shorter chain, so the checker printed "chain intact" and exited 0 on a file whose rows had all been deleted. Emek Can Dogru described the failure and the fix on the SCITT list on 2026-08-21, from having hit it himself; the shape here is his.
+
 - A term stating what an outside suggestion can change. Wording changes when it is shown to be false, and anyone may show that, including a party that competes with Vaara. A case, an expected verdict or a checker changes only on evidence that the current one is wrong, never on request and never to make a party pass, and every such change is a commit anyone can diff.
 
 ## [1.74.0] - 2026-08-21
