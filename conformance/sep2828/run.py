@@ -95,22 +95,62 @@ def run_suites(manifest: dict[str, Any]) -> int:
     return 0
 
 
+def is_line_ending_only(path: Path, want: str) -> bool:
+    """Does this file match the manifest once its line endings are undone?
+
+    Exact, not a guess: undo the CRLF (and lone-CR) translation a checkout can
+    apply, re-hash, and compare. A match proves the content is byte for byte the
+    published content and only the newlines were rewritten.
+
+    This never makes the check pass. The manifest stays byte-exact; this only
+    tells the two very different causes of a mismatch apart.
+    """
+    try:
+        raw = path.read_bytes()
+    except OSError:
+        return False
+    if b"\r" not in raw:
+        return False
+    normalised = raw.replace(b"\r\n", b"\n").replace(b"\r", b"\n")
+    return "sha256:" + hashlib.sha256(normalised).hexdigest() == want
+
+
 def verify_manifest(manifest: dict[str, Any]) -> int:
     want: dict[str, str] = manifest["files"]
     got = file_digests(HERE, manifest["suites"])
     problems: list[str] = []
+    line_endings: list[str] = []
     for rel in sorted(set(want) | set(got)):
         if rel not in got:
             problems.append(f"missing file: {rel}")
         elif rel not in want:
             problems.append(f"unexpected file: {rel}")
         elif want[rel] != got[rel]:
-            problems.append(f"digest mismatch: {rel}")
+            if is_line_ending_only(HERE / rel, want[rel]):
+                line_endings.append(rel)
+                problems.append(f"line endings changed, content intact: {rel}")
+            else:
+                problems.append(f"digest mismatch: {rel}")
     want_corpus = manifest["corpusDigest"]
     got_corpus = corpus_digest(got)
     if want_corpus != got_corpus:
         problems.append(f"corpusDigest mismatch: manifest {want_corpus} != computed {got_corpus}")
     if problems:
+        # Every mismatch is a line-ending rewrite: say so once, loudly, instead
+        # of printing the same fact once per file and letting it read as damage.
+        if line_endings and len(line_endings) == len(problems) - 1:
+            print("MANIFEST verification FAILED: line endings, not content.\n")
+            print(f"  All {len(line_endings)} fixture files carry the published content "
+                  "byte for byte\n  once their line endings are undone.\n")
+            print("  Cause: this clone translated LF to CRLF. Git for Windows installs")
+            print("  with core.autocrlf=true, and this corpus is pinned byte for byte,")
+            print("  so the translation breaks every digest without changing content.\n")
+            print("  Fix:")
+            print("    git config core.autocrlf false")
+            print("    git rm --cached -r .")
+            print("    git reset --hard\n")
+            print("  This says nothing about SEP-2828 conformance. Re-run after the fix.")
+            return 1
         print("MANIFEST verification FAILED:")
         for line in problems:
             print(f"  {line}")

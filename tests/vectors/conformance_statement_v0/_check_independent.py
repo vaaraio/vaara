@@ -77,11 +77,30 @@ def _corpus_digest(files):
     return "sha256:" + hashlib.sha256(("\n".join(lines) + "\n").encode("utf-8")).hexdigest()
 
 
+def _line_ending_only(rel, want):
+    """Does this file match the manifest once its line endings are undone?
+
+    Exact, not a guess: undo the CRLF (and lone-CR) rewrite a checkout can apply
+    and re-hash. A match proves the content is byte for byte the published
+    content. Never used to pass a check, only to tell two causes apart.
+    """
+    try:
+        raw = (CORPUS / rel).read_bytes()
+    except OSError:
+        return False
+    if b"\r" not in raw:
+        return False
+    return "sha256:" + hashlib.sha256(
+        raw.replace(b"\r\n", b"\n").replace(b"\r", b"\n")).hexdigest() == want
+
+
 def corpus_facts():
     """Recompute the corpus identity and integrity from the bytes on disk."""
     manifest = json.loads((CORPUS / "MANIFEST.json").read_text())
     files = _file_digests(manifest["suites"])
     verified = files == manifest["files"] and _corpus_digest(files) == manifest["corpusDigest"]
+    mismatched = [r for r, d in files.items() if manifest["files"].get(r) not in (None, d)]
+    same_set = set(files) == set(manifest["files"])
     return {
         "name": manifest["corpus"],
         "version": manifest["version"],
@@ -89,6 +108,10 @@ def corpus_facts():
         "fileCount": len(files),
         "verified": verified,
         "suites": list(manifest["suites"]),
+        # True only when every difference is provably a line-ending rewrite.
+        "lineEndingsOnly": bool(mismatched) and same_set and all(
+            _line_ending_only(r, manifest["files"][r]) for r in mismatched),
+        "mismatchCount": len(mismatched),
     }
 
 
@@ -244,8 +267,40 @@ def parse_page(text):
 # ── Cross-check ───────────────────────────────────────────────────────────────
 
 
+#: The conventional automake skip code the profile runner reports as SKIP.
+SKIP_EXIT_CODE = 77
+
+
 def main() -> int:
     corpus = corpus_facts()
+
+    # Precondition: this suite compares committed goldens against a fresh
+    # derivation from the published corpus. If the working tree is not that
+    # corpus, no comparison here can mean anything, and every scenario would
+    # report a mismatch that looks like Vaara disagreeing with its own vectors.
+    #
+    # A checkout that rewrote the line endings is the common cause and is
+    # provably content-identical, so the suite skips with the reason instead of
+    # failing. Any other integrity failure still fails loudly: only a difference
+    # we can prove is newlines-only goes quiet.
+    if corpus["lineEndingsOnly"]:
+        # The profile runner takes the last stderr line as the skip reason, so
+        # the whole diagnosis goes to stderr with "SKIP: " last.
+        print(
+            f"All {corpus['mismatchCount']} corpus fixture files differ from "
+            "MANIFEST.json by line endings only. Their content is the published "
+            "content byte for byte.\n"
+            "Cause: this clone translated LF to CRLF. Git for Windows installs "
+            "with core.autocrlf=true, and the corpus is pinned byte for byte.\n"
+            "Fix: git config core.autocrlf false && git rm --cached -r . && "
+            "git reset --hard\n",
+            file=sys.stderr,
+        )
+        print("SKIP: this clone rewrote the corpus line endings, so the published "
+              "bytes are not present to check against. Not a conformance result.",
+              file=sys.stderr)
+        return SKIP_EXIT_CODE
+
     reproduces_all, per_suite = self_test_facts(corpus["suites"])
     expected = json.loads((HERE / "expected.json").read_text())
     failures = 0
@@ -253,7 +308,11 @@ def main() -> int:
     for scenario in sorted(SCENARIO_RECORDS):
         rec = records_facts(scenario)
         # Grade every in-scope check independently, then fold worst-first.
-        corpus_grade = PROVED if corpus["verified"] else FALSE
+        # Corpus integrity is a precondition, so a corpus that does not verify
+        # is UNPROVED, not FALSE: the published bytes were not there to check
+        # against, which is not the same as an implementation disagreeing with
+        # the spec. It still gates, because only PROVED yields CONFORMS.
+        corpus_grade = PROVED if corpus["verified"] else UNPROVED
         selftest_grade = PROVED if reproduces_all else FALSE
         grades = [corpus_grade, selftest_grade]
         if rec is not None:

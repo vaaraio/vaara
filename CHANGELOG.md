@@ -12,7 +12,15 @@ and this project follows [Semantic Versioning](https://semver.org/spec/v2.0.0.ht
 
   The wording on the page, in `conformance/reproductions.json` and in the issue form now says what a chain gives, and states the residual: a row added after the last witnessing carries only the chain until the next head is published. `terms_version` is bumped to `2026-08-21`; the row already listed keeps the terms it agreed to.
 
+- A Windows clone made the SEP-2828 conformance corpus read as a disagreement with the spec. Git for Windows installs with `core.autocrlf=true`, which rewrites LF to CRLF on checkout. The corpus is pinned byte for byte, so all 32 file digests and the `corpusDigest` fail while no content changes at all. `vaara conformance-statement` called that NON-CONFORMING, and the `conformance_statement_v0` suite reported 0 of 5 scenarios matching, which reads as the implementation contradicting the published corpus. It is a checkout artefact and says nothing about conformance. Emek Can Dogru found it on 2026-08-21, before it reached a row.
+
+  Corpus integrity is now graded as the precondition it is. It asks whether the published byte set is present, not whether an implementation agrees with SEP-2828, so a corpus that does not verify grades `unproved` rather than `false`. It still gates: only `proved` yields CONFORMS, so a corpus that does not verify can never produce a pass. A mismatched file is re-hashed with the line-ending translation undone, which proves whether its content is the published content, and the cause is named instead of printing 32 bare digest mismatches. The `conformance_statement_v0` suite exits 77 (SKIP) with that reason rather than failing, because it cannot compare goldens against a corpus that is not the published one. Only a difference that is provably newlines-only goes quiet; real tampering still fails loudly.
+
+  Statement `schemaVersion` is 3, adding `corpus.lineEndingMismatches` and `corpus.lineEndingsOnly`. The verdict for a byte-exact corpus is unchanged.
+
 ### Added
+
+- A root `.gitattributes`. The byte-pinned corpus and its goldens are checked out verbatim on every platform, and the rest of the tree normalises to LF, so a fresh clone on Windows holds the published bytes.
 
 - `scripts/vcr_publish_head.py` records the current chain head in a public transparency log the maintainer does not operate, so a rewritten chain reaches a head that matches no witnessed entry. It publishes one digest and a signature over it, nothing else, and prints what leaves the machine before it does anything.
 

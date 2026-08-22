@@ -47,6 +47,11 @@ NOT_OURS = {
     "--create-namespace",  # helm install
     "--namespace",         # helm, kubectl
     "--from-file",         # kubectl create secret generic
+    # git, in docs/conformance-profile.md. Repairing a Windows clone whose
+    # line endings were rewritten is a git operation, so the commands that
+    # undo it belong to git.
+    "--cached",  # git rm --cached -r .
+    "--hard",    # git reset --hard
 }
 
 

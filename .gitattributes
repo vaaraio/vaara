@@ -1,0 +1,31 @@
+# Line-ending policy. Vaara pins bytes, not lines.
+#
+# Default: normalise text to LF in the repository and check it out as LF on
+# every platform, including Windows. This project's digests, goldens and CI all
+# assume LF, so a working tree that differs from the object store is a bug.
+* text=auto eol=lf
+
+# The SEP-2828 conformance corpus is byte-pinned. Every file has a SHA-256 in
+# MANIFEST.json, and one corpusDigest covers the whole set, so the corpus
+# version names an exact byte set that anyone can recompute.
+#
+# Git's line-ending translation breaks that. Git for Windows installs with
+# core.autocrlf=true by default, which rewrites LF to CRLF on checkout and
+# changes every digest in the corpus. The clone then reports the published
+# corpus as unverified, through no fault of the emitter or the corpus.
+#
+# -text means never translate, in either direction: what is in the object store
+# lands on disk verbatim. That is the same promise the manifest makes.
+conformance/sep2828/** -text
+
+# The conformance-statement goldens pin rendered output against that corpus.
+tests/vectors/conformance_statement_v0/** -text
+
+# Binaries: never translate, never diff as text.
+*.png binary
+*.jpg binary
+*.ico binary
+*.mp4 binary
+*.zip binary
+*.bin binary
+*.joblib binary

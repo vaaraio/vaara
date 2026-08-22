@@ -49,6 +49,31 @@ python record_conformance_v0/_check_independent.py
 python record_set_v0/_check_independent.py
 ```
 
+## Windows and line endings
+
+This corpus is pinned byte for byte, so line-ending translation breaks it.
+Git for Windows installs with `core.autocrlf=true`, which rewrites LF to
+CRLF on checkout. Every digest in `MANIFEST.json` then fails, and so does
+the `corpusDigest`, while no content has changed at all.
+
+The repository ships a `.gitattributes` that checks this directory out
+verbatim on every platform, so a fresh clone is already correct. A clone
+made before that was added can be repaired in place:
+
+```
+git config core.autocrlf false
+git rm --cached -r .
+git reset --hard
+```
+
+The tooling tells this apart from real damage rather than reporting it as
+a conformance problem. `run.py --verify-manifest` re-hashes with the
+translation undone and names line endings as the cause. A statement built
+against a corpus in this state grades UNPROVED rather than
+NON-CONFORMING, because the published bytes were not present to check
+against, which is not the same as an implementation disagreeing with the
+spec.
+
 ## Claiming conformance
 
 Your implementation conforms to a corpus version when, for every fixture,
