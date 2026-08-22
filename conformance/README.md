@@ -72,7 +72,7 @@ translation undone and names line endings as the cause. A statement built
 against a corpus in this state grades UNPROVED rather than
 NON-CONFORMING, because the published bytes were not present to check
 against, which is not the same as an implementation disagreeing with the
-spec. None of it is a verdict about your emitter.
+spec.
 
 ## Claiming conformance
 
