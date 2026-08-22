@@ -51,9 +51,36 @@ FIELDS = {
     "Which suites you ran": "suites",
     "Commit you ran at": "at_commit",
     "Result": "result",
+    "Kind of run": "kind",
     "Your own scoping": "their_scoping",
     "Link to where you reported it": "record",
 }
+
+#: What a run establishes is a property of who wrote the verifier and who wrote
+#: the vectors, never of how well the run went. The three are not degrees of one
+#: another: only the second says anything about the specification text, and only
+#: the third says anything about both the text and the cases.
+#:
+#: Joel Hillier proposed this on the SCITT list on 2026-08-21, after Iman
+#: Schrock scoped his own row that way unprompted and Emek Can Dogru filed one
+#: carrying it. The loss it prevents happens at the point a result is filed: a
+#: row outlives the message that explains it, and a register that cannot tell a
+#: reproduction from an independent implementation will be cited for the second
+#: while holding the first, by someone who is not lying.
+KINDS = {
+    "reproduction": "the author's checkers over the author's vectors",
+    "independent_implementation": (
+        "an independent implementation from the text, run against the author's vectors"
+    ),
+    "independent_implementation_and_vectors": (
+        "an independent implementation run against independently constructed vectors"
+    ),
+}
+
+#: An unnamed kind reads as the weakest claim available, never the strongest.
+#: Rows listed before the field existed carry no kind, and nothing may be added
+#: to them after the fact, so the page states the rule instead of editing them.
+DEFAULT_KIND = "reproduction"
 
 
 class Rejected(Exception):
@@ -160,6 +187,29 @@ def parse_suites(raw: str) -> list[str]:
     return names
 
 
+def parse_kind(raw: str) -> str:
+    """Map the dropdown's text to a stable key, defaulting to the weakest kind.
+
+    The form's options are prose, and prose gets reworded. The row stores a key
+    so a later edit to the wording cannot silently restate what a published row
+    claimed. An unrecognised or empty value is never promoted: it becomes the
+    weakest kind, which is the same rule the page states for rows listed before
+    the field existed.
+    """
+    text = raw.strip().lower()
+    if not text:
+        return DEFAULT_KIND
+    if text in KINDS:
+        return text
+    if text.startswith("reproduction"):
+        return "reproduction"
+    if "independently constructed" in text:
+        return "independent_implementation_and_vectors"
+    if text.startswith("independent implementation"):
+        return "independent_implementation"
+    return DEFAULT_KIND
+
+
 def validate(fields: dict, author: str) -> dict:
     """Return the row to publish, or raise Rejected with a readable reason."""
     consent = fields.get("consent") or []
@@ -215,6 +265,7 @@ def validate(fields: dict, author: str) -> dict:
         "suites": suites,
         "result": result,
         "at_commit": sha,
+        "kind": parse_kind(str(fields.get("kind", ""))),
         "their_scoping": str(fields.get("their_scoping", "")).strip(),
         "record": record,
         "submitted_by": author,

@@ -18,7 +18,15 @@ and this project follows [Semantic Versioning](https://semver.org/spec/v2.0.0.ht
 
   Statement `schemaVersion` is 3, adding `corpus.lineEndingMismatches` and `corpus.lineEndingsOnly`. The verdict for a byte-exact corpus is unchanged.
 
+- The conformance desk went red on every rejected submission. A rejection leaves the row output empty, and Actions expands a step's `env` block before it applies the step's `if`, so `fromJSON('')` failed the whole workflow template. The submitter still got their comment, which is posted earlier, but the run failed and the steps after it never ran. Emek Can Dogru's issue #612 is the one that surfaced it.
+
 ### Added
+
+- Every conformance row now names what kind of run it was. What a run establishes is a property of who wrote the verifier and who wrote the vectors, not of how well it went, and the three kinds are not degrees of one another. A reproduction is the author's checkers over the author's vectors, and establishes that the artefact runs and is byte-stable somewhere other than the author's machine. An independent implementation from the text, run against the author's vectors, establishes something about the text, because a second reader had to decide what the sentences meant. An independent implementation run against independently constructed vectors establishes something about both.
+
+  A row that does not name its kind reads as the first, because that is the weakest claim available. Rows listed before the field existed carry no kind and are never edited to add one, so the page states the rule rather than backfilling them. The row stores a stable key rather than the form's prose, so rewording the dropdown cannot restate what a published row claimed. `terms_version` is bumped to `2026-08-22`; rows already listed keep the terms they agreed to.
+
+  Joel Hillier proposed this on the SCITT list on 2026-08-21, after Iman Schrock scoped his own row that way with nobody asking him to and Emek Can Dogru filed one carrying it. The loss it prevents happens where a result gets filed: a row outlives the message that explains it, and a register that cannot tell a reproduction from an independent implementation gets cited for the second while holding the first, by someone who is not lying.
 
 - A root `.gitattributes`. The byte-pinned corpus and its goldens are checked out verbatim on every platform, and the rest of the tree normalises to LF, so a fresh clone on Windows holds the published bytes.
 

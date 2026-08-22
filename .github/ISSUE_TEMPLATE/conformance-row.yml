@@ -61,6 +61,21 @@ body:
       placeholder: "9 of 9 and 8 of 8, including the tampered-proof and forked-root negatives"
     validations:
       required: true
+  - type: dropdown
+    id: kind
+    attributes:
+      label: Kind of run
+      description: >
+        What your run establishes, which is a property of who wrote the
+        verifier and who wrote the vectors, not of how well it went. These are
+        not degrees of the same thing. A row that does not name its kind reads
+        as the first one, because that is the weakest claim available.
+      options:
+        - "Reproduction: the author's checkers over the author's vectors"
+        - "Independent implementation from the text, run against the author's vectors"
+        - "Independent implementation run against independently constructed vectors"
+    validations:
+      required: true
   - type: textarea
     id: scoping
     attributes:
@@ -93,8 +108,8 @@ body:
 
         The page at vaara.io/conformance.html is public and indexed. A row
         carries the name you gave above, your affiliation if you gave one, the
-        suites, the commit, the result, your scoping quoted as you wrote it,
-        and a link to your public record.
+        suites, the commit, the result, the kind of run, your scoping quoted as
+        you wrote it, and a link to your public record.
 
         **A row is permanent. It does not come down, and asking will not take
         it down.** This is a record of something that happened, not a list of
