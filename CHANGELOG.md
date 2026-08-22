@@ -6,6 +6,8 @@ and this project follows [Semantic Versioning](https://semver.org/spec/v2.0.0.ht
 
 ## [Unreleased]
 
+## [1.75.0] - 2026-08-22
+
 ### Fixed
 
 - The Vaara Conformance Results terms said the maintainer cannot remove a row because rows are chained. A chain makes a break detectable to someone holding an earlier head. It does not make removal impossible when one operator controls both the file and the published page, who could rewrite the chain and republish it consistently. The claim was wrong, and it sat in the consent form a party agrees through, which is worse than sitting in marketing. Iman Schrock raised it on the SCITT list on 2026-08-21 before filing a row, and he was right to hold it.
