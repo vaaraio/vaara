@@ -50,6 +50,23 @@ The `clean` and `flawed` records are byte copies of the `proper_pair` and
 `mixed_nonconforming` sets from the `record_set_v0` vectors, so their set
 verdict is already independently fixed there.
 
+## Corpus integrity is a precondition
+
+Corpus integrity asks whether the published byte set is present, not whether
+any implementation agrees with SEP-2828. When it fails, the self-test measured
+something other than the published corpus, so the run establishes nothing and
+the statement grades `unproved` rather than `false`. It still gates: only
+`proved` yields CONFORMS, so a corpus that does not verify can never produce a
+pass.
+
+The common cause is local and harmless. Git for Windows installs with
+`core.autocrlf=true` and rewrites every fixture's line endings on checkout,
+which breaks all 32 digests without changing a byte of content. Both this
+checker and `vaara conformance-statement` detect that exactly, by re-hashing
+with the translation undone, and name it instead of reporting a disagreement
+no check observed. This checker exits 77 (SKIP) in that case, because it
+cannot compare goldens against a corpus that is not the published one.
+
 ## Verifying
 
 ```

@@ -6,6 +6,8 @@
       "corpusDigest": "sha256:0baa437da95d6ffb6bda3185d657385b7738c79daba77819acc0c6280ac0ed7a",
       "fileCount": 32,
       "grade": "proved",
+      "lineEndingMismatches": [],
+      "lineEndingsOnly": false,
       "name": "sep2828-execution-record-conformance",
       "problems": [],
       "spec": "SEP-2828",
@@ -23,7 +25,7 @@
       "unreadable": []
     },
     "schema": "sep2828-conformance-statement",
-    "schemaVersion": 2,
+    "schemaVersion": 3,
     "selfTest": {
       "cases": 17,
       "conforms": true,
@@ -56,6 +58,8 @@
       "corpusDigest": "sha256:0baa437da95d6ffb6bda3185d657385b7738c79daba77819acc0c6280ac0ed7a",
       "fileCount": 32,
       "grade": "proved",
+      "lineEndingMismatches": [],
+      "lineEndingsOnly": false,
       "name": "sep2828-execution-record-conformance",
       "problems": [],
       "spec": "SEP-2828",
@@ -82,7 +86,7 @@
       "unreadable": []
     },
     "schema": "sep2828-conformance-statement",
-    "schemaVersion": 2,
+    "schemaVersion": 3,
     "selfTest": {
       "cases": 17,
       "conforms": true,
@@ -115,6 +119,8 @@
       "corpusDigest": "sha256:0baa437da95d6ffb6bda3185d657385b7738c79daba77819acc0c6280ac0ed7a",
       "fileCount": 32,
       "grade": "proved",
+      "lineEndingMismatches": [],
+      "lineEndingsOnly": false,
       "name": "sep2828-execution-record-conformance",
       "problems": [],
       "spec": "SEP-2828",
@@ -139,7 +145,7 @@
       "unreadable": []
     },
     "schema": "sep2828-conformance-statement",
-    "schemaVersion": 2,
+    "schemaVersion": 3,
     "selfTest": {
       "cases": 17,
       "conforms": true,
@@ -172,6 +178,8 @@
       "corpusDigest": "sha256:0baa437da95d6ffb6bda3185d657385b7738c79daba77819acc0c6280ac0ed7a",
       "fileCount": 32,
       "grade": "proved",
+      "lineEndingMismatches": [],
+      "lineEndingsOnly": false,
       "name": "sep2828-execution-record-conformance",
       "problems": [],
       "spec": "SEP-2828",
@@ -181,7 +189,7 @@
     "grade": "proved",
     "records": null,
     "schema": "sep2828-conformance-statement",
-    "schemaVersion": 2,
+    "schemaVersion": 3,
     "selfTest": {
       "cases": 17,
       "conforms": true,
@@ -214,6 +222,8 @@
       "corpusDigest": "sha256:0baa437da95d6ffb6bda3185d657385b7738c79daba77819acc0c6280ac0ed7a",
       "fileCount": 32,
       "grade": "proved",
+      "lineEndingMismatches": [],
+      "lineEndingsOnly": false,
       "name": "sep2828-execution-record-conformance",
       "problems": [],
       "spec": "SEP-2828",
@@ -236,7 +246,7 @@
       ]
     },
     "schema": "sep2828-conformance-statement",
-    "schemaVersion": 2,
+    "schemaVersion": 3,
     "selfTest": {
       "cases": 17,
       "conforms": true,

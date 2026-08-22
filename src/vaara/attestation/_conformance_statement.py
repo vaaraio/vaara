@@ -29,9 +29,19 @@ Every part grades to one of three states rather than a boolean:
 A boolean cannot tell a reader whether a check failed or was never reached, and
 those call for different repairs. ``unproved`` is only ever produced by an
 explicit execution state the runner recorded (a suite it could not place, a
-record file it could not read), never inferred from a primary check that failed.
-Where a run mixes states, the worst one wins: a check that ran and failed
-outranks one that never ran.
+record file it could not read, a corpus whose bytes are not the published set),
+never inferred from a primary check that failed. Where a run mixes states, the
+worst one wins: a check that ran and failed outranks one that never ran.
+
+Corpus integrity is a precondition and grades ``unproved`` when it fails, never
+``false``. It asks whether the published byte set is present, not whether any
+implementation agrees with the spec, so a corpus that does not verify means the
+self-test measured something other than the published corpus and the run
+established nothing. A common cause is entirely benign and local: a Windows
+clone with Git's ``core.autocrlf`` on rewrites every fixture's line endings,
+which breaks every digest without changing a single byte of content. The
+statement detects that case exactly, by re-hashing with the translation undone,
+and names it rather than reporting a disagreement that no check observed.
 
 Deterministic and keyless. There is no clock: an ``as_of`` date is echoed
 verbatim when the caller supplies one and is never read from the system, so the
@@ -54,7 +64,10 @@ from vaara.attestation._record_set_conformance import check_record_set
 from vaara.attestation._record_set_findings import SetFinding
 
 STATEMENT_SCHEMA = "sep2828-conformance-statement"
-STATEMENT_SCHEMA_VERSION = 2
+#: v3 adds ``corpus.lineEndingMismatches`` / ``corpus.lineEndingsOnly`` and
+#: grades an unverified corpus ``unproved`` rather than ``false``. Additive for
+#: readers; the verdict for a byte-exact corpus is unchanged.
+STATEMENT_SCHEMA_VERSION = 3
 
 #: The check ran and the property holds.
 PROVED = "proved"
@@ -98,11 +111,39 @@ class CorpusIntegrity:
     file_count: int
     verified: bool
     problems: tuple[str, ...]
+    #: Files that differ from the manifest only by line endings. Their content
+    #: is the published content; the checkout rewrote the newlines.
+    line_ending_mismatches: tuple[str, ...] = ()
 
     @property
     def grade(self) -> str:
-        """Corpus integrity is always reachable: the bytes are here or they are not."""
-        return PROVED if self.verified else FALSE
+        """``PROVED`` when the bytes match, ``UNPROVED`` when they do not.
+
+        Corpus integrity is a precondition, not a conformance claim. It answers
+        "am I holding the published byte set", and nothing about whether an
+        implementation agrees with SEP-2828. When the bytes on disk are not the
+        published set, the self-test ran against something else, so the run
+        established nothing about conformance to the published corpus.
+
+        That is ``UNPROVED``, not ``FALSE``. Grading it ``FALSE`` would fold a
+        local checkout problem into a verdict that reads as a disagreement with
+        the spec, which is a claim no part of the run observed. The most common
+        cause is exactly that benign: a Windows clone with Git's
+        ``core.autocrlf`` on, which rewrites every fixture's line endings and so
+        breaks every digest while changing no content at all.
+
+        ``UNPROVED`` still gates. A statement conforms only when every in-scope
+        check grades ``PROVED``, so a tampered or mangled corpus can never yield
+        a pass; it yields "cannot tell", which is the honest answer.
+        """
+        return PROVED if self.verified else UNPROVED
+
+    @property
+    def line_endings_only(self) -> bool:
+        """True when line endings explain every problem found."""
+        return bool(self.line_ending_mismatches) and len(self.line_ending_mismatches) == len(
+            [p for p in self.problems if not p.startswith("corpusDigest mismatch")]
+        )
 
     def to_dict(self) -> dict[str, Any]:
         return {
@@ -114,6 +155,8 @@ class CorpusIntegrity:
             "verified": self.verified,
             "grade": self.grade,
             "problems": list(self.problems),
+            "lineEndingMismatches": list(self.line_ending_mismatches),
+            "lineEndingsOnly": self.line_endings_only,
         }
 
 
@@ -301,6 +344,27 @@ def _corpus_digest(files: dict[str, str]) -> str:
     return "sha256:" + hashlib.sha256(blob).hexdigest()
 
 
+def _is_line_ending_only(path: Path, want: str) -> bool:
+    """Does this file match the manifest once its line endings are undone?
+
+    Exact, not a guess: undo the CRLF (and lone-CR) translation a checkout can
+    apply and re-hash. A match means the content is byte for byte the published
+    content and only the newlines were rewritten, which is a property of the
+    working tree rather than of the corpus.
+
+    Never used to pass the integrity check. The digest stays byte-exact; this
+    only lets the statement say which of the two very different things happened.
+    """
+    try:
+        raw = path.read_bytes()
+    except OSError:
+        return False
+    if b"\r" not in raw:
+        return False
+    normalised = raw.replace(b"\r\n", b"\n").replace(b"\r", b"\n")
+    return "sha256:" + hashlib.sha256(normalised).hexdigest() == want
+
+
 def verify_corpus_integrity(corpus_dir: Path, manifest: dict[str, Any]) -> CorpusIntegrity:
     """Confirm the corpus bytes on disk match what its manifest pins.
 
@@ -314,13 +378,21 @@ def verify_corpus_integrity(corpus_dir: Path, manifest: dict[str, Any]) -> Corpu
     got = _file_digests(corpus_dir, suites)
 
     problems: list[str] = []
+    line_endings: list[str] = []
     for rel in sorted(set(want) | set(got)):
         if rel not in got:
             problems.append(f"missing file: {rel}")
         elif rel not in want:
             problems.append(f"unexpected file: {rel}")
         elif want[rel] != got[rel]:
-            problems.append(f"digest mismatch: {rel}")
+            # Separate "this file was changed" from "this checkout rewrote the
+            # newlines". They look identical to a digest and call for opposite
+            # responses, so the statement must not report them with one word.
+            if _is_line_ending_only(corpus_dir / rel, want[rel]):
+                line_endings.append(rel)
+                problems.append(f"line endings changed, content intact: {rel}")
+            else:
+                problems.append(f"digest mismatch: {rel}")
 
     want_corpus = str(manifest.get("corpusDigest", ""))
     got_corpus = _corpus_digest(got)
@@ -335,6 +407,7 @@ def verify_corpus_integrity(corpus_dir: Path, manifest: dict[str, Any]) -> Corpu
         file_count=len(got),
         verified=not problems,
         problems=tuple(problems),
+        line_ending_mismatches=tuple(line_endings),
     )
 
 
@@ -543,9 +616,19 @@ def render_conformance_statement(statement: ConformanceStatement) -> str:
             "and the corpusDigest recomputes."
         )
     else:
-        lines.append(f"NOT verified: {len(c.problems)} problem(s) with the corpus bytes.")
-        for p in c.problems:
-            lines.append(f"- {_safe(p)}")
+        if c.line_endings_only:
+            _render_line_ending_diagnosis(c, lines)
+        else:
+            lines.append(f"NOT verified: {len(c.problems)} problem(s) with the corpus bytes.")
+            for p in c.problems:
+                lines.append(f"- {_safe(p)}")
+            if c.line_ending_mismatches:
+                lines.append("")
+                lines.append(
+                    f"Of these, {len(c.line_ending_mismatches)} differ by line endings "
+                    "only and their content is intact; see the note on "
+                    "`core.autocrlf` in the corpus README."
+                )
     lines.append("")
 
     st = statement.self_test
@@ -556,6 +639,15 @@ def render_conformance_statement(statement: ConformanceStatement) -> str:
         f"This implementation's keyless conformance check {state} "
         f"{st.reproduced} of {st.cases} recorded verdicts."
     )
+    if not c.verified:
+        # Cuts the mirror-image misreading: a clean self-test over bytes that
+        # were never pinned is not a pass against the published corpus either.
+        lines.append("")
+        lines.append(
+            "Read this against the corpus integrity section above: these cases "
+            "came from the files on disk, which did not match the published "
+            "manifest, so the count is not a claim about the published corpus."
+        )
     lines.append("")
     for s in st.suites:
         if not s.runnable:
@@ -576,6 +668,43 @@ def render_conformance_statement(statement: ConformanceStatement) -> str:
     lines.append(_HOW)
     lines.append("")
     return "\n".join(lines)
+
+
+def _render_line_ending_diagnosis(c: CorpusIntegrity, lines: list[str]) -> None:
+    """Say plainly that the checkout rewrote the newlines and nothing else.
+
+    Every one of these files carries the published content. Listing them one by
+    one would repeat a single fact many times and bury it; the count and the
+    cause are what a reader needs, and both are stated exactly.
+    """
+    n = len(c.line_ending_mismatches)
+    lines.append(
+        f"NOT verified: all {n} fixture file{_s(n)} differ from `MANIFEST.json` "
+        "by line endings only, so the corpusDigest does not recompute either. "
+        "The content is the published content, byte for byte, once the newlines "
+        "are undone."
+    )
+    lines.append("")
+    lines.append(
+        "This is a checkout artefact, not a problem with the corpus or with any "
+        "emitter. Git for Windows installs with `core.autocrlf=true`, which "
+        "rewrites LF to CRLF on checkout. The corpus is pinned byte for byte, so "
+        "that translation breaks every digest while changing no content."
+    )
+    lines.append("")
+    lines.append("To check out the corpus verbatim:")
+    lines.append("")
+    lines.append("```")
+    lines.append("git config core.autocrlf false")
+    lines.append("git rm --cached -r .")
+    lines.append("git reset --hard")
+    lines.append("```")
+    lines.append("")
+    lines.append(
+        "Nothing above is a disagreement with SEP-2828. This statement is "
+        "UNPROVED because the published bytes were not present to check "
+        "against, not because a check ran and failed."
+    )
 
 
 def _render_records(r: RecordsResult, lines: list[str]) -> None:

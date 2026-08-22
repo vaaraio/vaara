@@ -44,6 +44,16 @@ when their dependency is absent rather than failing the run. None of these is
 Vaara. The point of the profile is that you run standard public crypto, never
 the producer's stack.
 
+On Windows, check that Git did not rewrite the line endings. The SEP-2828
+corpus is pinned byte for byte, and Git for Windows installs with
+`core.autocrlf=true`, which converts LF to CRLF on checkout and breaks every
+digest without changing any content. The repository's `.gitattributes` prevents
+this on a fresh clone. An older clone is repaired with `git config
+core.autocrlf false`, then `git rm --cached -r .` and `git reset --hard`. The
+`conformance_statement_v0` suite detects the case and reports SKIP with that
+reason, so it is never counted as a failed suite or a disagreement with the
+spec.
+
 ## The one command
 
 Grade the reference corpus from a clean checkout:

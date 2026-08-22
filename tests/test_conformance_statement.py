@@ -221,6 +221,160 @@ def test_extra_file_in_corpus_is_an_integrity_problem(tmp_path):
     assert any("unexpected file" in p for p in statement.corpus.problems)
 
 
+# ── Windows checkout (CRLF) ───────────────────────────────────────────────────
+#
+# Git for Windows installs with core.autocrlf=true, so a plain clone rewrites
+# every fixture's line endings. The corpus is pinned byte for byte, so that
+# breaks all 32 digests without changing a byte of content. Before the fix the
+# statement called that NON-CONFORMING, which reads as "this emitter disagrees
+# with SEP-2828" and is the kind of thing that gets filed as a permanent public
+# conformance row. It is not a disagreement. It is a checkout artefact.
+
+
+def _to_crlf(corpus: Path) -> int:
+    """Do to the corpus what a core.autocrlf=true checkout does."""
+    n = 0
+    for path in sorted(corpus.rglob("*")):
+        if not path.is_file() or "__pycache__" in path.parts:
+            continue
+        raw = path.read_bytes()
+        if b"\r" in raw or b"\n" not in raw or b"\0" in raw:
+            continue
+        path.write_bytes(raw.replace(b"\n", b"\r\n"))
+        n += 1
+    return n
+
+
+def test_windows_checkout_is_unproved_not_a_disagreement(tmp_path):
+    corpus = _copy_corpus(tmp_path / "corpus")
+    assert _to_crlf(corpus) > 0
+    statement = build_conformance_statement(corpus)
+
+    # The implementation still agrees with the spec on every recorded case:
+    # CRLF changes the bytes on disk, not what the records mean.
+    assert statement.self_test.conforms
+    assert statement.self_test.reproduced == statement.self_test.cases
+
+    # So the run establishes nothing, rather than contradicting the spec.
+    assert statement.corpus.grade == "unproved"
+    assert statement.grade == "unproved"
+    assert statement.corpus.line_endings_only
+
+    page = render_conformance_statement(statement)
+    assert "**Statement: UNPROVED**" in page
+    assert "NON-CONFORMING" not in page  # the false-disagreement regression
+    assert "core.autocrlf" in page  # and it names the actual cause
+
+
+def test_mangled_corpus_still_cannot_yield_a_pass(tmp_path):
+    """UNPROVED gates exactly as hard as FALSE did. It is honest, not lenient."""
+    corpus = _copy_corpus(tmp_path / "corpus")
+    _to_crlf(corpus)
+    statement = build_conformance_statement(corpus)
+    assert not statement.conforms
+    assert not statement.corpus.verified
+    rc = main(["conformance-statement", "--corpus", str(corpus)])
+    assert rc == 1
+
+
+def test_line_ending_detection_is_exact_not_a_guess(tmp_path):
+    """A real content edit is never excused as a line-ending artefact.
+
+    The check re-hashes with the translation undone, so only a file whose
+    content is byte for byte the published content can qualify.
+    """
+    corpus = _copy_corpus(tmp_path / "corpus")
+    victim = corpus / "record_set_v0" / "sets" / "clean" / "r1.json"
+    doc = json.loads(victim.read_text())
+    doc["alg"] = "HS256-tampered"
+    victim.write_bytes(json.dumps(doc, indent=2).encode() + b"\r\n")  # CRLF *and* edited
+    statement = build_conformance_statement(corpus)
+    assert not statement.corpus.line_ending_mismatches
+    assert any("digest mismatch" in p for p in statement.corpus.problems)
+    assert not statement.corpus.line_endings_only
+
+
+def test_mangling_plus_tampering_does_not_hide_the_tampering(tmp_path):
+    corpus = _copy_corpus(tmp_path / "corpus")
+    _to_crlf(corpus)
+    victim = corpus / "record_set_v0" / "sets" / "clean" / "r2.json"
+    victim.write_bytes(b'{"not": "the published record"}')
+    statement = build_conformance_statement(corpus)
+    assert not statement.corpus.line_endings_only  # one file is genuinely changed
+    page = render_conformance_statement(statement)
+    assert "digest mismatch: record_set_v0/sets/clean/r2.json" in page
+
+
+def test_standalone_runner_names_line_endings(tmp_path):
+    """The Vaara-free path a third party runs must say the same thing."""
+    corpus = _copy_corpus(tmp_path / "corpus")
+    _to_crlf(corpus)
+    proc = subprocess.run([sys.executable, "run.py", "--verify-manifest"],
+                          cwd=corpus, capture_output=True, text=True)
+    assert proc.returncode == 1
+    assert "line endings, not content" in proc.stdout
+    assert "core.autocrlf" in proc.stdout
+    assert "says nothing about SEP-2828 conformance" in proc.stdout
+
+
+def test_vectors_checker_skips_a_mangled_clone_instead_of_failing(tmp_path):
+    """The symptom a stranger actually reports, and the one that becomes a row.
+
+    This suite compares committed goldens against a fresh derivation from the
+    corpus. On a CRLF clone the derivation runs over bytes that are not the
+    published corpus, so every scenario mismatched and the suite reported 0/5.
+    That reads as Vaara disagreeing with its own vectors and is exactly the kind
+    of thing that gets filed as a permanent public conformance row.
+
+    It must skip with a reason instead. Exit 77 is the profile runner's SKIP
+    contract, and the runner takes the last stderr line as the reason.
+    """
+    shutil.copytree(CORPUS, tmp_path / "conformance" / "sep2828")
+    dst = tmp_path / "tests" / "vectors" / "conformance_statement_v0"
+    shutil.copytree(VECTORS, dst)
+    assert _to_crlf(tmp_path / "conformance") > 0
+
+    proc = subprocess.run([sys.executable, str(dst / "_check_independent.py")],
+                          capture_output=True, text=True)
+    assert proc.returncode == 77, proc.stdout + proc.stderr
+    assert proc.stderr.strip().splitlines()[-1].startswith("SKIP: ")
+    assert "core.autocrlf" in proc.stderr
+    assert "Not a conformance result" in proc.stderr
+    # It must not read as a disagreement.
+    assert "statements match the independent derivation" not in proc.stdout
+
+
+def test_vectors_checker_still_fails_on_real_corpus_tampering(tmp_path):
+    """Only a provably newlines-only difference goes quiet. Tampering stays loud."""
+    shutil.copytree(CORPUS, tmp_path / "conformance" / "sep2828")
+    dst = tmp_path / "tests" / "vectors" / "conformance_statement_v0"
+    shutil.copytree(VECTORS, dst)
+    victim = (tmp_path / "conformance" / "sep2828" / "record_set_v0" / "sets"
+              / "clean" / "r1.json")
+    victim.write_bytes(b'{"tampered": true}')
+
+    proc = subprocess.run([sys.executable, str(dst / "_check_independent.py")],
+                          capture_output=True, text=True)
+    assert proc.returncode == 1, proc.stdout + proc.stderr
+    assert "SKIP" not in proc.stderr
+
+
+def test_gitattributes_checks_the_corpus_out_verbatim():
+    """The root fix: git must never translate the byte-pinned corpus.
+
+    Asserts the effective attribute rather than the file's text, so the guard
+    survives any reshuffle of .gitattributes that keeps the promise.
+    """
+    if not (REPO / ".gitattributes").is_file():
+        pytest.fail(".gitattributes is missing; the corpus is unpinned on Windows")
+    probe = "conformance/sep2828/record_set_v0/sets/clean/r1.json"
+    proc = subprocess.run(["git", "check-attr", "text", "--", probe],
+                          cwd=REPO, capture_output=True, text=True)
+    if proc.returncode != 0:
+        pytest.skip("git unavailable")
+    assert proc.stdout.strip().endswith("text: unset"), proc.stdout
+
+
 # ── CLI ───────────────────────────────────────────────────────────────────────
 
 
