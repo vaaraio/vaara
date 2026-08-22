@@ -168,7 +168,7 @@
     <div class="stat"><b>3</b><span>skipped</span></div>
     <div class="stat"><b>75</b><span>cases</span></div>
   </div>
-  <p class="mono" style="color:var(--faint)">generated 2026-08-22T07:12:46Z</p>
+  <p class="mono" style="color:var(--faint)">generated 2026-08-22T07:41:06Z</p>
 
   <h2>Run it yourself</h2>
   <p>Nothing here needs Vaara installed. The checkers use the standard library
@@ -240,6 +240,20 @@ python scripts/vcr_chain.py            # nothing removed from the table</code></
     which pins the tail for a reader who retained nothing of their own. The
     residual is narrow and real: a row added after the last witnessing carries
     only the chain until the next head is published.</li>
+    <li><strong>Every row names what kind of run it was.</strong> What a run
+    establishes is a property of who wrote the verifier and who wrote the
+    vectors, not of how well it went, and the three are not degrees of one
+    another. A <em>reproduction</em> is the author's checkers over the author's
+    vectors: it establishes that the artefact runs and is byte-stable somewhere
+    other than the author's machine, and nothing about the specification text.
+    An <em>independent implementation from the text</em>, run against the
+    author's vectors, establishes something about the text, because a second
+    reader had to decide what the sentences meant. An <em>independent
+    implementation run against independently constructed vectors</em>
+    establishes something about both. A row that does not name its kind reads
+    as the first, because that is the weakest claim available. Rows listed
+    before this field existed carry no kind and are never edited to add one, so
+    this rule covers them instead.</li>
     <li>Nothing is edited after the fact. A correction is a new row referring
     to the earlier one, never a rewrite of it.</li>
     <li><strong>What an outside suggestion can change.</strong> Wording here
@@ -268,6 +282,7 @@ python scripts/vcr_chain.py            # nothing removed from the table</code></
           </div>
           <p class="result">40 passed, 0 failed, 3 skipped, 49 cases</p>
           <dl>
+            <dt>Kind of run</dt><dd>Not stated. An unstated kind reads as a reproduction, the weakest of the three.</dd>
             <dt>Suites</dt><dd class="mono">acp_checkout_v0, agent_decision_v0, agent_identity_v0, ap2_v0, article12_fold_v0, atlas_threat_v0, attestation_result_v0, audit_summary_v0, authorization_v0, build_bundle_v0, bundle_doc_v0, bundle_set_v0, capability_scope_v0, class_gate_v0, conformance_statement_v0, contiguity_v0, credential_binding_v0, credential_grant_v0, crewai_enforcement_v0, cross_org_handoff_v0, cross_stack_revocation_v0, data_locality_v0, decision_pairing_v0, enforcement_attestation_v0, enforcement_set_v0, evidence_bundle_v0, evidence_ref_v0, execution_receipt_v0, external_evidence_v0, fallback_projection_v0, governance_decision_v0, handoff_set_v0, ingest_v0, key_rotation_v0, normalize_v0, pq_hybrid_v0, qualified_time_v0, record_conformance_v0, record_set_v0, sep2787_attestation_v0, tap_v0, transparency_consistency_v0, x402_settlement_v0</dd>
             <dt>At commit</dt><dd class="mono">cc5df5d2938cb9a26e820c1b8b5ac3b7d398ab1e</dd>
             <dt>Their scoping</dt><dd class="scoping">Ran the independent checkers exactly as documented (git clone, pip install cryptography rfc8785, python scripts/conformance_runner.py) in an isolated venv, no Vaara install. Establishes that the checkers reproduce their own stated verdicts against the shipped case files at this commit. Does not establish interoperability between Vaara&#x27;s proofs and our own (invinoveritas) proof format.</dd>
@@ -288,6 +303,7 @@ python scripts/vcr_chain.py            # nothing removed from the table</code></
           </div>
           <p class="result">45 passed, 0 failed, 1 skipped, 75 cases. Runner exit 0. The skip is `article12_fold_v0` (checker wants a bundle zip argument rather than a bare case directory — structural, not environmental). An earlier same-day run at f0dbf4d8 gave 44/45, 65 cases, 0 failures, before the corpus grew.</p>
           <dl>
+            <dt>Kind of run</dt><dd>Not stated. An unstated kind reads as a reproduction, the weakest of the three.</dd>
             <dt>Suites</dt><dd class="mono">acp_checkout_v0, agent_decision_v0, agent_identity_v0, ap2_v0, article12_fold_v0, atlas_threat_v0, attestation_result_v0, attribute_attestation_v0, attribute_attestation_zk_v0, audit_summary_v0, authorization_v0, build_bundle_v0, bundle_doc_v0, bundle_set_v0, capability_scope_v0, class_gate_v0, conformance_statement_v0, contiguity_v0, credential_binding_v0, credential_grant_v0, crewai_enforcement_v0, cross_org_handoff_v0, cross_stack_revocation_v0, data_locality_v0, decision_pairing_v0, enforcement_attestation_v0, enforcement_set_v0, evidence_bundle_v0, evidence_ref_v0, execution_receipt_v0, external_evidence_v0, fallback_projection_v0, governance_decision_v0, handoff_set_v0, ingest_v0, key_rotation_v0, normalize_v0, pq_hybrid_v0, qualified_time_v0, record_conformance_v0, record_set_v0, release_condition_v0, sep2787_attestation_v0, tap_v0, transparency_consistency_v0, x402_settlement_v0</dd>
             <dt>At commit</dt><dd class="mono">a209864e11fc14f0ac3466dd33d668d9c156208f</dd>
             <dt>Their scoping</dt><dd class="scoping">This is a reproduction of the author-supplied checkers and vectors at commit a209864e. It is not an independent implementation of draft-sirkkavaara-vaara-receipt and not a validation of the specification text. The figures match row #612 at the same commit on a different machine and OS (Linux, Python 3.12, clean venv), making this an independent confirmation of that row&#x27;s byte-stability. pq_hybrid_v0 and qualified_time_v0 ran with their optional dependencies installed rather than skipped.</dd>
