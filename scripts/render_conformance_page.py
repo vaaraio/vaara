@@ -44,6 +44,34 @@ TITLE = "Vaara Conformance Results"
 # another set by an edit they never saw.
 FALLBACK_TERMS_VERSION = "unversioned"
 
+#: What a run establishes: a property of who wrote the verifier and who wrote
+#: the vectors, never of how well the run went. Kept in step with KINDS in
+#: scripts/vcr_row.py, which is what writes the key into a row.
+KIND_TEXT = {
+    "reproduction": "Reproduction: the author's checkers over the author's vectors",
+    "independent_implementation": (
+        "Independent implementation from the text, run against the author's vectors"
+    ),
+    "independent_implementation_and_vectors": (
+        "Independent implementation run against independently constructed vectors"
+    ),
+}
+
+#: Rows listed before the field existed carry no kind. Nothing is ever added to
+#: a published row, so the absence is rendered as what the rule already says it
+#: means rather than backfilled into the row itself.
+KIND_UNSTATED = (
+    "Not stated. An unstated kind reads as a reproduction, the weakest of the three."
+)
+
+
+def kind_text(row: dict) -> str:
+    """The prose for a row's kind, or the rule that covers a row without one."""
+    key = str(row.get("kind", "")).strip()
+    if not key:
+        return KIND_UNSTATED
+    return KIND_TEXT.get(key, KIND_UNSTATED)
+
 # COLOURS. The left cap is #45565E carrying the mark in brand green
 # #78A08A. Brand dark #1A2226 sat there first and it swallowed the gloss: every
 # shields.io badge lays a #bbb gradient at 10% opacity over both plates, and on
@@ -437,6 +465,7 @@ CERTIFICATE_TEMPLATE = """<!doctype html>
   <p class="scoping">{scoping}</p>
 
   <dl>
+    <dt>Kind of run</dt><dd>{kind}</dd>
     <dt>Suites</dt><dd>{suites}</dd>
     <dt>At commit</dt><dd>{at_commit}</dd>
     <dt>Date</dt><dd>{date}</dd>
@@ -479,6 +508,7 @@ def certificate_html(row: dict) -> str:
         party=esc(row.get("party", "")),
         affiliation=esc(row.get("affiliation", "")),
         result=esc(row.get("result", "")),
+        kind=esc(kind_text(row)),
         scoping=esc(scoping),
         suites=esc(", ".join(row.get("suites", []))),
         at_commit=esc(row.get("at_commit", "")),
@@ -562,6 +592,7 @@ def reproduction_blocks(data: dict) -> str:
           </div>
           <p class="result">{esc(r.get('result', ''))}</p>
           <dl>
+            <dt>Kind of run</dt><dd>{esc(kind_text(r))}</dd>
             <dt>Suites</dt><dd class="mono">{esc(suites)}</dd>
             <dt>At commit</dt><dd class="mono">{esc(r.get('at_commit', ''))}</dd>
             <dt>Their scoping</dt><dd class="scoping">{esc(r.get('their_scoping', ''))}</dd>
@@ -820,6 +851,20 @@ python scripts/vcr_chain.py            # nothing removed from the table</code></
     which pins the tail for a reader who retained nothing of their own. The
     residual is narrow and real: a row added after the last witnessing carries
     only the chain until the next head is published.</li>
+    <li><strong>Every row names what kind of run it was.</strong> What a run
+    establishes is a property of who wrote the verifier and who wrote the
+    vectors, not of how well it went, and the three are not degrees of one
+    another. A <em>reproduction</em> is the author's checkers over the author's
+    vectors: it establishes that the artefact runs and is byte-stable somewhere
+    other than the author's machine, and nothing about the specification text.
+    An <em>independent implementation from the text</em>, run against the
+    author's vectors, establishes something about the text, because a second
+    reader had to decide what the sentences meant. An <em>independent
+    implementation run against independently constructed vectors</em>
+    establishes something about both. A row that does not name its kind reads
+    as the first, because that is the weakest claim available. Rows listed
+    before this field existed carry no kind and are never edited to add one, so
+    this rule covers them instead.</li>
     <li>Nothing is edited after the fact. A correction is a new row referring
     to the earlier one, never a rewrite of it.</li>
     <li><strong>What an outside suggestion can change.</strong> Wording here

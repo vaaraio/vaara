@@ -157,12 +157,17 @@ jobs:
           python scripts/conformance_runner.py --json /tmp/report.json
           python scripts/render_conformance_page.py /tmp/report.json webpage/conformance.html
 
+      # `|| '{}'` because a rejected submission leaves `row` empty, and Actions
+      # expands a step's env block before it applies the `if`, so fromJSON('')
+      # failed the whole template. The submitter still got their comment, which
+      # is posted earlier, but the run went red on every rejection and the next
+      # step never ran. Emek Can Dogru's issue #612 is the one that showed it.
       - name: Publish to the vcr branch
         if: steps.decide.outputs.code == '0'
         env:
-          SLUG: ${{ fromJSON(steps.decide.outputs.row).slug }}
-          ID: ${{ fromJSON(steps.decide.outputs.row).id }}
-          PARTY: ${{ fromJSON(steps.decide.outputs.row).party }}
+          SLUG: ${{ fromJSON(steps.decide.outputs.row || '{}').slug }}
+          ID: ${{ fromJSON(steps.decide.outputs.row || '{}').id }}
+          PARTY: ${{ fromJSON(steps.decide.outputs.row || '{}').party }}
         run: |
           set -euo pipefail
           mkdir -p /tmp/vcr/vcr
@@ -193,8 +198,8 @@ jobs:
         if: steps.decide.outputs.code == '0'
         env:
           GH_TOKEN: ${{ github.token }}
-          SLUG: ${{ fromJSON(steps.decide.outputs.row).slug }}
-          ID: ${{ fromJSON(steps.decide.outputs.row).id }}
+          SLUG: ${{ fromJSON(steps.decide.outputs.row || '{}').slug }}
+          ID: ${{ fromJSON(steps.decide.outputs.row || '{}').id }}
         run: |
           gh issue comment "${{ steps.issue.outputs.number }}" --body "$(cat <<EOF
           You are row #${ID} at https://vaara.io/conformance.html

@@ -168,7 +168,7 @@
     <div class="stat"><b>1</b><span>skipped</span></div>
     <div class="stat"><b>75</b><span>cases</span></div>
   </div>
-  <p class="mono" style="color:var(--faint)">generated 2026-08-21T13:17:03Z</p>
+  <p class="mono" style="color:var(--faint)">generated 2026-08-22T07:22:14Z</p>
 
   <h2>Run it yourself</h2>
   <p>Nothing here needs Vaara installed. The checkers use the standard library
@@ -215,7 +215,7 @@ python scripts/vcr_chain.py            # nothing removed from the table</code></
   claim that recomputes from bytes, checkable by someone who trusts neither
   the party nor Vaara.</p>
 
-  <h3>Terms for a listed party, version 2026-08-21</h3>
+  <h3>Terms for a listed party, version 2026-08-22</h3>
   <p class="note">Stated before there is anything to sell, so that anyone
   deciding whether to be listed can read the commercial position at the moment
   they decide rather than learn it afterwards.</p>
@@ -240,6 +240,20 @@ python scripts/vcr_chain.py            # nothing removed from the table</code></
     which pins the tail for a reader who retained nothing of their own. The
     residual is narrow and real: a row added after the last witnessing carries
     only the chain until the next head is published.</li>
+    <li><strong>Every row names what kind of run it was.</strong> What a run
+    establishes is a property of who wrote the verifier and who wrote the
+    vectors, not of how well it went, and the three are not degrees of one
+    another. A <em>reproduction</em> is the author's checkers over the author's
+    vectors: it establishes that the artefact runs and is byte-stable somewhere
+    other than the author's machine, and nothing about the specification text.
+    An <em>independent implementation from the text</em>, run against the
+    author's vectors, establishes something about the text, because a second
+    reader had to decide what the sentences meant. An <em>independent
+    implementation run against independently constructed vectors</em>
+    establishes something about both. A row that does not name its kind reads
+    as the first, because that is the weakest claim available. Rows listed
+    before this field existed carry no kind and are never edited to add one, so
+    this rule covers them instead.</li>
     <li>Nothing is edited after the fact. A correction is a new row referring
     to the earlier one, never a rewrite of it.</li>
     <li><strong>What an outside suggestion can change.</strong> Wording here

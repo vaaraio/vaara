@@ -57,6 +57,10 @@ EMILIA Protocol
 
 9 of 9 and 8 of 8, including the tampered-proof and forked-root negatives
 
+### Kind of run
+
+{kind}
+
 ### Your own scoping
 
 Validates the pinned independent vector lanes.
@@ -79,6 +83,7 @@ def form(**over) -> str:
         "suites": "transparency_consistency_v0, evidence_bundle_v0",
         "commit": HEAD,
         "record": "https://mailarchive.ietf.org/arch/msg/scitt/fE4RYzpmR440PVrZaknTvVKjUoI/",
+        "kind": "Reproduction: the author's checkers over the author's vectors",
         "c1": "X",
         "c2": "X",
         "c3": "X",
@@ -97,6 +102,56 @@ def test_a_complete_form_becomes_a_row():
     assert row["suites"] == ["transparency_consistency_v0", "evidence_bundle_v0"]
     assert row["at_commit"] == HEAD
     assert row["submitted_by"] == "someone"
+
+
+# ── Kind of run ───────────────────────────────────────────────────────────────
+#
+# What a run establishes is a property of who wrote the verifier and who wrote
+# the vectors. A register that cannot tell a reproduction from an independent
+# implementation gets cited for the second while holding the first, and the row
+# outlives the message that would have explained it.
+
+
+@pytest.mark.parametrize(
+    "chosen,key",
+    [
+        ("Reproduction: the author's checkers over the author's vectors",
+         "reproduction"),
+        ("Independent implementation from the text, run against the author's vectors",
+         "independent_implementation"),
+        ("Independent implementation run against independently constructed vectors",
+         "independent_implementation_and_vectors"),
+    ],
+)
+def test_each_kind_reaches_the_row_as_a_stable_key(chosen, key):
+    """The row stores a key, so rewording the form cannot restate a published row."""
+    assert row_from(form(kind=chosen))["kind"] == key
+
+
+@pytest.mark.parametrize("raw", ["", "   ", "something else entirely", "_No response_"])
+def test_an_unnamed_or_unknown_kind_is_never_promoted(raw):
+    """An unnamed kind reads as the weakest claim available, never the strongest."""
+    assert vcr.parse_kind(raw) == "reproduction"
+    assert vcr.DEFAULT_KIND == "reproduction"
+
+
+def test_a_form_with_no_kind_field_still_yields_the_weakest():
+    body = form().replace("### Kind of run", "### Something Else")
+    assert row_from(body)["kind"] == "reproduction"
+
+
+def test_the_page_states_the_rule_for_a_row_that_has_no_kind():
+    """Rows listed before the field existed are never edited to add one."""
+    text = render.kind_text({"id": 1, "party": "Someone"})
+    assert "Not stated" in text
+    assert "reproduction" in text.lower()
+    for key, prose in render.KIND_TEXT.items():
+        assert render.kind_text({"kind": key}) == prose
+
+
+def test_the_two_kind_tables_agree():
+    """vcr_row writes the key; the renderer turns it into prose. Same three."""
+    assert set(vcr.KINDS) == set(render.KIND_TEXT)
 
 
 @pytest.mark.parametrize(
