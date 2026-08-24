@@ -1,0 +1,81 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<title>Vaara Conformance Results, row 3</title>
+<meta name="robots" content="noindex">
+<style>
+  @page { size: A4 landscape; margin: 18mm; }
+  :root { --ink:#1A2226; --green:#78A08A; --faint:#8B9792; --rule:#DEE4E1; }
+  * { box-sizing:border-box; }
+  body {
+    margin:0; padding:28mm 24mm; color:var(--ink); background:#fff;
+    font:16px/1.55 Georgia, "Times New Roman", serif;
+  }
+  .sheet { border:2px solid var(--ink); padding:16mm 18mm; height:100%; }
+  .kicker {
+    font:600 11px/1 ui-sans-serif, system-ui, sans-serif;
+    letter-spacing:.22em; text-transform:uppercase; color:var(--faint);
+  }
+  h1 { font-size:31px; margin:10px 0 2px; letter-spacing:.01em; }
+  .num { color:var(--green); font-weight:700; }
+  .party { font-size:26px; margin:18px 0 2px; }
+  .aff { color:var(--faint); font-size:15px; margin:0; }
+  .claim { margin:16px 0 0; max-width:58ch; }
+  .scoping {
+    margin:12px 0 0; padding-left:12px; border-left:3px solid var(--rule);
+    color:#3d474b; font-style:italic; max-width:62ch;
+  }
+  dl {
+    display:grid; grid-template-columns:auto 1fr; gap:3px 14px;
+    margin:18px 0 0; font:12px/1.5 ui-monospace, SFMono-Regular, Menlo, monospace;
+  }
+  dt { color:var(--faint); }
+  dd { margin:0; word-break:break-all; }
+  footer {
+    margin-top:16px; padding-top:10px; border-top:1px solid var(--rule);
+    font:11px/1.5 ui-sans-serif, system-ui, sans-serif; color:var(--faint);
+    max-width:74ch;
+  }
+  @media print { body { padding:0; } .noprint { display:none; } }
+</style>
+</head>
+<body>
+<div class="sheet">
+  <p class="kicker">Vaara Conformance Results</p>
+  <h1>Independent reproduction <span class="num">#3</span></h1>
+
+  <p class="party">Emek Can Doğru</p>
+  <p class="aff">VERAX TEKNOLOJİ LİMİTED ŞİRKETİ — independent of Vaara</p>
+
+  <p class="claim">ran the independent checkers listed below, from a clean
+  checkout at the commit recorded here, with no Vaara installed, and reported
+  the outcome in public. The result they reported was 45 passed, 0 failed, 1 skipped, 75 cases. Runner exit 0. The skip is `article12_fold_v0`, whose checker validates a passed-in bundle zip rather than a bare case directory — structural, not environmental..</p>
+
+  <p class="scoping">This is a reproduction of the author-supplied checkers and vectors at commit a209864e. It is not an independent implementation of draft-sirkkavaara-vaara-receipt and it is not a validation of the specification text. The checkers importing no Vaara code is what makes the reproduction worth anything; it remains the author&#x27;s corpus grading the author&#x27;s cases. The skip is `article12_fold_v0`, whose checker validates a passed-in bundle zip rather than a bare case directory — structural, not environmental.</p>
+
+  <dl>
+    <dt>Kind of run</dt><dd>Reproduction: the author&#x27;s checkers over the author&#x27;s vectors</dd>
+    <dt>Suites</dt><dd>acp_checkout_v0, agent_decision_v0, agent_identity_v0, ap2_v0, article12_fold_v0, atlas_threat_v0, attestation_result_v0, attribute_attestation_v0, attribute_attestation_zk_v0, audit_summary_v0, authorization_v0, build_bundle_v0, bundle_doc_v0, bundle_set_v0, capability_scope_v0, class_gate_v0, conformance_statement_v0, contiguity_v0, credential_binding_v0, credential_grant_v0, crewai_enforcement_v0, cross_org_handoff_v0, cross_stack_revocation_v0, data_locality_v0, decision_pairing_v0, enforcement_attestation_v0, enforcement_set_v0, evidence_bundle_v0, evidence_ref_v0, execution_receipt_v0, external_evidence_v0, fallback_projection_v0, governance_decision_v0, handoff_set_v0, ingest_v0, key_rotation_v0, normalize_v0, pq_hybrid_v0, qualified_time_v0, record_conformance_v0, record_set_v0, release_condition_v0, sep2787_attestation_v0, tap_v0, transparency_consistency_v0, x402_settlement_v0</dd>
+    <dt>At commit</dt><dd>a209864e11fc14f0ac3466dd33d668d9c156208f</dd>
+    <dt>Date</dt><dd>2026-08-24</dd>
+    <dt>Row digest</dt><dd>sha256:d8cf95879212db9a9a230a86ff45419eeb7db7eef235ef0bac9f5f71288e0773</dd>
+    <dt>Record</dt><dd>https://mailarchive.ietf.org/arch/msg/scitt/wZDSwS77Bb46AZNZ197XkHedNAg/</dd>
+    <dt>Terms</dt><dd>2026-08-21</dd>
+  </dl>
+
+  <footer>
+    This states what those checkers returned on that date at that commit. It is
+    not a certification, it does not say Vaara is compliant with anything, and
+    it does not say the party above endorses Vaara. These vectors have no
+    ratification process behind them and the maintainer decides what a verdict
+    means. Every case recomputes from committed bytes, so anyone may disagree
+    and show their work. This row is a permanent record of a run on a date and
+    is never removed or edited, by anyone, including Vaara. Check this sheet
+    against
+    https://vaara.io/badge/emek-can-dogru.json, whose sha256 is the row digest above.
+  </footer>
+</div>
+</body>
+</html>
