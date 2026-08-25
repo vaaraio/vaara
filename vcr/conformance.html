@@ -4,14 +4,529 @@
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width,initial-scale=1">
 <title>Vaara Conformance Results | Vaara</title>
-<meta name="description" content="Every Vaara conformance suite, its verdict, and every independent party who reproduced the vectors and said so in public. Generated from the runner's own report.">
-<meta name="robots" content="index, follow">
+<meta name="description" content="Every Vaara conformance suite, its verdict, and the 5 named independent parties who have reproduced the vectors and said so in public. Generated from the runner&#x27;s own report.">
+<meta name="author" content="Henri Sirkkavaara">
+<meta name="robots" content="index, follow, max-image-preview:large, max-snippet:-1">
+<meta name="googlebot" content="index, follow">
+<meta name="referrer" content="strict-origin-when-cross-origin">
+<meta name="theme-color" content="#ececec">
 <link rel="canonical" href="https://vaara.io/conformance.html">
 <link rel="icon" type="image/svg+xml" href="/favicon.svg">
+<link rel="alternate icon" href="/favicon.ico">
+<link rel="apple-touch-icon" href="/favicon-180.png">
+<link rel="sitemap" type="application/xml" href="/sitemap.xml">
+<!-- The rows as bytes, for a reader who wants the register rather than the
+     page. Same file the desk published, served next to it. -->
+<link rel="alternate" type="application/json" href="/conformance.json" title="The reproduction register as JSON">
+<link rel="author" href="https://vaara.io/">
 <meta property="og:type" content="website">
+<meta property="og:site_name" content="Vaara">
 <meta property="og:title" content="Vaara Conformance Results">
-<meta property="og:description" content="Every suite, every verdict, every independent reproduction. Recomputable from committed bytes with no Vaara import.">
+<meta property="og:description" content="Every Vaara conformance suite, its verdict, and the 5 named independent parties who have reproduced the vectors and said so in public. Generated from the runner&#x27;s own report.">
 <meta property="og:url" content="https://vaara.io/conformance.html">
+<meta property="og:image" content="https://vaara.io/vaara-wordmark-light.png">
+<meta property="og:image:width" content="1200">
+<meta property="og:image:height" content="346">
+<meta property="og:image:alt" content="Vaara">
+<meta property="og:locale" content="en_US">
+<meta name="twitter:card" content="summary_large_image">
+<meta name="twitter:title" content="Vaara Conformance Results">
+<meta name="twitter:description" content="Every Vaara conformance suite, its verdict, and the 5 named independent parties who have reproduced the vectors and said so in public. Generated from the runner&#x27;s own report.">
+<meta name="twitter:image" content="https://vaara.io/vaara-wordmark-light.png">
+<meta name="twitter:image:alt" content="Vaara">
+<script type="application/ld+json">
+{
+  "@context": "https://schema.org",
+  "@graph": [
+    {
+      "@type": [
+        "WebPage",
+        "CollectionPage"
+      ],
+      "@id": "https://vaara.io/conformance.html",
+      "url": "https://vaara.io/conformance.html",
+      "name": "Vaara Conformance Results",
+      "description": "Every Vaara conformance suite, its verdict, and the 5 named independent parties who have reproduced the vectors and said so in public. Generated from the runner's own report.",
+      "dateModified": "2026-08-25T09:53:57Z",
+      "inLanguage": "en",
+      "isPartOf": {
+        "@id": "https://vaara.io/#website"
+      },
+      "about": {
+        "@id": "https://vaara.io/conformance.html#corpus"
+      },
+      "mainEntity": {
+        "@id": "https://vaara.io/conformance.html#reproductions"
+      },
+      "creator": {
+        "@id": "https://vaara.io/#henri"
+      },
+      "publisher": {
+        "@id": "https://vaara.io/#organization"
+      },
+      "license": "https://www.gnu.org/licenses/agpl-3.0.html"
+    },
+    {
+      "@type": "WebSite",
+      "@id": "https://vaara.io/#website",
+      "name": "Vaara",
+      "url": "https://vaara.io/",
+      "inLanguage": "en"
+    },
+    {
+      "@type": "Organization",
+      "@id": "https://vaara.io/#organization",
+      "name": "Vaara",
+      "url": "https://vaara.io/",
+      "logo": "https://vaara.io/vaara-wordmark-light.png",
+      "founder": {
+        "@id": "https://vaara.io/#henri"
+      }
+    },
+    {
+      "@type": "Person",
+      "@id": "https://vaara.io/#henri",
+      "name": "Henri Sirkkavaara",
+      "url": "https://vaara.io/"
+    },
+    {
+      "@type": "Dataset",
+      "@id": "https://vaara.io/conformance.html#corpus",
+      "name": "Vaara conformance vectors",
+      "alternateName": "Vaara conformance corpus",
+      "description": "Committed case files for every Vaara conformance suite. Each suite ships an independent checker that imports no Vaara code and recomputes its verdicts from the bytes of its own cases, so a stranger can disagree with an expected result and show their work. The vectors are Vaara's own and no ratification body stands behind them.",
+      "url": "https://vaara.io/conformance.html",
+      "dateModified": "2026-08-25T09:53:57Z",
+      "identifier": "https://doi.org/10.5281/zenodo.22027975",
+      "sameAs": [
+        "https://doi.org/10.5281/zenodo.22027975",
+        "https://github.com/vaaraio/vaara"
+      ],
+      "citation": "https://doi.org/10.5281/zenodo.22027975",
+      "license": "https://www.gnu.org/licenses/agpl-3.0.html",
+      "isAccessibleForFree": true,
+      "creator": {
+        "@id": "https://vaara.io/#henri"
+      },
+      "publisher": {
+        "@id": "https://vaara.io/#organization"
+      },
+      "inLanguage": "en",
+      "keywords": [
+        "conformance vectors",
+        "independent reproduction",
+        "tamper-evident audit trail",
+        "execution receipt",
+        "SCITT",
+        "EU AI Act Article 12",
+        "accountable autonomy"
+      ],
+      "measurementTechnique": "Each suite is graded by its own checker, which imports no Vaara code and recomputes every verdict from the committed bytes of its case files.",
+      "variableMeasured": [
+        {
+          "@type": "PropertyValue",
+          "name": "suites",
+          "value": 46
+        },
+        {
+          "@type": "PropertyValue",
+          "name": "passed",
+          "value": 43
+        },
+        {
+          "@type": "PropertyValue",
+          "name": "failed",
+          "value": 0
+        },
+        {
+          "@type": "PropertyValue",
+          "name": "skipped",
+          "value": 3
+        },
+        {
+          "@type": "PropertyValue",
+          "name": "cases passed",
+          "value": 75
+        },
+        {
+          "@type": "PropertyValue",
+          "name": "independent reproductions listed",
+          "value": 5
+        }
+      ],
+      "distribution": [
+        {
+          "@type": "DataDownload",
+          "name": "The reproduction register, as published",
+          "encodingFormat": "application/json",
+          "contentUrl": "https://vaara.io/conformance.json"
+        },
+        {
+          "@type": "DataDownload",
+          "name": "The vectors and their checkers, in the repository",
+          "encodingFormat": "text/plain",
+          "contentUrl": "https://github.com/vaaraio/vaara/tree/main/tests/vectors"
+        }
+      ]
+    },
+    {
+      "@type": "ItemList",
+      "@id": "https://vaara.io/conformance.html#reproductions",
+      "name": "Independent reproductions of the Vaara conformance vectors",
+      "description": "Parties other than the maintainer who ran the checkers and reported the outcome in public. Each entry records a run on a date at a commit. It is not a certification, it does not say Vaara is compliant with anything, and it does not say the party endorses Vaara.",
+      "itemListOrder": "https://schema.org/ItemListOrderAscending",
+      "numberOfItems": 5,
+      "itemListElement": [
+        {
+          "@type": "ListItem",
+          "position": 1,
+          "item": {
+            "@id": "https://vaara.io/conformance.html#row-1"
+          }
+        },
+        {
+          "@type": "ListItem",
+          "position": 2,
+          "item": {
+            "@id": "https://vaara.io/conformance.html#row-2"
+          }
+        },
+        {
+          "@type": "ListItem",
+          "position": 3,
+          "item": {
+            "@id": "https://vaara.io/conformance.html#row-3"
+          }
+        },
+        {
+          "@type": "ListItem",
+          "position": 4,
+          "item": {
+            "@id": "https://vaara.io/conformance.html#row-4"
+          }
+        },
+        {
+          "@type": "ListItem",
+          "position": 5,
+          "item": {
+            "@id": "https://vaara.io/conformance.html#row-5"
+          }
+        }
+      ]
+    },
+    {
+      "@type": "Report",
+      "@id": "https://vaara.io/conformance.html#row-1",
+      "url": "https://vaara.io/conformance.html#row-1",
+      "reportNumber": "1",
+      "name": "Vaara Conformance Results row 1: babyblueviper1 (invinoveritas)",
+      "author": "babyblueviper1 (invinoveritas)",
+      "datePublished": "2026-08-19",
+      "inLanguage": "en",
+      "publisher": {
+        "@id": "https://vaara.io/#organization"
+      },
+      "about": {
+        "@id": "https://vaara.io/conformance.html#corpus"
+      },
+      "isPartOf": {
+        "@id": "https://vaara.io/conformance.html#reproductions"
+      },
+      "abstract": "40 passed, 0 failed, 3 skipped, 49 cases",
+      "disambiguatingDescription": "Not stated. An unstated kind reads as a reproduction, the weakest of the three.",
+      "identifier": {
+        "@type": "PropertyValue",
+        "propertyID": "sha256",
+        "value": "2682d581d86fc18156386c716c38d9c63ea34264ecb2dc31938ae30d20a55693",
+        "url": "https://vaara.io/badge/babyblueviper1-invinoveritas.json"
+      },
+      "image": "https://vaara.io/badge/babyblueviper1-invinoveritas.svg",
+      "additionalProperty": [
+        {
+          "@type": "PropertyValue",
+          "name": "affiliation, as the party stated it",
+          "value": "invinoveritas"
+        },
+        {
+          "@type": "PropertyValue",
+          "name": "kind of run",
+          "value": "Not stated. An unstated kind reads as a reproduction, the weakest of the three."
+        },
+        {
+          "@type": "PropertyValue",
+          "name": "at commit",
+          "propertyID": "git-commit",
+          "value": "cc5df5d2938cb9a26e820c1b8b5ac3b7d398ab1e"
+        },
+        {
+          "@type": "PropertyValue",
+          "name": "suites run",
+          "value": 43
+        },
+        {
+          "@type": "PropertyValue",
+          "name": "listed under terms version",
+          "value": "2026-08-15"
+        }
+      ],
+      "text": "Ran the independent checkers exactly as documented (git clone, pip install cryptography rfc8785, python scripts/conformance_runner.py) in an isolated venv, no Vaara install. Establishes that the checkers reproduce their own stated verdicts against the shipped case files at this commit. Does not establish interoperability between Vaara's proofs and our own (invinoveritas) proof format.",
+      "citation": {
+        "@type": "CreativeWork",
+        "name": "The party's own public record",
+        "url": "https://github.com/crewAIInc/crewAI/issues/4877#issuecomment-5339555715"
+      }
+    },
+    {
+      "@type": "Report",
+      "@id": "https://vaara.io/conformance.html#row-2",
+      "url": "https://vaara.io/conformance.html#row-2",
+      "reportNumber": "2",
+      "name": "Vaara Conformance Results row 2: Nenad Vasic / Elara Protocol",
+      "author": "Nenad Vasic / Elara Protocol",
+      "datePublished": "2026-08-21",
+      "inLanguage": "en",
+      "publisher": {
+        "@id": "https://vaara.io/#organization"
+      },
+      "about": {
+        "@id": "https://vaara.io/conformance.html#corpus"
+      },
+      "isPartOf": {
+        "@id": "https://vaara.io/conformance.html#reproductions"
+      },
+      "abstract": "45 passed, 0 failed, 1 skipped, 75 cases. Runner exit 0. The skip is `article12_fold_v0` (checker wants a bundle zip argument rather than a bare case directory — structural, not environmental). An earlier same-day run at f0dbf4d8 gave 44/45, 65 cases, 0 failures, before the corpus grew.",
+      "disambiguatingDescription": "Not stated. An unstated kind reads as a reproduction, the weakest of the three.",
+      "identifier": {
+        "@type": "PropertyValue",
+        "propertyID": "sha256",
+        "value": "79e05e18a3214b9ada4bcf31ce25141640982b461a4fe655a14017f1f410bb33",
+        "url": "https://vaara.io/badge/nenad-vasic-elara-protocol.json"
+      },
+      "image": "https://vaara.io/badge/nenad-vasic-elara-protocol.svg",
+      "additionalProperty": [
+        {
+          "@type": "PropertyValue",
+          "name": "affiliation, as the party stated it",
+          "value": "Elara Protocol — AI-agent-maintained (disclosed), independent of Vaara"
+        },
+        {
+          "@type": "PropertyValue",
+          "name": "kind of run",
+          "value": "Not stated. An unstated kind reads as a reproduction, the weakest of the three."
+        },
+        {
+          "@type": "PropertyValue",
+          "name": "at commit",
+          "propertyID": "git-commit",
+          "value": "a209864e11fc14f0ac3466dd33d668d9c156208f"
+        },
+        {
+          "@type": "PropertyValue",
+          "name": "suites run",
+          "value": 46
+        },
+        {
+          "@type": "PropertyValue",
+          "name": "listed under terms version",
+          "value": "2026-08-21"
+        }
+      ],
+      "text": "This is a reproduction of the author-supplied checkers and vectors at commit a209864e. It is not an independent implementation of draft-sirkkavaara-vaara-receipt and not a validation of the specification text. The figures match row #612 at the same commit on a different machine and OS (Linux, Python 3.12, clean venv), making this an independent confirmation of that row's byte-stability. pq_hybrid_v0 and qualified_time_v0 ran with their optional dependencies installed rather than skipped.",
+      "citation": {
+        "@type": "CreativeWork",
+        "name": "The party's own public record",
+        "url": "https://mailarchive.ietf.org/arch/msg/scitt/HOKZT8J06zB3JaNxOfAEasNty1Q/"
+      }
+    },
+    {
+      "@type": "Report",
+      "@id": "https://vaara.io/conformance.html#row-3",
+      "url": "https://vaara.io/conformance.html#row-3",
+      "reportNumber": "3",
+      "name": "Vaara Conformance Results row 3: Emek Can Doğru",
+      "author": "Emek Can Doğru",
+      "datePublished": "2026-08-24",
+      "inLanguage": "en",
+      "publisher": {
+        "@id": "https://vaara.io/#organization"
+      },
+      "about": {
+        "@id": "https://vaara.io/conformance.html#corpus"
+      },
+      "isPartOf": {
+        "@id": "https://vaara.io/conformance.html#reproductions"
+      },
+      "abstract": "45 passed, 0 failed, 1 skipped, 75 cases. Runner exit 0. The skip is `article12_fold_v0`, whose checker validates a passed-in bundle zip rather than a bare case directory — structural, not environmental.",
+      "disambiguatingDescription": "Reproduction: the author's checkers over the author's vectors",
+      "identifier": {
+        "@type": "PropertyValue",
+        "propertyID": "sha256",
+        "value": "d8cf95879212db9a9a230a86ff45419eeb7db7eef235ef0bac9f5f71288e0773",
+        "url": "https://vaara.io/badge/emek-can-dogru.json"
+      },
+      "image": "https://vaara.io/badge/emek-can-dogru.svg",
+      "additionalProperty": [
+        {
+          "@type": "PropertyValue",
+          "name": "affiliation, as the party stated it",
+          "value": "VERAX TEKNOLOJİ LİMİTED ŞİRKETİ — independent of Vaara"
+        },
+        {
+          "@type": "PropertyValue",
+          "name": "kind of run",
+          "value": "Reproduction: the author's checkers over the author's vectors"
+        },
+        {
+          "@type": "PropertyValue",
+          "name": "at commit",
+          "propertyID": "git-commit",
+          "value": "a209864e11fc14f0ac3466dd33d668d9c156208f"
+        },
+        {
+          "@type": "PropertyValue",
+          "name": "suites run",
+          "value": 46
+        },
+        {
+          "@type": "PropertyValue",
+          "name": "listed under terms version",
+          "value": "2026-08-21"
+        }
+      ],
+      "text": "This is a reproduction of the author-supplied checkers and vectors at commit a209864e. It is not an independent implementation of draft-sirkkavaara-vaara-receipt and it is not a validation of the specification text. The checkers importing no Vaara code is what makes the reproduction worth anything; it remains the author's corpus grading the author's cases. The skip is `article12_fold_v0`, whose checker validates a passed-in bundle zip rather than a bare case directory — structural, not environmental.",
+      "citation": {
+        "@type": "CreativeWork",
+        "name": "The party's own public record",
+        "url": "https://mailarchive.ietf.org/arch/msg/scitt/wZDSwS77Bb46AZNZ197XkHedNAg/"
+      }
+    },
+    {
+      "@type": "Report",
+      "@id": "https://vaara.io/conformance.html#row-4",
+      "url": "https://vaara.io/conformance.html#row-4",
+      "reportNumber": "4",
+      "name": "Vaara Conformance Results row 4: Council of AI",
+      "author": "Council of AI",
+      "datePublished": "2026-08-25",
+      "inLanguage": "en",
+      "publisher": {
+        "@id": "https://vaara.io/#organization"
+      },
+      "about": {
+        "@id": "https://vaara.io/conformance.html#corpus"
+      },
+      "isPartOf": {
+        "@id": "https://vaara.io/conformance.html#reproductions"
+      },
+      "abstract": "43 passed, 0 failed, 3 skipped, 75 cases",
+      "disambiguatingDescription": "Reproduction: the author's checkers over the author's vectors",
+      "identifier": {
+        "@type": "PropertyValue",
+        "propertyID": "sha256",
+        "value": "a28173bb93fd61540ec2ef0f73a39e6ada107f7bc23b561b2d6992eddffa41c6",
+        "url": "https://vaara.io/badge/council-of-ai.json"
+      },
+      "image": "https://vaara.io/badge/council-of-ai.svg",
+      "additionalProperty": [
+        {
+          "@type": "PropertyValue",
+          "name": "affiliation, as the party stated it",
+          "value": "Independent AI measurement body — councilof.ai (CSOAI)"
+        },
+        {
+          "@type": "PropertyValue",
+          "name": "kind of run",
+          "value": "Reproduction: the author's checkers over the author's vectors"
+        },
+        {
+          "@type": "PropertyValue",
+          "name": "at commit",
+          "propertyID": "git-commit",
+          "value": "9fefe51a61f16dc13cd64ca8ca4b8792e48fb64b"
+        },
+        {
+          "@type": "PropertyValue",
+          "name": "suites run",
+          "value": 46
+        },
+        {
+          "@type": "PropertyValue",
+          "name": "listed under terms version",
+          "value": "2026-08-21"
+        }
+      ],
+      "text": "Reproduction of author-supplied checkers at the pinned commit, macOS arm64 / Python 3.14.6, clean venv. Validates the pinned independent vector lanes. Does not establish hosted-service interoperability, official SCITT conformance, or an independent implementation.",
+      "citation": {
+        "@type": "CreativeWork",
+        "name": "The party's own public record",
+        "url": "https://github.com/CSOAI-ORG/councilof-ai/blob/conformance-runs/docs/conformance-runs/vaara-sep2828-2026-08-25.md"
+      }
+    },
+    {
+      "@type": "Report",
+      "@id": "https://vaara.io/conformance.html#row-5",
+      "url": "https://vaara.io/conformance.html#row-5",
+      "reportNumber": "5",
+      "name": "Vaara Conformance Results row 5: Iman Schrock",
+      "author": "Iman Schrock",
+      "datePublished": "2026-08-25",
+      "inLanguage": "en",
+      "publisher": {
+        "@id": "https://vaara.io/#organization"
+      },
+      "about": {
+        "@id": "https://vaara.io/conformance.html#corpus"
+      },
+      "isPartOf": {
+        "@id": "https://vaara.io/conformance.html#reproductions"
+      },
+      "abstract": "41 passed, 0 failed, 3 skipped, 57 cases. Skips: `article12_fold_v0` (bundle zip required), `pq_hybrid_v0` (optional `dilithium_py` missing), and `qualified_time_v0` (optional `asn1crypto` missing). `release_condition_v0` passed 8/8.",
+      "disambiguatingDescription": "Reproduction: the author's checkers over the author's vectors",
+      "identifier": {
+        "@type": "PropertyValue",
+        "propertyID": "sha256",
+        "value": "34d77df3e24ddb6d9aba843c27f4635a4cfbd859dd89f263f8dd69dc8b5849db",
+        "url": "https://vaara.io/badge/iman-schrock.json"
+      },
+      "image": "https://vaara.io/badge/iman-schrock.svg",
+      "additionalProperty": [
+        {
+          "@type": "PropertyValue",
+          "name": "affiliation, as the party stated it",
+          "value": "EMILIA Protocol"
+        },
+        {
+          "@type": "PropertyValue",
+          "name": "kind of run",
+          "value": "Reproduction: the author's checkers over the author's vectors"
+        },
+        {
+          "@type": "PropertyValue",
+          "name": "at commit",
+          "propertyID": "git-commit",
+          "value": "62a7080b7c854173c7d6b8ee51ce4dd724d59227"
+        },
+        {
+          "@type": "PropertyValue",
+          "name": "suites run",
+          "value": 44
+        },
+        {
+          "@type": "PropertyValue",
+          "name": "listed under terms version",
+          "value": "2026-08-21"
+        }
+      ],
+      "text": "This is a reproduction of the author-supplied checkers and vectors, not an independent implementation or validation of the specification text.",
+      "citation": {
+        "@type": "CreativeWork",
+        "name": "The party's own public record",
+        "url": "https://mailarchive.ietf.org/arch/msg/scitt/I5mdtYRinS-wjrnbwCnyXwwvrjU/"
+      }
+    }
+  ]
+}
+</script>
 <style>
   :root {
     color-scheme: light;
@@ -88,6 +603,12 @@
   .repro-head{display:flex;flex-wrap:wrap;gap:12px;align-items:baseline;margin-bottom:8px}
   .repro-head .who{font-weight:600}
   .repro-head .aff{color:var(--faint);font-size:13px}
+  /* The row number is the citable handle for a row, so it links to its own
+     anchor instead of sitting there as a label. Somebody arguing about one
+     party's run can point at that run rather than at the whole table. */
+  .repro-head .num{border:0;color:var(--tri-bright)}
+  .repro-head .num:hover{border-bottom:1px solid var(--tri)}
+  .repro:target{border-color:var(--tri)}
   .repro .result{margin:0 0 12px}
   dl{display:grid;grid-template-columns:auto 1fr;gap:5px 16px;margin:0;font-size:13px}
   dt{font-family:var(--mono);font-size:10.5px;letter-spacing:.14em;text-transform:uppercase;
@@ -168,7 +689,7 @@
     <div class="stat"><b>3</b><span>skipped</span></div>
     <div class="stat"><b>75</b><span>cases</span></div>
   </div>
-  <p class="mono" style="color:var(--faint)">generated 2026-08-25T08:10:31Z</p>
+  <p class="mono" style="color:var(--faint)">generated 2026-08-25T09:53:57Z</p>
 
   <h2>Run it yourself</h2>
   <p>Nothing here needs Vaara installed. The checkers use the standard library
@@ -273,9 +794,9 @@ python scripts/vcr_chain.py            # nothing removed from the table</code></
     listed under, and a change is never applied backwards.</li>
   </ul>
 
-        <article class="repro">
+        <article class="repro" id="row-1">
           <div class="repro-head">
-            <span class="num mono">#1</span>
+            <a class="num mono" href="#row-1">#1</a>
             <span class="date mono">2026-08-19</span>
             <span class="who">babyblueviper1 (invinoveritas)</span>
             <span class="aff">invinoveritas</span>
@@ -294,9 +815,9 @@ python scripts/vcr_chain.py            # nothing removed from the table</code></
           </dl>
         </article>
 
-        <article class="repro">
+        <article class="repro" id="row-2">
           <div class="repro-head">
-            <span class="num mono">#2</span>
+            <a class="num mono" href="#row-2">#2</a>
             <span class="date mono">2026-08-21</span>
             <span class="who">Nenad Vasic / Elara Protocol</span>
             <span class="aff">Elara Protocol — AI-agent-maintained (disclosed), independent of Vaara</span>
@@ -315,9 +836,9 @@ python scripts/vcr_chain.py            # nothing removed from the table</code></
           </dl>
         </article>
 
-        <article class="repro">
+        <article class="repro" id="row-3">
           <div class="repro-head">
-            <span class="num mono">#3</span>
+            <a class="num mono" href="#row-3">#3</a>
             <span class="date mono">2026-08-24</span>
             <span class="who">Emek Can Doğru</span>
             <span class="aff">VERAX TEKNOLOJİ LİMİTED ŞİRKETİ — independent of Vaara</span>
@@ -336,9 +857,9 @@ python scripts/vcr_chain.py            # nothing removed from the table</code></
           </dl>
         </article>
 
-        <article class="repro">
+        <article class="repro" id="row-4">
           <div class="repro-head">
-            <span class="num mono">#4</span>
+            <a class="num mono" href="#row-4">#4</a>
             <span class="date mono">2026-08-25</span>
             <span class="who">Council of AI</span>
             <span class="aff">Independent AI measurement body — councilof.ai (CSOAI)</span>
@@ -357,9 +878,9 @@ python scripts/vcr_chain.py            # nothing removed from the table</code></
           </dl>
         </article>
 
-        <article class="repro">
+        <article class="repro" id="row-5">
           <div class="repro-head">
-            <span class="num mono">#5</span>
+            <a class="num mono" href="#row-5">#5</a>
             <span class="date mono">2026-08-25</span>
             <span class="who">Iman Schrock</span>
             <span class="aff">EMILIA Protocol</span>
