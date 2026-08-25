@@ -6,6 +6,8 @@ and this project follows [Semantic Versioning](https://semver.org/spec/v2.0.0.ht
 
 ## [Unreleased]
 
+## [1.76.0] - 2026-08-25
+
 ### Added
 
 - The conformance results page ships structured data. The corpus is described as a `Dataset` that carries its concept DOI, its license and the live suite totals. Every listed reproduction becomes a `Report` credited to the party who made the claim, with a link to their own public record and the sha256 of the row it commits to. Every row also gets a stable anchor, so a single run can be cited on its own.
