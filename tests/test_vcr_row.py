@@ -117,6 +117,9 @@ def test_a_complete_form_becomes_a_row():
     [
         ("Reproduction: the author's checkers over the author's vectors",
          "reproduction"),
+        ("Construction reproduction: a published construction derived from its prose "
+         "alone, without running the author's verifier",
+         "construction_reproduction"),
         ("Independent implementation from the text, run against the author's vectors",
          "independent_implementation"),
         ("Independent implementation run against independently constructed vectors",
@@ -133,6 +136,54 @@ def test_an_unnamed_or_unknown_kind_is_never_promoted(raw):
     """An unnamed kind reads as the weakest claim available, never the strongest."""
     assert vcr.parse_kind(raw) == "reproduction"
     assert vcr.DEFAULT_KIND == "reproduction"
+
+
+def test_a_construction_reproduction_does_not_fall_through_to_reproduction():
+    """The fourth kind's wording carries the third's word, and order keeps them apart.
+
+    A construction reproduction asks whether the prose was sufficient to derive
+    a published value. A reproduction asks whether the author's own checker runs
+    elsewhere. Filing the first as the second would record a claim about the
+    text as a claim about an artefact, in a row that cannot be edited later.
+    """
+    for phrasing in (
+        "Construction reproduction: a published construction derived from its prose "
+        "alone, without running the author's verifier",
+        "construction reproduction",
+        "CONSTRUCTION REPRODUCTION of the class digest",
+    ):
+        assert vcr.parse_kind(phrasing) == "construction_reproduction"
+
+
+def test_the_issue_form_offers_exactly_the_kinds_the_register_knows():
+    """The dropdown a submitter reads and the table a row is stored against.
+
+    Nothing bound these together, so a kind added to the table without a form
+    option was unreachable, and a reworded option would have parsed as the
+    weakest kind and filed a quieter claim than the submitter picked. Both fail
+    silently, and a row cannot be edited afterwards.
+    """
+    # Read without PyYAML. It ships in the `yaml` extra, so importing it here
+    # would error this test out on every job that does not install that extra,
+    # which is the fault #622 fixed. A guard that skips on most runs is not a
+    # guard, and the block being read is a flat list of quoted strings.
+    text = (ROOT / ".github" / "ISSUE_TEMPLATE" / "conformance-row.yml").read_text(
+        encoding="utf-8"
+    )
+    block = re.search(
+        r"^(?P<indent> +)options:\n(?P<items>(?:(?P=indent) +- .*\n)+)",
+        text,
+        re.MULTILINE,
+    )
+    assert block, "the kind dropdown has no options block"
+    options = [
+        re.sub(r'^\s*- +"?|"?\s*$', "", line)
+        for line in block.group("items").splitlines()
+    ]
+    assert [vcr.parse_kind(o) for o in options] == list(vcr.KINDS), (
+        f"the form's options no longer map one-to-one onto KINDS, in order.\n"
+        f"form: {options}\nkinds: {list(vcr.KINDS)}"
+    )
 
 
 def test_a_form_with_no_kind_field_still_yields_the_weakest():
