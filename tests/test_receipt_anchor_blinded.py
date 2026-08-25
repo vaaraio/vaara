@@ -251,8 +251,19 @@ def test_a_blinded_qualified_anchor_still_renders_as_qualified(receipt, tmp_path
 
 
 def test_the_server_anchorer_reads_the_blind_switch(monkeypatch):
-    """Construction does no network I/O, so this only reads the switch."""
-    from vaara.server.anchor import Anchorer
+    """Construction does no network I/O, so this only reads the switch.
+
+    Guarded because `vaara.server.anchor` imports the app, which needs fastapi.
+    Without the guard this fails rather than skips on any checkout that has the
+    signing extras and not the server extra, which is exactly what the "Signing
+    extras" CI job installs. Main has been red on that job since 2026-08-21,
+    when the blind switch shipped in v1.74.0, through four releases, and it did
+    not show up locally because a development venv has fastapi.
+    """
+    try:
+        from vaara.server.anchor import Anchorer
+    except ImportError:
+        pytest.skip("server extra not installed (pip install 'vaara[server]')")
 
     url = "https://qtsp.example/tsr"
     monkeypatch.delenv("VAARA_ANCHOR_BLIND", raising=False)
