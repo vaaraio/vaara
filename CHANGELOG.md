@@ -6,6 +6,18 @@ and this project follows [Semantic Versioning](https://semver.org/spec/v2.0.0.ht
 
 ## [Unreleased]
 
+### Added
+
+- The conformance results page ships structured data. The corpus is described as a `Dataset` that carries its concept DOI, its license and the live suite totals. Every listed reproduction becomes a `Report` credited to the party who made the claim, with a link to their own public record and the sha256 of the row it commits to. Every row also gets a stable anchor, so a single run can be cited on its own.
+
+  Nothing in the block is typed as a review, a rating or a certification. No party is typed as a person or a company either. The register records a party name and does not record which of the two it is, and the listed parties are a mix of both plus a pseudonym, so a type here would be a guess published as data. Tests cover both rules.
+
+- `webpage/verify.html` carried a title in its head and nothing more. It now has a description, a canonical URL, link preview tags and structured data, including a `WebApplication` node for the verifier and a `HowTo` whose closing step is the page's own sentence about what a passing signature does not establish.
+
+- `https://vaara.io/conformance.json` publishes the whole register as one file. Single rows were already served as canonical bytes under `/badge/<slug>.json`, while the table as a whole was only reachable by scraping the page.
+
+- `scripts/stamp_site.py` fills `llms.txt`, `sitemap.xml` and the register from the rows being published. Rows land on the `vcr` branch and the site is built from main, so all three described rows they could not see. `llms.txt` did not mention the results register at all. The sitemap reported the conformance page unchanged since 2026-08-15 under `changefreq weekly`, while three rows had landed in that window. Dates now come from git, or from the `vcr` branch for the page published from it.
+
 ## [1.75.0] - 2026-08-22
 
 ### Fixed

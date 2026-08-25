@@ -155,6 +155,179 @@ def test_page_is_linked_from_the_site():
 
 
 # ---------------------------------------------------------------------------
+# Structured data.
+#
+# Five named third parties reproducing the corpus is the strongest thing the
+# project has, and it only compounds if a machine can tell that is what it is
+# looking at. A rendered table is not that. These hold the machine-readable
+# copy to the same rule the visible page is held to: it says what the checkers
+# and the rows say, and it never says more.
+# ---------------------------------------------------------------------------
+
+
+def structured_data(page: str) -> dict:
+    """The one ld+json block on the page, parsed. Fails loudly if it is not."""
+    blocks = re.findall(
+        r'<script type="application/ld\+json">\n(.*?)\n</script>', page, re.S
+    )
+    assert len(blocks) == 1, f"expected one ld+json block, found {len(blocks)}"
+    return json.loads(blocks[0])
+
+
+def by_type(graph: list, wanted: str) -> list:
+    return [n for n in graph if wanted in (n["@type"] if isinstance(n["@type"], list) else [n["@type"]])]
+
+
+SYNTHETIC_ROWS = {
+    "terms_version": "2026-08-21",
+    "reproductions": [
+        {
+            "id": 1,
+            "slug": "someone-else",
+            "date": "2026-08-19",
+            "terms_version": "2026-08-21",
+            "prev": "sha256:" + "0" * 64,
+            "party": "Someone Else",
+            "affiliation": "Some Lab",
+            "suites": ["agent_decision_v0", "record_set_v0"],
+            "result": "2 passed, 0 failed, 0 skipped, 4 cases",
+            "at_commit": "a" * 40,
+            "kind": "reproduction",
+            "their_scoping": "Ran the checkers, nothing more.",
+            "record": "https://example.org/their-post",
+        },
+        {
+            "id": 2,
+            "slug": "no-kind-stated",
+            "date": "2026-08-20",
+            "terms_version": "2026-08-15",
+            "prev": "sha256:" + "1" * 64,
+            "party": "Older Row",
+            "affiliation": "",
+            "suites": ["agent_decision_v0"],
+            "result": "1 passed, 0 failed, 0 skipped, 1 case",
+            "at_commit": "b" * 40,
+            "their_scoping": "Listed before the kind field existed.",
+            "record": "https://example.org/older",
+        },
+    ],
+}
+
+FAKE_REPORT = {
+    "generated_at": "2026-08-25T09:14:04Z",
+    "totals": {"suites": 46, "passed": 45, "failed": 0, "skipped": 1, "cases_passed": 75},
+    "suites": [{"suite": "agent_decision_v0", "status": "PASS", "reason": ""}],
+}
+
+
+def test_the_committed_page_carries_parseable_structured_data():
+    structured_data(PAGE.read_text(encoding="utf-8"))
+
+
+def test_the_corpus_is_described_with_the_real_totals():
+    graph = structured_data(PAGE.read_text(encoding="utf-8"))["@graph"]
+    dataset = by_type(graph, "Dataset")
+    assert len(dataset) == 1, "the corpus is not described as a Dataset"
+    measured = {v["name"]: v["value"] for v in dataset[0]["variableMeasured"]}
+    page = PAGE.read_text(encoding="utf-8")
+    for key in ("suites", "passed", "failed", "skipped"):
+        assert measured[key] == page_count(page, key), (
+            f"structured data says {key}={measured[key]} while the page shows "
+            f"{page_count(page, key)}. The two are generated from one report and "
+            "must not be able to disagree."
+        )
+
+
+def test_the_corpus_carries_its_doi_and_licence():
+    """The citation path a reader needs is in the data, not only in the prose."""
+    dataset = by_type(structured_data(PAGE.read_text(encoding="utf-8"))["@graph"], "Dataset")[0]
+    assert "10.5281/zenodo.22027975" in dataset["identifier"]
+    assert dataset["license"].endswith("agpl-3.0.html")
+
+
+def test_every_row_gets_a_node_an_anchor_and_a_citable_digest():
+    pytest.importorskip("rfc8785")
+    module = renderer()
+    page = module.render(FAKE_REPORT, SYNTHETIC_ROWS)
+    graph = structured_data(page)["@graph"]
+    reports = by_type(graph, "Report")
+    assert len(reports) == len(SYNTHETIC_ROWS["reproductions"])
+    for row, node in zip(SYNTHETIC_ROWS["reproductions"], reports):
+        anchor = f'id="row-{row["id"]}"'
+        assert anchor in page, f"row {row['id']} has no anchor, so it cannot be cited"
+        assert node["@id"].endswith(f"#row-{row['id']}")
+        assert node["citation"]["url"] == row["record"]
+        assert node["identifier"]["value"] == module.row_digest(row).removeprefix("sha256:")
+        assert node["identifier"]["url"].endswith(f"/badge/{row['slug']}.json")
+
+
+def test_a_row_is_never_typed_as_a_review_a_rating_or_a_certification():
+    """The page spends three paragraphs saying it is none of those.
+
+    The structured copy is what a machine reads instead of those paragraphs, so
+    a `Review` or an `aggregateRating` here would quietly assert exactly what
+    the visible page refuses to.
+    """
+    pytest.importorskip("rfc8785")
+    data = structured_data(renderer().render(FAKE_REPORT, SYNTHETIC_ROWS))
+    blob = json.dumps(data)
+    for banned in ("Review", "aggregateRating", "ratingValue", "Certification"):
+        assert banned not in blob, f"structured data claims {banned!r}"
+    # And it says so outright, where a reader of the data alone will find it.
+    listed = by_type(data["@graph"], "ItemList")[0]["description"]
+    assert "not a certification" in listed
+    assert "does not say the party endorses Vaara" in listed
+
+
+def test_a_party_is_never_given_a_type_the_register_does_not_record():
+    """The rows record a party name, not whether it is a person or a company.
+
+    The listed parties are a mix of both plus a pseudonym. Typing them would
+    write a guess into the machine-readable copy of a page whose argument is
+    that nothing on it is guessed.
+    """
+    pytest.importorskip("rfc8785")
+    graph = structured_data(renderer().render(FAKE_REPORT, SYNTHETIC_ROWS))["@graph"]
+    for node in by_type(graph, "Report"):
+        assert isinstance(node["author"], str), (
+            f"row {node['reportNumber']} types its party as {node['author']}"
+        )
+
+
+def test_an_unstated_kind_is_carried_as_the_weakest_claim():
+    """Row 2 has no kind. The rule the page states has to reach the data too."""
+    pytest.importorskip("rfc8785")
+    graph = structured_data(renderer().render(FAKE_REPORT, SYNTHETIC_ROWS))["@graph"]
+    older = [n for n in by_type(graph, "Report") if n["reportNumber"] == "2"][0]
+    assert "weakest of the three" in older["disambiguatingDescription"]
+
+
+def test_the_description_counts_the_rows_rather_than_claiming_them():
+    module = renderer()
+    assert "5 named independent parties" in module.page_description(
+        {"reproductions": [{"id": i} for i in range(5)]}
+    )
+    assert "1 named independent party" in module.page_description(
+        {"reproductions": [{"id": 1}]}
+    )
+    none_yet = module.page_description({"reproductions": []})
+    assert "every independent party" in none_yet and "0" not in none_yet
+
+
+def test_nothing_can_close_the_script_element_early():
+    """Party names and scoping come off a submitted issue form."""
+    pytest.importorskip("rfc8785")
+    hostile = json.loads(json.dumps(SYNTHETIC_ROWS))
+    hostile["reproductions"][0]["party"] = "</script><script>alert(1)</script>"
+    page = renderer().render(FAKE_REPORT, hostile)
+    block = re.search(
+        r'<script type="application/ld\+json">\n(.*?)\n</script>', page, re.S
+    ).group(1)
+    assert "</script" not in block
+    assert json.loads(block), "escaping broke the JSON"
+
+
+# ---------------------------------------------------------------------------
 # Badge geometry.
 #
 # The badge is the only part of this work that travels: it gets pasted into

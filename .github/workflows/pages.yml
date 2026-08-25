@@ -8,6 +8,9 @@ on:
     branches: [main]
     paths:
       - 'webpage/**'
+      # llms.txt, the sitemap and the register are filled in at publish time,
+      # so a change to what they say is a change to the site.
+      - 'scripts/stamp_site.py'
       - '.github/workflows/pages.yml'
   workflow_dispatch:
 
@@ -28,7 +31,12 @@ jobs:
       name: github-pages
       url: ${{ steps.deployment.outputs.page_url }}
     steps:
+      # Full history, because the sitemap's `lastmod` dates are read out of git
+      # rather than typed. A shallow checkout has one commit, so every page the
+      # tip did not touch would report no date and keep a stale one.
       - uses: actions/checkout@9c091bb21b7c1c1d1991bb908d89e4e9dddfe3e0  # v7.0.0
+        with:
+          fetch-depth: 0
       # Conformance rows arrive by issue form and land on the unprotected `vcr`
       # branch, so nobody needs write access, a fork or a pull request to get
       # onto the results table. Overlay them here at publish time. If the
@@ -36,11 +44,18 @@ jobs:
       - name: Overlay conformance rows and badges
         run: |
           set -euo pipefail
+          echo "rows=conformance/reproductions.json" >> "$GITHUB_ENV"
           if git ls-remote --exit-code --heads origin vcr >/dev/null 2>&1; then
             git fetch --depth 1 origin vcr
             git --work-tree=/tmp checkout FETCH_HEAD -- vcr || true
             if [ -f /tmp/vcr/conformance.html ]; then
               cp /tmp/vcr/conformance.html webpage/conformance.html
+              # The published page's own history is on that branch, not in this
+              # checkout, so its sitemap date has to come from there too.
+              echo "conformance_date=$(git log -1 --format=%cs FETCH_HEAD)" >> "$GITHUB_ENV"
+            fi
+            if [ -f /tmp/vcr/reproductions.json ]; then
+              echo "rows=/tmp/vcr/reproductions.json" >> "$GITHUB_ENV"
             fi
             if [ -d /tmp/vcr/badge ]; then
               rm -rf webpage/badge
@@ -50,6 +65,19 @@ jobs:
           else
             echo "no vcr branch yet, publishing the committed page"
           fi
+      # Three files on main describe rows that live on another branch: llms.txt,
+      # sitemap.xml, and the whole register as one file. They are filled in from
+      # the rows that are actually being published, so none of them can claim a
+      # reproduction the overlaid page does not show. Stdlib and git only, so
+      # the runner's own python3 is enough and there is nothing to install.
+      - name: Stamp llms.txt, the sitemap and the register
+        run: |
+          set -euo pipefail
+          # An empty --conformance-date means "no vcr branch", and the script
+          # falls back to this checkout's own history for that page.
+          python3 scripts/stamp_site.py \
+            --rows "${rows}" \
+            --conformance-date "${conformance_date:-}"
       - uses: actions/configure-pages@983d7736d9b0ae728b81ab479565c72886d7745b  # v5
       - uses: actions/upload-pages-artifact@fc324d3547104276b827a68afc52ff2a11cc49c9  # v5.0.0
         with:

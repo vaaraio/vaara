@@ -24,6 +24,41 @@ Each is checkable at the link:
 - Vaara appears in the industry acknowledgements of Singapore IMDA's Model AI Governance Framework for Agentic AI v1.5 (20 May 2026). An acknowledgement of the project, not an advisory role.
 - Subject of an AMD AI Developer Program testimonial (May 2026). A testimonial about his work. He is not and has never been employed by AMD.
 
+<!-- generated: conformance register, by scripts/stamp_site.py -->
+## Conformance results
+
+Vaara publishes a results register: every conformance suite, its verdict,
+and every party other than the maintainer who ran the checkers and reported
+the outcome in public. Each suite ships an independent checker that imports
+no Vaara code and recomputes its verdicts from the bytes of its own case
+files, so a stranger can disagree with an expected result and show their work.
+
+- [Conformance results](https://vaara.io/conformance.html): the register as a page, generated from the runner's own report
+- [conformance.json](https://vaara.io/conformance.json): the same register as one machine-readable file
+- [Row request form](https://github.com/vaaraio/vaara/issues/new?template=conformance-row.yml): open to anyone who ran the checkers, free, no approval step
+- Concept DOI for the corpus: [10.5281/zenodo.22027975](https://doi.org/10.5281/zenodo.22027975)
+
+What a row is, stated exactly. It records that a named party ran the checkers
+at a commit on a date and said so somewhere public. It is not a certification,
+it does not say Vaara is compliant with anything, and it does not say the party
+endorses Vaara. The vectors are Vaara's own and no ratification body stands
+behind them, which is a real limit on any neutrality claim. Rows are permanent
+and chained, and each published head is recorded in a public transparency log
+the maintainer does not operate.
+
+Every row names what kind of run it was, because what a run establishes is a
+property of who wrote the verifier and who wrote the vectors rather than of how
+well the run went. A reproduction is the author's checkers over the author's
+vectors. An independent implementation from the text, run against the author's
+vectors, establishes something about the text. An independent implementation run
+against independently constructed vectors establishes something about both. A row
+that does not name its kind reads as the first, the weakest of the three.
+
+No independent reproduction is recorded yet. A row appears when someone
+other than the maintainer runs the checkers, reports the result somewhere
+public, and asks to be listed.
+<!-- end generated -->
+
 ## Repo and packages
 - [GitHub source](https://github.com/vaaraio/vaara): code, releases, issue tracker
 - [PyPI](https://pypi.org/project/vaara/): `pip install vaara`

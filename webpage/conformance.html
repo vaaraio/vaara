@@ -4,14 +4,183 @@
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width,initial-scale=1">
 <title>Vaara Conformance Results | Vaara</title>
-<meta name="description" content="Every Vaara conformance suite, its verdict, and every independent party who reproduced the vectors and said so in public. Generated from the runner's own report.">
-<meta name="robots" content="index, follow">
+<meta name="description" content="Every Vaara conformance suite, its verdict, and every independent party who reproduced the vectors and said so in public. Generated from the runner&#x27;s own report.">
+<meta name="author" content="Henri Sirkkavaara">
+<meta name="robots" content="index, follow, max-image-preview:large, max-snippet:-1">
+<meta name="googlebot" content="index, follow">
+<meta name="referrer" content="strict-origin-when-cross-origin">
+<meta name="theme-color" content="#ececec">
 <link rel="canonical" href="https://vaara.io/conformance.html">
 <link rel="icon" type="image/svg+xml" href="/favicon.svg">
+<link rel="alternate icon" href="/favicon.ico">
+<link rel="apple-touch-icon" href="/favicon-180.png">
+<link rel="sitemap" type="application/xml" href="/sitemap.xml">
+<!-- The rows as bytes, for a reader who wants the register rather than the
+     page. Same file the desk published, served next to it. -->
+<link rel="alternate" type="application/json" href="/conformance.json" title="The reproduction register as JSON">
+<link rel="author" href="https://vaara.io/">
 <meta property="og:type" content="website">
+<meta property="og:site_name" content="Vaara">
 <meta property="og:title" content="Vaara Conformance Results">
-<meta property="og:description" content="Every suite, every verdict, every independent reproduction. Recomputable from committed bytes with no Vaara import.">
+<meta property="og:description" content="Every Vaara conformance suite, its verdict, and every independent party who reproduced the vectors and said so in public. Generated from the runner&#x27;s own report.">
 <meta property="og:url" content="https://vaara.io/conformance.html">
+<meta property="og:image" content="https://vaara.io/vaara-wordmark-light.png">
+<meta property="og:image:width" content="1200">
+<meta property="og:image:height" content="346">
+<meta property="og:image:alt" content="Vaara">
+<meta property="og:locale" content="en_US">
+<meta name="twitter:card" content="summary_large_image">
+<meta name="twitter:title" content="Vaara Conformance Results">
+<meta name="twitter:description" content="Every Vaara conformance suite, its verdict, and every independent party who reproduced the vectors and said so in public. Generated from the runner&#x27;s own report.">
+<meta name="twitter:image" content="https://vaara.io/vaara-wordmark-light.png">
+<meta name="twitter:image:alt" content="Vaara">
+<script type="application/ld+json">
+{
+  "@context": "https://schema.org",
+  "@graph": [
+    {
+      "@type": [
+        "WebPage",
+        "CollectionPage"
+      ],
+      "@id": "https://vaara.io/conformance.html",
+      "url": "https://vaara.io/conformance.html",
+      "name": "Vaara Conformance Results",
+      "description": "Every Vaara conformance suite, its verdict, and every independent party who reproduced the vectors and said so in public. Generated from the runner's own report.",
+      "dateModified": "2026-08-25T09:14:04Z",
+      "inLanguage": "en",
+      "isPartOf": {
+        "@id": "https://vaara.io/#website"
+      },
+      "about": {
+        "@id": "https://vaara.io/conformance.html#corpus"
+      },
+      "mainEntity": {
+        "@id": "https://vaara.io/conformance.html#reproductions"
+      },
+      "creator": {
+        "@id": "https://vaara.io/#henri"
+      },
+      "publisher": {
+        "@id": "https://vaara.io/#organization"
+      },
+      "license": "https://www.gnu.org/licenses/agpl-3.0.html"
+    },
+    {
+      "@type": "WebSite",
+      "@id": "https://vaara.io/#website",
+      "name": "Vaara",
+      "url": "https://vaara.io/",
+      "inLanguage": "en"
+    },
+    {
+      "@type": "Organization",
+      "@id": "https://vaara.io/#organization",
+      "name": "Vaara",
+      "url": "https://vaara.io/",
+      "logo": "https://vaara.io/vaara-wordmark-light.png",
+      "founder": {
+        "@id": "https://vaara.io/#henri"
+      }
+    },
+    {
+      "@type": "Person",
+      "@id": "https://vaara.io/#henri",
+      "name": "Henri Sirkkavaara",
+      "url": "https://vaara.io/"
+    },
+    {
+      "@type": "Dataset",
+      "@id": "https://vaara.io/conformance.html#corpus",
+      "name": "Vaara conformance vectors",
+      "alternateName": "Vaara conformance corpus",
+      "description": "Committed case files for every Vaara conformance suite. Each suite ships an independent checker that imports no Vaara code and recomputes its verdicts from the bytes of its own cases, so a stranger can disagree with an expected result and show their work. The vectors are Vaara's own and no ratification body stands behind them.",
+      "url": "https://vaara.io/conformance.html",
+      "dateModified": "2026-08-25T09:14:04Z",
+      "identifier": "https://doi.org/10.5281/zenodo.22027975",
+      "sameAs": [
+        "https://doi.org/10.5281/zenodo.22027975",
+        "https://github.com/vaaraio/vaara"
+      ],
+      "citation": "https://doi.org/10.5281/zenodo.22027975",
+      "license": "https://www.gnu.org/licenses/agpl-3.0.html",
+      "isAccessibleForFree": true,
+      "creator": {
+        "@id": "https://vaara.io/#henri"
+      },
+      "publisher": {
+        "@id": "https://vaara.io/#organization"
+      },
+      "inLanguage": "en",
+      "keywords": [
+        "conformance vectors",
+        "independent reproduction",
+        "tamper-evident audit trail",
+        "execution receipt",
+        "SCITT",
+        "EU AI Act Article 12",
+        "accountable autonomy"
+      ],
+      "measurementTechnique": "Each suite is graded by its own checker, which imports no Vaara code and recomputes every verdict from the committed bytes of its case files.",
+      "variableMeasured": [
+        {
+          "@type": "PropertyValue",
+          "name": "suites",
+          "value": 46
+        },
+        {
+          "@type": "PropertyValue",
+          "name": "passed",
+          "value": 45
+        },
+        {
+          "@type": "PropertyValue",
+          "name": "failed",
+          "value": 0
+        },
+        {
+          "@type": "PropertyValue",
+          "name": "skipped",
+          "value": 1
+        },
+        {
+          "@type": "PropertyValue",
+          "name": "cases passed",
+          "value": 75
+        },
+        {
+          "@type": "PropertyValue",
+          "name": "independent reproductions listed",
+          "value": 0
+        }
+      ],
+      "distribution": [
+        {
+          "@type": "DataDownload",
+          "name": "The reproduction register, as published",
+          "encodingFormat": "application/json",
+          "contentUrl": "https://vaara.io/conformance.json"
+        },
+        {
+          "@type": "DataDownload",
+          "name": "The vectors and their checkers, in the repository",
+          "encodingFormat": "text/plain",
+          "contentUrl": "https://github.com/vaaraio/vaara/tree/main/tests/vectors"
+        }
+      ]
+    },
+    {
+      "@type": "ItemList",
+      "@id": "https://vaara.io/conformance.html#reproductions",
+      "name": "Independent reproductions of the Vaara conformance vectors",
+      "description": "Parties other than the maintainer who ran the checkers and reported the outcome in public. Each entry records a run on a date at a commit. It is not a certification, it does not say Vaara is compliant with anything, and it does not say the party endorses Vaara.",
+      "itemListOrder": "https://schema.org/ItemListOrderAscending",
+      "numberOfItems": 0,
+      "itemListElement": []
+    }
+  ]
+}
+</script>
 <style>
   :root {
     color-scheme: light;
@@ -88,6 +257,12 @@
   .repro-head{display:flex;flex-wrap:wrap;gap:12px;align-items:baseline;margin-bottom:8px}
   .repro-head .who{font-weight:600}
   .repro-head .aff{color:var(--faint);font-size:13px}
+  /* The row number is the citable handle for a row, so it links to its own
+     anchor instead of sitting there as a label. Somebody arguing about one
+     party's run can point at that run rather than at the whole table. */
+  .repro-head .num{border:0;color:var(--tri-bright)}
+  .repro-head .num:hover{border-bottom:1px solid var(--tri)}
+  .repro:target{border-color:var(--tri)}
   .repro .result{margin:0 0 12px}
   dl{display:grid;grid-template-columns:auto 1fr;gap:5px 16px;margin:0;font-size:13px}
   dt{font-family:var(--mono);font-size:10.5px;letter-spacing:.14em;text-transform:uppercase;
@@ -168,7 +343,7 @@
     <div class="stat"><b>1</b><span>skipped</span></div>
     <div class="stat"><b>75</b><span>cases</span></div>
   </div>
-  <p class="mono" style="color:var(--faint)">generated 2026-08-22T07:22:14Z</p>
+  <p class="mono" style="color:var(--faint)">generated 2026-08-25T09:14:04Z</p>
 
   <h2>Run it yourself</h2>
   <p>Nothing here needs Vaara installed. The checkers use the standard library

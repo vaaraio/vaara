@@ -23,6 +23,138 @@
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
 <title>Explore the Vaara Resin: verify any autonomous-action receipt</title>
+<meta name="description" content="Vaara Resin is the chain of autonomous-action receipts. Check a receipt here in your own tab, with no upload and no account, or look one up in the public transparency log. The verifier imports no Vaara code and still works with the network off.">
+<meta name="author" content="Henri Sirkkavaara">
+<meta name="robots" content="index, follow, max-image-preview:large, max-snippet:-1">
+<meta name="googlebot" content="index, follow">
+<meta name="referrer" content="strict-origin-when-cross-origin">
+<meta name="theme-color" content="#ececec">
+<link rel="canonical" href="https://vaara.io/verify.html">
+<link rel="icon" type="image/svg+xml" href="/favicon.svg">
+<link rel="alternate icon" href="/favicon.ico">
+<link rel="apple-touch-icon" href="/favicon-180.png">
+<link rel="sitemap" type="application/xml" href="/sitemap.xml">
+<link rel="author" href="https://vaara.io/">
+<meta property="og:type" content="website">
+<meta property="og:site_name" content="Vaara">
+<meta property="og:title" content="Explore the Vaara Resin">
+<meta property="og:description" content="Check any autonomous-action receipt in your own browser. Nothing is uploaded, so the page learns nothing about you and you do not have to trust whoever served it.">
+<meta property="og:url" content="https://vaara.io/verify.html">
+<meta property="og:image" content="https://vaara.io/vaara-wordmark-light.png">
+<meta property="og:image:width" content="1200">
+<meta property="og:image:height" content="346">
+<meta property="og:image:alt" content="Vaara">
+<meta property="og:locale" content="en_US">
+<meta name="twitter:card" content="summary_large_image">
+<meta name="twitter:title" content="Explore the Vaara Resin">
+<meta name="twitter:description" content="Check any autonomous-action receipt in your own browser. Nothing is uploaded, so the page learns nothing about you and you do not have to trust whoever served it.">
+<meta name="twitter:image" content="https://vaara.io/vaara-wordmark-light.png">
+<meta name="twitter:image:alt" content="Vaara">
+<!--
+  The page restated as data. A crawler or a model arriving here sees a text box
+  and a table and has to guess what they are for, which is how a verifier that
+  runs entirely in the reader's own tab ends up indexed as a marketing page.
+  Every claim below is one this file already makes further down, and the two
+  are edited together or not at all.
+-->
+<script type="application/ld+json">
+{
+  "@context": "https://schema.org",
+  "@graph": [
+    {
+      "@type": ["WebPage", "CollectionPage"],
+      "@id": "https://vaara.io/verify.html",
+      "url": "https://vaara.io/verify.html",
+      "name": "Explore the Vaara Resin",
+      "description": "Vaara Resin is the chain of autonomous-action receipts: every allow, escalate and deny an agent produced, hash-chained so a removed one stops reconciling. This page checks a receipt in the reader's own browser and looks up published heads in a public transparency log.",
+      "inLanguage": "en",
+      "isPartOf": {"@id": "https://vaara.io/#website"},
+      "mainEntity": {"@id": "https://vaara.io/verify.html#verifier"},
+      "creator": {"@id": "https://vaara.io/#henri"},
+      "publisher": {"@id": "https://vaara.io/#organization"},
+      "license": "https://www.gnu.org/licenses/agpl-3.0.html"
+    },
+    {
+      "@type": "WebSite",
+      "@id": "https://vaara.io/#website",
+      "name": "Vaara",
+      "url": "https://vaara.io/",
+      "inLanguage": "en"
+    },
+    {
+      "@type": "Organization",
+      "@id": "https://vaara.io/#organization",
+      "name": "Vaara",
+      "url": "https://vaara.io/",
+      "logo": "https://vaara.io/vaara-wordmark-light.png",
+      "founder": {"@id": "https://vaara.io/#henri"}
+    },
+    {
+      "@type": "Person",
+      "@id": "https://vaara.io/#henri",
+      "name": "Henri Sirkkavaara",
+      "url": "https://vaara.io/"
+    },
+    {
+      "@type": "WebApplication",
+      "@id": "https://vaara.io/verify.html#verifier",
+      "name": "Vaara Resin explorer and receipt verifier",
+      "url": "https://vaara.io/verify.html",
+      "applicationCategory": "SecurityApplication",
+      "applicationSubCategory": "Signature and audit-trail verification",
+      "operatingSystem": "Any",
+      "browserRequirements": "A browser with WebCrypto Ed25519. No install, no build step, no dependencies.",
+      "isAccessibleForFree": true,
+      "offers": {
+        "@type": "Offer",
+        "price": "0",
+        "priceCurrency": "EUR"
+      },
+      "license": "https://www.gnu.org/licenses/agpl-3.0.html",
+      "author": {"@id": "https://vaara.io/#henri"},
+      "publisher": {"@id": "https://vaara.io/#organization"},
+      "featureList": [
+        "Recomputes the DSSE pre-authentication encoding and takes its digest",
+        "Checks the Ed25519 signature with WebCrypto, in the reader's own tab",
+        "Uploads nothing, so the page learns nothing about the reader",
+        "Keeps working with the network off, saved as a single file",
+        "Looks up published chain heads by receipt digest, entry digest or public key",
+        "Imports no Vaara code, so producer and verifier share no implementation"
+      ],
+      "softwareHelp": "https://github.com/vaaraio/vaara",
+      "sameAs": "https://github.com/vaaraio/vaara"
+    },
+    {
+      "@type": "HowTo",
+      "@id": "https://vaara.io/verify.html#how-to-check-a-receipt",
+      "name": "Check a Vaara receipt without trusting whoever produced it",
+      "description": "The receipt never leaves the browser. Everything runs locally, so no party has to be trusted for the answer to mean something.",
+      "totalTime": "PT1M",
+      "tool": {"@id": "https://vaara.io/verify.html#verifier"},
+      "step": [
+        {
+          "@type": "HowToStep",
+          "position": 1,
+          "name": "Paste the receipt",
+          "text": "Drop the receipt into the box on this page. It is read in your tab and is not uploaded anywhere."
+        },
+        {
+          "@type": "HowToStep",
+          "position": 2,
+          "name": "The signature is checked locally",
+          "text": "The DSSE pre-authentication encoding is recomputed, its digest taken, and the Ed25519 signature checked with WebCrypto."
+        },
+        {
+          "@type": "HowToStep",
+          "position": 3,
+          "name": "Read what it does and does not establish",
+          "text": "A passing signature proves the payload is byte-identical to what the holder of that key signed. It says nothing about whether the key belongs to who you think, or whether the statement is true. Pin the public key from a source the signer does not control before treating a pass as meaningful."
+        }
+      ]
+    }
+  ]
+}
+</script>
 <style>
   /* Same tokens as vaara.io/index.html so this reads as one site. */
   :root {
