@@ -196,6 +196,50 @@ def test_a_whole_corpus_claim_has_to_match_the_corpus():
         row_from(form(suites=f"all {n - 1} suites"))
 
 
+#: A commit whose corpus is smaller than the one on the branch today. Iman
+#: Schrock ran here, and the runner at this commit prints `all 44 suites`.
+HISTORICAL_COMMIT = "62a7080b7c854173c7d6b8ee51ce4dd724d59227"
+
+
+def _has_commit(sha: str) -> bool:
+    return subprocess.run(
+        ["git", "cat-file", "-e", f"{sha}^{{commit}}"],
+        cwd=ROOT, capture_output=True,
+    ).returncode == 0
+
+
+@pytest.mark.skipif(
+    not _has_commit(HISTORICAL_COMMIT),
+    reason="shallow clone cannot see the tree at that commit",
+)
+def test_the_corpus_size_is_read_at_the_commit_the_row_is_scoped_to():
+    """A row over 44 suites at a 44-suite commit is not a claim about 46.
+
+    Issue #618, 2026-08-24. The corpus grew from 44 to 46, this validator
+    resolved the count against the working tree, and an honest row became
+    impossible to file. `all 44 suites` was refused for not being 46, and the
+    rejection told the submitter to rerun at the commit they were listing and
+    use the link it prints, which is exactly what produced the 44. Naming the
+    suites instead does not help either: the field caps at 200 characters and
+    the 44 names come to 802. The only remaining path was to relabel the run as
+    46, and Iman Schrock refused to do that, correctly.
+    """
+    at_commit = vcr.known_suites(HISTORICAL_COMMIT)
+    today = vcr.known_suites()
+    assert at_commit, "no suites resolved at the historical commit"
+    assert len(at_commit) < len(today), (
+        "this test needs a commit whose corpus is smaller than today's; "
+        f"got {len(at_commit)} then and {len(today)} now"
+    )
+
+    row = row_from(form(suites=f"all {len(at_commit)} suites", commit=HISTORICAL_COMMIT))
+    assert row["suites"] == sorted(at_commit)
+
+    # And today's count is the wrong claim for that commit, in both directions.
+    with pytest.raises(vcr.Rejected, match="suites"):
+        row_from(form(suites=f"all {len(today)} suites", commit=HISTORICAL_COMMIT))
+
+
 def test_prose_around_the_suites_is_still_refused():
     """Liberal enough for the tool's output, not for a hand-written paragraph."""
     n = len(vcr.known_suites())

@@ -137,7 +137,50 @@ def commit_exists(sha: str) -> bool:
         return False
 
 
-def known_suites() -> set[str]:
+#: Path to the vector directory as git spells it, for `git ls-tree`.
+VECTORS_IN_TREE = "tests/vectors"
+
+
+def known_suites(at_commit: str | None = None) -> set[str]:
+    """The suite names, at a commit if one is given, else in the working tree.
+
+    Resolving against the working tree was the only behaviour until 2026-08-25,
+    and it made an honest historical row impossible to file. A row is scoped to
+    the commit it ran at, which is the whole reason the field exists, so a run
+    over the 44 suites that existed at 62a7080 was being measured against the 46
+    on the branch today and refused. The rejection then told the submitter to
+    rerun at the commit they were listing and use the link it prints, which is
+    exactly what they had done: the runner at that commit prints `all 44
+    suites`, and this function refused it. The instruction contradicted itself.
+
+    Naming the suites individually is not a way round it either. FIELD_LIMITS
+    caps `suites` at 200 characters and the 44 names come to 802, which the
+    comment on WHOLE_CORPUS below already says.
+
+    So the only path through was to relabel a 44-suite run as 46, and Iman
+    Schrock refused to do that and said so on issue #618. He was right. A
+    register built to record what people actually got must never be the reason
+    somebody restates their run.
+    """
+    if at_commit:
+        try:
+            out = subprocess.run(
+                ["git", "ls-tree", "--name-only", f"{at_commit}:{VECTORS_IN_TREE}"],
+                cwd=REPO,
+                check=True,
+                capture_output=True,
+                text=True,
+            ).stdout
+            names = {line.strip().rstrip("/") for line in out.splitlines() if line.strip()}
+            if names:
+                return names
+            # An empty listing means the path did not exist at that commit.
+            # Fall through rather than accept a row against nothing.
+        except (subprocess.CalledProcessError, FileNotFoundError):
+            # A shallow clone cannot see the tree at an old commit. Better to
+            # fall back to the working tree than to refuse a row for a reason
+            # that is about our checkout depth and not about their run.
+            pass
     return {p.name for p in VECTORS.iterdir() if p.is_dir()} if VECTORS.exists() else set()
 
 
@@ -148,14 +191,14 @@ def known_suites() -> set[str]:
 WHOLE_CORPUS = re.compile(r"^all\s+(\d+)\s+suites$", re.IGNORECASE)
 
 
-def parse_suites(raw: str) -> list[str]:
+def parse_suites(raw: str, at_commit: str | None = None) -> list[str]:
     """The suites a row claims, from either the tool's words or the party's.
 
     Two accepted forms, and nothing else:
 
     * ``all <N> suites``, exactly as the runner prints it, where N has to match
-      the corpus actually in this repository. A whole-corpus claim that names
-      the wrong size is a claim about some other run.
+      the corpus AT THE COMMIT THE ROW IS SCOPED TO. A whole-corpus claim that
+      names the wrong size for that commit is a claim about some other run.
     * a comma or newline separated list of suite directory names.
 
     The first form existed on the printing side from 2026-08-17 and was never
@@ -165,15 +208,16 @@ def parse_suites(raw: str) -> list[str]:
     paragraph, because a row is quoted onto a public page and free prose in a
     field with a fixed meaning is how that page stops meaning one thing.
     """
-    known = known_suites()
+    known = known_suites(at_commit)
     text = raw.strip()
     whole = WHOLE_CORPUS.match(text)
     if whole:
         claimed = int(whole.group(1))
         if claimed != len(known):
+            where = f"at commit {at_commit[:9]}" if at_commit else "in this repository"
             raise Rejected(
-                f"This repository has {len(known)} suites, and the row claims a "
-                f"run over {claimed}. Rerun `python scripts/conformance_runner.py` "
+                f"The corpus {where} has {len(known)} suites, and the row claims "
+                f"a run over {claimed}. Rerun `python scripts/conformance_runner.py` "
                 "at the commit you are listing and use the link it prints."
             )
         return sorted(known)
@@ -183,7 +227,8 @@ def parse_suites(raw: str) -> list[str]:
         raise Rejected("Name at least one suite you ran.")
     unknown = sorted(set(names) - known)
     if unknown:
-        raise Rejected(f"These are not suites in this repository: {', '.join(unknown)}")
+        where = f"suites at commit {at_commit[:9]}" if at_commit else "suites in this repository"
+        raise Rejected(f"These are not {where}: {', '.join(unknown)}")
     return names
 
 
@@ -253,7 +298,9 @@ def validate(fields: dict, author: str) -> dict:
     if not commit_exists(sha):
         raise Rejected(f"Commit `{sha}` is not in this repository.")
 
-    suites = parse_suites(str(fields.get("suites", "")))
+    # `sha` is validated above, so the suite check can be scoped to the commit
+    # the row is actually about rather than to whatever is on the branch today.
+    suites = parse_suites(str(fields.get("suites", "")), sha)
 
     result = str(fields.get("result", "")).strip()
     if not result:
