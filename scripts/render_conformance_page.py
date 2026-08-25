@@ -70,6 +70,10 @@ FALLBACK_TERMS_VERSION = "unversioned"
 #: scripts/vcr_row.py, which is what writes the key into a row.
 KIND_TEXT = {
     "reproduction": "Reproduction: the author's checkers over the author's vectors",
+    "construction_reproduction": (
+        "Construction reproduction: a published construction derived from its prose "
+        "alone, without running the author's verifier"
+    ),
     "independent_implementation": (
         "Independent implementation from the text, run against the author's vectors"
     ),
@@ -1172,18 +1176,22 @@ python scripts/vcr_chain.py            # nothing removed from the table</code></
     only the chain until the next head is published.</li>
     <li><strong>Every row names what kind of run it was.</strong> What a run
     establishes is a property of who wrote the verifier and who wrote the
-    vectors, not of how well it went, and the three are not degrees of one
+    vectors, not of how well it went, and the four are not degrees of one
     another. A <em>reproduction</em> is the author's checkers over the author's
     vectors: it establishes that the artefact runs and is byte-stable somewhere
     other than the author's machine, and nothing about the specification text.
-    An <em>independent implementation from the text</em>, run against the
-    author's vectors, establishes something about the text, because a second
-    reader had to decide what the sentences meant. An <em>independent
-    implementation run against independently constructed vectors</em>
-    establishes something about both. A row that does not name its kind reads
-    as the first, because that is the weakest claim available. Rows listed
-    before this field existed carry no kind and are never edited to add one, so
-    this rule covers them instead.</li>
+    A <em>construction reproduction</em> derives a published value from the
+    prose that describes it, without running the author's verifier and without
+    writing a second implementation: it establishes whether the description was
+    sufficient to get there, which is a question about the text answerable with
+    no code on either side. An <em>independent implementation from the text</em>,
+    run against the author's vectors, establishes something about the text,
+    because a second reader had to decide what the sentences meant and then
+    build to that decision. An <em>independent implementation run against
+    independently constructed vectors</em> establishes something about both. A
+    row that does not name its kind reads as the first, because that is the
+    weakest claim available. Rows listed before this field existed carry no kind
+    and are never edited to add one, so this rule covers them instead.</li>
     <li>Nothing is edited after the fact. A correction is a new row referring
     to the earlier one, never a rewrite of it.</li>
     <li><strong>What an outside suggestion can change.</strong> Wording here

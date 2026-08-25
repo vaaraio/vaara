@@ -72,6 +72,7 @@ body:
         as the first one, because that is the weakest claim available.
       options:
         - "Reproduction: the author's checkers over the author's vectors"
+        - "Construction reproduction: a published construction derived from its prose alone, without running the author's verifier"
         - "Independent implementation from the text, run against the author's vectors"
         - "Independent implementation run against independently constructed vectors"
     validations:

@@ -67,8 +67,20 @@ FIELDS = {
 #: row outlives the message that explains it, and a register that cannot tell a
 #: reproduction from an independent implementation will be cited for the second
 #: while holding the first, by someone who is not lying.
+#: The fourth kind arrived from Tiago Pinto on the SCITT list on 2026-08-25.
+#: He reproduced a published class digest from the prose that describes it,
+#: without running the author's verifier and without writing a second
+#: implementation, and said plainly that it fitted none of the three. He is
+#: right, and it is not a rung on the same ladder. A reproduction asks whether
+#: the artefact runs somewhere else. This asks whether the description was
+#: sufficient to derive the published value at all, which is a question about
+#: the text, answerable with no code on either side.
 KINDS = {
     "reproduction": "the author's checkers over the author's vectors",
+    "construction_reproduction": (
+        "a published construction derived from its prose alone, without running "
+        "the author's verifier"
+    ),
     "independent_implementation": (
         "an independent implementation from the text, run against the author's vectors"
     ),
@@ -246,6 +258,10 @@ def parse_kind(raw: str) -> str:
         return DEFAULT_KIND
     if text in KINDS:
         return text
+    # Checked before the bare "reproduction" prefix, because the fourth kind's
+    # wording carries that word too and the order is what keeps them apart.
+    if text.startswith("construction"):
+        return "construction_reproduction"
     if text.startswith("reproduction"):
         return "reproduction"
     if "independently constructed" in text:
