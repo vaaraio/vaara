@@ -680,10 +680,12 @@ decision-only escalate, the two replay-rejection cases (substituted attestation
 back-link and substituted pairing nonce, both failing Check A), a substituted
 decision under a shared attestation (Check A passes, Check B fails), the
 equal-`decidedAt` supersession tie reported as ambiguous, and the no-SEP-2787
-fallback request-envelope binding (with its replayed-envelope substitution). An
-independent consumer verifier (Rul1an/Assay) reproduces the Check-A subset today
-and the Check-B and supersession cases as it adopts the digest and ordering
-model.
+fallback request-envelope binding (with its replayed-envelope substitution).
+
+Runs of these vectors by parties other than the author are recorded at
+<https://vaara.io/conformance.html>, on terms that are the same for everyone and
+that each runner agrees to before a row is published. This page states no claim
+about any third-party implementation on its own account.
 
 Conformance traceability, mapping each MUST / MUST NOT and SHOULD / SHOULD NOT in
 the Specification to a conformance check ID, is maintained with the living
