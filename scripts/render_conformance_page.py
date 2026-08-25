@@ -36,6 +36,27 @@ BADGE_DIR = REPO / "webpage" / "badge"
 
 TITLE = "Vaara Conformance Results"
 
+#: Identifiers the rest of the site already uses, so the nodes this page emits
+#: join the ones on index.html instead of describing a second, parallel Vaara.
+SITE = "https://vaara.io"
+PAGE_URL = f"{SITE}/conformance.html"
+CORPUS_ID = f"{PAGE_URL}#corpus"
+LIST_ID = f"{PAGE_URL}#reproductions"
+PERSON_ID = f"{SITE}/#henri"
+ORG_ID = f"{SITE}/#organization"
+SITE_ID = f"{SITE}/#website"
+AGPL = "https://www.gnu.org/licenses/agpl-3.0.html"
+
+#: The concept DOI, which always resolves to the newest archived version. Also
+#: on the README and on the DOI badge. Stated here so the structured data hands
+#: a citation path to anyone who wants to cite the corpus rather than link it.
+DOI = "https://doi.org/10.5281/zenodo.22027975"
+
+#: The whole register as one file, published by the Pages job from the same
+#: bytes the desk wrote. Linked from the head so a reader who wants the rows
+#: rather than the page does not have to scrape the table to get them.
+REGISTER_JSON = f"{SITE}/conformance.json"
+
 # The terms a party agrees to when they ask for a row live in reproductions.json
 # under ``terms_version``, so the desk and the page cannot disagree about which
 # version is current. Bump it there when the text changes, never edit a version
@@ -583,9 +604,9 @@ def reproduction_blocks(data: dict) -> str:
             f"(https://vaara.io{badge})](https://vaara.io/conformance.html)"
         )
         out.append(f"""
-        <article class="repro">
+        <article class="repro" id="row-{esc(r['id'])}">
           <div class="repro-head">
-            <span class="num mono">#{esc(r['id'])}</span>
+            <a class="num mono" href="#row-{esc(r['id'])}">#{esc(r['id'])}</a>
             <span class="date mono">{esc(r.get('date', ''))}</span>
             <span class="who">{esc(r.get('party', ''))}</span>
             <span class="aff">{esc(r.get('affiliation', ''))}</span>
@@ -606,23 +627,315 @@ def reproduction_blocks(data: dict) -> str:
     return "\n".join(out)
 
 
+def page_description(repro: dict) -> str:
+    """The meta description, counted from the rows rather than written once.
+
+    A hand-written description saying "independent parties" was true on the day
+    it was typed and says nothing a search result can use. This is generated
+    from the same file the table is, so it cannot claim a reproduction the page
+    does not show, and it cannot go stale in the other direction either.
+    """
+    n = len(repro.get("reproductions", []))
+    if not n:
+        return (
+            "Every Vaara conformance suite, its verdict, and every independent "
+            "party who reproduced the vectors and said so in public. Generated "
+            "from the runner's own report."
+        )
+    party = "party" if n == 1 else "parties"
+    has = "has" if n == 1 else "have"
+    return (
+        f"Every Vaara conformance suite, its verdict, and the {n} named "
+        f"independent {party} who {has} reproduced the vectors and said so in "
+        "public. Generated from the runner's own report."
+    )
+
+
+def _script_safe(blob: str) -> str:
+    """Escape the three characters that can end a script element early.
+
+    None of them carry structure in JSON, so escaping them changes no value:
+    ``\\u003C`` parses back to ``<``. Party names and their scoping come from
+    a submitted issue form, so the page never embeds them unescaped.
+    """
+    return blob.replace("<", "\\u003C").replace(">", "\\u003E").replace("&", "\\u0026")
+
+
+def row_node(row: dict) -> dict:
+    """One reproduction row as structured data.
+
+    The party is emitted as plain text rather than as a ``Person`` or an
+    ``Organization``. The register records a party name and does not record
+    which of the two it is, and the five rows listed so far are a mix of both
+    plus a pseudonym. Picking one would write a guess into the machine-readable
+    copy of a page whose whole argument is that nothing on it is guessed.
+
+    Everything a reader needs to check the row without trusting this page is
+    here: the digest, the file it is a digest of, the commit, and the party's
+    own public record.
+    """
+    props = [
+        {
+            "@type": "PropertyValue",
+            "name": "kind of run",
+            "value": kind_text(row),
+        },
+        {
+            "@type": "PropertyValue",
+            "name": "at commit",
+            "propertyID": "git-commit",
+            "value": row.get("at_commit", ""),
+        },
+        {
+            "@type": "PropertyValue",
+            "name": "suites run",
+            "value": len(row.get("suites", [])),
+        },
+        {
+            "@type": "PropertyValue",
+            "name": "listed under terms version",
+            "value": row.get("terms_version", "unversioned"),
+        },
+    ]
+    if row.get("affiliation"):
+        props.insert(0, {
+            "@type": "PropertyValue",
+            "name": "affiliation, as the party stated it",
+            "value": row["affiliation"],
+        })
+    node = {
+        "@type": "Report",
+        "@id": f"{PAGE_URL}#row-{row['id']}",
+        "url": f"{PAGE_URL}#row-{row['id']}",
+        "reportNumber": str(row["id"]),
+        "name": f"{TITLE} row {row['id']}: {row.get('party', '')}",
+        "author": row.get("party", ""),
+        "datePublished": row.get("date", ""),
+        "inLanguage": "en",
+        "publisher": {"@id": ORG_ID},
+        "about": {"@id": CORPUS_ID},
+        "isPartOf": {"@id": LIST_ID},
+        "abstract": row.get("result", ""),
+        "disambiguatingDescription": kind_text(row),
+        "identifier": {
+            "@type": "PropertyValue",
+            "propertyID": "sha256",
+            "value": row_digest(row).removeprefix("sha256:"),
+            "url": f"{SITE}/badge/{row['slug']}.json",
+        },
+        "image": f"{SITE}/badge/{row['slug']}.svg",
+        "additionalProperty": props,
+    }
+    if row.get("their_scoping"):
+        node["text"] = row["their_scoping"]
+    if row.get("record"):
+        node["citation"] = {
+            "@type": "CreativeWork",
+            "name": row.get("record_held_by") or "The party's own public record",
+            "url": row["record"],
+        }
+    return node
+
+
+def json_ld(report: dict, repro: dict) -> str:
+    """The page, restated as data, for readers that are not people.
+
+    A model or a crawler reaching this page sees a rendered table and has to
+    infer what the columns mean. Five named third parties reproducing a corpus
+    is the strongest thing the project has, and it only compounds if a machine
+    can tell that is what it is looking at. Everything below is generated from
+    the same two inputs as the table, so the structured copy cannot claim
+    anything the visible page does not.
+
+    The corpus is a ``Dataset`` because that is what it is: committed case
+    files with a DOI and a licence. Each row is a ``Report`` credited to the
+    party who made the claim, published by Vaara, citing their own public
+    record. Nothing here is typed as a rating, a review or a certification,
+    because the page spends three paragraphs saying it is none of those.
+    """
+    rows = repro.get("reproductions", [])
+    t = report["totals"]
+    generated = report.get("generated_at", "")
+    graph = [
+        {
+            "@type": ["WebPage", "CollectionPage"],
+            "@id": PAGE_URL,
+            "url": PAGE_URL,
+            "name": TITLE,
+            "description": page_description(repro),
+            "dateModified": generated,
+            "inLanguage": "en",
+            "isPartOf": {"@id": SITE_ID},
+            "about": {"@id": CORPUS_ID},
+            "mainEntity": {"@id": LIST_ID},
+            "creator": {"@id": PERSON_ID},
+            "publisher": {"@id": ORG_ID},
+            "license": AGPL,
+        },
+        {
+            "@type": "WebSite",
+            "@id": SITE_ID,
+            "name": "Vaara",
+            "url": f"{SITE}/",
+            "inLanguage": "en",
+        },
+        {
+            "@type": "Organization",
+            "@id": ORG_ID,
+            "name": "Vaara",
+            "url": f"{SITE}/",
+            "logo": f"{SITE}/vaara-wordmark-light.png",
+            "founder": {"@id": PERSON_ID},
+        },
+        {
+            "@type": "Person",
+            "@id": PERSON_ID,
+            "name": "Henri Sirkkavaara",
+            "url": f"{SITE}/",
+        },
+        {
+            "@type": "Dataset",
+            "@id": CORPUS_ID,
+            "name": "Vaara conformance vectors",
+            "alternateName": "Vaara conformance corpus",
+            "description": (
+                "Committed case files for every Vaara conformance suite. Each "
+                "suite ships an independent checker that imports no Vaara code "
+                "and recomputes its verdicts from the bytes of its own cases, "
+                "so a stranger can disagree with an expected result and show "
+                "their work. The vectors are Vaara's own and no ratification "
+                "body stands behind them."
+            ),
+            "url": PAGE_URL,
+            "dateModified": generated,
+            "identifier": DOI,
+            "sameAs": [DOI, "https://github.com/vaaraio/vaara"],
+            "citation": DOI,
+            "license": AGPL,
+            "isAccessibleForFree": True,
+            "creator": {"@id": PERSON_ID},
+            "publisher": {"@id": ORG_ID},
+            "inLanguage": "en",
+            "keywords": [
+                "conformance vectors",
+                "independent reproduction",
+                "tamper-evident audit trail",
+                "execution receipt",
+                "SCITT",
+                "EU AI Act Article 12",
+                "accountable autonomy",
+            ],
+            "measurementTechnique": (
+                "Each suite is graded by its own checker, which imports no "
+                "Vaara code and recomputes every verdict from the committed "
+                "bytes of its case files."
+            ),
+            "variableMeasured": [
+                {"@type": "PropertyValue", "name": "suites", "value": t["suites"]},
+                {"@type": "PropertyValue", "name": "passed", "value": t["passed"]},
+                {"@type": "PropertyValue", "name": "failed", "value": t["failed"]},
+                {"@type": "PropertyValue", "name": "skipped", "value": t["skipped"]},
+                {
+                    "@type": "PropertyValue",
+                    "name": "cases passed",
+                    "value": t["cases_passed"],
+                },
+                {
+                    "@type": "PropertyValue",
+                    "name": "independent reproductions listed",
+                    "value": len(rows),
+                },
+            ],
+            "distribution": [
+                {
+                    "@type": "DataDownload",
+                    "name": "The reproduction register, as published",
+                    "encodingFormat": "application/json",
+                    "contentUrl": REGISTER_JSON,
+                },
+                {
+                    "@type": "DataDownload",
+                    "name": "The vectors and their checkers, in the repository",
+                    "encodingFormat": "text/plain",
+                    "contentUrl": "https://github.com/vaaraio/vaara/tree/main/tests/vectors",
+                },
+            ],
+        },
+        {
+            "@type": "ItemList",
+            "@id": LIST_ID,
+            "name": "Independent reproductions of the Vaara conformance vectors",
+            "description": (
+                "Parties other than the maintainer who ran the checkers and "
+                "reported the outcome in public. Each entry records a run on a "
+                "date at a commit. It is not a certification, it does not say "
+                "Vaara is compliant with anything, and it does not say the "
+                "party endorses Vaara."
+            ),
+            "itemListOrder": "https://schema.org/ItemListOrderAscending",
+            "numberOfItems": len(rows),
+            "itemListElement": [
+                {
+                    "@type": "ListItem",
+                    "position": i,
+                    "item": {"@id": f"{PAGE_URL}#row-{r['id']}"},
+                }
+                for i, r in enumerate(rows, start=1)
+            ],
+        },
+    ]
+    graph.extend(row_node(r) for r in rows)
+    blob = json.dumps(
+        {"@context": "https://schema.org", "@graph": graph},
+        indent=2,
+        ensure_ascii=False,
+    )
+    return _script_safe(blob)
+
+
 def render(report: dict, repro: dict) -> str:
     t = report["totals"]
     generated = report.get("generated_at", "")
+    description = page_description(repro)
     return f"""<!doctype html>
 <html lang="en">
 <head>
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width,initial-scale=1">
 <title>{TITLE} | Vaara</title>
-<meta name="description" content="Every Vaara conformance suite, its verdict, and every independent party who reproduced the vectors and said so in public. Generated from the runner's own report.">
-<meta name="robots" content="index, follow">
+<meta name="description" content="{esc(description)}">
+<meta name="author" content="Henri Sirkkavaara">
+<meta name="robots" content="index, follow, max-image-preview:large, max-snippet:-1">
+<meta name="googlebot" content="index, follow">
+<meta name="referrer" content="strict-origin-when-cross-origin">
+<meta name="theme-color" content="#ececec">
 <link rel="canonical" href="https://vaara.io/conformance.html">
 <link rel="icon" type="image/svg+xml" href="/favicon.svg">
+<link rel="alternate icon" href="/favicon.ico">
+<link rel="apple-touch-icon" href="/favicon-180.png">
+<link rel="sitemap" type="application/xml" href="/sitemap.xml">
+<!-- The rows as bytes, for a reader who wants the register rather than the
+     page. Same file the desk published, served next to it. -->
+<link rel="alternate" type="application/json" href="/conformance.json" title="The reproduction register as JSON">
+<link rel="author" href="https://vaara.io/">
 <meta property="og:type" content="website">
+<meta property="og:site_name" content="Vaara">
 <meta property="og:title" content="{TITLE}">
-<meta property="og:description" content="Every suite, every verdict, every independent reproduction. Recomputable from committed bytes with no Vaara import.">
+<meta property="og:description" content="{esc(description)}">
 <meta property="og:url" content="https://vaara.io/conformance.html">
+<meta property="og:image" content="https://vaara.io/vaara-wordmark-light.png">
+<meta property="og:image:width" content="1200">
+<meta property="og:image:height" content="346">
+<meta property="og:image:alt" content="Vaara">
+<meta property="og:locale" content="en_US">
+<meta name="twitter:card" content="summary_large_image">
+<meta name="twitter:title" content="{TITLE}">
+<meta name="twitter:description" content="{esc(description)}">
+<meta name="twitter:image" content="https://vaara.io/vaara-wordmark-light.png">
+<meta name="twitter:image:alt" content="Vaara">
+<script type="application/ld+json">
+{json_ld(report, repro)}
+</script>
 <style>
   :root {{
     color-scheme: light;
@@ -699,6 +1012,12 @@ def render(report: dict, repro: dict) -> str:
   .repro-head{{display:flex;flex-wrap:wrap;gap:12px;align-items:baseline;margin-bottom:8px}}
   .repro-head .who{{font-weight:600}}
   .repro-head .aff{{color:var(--faint);font-size:13px}}
+  /* The row number is the citable handle for a row, so it links to its own
+     anchor instead of sitting there as a label. Somebody arguing about one
+     party's run can point at that run rather than at the whole table. */
+  .repro-head .num{{border:0;color:var(--tri-bright)}}
+  .repro-head .num:hover{{border-bottom:1px solid var(--tri)}}
+  .repro:target{{border-color:var(--tri)}}
   .repro .result{{margin:0 0 12px}}
   dl{{display:grid;grid-template-columns:auto 1fr;gap:5px 16px;margin:0;font-size:13px}}
   dt{{font-family:var(--mono);font-size:10.5px;letter-spacing:.14em;text-transform:uppercase;
@@ -961,9 +1280,13 @@ def main(argv: list[str]) -> int:
 
     if check:
         # The generated timestamp changes every run, so compare everything else.
+        # `dateModified` in the structured data is the same timestamp restated
+        # for machines and moves for the same reason, so it is held to the same
+        # rule. Every other line, including all six measured values, is compared.
         current = out.read_text(encoding="utf-8") if out.exists() else ""
+        drifts_by_the_clock = ("generated ", '"dateModified"')
         strip = lambda s: "\n".join(  # noqa: E731
-            ln for ln in s.splitlines() if "generated " not in ln
+            ln for ln in s.splitlines() if not any(k in ln for k in drifts_by_the_clock)
         )
         stale_badges = badge_drift(repro, report=report)
         if strip(current) != strip(page) or stale_badges:
