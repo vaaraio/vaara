@@ -113,12 +113,22 @@ def register_block(rows: dict) -> str:
         "no Vaara code and recomputes its verdicts from the bytes of its own case",
         "files, so a stranger can disagree with an expected result and show their work.",
         "",
-        "- [Conformance results](https://vaara.io/conformance.html): the register as a page,"
-        " generated from the runner's own report",
-        "- [conformance.json](https://vaara.io/conformance.json): the same register as one"
-        " machine-readable file",
-        "- [Row request form](https://github.com/vaaraio/vaara/issues/new?template=conformance-row.yml):"
-        " open to anyone who ran the checkers, free, no approval step",
+        # Each bullet is one markdown line, wrapped in parentheses so the joining
+        # is explicit. Bare adjacent strings in a list read the same to Python and
+        # a dropped comma silently welds two bullets into one.
+        (
+            "- [Conformance results](https://vaara.io/conformance.html): "
+            "the register as a page, generated from the runner's own report"
+        ),
+        (
+            "- [conformance.json](https://vaara.io/conformance.json): "
+            "the same register as one machine-readable file"
+        ),
+        (
+            "- [Row request form](https://github.com/vaaraio/vaara/issues/new"
+            "?template=conformance-row.yml): open to anyone who ran the checkers, "
+            "free, no approval step"
+        ),
         "- Concept DOI for the corpus: [10.5281/zenodo.22027975](https://doi.org/10.5281/zenodo.22027975)",
         "",
         "What a row is, stated exactly. It records that a named party ran the checkers",
