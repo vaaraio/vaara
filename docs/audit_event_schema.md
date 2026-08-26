@@ -116,7 +116,7 @@ keys). Reserved top-level keys:
   null), `sequence_position` (integer). The delegation keys link this action
   to the one that spawned it; see [§ Delegation linkage](#delegation-linkage).
 - `risk_scored`: `risk_score` (number in [0, 1]), `interval` (`[low, high]`), `classifier_version` (string), `contributing_signals` (array).
-- `decision_made`: `decision` (`allow` | `escalate` | `deny`), `threshold_set` (string), `verdict_inputs` (array).
+- `decision_made`: `decision` (`allow` | `escalate` | `deny`), `threshold_set` (string), `verdict_inputs` (array), `decision_detail` (`modify` | `step_up` | `defer`, optional), `modified_parameters` (object, optional).
 - `action_executed`: `executor` (string), `duration_ms` (number).
 - `action_blocked`: `reason` (string), `blocking_policy` (string).
 - `escalation_sent`: `reviewer_queue` (string), `priority` (string).
@@ -128,6 +128,17 @@ Caller-controlled strings in `data` (`agent_id`, `reason`,
 `override_reason`) MUST be treated as untrusted at narrative-rendering
 time. The hash chain still covers original values; the renderer
 sanitizes for display only.
+
+`decision` on a `decision_made` record stays inside the three-value enum
+above and always will. A policy layer may work with a finer vocabulary,
+and `decision_detail` names which refinement produced the recorded
+decision: `step_up` and `defer` are holds and record `escalate`, `modify`
+records `deny` because the arguments it was asked about do not run. When a
+`modify` proposes different arguments, `modified_parameters` carries them
+and the caller resubmits, producing a second decision bound to those
+arguments. **No decision record ever says `allow` against arguments other
+than the ones that executed.** Both optional keys are omitted when absent,
+so records written without a refinement are unchanged.
 
 ## Delegation linkage
 

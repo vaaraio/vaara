@@ -120,6 +120,44 @@ _MAX_OVERRIDE_REASON_LEN = 8192
 _MAX_DECISION_LABEL_LEN = 64
 
 
+# The decision vocabulary, and the projection that keeps it from reaching
+# places that only understand three words.
+#
+# AARM Core R4 asks for five decisions. The signed decision record can carry
+# three: published conformance checkers hold a closed verdict set and grade
+# anything else non-conforming, and independent parties already run those
+# checkers. So MODIFY, STEP_UP and DEFER are policy-layer names that project
+# onto the coarse three here, at the pipeline boundary.
+#
+# Projecting HERE rather than downstream is deliberate. Roughly a dozen call
+# sites across the integrations branch on `result.decision == "escalate"` or
+# `== "deny"` to decide whether to raise. A fine-grained name flowing out of
+# intercept() would miss every one of those branches and read as a fall-
+# through, which is a fail-OPEN in exactly the code paths that exist to stop
+# an action. `InterceptionResult.decision` therefore keeps returning the
+# coarse word and `decision_detail` carries the refinement for callers that
+# know to look.
+#
+# MODIFY maps to `deny` because the arguments it was asked about must not
+# run. The altered arguments come back to the caller in
+# `modified_parameters` and are resubmitted as a fresh intercept with its own
+# decision bound to its own digest. A decision record must never say `allow`
+# against arguments other than the ones that executed.
+_FINE_TO_COARSE: dict[str, str] = {
+    "allow": "allow",
+    "deny": "deny",
+    "escalate": "escalate",
+    "modify": "deny",
+    "step_up": "escalate",
+    "defer": "escalate",
+}
+
+# JSON-serialized bytes for a gate-proposed argument set. Same amplification
+# concern as _MAX_PARAMS_JSON_BYTES: this value is scorer-controlled, lands
+# on the hash chain, and goes back to the caller.
+_MAX_MODIFIED_PARAMS_JSON_BYTES = 64 * 1024
+
+
 def _cap_str(value: Any, max_len: int, field_name: str) -> str:
     """Truncate a caller-supplied string to max_len with a TRUNCATED marker.
 
@@ -215,13 +253,22 @@ class InterceptionResult:
     """Result of intercepting an action request."""
     allowed: bool
     action_id: str              # For tracking outcome later
-    decision: str               # "allow", "deny", "escalate"
+    decision: str               # "allow", "deny", "escalate" — always coarse
     risk_score: float           # Point estimate
     risk_interval: tuple[float, float]  # Conformal (lower, upper)
     reason: str
     action_type: ActionType
     signals: dict[str, float]   # Contributing risk signals
     evaluation_ms: float
+    # The AARM Core R4 refinement behind `decision`, when there is one:
+    # "modify", "step_up" or "defer". None when the decision was already
+    # one of the coarse three. `decision` stays coarse so existing callers
+    # keep working; read this when the finer answer matters.
+    decision_detail: Optional[str] = None
+    # Only set alongside decision_detail == "modify": the arguments the gate
+    # is willing to permit. The original call is denied. Resubmit these
+    # through intercept() to get a decision bound to them.
+    modified_parameters: Optional[dict] = None
 
 
 class InterceptionPipeline:
@@ -569,13 +616,45 @@ class InterceptionPipeline:
             decision_str = raw_decision.strip().lower()
         else:
             decision_str = "deny"
-        if decision_str not in ("allow", "deny", "escalate"):
+        if decision_str not in _FINE_TO_COARSE:
             logger.warning(
                 "Scorer returned unknown action=%r for action_id=%s; "
                 "failing closed to 'deny'",
                 raw_decision, action_id,
             )
             decision_str = "deny"
+
+        # 6a. Project the R4 refinements onto the coarse three. `decision_str`
+        # stays coarse from here down, so every downstream branch, audit
+        # record and integration sees a vocabulary it already understands.
+        decision_detail: Optional[str] = None
+        modified_parameters: Optional[dict] = None
+        coarse = _FINE_TO_COARSE[decision_str]
+        if coarse != decision_str:
+            decision_detail = decision_str
+            decision_str = coarse
+
+        if decision_detail == "modify":
+            # A modify that carries no modification is malformed. Fall back to
+            # a plain deny rather than a deny the caller cannot act on: the
+            # action is already blocked either way, and claiming a refinement
+            # the scorer did not supply would put a false detail on the chain.
+            raw_modified = scorer_result.get("modified_parameters")
+            if isinstance(raw_modified, dict) and raw_modified:
+                modified_parameters = _cap_dict_bytes(
+                    _json_safe_dict(raw_modified),
+                    _MAX_MODIFIED_PARAMS_JSON_BYTES,
+                    "modified_parameters",
+                )
+            else:
+                logger.warning(
+                    "Scorer returned action='modify' without usable "
+                    "modified_parameters (%r) for action_id=%s; recording a "
+                    "plain deny",
+                    type(raw_modified).__name__, action_id,
+                )
+                decision_detail = None
+
         allowed = decision_str == "allow"
         reason = scorer_result.get("reason", "")
         if not isinstance(reason, str):
@@ -592,6 +671,11 @@ class InterceptionPipeline:
         if attenuation_reason is not None:
             decision_str = "deny"
             allowed = False
+            # Attenuation outranks whatever the scorer proposed. A refinement
+            # left in place here would describe a decision that no longer
+            # applies, and a modification the caller must not retry.
+            decision_detail = None
+            modified_parameters = None
             reason = _cap_str(
                 f"privilege attenuation violation ({attenuation_reason})"
                 + (f"; {reason}" if reason else ""),
@@ -619,13 +703,21 @@ class InterceptionPipeline:
             if prior is not None:
                 decision_str = "allow"
                 allowed = True
+                # The recorded decision is now `allow`; a leftover step_up or
+                # defer detail would contradict the word next to it.
+                decision_detail = None
                 reason = _cap_str(
                     f"auto-allowed by prior approval "
                     f"(action_id={prior.action_id}, {prior.timestamp})",
                     _MAX_DECISION_REASON_LEN, "reason",
                 )
 
-        # 8. Record the decision in audit
+        # 8. Record the decision in audit. `decision` stays inside the
+        # documented allow/escalate/deny enum; the refinement and any
+        # proposed arguments ride along as additional keys, which the 1.0
+        # data-payload schema explicitly permits (consumers MUST accept
+        # unknown keys). A record with no refinement gains no keys, so
+        # every existing record hashes exactly as it did before.
         self.trail.record_decision(
             action_id=action_id,
             agent_id=agent_id,
@@ -634,6 +726,8 @@ class InterceptionPipeline:
             reason=reason,
             risk_score=point_estimate,
             regulatory_domains=action_type.regulatory_domains,
+            decision_detail=decision_detail,
+            modified_parameters=modified_parameters,
         )
 
         if decision_str == "escalate":
@@ -744,6 +838,8 @@ class InterceptionPipeline:
             action_type=action_type,
             signals=signals,
             evaluation_ms=elapsed_ms,
+            decision_detail=decision_detail,
+            modified_parameters=modified_parameters,
         )
 
     def report_outcome(

@@ -226,6 +226,12 @@ def _event_to_decision(event_type: EventType) -> str:
 # policy vocabulary. The SEP-2787 decision-record wire enum is
 # ``allow`` / ``block`` / ``escalate``, so ``deny`` normalises to ``block`` and
 # the review family normalises to ``escalate``.
+# The AARM Core R4 refinements project here too. STEP_UP and DEFER are holds
+# and join the review family on ``escalate``; MODIFY blocks the arguments it
+# was asked about, and the altered arguments come back as their own decision
+# bound to their own digest (see ``vaara.pipeline._FINE_TO_COARSE``). A
+# decision record must never say ``allow`` against a digest other than the
+# one that executed.
 _VERDICT_TO_WIRE: dict[str, str] = {
     "allow": "allow",
     "deny": "block",
@@ -233,6 +239,9 @@ _VERDICT_TO_WIRE: dict[str, str] = {
     "escalate": "escalate",
     "review": "escalate",
     "refer": "escalate",
+    "step_up": "escalate",
+    "defer": "escalate",
+    "modify": "block",
 }
 
 

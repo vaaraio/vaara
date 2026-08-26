@@ -851,8 +851,18 @@ class AuditTrail:
         reason: str,
         risk_score: float,
         regulatory_domains: frozenset[RegulatoryDomain] = frozenset(),
+        decision_detail: Optional[str] = None,
+        modified_parameters: Optional[dict] = None,
     ) -> None:
-        """Record the allow/deny/escalate decision."""
+        """Record the allow/deny/escalate decision.
+
+        ``decision`` is always one of the coarse three. ``decision_detail``
+        carries the AARM Core R4 refinement behind it when there is one
+        ("modify", "step_up", "defer"), and ``modified_parameters`` the
+        arguments a ``modify`` proposed. Both keys are omitted entirely when
+        absent, so a record without a refinement is byte-identical to one
+        written before this vocabulary existed and its hash does not move.
+        """
         event_type = (
             EventType.ACTION_BLOCKED if decision == "deny"
             else EventType.DECISION_MADE
@@ -862,6 +872,21 @@ class AuditTrail:
             event_type, regulatory_domains,
         )
 
+        data: dict = {
+            "decision": self._cap_record_str(decision, self._MAX_DECISION_LABEL_LEN),
+            "reason": self._cap_record_str(reason, self._MAX_DECISION_REASON_LEN),
+            "risk_score": risk_score,
+        }
+        if decision_detail:
+            data["decision_detail"] = self._cap_record_str(
+                decision_detail, self._MAX_DECISION_LABEL_LEN,
+            )
+        if modified_parameters:
+            data["modified_parameters"] = self._cap_record_dict_bytes(
+                {str(k): json_safe(v) for k, v in modified_parameters.items()},
+                self._MAX_EXECUTION_RESULT_JSON_BYTES,
+            )
+
         self._append(AuditRecord(
             record_id=str(uuid.uuid4()),
             action_id=action_id,
@@ -869,11 +894,7 @@ class AuditTrail:
             timestamp=time.time(),
             agent_id=self._cap_record_str(agent_id, self._MAX_AGENT_ID_LEN),
             tool_name=self._cap_record_str(tool_name, self._MAX_TOOL_NAME_LEN),
-            data={
-                "decision": self._cap_record_str(decision, self._MAX_DECISION_LABEL_LEN),
-                "reason": self._cap_record_str(reason, self._MAX_DECISION_REASON_LEN),
-                "risk_score": risk_score,
-            },
+            data=data,
             regulatory_articles=articles,
             tenant_id=self._tenant_for(action_id),
         ))
