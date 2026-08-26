@@ -37,7 +37,19 @@ from vaara.credential._grant_attenuation import (
     chain_is_attenuating,
 )
 from vaara.credential._grant_capability import Capability
-from vaara.credential._grant_emit import emit_grant, verify_grant_signature
+from vaara.credential._grant_emit import (
+    emit_grant,
+    signing_payload,
+    verify_grant_signature,
+)
+from vaara.credential._grant_mandate import (
+    EAA_Q_SERVICE_TYPE,
+    GrantMandate,
+    encode_attestation,
+    mandate_digest_of,
+    mandate_from_dict,
+    verify_mandate_binding,
+)
 from vaara.credential._grant_parse import (
     asserted_from_dict,
     binding_from_dict,
@@ -65,9 +77,11 @@ __all__ = [
     "ClassGateDecision",
     "ContiguityReport",
     "CredentialGateway",
+    "EAA_Q_SERVICE_TYPE",
     "GrantAlgorithm",
     "GrantAsserted",
     "GrantBinding",
+    "GrantMandate",
     "GrantScope",
     "GrantVerdict",
     "ReceiptSigner",
@@ -75,13 +89,18 @@ __all__ = [
     "binding_from_dict",
     "build_authorization_evidence",
     "emit_grant",
+    "encode_attestation",
     "enforce_on_sealed_class",
     "evidence_binding_ok",
     "grant_from_dict",
+    "mandate_digest_of",
+    "mandate_from_dict",
     "mint_authorization_receipt",
     "mint_for_signer",
     "scope_from_dict",
+    "signing_payload",
     "verify_contiguity",
     "verify_grant",
     "verify_grant_signature",
+    "verify_mandate_binding",
 ]

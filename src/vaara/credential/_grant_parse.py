@@ -16,6 +16,7 @@ from typing import Any
 
 from vaara.attestation._attest_types import VALID_ALGS, AttestationError
 from vaara.credential._grant_capability import Capability, capability_from_dict
+from vaara.credential._grant_mandate import mandate_from_dict
 from vaara.credential._grant_types import (
     ASSERTED_KEYS,
     BINDING_KEYS,
@@ -114,6 +115,8 @@ def grant_from_dict(d: dict[str, Any]) -> BrokeredCredential:
         if not isinstance(caps_raw, list) or not caps_raw:
             raise AttestationError("credential.capabilities must be a non-empty list")
         capabilities = tuple(capability_from_dict(c) for c in caps_raw)
+    mandate_raw = d.get("mandate")
+    mandate = None if mandate_raw is None else mandate_from_dict(mandate_raw)
     return BrokeredCredential(
         version=d["version"],
         alg=d["alg"],
@@ -122,4 +125,5 @@ def grant_from_dict(d: dict[str, Any]) -> BrokeredCredential:
         asserted=asserted_from_dict(d["asserted"]),
         signature=_require_str(d, "signature", "credential"),
         capabilities=capabilities,
+        mandate=mandate,
     )

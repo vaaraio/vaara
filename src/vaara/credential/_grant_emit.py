@@ -34,6 +34,7 @@ from vaara.attestation._attest_types import (
     AttestationError,
 )
 from vaara.credential._grant_capability import Capability, capability_to_dict
+from vaara.credential._grant_mandate import GrantMandate, mandate_to_dict
 from vaara.credential._grant_types import (
     BrokeredCredential,
     GrantAsserted,
@@ -53,8 +54,14 @@ def _signing_payload(
     binding: GrantBinding,
     asserted: GrantAsserted,
     capabilities: Sequence[Capability] = (),
+    mandate: Optional[GrantMandate] = None,
 ) -> bytes:
-    """JCS-canonical encoding of the grant blocks, signature excluded."""
+    """JCS-canonical encoding of the grant blocks, signature excluded.
+
+    Optional blocks are added only when present, so a grant carrying neither
+    capabilities nor a mandate signs exactly the bytes it signed before either
+    field existed. Every published grant vector still verifies unchanged.
+    """
     body: dict[str, Any] = {
         "version": version,
         "alg": alg,
@@ -64,6 +71,8 @@ def _signing_payload(
     }
     if capabilities:
         body["capabilities"] = [capability_to_dict(c) for c in capabilities]
+    if mandate is not None:
+        body["mandate"] = mandate_to_dict(mandate)
     return canonical_json(body)
 
 
@@ -81,6 +90,7 @@ def emit_grant(
     iat: Optional[str] = None,
     version: int = 1,
     capabilities: Sequence[Capability] = (),
+    mandate: Optional[GrantMandate] = None,
 ) -> BrokeredCredential:
     """Build, JCS-canonicalize, and sign a BrokeredCredential envelope.
 
@@ -92,6 +102,10 @@ def emit_grant(
     Passing ``capabilities`` mints a capability-mode grant: the gateway
     enforces the typed constraints against runtime args (closed coverage)
     instead of the exact ``scope.argsCommitment``.
+
+    Passing ``mandate`` carries a qualified attestation of attributes with the
+    grant, so the issuer's identity rests on a supervised provider resolvable
+    from a public register rather than on ``asserted.iss``.
     """
     if alg not in VALID_ALGS:
         raise AttestationError(f"unsupported alg: {alg!r}")
@@ -118,6 +132,7 @@ def emit_grant(
         binding=binding,
         asserted=asserted,
         capabilities=capabilities,
+        mandate=mandate,
     )
 
     if alg == "HS256":
@@ -139,6 +154,7 @@ def emit_grant(
         asserted=asserted,
         signature=signature_hex,
         capabilities=tuple(capabilities),
+        mandate=mandate,
     )
 
 
@@ -158,6 +174,7 @@ def signing_payload(credential: BrokeredCredential) -> bytes:
         binding=credential.binding,
         asserted=credential.asserted,
         capabilities=credential.capabilities,
+        mandate=credential.mandate,
     )
 
 

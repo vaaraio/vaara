@@ -27,10 +27,11 @@ byte-exact to the wire.
 from __future__ import annotations
 
 from dataclasses import dataclass
-from typing import Any
+from typing import Any, Optional
 
 from vaara.attestation._attest_types import Algorithm
 from vaara.credential._grant_capability import Capability, capability_to_dict
+from vaara.credential._grant_mandate import GrantMandate, mandate_to_dict
 
 GrantAlgorithm = Algorithm
 
@@ -88,6 +89,10 @@ class BrokeredCredential:
     asserted: GrantAsserted
     signature: str
     capabilities: tuple[Capability, ...] = ()
+    #: Optional qualified attestation of attributes (see ``_grant_mandate``).
+    #: Absent by default, and absent means the signed preimage is exactly what
+    #: it was before this field existed.
+    mandate: Optional[GrantMandate] = None
 
     def to_dict(self) -> dict[str, Any]:
         d: dict[str, Any] = {
@@ -100,6 +105,8 @@ class BrokeredCredential:
         }
         if self.capabilities:
             d["capabilities"] = [capability_to_dict(c) for c in self.capabilities]
+        if self.mandate is not None:
+            d["mandate"] = mandate_to_dict(self.mandate)
         return d
 
 
@@ -135,5 +142,6 @@ ASSERTED_KEYS = frozenset(
     {"expSeconds", "iat", "iss", "nonce", "secretVersion", "sub"}
 )
 GRANT_KEYS = frozenset(
-    {"version", "alg", "scope", "binding", "asserted", "signature", "capabilities"}
+    {"version", "alg", "scope", "binding", "asserted", "signature", "capabilities",
+     "mandate"}
 )
