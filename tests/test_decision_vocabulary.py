@@ -99,7 +99,9 @@ def test_refinements_project_onto_the_coarse_three():
 
 
 def test_every_enum_member_has_a_projection():
-    for decision in Decision:
+    # list(Decision) rather than iterating the class directly: CodeQL does not
+    # model EnumMeta.__iter__ and reports py/non-iterable-in-for-loop.
+    for decision in list(Decision):
         assert decision.value in _FINE_TO_COARSE
 
 
