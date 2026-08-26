@@ -1,0 +1,122 @@
+[
+  {
+    "record_id": "51c1ac82-16af-5f4a-a6c6-36e833eb7684",
+    "action_id": "a7c6852a-b19b-5b26-a5ae-7dff1438928b",
+    "event_type": "action_requested",
+    "timestamp": 1780000006.0,
+    "agent_id": "agent:vector",
+    "tool_name": "tx.transfer",
+    "data": {
+      "parameters": {
+        "amount": 50000,
+        "to": "acct:9"
+      },
+      "context": {},
+      "action_category": "financial",
+      "reversibility": "irreversible",
+      "blast_radius": "shared",
+      "urgency": "irrevocable",
+      "base_risk_score": 0.875,
+      "agent_confidence": null,
+      "session_id": "",
+      "parent_action_id": null,
+      "sequence_position": 0
+    },
+    "regulatory_articles": [
+      {
+        "domain": "eu_ai_act",
+        "article": "Article 12(1)",
+        "requirement": "Automatic recording of events (logging capabilities)",
+        "how_satisfied": "Every action request is recorded with full context before processing"
+      },
+      {
+        "domain": "dora",
+        "article": "Article 12(1)",
+        "requirement": "ICT-related incident detection, including automated alert mechanisms",
+        "how_satisfied": "All agent actions are logged as events for incident detection"
+      }
+    ],
+    "previous_hash": "",
+    "record_hash": "627bc8166010bb9f62196ef8db185f74d5f93c414103088e28f7b0ca5b6ba24c",
+    "system_operation": "logging_intake",
+    "data_usage": "tool_args+context",
+    "decision_making": "n/a",
+    "limitations": null,
+    "tenant_id": "",
+    "chain_version": 2
+  },
+  {
+    "record_id": "a4f16a67-ab60-573a-9f1f-6acb3c4f2a2e",
+    "action_id": "a7c6852a-b19b-5b26-a5ae-7dff1438928b",
+    "event_type": "risk_scored",
+    "timestamp": 1780000007.0,
+    "agent_id": "agent:vector",
+    "tool_name": "tx.transfer",
+    "data": {
+      "point_estimate": 0.5,
+      "conformal_lower": 0.4,
+      "conformal_upper": 0.6,
+      "signals": {},
+      "calibration_size": 0,
+      "effective_alpha": 0.1,
+      "bucket_category": null
+    },
+    "regulatory_articles": [
+      {
+        "domain": "eu_ai_act",
+        "article": "Article 9(2)(a)",
+        "requirement": "Risk management system shall identify and analyse known and reasonably foreseeable risks",
+        "how_satisfied": "Adaptive risk scoring with conformal prediction intervals quantifies risk for every action"
+      },
+      {
+        "domain": "eu_ai_act",
+        "article": "Article 9(7)",
+        "requirement": "Testing shall be suitable to identify relevant risks",
+        "how_satisfied": "Conformal calibration provides distribution-free coverage guarantees on risk estimates"
+      }
+    ],
+    "previous_hash": "627bc8166010bb9f62196ef8db185f74d5f93c414103088e28f7b0ca5b6ba24c",
+    "record_hash": "f457fa870eee5cd5a13a4551b4aed8f073740fe8964ccc0f87daee4214e08a2e",
+    "system_operation": "scoring",
+    "data_usage": "tool_args+history+policy",
+    "decision_making": "heuristic_score",
+    "limitations": null,
+    "tenant_id": "",
+    "chain_version": 2
+  },
+  {
+    "record_id": "10c8057c-2e76-58a7-be03-5858611468b6",
+    "action_id": "a7c6852a-b19b-5b26-a5ae-7dff1438928b",
+    "event_type": "action_blocked",
+    "timestamp": 1780000008.0,
+    "agent_id": "agent:vector",
+    "tool_name": "tx.transfer",
+    "data": {
+      "decision": "deny",
+      "reason": "vector: policy returned deny",
+      "risk_score": 0.5
+    },
+    "regulatory_articles": [
+      {
+        "domain": "eu_ai_act",
+        "article": "Article 9(4)(a)",
+        "requirement": "Appropriate risk management measures shall be adopted, including elimination or reduction of risks",
+        "how_satisfied": "High-risk actions are automatically blocked with full audit trail"
+      },
+      {
+        "domain": "dora",
+        "article": "Article 10(1)",
+        "requirement": "ICT risk management framework shall include protection and prevention mechanisms",
+        "how_satisfied": "Automated blocking of high-risk actions with full incident trail"
+      }
+    ],
+    "previous_hash": "f457fa870eee5cd5a13a4551b4aed8f073740fe8964ccc0f87daee4214e08a2e",
+    "record_hash": "8a4656dd936a988f5decda7d95c73af32ada25c7fa09c5b9115d44850db7abb6",
+    "system_operation": "blocking",
+    "data_usage": "risk_score+thresholds",
+    "decision_making": "threshold_match",
+    "limitations": null,
+    "tenant_id": "",
+    "chain_version": 2
+  }
+]

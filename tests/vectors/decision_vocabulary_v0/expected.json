@@ -1,0 +1,186 @@
+{
+  "allow_plain": {
+    "conforms": true,
+    "decisions": 1,
+    "findings": [],
+    "records": 3,
+    "refinements": {},
+    "verdicts": {
+      "allow": 1
+    }
+  },
+  "chain_break": {
+    "conforms": false,
+    "decisions": 1,
+    "findings": [
+      {
+        "id": "chain_break",
+        "records": [
+          "b1b66ac5-0cdf-56aa-8c08-b8db9d066945"
+        ],
+        "severity": "required"
+      }
+    ],
+    "records": 3,
+    "refinements": {},
+    "verdicts": {
+      "allow": 1
+    }
+  },
+  "contradictory_refinement_dropped": {
+    "conforms": true,
+    "decisions": 1,
+    "findings": [],
+    "records": 1,
+    "refinements": {},
+    "verdicts": {
+      "allow": 1
+    }
+  },
+  "defer_hold": {
+    "conforms": true,
+    "decisions": 1,
+    "findings": [],
+    "records": 4,
+    "refinements": {
+      "defer": 1
+    },
+    "verdicts": {
+      "escalate": 1
+    }
+  },
+  "deny_plain": {
+    "conforms": true,
+    "decisions": 1,
+    "findings": [],
+    "records": 3,
+    "refinements": {},
+    "verdicts": {
+      "deny": 1
+    }
+  },
+  "escalate_plain": {
+    "conforms": true,
+    "decisions": 1,
+    "findings": [],
+    "records": 4,
+    "refinements": {},
+    "verdicts": {
+      "escalate": 1
+    }
+  },
+  "modify_then_retry": {
+    "conforms": true,
+    "decisions": 2,
+    "findings": [],
+    "records": 6,
+    "refinements": {
+      "modify": 1
+    },
+    "verdicts": {
+      "allow": 1,
+      "deny": 1
+    }
+  },
+  "modify_without_modification": {
+    "conforms": true,
+    "decisions": 1,
+    "findings": [],
+    "records": 3,
+    "refinements": {},
+    "verdicts": {
+      "deny": 1
+    }
+  },
+  "modify_without_retry": {
+    "conforms": true,
+    "decisions": 1,
+    "findings": [
+      {
+        "id": "modify_without_retry",
+        "records": [
+          "12f53f20-d811-52c7-a6a2-2e7d8f64fe2d"
+        ],
+        "severity": "advisory"
+      }
+    ],
+    "records": 3,
+    "refinements": {
+      "modify": 1
+    },
+    "verdicts": {
+      "deny": 1
+    }
+  },
+  "refinement_contradicts_verdict": {
+    "conforms": false,
+    "decisions": 2,
+    "findings": [
+      {
+        "id": "refinement_contradicts_verdict",
+        "records": [
+          "12f53f20-d811-52c7-a6a2-2e7d8f64fe2d"
+        ],
+        "severity": "required"
+      }
+    ],
+    "records": 6,
+    "refinements": {
+      "modify": 1
+    },
+    "verdicts": {
+      "allow": 2
+    }
+  },
+  "retry_bound_to_other_arguments": {
+    "conforms": false,
+    "decisions": 2,
+    "findings": [
+      {
+        "id": "retry_not_bound_to_proposed_arguments",
+        "records": [
+          "022d7950-c0f1-5469-b2ec-6e2511404211"
+        ],
+        "severity": "required"
+      }
+    ],
+    "records": 6,
+    "refinements": {
+      "modify": 1
+    },
+    "verdicts": {
+      "allow": 1,
+      "deny": 1
+    }
+  },
+  "step_up_hold": {
+    "conforms": true,
+    "decisions": 1,
+    "findings": [],
+    "records": 4,
+    "refinements": {
+      "step_up": 1
+    },
+    "verdicts": {
+      "escalate": 1
+    }
+  },
+  "verdict_outside_the_enum": {
+    "conforms": false,
+    "decisions": 1,
+    "findings": [
+      {
+        "id": "unknown_verdict",
+        "records": [
+          "d86b93ac-48b8-5ba2-ac19-be25979ad608"
+        ],
+        "severity": "required"
+      }
+    ],
+    "records": 4,
+    "refinements": {},
+    "verdicts": {
+      "step_up": 1
+    }
+  }
+}
