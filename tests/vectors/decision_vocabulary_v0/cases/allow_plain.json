@@ -1,0 +1,122 @@
+[
+  {
+    "record_id": "3c38a7cf-39fe-5c31-906b-90957e8f4ab7",
+    "action_id": "9447d186-a55b-59e1-95bf-1a63689954fb",
+    "event_type": "action_requested",
+    "timestamp": 1780000002.0,
+    "agent_id": "agent:vector",
+    "tool_name": "tx.transfer",
+    "data": {
+      "parameters": {
+        "amount": 50000,
+        "to": "acct:9"
+      },
+      "context": {},
+      "action_category": "financial",
+      "reversibility": "irreversible",
+      "blast_radius": "shared",
+      "urgency": "irrevocable",
+      "base_risk_score": 0.875,
+      "agent_confidence": null,
+      "session_id": "",
+      "parent_action_id": null,
+      "sequence_position": 0
+    },
+    "regulatory_articles": [
+      {
+        "domain": "eu_ai_act",
+        "article": "Article 12(1)",
+        "requirement": "Automatic recording of events (logging capabilities)",
+        "how_satisfied": "Every action request is recorded with full context before processing"
+      },
+      {
+        "domain": "dora",
+        "article": "Article 12(1)",
+        "requirement": "ICT-related incident detection, including automated alert mechanisms",
+        "how_satisfied": "All agent actions are logged as events for incident detection"
+      }
+    ],
+    "previous_hash": "",
+    "record_hash": "8ed346dc4b07b34cd3050755d1fe27c9397407c45738ae6cae7c9cf1d4403d8c",
+    "system_operation": "logging_intake",
+    "data_usage": "tool_args+context",
+    "decision_making": "n/a",
+    "limitations": null,
+    "tenant_id": "",
+    "chain_version": 2
+  },
+  {
+    "record_id": "7bf2078e-f32e-52af-bf26-a95d113a3434",
+    "action_id": "9447d186-a55b-59e1-95bf-1a63689954fb",
+    "event_type": "risk_scored",
+    "timestamp": 1780000003.0,
+    "agent_id": "agent:vector",
+    "tool_name": "tx.transfer",
+    "data": {
+      "point_estimate": 0.5,
+      "conformal_lower": 0.4,
+      "conformal_upper": 0.6,
+      "signals": {},
+      "calibration_size": 0,
+      "effective_alpha": 0.1,
+      "bucket_category": null
+    },
+    "regulatory_articles": [
+      {
+        "domain": "eu_ai_act",
+        "article": "Article 9(2)(a)",
+        "requirement": "Risk management system shall identify and analyse known and reasonably foreseeable risks",
+        "how_satisfied": "Adaptive risk scoring with conformal prediction intervals quantifies risk for every action"
+      },
+      {
+        "domain": "eu_ai_act",
+        "article": "Article 9(7)",
+        "requirement": "Testing shall be suitable to identify relevant risks",
+        "how_satisfied": "Conformal calibration provides distribution-free coverage guarantees on risk estimates"
+      }
+    ],
+    "previous_hash": "8ed346dc4b07b34cd3050755d1fe27c9397407c45738ae6cae7c9cf1d4403d8c",
+    "record_hash": "b2600a1218ccb83b3b43d4481c441dd63558b902334d880fa7befbb6d37a6314",
+    "system_operation": "scoring",
+    "data_usage": "tool_args+history+policy",
+    "decision_making": "heuristic_score",
+    "limitations": null,
+    "tenant_id": "",
+    "chain_version": 2
+  },
+  {
+    "record_id": "b1b66ac5-0cdf-56aa-8c08-b8db9d066945",
+    "action_id": "9447d186-a55b-59e1-95bf-1a63689954fb",
+    "event_type": "decision_made",
+    "timestamp": 1780000004.0,
+    "agent_id": "agent:vector",
+    "tool_name": "tx.transfer",
+    "data": {
+      "decision": "allow",
+      "reason": "vector: policy returned allow",
+      "risk_score": 0.5
+    },
+    "regulatory_articles": [
+      {
+        "domain": "eu_ai_act",
+        "article": "Article 14(1)",
+        "requirement": "High-risk AI systems shall be designed to be effectively overseen by natural persons",
+        "how_satisfied": "Three-tier decision (allow/escalate/deny) ensures humans review borderline cases"
+      },
+      {
+        "domain": "eu_ai_act",
+        "article": "Article 14(4)(a)",
+        "requirement": "The human shall be able to fully understand the capacities and limitations of the system",
+        "how_satisfied": "Decision records include risk scores, confidence intervals, and contributing signals"
+      }
+    ],
+    "previous_hash": "b2600a1218ccb83b3b43d4481c441dd63558b902334d880fa7befbb6d37a6314",
+    "record_hash": "9c18c3598f25e882781afa60e7bce31b9e2a37639c42111222338cf3ed1f9710",
+    "system_operation": "decision_threshold",
+    "data_usage": "risk_score+thresholds",
+    "decision_making": "threshold_match",
+    "limitations": null,
+    "tenant_id": "",
+    "chain_version": 2
+  }
+]
