@@ -172,29 +172,32 @@ agree is a suite that fails for reasons that have nothing to do with the code.
 
 ## State of implementation, 2026-08-26
 
-The design above is settled. **None of it is built yet.** There is no `mandate`
-symbol anywhere in the tree, so nothing here has an implementation to drift
-from, and the order below is the build order.
-
-1. **`mandate` on the grant envelope.** Optional block, covered by the existing
-   grant signature over the JCS encoding. The signature surface changes only
-   when the block is present, so every existing grant stays byte-identical and
-   every published vector still passes. This is the same constraint the
-   decision vocabulary hit on 2026-08-26 and the same answer: add, never
-   rename, and keep the absent case identical.
-2. **Digest and structural verification**, steps 1, 2, 3 and 6 of the
-   verification order. All offline, all testable with fixtures, no network.
-3. **Trusted-list resolution**, steps 4 and 5. `eu_trusted_list.py` already
-   walks the LOTL and parses national lists, but it filters on the qualified
-   timestamp service type. It needs the `EAA/Q` type alongside, plus the
-   status-at-a-time check that step 4 describes, which the timestamp path does
-   not currently need.
-4. **Wire it to `_decision_binding` and `_handoff`.** This is where the value
-   lands: a handoff that crosses an organisational boundary carrying an
-   attestation the receiving side resolves from a public register.
-5. **`qeaa_mandate_v0`**, the seven cases listed above, with pinned list
+1. **`mandate` on the grant envelope. DONE.** `src/vaara/credential/_grant_mandate.py`.
+   Optional block, covered by the existing grant signature over the JCS
+   encoding, added to the preimage only when present. A grant without one signs
+   exactly the bytes it signed before the field existed, which is asserted
+   directly rather than assumed. Closed schema on all four sub-objects, and the
+   reserved `boundVia` values reject rather than pass.
+2. **Digest verification. DONE.** `verify_mandate_binding` recomputes SHA-256
+   over the decoded attestation and compares it to the commitment. The
+   digest-only path returns true because there is nothing carried to disagree
+   with, and the docstring says why a caller wanting the bytes present must
+   check for them itself: "not carried" and "carried and wrong" must not
+   collapse into one answer. Undecodable base64 is a failed binding, not a
+   raise on the verification path.
+3. **Trusted-list resolution**, steps 4 and 5 of the verification order. **Next.**
+   `eu_trusted_list.py` already walks the LOTL and parses national lists, but
+   `parse_trusted_list` filters on `_QTST`, the qualified timestamp type. It
+   needs the `EAA/Q` type alongside, plus the status-at-a-time check step 4
+   describes, which the timestamp path never needed.
+4. **Attestation signature verification**, step 3 of the verification order.
+   Needs the provider's certificate, so it is the first piece that cannot be
+   done with invented bytes.
+5. **Wire it to `_decision_binding` and `_handoff`.** Where the value lands: a
+   handoff crossing an organisational boundary carrying an attestation the
+   receiving side resolves from a public register.
+6. **`qeaa_mandate_v0`**, the seven cases listed above, with pinned list
    fixtures.
 
-Steps 1 to 3 are self-contained and do not need a real attestation. Step 4 is
-where a real one from a live provider is needed to prove the path end to end,
-and there are now two providers to ask rather than one.
+Step 3 is self-contained and needs no real attestation. Steps 4 and 5 need one
+from a live provider, and there are now two to ask rather than one.
