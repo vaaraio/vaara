@@ -42,6 +42,7 @@ from collections import OrderedDict
 from dataclasses import dataclass
 from typing import TYPE_CHECKING, Any, Optional, Sequence
 
+from vaara._decision_vocabulary import FINE_TO_COARSE
 from vaara._sanitize import json_safe
 from pathlib import Path
 
@@ -120,37 +121,20 @@ _MAX_OVERRIDE_REASON_LEN = 8192
 _MAX_DECISION_LABEL_LEN = 64
 
 
-# The decision vocabulary, and the projection that keeps it from reaching
-# places that only understand three words.
+# The projection from the policy vocabulary onto the three words that are
+# recorded (see vaara._decision_vocabulary for the table and why it exists).
 #
-# AARM Core R4 asks for five decisions. The signed decision record can carry
-# three: published conformance checkers hold a closed verdict set and grade
-# anything else non-conforming, and independent parties already run those
-# checkers. So MODIFY, STEP_UP and DEFER are policy-layer names that project
-# onto the coarse three here, at the pipeline boundary.
-#
-# Projecting HERE rather than downstream is deliberate. Roughly a dozen call
-# sites across the integrations branch on `result.decision == "escalate"` or
-# `== "deny"` to decide whether to raise. A fine-grained name flowing out of
-# intercept() would miss every one of those branches and read as a fall-
-# through, which is a fail-OPEN in exactly the code paths that exist to stop
-# an action. `InterceptionResult.decision` therefore keeps returning the
-# coarse word and `decision_detail` carries the refinement for callers that
-# know to look.
-#
-# MODIFY maps to `deny` because the arguments it was asked about must not
-# run. The altered arguments come back to the caller in
-# `modified_parameters` and are resubmitted as a fresh intercept with its own
-# decision bound to its own digest. A decision record must never say `allow`
-# against arguments other than the ones that executed.
-_FINE_TO_COARSE: dict[str, str] = {
-    "allow": "allow",
-    "deny": "deny",
-    "escalate": "escalate",
-    "modify": "deny",
-    "step_up": "escalate",
-    "defer": "escalate",
-}
+# Projecting HERE, at the pipeline boundary rather than downstream, is
+# deliberate. Eleven call sites across the integrations branch on
+# `result.decision == "escalate"` or `== "deny"` to decide whether to raise:
+# langchain.py:173,181,353,361, openai_agents.py:152,159,272,278,
+# claude_code_hooks.py:376, mcp_server.py:658, _infer_proxy_gate.py:104. A
+# fine-grained name flowing out of intercept() would miss every one of those
+# branches and read as a fall-through, which is a fail-OPEN in exactly the
+# code paths that exist to stop an action. `InterceptionResult.decision`
+# therefore keeps returning the coarse word and `decision_detail` carries the
+# refinement for callers that know to look.
+_FINE_TO_COARSE = FINE_TO_COARSE
 
 # JSON-serialized bytes for a gate-proposed argument set. Same amplification
 # concern as _MAX_PARAMS_JSON_BYTES: this value is scorer-controlled, lands

@@ -233,6 +233,72 @@ def test_modify_records_what_it_proposed():
 
 # ── The re-decision loop, which is the point of shape (a) ─────────────────
 
+def test_the_trail_refuses_a_refinement_that_contradicts_its_decision():
+    """record_decision is reachable from custom policy code, not just here."""
+    pipeline = _pipeline(_FixedScorer("allow"))
+    pipeline.trail.record_decision(
+        action_id="a-1", agent_id="a", tool_name="tx.transfer",
+        decision="allow", reason="", risk_score=0.1,
+        decision_detail="modify", modified_parameters={"amount": 1},
+    )
+
+    record = _decision_record(pipeline, "a-1")
+    assert record.data["decision"] == "allow"
+    assert "decision_detail" not in record.data
+    assert "modified_parameters" not in record.data
+
+
+def test_the_trail_refuses_an_unknown_refinement():
+    pipeline = _pipeline(_FixedScorer("allow"))
+    pipeline.trail.record_decision(
+        action_id="a-2", agent_id="a", tool_name="tx.sign",
+        decision="escalate", reason="", risk_score=0.5,
+        decision_detail="probably",
+    )
+
+    record = _decision_record(pipeline, "a-2")
+    assert record.data["decision"] == "escalate"
+    assert "decision_detail" not in record.data
+
+
+def test_the_trail_refuses_a_coarse_word_as_a_refinement():
+    """`escalate` explains nothing about `escalate`."""
+    pipeline = _pipeline(_FixedScorer("allow"))
+    pipeline.trail.record_decision(
+        action_id="a-3", agent_id="a", tool_name="tx.sign",
+        decision="escalate", reason="", risk_score=0.5,
+        decision_detail="escalate",
+    )
+
+    assert "decision_detail" not in _decision_record(pipeline, "a-3").data
+
+
+def test_the_trail_drops_proposed_arguments_without_a_modify():
+    pipeline = _pipeline(_FixedScorer("allow"))
+    pipeline.trail.record_decision(
+        action_id="a-4", agent_id="a", tool_name="tx.sign",
+        decision="escalate", reason="", risk_score=0.5,
+        decision_detail="step_up", modified_parameters={"amount": 1},
+    )
+
+    record = _decision_record(pipeline, "a-4")
+    assert record.data["decision_detail"] == "step_up"
+    assert "modified_parameters" not in record.data
+
+
+def test_the_trail_keeps_a_consistent_refinement():
+    pipeline = _pipeline(_FixedScorer("allow"))
+    pipeline.trail.record_decision(
+        action_id="a-5", agent_id="a", tool_name="tx.transfer",
+        decision="deny", reason="", risk_score=0.9,
+        decision_detail="modify", modified_parameters={"amount": 5000},
+    )
+
+    record = _decision_record(pipeline, "a-5")
+    assert record.data["decision_detail"] == "modify"
+    assert record.data["modified_parameters"] == {"amount": 5000}
+
+
 def test_the_retry_is_a_separate_decision_bound_to_its_own_arguments():
     """No approval is ever bound to arguments other than the ones that ran."""
     scorer = _FixedScorer("modify", modified_parameters={"amount": 5000})

@@ -37,6 +37,7 @@ from enum import Enum
 from pathlib import Path
 from typing import Any, Callable, Optional
 
+from vaara._decision_vocabulary import FINE_TO_COARSE, REFINEMENTS
 from vaara._sanitize import json_safe, strict_json_dumps
 from vaara.taxonomy.actions import ActionRequest, RegulatoryDomain
 
@@ -871,6 +872,38 @@ class AuditTrail:
         articles = self._get_regulatory_articles(
             event_type, regulatory_domains,
         )
+
+        # The refinement is checked against the decision it claims to explain
+        # before either reaches the chain. The pipeline never passes an
+        # inconsistent pair, but record_decision is reachable from custom
+        # policy code, and a record saying `allow` with a `modify` refinement
+        # would be hash-chained evidence that contradicts itself. That is the
+        # exact failure the coarse/fine split exists to prevent, so an
+        # unrecognised or mismatched refinement is dropped with a warning
+        # rather than recorded: `decision` is the authoritative field and it
+        # stays true either way.
+        if decision_detail:
+            claimed = str(decision_detail).strip().lower()
+            projects_to = FINE_TO_COARSE.get(claimed)
+            if claimed not in REFINEMENTS or projects_to != decision:
+                logger.warning(
+                    "record_decision: decision_detail=%r does not refine "
+                    "decision=%r for action_id=%s; recording the decision "
+                    "without it",
+                    decision_detail, decision, action_id,
+                )
+                decision_detail = None
+                modified_parameters = None
+
+        # Proposed arguments only mean something alongside a modify. Anywhere
+        # else they are arguments nobody decided on.
+        if modified_parameters and decision_detail != "modify":
+            logger.warning(
+                "record_decision: modified_parameters supplied with "
+                "decision_detail=%r for action_id=%s; dropping them",
+                decision_detail, action_id,
+            )
+            modified_parameters = None
 
         data: dict = {
             "decision": self._cap_record_str(decision, self._MAX_DECISION_LABEL_LEN),
