@@ -62,9 +62,11 @@ pipeline, not written to match the checker.
 | `modify_without_modification` | a policy saying modify and supplying nothing, recorded as a plain deny |
 | `contradictory_refinement_dropped` | a refinement that disagreed with its decision, refused at the recording boundary |
 
-Five are what a gate **without** the projection would write. They are committed
-as non-conforming so an outside party can confirm their checker rejects them,
-not only that it accepts good records.
+Five are what a gate **without** the projection would write. Four of them are
+committed as non-conforming, so an outside party can confirm their checker
+rejects them and not only that it accepts good records. The fifth,
+`modify_without_retry`, is advisory and still conforms: it is there to pin the
+line between a record that is wrong and a caller that simply stopped.
 
 | Case | Rule it breaks |
 |---|---|

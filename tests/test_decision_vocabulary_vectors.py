@@ -6,8 +6,9 @@ The checker imports no Vaara and needs no optional dependency: a passing run
 means the committed records prove, from their own bytes, that every verdict
 stayed inside the closed three, that every refinement agreed with the verdict
 beside it, and that a retry after a modify carried exactly the arguments the
-gate proposed. The five adversarial cases prove the checker rejects the records
-a gate without the projection would write.
+gate proposed. Four adversarial cases prove the checker rejects the records a
+gate without the projection would write; a fifth is advisory and still
+conforms, which pins the line between a wrong record and a caller that stopped.
 
 The generator is gated too. Vectors that can drift from the code that produced
 them are evidence of nothing, so `--check` regenerates and fails on any diff.
