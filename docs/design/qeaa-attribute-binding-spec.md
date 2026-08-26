@@ -34,10 +34,23 @@ A Qualified Electronic Attestation of Attributes is an eIDAS trust service:
 attests an attribute of a subject, and the attestation carries a statutory
 presumption. An organisation cannot issue one about itself, by construction.
 
-As of 2026-08-05 there is exactly one granted `EAA/Q` service in the European
-Union, held by Microsec (HU), verified by walking the EU List of Trusted Lists
-with `eu_trusted_list.py` across all 31 national lists. The consuming side of
-this ecosystem is empty. That is the gap this spec occupies: Vaara is a
+Walking the EU List of Trusted Lists with `eu_trusted_list.py` on **2026-08-26**
+finds **two** granted `EAA/Q` services across the 31 national lists it points
+to:
+
+| Territory | Provider | Service |
+|---|---|---|
+| HU | Microsec Micro Software Engineering & Consulting | Issuance of Qualified Electronic Attestations of Attributes |
+| SE | IDnow Trust Services AB | IDnow Qualified electronic attestation of attributes |
+
+Two caveats on that count, both of which matter more than the number.
+The Portuguese list did not respond during the walk, so two is a floor rather
+than a ceiling. And an earlier revision of this document said there was exactly
+one, verified the same way on 2026-08-05: the field changed inside three weeks.
+**Re-walk the lists before repeating any count, and never publish "the only
+provider" from a cached figure.**
+
+The consuming side of this ecosystem is still where the gap is. Vaara is a
 relying party, not an issuer, and becoming a QTSP is neither possible nor
 necessary here.
 
@@ -153,4 +166,35 @@ Vaara.
 
 The trusted-list responses used by the negative cases are pinned fixtures, so
 the suite is deterministic and does not depend on a live national list being
-reachable at test time.
+reachable at test time. The Portuguese list being unreachable during the
+2026-08-26 walk is exactly why: a suite that needs 31 remote XML documents to
+agree is a suite that fails for reasons that have nothing to do with the code.
+
+## State of implementation, 2026-08-26
+
+The design above is settled. **None of it is built yet.** There is no `mandate`
+symbol anywhere in the tree, so nothing here has an implementation to drift
+from, and the order below is the build order.
+
+1. **`mandate` on the grant envelope.** Optional block, covered by the existing
+   grant signature over the JCS encoding. The signature surface changes only
+   when the block is present, so every existing grant stays byte-identical and
+   every published vector still passes. This is the same constraint the
+   decision vocabulary hit on 2026-08-26 and the same answer: add, never
+   rename, and keep the absent case identical.
+2. **Digest and structural verification**, steps 1, 2, 3 and 6 of the
+   verification order. All offline, all testable with fixtures, no network.
+3. **Trusted-list resolution**, steps 4 and 5. `eu_trusted_list.py` already
+   walks the LOTL and parses national lists, but it filters on the qualified
+   timestamp service type. It needs the `EAA/Q` type alongside, plus the
+   status-at-a-time check that step 4 describes, which the timestamp path does
+   not currently need.
+4. **Wire it to `_decision_binding` and `_handoff`.** This is where the value
+   lands: a handoff that crosses an organisational boundary carrying an
+   attestation the receiving side resolves from a public register.
+5. **`qeaa_mandate_v0`**, the seven cases listed above, with pinned list
+   fixtures.
+
+Steps 1 to 3 are self-contained and do not need a real attestation. Step 4 is
+where a real one from a live provider is needed to prove the path end to end,
+and there are now two providers to ask rather than one.
