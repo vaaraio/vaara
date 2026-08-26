@@ -74,10 +74,28 @@ def _coerce_optional_unit_float(value: Any) -> Optional[float]:
 # ── Decision types ────────────────────────────────────────────────────────
 
 class Decision(str, Enum):
-    """Scorer decision — allow, deny, or escalate for human review."""
+    """Scorer decision.
+
+    ALLOW, DENY and ESCALATE are the coarse vocabulary and they are frozen.
+    Published conformance checkers hold a closed verdict set (see
+    ``tests/vectors/record_set_v0/_check_independent.py``) and grade any
+    other value non-conforming, and independent parties already run those
+    checkers against pinned commits. Renaming one of these three is a
+    wire-format break dressed up as a refactor.
+
+    MODIFY, STEP_UP and DEFER are the AARM Core R4 refinements. They are
+    policy-layer names: each projects onto one of the coarse three at the
+    pipeline boundary (``vaara.pipeline._FINE_TO_COARSE``) and again at the
+    receipt boundary (``vaara.audit.receipts._VERDICT_TO_WIRE``). None of
+    them is permissive on its own, which is what keeps ``allowed`` a
+    single-meaning bool for every existing relying party.
+    """
     ALLOW = "allow"
     DENY = "deny"
     ESCALATE = "escalate"  # Human review required
+    MODIFY = "modify"      # Only with altered arguments; blocks, then retry
+    STEP_UP = "step_up"    # Only after stronger authentication; a hold
+    DEFER = "defer"        # Not now, possibly later; a hold
 
 
 @dataclass
@@ -133,7 +151,14 @@ class RiskAssessment:
                 )
 
     def to_backend_decision(self) -> dict:
-        """Convert to a plain decision dict (allowed/action/reason/backend)."""
+        """Convert to a plain decision dict (allowed/action/reason/backend).
+
+        ``allowed`` is True for ALLOW and nothing else, including the three
+        R4 refinements: MODIFY, STEP_UP and DEFER are all holds at the moment
+        the gate returns. The pipeline re-derives this bool from the decision
+        string anyway (see ``vaara.pipeline`` step 6) and does not trust the
+        value here, so the two must not be allowed to drift apart.
+        """
         return {
             "allowed": self.decision == Decision.ALLOW,
             "action": self.decision.value,

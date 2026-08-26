@@ -37,6 +37,7 @@ from enum import Enum
 from pathlib import Path
 from typing import Any, Callable, Optional
 
+from vaara._decision_vocabulary import FINE_TO_COARSE, REFINEMENTS
 from vaara._sanitize import json_safe, strict_json_dumps
 from vaara.taxonomy.actions import ActionRequest, RegulatoryDomain
 
@@ -851,8 +852,18 @@ class AuditTrail:
         reason: str,
         risk_score: float,
         regulatory_domains: frozenset[RegulatoryDomain] = frozenset(),
+        decision_detail: Optional[str] = None,
+        modified_parameters: Optional[dict] = None,
     ) -> None:
-        """Record the allow/deny/escalate decision."""
+        """Record the allow/deny/escalate decision.
+
+        ``decision`` is always one of the coarse three. ``decision_detail``
+        carries the AARM Core R4 refinement behind it when there is one
+        ("modify", "step_up", "defer"), and ``modified_parameters`` the
+        arguments a ``modify`` proposed. Both keys are omitted entirely when
+        absent, so a record without a refinement is byte-identical to one
+        written before this vocabulary existed and its hash does not move.
+        """
         event_type = (
             EventType.ACTION_BLOCKED if decision == "deny"
             else EventType.DECISION_MADE
@@ -862,6 +873,53 @@ class AuditTrail:
             event_type, regulatory_domains,
         )
 
+        # The refinement is checked against the decision it claims to explain
+        # before either reaches the chain. The pipeline never passes an
+        # inconsistent pair, but record_decision is reachable from custom
+        # policy code, and a record saying `allow` with a `modify` refinement
+        # would be hash-chained evidence that contradicts itself. That is the
+        # exact failure the coarse/fine split exists to prevent, so an
+        # unrecognised or mismatched refinement is dropped with a warning
+        # rather than recorded: `decision` is the authoritative field and it
+        # stays true either way.
+        if decision_detail:
+            claimed = str(decision_detail).strip().lower()
+            projects_to = FINE_TO_COARSE.get(claimed)
+            if claimed not in REFINEMENTS or projects_to != decision:
+                logger.warning(
+                    "record_decision: decision_detail=%r does not refine "
+                    "decision=%r for action_id=%s; recording the decision "
+                    "without it",
+                    decision_detail, decision, action_id,
+                )
+                decision_detail = None
+                modified_parameters = None
+
+        # Proposed arguments only mean something alongside a modify. Anywhere
+        # else they are arguments nobody decided on.
+        if modified_parameters and decision_detail != "modify":
+            logger.warning(
+                "record_decision: modified_parameters supplied with "
+                "decision_detail=%r for action_id=%s; dropping them",
+                decision_detail, action_id,
+            )
+            modified_parameters = None
+
+        data: dict = {
+            "decision": self._cap_record_str(decision, self._MAX_DECISION_LABEL_LEN),
+            "reason": self._cap_record_str(reason, self._MAX_DECISION_REASON_LEN),
+            "risk_score": risk_score,
+        }
+        if decision_detail:
+            data["decision_detail"] = self._cap_record_str(
+                decision_detail, self._MAX_DECISION_LABEL_LEN,
+            )
+        if modified_parameters:
+            data["modified_parameters"] = self._cap_record_dict_bytes(
+                {str(k): json_safe(v) for k, v in modified_parameters.items()},
+                self._MAX_EXECUTION_RESULT_JSON_BYTES,
+            )
+
         self._append(AuditRecord(
             record_id=str(uuid.uuid4()),
             action_id=action_id,
@@ -869,11 +927,7 @@ class AuditTrail:
             timestamp=time.time(),
             agent_id=self._cap_record_str(agent_id, self._MAX_AGENT_ID_LEN),
             tool_name=self._cap_record_str(tool_name, self._MAX_TOOL_NAME_LEN),
-            data={
-                "decision": self._cap_record_str(decision, self._MAX_DECISION_LABEL_LEN),
-                "reason": self._cap_record_str(reason, self._MAX_DECISION_REASON_LEN),
-                "risk_score": risk_score,
-            },
+            data=data,
             regulatory_articles=articles,
             tenant_id=self._tenant_for(action_id),
         ))

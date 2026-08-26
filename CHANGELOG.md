@@ -6,6 +6,22 @@ and this project follows [Semantic Versioning](https://semver.org/spec/v2.0.0.ht
 
 ## [Unreleased]
 
+### Added
+
+- `MODIFY`, `STEP_UP` and `DEFER` join `ALLOW`, `DENY` and `ESCALATE`, which covers the decision vocabulary the AARM Core registry asks for under R4. That registry names five and `Decision` now has six, because `ESCALATE` stays exactly as it was and `STEP_UP` and `DEFER` refine it rather than replace it.
+
+  The three new names do not reach the signed decision record, and that is deliberate rather than a shortcut. The record's verdict enum is a closed set of three, and it is closed inside a checker this repository publishes for outside parties to run: `tests/vectors/record_set_v0/_check_independent.py` grades a record carrying any other verdict as non-conforming. Renaming `escalate` to `step_up` would have invalidated published vectors and made the scoping text of results rows that cannot be edited become false. So the refinements are policy-layer names that project onto the coarse three, in the same table shape that already maps `deny` to `block` and `review` and `refer` to `escalate`.
+
+  `STEP_UP` and `DEFER` are holds and record `escalate`. `MODIFY` records `deny`, because the arguments it was asked about do not run. When a policy proposes different arguments they come back on `InterceptionResult.modified_parameters`, the caller resubmits them, and that resubmission is scored and recorded on its own. Two records, both true, each bound to the arguments it actually decided. No decision record ever says `allow` against arguments other than the ones that executed.
+
+  `InterceptionResult.decision` keeps returning the coarse word and `decision_detail` carries the refinement. Eleven call sites across the framework integrations branch on `decision == "escalate"` or `== "deny"` to decide whether to raise, in `langchain.py`, `openai_agents.py`, `claude_code_hooks.py`, `mcp_server.py` and `_infer_proxy_gate.py`. A finer word arriving there would have missed every one of those branches and read as a fall-through, which is a fail-open in precisely the code that exists to stop an action.
+
+  `allowed` is still true for `allow` and nothing else. All three new decisions are holds at the moment the gate returns, so no relying party has a new rule to learn.
+
+- `decision_made` audit records carry `decision_detail` and, for a modify, `modified_parameters`. Both keys are omitted when absent, so a record written without a refinement is byte-identical to one written before the vocabulary existed and its hash does not move. `decision` itself stays inside the documented three-value enum.
+
+  `record_decision` checks the refinement against the decision it claims to explain and drops it if the two disagree. The pipeline never passes an inconsistent pair, but the method is reachable from custom policy code, and a record saying `allow` with a `modify` refinement would be hash-chained evidence that contradicts itself.
+
 ## [1.77.0] - 2026-08-25
 
 ### Added
