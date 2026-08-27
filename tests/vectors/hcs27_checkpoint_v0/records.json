@@ -1,0 +1,156 @@
+[
+  {
+    "record_id": "rec-00",
+    "action_id": "act-1",
+    "event_type": "action_requested",
+    "timestamp": 1756220400.0,
+    "agent_id": "agentti-ä",
+    "tool_name": "Bash",
+    "data": {
+      "seq": 0,
+      "note": "ääkkönen"
+    },
+    "regulatory_articles": [
+      {
+        "framework": "EU AI Act",
+        "article": "12"
+      }
+    ],
+    "previous_hash": "",
+    "record_hash": "72346982a3137249ea67a77fd85bf6cccb46bc452912fdb73019bc98cb08fcef",
+    "tenant_id": "tenant-1",
+    "chain_version": 2
+  },
+  {
+    "record_id": "rec-01",
+    "action_id": "act-1",
+    "event_type": "risk_scored",
+    "timestamp": 1756220401.0,
+    "agent_id": "agentti-ä",
+    "tool_name": "Bash",
+    "data": {
+      "seq": 1,
+      "note": "ääkkönen"
+    },
+    "regulatory_articles": [
+      {
+        "framework": "EU AI Act",
+        "article": "12"
+      }
+    ],
+    "previous_hash": "72346982a3137249ea67a77fd85bf6cccb46bc452912fdb73019bc98cb08fcef",
+    "record_hash": "96f45c43dbb44ef5b5ff43ab97086fc6ed7a7043211b01bc19aed63667041e0a",
+    "tenant_id": "tenant-1",
+    "chain_version": 2
+  },
+  {
+    "record_id": "rec-02",
+    "action_id": "act-1",
+    "event_type": "decision_made",
+    "timestamp": 1756220402.0,
+    "agent_id": "agentti-ä",
+    "tool_name": "Bash",
+    "data": {
+      "seq": 2,
+      "note": "ääkkönen"
+    },
+    "regulatory_articles": [
+      {
+        "framework": "EU AI Act",
+        "article": "12"
+      }
+    ],
+    "previous_hash": "96f45c43dbb44ef5b5ff43ab97086fc6ed7a7043211b01bc19aed63667041e0a",
+    "record_hash": "1ec51f08203e1a4ea332f9393bb2588d089439c647df88b6cee0969d1d6fc421",
+    "tenant_id": "tenant-1",
+    "chain_version": 2
+  },
+  {
+    "record_id": "rec-03",
+    "action_id": "act-1",
+    "event_type": "action_executed",
+    "timestamp": 1756220403.0,
+    "agent_id": "agentti-ä",
+    "tool_name": "Bash",
+    "data": {
+      "seq": 3,
+      "note": "ääkkönen"
+    },
+    "regulatory_articles": [
+      {
+        "framework": "EU AI Act",
+        "article": "12"
+      }
+    ],
+    "previous_hash": "1ec51f08203e1a4ea332f9393bb2588d089439c647df88b6cee0969d1d6fc421",
+    "record_hash": "7cac90d0f5bf7037e9d20279c979fb0f11f3386be3272d2d67610f2f570977bc",
+    "tenant_id": "tenant-1",
+    "chain_version": 2
+  },
+  {
+    "record_id": "rec-04",
+    "action_id": "act-2",
+    "event_type": "action_requested",
+    "timestamp": 1756220404.0,
+    "agent_id": "agentti-ä",
+    "tool_name": "Write",
+    "data": {
+      "seq": 4,
+      "note": "ääkkönen"
+    },
+    "regulatory_articles": [
+      {
+        "framework": "EU AI Act",
+        "article": "12"
+      }
+    ],
+    "previous_hash": "7cac90d0f5bf7037e9d20279c979fb0f11f3386be3272d2d67610f2f570977bc",
+    "record_hash": "3b63f6e77816cb1c4c04bae7da72d58661beec396c1ee049d8e66f480895f4a4",
+    "tenant_id": "tenant-1",
+    "chain_version": 2
+  },
+  {
+    "record_id": "rec-05",
+    "action_id": "act-2",
+    "event_type": "decision_made",
+    "timestamp": 1756220405.0,
+    "agent_id": "agentti-ä",
+    "tool_name": "Write",
+    "data": {
+      "seq": 5,
+      "note": "ääkkönen"
+    },
+    "regulatory_articles": [
+      {
+        "framework": "EU AI Act",
+        "article": "12"
+      }
+    ],
+    "previous_hash": "3b63f6e77816cb1c4c04bae7da72d58661beec396c1ee049d8e66f480895f4a4",
+    "record_hash": "9b7b51fd8c00699727ad0cbe44d0b8a4fe6df5eba1ec783a1a8e3f10992f94e0",
+    "tenant_id": "tenant-1",
+    "chain_version": 2
+  },
+  {
+    "record_id": "rec-06",
+    "action_id": "act-2",
+    "event_type": "action_blocked",
+    "timestamp": 1756220406.0,
+    "agent_id": "agentti-ä",
+    "tool_name": "Write",
+    "data": {
+      "seq": 6,
+      "note": "ääkkönen"
+    },
+    "regulatory_articles": [
+      {
+        "framework": "EU AI Act",
+        "article": "12"
+      }
+    ],
+    "previous_hash": "9b7b51fd8c00699727ad0cbe44d0b8a4fe6df5eba1ec783a1a8e3f10992f94e0",
+    "record_hash": "cd2269d500caaef081098cd8cbd014cc4e82f3c0bc4e7b036f31f06b6ebd788d",
+    "tenant_id": "tenant-1",
+    "chain_version": 2
+  }
+]

@@ -1,0 +1,16 @@
+{
+  "treeSize": 7,
+  "prevTreeSize": 4,
+  "rootHashB64": "4FEQzatTory4DC2gGETEoK4QC4Kic0PpMiMsnhN07+c=",
+  "prevRootHashB64": "u1oCtZoaKY65tHiioonbN4C81Uib0BW5Pb7sxvDTA+0=",
+  "chainHead": "cd2269d500caaef081098cd8cbd014cc4e82f3c0bc4e7b036f31f06b6ebd788d",
+  "verdicts": {
+    "chainRecomputes": true,
+    "entriesBindToRecords": true,
+    "rootRecomputes": true,
+    "prevRootRecomputes": true,
+    "allInclusionProofsVerify": true,
+    "consistencyProofVerifies": true,
+    "checkpointShapeConforms": true
+  }
+}
