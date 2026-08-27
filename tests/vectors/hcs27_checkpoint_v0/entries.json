@@ -1,0 +1,93 @@
+[
+  {
+    "v": 1,
+    "recordId": "rec-00",
+    "actionId": "act-1",
+    "eventType": "action_requested",
+    "timestamp": "1756220400.0",
+    "agentId": "agentti-ä",
+    "toolName": "Bash",
+    "previousHash": "",
+    "recordHash": "72346982a3137249ea67a77fd85bf6cccb46bc452912fdb73019bc98cb08fcef",
+    "chainVersion": 2,
+    "tenantId": "tenant-1"
+  },
+  {
+    "v": 1,
+    "recordId": "rec-01",
+    "actionId": "act-1",
+    "eventType": "risk_scored",
+    "timestamp": "1756220401.0",
+    "agentId": "agentti-ä",
+    "toolName": "Bash",
+    "previousHash": "72346982a3137249ea67a77fd85bf6cccb46bc452912fdb73019bc98cb08fcef",
+    "recordHash": "96f45c43dbb44ef5b5ff43ab97086fc6ed7a7043211b01bc19aed63667041e0a",
+    "chainVersion": 2,
+    "tenantId": "tenant-1"
+  },
+  {
+    "v": 1,
+    "recordId": "rec-02",
+    "actionId": "act-1",
+    "eventType": "decision_made",
+    "timestamp": "1756220402.0",
+    "agentId": "agentti-ä",
+    "toolName": "Bash",
+    "previousHash": "96f45c43dbb44ef5b5ff43ab97086fc6ed7a7043211b01bc19aed63667041e0a",
+    "recordHash": "1ec51f08203e1a4ea332f9393bb2588d089439c647df88b6cee0969d1d6fc421",
+    "chainVersion": 2,
+    "tenantId": "tenant-1"
+  },
+  {
+    "v": 1,
+    "recordId": "rec-03",
+    "actionId": "act-1",
+    "eventType": "action_executed",
+    "timestamp": "1756220403.0",
+    "agentId": "agentti-ä",
+    "toolName": "Bash",
+    "previousHash": "1ec51f08203e1a4ea332f9393bb2588d089439c647df88b6cee0969d1d6fc421",
+    "recordHash": "7cac90d0f5bf7037e9d20279c979fb0f11f3386be3272d2d67610f2f570977bc",
+    "chainVersion": 2,
+    "tenantId": "tenant-1"
+  },
+  {
+    "v": 1,
+    "recordId": "rec-04",
+    "actionId": "act-2",
+    "eventType": "action_requested",
+    "timestamp": "1756220404.0",
+    "agentId": "agentti-ä",
+    "toolName": "Write",
+    "previousHash": "7cac90d0f5bf7037e9d20279c979fb0f11f3386be3272d2d67610f2f570977bc",
+    "recordHash": "3b63f6e77816cb1c4c04bae7da72d58661beec396c1ee049d8e66f480895f4a4",
+    "chainVersion": 2,
+    "tenantId": "tenant-1"
+  },
+  {
+    "v": 1,
+    "recordId": "rec-05",
+    "actionId": "act-2",
+    "eventType": "decision_made",
+    "timestamp": "1756220405.0",
+    "agentId": "agentti-ä",
+    "toolName": "Write",
+    "previousHash": "3b63f6e77816cb1c4c04bae7da72d58661beec396c1ee049d8e66f480895f4a4",
+    "recordHash": "9b7b51fd8c00699727ad0cbe44d0b8a4fe6df5eba1ec783a1a8e3f10992f94e0",
+    "chainVersion": 2,
+    "tenantId": "tenant-1"
+  },
+  {
+    "v": 1,
+    "recordId": "rec-06",
+    "actionId": "act-2",
+    "eventType": "action_blocked",
+    "timestamp": "1756220406.0",
+    "agentId": "agentti-ä",
+    "toolName": "Write",
+    "previousHash": "9b7b51fd8c00699727ad0cbe44d0b8a4fe6df5eba1ec783a1a8e3f10992f94e0",
+    "recordHash": "cd2269d500caaef081098cd8cbd014cc4e82f3c0bc4e7b036f31f06b6ebd788d",
+    "chainVersion": 2,
+    "tenantId": "tenant-1"
+  }
+]

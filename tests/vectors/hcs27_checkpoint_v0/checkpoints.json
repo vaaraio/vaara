@@ -1,0 +1,50 @@
+{
+  "previous": {
+    "p": "hcs-27",
+    "op": "register",
+    "metadata": {
+      "type": "ans-checkpoint-v1",
+      "stream": {
+        "registry": "vaara",
+        "log_id": "trail-demo"
+      },
+      "log": {
+        "alg": "sha-256",
+        "leaf": "sha256(jcs(vaara.trail-entry/v1))",
+        "merkle": "rfc9162"
+      },
+      "root": {
+        "treeSize": "4",
+        "rootHashB64u": "u1oCtZoaKY65tHiioonbN4C81Uib0BW5Pb7sxvDTA-0"
+      },
+      "vaaraProfile": "vaara-trail-checkpoint-v1"
+    },
+    "m": "vaara trail checkpoint, 4 records"
+  },
+  "current": {
+    "p": "hcs-27",
+    "op": "register",
+    "metadata": {
+      "type": "ans-checkpoint-v1",
+      "stream": {
+        "registry": "vaara",
+        "log_id": "trail-demo"
+      },
+      "log": {
+        "alg": "sha-256",
+        "leaf": "sha256(jcs(vaara.trail-entry/v1))",
+        "merkle": "rfc9162"
+      },
+      "root": {
+        "treeSize": "7",
+        "rootHashB64u": "4FEQzatTory4DC2gGETEoK4QC4Kic0PpMiMsnhN07-c"
+      },
+      "vaaraProfile": "vaara-trail-checkpoint-v1",
+      "prev": {
+        "treeSize": "4",
+        "rootHashB64u": "u1oCtZoaKY65tHiioonbN4C81Uib0BW5Pb7sxvDTA-0"
+      }
+    },
+    "m": "vaara trail checkpoint, 7 records"
+  }
+}

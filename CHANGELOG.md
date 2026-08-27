@@ -40,6 +40,20 @@ and this project follows [Semantic Versioning](https://semver.org/spec/v2.0.0.ht
 
   `scripts/build_decision_vocabulary_vectors.py --check` regenerates and fails on any diff, so the vectors cannot drift away from the code that produced them.
 
+- `vaara.audit.hcs27` publishes a Vaara trail head as an HCS-27 Transparency Log Checkpoint. Standard library only. `hcs27_checkpoint_v0` joins the corpus, which grows to 48 suites.
+
+  HCS-27 anchors an append-only log to a Hedera Consensus Service topic by publishing periodic Merkle checkpoints, and it says in its own words that it does not define log entry schemas. That sentence is the seam. HCS-27 supplies the commitment that a log only ever grew; Vaara supplies the record saying a specific act was permitted, by whom, under what scope. A stranger checks inclusion with a stock HCS-27 client that imports no Vaara, then re-derives `record_hash` to check the chain.
+
+  There is no Merkle implementation in the new module, because `vaara.attestation.transparency_log` already was one. It turns out to be byte-identical to the HCS-27 Merkle v1 profile, established by running the upstream `standards-sdk/src/hcs-27/merkle.ts` against it rather than by reading it. Roots agree for every tree size 0 to 64 and at every power-of-two boundary to 1025, and 110 Vaara proofs verify unmodified in the upstream `verifyInclusionProof` and `verifyConsistencyProof`. The two build the tree differently and arrive at the same root: Vaara folds bottom up and promotes an unpaired node, HCS-27 splits at the largest power of two below n and recurses.
+
+  `ensure_ascii=False` is load-bearing and is the rule that silently breaks interoperability. The leaf preimage is JCS, and Python's default escapes every umlaut to `\uXXXX`, yielding a leaf hash no other implementation reproduces. Finnish text makes that a certainty rather than an edge case, so the vector carries an umlaut in `agentId` and a regression breaks that test first. Floats are rejected outright rather than emitted, since Python writes `1.0` where JavaScript writes `1`.
+
+  This canonicalisation is not the one `AuditRecord.compute_hash` uses, which keeps the `ensure_ascii=True` default. The chain digest and the checkpoint leaf are separate functions over separate inputs on purpose, so that every trail already on disk stays verifiable.
+
+  The entry carries identity and `recordHash`, not `data` and not `regulatory_articles`. Both stay committed through `recordHash`, so anyone holding the record can still prove what was in it, while a public topic carries neither the payload nor Vaara's compliance attribution, and caller-shaped values stay out of the canonicalisation path.
+
+  Two limits are recorded rather than worked around. `metadata.type` is typed as the literal `ans-checkpoint-v1` upstream, so a standard that delegates entry schemas to consuming profiles gives a second profile no way to name itself; Vaara emits the accepted literal and carries its own identity in `stream.registry`, in the declared `log.leaf` formula and in a passthrough key. HCS-1 overflow inscription is not implemented, because a checkpoint measures 461 bytes against Hedera's 1024-byte cap, and the builder raises rather than emit an oversized message.
+
 ## [1.77.0] - 2026-08-25
 
 ### Added
