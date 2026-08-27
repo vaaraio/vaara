@@ -59,6 +59,10 @@ scitt = ["cbor2>=5.4", "cryptography>=41.0"]
 proxy = ["fastapi>=0.110", "uvicorn>=0.29", "httpx>=0.27"]
 llm-proxy = ["fastapi>=0.110", "uvicorn>=0.29", "httpx[http2]>=0.27"]
 pq = ["dilithium-py>=1.4.0"]
+# Only scripts/hcs27_publish.py needs this. vaara.audit.hcs27 builds and
+# verifies checkpoints with the standard library alone, so a machine with no
+# SDK and no Hedera account can still do everything except submit.
+hedera = ["hiero-sdk-python>=0.2.10"]
 pdf = ["reportlab>=4.0"]
 bedrock = ["boto3>=1.34"]
 azure-content-safety = ["azure-ai-contentsafety>=1.0"]
