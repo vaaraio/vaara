@@ -6,6 +6,8 @@ and this project follows [Semantic Versioning](https://semver.org/spec/v2.0.0.ht
 
 ## [Unreleased]
 
+## [1.78.0] - 2026-08-27
+
 ### Added
 
 - `MODIFY`, `STEP_UP` and `DEFER` join `ALLOW`, `DENY` and `ESCALATE`, which covers the decision vocabulary the AARM Core registry asks for under R4. That registry names five and `Decision` now has six, because `ESCALATE` stays exactly as it was and `STEP_UP` and `DEFER` refine it rather than replace it.
