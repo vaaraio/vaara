@@ -78,13 +78,24 @@ jobs:
         with:
           fetch-depth: 0
 
+      # A row keeps the terms it was filed under, and that is what makes the
+      # per-row `terms_version` worth recording. The file's CURRENT terms
+      # version is a different thing: it says which terms a new row is being
+      # filed under, and the terms text lives on main. Carrying the vcr copy's
+      # value forward meant a bump on main never reached a new row. Rows 3
+      # through 6 were stamped 2026-08-21 after the 2026-08-22 correction had
+      # already shipped, so four parties are recorded as consenting to terms
+      # that had been superseded, including the one whose objection caused the
+      # correction. Existing rows are left exactly as filed; only the top-level
+      # value is taken from main.
       - name: Bring the live rows over from the vcr branch
         run: |
           set -euo pipefail
           if git ls-remote --exit-code --heads origin vcr >/dev/null 2>&1; then
             git fetch origin vcr:vcr
-            git show vcr:vcr/reproductions.json > conformance/reproductions.json
-            echo "existing rows carried over"
+            git show vcr:vcr/reproductions.json > /tmp/live_rows.json
+            python -c "import json; b=json.load(open('conformance/reproductions.json')); l=json.load(open('/tmp/live_rows.json')); l['terms_version']=b['terms_version']; f=open('conformance/reproductions.json','w',encoding='utf-8'); json.dump(l,f,indent=2,ensure_ascii=False); f.write('\n')"
+            echo "existing rows carried over, filing under terms $(python -c "import json;print(json.load(open('conformance/reproductions.json'))['terms_version'])")"
           else
             echo "no vcr branch yet, starting from the committed baseline"
           fi
@@ -156,6 +167,37 @@ jobs:
           set -euo pipefail
           python scripts/conformance_runner.py --json /tmp/report.json
           python scripts/render_conformance_page.py /tmp/report.json webpage/conformance.html
+
+      # The page tells a reader that each published head is recorded in a log
+      # the maintainer does not operate. Nothing here was doing that. The head
+      # was witnessed by hand on 2026-08-21 with one row filed, and the next
+      # five rows landed past it, so `vcr_chain.py --check-witness` reported the
+      # tail as not pinned while the page said otherwise. This runs before the
+      # publish step so the witness entry travels in the same commit as the row.
+      #
+      # Without VCR_PUBLISH_KEY the row still files and the run says plainly
+      # that its head is unwitnessed. Blocking a contributor's row over a
+      # missing repository secret would be the worse failure, and a warning
+      # nobody reads is how this drifted the first time, so the head is named.
+      - name: Witness the new head
+        if: steps.decide.outputs.code == '0'
+        env:
+          VCR_PUBLISH_KEY: ${{ secrets.VCR_PUBLISH_KEY }}
+        run: |
+          set -euo pipefail
+          if [ -z "${VCR_PUBLISH_KEY:-}" ]; then
+            HEAD_NOW=$(python -c "import sys; sys.path.insert(0,'scripts'); import json; from vcr_chain import head_of; print(head_of(json.load(open('conformance/reproductions.json'))))")
+            echo "::warning title=Head not witnessed::VCR_PUBLISH_KEY is not set, so ${HEAD_NOW} was not published. vcr_chain.py --check-witness will report the tail as not pinned until a head is published."
+            exit 0
+          fi
+          umask 077
+          printf '%s' "${VCR_PUBLISH_KEY}" > /tmp/vcr_publish_key.pem
+          python scripts/vcr_publish_head.py conformance/reproductions.json \
+            --key /tmp/vcr_publish_key.pem --yes
+          rm -f /tmp/vcr_publish_key.pem
+          # Fails the run if the entry did not land, because a desk that reports
+          # success while the tail is unpinned is the defect this step exists for.
+          python scripts/vcr_chain.py conformance/reproductions.json --check-witness
 
       # `|| '{}'` because a rejected submission leaves `row` empty, and Actions
       # expands a step's env block before it applies the `if`, so fromJSON('')
@@ -258,7 +300,8 @@ jobs:
           set -euo pipefail
           if git ls-remote --exit-code --heads origin vcr >/dev/null 2>&1; then
             git fetch origin vcr:vcr
-            git show vcr:vcr/reproductions.json > conformance/reproductions.json
+            git show vcr:vcr/reproductions.json > /tmp/live_rows.json
+            python -c "import json; b=json.load(open('conformance/reproductions.json')); l=json.load(open('/tmp/live_rows.json')); l['terms_version']=b['terms_version']; f=open('conformance/reproductions.json','w',encoding='utf-8'); json.dump(l,f,indent=2,ensure_ascii=False); f.write('\n')"
             echo "existing rows carried over"
           else
             echo "no vcr branch yet, nothing published to refresh"
