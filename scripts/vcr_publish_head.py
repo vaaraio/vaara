@@ -137,7 +137,14 @@ def main(argv: list[str]) -> int:
         "logUrl": publication.log_url,
         "published": stamp,
     })
-    path.write_text(json.dumps(data, indent=2) + "\n", encoding="utf-8")
+    # ensure_ascii=False, because the default escapes every non-ASCII character
+    # in a party's name. Row digests come from rfc8785 over the parsed objects,
+    # so the chain survives either way, but witnessing a head once rewrote
+    # "Emek Can Dogru" with an escape sequence in the file people download.
+    # A file about recording what happened should spell the names right.
+    path.write_text(
+        json.dumps(data, indent=2, ensure_ascii=False) + "\n", encoding="utf-8"
+    )
 
     print(f"\npublished. logIndex={publication.log_index} uuid={publication.uuid}")
     print(f"recorded in {path}")
