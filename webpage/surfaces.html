@@ -15,43 +15,74 @@
 <link rel="sitemap" type="application/xml" href="/sitemap.xml">
 <style>
 :root{
-  --bg:#ececec; --panel:#FFFFFF; --deep:#ECEFEA; --ink:#1A2226;
+  color-scheme:light;
+  --bg:#ececec; --panel:#FFFFFF; --panel-2:#F1F4F0; --deep:#ECEFEA; --ink:#1A2226;
   --muted:#566159; --faint:#7C857E; --line:rgba(60,90,72,.18);
   --tri:#3E6B54; --tri-bright:#2C523E; --edge:16px;
   --sans:'Inter',-apple-system,BlinkMacSystemFont,'Segoe UI',Helvetica,Arial,sans-serif;
   --mono:ui-monospace,'SFMono-Regular','JetBrains Mono','Fira Code',Menlo,Consolas,'Liberation Mono',monospace;
 }
+/* Same three-way scheme as the other pages: an explicit choice from the toggle
+   sets data-theme and wins; without one, follow the OS. */
+html[data-theme="dark"]{
+  color-scheme:dark;
+  --bg:#0F1417; --panel:#1A2226; --panel-2:#151D20; --deep:#0B1012; --ink:#DEE4E1;
+  --muted:#8B9792; --faint:#5E6A66; --line:rgba(123,156,138,.16);
+  --tri:#78A08A; --tri-bright:#93B8A3;
+}
 @media (prefers-color-scheme:dark){
-  :root{ --bg:#0F1417; --panel:#1A2226; --deep:#0B1012; --ink:#DEE4E1;
+  html:not([data-theme]){
+    color-scheme:dark;
+    --bg:#0F1417; --panel:#1A2226; --panel-2:#151D20; --deep:#0B1012; --ink:#DEE4E1;
     --muted:#8B9792; --faint:#5E6A66; --line:rgba(123,156,138,.16);
-    --tri:#78A08A; --tri-bright:#93B8A3; }
+    --tri:#78A08A; --tri-bright:#93B8A3;
+  }
 }
 *{box-sizing:border-box}
 body{margin:0;background:var(--bg);color:var(--ink);font-family:var(--sans);
   line-height:1.55;-webkit-font-smoothing:antialiased}
 main{max-width:820px;margin:0 auto;padding:40px 22px 96px}
-.topbar{position:sticky;top:0;z-index:20;display:flex;align-items:center;
-  gap:14px;flex-wrap:wrap;padding:10px 16px;
+/* One glass bar. Mark on the left, links on the true centre, one sun/moon
+   on the right. grid 1fr auto 1fr so the links stay centred on the viewport
+   whatever the side cells weigh. No wordmark text: the mark is the mark. */
+.topbar{position:sticky;top:0;z-index:20;display:grid;
+  grid-template-columns:1fr auto 1fr;align-items:center;gap:12px;padding:9px 18px;
   background:var(--bg);
-  background:color-mix(in srgb, var(--bg) 86%, transparent);
-  backdrop-filter:saturate(1.4) blur(10px);
-  -webkit-backdrop-filter:saturate(1.4) blur(10px);
+  background:color-mix(in srgb, var(--bg) 58%, transparent);
+  backdrop-filter:saturate(1.7) blur(18px);
+  -webkit-backdrop-filter:saturate(1.7) blur(18px);
   border-bottom:1px solid var(--line)}
-.topbar .brand{font-family:var(--mono);font-size:12px;letter-spacing:.24em;
-  text-transform:uppercase;color:var(--tri);font-weight:600;text-decoration:none;
-  padding:4px 2px;margin-right:auto;border:0}
-.topbar .brand:hover{color:var(--tri-bright)}
-.nav-jump{display:inline-flex;background:var(--panel);border:1px solid var(--line);
-  border-radius:999px;padding:4px}
+.topbar .mark{justify-self:start;display:inline-flex;align-items:center;border:0;
+  line-height:0;padding:3px;border-radius:9px}
+.topbar .mark img{width:24px;height:24px;display:block}
+.topbar .mark:hover{background:var(--panel)}
+.nav-jump{justify-self:center;display:inline-flex;background:var(--panel);
+  border:1px solid var(--line);border-radius:999px;padding:4px}
 .nav-jump a{font-family:var(--mono);font-size:11px;letter-spacing:.18em;
-  text-transform:uppercase;color:var(--faint);padding:4px 11px;border-radius:999px;
+  text-transform:uppercase;color:var(--faint);padding:4px 12px;border-radius:999px;
   text-decoration:none;white-space:nowrap;border:0}
 .nav-jump a:hover{color:var(--tri);background:var(--panel-2,var(--panel))}
 .nav-jump a[aria-current="page"]{color:var(--tri);background:var(--panel-2,var(--panel))}
+.theme-toggle{justify-self:end;display:inline-flex}
+.theme-toggle button{appearance:none;background:var(--panel);border:1px solid var(--line);
+  border-radius:999px;cursor:pointer;margin:0;width:32px;height:32px;padding:0;
+  display:inline-flex;align-items:center;justify-content:center;color:var(--faint);
+  transition:color .15s ease,background .15s ease}
+.theme-toggle button:hover{color:var(--tri)}
+.theme-toggle button:focus-visible{outline:2px solid var(--tri);outline-offset:2px}
+.theme-toggle svg{width:16px;height:16px;display:block}
+/* Icon shows the mode you are about to get. Swapped in CSS, not JS, so it is
+   correct on first paint and cannot desync from the theme. */
+.theme-toggle .i-sun{display:none}
+html[data-theme="dark"] .theme-toggle .i-moon{display:none}
+html[data-theme="dark"] .theme-toggle .i-sun{display:block}
+@media (prefers-color-scheme:dark){
+  html:not([data-theme]) .theme-toggle .i-moon{display:none}
+  html:not([data-theme]) .theme-toggle .i-sun{display:block}
+}
 @media (max-width:640px){
-  .topbar{gap:8px;padding:8px 12px}
-  .topbar .brand{margin-right:0;width:100%}
-  .nav-jump a{padding:4px 8px;letter-spacing:.12em}
+  .topbar{padding:8px 12px;gap:8px}
+  .nav-jump a{padding:4px 9px;letter-spacing:.10em;font-size:10px}
 }
 a{color:var(--tri-bright);text-decoration:none;border-bottom:1px solid var(--line)}
 a:hover{border-bottom-color:var(--tri)}
@@ -75,8 +106,11 @@ footer{margin-top:52px;padding-top:20px;border-top:1px solid var(--line);
 </head>
 <body>
 <header class="topbar">
-  <a class="brand" href="/">Vaara</a>
+  <a class="mark" href="/" aria-label="Vaara home"><img src="/favicon.svg" alt="Vaara" width="24" height="24"></a>
   <nav class="nav-jump" aria-label="Sections"><a href="/verify.html">Explorer</a><a href="/conformance.html">Conformance</a><a href="/surfaces.html" aria-current="page">Published</a></nav>
+  <div class="theme-toggle">
+    <button type="button" id="themeBtn" aria-label="Switch to dark theme"><svg class="i-moon" viewBox="0 0 18 18" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M15.2 11.4A6.8 6.8 0 0 1 6.6 2.8a7 7 0 1 0 8.6 8.6z"/></svg><svg class="i-sun" viewBox="0 0 18 18" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" aria-hidden="true"><circle cx="9" cy="9" r="3.4"/><path d="M9 1.4v1.7M9 14.9v1.7M1.4 9h1.7M14.9 9h1.7M3.6 3.6l1.2 1.2M13.2 13.2l1.2 1.2M14.4 3.6l-1.2 1.2M4.8 13.2l-1.2 1.2"/></svg></button>
+  </div>
 </header>
 <main>
 
@@ -136,5 +170,32 @@ Built and maintained by Henri Sirkkavaara, Helsinki. <a href="/">vaara.io</a>
 </footer>
 
 </main>
+<script>
+(function(){
+  var root = document.documentElement;
+  var meta = document.querySelector('meta[name="theme-color"]');
+  var btn  = document.getElementById("themeBtn");
+  var COLORS = { light: "#ececec", dark: "#0F1417" };
+  function current(){
+    var t = root.getAttribute("data-theme");
+    if (t) return t;
+    return (window.matchMedia && window.matchMedia("(prefers-color-scheme: dark)").matches) ? "dark" : "light";
+  }
+  function label(){
+    if (btn) btn.setAttribute("aria-label", current() === "dark" ? "Switch to light theme" : "Switch to dark theme");
+  }
+  function apply(theme) {
+    root.setAttribute("data-theme", theme === "dark" ? "dark" : "light");
+    if (meta) meta.setAttribute("content", COLORS[theme] || COLORS.light);
+    try { localStorage.setItem("vaara-theme", theme); } catch(e) {}
+    label();
+  }
+  function reflectAuto(){ root.removeAttribute("data-theme"); label(); }
+  if (btn) btn.addEventListener("click", function(){ apply(current() === "dark" ? "light" : "dark"); });
+  var saved = null;
+  try { saved = localStorage.getItem("vaara-theme"); } catch(e) {}
+  if (saved === "dark" || saved === "light") apply(saved); else reflectAuto();
+})();
+</script>
 </body>
 </html>
