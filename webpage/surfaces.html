@@ -1,0 +1,113 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<title>What Vaara publishes | Every checkable surface in one place</title>
+<meta name="description" content="Every page, record and package Vaara publishes, each in one line: six independent reproductions of the conformance vectors, the receipt Internet-Draft, the verifier, the packages and the documents. Each item links to the thing itself.">
+<meta name="author" content="Henri Sirkkavaara">
+<meta name="robots" content="index, follow, max-snippet:-1">
+<meta name="theme-color" content="#ececec">
+<link rel="canonical" href="https://vaara.io/surfaces.html">
+<link rel="icon" type="image/svg+xml" href="/favicon.svg">
+<link rel="alternate icon" href="/favicon.ico">
+<link rel="apple-touch-icon" href="/favicon-180.png">
+<link rel="sitemap" type="application/xml" href="/sitemap.xml">
+<style>
+:root{
+  --bg:#ececec; --panel:#FFFFFF; --deep:#ECEFEA; --ink:#1A2226;
+  --muted:#566159; --faint:#7C857E; --line:rgba(60,90,72,.18);
+  --tri:#3E6B54; --tri-bright:#2C523E; --edge:16px;
+  --sans:'Inter',-apple-system,BlinkMacSystemFont,'Segoe UI',Helvetica,Arial,sans-serif;
+  --mono:ui-monospace,'SFMono-Regular','JetBrains Mono','Fira Code',Menlo,Consolas,'Liberation Mono',monospace;
+}
+@media (prefers-color-scheme:dark){
+  :root{ --bg:#0F1417; --panel:#1A2226; --deep:#0B1012; --ink:#DEE4E1;
+    --muted:#8B9792; --faint:#5E6A66; --line:rgba(123,156,138,.16);
+    --tri:#78A08A; --tri-bright:#93B8A3; }
+}
+*{box-sizing:border-box}
+body{margin:0;background:var(--bg);color:var(--ink);font-family:var(--sans);
+  line-height:1.55;-webkit-font-smoothing:antialiased}
+main{max-width:820px;margin:0 auto;padding:56px 22px 96px}
+a{color:var(--tri-bright);text-decoration:none;border-bottom:1px solid var(--line)}
+a:hover{border-bottom-color:var(--tri)}
+h1{font-size:clamp(1.5rem,4vw,2.1rem);line-height:1.2;margin:0 0 10px;letter-spacing:-.02em}
+.lede{color:var(--muted);margin:0 0 8px;max-width:62ch}
+.stamp{font-family:var(--mono);font-size:.76rem;color:var(--faint);margin:0 0 40px}
+h2{font-size:.79rem;text-transform:uppercase;letter-spacing:.1em;color:var(--tri);
+  margin:38px 0 12px;font-weight:600}
+ul{list-style:none;margin:0;padding:0}
+li{padding:9px 0;border-bottom:1px solid var(--line);display:flex;gap:14px;
+  align-items:baseline;flex-wrap:wrap}
+li:last-child{border-bottom:none}
+.name{font-weight:600;min-width:190px;flex:0 0 auto}
+.what{color:var(--muted);font-size:.92rem;flex:1 1 260px}
+.res{font-family:var(--mono);font-size:.76rem;color:var(--faint);flex:0 0 auto}
+.note{background:var(--panel);border:1px solid var(--line);border-radius:var(--edge);
+  padding:16px 18px;margin:34px 0 0;color:var(--muted);font-size:.9rem}
+footer{margin-top:52px;padding-top:20px;border-top:1px solid var(--line);
+  color:var(--faint);font-size:.82rem;font-family:var(--mono)}
+</style>
+</head>
+<body>
+<main>
+
+<h1>What Vaara publishes</h1>
+<p class="lede">Every surface in one line each, with a link to the thing itself. Nothing here asks you to take a claim on trust. Each item is either a record held by someone else or a file you can recompute.</p>
+<p class="stamp">vaara.io &middot; last reviewed 2026-08-29</p>
+
+<h2>Independent reproductions</h2>
+<p class="lede">Six parties ran the conformance vectors and published their own results. Each checker imports none of Vaara's code. Rows are filed through an issue form rather than curated, and a run that disagrees is a row on the same terms.</p>
+<ul>
+  <li><span class="name"><a href="/badge/babyblueviper1-invinoveritas.html">babyblueviper1</a></span><span class="what">invinoveritas &middot; 2026-08-19</span><span class="res">40 passed, 0 failed, 3 skipped</span></li>
+  <li><span class="name"><a href="/badge/nenad-vasic-elara-protocol.html">Nenad Vasic</a></span><span class="what">Elara Protocol, AI-agent-maintained and disclosed &middot; 2026-08-21</span><span class="res">45 passed, 0 failed, 1 skipped</span></li>
+  <li><span class="name"><a href="/badge/emek-can-dogru.html">Emek Can Do&#287;ru</a></span><span class="what">Verax Teknoloji &middot; 2026-08-24</span><span class="res">45 passed, 0 failed, 1 skipped</span></li>
+  <li><span class="name"><a href="/badge/council-of-ai.html">Council of AI</a></span><span class="what">Independent AI measurement body &middot; 2026-08-25</span><span class="res">43 passed, 0 failed, 3 skipped</span></li>
+  <li><span class="name"><a href="/badge/iman-schrock.html">Iman Schrock</a></span><span class="what">EMILIA Protocol &middot; 2026-08-25</span><span class="res">41 passed, 0 failed, 3 skipped</span></li>
+  <li><span class="name"><a href="/badge/yutao-peng.html">YuTao Peng</a></span><span class="what">Insight &middot; 2026-08-26</span><span class="res">43 passed, 0 failed, 3 skipped</span></li>
+</ul>
+
+<h2>Check it yourself</h2>
+<ul>
+  <li><span class="name"><a href="/conformance.html">Conformance results</a></span><span class="what">The register, its terms, and how to file a row of your own</span></li>
+  <li><span class="name"><a href="/verify.html">Verifier</a></span><span class="what">Recompute a receipt in the browser, offline, without contacting Vaara</span></li>
+  <li><span class="name"><a href="/conformance.json">conformance.json</a></span><span class="what">The register as machine-readable data, hash-chained row to row</span></li>
+  <li><span class="name"><a href="/badge/conformance.svg">Badge</a></span><span class="what">Current row count, regenerated from the register</span></li>
+</ul>
+
+<h2>Specification</h2>
+<ul>
+  <li><span class="name"><a href="https://datatracker.ietf.org/doc/draft-sirkkavaara-vaara-receipt/">draft-sirkkavaara-vaara-receipt</a></span><span class="what">The receipt format at the IETF. An active Internet-Draft, not an RFC and not an adopted standard</span></li>
+  <li><span class="name"><a href="https://github.com/vaaraio/vaara/blob/main/docs/standards.md">Standards used</a></span><span class="what">RFC 8785 canonicalisation, COSE_Sign1, RFC 3161 timestamps, and what each one is relied on for</span></li>
+</ul>
+
+<h2>Code and packages</h2>
+<ul>
+  <li><span class="name"><a href="https://github.com/vaaraio/vaara">Source</a></span><span class="what">AGPL-3.0, no SaaS, no telemetry</span></li>
+  <li><span class="name"><a href="https://pypi.org/project/vaara/">PyPI</a></span><span class="what">vaara</span></li>
+  <li><span class="name"><a href="https://www.npmjs.com/package/@vaara/client">npm</a></span><span class="what">@vaara/client</span></li>
+  <li><span class="name"><a href="https://github.com/marketplace/actions/vaara-policy-check">GitHub Action</a></span><span class="what">Vaara Policy Check</span></li>
+  <li><span class="name"><a href="https://www.bestpractices.dev/projects/12612">OpenSSF Best Practices</a></span><span class="what">Passing badge, assessed by OpenSSF and not by Vaara</span></li>
+</ul>
+
+<h2>Documents</h2>
+<ul>
+  <li><span class="name"><a href="https://github.com/vaaraio/vaara/blob/main/docs/logs-vs-evidence.md">Logs versus evidence</a></span><span class="what">Why a log your own system wrote does not establish what happened</span></li>
+  <li><span class="name"><a href="https://github.com/vaaraio/vaara/blob/main/docs/eu-ai-act-article-12.md">EU AI Act Article 12</a></span><span class="what">Record-keeping, and where a log stops being sufficient</span></li>
+  <li><span class="name"><a href="https://github.com/vaaraio/vaara/blob/main/docs/execution-receipts.md">Execution receipts</a></span><span class="what">Pairing a tool call to the policy that allowed it</span></li>
+  <li><span class="name"><a href="https://github.com/vaaraio/vaara/blob/main/COMPLIANCE.md">Compliance mapping</a></span><span class="what">What Vaara covers, and what it does not</span></li>
+  <li><span class="name"><a href="/llms.txt">llms.txt</a></span><span class="what">The same ground in one file, for machine readers</span></li>
+</ul>
+
+<div class="note">
+Vaara produces evidence. It does not certify anyone, and a passing run establishes portability rather than correctness. Two of the defects found so far were in the claims on this site rather than in the code, and both were found by people running the vectors somewhere Vaara had never run them.
+</div>
+
+<footer>
+Built and maintained by Henri Sirkkavaara, Helsinki. <a href="/">vaara.io</a>
+</footer>
+
+</main>
+</body>
+</html>
