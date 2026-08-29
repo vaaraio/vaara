@@ -194,13 +194,12 @@
      means it can never run under them at any width or scroll position. Below
      the breakpoint the controls return to normal flow, where the overlap
      cannot happen at all. */
-  main { max-width: min(760px, calc(100vw - 2*(2*var(--edge) + var(--ctrl)))); margin: 0 auto; }
-  :root{--edge:16px;--ctrl:11.5rem}
-  @media (max-width:900px){
-    .nav-jump,.theme-toggle{position:static;top:auto;left:auto;right:auto}
-    .nav-jump{margin:14px 0 0 16px}
-    .theme-toggle{margin:14px 16px 0;justify-content:flex-end}
-    main{max-width:760px}
+  main { max-width:760px; margin: 0 auto; }
+  :root{--edge:16px}
+  @media (max-width:640px{
+    .topbar{gap:8px;padding:8px 12px}
+    .topbar .brand{margin-right:0;width:100%}
+    .nav-jump a{padding:4px 8px;letter-spacing:.12em}
   }
 
   h1 { font-family:var(--sans); font-size:18px; font-weight:500; margin:24px 0 12px;
@@ -214,7 +213,7 @@
              text-transform:uppercase; color:var(--faint); font-weight:600; }
   .tile .v { font-family:var(--mono); font-size:15px; color:var(--ink); margin-top:6px;
              word-break:break-all; }
-  @media (max-width:560px){ .tiles{grid-template-columns:1fr} }
+  @media (max-width:560px{ .tiles{grid-template-columns:1fr} }
   .drop { border:1px dashed var(--line); border-radius:8px; padding:1.5rem;
           background:var(--panel); text-align:center; color:var(--dim);
           transition:border-color .15s; }
@@ -251,15 +250,31 @@
     html:not([data-theme]) .wordmark .wm-light { display: none; }
     html:not([data-theme]) .wordmark .wm-dark { display: inline-block; }
   }
-  .nav-jump{position:fixed;top:14px;left:16px;z-index:10;display:inline-flex;
-    background:var(--panel);border:1px solid var(--line);border-radius:999px;padding:4px}
+  /* One sticky bar, in the mono label grammar (no icons).
+     Was two fixed clusters floating over the text, which reached five
+     controls once the surfaces page was added and forced the column to be
+     narrowed by a --ctrl guard so text could not run under them.
+     A sticky bar is in normal flow, so the guard is gone with it. */
+  .topbar{position:sticky;top:0;z-index:20;display:flex;align-items:center;
+    gap:14px;flex-wrap:wrap;padding:10px 16px;
+    background:var(--bg);
+    background:color-mix(in srgb, var(--bg) 86%, transparent);
+    backdrop-filter:saturate(1.4) blur(10px);
+    -webkit-backdrop-filter:saturate(1.4) blur(10px);
+    border-bottom:1px solid var(--line)}
+  .topbar .brand{font-family:var(--mono);font-size:12px;letter-spacing:.24em;
+    text-transform:uppercase;color:var(--tri);font-weight:600;text-decoration:none;
+    padding:4px 2px;margin-right:auto;border:0}
+  .topbar .brand:hover{color:var(--tri-bright)}
+  .nav-jump{display:inline-flex;background:var(--panel);border:1px solid var(--line);
+    border-radius:999px;padding:4px}
   .nav-jump a{font-family:var(--mono);font-size:11px;letter-spacing:.18em;
     text-transform:uppercase;color:var(--faint);padding:4px 11px;border-radius:999px;
     text-decoration:none}
   .nav-jump a:hover{color:var(--tri);background:var(--panel-2)}
   .stamp-lead{font-family:var(--mono);font-size:12px;letter-spacing:.24em;
     text-transform:uppercase;color:var(--tri);font-weight:600;margin:2rem 0 .8rem}
-  .theme-toggle{position:fixed;top:14px;right:16px;z-index:10;display:inline-flex;
+  .theme-toggle{display:inline-flex;
     gap:2px;background:var(--panel);border:1px solid var(--line);border-radius:999px;padding:4px}
   .theme-toggle button{appearance:none;background:none;border:0;cursor:pointer;margin:0;
     font-family:var(--mono);font-size:11px;letter-spacing:.18em;text-transform:uppercase;
@@ -296,7 +311,7 @@
   .searchrow { display:flex; gap:.5rem; align-items:stretch; }
   .searchrow input { flex:1 1 auto; min-width:0; font-size:13px; padding:.7rem .8rem; }
   .searchrow button { margin-top:0; white-space:nowrap; }
-  @media (max-width:560px) {
+  @media (max-width:560px {
     .searchrow { flex-wrap:wrap; }
     .searchrow input { flex:1 1 100%; }
   }
@@ -313,11 +328,14 @@
 </script>
 </head>
 <body>
-<nav class="nav-jump"><a href="/">Home</a></nav>
-<div class="theme-toggle" role="group" aria-label="Color theme">
-  <button type="button" data-set-theme="light" aria-pressed="true">light</button>
-  <button type="button" data-set-theme="dark" aria-pressed="false">dark</button>
-</div>
+<header class="topbar">
+  <a class="brand" href="/">Vaara</a>
+  <nav class="nav-jump" aria-label="Sections"><a href="/verify.html" aria-current="page">Explorer</a><a href="/conformance.html">Conformance</a><a href="/surfaces.html">Published</a></nav>
+  <div class="theme-toggle" role="group" aria-label="Color theme">
+    <button type="button" data-set-theme="light" aria-pressed="true">light</button>
+    <button type="button" data-set-theme="dark" aria-pressed="false">dark</button>
+  </div>
+</header>
 <main>
   <div class="wordmark">
     <a href="/"><img class="wm-light" src="/vaara-wordmark-light.png" alt="Vaara" width="440" height="127"></a>
