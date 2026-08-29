@@ -52,7 +52,7 @@
     "added afterwards and never reaches back to somebody who agreed to",
     "something else."
   ],
-  "terms_version": "2026-08-21",
+  "terms_version": "2026-08-22",
   "genesis": "sha256:0000000000000000000000000000000000000000000000000000000000000000",
   "witnessed_heads": [
     {
