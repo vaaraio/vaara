@@ -43,6 +43,7 @@ LIMITS = {
     "result": 300,
     "their_scoping": 600,
     "record": 400,
+    "prior_art": 400,
 }
 
 FIELDS = {
@@ -54,6 +55,7 @@ FIELDS = {
     "Kind of run": "kind",
     "Your own scoping": "their_scoping",
     "Link to where you reported it": "record",
+    "Prior art": "prior_art",
 }
 
 #: What a run establishes is a property of who wrote the verifier and who wrote
@@ -322,7 +324,7 @@ def validate(fields: dict, author: str) -> dict:
     if not result:
         raise Rejected("The result is required.")
 
-    return {
+    row = {
         "party": party,
         "affiliation": str(fields.get("affiliation", "")).strip(),
         "suites": suites,
@@ -333,6 +335,13 @@ def validate(fields: dict, author: str) -> dict:
         "record": record,
         "submitted_by": author,
     }
+    # Only carried when the submitter gave one. Adding an empty key to every
+    # row would change the JCS bytes of rows that say nothing new, and the
+    # digest is supposed to move only when the content does.
+    prior_art = str(fields.get("prior_art", "")).strip()
+    if prior_art:
+        row["prior_art"] = prior_art
+    return row
 
 
 def row_digest(row: dict) -> str:

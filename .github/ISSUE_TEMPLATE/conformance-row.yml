@@ -68,7 +68,8 @@ body:
       description: >
         What your run establishes, which is a property of who wrote the
         verifier and who wrote the vectors, not of how well it went. These are
-        not degrees of the same thing. A row that does not name its kind reads
+        not degrees of the same thing. Naming one is required, so a new row
+        cannot arrive without a kind. Rows filed before this field existed read
         as the first one, because that is the weakest claim available.
       options:
         - "Reproduction: the author's checkers over the author's vectors"
@@ -100,6 +101,19 @@ body:
       placeholder: "https://mailarchive.ietf.org/arch/msg/..."
     validations:
       required: true
+  - type: textarea
+    id: prior-art
+    attributes:
+      label: Prior art
+      description: >
+        Optional. If the phenomenon your run turns on is already on the public
+        record, cite it here, and say what is new to this register rather than
+        what is new to the world. A row that names its prior art is stronger
+        than one that does not, because a reader can tell the difference
+        between finding something and being the first to raise it here.
+      placeholder: "draft-example-00 Section 6.2.1, or a paper, or a prior issue"
+    validations:
+      required: false
   - type: markdown
     attributes:
       value: |
