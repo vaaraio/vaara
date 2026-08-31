@@ -47,7 +47,7 @@
       "url": "https://vaara.io/conformance.html",
       "name": "Vaara Conformance Results",
       "description": "Every Vaara conformance suite, its verdict, and every independent party who reproduced the vectors and said so in public. Generated from the runner's own report.",
-      "dateModified": "2026-08-26T16:32:22Z",
+      "dateModified": "2026-08-29T12:12:27Z",
       "inLanguage": "en",
       "isPartOf": {
         "@id": "https://vaara.io/#website"
@@ -96,7 +96,7 @@
       "alternateName": "Vaara conformance corpus",
       "description": "Committed case files for every Vaara conformance suite. Each suite ships an independent checker that imports no Vaara code and recomputes its verdicts from the bytes of its own cases, so a stranger can disagree with an expected result and show their work. The vectors are Vaara's own and no ratification body stands behind them.",
       "url": "https://vaara.io/conformance.html",
-      "dateModified": "2026-08-26T16:32:22Z",
+      "dateModified": "2026-08-29T12:12:27Z",
       "identifier": "https://doi.org/10.5281/zenodo.22027975",
       "sameAs": [
         "https://doi.org/10.5281/zenodo.22027975",
@@ -210,17 +210,11 @@
   *{box-sizing:border-box}
   body{margin:0;background:var(--bg);color:var(--ink);font-family:var(--sans);
        line-height:1.55;-webkit-font-smoothing:antialiased}
-  /* Fixed controls sit against the viewport edge. The centred column is capped
-     so it leaves the control plus the same edge gap again on each side, which
-     means it can never run under them at any width or scroll position. Below
-     the breakpoint the controls return to normal flow, where the overlap
-     cannot happen at all. */
-  .wrap{max-width:940px;margin:0 auto;padding:56px 22px 96px}
+  /* The column is a plain cap. It used to be narrowed by the width of the
+     floating controls so text could not run under them; the sticky bar is in
+     normal flow, so the guard is gone. */
+  .wrap{max-width:940px;margin:0 auto;padding:40px 22px 96px}
   :root{--edge:16px}
-  @media (max-width:640px{
-    .topbar{gap:8px;padding:8px 12px}
-    .nav-jump a{padding:4px 8px;letter-spacing:.12em}
-  }
 
   a{color:var(--tri-bright);text-decoration:none;border-bottom:1px solid var(--line)}
   a:hover{border-bottom-color:var(--tri)}
@@ -310,8 +304,8 @@
   .nav-jump a{font-family:var(--mono);font-size:11px;letter-spacing:.18em;
     text-transform:uppercase;color:var(--faint);padding:4px 12px;border-radius:999px;
     text-decoration:none;white-space:nowrap;border:0}
-  .nav-jump a:hover{color:var(--tri);background:var(--panel-2,var(--panel))}
-  .nav-jump a[aria-current="page"]{color:var(--tri);background:var(--panel-2,var(--panel))}
+  .nav-jump a:hover{color:var(--tri);background:var(--panel-2)}
+  .nav-jump a[aria-current="page"]{color:var(--tri);background:var(--panel-2)}
   .theme-toggle{justify-self:end;display:inline-flex}
   .theme-toggle button{appearance:none;background:var(--panel);border:1px solid var(--line);
     border-radius:999px;cursor:pointer;margin:0;width:32px;height:32px;padding:0;
@@ -372,7 +366,7 @@
     <div class="stat"><b>1</b><span>skipped</span></div>
     <div class="stat"><b>88</b><span>cases</span></div>
   </div>
-  <p class="mono" style="color:var(--faint)">generated 2026-08-26T16:32:22Z</p>
+  <p class="mono" style="color:var(--faint)">generated 2026-08-29T12:12:27Z</p>
 
   <h2>Run it yourself</h2>
   <p>Nothing here needs Vaara installed. The checkers use the standard library
