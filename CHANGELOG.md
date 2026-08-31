@@ -6,6 +6,20 @@ and this project follows [Semantic Versioning](https://semver.org/spec/v2.0.0.ht
 
 ## [Unreleased]
 
+## [1.79.0] - 2026-08-31
+
+### Added
+
+- Three scripts put an HCS-27 checkpoint on a Hedera topic and read it back off one. The module shipped in 1.78.0 could build a checkpoint and nothing could publish or retrieve it. The split between the three is the point: everything needing an account lives in `scripts/hcs27_publish.py`, behind a new `hedera` extra, while `scripts/hcs27_mirror_check.py` reads a topic off the public mirror node and recomputes the published root with no account, no key and no install. The checker imports nothing outside the standard library, no Vaara and no Hedera SDK, and a test now asserts that rather than leaving it as an intention. `scripts/demo_mcp_guardian.py` drives the pipeline over a persistent trail, prints what the gate decided, checkpoints the head and submits it.
+
+  Three defects came out of running these against a real network rather than reasoning about them. A raw 32-byte private key is ambiguous, because an Ed25519 seed cannot be distinguished from an ECDSA scalar, so both parse and the failure arrives at submit time naming neither cause; `HEDERA_KEY_TYPE` now selects the parser and defaults to ed25519. One topic may legitimately carry several logs, and HCS-27 gives each a `stream.log_id`, so `prev` chains within a log and says nothing across logs; chaining per topic reported a false break the moment a second stream shared a topic. And `prev` chaining alone does not prove append-only growth, because a publisher that discards a log and starts another still produces a chain that links, so a shrinking tree and a tree that kept its size while its root moved are now both caught from the checkpoints alone. The general case needs an RFC 9162 consistency proof, which HCS-27 serves off-ledger, and the file says so.
+
+### Fixed
+
+- The checker is pinned by 28 tests that touch no network. The two Merkle constructions are asserted to agree at every tree size 0 to 64 and at 2^k either side up to 1025, rather than re-derived by inspection, and each of the three defects above has a test that fails when its fix is removed.
+
+  One claim from the scripts' own description did not survive those tests. `vaara.audit.hcs27` uses only the standard library in its own code, so a machine with no SDK and no Hedera account can do everything except submit, but importing it goes through the `vaara` package, which brings numpy and joblib with it. The test asserts the first and records that it does not cover the second. The checker script carries no such caveat.
+
 ## [1.78.0] - 2026-08-27
 
 ### Added
