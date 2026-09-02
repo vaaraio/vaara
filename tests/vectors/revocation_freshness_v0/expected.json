@@ -1,0 +1,44 @@
+{
+  "fresh_clean": {
+    "establishes_current": true,
+    "freshness": "fresh",
+    "registry_digest": "sha256:7f5430e76cc3b309b1aa4f463011502d90c4c3b671a070a77d388cf226a5febd",
+    "revoked": false
+  },
+  "future_as_of": {
+    "establishes_current": false,
+    "freshness": "unknown",
+    "registry_digest": "sha256:26356ffc246512a1f8ede4cb8f6c962666185405db0e9a73e274127e097d2146",
+    "revoked": false
+  },
+  "revoked_fresh": {
+    "establishes_current": false,
+    "freshness": "fresh",
+    "registry_digest": "sha256:886ee24a3a89421249afbc4fba13b6c68da810ea64c363bd3260add94c3555cb",
+    "revoked": true
+  },
+  "revoked_stale": {
+    "establishes_current": false,
+    "freshness": "stale",
+    "registry_digest": "sha256:d1bef942713515165e675e6e43edeb5947bd7caf76c94c55ec42cb243214a521",
+    "revoked": true
+  },
+  "stale_clean": {
+    "establishes_current": false,
+    "freshness": "stale",
+    "registry_digest": "sha256:7f5430e76cc3b309b1aa4f463011502d90c4c3b671a070a77d388cf226a5febd",
+    "revoked": false
+  },
+  "unbounded_clean": {
+    "establishes_current": false,
+    "freshness": "unknown",
+    "registry_digest": "sha256:7f5430e76cc3b309b1aa4f463011502d90c4c3b671a070a77d388cf226a5febd",
+    "revoked": false
+  },
+  "undated_clean": {
+    "establishes_current": false,
+    "freshness": "unknown",
+    "registry_digest": "sha256:a6a20076da005b27c9afc3a5d5b2457798c0ac817d1abc38b2fee4398ac3f133",
+    "revoked": false
+  }
+}
