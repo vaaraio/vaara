@@ -43,6 +43,11 @@ from vaara.attestation._receipt_types import ExecutionReceipt
 
 RevocationScope = Literal["key", "identity"]
 
+# How recent the registry was, relative to the bound the deployment stated.
+# "unknown" is the honest default: it is what a registry with no observation
+# instant, or a caller who named no bound, is entitled to claim.
+RevocationFreshness = Literal["fresh", "stale", "unknown"]
+
 
 def _parse_iso(value: object) -> Optional[datetime]:
     """Parse an ISO 8601 instant to an aware UTC datetime, or None.
@@ -121,13 +126,26 @@ class RevocationEntry:
 
 @dataclass(frozen=True)
 class RevocationStatus:
-    """Verdict of a revocation check.
+    """Verdict of a revocation check, and the freshness bound it was decided under.
 
     ``revoked`` is the single answer: was the receipt's issuer (or its bound
     key) revoked at or before the receipt was issued. ``revoked_at`` and
     ``matched_by`` name the binding entry when one matched. ``issued_at`` is
     surfaced so a verifier with a stronger time anchor than the receipt's
     self-asserted ``iat`` can re-decide.
+
+    ``registry_as_of`` and ``freshness`` carry what the verdict cannot
+    establish on its own. A revocation check is a computation over the
+    entries the verifier holds, so a ``revoked=False`` answer only ever means
+    "nothing in this registry revoked it", never "the key is valid now".
+    ``freshness`` says whether the registry was recent enough for the
+    deployment's stated bound: ``"fresh"``, ``"stale"``, or ``"unknown"``
+    when no ``as_of`` or no bound was supplied.
+
+    The asymmetry is deliberate. A revocation the verifier can see is binding
+    however old the registry is, because the fact does not expire. Only the
+    negative verdict weakens with staleness, so :attr:`establishes_current`
+    is true for exactly one combination.
     """
 
     revoked: bool
@@ -135,6 +153,19 @@ class RevocationStatus:
     revoked_at: Optional[str]
     issued_at: Optional[str]
     reason: str
+    registry_as_of: Optional[str] = None
+    freshness: RevocationFreshness = "unknown"
+
+    @property
+    def establishes_current(self) -> bool:
+        """Whether this verdict may be read as a statement about now.
+
+        Only a not-revoked answer from a registry observed inside the
+        deployment's stated staleness bound. Everything else, including a
+        clean answer from a registry with no ``as_of``, says something about
+        the past and must not be promoted to a claim about the present.
+        """
+        return not self.revoked and self.freshness == "fresh"
 
 
 class RevocationRegistry:
@@ -147,15 +178,61 @@ class RevocationRegistry:
     a receipt gets the same revoked verdict whichever lens looks.
     """
 
-    def __init__(self, entries: Iterable[RevocationEntry] = ()) -> None:
+    def __init__(
+        self,
+        entries: Iterable[RevocationEntry] = (),
+        *,
+        as_of: Optional[str] = None,
+    ) -> None:
         self._entries: tuple[RevocationEntry, ...] = tuple(entries)
+        self._as_of = as_of
 
     @property
     def entries(self) -> tuple[RevocationEntry, ...]:
         return self._entries
 
+    @property
+    def as_of(self) -> Optional[str]:
+        """When this registry was observed, if the source said.
+
+        A registry carries facts about revocations up to some instant. Without
+        that instant a verifier cannot say how far into the past its clean
+        answer reaches, which is why its absence produces ``"unknown"``
+        freshness rather than being quietly treated as current.
+        """
+        return self._as_of
+
     def __len__(self) -> int:
         return len(self._entries)
+
+    def freshness(
+        self,
+        *,
+        now: Optional[str] = None,
+        max_staleness_seconds: Optional[float] = None,
+    ) -> RevocationFreshness:
+        """How recent this registry is against a stated staleness bound.
+
+        Returns ``"unknown"`` unless the registry carries an ``as_of``, the
+        caller states a bound, and both instants parse. That is not a
+        degraded answer, it is the correct one: without an observation
+        instant and a deployment-stated bound there is no basis on which to
+        call a clean verdict current.
+
+        A registry observed after ``now`` is treated as ``"unknown"`` rather
+        than fresh, because a future observation instant means the two clocks
+        disagree and the bound cannot be evaluated honestly.
+        """
+        if self._as_of is None or max_staleness_seconds is None:
+            return "unknown"
+        observed = _parse_iso(self._as_of)
+        current = _parse_iso(now) if now is not None else datetime.now(timezone.utc)
+        if observed is None or current is None:
+            return "unknown"
+        age = (current - observed).total_seconds()
+        if age < 0:
+            return "unknown"
+        return "fresh" if age <= max_staleness_seconds else "stale"
 
     def status(
         self,
@@ -163,6 +240,8 @@ class RevocationRegistry:
         issued_at: str,
         *,
         keyid: Optional[str] = None,
+        now: Optional[str] = None,
+        max_staleness_seconds: Optional[float] = None,
     ) -> RevocationStatus:
         """Whether the issuer (or bound key) was revoked at or before issuance.
 
@@ -171,7 +250,14 @@ class RevocationRegistry:
         the earliest revocation wins, since the strictest fact governs. A
         key-scope match is reported in preference to an identity-scope one at
         the same instant, because it is the more specific statement.
+
+        ``now`` and ``max_staleness_seconds`` are the deployment's stated
+        freshness parameters. They do not change the revoked answer. They
+        decide whether a not-revoked answer may be read as a statement about
+        the present, which is recorded on the returned
+        :attr:`RevocationStatus.freshness`.
         """
+        fresh = self.freshness(now=now, max_staleness_seconds=max_staleness_seconds)
         best: Optional[tuple[datetime, RevocationEntry]] = None
         unparseable: Optional[RevocationEntry] = None
         for entry in self._entries:
@@ -205,6 +291,8 @@ class RevocationRegistry:
                     f"{entry.scope} {entry.subject!r} was revoked at or before "
                     f"issuance (revoked_at={entry.revoked_at}, iat={issued_at})"
                 ),
+                registry_as_of=self._as_of,
+                freshness=fresh,
             )
         if unparseable is not None:
             return RevocationStatus(
@@ -216,22 +304,48 @@ class RevocationRegistry:
                     f"{unparseable.scope} {unparseable.subject!r} revocation or "
                     f"issuance instant is unparseable; failing closed"
                 ),
+                registry_as_of=self._as_of,
+                freshness=fresh,
             )
+        # The clean answer. This is the one staleness weakens, so the reason
+        # states the reach of the check rather than stopping at "no match".
+        qualifier = {
+            "fresh": (
+                f" registry observed {self._as_of}, inside the stated bound"
+            ),
+            "stale": (
+                f" registry observed {self._as_of}, outside the stated bound, so "
+                f"this says nothing about revocations since"
+            ),
+            "unknown": (
+                " registry freshness unknown, so this establishes nothing about now"
+            ),
+        }[fresh]
         return RevocationStatus(
             revoked=False,
             matched_by=None,
             revoked_at=None,
             issued_at=issued_at,
-            reason="no matching revocation at or before issuance",
+            reason="no matching revocation at or before issuance;" + qualifier,
+            registry_as_of=self._as_of,
+            freshness=fresh,
         )
 
     def to_dict(self) -> dict[str, object]:
-        """Canonical, sorted dict form. Stable across constructions."""
+        """Canonical, sorted dict form. Stable across constructions.
+
+        ``as_of`` is emitted only when the registry carries one, so a registry
+        without an observation instant serialises to exactly the bytes it did
+        before this field existed and its digest is unchanged.
+        """
         entries = sorted(
             (e.to_dict() for e in self._entries),
             key=lambda d: (d["scope"], d["subject"], d["revoked_at"]),
         )
-        return {"version": 1, "entries": entries}
+        out: dict[str, object] = {"version": 1, "entries": entries}
+        if self._as_of is not None:
+            out["as_of"] = self._as_of
+        return out
 
     def canonical_bytes(self) -> bytes:
         """RFC 8785 JCS bytes over :meth:`to_dict`, for a stable digest."""
@@ -255,7 +369,13 @@ class RevocationRegistry:
         raw = data.get("entries", [])
         if not isinstance(raw, list):
             raise ValueError("revocation registry 'entries' must be a list")
-        return cls(RevocationEntry.from_dict(e) for e in raw)
+        as_of = data.get("as_of")
+        if as_of is not None and (not isinstance(as_of, str) or not as_of):
+            raise ValueError("revocation registry 'as_of' must be a non-empty string")
+        return cls(
+            (RevocationEntry.from_dict(e) for e in raw),
+            as_of=as_of,
+        )
 
     @classmethod
     def from_did_document(
