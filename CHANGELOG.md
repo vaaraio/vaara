@@ -6,6 +6,22 @@ and this project follows [Semantic Versioning](https://semver.org/spec/v2.0.0.ht
 
 ## [Unreleased]
 
+## [1.80.0] - 2026-09-02
+
+### Added
+
+- A revocation registry now records when it was observed, and a clean answer states how far into the past it reaches. Until this release `RevocationRegistry.status()` returned `revoked=False` with nothing attached, which reads as "this key is fine" when what the computation supports is "nothing in the entries I hold revoked it, as of whenever I obtained them". `RevocationRegistry` takes an optional `as_of`, `status()` takes the deployment's `now` and `max_staleness_seconds`, and `RevocationStatus` carries `registry_as_of`, `freshness` and `establishes_current`.
+
+  `freshness` is `fresh`, `stale` or `unknown`. `unknown` covers a registry with no `as_of`, a caller who stated no bound, and an `as_of` later than `now`. That last one is a clock disagreement, so the bound cannot be evaluated honestly and is not quietly treated as met. `establishes_current` is true for exactly one combination, not revoked and fresh, and every other combination is a statement about the past.
+
+  Staleness weakens the negative answer alone. A revocation the verifier can see binds however old the registry is, because a revocation fact does not expire. An implementation reasoning "the registry is stale, so we know nothing" would discard a revocation it is plainly holding, which is worse than the gap this closes.
+
+  The rule is `draft-sirkkavaara-vaara-receipt-08` Section 10, posted to the datatracker the same day: offline verification is a computation over the parameters the consumer holds, revocation is a property of the present, and where a decision depends on revocation state the staleness a deployment accepts is an operational parameter that deployment must state. The shape is the one RPKI uses, where a router validates against a locally held cache whose refresh interval is a stated parameter rather than something the validation establishes.
+
+- `revocation_freshness_v0` is the 49th vector suite. Seven cases, six of them negative, and `establishes_current` is true in exactly one row of its table. `revoked_stale` pins the asymmetry above and is the case most likely to regress. `future_as_of` pins the clock-disagreement rule. The checker imports the standard library plus `rfc8785`, rebuilds both the revocation-in-time predicate and the freshness rule from the text rather than calling the implementation it grades, and is the form of local, third-party-runnable detection the European Commission's Article 50 transparency guidelines describe at paragraph 76.
+
+  Compatibility is checkable rather than asserted. `as_of` serialises only when set, so a registry without one produces the bytes it produced before the field existed. The `undated_clean` case digests to `sha256:a6a20076da005b27c9afc3a5d5b2457798c0ac817d1abc38b2fee4398ac3f133`, byte-identical to the `clean` case in `cross_stack_revocation_v0`, so no previously issued digest moved. Callers passing neither `now` nor `max_staleness_seconds` get the previous `revoked` answer with `freshness="unknown"` attached.
+
 ## [1.79.0] - 2026-08-31
 
 ### Added
