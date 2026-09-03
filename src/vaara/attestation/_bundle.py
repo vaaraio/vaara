@@ -50,6 +50,7 @@ from vaara.attestation._revocation import (
 from vaara.attestation._attest_types import Attestation
 from vaara.attestation.transparency_log import (
     ConsistencyProof,
+    ConsistencyVerdict,
     InclusionProof,
     verify_consistency,
     verify_inclusion,
@@ -257,19 +258,30 @@ def _consistency_lens(bundle: EvidenceBundle) -> LensResult:
         return LensResult(
             "consistency", False, False, "no consistency proof and tree heads supplied"
         )
-    ok = verify_consistency(
+    verdict = verify_consistency(
         first_size=bundle.consistency.first_size,
         first_root=bundle.consistency_first_root,
         second_size=bundle.consistency.second_size,
         second_root=bundle.consistency_second_root,
         proof=bundle.consistency,
     )
-    reason = (
-        "log is append-only across the two supplied tree heads"
-        if ok
-        else "consistency proof does not reproduce the supplied tree heads"
-    )
-    return LensResult("consistency", True, ok, reason)
+    # The could-not-compare verdict is reported as its own reason rather than
+    # folded into the failure text. A bundle whose tree heads sit outside
+    # RFC 9162's 0 < m < n was not shown to have forked; it was never checked,
+    # and the reader has to be able to tell those apart.
+    reasons = {
+        ConsistencyVerdict.CONSISTENT: (
+            "log is append-only across the two supplied tree heads"
+        ),
+        ConsistencyVerdict.INCONSISTENT: (
+            "consistency proof does not reproduce the supplied tree heads"
+        ),
+        ConsistencyVerdict.COULD_NOT_COMPARE: (
+            "consistency was not checked: the supplied tree heads fall outside "
+            "the range RFC 9162 defines a proof over, so no roots were compared"
+        ),
+    }
+    return LensResult("consistency", True, bool(verdict), reasons[verdict])
 
 
 def _revocation_lens(bundle: EvidenceBundle, keyid: Optional[str]) -> LensResult:

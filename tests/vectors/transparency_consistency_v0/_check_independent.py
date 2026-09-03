@@ -7,6 +7,12 @@ given two tree sizes, the two roots a verifier holds, and the proof hashes,
 recompute both roots and confirm the smaller tree is a verifiable prefix of
 the larger one. Verdicts are compared against ``expected.json``.
 
+The verdict is three-valued: ``consistent``, ``inconsistent``, or
+``could_not_compare``. RFC 9162 section 2.1.4.2 bounds a consistency proof at
+``0 < m < n``, and a checker asked about sizes outside that range has no
+comparison to report. Cases assert the verdict identity, not its truthiness,
+so folding ``could_not_compare`` into either boolean fails the case.
+
 As a second, stronger check it recomputes ``first_root`` and ``second_root``
 directly from the committed log leaves and confirms each positive case's roots
 are the genuine Merkle roots over those leaves, so the vectors cannot pass by
@@ -20,6 +26,7 @@ Exit code 0 means every case matched its expected verdict.
 
 from __future__ import annotations
 
+import enum
 import hashlib
 import json
 import sys
@@ -51,26 +58,55 @@ def _root_from_leaves(leaf_hashes: list[bytes]) -> bytes:
     return nodes[0]
 
 
+class Verdict(enum.Enum):
+    """Three-valued consistency verdict.
+
+    ``COULD_NOT_COMPARE`` is the value that makes this vector set a
+    constraint rather than a documented disagreement: a checker that answers
+    either ``CONSISTENT`` or ``INCONSISTENT`` on an input RFC 9162 does not
+    define has answered a question it never asked, and fails the case.
+
+    Only ``CONSISTENT`` is truthy, so a checker written against a boolean
+    return fails closed on an input it could not compare.
+    """
+
+    CONSISTENT = "consistent"
+    INCONSISTENT = "inconsistent"
+    COULD_NOT_COMPARE = "could_not_compare"
+
+    def __bool__(self) -> bool:
+        return self is Verdict.CONSISTENT
+
+
 def verify_consistency(
     first_size: int,
     first_root: bytes,
     second_size: int,
     second_root: bytes,
     proof: list[bytes],
-) -> bool:
-    """RFC 9162 section 2.1.4.2 consistency-proof verification."""
-    if first_size > second_size:
-        return False
+) -> Verdict:
+    """RFC 9162 section 2.1.4.2 consistency-proof verification.
+
+    Section 2.1.4.2 bounds the proof at ``0 < m < n``. Sizes outside that
+    range are decided first and return ``COULD_NOT_COMPARE``, so an input
+    the document does not define can never be reported as a verdict about
+    the log.
+    """
+    if first_size <= 0:
+        return Verdict.COULD_NOT_COMPARE
+    if second_size < first_size:
+        return Verdict.COULD_NOT_COMPARE
+
     if first_size == second_size:
-        return not proof and first_root == second_root
-    if first_size == 0:
-        return not proof
+        if not proof and first_root == second_root:
+            return Verdict.CONSISTENT
+        return Verdict.INCONSISTENT
 
     path = list(proof)
     if first_size & (first_size - 1) == 0:
         path = [first_root, *path]
     if not path:
-        return False
+        return Verdict.INCONSISTENT
 
     fn = first_size - 1
     sn = second_size - 1
@@ -82,7 +118,7 @@ def verify_consistency(
     fr = sr = next(nodes)
     for sibling in nodes:
         if sn == 0:
-            return False
+            return Verdict.INCONSISTENT
         if fn & 1 or fn == sn:
             fr = _hash_node(sibling, fr)
             sr = _hash_node(sibling, sr)
@@ -94,7 +130,9 @@ def verify_consistency(
         fn >>= 1
         sn >>= 1
 
-    return sn == 0 and fr == first_root and sr == second_root
+    if sn == 0 and fr == first_root and sr == second_root:
+        return Verdict.CONSISTENT
+    return Verdict.INCONSISTENT
 
 
 def main() -> int:
@@ -115,16 +153,19 @@ def main() -> int:
             case["first_size"], first_root,
             case["second_size"], second_root, proof,
         )
-        want = expected[name]["consistent"]
-        if got != want:
-            print(f"FAIL {name}: consistency={got}, expected {want}")
+        # The case asserts the verdict identity, not its truthiness. A checker
+        # that folds could-not-compare into either boolean answer fails here,
+        # which is the whole point of the third value.
+        want = expected[name]["verdict"]
+        if got.value != want:
+            print(f"FAIL {name}: verdict={got.value}, expected {want}")
             failures += 1
             continue
 
         # For positive cases, the committed roots must be the genuine Merkle
         # roots over the log prefixes. (Negative cases intentionally carry a
         # corrupted root, so this stronger check applies only when consistent.)
-        if want:
+        if got is Verdict.CONSISTENT:
             real_first = _root_from_leaves(leaf_hashes[: case["first_size"]])
             real_second = _root_from_leaves(leaf_hashes[: case["second_size"]])
             if real_first != first_root or real_second != second_root:
@@ -132,7 +173,7 @@ def main() -> int:
                 failures += 1
                 continue
 
-        print(f"ok   {name}: consistent={got}")
+        print(f"ok   {name}: verdict={got.value}")
 
     if failures:
         print(f"\n{failures} case(s) failed")

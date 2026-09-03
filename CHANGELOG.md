@@ -6,6 +6,27 @@ and this project follows [Semantic Versioning](https://semver.org/spec/v2.0.0.ht
 
 ## [Unreleased]
 
+### Changed
+
+- **Breaking.** `verify_consistency()` returns a three-valued `ConsistencyVerdict` instead of a `bool`. Only `CONSISTENT` is truthy, so a caller written against the old return refuses a check that did not happen.
+
+  The old code answered `True` for an empty first tree without looking at either root:
+
+  ```python
+  if first_size == 0:
+      return not proof.hashes
+  ```
+
+  That is a verdict on a comparison that never happened. It would have returned `True` for any pair of roots at all, as long as the proof list was empty, including a first root and a second root from two unrelated logs. The branch immediately above it, for equal sizes, does compare the roots before answering, so the looseness was not even consistent within the same function.
+
+  RFC 9162 section 2.1.4.2 bounds a consistency proof at `0 < m < n`. For sizes outside that range the function has no comparison to report, so it now returns `COULD_NOT_COMPARE`, which is the absence of a claim about the log. That verdict is decided before any comparison is attempted, so an out-of-range input can never be reported as `INCONSISTENT` by a path that never reached a root. Out-of-range today is `first_size <= 0`, `second_size < first_size`, and a proof whose declared sizes describe a different pair of heads than the one asked about.
+
+  Blake Morrison found the disagreement by running an independent implementation against the pinned `transparency_consistency_v0` vectors, and proposed the shape on the SCITT list: put the third value on what the checker answers rather than tagging the vector, because a vector tagged out-of-range is a row a harness can skip while a checker that answers `true` still passes.
+
+  `verify_evidence_bundle()` reports the new verdict as its own reason rather than folding it into the failure text. A bundle whose tree heads fall outside the defined range was not shown to have forked, it was never checked, and the two now read differently.
+
+- `transparency_consistency_v0` carries ten cases, and `expected.json` now pins a `verdict` string per case where it used to pin a `consistent` boolean. Each case checks which verdict came back, so a checker returning a truthy value for the wrong reason fails. `consistent_0_to_12` is renamed to `out_of_range_0_to_12` and expects `could_not_compare`; `out_of_range_8_to_4` is new. The rename is deliberate, so that a harness carrying the old expectation fails loudly.
+
 ### Added
 
 - `verify_grant()` can now honour a deployment's revocation staleness bound. It takes optional `revocation_now` and `max_staleness_seconds`, forwards them to `RevocationRegistry.status()`, and refuses with the new reason `revocation_stale` when the registry cannot establish anything about the present under the stated bound.

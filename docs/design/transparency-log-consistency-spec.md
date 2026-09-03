@@ -39,10 +39,38 @@ New surface, all additive:
   leaves, so a monitor can pin a historical signed tree head before asking for
   a proof against a later one.
 - `verify_consistency(first_size, first_root, second_size, second_root, proof)`
-  recomputes both roots from the proof and returns a single `bool`. The two
-  roots are supplied by the verifier (the signed tree heads it holds at two
+  recomputes both roots from the proof and returns a `ConsistencyVerdict`. The
+  two roots are supplied by the verifier (the signed tree heads it holds at two
   points in time); the proof hashes alone do not bind to a specific pair of
   roots, exactly as with inclusion proofs.
+
+## The verdict is three-valued
+
+RFC 9162 section 2.1.4.2 bounds a consistency proof at `0 < m < n`. For sizes
+outside that range there is no comparison to perform, and a two-valued answer
+has to lie in one direction or the other: `true` claims the log is append-only
+on the strength of a check that never ran, `false` claims the log was
+inconsistent on the same absence of evidence.
+
+`ConsistencyVerdict` has three members, and only `CONSISTENT` is truthy:
+
+| Verdict | Meaning |
+|---|---|
+| `CONSISTENT` | Both roots were recomputed from the proof and matched. |
+| `INCONSISTENT` | A comparison ran and the roots disagreed. |
+| `COULD_NOT_COMPARE` | No comparison ran. Not a claim about the log. |
+
+The third value only constrains anything if two further rules hold:
+
+1. `COULD_NOT_COMPARE` is decided first, before any comparison is attempted.
+   If invalid were decided first it would swallow the third value, which
+   would then exist in the type without ever reaching a caller.
+2. The verdict is falsy unless it is `CONSISTENT`. A caller written against
+   the older `bool` return refuses a check that did not happen.
+
+Out-of-range inputs today are `first_size <= 0`, `second_size < first_size`,
+and a proof whose declared sizes describe a different pair of heads than the
+one asked about.
 
 The receipt envelope, canonicalization, inclusion-proof format, and signature
 verification are unchanged. The envelope version stays 1.
@@ -73,9 +101,15 @@ without changing verifier code.
 
 ## Conformance
 
-`tests/vectors/transparency_consistency_v0/` carries nine cases over a
-twelve-leaf log: power-of-two and non-power-of-two prefixes, an empty prefix,
-identical trees, and two negatives (a flipped proof hash, and a proof checked
-against a forked second root). `_check_independent.py` reproduces every
-verdict using only the Python standard library and without importing Vaara,
-so the append-only guarantee is consumable by a second implementation.
+`tests/vectors/transparency_consistency_v0/` carries ten cases over a
+twelve-leaf log: power-of-two and non-power-of-two prefixes, identical trees,
+two negatives (a flipped proof hash, and a proof checked against a forked
+second root), and two out-of-range cases (an empty prefix, and a second tree
+smaller than the first). `_check_independent.py` reproduces every verdict
+using only the Python standard library and without importing Vaara, so the
+append-only guarantee is consumable by a second implementation.
+
+Each case pins the exact verdict string it expects. A checker that answers
+`consistent` or `inconsistent` on an input RFC 9162 leaves undefined fails
+the case, where a check on truthiness alone would have let the wrong answer
+stay green.
