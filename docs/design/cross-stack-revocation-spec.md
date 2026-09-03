@@ -101,12 +101,42 @@ Vaara-free, standard-library-plus-`cryptography`-plus-`rfc8785` checker
 reproduces every verdict, so the cross-stack guarantee is verifiable without
 depending on Vaara.
 
+## Reaching it from an export a regulator receives
+
+Pinning only happens when the exporter supplies a registry, and every
+shipped export path can now do that:
+
+| Path | How |
+|---|---|
+| `vaara trail export` | `--revocations PATH` |
+| `vaara trail export-threshold` | `--revocations PATH` |
+| `vaara trail export-article12` | `--revocations PATH` |
+| `vaara trail export-article50` | `--revocations PATH` |
+| `export_signed`, `export_signed_threshold` | `revocation=` |
+| `export_article12`, `export_article50`, `rotate` | `revocation=` |
+
+An export without a registry carries no `revocation` key in its manifest
+and no `revocation.json` in the zip. A reader who wants to recompute a
+revocation-in-time verdict from that bundle has nothing to recompute
+against, and the absence is visible in the bundle itself: a bundle that
+pins an empty registry states that nothing was revoked as of a given
+instant, and a bundle with no registry states nothing at all. Those are different
+packages and a regulator can tell them apart.
+
+A `--revocations` path that is supplied and unusable stops the export
+instead of falling back to an unpinned bundle.
+
 ## Compatibility
 
 Purely additive. The receipt envelope, canonicalization, inclusion- and
 consistency-proof formats, and signature verification are unchanged; the
 envelope version stays 1. `export_signed` with no `revocation` argument
-produces a byte-identical manifest to v0.54.
+produces a byte-identical manifest to v0.54, and so does every export
+command invoked without `--revocations`.
+
+In the threshold export the registry digest goes into the same manifest
+every custodian signs, so `revocation.json` is covered transitively by all
+k signatures rather than by a signature of its own.
 
 ## Freshness: what a clean answer is allowed to claim (v1.80.0)
 

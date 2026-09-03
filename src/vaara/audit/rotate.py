@@ -49,6 +49,7 @@ def rotate(
     *,
     tenant_id: str = "",
     dry_run: bool = False,
+    revocation=None,
 ) -> RotateResult:
     """Export the whole trail as a signed zip, verify it, then purge.
 
@@ -70,7 +71,10 @@ def rotate(
         exported = backend.count()
 
         try:
-            export_result = export_signed(backend.load_trail(), out, signer_key=signer_key)
+            export_result = export_signed(
+                backend.load_trail(), out, signer_key=signer_key,
+                revocation=revocation,
+            )
         except Exception as exc:
             return RotateResult(
                 ok=False,

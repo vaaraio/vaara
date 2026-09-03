@@ -587,6 +587,7 @@ def export_article50(
     system_meta: Optional[dict] = None,
     period: Optional[tuple] = None,
     agent_id: str = "",
+    revocation=None,
 ):
     """Write a signed Article 50 transparency evidence package.
 
@@ -601,7 +602,7 @@ def export_article50(
     out_path = Path(out_path)
     result = export_signed(
         trail, out_path, signer_key=signer_key, signer=signer,
-        agent_id=agent_id,
+        agent_id=agent_id, revocation=revocation,
     )
 
     records, manifest = _records_from_zip(out_path)

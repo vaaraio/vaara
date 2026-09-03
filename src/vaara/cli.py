@@ -476,6 +476,23 @@ def _add_trail_source_args(sub_parser: argparse.ArgumentParser) -> None:
     )
 
 
+def _load_export_revocations(args: argparse.Namespace):
+    """Load the registry an export should pin, or None when none was given.
+
+    An export without a registry pins no revocation state, so a reader
+    recomputing a revocation-in-time verdict from the bundle has nothing to
+    recompute against. That is a valid choice; it just has to be a choice,
+    so a path that is supplied and unusable stops the export instead of
+    quietly producing an unpinned bundle.
+    """
+    path = getattr(args, "revocations", None)
+    if not path:
+        return None
+    from vaara.attestation import RevocationRegistry
+
+    return RevocationRegistry.from_dict(_load_json_file(path, "revocations"))
+
+
 def _cmd_trail_export(args: argparse.Namespace) -> int:
     try:
         from vaara.audit.export import export_signed
@@ -487,6 +504,12 @@ def _cmd_trail_export(args: argparse.Namespace) -> int:
     if trail is None:
         return err
 
+    try:
+        revocation = _load_export_revocations(args)
+    except (OSError, ValueError) as exc:
+        print(f"vaara trail export: --revocations: {exc}", file=sys.stderr)
+        return 2
+
     out = Path(args.out).expanduser()
     out.parent.mkdir(parents=True, exist_ok=True)
 
@@ -495,6 +518,7 @@ def _cmd_trail_export(args: argparse.Namespace) -> int:
         out_path=out,
         signer_key=Path(args.key).expanduser(),
         agent_id=args.agent_id or "",
+        revocation=revocation,
     )
 
     print(f"Exported signed trail to {result.path}")
@@ -551,8 +575,9 @@ def _cmd_trail_export_threshold(args: argparse.Namespace) -> int:
             signers=signers,
             threshold_k=args.threshold_k,
             agent_id=args.agent_id or "",
+            revocation=_load_export_revocations(args),
         )
-    except ValueError as exc:
+    except (OSError, ValueError) as exc:
         print(f"threshold export failed: {exc}", file=sys.stderr)
         return 2
 
@@ -987,7 +1012,11 @@ def _cmd_trail_export_article50(args: argparse.Namespace) -> int:
         result = export_article50(
             trail, out, signer_key=Path(args.key).expanduser(),
             system_meta=system_meta, period=period,
+            revocation=_load_export_revocations(args),
         )
+    except (OSError, ValueError) as exc:
+        print(f"vaara trail export-article50: {exc}", file=sys.stderr)
+        return 2
     except ImportError:
         print(_INSTALL_HINT, file=sys.stderr)
         return 2
@@ -1144,10 +1173,11 @@ def _cmd_trail_export_article12(args: argparse.Namespace) -> int:
             enforcements=enforcements,
             trusted_did_document=trusted,
             expected_measurement=expected,
+            revocation=_load_export_revocations(args),
             fmt=args.format,
             agent_id=args.agent_id or "",
         )
-    except (ValueError, ImportError, TimeAnchorError) as exc:
+    except (OSError, ValueError, ImportError, TimeAnchorError) as exc:
         print(f"Article 12 export failed: {exc}", file=sys.stderr)
         return 2
 
@@ -5098,6 +5128,8 @@ def build_parser() -> argparse.ArgumentParser:
     pe.add_argument("--out", required=True, help="Path to write the signed zip")
     pe.add_argument("--key", required=True, help="Path to Ed25519 signing private key (PEM)")
     pe.add_argument("--agent-id", default="", help="Optional agent_id tag for the manifest")
+    pe.add_argument("--revocations", default=None,
+                        help="Optional revocation-registry JSON to pin into the signed manifest as revocation.registry_sha256, with the registry written to revocation.json inside the zip. Without it the export pins no revocation state, so a reader cannot recompute a revocation-in-time verdict from the bundle.")
     pe.set_defaults(func=_cmd_trail_export)
 
     pet = tsub.add_parser(
@@ -5120,6 +5152,8 @@ def build_parser() -> argparse.ArgumentParser:
         help="Quorum: minimum valid custodian signatures required to verify.",
     )
     pet.add_argument("--agent-id", default="", help="Optional agent_id tag for the manifest")
+    pet.add_argument("--revocations", default=None,
+                        help="Optional revocation-registry JSON to pin into the signed manifest as revocation.registry_sha256, with the registry written to revocation.json inside the zip. Without it the export pins no revocation state, so a reader cannot recompute a revocation-in-time verdict from the bundle.")
     pet.set_defaults(func=_cmd_trail_export_threshold)
 
     pv = tsub.add_parser("verify", help="Verify a signed trail zip")
@@ -5273,6 +5307,8 @@ def build_parser() -> argparse.ArgumentParser:
         help="Vetted SHA-384 launch measurement (96 hex chars) to pin folded "
              "enforcement bindings against.",
     )
+    pa12.add_argument("--revocations", default=None,
+                        help="Optional revocation-registry JSON to pin into the signed manifest as revocation.registry_sha256, with the registry written to revocation.json inside the zip. Without it the export pins no revocation state, so a reader cannot recompute a revocation-in-time verdict from the bundle.")
     pa12.set_defaults(func=_cmd_trail_export_article12)
 
     pa50 = tsub.add_parser(
@@ -5296,6 +5332,8 @@ def build_parser() -> argparse.ArgumentParser:
              "side may be empty. Narrows the summary counts only; the signed "
              "trail stays whole.",
     )
+    pa50.add_argument("--revocations", default=None,
+                        help="Optional revocation-registry JSON to pin into the signed manifest as revocation.registry_sha256, with the registry written to revocation.json inside the zip. Without it the export pins no revocation state, so a reader cannot recompute a revocation-in-time verdict from the bundle.")
     pa50.set_defaults(func=_cmd_trail_export_article50)
 
     prd = tsub.add_parser(
