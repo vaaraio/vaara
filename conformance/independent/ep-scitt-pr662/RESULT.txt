@@ -1,0 +1,31 @@
+profile          EP-SCITT-STATEMENT-IDENTITY-v0.1
+runner           independent Python, cryptography only
+platform         Linux-6.18.37-0-virt-aarch64-with-glibc2.41
+python           3.12.13
+vectors sha-256  889e410cceec75f4c0955ca9a373d4a8375c00300cbe4d2be375a559958de697
+
+=== POSITIVE CASES ===
+  [PASS] signature_a_valid                  got=True
+  [PASS] signature_b_valid                  got=True
+  [PASS] statement_entry_digest_a           got=sha256:ba36963493c183eea6c8f71e492121d49d14c1f0338574a6171b1312c763b4e1
+  [PASS] statement_entry_digest_b           got=sha256:be2becd5536416c02adec625fff8aca3b75beb691543d458935bfce7ea857ef0
+  [PASS] entry_digests_differ               got=True
+  [PASS] signing_input_digest               got=sha256:c4b229193fd4f871f431daf6f6bc7c5cab5f13896c42b7fc3a7397a3ff67dd86
+  [PASS] same_r                             got=True
+  [PASS] s_b_equals_n_minus_s_a             got=True
+  [PASS] a_is_high_s                        got=True
+  [PASS] b_is_low_s                         got=True
+  [PASS] classification                     got=same_signing_input_different_envelope
+
+=== HOSTILE SUBSTITUTIONS (all must be refused) ===
+  [PASS] payload_bit_flip_vs_sig_a          accepted=False
+  [PASS] payload_bit_flip_vs_sig_b          accepted=False
+  [PASS] reversed_s_bytes                   accepted=False
+  [PASS] all_zero_signature                 accepted=False
+  [PASS] s_plus_group_order                 accepted=False
+  [PASS] valid_sig_wrong_key                accepted=False
+  [PASS] envelope_a_bytes_as_signing_input  accepted=False
+
+positive: 11/11 matched
+hostile:  7/7 refused
+RESULT: independent verifier agrees with vectors.reference.json in full
