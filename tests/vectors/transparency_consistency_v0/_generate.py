@@ -10,10 +10,16 @@ guarantee a transparency log exists to provide.
 The committed log is a fixed sequence of leaves. Each case names a
 ``first_size`` and ``second_size`` and carries the proof hashes plus the two
 roots an independent verifier would hold (the signed tree heads at those two
-points). Positive cases expect ``consistent: true``. Negative cases keep a
-genuine proof but corrupt an input (a flipped proof hash, a root from an
-unrelated tree); they expect ``consistent: false``, so a checker that always
-returned true would be caught.
+points).
+
+Each case expects one of three verdicts. Positive cases expect
+``consistent``. Negative cases keep a genuine proof but corrupt an input (a
+flipped proof hash, a root from an unrelated tree) and expect
+``inconsistent``, so a checker that always answered yes is caught.
+Out-of-range cases sit outside RFC 9162 section 2.1.4.2's ``0 < m < n`` and
+expect ``could_not_compare``, so a checker that answers either boolean on an
+input the document does not define is caught too. Cases assert the verdict
+identity rather than its truthiness, or a wrong answer would stay green.
 
 Hashing is RFC 6962: ``SHA-256(0x00 || leaf)`` for leaves,
 ``SHA-256(0x01 || left || right)`` for internal nodes. No signatures, so the
@@ -52,7 +58,6 @@ def main() -> None:
         forked.append(f"forked-{i:02d}".encode())
 
     positive_pairs = [
-        (0, 12),   # empty prefix: trivially consistent, empty proof
         (1, 12),   # single-leaf (power-of-two) prefix
         (3, 12),   # non-power-of-two first size
         (7, 12),   # odd, deep first size
@@ -99,16 +104,43 @@ def main() -> None:
         "proof": [_hex(h) for h in p.hashes],
     })
 
+    # Out-of-range 1: an empty first tree. RFC 9162 section 2.1.4.2 bounds the
+    # proof at 0 < m < n, so m = 0 is outside what the document defines. The
+    # roots are genuine and the proof is empty; the only correct answer is
+    # that nothing was compared. Previously committed as
+    # `consistent_0_to_12` expecting true, which was a verdict on a
+    # comparison that never happened.
+    cases.append({
+        "name": "out_of_range_0_to_12",
+        "first_size": 0,
+        "second_size": 12,
+        "first_root": _hex(log.root_at(0)),
+        "second_root": _hex(log.root_at(12)),
+        "proof": [],
+    })
+
+    # Out-of-range 2: the second tree is smaller than the first, so there is
+    # no larger tree for the prefix to sit inside. Outside m < n.
+    cases.append({
+        "name": "out_of_range_8_to_4",
+        "first_size": 8,
+        "second_size": 4,
+        "first_root": _hex(log.root_at(8)),
+        "second_root": _hex(log.root_at(4)),
+        "proof": [],
+    })
+
     expected = {
-        "consistent_0_to_12": {"consistent": True},
-        "consistent_1_to_12": {"consistent": True},
-        "consistent_3_to_12": {"consistent": True},
-        "consistent_7_to_12": {"consistent": True},
-        "consistent_8_to_12": {"consistent": True},
-        "consistent_12_to_12": {"consistent": True},
-        "consistent_5_to_9": {"consistent": True},
-        "tampered_proof_hash_3_to_12": {"consistent": False},
-        "forked_second_root_3_to_12": {"consistent": False},
+        "consistent_1_to_12": {"verdict": "consistent"},
+        "consistent_3_to_12": {"verdict": "consistent"},
+        "consistent_7_to_12": {"verdict": "consistent"},
+        "consistent_8_to_12": {"verdict": "consistent"},
+        "consistent_12_to_12": {"verdict": "consistent"},
+        "consistent_5_to_9": {"verdict": "consistent"},
+        "tampered_proof_hash_3_to_12": {"verdict": "inconsistent"},
+        "forked_second_root_3_to_12": {"verdict": "inconsistent"},
+        "out_of_range_0_to_12": {"verdict": "could_not_compare"},
+        "out_of_range_8_to_4": {"verdict": "could_not_compare"},
     }
 
     log_doc = {

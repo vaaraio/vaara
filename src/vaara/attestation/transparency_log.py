@@ -24,6 +24,7 @@ from __future__ import annotations
 import hashlib
 import threading
 from dataclasses import dataclass
+from enum import Enum
 
 
 class TransparencyLogError(RuntimeError):
@@ -163,6 +164,28 @@ def _subproof(m: int, leaves: list[bytes], on_path: bool) -> list[bytes]:
     return _subproof(m - k, leaves[k:], False) + [_root_from_leaves(leaves[:k])]
 
 
+class ConsistencyVerdict(Enum):
+    """Three-valued result of an RFC 9162 consistency check.
+
+    A two-valued verdict cannot distinguish "I compared the roots and they
+    disagreed" from "I never compared anything", and the second silently
+    becomes the first at any call site that reads the result as a boolean.
+    ``COULD_NOT_COMPARE`` keeps that distinction alive past the function
+    that made it.
+
+    Only ``CONSISTENT`` is truthy, so a caller written against the older
+    ``bool`` return fails closed: it refuses a check that did not happen
+    rather than passing it.
+    """
+
+    CONSISTENT = "consistent"
+    INCONSISTENT = "inconsistent"
+    COULD_NOT_COMPARE = "could_not_compare"
+
+    def __bool__(self) -> bool:
+        return self is ConsistencyVerdict.CONSISTENT
+
+
 def verify_consistency(
     *,
     first_size: int,
@@ -170,24 +193,42 @@ def verify_consistency(
     second_size: int,
     second_root: bytes,
     proof: ConsistencyProof,
-) -> bool:
+) -> ConsistencyVerdict:
     """Verify an RFC 9162 consistency proof between two tree heads.
 
     Recomputes both ``first_root`` and ``second_root`` from the proof and
-    returns whether both match. A ``True`` result means the ``first_size``
-    tree is a verifiable prefix of the ``second_size`` tree: the log is
-    append-only across the two snapshots. Implements RFC 9162 section 2.1.4.2.
+    reports whether both match. ``CONSISTENT`` means the ``first_size`` tree
+    is a verifiable prefix of the ``second_size`` tree: the log is
+    append-only across the two snapshots. Implements RFC 9162 section
+    2.1.4.2.
+
+    RFC 9162 section 2.1.4.2 bounds a consistency proof at ``0 < m < n``.
+    Inputs outside that range are not a log that disagreed, they are a
+    question this function cannot answer, and they return
+    ``COULD_NOT_COMPARE``. That verdict is decided *first*, before any
+    comparison is attempted, so an out-of-range input can never be reported
+    as ``INCONSISTENT`` by a path that never reached a root.
     """
+    # Could-not-compare is evaluated before anything else. If it ran second,
+    # an "invalid" answer would swallow it and the distinction would exist in
+    # the type without ever being reported.
+    if first_size <= 0:
+        # Outside RFC 9162's 0 < m: no prefix root exists to compare against.
+        return ConsistencyVerdict.COULD_NOT_COMPARE
+    if second_size < first_size:
+        # Outside RFC 9162's m < n: there is no larger tree to be a prefix of.
+        return ConsistencyVerdict.COULD_NOT_COMPARE
     if proof.first_size != first_size or proof.second_size != second_size:
-        return False
-    if first_size > second_size:
-        return False
+        # The proof describes a different pair of heads than the one asked
+        # about, so nothing was compared for the requested pair.
+        return ConsistencyVerdict.COULD_NOT_COMPARE
+
     if first_size == second_size:
-        # Same tree: nothing to prove beyond identical roots.
-        return not proof.hashes and first_root == second_root
-    if first_size == 0:
-        # The empty tree is a prefix of every tree; no path hashes needed.
-        return not proof.hashes
+        # Same tree: nothing to prove beyond identical roots. The roots are
+        # compared, so this branch can return a real verdict either way.
+        if not proof.hashes and first_root == second_root:
+            return ConsistencyVerdict.CONSISTENT
+        return ConsistencyVerdict.INCONSISTENT
 
     # 0 < first_size < second_size. For a power-of-two first tree the spec
     # omits first_root from the path because the verifier already holds it;
@@ -196,7 +237,7 @@ def verify_consistency(
     if first_size & (first_size - 1) == 0:
         path = [first_root, *path]
     if not path:
-        return False
+        return ConsistencyVerdict.INCONSISTENT
 
     fn = first_size - 1
     sn = second_size - 1
@@ -211,7 +252,7 @@ def verify_consistency(
     for sibling in nodes:
         if sn == 0:
             # More path nodes than the second tree can account for.
-            return False
+            return ConsistencyVerdict.INCONSISTENT
         if fn & 1 or fn == sn:
             fr = _hash_node(sibling, fr)
             sr = _hash_node(sibling, sr)
@@ -223,7 +264,9 @@ def verify_consistency(
         fn >>= 1
         sn >>= 1
 
-    return sn == 0 and fr == first_root and sr == second_root
+    if sn == 0 and fr == first_root and sr == second_root:
+        return ConsistencyVerdict.CONSISTENT
+    return ConsistencyVerdict.INCONSISTENT
 
 
 def verify_inclusion(

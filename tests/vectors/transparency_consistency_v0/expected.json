@@ -1,29 +1,32 @@
 {
-  "consistent_0_to_12": {
-    "consistent": true
-  },
   "consistent_1_to_12": {
-    "consistent": true
+    "verdict": "consistent"
   },
   "consistent_3_to_12": {
-    "consistent": true
+    "verdict": "consistent"
   },
   "consistent_7_to_12": {
-    "consistent": true
+    "verdict": "consistent"
   },
   "consistent_8_to_12": {
-    "consistent": true
+    "verdict": "consistent"
   },
   "consistent_12_to_12": {
-    "consistent": true
+    "verdict": "consistent"
   },
   "consistent_5_to_9": {
-    "consistent": true
+    "verdict": "consistent"
   },
   "tampered_proof_hash_3_to_12": {
-    "consistent": false
+    "verdict": "inconsistent"
   },
   "forked_second_root_3_to_12": {
-    "consistent": false
+    "verdict": "inconsistent"
+  },
+  "out_of_range_0_to_12": {
+    "verdict": "could_not_compare"
+  },
+  "out_of_range_8_to_4": {
+    "verdict": "could_not_compare"
   }
 }

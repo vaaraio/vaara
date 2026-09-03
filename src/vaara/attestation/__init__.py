@@ -65,6 +65,7 @@ from vaara.attestation.iap import (
 )
 from vaara.attestation.transparency_log import (
     ConsistencyProof,
+    ConsistencyVerdict,
     InProcessTransparencyLog,
     InclusionProof,
     LogEntry,
@@ -167,6 +168,7 @@ __all__ = [
     "EnforcementVerdict",
     "ConformalExtension",
     "ConsistencyProof",
+    "ConsistencyVerdict",
     "EnvelopeError",
     "EvidenceBundle",
     "ExecutionReceipt",

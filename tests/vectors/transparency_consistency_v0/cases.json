@@ -1,13 +1,5 @@
 [
   {
-    "name": "consistent_0_to_12",
-    "first_size": 0,
-    "second_size": 12,
-    "first_root": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
-    "second_root": "6ce56e85bcd4acf388b120048f31b0b1562d5d4232af6c1fdb88f9a234b09f6a",
-    "proof": []
-  },
-  {
     "name": "consistent_1_to_12",
     "first_size": 1,
     "second_size": 12,
@@ -107,5 +99,21 @@
       "4cad0fdb69d80c4668b49335603a9a1ce781af4d71d5388135eca696fc4d6b05",
       "d9891e6ddaaf11f458297eebeaf87e2ccb596786c929974b3abdf4a956be3b9d"
     ]
+  },
+  {
+    "name": "out_of_range_0_to_12",
+    "first_size": 0,
+    "second_size": 12,
+    "first_root": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+    "second_root": "6ce56e85bcd4acf388b120048f31b0b1562d5d4232af6c1fdb88f9a234b09f6a",
+    "proof": []
+  },
+  {
+    "name": "out_of_range_8_to_4",
+    "first_size": 8,
+    "second_size": 4,
+    "first_root": "cf13081aab6a87268ae7ed59230cad72abce4d476ce0ffe98ac68ff5b5aaab6b",
+    "second_root": "8070185a3e93a45a1e2d4c4149ef795d8543249c0295dc95245d2a2a513a0ba8",
+    "proof": []
   }
 ]
