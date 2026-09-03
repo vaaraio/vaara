@@ -147,6 +147,86 @@ def test_revocation_identity_scope_revoked():
     assert _ok(_mint(), revocation=reg).reason == "revoked"
 
 
+# --- revocation freshness ------------------------------------------------
+#
+# v1.80.0 gave RevocationStatus a freshness verdict, but no shipped path read
+# it: verify_grant called status() with no bound and consumed only .revoked,
+# so a registry that said in its own words it could establish nothing about
+# the present still produced ok=True. These pin the pass-through that closes
+# that, and pin that omitting the bound changes nothing.
+
+STALE_REG = RevocationRegistry((), as_of="2026-06-18T00:00:00Z")  # 12h before iat
+FRESH_REG = RevocationRegistry((), as_of="2026-06-18T11:59:00Z")  # 60s before iat
+REVOKED_STALE_REG = RevocationRegistry(
+    (RevocationEntry(scope="key", subject="key-v1", revoked_at="2026-06-18T11:00:00Z"),),
+    as_of="2026-06-18T00:00:00Z",
+)
+CHECK_AT = "2026-06-18T12:00:05Z"  # matches now=IAT_EPOCH + 5
+
+
+def test_stale_registry_admits_when_no_bound_is_stated():
+    # Backward compatibility. Section 10 puts the bound on the deployment, so
+    # a caller that states none gets exactly the pre-existing behaviour.
+    assert _ok(_mint(), revocation=STALE_REG).ok
+
+
+def test_stale_registry_refuses_once_a_bound_is_stated():
+    v = _ok(
+        _mint(),
+        revocation=STALE_REG,
+        revocation_now=CHECK_AT,
+        max_staleness_seconds=300,
+    )
+    assert not v.ok and v.reason == "revocation_stale"
+
+
+def test_fresh_registry_inside_the_bound_admits():
+    v = _ok(
+        _mint(),
+        revocation=FRESH_REG,
+        revocation_now=CHECK_AT,
+        max_staleness_seconds=300,
+    )
+    assert v.ok and v.reason == "ok"
+
+
+def test_registry_without_as_of_refuses_under_a_bound():
+    # freshness is "unknown", not "fresh". Absence of an observation instant
+    # is never read as permission to treat the answer as current.
+    v = _ok(
+        _mint(),
+        revocation=RevocationRegistry(()),
+        revocation_now=CHECK_AT,
+        max_staleness_seconds=300,
+    )
+    assert not v.ok and v.reason == "revocation_stale"
+
+
+def test_future_as_of_refuses_under_a_bound():
+    # Observation instant after now means the clocks disagree, so the bound
+    # cannot be evaluated honestly and is not quietly treated as met.
+    v = _ok(
+        _mint(),
+        revocation=RevocationRegistry((), as_of="2026-06-19T00:00:00Z"),
+        revocation_now=CHECK_AT,
+        max_staleness_seconds=300,
+    )
+    assert not v.ok and v.reason == "revocation_stale"
+
+
+def test_revocation_binds_however_stale_the_registry_is():
+    # THE ASYMMETRY, and the case most likely to regress. A revocation fact
+    # does not expire, so staleness must not downgrade "revoked" to
+    # "revocation_stale" and must never turn a refusal into an admit.
+    v = _ok(
+        _mint(),
+        revocation=REVOKED_STALE_REG,
+        revocation_now=CHECK_AT,
+        max_staleness_seconds=300,
+    )
+    assert not v.ok and v.reason == "revoked"
+
+
 def test_binding_absent_unknown():
     assert _ok(_mint(), known_attestation_digests=frozenset()).reason == "binding_unknown"
 
