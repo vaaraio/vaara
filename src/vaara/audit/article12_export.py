@@ -224,6 +224,7 @@ def export_article12(
     enforcements: "Optional[Sequence[tuple[str, dict, bytes, bytes]]]" = None,
     trusted_did_document: Optional[dict] = None,
     expected_measurement: Optional[str] = None,
+    revocation=None,
     fmt: str = "md",
     agent_id: str = "",
 ) -> ExportResult:
@@ -281,11 +282,13 @@ def export_article12(
         result = export_signed_threshold(
             trail, out_path, signers=signers,
             threshold_k=threshold_k, agent_id=agent_id,
+            revocation=revocation,
         )
     else:
         result = export_signed(
             trail, out_path, signer_key=signer_key,
             signer=signer, agent_id=agent_id,
+            revocation=revocation,
         )
 
     # Build the report from the trail bytes that were actually signed.

@@ -349,6 +349,7 @@ def export_signed_threshold(
     authorized_pubkeys: Optional[list[bytes]] = None,
     member_algorithm: str = "Ed25519",
     agent_id: str = "",
+    revocation: Optional["RevocationRegistry"] = None,
 ) -> ExportResult:
     """Produce a k-of-n threshold-signed audit-trail export.
 
@@ -440,6 +441,7 @@ def export_signed_threshold(
         n=n,
         member_algorithm=member_algorithm,
         agent_id=agent_id,
+        revocation=revocation,
     )
 
 
@@ -453,6 +455,7 @@ def _write_threshold_zip(
     n: int,
     member_algorithm: str,
     agent_id: str,
+    revocation: Optional["RevocationRegistry"] = None,
 ) -> ExportResult:
     """Build the manifest, collect member signatures, write the zip."""
     from vaara import __version__ as vaara_version
@@ -484,6 +487,19 @@ def _write_threshold_zip(
     manifest["signers_n"] = n
     manifest["member_algorithm"] = member_algorithm
     manifest["signer_fingerprints"] = signer_fingerprints
+
+    # Same shape as export_signed: the registry's digest goes into the signed
+    # manifest, so revocation.json is covered transitively by every member
+    # signature and a regulator recomputes verdicts against the exact registry
+    # the exporter used.
+    revocation_bytes: Optional[bytes] = None
+    if revocation is not None:
+        revocation_bytes = revocation.canonical_bytes()
+        manifest["revocation"] = {
+            "entry_count": len(revocation),
+            "registry_sha256": revocation.digest(),
+        }
+
     manifest_bytes = json.dumps(manifest, sort_keys=True, indent=2).encode("utf-8")
 
     # Every custodian signs the identical digest over the trail and the
@@ -493,6 +509,8 @@ def _write_threshold_zip(
     with zipfile.ZipFile(out_path, "w", compression=zipfile.ZIP_DEFLATED) as zf:
         zf.writestr("trail.jsonl", trail_bytes)
         zf.writestr("manifest.json", manifest_bytes)
+        if revocation_bytes is not None:
+            zf.writestr("revocation.json", revocation_bytes)
         for fp, s in signing_by_fp.items():
             zf.writestr(f"sigs/{fp}.sig", s.sign(to_sign))
         for fp, raw in authorized_by_fp.items():

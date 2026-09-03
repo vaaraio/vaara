@@ -8,6 +8,14 @@ and this project follows [Semantic Versioning](https://semver.org/spec/v2.0.0.ht
 
 ### Added
 
+- Every shipped export path can pin the revocation registry it used. `--revocations PATH` on `vaara trail export`, `export-threshold`, `export-article12` and `export-article50`, and a `revocation=` argument on `export_signed_threshold`, `export_article12`, `export_article50` and `rotate`.
+
+  `export_signed()` has carried a `revocation` argument for a while. It writes `revocation.json` into the zip and pins `registry_sha256` into the signed manifest, so a regulator recomputes each receipt's revocation-in-time verdict against the exact registry the exporter held. No shipped caller passed it. The four callers in the tree, the CLI export command, `export_article12`, `export_article50` and `rotate`, all omitted it, and the last three had no parameter to pass. `export_signed_threshold` had none either. Only tests reached the feature, so every package a regulator actually received was produced with no revocation state in it.
+
+  The threshold path pins the digest into the same manifest every custodian signs, so `revocation.json` is covered transitively by all k signatures. Article 12's threshold branch forwards it too, which is where it would otherwise have been dropped while the single-signer branch kept it.
+
+  An export without a registry still carries no `revocation` key and no `revocation.json`, byte-identical to before. That absence is now a stated position: a bundle pinning an empty registry says nothing was revoked as of an instant, and a bundle with no registry says nothing at all. A `--revocations` path that is supplied and unusable stops the export instead of falling back to an unpinned bundle.
+
 - The MCP proxy can now check revocation. Four new flags on `vaara-mcp-proxy`: `--attest-revocation-registry`, `--attest-max-revocation-staleness-seconds`, `--attest-clock-skew-seconds`, and `--attest-expected-tenant`. All opt-in, all absent-means-off, no verdict changes for anyone who passes nothing.
 
   `verify_grant()` has been able to refuse with `revoked` for some time, and with `revocation_stale` since the staleness bound landed. Neither verdict was reachable from the shipped enforcement path. `AttestPairEmitter` built its `CredentialGateway` with a verifying key and a receipts directory and nothing else, so `revocation` was always `None` and the revocation branch never ran. `AttestPairEmitter.__init__` had no parameter to supply one from. Separately, `CredentialGateway` never forwarded `max_staleness_seconds` to `verify_grant`, so the bound was unreachable through that class even when a registry was passed directly.
