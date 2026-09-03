@@ -6,6 +6,20 @@ and this project follows [Semantic Versioning](https://semver.org/spec/v2.0.0.ht
 
 ## [Unreleased]
 
+### Added
+
+- The MCP proxy can now check revocation. Four new flags on `vaara-mcp-proxy`: `--attest-revocation-registry`, `--attest-max-revocation-staleness-seconds`, `--attest-clock-skew-seconds`, and `--attest-expected-tenant`. All opt-in, all absent-means-off, no verdict changes for anyone who passes nothing.
+
+  `verify_grant()` has been able to refuse with `revoked` for some time, and with `revocation_stale` since the staleness bound landed. Neither verdict was reachable from the shipped enforcement path. `AttestPairEmitter` built its `CredentialGateway` with a verifying key and a receipts directory and nothing else, so `revocation` was always `None` and the revocation branch never ran. `AttestPairEmitter.__init__` had no parameter to supply one from. Separately, `CredentialGateway` never forwarded `max_staleness_seconds` to `verify_grant`, so the bound was unreachable through that class even when a registry was passed directly.
+
+  The proxy has one enforcement call site. Before this change it could not check revocation at all, whatever the operator configured.
+
+  A proxy with no registry configured still does not check revocation, and that is now stated in `docs/design/credential-broker-spec.md` under both the verification section and the honest-limits list. The check does not run; it is not that every credential passes it.
+
+  Configuration that cannot mean anything is refused at startup rather than ignored: a staleness bound with no registry, a registry file that is missing, and a registry file that does not parse all stop the proxy with a message instead of falling back to no registry.
+
+- `--attest-clock-skew-seconds` makes the 30 second default adjustable. The tolerance extends a grant's effective lifetime by that many seconds, so a credential one second past a 300 second lifetime is admitted under the default and refused at `0`. A freshness margin smaller than the skew cannot separate a verifier with no expiry check from one that has an expiry check plus any tolerance. `test_default_skew_admits_a_credential_one_second_past_its_bound` pins both halves.
+
 ### Changed
 
 - **Breaking.** `verify_consistency()` returns a three-valued `ConsistencyVerdict` instead of a `bool`. Only `CONSISTENT` is truthy, so a caller written against the old return refuses a check that did not happen.
