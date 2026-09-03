@@ -1,0 +1,77 @@
+{
+  "consumed_input": {
+    "branch": "feat/aic-ccs-partner-artifacts",
+    "file": "vectors.reference.json",
+    "sha256": "889e410cceec75f4c0955ca9a373d4a8375c00300cbe4d2be375a559958de697",
+    "source": "https://github.com/emiliaprotocol/emilia-protocol/tree/e507acdf8efbe8951cb4294801d4c440f0b86a5a/conformance/composition/scitt-statement-identity-v0.1"
+  },
+  "does_not_establish": [
+    "independently derived vectors",
+    "EP profile verification",
+    "Transparency Service registration",
+    "validation of the specification text"
+  ],
+  "environment": {
+    "cryptography": "49.0.0",
+    "implementation": "CPython",
+    "kernel": "6.18.37-0-virt",
+    "libc": "glibc 2.41",
+    "machine": "aarch64",
+    "openssl": "OpenSSL 4.0.1 9 Jun 2026",
+    "os": "Linux",
+    "python": "3.12.13"
+  },
+  "establishes": "Independent implementation over pinned, author-supplied vectors. The published vectors reproduce in a different language on a different platform, and the three identities remain separate when computed by a second party.",
+  "hostile_accepted": {
+    "all_zero_signature": false,
+    "envelope_a_bytes_as_signing_input": false,
+    "payload_bit_flip_vs_sig_a": false,
+    "payload_bit_flip_vs_sig_b": false,
+    "reversed_s_bytes": false,
+    "s_plus_group_order": false,
+    "valid_sig_wrong_key": false
+  },
+  "hostile_all_refused": true,
+  "positive": {
+    "a_is_high_s": true,
+    "b_is_low_s": true,
+    "classification": "same_signing_input_different_envelope",
+    "entry_digests_differ": true,
+    "s_b_equals_n_minus_s_a": true,
+    "same_r": true,
+    "signature_a_valid": true,
+    "signature_b_valid": true,
+    "signing_input_digest": "sha256:c4b229193fd4f871f431daf6f6bc7c5cab5f13896c42b7fc3a7397a3ff67dd86",
+    "statement_entry_digest_a": "sha256:ba36963493c183eea6c8f71e492121d49d14c1f0338574a6171b1312c763b4e1",
+    "statement_entry_digest_b": "sha256:be2becd5536416c02adec625fff8aca3b75beb691543d458935bfce7ea857ef0"
+  },
+  "positive_all_match": true,
+  "positive_expected": {
+    "a_is_high_s": true,
+    "b_is_low_s": true,
+    "classification": "same_signing_input_different_envelope",
+    "entry_digests_differ": true,
+    "s_b_equals_n_minus_s_a": true,
+    "same_r": true,
+    "signature_a_valid": true,
+    "signature_b_valid": true,
+    "signing_input_digest": "sha256:c4b229193fd4f871f431daf6f6bc7c5cab5f13896c42b7fc3a7397a3ff67dd86",
+    "statement_entry_digest_a": "sha256:ba36963493c183eea6c8f71e492121d49d14c1f0338574a6171b1312c763b4e1",
+    "statement_entry_digest_b": "sha256:be2becd5536416c02adec625fff8aca3b75beb691543d458935bfce7ea857ef0"
+  },
+  "profile": "EP-SCITT-STATEMENT-IDENTITY-v0.1",
+  "report_version": "independent-second-runner-v1",
+  "run_kind": "independent-implementation",
+  "runner": "Henri Sirkkavaara, Vaara",
+  "vectors_version": "EP-SCITT-STATEMENT-IDENTITY-VECTORS-v1",
+  "verifier": {
+    "file": "independent_verify.py",
+    "imports_emilia_code": false,
+    "imports_vaara_code": false,
+    "language": "Python",
+    "sha256": "d051feb07780be1e727f05c56b9419ffb1514850d8872f9483e9453f9fb4da7b",
+    "third_party_imports": [
+      "cryptography"
+    ]
+  }
+}
