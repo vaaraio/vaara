@@ -47,6 +47,11 @@ def _trail(n: int = 3) -> AuditTrail:
 
 
 def _registry() -> RevocationRegistry:
+    # Pinning a registry canonicalises it, which needs vaara[attestation].
+    # The skip lives here rather than at module scope so the two tests that
+    # pin nothing still run on the base matrix, which is where the honest
+    # default matters: no registry means no revocation key in the manifest.
+    pytest.importorskip("rfc8785")
     return RevocationRegistry((), as_of="2026-09-03T00:00:00Z")
 
 
