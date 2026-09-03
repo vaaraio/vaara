@@ -76,6 +76,33 @@ loads the known digests by recomputing `attestation_digest` over every
 `*-attest.json` in the proxy's receipts directory, and runs `verify_grant`. A
 missing `_meta` returns `missing_credential`.
 
+### What each check needs before it runs
+
+The `revoked` and `revocation_stale` gates above are inert unless the
+deployment supplies something. A check that passed and a check that never
+ran are different results, and an operator has to be able to tell which one
+a given configuration produces.
+
+**`revoked` needs a registry.** `verify_grant` skips its revocation branch
+entirely when `revocation` is `None`, and reports nothing when it does. A
+proxy started without `--attest-revocation-registry` does not check
+revocation. That is the shipped default. It is not that every credential
+passes the check; the check does not run. Supply a registry to turn it on.
+
+**`revocation_stale` needs a bound as well as a registry.** Per
+`draft-sirkkavaara-vaara-receipt-08` Section 10 the staleness a deployment
+accepts is the deployment's to state, so absent
+`--attest-max-revocation-staleness-seconds` a clean answer stands at any
+registry age. Stating the bound without a registry is refused at startup
+rather than ignored.
+
+**Clock skew widens `expired`.** The 30 second default extends a grant's
+effective lifetime by 30 seconds, so a freshness margin smaller than the
+tolerance is absorbed and admitted. A boundary case one second past a 300
+second lifetime cannot distinguish a verifier with no expiry check from one
+with an expiry check plus any tolerance at all. Set
+`--attest-clock-skew-seconds 0` to accept no skew.
+
 ## D. Auditor reconciliation
 
 For tools not behind the gateway, completeness is recovered after the fact, not
@@ -99,6 +126,9 @@ What it does NOT cover:
   mediation chokepoint to put a gateway in front of.
 - `_meta` stripping by an intermediary. This degrades to a
   `missing_credential` refusal, which is fail-closed and acceptable.
+- Revocation, unless a registry is configured. See "What each check needs
+  before it runs" above. This one is off by default and silent about it at
+  call time, so it belongs on this list until an operator turns it on.
 
 The mint-before-receipt ordering means a true grant-to-receipt binding is
 fully checkable only at reconciliation; the live shim checks

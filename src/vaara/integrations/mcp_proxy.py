@@ -2015,6 +2015,33 @@ def main(argv: Optional[list[str]] = None) -> None:
                              "{arg, op, value} objects (op: le/ge/eq/in). Grants for listed "
                              "tools carry typed constraints; unlisted tools get exact-args "
                              "grants. Has no effect without --attest-signing-key.")
+    parser.add_argument("--attest-revocation-registry", type=Path, default=None,
+                        metavar="PATH",
+                        help="JSON revocation registry consulted when authorizing "
+                             "gateway-protected tool calls. WITHOUT THIS FLAG THE PROXY "
+                             "DOES NOT CHECK REVOCATION: the check does not run at all, "
+                             "rather than running and passing. Format is the "
+                             "RevocationRegistry dict ({version, entries[, as_of]}). "
+                             "Has no effect without --tool-constraints.")
+    parser.add_argument("--attest-clock-skew-seconds", type=int, default=30,
+                        metavar="N",
+                        help="Clock skew tolerance applied to credential issuance and "
+                             "expiry when authorizing gateway-protected calls (default "
+                             "30). The tolerance extends a grant's effective lifetime by "
+                             "this many seconds, so a freshness margin smaller than it is "
+                             "absorbed. Set 0 to accept no skew.")
+    parser.add_argument("--attest-expected-tenant", type=str, default=None,
+                        metavar="TENANT",
+                        help="Tenant id every credential's scope must match. When absent "
+                             "the gateway requires an empty tenant scope. Has no effect "
+                             "without --tool-constraints.")
+    parser.add_argument("--attest-max-revocation-staleness-seconds", type=float,
+                        default=None, metavar="SECONDS",
+                        help="Refuse with 'revocation_stale' when the registry's as_of is "
+                             "older than this bound, so a registry that cannot speak to "
+                             "the present stops admitting calls. Requires "
+                             "--attest-revocation-registry. Absent means no bound is "
+                             "stated and a clean answer stands at any registry age.")
     parser.add_argument("--overt-signing-key", type=Path, default=None,
                         help="Ed25519 PEM private key used to sign OVERT 1.0 Base "
                              "Envelopes for every governed MCP interaction. Off when "
@@ -2330,6 +2357,14 @@ def _build_attest_emitter_from_args(
             receipts_dir=args.attest_receipts_dir,
             upstream_commands=upstreams,
             tool_constraints_path=getattr(args, "tool_constraints", None),
+            revocation_registry_path=getattr(
+                args, "attest_revocation_registry", None
+            ),
+            clock_skew_seconds=getattr(args, "attest_clock_skew_seconds", 30),
+            expected_tenant=getattr(args, "attest_expected_tenant", None),
+            max_staleness_seconds=getattr(
+                args, "attest_max_revocation_staleness_seconds", None
+            ),
         )
     except AttestConfigError as exc:
         print(f"vaara-mcp-proxy: {exc}", file=sys.stderr)

@@ -49,6 +49,7 @@ class CredentialGateway:
         expected_tenant: Optional[str] = None,
         revocation: Any = None,
         clock_skew_seconds: int = 30,
+        max_staleness_seconds: Optional[float] = None,
         signer: Optional[ReceiptSigner] = None,
     ) -> None:
         self._vm = verifying_material
@@ -56,6 +57,13 @@ class CredentialGateway:
         self._expected_tenant = expected_tenant
         self._rev = revocation
         self._clock_skew_seconds = clock_skew_seconds
+        # The staleness bound a deployment accepts, per
+        # draft-sirkkavaara-vaara-receipt-08 Section 10, which puts that choice
+        # on the deployment. None means no bound was stated and a clean answer
+        # from any registry age stands, which is what every caller had before
+        # this parameter existed. Without it, verify_grant's revocation_stale
+        # verdict was unreachable through this gateway.
+        self._max_staleness_seconds = max_staleness_seconds
         # Opt-in: when a signer is supplied, authorize_and_receipt mints a signed
         # proof of every grant-bound decision. Absent it, the gateway only
         # verifies and the authority layer stays observation-free (off by default).
@@ -112,6 +120,7 @@ class CredentialGateway:
             revocation=self._rev,
             known_attestation_digests=self._load_known_digests(),
             clock_skew_seconds=self._clock_skew_seconds,
+            max_staleness_seconds=self._max_staleness_seconds,
         )
         return verdict, cred
 

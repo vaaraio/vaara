@@ -77,6 +77,10 @@ class AttestPairEmitter:
         upstream_commands: dict[str, list[str]],
         exp_seconds: int = 300,
         tool_constraints: "Optional[dict[str, tuple[Any, ...]]]" = None,
+        revocation: Any = None,
+        clock_skew_seconds: int = 30,
+        expected_tenant: Optional[str] = None,
+        max_staleness_seconds: Optional[float] = None,
     ) -> None:
         from vaara.attestation._attest_types import VALID_ALGS
         if alg not in VALID_ALGS:
@@ -88,6 +92,10 @@ class AttestPairEmitter:
         self._secret_version = secret_version
         self._exp_seconds = exp_seconds
         self._tool_constraints: dict[str, tuple[Any, ...]] = tool_constraints or {}
+        self._revocation = revocation
+        self._clock_skew_seconds = clock_skew_seconds
+        self._expected_tenant = expected_tenant
+        self._max_staleness_seconds = max_staleness_seconds
         self._counter = 0
         # Per-coverage-boundary sequence for authorization receipts, gap-free by
         # construction. Distinct from ``_counter`` (the per-call attestation id):
@@ -105,6 +113,13 @@ class AttestPairEmitter:
         # Fail-closed gateway for tools listed in tool_constraints. Built once at
         # init so the verifying material stays paired with the signing key. Only
         # present when tool_constraints is non-empty; absent = no enforcement.
+        #
+        # revocation defaults to None, and verify_grant skips its revocation
+        # branch entirely when no registry is supplied. A proxy started without
+        # --attest-revocation-registry therefore does not check revocation at
+        # all: it is not that every credential passes the check, it is that the
+        # check does not run. The same holds for the staleness bound, which
+        # needs a registry before it can mean anything.
         self._gateway: "Optional[Any]" = None
         if self._tool_constraints:
             try:
@@ -117,6 +132,10 @@ class AttestPairEmitter:
                 self._gateway = CredentialGateway(
                     verifying_material=vm,
                     receipts_dir=self._receipts_dir,
+                    expected_tenant=self._expected_tenant,
+                    revocation=self._revocation,
+                    clock_skew_seconds=self._clock_skew_seconds,
+                    max_staleness_seconds=self._max_staleness_seconds,
                 )
             except Exception:
                 logger.exception("Failed to build CredentialGateway for tool constraints")
@@ -477,6 +496,10 @@ def build_attest_emitter(
     secret_version: Optional[str] = None,
     exp_seconds: int = 300,
     tool_constraints_path: Optional[Path] = None,
+    revocation_registry_path: Optional[Path] = None,
+    clock_skew_seconds: int = 30,
+    expected_tenant: Optional[str] = None,
+    max_staleness_seconds: Optional[float] = None,
 ) -> AttestPairEmitter:
     """Load signing key from path and return an ``AttestPairEmitter``.
 
@@ -559,6 +582,34 @@ def build_attest_emitter(
         for tname, cap_list in raw_cfg.get("tools", {}).items():
             tool_constraints[tname] = tuple(capability_from_dict(c) for c in cap_list)
 
+    revocation = None
+    if revocation_registry_path is not None:
+        from vaara.attestation._revocation import RevocationRegistry
+
+        rev_path = Path(revocation_registry_path).expanduser()
+        if not rev_path.is_file():
+            raise AttestConfigError(
+                f"--attest-revocation-registry file not found: {rev_path}"
+            )
+        try:
+            revocation = RevocationRegistry.from_dict(
+                json.loads(rev_path.read_text(encoding="utf-8"))
+            )
+        except (OSError, ValueError, json.JSONDecodeError) as exc:
+            # Refuse to start rather than fall back to no registry. Starting
+            # without one is a valid configuration, but it has to be chosen,
+            # not arrived at because a file failed to parse.
+            raise AttestConfigError(
+                f"--attest-revocation-registry is not a usable registry: {exc}"
+            ) from exc
+
+    if max_staleness_seconds is not None and revocation is None:
+        raise AttestConfigError(
+            "--attest-max-revocation-staleness-seconds has no effect without "
+            "--attest-revocation-registry: there is no registry whose age "
+            "could be bounded."
+        )
+
     return AttestPairEmitter(
         signing_key=signing_material,
         alg=alg,
@@ -567,4 +618,8 @@ def build_attest_emitter(
         upstream_commands=upstream_commands,
         exp_seconds=exp_seconds,
         tool_constraints=tool_constraints or None,
+        revocation=revocation,
+        clock_skew_seconds=clock_skew_seconds,
+        expected_tenant=expected_tenant,
+        max_staleness_seconds=max_staleness_seconds,
     )
