@@ -17,9 +17,26 @@ signature:
    committed scope (args re-derived with ``make_args_digest``).
 4. ``revoked``        - the issuer or its bound key was revoked at or before
    issuance (``RevocationRegistry``).
-5. ``binding_unknown``- the bound attestation digest is not in the set of
+5. ``revocation_stale``- the deployment stated a staleness bound and the
+   registry cannot establish anything about the present under it. Only
+   reachable when the caller passes ``max_staleness_seconds``; see below.
+6. ``binding_unknown``- the bound attestation digest is not in the set of
    known mediation digests the verifier was given (fail-closed when no set is
    supplied).
+
+Revocation freshness is opt-in, and deliberately so. ``draft-sirkkavaara-vaara-receipt-08``
+Section 10 puts the staleness a deployment accepts on the deployment, not on
+the verifier, so ``verify_grant`` imposes no bound of its own. Pass
+``max_staleness_seconds`` (and optionally ``revocation_now`` for a
+deterministic instant) and the bound is honoured: a clean answer the registry
+cannot vouch for as current refuses instead of admitting.
+
+Omit it and behaviour is exactly what it was before this parameter existed.
+
+The asymmetry from ``RevocationStatus`` is preserved here. A visible revocation
+binds however stale the registry is, so ``revoked`` is checked first and a
+stale registry never downgrades it to ``revocation_stale``. Staleness weakens
+only the negative answer.
 
 This is detection of a defeated broker, not a mathematical-completeness claim.
 Completeness holds only for tools placed behind a gateway that runs this; see
@@ -59,6 +76,8 @@ def verify_grant(
     known_attestation_digests: Optional[frozenset[str]] = None,
     now: Optional[float] = None,
     clock_skew_seconds: int = 30,
+    revocation_now: Optional[str] = None,
+    max_staleness_seconds: Optional[float] = None,
 ) -> GrantVerdict:
     """Check a credential against the runtime call. See module docstring."""
     if not verify_grant_signature(credential, verifying_material=verifying_material):
@@ -92,10 +111,22 @@ def verify_grant(
 
     if revocation is not None:
         status = revocation.status(
-            asserted.iss, asserted.iat, keyid=asserted.secret_version
+            asserted.iss,
+            asserted.iat,
+            keyid=asserted.secret_version,
+            now=revocation_now,
+            max_staleness_seconds=max_staleness_seconds,
         )
+        # Order matters. A revocation the registry can see binds however old
+        # the registry is, so it is answered before staleness is considered
+        # and a stale registry never downgrades "revoked" to "revocation_stale".
         if status.revoked:
             return GrantVerdict(False, "revoked")
+        # Only reachable when the deployment stated a bound. Without one there
+        # is nothing to honour and the clean answer stands, which is the
+        # behaviour every caller had before these parameters existed.
+        if max_staleness_seconds is not None and not status.establishes_current:
+            return GrantVerdict(False, "revocation_stale")
 
     known = known_attestation_digests or frozenset()
     if credential.binding.attestation_digest not in known:

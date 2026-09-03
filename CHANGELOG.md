@@ -6,6 +6,16 @@ and this project follows [Semantic Versioning](https://semver.org/spec/v2.0.0.ht
 
 ## [Unreleased]
 
+### Added
+
+- `verify_grant()` can now honour a deployment's revocation staleness bound. It takes optional `revocation_now` and `max_staleness_seconds`, forwards them to `RevocationRegistry.status()`, and refuses with the new reason `revocation_stale` when the registry cannot establish anything about the present under the stated bound.
+
+  1.80.0 gave `RevocationStatus` a `freshness` verdict and an `establishes_current` property, but no shipped path read them. `verify_grant()` called `status()` with no `now` and no bound, so on that path `freshness` could only ever be `unknown`, and the only line consuming the status was `if status.revoked:`. A registry that stated in its own words that it could say nothing about revocations since it was observed still produced `GrantVerdict(ok=True, reason='ok')`. The verdict was computed, exposed, pinned by vectors, and enforced nowhere.
+
+  The bound stays opt-in, because `draft-sirkkavaara-vaara-receipt-08` Section 10 puts the staleness a deployment accepts on the deployment rather than on the verifier. Callers that pass neither parameter get the behaviour they had before it existed, which `test_stale_registry_admits_when_no_bound_is_stated` pins.
+
+  The asymmetry is preserved and pinned separately. A revocation the registry can see binds however old the registry is, so `revoked` is answered before staleness is considered and a stale registry never downgrades a refusal to `revocation_stale`. Staleness weakens only the negative answer. `test_revocation_binds_however_stale_the_registry_is` is the case most likely to regress.
+
 ## [1.80.0] - 2026-09-02
 
 ### Added
