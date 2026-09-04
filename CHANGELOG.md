@@ -6,6 +6,18 @@ and this project follows [Semantic Versioning](https://semver.org/spec/v2.0.0.ht
 
 ## [Unreleased]
 
+### Fixed
+
+- A trail that stops recording now says so. The Claude Code hook could fail to persist every single record, print a traceback, and exit 0, and nothing anywhere surfaced it. Found by dogfooding: on the maintainer's own machine the trail had been dead for thirteen days, and it turned up only because someone went looking for an unrelated reason.
+
+  The signal was a full traceback on every tool call, which reads as ordinary hook noise within minutes. The failure counter printed beside it lived in `AuditTrail`, which is per-process, while the hook is a fresh process per tool call, so it could never climb past 1 and never crossed any threshold.
+
+  The count now lives beside the database, in `<db>.write-failure.json`, where it survives the process and accumulates. `vaara hook session-start` reads it and states that the trail is not recording, with the first failure time, the running count and the recovery commands. When no marker exists it runs `PRAGMA quick_check` at session start instead, which catches a trail damaged while nothing was writing to it. On the write path the stack trace is kept for the first failure of an outage and every failure after it is one line. A successful write stamps the marker resolved and keeps the file, so how long the trail was down stays on disk.
+
+  Opening the trail also no longer takes the hook down: an unreadable `audit.db` on the `mcp__*` path raised through `PreToolUse`, and in the fallback scripts it raised from `_record_call` too. Both now pass the call through and report.
+
+  Fail-open is unchanged and deliberate. A governance hook that blocks the session gets uninstalled, and an uninstalled hook records nothing at all. The defect was the silence. Fixed in both the packaged hooks and the bundled fallback scripts, which had the same shape.
+
 ### Added
 
 - Every shipped export path can pin the revocation registry it used. `--revocations PATH` on `vaara trail export`, `export-threshold`, `export-article12` and `export-article50`, and a `revocation=` argument on `export_signed_threshold`, `export_article12`, `export_article50` and `rotate`.

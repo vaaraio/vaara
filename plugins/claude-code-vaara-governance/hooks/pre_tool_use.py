@@ -36,6 +36,7 @@ sys.path.insert(0, str(Path(__file__).parent))
 import _config  # noqa: E402
 from _deny_patterns import load_deny_rules, match_deny_rule  # noqa: E402
 from _notify import notify as _raw_notify  # noqa: E402
+from _trail_health import note_failure  # noqa: E402
 
 CFG = _config.load_config()
 
@@ -81,12 +82,12 @@ def _record_call(
     except ImportError:
         return
     db_path = _audit_db_path()
-    db_path.parent.mkdir(parents=True, exist_ok=True)
-    backend = SQLiteAuditBackend(db_path)
-    trail = backend.load_trail()
-    trail._on_record = backend.write_record
-    pipeline = InterceptionPipeline(trail=trail, enforce=False)
     try:
+        db_path.parent.mkdir(parents=True, exist_ok=True)
+        backend = SQLiteAuditBackend(db_path)
+        trail = backend.load_trail()
+        trail._on_record = backend.write_record
+        pipeline = InterceptionPipeline(trail=trail, enforce=False)
         pipeline.intercept(
             agent_id=agent_id,
             tool_name=tool_name,
@@ -94,8 +95,12 @@ def _record_call(
             context=context,
             session_id=session_id,
         )
-    except Exception:
-        pass
+    except Exception as exc:
+        # Fail-open, and say so. Opening the trail used to sit outside this
+        # try, so an unreadable audit.db took the hook down with a traceback;
+        # everything after it was swallowed whole and the trail could stop
+        # recording without anything saying it had.
+        note_failure(db_path, exc, stage="record_call")
 
 
 def _classify_mcp(
@@ -126,10 +131,14 @@ def _classify_mcp(
         return 2
 
     db_path = _audit_db_path()
-    db_path.parent.mkdir(parents=True, exist_ok=True)
-    backend = SQLiteAuditBackend(db_path)
-    trail = backend.load_trail()
-    trail._on_record = backend.write_record
+    try:
+        db_path.parent.mkdir(parents=True, exist_ok=True)
+        backend = SQLiteAuditBackend(db_path)
+        trail = backend.load_trail()
+        trail._on_record = backend.write_record
+    except Exception as exc:
+        note_failure(db_path, exc, stage="open")
+        return 0
     pipeline = InterceptionPipeline(trail=trail, enforce=not shadow)
 
     preset = _config.protection_preset(CFG)
