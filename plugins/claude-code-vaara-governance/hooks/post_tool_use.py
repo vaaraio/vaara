@@ -26,6 +26,7 @@ from pathlib import Path
 
 sys.path.insert(0, str(Path(__file__).parent))
 import _config  # noqa: E402
+import _trail_health  # noqa: E402
 
 CFG = _config.load_config()
 
@@ -102,9 +103,13 @@ def main() -> int:
     if not db_path.exists():
         return 0
 
-    backend = SQLiteAuditBackend(db_path)
-    trail = backend.load_trail()
-    trail._on_record = backend.write_record
+    try:
+        backend = SQLiteAuditBackend(db_path)
+        trail = backend.load_trail()
+        trail._on_record = backend.write_record
+    except Exception as exc:
+        _trail_health.note_failure(db_path, exc, stage="open")
+        return 0
 
     target_action_id = None
     for record in reversed(trail._records):
@@ -125,7 +130,8 @@ def main() -> int:
         pipeline = InterceptionPipeline(trail=trail)
         pipeline._pending_outcomes[target_action_id] = (0.5, {})
         pipeline.report_outcome(target_action_id, outcome_severity=severity)
-    except Exception:
+    except Exception as exc:
+        _trail_health.note_failure(db_path, exc, stage="post_tool_use")
         return 0
     return 0
 

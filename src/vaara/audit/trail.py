@@ -39,6 +39,7 @@ from typing import Any, Callable, Optional
 
 from vaara._decision_vocabulary import FINE_TO_COARSE, REFINEMENTS
 from vaara._sanitize import json_safe, strict_json_dumps
+from vaara.audit.write_failure import mark_recovered, record_failure
 from vaara.taxonomy.actions import ActionRequest, RegulatoryDomain
 
 logger = logging.getLogger(__name__)
@@ -596,6 +597,14 @@ class AuditTrail:
         # surfaces only at next load_trail. Article 12(2) compliance asks
         # for active detection, not forensic-only.
         self._persistence_failures = 0
+        # This counter is per-process, and the Claude Code hook is a fresh
+        # process per tool call, so on that deployment it can never exceed 1.
+        # That is why the 2026-08-22 outage ran thirteen days without crossing
+        # any threshold. The durable count lives beside the database file; see
+        # vaara.audit.write_failure. False means "the marker has not been
+        # consulted since the last failure", so the first successful write
+        # after a failure is the one that clears it.
+        self._write_marker_checked = False
         # Count of rows loaded as skeletons during load_trail because
         # their data/regulatory JSON columns were corrupt. Parallel
         # signal to persistence_failures but for the READ path — an ops
@@ -1780,36 +1789,23 @@ class AuditTrail:
                         # only evidence that this discontinuity is somebody
                         # else's record rather than a missing one.
                         self._store_anchors[record.record_id] = head
-                except Exception:
+                except Exception as exc:
                     # Store rejected the write. Keep the in-memory chain
                     # coherent off the local head and count the divergence,
                     # exactly as the on_record path below does.
                     _stamp(self._last_hash)
-                    self._persistence_failures += 1
-                    logger.exception(
-                        "append_record failed for record %s "
-                        "(persistent store now out of sync with in-memory "
-                        "chain; failure count=%d)",
-                        record.record_id,
-                        self._persistence_failures,
-                    )
+                    self._note_persistence_failure(record, exc, "append_record")
+                else:
+                    self._note_persistence_ok()
             else:
                 _stamp(self._last_hash)
                 if self._on_record:
                     try:
                         self._on_record(record)
-                    except Exception:
-                        # logger.exception preserves the stack trace so ops can
-                        # diagnose disk-full / locked-DB / permission errors
-                        # instead of seeing a bare error line.
-                        self._persistence_failures += 1
-                        logger.exception(
-                            "on_record callback failed for record %s "
-                            "(persistent store now out of sync with in-memory "
-                            "chain; failure count=%d)",
-                            record.record_id,
-                            self._persistence_failures,
-                        )
+                    except Exception as exc:
+                        self._note_persistence_failure(record, exc, "on_record")
+                    else:
+                        self._note_persistence_ok()
 
             self._last_hash = record.record_hash
             self._records.append(record)
@@ -1826,6 +1822,73 @@ class AuditTrail:
         if target is not None and hasattr(target, "append_record"):
             return target
         return None
+
+    def _persistence_path(self):
+        """The file the failure marker belongs beside, or ``None``.
+
+        An in-memory trail, a plain callable sink and a test double all
+        return ``None``, and every function in ``write_failure`` treats that
+        as "nowhere to report, do nothing".
+        """
+        for target in (self._backend, getattr(self._on_record, "__self__", None)):
+            if target is None:
+                continue
+            path = getattr(target, "db_path", None)
+            if path is None:
+                path = getattr(target, "_db_path", None)
+            if path is not None:
+                return path
+        return None
+
+    def _note_persistence_failure(self, record: AuditRecord, exc: BaseException,
+                                  stage: str) -> None:
+        """Record a failed persist so it is visible past this process.
+
+        The old behaviour was ``logger.exception`` on every record. That is
+        what hid the 2026-08-22 outage for thirteen days: a traceback per tool
+        call reads as normal hook noise within minutes, and the in-process
+        counter beside it could never climb because the hook is a new process
+        each call. So the stack trace is kept for the first failure of an
+        outage, where it is the diagnosis, and every failure after it is one
+        line that says the trail is not recording. The count that matters
+        lives in the marker file.
+        """
+        self._persistence_failures += 1
+        self._write_marker_checked = False
+        state = record_failure(self._persistence_path(), exc, stage=stage)
+        count = state.get("count", self._persistence_failures) if state else \
+            self._persistence_failures
+        if count <= 1:
+            logger.exception(
+                "%s failed for record %s (persistent store now out of sync "
+                "with in-memory chain; failure count=%d)",
+                stage, record.record_id, count,
+            )
+        else:
+            logger.error(
+                "%s failed for record %s: %s — THE TRAIL IS NOT RECORDING "
+                "(%d failed writes since %s)",
+                stage, record.record_id, exc, count,
+                state.get("first_failure_utc", "an unknown time") if state else "?",
+            )
+
+    def _note_persistence_ok(self) -> None:
+        """Clear an outage marker once, on the first write that succeeds.
+
+        Checked at most once per trail instance, and re-armed by the next
+        failure, so the steady state costs nothing.
+        """
+        if self._write_marker_checked:
+            return
+        self._write_marker_checked = True
+        state = mark_recovered(self._persistence_path())
+        if state:
+            logger.warning(
+                "the audit trail at %s is recording again after %s failed "
+                "write(s) starting %s",
+                state.get("db"), state.get("count", "?"),
+                state.get("first_failure_utc", "an unknown time"),
+            )
 
     def _get_regulatory_articles(
         self,

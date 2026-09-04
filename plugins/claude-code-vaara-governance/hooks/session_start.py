@@ -20,6 +20,7 @@ from pathlib import Path
 
 sys.path.insert(0, str(Path(__file__).parent))
 import _config  # noqa: E402
+import _trail_health  # noqa: E402
 
 CFG = _config.load_config()
 
@@ -104,6 +105,7 @@ def main() -> int:
         db_state = "existing" if existed else "created"
     except Exception as exc:
         db_state = f"unavailable ({exc!r})"
+        _trail_health.note_failure(db_path, exc, stage="open")
 
     disclosure = ""
     statement = _config.article50_statement(CFG)
@@ -117,6 +119,7 @@ def main() -> int:
         f"notifications={notif}, audit_db={db_path} [{db_state}]{disclosure}). "
         f"Settings: /vaara-setup"
     )
+    _trail_health.report(db_path, existed)
     return 0
 
 

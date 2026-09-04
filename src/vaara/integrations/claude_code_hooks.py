@@ -288,7 +288,36 @@ def _record_call(cfg: dict, agent: str, tool_name: str, tool_input: dict,
             agent_id=agent, tool_name=tool_name, parameters=tool_input,
             context=context, session_id=session_id,
         )
+    except Exception as exc:
+        _note_trail_failure(cfg, exc, stage="record_call")
+
+
+def _note_trail_failure(cfg: dict, exc: BaseException, *, stage: str) -> None:
+    """Say the trail is not recording, in those words, without blocking.
+
+    The call still goes through: fail-open is the right default, because a
+    governance hook that stops the session gets uninstalled and an
+    uninstalled hook records nothing at all. What changes is that the
+    operator finds out. Rate-limited by the marker, so a persistent outage
+    stays one visible line a minute instead of the per-call traceback that
+    hid this failure mode for thirteen days.
+    """
+    try:
+        from vaara.audit.write_failure import failure_banner, record_failure
+
+        state = record_failure(audit_db_path(cfg), exc, stage=stage)
+        if state is None:
+            _emit(f"vaara-governance: trail write failed ({exc!r}); NOT recording.")
+            return
+        if state.get("notify"):
+            _emit(failure_banner(state))
+            notify(
+                cfg, "TRAIL NOT RECORDING", "audit trail",
+                f"{state.get('count', '?')} failed writes since "
+                f"{state.get('first_failure_utc', 'an unknown time')}",
+            )
     except Exception:
+        # Reporting a failure must never become the failure.
         pass
 
 
@@ -338,7 +367,15 @@ def run_pre_tool_use(deny_patterns: Optional[str] = None) -> int:
 
     from vaara.pipeline import InterceptionPipeline
 
-    pipeline = InterceptionPipeline(trail=_open_trail(cfg), enforce=not shadow)
+    try:
+        trail = _open_trail(cfg)
+    except Exception as exc:
+        # A trail that will not open used to take the hook down with it, with
+        # a traceback and no statement of what that meant. Pass the call
+        # through, and say plainly that it is not being recorded.
+        _note_trail_failure(cfg, exc, stage="open")
+        return 0
+    pipeline = InterceptionPipeline(trail=trail, enforce=not shadow)
 
     preset = protection_preset(cfg)
     custom = custom_thresholds(cfg)
@@ -490,7 +527,8 @@ def run_post_tool_use() -> int:
         pipeline = InterceptionPipeline(trail=trail)
         pipeline._pending_outcomes[target_action_id] = (0.5, {})
         pipeline.report_outcome(target_action_id, outcome_severity=severity)
-    except Exception:
+    except Exception as exc:
+        _note_trail_failure(cfg, exc, stage="post_tool_use")
         return 0
     return 0
 
@@ -516,6 +554,7 @@ def run_session_start() -> int:
         db_state = "existing" if existed else "created"
     except Exception as exc:
         db_state = f"unavailable ({exc!r})"
+        _note_trail_failure(cfg, exc, stage="open")
 
     disclosure = ""
     statement = article50_statement(cfg)
@@ -549,4 +588,41 @@ def run_session_start() -> int:
         f"protection={preset}, notifications={notif}, audit_db={db_path} "
         f"[{db_state}]{disclosure}). Settings: /vaara-setup"
     )
+    _report_trail_health(cfg, db_path, existed)
     return 0
+
+
+def _report_trail_health(cfg: dict, db_path: Path, existed: bool) -> None:
+    """Once per session, on the line the operator already reads.
+
+    Two questions, in order. Has this trail been failing to record — the
+    marker knows, across processes, which is the thing nothing knew on
+    2026-08-22. And if not, does the file still read clean — which catches a
+    trail damaged while nothing was writing to it, where the first symptom
+    would otherwise be the next record nobody is watching.
+    """
+    try:
+        from vaara.audit.write_failure import active_failure, failure_banner, quick_check
+
+        state = active_failure(db_path)
+        if state is not None:
+            _emit(failure_banner(state))
+            notify(
+                cfg, "TRAIL NOT RECORDING", "audit trail",
+                f"{state.get('count', '?')} failed writes since "
+                f"{state.get('first_failure_utc', 'an unknown time')}",
+            )
+            return
+        if not existed:
+            return
+        problem = quick_check(db_path)
+        if problem is not None:
+            _emit(
+                f"vaara-governance: the audit trail at {db_path} does not read "
+                f"clean ({problem}). Records may not be persisting. Check it with "
+                f"`sqlite3 {db_path} 'PRAGMA integrity_check'` and recover with "
+                "`.recover`. Do not delete the file, it is the evidence."
+            )
+            notify(cfg, "TRAIL DAMAGED", "audit trail", problem)
+    except Exception:
+        pass

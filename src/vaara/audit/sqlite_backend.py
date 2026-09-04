@@ -430,6 +430,17 @@ class SQLiteAuditBackend:
     _WAL_RETRY_SLEEP = 0.05
 
     @property
+    def db_path(self) -> Path:
+        """The file this trail is stored in.
+
+        Public because callers outside the backend need to name the trail:
+        the failure marker in :mod:`vaara.audit.write_failure` lives beside
+        it, and an operator-facing message about a trail that is not
+        recording is not much use without the path.
+        """
+        return self._db_path
+
+    @property
     def journal_mode(self) -> str:
         """The journal mode this trail is actually running in, lowercased."""
         with self._lock:
