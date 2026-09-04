@@ -1,0 +1,11 @@
+{
+  "policy_allow": { "conforming": true, "keys_present": false, "approver": null, "human_disposed": null },
+  "human_approved_at_escalation": { "conforming": true, "keys_present": true, "approver": "human", "human_disposed": true },
+  "replayed_prior_approval": { "conforming": true, "keys_present": true, "approver": "policy", "human_disposed": false },
+  "human_denied_at_escalation": { "conforming": true, "keys_present": true, "approver": "human", "human_disposed": true },
+  "human_reviewed_but_policy_disposed": { "conforming": true, "keys_present": true, "approver": "human", "human_disposed": false },
+  "policy_claiming_human": { "conforming": false, "reason_class": "human_claim_by_policy" },
+  "bare_flag_no_approver": { "conforming": false, "reason_class": "human_claim_by_policy" },
+  "unknown_approver": { "conforming": false, "reason_class": "approver_not_in_closed_set" },
+  "truthy_non_bool_flag": { "conforming": false, "reason_class": "flag_not_boolean" }
+}

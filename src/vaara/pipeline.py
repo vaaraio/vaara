@@ -42,6 +42,7 @@ from collections import OrderedDict
 from dataclasses import dataclass
 from typing import TYPE_CHECKING, Any, Optional, Sequence
 
+from vaara import _disposition
 from vaara._decision_vocabulary import FINE_TO_COARSE
 from vaara._sanitize import json_safe
 from pathlib import Path
@@ -675,6 +676,13 @@ class InterceptionPipeline:
         #    case governance failure named in step 6: the record and
         #    the behaviour disagree.
         args_digest = ""
+        # Empty approver means the record carries no disposition keys and
+        # hashes exactly as it did before this vocabulary existed. Only the
+        # replay branch below fills it in, because that is the only place in
+        # intercept() where an allow means something other than "policy
+        # allowed it" and the difference is invisible in the word `allow`.
+        approver = ""
+        human_disposed = False
         if decision_str == "escalate":
             args_digest = hashlib.sha256(
                 json.dumps(safe_params or {}, sort_keys=True).encode()
@@ -695,6 +703,15 @@ class InterceptionPipeline:
                     f"(action_id={prior.action_id}, {prior.timestamp})",
                     _MAX_DECISION_REASON_LEN, "reason",
                 )
+                # A human approved the EARLIER action. This one was disposed
+                # of by a cache lookup, so the record says policy. The reason
+                # string above already back-references the approval it
+                # replayed; this makes the same fact a field, so a relying
+                # party separating "a human approved this" from "a human
+                # approved something shaped like this, yesterday" does not
+                # have to parse prose to do it.
+                approver = _disposition.POLICY
+                human_disposed = False
 
         # 8. Record the decision in audit. `decision` stays inside the
         # documented allow/escalate/deny enum; the refinement and any
@@ -712,6 +729,8 @@ class InterceptionPipeline:
             regulatory_domains=action_type.regulatory_domains,
             decision_detail=decision_detail,
             modified_parameters=modified_parameters,
+            approver=approver,
+            human_disposed=human_disposed,
         )
 
         if decision_str == "escalate":
@@ -986,14 +1005,25 @@ class InterceptionPipeline:
         resolution: str,
         reviewer: str,
         justification: str = "",
+        approver: str = "",
+        human_disposed: bool = False,
     ) -> None:
-        """Record human resolution of an escalated action.
+        """Record resolution of an escalated action.
 
         Args:
             action_id: The action that was escalated.
             resolution: "allow" or "deny".
-            reviewer: Who made the decision.
+            reviewer: Who made the decision. Free text, and both shipped
+                call sites pass a mechanism name rather than a person, so it
+                answers who and never what kind.
             justification: Why.
+            approver: "human" or "policy". The closed vocabulary in
+                :mod:`vaara._disposition`. Left empty, the record carries no
+                disposition keys and hashes as it did before.
+            human_disposed: True ONLY when a human actually acted on this
+                action. Requires approver="human"; the pair is validated in
+                the trail rather than here, so every writer goes through the
+                same check.
         """
         # Narrow the resolution to the two values downstream compliance
         # queries assume. Unchecked, a typo like "alllow" or a caller
@@ -1090,6 +1120,8 @@ class InterceptionPipeline:
             reviewer=reviewer,
             justification=justification,
             args_digest=args_digest,
+            approver=approver,
+            human_disposed=human_disposed,
         )
 
     def run_compliance_assessment(

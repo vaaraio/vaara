@@ -1,0 +1,63 @@
+{
+  "policy_allow": {
+    "note": "Policy allowed the action outright. No human was involved and no disposition is claimed.",
+    "decision": "allow",
+    "reason": "risk 0.11 below allow threshold",
+    "approver": null,
+    "human_disposed": null
+  },
+  "human_approved_at_escalation": {
+    "note": "A person wrote the decision file during the approvals handshake. A human acted on THIS action.",
+    "decision": "allow",
+    "reason": "approved at escalation",
+    "approver": "human",
+    "human_disposed": true
+  },
+  "replayed_prior_approval": {
+    "note": "find_prior_approval matched an earlier resolution inside its 24h window. The allow replays a human decision taken on a DIFFERENT action, so no human acted on this one.",
+    "decision": "allow",
+    "reason": "auto-allowed by prior approval (action_id=act-b, 1788500000.0)",
+    "approver": "policy",
+    "human_disposed": false
+  },
+  "human_denied_at_escalation": {
+    "decision": "deny",
+    "reason": "denied at escalation",
+    "approver": "human",
+    "human_disposed": true
+  },
+  "human_reviewed_but_policy_disposed": {
+    "note": "A human looked at it and the disposition was still automatic. Legal: the flag only ever narrows the claim.",
+    "decision": "allow",
+    "reason": "reviewed, auto-cleared",
+    "approver": "human",
+    "human_disposed": false
+  },
+  "policy_claiming_human": {
+    "note": "The lie this vocabulary exists to prevent.",
+    "decision": "allow",
+    "reason": "r",
+    "approver": "policy",
+    "human_disposed": true
+  },
+  "bare_flag_no_approver": {
+    "decision": "allow",
+    "reason": "r",
+    "approver": null,
+    "human_disposed": true
+  },
+  "unknown_approver": {
+    "note": "The vocabulary is closed. counterparty is a value another specification uses and this one does not.",
+    "decision": "allow",
+    "reason": "r",
+    "approver": "counterparty",
+    "human_disposed": false
+  },
+  "truthy_non_bool_flag": {
+    "note": "A caller passing 1 rather than True must not silently produce a human claim.",
+    "decision": "allow",
+    "reason": "r",
+    "approver": "human",
+    "human_disposed": 1
+  }
+}

@@ -730,6 +730,10 @@ class VaaraMCPServer:
                 "allow" if human == "approve" else "deny",
                 reviewer="approvals-handshake",
                 justification="human decision via ~/.vaara/approvals",
+                # Guarded above: anything other than approve or deny already
+                # returned, so reaching this line means a person answered.
+                approver="human",
+                human_disposed=True,
             )
         except Exception:
             logger.warning(
