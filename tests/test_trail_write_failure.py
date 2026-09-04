@@ -343,6 +343,15 @@ class TestHookSurfacesTheOutage:
         assert "integrity_check" in err
         assert "Do not delete the file" in err
 
+    def test_session_start_says_it_once(self, audit_db, monkeypatch, capsys):
+        """Two banners for one outage would be the noise this change removes."""
+        audit_db.write_bytes(b"\x00" * 8192)
+        _feed(monkeypatch, {"session_id": "s1"})
+        hooks.run_session_start()
+
+        err = capsys.readouterr().err
+        assert err.count("THE AUDIT TRAIL IS NOT RECORDING") == 1
+
     def test_the_quick_check_branch_reports_a_trail_that_still_opens(
         self, tmp_path: Path, capsys
     ):

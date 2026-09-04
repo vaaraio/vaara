@@ -97,6 +97,7 @@ def main() -> int:
     notif = "on" if _config.notifications_enabled(CFG) else "off"
     db_path = _audit_db_path()
     existed = db_path.exists()
+    reported = False
     try:
         from vaara.audit.sqlite_backend import SQLiteAuditBackend
 
@@ -106,6 +107,9 @@ def main() -> int:
     except Exception as exc:
         db_state = f"unavailable ({exc!r})"
         _trail_health.note_failure(db_path, exc, stage="open")
+        # note_failure already printed the banner for this marker. Reporting
+        # again below would say the same thing twice.
+        reported = True
 
     disclosure = ""
     statement = _config.article50_statement(CFG)
@@ -119,7 +123,8 @@ def main() -> int:
         f"notifications={notif}, audit_db={db_path} [{db_state}]{disclosure}). "
         f"Settings: /vaara-setup"
     )
-    _trail_health.report(db_path, existed)
+    if not reported:
+        _trail_health.report(db_path, existed)
     return 0
 
 

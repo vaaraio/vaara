@@ -74,4 +74,7 @@ def report(db_path, existed: bool) -> None:
             )
             _raw_notify("TRAIL DAMAGED", "audit trail", problem)
     except Exception:
+        # Reporting on the trail's health must never break the session it is
+        # reporting to. There is nowhere left to escalate to from here: the
+        # thing that would carry the error is the trail itself.
         pass

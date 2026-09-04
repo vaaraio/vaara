@@ -549,12 +549,18 @@ def run_session_start() -> int:
     notif = "on" if notifications_enabled(cfg) else "off"
     db_path = audit_db_path(cfg)
     existed = db_path.exists()
+    reported = False
     try:
         _open_trail(cfg)
         db_state = "existing" if existed else "created"
     except Exception as exc:
         db_state = f"unavailable ({exc!r})"
         _note_trail_failure(cfg, exc, stage="open")
+        # That call already printed the banner and fired the notification for
+        # this exact marker. Letting the health report print it again would
+        # make session start say the same thing three times, which is the
+        # noise this whole change exists to remove.
+        reported = True
 
     disclosure = ""
     statement = article50_statement(cfg)
@@ -588,7 +594,8 @@ def run_session_start() -> int:
         f"protection={preset}, notifications={notif}, audit_db={db_path} "
         f"[{db_state}]{disclosure}). Settings: /vaara-setup"
     )
-    _report_trail_health(cfg, db_path, existed)
+    if not reported:
+        _report_trail_health(cfg, db_path, existed)
     return 0
 
 
@@ -625,4 +632,7 @@ def _report_trail_health(cfg: dict, db_path: Path, existed: bool) -> None:
             )
             notify(cfg, "TRAIL DAMAGED", "audit trail", problem)
     except Exception:
+        # Reporting on the trail's health must never break the session it is
+        # reporting to. There is nowhere left to escalate to from here: the
+        # thing that would carry the error is the trail itself.
         pass

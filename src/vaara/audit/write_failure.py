@@ -28,6 +28,17 @@ not the exit code.
 
 Nothing here raises. A failure to report a failure must not become the
 failure, and a read-only directory must not stop the agent from working.
+
+**The count is a lower bound, and deliberately so.** Two hook processes that
+fail at the same moment can read the same count and both write ``n + 1``, so
+one of the two is lost. Marker writes go through ``os.replace``, so a reader
+never sees a half-written file, but there is no lock across processes. That
+is acceptable because the operator signal is the marker's existence and its
+``first_failure`` time, and both survive the race: whichever writer lands
+last still carries the earliest start it read. An exact ledger of failed
+writes would need a lock on the reporting path for the sake of a number
+nobody acts on, on a machine that is already having a bad time. The trail
+itself is the ledger, and this file is the smoke alarm.
 """
 
 from __future__ import annotations
