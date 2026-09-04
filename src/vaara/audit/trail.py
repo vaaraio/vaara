@@ -854,6 +854,8 @@ class AuditTrail:
         regulatory_domains: frozenset[RegulatoryDomain] = frozenset(),
         decision_detail: Optional[str] = None,
         modified_parameters: Optional[dict] = None,
+        approver: str = "",
+        human_disposed: bool = False,
     ) -> None:
         """Record the allow/deny/escalate decision.
 
@@ -863,6 +865,13 @@ class AuditTrail:
         arguments a ``modify`` proposed. Both keys are omitted entirely when
         absent, so a record without a refinement is byte-identical to one
         written before this vocabulary existed and its hash does not move.
+
+        ``approver`` and ``human_disposed`` say what kind of party disposed of
+        the action. They matter most on the ``allow`` that
+        :meth:`find_prior_approval` produces: that allow replays a human's
+        earlier decision by cache lookup, so a human did not act on THIS
+        action and the record must not read as though one did. Same omission
+        rule as above; empty approver adds no keys.
         """
         event_type = (
             EventType.ACTION_BLOCKED if decision == "deny"
@@ -905,6 +914,29 @@ class AuditTrail:
             )
             modified_parameters = None
 
+        # The disposition raises rather than dropping, which is the opposite
+        # of the refinement handling directly above, and the difference is
+        # deliberate. A bad refinement is a record that is less specific than
+        # it could be. A bad disposition is a record that OVERSTATES human
+        # involvement, and dropping it quietly would leave the same allow it
+        # was meant to qualify. Fail loudly instead.
+        disposition: dict = {}
+        if approver:
+            from vaara._disposition import check
+
+            checked_approver, checked_flag = check(approver, human_disposed)
+            disposition = {
+                "approver": checked_approver,
+                "human_disposed": checked_flag,
+            }
+        elif human_disposed:
+            from vaara._disposition import DispositionError
+
+            raise DispositionError(
+                "human_disposed=True requires approver='human'; "
+                "a producer must not claim a human disposed what a policy did"
+            )
+
         data: dict = {
             "decision": self._cap_record_str(decision, self._MAX_DECISION_LABEL_LEN),
             "reason": self._cap_record_str(reason, self._MAX_DECISION_REASON_LEN),
@@ -919,6 +951,7 @@ class AuditTrail:
                 {str(k): json_safe(v) for k, v in modified_parameters.items()},
                 self._MAX_EXECUTION_RESULT_JSON_BYTES,
             )
+        data.update(disposition)
 
         self._append(AuditRecord(
             record_id=str(uuid.uuid4()),
@@ -1018,17 +1051,45 @@ class AuditTrail:
         reviewer: str,
         justification: str = "",
         args_digest: str = "",
+        approver: str = "",
+        human_disposed: bool = False,
     ) -> None:
-        """Record human resolution of an escalation.
+        """Record resolution of an escalation.
 
         ``args_digest`` is the argument-shape digest carried over from the
         ESCALATION_SENT record. find_prior_approval requires it to match
         before auto-allowing a later action, so approving ``tx.transfer``
         with amount 10 does not auto-allow amount 100000.
+
+        ``approver`` and ``human_disposed`` say what KIND of party disposed of
+        this, which ``reviewer`` does not: reviewer is free text naming who,
+        and both shipped call sites pass a mechanism name. When ``approver``
+        is empty the two keys are omitted entirely, so a caller that does not
+        supply a disposition produces a record that hashes exactly as it did
+        before these parameters existed.
         """
         articles = self._get_regulatory_articles(
             EventType.ESCALATION_RESOLVED, frozenset({RegulatoryDomain.EU_AI_ACT}),
         )
+
+        disposition: dict = {}
+        if approver:
+            from vaara._disposition import check  # local import: avoid cycle
+
+            checked_approver, checked_flag = check(approver, human_disposed)
+            disposition = {
+                "approver": checked_approver,
+                "human_disposed": checked_flag,
+            }
+        elif human_disposed:
+            # A flag with no approver beside it is the exact claim this
+            # vocabulary exists to prevent, so it fails rather than recording.
+            from vaara._disposition import DispositionError
+
+            raise DispositionError(
+                "human_disposed=True requires approver='human'; "
+                "a producer must not claim a human disposed what a policy did"
+            )
 
         self._append(AuditRecord(
             record_id=str(uuid.uuid4()),
@@ -1044,6 +1105,7 @@ class AuditTrail:
                 "args_digest": self._cap_record_str(
                     args_digest, self._MAX_ARGS_DIGEST_LEN,
                 ),
+                **disposition,
             },
             regulatory_articles=articles,
             tenant_id=self._tenant_for(action_id),

@@ -415,6 +415,12 @@ def _handle_escalation(cfg: dict, pipeline, result, tool_name: str) -> int:
                     result.action_id, resolution,
                     reviewer="approvals-handshake",
                     justification="human decision via ~/.vaara/approvals",
+                    # A person wrote the decision file. Only approve and deny
+                    # reach here; timeout and an unreadable file both fall
+                    # through without resolving, so this branch is the one
+                    # place a human demonstrably acted.
+                    approver="human",
+                    human_disposed=True,
                 )
             except Exception as exc:
                 _emit(f"vaara-governance: could not record resolution ({exc!r}).")
