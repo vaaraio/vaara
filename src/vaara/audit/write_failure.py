@@ -63,6 +63,19 @@ def _utc(ts: float) -> str:
     return datetime.fromtimestamp(ts, tz=timezone.utc).strftime("%Y-%m-%dT%H:%M:%SZ")
 
 
+def _as_float(value: Any, default: float) -> float:
+    """A timestamp read back out of the marker, or ``default``.
+
+    Marker files are edited by hand often enough (an operator looking at why
+    a trail went quiet) that every field has to survive being the wrong type.
+    ``bool`` is excluded on purpose: it is an ``int`` to Python, and ``True``
+    as a timestamp would put the first failure in 1970.
+    """
+    if isinstance(value, bool) or not isinstance(value, (int, float)):
+        return default
+    return float(value)
+
+
 def _describe(error: Any) -> str:
     if isinstance(error, BaseException):
         text = f"{type(error).__name__}: {error}"
@@ -141,22 +154,18 @@ def record_failure(
     previous = read_marker(db_path) or {}
     resolved = bool(previous.get("resolved"))
 
-    count = previous.get("count")
+    stored = previous.get("count")
     # A resolved marker describes a finished outage. The next failure is a new
-    # one, so it starts its own count and its own clock rather than inheriting
-    # a total that spans a working period in between.
-    if resolved or not isinstance(count, int) or isinstance(count, bool) or count < 1:
+    # one, so it starts its own count and its own clock. Inheriting the old
+    # total would span a working period in between and overstate the gap.
+    if resolved or isinstance(stored, bool) or not isinstance(stored, int) or stored < 1:
         count = 1
         first = now
         last_notified = 0.0
     else:
-        count += 1
-        first = previous.get("first_failure")
-        if not isinstance(first, (int, float)) or isinstance(first, bool):
-            first = now
-        last_notified = previous.get("last_notified")
-        if not isinstance(last_notified, (int, float)) or isinstance(last_notified, bool):
-            last_notified = 0.0
+        count = stored + 1
+        first = _as_float(previous.get("first_failure"), now)
+        last_notified = _as_float(previous.get("last_notified"), 0.0)
 
     notify = count == 1 or (now - last_notified) >= notify_interval
     state = {
