@@ -22,7 +22,9 @@ PAGES = ("index.html", "verify.html")
 #: Every page that ships structured data. A crawler or a model arriving at any
 #: of these reads the block instead of guessing from the layout, so a block
 #: that does not parse is worse than none: it is silently dropped.
-PAGES_WITH_STRUCTURED_DATA = ("index.html", "verify.html", "conformance.html")
+PAGES_WITH_STRUCTURED_DATA = (
+    "index.html", "verify.html", "conformance.html", "surfaces.html",
+)
 
 #: The nodes the whole site shares. Declared with the same @id on every page so
 #: the graphs join into one Vaara instead of describing three unrelated ones.
