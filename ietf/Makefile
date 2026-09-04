@@ -1,7 +1,7 @@
 # Render the Vaara receipt Internet-Draft.
 # Requires: pip install xml2rfc  (3.34.0 or newer)
 
-DRAFT = draft-sirkkavaara-vaara-receipt-08
+DRAFT = draft-sirkkavaara-vaara-receipt-09
 XML   = $(DRAFT).xml
 
 .PHONY: all text html clean
