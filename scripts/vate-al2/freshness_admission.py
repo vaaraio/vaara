@@ -37,7 +37,7 @@ from vaara.credential import verify_grant  # noqa: E402
 from _common import (  # noqa: E402
     BINDING_DIGEST,
     ISS,
-    SECRET,
+    TEST_KEY,
     epoch,
     gateway_params,
     header,
@@ -114,7 +114,7 @@ def main(argv: list[str]) -> int:
     def admit(*, revocation_now: str, bound: float | None):
         return verify_grant(
             grant,
-            verifying_material=SECRET,
+            verifying_material=TEST_KEY,
             runtime_tool_name=grant.scope.tool_name,
             runtime_args={"path": "/tmp/x"},
             runtime_tenant_id=grant.scope.tenant_id,
@@ -239,7 +239,7 @@ def _run_gateway_cases() -> list:
 
         def gw(**kwargs):
             return CredentialGateway(
-                verifying_material=SECRET,
+                verifying_material=TEST_KEY,
                 receipts_dir=receipts,
                 expected_tenant=cred["scope"]["tenantId"],
                 **kwargs,
@@ -270,7 +270,7 @@ def _run_gateway_cases() -> list:
 
         def gw_short(skew: int):
             return CredentialGateway(
-                verifying_material=SECRET,
+                verifying_material=TEST_KEY,
                 receipts_dir=receipts,
                 expected_tenant=short["scope"]["tenantId"],
                 clock_skew_seconds=skew,

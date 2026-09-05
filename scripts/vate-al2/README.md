@@ -62,4 +62,4 @@ arguments, tool name and tenant matching, and the binding digest supplied to
 the verifier as known. None of that is VATE. It is stated in the output of
 each run so a reader can see what was held constant.
 
-The HS256 secret is a hard-coded test value protecting nothing.
+The HS256 key material is a published test value protecting nothing.

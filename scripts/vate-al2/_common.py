@@ -27,15 +27,15 @@ FIXTURE_URL = (
     "/v0.4.0/conformance/al2-vate-v0.3/fixtures/" + FIXTURE_NAME
 )
 
-# Test scaffolding. The secret protects nothing and is published on purpose so
-# the runs are reproducible byte for byte.
-SECRET = b"x" * 32
+# Test scaffolding. This key material protects nothing and is published on
+# purpose, so the runs reproduce byte for byte.
+TEST_KEY = b"x" * 32
 TOOL = "read_file"
 ARGS = {"path": "/tmp/x"}
 TENANT = "t1"
 ISS = "vaara-proxy"
 SUB = "agent-1"
-SECRET_VERSION = "v1"
+TEST_KEY_VERSION = "v1"
 
 # A binding digest is required to be a sha256: string and to be in the set of
 # digests the verifier knows. Both scripts supply this one as known, so the
@@ -72,9 +72,9 @@ def mint_grant(*, iat: str, exp_seconds: int) -> Any:
         ),
         iss=ISS,
         sub=SUB,
-        secret_version=SECRET_VERSION,
+        secret_version=TEST_KEY_VERSION,
         alg="HS256",
-        signing_material=SECRET,
+        signing_material=TEST_KEY,
         exp_seconds=exp_seconds,
         iat=iat,
         nonce="n-grant-vate-al2",
@@ -92,7 +92,7 @@ def mint_through_emitter(receipts_dir: Path, *, grant_exp_seconds: int = 60) -> 
     from vaara.integrations._mcp_attest import build_attest_emitter
 
     key_path = receipts_dir.parent / "attest.key"
-    key_path.write_bytes(SECRET)
+    key_path.write_bytes(TEST_KEY)
     emitter = build_attest_emitter(
         signing_key_path=key_path,
         receipts_dir=receipts_dir,
@@ -142,7 +142,7 @@ def header(title: str, fixture_path: Path) -> None:
     print(f"  platform  {platform.system()} {platform.machine()}")
     print()
     print("## Non-VATE scaffolding held constant")
-    print("  alg HS256 with a published test secret")
+    print("  alg HS256 with a published test key")
     print("  argsCommitment recomputed from the runtime arguments")
     print(f"  tool {TOOL!r} and tenant {TENANT!r} matching the grant scope")
     print("  binding digest supplied to the verifier as known")

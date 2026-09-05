@@ -2,7 +2,7 @@
 # SPDX-License-Identifier: AGPL-3.0-or-later
 """VATE status freshness through the proposed credential-TTL bridge.
 
-The bridge is Takao Sato's, unmodified, from discussion #502:
+The bridge is @Poke-nushi's, unmodified, from discussion #502:
 
     source_issued_at  -> asserted.iat
     max_age_seconds   -> expSeconds
@@ -31,7 +31,7 @@ from vaara.credential import verify_grant  # noqa: E402
 
 from _common import (  # noqa: E402
     BINDING_DIGEST,
-    SECRET,
+    TEST_KEY,
     epoch,
     header,
     load_fixture,
@@ -66,7 +66,7 @@ def main(argv: list[str]) -> int:
     def run(*, now: float, skew: int):
         return verify_grant(
             grant,
-            verifying_material=SECRET,
+            verifying_material=TEST_KEY,
             runtime_tool_name=grant.scope.tool_name,
             runtime_args={"path": "/tmp/x"},
             runtime_tenant_id=grant.scope.tenant_id,
