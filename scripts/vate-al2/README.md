@@ -2,7 +2,7 @@
 
 Two standalone scripts backing the answers in
 [discussion #502](https://github.com/vaaraio/vaara/discussions/502), where
-Takao Sato asked for a bounded classification of VATE conformance cases
+@Poke-nushi asked for a bounded classification of VATE conformance cases
 against shipped Vaara code.
 
 They consume one pinned VATE fixture,
@@ -17,14 +17,14 @@ stays in the discussion thread, in prose, where it can be disagreed with.
 
 ## Running them
 
-```
+```sh
 python scripts/vate-al2/ttl_bridge.py            path/to/context.json
 python scripts/vate-al2/freshness_admission.py   path/to/context.json
 ```
 
 The fixture path is required. Fetch it with:
 
-```
+```sh
 curl -sSL -o /tmp/vate-ctx.json \
   https://raw.githubusercontent.com/Poke-nushi/Verifiable-Agent-Trust-Envelope/v0.4.0/conformance/al2-vate-v0.3/fixtures/status-stale-just-over-boundary-context.json
 ```
@@ -40,14 +40,19 @@ thing joining them.
 
 `freshness_admission.py` runs the surface that is the same object,
 `RevocationRegistry.status()`, and then carries it one step further into an
-admission decision. That second half is the part the 2 September run did not
-do. It shows three layers, and they do not all pin the same thing:
+admission decision. The 2 September run stopped at the observation and never
+evaluated the decision. The layers below each print their own run, because
+they do not all pin the same thing:
 
 - the registry verdict at a fixed clock, where the 300/301 boundary is exact;
 - `verify_grant` at a fixed clock, which reaches `revocation_stale` through
   `establishes_current` when the deployment states a bound;
-- `CredentialGateway`, which forwards the bound but exposes no injectable
-  clock, so the verdict is reachable there while the boundary is not.
+- `CredentialGateway`, with a real attestation and grant on disk, which
+  forwards both the bound and the clock skew but exposes no injectable clock,
+  so the verdict is reachable there while the boundary is not.
+
+Every claim either script prints is backed by an assertion in the same script.
+Both exit non-zero if any assertion fails.
 
 ## Scaffolding, and why it is here
 

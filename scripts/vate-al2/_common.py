@@ -81,6 +81,42 @@ def mint_grant(*, iat: str, exp_seconds: int) -> Any:
     )
 
 
+def mint_through_emitter(receipts_dir: Path, *, grant_exp_seconds: int = 60) -> dict:
+    """A real grant and attestation on disk, as the shipped proxy would write them.
+
+    ``CredentialGateway`` recomputes the known-digest set from the
+    ``*-attest.json`` files in its receipts directory, so a gateway run needs
+    the attestation actually written rather than a digest handed in. This is
+    the path ``AttestPairEmitter`` takes in the proxy.
+    """
+    from vaara.integrations._mcp_attest import build_attest_emitter
+
+    key_path = receipts_dir.parent / "attest.key"
+    key_path.write_bytes(SECRET)
+    emitter = build_attest_emitter(
+        signing_key_path=key_path,
+        receipts_dir=receipts_dir,
+        upstream_commands={"default": ["echo"]},
+    )
+    attestation, counter = emitter.emit_attestation(
+        tool_name=TOOL, arguments=ARGS, upstream_name="default", tenant_id=TENANT
+    )
+    credential = emitter.emit_grant(
+        attestation=attestation,
+        counter=counter,
+        tool_name=TOOL,
+        upstream_name="default",
+        tenant_id=TENANT,
+        grant_exp_seconds=grant_exp_seconds,
+    )
+    return credential.to_dict()
+
+
+def gateway_params(credential: dict) -> dict:
+    """A ``tools/call`` params block carrying the grant where the gateway looks."""
+    return {"_meta": {"vaara/credential": credential}}
+
+
 def epoch(ts: str) -> float:
     """ISO 8601 to epoch seconds, refusing anything the parser cannot read."""
     value = iso8601_to_epoch(ts)

@@ -2,26 +2,24 @@
 # SPDX-License-Identifier: AGPL-3.0-or-later
 """VATE status freshness against the Vaara surface that is the same object.
 
-Two halves.
-
-The first is the registry verdict, `RevocationRegistry.status()`, mapped as:
+The registry verdict comes from `RevocationRegistry.status()`, mapped as:
 
     source_issued_at -> RevocationRegistry(as_of=...)
     checked_at       -> now
     max_age_seconds  -> max_staleness_seconds
 
-No clock skew participates in this path. This half was run on 2 September and
+No clock skew participates in this path. That much was run on 2 September and
 is reproduced here unchanged.
 
-The second half is the step from a freshness observation to an admission
+What follows it is the step from a freshness observation to an admission
 decision, which the 2 September run did NOT evaluate. `verify_grant` consumes
 `establishes_current` and refuses with `revocation_stale`, but only when the
 deployment states a bound: with `max_staleness_seconds=None` the branch is
 unreachable and a clean answer of any age stands. `CredentialGateway` forwards
 the bound, so the verdict is reachable through the shipped enforcement path,
 but it exposes no injectable clock, so the one-second boundary cannot be
-pinned there. All three layers are printed so the difference is visible rather
-than asserted.
+pinned there. Each layer prints its own run, so a reader can see where they
+diverge.
 
 Usage:  python scripts/vate-al2/freshness_admission.py <path-to-context.json>
 """
@@ -41,9 +39,11 @@ from _common import (  # noqa: E402
     ISS,
     SECRET,
     epoch,
+    gateway_params,
     header,
     load_fixture,
     mint_grant,
+    mint_through_emitter,
 )
 
 
@@ -66,7 +66,7 @@ def main(argv: list[str]) -> int:
 
     registry = RevocationRegistry((), as_of=issued_at)
 
-    print("## Half one: the registry verdict at a fixed clock")
+    print("## The registry verdict at a fixed clock")
     print(f"  RevocationRegistry(entries=(), as_of={issued_at!r})")
     print()
 
@@ -101,7 +101,7 @@ def main(argv: list[str]) -> int:
         print(f"    {label:<28} -> {st.freshness!r}")
     print()
 
-    print("## Half two: freshness carried into an admission decision")
+    print("## Freshness carried into an admission decision")
     print("  This is the step the 2 September run did not evaluate. The deny and")
     print("  should_execute rows reported that day were a proposed mapping from")
     print("  establishes_current, not the output of a decision step. Here it is")
@@ -147,11 +147,16 @@ def main(argv: list[str]) -> int:
         print(f"    {label:<48} -> ok={verdict.ok}, reason={verdict.reason!r}")
     print()
 
-    print("  CredentialGateway forwards max_staleness_seconds into exactly this")
-    print("  call, so the verdict is reachable through the shipped enforcement")
-    print("  path. It takes no now, so the one-second boundary above cannot be")
-    print("  pinned through it. tests/credential/")
-    print("  test_gateway_revocation_reachable.py pins both facts.")
+    gateway_rows = _run_gateway_cases()
+    print("## The same verdicts through the shipped enforcement path")
+    print("  CredentialGateway, with a real attestation and grant written to disk")
+    print("  by AttestPairEmitter, as the proxy writes them. The gateway takes no")
+    print("  now, so these run on the real clock and the one-second boundary above")
+    print("  cannot be pinned here. What they show is that the bound and the skew")
+    print("  reach verify_grant through the class itself.")
+    print()
+    for label, verdict in gateway_rows:
+        print(f"    {label:<48} -> ok={verdict.ok}, reason={verdict.reason!r}")
     print()
 
     print("## Reading, in the terms the ask used")
@@ -163,7 +168,8 @@ def main(argv: list[str]) -> int:
     print("                            visible revocation is never downgraded to")
     print("                            revocation_stale by a stale registry")
     print()
-    print("  Unchanged from 2 September, and still mismatches rather than rows:")
+    print("  Unchanged from 2 September. These stay written out as mismatches,")
+    print("  because a table cell would overstate each one:")
     print("    required     unmapped. Vaara has no per-call notion of status")
     print("                 evidence being required. Absent registry is")
     print("                 revocation=None, which skips the check silently.")
@@ -188,11 +194,96 @@ def main(argv: list[str]) -> int:
         ),
         ("admission at the bound admits", admission[1][1].ok is True),
         ("no bound stated admits", admission[2][1].ok is True),
+        ("gateway without a bound admits an old registry", gateway_rows[0][1].ok is True),
+        (
+            "gateway with a bound refuses it as revocation_stale",
+            gateway_rows[1][1].ok is False
+            and gateway_rows[1][1].reason == "revocation_stale",
+        ),
+        (
+            "gateway forwards skew 0, expired grant refused",
+            gateway_rows[2][1].ok is False and gateway_rows[2][1].reason == "expired",
+        ),
+        ("gateway forwards skew 30, the same grant admitted", gateway_rows[3][1].ok is True),
     ]
     for label, good in checks:
         ok = ok and good
         print(f"  [{'pass' if good else 'FAIL'}] {label}")
     return 0 if ok else 1
+
+
+def _run_gateway_cases() -> list:
+    """Execute the forwarding claims instead of asserting them in prose.
+
+    Two parameters are under test. ``max_staleness_seconds`` needs only a
+    registry too old to speak to the present. ``clock_skew_seconds`` needs a
+    grant that has actually expired, and the gateway accepts no injected
+    clock, so the grant is minted with a one second lifetime and the script
+    waits it out. Two seconds of real time, and it puts the shipped class under
+    the same assertions as everything else here.
+    """
+    import tempfile
+    import time
+
+    from vaara.attestation._revocation import RevocationRegistry
+    from vaara.credential import CredentialGateway
+
+    old = "2020-01-01T00:00:00Z"
+    rows = []
+    with tempfile.TemporaryDirectory() as tmp:
+        receipts = Path(tmp) / "receipts"
+        receipts.mkdir()
+
+        cred = mint_through_emitter(receipts)
+        params = gateway_params(cred)
+
+        def gw(**kwargs):
+            return CredentialGateway(
+                verifying_material=SECRET,
+                receipts_dir=receipts,
+                expected_tenant=cred["scope"]["tenantId"],
+                **kwargs,
+            ).authorize(
+                params,
+                tool_name=cred["scope"]["toolName"],
+                arguments={"path": "/tmp/x"},
+            )
+
+        rows.append(
+            (
+                "registry from 2020, no bound stated",
+                gw(revocation=RevocationRegistry((), as_of=old)),
+            )
+        )
+        rows.append(
+            (
+                "registry from 2020, bound 300s",
+                gw(
+                    revocation=RevocationRegistry((), as_of=old),
+                    max_staleness_seconds=300,
+                ),
+            )
+        )
+
+        short = mint_through_emitter(receipts, grant_exp_seconds=1)
+        short_params = gateway_params(short)
+
+        def gw_short(skew: int):
+            return CredentialGateway(
+                verifying_material=SECRET,
+                receipts_dir=receipts,
+                expected_tenant=short["scope"]["tenantId"],
+                clock_skew_seconds=skew,
+            ).authorize(
+                short_params,
+                tool_name=short["scope"]["toolName"],
+                arguments={"path": "/tmp/x"},
+            )
+
+        time.sleep(2)
+        rows.append(("grant 1s old past a 1s lifetime, skew 0", gw_short(0)))
+        rows.append(("the same grant, skew 30 (the default)", gw_short(30)))
+    return rows
 
 
 def _shift(ts: str, seconds: float) -> str:
