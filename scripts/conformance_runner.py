@@ -137,6 +137,29 @@ def _build_artifact(suite_dir: Path, suite: str, work: Path) -> Path | None:
         return None
 
 
+def _scrub(text: str, vectors_dir: Path) -> str:
+    """Take absolute local paths out of captured checker output.
+
+    A traceback names the file it was raised in, so a checker that cannot
+    import an optional dependency writes the runner's filesystem layout into
+    the report. That was harmless while the report was a local artifact. It is
+    not harmless now that the report is meant to be handed to strangers.
+
+    Found by the record's own no-absolute-paths test failing in CI, where
+    rfc8785 is absent and one checker skipped with a full traceback.
+    """
+    if not text:
+        return text
+    replacements = [(vectors_dir.resolve(), "<vectors>"), (REPO, "<repo>")]
+    try:
+        replacements.append((Path.home(), "~"))
+    except RuntimeError:  # pragma: no cover - no home dir on this platform
+        pass
+    for root, marker in replacements:
+        text = text.replace(str(root), marker)
+    return text
+
+
 def run_suite(vectors_dir: Path, suite: str, with_vaara: bool = False) -> dict[str, Any]:
     """Run one suite's checker and return a structured result row."""
     suite_dir = vectors_dir / suite
@@ -159,7 +182,7 @@ def run_suite(vectors_dir: Path, suite: str, with_vaara: bool = False) -> dict[s
         return {
             "suite": suite,
             "status": "PASS" if proc.returncode == 0 else "FAIL",
-            "reason": "" if proc.returncode == 0 else proc.stderr.strip()[-400:],
+            "reason": "" if proc.returncode == 0 else _scrub(proc.stderr.strip()[-400:], vectors_dir),
             "cases": _case_count(suite_dir), "returncode": proc.returncode,
             "duration_s": duration,
         }
@@ -176,6 +199,7 @@ def run_suite(vectors_dir: Path, suite: str, with_vaara: bool = False) -> dict[s
         lines = proc.stderr.strip().splitlines()
         reason = lines[-1].removeprefix("SKIP: ") if lines else \
             "optional dependency not installed"
+        reason = _scrub(reason, vectors_dir)
         return {
             "suite": suite, "status": "SKIP", "reason": reason,
             "cases": _case_count(suite_dir), "returncode": proc.returncode,
@@ -188,7 +212,10 @@ def run_suite(vectors_dir: Path, suite: str, with_vaara: bool = False) -> dict[s
     }
     if status == "FAIL":
         # Tail of the checker's own output, so a failure is actionable in place.
-        row["output_tail"] = (proc.stdout + proc.stderr).strip().splitlines()[-12:]
+        row["output_tail"] = [
+            _scrub(line, vectors_dir)
+            for line in (proc.stdout + proc.stderr).strip().splitlines()[-12:]
+        ]
     return row
 
 

@@ -117,6 +117,31 @@ def test_no_absolute_local_paths_leak_into_a_shared_record(report):
     assert not report["vectors_dir"].startswith("/")
 
 
+def test_captured_tracebacks_are_scrubbed_of_local_paths():
+    """The leak this test found in CI, pinned so it cannot come back.
+
+    On a machine without rfc8785 a checker skips with a full traceback, and a
+    traceback names the file it was raised in. That put the runner's
+    filesystem into a record meant to be handed to strangers.
+    """
+    from conformance_runner import _scrub
+
+    vectors = REPO / "tests" / "vectors"
+    line = f'File "{vectors}/tap_v0/_check_independent.py", line 42, in <module>'
+    out = _scrub(line, vectors)
+    assert str(vectors) not in out
+    assert str(REPO) not in out
+    assert "<vectors>/tap_v0/_check_independent.py" in out
+    assert "line 42" in out, "scrubbing must not destroy the diagnostic"
+
+
+def test_scrub_leaves_text_without_paths_alone():
+    from conformance_runner import _scrub
+    msg = "optional dependency not installed"
+    assert _scrub(msg, REPO / "tests" / "vectors") == msg
+    assert _scrub("", REPO / "tests" / "vectors") == ""
+
+
 def test_canonical_bytes_are_stable_across_key_order():
     a = {"b": 1, "a": {"d": 2, "c": [3, 4]}}
     b = {"a": {"c": [3, 4], "d": 2}, "b": 1}
