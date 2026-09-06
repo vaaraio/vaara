@@ -25,12 +25,27 @@ says they should.
 A suite that cannot run bare (it needs an external artifact passed as an
 argument, or an optional dependency that is not installed) is reported SKIP,
 never silently dropped, and does not on its own fail the run.
+
+The report is a portable run record. It pins the commit and the sha256 of
+every checker and case file that was graded, and carries its own digest over
+those bytes. So a run can be handed to a third party and checked against a
+clean clone without a public listing, without consent to a permanent row, and
+without the maintainer in the trust path. Being listed is for being seen;
+the record is for being believed, and nobody should have to buy the first to
+get the second.
+
+The digest is taken over stdlib-canonical bytes (sorted keys, no spaces,
+UTF-8), named in the record as ``canonicalization``. Deliberately not JCS:
+this runner grades outside implementations and imports nothing, so it cannot
+require a canonicalisation library to state its own result.
 """
 
 from __future__ import annotations
 
 import argparse
+import hashlib
 import json
+import platform
 import subprocess
 import sys
 import tempfile
@@ -187,15 +202,104 @@ def _print_table(rows: list[dict[str, Any]]) -> None:
             print(f"            | {line}")
 
 
+# The canonicalisation used for the record digest, named in the record itself
+# so a verifier does not have to guess. Deliberately NOT called JCS: this is
+# stdlib `json.dumps` with sorted keys and no spaces, which is reproducible
+# from the standard library alone. That constraint is the point. This runner
+# grades outside implementations and imports nothing, so it cannot require
+# rfc8785 to be installed in order to state its own result.
+CANONICALIZATION = "json-sorted-compact-utf8"
+RECORD_VERSION = 1
+
+
+def canonical_bytes(obj: Any) -> bytes:
+    """Deterministic bytes for `obj`. See CANONICALIZATION."""
+    return json.dumps(
+        obj, sort_keys=True, separators=(",", ":"), ensure_ascii=False,
+    ).encode("utf-8")
+
+
+def _sha256_file(path: Path) -> str:
+    h = hashlib.sha256()
+    with path.open("rb") as fh:
+        for chunk in iter(lambda: fh.read(65536), b""):
+            h.update(chunk)
+    return h.hexdigest()
+
+
+def _git(*args: str) -> Optional[str]:
+    """A git value, or None when this is not a checkout or git is absent."""
+    try:
+        out = subprocess.run(
+            ["git", "-C", str(REPO), *args],
+            capture_output=True, text=True, timeout=10, check=False,
+        )
+    except (OSError, subprocess.SubprocessError):
+        return None
+    if out.returncode != 0:
+        return None
+    return out.stdout.strip() or None
+
+
+def pin_corpus(vectors_dir: Path, suites: list[str]) -> dict[str, Any]:
+    """Digest every checker and case file that this run graded.
+
+    Without this a report says "49 passed" and nothing that ties the claim to
+    the bytes it was made against. A reader holding the report and a clean
+    clone can recompute these and see whether the corpus was the real one.
+    """
+    pinned: dict[str, Any] = {}
+    for suite in sorted(suites):
+        suite_dir = vectors_dir / suite
+        entry: dict[str, Any] = {}
+        checker = suite_dir / CHECKER
+        if checker.is_file():
+            entry["checker_sha256"] = _sha256_file(checker)
+        files: dict[str, str] = {}
+        for path in sorted(suite_dir.rglob("*")):
+            if not path.is_file() or path.name == CHECKER:
+                continue
+            if "__pycache__" in path.parts:
+                continue
+            files[path.relative_to(suite_dir).as_posix()] = _sha256_file(path)
+        if files:
+            entry["files_sha256"] = files
+        pinned[suite] = entry
+    return {
+        "suites": pinned,
+        "corpus_sha256": hashlib.sha256(canonical_bytes(pinned)).hexdigest(),
+    }
+
+
+def seal(report: dict[str, Any]) -> dict[str, Any]:
+    """Add the record's own digest, computed over everything else in it."""
+    body = {k: v for k, v in report.items() if k != "record_sha256"}
+    report["record_sha256"] = hashlib.sha256(canonical_bytes(body)).hexdigest()
+    return report
+
+
 def build_report(rows: list[dict[str, Any]], vectors_dir: Path, stamp: str) -> dict[str, Any]:
     passed = [r for r in rows if r["status"] == "PASS"]
     failed = [r for r in rows if r["status"] == "FAIL"]
     skipped = [r for r in rows if r["status"] == "SKIP"]
-    return {
+    try:
+        shown_dir = str(vectors_dir.relative_to(REPO).as_posix())
+    except ValueError:
+        # Outside the repo, which is the `--vectors-dir ./their_vectors` case.
+        # Name it without the absolute path, so a shared record does not carry
+        # the runner's filesystem layout.
+        shown_dir = vectors_dir.name
+    report = {
         "tool": "vaara-conformance-runner",
+        "record_version": RECORD_VERSION,
+        "canonicalization": CANONICALIZATION,
         "generated_at": stamp,
-        "vectors_dir": str(vectors_dir),
+        "vectors_dir": shown_dir,
         "python": sys.version.split()[0],
+        "platform": platform.platform(),
+        "commit": _git("rev-parse", "HEAD"),
+        "commit_dirty": bool(_git("status", "--porcelain")),
+        "corpus": pin_corpus(vectors_dir, [r["suite"] for r in rows]),
         "totals": {
             "suites": len(rows), "passed": len(passed), "failed": len(failed),
             "skipped": len(skipped), "cases_passed": sum(r["cases"] or 0 for r in passed),
@@ -203,6 +307,7 @@ def build_report(rows: list[dict[str, Any]], vectors_dir: Path, stamp: str) -> d
         "all_passed": not failed,
         "suites": rows,
     }
+    return seal(report)
 
 
 #: Where a reproduction gets listed. The issue form is a self-service desk: a
@@ -274,6 +379,35 @@ def print_submit_block(report: dict, repo_root: Path, selected=None) -> None:
     print(f"  {link}")
 
 
+def print_record_block(report: dict, json_path: Optional[Path]) -> None:
+    """The other door, and it has to be shown or it does not exist.
+
+    A row is permanent and public. Plenty of people will not consent to that
+    and will run the corpus anyway, which is their right and costs them
+    nothing. Until this block existed those runs left an unsigned JSON file
+    that proved nothing, so the only way to be believed was to be listed.
+
+    This says the record is checkable on its own. No page, no permanence, no
+    consent, and nobody has to be told who ran it.
+    """
+    print()
+    print("Not listing it? The run is still provable on its own.")
+    print(f"  record digest  {report['record_sha256']}")
+    print(f"  corpus digest  {report['corpus']['corpus_sha256']}")
+    if json_path is None:
+        print()
+        print("  Re-run with --json report.json to keep it. The file pins the")
+        print("  commit and the sha256 of every checker and case file that was")
+        print("  graded, so anyone you hand it to can recompute it against a")
+        print("  clean clone. You do not have to be listed to be checked.")
+    else:
+        print()
+        print(f"  {json_path} pins the commit and the sha256 of every checker")
+        print("  and case file that was graded. Hand it to whoever you like:")
+        print("  they recompute it against a clean clone and need neither this")
+        print("  page nor our word for it.")
+
+
 def main(argv: Optional[list[str]] = None) -> int:
     parser = argparse.ArgumentParser(
         description="Aggregate runner over the Vaara conformance vector corpus."
@@ -335,6 +469,7 @@ def main(argv: Optional[list[str]] = None) -> int:
     # value here is that nobody has to go looking for the form.
     if not args.no_submit_link:
         print_submit_block(report, Path(__file__).resolve().parent.parent, args.corpus)
+        print_record_block(report, args.json)
 
     return 1 if failed else 0
 

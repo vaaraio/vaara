@@ -1,0 +1,47 @@
+{
+  "tool": "vaara-conformance-runner",
+  "record_version": 1,
+  "canonicalization": "json-sorted-compact-utf8",
+  "generated_at": "2026-09-06T16:51:58Z",
+  "vectors_dir": "tests/vectors",
+  "python": "3.12.13",
+  "platform": "Linux-6.18.37-0-virt-aarch64-with-glibc2.41",
+  "commit": "4459c4614d5a978de6d311bc7735085f33c3938a",
+  "commit_dirty": true,
+  "corpus": {
+    "suites": {
+      "tap_v0": {
+        "checker_sha256": "db0a54343a62486075bceba9e1b8143020ebb3544cdb281bcbccdabe8ca9f930",
+        "files_sha256": {
+          "README.md": "20b0e60e43a1aaa86067965f28dd08819a0e62e951a5bc5ab14902a30390e929",
+          "_generate.py": "b5c3e099b0f7b230bfbd163292fe967581b004aee8ffa9b57863c0816874f640",
+          "expected.json": "d1d0ed6978f8a3af4d2277bc5709a025e4f334ace1d9beec6a8494667f7b199f",
+          "keys/es256_public.pem": "ac49da8981c4ddb018fe0dbe75d5f4e336c11f75e5410bc11b7bab0062defe23",
+          "step0/receipt.json": "bcccc5c7344968f3f236b6b79b31b872cd958aaf9973e54f0623e8af4ece41d5",
+          "step0/request.json": "5413d816b13ed5c33c84ac9f51e47c26d9395878ec68cd4aa24af8fa133f35d0",
+          "step1/receipt.json": "5f95b69bffe42ae0666448209fd86fdd97e728892a6e12e9314bacb337980d75",
+          "step1/request.json": "501337bbb1f7cce527080f0892b8ad718a17fea16fe828852c89acc46042fca5"
+        }
+      }
+    },
+    "corpus_sha256": "1be499dc7252b6c4a47c839ee8e890f1269cf13590978b7e1f588e71ae0f2d58"
+  },
+  "totals": {
+    "suites": 1,
+    "passed": 1,
+    "failed": 0,
+    "skipped": 0,
+    "cases_passed": 0
+  },
+  "all_passed": true,
+  "suites": [
+    {
+      "suite": "tap_v0",
+      "status": "PASS",
+      "cases": null,
+      "returncode": 0,
+      "duration_s": 0.07
+    }
+  ],
+  "record_sha256": "0654b997458f112ba4ec90d3466df92e0920d750d45634e92946279378cd15b3"
+}
