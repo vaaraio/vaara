@@ -1196,7 +1196,15 @@ class VaaraMCPProxy:
         arguments = params.get("arguments", {}) or {}
         if not isinstance(arguments, dict):
             arguments = {}
+        # Which gates ran, in the order they ran. The sequence here is a
+        # property of the code and was previously only knowable by reading
+        # it: a reader of the record could not tell a gate that passed from
+        # one that never ran. Recording it makes the ordering observable
+        # rather than inferred, and keeps "did not run" distinct from
+        # "ran and allowed".
+        gates: list[str] = []
         if self._tool_filtered(tool_name):
+            gates.append("operator_filter:filtered")
             logger.warning(
                 "tools/call rejected at perimeter (operator filter): %s",
                 _safe_log(tool_name),
@@ -1206,6 +1214,7 @@ class VaaraMCPProxy:
                 "reason": "Tool filtered by operator policy",
                 "decision": "FILTERED",
                 "tool": tool_name,
+                "gates": list(gates),
             }
             self._overt_emit(
                 surface="mcp.tool.call",
@@ -1214,7 +1223,7 @@ class VaaraMCPProxy:
                 request_obj={"tool": tool_name, "arguments": arguments},
                 decision="FILTERED",
                 reason="Tool filtered by operator policy",
-                extra={"agent_id": self._agent_id_default},
+                extra={"agent_id": self._agent_id_default, "gates": list(gates)},
             )
             return {
                 "jsonrpc": "2.0", "id": request.get("id"),
@@ -1242,8 +1251,10 @@ class VaaraMCPProxy:
             agent_id=agent_id, tool_name=tool_name, parameters=arguments,
             tenant_id=_REQUEST_TENANT.get(),
         )
+        gates.append("operator_filter:pass")
         progress_token = self._progress_token(params)
         if not result.allowed:
+            gates.append("policy:deny")
             decision = getattr(result, "decision", None) or "DENY"
             reason = getattr(result, "reason", None) or "Blocked by Vaara policy"
             block_payload = {
@@ -1251,6 +1262,7 @@ class VaaraMCPProxy:
                 "reason": reason,
                 "decision": decision,
                 "action_id": getattr(result, "action_id", None),
+                "gates": list(gates),
             }
             self._overt_emit(
                 surface="mcp.tool.call",
@@ -1262,6 +1274,7 @@ class VaaraMCPProxy:
                 extra={
                     "agent_id": agent_id,
                     "action_id": getattr(result, "action_id", None) or "",
+                    "gates": list(gates),
                 },
             )
             return {
@@ -1271,6 +1284,7 @@ class VaaraMCPProxy:
                     "isError": True,
                 },
             }
+        gates.append("policy:allow")
         request_id = request.get("id")
         upstream_name = _REQUEST_UPSTREAM.get()
         attest_pair = None
@@ -1304,12 +1318,12 @@ class VaaraMCPProxy:
                         upstream_name=upstream_name,
                         tenant_id=_REQUEST_TENANT.get(),
                     )
-        if (
+        _gateway_present = (
             self._mint_credentials
             and self._attest is not None
             and self._attest.gateway is not None
-            and self._attest.is_constrained(tool_name)
-        ):
+        )
+        if _gateway_present and self._attest.is_constrained(tool_name):
             _gw_params = request.get("params")
             verdict = self._attest.gateway.authorize(
                 _gw_params,
@@ -1317,6 +1331,7 @@ class VaaraMCPProxy:
                 arguments=arguments,
             )
             if not verdict.ok:
+                gates.append("credential_gateway:refuse")
                 # The policy decision at step 1 already went into the chain,
                 # and for a constrained tool it can be `allow` while the
                 # gateway refuses here — runtime arguments that no longer
@@ -1354,6 +1369,7 @@ class VaaraMCPProxy:
                     extra={
                         "agent_id": agent_id,
                         "action_id": getattr(result, "action_id", None) or "",
+                        "gates": list(gates),
                     },
                 )
                 return self._error_response(
@@ -1361,6 +1377,16 @@ class VaaraMCPProxy:
                     -32603,
                     f"vaara: grant required but not valid for tool {tool_name!r}: {verdict.reason}",
                 )
+            gates.append("credential_gateway:pass")
+        elif _gateway_present:
+            # A gateway exists but this tool declares no constraints, so it
+            # was never consulted. Not the same as passing it.
+            gates.append("credential_gateway:not_constrained")
+        else:
+            # No gateway in this deployment at all. `tool_constraints` empty
+            # means no gateway is constructed and no binding is enforced
+            # anywhere, which a reader of the record has to be able to see.
+            gates.append("credential_gateway:not_configured")
         with self._inflight_lock:
             if progress_token is not None:
                 self._inflight_progress[progress_token] = (
@@ -1412,6 +1438,7 @@ class VaaraMCPProxy:
                 "agent_id": agent_id,
                 "action_id": getattr(result, "action_id", None) or "",
                 "outcome_severity": int(outcome_severity),
+                "gates": list(gates),
             },
         )
         return upstream_response
