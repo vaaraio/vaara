@@ -914,6 +914,110 @@ class SQLiteAuditBackend:
         )
         return trail
 
+    def verify_chain_streaming(
+        self,
+        *,
+        start_seq: int = 0,
+        expected_previous_hash: str = "",
+        on_progress: Optional[Any] = None,
+        progress_every: int = 100_000,
+    ) -> Optional[str]:
+        """Verify the stored chain without materialising it. None if intact.
+
+        ``load_trail`` cannot answer this question at scale: it does
+        ``fetchall``, builds every ``AuditRecord``, and appends each to both
+        ``_records`` and ``_by_action``. A year of records at eHealth rates is
+        roughly 201 million, and no amount of care in the walk helps once the
+        rows are already in a list.
+
+        This iterates the cursor row by row and keeps exactly one record and
+        one hash alive, so peak memory is flat in the row count. The
+        arithmetic was never the problem: measured elsewhere at 4.99 us per
+        record, 201 million records is about 17 minutes of hashing, which is
+        tolerable for an annual audit. Holding them was the problem.
+
+        ``start_seq`` and ``expected_previous_hash`` restart the walk part way,
+        so a long verify can checkpoint instead of starting over. Rows below
+        ``start_seq`` are NOT verified and nothing is claimed about them. The
+        caller supplies the hash it expects rather than having one read out of
+        the rows being skipped, because reading it from there would let a
+        rewritten prefix authenticate itself.
+
+        ``on_progress(seq, record_hash)`` fires every ``progress_every`` rows
+        and at the end. Each callback carries a valid restart point, which is
+        what makes a multi-hour verify resumable across a crash.
+
+        A corrupt ``data`` column is a verification FAILURE here, not a
+        skeleton row. ``load_trail`` reconstructs skeletons so one bad row
+        cannot DoS a reload; this call exists to answer whether the chain is
+        intact, and a row whose content cannot be read cannot be shown to be
+        the row that was written.
+
+        **It does not hold the write lock.** A 17-minute walk holding
+        ``self._lock`` would stall every recording thread for 17 minutes, which
+        would make verification something an operator learns not to run. A
+        file-backed store is read through a SEPARATE read-only connection so
+        Python-side writers are never blocked. Database-level concurrency is
+        then whatever the journal mode gives: WAL lets the reader run beside
+        writers, and the DELETE fallback used on filesystems without shared
+        memory (see ``_journal_mode_for``) does not, so on those a long verify
+        does still contend. An in-memory store has no second connection to
+        open and is read under the lock.
+        """
+        t_clause, t_params = self._tenant_clause()
+        prev_hash = expected_previous_hash
+        seen = 0
+        last_seq = start_seq - 1
+        sql = (f"SELECT * FROM audit_records WHERE {t_clause} AND seq >= ? "
+               "ORDER BY seq ASC")
+        params = (*t_params, start_seq)
+
+        in_memory = str(self._db_path) == ":memory:"
+        if in_memory:
+            self._lock.acquire()
+            conn = self._conn
+        else:
+            conn = sqlite3.connect(
+                f"file:{self._db_path}?mode=ro", uri=True, check_same_thread=False,
+            )
+        try:
+            for row in conn.execute(sql, params):
+                seq = row[10]
+                try:
+                    record = self._row_to_record(row)
+                except (json.JSONDecodeError, ValueError, KeyError, TypeError) as exc:
+                    return (
+                        f"Unreadable record at seq {seq} ({row[0]}): "
+                        f"{type(exc).__name__}: {exc}"
+                    )
+                if record.previous_hash != prev_hash:
+                    return (
+                        f"Chain broken at seq {seq} ({record.record_id}): "
+                        f"expected previous_hash={prev_hash!r}, "
+                        f"got {record.previous_hash!r}"
+                    )
+                expected = record.compute_hash()
+                if record.record_hash != expected:
+                    return (
+                        f"Hash mismatch at seq {seq} ({record.record_id}, "
+                        f"agent_id={record.agent_id!r}): expected {expected!r}, "
+                        f"got {record.record_hash!r}"
+                    )
+                prev_hash = record.record_hash
+                last_seq = seq
+                seen += 1
+                if on_progress is not None and progress_every and \
+                        seen % progress_every == 0:
+                    on_progress(seq, prev_hash)
+        finally:
+            if in_memory:
+                self._lock.release()
+            else:
+                conn.close()
+        if on_progress is not None and seen:
+            on_progress(last_seq, prev_hash)
+        return None
+
     def count(self) -> int:
         """Total records (scoped to tenant_id if set)."""
         t_clause, t_params = self._tenant_clause()
