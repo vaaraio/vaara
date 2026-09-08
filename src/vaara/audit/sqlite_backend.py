@@ -879,9 +879,15 @@ class SQLiteAuditBackend:
                     previous_hash=_as_text(row[8]),
                     record_hash=_as_text(row[9]),
                 )
-            # Inject directly into the trail (bypass on_record to avoid re-write)
-            trail._records.append(record)
-            trail._by_action[record.action_id].append(record)
+            # Inject directly into the trail (bypass on_record to avoid
+            # re-write), but go through _index_record rather than appending to
+            # _records by hand. Reloaded records never pass through _append, so
+            # this is the path that decides whether a reloaded trail can still
+            # answer find_prior_approval. Appending to _records alone leaves
+            # every prior approval invisible after a restart, which fails
+            # closed and silently: the action escalates to a human a second
+            # time instead of being auto-allowed.
+            trail._index_record(record)
             trail._last_hash = record.record_hash
 
         # Expose the skeleton-row count on the returned trail so callers

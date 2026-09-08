@@ -216,12 +216,6 @@ class TestPriorApprovalScanCost:
         assert second.allowed is True
         assert second.decision == "allow"
 
-    @pytest.mark.xfail(
-        strict=True,
-        reason="find_prior_approval scans the whole trail. Fix is an index of "
-               "ESCALATION_RESOLVED records; see perf-find-prior-approval-scan. "
-               "Remove this marker when it lands.",
-    )
     def test_lookup_cost_does_not_grow_with_trail_length(self, pipeline):
         """A long trail must answer in time comparable to a short one.
 
@@ -269,4 +263,113 @@ class TestPriorApprovalScanCost:
             f"lookup cost grew with trail length: {short_trail:.4f}s over a "
             f"short trail, {long_trail:.4f}s over {len(trail._records)} "
             f"records. The scan is walking the whole history again."
+        )
+
+
+class TestApprovalIndexStaysComplete:
+    """The index must never be a subset of the resolutions in the trail.
+
+    `find_prior_approval` scans `_resolved_approvals` instead of `_records`,
+    which is what makes it cheap. The cost of that is a second structure that
+    can drift, and drift here is SILENT and fails CLOSED: a missing entry means
+    the action escalates to a human a second time rather than being
+    auto-allowed. Nothing raises, nothing logs, and the only symptom is a
+    reviewer being asked twice.
+
+    The path that would have been forgotten is `load_trail`, because reloaded
+    records never pass through `_append`. These tests exist so that forgetting
+    it is a red build rather than a support ticket.
+    """
+
+    def _resolutions_in(self, trail):
+        return [r for r in trail._records
+                if r.event_type == EventType.ESCALATION_RESOLVED]
+
+    def test_index_matches_the_trail_after_appends(self, pipeline):
+        _escalate_and_approve(pipeline, amount=10)
+        _escalate_and_approve(pipeline, amount=20)
+        trail = pipeline.trail
+        assert self._resolutions_in(trail) == trail._resolved_approvals, (
+            "the index and the trail disagree about which records are "
+            "resolutions"
+        )
+        assert len(trail._resolved_approvals) == 2
+
+    def test_index_is_rebuilt_when_a_trail_is_reloaded(self, tmp_path):
+        """The regression. Reloaded records bypass _append entirely."""
+        db = tmp_path / "trail.db"
+        backend = SQLiteAuditBackend(str(db))
+        trail = backend.load_trail()
+        trail._on_record = backend.write_record
+        pipe = InterceptionPipeline(trail=trail)
+        _escalate_and_approve(pipe, amount=10)
+        assert len(trail._resolved_approvals) == 1, "precondition"
+
+        reloaded = SQLiteAuditBackend(str(db)).load_trail()
+        assert self._resolutions_in(reloaded) == reloaded._resolved_approvals
+        assert len(reloaded._resolved_approvals) == 1, (
+            "a reloaded trail lost its approval index, so every prior "
+            "approval is invisible and every action re-escalates"
+        )
+
+    def test_prior_approval_still_found_after_a_reload(self, tmp_path):
+        """The behaviour the index exists to serve, across a restart.
+
+        The docstring on find_prior_approval promises that approved action
+        shapes survive process restarts within the time window. That promise
+        now depends on load_trail maintaining the index.
+        """
+        db = tmp_path / "trail.db"
+        backend = SQLiteAuditBackend(str(db))
+        trail = backend.load_trail()
+        trail._on_record = backend.write_record
+        pipe = InterceptionPipeline(trail=trail)
+        first = _escalate_and_approve(pipe, amount=10)
+
+        reloaded = SQLiteAuditBackend(str(db)).load_trail()
+        found = reloaded.find_prior_approval(
+            agent_id="agent-1", tool_name="tx.transfer",
+            args_digest=_expected_digest({"amount": 10}),
+        )
+        assert found is not None, (
+            "a prior approval must survive a restart; it did not, which means "
+            "the reviewer is asked to approve the same action again"
+        )
+        assert found.event_type == EventType.ESCALATION_RESOLVED
+        assert (found.data or {}).get("resolution") == "allow"
+        assert first.action_id
+
+    def test_index_holds_only_resolutions(self, pipeline):
+        """A wider index would reintroduce the cost this change removed."""
+        _escalate_and_approve(pipeline, amount=10)
+        pipeline.intercept(agent_id="agent-1", tool_name="db.read",
+                           parameters={"table": "t"})
+        trail = pipeline.trail
+        assert len(trail._records) > len(trail._resolved_approvals)
+        assert all(r.event_type == EventType.ESCALATION_RESOLVED
+                   for r in trail._resolved_approvals)
+
+    def test_records_is_only_appended_through_index_record(self):
+        """Structural guard, because a future bulk loader is the real risk.
+
+        Documentation did not stop `load_trail` from appending by hand the
+        first time. This fails the build if a new writer does the same.
+        """
+        import pathlib
+        import re
+        root = pathlib.Path(__file__).resolve().parent.parent / "src" / "vaara"
+        offenders = []
+        for path in (root / "audit" / "trail.py",
+                     root / "audit" / "sqlite_backend.py"):
+            for number, line in enumerate(
+                    path.read_text(encoding="utf-8").splitlines(), 1):
+                if re.search(r"_records\.append\(", line):
+                    # The one legitimate appender.
+                    if path.name == "trail.py" and "self._records.append" in line:
+                        continue
+                    offenders.append(f"{path.name}:{number}: {line.strip()}")
+        assert not offenders, (
+            "these append to _records without going through _index_record, so "
+            "the approval index will silently miss those records:\n  "
+            + "\n  ".join(offenders)
         )
