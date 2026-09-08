@@ -682,7 +682,12 @@ class AuditTrail:
         """Verify the hash chain is unbroken."""
         return self.verify_chain() is None
 
-    def verify_chain(self) -> Optional[str]:
+    def verify_chain(
+        self,
+        *,
+        start_index: int = 0,
+        expected_previous_hash: str = "",
+    ) -> Optional[str]:
         """Verify hash chain integrity.  Returns None if intact, error string if broken.
 
         A trail whose persistent store owns the chain head holds a *window*
@@ -705,12 +710,41 @@ class AuditTrail:
         This is the process's view. The complete chain is verified by
         reloading it from the store, which is what ``load_trail`` does on
         every open and what ``vaara verify`` and the export path use.
+
+        **Memory.** The walk holds one record at a time. It used to open with
+        ``snapshot = list(self._records)``, and measured, that copy was the
+        entire transient cost of the call: 393 KiB over 50,000 records against
+        390.6 KiB of pointer array, 1565 KiB over 200,000 against 1562.5 KiB.
+        ``_records`` is append-only (built once, appended to in one place), so
+        iterating by index up to a length captured at entry is safe against a
+        concurrent append and needs no copy. Records appended mid-walk are
+        simply outside this walk, which is the same guarantee the snapshot gave.
+
+        This does NOT make a trail too large to hold verifiable: ``_records``
+        still holds every record. Verifying a store that does not fit in memory
+        is ``SQLiteAuditBackend.verify_chain_streaming``, which never
+        materialises the rows.
+
+        **Resuming.** ``start_index`` and ``expected_previous_hash`` restart the
+        walk part way, so a long verify can checkpoint instead of starting
+        over. An anchored head is the intended restart point: pass
+        ``anchor.chain_position + 1`` and ``anchor.chain_head_hash``, having
+        verified that anchor's token first. Everything below ``start_index`` is
+        then NOT verified and no claim is made about it, which is the whole
+        point of resuming and the reason the caller has to supply the hash it
+        expects rather than have one read out of the records it is skipping.
         """
         with self._lock:
-            snapshot = list(self._records)
+            length = len(self._records)
             anchors = dict(self._store_anchors)
-        prev_hash = ""
-        for i, record in enumerate(snapshot):
+            if start_index < 0 or (start_index > length and length):
+                raise ValueError(
+                    f"start_index {start_index} is outside the trail (len={length})"
+                )
+            records = self._records
+        prev_hash = expected_previous_hash
+        for i in range(start_index, length):
+            record = records[i]
             if record.previous_hash != prev_hash:
                 anchor = anchors.get(record.record_id)
                 if anchor is None or record.previous_hash != anchor:
