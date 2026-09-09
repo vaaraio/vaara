@@ -78,6 +78,7 @@ def emit_receipt(
     version: int = 1,
     sig_suite: Optional[str] = None,
     crypto_posture: Optional[CryptoPosture] = None,
+    completeness: Optional[dict[str, Any]] = None,
 ) -> ExecutionReceipt:
     """Build, JCS-canonicalize, and sign an ExecutionReceipt envelope.
 
@@ -93,6 +94,12 @@ def emit_receipt(
     Derive it with ``crypto_posture_for(alg=..., sig_suite=...)`` so it stays
     consistent with the signing algorithm and any hybrid suite; it is written
     into ``receiptAsserted`` and so covered by the signature.
+
+    ``completeness`` is the per-boundary ``{boundaryId, seq, runningCount}``
+    block. It rides inside ``receiptAsserted`` and therefore inside the signed
+    preimage, which is what makes a dropped receipt a provable gap with no
+    external witness. It closes dropped-in-the-middle; a pure tail truncation
+    still needs a timestamp anchor over the running count.
     """
     if alg not in VALID_ALGS:
         raise AttestationError(f"unsupported alg: {alg!r}")
@@ -112,6 +119,7 @@ def emit_receipt(
         alg=alg,
         sig_suite=sig_suite,
         crypto_posture=crypto_posture,
+        completeness=completeness,
     )
 
     payload = _signing_payload(

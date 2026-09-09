@@ -128,6 +128,29 @@ class ReceiptAsserted:
     signed bytes. Absent means the record predates the block and the envelope
     is byte-for-byte what it was before. See
     ``docs/design/cbom-crypto-posture-spec.md``.
+
+    ``completeness`` is the optional per-boundary sequence block:
+    ``{"boundaryId": str, "seq": int, "runningCount": int}`` with
+    ``runningCount == seq + 1``. Authorization receipts have carried one since
+    the held-set work; execution receipts did not, so the held-set proof covered
+    only one half of the pair. A holder could name every allow decision with no
+    execution receipt, because the authorization side is provably contiguous and
+    every execution receipt back-links to its attestation. What the holder could
+    not do was separate "the action never ran" from "the receipt was dropped or
+    never persisted", because the execution side had no contiguity to break.
+
+    Its boundary id is the authorization boundary with ``#execution`` appended,
+    so the two sequences never share a counter. Denied calls legitimately mint an
+    authorization receipt and no execution receipt, and a shared sequence would
+    read every deny as a gap.
+
+    **The limit, stated so it is not overclaimed.** Contiguity closes
+    dropped-in-the-middle. A pure tail truncation is not detectable by sequence
+    contiguity alone and needs a timestamp anchor over the running count to
+    close. The same limit is already recorded for the authorization side.
+
+    Absent means the receipt predates the block and the envelope is
+    byte-for-byte what it was before this field existed.
     """
 
     iss: str
@@ -138,6 +161,7 @@ class ReceiptAsserted:
     alg: Algorithm
     sig_suite: Optional[str] = None
     crypto_posture: Optional["CryptoPosture"] = None
+    completeness: Optional[dict[str, Any]] = None
 
 
 @dataclass(frozen=True)
@@ -439,6 +463,15 @@ def receipt_asserted_to_dict(ra: ReceiptAsserted) -> dict[str, Any]:
         out["sigSuite"] = ra.sig_suite
     if ra.crypto_posture is not None:
         out["cryptoPosture"] = crypto_posture_to_dict(ra.crypto_posture)
+    if ra.completeness is not None:
+        # Rebuilt key by key rather than copied, so a caller handing in a dict
+        # with extra keys cannot smuggle unsigned-looking fields into a block
+        # that a verifier reads as authoritative.
+        out["completeness"] = {
+            "boundaryId": ra.completeness["boundaryId"],
+            "seq": ra.completeness["seq"],
+            "runningCount": ra.completeness["runningCount"],
+        }
     return out
 
 
@@ -459,8 +492,14 @@ _BACK_LINK_KEYS = frozenset(
 )
 _RECEIPT_ASSERTED_KEYS = frozenset(
     {"alg", "iat", "iss", "nonce", "secretVersion", "sub", "sigSuite",
-     "cryptoPosture"}
+     "cryptoPosture", "completeness"}
 )
+
+#: The keys a completeness block may carry, and all three are required when the
+#: block is present. A partial block is refused rather than half-read, because a
+#: sequence with no boundary id names no population and a boundary id with no
+#: sequence proves nothing.
+_COMPLETENESS_KEYS = frozenset({"boundaryId", "seq", "runningCount"})
 _OUTCOME_KEYS = frozenset(
     {"status", "completedAt", "resultCommitment", "decisionDigest"}
 )
@@ -502,6 +541,7 @@ def receipt_asserted_from_dict(d: dict[str, Any]) -> ReceiptAsserted:
                 "receiptAsserted.cryptoPosture must be an object or absent"
             )
         crypto_posture = crypto_posture_from_dict(crypto_posture_raw)
+    completeness = _completeness_from_dict(d.get("completeness"))
     return ReceiptAsserted(
         alg=d["alg"],
         iat=d["iat"],
@@ -511,7 +551,49 @@ def receipt_asserted_from_dict(d: dict[str, Any]) -> ReceiptAsserted:
         sub=d["sub"],
         sig_suite=sig_suite,
         crypto_posture=crypto_posture,
+        completeness=completeness,
     )
+
+
+def _completeness_from_dict(raw: Any) -> Optional[dict[str, Any]]:
+    """Validate a completeness block, or refuse it.
+
+    Strict on purpose. This block is the thing a holder counts on to tell a
+    dropped receipt from an action that never ran, so a malformed one has to
+    fail loudly instead of being read as a smaller population.
+    """
+    if raw is None:
+        return None
+    if not isinstance(raw, dict):
+        raise AttestationError(
+            "receiptAsserted.completeness must be an object or absent"
+        )
+    _reject_unknown_keys(raw, _COMPLETENESS_KEYS, "receiptAsserted.completeness")
+    for required in ("boundaryId", "seq", "runningCount"):
+        if required not in raw:
+            raise AttestationError(
+                f"receiptAsserted.completeness missing required field {required!r}"
+            )
+    boundary = raw["boundaryId"]
+    if not isinstance(boundary, str) or not boundary:
+        raise AttestationError(
+            "receiptAsserted.completeness.boundaryId must be a non-empty string"
+        )
+    seq, running = raw["seq"], raw["runningCount"]
+    # bool is a subclass of int, and True would otherwise pass as seq 1.
+    for name, value in (("seq", seq), ("runningCount", running)):
+        if isinstance(value, bool) or not isinstance(value, int):
+            raise AttestationError(
+                f"receiptAsserted.completeness.{name} must be an integer"
+            )
+    if seq < 0:
+        raise AttestationError("receiptAsserted.completeness.seq must not be negative")
+    if running != seq + 1:
+        raise AttestationError(
+            "receiptAsserted.completeness.runningCount must equal seq + 1, "
+            f"got seq={seq} runningCount={running}"
+        )
+    return {"boundaryId": boundary, "seq": seq, "runningCount": running}
 
 
 def outcome_from_dict(d: dict[str, Any]) -> OutcomeDerived:
