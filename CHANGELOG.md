@@ -6,6 +6,24 @@ and this project follows [Semantic Versioning](https://semver.org/spec/v2.0.0.ht
 
 ## [Unreleased]
 
+## [1.83.0] - 2026-09-09
+
+### Added
+
+- Execution receipts carry a completeness sequence, so a dropped one is a provable gap. Authorization receipts have carried a per-boundary `seq` and `runningCount` since the held-set work; execution receipts carried neither, so the held-set proof covered one half of the pair.
+
+  A holder could already name every allow decision with no execution receipt, because the authorization side is provably contiguous and every execution receipt back-links to its attestation, so the set difference is computable. What they could not do was separate "the action never ran" from "the receipt was dropped or never persisted", because the execution side had no contiguity to break and therefore no gap to find.
+
+  `receiptAsserted` gains an optional `completeness` block, `{"boundaryId", "seq", "runningCount"}` with `runningCount == seq + 1`. It rides inside the signed preimage, so renumbering a receipt to close a gap invalidates it. The block is validated strictly on parse: all three keys required, non-negative integer `seq`, `bool` refused because it subclasses `int`, unknown keys refused. A malformed block fails loudly instead of being read as a smaller population.
+
+  The two streams count separately, under a boundary id that is the authorization one with `#execution` appended. A denied call mints an authorization receipt and no execution receipt by design, so a single shared counter would read every legitimate deny as a gap, and two sequences under one id would leave a reader unable to tell which population a number belongs to.
+
+  `completeness_from_execution_receipts` projects receipts into the record shape `verify_contiguity` already reads, so that checker and its seal handling are untouched. Receipts minted before this field existed carry no block and are skipped rather than counted as gaps.
+
+  Absent means byte-identical, the same additive-optional contract the envelope already keeps for `sigSuite` and `cryptoPosture`, and a test pins it.
+
+  What this does not close, stated here rather than left to be found: contiguity catches a receipt dropped in the middle of a run. A pure tail truncation is invisible to sequence contiguity alone, because the dropped records take their own numbers with them, and closing it needs a timestamp anchor over the running count or a sealing block of the kind the authorization side supports.
+
 ## [1.82.0] - 2026-09-09
 
 ### Added
