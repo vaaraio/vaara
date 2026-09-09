@@ -24,6 +24,7 @@ human oversight.  This module satisfies both.
 
 from __future__ import annotations
 
+import bisect
 import hashlib
 import json
 import logging
@@ -705,6 +706,20 @@ class AuditTrail:
         # chain's existence is provable against an external clock even if the
         # signing key is later compromised. See vaara.audit.timeanchor.
         self._anchors: list = []
+        # The same anchors again, kept in chain-position order, so
+        # verify_segment can bisect for its bounding pair instead of scanning.
+        # Two lists rather than one list of tuples: two anchors can share a
+        # position, and a tuple comparison would then fall through to comparing
+        # the anchor objects themselves, which are not orderable.
+        #
+        # This has to be an insertion, never an append. anchor_head reads the
+        # position under _lock, makes the TSA round trip OUTSIDE it, then
+        # appends under _lock again, so two concurrent anchors can arrive in
+        # the opposite order to the positions they carry. _anchors is therefore
+        # unordered by construction and _index_anchor puts each one where it
+        # belongs. Maintained ONLY by _index_anchor.
+        self._anchor_positions: list[int] = []
+        self._anchors_by_position: list = []
         # v0.49 automatic cadence anchoring. Once enable_auto_anchor() sets a
         # client, the trail anchors its own head every _anchor_cadence records.
         # Fail-open: a failed anchor attempt records a chained ANCHOR_GAP marker
@@ -1703,7 +1718,7 @@ class AuditTrail:
             head_hash = self._records[-1].record_hash
         anchor = client.anchor(position, head_hash)
         with self._lock:
-            self._anchors.append(anchor)
+            self._index_anchor(anchor)
         return anchor
 
     def verify_segment(
@@ -1771,7 +1786,6 @@ class AuditTrail:
             # is safe against a concurrent append.
             length = len(self._records)
             records = self._records
-            anchors = list(self._anchors)
             store_anchors = dict(self._store_anchors)
             # Exactly one of the two is set, guarded above, but the branches
             # test each one directly so the narrowing is local.
@@ -1791,18 +1805,48 @@ class AuditTrail:
                     p for r in self._by_action.get(action_id, [])
                     if (p := self._pos_by_record_id.get(r.record_id)) is not None
                 )
+            # An index entry pointing past the captured length belongs to a
+            # record appended after this call started. It is outside this walk,
+            # the same as any other late arrival.
+            targets = [t for t in targets if t < length]
+            first = min(targets) if targets else -1
+            last = max(targets) if targets else -1
+
+            # O(log n), against the position-ordered index rather than the
+            # arrival-ordered list. This was a full pass over every anchor, and
+            # measured at a million records with the default 32-record cadence
+            # it was 6.7 ms of which about 0.58 ms was the actual verification
+            # work: 31,250 anchors scanned to use two of them.
+            #
+            # The scan existed because _anchors is genuinely unordered:
+            # anchor_head makes its TSA round trip outside the lock, so two
+            # concurrent anchors can append in the opposite order to the
+            # positions they carry. _index_anchor maintains the order instead
+            # of assuming it, which is what makes a bisect sound here.
+            #
+            # Both lookups run under _lock. Unlike _records these lists are
+            # inserted into rather than appended to, so an element can move
+            # while another thread reads, and a reference taken outside the
+            # lock would not be safe.
+            n_anchors = len(self._anchor_positions)
+            lower = upper = None
+            if targets and n_anchors:
+                # The last anchor strictly below the segment, and the first at
+                # or above its end. Ties resolve to the same position and the
+                # same head hash, so either member of a tie is the same answer.
+                low_i = bisect.bisect_left(self._anchor_positions, first) - 1
+                if low_i >= 0:
+                    lower = self._anchors_by_position[low_i]
+                up_i = bisect.bisect_left(self._anchor_positions, last)
+                if up_i < n_anchors:
+                    upper = self._anchors_by_position[up_i]
+
         label = (f"record_id={record_id!r}" if record_id is not None
                  else f"action_id={action_id!r}")
-        # An index entry pointing past the captured length belongs to a record
-        # appended after this call started. It is outside this walk, the same
-        # as any other late arrival.
-        targets = [t for t in targets if t < length]
         if not targets:
             return SegmentVerification(ok=False, reason=f"{label} not found in trail")
 
-        first, last = min(targets), max(targets)
-
-        if not anchors:
+        if not n_anchors:
             return SegmentVerification(
                 ok=False,
                 record_index=first,
@@ -1813,27 +1857,6 @@ class AuditTrail:
                     "whole-chain walk, which would answer a different question."
                 ),
             )
-
-        # One pass, no sort. The previous form sorted the anchor list on every
-        # call, and once the record scan was indexed away that sort became the
-        # remaining term that grew with the trail: at the default 32-record
-        # cadence a 50,000 record trail carries 1,562 anchors, and it is 15,600
-        # at half a million.
-        #
-        # Not bisect, because the list is not reliably ordered. anchor_head
-        # reads the position under the lock, makes the TSA round trip outside
-        # it, then appends under the lock again, so two concurrent anchors can
-        # append in the opposite order to the positions they hold. A single
-        # scan for the tightest bounds needs no ordering assumption at all.
-        lower = upper = None
-        for a in anchors:
-            pos = a.chain_position
-            if pos < first:
-                if lower is None or pos > lower.chain_position:
-                    lower = a
-            elif pos >= last:
-                if upper is None or pos < upper.chain_position:
-                    upper = a
 
         from vaara.audit.timeanchor import TimeAnchorError, verify_anchor
 
@@ -2051,6 +2074,28 @@ class AuditTrail:
         with self._publish_lock:
             self._publications.append(pub.to_dict())
 
+    def _index_anchor(self, anchor: Any) -> None:
+        """Record one anchor, in arrival order and in chain-position order.
+
+        Call under ``_lock``. The caller has already made the TSA round trip
+        outside the lock, so anchors can arrive out of position order and the
+        position-ordered list is built by insertion.
+
+        ``bisect_right`` puts a new anchor after any it ties with, which keeps
+        arrival order among equal positions. Ties are possible: two callers can
+        read the same head position before either appends. Both anchors then
+        name the same position and the same head hash, so a bound search may
+        pick either one and get the same answer, with a different token.
+
+        The insert is O(n) in list movement, and anchors arrive once per
+        cadence (32 records by default) and almost always in order, so in
+        practice it lands at the tail and costs a memmove of nothing.
+        """
+        self._anchors.append(anchor)
+        i = bisect.bisect_right(self._anchor_positions, anchor.chain_position)
+        self._anchor_positions.insert(i, anchor.chain_position)
+        self._anchors_by_position.insert(i, anchor)
+
     def _maybe_auto_anchor(self) -> None:
         """Anchor the head when the per-record cadence is reached (fail-open)."""
         if self._anchor_client is None:
@@ -2072,7 +2117,7 @@ class AuditTrail:
             self._record_anchor_gap(position, head_hash, repr(exc), client)
             return
         with self._lock:
-            self._anchors.append(anchor)
+            self._index_anchor(anchor)
 
     def _record_anchor_gap(
         self, position: int, head_hash: str, reason: str, client: Any
