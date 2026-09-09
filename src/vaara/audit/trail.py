@@ -618,6 +618,15 @@ class AuditTrail:
         # records in a 24 hour window and this list holds the handful a human
         # actually answered. Maintained ONLY by _index_record.
         self._resolved_approvals: list[AuditRecord] = []
+        # record_id -> its position in _records, so verify_segment can locate
+        # one record without a linear scan. Unlike the list above this holds an
+        # entry per record, measured at 66 bytes each, which is about 3 percent
+        # on top of a trail whose records already cost roughly 2 KiB apiece.
+        # It exists only where _records does, so a store too large to
+        # materialise carries neither: that trail is verified by
+        # SQLiteAuditBackend.verify_chain_streaming, which holds no index and
+        # no records. Maintained ONLY by _index_record.
+        self._pos_by_record_id: dict[str, int] = {}
         self._last_hash = ""
         self._on_record = on_record
         # record_id -> the chain head the persistent store handed out for it,
@@ -1735,16 +1744,39 @@ class AuditTrail:
             raise ValueError("pass exactly one of record_id or action_id")
 
         with self._lock:
-            records = list(self._records)
-            anchors = sorted(self._anchors, key=lambda a: a.chain_position)
+            # Length and a reference, not a copy. `list(self._records)` was
+            # the same O(n) materialisation verify_chain shed: it allocated a
+            # pointer array the size of the trail to look at 32 records.
+            # _records is append-only, so indexing below a length captured here
+            # is safe against a concurrent append.
+            length = len(self._records)
+            records = self._records
+            anchors = list(self._anchors)
             store_anchors = dict(self._store_anchors)
-
-        if record_id is not None:
-            targets = [i for i, r in enumerate(records) if r.record_id == record_id]
-            label = f"record_id={record_id!r}"
-        else:
-            targets = [i for i, r in enumerate(records) if r.action_id == action_id]
-            label = f"action_id={action_id!r}"
+            # Exactly one of the two is set, guarded above, but the branches
+            # test each one directly so the narrowing is local.
+            targets: list[int] = []
+            if record_id is not None:
+                # O(1). This was a scan, and measured it was 59 percent of the
+                # call at 50,000 records: the flat verification work was flat
+                # and finding the record was not.
+                position = self._pos_by_record_id.get(record_id)
+                if position is not None:
+                    targets = [position]
+            elif action_id is not None:
+                # An action's records are already indexed by action_id; map
+                # each to its position rather than walking the trail. An action
+                # holds a handful of records, so this is O(that handful).
+                targets = sorted(
+                    p for r in self._by_action.get(action_id, [])
+                    if (p := self._pos_by_record_id.get(r.record_id)) is not None
+                )
+        label = (f"record_id={record_id!r}" if record_id is not None
+                 else f"action_id={action_id!r}")
+        # An index entry pointing past the captured length belongs to a record
+        # appended after this call started. It is outside this walk, the same
+        # as any other late arrival.
+        targets = [t for t in targets if t < length]
         if not targets:
             return SegmentVerification(ok=False, reason=f"{label} not found in trail")
 
@@ -1762,22 +1794,39 @@ class AuditTrail:
                 ),
             )
 
-        lower = None
+        # One pass, no sort. The previous form sorted the anchor list on every
+        # call, and once the record scan was indexed away that sort became the
+        # remaining term that grew with the trail: at the default 32-record
+        # cadence a 50,000 record trail carries 1,562 anchors, and it is 15,600
+        # at half a million.
+        #
+        # Not bisect, because the list is not reliably ordered. anchor_head
+        # reads the position under the lock, makes the TSA round trip outside
+        # it, then appends under the lock again, so two concurrent anchors can
+        # append in the opposite order to the positions they hold. A single
+        # scan for the tightest bounds needs no ordering assumption at all.
+        lower = upper = None
         for a in anchors:
-            if a.chain_position < first:
-                lower = a
-            else:
-                break
-        upper = next((a for a in anchors if a.chain_position >= last), None)
+            pos = a.chain_position
+            if pos < first:
+                if lower is None or pos > lower.chain_position:
+                    lower = a
+            elif pos >= last:
+                if upper is None or pos < upper.chain_position:
+                    upper = a
 
         from vaara.audit.timeanchor import TimeAnchorError, verify_anchor
 
         def _check(anchor: Any, which: str) -> tuple[Optional[str], Optional[str]]:
             """Verify one bounding anchor. Returns (attested_time, error)."""
             pos = anchor.chain_position
-            if pos < 0 or pos >= len(records):
+            # Against the length captured at entry, not the live one. Now that
+            # `records` is the live list rather than a copy, len() would drift
+            # upward mid-call and an anchor could pass a bounds check against
+            # records this walk is not covering.
+            if pos < 0 or pos >= length:
                 return None, (f"{which} anchor at position {pos} is outside the "
-                              f"trail (len={len(records)})")
+                              f"trail (len={length})")
             if records[pos].record_hash != anchor.chain_head_hash:
                 return None, (f"{which} anchor at position {pos} names a head "
                               "hash this trail does not have there: the chain "
@@ -2106,6 +2155,22 @@ class AuditTrail:
         """
         self._records.append(record)
         self._by_action[record.action_id].append(record)
+        # record_id to position, so verify_segment can find one record without
+        # walking the trail. Measured before this existed: the id scan was 16
+        # percent of the call at 5,000 records and 59 percent at 50,000, which
+        # made the lookup the wall rather than the hashing.
+        #
+        # Positions are stable because _records is append-only. Nothing in the
+        # tree removes, reorders or replaces an element: rotate purges the
+        # DATABASE and builds a fresh trail through load_trail rather than
+        # editing a live one. If that ever changes, this index has to be
+        # rebuilt at the same moment, and test_index_matches_records is what
+        # will notice.
+        #
+        # setdefault, not assignment: on a duplicate record_id the FIRST
+        # occurrence wins, because a segment claim about the earlier copy is
+        # the conservative answer, it covers more of the chain.
+        self._pos_by_record_id.setdefault(record.record_id, len(self._records) - 1)
         if record.event_type == EventType.ESCALATION_RESOLVED:
             self._resolved_approvals.append(record)
 
