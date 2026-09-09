@@ -611,6 +611,13 @@ class AuditTrail:
         """
         self._records: list[AuditRecord] = []
         self._by_action: dict[str, list[AuditRecord]] = defaultdict(list)
+        # Escalations a human resolved, in append order, so
+        # find_prior_approval does not walk the whole trail on every
+        # intercept. Only resolutions land here, so it stays small even over a
+        # busy day: at 23,000 services an hour the trail holds ~552,000
+        # records in a 24 hour window and this list holds the handful a human
+        # actually answered. Maintained ONLY by _index_record.
+        self._resolved_approvals: list[AuditRecord] = []
         self._last_hash = ""
         self._on_record = on_record
         # record_id -> the chain head the persistent store handed out for it,
@@ -1251,12 +1258,28 @@ class AuditTrail:
         """
         cutoff = time.time() - window_hours * 3600
         want_tenant = tenant_id or ""
-        # Snapshot under the chain lock — every other reader of _records
-        # does the same; iterating a list another thread is appending to
-        # is a data race even under the GIL.
+        # Snapshot under the chain lock — every other reader does the same;
+        # iterating a list another thread is appending to is a data race even
+        # under the GIL.
+        #
+        # Scans _resolved_approvals, not _records. That is the whole fix: this
+        # ran on every intercept and took 62 percent of a 3,000 call benchmark
+        # because it copied and walked the entire trail to find records that
+        # are a tiny fraction of it.
+        #
+        # NOT an early `break` on the cutoff, and that was tried and reverted
+        # on 2026-09-08. Two reasons it stays a `continue`. Under the load that
+        # matters a full 24 hour window holds every record there is, so there
+        # is no window edge to stop at. And append order is not guaranteed to
+        # be timestamp order: two threads can take timestamps and append in
+        # opposite orders, and a `break` would then silently stop early and
+        # miss a valid approval. `continue` costs nothing on a short list and
+        # holds the boundary property unconditionally.
         with self._lock:
-            records = list(self._records)
+            records = list(self._resolved_approvals)
         for r in reversed(records):
+            # Redundant by construction, kept because it is the invariant the
+            # whole index rests on and it costs one comparison on a short list.
             if r.event_type != EventType.ESCALATION_RESOLVED:
                 continue
             if r.timestamp < cutoff:
@@ -2060,8 +2083,31 @@ class AuditTrail:
                         self._note_persistence_ok()
 
             self._last_hash = record.record_hash
-            self._records.append(record)
-            self._by_action[record.action_id].append(record)
+            self._index_record(record)
+
+    def _index_record(self, record: AuditRecord) -> None:
+        """Put one record into every in-memory index.
+
+        THE ONLY place that appends to ``_records``. Bulk loaders must call
+        this rather than appending directly, because a record that reaches
+        ``_records`` without reaching ``_resolved_approvals`` is invisible to
+        :meth:`find_prior_approval`.
+
+        That failure is silent and it fails CLOSED: a missing approval means
+        the action escalates to a human again rather than being auto-allowed,
+        which is the safe direction but is still wrong. ``load_trail`` in the
+        SQLite backend is the path that would have been forgotten, since
+        reloaded records never pass through ``_append``, so it calls this too.
+
+        Callers already holding ``_lock`` (``_append_chained``) must not
+        re-acquire it; this method deliberately does no locking of its own and
+        inherits whatever the caller holds. ``load_trail`` builds a fresh trail
+        single-threaded and needs none.
+        """
+        self._records.append(record)
+        self._by_action[record.action_id].append(record)
+        if record.event_type == EventType.ESCALATION_RESOLVED:
+            self._resolved_approvals.append(record)
 
     def _chain_backend(self):
         """The store that owns the persistent chain head, or ``None``.
