@@ -6,6 +6,40 @@ and this project follows [Semantic Versioning](https://semver.org/spec/v2.0.0.ht
 
 ## [Unreleased]
 
+## [1.82.0] - 2026-09-09
+
+### Added
+
+- Reading is now an event. Every `EventType` member so far described what an agent did: requested, scored, decided, executed, blocked, escalated, overridden, disclosed. Nothing in the trail answered the question a supervisor asks first, which is who opened the record. `ACCESS_RECORDED` and `vaara.audit.access` add it, with four properties an ordinary access log does not have.
+
+  Two identities, and one of them is a person. When an agent performs a read, "who accessed this" has two answers: the agent, and the principal it acted for. A single actor field collapses them and the collapse cannot be recovered afterwards. `accessed_by` and `on_behalf_of` are both required and neither defaults. Finnish health law is the sharp case: asiakastietolaki 703/2023 section 11 gives a client the right to be told who used their data and on what basis, and a service account name does not answer that.
+
+  A commitment to what came back, holding none of it. "Agent X opened patient Y" does not say what X saw, and a dispute is about content, so the record carries a digest over the returned set and has no parameter that could accept the rows. An access record over health data that copied the data would be a second unprotected copy of the thing it exists to protect.
+
+  Enumerable fields. Deployments add their own through `deployment_fields`, and `fields_present` lists what was actually captured, so a missing returned digest is stated rather than left for a reader to interpret.
+
+  Attested time rather than asserted time. The record is chained, anchorable and reachable by `verify_segment` like any other, so removing an access breaks the chain and the timestamp is backed by a party outside the operator.
+
+  Then the half that matters as much: whether anything followed. An access ends in one of three states and they are three facts. Closed with an action. Closed with an explicit statement by a named person that nothing came of it. Or never closed at all, which is what `accesses_with_no_recorded_outcome` returns. Reading "nobody said anything" as "nothing happened" is the same collapse this project refuses in `verify_consistency` and in `RevocationStatus`.
+
+### Performance
+
+- `verify_segment` no longer scans every anchor to find the pair that bounds a record. With the record lookup already indexed, the anchor handling was what remained growing: a copy of the anchor list under the lock, then a full pass over it. At the default 32-record cadence that is one anchor per 32 records, so both terms scaled with the trail.
+
+  Measured with `scripts/bench_anchor_bound_search.py`, 200 calls per row against a record in the middle of the trail:
+
+  | records | anchors | before | after |
+  |---|---|---|---|
+  | 5,000 | 156 | 0.613 ms | 0.614 ms |
+  | 50,000 | 1,562 | 0.752 ms | 0.622 ms |
+  | 150,000 | 4,687 | 1.004 ms | 0.619 ms |
+  | 500,000 | 15,625 | 2.198 ms | 0.651 ms |
+  | 1,000,000 | 31,250 | 6.731 ms | 0.645 ms |
+
+  At a million records the fixed verification work is about 0.58 ms, so the scan was roughly 91 percent of the call: 31,250 anchors read to use two of them. The curve is flat afterwards.
+
+  The order is maintained rather than assumed. `_anchors` is genuinely unordered, because `anchor_head` reads the head position under the lock, makes the timestamp-authority round trip outside it, then appends under the lock again, so two concurrent anchors can append in the opposite order to the positions they carry. A bisect over `_anchors` would be unsound, which is why the previous code took a full pass. `_index_anchor` now inserts each anchor into a position-ordered index at append time, both anchoring paths go through it, and the bound search bisects that index under the lock the rest of the capture already holds.
+
 ## [1.81.0] - 2026-09-09
 
 ### Fixed
