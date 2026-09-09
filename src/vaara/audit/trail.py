@@ -62,6 +62,7 @@ class EventType(str, Enum):
     ANCHOR_GAP = "anchor_gap"               # Auto-anchor attempt failed (fail-open marker)
     KEY_LIFECYCLE = "key_lifecycle"         # Signing-key custodian rotated/revoked/added
     DISCLOSURE_RECORDED = "disclosure_recorded"  # EU AI Act Art 50 transparency disclosure
+    ACCESS_RECORDED = "access_recorded"     # Something was opened, and by whom
 
 
 # ── Regulatory article mappings ───────────────────────────────────────────
@@ -276,6 +277,14 @@ TRANSPARENCY_DEFAULTS: dict[EventType, dict[str, str]] = {
         "data_usage": "disclosure_statement",
         "decision_making": "policy_requirement",
     },
+    EventType.ACCESS_RECORDED: {
+        "system_operation": "read_access",
+        # The record commits to what was returned by digest and holds none of
+        # it. That is the point: an access record over patient data cannot
+        # itself become a second copy of patient data.
+        "data_usage": "returned_set_digest",
+        "decision_making": "n/a",
+    },
 }
 
 
@@ -473,6 +482,17 @@ class AuditRecord:
                 f"{prefix} Article 50 disclosure: "
                 f"{_narrative_str(self.data.get('parameters', {}).get('article', '?'))}"
                 f" — {_narrative_str(self.data.get('parameters', {}).get('statement', ''), max_len=80)}"
+            ),
+            # The prefix already names the agent, so this names the person the
+            # agent acted for and the stated basis. Both belong in the line a
+            # human reads: "an entity saw it" is the transparency this record
+            # type exists to replace.
+            EventType.ACCESS_RECORDED: (
+                f"{prefix} opened "
+                f"{_narrative_str(self.data.get('parameters', {}).get('subject', '?'), max_len=64)}"
+                f" for "
+                f"{_narrative_str(self.data.get('parameters', {}).get('on_behalf_of', '?'), max_len=64)}"
+                f" ({_narrative_str(self.data.get('parameters', {}).get('basis', 'no basis given'), max_len=64)})"
             ),
         }
 
