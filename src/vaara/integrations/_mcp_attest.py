@@ -55,6 +55,15 @@ _ISS = "vaara-mcp-proxy"
 # every authorization receipt's coverage block.
 _COVERAGE_SCOPE = "calls-routed-through-chokepoint"
 
+# The execution side gets its own sequence, under its own boundary id.
+#
+# A shared counter across both halves of the pair would read every denied call
+# as a gap, because a deny legitimately mints an authorization receipt and no
+# execution receipt. Two sequences under one id would be worse still: a reader
+# could not tell which population a seq belongs to. So the id says which stream
+# it counts, and `_next_completeness` stays keyed by whatever id it is handed.
+_EXEC_BOUNDARY = f"{_ISS}#execution"
+
 
 class AttestConfigError(RuntimeError):
     """Operator-side attestation config is incomplete or unusable."""
@@ -451,6 +460,23 @@ class AttestPairEmitter:
             )
             sub = f"{tenant_id}/{upstream_name}" if tenant_id else upstream_name
 
+            # Completeness over executions. Consumed here, before the receipt is
+            # signed and written, exactly as the authorization side does it: a
+            # write that fails after this leaves a seq with no persisted receipt,
+            # and that gap is the finding rather than a bug in the counter.
+            #
+            # This is what lets a holder tell "the action never ran" from "the
+            # receipt was dropped". Until it existed, the execution side had no
+            # contiguity to break, so the set difference against the
+            # authorization side produced a list to investigate instead of an
+            # answer.
+            seq, running_count = self._next_completeness(_EXEC_BOUNDARY)
+            completeness = {
+                "boundaryId": _EXEC_BOUNDARY,
+                "seq": seq,
+                "runningCount": running_count,
+            }
+
             receipt = _emit_receipt(
                 back_link=back_link,
                 outcome_derived=outcome,
@@ -459,6 +485,7 @@ class AttestPairEmitter:
                 secret_version=self._secret_version,
                 alg=self._alg,
                 signing_material=self._signing_key,
+                completeness=completeness,
             )
 
             nonce_tag = attestation.issuer_asserted.nonce[:8]

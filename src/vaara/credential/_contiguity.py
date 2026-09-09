@@ -135,6 +135,43 @@ def _compact(seqs: list[int]) -> str:
     return ", ".join(out)
 
 
+def completeness_from_execution_receipts(
+    receipts: list[dict[str, Any]],
+) -> list[dict[str, Any]]:
+    """Project execution receipts into the shape ``verify_contiguity`` reads.
+
+    The two halves of the pair carry their completeness block in different
+    places, for reasons that belong to each format. An authorization receipt
+    puts it in the evidence document, whose digest the signed record pins. An
+    execution receipt has no evidence document, so the block rides in
+    ``receiptAsserted``, the issuer block, and is covered by the signature
+    directly.
+
+    Rather than teach the checker two shapes, this lifts the execution block to
+    where the checker already looks. ``verify_contiguity`` stays as it is, seal
+    handling and all.
+
+    Receipts with no completeness block are skipped rather than counted as gaps.
+    A receipt minted before the field existed is not evidence that a receipt is
+    missing, and treating it as one would report every historical run as broken.
+
+    The caller is expected to have verified each receipt's signature first. This
+    reads the blocks as given; an unverified receipt's sequence number is a
+    claim, not a fact.
+    """
+    out: list[dict[str, Any]] = []
+    for r in receipts:
+        if not isinstance(r, dict):
+            continue
+        asserted = r.get("receiptAsserted")
+        if not isinstance(asserted, dict):
+            continue
+        block = asserted.get("completeness")
+        if isinstance(block, dict):
+            out.append({"completeness": block})
+    return out
+
+
 def _completeness_records(
     evidence_records: list[dict[str, Any]], boundary_id: Optional[str]
 ) -> tuple[str, list[dict[str, Any]]]:
