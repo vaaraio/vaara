@@ -272,3 +272,90 @@ def test_requires_exactly_one_selector():
         trail.verify_segment()
     with pytest.raises(ValueError):
         trail.verify_segment(record_id="a", action_id="b")
+
+
+# ── The ordering the bisect depends on ──────────────────────────────────────
+#
+# verify_segment finds its bounding pair with a bisect over a position-ordered
+# index. _anchors itself is NOT ordered: anchor_head reads the head position
+# under the lock, makes the TSA round trip outside it, then appends under the
+# lock again, so two concurrent anchors can arrive in the opposite order to the
+# positions they carry. These tests drive that arrival order directly, which is
+# what the race produces, and pin that the index puts them back in place.
+
+def test_anchors_arriving_out_of_position_order_still_bound_the_segment():
+    trail = AuditTrail()
+    client = _local_tsa_client()
+    _add(trail, 30)
+
+    # Two anchors built for positions 9 and 19, then handed over in the wrong
+    # order, which is the outcome of two concurrent anchor_head calls.
+    late = client.anchor(9, trail._records[9].record_hash)
+    early = client.anchor(19, trail._records[19].record_hash)
+    with trail._lock:
+        trail._index_anchor(early)     # position 19 arrives first
+        trail._index_anchor(late)      # position 9 arrives second
+
+    assert [a.chain_position for a in trail._anchors] == [19, 9]
+    assert trail._anchor_positions == [9, 19]
+
+    result = trail.verify_segment(record_id=_rid(trail, 15))
+
+    assert result.ok, result.reason
+    assert result.lower_anchor_position == 9
+    assert result.upper_anchor_position == 19
+
+
+def test_out_of_order_anchors_do_not_widen_the_segment():
+    """The tightest pair, not the first pair found. A wider walk would pass a
+    tamper below the true lower bound into scope and change what ok means."""
+    trail = AuditTrail()
+    client = _local_tsa_client()
+    _add(trail, 40)
+
+    anchors = [client.anchor(p, trail._records[p].record_hash)
+               for p in (9, 19, 29)]
+    with trail._lock:
+        for a in reversed(anchors):    # 29, 19, 9
+            trail._index_anchor(a)
+
+    result = trail.verify_segment(record_id=_rid(trail, 22))
+
+    assert result.ok, result.reason
+    assert result.lower_anchor_position == 19
+    assert result.upper_anchor_position == 29
+    assert result.records_verified == 10     # 20..29, not 0..29
+
+
+def test_two_anchors_at_the_same_position_are_both_usable():
+    """Two callers can read the same head before either appends. Both anchors
+    then name that position and that head hash, so either bounds the segment."""
+    trail = AuditTrail()
+    client = _local_tsa_client()
+    _add(trail, 30)
+
+    head9 = trail._records[9].record_hash
+    with trail._lock:
+        trail._index_anchor(client.anchor(9, head9))
+        trail._index_anchor(client.anchor(9, head9))
+        trail._index_anchor(client.anchor(19, trail._records[19].record_hash))
+
+    assert trail._anchor_positions == [9, 9, 19]
+
+    result = trail.verify_segment(record_id=_rid(trail, 15))
+
+    assert result.ok, result.reason
+    assert result.lower_anchor_position == 9
+    assert result.upper_anchor_position == 19
+
+
+def test_index_stays_ordered_through_ordinary_anchoring():
+    """The common path appends in order; the index must not disturb it."""
+    trail = _anchored_trail()
+    _add(trail, 10)
+    trail.anchor_head(_local_tsa_client())
+
+    assert trail._anchor_positions == sorted(trail._anchor_positions)
+    assert [a.chain_position for a in trail._anchors_by_position] == \
+        trail._anchor_positions
+    assert len(trail._anchors_by_position) == len(trail._anchors)
