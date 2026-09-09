@@ -6,6 +6,8 @@ and this project follows [Semantic Versioning](https://semver.org/spec/v2.0.0.ht
 
 ## [Unreleased]
 
+## [1.81.0] - 2026-09-09
+
 ### Fixed
 
 - A trail that stops recording now says so. The Claude Code hook could fail to persist every single record, print a traceback, and exit 0, and nothing anywhere surfaced it. Found by dogfooding: on the maintainer's own machine the trail had been dead for thirteen days, and it turned up only because someone went looking for an unrelated reason.
@@ -74,6 +76,20 @@ and this project follows [Semantic Versioning](https://semver.org/spec/v2.0.0.ht
   The bound stays opt-in, because `draft-sirkkavaara-vaara-receipt-08` Section 10 puts the staleness a deployment accepts on the deployment rather than on the verifier. Callers that pass neither parameter get the behaviour they had before it existed, which `test_stale_registry_admits_when_no_bound_is_stated` pins.
 
   The asymmetry is preserved and pinned separately. A revocation the registry can see binds however old the registry is, so `revoked` is answered before staleness is considered and a stale registry never downgrades a refusal to `revocation_stale`. Staleness weakens only the negative answer. `test_revocation_binds_however_stale_the_registry_is` is the case most likely to regress.
+
+- One record's segment can be verified without walking the trail. `verify_segment(record_id=...)` or `action_id=...` bounds a record between the two nearest time anchors, verifies that pair, and walks only the records between them. The question a supervisor asks is not whether the trail is broadly sound, it is whether one action's record is what it was when it was written, and answering it used to cost a whole-chain walk.
+
+  Anchoring is opt-in and no TSA is configured by default, so the unanchored case is the common one and it fails loudly rather than degrading to a walk from genesis, which would answer a different question. A record above the last anchor is reported `ok` with `closed=False`: it chains back to an attested head and nothing external attests it yet, and those are different claims. An `action_id` widens the walk to cover every record of that action, because an action's records can straddle an anchor.
+
+- The whole chain can be verified without materialising it, and the walk can be resumed. `verify_chain` holds one record at a time instead of opening with a copy of the record list, which was the entire transient cost of the call: 393 KiB over 50,000 records against 390.6 KiB of pointer array. `start_index` and `expected_previous_hash` restart the walk part way, so a long verification can checkpoint against an anchored head instead of starting over. Everything below the restart point is then not verified and no claim is made about it, which is why the caller supplies the hash it expects rather than having one read out of the records being skipped.
+
+  A store too large to hold in memory is verified by `SQLiteAuditBackend.verify_chain_streaming`, which never materialises the rows.
+
+### Performance
+
+- Prior-approval lookup no longer scans the trail. Resolved escalations are indexed as they are recorded, so `find_prior_approval` reads a short list instead of walking every record. At 23,000 services an hour a trail holds around 552,000 records in a 24 hour window, and a human answers a handful of them.
+
+- `verify_segment` resolves a record id in constant time. Locating the record was a linear scan and, measured at 50,000 records, it was 59 percent of the call: the verification work is flat at 32 record hashes and two tokens whatever the trail size, and finding the record was not. The index costs about 66 bytes per record, roughly 3 percent on top of records that already cost about 2 KiB each, and it exists only where the record list does.
 
 ## [1.80.0] - 2026-09-02
 
