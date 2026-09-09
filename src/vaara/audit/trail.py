@@ -1753,13 +1753,17 @@ class AuditTrail:
             records = self._records
             anchors = list(self._anchors)
             store_anchors = dict(self._store_anchors)
+            # Exactly one of the two is set, guarded above, but the branches
+            # test each one directly so the narrowing is local.
+            targets: list[int] = []
             if record_id is not None:
                 # O(1). This was a scan, and measured it was 59 percent of the
                 # call at 50,000 records: the flat verification work was flat
                 # and finding the record was not.
                 position = self._pos_by_record_id.get(record_id)
-                targets = [position] if position is not None else []
-            else:
+                if position is not None:
+                    targets = [position]
+            elif action_id is not None:
                 # An action's records are already indexed by action_id; map
                 # each to its position rather than walking the trail. An action
                 # holds a handful of records, so this is O(that handful).
