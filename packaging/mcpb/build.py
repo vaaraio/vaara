@@ -23,10 +23,10 @@ Output: dist/vaara-<version>.mcpb
 from __future__ import annotations
 
 import json
+import re
 import shutil
 import subprocess
 import sys
-import tomllib
 from pathlib import Path
 
 ROOT = Path(__file__).resolve().parents[2]
@@ -48,10 +48,27 @@ LONG_DESCRIPTION = (
 )
 
 
+#: `__version__ = "1.83.0"` in the package's `__init__.py`.
+_VERSION_RE = re.compile(r'^__version__\s*=\s*["\']([^"\']+)["\']', re.M)
+
+
 def version() -> str:
-    """The single source of truth, read from pyproject rather than typed here."""
-    data = tomllib.loads((ROOT / "pyproject.toml").read_text(encoding="utf-8"))
-    return data["project"]["version"]
+    """The version, read from the package rather than typed here.
+
+    Read from `src/vaara/__init__.py` and NOT from pyproject, deliberately.
+    `tomllib` arrived in Python 3.11 and this project supports 3.10, so parsing
+    pyproject here would make the build script fail on the oldest interpreter
+    the package itself claims to support. CI caught exactly that on the first
+    run of this file.
+
+    The version is declared in two places by release convention, pyproject and
+    here. A test asserts the two agree, on the interpreters that can read TOML.
+    """
+    src = (ROOT / "src" / "vaara" / "__init__.py").read_text(encoding="utf-8")
+    match = _VERSION_RE.search(src)
+    if not match:
+        raise RuntimeError("no __version__ in src/vaara/__init__.py")
+    return match.group(1)
 
 
 def manifest(ver: str) -> dict:
