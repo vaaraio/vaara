@@ -1,1 +1,4 @@
 .shared/
+
+# Build output for the .mcpb bundle (packaging/mcpb/build.py)
+dist/
