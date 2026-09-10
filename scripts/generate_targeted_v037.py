@@ -67,6 +67,9 @@ def main() -> int:
     ap.add_argument("--seeds-per-batch", type=int, default=5)
     ap.add_argument("--max-batches", type=int, default=80)
     ap.add_argument("--random-seed", type=int, default=42)
+    # Swaps in a deliberately different instruction for the same category, so
+    # a generation ceiling can be attributed to the prompt or to the category.
+    ap.add_argument("--variant", default="", choices=["", "v2"])
     ap.add_argument("--dedupe-prior", action="store_true")
     ap.add_argument("--out", default=None)
     args = ap.parse_args()
@@ -84,7 +87,8 @@ def main() -> int:
         while written < args.n and batch_idx < args.max_batches:
             batch_idx += 1
             seeds = load_seeds(seeds_path, args.seeds_per_batch)
-            user_msg = build_user_message(args.category, args.batch_size, seeds, batch_idx)
+            user_msg = build_user_message(args.category, args.batch_size, seeds,
+                                          batch_idx, args.variant)
             messages = [
                 {"role": "system", "content": SYSTEM_PROMPT},
                 {"role": "user", "content": user_msg},
