@@ -14,13 +14,23 @@ from __future__ import annotations
 
 import importlib.util
 import json
-import tomllib
 from pathlib import Path
 
 import pytest
 
 ROOT = Path(__file__).resolve().parents[1]
 BUILD = ROOT / "packaging" / "mcpb" / "build.py"
+
+
+def _pyproject() -> dict:
+    """Parsed pyproject, or skip.
+
+    `tomllib` is 3.11+ and this project supports 3.10, so the tests that need
+    to read TOML skip on the oldest interpreter rather than failing collection
+    for the whole module. Importing it at module scope broke the 3.10 CI leg.
+    """
+    tomllib = pytest.importorskip("tomllib", reason="tomllib is Python 3.11+")
+    return tomllib.loads((ROOT / "pyproject.toml").read_text(encoding="utf-8"))
 
 
 def _build_module():
@@ -41,12 +51,21 @@ def manifest(mcpb):
     return mcpb.manifest(mcpb.version())
 
 
-def test_version_comes_from_pyproject(mcpb):
+def test_version_comes_from_the_package(mcpb):
     """One source of truth. A hand-typed version is a version that goes stale."""
-    declared = tomllib.loads(
-        (ROOT / "pyproject.toml").read_text(encoding="utf-8")
-    )["project"]["version"]
-    assert mcpb.version() == declared
+    import vaara
+
+    assert mcpb.version() == vaara.__version__
+
+
+def test_the_two_declared_versions_agree(mcpb):
+    """Release convention puts the version in pyproject AND in __init__.py.
+
+    The build script reads the second, because tomllib is 3.11+ and this
+    package supports 3.10. That only stays safe while the two agree, so this
+    checks it on every interpreter that can read TOML.
+    """
+    assert mcpb.version() == _pyproject()["project"]["version"]
 
 
 def test_required_manifest_fields_present(manifest):
@@ -75,9 +94,7 @@ def test_pinned_spec_matches_the_manifest_version(manifest):
 
 def test_entry_point_exists_in_pyproject(manifest):
     """The bundle must launch a console script this package actually installs."""
-    scripts = tomllib.loads(
-        (ROOT / "pyproject.toml").read_text(encoding="utf-8")
-    )["project"]["scripts"]
+    scripts = _pyproject()["project"]["scripts"]
     assert manifest["server"]["entry_point"] in scripts
 
 
@@ -85,11 +102,9 @@ def test_licence_is_stated_and_matches_the_project(manifest):
     """Six of ten third-party directories show no licence for Vaara, because
     the MCP registry schema has no licence field. The bundle has one, so it
     gets used, and it has to agree with pyproject."""
-    declared = tomllib.loads(
-        (ROOT / "pyproject.toml").read_text(encoding="utf-8")
-    )["project"]["license"]
-    text = declared if isinstance(declared, str) else declared.get("text", "")
     assert "AGPL-3.0" in manifest["license"]
+    declared = _pyproject()["project"]["license"]
+    text = declared if isinstance(declared, str) else declared.get("text", "")
     assert "AGPL-3.0" in text
 
 
