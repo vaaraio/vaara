@@ -153,11 +153,30 @@ SCHEMA_BLOCK = """Schema (one JSON object per line):
 
 
 def load_anti_seeds(category: str, n: int) -> list[dict]:
+    # The v034 file is preferred where it exists, so the three original
+    # categories keep drawing from exactly the anti-seeds they always have and
+    # stay comparable with what came before.
+    #
+    # The four categories added 2026-09-10 have no v034 file, because the
+    # adversarial generator had never been pointed at them. The hardcoded name
+    # meant this returned nothing for them and the run would produce no benign
+    # counterparts at all, silently, which is the exact class-balance failure
+    # this script exists to prevent. Hence the fallback to the newest file
+    # carrying the prefix.
     prefix = CATEGORY_PREFIX[category]
     path = SEEDS_DIR / f"{prefix}-v034.jsonl"
     if not path.exists():
-        sys.stderr.write(f"WARN: anti-seed file missing: {path}\n")
-        return []
+        candidates = sorted(
+            SEEDS_DIR.glob(f"{prefix}-*.jsonl"), key=lambda p: p.stat().st_mtime
+        )
+        if not candidates:
+            sys.stderr.write(
+                f"WARN: no anti-seed file for {category}; looked for "
+                f"{path.name} and {prefix}-*.jsonl in {SEEDS_DIR}\n"
+            )
+            return []
+        path = candidates[-1]
+        sys.stderr.write(f"[anti-seeds] {category}: using {path.name}\n")
     seeds: list[dict] = []
     for line in path.read_text().splitlines():
         line = line.strip()
