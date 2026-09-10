@@ -110,6 +110,12 @@ def report(name, m_v8, m_v9):
 
 def main():
     ap = argparse.ArgumentParser()
+    # val/test have always come from v035 and holdout from v039. Passing
+    # --split points ALL THREE at one manifest, which is what v0.40 needs:
+    # its four new categories only exist there. Changing the folds changes
+    # the denominators, so any number produced this way must say so.
+    ap.add_argument("--split", default=None,
+                    help="one manifest for val, test and holdout")
     ap.add_argument("--target-fpr", type=float, default=0.05)
     ap.add_argument("--json-out", default="bench/v039_v9_eval.json")
     ap.add_argument("--update-bundle-threshold", action="store_true")
@@ -118,7 +124,9 @@ def main():
     b8, b9 = load_b(V8), load_b(V9)
     print(f"[v8] {b8['version']} T={b8['T']:.4f}\n[v9] {b9['version']} T={b9['T']:.4f}")
 
-    val = fold("val", SP035)
+    sp_vt = Path(args.split) if args.split else SP035
+    sp_ho = Path(args.split) if args.split else SP039
+    val = fold("val", sp_vt)
     yv = np.asarray(build_labels(val)[0], dtype=np.int32)
     p8v, p9v = sc(b8, val), sc(b9, val)
     T8 = b8["T"]
@@ -127,7 +135,7 @@ def main():
     print(f"\n[val v035] cal T9={T9:.4f} target FPR<={args.target_fpr}")
     report("val v035", val_v8, val_v9)
 
-    test = fold("test", SP035)
+    test = fold("test", sp_vt)
     yt = np.asarray(build_labels(test)[0], dtype=np.int32)
     test_v8 = mx(sc(b8, test), yt, T8)
     test_v9 = mx(sc(b9, test), yt, T9)
@@ -139,7 +147,7 @@ def main():
     v38_v9 = mx(sc(b9, v38e), y38, T9)
     report("v0.38 Phase 1", v38_v8, v38_v9)
 
-    hold = fold("holdout", SP039)
+    hold = fold("holdout", sp_ho)
     yh = np.asarray(build_labels(hold)[0], dtype=np.int32)
     p8h, p9h = sc(b8, hold), sc(b9, hold)
     h_v8 = mx(p8h, yh, T8)

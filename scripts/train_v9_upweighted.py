@@ -44,6 +44,12 @@ def git_commit() -> str:
 
 def main() -> int:
     ap = argparse.ArgumentParser()
+    # Defaults to v039 so every existing invocation behaves exactly as before.
+    # v0.40 adds four categories and needs its own manifest, and the bundle
+    # records whichever path was used plus its sha256, so a model can always
+    # be traced to the split that produced it.
+    ap.add_argument("--split", default=str(V039_SPLIT),
+                    help="split manifest to train against")
     ap.add_argument("--follow-weight", type=float, default=8.0)
     ap.add_argument("--max-bipia-benign", type=int, default=0,
                     help="If >0, subsample BIPIA benign-under-pressure train rows to "
@@ -58,7 +64,11 @@ def main() -> int:
     import joblib
     import xgboost as xgb
 
-    assignments = json.loads(V039_SPLIT.read_text())["assignments"]
+    split_path = Path(args.split)
+    if not split_path.is_file():
+        sys.stderr.write(f"no such split: {split_path}\n")
+        return 2
+    assignments = json.loads(split_path.read_text())["assignments"]
     keyed = load_corpus_keyed()
     train_keyed = [(k, e) for k, e in keyed if assignments.get(k) == "train"]
     if not train_keyed:
@@ -116,7 +126,7 @@ def main() -> int:
 
     from vaara.embeddings import EMBED_MODEL_ID, EMBED_MODEL_REVISION
 
-    split_sha = hashlib.sha256(V039_SPLIT.read_bytes()).hexdigest()
+    split_sha = hashlib.sha256(split_path.read_bytes()).hexdigest()
     manifest_sha = (
         hashlib.sha256(MANIFEST.read_bytes()).hexdigest() if MANIFEST.exists() else None
     )
@@ -128,7 +138,7 @@ def main() -> int:
         "training_commit": git_commit(),
         "n_entries": int(len(entries)), "positive_rate": float(y.mean()),
         "training_corpus_manifest_sha256": manifest_sha,
-        "split_manifest_path": "tests/adversarial/v039_split.json",
+        "split_manifest_path": split_path.relative_to(REPO).as_posix(),
         "split_manifest_sha256": split_sha, "training_fold": "train",
         "uses_embeddings": True, "embedding_model_id": EMBED_MODEL_ID,
         "embedding_model_revision": EMBED_MODEL_REVISION,
