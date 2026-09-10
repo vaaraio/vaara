@@ -17,8 +17,12 @@ Vendoring would mean shipping a second copy of the package that can disagree
 with the one on PyPI, and disagreeing copies of an audit tool is the exact
 failure the product exists to prevent.
 
-Build:  python packaging/mcpb/build.py
-Output: dist/vaara-<version>.mcpb
+Build:  python packaging/mcpb/build.py [output-dir]
+Output: <output-dir>/vaara-<version>.mcpb, defaulting to dist/
+
+The output directory is overridable because the release workflow must NOT put
+this next to the wheel. `dist/` is uploaded wholesale to PyPI, which rejects an
+unknown archive type and would fail the publish for every release.
 """
 from __future__ import annotations
 
@@ -147,9 +151,13 @@ def manifest(ver: str) -> dict:
     }
 
 
-def main() -> int:
+def main(argv: list[str] | None = None) -> int:
+    argv = sys.argv[1:] if argv is None else argv
+    out = Path(argv[0]).resolve() if argv else OUT
+    out.mkdir(parents=True, exist_ok=True)
+
     ver = version()
-    stage = OUT / "mcpb-stage"
+    stage = out / "mcpb-stage"
     if stage.exists():
         shutil.rmtree(stage)
     stage.mkdir(parents=True)
@@ -176,7 +184,7 @@ def main() -> int:
 
     print(f"[mcpb] staged v{ver} in {stage}")
 
-    packed = OUT / f"vaara-{ver}.mcpb"
+    packed = out / f"vaara-{ver}.mcpb"
     if packed.exists():
         packed.unlink()
 

@@ -72,6 +72,30 @@ jobs:
           name: dist
           path: dist/
 
+      # The .mcpb bundle is built into its own directory, NOT dist/. The PyPI
+      # publish step uploads dist/ wholesale, and an unknown archive type there
+      # would fail the publish for every release.
+      # Pinned rather than relying on whatever Node the runner image ships,
+      # because the pack step runs through npx and the runner's default moves.
+      - name: Set up Node.js for the bundle packer
+        uses: actions/setup-node@820762786026740c76f36085b0efc47a31fe5020  # v6.0.0
+        with:
+          node-version: '22'
+
+      - name: Build the .mcpb bundle
+        run: python packaging/mcpb/build.py mcpb-dist
+
+      - name: Generate SLSA build provenance for the bundle
+        uses: actions/attest-build-provenance@4d101475d8b20a2381f78447822ac1eab6504dd8  # v4.2.2
+        with:
+          subject-path: 'mcpb-dist/*.mcpb'
+
+      - name: Upload the bundle
+        uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a  # v7.0.1
+        with:
+          name: mcpb
+          path: mcpb-dist/*.mcpb
+
   publish-pypi:
     name: Publish to PyPI (trusted publishing)
     needs: build
@@ -115,10 +139,20 @@ jobs:
           name: dist
           path: dist/
 
+      - name: Download the .mcpb bundle
+        uses: actions/download-artifact@3e5f45b2cfb9172054b4087a40e8e0b5a5461e7c  # v8.0.1
+        with:
+          name: mcpb
+          path: mcpb-dist/
+
       - name: Sign distributions with Sigstore
+        # The bundle is signed alongside the wheel. It installs a governance
+        # tool in one click on a machine whose owner has no easy way to inspect
+        # it first, so shipping it unsigned would be the wrong artefact to ship
+        # unsigned.
         uses: sigstore/gh-action-sigstore-python@790bc6befb9d733738f18d8f895854b453640ec9  # v3.5.0
         with:
-          inputs: ./dist/*.tar.gz ./dist/*.whl
+          inputs: ./dist/*.tar.gz ./dist/*.whl ./mcpb-dist/*.mcpb
 
       - name: Extract release notes from CHANGELOG
         env:
@@ -147,6 +181,8 @@ jobs:
             dist/*.tar.gz
             dist/*.whl
             dist/*.sigstore.json
+            mcpb-dist/*.mcpb
+            mcpb-dist/*.sigstore.json
           body_path: release-notes.md
           fail_on_unmatched_files: true
 
