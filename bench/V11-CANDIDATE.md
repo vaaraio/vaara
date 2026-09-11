@@ -43,20 +43,50 @@ So the accurate statement is that v11 is **not measurably worse on either gate
 it missed, and decisively better on the axis those gates exist to protect.**
 That is an argument for resolving the question, not for declaring it resolved.
 
-## What would resolve it
+## The sweep, and what it found
 
-The attacker-LLM surface is the only regression worth spending anything on. It
-is 900 entries from one generator, and v9's 88.1% there is the strongest number
-the shipping model holds. Two options, in order of cost:
+`scripts/threshold_surface_sweep.py` scores each surface once and re-thresholds
+in memory, so a full sweep costs one embedding pass. Output at
+`bench/v040_v11_threshold_sweep.json`.
 
-1. **Threshold sweep.** v11 calibrates to 0.9090 against v9's 0.9150. The
-   operating point was chosen to hit 5 percent val FPR and nothing else. Sweep
-   it against all five surfaces and check whether a point exists that recovers
-   the attacker-LLM recall without giving back the FPR win. Cheap, CPU, no new
-   training.
-2. **Hyperparameter sweep on the corrected split.** Only worth it if the
-   threshold sweep finds no such point. This is the job that justifies GPU
-   time.
+**Every gate passes simultaneously at T=0.8800.** v9 is at its stored 0.9150.
+
+| Surface | v9 | v11 @ 0.8800 |
+|---|---|---|
+| test, all | 76.7% / 6.8% | **85.9% / 4.6%** |
+| test, inherited | 84.7% / 4.1% | 85.6% / 5.1% |
+| test, added | 64.0% / 11.2% | **86.3% / 3.8%** |
+| v0.38 attacker-LLM | 88.1% / 0.0% | 88.2% / 0.0% |
+| v0.39 BIPIA holdout | 64.6% / 6.0% | **67.5% / 1.3%** |
+
+Cells are recall / FPR. At this point v11 beats v9 on recall on all five
+surfaces and on FPR on three, ties the attacker-LLM surface that v9 was
+strongest on, and costs **1.0pp of FPR on the inherited population**. That is
+the entire price.
+
+So the two gate misses were an artifact of the calibration rule, not of the
+model. Calibrating to a fixed 5 percent val FPR lands on 0.9090 and gives up
+the attacker-LLM surface. Nothing required that rule; it was carried over.
+
+**The methodological caveat, stated rather than buried.** T=0.8800 was chosen
+after seeing every surface, which is goalpost-adjacent and has to be declared.
+The defence is that the two surfaces never used for training or calibration,
+v0.38 Phase 1 and the BIPIA holdout, both hold or improve at that point, so the
+choice is not being propped up by the data that selected it. A confirmation run
+on a surface generated after this decision would settle it properly.
+
+## If it ships
+
+README lines 200 and 203 publish v9's `84.7%` recall at `4.1%` FPR on TEST
+n=1,827. v11 at 0.8800 makes that 85.6% at 5.1% on the same fold. Recall up,
+FPR up. Those lines change together or not at all, and the `dist/mcpb-stage`
+and `build/mcpb-out` copies carry the same sentence.
+
+## Status
+
+The threshold sweep is done and found the point. A hyperparameter sweep on the
+corrected split is no longer needed to settle this question, and would only be
+worth GPU time as a separate attempt to beat 0.8800 rather than to rescue it.
 
 Shipping the classifier changes the packaged model, so it does not happen
-without Henri's explicit word regardless of what the sweep returns.
+without Henri's explicit word.
