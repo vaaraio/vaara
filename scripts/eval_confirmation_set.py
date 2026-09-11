@@ -73,6 +73,34 @@ def load_files(patterns: list[str]) -> list[tuple[str, dict]]:
     return out
 
 
+#: Matched-benign files are BT-<tag>-<PREFIX>.jsonl. The ENTRIES inside carry
+#: category "benign_control" regardless of what they were matched to, so
+#: grouping on the entry alone collapses every negative into one bucket and the
+#: per-category false-positive rate stays invisible. That is the same shape of
+#: blindness that hid the orphaned benigns: the information exists, nothing reads
+#: it. The filename is where the matching is recorded, so read it from there.
+_PREFIX_CATEGORY = {
+    "TM": "tool_misuse", "PE": "privilege_escalation", "DE": "data_exfil",
+    "PI": "prompt_injection", "SR": "ssrf_via_tools",
+    "DA": "destructive_actions", "CE": "credential_exfil",
+}
+
+
+def category_of(source_file: str, entry: dict) -> str:
+    """Category for grouping, resolved from the filename for matched benigns."""
+    cat = entry.get("category", "?")
+    if cat != "benign_control":
+        return cat
+    parts = Path(source_file).stem.split("-")
+    if parts and parts[0] == "BT" and len(parts) > 2:
+        matched = _PREFIX_CATEGORY.get(parts[2])
+        if matched:
+            return matched
+    # An unmatched benign belongs to no category and must not be silently
+    # folded into one, or it inflates somebody's denominator.
+    return "benign_unmatched"
+
+
 def report(name: str, y: np.ndarray, scored: dict[str, np.ndarray],
            thresholds: dict[str, float]) -> dict:
     pos, neg = int((y == 1).sum()), int((y == 0).sum())
@@ -125,8 +153,8 @@ def main() -> int:
     out["surfaces"]["ALL"] = report("ALL", y, scored, thresholds)
 
     by_cat: dict[str, list[int]] = defaultdict(list)
-    for i, e in enumerate(ents):
-        by_cat[e.get("category", "?")].append(i)
+    for i, (src, e) in enumerate(keyed):
+        by_cat[category_of(src, e)].append(i)
     for cat, idx in sorted(by_cat.items()):
         m = np.zeros(len(ents), bool)
         m[idx] = True
