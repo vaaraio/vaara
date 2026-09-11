@@ -1,5 +1,5 @@
 {
-  "evaluated_at": "2026-09-11T18:53:12.299430+00:00",
+  "evaluated_at": "2026-09-11T20:56:27.438188+00:00",
   "globs": [
     "tests/adversarial/generated/*-v041-qwen25-*.jsonl",
     "tests/adversarial/benign_generated/BT-v041-*.jsonl"
@@ -10,9 +10,9 @@
       "sha256": "2566da22bf5229a3982f5b6ac2a1bb6ca36d13177a32bbbffcc251d8e4fb16c1",
       "threshold": 0.915
     },
-    "v11_candidate": {
-      "path": "bench/candidates/adversarial_classifier_v11_candidate.joblib",
-      "sha256": "08169f5c602c63703df32861bcd4ca4c0174ff814900373dfa097adb53273e91",
+    "v11": {
+      "path": "src/vaara/data/adversarial_classifier_v11.joblib",
+      "sha256": "636260a35eb3fefcec2aef3fc399cc0b0d76a63b183fea531b2e003033c0f5d4",
       "threshold": 0.88
     }
   },
@@ -40,7 +40,7 @@
             0.07587997941043464
           ]
         },
-        "v11_candidate": {
+        "v11": {
           "n": 5600,
           "pos": 2800,
           "neg": 2800,
@@ -83,7 +83,7 @@
             0.12445406501886036
           ]
         },
-        "v11_candidate": {
+        "v11": {
           "n": 1400,
           "pos": 700,
           "neg": 700,
@@ -126,7 +126,7 @@
             0.10562662677756715
           ]
         },
-        "v11_candidate": {
+        "v11": {
           "n": 1400,
           "pos": 700,
           "neg": 700,
@@ -169,7 +169,7 @@
             0.10404711626394314
           ]
         },
-        "v11_candidate": {
+        "v11": {
           "n": 1400,
           "pos": 700,
           "neg": 700,
@@ -212,7 +212,7 @@
             0.005458046242222682
           ]
         },
-        "v11_candidate": {
+        "v11": {
           "n": 1400,
           "pos": 700,
           "neg": 700,

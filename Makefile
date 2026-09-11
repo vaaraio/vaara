@@ -6,27 +6,54 @@ V031 := $(ADV)/v031
 
 help:
 	@echo "Targets:"
-	@echo "  bench              reproduce the current bench doc numbers (v0.39)"
+	@echo "  bench              reproduce the classifier figures published in README.md"
 	@echo "  repro-v031-bench   reproduce the historical v0.31 bench numbers"
 	@echo ""
 	@echo "bench needs the ml extra: pip install 'vaara[ml]'"
 	@echo "The first run downloads the MiniLM embedding model, so it needs"
 	@echo "network access once. Everything after that is offline."
 
-# Current bench reproduction, against bench/vaara-bench-v0.39.md and the v8
-# and v9 bundles that actually ship in src/vaara/data/.
+# Reproduces the classifier figures in README.md against the bundles that ship
+# in src/vaara/data/. The README tells every reader those numbers are
+# reproducible by running this, so the two have to move together.
 #
-# This target used to evaluate adversarial_classifier_v6 and _v3 against the
-# v0.35 split. Neither bundle is in the tree any more, so the target failed on
-# a missing file, while the README told a reader every published figure was
-# reproducible by running it. Pointing it at the script that produced the
-# published artifact keeps the two in step.
+# THIS TARGET HAS NOW DRIFTED TWICE. It first evaluated v6 and v3 against the
+# v0.35 split after both bundles left the tree, so it failed on a missing file.
+# It was then pointed at v9 on the v0.39 surfaces, and stayed there when v11
+# shipped on the v0.40 split, so it reproduced numbers the README no longer
+# published. Both times the README kept promising reproduction and both times
+# the promise was false. Whoever changes the shipped bundle changes this target
+# in the same commit.
+#
+# The candidate is held at its SHIPPED threshold rather than recalibrated.
+# Calibration answers what a model could do at a chosen FPR; a published figure
+# answers what the model in the package actually does.
+SHIPPED := src/vaara/data/adversarial_classifier_v11.joblib
+BASELINE := src/vaara/data/adversarial_classifier_v9.joblib
+SHIPPED_T := 0.8800
+SPLIT := $(ADV)/v040_split.json
+
 bench:
-	@echo "[1/2] verify corpus integrity"
-	cd $(ADV) && sha256sum -c MANIFEST.sha256 > /dev/null
-	@echo "[2/2] calibrate and evaluate v9 across the four v0.39 surfaces"
-	$(PY) scripts/eval_v039_v9.py --json-out bench/v039_v9_eval.json
-	@echo "done. compare against bench/vaara-bench-v0.39.md."
+	@echo "[1/4] verify corpus integrity, including files on disk that no manifest line covers"
+	$(PY) scripts/check_corpus_manifest.py --quiet-unlisted
+	@echo "[2/4] shipped bundle against the baseline across the v0.40 surfaces"
+	$(PY) scripts/eval_v039_v9.py --split $(SPLIT) \
+		--baseline $(BASELINE) --candidate $(SHIPPED) \
+		--candidate-threshold $(SHIPPED_T) \
+		--json-out bench/v040_shipped_eval.json
+	@echo "[3/4] confirmation set, generated after the operating point was fixed"
+	$(PY) scripts/eval_confirmation_set.py \
+		--glob 'tests/adversarial/generated/*-v041-llama33-*.jsonl' \
+		--glob 'tests/adversarial/benign_generated/BT-v041-*.jsonl' \
+		--bundle $(BASELINE):0.9150 --bundle $(SHIPPED):$(SHIPPED_T) \
+		--json-out bench/v041_confirmation_full.json
+	@echo "[4/4] cross-model holdout, attacks from a model absent from TRAIN"
+	$(PY) scripts/eval_confirmation_set.py \
+		--glob 'tests/adversarial/generated/*-v041-qwen25-*.jsonl' \
+		--glob 'tests/adversarial/benign_generated/BT-v041-*.jsonl' \
+		--bundle $(BASELINE):0.9150 --bundle $(SHIPPED):$(SHIPPED_T) \
+		--json-out bench/v041_crossmodel_qwen25.json
+	@echo "done. compare against the classifier bullets in README.md and bench/V11-CANDIDATE.md."
 
 # End-to-end reproduction of bench/vaara-bench-v0.31.md. Anyone cloning
 # the repo at a tagged commit can run this and get the same SHAs and

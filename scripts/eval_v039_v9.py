@@ -187,6 +187,12 @@ def main():
                     help="bundle held at its own stored threshold")
     ap.add_argument("--candidate", default=str(V9),
                     help="bundle whose threshold is recalibrated on val")
+    # Reproducing a SHIPPED figure needs the shipped operating point, not a
+    # fresh one. Calibration answers "how good could this model be at 5 percent
+    # val FPR"; a published number answers "what does the model in the package
+    # actually do". Those differ, and `make bench` needs the second one.
+    ap.add_argument("--candidate-threshold", type=float, default=None,
+                    help="hold the candidate here instead of calibrating on val")
     args = ap.parse_args()
 
     global LBL_A, LBL_B
@@ -207,7 +213,11 @@ def main():
     yv = np.asarray(build_labels(val)[0], dtype=np.int32)
     p8v, p9v = sc(b8, val), sc(b9, val)
     T8 = b8["T"]
-    T9, val_v9 = cal(p9v, yv, args.target_fpr)
+    if args.candidate_threshold is not None:
+        T9 = float(args.candidate_threshold)
+        val_v9 = mx(p9v, yv, T9)
+    else:
+        T9, val_v9 = cal(p9v, yv, args.target_fpr)
     val_v8 = mx(p8v, yv, T8)
     print(f"\n[val v035] cal T9={T9:.4f} target FPR<={args.target_fpr}")
     report("val v035", val_v8, val_v9)
