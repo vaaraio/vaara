@@ -90,7 +90,23 @@ Yields 4-8x amplification per seed with controlled diversity. No LLM required.
 - **v1 (2026-04-22):** 200 curated entries, 8 categories, structured schema. Regression baseline.
 - **v0.5.3 (2026-04-26):** corpus expanded via LLM-generation under `generated/` and `benign_generated/`, total ~5,955 entries used to train `adversarial_classifier_v1.joblib` (bundled).
 - **v0.31 (2026-05-24):** +2,000 entries via the on-droplet Qwen2.5-72B generators (`scripts/e1_generate.py`, `scripts/e2_generate.py`). Total **7,955** entries. See "v0.31 corpus extension" below.
-- Bump version when expanding. Never delete prior entries — they remain stable regression baselines.
+- **v0.37 (2026-09-10):** +3,883 entries across four starved categories (`prompt_injection`, `ssrf_via_tools`, `destructive_actions`, `credential_exfil`) from `RedHatAI/Llama-3.3-70B-Instruct-FP8-dynamic`, via `scripts/generate_targeted_v037.py`.
+- **v0.40 (2026-09-11):** split only, no new entries. `tests/adversarial/v040_split.json` folds the v0.37 additions and their 2,800 matched benigns in by (category x batch) cell.
+- **v0.41 (2026-09-11):** +2,800 entries, same four categories, seed 77, deduplicated against every prior fingerprint. Generated as a confirmation set after a threshold decision was already made, so it is held out by construction and carries no fold assignment.
+- Bump version when expanding. Never delete prior entries, they remain stable regression baselines.
+
+## Generation hardware
+
+Every LLM-generated extension from v0.31 onward was produced on a single AMD
+Instinct MI300X under vLLM, on cloud capacity sponsored by AMD. The v0.31 run
+used `rocm/vllm:latest`; v0.37 onward use `vllm/vllm-openai-rocm:latest`, whose
+entrypoint is `["vllm","serve"]` and which therefore takes the model as its
+first argument rather than a repeated `vllm serve`.
+
+Recorded because where a measurement was produced is part of the method. The
+FP8-dynamic checkpoints declare `compressed-tensors` in their own config, so
+passing `--quantization fp8` makes vLLM refuse the model outright; pass no
+quantization flag and let it read the config.
 
 ## v0.31 corpus extension (2026-05-24)
 

@@ -6,6 +6,29 @@ and this project follows [Semantic Versioning](https://semver.org/spec/v2.0.0.ht
 
 ## [Unreleased]
 
+### Changed
+
+- The shipped adversarial classifier is now v11, trained on the corrected v0.40 corpus split, at threshold 0.8800. `_DEFAULT_BUNDLE` points at `adversarial_classifier_v11.joblib` and its pinned digest moves with it. v9 stays on disk as the regression baseline, because every published comparison is measured against it and removing it would make those numbers unreproducible from the package alone.
+
+  The corpus fix is the reason the model moved. `scripts/build_v040_split.py` derived a file's category prefix from `fp.name.split("-")`. Attack files are `SR-v037-llama33.jsonl`, prefix first, so field 0 never held the extension and the read was correct. Matched benign files are `BT-v035-SR.jsonl`, prefix last, so field 2 was the string `"SR.jsonl"` and matched nothing. Every benign file was skipped without a word. 2800 entries, 700 for each of four categories, correctly labelled `benign_control` / `expected: ALLOW`, were assigned to no fold in either v0.39 or v0.40. With them absent the false-positive rate on those categories was not computable at any threshold.
+
+  Measured on 5,600 entries generated after v11's operating point was fixed, so none of the data could have informed it: recall 63.1% to 87.0% and false positives 6.6% to 2.5% against v9, with every category improving on both axes. Credential exfiltration moves 45.9% to 80.3% at 10.0% to 3.9% FPR. On a cross-model holdout written by Qwen2.5-72B, absent from TRAIN, 67.4% to 86.3%.
+
+  On the fold the README has always cited, held-out TEST n=1,827, recall goes 84.7% to 85.6% and FPR goes 4.1% to 5.1%. The false-positive rate on that legacy fold is worse and it is published rather than omitted.
+
+  An earlier candidate trained on the same split before the benigns were restored read +7.2 points of aggregate test recall and was rejected. Splitting the test fold by entry origin showed the gain sat entirely in the refilled categories while the model lost ground on everything inherited. `bench/V10-DECISION.md` and `bench/V11-CANDIDATE.md` carry both records.
+
+### Added
+
+- `scripts/eval_confirmation_set.py` scores bundles against file globs with no split manifest, for held-out sets where every entry is out of sample by construction. It resolves a matched benign's category from its filename, because entries carry `category: benign_control` whatever they were matched to and grouping on the entry alone collapses every negative into one bucket.
+- `scripts/threshold_surface_sweep.py` sweeps one bundle's operating point across every eval surface in a single embedding pass.
+- `scripts/check_corpus_manifest.py` checks `tests/adversarial/MANIFEST.sha256` against what is on disk, reporting unlisted, missing and changed files separately. The README has always told replicators to verify their corpus against that manifest; nothing verified it against ours, and it listed 305 files against 334.
+
+### Fixed
+
+- `scripts/build_v040_split.py` reads `fp.stem` rather than `fp.name`, restoring 2800 orphaned matched benigns. It now names every file it skips and the reason, and takes its release filter from a `RELEASE_TAGS` constant instead of a literal chain buried in an `and`.
+- `scripts/eval_v039_v9.py` splits the test fold by entry origin whenever the split manifest declares `inherits_from`, and warns when a population has no negatives. One aggregate over two populations is an average of an improvement and a regression.
+
 ## [1.83.0] - 2026-09-09
 
 ### Added

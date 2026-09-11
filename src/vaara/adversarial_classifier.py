@@ -151,13 +151,18 @@ _DST_PATTERNS = [
         re.I | re.S)),
 ]
 
-_DEFAULT_BUNDLE = Path(__file__).parent / "data" / "adversarial_classifier_v9.joblib"
+_DEFAULT_BUNDLE = Path(__file__).parent / "data" / "adversarial_classifier_v11.joblib"
 # Pinned digest of the shipped bundle, verified before unpickling. joblib.load
 # is pickle, so a swapped bundle file is arbitrary code execution; the pin
 # turns that into a clean ValueError. Regenerate with
-# `sha256sum src/vaara/data/adversarial_classifier_v9.joblib` when the
+# `sha256sum src/vaara/data/adversarial_classifier_v11.joblib` when the
 # production bundle changes.
-_DEFAULT_BUNDLE_SHA256 = "2566da22bf5229a3982f5b6ac2a1bb6ca36d13177a32bbbffcc251d8e4fb16c1"
+_DEFAULT_BUNDLE_SHA256 = "636260a35eb3fefcec2aef3fc399cc0b0d76a63b183fea531b2e003033c0f5d4"
+
+# v9 stays on disk as the regression baseline. Every comparison in
+# bench/V11-CANDIDATE.md is measured against it, so removing it would make the
+# published numbers unreproducible from the package alone.
+_BASELINE_BUNDLE = Path(__file__).parent / "data" / "adversarial_classifier_v9.joblib"
 
 _STATIC_FEATURES = [f"ip__{n}" for n,_ in _IP_PATTERNS] + [f"cred__{n}" for n,_ in _CRED_PATTERNS] + [f"sql__{n}" for n,_ in _SQL_PATTERNS] + [f"shell__{n}" for n,_ in _SHELL_PATTERNS] + [f"scheme__{s}" for s in _URL_SCHEMES] + ["ctx_source_injected", "param_blob_len", "has_wildcard_star", "has_all_keyword", "has_recursive_flag"]
 _DST_STATIC = [f"dst__{n}" for n, _ in _DST_PATTERNS]

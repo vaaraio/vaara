@@ -14,8 +14,11 @@ With --update-bundle-threshold the chosen T is written back into v9.
 from __future__ import annotations
 
 import argparse
+import datetime as dt
+import hashlib
 import json
 import math
+import subprocess
 import sys
 from pathlib import Path
 
@@ -37,6 +40,35 @@ V038_FILES = [
     "tests/adversarial/generated/PE-v038-llama33-s43.jsonl",
     "tests/adversarial/generated/DE-v038-llama33-s43.jsonl",
 ]
+
+
+def git_commit() -> str:
+    try:
+        return subprocess.check_output(
+            ["git", "-C", str(REPO), "rev-parse", "HEAD"], text=True
+        ).strip()
+    except Exception:
+        return "unknown"
+
+
+def sha256_of(p) -> str:
+    try:
+        return hashlib.sha256(Path(p).read_bytes()).hexdigest()
+    except Exception:
+        return "unavailable"
+
+
+def rel(p) -> str:
+    """Repo-relative where possible, absolute otherwise.
+
+    A candidate bundle can legitimately live outside the tree, which is where
+    the v10 candidate sits, so this must not raise the way the trainer's
+    relative_to did before it was fixed.
+    """
+    try:
+        return Path(p).resolve().relative_to(REPO).as_posix()
+    except ValueError:
+        return str(Path(p).resolve())
 
 
 def wilson(k, n):
@@ -92,6 +124,31 @@ def fold(name, split):
     return [e for k, e in load_corpus_keyed() if a.get(k) == name]
 
 
+def fold_keyed(name, split):
+    a = json.loads(split.read_text())["assignments"]
+    return [(k, e) for k, e in load_corpus_keyed() if a.get(k) == name]
+
+
+def parent_keys(split):
+    """Keys of the manifest this one inherits from, or None if it is a root.
+
+    A split that extends an older one puts two populations in the same test
+    fold: entries the baseline was trained alongside, and entries it has never
+    seen. One aggregate recall over both is not a regression check, it is an
+    average of an improvement and a regression, and it hid a 3.4pp loss behind
+    a 7.2pp headline on the first candidate graded this way.
+    """
+    meta = json.loads(split.read_text()).get("metadata", {})
+    parent = meta.get("inherits_from")
+    if not parent:
+        return None
+    p = REPO / "tests" / parent
+    if not p.exists():
+        print(f"[warn] inherits_from {parent!r} not found, skipping origin split")
+        return None
+    return set(json.loads(p.read_text())["assignments"])
+
+
 def v38():
     out = []
     for p in V038_FILES:
@@ -102,36 +159,92 @@ def v38():
     return out
 
 
+LBL_A = "v8"
+LBL_B = "v9"
+
+
 def report(name, m_v8, m_v9):
     print(f"\n[{name}] n={m_v8['n']} pos={m_v8['pos']}")
-    print(f"  v8  recall={m_v8['recall']:.1%} [{m_v8['recall_ci'][0]:.1%},{m_v8['recall_ci'][1]:.1%}] FPR={m_v8['fpr']:.1%}")
-    print(f"  v9  recall={m_v9['recall']:.1%} [{m_v9['recall_ci'][0]:.1%},{m_v9['recall_ci'][1]:.1%}] FPR={m_v9['fpr']:.1%}")
+    print(f"  {LBL_A:<22} recall={m_v8['recall']:.1%} [{m_v8['recall_ci'][0]:.1%},{m_v8['recall_ci'][1]:.1%}] FPR={m_v8['fpr']:.1%}")
+    print(f"  {LBL_B:<22} recall={m_v9['recall']:.1%} [{m_v9['recall_ci'][0]:.1%},{m_v9['recall_ci'][1]:.1%}] FPR={m_v9['fpr']:.1%}")
 
 
 def main():
     ap = argparse.ArgumentParser()
+    # val/test have always come from v035 and holdout from v039. Passing
+    # --split points ALL THREE at one manifest, which is what v0.40 needs:
+    # its four new categories only exist there. Changing the folds changes
+    # the denominators, so any number produced this way must say so.
+    ap.add_argument("--split", default=None,
+                    help="one manifest for val, test and holdout")
     ap.add_argument("--target-fpr", type=float, default=0.05)
     ap.add_argument("--json-out", default="bench/v039_v9_eval.json")
     ap.add_argument("--update-bundle-threshold", action="store_true")
+    # Which two bundles to compare. Defaults are v8 and v9, so every existing
+    # invocation behaves exactly as before. A candidate trained on a new split
+    # can be graded against the shipping model without copying this file.
+    ap.add_argument("--baseline", default=str(V8),
+                    help="bundle held at its own stored threshold")
+    ap.add_argument("--candidate", default=str(V9),
+                    help="bundle whose threshold is recalibrated on val")
+    # Reproducing a SHIPPED figure needs the shipped operating point, not a
+    # fresh one. Calibration answers "how good could this model be at 5 percent
+    # val FPR"; a published number answers "what does the model in the package
+    # actually do". Those differ, and `make bench` needs the second one.
+    ap.add_argument("--candidate-threshold", type=float, default=None,
+                    help="hold the candidate here instead of calibrating on val")
     args = ap.parse_args()
 
-    b8, b9 = load_b(V8), load_b(V9)
-    print(f"[v8] {b8['version']} T={b8['T']:.4f}\n[v9] {b9['version']} T={b9['T']:.4f}")
+    global LBL_A, LBL_B
+    pa, pc = Path(args.baseline), Path(args.candidate)
+    b8, b9 = load_b(pa), load_b(pc)
+    # Label by FILENAME, not by the bundle's version field. Two bundles trained
+    # from the same release carry the same version string, so labelling by it
+    # printed the identical name on both rows of every comparison and made the
+    # output unreadable. The filename is the thing that actually differs.
+    LBL_A = f"base {pa.stem.replace('adversarial_classifier_', '')}"
+    LBL_B = f"cand {pc.stem.replace('adversarial_classifier_', '')}"
+    print(f"[{LBL_A}] {b8.get('version', '?')} T={b8['T']:.4f}")
+    print(f"[{LBL_B}] {b9.get('version', '?')} T={b9['T']:.4f}")
 
-    val = fold("val", SP035)
+    sp_vt = Path(args.split) if args.split else SP035
+    sp_ho = Path(args.split) if args.split else SP039
+    val = fold("val", sp_vt)
     yv = np.asarray(build_labels(val)[0], dtype=np.int32)
     p8v, p9v = sc(b8, val), sc(b9, val)
     T8 = b8["T"]
-    T9, val_v9 = cal(p9v, yv, args.target_fpr)
+    if args.candidate_threshold is not None:
+        T9 = float(args.candidate_threshold)
+        val_v9 = mx(p9v, yv, T9)
+    else:
+        T9, val_v9 = cal(p9v, yv, args.target_fpr)
     val_v8 = mx(p8v, yv, T8)
     print(f"\n[val v035] cal T9={T9:.4f} target FPR<={args.target_fpr}")
     report("val v035", val_v8, val_v9)
 
-    test = fold("test", SP035)
+    test_keyed = fold_keyed("test", sp_vt)
+    test = [e for _, e in test_keyed]
     yt = np.asarray(build_labels(test)[0], dtype=np.int32)
-    test_v8 = mx(sc(b8, test), yt, T8)
-    test_v9 = mx(sc(b9, test), yt, T9)
+    p8t, p9t = sc(b8, test), sc(b9, test)
+    test_v8 = mx(p8t, yt, T8)
+    test_v9 = mx(p9t, yt, T9)
     report("test v035", test_v8, test_v9)
+
+    # Same fold, split by whether the baseline could have seen the entry's
+    # population. See parent_keys() for why the aggregate above is not enough.
+    by_origin: dict[str, dict] = {}
+    pk = parent_keys(sp_vt)
+    if pk is not None:
+        inh = np.array([k in pk for k, _ in test_keyed])
+        for lbl, m in (("inherited", inh), ("added", ~inh)):
+            if not m.any():
+                continue
+            o8, o9 = mx(p8t[m], yt[m], T8), mx(p9t[m], yt[m], T9)
+            by_origin[lbl] = {"v8": o8, "v9": o9}
+            report(f"test {lbl}", o8, o9)
+            if o9["neg"] == 0:
+                print(f"  [warn] {lbl}: no benign entries, FPR on this "
+                      f"population is UNMEASURED")
 
     v38e = v38()
     y38 = np.asarray(build_labels(v38e)[0], dtype=np.int32)
@@ -139,7 +252,7 @@ def main():
     v38_v9 = mx(sc(b9, v38e), y38, T9)
     report("v0.38 Phase 1", v38_v8, v38_v9)
 
-    hold = fold("holdout", SP039)
+    hold = fold("holdout", sp_ho)
     yh = np.asarray(build_labels(hold)[0], dtype=np.int32)
     p8h, p9h = sc(b8, hold), sc(b9, hold)
     h_v8 = mx(p8h, yh, T8)
@@ -170,15 +283,44 @@ def main():
         print(f"  {m:24s} {b['follow_n']:>4d} {b['v8_recall']:>6.1%} {b['v9_recall']:>6.1%} "
               f"{b['benign_n']:>4d} {b['v8_fpr']:>6.1%} {b['v9_fpr']:>6.1%}")
 
-    out = {"v8_threshold": T8, "v9_threshold_calibrated": T9,
+    # Provenance. The trainer already stamps the split path and its sha256 into
+    # every bundle it writes, so a model can be traced to the split behind it.
+    # The eval wrote none, so a NUMBER could not be. That matters here more than
+    # it would elsewhere: v9 reads 76.7% test recall on the v040 folds and
+    # 84.67% on the v039 ones, and the entire difference is fold assignment. A
+    # reader holding one of these files and not the other had no way to tell
+    # which split produced it. Field names mirror the trainer's on purpose.
+    #
+    # Both split paths are recorded rather than one, because with no --split the
+    # val and test folds come from v035 and the holdout from v039. Collapsing
+    # that into a single "split" key would be a lie in the default case.
+    out = {"evaluated_at": dt.datetime.now(dt.UTC).isoformat(),
+           "eval_commit": git_commit(),
+           "split_single_manifest": bool(args.split),
+           "split_val_test_path": rel(sp_vt),
+           "split_val_test_sha256": sha256_of(sp_vt),
+           "split_holdout_path": rel(sp_ho),
+           "split_holdout_sha256": sha256_of(sp_ho),
+           "baseline_bundle_path": rel(pa),
+           "baseline_bundle_sha256": sha256_of(pa),
+           "baseline_bundle_version": b8.get("version"),
+           "candidate_bundle_path": rel(pc),
+           "candidate_bundle_sha256": sha256_of(pc),
+           "candidate_bundle_version": b9.get("version"),
+           "v8_threshold": T8, "v9_threshold_calibrated": T9,
            "calibration_target_fpr": args.target_fpr,
            "surfaces": {"val_v035": {"v8": val_v8, "v9": val_v9},
                         "test_v035": {"v8": test_v8, "v9": test_v9},
                         "v038_phase1": {"v8": v38_v8, "v9": v38_v9},
                         "v039_bipia_holdout": {"v8": h_v8, "v9": h_v9}},
+           "test_by_origin": by_origin,
            "v039_bipia_holdout_per_model": bm}
     Path(args.json_out).write_text(json.dumps(out, indent=2))
     print(f"\n[out] {args.json_out}")
+    print(f"[prov] val/test split {out['split_val_test_path']} "
+          f"sha256:{out['split_val_test_sha256'][:12]}")
+    print(f"[prov] holdout  split {out['split_holdout_path']} "
+          f"sha256:{out['split_holdout_sha256'][:12]}")
 
     if args.update_bundle_threshold:
         import joblib

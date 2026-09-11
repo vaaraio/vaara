@@ -1,0 +1,3 @@
+candidates/
+train-*.log
+eval-rerun-*.out
