@@ -14,8 +14,11 @@ With --update-bundle-threshold the chosen T is written back into v9.
 from __future__ import annotations
 
 import argparse
+import datetime as dt
+import hashlib
 import json
 import math
+import subprocess
 import sys
 from pathlib import Path
 
@@ -37,6 +40,35 @@ V038_FILES = [
     "tests/adversarial/generated/PE-v038-llama33-s43.jsonl",
     "tests/adversarial/generated/DE-v038-llama33-s43.jsonl",
 ]
+
+
+def git_commit() -> str:
+    try:
+        return subprocess.check_output(
+            ["git", "-C", str(REPO), "rev-parse", "HEAD"], text=True
+        ).strip()
+    except Exception:
+        return "unknown"
+
+
+def sha256_of(p) -> str:
+    try:
+        return hashlib.sha256(Path(p).read_bytes()).hexdigest()
+    except Exception:
+        return "unavailable"
+
+
+def rel(p) -> str:
+    """Repo-relative where possible, absolute otherwise.
+
+    A candidate bundle can legitimately live outside the tree, which is where
+    the v10 candidate sits, so this must not raise the way the trainer's
+    relative_to did before it was fixed.
+    """
+    try:
+        return Path(p).resolve().relative_to(REPO).as_posix()
+    except ValueError:
+        return str(Path(p).resolve())
 
 
 def wilson(k, n):
@@ -198,7 +230,31 @@ def main():
         print(f"  {m:24s} {b['follow_n']:>4d} {b['v8_recall']:>6.1%} {b['v9_recall']:>6.1%} "
               f"{b['benign_n']:>4d} {b['v8_fpr']:>6.1%} {b['v9_fpr']:>6.1%}")
 
-    out = {"v8_threshold": T8, "v9_threshold_calibrated": T9,
+    # Provenance. The trainer already stamps the split path and its sha256 into
+    # every bundle it writes, so a model can be traced to the split behind it.
+    # The eval wrote none, so a NUMBER could not be. That matters here more than
+    # it would elsewhere: v9 reads 76.7% test recall on the v040 folds and
+    # 84.67% on the v039 ones, and the entire difference is fold assignment. A
+    # reader holding one of these files and not the other had no way to tell
+    # which split produced it. Field names mirror the trainer's on purpose.
+    #
+    # Both split paths are recorded rather than one, because with no --split the
+    # val and test folds come from v035 and the holdout from v039. Collapsing
+    # that into a single "split" key would be a lie in the default case.
+    out = {"evaluated_at": dt.datetime.now(dt.UTC).isoformat(),
+           "eval_commit": git_commit(),
+           "split_single_manifest": bool(args.split),
+           "split_val_test_path": rel(sp_vt),
+           "split_val_test_sha256": sha256_of(sp_vt),
+           "split_holdout_path": rel(sp_ho),
+           "split_holdout_sha256": sha256_of(sp_ho),
+           "baseline_bundle_path": rel(pa),
+           "baseline_bundle_sha256": sha256_of(pa),
+           "baseline_bundle_version": b8.get("version"),
+           "candidate_bundle_path": rel(pc),
+           "candidate_bundle_sha256": sha256_of(pc),
+           "candidate_bundle_version": b9.get("version"),
+           "v8_threshold": T8, "v9_threshold_calibrated": T9,
            "calibration_target_fpr": args.target_fpr,
            "surfaces": {"val_v035": {"v8": val_v8, "v9": val_v9},
                         "test_v035": {"v8": test_v8, "v9": test_v9},
@@ -207,6 +263,10 @@ def main():
            "v039_bipia_holdout_per_model": bm}
     Path(args.json_out).write_text(json.dumps(out, indent=2))
     print(f"\n[out] {args.json_out}")
+    print(f"[prov] val/test split {out['split_val_test_path']} "
+          f"sha256:{out['split_val_test_sha256'][:12]}")
+    print(f"[prov] holdout  split {out['split_holdout_path']} "
+          f"sha256:{out['split_holdout_sha256'][:12]}")
 
     if args.update_bundle_threshold:
         import joblib
