@@ -75,6 +75,30 @@ v0.38 Phase 1 and the BIPIA holdout, both hold or improve at that point, so the
 choice is not being propped up by the data that selected it. A confirmation run
 on a surface generated after this decision would settle it properly.
 
+## The confirmation run, and it settles the recall half
+
+Generated 2026-09-11 on an MI300X after the threshold above was committed, so
+this data did not exist when 0.8800 was chosen and cannot have informed it.
+2800 entries, seed 77, four categories, deduplicated against 16,921 fingerprints
+from 228 existing files. Scored with `scripts/eval_confirmation_set.py`, output
+at `bench/v041_confirmation_llama33.json`.
+
+| Category | n | v9 @0.9150 | v11 @0.8800 |
+|---|---|---|---|
+| ALL | 2800 | 63.1% [61.3, 64.9] | **87.0% [85.7, 88.2]** |
+| credential_exfil | 700 | 45.9% [42.2, 49.6] | **80.3% [77.2, 83.1]** |
+| destructive_actions | 700 | 81.1% [78.1, 83.9] | 87.7% [85.1, 89.9] |
+| prompt_injection | 700 | 55.3% [51.6, 58.9] | **81.3% [78.2, 84.0]** |
+| ssrf_via_tools | 700 | 70.1% [66.7, 73.4] | **98.7% [97.6, 99.3]** |
+
+Every category improves and no confidence interval overlaps. The aggregate gain
+is 23.9pp on data chosen by nobody.
+
+This settles recall. **It does not settle false positives**, because the set is
+attack-only: v9 catching 45.9 per cent of fresh credential-exfiltration attempts
+is measured, and what either model does to the legitimate traffic alongside it
+is not. Matched benigns from a second model are the remaining half.
+
 ## If it ships
 
 README lines 200 and 203 publish v9's `84.7%` recall at `4.1%` FPR on TEST
