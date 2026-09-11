@@ -124,6 +124,31 @@ def fold(name, split):
     return [e for k, e in load_corpus_keyed() if a.get(k) == name]
 
 
+def fold_keyed(name, split):
+    a = json.loads(split.read_text())["assignments"]
+    return [(k, e) for k, e in load_corpus_keyed() if a.get(k) == name]
+
+
+def parent_keys(split):
+    """Keys of the manifest this one inherits from, or None if it is a root.
+
+    A split that extends an older one puts two populations in the same test
+    fold: entries the baseline was trained alongside, and entries it has never
+    seen. One aggregate recall over both is not a regression check, it is an
+    average of an improvement and a regression, and it hid a 3.4pp loss behind
+    a 7.2pp headline on the first candidate graded this way.
+    """
+    meta = json.loads(split.read_text()).get("metadata", {})
+    parent = meta.get("inherits_from")
+    if not parent:
+        return None
+    p = REPO / "tests" / parent
+    if not p.exists():
+        print(f"[warn] inherits_from {parent!r} not found, skipping origin split")
+        return None
+    return set(json.loads(p.read_text())["assignments"])
+
+
 def v38():
     out = []
     for p in V038_FILES:
@@ -187,11 +212,29 @@ def main():
     print(f"\n[val v035] cal T9={T9:.4f} target FPR<={args.target_fpr}")
     report("val v035", val_v8, val_v9)
 
-    test = fold("test", sp_vt)
+    test_keyed = fold_keyed("test", sp_vt)
+    test = [e for _, e in test_keyed]
     yt = np.asarray(build_labels(test)[0], dtype=np.int32)
-    test_v8 = mx(sc(b8, test), yt, T8)
-    test_v9 = mx(sc(b9, test), yt, T9)
+    p8t, p9t = sc(b8, test), sc(b9, test)
+    test_v8 = mx(p8t, yt, T8)
+    test_v9 = mx(p9t, yt, T9)
     report("test v035", test_v8, test_v9)
+
+    # Same fold, split by whether the baseline could have seen the entry's
+    # population. See parent_keys() for why the aggregate above is not enough.
+    by_origin: dict[str, dict] = {}
+    pk = parent_keys(sp_vt)
+    if pk is not None:
+        inh = np.array([k in pk for k, _ in test_keyed])
+        for lbl, m in (("inherited", inh), ("added", ~inh)):
+            if not m.any():
+                continue
+            o8, o9 = mx(p8t[m], yt[m], T8), mx(p9t[m], yt[m], T9)
+            by_origin[lbl] = {"v8": o8, "v9": o9}
+            report(f"test {lbl}", o8, o9)
+            if o9["neg"] == 0:
+                print(f"  [warn] {lbl}: no benign entries, FPR on this "
+                      f"population is UNMEASURED")
 
     v38e = v38()
     y38 = np.asarray(build_labels(v38e)[0], dtype=np.int32)
@@ -260,6 +303,7 @@ def main():
                         "test_v035": {"v8": test_v8, "v9": test_v9},
                         "v038_phase1": {"v8": v38_v8, "v9": v38_v9},
                         "v039_bipia_holdout": {"v8": h_v8, "v9": h_v9}},
+           "test_by_origin": by_origin,
            "v039_bipia_holdout_per_model": bm}
     Path(args.json_out).write_text(json.dumps(out, indent=2))
     print(f"\n[out] {args.json_out}")

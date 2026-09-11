@@ -5,7 +5,7 @@
 Composition:
   - Inherit every v039_split.json assignment unchanged.
   - Add the v0.40 entries: four adversarial categories that the generator had
-    never been pointed at, plus their matched benign counterparts.
+    never been pointed at. ATTACK ENTRIES ONLY, see BENIGN COUNTERPARTS below.
 
 WHY THIS SPLITS DIFFERENTLY FROM v0.39, and the departure is deliberate
 
@@ -43,12 +43,23 @@ Allocation is a fixed rotation over six batches: three train, one val, one
 test, one holdout. That is roughly 50/17/17/17, and it takes the per-category
 test denominator from about 36 to about 150.
 
-BENIGN COUNTERPARTS
+BENIGN COUNTERPARTS — THERE ARE NONE, AND THAT BOUNDS WHAT THIS SPLIT CAN SHOW
 
-The matched benigns get the same rotation over their own batches. They are not
-paired entry-to-entry with a specific attack, unlike v0.39's BIPIA follows, so
-proportional allocation per category is the honest equivalent of v0.39's
-"benigns move with their cell" rather than a weaker version of it.
+This section used to describe matched benigns getting the same rotation over
+their own batches. They do not, because they do not exist. Every benign entry
+in the corpus is `benign_generated/BN-*.jsonl`, all 4800 of them carry
+`category: benign_control`, and all 4800 were already assigned by v0.39 and are
+inherited here untouched. The collector below looked for `BT-v035-<PREFIX>-*`
+naming that has never been on disk, so it matched nothing and said nothing.
+
+The consequence is a measurement limit, not just a docs error. All 3883 v0.40
+additions are attack-labelled, so the four new categories reach the test fold
+with ZERO negatives. Recall on them is measurable; false-positive rate on them
+is NOT, at any threshold. A candidate can therefore post a large recall gain on
+these categories while its false-positive behaviour on their benign
+counterparts stays entirely unobserved. Read any v0.40 number with that bound
+attached, and treat generating matched benigns as the prerequisite for a v0.41
+that can actually settle a ship decision on these categories.
 
 Usage:  python scripts/build_v040_split.py [--dry-run]
 """
@@ -139,7 +150,16 @@ def main() -> int:
     assignments: dict[str, str] = dict(v039["assignments"])
     inherited = len(assignments)
 
-    new = collect(GEN_DIR, PREFIXES) + collect(BENIGN_DIR, PREFIXES)
+    attacks = collect(GEN_DIR, PREFIXES)
+    benigns = collect(BENIGN_DIR, PREFIXES)
+    # Say it out loud. This returned empty on the v0.40 build and nothing in the
+    # output revealed it, so the manifest went out claiming matched benigns it
+    # did not have and the four new categories reached test with no negatives.
+    if not benigns:
+        print(f"[warn] no matched benigns collected from {BENIGN_DIR.name}/ -- "
+              f"the new categories will have NO negatives in val/test/holdout, "
+              f"so their false-positive rate is unmeasurable at any threshold")
+    new = attacks + benigns
     new = [(k, c, b) for k, c, b in new if k not in assignments]
     if not new:
         print("[error] no new v0.40 entries found; has generation finished?")
@@ -172,9 +192,17 @@ def main() -> int:
             "version": "v0.40",
             "purpose": (
                 "v039_split inherited verbatim; v0.40 adds prompt_injection, "
-                "ssrf_via_tools, destructive_actions and credential_exfil with "
-                "their matched benigns, split leak-free by (category x batch) "
-                "cell on a fixed train/train/train/val/test/holdout rotation."
+                "ssrf_via_tools, destructive_actions and credential_exfil, "
+                "split leak-free by (category x batch) cell on a fixed "
+                "train/train/train/val/test/holdout rotation."
+            ),
+            "benign_counterparts": (
+                "NONE. Every v0.40 addition is attack-labelled. All 4800 "
+                "benign entries are inherited from v0.39 and carry "
+                "category=benign_control, matched to no category. So recall on "
+                "the four new categories is measurable and their false-positive "
+                "rate is NOT, at any threshold. Any v0.40 number carries that "
+                "bound."
             ),
             "departure_from_v039": (
                 "v0.39 split by (model x attack_class) with every 3rd cell to "

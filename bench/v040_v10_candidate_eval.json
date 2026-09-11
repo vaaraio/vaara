@@ -1,11 +1,11 @@
 {
-  "evaluated_at": "2026-09-11T12:51:08.713464+00:00",
-  "eval_commit": "4340a5eb8bb0102550acbb2768f7884a05a2f3db",
+  "evaluated_at": "2026-09-11T13:40:35.179365+00:00",
+  "eval_commit": "2a23a834919edb844fff549327b7a690c02175c3",
   "split_single_manifest": true,
   "split_val_test_path": "tests/adversarial/v040_split.json",
-  "split_val_test_sha256": "60ef4c7c1c1a4aca832ff8f590d42b48c26ca6191201319499f7195ac2f8de12",
+  "split_val_test_sha256": "d30f162db88e3acd2f8b8e9bcc3074887c2d6cc23d89fdd28cc181a40273a28a",
   "split_holdout_path": "tests/adversarial/v040_split.json",
-  "split_holdout_sha256": "60ef4c7c1c1a4aca832ff8f590d42b48c26ca6191201319499f7195ac2f8de12",
+  "split_holdout_sha256": "d30f162db88e3acd2f8b8e9bcc3074887c2d6cc23d89fdd28cc181a40273a28a",
   "baseline_bundle_path": "src/vaara/data/adversarial_classifier_v9.joblib",
   "baseline_bundle_sha256": "2566da22bf5229a3982f5b6ac2a1bb6ca36d13177a32bbbffcc251d8e4fb16c1",
   "baseline_bundle_version": "v0.39",
@@ -165,6 +165,84 @@
         "fpr_ci": [
           0.0,
           0.015500222722900431
+        ]
+      }
+    }
+  },
+  "test_by_origin": {
+    "inherited": {
+      "v8": {
+        "n": 1827,
+        "pos": 1063,
+        "neg": 764,
+        "tp": 900,
+        "fp": 31,
+        "fn": 163,
+        "recall": 0.8466603951081844,
+        "recall_ci": [
+          0.82375449499424,
+          0.8670697098361678
+        ],
+        "fpr": 0.04057591623036649,
+        "fpr_ci": [
+          0.028730487864971316,
+          0.05701844785302053
+        ]
+      },
+      "v9": {
+        "n": 1827,
+        "pos": 1063,
+        "neg": 764,
+        "tp": 864,
+        "fp": 28,
+        "fn": 199,
+        "recall": 0.812793979303857,
+        "recall_ci": [
+          0.7882329876834957,
+          0.8351022853317298
+        ],
+        "fpr": 0.03664921465968586,
+        "fpr_ci": [
+          0.025476145446859003,
+          0.052458678610602855
+        ]
+      }
+    },
+    "added": {
+      "v8": {
+        "n": 673,
+        "pos": 673,
+        "neg": 0,
+        "tp": 431,
+        "fp": 0,
+        "fn": 242,
+        "recall": 0.6404160475482912,
+        "recall_ci": [
+          0.6034573392586798,
+          0.6757808163156819
+        ],
+        "fpr": 0.0,
+        "fpr_ci": [
+          0.0,
+          0.0
+        ]
+      },
+      "v9": {
+        "n": 673,
+        "pos": 673,
+        "neg": 0,
+        "tp": 592,
+        "fp": 0,
+        "fn": 81,
+        "recall": 0.8796433878157504,
+        "recall_ci": [
+          0.8528808479751132,
+          0.9020963874666797
+        ],
+        "fpr": 0.0,
+        "fpr_ci": [
+          0.0,
+          0.0
         ]
       }
     }

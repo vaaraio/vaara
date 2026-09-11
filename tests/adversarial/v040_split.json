@@ -1,7 +1,8 @@
 {
  "metadata": {
   "version": "v0.40",
-  "purpose": "v039_split inherited verbatim; v0.40 adds prompt_injection, ssrf_via_tools, destructive_actions and credential_exfil with their matched benigns, split leak-free by (category x batch) cell on a fixed train/train/train/val/test/holdout rotation.",
+  "purpose": "v039_split inherited verbatim; v0.40 adds prompt_injection, ssrf_via_tools, destructive_actions and credential_exfil, split leak-free by (category x batch) cell on a fixed train/train/train/val/test/holdout rotation.",
+  "benign_counterparts": "NONE. Every v0.40 addition is attack-labelled. All 4800 benign entries are inherited from v0.39 and carry category=benign_control, matched to no category. So recall on the four new categories is measurable and their false-positive rate is NOT, at any threshold. Any v0.40 number carries that bound.",
   "departure_from_v039": "v0.39 split by (model x attack_class) with every 3rd cell to holdout. Every v0.40 entry comes from one generator, so that grain would place whole categories wholly in one fold. It also feeds test and val, because these four categories held only 36 to 46 entries in test and the published figure is measured there, so a train-only addition would be unmeasurable.",
   "cell": "(category, generation batch)",
   "rotation": [
