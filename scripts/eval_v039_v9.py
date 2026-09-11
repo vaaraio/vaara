@@ -102,10 +102,14 @@ def v38():
     return out
 
 
+LBL_A = "v8"
+LBL_B = "v9"
+
+
 def report(name, m_v8, m_v9):
     print(f"\n[{name}] n={m_v8['n']} pos={m_v8['pos']}")
-    print(f"  v8  recall={m_v8['recall']:.1%} [{m_v8['recall_ci'][0]:.1%},{m_v8['recall_ci'][1]:.1%}] FPR={m_v8['fpr']:.1%}")
-    print(f"  v9  recall={m_v9['recall']:.1%} [{m_v9['recall_ci'][0]:.1%},{m_v9['recall_ci'][1]:.1%}] FPR={m_v9['fpr']:.1%}")
+    print(f"  {LBL_A:<22} recall={m_v8['recall']:.1%} [{m_v8['recall_ci'][0]:.1%},{m_v8['recall_ci'][1]:.1%}] FPR={m_v8['fpr']:.1%}")
+    print(f"  {LBL_B:<22} recall={m_v9['recall']:.1%} [{m_v9['recall_ci'][0]:.1%},{m_v9['recall_ci'][1]:.1%}] FPR={m_v9['fpr']:.1%}")
 
 
 def main():
@@ -119,10 +123,20 @@ def main():
     ap.add_argument("--target-fpr", type=float, default=0.05)
     ap.add_argument("--json-out", default="bench/v039_v9_eval.json")
     ap.add_argument("--update-bundle-threshold", action="store_true")
+    # Which two bundles to compare. Defaults are v8 and v9, so every existing
+    # invocation behaves exactly as before. A candidate trained on a new split
+    # can be graded against the shipping model without copying this file.
+    ap.add_argument("--baseline", default=str(V8),
+                    help="bundle held at its own stored threshold")
+    ap.add_argument("--candidate", default=str(V9),
+                    help="bundle whose threshold is recalibrated on val")
     args = ap.parse_args()
 
-    b8, b9 = load_b(V8), load_b(V9)
-    print(f"[v8] {b8['version']} T={b8['T']:.4f}\n[v9] {b9['version']} T={b9['T']:.4f}")
+    global LBL_A, LBL_B
+    b8, b9 = load_b(Path(args.baseline)), load_b(Path(args.candidate))
+    LBL_A, LBL_B = b8.get("version", "A"), b9.get("version", "B")
+    print(f"[{LBL_A}] baseline {Path(args.baseline).name} T={b8['T']:.4f}")
+    print(f"[{LBL_B}] candidate {Path(args.candidate).name} T={b9['T']:.4f}")
 
     sp_vt = Path(args.split) if args.split else SP035
     sp_ho = Path(args.split) if args.split else SP039

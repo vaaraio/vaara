@@ -64,7 +64,13 @@ def main() -> int:
     import joblib
     import xgboost as xgb
 
+    # Resolved against the repo root, not the caller's cwd. The metadata block
+    # below calls relative_to(REPO), which raises on a bare relative path, and
+    # it does so AFTER the fit, so an hour of embedding used to be thrown away
+    # over a cosmetic field. Accept either form and normalise here instead.
     split_path = Path(args.split)
+    if not split_path.is_absolute():
+        split_path = (REPO / split_path).resolve()
     if not split_path.is_file():
         sys.stderr.write(f"no such split: {split_path}\n")
         return 2
