@@ -43,23 +43,29 @@ Allocation is a fixed rotation over six batches: three train, one val, one
 test, one holdout. That is roughly 50/17/17/17, and it takes the per-category
 test denominator from about 36 to about 150.
 
-BENIGN COUNTERPARTS — THERE ARE NONE, AND THAT BOUNDS WHAT THIS SPLIT CAN SHOW
+BENIGN COUNTERPARTS
 
-This section used to describe matched benigns getting the same rotation over
-their own batches. They do not, because they do not exist. Every benign entry
-in the corpus is `benign_generated/BN-*.jsonl`, all 4800 of them carry
-`category: benign_control`, and all 4800 were already assigned by v0.39 and are
-inherited here untouched. The collector below looked for `BT-v035-<PREFIX>-*`
-naming that has never been on disk, so it matched nothing and said nothing.
+The matched benigns get the same rotation over their own batches. They are not
+paired entry-to-entry with a specific attack, unlike v0.39's BIPIA follows, so
+proportional allocation per category is the honest equivalent of v0.39's
+"benigns move with their cell" rather than a weaker version of it.
 
-The consequence is a measurement limit, not just a docs error. All 3883 v0.40
-additions are attack-labelled, so the four new categories reach the test fold
-with ZERO negatives. Recall on them is measurable; false-positive rate on them
-is NOT, at any threshold. A candidate can therefore post a large recall gain on
-these categories while its false-positive behaviour on their benign
-counterparts stays entirely unobserved. Read any v0.40 number with that bound
-attached, and treat generating matched benigns as the prerequisite for a v0.41
-that can actually settle a ship decision on these categories.
+THEY WERE ORPHANED FOR ONE BUILD, AND IT INVERTED A SHIP DECISION
+
+collect() read the category prefix out of `fp.name.split("-")`. Attack files are
+`SR-v037-llama33.jsonl`, prefix first, so field 0 never held the extension and
+the read was right. Benign files are `BT-v035-SR.jsonl`, prefix LAST, so field 2
+was "SR.jsonl" and matched nothing. Every benign file was skipped in silence.
+
+2800 entries, 700 per category, correctly labelled and in no fold. The four
+categories reached val and test with zero negatives, so their false-positive
+rate was unmeasurable at any threshold, and a candidate calibrated on that val
+fold picked a threshold it could not hold once the negatives came back. The
+first grading of the v10 candidate read +7.2pp on test recall. With the benigns
+restored the same candidate reads -6.6pp. See bench/V10-DECISION.md.
+
+Fixed by reading fp.stem. The empty-collection case now warns rather than
+passing quietly, because nothing in the output revealed this for a whole build.
 
 Usage:  python scripts/build_v040_split.py [--dry-run]
 """
@@ -113,10 +119,16 @@ def collect(directory: Path, prefixes: dict[str, str]) -> list[tuple[str, str, s
     if not directory.is_dir():
         return out
     for fp in sorted(directory.glob("*.jsonl")):
-        stem_prefix = fp.name.split("-")[0]
-        # Benign files are BT-v035-<PREFIX>-... so look one field further in.
+        # fp.stem, NOT fp.name. On the two-field attack names the extension sits
+        # in the last field and split("-")[0] never saw it, so this read right.
+        # The benign names are BT-v035-<PREFIX> with the prefix LAST, so
+        # fp.name.split("-")[2] returned "CE.jsonl" and no prefix ever matched.
+        # That one missing strip orphaned all 2800 matched benigns for the four
+        # v0.40 categories: they sat on disk, correctly labelled, in no fold.
+        parts = fp.stem.split("-")
+        stem_prefix = parts[0]
+        # Benign files are BT-v035-<PREFIX>, so look one field further in.
         if stem_prefix == "BT":
-            parts = fp.name.split("-")
             stem_prefix = parts[2] if len(parts) > 2 else ""
         if stem_prefix not in prefixes:
             continue
@@ -197,12 +209,11 @@ def main() -> int:
                 "train/train/train/val/test/holdout rotation."
             ),
             "benign_counterparts": (
-                "NONE. Every v0.40 addition is attack-labelled. All 4800 "
-                "benign entries are inherited from v0.39 and carry "
-                "category=benign_control, matched to no category. So recall on "
-                "the four new categories is measurable and their false-positive "
-                "rate is NOT, at any threshold. Any v0.40 number carries that "
-                "bound."
+                "700 matched benigns per category from BT-v035-<PREFIX>.jsonl, "
+                "rotated over their own batches. A prefix-parsing bug orphaned "
+                "all 2800 for one build, leaving the four categories with zero "
+                "negatives in val and test; any number produced against split "
+                "sha256 60ef4c7c1c1a or d30f162db88e carries that defect."
             ),
             "departure_from_v039": (
                 "v0.39 split by (model x attack_class) with every 3rd cell to "
