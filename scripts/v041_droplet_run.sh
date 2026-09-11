@@ -28,6 +28,11 @@ SEED="${SEED:-42}"
 N_PER_CAT="${N_PER_CAT:-700}"
 PORT="${PORT:-8000}"
 CATS="${CATS:-prompt_injection ssrf_via_tools destructive_actions credential_exfil}"
+#: Empty by default, and deliberately. The FP8-dynamic checkpoint declares
+#: compressed-tensors in its own config, so passing --quantization fp8 makes
+#: vLLM refuse the model outright over a mismatch it can already read off disk.
+#: Set this only for a checkpoint whose config does not say.
+QUANT="${QUANT:-}"
 OUT_SUFFIX="${OUT_SUFFIX:-v041-${MODEL_TAG}-s${SEED}}"
 
 declare -A PREFIX=(
@@ -50,20 +55,30 @@ else
     sleep 10
   fi
   echo "[v041] launching vllm for ${MODEL}"
-  docker run -d --rm --name vllm-server \
+  # The image ENTRYPOINT is already ["vllm","serve"], so the model is the FIRST
+  # ARGUMENT and nothing else. Passing "vllm serve ${MODEL}" here doubles the
+  # entrypoint and the container dies in 18 seconds with "unrecognized
+  # arguments". The v037 runner did pass it, correctly, because it targeted
+  # rocm/vllm:latest, which has no such entrypoint. Two images, two shapes.
+  #
+  # No --rm either. A container that exits takes its logs with it under --rm,
+  # which turned an 18-second crash into a 60-minute wait against a dead port
+  # with nothing to read at the end of it.
+  docker rm -f vllm-server >/dev/null 2>&1 || true
+  docker run -d --name vllm-server \
     --device /dev/kfd --device /dev/dri \
     --group-add video --ipc host --network host \
     --shm-size 16g \
     -v /root/.cache/huggingface:/root/.cache/huggingface \
     ${HF_TOKEN:+-e HF_TOKEN="${HF_TOKEN}"} \
     vllm/vllm-openai-rocm:latest \
-    vllm serve "${MODEL}" \
+      "${MODEL}" \
       --host 0.0.0.0 --port "${PORT}" \
       --max-model-len 8192 \
       --enforce-eager \
       --gpu-memory-utilization 0.92 \
-      --quantization fp8 \
-      >"${LOG_DIR}/vllm_${MODEL_TAG}.log" 2>&1
+      ${QUANT:+--quantization "${QUANT}"} \
+      >"${LOG_DIR}/vllm_${MODEL_TAG}.container" 2>&1
 
   echo "[v041] waiting for /v1/models (max 60 min; a cold model pull is slow)"
   for i in $(seq 1 360); do
@@ -71,11 +86,18 @@ else
       echo "[v041] vllm healthy after ${i} x 10s"
       break
     fi
+    # Stop waiting the moment the container is gone. Polling a port for an hour
+    # after the process behind it has died is the expensive kind of patient.
+    if ! docker ps --format '{{.Names}}' | grep -qx vllm-server; then
+      echo "[v041] vllm-server exited after ${i} x 10s. Container log:" >&2
+      docker logs --tail 40 vllm-server 2>&1 | sed 's/^/    /' >&2
+      exit 2
+    fi
     sleep 10
   done
   if ! curl -sf "http://localhost:${PORT}/v1/models" >/dev/null 2>&1; then
-    echo "[v041] vllm did not become healthy; tail of log:" >&2
-    tail -40 "${LOG_DIR}/vllm_${MODEL_TAG}.log" >&2
+    echo "[v041] vllm did not become healthy in 60 min. Container log:" >&2
+    docker logs --tail 40 vllm-server 2>&1 | sed 's/^/    /' >&2
     exit 2
   fi
 fi
