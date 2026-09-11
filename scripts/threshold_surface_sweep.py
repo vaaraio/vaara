@@ -31,10 +31,10 @@ REPO = Path(__file__).resolve().parent.parent
 sys.path.insert(0, str(REPO / "scripts"))
 
 from train_adversarial_classifier import (  # noqa: E402
-    build_features, build_labels, load_corpus_keyed,
+    build_labels,
 )
 from eval_v039_v9 import (  # noqa: E402
-    V038_FILES, fold_keyed, load_b, parent_keys, sc, v38,
+    fold_keyed, load_b, parent_keys, sc, v38,
 )
 
 
