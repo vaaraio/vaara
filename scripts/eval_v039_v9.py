@@ -133,10 +133,16 @@ def main():
     args = ap.parse_args()
 
     global LBL_A, LBL_B
-    b8, b9 = load_b(Path(args.baseline)), load_b(Path(args.candidate))
-    LBL_A, LBL_B = b8.get("version", "A"), b9.get("version", "B")
-    print(f"[{LBL_A}] baseline {Path(args.baseline).name} T={b8['T']:.4f}")
-    print(f"[{LBL_B}] candidate {Path(args.candidate).name} T={b9['T']:.4f}")
+    pa, pc = Path(args.baseline), Path(args.candidate)
+    b8, b9 = load_b(pa), load_b(pc)
+    # Label by FILENAME, not by the bundle's version field. Two bundles trained
+    # from the same release carry the same version string, so labelling by it
+    # printed the identical name on both rows of every comparison and made the
+    # output unreadable. The filename is the thing that actually differs.
+    LBL_A = f"base {pa.stem.replace('adversarial_classifier_', '')}"
+    LBL_B = f"cand {pc.stem.replace('adversarial_classifier_', '')}"
+    print(f"[{LBL_A}] {b8.get('version', '?')} T={b8['T']:.4f}")
+    print(f"[{LBL_B}] {b9.get('version', '?')} T={b9['T']:.4f}")
 
     sp_vt = Path(args.split) if args.split else SP035
     sp_ho = Path(args.split) if args.split else SP039
