@@ -89,6 +89,12 @@ BENIGN_DIR = ADV / "benign_generated"
 PREFIXES = {"PI": "prompt_injection", "SR": "ssrf_via_tools",
             "DA": "destructive_actions", "CE": "credential_exfil"}
 
+#: Which generation runs this release owns. Anything already carried by v039 is
+#: inherited untouched. Kept as data and reported on skip, because as a literal
+#: buried in an `and` chain it is a silent filter, and a silent filter is what
+#: this file has already been burned by once.
+RELEASE_TAGS = ("v035", "v037", "v040")
+
 #: Fixed rotation over batches. Three train, then one each of val, test and
 #: holdout. Written out rather than computed so the shape is legible and a
 #: future reader can see the proportions without running it.
@@ -116,7 +122,9 @@ def batch_of(entry: dict, line_index: int) -> str:
 def collect(directory: Path, prefixes: dict[str, str]) -> list[tuple[str, str, str]]:
     """Return (split-key, category, batch) for every new entry on disk."""
     out: list[tuple[str, str, str]] = []
+    skipped: dict[str, list[str]] = {}
     if not directory.is_dir():
+        print(f"[warn] {directory} is not a directory, collected nothing")
         return out
     for fp in sorted(directory.glob("*.jsonl")):
         # fp.stem, NOT fp.name. On the two-field attack names the extension sits
@@ -131,10 +139,12 @@ def collect(directory: Path, prefixes: dict[str, str]) -> list[tuple[str, str, s
         if stem_prefix == "BT":
             stem_prefix = parts[2] if len(parts) > 2 else ""
         if stem_prefix not in prefixes:
+            skipped.setdefault("prefix", []).append(fp.name)
             continue
         # Only files this release produced. Anything already carried by v039 is
         # inherited untouched and must not be re-assigned here.
-        if "v037" not in fp.name and "v040" not in fp.name and "v035" not in fp.name:
+        if not any(tag in fp.name for tag in RELEASE_TAGS):
+            skipped.setdefault("release-tag", []).append(fp.name)
             continue
         rel = fp.relative_to(ADV).as_posix()
         with fp.open() as fh:
@@ -147,6 +157,13 @@ def collect(directory: Path, prefixes: dict[str, str]) -> list[tuple[str, str, s
                 except json.JSONDecodeError:
                     continue
                 out.append((f"{rel}#L{li}", prefixes[stem_prefix], batch_of(e, li)))
+    # Every skip gets named. A file on disk that lands in no fold is invisible
+    # in the totals, in the leakage check and in every number computed after,
+    # which is exactly how 2800 matched benigns went missing for a whole build.
+    for reason, names in sorted(skipped.items()):
+        print(f"[skip] {directory.name}/: {len(names)} file(s) on {reason}: "
+              f"{', '.join(sorted(names)[:6])}"
+              f"{' ...' if len(names) > 6 else ''}")
     return out
 
 
