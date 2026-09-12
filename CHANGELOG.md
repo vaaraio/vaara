@@ -6,6 +6,8 @@ and this project follows [Semantic Versioning](https://semver.org/spec/v2.0.0.ht
 
 ## [Unreleased]
 
+## [1.84.0] - 2026-09-12
+
 ### Changed
 
 - The shipped adversarial classifier is now v11, trained on the corrected v0.40 corpus split, at threshold 0.8800. `_DEFAULT_BUNDLE` points at `adversarial_classifier_v11.joblib` and its pinned digest moves with it. v9 stays on disk as the regression baseline, because every published comparison is measured against it and removing it would make those numbers unreproducible from the package alone.
