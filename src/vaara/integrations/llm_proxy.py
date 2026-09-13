@@ -17,6 +17,14 @@ Usage::
     vaara llm-proxy --upstream ... --model-allow "claude-sonnet-4-*,deepseek-*"
 
     # Agent points at 127.0.0.1:8790/v1
+
+    # Govern an agent that carries its own subscription credential, where
+    # there is no operator API key to inject
+    vaara llm-proxy \\
+        --upstream https://api.anthropic.com \\
+        --auth-passthrough --seal-file ~/.vaara/seal.json
+
+    # Then: ANTHROPIC_BASE_URL=http://127.0.0.1:8790 claude
 """
 
 from __future__ import annotations
@@ -70,6 +78,14 @@ def main(args: Optional[list[str]] = None) -> int:
     key_group.add_argument(
         "--api-key-file", default=None,
         help="Path to file containing the upstream API key (mode 0400)",
+    )
+    key_group.add_argument(
+        "--auth-passthrough", action="store_true",
+        help="Hold no key. Forward the caller's own credential to the "
+             "provider untouched. Use this to govern an agent that "
+             "authenticates with its own subscription (Claude Code, Cursor), "
+             "which has no API key to hand over. The proxy still intercepts, "
+             "seals, audits and enforces; it just does not supply identity.",
     )
     p.add_argument(
         "--api-key-header", default="x-api-key",
@@ -158,7 +174,12 @@ def main(args: Optional[list[str]] = None) -> int:
             return 1
         api_key = key_path.read_text().strip()
 
-    if not api_key:
+    if parsed.auth_passthrough:
+        # None is the signal the app layer reads as "hold nothing, forward
+        # what the caller sent". Kept distinct from the empty string so a key
+        # file that happens to be empty still fails loudly below.
+        api_key = None
+    elif not api_key:
         print("Error: no API key provided", file=sys.stderr)
         return 1
 
@@ -224,8 +245,12 @@ def main(args: Optional[list[str]] = None) -> int:
         where = f"{host}:{port}"
     server = Server(config=config)
 
+    # Say which identity goes upstream. An operator who cannot tell whether
+    # the proxy is supplying a key or forwarding the caller's own cannot tell
+    # whose quota is being spent.
+    auth_note = ", auth=passthrough" if api_key is None else ""
     print(f"vaara llm-proxy: {parsed.mode} mode, audit={parsed.audit}"
-          f"{seal_note}, listening on {where} -> {parsed.upstream}",
+          f"{seal_note}{auth_note}, listening on {where} -> {parsed.upstream}",
           file=sys.stderr)
 
     try:
