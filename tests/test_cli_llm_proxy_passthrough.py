@@ -7,7 +7,6 @@ and not mirrored was silently unreachable. Three were: --seal-file,
 stops a visited page from spending the upstream key. This pins the property
 rather than the three names, so the next added option cannot drift either.
 """
-import argparse
 import io
 import contextlib
 import pytest
