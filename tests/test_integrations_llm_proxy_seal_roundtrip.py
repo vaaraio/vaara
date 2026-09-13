@@ -107,3 +107,32 @@ def test_unsealed_proxy_forwards_the_body_byte_for_byte(monkeypatch, seen):
         headers={"content-type": "application/json"},
     )
     assert seen["body"].decode("utf-8") == sent
+
+
+class TestUpstreamPathIsConfined:
+    """The proxy injects the operator's provider key into whatever it forwards.
+
+    A caller-controlled path that escapes the configured upstream would spend
+    that key against another host, so escapes are refused rather than
+    normalised.
+    """
+
+    @pytest.mark.parametrize("path", [
+        "//evil.example/v1/messages",   # protocol-relative, resolves off-host
+        "/v1/messages",                 # absolute, replaces the base path
+        "v1/../../v1/messages",         # traversal
+        "v1\\messages",                 # backslash
+        "v1/messages\nX-Injected: 1",   # header injection
+    ])
+    def test_escaping_paths_are_refused(self, path):
+        from vaara.integrations._llm_proxy_app import _safe_upstream_path
+        assert _safe_upstream_path(path) is None
+
+    @pytest.mark.parametrize("path,expected", [
+        ("v1/messages", "/v1/messages"),
+        ("v1/chat/completions", "/v1/chat/completions"),
+        ("", "/"),
+    ])
+    def test_ordinary_paths_pass(self, path, expected):
+        from vaara.integrations._llm_proxy_app import _safe_upstream_path
+        assert _safe_upstream_path(path) == expected

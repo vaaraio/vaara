@@ -41,6 +41,27 @@ logger = logging.getLogger("vaara.llm_proxy")
 _CHAT_PATHS = frozenset({"/v1/chat/completions", "/v1/messages"})
 
 
+def _safe_upstream_path(path: str) -> Optional[str]:
+    """Return a path that cannot leave the configured upstream, or None.
+
+    The caller controls this segment, and the proxy holds the operator's
+    provider key and injects it into whatever it forwards. A path beginning
+    ``//`` is protocol-relative and resolves to a different host, so a request
+    to ``//evil.example/x`` would spend that key somewhere else entirely.
+    Traversal is refused for the same reason rather than normalised, because a
+    normalised path that still escapes is worse than a rejection.
+    """
+    if not path:
+        return "/"
+    if path.startswith("/") or "//" in path:
+        return None
+    if ".." in path.split("/"):
+        return None
+    if "\\" in path or "\n" in path or "\r" in path:
+        return None
+    return f"/{path}"
+
+
 def _detect_provider(upstream: str) -> str:
     u = upstream.lower()
     if "anthropic" in u:
@@ -182,9 +203,14 @@ def build_app(*, upstream: str, api_key: str, api_key_header: str,
                 logger.warning("sealing failed, forwarding unsealed: %s", exc)
                 outbound = body_bytes
 
+        safe_path = _safe_upstream_path(path)
+        if safe_path is None:
+            return JSONResponse(
+                {"error": "invalid upstream path"}, status_code=400)
+
         try:
             upstream_response = await client.post(
-                f"/{path}", content=outbound, headers=headers,
+                safe_path, content=outbound, headers=headers,
             )
         except httpx.RequestError as exc:
             logger.error("Upstream request failed: %s", exc)

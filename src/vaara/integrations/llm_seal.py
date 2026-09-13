@@ -69,11 +69,18 @@ class SealRegistry:
     def __init__(self, secrets: Optional[dict[str, str]] = None) -> None:
         self._pairs: list[tuple[str, str]] = []
         self._reverse: dict[str, str] = {}
+        skipped = 0
         for name, secret in (secrets or {}).items():
             if not secret:
-                logger.warning("seal %r has an empty secret, skipped", name)
+                # The name is not logged either. A seal name describes what it
+                # seals, so "northern_lights_concept" leaks the thing the entry
+                # exists to hide. Count them and say how many.
+                skipped += 1
                 continue
             self.add(name, secret)
+        if skipped:
+            logger.warning("%d seal entr%s had an empty secret and were "
+                           "skipped", skipped, "y" if skipped == 1 else "ies")
 
     def add(self, name: str, secret: str) -> None:
         token = placeholder_for(secret)
