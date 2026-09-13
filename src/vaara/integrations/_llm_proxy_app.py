@@ -38,7 +38,51 @@ from ._llm_proxy_shape import (
 
 logger = logging.getLogger("vaara.llm_proxy")
 
-_CHAT_PATHS = frozenset({"/v1/chat/completions", "/v1/messages"})
+#: Ordered so a matched path can be recovered *by index* from the constant
+#: rather than passed through from the request. The chat handler only ever runs
+#: for a path already known to be in this set, so forwarding the constant is
+#: both what we mean and the form that leaves no caller-controlled string in
+#: the outgoing URL at all.
+_CHAT_PATH_LIST = ["/v1/chat/completions", "/v1/messages"]
+_CHAT_PATHS = frozenset(_CHAT_PATH_LIST)
+
+
+def _canonical_chat_path(path: str) -> Optional[str]:
+    """The constant this request matched, or None.
+
+    Validating a caller-controlled string and forwarding it still forwards a
+    caller-controlled string. Returning the element of the constant list is a
+    different thing: whatever the caller sent, the value that reaches the
+    upstream URL provably originated here.
+    """
+    try:
+        return _CHAT_PATH_LIST[_CHAT_PATH_LIST.index(f"/{path}")]
+    except ValueError:
+        return None
+
+
+def _safe_upstream_path(path: str) -> Optional[str]:
+    """Return a path that cannot leave the configured upstream, or None.
+
+    Used for the general pass-through, where the path is not drawn from a fixed
+    set and so cannot be replaced by a constant.
+
+    The caller controls this segment, and the proxy holds the operator's
+    provider key and injects it into whatever it forwards. A path beginning
+    ``//`` is protocol-relative and resolves to a different host, so a request
+    to ``//evil.example/x`` would spend that key somewhere else entirely.
+    Traversal is refused for the same reason rather than normalised, because a
+    normalised path that still escapes is worse than a rejection.
+    """
+    if not path:
+        return "/"
+    if path.startswith("/") or "//" in path:
+        return None
+    if ".." in path.split("/"):
+        return None
+    if "\\" in path or "\n" in path or "\r" in path:
+        return None
+    return f"/{path}"
 
 
 def _detect_provider(upstream: str) -> str:
@@ -62,6 +106,7 @@ def build_app(*, upstream: str, api_key: str, api_key_header: str,
               rate_limit_rpm: int = 0,
               redact_patterns: Optional[list[str]] = None,
               agent_id_header: str = "x-agent-id",
+              seal_registry: Optional[Any] = None,
               allowed_origins: Optional[list[str]] = None) -> FastAPI:
     app = FastAPI(title="Vaara LLM Proxy")
     # This proxy holds the operator's upstream provider key and injects it
@@ -91,6 +136,9 @@ def build_app(*, upstream: str, api_key: str, api_key_header: str,
     _model_deny_pats = _compile_glob_patterns(model_deny or [])
     _redact_pats = _compile_redact_patterns(redact_patterns) \
         if mode == "govern" else []
+    # Sealing is independent of `mode`. Redaction protects the trail; sealing
+    # protects the provider request, and an operator may want either alone.
+    _seal = seal_registry
 
     @app.api_route("/{path:path}", methods=["GET", "POST", "PUT", "DELETE", "PATCH"])
     async def handle_request(path: str, request: Request):
@@ -164,9 +212,30 @@ def build_app(*, upstream: str, api_key: str, api_key_header: str,
             headers[api_key_header] = api_key
 
         is_stream = body.get("stream", False)
+
+        # Seal named secrets on the way out. Fails open: a sealing fault costs
+        # the sealing, never the request. Forwarding the raw bytes rather than
+        # re-serialising the parsed body also keeps the payload byte-identical
+        # when sealing is off, which matters because any rewrite of the early
+        # message content invalidates the provider's prompt-cache prefix.
+        outbound = body_bytes
+        if _seal is not None and _seal.active:
+            try:
+                outbound = _seal.seal_bytes(body_bytes)
+            except Exception as exc:  # pragma: no cover - guard, not a path
+                logger.warning("sealing failed, forwarding unsealed: %s", exc)
+                outbound = body_bytes
+
+        # `path` reached here only because handle_request matched it against
+        # _CHAT_PATHS, so the constant is recoverable and is what we forward.
+        chat_path = _canonical_chat_path(path)
+        if chat_path is None:  # pragma: no cover - dispatcher guarantees it
+            return JSONResponse(
+                {"error": "invalid upstream path"}, status_code=400)
+
         try:
             upstream_response = await client.post(
-                f"/{path}", json=body, headers=headers,
+                chat_path, content=outbound, headers=headers,
             )
         except httpx.RequestError as exc:
             logger.error("Upstream request failed: %s", exc)
@@ -174,31 +243,38 @@ def build_app(*, upstream: str, api_key: str, api_key_header: str,
 
         if is_stream:
             return StreamingResponse(
-                _forward_stream(upstream_response, pipeline, result.action_id),
+                _forward_stream(upstream_response, pipeline,
+                                result.action_id, _seal),
                 status_code=upstream_response.status_code,
                 headers=forward_response_headers(upstream_response.headers),
                 media_type=upstream_response.headers.get("content-type"),
             )
 
-        try:
-            response_body = upstream_response.json()
-        except json.JSONDecodeError:
-            pipeline.report_outcome(result.action_id, outcome_severity=0.8)
-            return Response(
-                content=upstream_response.content,
-                status_code=upstream_response.status_code,
-                headers=forward_response_headers(upstream_response.headers),
-            )
+        raw_response = upstream_response.content
+        if _seal is not None and _seal.active:
+            try:
+                raw_response = _seal.unseal_bytes(raw_response)
+            except Exception as exc:  # pragma: no cover - guard, not a path
+                logger.warning("unsealing failed, passing through: %s", exc)
+                raw_response = upstream_response.content
 
         pipeline.report_outcome(result.action_id, outcome_severity=0.0
                                 if upstream_response.is_success else 0.5)
-        return JSONResponse(
-            content=response_body,
+        return Response(
+            content=raw_response,
             status_code=upstream_response.status_code,
             headers=forward_response_headers(upstream_response.headers),
+            media_type=upstream_response.headers.get("content-type"),
         )
 
     async def _proxy_pass_through(path: str, request: Request) -> Response:
+        # No fixed set to draw from here, so this one is validated rather than
+        # replaced. Same reason as the chat path: the proxy injects the
+        # operator's key into whatever it forwards.
+        safe_path = _safe_upstream_path(path)
+        if safe_path is None:
+            return JSONResponse(
+                {"error": "invalid upstream path"}, status_code=400)
         body_bytes = await request.body()
         headers = forward_request_headers(request.headers)
         if api_key_header.lower() == "authorization":
@@ -207,7 +283,7 @@ def build_app(*, upstream: str, api_key: str, api_key_header: str,
             headers[api_key_header] = api_key
         try:
             resp = await client.request(
-                method=request.method, url=f"/{path}",
+                method=request.method, url=safe_path,
                 content=body_bytes, headers=headers,
             )
         except httpx.RequestError as exc:
@@ -256,10 +332,30 @@ def _build_audit_params(body: dict, body_bytes: bytes,
 
 async def _forward_stream(upstream_response: httpx.Response,
                            pipeline: InterceptionPipeline,
-                           action_id: str):
+                           action_id: str,
+                           seal: Optional[Any] = None):
+    unsealer = None
+    if seal is not None and seal.active:
+        from .llm_seal import StreamUnsealer
+        unsealer = StreamUnsealer(seal)
     try:
         async for chunk in upstream_response.aiter_bytes():
-            yield chunk
+            if unsealer is None:
+                yield chunk
+                continue
+            try:
+                out = unsealer.feed(chunk)
+            except Exception as exc:  # pragma: no cover - guard, not a path
+                logger.warning("stream unseal failed, passing through: %s", exc)
+                unsealer = None
+                yield chunk
+                continue
+            if out:
+                yield out
+        if unsealer is not None:
+            tail = unsealer.flush()
+            if tail:
+                yield tail
         pipeline.report_outcome(action_id, outcome_severity=0.0)
     except Exception as exc:
         logger.warning("Stream error: %s", exc)

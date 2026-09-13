@@ -120,6 +120,19 @@ def main(args: Optional[list[str]] = None) -> int:
         help="Request header carrying the agent identity (default: x-agent-id)",
     )
     p.add_argument(
+        "--seal-file", default=None, metavar="PATH",
+        help="JSON object of {\"name\": \"secret\"} whose values are replaced "
+             "with stable placeholders before the request reaches the "
+             "provider, and restored in the response. Covers only what you "
+             "name in advance. Missing or unreadable file means sealing is "
+             "off and the proxy runs unchanged.",
+    )
+    p.add_argument(
+        "--seal-listen-unix", default=None, metavar="PATH",
+        help="Bind a unix socket instead of TCP. No listening port, so "
+             "filesystem permissions decide who can reach the proxy.",
+    )
+    p.add_argument(
         "--allow-origin", action="append", default=None, metavar="ORIGIN",
         help="Browser origin permitted to call the proxy, e.g. "
              "https://console.example (repeatable, matched exactly). By "
@@ -166,6 +179,18 @@ def main(args: Optional[list[str]] = None) -> int:
         return 1
 
     from ._llm_proxy_app import build_app
+    from .llm_seal import SealRegistry
+
+    seal = SealRegistry.from_file(parsed.seal_file) if parsed.seal_file \
+        else SealRegistry()
+    if parsed.seal_file and not seal.active:
+        # Say so rather than running silently unsealed. An operator who passed
+        # --seal-file believes secrets are being held back.
+        print(
+            f"vaara llm-proxy: seal file {parsed.seal_file} loaded no "
+            "secrets; sealing is OFF for this run.",
+            file=sys.stderr,
+        )
 
     app = build_app(
         upstream=parsed.upstream,
@@ -178,20 +203,30 @@ def main(args: Optional[list[str]] = None) -> int:
         model_allow=parsed.model_allow,
         model_deny=parsed.model_deny,
         rate_limit_rpm=parsed.rate_limit,
+        seal_registry=seal,
         redact_patterns=parsed.redact,
         agent_id_header=parsed.agent_id_header,
         allowed_origins=parsed.allow_origin,
     )
 
-    host, _, port_str = parsed.listen.rpartition(":")
-    port = int(port_str) if port_str else 8790
-    host = host or "127.0.0.1"
+    seal_note = f", sealing {len(seal)} secret(s)" if seal.active \
+        else ""
 
-    config = Config(app=app, host=host, port=port, log_level="info")
+    if parsed.seal_listen_unix:
+        sock_path = str(Path(parsed.seal_listen_unix).expanduser())
+        config = Config(app=app, uds=sock_path, log_level="info")
+        where = f"unix:{sock_path}"
+    else:
+        host, _, port_str = parsed.listen.rpartition(":")
+        port = int(port_str) if port_str else 8790
+        host = host or "127.0.0.1"
+        config = Config(app=app, host=host, port=port, log_level="info")
+        where = f"{host}:{port}"
     server = Server(config=config)
 
-    print(f"vaara llm-proxy: {parsed.mode} mode, audit={parsed.audit}, "
-          f"listening on {host}:{port} -> {parsed.upstream}", file=sys.stderr)
+    print(f"vaara llm-proxy: {parsed.mode} mode, audit={parsed.audit}"
+          f"{seal_note}, listening on {where} -> {parsed.upstream}",
+          file=sys.stderr)
 
     try:
         server.run()

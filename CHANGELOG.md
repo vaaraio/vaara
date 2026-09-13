@@ -6,6 +6,26 @@ and this project follows [Semantic Versioning](https://semver.org/spec/v2.0.0.ht
 
 ## [Unreleased]
 
+## [1.85.0] - 2026-09-13
+
+### Added
+
+- `vaara llm-proxy --seal-file PATH` holds named secrets back from the provider. Values listed in the file are replaced with stable placeholders before the request is forwarded and restored in the response, including across SSE chunk boundaries, so the caller reads the original text and the provider never receives it.
+
+  Redaction already existed and does a different job. `redact_body` replaces matches with `***` and is applied only to the copy written into the audit trail, which keeps secrets out of the record while the provider still gets the original bytes. Sealing is the reversible form, because a model handed `***` cannot answer and the conversation breaks.
+
+  Placeholders are derived from the secret's own sha256 rather than assigned per run. A placeholder that changed between runs would alter the prompt prefix on every turn and defeat provider-side prompt caching, which is a cost paid on every subsequent request rather than once.
+
+  It covers only what is named in advance. Prose that has never been registered travels in the clear, so this bounds and records the channel rather than closing it. That limit is in the module docstring as well as here, because a reader who assumes otherwise is worse off than one who never enabled it.
+
+  Fails open throughout. A sealing fault forwards the unsealed request rather than costing the call, on the grounds that a governance layer which can break a working session will be switched off.
+
+- `vaara llm-proxy --seal-listen-unix PATH` binds a unix socket instead of a TCP port, leaving filesystem permissions as the access control. The proxy holds the operator's upstream key and injects it into every forwarded call, so removing the listening port removes a class of local reachability entirely.
+
+### Changed
+
+- The chat path forwards the received request bytes instead of re-serialising the parsed body. With sealing off a payload is now byte-identical to what the client sent, which a round-trip test asserts. Re-serialisation rewrote byte layout the caller never asked to change, and any such rewrite risks the provider's cache prefix.
+
 ## [1.84.0] - 2026-09-12
 
 ### Changed
