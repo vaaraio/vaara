@@ -6,6 +6,24 @@ and this project follows [Semantic Versioning](https://semver.org/spec/v2.0.0.ht
 
 ## [Unreleased]
 
+## [1.86.0] - 2026-09-13
+
+### Added
+
+- `vaara llm-proxy --auth-passthrough` runs the proxy with no key of its own and forwards the caller's credential to the provider untouched.
+
+  Until now the proxy always held an operator API key, stripped whatever credential the caller sent, and injected its own. That shape governs a service you run. It cannot govern an agent that authenticates with its own subscription, and most coding agents now do: the user has no API key to hand over, and stripping the token they do have left the request unauthenticated. The one case people most want to put a governance layer in front of was the one case the proxy could not accept.
+
+  With `--auth-passthrough` the proxy still intercepts, seals, audits, enforces model and rate policy, and records every call in the trail. The only thing it stops doing is supplying identity. Verified end to end against a live subscription-authenticated session in govern mode with sealing on.
+
+  It is mutually exclusive with `--api-key` and `--api-key-file`, because two identities is a configuration error rather than a precedence question. An empty or unreadable key file still fails loudly instead of quietly falling back to pass-through.
+
+  The forwarded credential is never recorded. Auditing reads the request body and never the headers, so no bearer token can reach the trail.
+
+### Changed
+
+- `forward_request_headers` takes `keep_auth`, default `False`. Hop-by-hop headers are dropped in both modes, so pass-through does not widen into forwarding everything.
+
 ## [1.85.1] - 2026-09-13
 
 ### Fixed

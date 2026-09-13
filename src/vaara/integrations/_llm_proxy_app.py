@@ -98,7 +98,7 @@ def _detect_provider(upstream: str) -> str:
     return "custom"
 
 
-def build_app(*, upstream: str, api_key: str, api_key_header: str,
+def build_app(*, upstream: str, api_key: Optional[str], api_key_header: str,
               pipeline: InterceptionPipeline, mode: str = "relay",
               audit_level: str = "meta", enforce: bool = False,
               model_allow: Optional[list[str]] = None,
@@ -117,6 +117,27 @@ def build_app(*, upstream: str, api_key: str, api_key_header: str,
         app, allowed_origins=allowed_origins, surface="vaara llm-proxy",
     )
     provider = _detect_provider(upstream)
+    # Pass-through auth. With no key of its own the proxy has nothing to
+    # inject, so the caller's own credential is the only one there is and it
+    # travels untouched. This is what lets Vaara govern an agent that
+    # authenticates with its own subscription (Claude Code, Cursor) instead of
+    # an operator-held API key, which the inject-only path could never do:
+    # a subscriber has no API key to hand over, and stripping the token they
+    # do have left the request unauthenticated.
+    #
+    # The credential is forwarded and never recorded. Auditing reads the body,
+    # never the headers, so nothing here can put a bearer token in the trail.
+    passthrough_auth = api_key is None
+
+    def _upstream_headers(request_headers: Any) -> dict[str, str]:
+        headers = forward_request_headers(
+            request_headers, keep_auth=passthrough_auth)
+        if not passthrough_auth:
+            if api_key_header.lower() == "authorization":
+                headers["Authorization"] = f"Bearer {api_key}"
+            else:
+                headers[api_key_header] = api_key
+        return headers
     # HTTP/2 needs the optional `h2` package. The llm-proxy extra now pulls
     # it in, but httpx can also arrive from somewhere else without it, and
     # AsyncClient(http2=True) raises ImportError at construction — which
@@ -205,11 +226,7 @@ def build_app(*, upstream: str, api_key: str, api_key_header: str,
             return JSONResponse(
                 {"error": result.reason or "denied"}, status_code=403)
 
-        headers = forward_request_headers(request.headers)
-        if api_key_header.lower() == "authorization":
-            headers["Authorization"] = f"Bearer {api_key}"
-        else:
-            headers[api_key_header] = api_key
+        headers = _upstream_headers(request.headers)
 
         is_stream = body.get("stream", False)
 
@@ -276,11 +293,7 @@ def build_app(*, upstream: str, api_key: str, api_key_header: str,
             return JSONResponse(
                 {"error": "invalid upstream path"}, status_code=400)
         body_bytes = await request.body()
-        headers = forward_request_headers(request.headers)
-        if api_key_header.lower() == "authorization":
-            headers["Authorization"] = f"Bearer {api_key}"
-        else:
-            headers[api_key_header] = api_key
+        headers = _upstream_headers(request.headers)
         try:
             resp = await client.request(
                 method=request.method, url=safe_path,

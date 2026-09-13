@@ -162,14 +162,23 @@ def truncate_for_audit(messages: list[dict[str, Any]],
     return out
 
 
-def forward_request_headers(headers: Any) -> dict[str, str]:
-    """Return headers suitable for forwarding, dropping hop-by-hop and auth."""
+def forward_request_headers(
+    headers: Any, *, keep_auth: bool = False,
+) -> dict[str, str]:
+    """Return headers suitable for forwarding, dropping hop-by-hop and auth.
+
+    ``keep_auth`` leaves the caller's own credential in place instead of
+    stripping it, for the pass-through case where the proxy holds no key of
+    its own and the client authenticates itself.  Default stays False so the
+    operator-holds-the-key path is unchanged and no caller starts forwarding
+    credentials by accident.
+    """
     result: dict[str, str] = {}
     for k, v in headers.items():
         kl = k.lower()
         if kl in _DROP_REQUEST_HEADERS:
             continue
-        if kl in KNOWN_AUTH_HEADERS:
+        if kl in KNOWN_AUTH_HEADERS and not keep_auth:
             continue
         result[k] = v
     return result
