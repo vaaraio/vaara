@@ -102,6 +102,10 @@ class SealRegistry:
     def active(self) -> bool:
         return bool(self._pairs)
 
+    def __len__(self) -> int:
+        """How many secrets are registered. For startup reporting."""
+        return len(self._pairs)
+
     def seal_text(self, text: str) -> str:
         for secret, token in self._pairs:
             text = text.replace(secret, token)
