@@ -6,6 +6,22 @@ and this project follows [Semantic Versioning](https://semver.org/spec/v2.0.0.ht
 
 ## [Unreleased]
 
+## [1.85.1] - 2026-09-13
+
+### Fixed
+
+- `vaara llm-proxy` now forwards its arguments to the parser that owns the
+  command instead of restating them. The subcommand kept a hand-written copy of
+  every option and re-serialised it for the real parser, so any option added to
+  `vaara/integrations/llm_proxy.py` and not mirrored into `vaara/cli.py` was
+  unreachable through `vaara llm-proxy`, with no error to say so. Three had
+  drifted out of reach: `--seal-file` and `--seal-listen-unix` from 1.85.0, and
+  `--allow-origin`, the browser origin guard that stops a page the operator
+  visits from spending the upstream provider key. `--help` forwards too, so the
+  help text comes from the one parser. Running the module directly was always
+  unaffected.
+
+
 ## [1.85.0] - 2026-09-13
 
 ### Added
