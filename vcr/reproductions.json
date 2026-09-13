@@ -72,6 +72,15 @@
       "integratedTime": 1787836991,
       "logUrl": "https://rekor.sigstore.dev",
       "published": "2026-08-27T13:23:11Z"
+    },
+    {
+      "head": "sha256:ea8dc88d80ecd7209cd9a1ea417f18c6183b5399a9b3ece89a55c81cee76f0df",
+      "rows": 7,
+      "uuid": "108e9186e8c5677adaf49de22c3d53da81044903143b4f0bf2682b54bb00d328c9e02e51731e6fca",
+      "logIndex": 2820370434,
+      "integratedTime": 1789320653,
+      "logUrl": "https://rekor.sigstore.dev",
+      "published": "2026-09-13T17:30:53Z"
     }
   ],
   "reproductions": [
@@ -445,7 +454,26 @@
       "their_scoping": "Reproduces the published independent vector lanes at commit 54a69b3 using only standard public libraries (cryptography, rfc8785), with no Vaara code imported. 43/46 suites passed, 0 failed, 3 skipped (optional-dependency lanes). Establishes reproducibility of Vaara's published verdicts over the pinned corpus. Does not establish integration of Insight oracle attestations into Vaara records, nor any opinion on Vaara's compliance standing.",
       "record": "https://github.com/imokokok/vaara-conformance",
       "submitted_by": "imokokok"
+    },
+    {
+      "id": 7,
+      "slug": "ali-toygar-abak",
+      "date": "2026-09-13",
+      "terms_version": "2026-08-22",
+      "prev": "sha256:0b0c9e52d68d1a7c46199c9f0e7578991020c4e6198c7cf7d967d234eead3154",
+      "party": "Ali Toygar Abak",
+      "affiliation": "Phionyx",
+      "suites": [
+        "record_conformance_v0",
+        "record_set_v0"
+      ],
+      "result": "2 suites passed, 0 failed, 0 skipped; both selected suites matched their published expected verdicts. No declared case count is exposed by this pinned corpus layout; see record.",
+      "at_commit": "d44b8b0de4f5f3e4e5c0248ad1e6fbbc3972b317",
+      "kind": "reproduction",
+      "their_scoping": "Ali Toygar Abak / Phionyx executed Vaara's published record_conformance_v0 and record_set_v0 checkers over the pinned SEP-2828 1.0.0 vectors at commit d44b8b0de4f5f3e4e5c0248ad1e6fbbc3972b317. This is a reproduction of the author's checkers over the author's vectors. It does not establish an independent implementation, independently constructed vectors, specification correctness, complete Vaara product conformance, hosted-service interoperability, Vaara-AIREP interoperability, certification, or endorsement.",
+      "record": "https://github.com/halvrenofviryel/ai-runtime-evidence-protocol/blob/9114f4f365369cab133e857e08bb59ff6fb5e24d/interop/vaara/2026-09-13/conformance-reproduction/README.md",
+      "submitted_by": "halvrenofviryel"
     }
   ],
-  "issued": 6
+  "issued": 7
 }

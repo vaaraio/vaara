@@ -1,0 +1,81 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<title>Vaara Conformance Results, row 7</title>
+<meta name="robots" content="noindex">
+<style>
+  @page { size: A4 landscape; margin: 18mm; }
+  :root { --ink:#1A2226; --green:#78A08A; --faint:#8B9792; --rule:#DEE4E1; }
+  * { box-sizing:border-box; }
+  body {
+    margin:0; padding:28mm 24mm; color:var(--ink); background:#fff;
+    font:16px/1.55 Georgia, "Times New Roman", serif;
+  }
+  .sheet { border:2px solid var(--ink); padding:16mm 18mm; height:100%; }
+  .kicker {
+    font:600 11px/1 ui-sans-serif, system-ui, sans-serif;
+    letter-spacing:.22em; text-transform:uppercase; color:var(--faint);
+  }
+  h1 { font-size:31px; margin:10px 0 2px; letter-spacing:.01em; }
+  .num { color:var(--green); font-weight:700; }
+  .party { font-size:26px; margin:18px 0 2px; }
+  .aff { color:var(--faint); font-size:15px; margin:0; }
+  .claim { margin:16px 0 0; max-width:58ch; }
+  .scoping {
+    margin:12px 0 0; padding-left:12px; border-left:3px solid var(--rule);
+    color:#3d474b; font-style:italic; max-width:62ch;
+  }
+  dl {
+    display:grid; grid-template-columns:auto 1fr; gap:3px 14px;
+    margin:18px 0 0; font:12px/1.5 ui-monospace, SFMono-Regular, Menlo, monospace;
+  }
+  dt { color:var(--faint); }
+  dd { margin:0; word-break:break-all; }
+  footer {
+    margin-top:16px; padding-top:10px; border-top:1px solid var(--rule);
+    font:11px/1.5 ui-sans-serif, system-ui, sans-serif; color:var(--faint);
+    max-width:74ch;
+  }
+  @media print { body { padding:0; } .noprint { display:none; } }
+</style>
+</head>
+<body>
+<div class="sheet">
+  <p class="kicker">Vaara Conformance Results</p>
+  <h1>Independent reproduction <span class="num">#7</span></h1>
+
+  <p class="party">Ali Toygar Abak</p>
+  <p class="aff">Phionyx</p>
+
+  <p class="claim">ran the independent checkers listed below, from a clean
+  checkout at the commit recorded here, with no Vaara installed, and reported
+  the outcome in public. The result they reported was 2 suites passed, 0 failed, 0 skipped; both selected suites matched their published expected verdicts. No declared case count is exposed by this pinned corpus layout; see record..</p>
+
+  <p class="scoping">Ali Toygar Abak / Phionyx executed Vaara&#x27;s published record_conformance_v0 and record_set_v0 checkers over the pinned SEP-2828 1.0.0 vectors at commit d44b8b0de4f5f3e4e5c0248ad1e6fbbc3972b317. This is a reproduction of the author&#x27;s checkers over the author&#x27;s vectors. It does not establish an independent implementation, independently constructed vectors, specification correctness, complete Vaara product conformance, hosted-service interoperability, Vaara-AIREP interoperability, certification, or endorsement.</p>
+
+  <dl>
+    <dt>Kind of run</dt><dd>Reproduction: the author&#x27;s checkers over the author&#x27;s vectors</dd>
+    <dt>Suites</dt><dd>record_conformance_v0, record_set_v0</dd>
+    <dt>At commit</dt><dd>d44b8b0de4f5f3e4e5c0248ad1e6fbbc3972b317</dd>
+    <dt>Date</dt><dd>2026-09-13</dd>
+    <dt>Row digest</dt><dd>sha256:ea8dc88d80ecd7209cd9a1ea417f18c6183b5399a9b3ece89a55c81cee76f0df</dd>
+    <dt>Record</dt><dd>https://github.com/halvrenofviryel/ai-runtime-evidence-protocol/blob/9114f4f365369cab133e857e08bb59ff6fb5e24d/interop/vaara/2026-09-13/conformance-reproduction/README.md</dd>
+    <dt>Terms</dt><dd>2026-08-22</dd>
+  </dl>
+
+  <footer>
+    This states what those checkers returned on that date at that commit. It is
+    not a certification, it does not say Vaara is compliant with anything, and
+    it does not say the party above endorses Vaara. These vectors have no
+    ratification process behind them and the maintainer decides what a verdict
+    means. Every case recomputes from committed bytes, so anyone may disagree
+    and show their work. This row is a permanent record of a run on a date and
+    is never removed or edited, by anyone, including Vaara. Check this sheet
+    against
+    https://vaara.io/badge/ali-toygar-abak.json, whose sha256 is the row digest above.
+  </footer>
+</div>
+</body>
+</html>
