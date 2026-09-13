@@ -105,8 +105,18 @@ jobs:
         with:
           python-version: "3.12"
 
+      # `-e .` because the witness step imports vaara.attestation.rekor_log,
+      # and only the two third-party packages were installed here. The witness
+      # step was added on 27 August and the last submission before it landed on
+      # 26 August, so it never ran against a real row until Ali Toygar Abak
+      # filed issue #694 on 13 September. It failed on the import, `set -e`
+      # took the job with it, and every later step was skipped: the row never
+      # reached the vcr branch, the page never rebuilt, the issue never closed
+      # and the submitter got no comment at all. The package declares no
+      # dependencies and rekor_log is stdlib only, so this adds nothing to the
+      # runner beyond making the tree importable.
       - name: Install what the runner needs
-        run: pip install cryptography rfc8785
+        run: pip install cryptography rfc8785 -e .
 
       - name: Read the issue
         id: issue
