@@ -38,11 +38,34 @@ from ._llm_proxy_shape import (
 
 logger = logging.getLogger("vaara.llm_proxy")
 
-_CHAT_PATHS = frozenset({"/v1/chat/completions", "/v1/messages"})
+#: Ordered so a matched path can be recovered *by index* from the constant
+#: rather than passed through from the request. The chat handler only ever runs
+#: for a path already known to be in this set, so forwarding the constant is
+#: both what we mean and the form that leaves no caller-controlled string in
+#: the outgoing URL at all.
+_CHAT_PATH_LIST = ["/v1/chat/completions", "/v1/messages"]
+_CHAT_PATHS = frozenset(_CHAT_PATH_LIST)
+
+
+def _canonical_chat_path(path: str) -> Optional[str]:
+    """The constant this request matched, or None.
+
+    Validating a caller-controlled string and forwarding it still forwards a
+    caller-controlled string. Returning the element of the constant list is a
+    different thing: whatever the caller sent, the value that reaches the
+    upstream URL provably originated here.
+    """
+    try:
+        return _CHAT_PATH_LIST[_CHAT_PATH_LIST.index(f"/{path}")]
+    except ValueError:
+        return None
 
 
 def _safe_upstream_path(path: str) -> Optional[str]:
     """Return a path that cannot leave the configured upstream, or None.
+
+    Used for the general pass-through, where the path is not drawn from a fixed
+    set and so cannot be replaced by a constant.
 
     The caller controls this segment, and the proxy holds the operator's
     provider key and injects it into whatever it forwards. A path beginning
@@ -203,14 +226,16 @@ def build_app(*, upstream: str, api_key: str, api_key_header: str,
                 logger.warning("sealing failed, forwarding unsealed: %s", exc)
                 outbound = body_bytes
 
-        safe_path = _safe_upstream_path(path)
-        if safe_path is None:
+        # `path` reached here only because handle_request matched it against
+        # _CHAT_PATHS, so the constant is recoverable and is what we forward.
+        chat_path = _canonical_chat_path(path)
+        if chat_path is None:  # pragma: no cover - dispatcher guarantees it
             return JSONResponse(
                 {"error": "invalid upstream path"}, status_code=400)
 
         try:
             upstream_response = await client.post(
-                safe_path, content=outbound, headers=headers,
+                chat_path, content=outbound, headers=headers,
             )
         except httpx.RequestError as exc:
             logger.error("Upstream request failed: %s", exc)
@@ -243,6 +268,13 @@ def build_app(*, upstream: str, api_key: str, api_key_header: str,
         )
 
     async def _proxy_pass_through(path: str, request: Request) -> Response:
+        # No fixed set to draw from here, so this one is validated rather than
+        # replaced. Same reason as the chat path: the proxy injects the
+        # operator's key into whatever it forwards.
+        safe_path = _safe_upstream_path(path)
+        if safe_path is None:
+            return JSONResponse(
+                {"error": "invalid upstream path"}, status_code=400)
         body_bytes = await request.body()
         headers = forward_request_headers(request.headers)
         if api_key_header.lower() == "authorization":
@@ -251,7 +283,7 @@ def build_app(*, upstream: str, api_key: str, api_key_header: str,
             headers[api_key_header] = api_key
         try:
             resp = await client.request(
-                method=request.method, url=f"/{path}",
+                method=request.method, url=safe_path,
                 content=body_bytes, headers=headers,
             )
         except httpx.RequestError as exc:
