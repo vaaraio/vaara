@@ -62,6 +62,7 @@ def build_app(*, upstream: str, api_key: str, api_key_header: str,
               rate_limit_rpm: int = 0,
               redact_patterns: Optional[list[str]] = None,
               agent_id_header: str = "x-agent-id",
+              seal_registry: Optional[Any] = None,
               allowed_origins: Optional[list[str]] = None) -> FastAPI:
     app = FastAPI(title="Vaara LLM Proxy")
     # This proxy holds the operator's upstream provider key and injects it
@@ -91,6 +92,9 @@ def build_app(*, upstream: str, api_key: str, api_key_header: str,
     _model_deny_pats = _compile_glob_patterns(model_deny or [])
     _redact_pats = _compile_redact_patterns(redact_patterns) \
         if mode == "govern" else []
+    # Sealing is independent of `mode`. Redaction protects the trail; sealing
+    # protects the provider request, and an operator may want either alone.
+    _seal = seal_registry
 
     @app.api_route("/{path:path}", methods=["GET", "POST", "PUT", "DELETE", "PATCH"])
     async def handle_request(path: str, request: Request):
@@ -164,9 +168,23 @@ def build_app(*, upstream: str, api_key: str, api_key_header: str,
             headers[api_key_header] = api_key
 
         is_stream = body.get("stream", False)
+
+        # Seal named secrets on the way out. Fails open: a sealing fault costs
+        # the sealing, never the request. Forwarding the raw bytes rather than
+        # re-serialising the parsed body also keeps the payload byte-identical
+        # when sealing is off, which matters because any rewrite of the early
+        # message content invalidates the provider's prompt-cache prefix.
+        outbound = body_bytes
+        if _seal is not None and _seal.active:
+            try:
+                outbound = _seal.seal_bytes(body_bytes)
+            except Exception as exc:  # pragma: no cover - guard, not a path
+                logger.warning("sealing failed, forwarding unsealed: %s", exc)
+                outbound = body_bytes
+
         try:
             upstream_response = await client.post(
-                f"/{path}", json=body, headers=headers,
+                f"/{path}", content=outbound, headers=headers,
             )
         except httpx.RequestError as exc:
             logger.error("Upstream request failed: %s", exc)
@@ -174,28 +192,28 @@ def build_app(*, upstream: str, api_key: str, api_key_header: str,
 
         if is_stream:
             return StreamingResponse(
-                _forward_stream(upstream_response, pipeline, result.action_id),
+                _forward_stream(upstream_response, pipeline,
+                                result.action_id, _seal),
                 status_code=upstream_response.status_code,
                 headers=forward_response_headers(upstream_response.headers),
                 media_type=upstream_response.headers.get("content-type"),
             )
 
-        try:
-            response_body = upstream_response.json()
-        except json.JSONDecodeError:
-            pipeline.report_outcome(result.action_id, outcome_severity=0.8)
-            return Response(
-                content=upstream_response.content,
-                status_code=upstream_response.status_code,
-                headers=forward_response_headers(upstream_response.headers),
-            )
+        raw_response = upstream_response.content
+        if _seal is not None and _seal.active:
+            try:
+                raw_response = _seal.unseal_bytes(raw_response)
+            except Exception as exc:  # pragma: no cover - guard, not a path
+                logger.warning("unsealing failed, passing through: %s", exc)
+                raw_response = upstream_response.content
 
         pipeline.report_outcome(result.action_id, outcome_severity=0.0
                                 if upstream_response.is_success else 0.5)
-        return JSONResponse(
-            content=response_body,
+        return Response(
+            content=raw_response,
             status_code=upstream_response.status_code,
             headers=forward_response_headers(upstream_response.headers),
+            media_type=upstream_response.headers.get("content-type"),
         )
 
     async def _proxy_pass_through(path: str, request: Request) -> Response:
@@ -256,10 +274,30 @@ def _build_audit_params(body: dict, body_bytes: bytes,
 
 async def _forward_stream(upstream_response: httpx.Response,
                            pipeline: InterceptionPipeline,
-                           action_id: str):
+                           action_id: str,
+                           seal: Optional[Any] = None):
+    unsealer = None
+    if seal is not None and seal.active:
+        from .llm_seal import StreamUnsealer
+        unsealer = StreamUnsealer(seal)
     try:
         async for chunk in upstream_response.aiter_bytes():
-            yield chunk
+            if unsealer is None:
+                yield chunk
+                continue
+            try:
+                out = unsealer.feed(chunk)
+            except Exception as exc:  # pragma: no cover - guard, not a path
+                logger.warning("stream unseal failed, passing through: %s", exc)
+                unsealer = None
+                yield chunk
+                continue
+            if out:
+                yield out
+        if unsealer is not None:
+            tail = unsealer.flush()
+            if tail:
+                yield tail
         pipeline.report_outcome(action_id, outcome_severity=0.0)
     except Exception as exc:
         logger.warning("Stream error: %s", exc)
