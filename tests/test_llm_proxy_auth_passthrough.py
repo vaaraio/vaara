@@ -70,7 +70,17 @@ class TestCli:
 
 
 class TestBuildApp:
+    """Needs the llm-proxy extra. The header and CLI tests above deliberately
+    do not, so the contract stays covered in jobs that install only the
+    signing extras."""
+
     def _app(self, api_key):
+        pytest.importorskip(
+            "httpx", reason="llm-proxy extra not installed "
+                            "(pip install 'vaara[llm-proxy]')")
+        pytest.importorskip(
+            "fastapi", reason="llm-proxy extra not installed "
+                              "(pip install 'vaara[llm-proxy]')")
         from vaara.integrations._llm_proxy_app import build_app
         from vaara.integrations.llm_proxy import _build_pipeline
         return build_app(
