@@ -13,13 +13,23 @@ from __future__ import annotations
 
 import json
 
-import httpx
 import pytest
-from fastapi.testclient import TestClient
 
-from vaara.integrations._llm_proxy_app import build_app
-from vaara.integrations.llm_proxy import _build_pipeline
-from vaara.integrations.llm_seal import SealRegistry, placeholder_for
+# The proxy extras are optional, and the signing-extras CI job installs only
+# the signing ones. Importing these at module level errored collection for
+# that whole job rather than skipping this file, which is what every other
+# proxy test in the tree guards against.
+httpx = pytest.importorskip("httpx", reason="proxy deps not installed: no httpx")
+pytest.importorskip("fastapi", reason="proxy deps not installed: no fastapi")
+
+from fastapi.testclient import TestClient  # noqa: E402
+
+from vaara.integrations._llm_proxy_app import build_app  # noqa: E402
+from vaara.integrations.llm_proxy import _build_pipeline  # noqa: E402
+from vaara.integrations.llm_seal import (  # noqa: E402
+    SealRegistry,
+    placeholder_for,
+)
 
 SECRET = "anti-note"
 TOKEN = placeholder_for(SECRET)
