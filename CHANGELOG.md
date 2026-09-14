@@ -6,6 +6,8 @@ and this project follows [Semantic Versioning](https://semver.org/spec/v2.0.0.ht
 
 ## [Unreleased]
 
+## [1.87.0] - 2026-09-14
+
 ### Added
 
 - A decision record and the execution receipt bound to it are now checked for order, not only for binding.
