@@ -6,6 +6,22 @@ and this project follows [Semantic Versioning](https://semver.org/spec/v2.0.0.ht
 
 ## [Unreleased]
 
+### Added
+
+- A decision record and the execution receipt bound to it are now checked for order, not only for binding.
+
+  `records_paired` answers whether two records describe one governed call. It compares an attestation back-link and a content digest. Neither carries a time, so a receipt claiming the call completed in 1999 paired with a decision made in 2026 exactly as well as one that did not. Measured on the shipped `decision_pairing_v0` fixtures before this change: moving `completedAt` back by a year, and then to 1999, left `records_paired` returning `True` in both runs.
+
+  `draft-sirkkavaara-vaara-receipt-10` states that only the pair establishes that an action was permitted and *then* took effect. Nothing enforced the "then".
+
+  `effect_ordering` is the separate verdict, with three named results rather than a third state folded into an existing boolean: `ordered`, `effect_precedes_decision`, and `not_comparable` when either timestamp is absent or unparseable. `records_paired` is unchanged, so binding and ordering stay two questions with two answers.
+
+  The tolerance is a deployment parameter and defaults to 0 seconds. The two timestamps are written by whichever parties governed and executed the call, and their clocks are not required to agree, so a deployment that permits skew states how much it permits. Nothing new travels on the wire: `decidedAt` and `completedAt` are both already inside the signed payloads.
+
+  The limit is stated in the code and not argued around. An issuer that controls both records controls both clocks, so ordering that verifies here constrains a confused or partial implementation and not a determined forger. Anchoring the timestamps outside the issuer is what would close that, and this does not do it.
+
+  New conformance case `decision_pairing_v0/normative/effect_precedes_decision`: a correctly signed, correctly paired receipt whose effect is stamped one hour before the decision that permitted it. `records_paired` is `true` and `effect_ordering` is `effect_precedes_decision` in the same expected verdict.
+
 ## [1.86.1] - 2026-09-14
 
 ### Fixed

@@ -1,0 +1,9 @@
+{
+  "decision_back_link_ok": true,
+  "decision_signature_ok": true,
+  "effect_ordering": "effect_precedes_decision",
+  "note": "the receipt is correctly signed and correctly paired: it shares the attestation back-link and commits to this decision's digest. Its completedAt is one hour before the decision's decidedAt. Pairing binds the two records to one call and says nothing about their order, so the ordering verdict is reported separately under its own reason string rather than collapsed into records_paired.",
+  "receipt_back_link_ok": true,
+  "receipt_signature_ok": true,
+  "records_paired": true
+}

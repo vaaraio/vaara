@@ -21,6 +21,7 @@ from __future__ import annotations
 import hashlib
 import hmac
 from collections.abc import Mapping, Sequence
+from datetime import datetime, timedelta, timezone
 from typing import Any
 
 from vaara.attestation._decision_types import DecisionRecord
@@ -252,6 +253,75 @@ def records_paired(
     if bound is None:
         return False
     return hmac.compare_digest(bound, decision_digest(decision))
+
+
+EFFECT_ORDERED = "ordered"
+EFFECT_PRECEDES_DECISION = "effect_precedes_decision"
+EFFECT_ORDER_NOT_COMPARABLE = "not_comparable"
+
+
+def _instant(value: object) -> datetime | None:
+    """An aware UTC datetime from an ISO 8601 wire string, or None.
+
+    Returns None rather than raising for anything that does not parse.
+    An unparseable timestamp is a third state with its own name, not a
+    failure of ordering and not a pass.
+    """
+    if not isinstance(value, str) or not value:
+        return None
+    text = value[:-1] + "+00:00" if value.endswith("Z") else value
+    try:
+        parsed = datetime.fromisoformat(text)
+    except ValueError:
+        return None
+    return parsed if parsed.tzinfo else parsed.replace(tzinfo=timezone.utc)
+
+
+def effect_ordering(
+    decision: DecisionRecord,
+    receipt: ExecutionReceipt,
+    *,
+    tolerance_seconds: float = 0.0,
+) -> str:
+    """Whether the receipt's effect happened at or after its decision.
+
+    ``records_paired`` answers whether two records describe one call. It
+    compares an attestation back-link and a content digest, and neither
+    carries a time, so a receipt claiming the call completed years before
+    the decision that permitted it pairs exactly as well as one that did
+    not. This function answers the ordering question separately and
+    returns its own reason string rather than folding a third state into
+    an existing boolean:
+
+    - ``EFFECT_ORDERED``: ``completedAt`` is at or after ``decidedAt``,
+      within ``tolerance_seconds``.
+    - ``EFFECT_PRECEDES_DECISION``: the effect is stamped before the
+      decision by more than the tolerance. The pair still binds; what it
+      does not support is the claim that the action was permitted and
+      *then* took effect.
+    - ``EFFECT_ORDER_NOT_COMPARABLE``: one of the two timestamps is
+      absent or does not parse, so no ordering claim can be made in
+      either direction.
+
+    ``tolerance_seconds`` is a deployment parameter and defaults to 0.
+    The two timestamps are written by whichever parties governed and
+    executed the call, whose clocks are not required to agree, so a
+    deployment that permits skew states how much it permits. Nothing on
+    the wire carries it: both timestamps are already signed, and this
+    reads them.
+
+    What it does not establish: an issuer that controls both records
+    controls both clocks. Ordering that verifies here constrains a
+    confused or partial implementation, not a determined forger. For that
+    the timestamps need an anchor outside the issuer.
+    """
+    decided = _instant(decision.decision_derived.decided_at)
+    completed = _instant(receipt.outcome_derived.completed_at)
+    if decided is None or completed is None:
+        return EFFECT_ORDER_NOT_COMPARABLE
+    if completed + timedelta(seconds=tolerance_seconds) < decided:
+        return EFFECT_PRECEDES_DECISION
+    return EFFECT_ORDERED
 
 
 class AmbiguousSupersessionError(ValueError):

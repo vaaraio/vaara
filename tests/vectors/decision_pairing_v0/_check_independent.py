@@ -20,6 +20,7 @@ import hashlib
 import hmac
 import json
 import sys
+from datetime import datetime, timedelta, timezone
 from pathlib import Path
 
 import rfc8785
@@ -163,6 +164,44 @@ def records_paired(decision: dict, receipt: dict) -> bool:
     return hmac.compare_digest(bound, decision_digest(decision))
 
 
+EFFECT_ORDERED = "ordered"
+EFFECT_PRECEDES_DECISION = "effect_precedes_decision"
+EFFECT_ORDER_NOT_COMPARABLE = "not_comparable"
+
+
+def _instant(value):
+    """An aware UTC datetime from an ISO 8601 wire string, or None."""
+    if not isinstance(value, str) or not value:
+        return None
+    text = value[:-1] + "+00:00" if value.endswith("Z") else value
+    try:
+        parsed = datetime.fromisoformat(text)
+    except ValueError:
+        return None
+    return parsed if parsed.tzinfo else parsed.replace(tzinfo=timezone.utc)
+
+
+def effect_ordering(decision: dict, receipt: dict,
+                    tolerance_seconds: float = 0.0) -> str:
+    """Whether the effect is stamped at or after the decision that allowed it.
+
+    records_paired compares a back-link and a content digest, neither of
+    which carries a time, so a receipt claiming the call completed before
+    its decision pairs exactly as well as one that did not. This is the
+    separate ordering verdict, with its own reason string rather than a
+    third state folded into an existing boolean. The tolerance is a
+    deployment parameter: the two clocks belong to different parties and
+    are not required to agree.
+    """
+    decided = _instant(decision["decisionDerived"].get("decidedAt"))
+    completed = _instant(receipt["outcomeDerived"].get("completedAt"))
+    if decided is None or completed is None:
+        return EFFECT_ORDER_NOT_COMPARABLE
+    if completed + timedelta(seconds=tolerance_seconds) < decided:
+        return EFFECT_PRECEDES_DECISION
+    return EFFECT_ORDERED
+
+
 def supersession_verdict(decisions: list) -> str:
     """The effective decision among records for one call. The latest
     decidedAt wins. When distinct records share the latest decidedAt with
@@ -207,6 +246,8 @@ def _verdicts(case: Path, expected: dict) -> dict:
             got[key] = verify_back_link(rec, att)
         elif key == "records_paired":
             got[key] = records_paired(dec, rec)
+        elif key == "effect_ordering":
+            got[key] = effect_ordering(dec, rec)
         elif key == "shared_back_link":
             got[key] = dec["backLink"] == rec["backLink"]
         elif key == "supersession":
