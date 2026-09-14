@@ -143,14 +143,21 @@ def build_app(*, upstream: str, api_key: Optional[str], api_key_header: str,
     # AsyncClient(http2=True) raises ImportError at construction — which
     # took the whole proxy down at startup rather than costing it
     # multiplexing. Fall back to HTTP/1.1, which every provider speaks.
+    # No timeout. httpx defaults to 5s on every phase, including each read
+    # of a buffered response, so an upstream that pauses longer than that
+    # mid-generation raises ReadTimeout and the caller sees a 502. Long
+    # generations pause for longer than 5s routinely. The infer proxy
+    # already runs with Timeout(None) for the same reason.
+    _no_timeout = httpx.Timeout(None)
     try:
-        client = httpx.AsyncClient(base_url=upstream, http2=True)
+        client = httpx.AsyncClient(
+            base_url=upstream, http2=True, timeout=_no_timeout)
     except ImportError:
         logger.info(
             "h2 is not installed; llm-proxy is using HTTP/1.1. Install "
             "'vaara[llm-proxy]' (or httpx[http2]) for HTTP/2 multiplexing.",
         )
-        client = httpx.AsyncClient(base_url=upstream)
+        client = httpx.AsyncClient(base_url=upstream, timeout=_no_timeout)
 
     _rate_buckets: dict[str, list[float]] = {}
     _model_allow_pats = _compile_glob_patterns(model_allow or [])
@@ -255,7 +262,11 @@ def build_app(*, upstream: str, api_key: Optional[str], api_key_header: str,
                 chat_path, content=outbound, headers=headers,
             )
         except httpx.RequestError as exc:
-            logger.error("Upstream request failed: %s", exc)
+            # httpx.RequestError often stringifies empty (ReadError,
+            # RemoteProtocolError), which logs a failure with no reason.
+            # The class name is always there, so lead with it.
+            logger.error("Upstream request failed: %s: %s",
+                         type(exc).__name__, exc)
             return JSONResponse({"error": f"upstream: {exc}"}, status_code=502)
 
         if is_stream:

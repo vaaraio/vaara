@@ -57,6 +57,27 @@ def _build_pipeline(db: Optional[Path] = None) -> InterceptionPipeline:
 def add_arguments(parser): ...
 
 
+def _timestamped_log_config():
+    """uvicorn's own logging config, with a dated prefix on every line.
+
+    uvicorn's defaults carry no time at all, so an operator correlating a
+    502 in this log against a trail entry has nothing to join on. The
+    sibling proxies all set %(asctime)s through basicConfig; that does not
+    work here because uvicorn installs its own handlers, so the timestamp
+    has to go into uvicorn's formatters instead.
+    """
+    from copy import deepcopy
+
+    from uvicorn.config import LOGGING_CONFIG
+
+    config = deepcopy(LOGGING_CONFIG)
+    for formatter in config["formatters"].values():
+        formatter["fmt"] = "%(asctime)s " + formatter["fmt"]
+        # Offset included, so a log shipped off this box stays unambiguous.
+        formatter["datefmt"] = "%Y-%m-%dT%H:%M:%S%z"
+    return config
+
+
 def main(args: Optional[list[str]] = None) -> int:
     import argparse
 
@@ -235,13 +256,15 @@ def main(args: Optional[list[str]] = None) -> int:
 
     if parsed.seal_listen_unix:
         sock_path = str(Path(parsed.seal_listen_unix).expanduser())
-        config = Config(app=app, uds=sock_path, log_level="info")
+        config = Config(app=app, uds=sock_path, log_level="info",
+                        log_config=_timestamped_log_config())
         where = f"unix:{sock_path}"
     else:
         host, _, port_str = parsed.listen.rpartition(":")
         port = int(port_str) if port_str else 8790
         host = host or "127.0.0.1"
-        config = Config(app=app, host=host, port=port, log_level="info")
+        config = Config(app=app, host=host, port=port, log_level="info",
+                        log_config=_timestamped_log_config())
         where = f"{host}:{port}"
     server = Server(config=config)
 
