@@ -6,6 +6,16 @@ and this project follows [Semantic Versioning](https://semver.org/spec/v2.0.0.ht
 
 ## [Unreleased]
 
+### Fixed
+
+- `vaara llm-proxy` no longer runs the upstream request on httpx's 5 second default timeout.
+
+  The proxy built its upstream client without a timeout, so every phase inherited httpx's default of 5 seconds, including each read of a buffered response. The chat handler buffers rather than streams, so a generation that paused for longer than 5 seconds mid-response raised `ReadTimeout` and the caller received a 502. Long generations pause for longer than that routinely. Measured against a live provider, 11 of 83 calls failed this way, intermittently and recovering on their own. The inference proxy already ran with no timeout; only this client was missed.
+
+  Upstream failures were also unreadable. `httpx.RequestError` stringifies to nothing for `ReadTimeout` and `RemoteProtocolError`, so the log recorded a failure with no reason. The exception class name is now logged alongside the message.
+
+  uvicorn's access log carried no timestamp, so a 502 in `proxy.log` could not be dated or lined up against the audit trail. The proxy now installs uvicorn's logging config with an ISO 8601 prefix, including the UTC offset, on every line.
+
 ## [1.86.0] - 2026-09-13
 
 ### Added
