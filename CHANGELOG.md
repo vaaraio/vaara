@@ -6,6 +6,8 @@ and this project follows [Semantic Versioning](https://semver.org/spec/v2.0.0.ht
 
 ## [Unreleased]
 
+## [1.86.1] - 2026-09-14
+
 ### Fixed
 
 - `vaara llm-proxy` no longer runs the upstream request on httpx's 5 second default timeout.
