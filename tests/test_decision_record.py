@@ -23,10 +23,14 @@ for _mod in ("rfc8785", "cryptography"):
 from cryptography.hazmat.primitives.asymmetric import ec, rsa  # noqa: E402
 
 from vaara.attestation.decision import (  # noqa: E402
+    EFFECT_ORDER_NOT_COMPARABLE,
+    EFFECT_ORDERED,
+    EFFECT_PRECEDES_DECISION,
     AmbiguousSupersessionError,
     DecisionDerived,
     EvidenceRef,
     decision_digest,
+    effect_ordering,
     emit_decision_record,
     make_back_link,
     parse_decision_record,
@@ -490,3 +494,87 @@ def test_commit_payload_allow_maps_through():
     att = _attestation()
     r = _emit(att, decision_derived=dd)
     assert verify_decision_signature(r, verifying_material=HS_SECRET) is True
+
+
+def _receipt_completed_at(att, decision, completed_at):
+    """A correctly signed, correctly paired receipt stamped at ``completed_at``."""
+    return emit_receipt(
+        back_link=make_back_link(att),
+        outcome_derived=OutcomeDerived(
+            status="executed",
+            completed_at=completed_at,
+            result_commitment=make_result_digest({"ok": True}),
+            decision_digest=decision_digest(decision),
+        ),
+        iss="vaara-proxy://acme-eu",
+        sub="tenant:acme/agent:billing-bot",
+        secret_version="2026-05",
+        alg="HS256",
+        signing_material=HS_SECRET,
+    )
+
+
+def test_effect_after_decision_is_ordered():
+    att = _attestation()
+    decision = _emit(att)
+    # The shipped helper stamps the effect two seconds after the decision.
+    assert effect_ordering(decision, _outcome_receipt(att, decision)) == (
+        EFFECT_ORDERED)
+
+
+def test_effect_before_decision_is_named_and_still_pairs():
+    """The gap this closes: pairing binds two records to one call and says
+    nothing about their order, so an effect stamped before the decision that
+    permitted it paired clean. Both answers are now available separately."""
+    att = _attestation()
+    decision = _emit(att)  # decided_at 2026-05-31T09:30:00Z
+    receipt = _receipt_completed_at(att, decision, "2025-01-01T00:00:00Z")
+    assert records_paired(decision, receipt) is True
+    assert effect_ordering(decision, receipt) == EFFECT_PRECEDES_DECISION
+
+
+def test_equal_timestamps_are_ordered():
+    att = _attestation()
+    decision = _emit(att)
+    receipt = _receipt_completed_at(att, decision, "2026-05-31T09:30:00Z")
+    assert effect_ordering(decision, receipt) == EFFECT_ORDERED
+
+
+def test_tolerance_absorbs_declared_skew_and_stops_at_its_edge():
+    """The two clocks belong to different parties, so a deployment states the
+    skew it accepts. Outside the stated window the verdict stands."""
+    att = _attestation()
+    decision = _emit(att)
+    receipt = _receipt_completed_at(att, decision, "2026-05-31T09:29:57Z")
+    assert effect_ordering(decision, receipt) == EFFECT_PRECEDES_DECISION
+    assert effect_ordering(decision, receipt, tolerance_seconds=3) == (
+        EFFECT_ORDERED)
+    assert effect_ordering(decision, receipt, tolerance_seconds=2) == (
+        EFFECT_PRECEDES_DECISION)
+
+
+def test_unparseable_timestamp_is_its_own_verdict():
+    """Not comparable is a third state with its own name. Folding it into
+    either of the other two would report an ordering nobody established."""
+    att = _attestation()
+    decision = _emit(att)
+    receipt = _receipt_completed_at(att, decision, "whenever")
+    assert effect_ordering(decision, receipt) == EFFECT_ORDER_NOT_COMPARABLE
+    undated = dataclasses.replace(
+        decision,
+        decision_derived=dataclasses.replace(
+            decision.decision_derived, decided_at=""),
+    )
+    good = _receipt_completed_at(att, decision, "2026-05-31T09:30:02Z")
+    assert effect_ordering(undated, good) == EFFECT_ORDER_NOT_COMPARABLE
+
+
+def test_offset_timestamps_compare_against_utc():
+    """A wire timestamp may carry an offset instead of Z; the comparison is
+    between instants, not between strings."""
+    att = _attestation()
+    decision = _emit(att)  # 09:30:00Z
+    later = _receipt_completed_at(att, decision, "2026-05-31T12:30:01+03:00")
+    assert effect_ordering(decision, later) == EFFECT_ORDERED
+    earlier = _receipt_completed_at(att, decision, "2026-05-31T11:29:59+03:00")
+    assert effect_ordering(decision, earlier) == EFFECT_PRECEDES_DECISION

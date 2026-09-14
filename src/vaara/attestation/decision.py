@@ -48,10 +48,14 @@ from vaara.attestation._decision_types import (
     decision_record_from_dict as parse_decision_record,
 )
 from vaara.attestation._decision_verifier import (
+    EFFECT_ORDER_NOT_COMPARABLE,
+    EFFECT_ORDERED,
+    EFFECT_PRECEDES_DECISION,
     FALLBACK_PROJECTION_V1,
     AmbiguousSupersessionError,
     MalformedFallbackBindingError,
     decision_digest,
+    effect_ordering,
     fallback_projection,
     records_paired,
     request_envelope_digest,
@@ -67,6 +71,9 @@ from vaara.attestation._receipt_verifier import (
 )
 
 __all__ = [
+    "EFFECT_ORDERED",
+    "EFFECT_ORDER_NOT_COMPARABLE",
+    "EFFECT_PRECEDES_DECISION",
     "FALLBACK_PROJECTION_V1",
     "AmbiguousSupersessionError",
     "BackLink",
@@ -79,6 +86,7 @@ __all__ = [
     "MalformedFallbackBindingError",
     "attestation_digest",
     "decision_digest",
+    "effect_ordering",
     "emit_decision_record",
     "fallback_projection",
     "make_back_link",
