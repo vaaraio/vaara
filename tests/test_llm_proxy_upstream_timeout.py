@@ -16,12 +16,21 @@ This pins the property rather than a spelling: every AsyncClient this module
 constructs must set a timeout explicitly, so a future branch that adds another
 client cannot silently inherit the 5 second default either.
 """
+from __future__ import annotations
+
 import inspect
 import re
 
-import httpx
+import pytest
 
-from vaara.integrations import _llm_proxy_app
+# The proxy extras are optional, and the signing-extras CI job installs only
+# the signing ones. Importing these at module level errored collection for
+# that whole job rather than skipping this file, which is what every other
+# proxy test in the tree guards against.
+httpx = pytest.importorskip("httpx", reason="proxy deps not installed: no httpx")
+pytest.importorskip("fastapi", reason="proxy deps not installed: no fastapi")
+
+from vaara.integrations import _llm_proxy_app  # noqa: E402
 
 
 def _async_client_calls():
