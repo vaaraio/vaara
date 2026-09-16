@@ -106,6 +106,7 @@ def build_app(*, upstream: str, api_key: Optional[str], api_key_header: str,
               rate_limit_rpm: int = 0,
               redact_patterns: Optional[list[str]] = None,
               agent_id_header: str = "x-agent-id",
+              agent_id_default: str = "llm-agent",
               seal_registry: Optional[Any] = None,
               allowed_origins: Optional[list[str]] = None) -> FastAPI:
     app = FastAPI(title="Vaara LLM Proxy")
@@ -143,21 +144,22 @@ def build_app(*, upstream: str, api_key: Optional[str], api_key_header: str,
     # AsyncClient(http2=True) raises ImportError at construction — which
     # took the whole proxy down at startup rather than costing it
     # multiplexing. Fall back to HTTP/1.1, which every provider speaks.
-    # No timeout. httpx defaults to 5s on every phase, including each read
-    # of a buffered response, so an upstream that pauses longer than that
-    # mid-generation raises ReadTimeout and the caller sees a 502. Long
-    # generations pause for longer than 5s routinely. The infer proxy
-    # already runs with Timeout(None) for the same reason.
-    _no_timeout = httpx.Timeout(None)
+    # Per-phase timeout. httpx defaults to 5s on every phase, including each
+    # read of a buffered response, so an upstream that pauses longer than
+    # that mid-generation raised ReadTimeout and the caller saw a 502. Long
+    # generations pause for longer than 5s routinely, so read is unbounded.
+    # Connect and write are not: Timeout(None) everywhere meant a dead
+    # upstream hung the request forever with nothing recorded.
+    _timeout = httpx.Timeout(connect=10.0, write=30.0, read=None, pool=None)
     try:
         client = httpx.AsyncClient(
-            base_url=upstream, http2=True, timeout=_no_timeout)
+            base_url=upstream, http2=True, timeout=_timeout)
     except ImportError:
         logger.info(
             "h2 is not installed; llm-proxy is using HTTP/1.1. Install "
             "'vaara[llm-proxy]' (or httpx[http2]) for HTTP/2 multiplexing.",
         )
-        client = httpx.AsyncClient(base_url=upstream, timeout=_no_timeout)
+        client = httpx.AsyncClient(base_url=upstream, timeout=_timeout)
 
     _rate_buckets: dict[str, list[float]] = {}
     _model_allow_pats = _compile_glob_patterns(model_allow or [])
@@ -175,7 +177,7 @@ def build_app(*, upstream: str, api_key: Optional[str], api_key_header: str,
         return await _proxy_pass_through(path, request)
 
     async def _handle_chat(path: str, request: Request) -> Response:
-        agent_id = request.headers.get(agent_id_header, "llm-agent")
+        agent_id = request.headers.get(agent_id_header, agent_id_default)
         body_bytes = await request.body()
         if not body_bytes:
             return JSONResponse({"error": "empty request body"}, status_code=400)
@@ -219,9 +221,41 @@ def build_app(*, upstream: str, api_key: Optional[str], api_key_header: str,
                 return JSONResponse({"error": "rate limited"}, status_code=429)
             window.append(now)
 
+        # Seal named secrets on the way out, BEFORE the trail record is
+        # written, so the record can say what actually left. Fails open: a
+        # sealing fault costs the sealing, never the request, but the fault
+        # is recorded rather than hidden. Forwarding the raw bytes rather than
+        # re-serialising the parsed body also keeps the payload byte-identical
+        # when sealing is off, which matters because any rewrite of the early
+        # message content invalidates the provider's prompt-cache prefix.
+        outbound = body_bytes
+        seal_state: dict[str, Any] = {
+            "seal_active": False, "seal_count": 0, "seal_fault": None}
+        if _seal is not None:
+            try:
+                _seal.refresh()
+            except Exception as exc:  # pragma: no cover - guard, not a path
+                logger.warning("seal refresh failed: %s", exc)
+            if _seal.active:
+                seal_state["seal_active"] = True
+                try:
+                    outbound = _seal.seal_bytes(body_bytes)
+                    seal_state["seal_count"] = _seal.count_sealed(outbound)
+                except Exception as exc:
+                    logger.warning(
+                        "sealing failed, forwarding unsealed: %s", exc)
+                    outbound = body_bytes
+                    seal_state["seal_fault"] = \
+                        f"{type(exc).__name__}: {exc}"[:200]
+
         audit_params = _build_audit_params(
             body, body_bytes, model_name, provider,
             agent_id, mode, audit_level, _redact_pats)
+        audit_params.update(seal_state)
+        # What governed this request. A reader of the record can then tell
+        # a proxy that would have blocked from one that only watched.
+        audit_params["enforce"] = enforce
+        audit_params["audit_level"] = audit_level
 
         result = pipeline.intercept(
             agent_id=agent_id, tool_name="llm.prompt",
@@ -229,26 +263,15 @@ def build_app(*, upstream: str, api_key: Optional[str], api_key_header: str,
         )
 
         if not result.allowed and enforce:
-            pipeline.report_outcome(result.action_id, outcome_severity=1.0)
+            pipeline.report_outcome(
+                result.action_id, outcome_severity=1.0,
+                description=_outcome("denied"))
             return JSONResponse(
                 {"error": result.reason or "denied"}, status_code=403)
 
         headers = _upstream_headers(request.headers)
 
         is_stream = body.get("stream", False)
-
-        # Seal named secrets on the way out. Fails open: a sealing fault costs
-        # the sealing, never the request. Forwarding the raw bytes rather than
-        # re-serialising the parsed body also keeps the payload byte-identical
-        # when sealing is off, which matters because any rewrite of the early
-        # message content invalidates the provider's prompt-cache prefix.
-        outbound = body_bytes
-        if _seal is not None and _seal.active:
-            try:
-                outbound = _seal.seal_bytes(body_bytes)
-            except Exception as exc:  # pragma: no cover - guard, not a path
-                logger.warning("sealing failed, forwarding unsealed: %s", exc)
-                outbound = body_bytes
 
         # `path` reached here only because handle_request matched it against
         # _CHAT_PATHS, so the constant is recoverable and is what we forward.
@@ -267,6 +290,10 @@ def build_app(*, upstream: str, api_key: Optional[str], api_key_header: str,
             # The class name is always there, so lead with it.
             logger.error("Upstream request failed: %s: %s",
                          type(exc).__name__, exc)
+            pipeline.report_outcome(
+                result.action_id, outcome_severity=0.5,
+                description=_outcome(
+                    "upstream_error", error=type(exc).__name__))
             return JSONResponse({"error": f"upstream: {exc}"}, status_code=502)
 
         if is_stream:
@@ -279,15 +306,25 @@ def build_app(*, upstream: str, api_key: Optional[str], api_key_header: str,
             )
 
         raw_response = upstream_response.content
+        unseal_count = 0
+        unmapped: list[str] = []
         if _seal is not None and _seal.active:
             try:
-                raw_response = _seal.unseal_bytes(raw_response)
-            except Exception as exc:  # pragma: no cover - guard, not a path
+                text, unseal_count = _seal.unseal_text_counted(
+                    raw_response.decode("utf-8"))
+                raw_response = text.encode("utf-8")
+                unmapped = _seal.unmapped_placeholders(raw_response)
+            except Exception as exc:
                 logger.warning("unsealing failed, passing through: %s", exc)
                 raw_response = upstream_response.content
 
-        pipeline.report_outcome(result.action_id, outcome_severity=0.0
-                                if upstream_response.is_success else 0.5)
+        pipeline.report_outcome(
+            result.action_id,
+            outcome_severity=0.0 if upstream_response.is_success else 0.5,
+            description=_outcome(
+                "ok" if upstream_response.is_success else "upstream_status",
+                http_status=upstream_response.status_code,
+                unseal_count=unseal_count, unmapped_placeholders=unmapped))
         return Response(
             content=raw_response,
             status_code=upstream_response.status_code,
@@ -354,7 +391,12 @@ def _build_audit_params(body: dict, body_bytes: bytes,
     return params
 
 
-async def _forward_stream(upstream_response: httpx.Response,
+def _outcome(status: str, **fields: Any) -> str:
+    """The outcome description: one JSON object, so a reader can parse it."""
+    return json.dumps({"status": status, **fields}, sort_keys=True)
+
+
+async def _forward_stream(upstream_response: Any,
                            pipeline: InterceptionPipeline,
                            action_id: str,
                            seal: Optional[Any] = None):
@@ -362,6 +404,7 @@ async def _forward_stream(upstream_response: httpx.Response,
     if seal is not None and seal.active:
         from .llm_seal import StreamUnsealer
         unsealer = StreamUnsealer(seal)
+    done = False
     try:
         async for chunk in upstream_response.aiter_bytes():
             if unsealer is None:
@@ -380,11 +423,67 @@ async def _forward_stream(upstream_response: httpx.Response,
             tail = unsealer.flush()
             if tail:
                 yield tail
-        pipeline.report_outcome(action_id, outcome_severity=0.0)
-    except Exception as exc:
-        logger.warning("Stream error: %s", exc)
-        pipeline.report_outcome(action_id, outcome_severity=0.8)
+        done = True
+        pipeline.report_outcome(
+            action_id, outcome_severity=0.0,
+            description=_outcome(
+                "ok",
+                unseal_count=unsealer.restored if unsealer else 0,
+                unmapped_placeholders=unsealer.unmapped if unsealer else []))
+    except BaseException as exc:
+        # BaseException, not Exception. A client that goes away mid-stream
+        # arrives here as GeneratorExit (Starlette closing the body
+        # generator) or CancelledError, and neither is an Exception. With the
+        # narrower clause nothing was recorded and the action stayed pending
+        # for good: 178 of them at the 2026-09-16 audit.
+        if not done:
+            aborted = isinstance(exc, (GeneratorExit,
+                                       __import__("asyncio").CancelledError))
+            logger.warning("Stream %s: %s: %s",
+                           "aborted" if aborted else "error",
+                           type(exc).__name__, exc)
+            pipeline.report_outcome(
+                action_id,
+                outcome_severity=0.5 if aborted else 0.8,
+                description=_outcome(
+                    "aborted" if aborted else "stream_error",
+                    error=type(exc).__name__,
+                    unseal_count=unsealer.restored if unsealer else 0))
         raise
+
+
+def sweep_orphaned_outcomes(pipeline: InterceptionPipeline,
+                            process_started: float) -> int:
+    """Close ``llm.prompt`` outcomes left pending by an earlier process.
+
+    A pending outcome older than this process belongs to a request no one
+    will ever finish reporting: the process that made it is gone. Closing it
+    as ``orphaned`` says so in the trail instead of leaving a request that
+    looks in flight forever. Other tools' pending rows are left alone; the
+    cross-process ``vaara check`` / ``vaara outcome`` pair owns those.
+    """
+    backend = getattr(pipeline.trail, "_backend", None)
+    lister = getattr(backend, "list_pending_outcomes", None)
+    if lister is None:
+        return 0
+    try:
+        rows = lister(tool_name="llm.prompt", created_before=process_started)
+    except Exception:
+        logger.exception("could not list pending outcomes")
+        return 0
+    closed = 0
+    for row in rows:
+        try:
+            pipeline.report_outcome(
+                row["action_id"], outcome_severity=0.5,
+                description=_outcome("orphaned"))
+            closed += 1
+        except Exception:
+            logger.exception("could not close orphaned outcome %s",
+                             row.get("action_id"))
+    if closed:
+        logger.info("closed %d orphaned llm.prompt outcome(s)", closed)
+    return closed
 
 
 def _compile_redact_patterns(extra: Optional[list[str]] = None) -> list[Any]:

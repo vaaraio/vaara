@@ -69,6 +69,14 @@ class SealRegistry:
     def __init__(self, secrets: Optional[dict[str, str]] = None) -> None:
         self._pairs: list[tuple[str, str]] = []
         self._reverse: dict[str, str] = {}
+        #: Where the entries came from, if a file. ``refresh`` re-reads it.
+        self._path: Optional[Path] = None
+        self._mtime: Optional[float] = None
+        self._load(secrets)
+
+    def _load(self, secrets: Optional[dict[str, str]]) -> None:
+        self._pairs = []
+        self._reverse = {}
         skipped = 0
         for name, secret in (secrets or {}).items():
             if not secret:
@@ -89,21 +97,64 @@ class SealRegistry:
         # Longest first, so a secret that contains another is sealed whole.
         self._pairs.sort(key=lambda p: len(p[0]), reverse=True)
 
-    @classmethod
-    def from_file(cls, path: str | Path) -> "SealRegistry":
-        """Load ``{"name": "secret"}`` from JSON. Missing file means inactive."""
-        p = Path(path)
-        if not p.exists():
-            return cls()
+    @staticmethod
+    def _read(p: Path) -> Optional[dict[str, str]]:
+        """Parse the file, or None when it cannot be used. Never raises."""
         try:
             data = json.loads(p.read_text(encoding="utf-8"))
         except (OSError, ValueError) as exc:
             logger.warning("seal registry %s unreadable (%s), sealing off", p, exc)
-            return cls()
+            return None
         if not isinstance(data, dict):
             logger.warning("seal registry %s is not an object, sealing off", p)
-            return cls()
-        return cls({str(k): str(v) for k, v in data.items()})
+            return None
+        return {str(k): str(v) for k, v in data.items()}
+
+    @staticmethod
+    def _stat_mtime(p: Path) -> Optional[float]:
+        try:
+            return p.stat().st_mtime
+        except OSError:
+            return None
+
+    @classmethod
+    def from_file(cls, path: str | Path) -> "SealRegistry":
+        """Load ``{"name": "secret"}`` from JSON. Missing file means inactive.
+
+        The registry remembers the path. ``refresh`` re-reads the file when
+        its mtime changes, so an edit reaches the running proxy instead of
+        waiting for a restart while the monitor already reports the new state.
+        """
+        p = Path(path)
+        reg = cls()
+        reg._path = p
+        reg._mtime = cls._stat_mtime(p)
+        if reg._mtime is None:
+            return reg
+        data = cls._read(p)
+        if data is not None:
+            reg._load(data)
+        return reg
+
+    def refresh(self) -> bool:
+        """Re-read the backing file if it changed. True when reloaded.
+
+        One stat per call. A file that vanished empties the registry, which
+        is what the operator asked for by deleting it. A file that became
+        unreadable also empties it: the proxy reports the state it can prove,
+        not the last good one.
+        """
+        if self._path is None:
+            return False
+        mtime = self._stat_mtime(self._path)
+        if mtime == self._mtime:
+            return False
+        self._mtime = mtime
+        data = self._read(self._path) if mtime is not None else None
+        self._load(data or {})
+        logger.info("seal registry %s reloaded, %d secret(s)",
+                    self._path, len(self._pairs))
+        return True
 
     @property
     def active(self) -> bool:
@@ -122,10 +173,17 @@ class SealRegistry:
         return text
 
     def unseal_text(self, text: str) -> str:
+        return self.unseal_text_counted(text)[0]
+
+    def unseal_text_counted(self, text: str) -> tuple[str, int]:
+        """Restore placeholders and say how many were restored."""
+        restored = 0
         for token, secret in self._reverse.items():
-            if token in text:
+            n = text.count(token)
+            if n:
+                restored += n
                 text = text.replace(token, secret)
-        return text
+        return text, restored
 
     def seal_bytes(self, raw: bytes) -> bytes:
         if not self._pairs:
@@ -175,6 +233,14 @@ class StreamUnsealer:
     def __init__(self, registry: SealRegistry) -> None:
         self._registry = registry
         self._carry = ""
+        #: How many placeholders were restored so far. For the receipt.
+        self.restored = 0
+        self._unmapped: set[str] = set()
+
+    @property
+    def unmapped(self) -> list[str]:
+        """Placeholders that passed through unrestored, sorted."""
+        return sorted(self._unmapped)
 
     def feed(self, chunk: bytes) -> bytes:
         if not self._registry.active:
@@ -187,17 +253,29 @@ class StreamUnsealer:
         # a placeholder that straddles the boundary have its head emitted raw
         # while its tail is still in the carry, which is what the first version
         # of this did and what the byte-at-a-time test caught.
-        text = self._registry.unseal_text(text)
+        text, n = self._registry.unseal_text_counted(text)
+        self.restored += n
         keep = max(0, PLACEHOLDER_LEN - 1)
         if len(text) > keep:
             emit, self._carry = text[:-keep], text[-keep:]
         else:
             emit, self._carry = "", text
+        # A placeholder still present after unsealing is one nobody here can
+        # restore. Count a match the first time its start falls inside the
+        # emitted slice. The carry is one byte shorter than a placeholder, so
+        # a match starting in the emitted slice is complete in `text`, and a
+        # match starting in the carry is seen again next feed with the same
+        # bytes ahead of it. Each is counted exactly once.
+        for m in _PLACEHOLDER_RE.finditer(text):
+            if m.start() < len(emit):
+                self._unmapped.add(m.group(0))
         return emit.encode("utf-8")
 
     def flush(self) -> bytes:
         if not self._carry:
             return b""
-        out = self._registry.unseal_text(self._carry)
+        out, n = self._registry.unseal_text_counted(self._carry)
+        self.restored += n
+        self._unmapped.update(_PLACEHOLDER_RE.findall(out))
         self._carry = ""
         return out.encode("utf-8")
