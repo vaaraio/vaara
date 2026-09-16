@@ -30,6 +30,7 @@ Usage::
 from __future__ import annotations
 
 import sys
+import time
 from pathlib import Path
 from typing import Optional
 
@@ -157,12 +158,25 @@ def main(args: Optional[list[str]] = None) -> int:
         help="Request header carrying the agent identity (default: x-agent-id)",
     )
     p.add_argument(
+        "--agent-id", default="llm-agent", metavar="ID",
+        help="Identity recorded when the caller sends no agent-id header "
+             "(default: llm-agent). A caller like Claude Code sends none, so "
+             "without this every record names the same anonymous agent.",
+    )
+    p.add_argument(
         "--seal-file", default=None, metavar="PATH",
         help="JSON object of {\"name\": \"secret\"} whose values are replaced "
              "with stable placeholders before the request reaches the "
              "provider, and restored in the response. Covers only what you "
              "name in advance. Missing or unreadable file means sealing is "
              "off and the proxy runs unchanged.",
+    )
+    p.add_argument(
+        "--allow-unsealed", action="store_true",
+        help="Start even when --seal-file loads no secrets. Without this the "
+             "proxy refuses, because an operator who passed --seal-file "
+             "believes secrets are being held back, and a proxy that runs "
+             "unsealed while the flag is set claims what it does not do.",
     )
     p.add_argument(
         "--seal-listen-unix", default=None, metavar="PATH",
@@ -223,16 +237,35 @@ def main(args: Optional[list[str]] = None) -> int:
     from ._llm_proxy_app import build_app
     from .llm_seal import SealRegistry
 
-    seal = SealRegistry.from_file(parsed.seal_file) if parsed.seal_file \
+    # Neither the path nor the contents of the seal file reach a log line.
+    seal_path = str(parsed.seal_file) if parsed.seal_file else None
+    seal = SealRegistry.from_file(seal_path) if seal_path \
         else SealRegistry()
-    if parsed.seal_file and not seal.active:
-        # Say so rather than running silently unsealed. An operator who passed
-        # --seal-file believes secrets are being held back.
+    if seal_path and not seal.active:
+        # An operator who passed --seal-file believes secrets are being held
+        # back. Running anyway would be the proxy claiming what it does not
+        # do, so it refuses unless told the unsealed run is intended.
+        if not parsed.allow_unsealed:
+            print(
+                "vaara llm-proxy: the --seal-file loaded nothing to seal; "
+                "refusing to start unsealed. Fix the file, or pass "
+                "--allow-unsealed to run with sealing OFF.",
+                file=sys.stderr,
+            )
+            return 2
         print(
-            f"vaara llm-proxy: seal file {parsed.seal_file} loaded no "
-            "secrets; sealing is OFF for this run.",
+            "vaara llm-proxy: the --seal-file loaded nothing to seal; "
+            "sealing is OFF for this run (--allow-unsealed).",
             file=sys.stderr,
         )
+
+    # Requests a dead process left pending would look in flight forever.
+    # Close them as orphaned before taking new ones.
+    from ._llm_proxy_app import sweep_orphaned_outcomes
+    orphaned = sweep_orphaned_outcomes(pipeline, process_started=time.time())
+    if orphaned:
+        print(f"vaara llm-proxy: closed {orphaned} orphaned outcome(s) from "
+              "an earlier process.", file=sys.stderr)
 
     app = build_app(
         upstream=parsed.upstream,
@@ -248,6 +281,7 @@ def main(args: Optional[list[str]] = None) -> int:
         seal_registry=seal,
         redact_patterns=parsed.redact,
         agent_id_header=parsed.agent_id_header,
+        agent_id_default=parsed.agent_id,
         allowed_origins=parsed.allow_origin,
     )
 

@@ -6,6 +6,23 @@ and this project follows [Semantic Versioning](https://semver.org/spec/v2.0.0.ht
 
 ## [Unreleased]
 
+## [1.88.0] - 2026-09-16
+
+### Added
+
+- Each `llm.prompt` record written by the llm-proxy now carries `seal_active`, `seal_count` and `seal_fault`, taken from the bytes that were forwarded. Sealing runs before the trail write, and a sealing fault is written to the record as well as the log.
+- Every llm-proxy outcome description is one JSON object with a `status`. With sealing on it also carries `unseal_count` and `unmapped_placeholders`. Upstream errors, denials and stream aborts each close their outcome with their own status.
+- The seal registry re-reads its file when the mtime changes, one stat per request. Deleting the file turns sealing off for the next request.
+- `--allow-unsealed` on `vaara llm-proxy`. Without it, a `--seal-file` that loads no secrets makes the proxy refuse to start with exit 2.
+- `--agent-id` on `vaara llm-proxy` sets the identity recorded when the caller sends no agent-id header. Each record also names the `enforce` flag and `audit_level` in force.
+- At startup the llm-proxy closes `llm.prompt` outcomes created before the process started as `orphaned`, through the normal outcome path.
+- `SQLiteAuditBackend.list_pending_outcomes(tool_name, created_before)`.
+
+### Fixed
+
+- A client that disconnected from the llm-proxy mid-stream raised `GeneratorExit` or `CancelledError`, neither an `Exception`, so the stream forwarder recorded no outcome and the action stayed pending. A live trail held 178 pending `llm.prompt` rows before this release. The forwarder now catches `BaseException`, records an aborted outcome at severity 0.5 and re-raises.
+- The llm-proxy upstream client bounds connect at 10 seconds and write at 30. Read stays unbounded. A dead upstream previously hung the request with nothing recorded.
+
 ## [1.87.0] - 2026-09-14
 
 ### Added
