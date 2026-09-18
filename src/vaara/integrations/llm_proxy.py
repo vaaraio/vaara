@@ -179,6 +179,15 @@ def main(args: Optional[list[str]] = None) -> int:
              "unsealed while the flag is set claims what it does not do.",
     )
     p.add_argument(
+        "--compact-history", type=int, default=0, metavar="N",
+        help="Keep the last N assistant turns verbatim and replace older tool "
+             "results and tool inputs with a size-and-digest stub before the "
+             "request leaves. User and assistant text is never touched. A "
+             "payload then leaves the machine once, when it is fresh, "
+             "instead of on every later call. The record carries bytes before "
+             "and after. 0 (default) is off.",
+    )
+    p.add_argument(
         "--markers-file", default=None, metavar="PATH",
         help="JSON object of {\"id\": \"marker\"}. Each prompt record lists "
              "the ids whose marker string was inside the bytes that left, so "
@@ -297,12 +306,15 @@ def main(args: Optional[list[str]] = None) -> int:
         agent_id_default=parsed.agent_id,
         allowed_origins=parsed.allow_origin,
         marker_watch=markers,
+        compact_keep_turns=parsed.compact_history,
     )
 
     seal_note = f", sealing {len(seal)} secret(s)" if seal.active \
         else ""
     if markers is not None and markers.active:
         seal_note += f", watching {len(markers)} marker(s)"
+    if parsed.compact_history > 0:
+        seal_note += f", compacting history beyond {parsed.compact_history} turn(s)"
 
     if parsed.seal_listen_unix:
         sock_path = str(Path(parsed.seal_listen_unix).expanduser())

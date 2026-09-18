@@ -35,6 +35,7 @@ from ._llm_proxy_shape import (
     redact_body,
     truncate_for_audit,
 )
+from .llm_compact import compact_messages
 from .llm_envelope import measure_envelope
 
 logger = logging.getLogger("vaara.llm_proxy")
@@ -110,7 +111,8 @@ def build_app(*, upstream: str, api_key: Optional[str], api_key_header: str,
               agent_id_default: str = "llm-agent",
               seal_registry: Optional[Any] = None,
               allowed_origins: Optional[list[str]] = None,
-              marker_watch: Optional[Any] = None) -> FastAPI:
+              marker_watch: Optional[Any] = None,
+              compact_keep_turns: int = 0) -> FastAPI:
     app = FastAPI(title="Vaara LLM Proxy")
     # This proxy holds the operator's upstream provider key and injects it
     # into every forwarded call, and it binds loopback with no inbound
@@ -235,6 +237,24 @@ def build_app(*, upstream: str, api_key: Optional[str], api_key_header: str,
         # when sealing is off, which matters because any rewrite of the early
         # message content invalidates the provider's prompt-cache prefix.
         outbound = body_bytes
+        # History compaction runs first, so that sealing and the envelope
+        # both see what will actually leave. Old tool payloads become
+        # size-and-digest stubs; the last N turns and every line of user or
+        # assistant text stay as sent. Off by default, and when it changes
+        # nothing the raw bytes are forwarded untouched.
+        compact_stats = {"bytes_before": len(body_bytes),
+                         "bytes_after": len(body_bytes),
+                         "compacted_blocks": 0}
+        if compact_keep_turns > 0 and isinstance(body.get("messages"), list):
+            new_msgs, compact_stats = compact_messages(
+                body["messages"], compact_keep_turns)
+            if compact_stats["compacted_blocks"] > 0:
+                body = dict(body)
+                body["messages"] = new_msgs
+                outbound = json.dumps(
+                    body, ensure_ascii=False).encode("utf-8")
+                compact_stats["bytes_before"] = len(body_bytes)
+                compact_stats["bytes_after"] = len(outbound)
         seal_state: dict[str, Any] = {
             "seal_active": False, "seal_count": 0, "seal_fault": None}
         if _seal is not None:
@@ -245,12 +265,13 @@ def build_app(*, upstream: str, api_key: Optional[str], api_key_header: str,
             if _seal.active:
                 seal_state["seal_active"] = True
                 try:
-                    outbound = _seal.seal_bytes(body_bytes)
+                    unsealed = outbound
+                    outbound = _seal.seal_bytes(unsealed)
                     seal_state["seal_count"] = _seal.count_sealed(outbound)
                 except Exception as exc:
                     logger.warning(
                         "sealing failed, forwarding unsealed: %s", exc)
-                    outbound = body_bytes
+                    outbound = unsealed
                     seal_state["seal_fault"] = \
                         f"{type(exc).__name__}: {exc}"[:200]
 
@@ -262,6 +283,10 @@ def build_app(*, upstream: str, api_key: Optional[str], api_key_header: str,
         # envelope is measured on the bytes that leave, after sealing, and so
         # is the marker check: a marker the seal replaced did not leave.
         audit_params["envelope"] = measure_envelope(body, outbound)
+        audit_params["envelope"]["bytes_before_compaction"] = \
+            compact_stats["bytes_before"]
+        audit_params["envelope"]["compacted_blocks"] = \
+            compact_stats["compacted_blocks"]
         present: list[str] = []
         if _markers is not None:
             try:
