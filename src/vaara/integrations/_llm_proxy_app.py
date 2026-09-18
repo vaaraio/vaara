@@ -35,6 +35,7 @@ from ._llm_proxy_shape import (
     redact_body,
     truncate_for_audit,
 )
+from .llm_envelope import measure_envelope
 
 logger = logging.getLogger("vaara.llm_proxy")
 
@@ -108,7 +109,8 @@ def build_app(*, upstream: str, api_key: Optional[str], api_key_header: str,
               agent_id_header: str = "x-agent-id",
               agent_id_default: str = "llm-agent",
               seal_registry: Optional[Any] = None,
-              allowed_origins: Optional[list[str]] = None) -> FastAPI:
+              allowed_origins: Optional[list[str]] = None,
+              marker_watch: Optional[Any] = None) -> FastAPI:
     app = FastAPI(title="Vaara LLM Proxy")
     # This proxy holds the operator's upstream provider key and injects it
     # into every forwarded call, and it binds loopback with no inbound
@@ -169,6 +171,10 @@ def build_app(*, upstream: str, api_key: Optional[str], api_key_header: str,
     # Sealing is independent of `mode`. Redaction protects the trail; sealing
     # protects the provider request, and an operator may want either alone.
     _seal = seal_registry
+    # The marker watch reports which private markers were in the bytes that
+    # left, by id. Like the seal it is refreshed per request and its strings
+    # never reach a log line or the trail.
+    _markers = marker_watch
 
     @app.api_route("/{path:path}", methods=["GET", "POST", "PUT", "DELETE", "PATCH"])
     async def handle_request(path: str, request: Request):
@@ -252,6 +258,18 @@ def build_app(*, upstream: str, api_key: Optional[str], api_key_header: str,
             body, body_bytes, model_name, provider,
             agent_id, mode, audit_level, _redact_pats)
         audit_params.update(seal_state)
+        # Sizes, not content, so they are recorded at every audit level. The
+        # envelope is measured on the bytes that leave, after sealing, and so
+        # is the marker check: a marker the seal replaced did not leave.
+        audit_params["envelope"] = measure_envelope(body, outbound)
+        present: list[str] = []
+        if _markers is not None:
+            try:
+                _markers.refresh()
+                present = _markers.present(outbound)
+            except Exception as exc:  # pragma: no cover - guard, not a path
+                logger.warning("marker watch failed: %s", type(exc).__name__)
+        audit_params["markers_present"] = present
         # What governed this request. A reader of the record can then tell
         # a proxy that would have blocked from one that only watched.
         audit_params["enforce"] = enforce
