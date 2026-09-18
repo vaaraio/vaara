@@ -37,6 +37,7 @@ from ._llm_proxy_shape import (
 )
 from .llm_compact import compact_messages
 from .llm_envelope import measure_envelope
+from .llm_usage import StreamUsage, extract_usage, usage_fields
 
 logger = logging.getLogger("vaara.llm_proxy")
 
@@ -361,13 +362,17 @@ def build_app(*, upstream: str, api_key: Optional[str], api_key_header: str,
                 logger.warning("unsealing failed, passing through: %s", exc)
                 raw_response = upstream_response.content
 
+        # What the provider says it counted, including the cached share of
+        # the input. Read off the reply the proxy already holds; the envelope
+        # alone cannot tell a cheap resend from an expensive one.
         pipeline.report_outcome(
             result.action_id,
             outcome_severity=0.0 if upstream_response.is_success else 0.5,
             description=_outcome(
                 "ok" if upstream_response.is_success else "upstream_status",
                 http_status=upstream_response.status_code,
-                unseal_count=unseal_count, unmapped_placeholders=unmapped))
+                unseal_count=unseal_count, unmapped_placeholders=unmapped,
+                **usage_fields(extract_usage(raw_response))))
         return Response(
             content=raw_response,
             status_code=upstream_response.status_code,
@@ -448,8 +453,13 @@ async def _forward_stream(upstream_response: Any,
         from .llm_seal import StreamUnsealer
         unsealer = StreamUnsealer(seal)
     done = False
+    # Counted on the chunks as they arrive, before any unsealing: the usage
+    # frames carry integers no placeholder appears in, and feeding the raw
+    # bytes means a sealing fault cannot also cost the numbers.
+    usage = StreamUsage()
     try:
         async for chunk in upstream_response.aiter_bytes():
+            usage.feed(chunk)
             if unsealer is None:
                 yield chunk
                 continue
@@ -472,7 +482,8 @@ async def _forward_stream(upstream_response: Any,
             description=_outcome(
                 "ok",
                 unseal_count=unsealer.restored if unsealer else 0,
-                unmapped_placeholders=unsealer.unmapped if unsealer else []))
+                unmapped_placeholders=unsealer.unmapped if unsealer else [],
+                **usage_fields(usage.usage)))
     except BaseException as exc:
         # BaseException, not Exception. A client that goes away mid-stream
         # arrives here as GeneratorExit (Starlette closing the body
@@ -491,7 +502,10 @@ async def _forward_stream(upstream_response: Any,
                 description=_outcome(
                     "aborted" if aborted else "stream_error",
                     error=type(exc).__name__,
-                    unseal_count=unsealer.restored if unsealer else 0))
+                    unseal_count=unsealer.restored if unsealer else 0,
+                    # A stream that died still spent its input. Whatever the
+                    # provider had reported by then is the honest number.
+                    **usage_fields(usage.usage)))
         raise
 
 
