@@ -35,6 +35,9 @@ from ._llm_proxy_shape import (
     redact_body,
     truncate_for_audit,
 )
+from .llm_compact import compact_messages
+from .llm_envelope import measure_envelope
+from .llm_usage import StreamUsage, extract_usage, usage_fields
 
 logger = logging.getLogger("vaara.llm_proxy")
 
@@ -108,7 +111,9 @@ def build_app(*, upstream: str, api_key: Optional[str], api_key_header: str,
               agent_id_header: str = "x-agent-id",
               agent_id_default: str = "llm-agent",
               seal_registry: Optional[Any] = None,
-              allowed_origins: Optional[list[str]] = None) -> FastAPI:
+              allowed_origins: Optional[list[str]] = None,
+              marker_watch: Optional[Any] = None,
+              compact_keep_turns: int = 0) -> FastAPI:
     app = FastAPI(title="Vaara LLM Proxy")
     # This proxy holds the operator's upstream provider key and injects it
     # into every forwarded call, and it binds loopback with no inbound
@@ -169,6 +174,10 @@ def build_app(*, upstream: str, api_key: Optional[str], api_key_header: str,
     # Sealing is independent of `mode`. Redaction protects the trail; sealing
     # protects the provider request, and an operator may want either alone.
     _seal = seal_registry
+    # The marker watch reports which private markers were in the bytes that
+    # left, by id. Like the seal it is refreshed per request and its strings
+    # never reach a log line or the trail.
+    _markers = marker_watch
 
     @app.api_route("/{path:path}", methods=["GET", "POST", "PUT", "DELETE", "PATCH"])
     async def handle_request(path: str, request: Request):
@@ -229,6 +238,24 @@ def build_app(*, upstream: str, api_key: Optional[str], api_key_header: str,
         # when sealing is off, which matters because any rewrite of the early
         # message content invalidates the provider's prompt-cache prefix.
         outbound = body_bytes
+        # History compaction runs first, so that sealing and the envelope
+        # both see what will actually leave. Old tool payloads become
+        # size-and-digest stubs; the last N turns and every line of user or
+        # assistant text stay as sent. Off by default, and when it changes
+        # nothing the raw bytes are forwarded untouched.
+        compact_stats = {"bytes_before": len(body_bytes),
+                         "bytes_after": len(body_bytes),
+                         "compacted_blocks": 0}
+        if compact_keep_turns > 0 and isinstance(body.get("messages"), list):
+            new_msgs, compact_stats = compact_messages(
+                body["messages"], compact_keep_turns)
+            if compact_stats["compacted_blocks"] > 0:
+                body = dict(body)
+                body["messages"] = new_msgs
+                outbound = json.dumps(
+                    body, ensure_ascii=False).encode("utf-8")
+                compact_stats["bytes_before"] = len(body_bytes)
+                compact_stats["bytes_after"] = len(outbound)
         seal_state: dict[str, Any] = {
             "seal_active": False, "seal_count": 0, "seal_fault": None}
         if _seal is not None:
@@ -239,12 +266,13 @@ def build_app(*, upstream: str, api_key: Optional[str], api_key_header: str,
             if _seal.active:
                 seal_state["seal_active"] = True
                 try:
-                    outbound = _seal.seal_bytes(body_bytes)
+                    unsealed = outbound
+                    outbound = _seal.seal_bytes(unsealed)
                     seal_state["seal_count"] = _seal.count_sealed(outbound)
                 except Exception as exc:
                     logger.warning(
                         "sealing failed, forwarding unsealed: %s", exc)
-                    outbound = body_bytes
+                    outbound = unsealed
                     seal_state["seal_fault"] = \
                         f"{type(exc).__name__}: {exc}"[:200]
 
@@ -252,6 +280,22 @@ def build_app(*, upstream: str, api_key: Optional[str], api_key_header: str,
             body, body_bytes, model_name, provider,
             agent_id, mode, audit_level, _redact_pats)
         audit_params.update(seal_state)
+        # Sizes, not content, so they are recorded at every audit level. The
+        # envelope is measured on the bytes that leave, after sealing, and so
+        # is the marker check: a marker the seal replaced did not leave.
+        audit_params["envelope"] = measure_envelope(body, outbound)
+        audit_params["envelope"]["bytes_before_compaction"] = \
+            compact_stats["bytes_before"]
+        audit_params["envelope"]["compacted_blocks"] = \
+            compact_stats["compacted_blocks"]
+        present: list[str] = []
+        if _markers is not None:
+            try:
+                _markers.refresh()
+                present = _markers.present(outbound)
+            except Exception as exc:  # pragma: no cover - guard, not a path
+                logger.warning("marker watch failed: %s", type(exc).__name__)
+        audit_params["markers_present"] = present
         # What governed this request. A reader of the record can then tell
         # a proxy that would have blocked from one that only watched.
         audit_params["enforce"] = enforce
@@ -318,13 +362,17 @@ def build_app(*, upstream: str, api_key: Optional[str], api_key_header: str,
                 logger.warning("unsealing failed, passing through: %s", exc)
                 raw_response = upstream_response.content
 
+        # What the provider says it counted, including the cached share of
+        # the input. Read off the reply the proxy already holds; the envelope
+        # alone cannot tell a cheap resend from an expensive one.
         pipeline.report_outcome(
             result.action_id,
             outcome_severity=0.0 if upstream_response.is_success else 0.5,
             description=_outcome(
                 "ok" if upstream_response.is_success else "upstream_status",
                 http_status=upstream_response.status_code,
-                unseal_count=unseal_count, unmapped_placeholders=unmapped))
+                unseal_count=unseal_count, unmapped_placeholders=unmapped,
+                **usage_fields(extract_usage(raw_response))))
         return Response(
             content=raw_response,
             status_code=upstream_response.status_code,
@@ -405,8 +453,13 @@ async def _forward_stream(upstream_response: Any,
         from .llm_seal import StreamUnsealer
         unsealer = StreamUnsealer(seal)
     done = False
+    # Counted on the chunks as they arrive, before any unsealing: the usage
+    # frames carry integers no placeholder appears in, and feeding the raw
+    # bytes means a sealing fault cannot also cost the numbers.
+    usage = StreamUsage()
     try:
         async for chunk in upstream_response.aiter_bytes():
+            usage.feed(chunk)
             if unsealer is None:
                 yield chunk
                 continue
@@ -429,7 +482,8 @@ async def _forward_stream(upstream_response: Any,
             description=_outcome(
                 "ok",
                 unseal_count=unsealer.restored if unsealer else 0,
-                unmapped_placeholders=unsealer.unmapped if unsealer else []))
+                unmapped_placeholders=unsealer.unmapped if unsealer else [],
+                **usage_fields(usage.usage)))
     except BaseException as exc:
         # BaseException, not Exception. A client that goes away mid-stream
         # arrives here as GeneratorExit (Starlette closing the body
@@ -448,7 +502,10 @@ async def _forward_stream(upstream_response: Any,
                 description=_outcome(
                     "aborted" if aborted else "stream_error",
                     error=type(exc).__name__,
-                    unseal_count=unsealer.restored if unsealer else 0))
+                    unseal_count=unsealer.restored if unsealer else 0,
+                    # A stream that died still spent its input. Whatever the
+                    # provider had reported by then is the honest number.
+                    **usage_fields(usage.usage)))
         raise
 
 
