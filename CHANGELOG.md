@@ -6,6 +6,8 @@ and this project follows [Semantic Versioning](https://semver.org/spec/v2.0.0.ht
 
 ## [Unreleased]
 
+## [1.89.0] - 2026-09-18
+
 ### Added
 - llm-proxy: every prompt record carries an envelope: bytes forwarded on the call, split between the system prompt, the tool definitions, the conversation, and the last user message. Recorded at every audit level.
 - llm-proxy: `--markers-file` watches private strings by id and records which ids were inside the bytes that left. The strings never reach the trail or a log line.
