@@ -179,6 +179,29 @@ def main(args: Optional[list[str]] = None) -> int:
              "unsealed while the flag is set claims what it does not do.",
     )
     p.add_argument(
+        "--compact-history", type=int, default=0, metavar="N",
+        help="Keep the last N assistant turns verbatim and replace older tool "
+             "results and tool inputs with a size-and-digest stub before the "
+             "request leaves. User and assistant text is never touched. A "
+             "payload then leaves the machine once, when it is fresh, "
+             "instead of on every later call. The record carries bytes before "
+             "and after. 0 (default) is off. This is a privacy control, not a "
+             "cost control: the stub boundary moves every turn, so against a "
+             "provider with prompt caching (Anthropic, OpenAI) every earlier "
+             "message changes on every call and the cached prefix is lost. "
+             "Measured at 6 to 10 times the input cost in front of a coding "
+             "agent that re-sends its whole context. Leave it at 0 for clients that rely on the cache.",
+    )
+    p.add_argument(
+        "--markers-file", default=None, metavar="PATH",
+        help="JSON object of {\"id\": \"marker\"}. Each prompt record lists "
+             "the ids whose marker string was inside the bytes that left, so "
+             "a marker later seen elsewhere can be traced to the call that "
+             "carried it. Ids only reach the trail; the strings never do. "
+             "Re-read on every request, so markers can be added while the "
+             "proxy runs.",
+    )
+    p.add_argument(
         "--seal-listen-unix", default=None, metavar="PATH",
         help="Bind a unix socket instead of TCP. No listening port, so "
              "filesystem permissions decide who can reach the proxy.",
@@ -235,7 +258,11 @@ def main(args: Optional[list[str]] = None) -> int:
         return 1
 
     from ._llm_proxy_app import build_app
+    from .llm_envelope import MarkerWatch
     from .llm_seal import SealRegistry
+
+    markers = MarkerWatch.from_file(str(parsed.markers_file)) \
+        if parsed.markers_file else None
 
     # Neither the path nor the contents of the seal file reach a log line.
     seal_path = str(parsed.seal_file) if parsed.seal_file else None
@@ -283,10 +310,16 @@ def main(args: Optional[list[str]] = None) -> int:
         agent_id_header=parsed.agent_id_header,
         agent_id_default=parsed.agent_id,
         allowed_origins=parsed.allow_origin,
+        marker_watch=markers,
+        compact_keep_turns=parsed.compact_history,
     )
 
     seal_note = f", sealing {len(seal)} secret(s)" if seal.active \
         else ""
+    if markers is not None and markers.active:
+        seal_note += f", watching {len(markers)} marker(s)"
+    if parsed.compact_history > 0:
+        seal_note += f", compacting history beyond {parsed.compact_history} turn(s)"
 
     if parsed.seal_listen_unix:
         sock_path = str(Path(parsed.seal_listen_unix).expanduser())
