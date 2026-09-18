@@ -1523,6 +1523,29 @@ class SQLiteAuditBackend:
             )
         return bool(cursor.rowcount)
 
+    def list_pending_outcomes(
+        self, tool_name: Optional[str] = None,
+        created_before: Optional[float] = None,
+    ) -> list[dict]:
+        """Pending outcomes, optionally for one tool and older than a time.
+
+        Lets a restarting process find the rows a dead one left behind.
+        """
+        sql = ("SELECT action_id, agent_id, tool_name, risk_score, created_at "
+               "FROM pending_outcomes WHERE 1=1")
+        args: list = []
+        if tool_name is not None:
+            sql += " AND tool_name=?"
+            args.append(tool_name)
+        if created_before is not None:
+            sql += " AND created_at < ?"
+            args.append(created_before)
+        sql += " ORDER BY created_at"
+        with self._lock:
+            rows = self._conn.execute(sql, args).fetchall()
+        return [{"action_id": r[0], "agent_id": r[1], "tool_name": r[2],
+                 "risk_score": r[3], "created_at": r[4]} for r in rows]
+
     def purge_stale_pending_outcomes(self, max_age_seconds: int = 86400) -> int:
         """Remove pending outcomes older than max_age_seconds (default 24h).
 
