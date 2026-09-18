@@ -6,6 +6,15 @@ and this project follows [Semantic Versioning](https://semver.org/spec/v2.0.0.ht
 
 ## [Unreleased]
 
+### Added
+- llm-proxy: every prompt record carries an envelope: bytes forwarded on the call, split between the system prompt, the tool definitions, the conversation, and the last user message. Recorded at every audit level.
+- llm-proxy: `--markers-file` watches private strings by id and records which ids were inside the bytes that left. The strings never reach the trail or a log line.
+- llm-proxy: `--compact-history N` replaces tool payloads older than the last N turns with a size-and-digest stub before the request leaves. Off by default.
+- llm-proxy: the outcome record keeps the provider's own token counts, including the cached share of the input.
+
+### Known limitation
+- `--compact-history` is a privacy control, not a cost control. The stub boundary moves every turn, so against a provider with prompt caching the cached prefix is lost on every call. Measured at 6 to 10 times the input cost in front of a coding agent that re-sends its whole context. Leave it at 0 for clients that rely on the cache.
+
 ## [1.88.0] - 2026-09-16
 
 ### Added

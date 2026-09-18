@@ -185,7 +185,12 @@ def main(args: Optional[list[str]] = None) -> int:
              "request leaves. User and assistant text is never touched. A "
              "payload then leaves the machine once, when it is fresh, "
              "instead of on every later call. The record carries bytes before "
-             "and after. 0 (default) is off.",
+             "and after. 0 (default) is off. This is a privacy control, not a "
+             "cost control: the stub boundary moves every turn, so against a "
+             "provider with prompt caching (Anthropic, OpenAI) every earlier "
+             "message changes on every call and the cached prefix is lost. "
+             "Measured at 6 to 10 times the input cost in front of a coding "
+             "agent that re-sends its whole context. Leave it at 0 for clients that rely on the cache.",
     )
     p.add_argument(
         "--markers-file", default=None, metavar="PATH",
