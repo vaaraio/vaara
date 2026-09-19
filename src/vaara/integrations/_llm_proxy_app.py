@@ -450,8 +450,11 @@ async def _forward_stream(upstream_response: Any,
                            seal: Optional[Any] = None):
     unsealer = None
     if seal is not None and seal.active:
-        from .llm_seal import StreamUnsealer
-        unsealer = StreamUnsealer(seal)
+        # Frame-aware, not byte-aware: a placeholder that straddles two SSE
+        # events has event framing between its halves and no byte regex can
+        # see it. See SseUnsealer for the measurement that found this.
+        from .llm_seal import SseUnsealer
+        unsealer = SseUnsealer(seal)
     done = False
     # Counted on the chunks as they arrive, before any unsealing: the usage
     # frames carry integers no placeholder appears in, and feeding the raw

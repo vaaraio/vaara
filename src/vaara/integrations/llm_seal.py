@@ -279,3 +279,152 @@ class StreamUnsealer:
         self._unmapped.update(_PLACEHOLDER_RE.findall(out))
         self._carry = ""
         return out.encode("utf-8")
+
+
+#: Delta fields whose text a model writes and a placeholder can appear in.
+_DELTA_TEXT_FIELDS = ("text", "partial_json", "thinking")
+
+
+def _partial_placeholder_tail(text: str) -> int:
+    """Length of the longest suffix of ``text`` that could begin a placeholder.
+
+    A placeholder split across two events leaves its head at the end of one
+    delta and its tail at the start of the next. Only that head needs holding
+    back; everything before it can be emitted at once. Returns 0 when no
+    suffix could be the start of a placeholder.
+    """
+    limit = min(len(text), PLACEHOLDER_LEN - 1)
+    for n in range(limit, 0, -1):
+        tail = text[-n:]
+        if n <= len(_PREFIX):
+            if _PREFIX.startswith(tail):
+                return n
+            continue
+        if tail.startswith(_PREFIX) and all(
+            c in "0123456789abcdef" for c in tail[len(_PREFIX):]
+        ):
+            return n
+    return 0
+
+
+class SseUnsealer:
+    """Restore placeholders in a streamed SSE response, across event frames.
+
+    ``StreamUnsealer`` runs a regex over the raw bytes with a short carry, which
+    handles a placeholder split by an HTTP chunk boundary. It cannot handle a
+    placeholder split by an SSE EVENT boundary, because the two halves then
+    have event framing between them, and a client streaming tool input emits
+    many small ``input_json_delta`` events. MEASURED 2026-09-19 on the live
+    trail: 1,881 outcomes, a placeholder restored once, an unrestored one
+    reported never, while every request sealed 30 to 45 of them. The
+    placeholders went back to the caller literal and the record said clean.
+
+    This class parses the frames. For each ``content_block_delta`` it decodes
+    the delta's text field, prepends the held head of the previous delta,
+    restores placeholders in the decoded text, holds back only a suffix that
+    could begin a placeholder, and re-emits the event with the new text. Any
+    other event first flushes the held text as one extra delta of the same
+    shape, so the client sees the same concatenation it would have seen.
+
+    Bytes that are not SSE frames, or frames that do not parse, pass through
+    the byte-level regex instead, so nothing is worse than before.
+    """
+
+    def __init__(self, registry: SealRegistry) -> None:
+        self._registry = registry
+        self._buf = b""
+        self._held = ""
+        self._held_shape: Optional[tuple[int, str, str]] = None
+        self.restored = 0
+        self._unmapped: set[str] = set()
+
+    @property
+    def unmapped(self) -> list[str]:
+        return sorted(self._unmapped)
+
+    def _note_unmapped(self, text: str) -> None:
+        for m in _PLACEHOLDER_RE.finditer(text):
+            self._unmapped.add(m.group(0))
+
+    def _raw(self, data: bytes) -> bytes:
+        text, n = self._registry.unseal_text_counted(data.decode("utf-8", "replace"))
+        self.restored += n
+        self._note_unmapped(text)
+        return text.encode("utf-8")
+
+    def _flush_held(self) -> bytes:
+        if not self._held or self._held_shape is None:
+            self._held = ""
+            return b""
+        index, dtype, field = self._held_shape
+        text, n = self._registry.unseal_text_counted(self._held)
+        self.restored += n
+        self._note_unmapped(text)
+        self._held = ""
+        event = {"type": "content_block_delta", "index": index,
+                 "delta": {"type": dtype, field: text}}
+        return ("event: content_block_delta\ndata: "
+                + json.dumps(event, ensure_ascii=False) + "\n\n").encode("utf-8")
+
+    def _event(self, frame: bytes) -> bytes:
+        try:
+            text = frame.decode("utf-8")
+        except UnicodeDecodeError:
+            return self._flush_held() + self._raw(frame + b"\n\n")
+        data_lines = [ln[5:].lstrip() for ln in text.split("\n") if ln.startswith("data:")]
+        if len(data_lines) != 1:
+            return self._flush_held() + self._raw(frame + b"\n\n")
+        try:
+            payload = json.loads(data_lines[0])
+        except json.JSONDecodeError:
+            return self._flush_held() + self._raw(frame + b"\n\n")
+        delta = payload.get("delta") if isinstance(payload, dict) else None
+        if (payload.get("type") != "content_block_delta"
+                or not isinstance(delta, dict)):
+            return self._flush_held() + self._raw(frame + b"\n\n")
+        field = next((f for f in _DELTA_TEXT_FIELDS
+                      if isinstance(delta.get(f), str)), None)
+        if field is None:
+            return self._flush_held() + self._raw(frame + b"\n\n")
+        shape = (payload.get("index", 0), str(delta.get("type", "")), field)
+        out = b""
+        if self._held and self._held_shape != shape:
+            out += self._flush_held()
+        combined = self._held + delta[field]
+        self._held = ""
+        combined, n = self._registry.unseal_text_counted(combined)
+        self.restored += n
+        keep = _partial_placeholder_tail(combined)
+        emit = combined[:len(combined) - keep] if keep else combined
+        self._note_unmapped(emit)
+        if keep:
+            self._held = combined[len(combined) - keep:]
+            self._held_shape = shape
+        delta[field] = emit
+        rebuilt = json.dumps(payload, ensure_ascii=False)
+        head = text[:text.index("data:")]
+        return out + (head + "data: " + rebuilt + "\n\n").encode("utf-8")
+
+    def feed(self, chunk: bytes) -> bytes:
+        if not self._registry.active:
+            return chunk
+        self._buf += chunk
+        out = b""
+        while True:
+            cut = self._buf.find(b"\n\n")
+            if cut < 0:
+                break
+            frame, self._buf = self._buf[:cut], self._buf[cut + 2:]
+            try:
+                out += self._event(frame)
+            except Exception as exc:  # pragma: no cover - guard, not a path
+                logger.warning("sse unseal failed on one frame: %s", exc)
+                out += self._flush_held() + self._raw(frame + b"\n\n")
+        return out
+
+    def flush(self) -> bytes:
+        out = self._flush_held()
+        if self._buf:
+            out += self._raw(self._buf)
+            self._buf = b""
+        return out
