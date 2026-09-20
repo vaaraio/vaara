@@ -466,3 +466,46 @@ def test_emitted_authz_receipts_carry_contiguous_completeness(emitter):
         assert block["boundaryId"] == auth.evidence["coverage"]["boundary"]
         seqs.append((block["seq"], block["runningCount"]))
     assert seqs == [(0, 1), (1, 2)]
+
+
+# ------------------------------------------------- MCP Tasks: related-task id
+
+def test_related_task_id_is_signed_into_the_receipt(
+    monkeypatch, emitter, attest_receipts_dir, attest_key
+):
+    from vaara.attestation.receipt import (
+        RELATED_TASK_META_KEY,
+        parse_receipt,
+        verify_receipt_signature,
+        verify_receipt_task,
+    )
+    task = "786512e2-9e0d-44bd-8f29-789f320fe840"
+    p, _ = _make_proxy(monkeypatch, emitter=emitter)
+    p._handle_tools_call({
+        "jsonrpc": "2.0", "id": 1,
+        "method": "tools/call",
+        "params": {
+            "name": "run_cmd", "arguments": {},
+            "_meta": {RELATED_TASK_META_KEY: {"taskId": task}},
+        },
+    })
+    receipt = parse_receipt(_receipts(attest_receipts_dir)[0])
+    assert verify_receipt_signature(receipt, verifying_material=attest_key.read_bytes())
+    assert receipt.receipt_asserted.task_id == task
+    assert verify_receipt_task(receipt, task).verdict == "bound"
+    assert verify_receipt_task(receipt, "another").verdict == "conflict"
+
+
+def test_call_without_related_task_emits_an_unbound_receipt(
+    monkeypatch, emitter, attest_receipts_dir
+):
+    from vaara.attestation.receipt import parse_receipt, verify_receipt_task
+    p, _ = _make_proxy(monkeypatch, emitter=emitter)
+    p._handle_tools_call({
+        "jsonrpc": "2.0", "id": 1,
+        "method": "tools/call",
+        "params": {"name": "run_cmd", "arguments": {}},
+    })
+    raw = _receipts(attest_receipts_dir)[0]
+    assert "taskId" not in raw["receiptAsserted"]
+    assert verify_receipt_task(parse_receipt(raw), "any").verdict == "unsupported"

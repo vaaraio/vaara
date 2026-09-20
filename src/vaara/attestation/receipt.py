@@ -171,6 +171,13 @@ from vaara.attestation._receipt_audience import (
     AudienceVerdict,
     verify_receipt_audience,
 )
+from vaara.attestation._receipt_task import (
+    RELATED_TASK_META_KEY,
+    TaskResult,
+    TaskVerdict,
+    related_task_id,
+    verify_receipt_task,
+)
 from vaara.attestation._receipt_identity import (
     IdentityResult,
     did_web_to_url,
@@ -394,6 +401,11 @@ __all__ = [
     "AudienceResult",
     "AudienceVerdict",
     "verify_receipt_audience",
+    "RELATED_TASK_META_KEY",
+    "TaskResult",
+    "TaskVerdict",
+    "related_task_id",
+    "verify_receipt_task",
     "verify_receipt_identity_live",
     "verify_receipt_retained",
     "verify_receipt_signature",

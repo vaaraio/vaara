@@ -40,6 +40,7 @@ from pathlib import Path
 from typing import Any, Optional
 
 from vaara import __version__ as _VAARA_VERSION
+from vaara.attestation._receipt_task import related_task_id as _related_task_id
 from vaara.audit.sqlite_backend import SQLiteAuditBackend
 from vaara.audit.trail import AuditTrail
 from vaara.integrations._mcp_notify import (
@@ -1420,6 +1421,7 @@ class VaaraMCPProxy:
                     outcome_severity=outcome_severity,
                     upstream_name=upstream_name,
                     tenant_id=_REQUEST_TENANT.get(),
+                    task_id=_related_task_id(params),
                 )
         try:
             self._pipeline.report_outcome(

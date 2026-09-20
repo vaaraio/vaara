@@ -160,6 +160,15 @@ class ReceiptAsserted:
     either bound or contradicted: integrity intact, association unknown. That
     third state is the reason the field exists; a check that can only say
     "verified" or "failed" loses the case where nothing was there to check.
+
+    ``task_id`` is the optional durable task this execution belongs to, the
+    ``taskId`` of an MCP task (``io.modelcontextprotocol/related-task``) or
+    any other long-running unit of work a supervisor accounts for. It rides
+    inside the signed preimage for the same reason ``aud`` does: when a
+    supervisor shows what a sub-agent did under a task, the receipts have to
+    name the task in signed bytes, or a receipt from another task is
+    indistinguishable from one that belongs. Absent means the issuer bound no
+    task, and a verifier asked to check one reports unsupported.
     """
 
     iss: str
@@ -172,6 +181,7 @@ class ReceiptAsserted:
     crypto_posture: Optional["CryptoPosture"] = None
     completeness: Optional[dict[str, Any]] = None
     aud: Optional[str] = None
+    task_id: Optional[str] = None
 
 
 @dataclass(frozen=True)
@@ -471,6 +481,8 @@ def receipt_asserted_to_dict(ra: ReceiptAsserted) -> dict[str, Any]:
     }
     if ra.aud is not None:
         out["aud"] = ra.aud
+    if ra.task_id is not None:
+        out["taskId"] = ra.task_id
     if ra.sig_suite is not None:
         out["sigSuite"] = ra.sig_suite
     if ra.crypto_posture is not None:
@@ -504,7 +516,7 @@ _BACK_LINK_KEYS = frozenset(
 )
 _RECEIPT_ASSERTED_KEYS = frozenset(
     {"alg", "iat", "iss", "nonce", "secretVersion", "sub", "sigSuite",
-     "cryptoPosture", "completeness", "aud"}
+     "cryptoPosture", "completeness", "aud", "taskId"}
 )
 
 #: The keys a completeness block may carry, and all three are required when the
@@ -557,6 +569,11 @@ def receipt_asserted_from_dict(d: dict[str, Any]) -> ReceiptAsserted:
     aud = d.get("aud")
     if aud is not None and (not isinstance(aud, str) or not aud):
         raise AttestationError("receiptAsserted.aud must be a non-empty string or absent")
+    task_id = d.get("taskId")
+    if task_id is not None and (not isinstance(task_id, str) or not task_id):
+        raise AttestationError(
+            "receiptAsserted.taskId must be a non-empty string or absent"
+        )
     return ReceiptAsserted(
         alg=d["alg"],
         iat=d["iat"],
@@ -568,6 +585,7 @@ def receipt_asserted_from_dict(d: dict[str, Any]) -> ReceiptAsserted:
         crypto_posture=crypto_posture,
         completeness=completeness,
         aud=aud,
+        task_id=task_id,
     )
 
 
