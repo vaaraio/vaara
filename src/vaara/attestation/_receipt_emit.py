@@ -79,6 +79,7 @@ def emit_receipt(
     sig_suite: Optional[str] = None,
     crypto_posture: Optional[CryptoPosture] = None,
     completeness: Optional[dict[str, Any]] = None,
+    aud: Optional[str] = None,
 ) -> ExecutionReceipt:
     """Build, JCS-canonicalize, and sign an ExecutionReceipt envelope.
 
@@ -100,7 +101,13 @@ def emit_receipt(
     preimage, which is what makes a dropped receipt a provable gap with no
     external witness. It closes dropped-in-the-middle; a pure tail truncation
     still needs a timestamp anchor over the running count.
+
+    ``aud`` names the relying party the receipt is issued for. It rides inside
+    ``receiptAsserted`` and so inside the signed preimage. Absent means no
+    audience was bound; see ``verify_receipt_audience``.
     """
+    if aud is not None and not aud:
+        raise AttestationError("aud must be a non-empty string or None")
     if alg not in VALID_ALGS:
         raise AttestationError(f"unsupported alg: {alg!r}")
     if not back_link.attestation_digest.startswith("sha256:"):
@@ -120,6 +127,7 @@ def emit_receipt(
         sig_suite=sig_suite,
         crypto_posture=crypto_posture,
         completeness=completeness,
+        aud=aud,
     )
 
     payload = _signing_payload(
