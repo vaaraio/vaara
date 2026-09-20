@@ -76,6 +76,7 @@ public, and asks to be listed.
 - [Vaara vs observability vs GRC](https://github.com/vaaraio/vaara/blob/main/docs/vaara-vs-observability-vs-grc.md): three different questions; comparison table and how they stack
 - [Our marketing runs under the gate](https://github.com/vaaraio/vaara/tree/main/docs/dogfood): the signed trail of Vaara's own marketing pipeline, with the policy and public key to verify it offline
 - [COMPLIANCE.md](https://github.com/vaaraio/vaara/blob/main/docs/COMPLIANCE.md): EU AI Act (Art. 9, 11 to 15, 61) and DORA (Art. 10, 12, 13) article-level mapping
+- [EU Product Liability Directive 2024/2853](https://github.com/vaaraio/vaara/blob/main/docs/COMPLIANCE.md#eu-product-liability-directive-20242853): applies to software and AI systems from 9 December 2026; Article 9 disclosure order and Article 10 presumption of defect when evidence cannot be produced, and what a receipt supplies for that
 - [Formal specification](https://github.com/vaaraio/vaara/blob/main/docs/formal_specification.md): MWU regret bound O(sqrt(T log N)), conformal coverage, security properties
 - [vaara-bench-v1](https://github.com/vaaraio/vaara/blob/main/bench/vaara-bench-v1.md): 77-trace synthetic benchmark, frozen methodology
 - [CHANGELOG](https://github.com/vaaraio/vaara/blob/main/CHANGELOG.md): version-by-version evolution
