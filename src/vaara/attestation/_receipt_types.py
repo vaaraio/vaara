@@ -151,6 +151,15 @@ class ReceiptAsserted:
 
     Absent means the receipt predates the block and the envelope is
     byte-for-byte what it was before this field existed.
+
+    ``aud`` is the optional audience: the relying party this receipt was
+    issued for. It rides inside the signed preimage, so a receipt legitimately
+    issued for one counterparty does not verify as if issued for another when
+    replayed there. Absent means the issuer bound no audience, and a verifier
+    asked to check one reports that association as unsupported rather than as
+    either bound or contradicted: integrity intact, association unknown. That
+    third state is the reason the field exists; a check that can only say
+    "verified" or "failed" loses the case where nothing was there to check.
     """
 
     iss: str
@@ -162,6 +171,7 @@ class ReceiptAsserted:
     sig_suite: Optional[str] = None
     crypto_posture: Optional["CryptoPosture"] = None
     completeness: Optional[dict[str, Any]] = None
+    aud: Optional[str] = None
 
 
 @dataclass(frozen=True)
@@ -459,6 +469,8 @@ def receipt_asserted_to_dict(ra: ReceiptAsserted) -> dict[str, Any]:
         "secretVersion": ra.secret_version,
         "sub": ra.sub,
     }
+    if ra.aud is not None:
+        out["aud"] = ra.aud
     if ra.sig_suite is not None:
         out["sigSuite"] = ra.sig_suite
     if ra.crypto_posture is not None:
@@ -492,7 +504,7 @@ _BACK_LINK_KEYS = frozenset(
 )
 _RECEIPT_ASSERTED_KEYS = frozenset(
     {"alg", "iat", "iss", "nonce", "secretVersion", "sub", "sigSuite",
-     "cryptoPosture", "completeness"}
+     "cryptoPosture", "completeness", "aud"}
 )
 
 #: The keys a completeness block may carry, and all three are required when the
@@ -542,6 +554,9 @@ def receipt_asserted_from_dict(d: dict[str, Any]) -> ReceiptAsserted:
             )
         crypto_posture = crypto_posture_from_dict(crypto_posture_raw)
     completeness = _completeness_from_dict(d.get("completeness"))
+    aud = d.get("aud")
+    if aud is not None and (not isinstance(aud, str) or not aud):
+        raise AttestationError("receiptAsserted.aud must be a non-empty string or absent")
     return ReceiptAsserted(
         alg=d["alg"],
         iat=d["iat"],
@@ -552,6 +567,7 @@ def receipt_asserted_from_dict(d: dict[str, Any]) -> ReceiptAsserted:
         sig_suite=sig_suite,
         crypto_posture=crypto_posture,
         completeness=completeness,
+        aud=aud,
     )
 
 

@@ -166,6 +166,11 @@ from vaara.attestation._receipt_emit import (
     emit_receipt,
     verify_receipt_signature,
 )
+from vaara.attestation._receipt_audience import (
+    AudienceResult,
+    AudienceVerdict,
+    verify_receipt_audience,
+)
 from vaara.attestation._receipt_identity import (
     IdentityResult,
     did_web_to_url,
@@ -386,6 +391,9 @@ __all__ = [
     "verify_evidence_bundle",
     "verify_logged_receipt",
     "verify_receipt_identity",
+    "AudienceResult",
+    "AudienceVerdict",
+    "verify_receipt_audience",
     "verify_receipt_identity_live",
     "verify_receipt_retained",
     "verify_receipt_signature",
