@@ -656,23 +656,24 @@ scope of strict product-liability rules. Member State transposition
 deadline is **9 December 2026** (Article 22). The provisions that
 matter for runtime evidence:
 
-- **Article 9 (Burden of proof, rebuttable presumptions).** A
-  national court SHALL presume the defectiveness of a product, or
-  the causal link between defectiveness and damage, where the
-  claimant faces excessive difficulties proving the technical
-  facts - in particular due to the technical complexity of the
-  product (Article 9(4)). The defendant rebuts the presumption by
-  showing the product was not defective.
-- **Article 7 (Defectiveness assessment).** Defectiveness is
-  assessed having regard to, among other factors, the effect on
-  the product of any ability to continue to learn or acquire new
-  features after deployment, the foreseeable use, and the specific
-  requirements of safety regulation applicable to the product.
-- **Article 8 (Disclosure of evidence).** Where a claimant
-  presents facts and evidence sufficient to support plausibility,
-  national courts may order disclosure of relevant evidence held by
-  the defendant. Failure to disclose triggers an Article 9
-  presumption.
+- **Article 7 (Defectiveness).** Defectiveness is assessed having
+  regard to, among other factors, the effect on the product of any
+  ability to continue to learn or acquire new features after
+  deployment, the foreseeable use, and the specific requirements of
+  safety regulation applicable to the product.
+- **Article 9 (Disclosure of evidence).** Where a claimant presents
+  facts and evidence sufficient to support the plausibility of the
+  claim, national courts may order the defendant to disclose relevant
+  evidence at its disposal, in an accessible and easily understandable
+  form.
+- **Article 10 (Burden of proof).** Defectiveness is presumed where
+  the defendant fails to disclose relevant evidence under Article 9
+  (Article 10(2)(a)). A court also presumes defectiveness, or the
+  causal link between defect and damage, where the claimant faces
+  excessive difficulties proving the technical facts, in particular
+  because of the product's technical or scientific complexity
+  (Article 10(4)). The defendant may rebut any of these presumptions
+  (Article 10(5)).
 
 How Vaara fits:
 
@@ -681,7 +682,7 @@ How Vaara fits:
   report`), and the OVERT 1.0 Base Envelope + S3P attestations
   together constitute the **technical record of foreseeable use,
   governance decisions, and risk signal evolution** that a defendant
-  needs to rebut the Article 9 presumption.
+  needs to rebut the Article 10 presumptions, and the record it discloses under Article 9.
 - The hash-chain integrity, Ed25519 signatures, and Article 12
   receipt pair give the evidence the tamper-evident shape that
   national courts will expect from contemporaneous records.
@@ -692,7 +693,7 @@ How Vaara fits:
 
 This is forward-looking documentation: transposition statutes will
 land between now and 2026-12-09 and the exact procedural shape of
-Article 9 presumptions will be a Member State implementation detail.
+Article 10 presumptions will be a Member State implementation detail.
 The intent of this section is to mark Vaara's evidence surface as
 **designed to be usable** under the Directive, not to claim
 sufficiency in advance of any specific transposition.
