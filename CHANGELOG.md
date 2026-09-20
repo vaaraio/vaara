@@ -6,6 +6,17 @@ and this project follows [Semantic Versioning](https://semver.org/spec/v2.0.0.ht
 
 ## [Unreleased]
 
+## [1.90.0] - 2026-09-20
+
+### Added
+- Execution receipts may carry `aud`, the relying party the receipt was issued for, inside `receiptAsserted` and so inside the signed preimage. A receipt without it is byte identical to one produced before this release.
+- `verify_receipt_audience(receipt, expected_aud)` returns `bound`, `conflict` or `unsupported`. A receipt with no `aud` checked against an expected audience comes back `unsupported`, decided before any comparison runs, so a missing binding is never reported as a match or as a contradiction. Only `bound` is truthy.
+
+### Fixed
+- llm-proxy: a placeholder split across two SSE events came back to the client literal and the outcome record said clean. The stream unsealer now parses the event frames, restores across events, and reports a placeholder it cannot restore. Non-SSE bodies and unparseable frames fall back to the previous byte-level path.
+- The Helm chart `appVersion` and `docs/supported-platforms.md` now follow the package version. The 1.89.0 release left them at 1.88.0.
+- `docs/COMPLIANCE.md` cited the wrong articles of the Product Liability Directive. Disclosure of evidence is Article 9 and the burden of proof is Article 10 of Directive (EU) 2024/2853.
+
 ## [1.89.0] - 2026-09-18
 
 ### Added
