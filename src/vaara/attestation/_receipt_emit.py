@@ -80,6 +80,7 @@ def emit_receipt(
     crypto_posture: Optional[CryptoPosture] = None,
     completeness: Optional[dict[str, Any]] = None,
     aud: Optional[str] = None,
+    task_id: Optional[str] = None,
 ) -> ExecutionReceipt:
     """Build, JCS-canonicalize, and sign an ExecutionReceipt envelope.
 
@@ -105,9 +106,16 @@ def emit_receipt(
     ``aud`` names the relying party the receipt is issued for. It rides inside
     ``receiptAsserted`` and so inside the signed preimage. Absent means no
     audience was bound; see ``verify_receipt_audience``.
+
+    ``task_id`` names the durable task this execution belongs to (an MCP
+    ``taskId`` when the call carried ``io.modelcontextprotocol/related-task``).
+    Same treatment as ``aud``: signed when present, absent means unbound; see
+    ``verify_receipt_task``.
     """
     if aud is not None and not aud:
         raise AttestationError("aud must be a non-empty string or None")
+    if task_id is not None and not task_id:
+        raise AttestationError("task_id must be a non-empty string or None")
     if alg not in VALID_ALGS:
         raise AttestationError(f"unsupported alg: {alg!r}")
     if not back_link.attestation_digest.startswith("sha256:"):
@@ -128,6 +136,7 @@ def emit_receipt(
         crypto_posture=crypto_posture,
         completeness=completeness,
         aud=aud,
+        task_id=task_id,
     )
 
     payload = _signing_payload(

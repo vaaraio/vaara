@@ -6,6 +6,10 @@ and this project follows [Semantic Versioning](https://semver.org/spec/v2.0.0.ht
 
 ## [Unreleased]
 
+### Added
+- Execution receipts may carry `taskId`, the durable task the execution belongs to, inside `receiptAsserted` and so inside the signed preimage. The MCP proxy reads it from `_meta["io.modelcontextprotocol/related-task"]` on a `tools/call`, the placement MCP Tasks define, and a call that carries none produces a receipt byte identical to one from before this release.
+- `verify_receipt_task(receipt, expected_task_id)` returns `bound`, `conflict` or `unsupported`, on the same rule as the audience check: a receipt with no `taskId` is `unsupported` before any comparison runs, and only `bound` is truthy. `related_task_id(params)` is the reader, and it yields nothing for a malformed block so a receipt is never bound to garbage.
+
 ## [1.90.0] - 2026-09-20
 
 ### Added

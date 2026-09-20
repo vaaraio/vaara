@@ -441,11 +441,15 @@ class AttestPairEmitter:
         outcome_severity: float,
         upstream_name: str,
         tenant_id: str,
+        task_id: Optional[str] = None,
     ) -> None:
         """Build, sign, and persist an execution receipt paired to the attestation.
 
         ``outcome_severity == 0.0`` maps to ``executed``; anything above maps
-        to ``errored``. Failures are logged and swallowed.
+        to ``errored``. ``task_id`` is the MCP related-task id the call
+        carried, if any; it is signed into the receipt so the receipt can
+        later be shown to belong to that task. Failures are logged and
+        swallowed.
         """
         try:
             from vaara.attestation.receipt import emit_receipt as _emit_receipt, make_back_link
@@ -486,6 +490,7 @@ class AttestPairEmitter:
                 alg=self._alg,
                 signing_material=self._signing_key,
                 completeness=completeness,
+                task_id=task_id,
             )
 
             nonce_tag = attestation.issuer_asserted.nonce[:8]
