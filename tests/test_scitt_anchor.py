@@ -6,6 +6,8 @@ from pathlib import Path
 
 import pytest
 
+pytest.importorskip("rfc8785")
+
 from vaara.audit.scitt_anchor import ScittAnchor, ScittAnchorError, verify_scitt_anchor
 
 
