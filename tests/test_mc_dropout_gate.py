@@ -1,34 +1,26 @@
 """Tests for the MCDropoutGateScorer — wraps a frozen MC dropout NN bundle.
 
-Tests are skipped if the bundle doesn't exist yet (mc_dropout_gate.py hasn't run).
+The bundle comes from the ``mc_dropout_gate_bundle`` fixture, which trains the
+shipped architecture on synthetic steps (see tests/gate_bundle_factory.py).
+Set VAARA_MC_DROPOUT_BUNDLE to score a production bundle instead.
 """
 
 from __future__ import annotations
 
-import os
-from pathlib import Path
-
 import pytest
 
-_BUNDLE = Path(
-    os.environ.get(
-        "VAARA_MC_DROPOUT_BUNDLE",
-        str(Path.home() / ".vaara" / "cache" / "mc_dropout_gate_bundle.joblib"),
-    )
-)
+from tests.gate_bundle_factory import BENIGN_CONTEXT, RISKY_CONTEXT
 
-
-pytestmark = pytest.mark.skipif(
-    not _BUNDLE.exists(),
-    reason=f"MC dropout gate bundle not present at {_BUNDLE}",
-)
+# torch is not declared in requirements-dev.txt and is not in the ml extra
+# either, so the backend is unimportable on a default install.
+pytest.importorskip("torch", reason="mc dropout gate needs torch")
 
 
 @pytest.fixture(scope="module")
-def scorer():
+def scorer(mc_dropout_gate_bundle):
     from vaara.scorer import MCDropoutGateScorer
 
-    return MCDropoutGateScorer(bundle_path=str(_BUNDLE))
+    return MCDropoutGateScorer(bundle_path=str(mc_dropout_gate_bundle))
 
 
 class TestMCDropoutGateScorer:
@@ -97,3 +89,66 @@ class TestMCDropoutGateScorer:
         }
         result = scorer.evaluate(context)
         assert result["action"] in {"allow", "deny", "escalate"}
+
+    def test_a_benign_read_and_a_risky_write_separate(self, scorer):
+        import torch
+
+        # Dropout stays on at inference, so fix the seed: the point of this
+        # test is the direction of the gap, not a particular sample.
+        torch.manual_seed(0)
+        benign = scorer.evaluate(BENIGN_CONTEXT)["raw_result"]["point_estimate"]
+        torch.manual_seed(0)
+        risky = scorer.evaluate(RISKY_CONTEXT)["raw_result"]["point_estimate"]
+        assert benign < risky
+
+    def test_mc_sampling_is_stochastic_across_calls(self, scorer):
+        # _model.train() is deliberately left on so dropout masks resample.
+        # If a future change flips it to eval() the UQ signal dies silently,
+        # and mc_std pinned at exactly zero is what that looks like.
+        spread = {
+            scorer.evaluate(RISKY_CONTEXT)["raw_result"]["point_estimate"]
+            for _ in range(5)
+        }
+        assert len(spread) > 1
+
+    def test_conformal_interval_is_q_hat_wide_and_clipped(self, scorer):
+        raw = scorer.evaluate(BENIGN_CONTEXT)["raw_result"]
+        lower, upper = raw["conformal_interval"]
+        point = raw["point_estimate"]
+        assert lower == pytest.approx(max(0.0, point - scorer.q_hat))
+        assert upper == pytest.approx(min(1.0, point + scorer.q_hat))
+
+    def test_variant_and_bundle_path_come_from_the_file(self, scorer, mc_dropout_gate_bundle):
+        raw = scorer.evaluate(BENIGN_CONTEXT)["raw_result"]
+        assert raw["variant"] == scorer.variant
+        assert raw["bundle"] == str(mc_dropout_gate_bundle)
+
+
+def test_missing_bundle_raises_with_the_path_in_the_message(tmp_path):
+    from vaara.scorer import MCDropoutGateScorer
+
+    missing = tmp_path / "not_here.joblib"
+    with pytest.raises(FileNotFoundError) as excinfo:
+        MCDropoutGateScorer(bundle_path=str(missing))
+    assert str(missing) in str(excinfo.value)
+
+
+def test_non_finite_samples_fall_back_to_a_half(scorer, monkeypatch):
+    import numpy as np
+
+    # Corrupt weights make the net emit NaN. The guard in evaluate() turns
+    # that into 0.5 and a warning rather than an interval of NaNs that every
+    # comparison downstream reads as False.
+    monkeypatch.setattr(
+        scorer, "_mc_sample", lambda feat: np.full(4, np.nan, dtype=np.float32)
+    )
+    raw = scorer.evaluate(BENIGN_CONTEXT)["raw_result"]
+    assert raw["point_estimate"] == 0.5
+    assert raw["mc_std"] == 0.5
+
+
+def test_factory_builds_the_same_backend(mc_dropout_gate_bundle):
+    from vaara.scorer import create_mc_dropout_scorer
+
+    scorer = create_mc_dropout_scorer(bundle_path=str(mc_dropout_gate_bundle))
+    assert scorer.name == "vaara_mc_dropout_gate"

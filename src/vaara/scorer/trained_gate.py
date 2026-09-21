@@ -18,6 +18,21 @@ Decisions:
     execute     -> ALLOW
     flag_review -> ESCALATE
     block       -> DENY
+
+Where the bundle comes from:
+    Vaara does not ship one and no script in this tree produces one. The
+    bundle is fitted offline and dropped at `~/.vaara/cache/
+    perstep_gate_bundle.joblib`, or wherever `bundle_path` points.
+
+    Format: a joblib dump of {"models", "q_hat", "nlp_encoder",
+    "feature_names"}, as written by `ActionGate.save()`. Every model needs
+    `predict_proba`, and all of them must be fitted on vectors produced by
+    `ActionGate._featurize()` — a bundle trained on any other layout loads
+    without complaint and then scores nonsense.
+
+    `tests/gate_bundle_factory.py` builds a small bundle in exactly that
+    format. It is a test fixture, not a training pipeline, but it is the
+    worked example of the shape.
 """
 
 from __future__ import annotations
@@ -48,8 +63,9 @@ class TrainedGateScorer:
         path = Path(bundle_path) if bundle_path else _DEFAULT_BUNDLE
         if not path.exists():
             raise FileNotFoundError(
-                f"Trained gate bundle not found at {path}. "
-                "Run freeze_best.py first."
+                f"Trained gate bundle not found at {path}. Vaara does not ship "
+                "one and nothing in the tree builds one; it is fitted offline "
+                "and placed here. See this module's docstring for the format."
             )
         self._gate = ActionGate.load(str(path))
         self._bundle_path = str(path)

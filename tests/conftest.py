@@ -29,6 +29,8 @@ import os
 import tempfile
 from pathlib import Path
 
+import pytest
+
 if not os.environ.get("VAARA_TEST_USE_REAL_HOME"):
     _sandbox = Path(tempfile.mkdtemp(prefix="vaara-test-home-"))
     (_sandbox / ".vaara").mkdir(parents=True, exist_ok=True)
@@ -39,3 +41,61 @@ if not os.environ.get("VAARA_TEST_USE_REAL_HOME"):
     # Anything reading the trail path from the environment follows the same
     # sandbox rather than the operator's file.
     os.environ.setdefault("VAARA_DB", str(_sandbox / ".vaara" / "test-audit.db"))
+
+
+# --- Gate bundles for the three trained scorer backends ---------------------
+#
+# Each backend loads a bundle from ``~/.vaara/cache/``. The redirect above
+# points that at a fresh temporary home, so the path is empty by construction
+# and the twelve tests over those backends skipped on every run. The fixtures
+# below build a real bundle in the real format instead. Set the matching
+# ``VAARA_*_BUNDLE`` variable to score a production bundle rather than one of
+# these; a path that is set but missing is an error, not a silent fallback.
+
+
+def _bundle_override(env_var: str) -> Path | None:
+    value = os.environ.get(env_var)
+    if not value:
+        return None
+    path = Path(value)
+    if not path.exists():
+        raise RuntimeError(f"{env_var} is set to {path}, which does not exist")
+    return path
+
+
+@pytest.fixture(scope="session")
+def trained_gate_bundle(tmp_path_factory):
+    pytest.importorskip("sklearn", reason="trained gate needs the ml extra")
+    pytest.importorskip("joblib", reason="trained gate needs the ml extra")
+    from tests.gate_bundle_factory import build_trained_gate_bundle
+
+    override = _bundle_override("VAARA_TRAINED_GATE_BUNDLE")
+    if override is not None:
+        return override
+    target = tmp_path_factory.mktemp("gate-bundles") / "perstep_gate_bundle.joblib"
+    return build_trained_gate_bundle(target)
+
+
+@pytest.fixture(scope="session")
+def mc_dropout_gate_bundle(tmp_path_factory):
+    pytest.importorskip("torch", reason="mc dropout gate needs torch")
+    from tests.gate_bundle_factory import build_mc_dropout_bundle
+
+    override = _bundle_override("VAARA_MC_DROPOUT_BUNDLE")
+    if override is not None:
+        return override
+    target = tmp_path_factory.mktemp("gate-bundles") / "mc_dropout_gate_bundle.joblib"
+    return build_mc_dropout_bundle(target)
+
+
+@pytest.fixture(scope="session")
+def stacked_gate_bundle(tmp_path_factory, trained_gate_bundle, mc_dropout_gate_bundle):
+    from tests.gate_bundle_factory import build_stacked_bundle
+
+    override = _bundle_override("VAARA_STACKED_GATE_BUNDLE")
+    if override is not None:
+        return override
+    target = tmp_path_factory.mktemp("gate-bundles") / "stacked_gate_bundle.joblib"
+    return build_stacked_bundle(
+        target, gbm_bundle=trained_gate_bundle, mc_bundle=mc_dropout_gate_bundle
+    )

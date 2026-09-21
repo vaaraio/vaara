@@ -17,6 +17,15 @@ Bundle format (joblib):
       "gbm_bundle_path": str,
       "mc_bundle_path": str,
     }
+
+Where the bundle comes from:
+    Vaara does not ship one and no script in this tree produces one. It is
+    fitted offline and dropped at `~/.vaara/cache/stacked_gate_bundle.joblib`,
+    or wherever `bundle_path` points. The two paths inside it must resolve, or
+    loading fails — this backend never comes up on one component.
+
+    `tests/gate_bundle_factory.py` writes a small one in that format. It is a
+    test fixture, not a training pipeline, but it is the worked example.
 """
 
 from __future__ import annotations
@@ -46,7 +55,9 @@ class StackedGateScorer:
         path = Path(bundle_path) if bundle_path else _DEFAULT_BUNDLE
         if not path.exists():
             raise FileNotFoundError(
-                f"Stacked bundle not found at {path}. Run freeze_stack.py first."
+                f"Stacked bundle not found at {path}. Vaara does not ship one "
+                "and nothing in the tree builds one; it is fitted offline and "
+                "placed here. See this module's docstring for the format."
             )
         bundle = joblib.load(str(path))
         self._w_gbm, self._w_mc = bundle["stack_coef"]

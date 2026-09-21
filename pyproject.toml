@@ -51,6 +51,11 @@ dev = [
 ]
 export = ["cryptography>=41.0"]
 ml = ["xgboost>=2.0", "scikit-learn>=1.3", "joblib>=1.3", "numpy>=1.24", "sentence-transformers>=2.6"]
+# The three per-action-step gate backends in vaara.scorer. torch was required
+# by mc_dropout_gate.py and declared nowhere, so `pip install vaara[ml]` gave
+# you a module that could not import. Separate from ml because the gate
+# backends need neither xgboost nor sentence-transformers.
+gate = ["scikit-learn>=1.3", "joblib>=1.3", "numpy>=1.24", "torch>=2.0"]
 yaml = ["pyyaml>=6.0"]
 server = ["fastapi>=0.110", "uvicorn>=0.27"]
 attestation = ["cbor2>=5.4", "cryptography>=41.0", "rfc8785>=0.1.4"]
