@@ -156,15 +156,24 @@ def _verdict(
     fail a run. Six tools named by deny rules scored CAUGHT on a box where
     the hook never sees them.
 
-    An allow-expected case is not judged on coverage. Nothing is being
-    enforced on it, so an unrouted benign call has no fence to fail.
+    A call the hook lets through is PASSED FENCE even when a source also
+    fails to route it. Both are true, and the weaker statement is the one
+    worth reporting: no rule caught it anywhere, so routing it would not
+    have helped.
+
+    An allow-expected case keeps the hook's verdict unless *no* source
+    routes it. Somewhere the call is mediated, so a benign call the hook
+    denies is still a false positive there.
     """
     missing = [name for name, ok in coverage.items() if not ok]
+    unrouted_everywhere = len(missing) == len(coverage)
     if expect == "deny":
+        if hook_verdict != "deny":
+            return hook_verdict, "PASSED FENCE"
         if missing:
             return "unmediated", "UNMEDIATED"
-        return hook_verdict, "CAUGHT" if hook_verdict == "deny" else "PASSED FENCE"
-    if missing:
+        return hook_verdict, "CAUGHT"
+    if unrouted_everywhere:
         return "unmediated", "OK"
     return hook_verdict, "OK" if hook_verdict == "allow" else "FALSE POSITIVE"
 

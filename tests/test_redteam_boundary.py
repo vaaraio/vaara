@@ -58,13 +58,34 @@ def test_covered_everywhere_and_allowed_passes_the_fence():
     assert redteam._verdict("deny", coverage, "allow") == ("allow", "PASSED FENCE")
 
 
-def test_benign_is_ok_whether_or_not_it_is_routed():
-    """An allow-expected call that no matcher routes is simply not mediated.
+def test_benign_is_ok_when_no_source_routes_it():
+    """An allow-expected call that no matcher routes is not mediated at all.
 
-    Nothing is being enforced on it, so there is no fence to fail.
+    Nothing is being enforced on it anywhere, so there is no fence to fail.
     """
     assert redteam._verdict("allow", {"plugin": True}, "allow") == ("allow", "OK")
     assert redteam._verdict("allow", {"plugin": False}, "allow") == ("unmediated", "OK")
+
+
+def test_benign_denied_is_a_false_positive_while_one_source_routes_it():
+    """A source that misses the tool must not hide a wrongly blocked call.
+
+    The call is mediated wherever it is routed, and the hook denied it
+    there. Suppressing that reported a false positive as OK and exited 0.
+    """
+    coverage = {"plugin": True, "settings": False}
+    assert redteam._verdict("allow", coverage, "deny") == ("deny", "FALSE POSITIVE")
+
+
+def test_unrouted_and_allowed_is_a_passed_fence():
+    """Both true, and the weaker statement is the one to report.
+
+    No rule caught the call anywhere, so routing it would not have helped.
+    Reporting UNMEDIATED here hid a real fence failure and kept it out of
+    the headline count.
+    """
+    coverage = {"plugin": True, "settings": False}
+    assert redteam._verdict("deny", coverage, "allow") == ("allow", "PASSED FENCE")
 
 
 def test_benign_denied_is_a_false_positive():
