@@ -21,7 +21,7 @@
             "timeout": 30
           }
         ],
-        "matcher": "Bash|WebFetch|WebSearch|Write|Edit|NotebookEdit|Agent|Task|Workflow|CronCreate|ScheduleWakeup|RemoteTrigger|SendMessage|Skill|mcp__.*"
+        "matcher": ".*"
       }
     ],
     "PostToolUse": [
@@ -33,7 +33,7 @@
             "timeout": 30
           }
         ],
-        "matcher": "Bash|WebFetch|WebSearch|Write|Edit|NotebookEdit|Agent|Task|Workflow|CronCreate|ScheduleWakeup|RemoteTrigger|SendMessage|Skill|mcp__.*"
+        "matcher": ".*"
       }
     ]
   }

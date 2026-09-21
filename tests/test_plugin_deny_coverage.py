@@ -190,10 +190,55 @@ def test_package_matcher_agrees_with_plugin_matcher():
         assert pkg.match_deny_rule(_rules(), tool, tool_input) is None
 
 
-def test_plugin_matcher_names_the_meta_tools():
+def test_plugin_matcher_dispatches_every_tool():
+    """The matcher is a catch-all, so an unnamed tool is seen and recorded.
+
+    It used to enumerate tool names. That list missed the subagent tool
+    when the harness renamed it from Task to Agent, and a boundary
+    red-team then found Read, CronDelete, TaskStop, ExitWorktree and
+    ReadMcpResourceTool outside it as well. Each miss was silent: the
+    call never reached the hook, so no rule could fire and nothing was
+    recorded. A call that is seen and allowed is on the trail; a call
+    the matcher drops is not.
+    """
     doc = json.loads((PLUGIN / "hooks" / "hooks.json").read_text())
     matcher = doc["hooks"]["PreToolUse"][0]["matcher"]
     for tool in ("Agent", "Task", "Workflow", "CronCreate", "ScheduleWakeup",
-                 "RemoteTrigger", "SendMessage", "Skill"):
+                 "RemoteTrigger", "SendMessage", "Skill", "TaskStop",
+                 "CronDelete", "Read", "ExitWorktree", "ReadMcpResourceTool",
+                 "SomeToolShippedNextRelease"):
         assert re.fullmatch(matcher, tool), tool
-    assert not re.fullmatch(matcher, "TaskStop")
+
+
+def test_package_init_matcher_equals_the_plugin_matcher():
+    """`vaara init-governance` and the plugin must dispatch the same surface.
+
+    They drifted. The package constant stayed at
+    `Bash|WebFetch|WebSearch|mcp__.*` while the plugin grew to fifteen
+    names, so a pip install ran deny rules for Write, Edit, Agent and
+    Workflow against a matcher that never dispatched them. The rules were
+    present, loaded and dead, and the only symptom was silence.
+    """
+    from vaara.integrations import init_governance as ig
+    doc = json.loads((PLUGIN / "hooks" / "hooks.json").read_text())
+    assert ig.HOOK_MATCHER == doc["hooks"]["PreToolUse"][0]["matcher"]
+    for rule in _rules():
+        for tool in rule["tools"]:
+            assert re.fullmatch(ig.HOOK_MATCHER, tool), (
+                f"rule {rule['id']!r} targets {tool!r}, which the package "
+                f"matcher never dispatches"
+            )
+
+
+def test_taskstop_is_named_by_a_rule_not_only_by_the_matcher():
+    """Dispatch alone decides nothing; TaskStop needs a rule of its own.
+
+    Under the old enumerated matcher `Task` deliberately did not cover
+    `TaskStop`, which was correct for fullmatch semantics and wrong as
+    policy: stopping a running task removes a watcher. The catch-all now
+    routes it, and this pins the rule that judges it.
+    """
+    stop = match_deny_rule(_rules(), "TaskStop", {"task_id": "monitor"})
+    assert stop is not None and stop[0] == "background_task_stop"
+    drop = match_deny_rule(_rules(), "CronDelete", {"id": "1aec2581"})
+    assert drop is not None and drop[0] == "schedule_removal"
