@@ -170,10 +170,10 @@ def _table(rows: list[dict], matcher_names: list[str]) -> str:
             *("yes" if r["matcher"].get(n) else "NO" for n in matcher_names),
             r["hook"], r["rule"] or "-", r["result"],
         ])
-    widths = [max(len(str(l[i])) for l in lines) for i in range(len(head))]
+    widths = [max(len(str(line[i])) for line in lines) for i in range(len(head))]
     out = []
-    for i, l in enumerate(lines):
-        out.append("  ".join(str(c).ljust(widths[j]) for j, c in enumerate(l)))
+    for i, line in enumerate(lines):
+        out.append("  ".join(str(c).ljust(widths[j]) for j, c in enumerate(line)))
         if i == 0:
             out.append("  ".join("-" * w for w in widths))
     return "\n".join(out)
