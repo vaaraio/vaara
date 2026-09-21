@@ -51,9 +51,13 @@ CLAUDE_CODE_CONFIG = Path.home() / ".vaara" / "claude-code" / "config.json"
 # Claude Code global settings file the hooks are written into.
 CLAUDE_SETTINGS = Path.home() / ".claude" / "settings.json"
 
-# The tool-call surface the hooks intercept — Bash, WebFetch, WebSearch, and
-# every MCP tool. Kept identical to the plugin's hooks.json matcher.
-HOOK_MATCHER = "Bash|WebFetch|WebSearch|mcp__.*"
+# The tool-call surface the hooks intercept: all of it. Kept identical to the
+# plugin's hooks.json matcher, and pinned by a test, because the two drifted.
+# This read "Bash|WebFetch|WebSearch|mcp__.*" while the plugin had grown to
+# fifteen names, so a `vaara init-governance` install ran deny rules for Write,
+# Edit, Agent and Workflow that the matcher never dispatched. A rule the
+# matcher drops is dead, and nothing said so.
+HOOK_MATCHER = ".*"
 
 # Substring that marks a hook entry as Vaara-managed. Used to find and remove
 # our own entries on re-run / ungovern without touching the operator's other

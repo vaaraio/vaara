@@ -6,6 +6,17 @@ and this project follows [Semantic Versioning](https://semver.org/spec/v2.0.0.ht
 
 ## [Unreleased]
 
+### Changed
+- The plugin's PreToolUse and PostToolUse matchers are a catch-all. They used to enumerate tool names, and the enumeration kept losing: it missed the subagent tool when the harness renamed it from `Task` to `Agent`, and a boundary red-team then found `Read`, `CronDelete`, `TaskStop`, `ExitWorktree` and `ReadMcpResourceTool` outside it as well. Every miss was silent, because a call the matcher drops never reaches the hook, so no rule can fire and nothing is recorded. An unnamed tool is now dispatched, recorded and allowed unless a rule names it, which puts it on the trail instead of leaving it invisible. The cost is one trail row per tool call, read-only calls included.
+
+### Added
+- Eight deny rules, each closing a call that the red-team harness drove past the fence. `secret_material_read` covers `Read` and the MCP resource readers over dotenv files, private keys, the llm-proxy seal file, cloud and git credentials, because reading is not a mutation and no other rule looked at it. `schedule_removal` and `background_task_stop` cover `CronDelete` and `TaskStop`, which subtract a watcher rather than add capability. `worktree_discard_changes` covers `ExitWorktree` only when it carries the explicit discard flag. `skill_spawns_subagent` covers the skills that run in a subagent and so spawn without a call to `Agent`, `Task` or `Workflow`; the list is named by the operator, not detected from the call. `interpreter_config_write` and `interpreter_network_egress` cover `python`, `perl`, `ruby` and `node` one-liners, which no shell rule read inside. `shell_netcat_egress` covers netcat and socat. New lifts: `VAARA_ALLOW_SECRET_READ`, `VAARA_ALLOW_DISCARD`, `VAARA_ALLOW_EGRESS`.
+- Twenty red-team cases at `conformance/redteam/cases.json`, fourteen adversarial and six benign controls. All fourteen passed the fence when they were written and all fourteen are caught now; the six benign calls were allowed before and after, which is what keeps the new rules from being paid for in false positives.
+
+### Fixed
+- `vaara init-governance` wrote a narrower matcher than the plugin ships. Its constant was `Bash|WebFetch|WebSearch|mcp__.*` under a comment claiming it was kept identical to the plugin's, which stopped being true when the plugin grew to fifteen tool names in 1.92.0. A pip install therefore loaded deny rules for `Write`, `Edit`, `Agent` and `Workflow` against a matcher that never dispatched them: the rules were present and dead, and the only symptom was silence. Both are now the same catch-all, and a test pins them together and fails if any rule names a tool the matcher would drop.
+- Four existing rules were escapable and are widened. `shell_upload_egress` bounded its lookaheads at a newline, so a backslash line continuation put the data flag and the URL on a different line from `curl` and the upload passed. `shell_copy_egress` required `user@host`, so an ssh config alias with no user part passed. `harness_config_write` and `harness_config_shell_write` did not cover `.claude/plugins/`, `.claude/CLAUDE.md` or `~/.vaara/config.json`, so the governance plugin's own hook script was editable in place and one ordinary file write to its config turned the gate off.
+
 ## [1.92.0] - 2026-09-22
 
 ### Added

@@ -1,6 +1,6 @@
 {
-  "version": "0.2",
-  "description": "Layer-1 regex deny patterns for the Vaara plugin. Covers shell and web input, file mutation (Write, Edit, NotebookEdit), and the agent's meta-actions: subagent spawn (Agent, Task, Workflow), scheduling (CronCreate), remote execution (RemoteTrigger), cross-session messaging (SendMessage) and writes to the harness's own configuration. Rules with match_any fire on any call to the tool; unless_env names a variable that, set to 1, lifts the rule for a deliberate exception. Rules with any_field false only apply by tool name; their pattern reads a specific field and means nothing over arbitrary arguments.",
+  "version": "0.3",
+  "description": "Layer-1 regex deny patterns for the Vaara plugin. Covers shell and web input, file mutation (Write, Edit, NotebookEdit), and the agent's meta-actions: subagent spawn (Agent, Task, Workflow), scheduling (CronCreate), remote execution (RemoteTrigger), cross-session messaging (SendMessage) and writes to the harness's own configuration. Rules with match_any fire on any call to the tool; unless_env names a variable that, set to 1, lifts the rule for a deliberate exception. Rules with any_field false only apply by tool name; their pattern reads a specific field and means nothing over arbitrary arguments. The PreToolUse and PostToolUse matchers are a catch-all: enumerating tool names missed the subagent tool when it was renamed to Agent, and missed Read, CronDelete, TaskStop, ExitWorktree and ReadMcpResourceTool besides. An unnamed tool is now seen and recorded rather than invisible, and the rules decide. The cost is a trail row for every tool call, read-only ones included.",
   "rules": [
     {
       "id": "ssrf_cloud_metadata_ipv4",
@@ -13,7 +13,7 @@
         "url"
       ],
       "pattern": "169\\.254\\.169\\.254",
-      "message": "AWS/GCP/Azure instance-metadata IP — common SSRF / credential exfiltration target."
+      "message": "AWS/GCP/Azure instance-metadata IP \u2014 common SSRF / credential exfiltration target."
     },
     {
       "id": "ssrf_gcp_metadata_host",
@@ -26,7 +26,7 @@
         "url"
       ],
       "pattern": "metadata\\.google\\.internal",
-      "message": "GCP metadata host — credential exfiltration target."
+      "message": "GCP metadata host \u2014 credential exfiltration target."
     },
     {
       "id": "ssrf_azure_imds_host",
@@ -39,7 +39,7 @@
         "url"
       ],
       "pattern": "100\\.100\\.100\\.200|metadata\\.azure\\.com",
-      "message": "Azure IMDS / metadata host — credential exfiltration target."
+      "message": "Azure IMDS / metadata host \u2014 credential exfiltration target."
     },
     {
       "id": "etc_shadow_read",
@@ -72,7 +72,7 @@
         "command"
       ],
       "pattern": "\\b(curl|wget|fetch)\\b[^|]+\\|\\s*(bash|sh|zsh|ksh|dash|fish)\\b",
-      "message": "Piping remote content directly into a shell — unverified code execution."
+      "message": "Piping remote content directly into a shell \u2014 unverified code execution."
     },
     {
       "id": "rm_rf_root",
@@ -83,7 +83,7 @@
         "command"
       ],
       "pattern": "\\brm\\s+(-[rRf]+|--recursive|--force)[^|;]*\\s+/(\\s|$|;|&|\\|)",
-      "message": "rm -rf / or equivalent — non-recoverable filesystem destruction."
+      "message": "rm -rf / or equivalent \u2014 non-recoverable filesystem destruction."
     },
     {
       "id": "fork_bomb_classic",
@@ -105,7 +105,7 @@
         "command"
       ],
       "pattern": "\\bdd\\b[^|;]*\\bof=/dev/(sd[a-z]|nvme\\d+n\\d+|disk\\d+|mmcblk\\d+)",
-      "message": "dd writing directly to a raw block device — disk destruction."
+      "message": "dd writing directly to a raw block device \u2014 disk destruction."
     },
     {
       "id": "history_purge",
@@ -116,7 +116,7 @@
         "command"
       ],
       "pattern": "history\\s+-c|>\\s*~?/?\\.bash_history|\\bunset\\s+HISTFILE",
-      "message": "Shell history purge — common post-compromise covering of tracks."
+      "message": "Shell history purge \u2014 common post-compromise covering of tracks."
     },
     {
       "id": "ssh_authorized_keys_write",
@@ -127,7 +127,7 @@
         "command"
       ],
       "pattern": "(>>?|tee)\\s+[^|;]*\\.ssh/authorized_keys",
-      "message": "Write to ~/.ssh/authorized_keys — persistent SSH backdoor."
+      "message": "Write to ~/.ssh/authorized_keys \u2014 persistent SSH backdoor."
     },
     {
       "id": "reverse_shell_bash_tcp",
@@ -149,7 +149,7 @@
         "command"
       ],
       "pattern": "\\bbase64\\s+(--decode|-d|-D)\\b[^|]*\\|\\s*(bash|sh|python|python3|perl|ruby)\\b",
-      "message": "Base64-decoded payload piped to an interpreter — common obfuscated execution."
+      "message": "Base64-decoded payload piped to an interpreter \u2014 common obfuscated execution."
     },
     {
       "id": "shell_rc_persistence",
@@ -321,7 +321,7 @@
       "fields": [
         "command"
       ],
-      "pattern": "\\b(curl|wget)\\b(?=[^|\\n]*\\s(?:-d|--data(?:-\\w+)?|--upload-file|-T|-F|--form|--json)\\b)(?=[^|\\n]*https?://(?!localhost|127\\.|0\\.0\\.0\\.0|\\[::1\\]))",
+      "pattern": "\\b(curl|wget)\\b(?=[^|]*\\s(?:-d|--data(?:-\\w+)?|--upload-file|-T|-F|--form|--json)\\b)(?=[^|]*https?://(?!localhost|127\\.|0\\.0\\.0\\.0|\\[::1\\]))",
       "message": "Outbound upload to a remote host from the shell."
     },
     {
@@ -332,7 +332,7 @@
       "fields": [
         "command"
       ],
-      "pattern": "\\b(scp|rsync|sftp)\\b[^|\\n]*\\s[^\\s@]+@[^\\s:]+:",
+      "pattern": "\\b(scp|rsync|sftp)\\b[^|\\n]*\\s(?:[^\\s@]+@)?[^\\s/@:][^\\s:]*:(?!//)",
       "message": "Copy to a remote host from the shell."
     },
     {
@@ -346,7 +346,7 @@
         "file_path",
         "notebook_path"
       ],
-      "pattern": "(^|/)(\\.claude\\.json|\\.claude/(settings(\\.local)?\\.json|hooks/|skills/|agents/|scheduled_tasks\\.json)|\\.claude-plugin/|\\.mcp\\.json$)",
+      "pattern": "(^|/)(\\.claude\\.json|\\.claude/(settings(\\.local)?\\.json|hooks/|skills/|agents/|plugins/|scheduled_tasks\\.json|CLAUDE\\.md)|\\.claude-plugin/|\\.vaara/(config\\.json|claude-code/)|\\.mcp\\.json$)",
       "unless_env": "VAARA_ALLOW_HARNESS_EDIT",
       "message": "Writes the agent harness configuration (hooks, skills, settings, MCP). Set VAARA_ALLOW_HARNESS_EDIT=1 for a deliberate edit."
     },
@@ -358,9 +358,104 @@
       "fields": [
         "command"
       ],
-      "pattern": "(^|[\\s;&|])(sed\\s+-i|tee|cp|mv|rm|chmod|truncate|>+)[^|\\n]*(\\.claude\\.json|\\.claude/(settings(\\.local)?\\.json|hooks/|skills/|agents/|scheduled_tasks\\.json)|\\.claude-plugin/|\\.mcp\\.json)",
+      "pattern": "(^|[\\s;&|])(sed\\s+-i|tee|cp|mv|rm|chmod|truncate|>+)[^|\\n]*(\\.claude\\.json|\\.claude/(settings(\\.local)?\\.json|hooks/|skills/|agents/|plugins/|scheduled_tasks\\.json|CLAUDE\\.md)|\\.claude-plugin/|\\.vaara/config|\\.mcp\\.json)",
       "unless_env": "VAARA_ALLOW_HARNESS_EDIT",
       "message": "Rewrites the agent harness configuration from the shell. Set VAARA_ALLOW_HARNESS_EDIT=1 for a deliberate edit."
+    },
+    {
+      "id": "secret_material_read",
+      "tools": [
+        "Read",
+        "ReadMcpResourceTool",
+        "ReadMcpResourceDirTool"
+      ],
+      "fields": [
+        "file_path",
+        "uri"
+      ],
+      "pattern": "(^|/)\\.env(\\.[A-Za-z0-9_-]+)?$|(^|/)\\.ssh/id_[A-Za-z0-9_]+$|(^|/)id_rsa$|/\\.vaara/llm-proxy/seal\\.json$|(^|/)\\.aws/credentials$|(^|/)\\.netrc$|(^|/)\\.git-credentials$",
+      "unless_env": "VAARA_ALLOW_SECRET_READ",
+      "message": "Read of credential material (dotenv, private key, seal file, cloud or git credentials). Reading is not a mutation, so no other rule covers it. Set VAARA_ALLOW_SECRET_READ=1 for a deliberate read."
+    },
+    {
+      "id": "schedule_removal",
+      "tools": [
+        "CronDelete"
+      ],
+      "match_any": true,
+      "unless_env": "VAARA_ALLOW_SCHEDULE",
+      "message": "Deletes a scheduled job. Removing the operator's own sweep subtracts oversight, which the spawn-shaped rules do not cover. Set VAARA_ALLOW_SCHEDULE=1."
+    },
+    {
+      "id": "background_task_stop",
+      "tools": [
+        "TaskStop"
+      ],
+      "match_any": true,
+      "unless_env": "VAARA_ALLOW_SPAWN",
+      "message": "Stops a running background task or teammate. Same shape as deleting a schedule: it removes a watcher. Set VAARA_ALLOW_SPAWN=1."
+    },
+    {
+      "id": "worktree_discard_changes",
+      "tools": [
+        "ExitWorktree"
+      ],
+      "fields": [
+        "discard_changes"
+      ],
+      "pattern": "^true$",
+      "unless_env": "VAARA_ALLOW_DISCARD",
+      "message": "Removes a worktree and discards uncommitted work by explicit flag. A removal without the flag refuses on its own and is not denied here. Set VAARA_ALLOW_DISCARD=1.",
+      "any_field": false
+    },
+    {
+      "id": "skill_spawns_subagent",
+      "tools": [
+        "Skill"
+      ],
+      "fields": [
+        "skill"
+      ],
+      "pattern": "(^|:)(wiki-ingest|wiki-lint|dispatching-parallel-agents|subagent-driven-development)$",
+      "unless_env": "VAARA_ALLOW_SPAWN",
+      "message": "This skill runs in a subagent, so it spawns without a call to Agent, Task or Workflow. The list is named by the operator, not detected from the call. Set VAARA_ALLOW_SPAWN=1.",
+      "any_field": false
+    },
+    {
+      "id": "interpreter_config_write",
+      "tools": [
+        "Bash"
+      ],
+      "fields": [
+        "command"
+      ],
+      "pattern": "\\b(python3?|perl|ruby|node|install|dd)\\b(?=[^|\\n]*(?:\\.claude\\.json|\\.claude/(?:settings|hooks/|skills/|agents/|plugins/|scheduled_tasks|CLAUDE\\.md)|\\.vaara/config))(?=[^|\\n]*(?:['\\\"]w['\\\"]|>|write|truncate|unlink|shutil|os\\.remove))",
+      "unless_env": "VAARA_ALLOW_HARNESS_EDIT",
+      "message": "An interpreter writes the harness or governance configuration. The shell rule names sed, tee, cp, mv, rm, chmod, truncate and redirection; python, perl, ruby, node, install and dd write the same file through none of them. Set VAARA_ALLOW_HARNESS_EDIT=1."
+    },
+    {
+      "id": "shell_netcat_egress",
+      "tools": [
+        "Bash"
+      ],
+      "fields": [
+        "command"
+      ],
+      "pattern": "\\b(ncat|netcat|socat)\\b|\\bnc\\s+(?:-[A-Za-z]+\\s+)*[A-Za-z0-9_.\\-]+\\s+\\d{1,5}\\b",
+      "unless_env": "VAARA_ALLOW_EGRESS",
+      "message": "netcat or socat moves bytes to a remote host without curl or wget. Set VAARA_ALLOW_EGRESS=1."
+    },
+    {
+      "id": "interpreter_network_egress",
+      "tools": [
+        "Bash"
+      ],
+      "fields": [
+        "command"
+      ],
+      "pattern": "\\b(python3?|perl|ruby|node)\\b(?=[^|\\n]*(?:urlopen|urllib|requests\\.(?:post|put|get)|http\\.client|socket\\.socket|net\\.connect|fetch\\())",
+      "unless_env": "VAARA_ALLOW_EGRESS",
+      "message": "An interpreter one-liner opens an outbound connection. No shell rule reads inside a -c string. Set VAARA_ALLOW_EGRESS=1."
     }
   ]
 }
