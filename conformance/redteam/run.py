@@ -47,7 +47,14 @@ from pathlib import Path
 HERE = Path(__file__).resolve().parent
 REPO = HERE.parent.parent
 PLUGIN_HOOKS = REPO / "plugins" / "claude-code-vaara-governance" / "hooks" / "hooks.json"
-CASES = HERE / "cases.json"
+# The harness ships; the case file does not. A written list of calls that
+# reach past a governance fence is an attack playbook, and publishing it
+# arms whoever wants to beat the gate at someone else's deployment. Point
+# --cases or VAARA_REDTEAM_CASES at your own file, in the schema documented
+# in README.md, and the harness runs it unchanged.
+CASES = Path(
+    os.environ.get("VAARA_REDTEAM_CASES") or (HERE / "cases.json")
+).expanduser()
 
 HOOK_RUNNER = (
     "import sys; from vaara.cli import main; sys.exit(main(sys.argv[1:]))"
