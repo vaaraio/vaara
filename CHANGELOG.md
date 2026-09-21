@@ -4,7 +4,7 @@ All notable changes to this project are documented here.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/)
 and this project follows [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
-## [Unreleased]
+## [1.93.0] - 2026-09-21
 
 ### Changed
 - The plugin's PreToolUse and PostToolUse matchers are a catch-all. They used to enumerate tool names, and the enumeration kept losing: it missed the subagent tool when the harness renamed it from `Task` to `Agent`, and a boundary red-team then found `Read`, `CronDelete`, `TaskStop`, `ExitWorktree` and `ReadMcpResourceTool` outside it as well. Every miss was silent, because a call the matcher drops never reaches the hook, so no rule can fire and nothing is recorded. An unnamed tool is now dispatched, recorded and allowed unless a rule names it, which puts it on the trail instead of leaving it invisible. The cost is one trail row per tool call, read-only calls included.
@@ -17,7 +17,7 @@ and this project follows [Semantic Versioning](https://semver.org/spec/v2.0.0.ht
 - `vaara init-governance` wrote a narrower matcher than the plugin ships. Its constant was `Bash|WebFetch|WebSearch|mcp__.*` under a comment claiming it was kept identical to the plugin's, which stopped being true when the plugin grew to fifteen tool names in 1.92.0. A pip install therefore loaded deny rules for `Write`, `Edit`, `Agent` and `Workflow` against a matcher that never dispatched them: the rules were present and dead, and the only symptom was silence. Both are now the same catch-all, and a test pins them together and fails if any rule names a tool the matcher would drop.
 - Four existing rules were escapable and are widened. `shell_upload_egress` bounded its lookaheads at a newline, so a backslash line continuation put the data flag and the URL on a different line from `curl` and the upload passed. `shell_copy_egress` required `user@host`, so an ssh config alias with no user part passed. `harness_config_write` and `harness_config_shell_write` did not cover `.claude/plugins/`, `.claude/CLAUDE.md` or `~/.vaara/config.json`, so the governance plugin's own hook script was editable in place and one ordinary file write to its config turned the gate off.
 
-## [1.92.0] - 2026-09-22
+## [1.92.0] - 2026-09-21
 
 ### Added
 - The plugin governs the agent's meta-actions. The PreToolUse matcher now names `Agent`, `Workflow`, `CronCreate`, `ScheduleWakeup`, `RemoteTrigger` and `Skill` alongside the tools it already matched, and nine deny rules cover subagent spawn (`Agent`, `Task`, `Workflow`), durable scheduled jobs, `RemoteTrigger` create, update and run, cross-session `SendMessage`, shell upload and copy egress (`curl -d`, `scp`, `rsync` to a remote host), and writes to the harness's own configuration (`.claude.json`, `.claude/settings*.json`, hooks, skills, agents, `.mcp.json`) from the file tools or the shell. Each of these rules names an operator lift (`VAARA_ALLOW_SPAWN`, `VAARA_ALLOW_SCHEDULE`, `VAARA_ALLOW_REMOTE`, `VAARA_ALLOW_XSESSION`, `VAARA_ALLOW_HARNESS_EDIT`) so a deliberate exception is one environment variable and is still recorded.
