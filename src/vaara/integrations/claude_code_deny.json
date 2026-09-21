@@ -1,6 +1,6 @@
 {
-  "version": "0.1",
-  "description": "Layer-1 regex deny patterns for the Vaara Claude Code plugin. Covers shell and web input plus file-mutation tools (Write, Edit, NotebookEdit), so persistence and remote-code paths are caught on the file surface as well as the shell surface.",
+  "version": "0.2",
+  "description": "Layer-1 regex deny patterns for the Vaara plugin. Covers shell and web input, file mutation (Write, Edit, NotebookEdit), and the agent's meta-actions: subagent spawn (Agent, Task, Workflow), scheduling (CronCreate), remote execution (RemoteTrigger), cross-session messaging (SendMessage) and writes to the harness's own configuration. Rules with match_any fire on any call to the tool; unless_env names a variable that, set to 1, lifts the rule for a deliberate exception.",
   "rules": [
     {
       "id": "ssrf_cloud_metadata_ipv4",
@@ -13,7 +13,7 @@
         "url"
       ],
       "pattern": "169\\.254\\.169\\.254",
-      "message": "AWS/GCP/Azure instance-metadata IP \u2014 common SSRF / credential exfiltration target."
+      "message": "AWS/GCP/Azure instance-metadata IP — common SSRF / credential exfiltration target."
     },
     {
       "id": "ssrf_gcp_metadata_host",
@@ -26,7 +26,7 @@
         "url"
       ],
       "pattern": "metadata\\.google\\.internal",
-      "message": "GCP metadata host \u2014 credential exfiltration target."
+      "message": "GCP metadata host — credential exfiltration target."
     },
     {
       "id": "ssrf_azure_imds_host",
@@ -39,7 +39,7 @@
         "url"
       ],
       "pattern": "100\\.100\\.100\\.200|metadata\\.azure\\.com",
-      "message": "Azure IMDS / metadata host \u2014 credential exfiltration target."
+      "message": "Azure IMDS / metadata host — credential exfiltration target."
     },
     {
       "id": "etc_shadow_read",
@@ -72,7 +72,7 @@
         "command"
       ],
       "pattern": "\\b(curl|wget|fetch)\\b[^|]+\\|\\s*(bash|sh|zsh|ksh|dash|fish)\\b",
-      "message": "Piping remote content directly into a shell \u2014 unverified code execution."
+      "message": "Piping remote content directly into a shell — unverified code execution."
     },
     {
       "id": "rm_rf_root",
@@ -83,7 +83,7 @@
         "command"
       ],
       "pattern": "\\brm\\s+(-[rRf]+|--recursive|--force)[^|;]*\\s+/(\\s|$|;|&|\\|)",
-      "message": "rm -rf / or equivalent \u2014 non-recoverable filesystem destruction."
+      "message": "rm -rf / or equivalent — non-recoverable filesystem destruction."
     },
     {
       "id": "fork_bomb_classic",
@@ -105,7 +105,7 @@
         "command"
       ],
       "pattern": "\\bdd\\b[^|;]*\\bof=/dev/(sd[a-z]|nvme\\d+n\\d+|disk\\d+|mmcblk\\d+)",
-      "message": "dd writing directly to a raw block device \u2014 disk destruction."
+      "message": "dd writing directly to a raw block device — disk destruction."
     },
     {
       "id": "history_purge",
@@ -116,7 +116,7 @@
         "command"
       ],
       "pattern": "history\\s+-c|>\\s*~?/?\\.bash_history|\\bunset\\s+HISTFILE",
-      "message": "Shell history purge \u2014 common post-compromise covering of tracks."
+      "message": "Shell history purge — common post-compromise covering of tracks."
     },
     {
       "id": "ssh_authorized_keys_write",
@@ -127,7 +127,7 @@
         "command"
       ],
       "pattern": "(>>?|tee)\\s+[^|;]*\\.ssh/authorized_keys",
-      "message": "Write to ~/.ssh/authorized_keys \u2014 persistent SSH backdoor."
+      "message": "Write to ~/.ssh/authorized_keys — persistent SSH backdoor."
     },
     {
       "id": "reverse_shell_bash_tcp",
@@ -149,7 +149,7 @@
         "command"
       ],
       "pattern": "\\bbase64\\s+(--decode|-d|-D)\\b[^|]*\\|\\s*(bash|sh|python|python3|perl|ruby)\\b",
-      "message": "Base64-decoded payload piped to an interpreter \u2014 common obfuscated execution."
+      "message": "Base64-decoded payload piped to an interpreter — common obfuscated execution."
     },
     {
       "id": "shell_rc_persistence",
@@ -254,6 +254,110 @@
       ],
       "pattern": "/etc/(shadow|gshadow|passwd|sudoers)(\\.d/[^/]*)?$",
       "message": "Write to a system credential or privilege file - changes who can log in or escalate."
+    },
+    {
+      "id": "agent_spawn",
+      "tools": [
+        "Agent",
+        "Task"
+      ],
+      "match_any": true,
+      "unless_env": "VAARA_ALLOW_SPAWN",
+      "message": "Subagent spawn. Operator policy is no subagents; set VAARA_ALLOW_SPAWN=1 for a named job."
+    },
+    {
+      "id": "workflow_fanout",
+      "tools": [
+        "Workflow"
+      ],
+      "match_any": true,
+      "unless_env": "VAARA_ALLOW_SPAWN",
+      "message": "Workflow fan-out spawns many agents in one call; set VAARA_ALLOW_SPAWN=1 for a named job."
+    },
+    {
+      "id": "remote_trigger_execute",
+      "tools": [
+        "RemoteTrigger"
+      ],
+      "fields": [
+        "action"
+      ],
+      "pattern": "^(create|update|run|create_webhook_trigger)$",
+      "unless_env": "VAARA_ALLOW_REMOTE",
+      "message": "Creates or runs a cloud agent: remote execution and data egress. Set VAARA_ALLOW_REMOTE=1 to permit."
+    },
+    {
+      "id": "cron_durable_job",
+      "tools": [
+        "CronCreate"
+      ],
+      "fields": [
+        "durable"
+      ],
+      "pattern": "^true$",
+      "unless_env": "VAARA_ALLOW_SCHEDULE",
+      "message": "A durable scheduled job survives the session. Set VAARA_ALLOW_SCHEDULE=1 to permit; session-only jobs pass."
+    },
+    {
+      "id": "cross_session_message",
+      "tools": [
+        "SendMessage"
+      ],
+      "fields": [
+        "to"
+      ],
+      "pattern": "^(?!main$).+",
+      "unless_env": "VAARA_ALLOW_XSESSION",
+      "message": "Message to another agent or session leaves the governed session. Set VAARA_ALLOW_XSESSION=1 to permit."
+    },
+    {
+      "id": "shell_upload_egress",
+      "tools": [
+        "Bash"
+      ],
+      "fields": [
+        "command"
+      ],
+      "pattern": "\\b(curl|wget)\\b(?=[^|\\n]*\\s(?:-d|--data(?:-\\w+)?|--upload-file|-T|-F|--form|--json)\\b)(?=[^|\\n]*https?://(?!localhost|127\\.|0\\.0\\.0\\.0|\\[::1\\]))",
+      "message": "Outbound upload to a remote host from the shell."
+    },
+    {
+      "id": "shell_copy_egress",
+      "tools": [
+        "Bash"
+      ],
+      "fields": [
+        "command"
+      ],
+      "pattern": "\\b(scp|rsync|sftp)\\b[^|\\n]*\\s[^\\s@]+@[^\\s:]+:",
+      "message": "Copy to a remote host from the shell."
+    },
+    {
+      "id": "harness_config_write",
+      "tools": [
+        "Write",
+        "Edit",
+        "NotebookEdit"
+      ],
+      "fields": [
+        "file_path",
+        "notebook_path"
+      ],
+      "pattern": "(^|/)(\\.claude\\.json|\\.claude/(settings(\\.local)?\\.json|hooks/|skills/|agents/|scheduled_tasks\\.json)|\\.claude-plugin/|\\.mcp\\.json$)",
+      "unless_env": "VAARA_ALLOW_HARNESS_EDIT",
+      "message": "Writes the agent harness configuration (hooks, skills, settings, MCP). Set VAARA_ALLOW_HARNESS_EDIT=1 for a deliberate edit."
+    },
+    {
+      "id": "harness_config_shell_write",
+      "tools": [
+        "Bash"
+      ],
+      "fields": [
+        "command"
+      ],
+      "pattern": "(^|[\\s;&|])(sed\\s+-i|tee|cp|mv|rm|chmod|truncate|>+)[^|\\n]*(\\.claude\\.json|\\.claude/(settings(\\.local)?\\.json|hooks/|skills/|agents/|scheduled_tasks\\.json)|\\.claude-plugin/|\\.mcp\\.json)",
+      "unless_env": "VAARA_ALLOW_HARNESS_EDIT",
+      "message": "Rewrites the agent harness configuration from the shell. Set VAARA_ALLOW_HARNESS_EDIT=1 for a deliberate edit."
     }
   ]
 }

@@ -113,6 +113,9 @@ def _run_hook(tool_name: str, tool_input: dict, home: Path) -> tuple[int, str]:
         "VAARA_PLUGIN_SHADOW": "0",
         "CLAUDE_PLUGIN_ROOT": str(PLUGIN_HOOKS.parent.parent),
     }
+    # Operator lifts (VAARA_ALLOW_*) pass through, so a run can show what a
+    # named exception opens. Everything else is scrubbed.
+    env.update({k: v for k, v in os.environ.items() if k.startswith("VAARA_ALLOW_")})
     proc = subprocess.run(
         [*_hook_argv(), "hook", "pre-tool-use"],
         input=json.dumps({
