@@ -152,6 +152,38 @@ interactive `npm login`. Requires `VAARA_NPM_TOKEN` env var
 (npmjs.org > Access Tokens > Automation). Ships without provenance;
 restore the workflow before the next release.
 
+## 5. Upgrade the box's own install (do this every release)
+
+```
+uv tool upgrade vaara
+vaara --version        # must match the version just tagged
+```
+
+The Linux box runs Vaara against its own audit trail, so a stale install
+there means the trail and the menu-bar client show something other than
+what shipped. The install is a `uv` tool, not a pip package: the binary at
+`~/.local/bin/vaara` symlinks into `~/.local/share/uv/tools/vaara/`, and
+`pip show` will not see it.
+
+Sanity check after the upgrade. The hook writes to `audit_db` from
+`~/.vaara/claude-code/config.json`, and falls back to
+`~/.vaara/claude-code/audit.db` when that key is absent
+(`claude_code_hooks.py:60`). Read the path from there rather than assuming
+one, then check it:
+
+```
+python3 -c "import json,os,sqlite3;cfg=os.path.expanduser('~/.vaara/claude-code/config.json');d=json.load(open(cfg)) if os.path.exists(cfg) else {};p=os.path.expanduser(d.get('audit_db') or '~/.vaara/claude-code/audit.db');print(p);print(open(p,'rb') and [r[0] for r in sqlite3.connect('file:%s?mode=ro'%p,uri=True).execute('pragma integrity_check(5)')])"
+```
+
+It should print the path and `['ok']`. A missing file raises rather than
+reporting corruption, so check the path it printed before reading anything
+into the error. A malformed index fails silently: table scans keep working
+while any indexed query raises, and the client renders an empty feed instead
+of an error. `REINDEX` repairs it without touching the records.
+
+`trail_db` in `~/.vaara/config.json` is a different key, written by
+`vaara init --auto` into its discovery report. No hook reads it.
+
 ## Cross-repo follow-up
 
 The release scripts do not touch cross-repo work. After v0.39.2-style

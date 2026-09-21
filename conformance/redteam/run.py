@@ -18,13 +18,21 @@ harness never routes the call to the hook:
 2. Hook verdict. Drive the real `vaara hook pre-tool-use` with shadow OFF
    in a throwaway HOME and read the exit code (0 allow, 2 deny/hold).
 
+Coverage is judged per source, not across them. Every source is a
+deployment, so one that does not route the tool is a real gap there whatever
+the others do. Taking any() across sources hid this: the plugin ships ``.*``
+and satisfied it for every case, so a narrow matcher in a user's
+settings.json could never fail a run.
+
 Result per case:
-  CAUGHT        expected deny, matcher covers it, hook denied
-  PASSED FENCE  expected deny, but the matcher misses it or the hook allowed
-  OK            expected allow, allowed
+  CAUGHT        expected deny, every matcher routes it, hook denied
+  UNMEDIATED    expected deny, but some matcher never routes it to the hook
+  PASSED FENCE  expected deny, routed, and the hook allowed it anyway
+  OK            expected allow, allowed (or not routed: nothing to enforce)
   FALSE POSITIVE expected allow, denied
 
-Exit 0 only when nothing passed the fence and nothing benign was blocked.
+Exit 0 only when nothing passed the fence, nothing is unmediated, and
+nothing benign was blocked.
 
 Usage:
   python conformance/redteam/run.py            # table on stdout
@@ -135,23 +143,50 @@ def _run_hook(tool_name: str, tool_input: dict, home: Path) -> tuple[int, str]:
     return proc.returncode, proc.stderr.strip()
 
 
+def _verdict(
+    expect: str, coverage: dict[str, bool], hook_verdict: str
+) -> tuple[str, str]:
+    """(effective, result) for one case, judged per matcher source.
+
+    Every source is a deployment. A source that does not route the tool is a
+    real gap in that deployment whatever the others do, so one miss is
+    enough to call the case UNMEDIATED. Taking ``any()`` across the sources
+    hid exactly this: the plugin ships ``.*`` and satisfied the test for
+    every case, so a narrow matcher in a user's settings.json could never
+    fail a run. Six tools named by deny rules scored CAUGHT on a box where
+    the hook never sees them.
+
+    A call the hook lets through is PASSED FENCE even when a source also
+    fails to route it. Both are true, and the weaker statement is the one
+    worth reporting: no rule caught it anywhere, so routing it would not
+    have helped.
+
+    An allow-expected case keeps the hook's verdict unless *no* source
+    routes it. Somewhere the call is mediated, so a benign call the hook
+    denies is still a false positive there.
+    """
+    missing = [name for name, ok in coverage.items() if not ok]
+    unrouted_everywhere = len(missing) == len(coverage)
+    if expect == "deny":
+        if hook_verdict != "deny":
+            return hook_verdict, "PASSED FENCE"
+        if missing:
+            return "unmediated", "UNMEDIATED"
+        return hook_verdict, "CAUGHT"
+    if unrouted_everywhere:
+        return "unmediated", "OK"
+    return hook_verdict, "OK" if hook_verdict == "allow" else "FALSE POSITIVE"
+
+
 def run(cases: list[dict], matchers: dict[str, list[str]], home: Path) -> list[dict]:
     rows = []
     for case in cases:
         tool = case["tool_name"]
         coverage = {name: _covered(ms, tool) for name, ms in matchers.items()}
-        any_cover = any(coverage.values())
         code, err = _run_hook(tool, case["tool_input"], home)
         hook_verdict = "deny" if code == 2 else ("allow" if code == 0 else f"exit {code}")
-        if not any_cover:
-            effective = "unmediated"
-        else:
-            effective = hook_verdict
         expect = case["expect"]
-        if expect == "deny":
-            result = "CAUGHT" if effective == "deny" else "PASSED FENCE"
-        else:
-            result = "OK" if effective in ("allow", "unmediated") else "FALSE POSITIVE"
+        effective, result = _verdict(expect, coverage, hook_verdict)
         rule = ""
         m = re.search(r"rule=([A-Za-z0-9_]+)", err)
         if m:
@@ -162,6 +197,7 @@ def run(cases: list[dict], matchers: dict[str, list[str]], home: Path) -> list[d
             "tool": tool,
             "expect": expect,
             "matcher": coverage,
+            "missing_matchers": [n for n, ok in coverage.items() if not ok],
             "hook": hook_verdict,
             "rule": rule,
             "effective": effective,
@@ -230,11 +266,17 @@ def main(argv: list[str] | None = None) -> int:
     passed = [r for r in rows if r["result"] == "PASSED FENCE"]
     fp = [r for r in rows if r["result"] == "FALSE POSITIVE"]
     caught = [r for r in rows if r["result"] == "CAUGHT"]
-    print(f"caught {len(caught)}  passed fence {len(passed)}  false positive {len(fp)}")
+    unmediated = [r for r in rows if r["result"] == "UNMEDIATED"]
+    print(f"caught {len(caught)}  passed fence {len(passed)}  "
+          f"unmediated {len(unmediated)}  false positive {len(fp)}")
     for r in passed:
-        why = "matcher does not route this tool to the hook" if r["effective"] == "unmediated" \
-            else "hook allowed it: no rule names this"
-        print(f"  PASSED FENCE  {r['id']:32s} {r['tool']:14s} {why}")
+        print(f"  PASSED FENCE  {r['id']:32s} {r['tool']:14s} "
+              f"hook allowed it: no rule names this")
+    for r in unmediated:
+        where = ", ".join(r["missing_matchers"])
+        print(f"  UNMEDIATED    {r['id']:32s} {r['tool']:14s} "
+              f"not routed to the hook by: {where} "
+              f"(rule would have fired: {r['rule'] or 'unknown'})")
     for r in fp:
         print(f"  FALSE POSITIVE {r['id']:32s} {r['tool']:14s} rule={r['rule']}")
 
@@ -244,9 +286,9 @@ def main(argv: list[str] | None = None) -> int:
             "matchers": matchers,
             "rows": rows,
             "summary": {"caught": len(caught), "passed_fence": len(passed),
-                        "false_positive": len(fp)},
+                        "unmediated": len(unmediated), "false_positive": len(fp)},
         }, indent=2), encoding="utf-8")
-    return 0 if not passed and not fp else 1
+    return 0 if not passed and not fp and not unmediated else 1
 
 
 if __name__ == "__main__":
