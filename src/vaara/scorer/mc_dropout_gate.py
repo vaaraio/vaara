@@ -17,6 +17,20 @@ Bundle format (torch.save):
       "mc_samples": int,
       "nlp_encoder": dict | None,  # {"vec": TfidfVectorizer, "svd": TruncatedSVD}
     }
+
+Where the bundle comes from:
+    Vaara does not ship one and no script in this tree produces one. It is
+    trained offline and dropped at `~/.vaara/cache/mc_dropout_gate_bundle
+    .joblib`, or wherever `bundle_path` points. The weights must belong to
+    the architecture `_build_model()` builds below, and the features must
+    match `_featurize()` in this module.
+
+    `tests/gate_bundle_factory.py` trains a small one in that format. It is
+    a test fixture, not a training pipeline, but it is the worked example.
+
+    `torch` is not in the base install. It comes with the `gate` extra;
+    without it this module is unimportable and `vaara.scorer` drops the
+    backend from `__all__` rather than failing at import.
 """
 
 from __future__ import annotations
@@ -72,8 +86,9 @@ class MCDropoutGateScorer:
         path = Path(bundle_path) if bundle_path else _DEFAULT_BUNDLE
         if not path.exists():
             raise FileNotFoundError(
-                f"MC dropout bundle not found at {path}. "
-                "Run mc_dropout_gate.py first."
+                f"MC dropout bundle not found at {path}. Vaara does not ship "
+                "one and nothing in the tree builds one; it is trained offline "
+                "and placed here. See this module's docstring for the format."
             )
         # Try weights_only=True (safe, no arbitrary code execution) first.
         # Falls back to weights_only=False only when the bundle contains

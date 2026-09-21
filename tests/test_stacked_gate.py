@@ -1,31 +1,29 @@
-"""Tests for StackedGateScorer — composes GBM + MC dropout via trained LR."""
+"""Tests for StackedGateScorer — composes GBM + MC dropout via trained LR.
+
+The bundle comes from the ``stacked_gate_bundle`` fixture, which writes an LR
+stack over the other two fixture bundles (see tests/gate_bundle_factory.py).
+Set VAARA_STACKED_GATE_BUNDLE to score a production bundle instead.
+"""
 
 from __future__ import annotations
 
-import os
-from pathlib import Path
+import math
 
 import pytest
 
-_BUNDLE = Path(
-    os.environ.get(
-        "VAARA_STACKED_GATE_BUNDLE",
-        str(Path.home() / ".vaara" / "cache" / "stacked_gate_bundle.joblib"),
-    )
-)
+from tests.gate_bundle_factory import BENIGN_CONTEXT, RISKY_CONTEXT
 
-
-pytestmark = pytest.mark.skipif(
-    not _BUNDLE.exists(),
-    reason=f"Stacked gate bundle not present at {_BUNDLE}",
-)
+# The stack loads both backends, so it needs both dependency sets.
+pytest.importorskip("sklearn", reason="stacked gate needs the ml extra")
+pytest.importorskip("joblib", reason="stacked gate needs the ml extra")
+pytest.importorskip("torch", reason="stacked gate needs torch")
 
 
 @pytest.fixture(scope="module")
-def scorer():
+def scorer(stacked_gate_bundle):
     from vaara.scorer import StackedGateScorer
 
-    return StackedGateScorer(bundle_path=str(_BUNDLE))
+    return StackedGateScorer(bundle_path=str(stacked_gate_bundle))
 
 
 class TestStackedGateScorer:
@@ -78,3 +76,73 @@ class TestStackedGateScorer:
         }
         result = scorer.evaluate(context)
         assert result["action"] in {"allow", "deny", "escalate"}
+
+    def test_point_estimate_is_the_logistic_stack_of_the_two_backends(self, scorer):
+        # The whole reason this backend exists is the combination step. Recompute
+        # it from the two component estimates the result already reports: a stack
+        # that quietly returned one backend's number would pass every other test
+        # in this file.
+        raw = scorer.evaluate(RISKY_CONTEXT)["raw_result"]
+        z = (
+            scorer._w_gbm * raw["gbm_p"]
+            + scorer._w_mc * raw["mc_p"]
+            + scorer._intercept
+        )
+        assert raw["point_estimate"] == pytest.approx(1.0 / (1.0 + math.exp(-z)))
+
+    def test_backend_disagreement_is_the_absolute_gap(self, scorer):
+        raw = scorer.evaluate(BENIGN_CONTEXT)["raw_result"]
+        assert raw["backend_disagree"] == pytest.approx(abs(raw["gbm_p"] - raw["mc_p"]))
+
+    def test_a_benign_read_and_a_risky_write_land_on_opposite_verdicts(self, scorer):
+        benign = scorer.evaluate(BENIGN_CONTEXT)
+        risky = scorer.evaluate(RISKY_CONTEXT)
+        assert benign["raw_result"]["point_estimate"] < risky["raw_result"]["point_estimate"]
+        assert benign["action"] == "allow"
+        assert risky["action"] == "deny"
+
+    def test_conformal_interval_is_q_hat_wide_and_clipped(self, scorer):
+        raw = scorer.evaluate(RISKY_CONTEXT)["raw_result"]
+        lower, upper = raw["conformal_interval"]
+        point = raw["point_estimate"]
+        assert lower == pytest.approx(max(0.0, point - scorer.q_hat))
+        assert upper == pytest.approx(min(1.0, point + scorer.q_hat))
+
+
+def test_missing_bundle_raises_with_the_path_in_the_message(tmp_path):
+    from vaara.scorer import StackedGateScorer
+
+    missing = tmp_path / "not_here.joblib"
+    with pytest.raises(FileNotFoundError) as excinfo:
+        StackedGateScorer(bundle_path=str(missing))
+    assert str(missing) in str(excinfo.value)
+
+
+def test_a_missing_component_bundle_fails_loudly(tmp_path, mc_dropout_gate_bundle):
+    # The stack holds paths to two other files. If one of them has moved, the
+    # stack must refuse to load rather than come up on one backend.
+    import joblib
+
+    from vaara.scorer import StackedGateScorer
+
+    broken = tmp_path / "stacked.joblib"
+    joblib.dump(
+        {
+            "variant": "stacked",
+            "stack_coef": [4.0, 4.0],
+            "stack_intercept": -4.0,
+            "q_hat": 0.35,
+            "gbm_bundle_path": str(tmp_path / "gone.joblib"),
+            "mc_bundle_path": str(mc_dropout_gate_bundle),
+        },
+        str(broken),
+    )
+    with pytest.raises(FileNotFoundError):
+        StackedGateScorer(bundle_path=str(broken))
+
+
+def test_factory_builds_the_same_backend(stacked_gate_bundle):
+    from vaara.scorer import create_stacked_scorer
+
+    scorer = create_stacked_scorer(bundle_path=str(stacked_gate_bundle))
+    assert scorer.name == "vaara_stacked_gate"

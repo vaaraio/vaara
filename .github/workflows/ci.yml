@@ -151,6 +151,49 @@ jobs:
             exit 1
           fi
 
+  gate-backends:
+    name: Scorer gate backends (trained, MC dropout, stacked)
+    runs-on: ubuntu-latest
+    # Same failure as the classifier job above, one layer over: the three
+    # per-action-step gate backends load a .joblib bundle from ~/.vaara/cache,
+    # no bundle ships, and nothing in the tree builds one. So the twelve tests
+    # over those 586 lines skipped on every machine and every matrix leg. The
+    # backends were executed nowhere at all.
+    #
+    # tests/gate_bundle_factory.py now builds bundles in the real format from
+    # the shipped featurizer, so the tests have something to load. They still
+    # cannot run in the main matrix: requirements-dev.txt carries no numpy,
+    # scikit-learn, joblib or torch, and torch on four legs is not worth it.
+    #
+    # Hence this job. Real extra, real code paths, and no skip tolerated — a
+    # skip here means an import broke and the backends went unexecuted again.
+    steps:
+      - uses: actions/checkout@9c091bb21b7c1c1d1991bb908d89e4e9dddfe3e0  # v7.0.0
+
+      - name: Set up Python 3.12
+        uses: actions/setup-python@5fda3b95a4ea91299a34e894583c3862153e4b97  # v7.0.0
+        with:
+          python-version: '3.12'
+
+      - name: Install Vaara with the gate extra
+        # The CPU wheel index keeps this off the CUDA build, which is ~2.5 GB.
+        run: |
+          pip install torch --index-url https://download.pytorch.org/whl/cpu
+          pip install -e '.[gate]'
+          pip install pytest
+
+      - name: Run the gate backend tests, failing on any skip
+        run: |
+          set -o pipefail
+          pytest tests/test_trained_gate.py \
+                 tests/test_mc_dropout_gate.py \
+                 tests/test_stacked_gate.py -q -rs | tee result.txt
+          if grep -qE '[0-9]+ skipped' result.txt; then
+            echo "::error::A gate backend test skipped, so the backend went unexecuted."
+            grep '^SKIPPED' result.txt
+            exit 1
+          fi
+
   no-private-keys:
     name: No private key material in the history
     runs-on: ubuntu-latest
