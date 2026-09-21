@@ -4,6 +4,15 @@ All notable changes to this project are documented here.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/)
 and this project follows [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [Unreleased]
+
+### Fixed
+- The Claude Code hook applied the deny rules by tool name only. An MCP server names its tools whatever it likes, so a call such as `mcp__shell__run_command` never matched a rule's tool list and went straight to the classifier, which scores the tool-name taxonomy and the agent's history, not the payload. The same upload-to-remote command that `shell_upload_egress` blocks on `Bash` therefore reached the classifier with nothing in front of it and scored the same as a directory listing. The hook now matches `mcp__*` calls by content after the by-name match misses, the way the MCP proxy already did, and the trail record says whether the rule matched by tool or by content. `match_any` rules are tool-name policy and still do not apply to MCP names.
+- The scorer's reason string quoted only the conformal interval, so a deny forced by the cloud-metadata content floor read as a deny at a risk well under the deny threshold. The reason now says when the content floor decided.
+
+### Added
+- `conformance/redteam/mcp_run.py`: the boundary red-team for the MCP path. It rewrites each case's tool name to an MCP name, drives the real hook with shadow off, then reads the trail it wrote and reports the classifier's decision, point estimate and conformal upper bound per case. Rows whose expected deny comes from a `match_any` rule are reported as name-only and do not fail the run.
+
 ## [1.93.0] - 2026-09-21
 
 ### Changed

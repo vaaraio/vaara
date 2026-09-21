@@ -957,6 +957,11 @@ class AdaptiveScorer:
             f"[{lower:.3f}, {upper:.3f}] "
             f"(threshold allow<{threshold_allow} deny>{threshold_deny})"
         )
+        if content_floor > upper:
+            # The decision was taken on the content floor, not the interval.
+            # A reason that quoted only the interval read as "deny at 0.11
+            # under a 0.7 threshold", which contradicts itself.
+            explanation += f"; content floor {content_floor:.2f} decided"
 
         assessment = RiskAssessment(
             action_name=tool_name,

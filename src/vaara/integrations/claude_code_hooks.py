@@ -306,7 +306,26 @@ def run_pre_tool_use(deny_patterns: Optional[str] = None) -> int:
     agent = agent_id(cfg)
     shadow = shadow_mode(cfg)
 
-    match = match_deny_rule(load_deny_rules(deny_patterns), tool_name, tool_input)
+    rules = load_deny_rules(deny_patterns)
+    match = match_deny_rule(rules, tool_name, tool_input)
+    matched_by = "tool"
+    if match is None and tool_name.startswith("mcp__"):
+        # An MCP server names its tools whatever it likes, so no rule's
+        # tool list can name them and the by-name match above never fires.
+        # The same payload a rule catches on Bash or Write reached the
+        # classifier here with nothing in front of it, and the classifier
+        # scores the tool-name taxonomy, not the payload (measured
+        # 2026-09-22: an upload of .env to a remote host through
+        # mcp__shell__run_command scored exactly as `ls`). Match by
+        # content instead, the way the MCP proxy already does.
+        from vaara.deny_rules import match_deny_rule_any_field
+
+        try:
+            match = match_deny_rule_any_field(rules, tool_input)
+        except Exception as exc:  # a broken rule must not take the hook down
+            _emit(f"vaara-governance: content deny rules failed ({exc!r}); skipping.")
+            match = None
+        matched_by = "content"
     if match is not None:
         rule_id, message = match
         _record_call(
@@ -314,6 +333,7 @@ def run_pre_tool_use(deny_patterns: Optional[str] = None) -> int:
             {
                 "vaara_governance_layer": "deny_pattern",
                 "rule_id": rule_id, "rule_message": message,
+                "matched_by": matched_by,
             },
             session_id,
         )
