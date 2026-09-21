@@ -76,8 +76,13 @@ Everything in the popover is wired to real state, not decoration:
 - Protection presets (eco / balanced / performance / strict) and custom
   escalate/deny thresholds, each shown with what it would have decided
   over the last 15 minutes, replayed from the recorded risk scores.
-- Watched trails: add any Vaara audit DB, or let "Find trails in
-  ~/.vaara" discover them.
+- Watched trails: the trail the engine names in `~/.vaara/config.json`
+  (`trail_db`) is watched first, then everything "Find trails in
+  ~/.vaara" discovers, plus any audit DB you add by hand.
+- A trail that fails to open or to answer a query is a red state, headed
+  "Trail unreadable", with SQLite's message. Each trail gets a quick
+  integrity check on open; an index-only fault is repaired with one
+  REINDEX and the outcome is shown under the trail in Settings.
 - Settings depth selector: Basic shows the essentials (gate mode,
   notifications, updates); Professional adds presets, thresholds, and
   tuning; Enterprise adds multi-trail sources. The same

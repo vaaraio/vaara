@@ -86,9 +86,16 @@ struct PresetStats {
 }
 
 struct Config: Codable {
-    var db_paths: [String] = [
+    /// The trail the first plugin builds wrote, before the engine moved to
+    /// ~/.vaara/trail/audit.db. Kept as a name so a saved config still
+    /// carrying it can be dropped when the file is gone, not shown as a fault.
+    static let legacyTrail =
         NSString(string: "~/.vaara/claude-code/audit.db").expandingTildeInPath
-    ]
+
+    /// Empty by default. Sources come from the engine's own config
+    /// (`trail_db` in ~/.vaara/config.json, `audit_db` in the plugin config)
+    /// and from discovery under ~/.vaara; explicit adds and removes persist.
+    var db_paths: [String] = []
     var alert_window_minutes: Int = 5
     var notifications: Bool = true
     var appearance: String = "dark"       // dark | light
@@ -216,6 +223,22 @@ final class GateModel: ObservableObject {
     /// How far back an agent still counts as "running" (seconds).
     static let runningWindow: Double = 15 * 60
 
+    /// Trails that failed to open or to answer a query, keyed by path, with
+    /// what SQLite said. Non-empty means the gate cannot vouch for the feed
+    /// and the header goes red. Cleared per path on the next clean read.
+    @Published var trailFaults: [String: String] = [:]
+    /// What the last integrity check or repair did to each trail.
+    @Published var trailNotes: [String: String] = [:]
+    /// The one line the header shows when a trail is faulted.
+    var trailFault: String? {
+        guard let first = trailFaults.sorted(by: { $0.key < $1.key }).first
+        else { return nil }
+        return "\((first.key as NSString).lastPathComponent): \(first.value)"
+    }
+    /// Never repair the same file more often than this (seconds).
+    private static let healInterval: Double = 60
+    private var lastHeal: [String: Date] = [:]
+
     private var cursors: [String: Int64] = [:]
     private var handledApprovals = Set<String>()
     private var timer: Timer?
@@ -232,7 +255,19 @@ final class GateModel: ObservableObject {
 
     func start() {
         guard timer == nil else { return }   // idempotent: never double-start
-        for path in config.db_paths { cursors[path] = maxSeq(path) }  // start at now
+        // A config saved by an older build carries the legacy plugin trail
+        // whether or not it exists. Drop it when the file is gone so it does
+        // not read as a fault on a box that never had it.
+        if !FileManager.default.fileExists(atPath: Config.legacyTrail) {
+            config.db_paths.removeAll { $0 == Config.legacyTrail }
+        }
+        // The engine says where it writes. That is the first source, ahead
+        // of discovery, so a trail_db outside ~/.vaara is watched too.
+        for path in engineTrailPaths() { addSource(path) }
+        for path in config.db_paths {
+            checkTrail(path)
+            cursors[path] = maxSeq(path)  // start at now
+        }
         // Auto-add every Vaara trail under ~/.vaara on launch, so a normal
         // user never has to hunt for or hand-add the audit DB. The default
         // claude-code trail plus any MCP-proxy or older-install trails all
@@ -256,7 +291,28 @@ final class GateModel: ObservableObject {
     func addSource(_ path: String) {
         guard !config.db_paths.contains(path) else { return }
         config.db_paths.append(path)
+        checkTrail(path)
         cursors[path] = maxSeq(path)
+    }
+
+    /// Where the engine says the trail is: `trail_db` in the unified
+    /// ~/.vaara/config.json (written by `vaara init` / discovery) and
+    /// `audit_db` in the plugin config (what the hook runner reads). Only
+    /// paths that exist; a named-but-missing trail is the engine's problem
+    /// to report, not a source to watch.
+    func engineTrailPaths() -> [String] {
+        var out: [String] = []
+        for (url, key) in [(unifiedConfigURL, "trail_db"), (pluginConfigURL, "audit_db")] {
+            guard let data = try? Data(contentsOf: url),
+                  let obj = try? JSONSerialization.jsonObject(with: data) as? [String: Any],
+                  let raw = obj[key] as? String, !raw.isEmpty
+            else { continue }
+            let path = (raw as NSString).expandingTildeInPath
+            if FileManager.default.fileExists(atPath: path), !out.contains(path) {
+                out.append(path)
+            }
+        }
+        return out
     }
 
     /// Scan ~/.vaara for SQLite files that hold a Vaara trail
@@ -296,6 +352,9 @@ final class GateModel: ObservableObject {
     func removeSource(_ path: String) {
         config.db_paths.removeAll { $0 == path }
         cursors[path] = nil
+        trailFaults[path] = nil
+        trailNotes[path] = nil
+        lastHeal[path] = nil
     }
 
     private func poll() {
@@ -310,7 +369,9 @@ final class GateModel: ObservableObject {
         feed.sort { $0.timestamp > $1.timestamp }
         if feed.count > 30 { feed.removeLast(feed.count - 30) }
         handlePendingApprovals()
-        state = overallState()
+        // A trail the gate cannot read outranks whatever the readable ones
+        // say: unknown evidence is not a green light.
+        state = trailFaults.isEmpty ? overallState() : .red
         agents = agentSummaries()
         activePreset = readPluginPreset()
         enforcementMode = readPluginMode()
@@ -403,6 +464,11 @@ final class GateModel: ObservableObject {
     /// it sees every committed row. If the file is genuinely not writable, we
     /// fall back to a plain read-only open (better a slightly stale view than
     /// none).
+    ///
+    /// Every failure is recorded in `trailFaults`. Before this, an open or a
+    /// query that failed came back as nil and every caller folded that into
+    /// an empty result, so a corrupt trail and a quiet one rendered the same
+    /// green empty feed. A gate that cannot read its evidence must say so.
     private func withDB<T>(_ path: String, _ body: (OpaquePointer) -> T) -> T? {
         var db: OpaquePointer?
         var flags: Int32 = SQLITE_OPEN_READWRITE
@@ -410,17 +476,90 @@ final class GateModel: ObservableObject {
             if db != nil { sqlite3_close(db); db = nil }
             flags = SQLITE_OPEN_READONLY
             guard sqlite3_open_v2(path, &db, flags, nil) == SQLITE_OK else {
+                let msg = db.map { String(cString: sqlite3_errmsg($0)) } ?? "cannot open"
                 if db != nil { sqlite3_close(db) }
+                fault(path, FileManager.default.fileExists(atPath: path)
+                      ? msg : "trail file not found")
                 return nil
             }
         }
-        guard let db else { return nil }
+        guard let db else { fault(path, "cannot open"); return nil }
         defer { sqlite3_close(db) }
         if flags == SQLITE_OPEN_READWRITE {
             sqlite3_exec(db, "PRAGMA query_only = ON", nil, nil, nil)
         }
         sqlite3_busy_timeout(db, 2000)
-        return body(db)
+        let result = body(db)
+        // The body's prepare/step guards bail without a message; the
+        // connection still remembers why. Anything past DONE is a fault.
+        let rc = sqlite3_errcode(db) & 0xff
+        if rc != SQLITE_OK, rc != SQLITE_ROW, rc != SQLITE_DONE {
+            fault(path, String(cString: sqlite3_errmsg(db)))
+            if rc == SQLITE_CORRUPT || rc == SQLITE_NOTADB { checkTrail(path) }
+            return nil
+        }
+        if trailFaults[path] != nil { trailFaults[path] = nil }
+        return result
+    }
+
+    /// Only watched sources carry faults. Discovery probes every .db under
+    /// ~/.vaara, and a stray non-SQLite file there is not a broken trail.
+    private func fault(_ path: String, _ message: String) {
+        guard config.db_paths.contains(path) else { return }
+        if trailFaults[path] != message { trailFaults[path] = message }
+    }
+
+    /// `PRAGMA quick_check` on open and whenever a read reports corruption.
+    /// A failed check gets one `REINDEX`, since every corruption seen on this
+    /// trail so far was index-only (`wrong # of entries`) and the chain lives
+    /// in the rows, not the indexes. If the file is still bad after that, the
+    /// fault stays up and the note says what was tried. Throttled per file.
+    @discardableResult
+    func checkTrail(_ path: String) -> Bool {
+        guard config.db_paths.contains(path) else { return false }
+        if let last = lastHeal[path], Date().timeIntervalSince(last) < Self.healInterval {
+            return trailFaults[path] == nil
+        }
+        lastHeal[path] = Date()
+        var db: OpaquePointer?
+        guard sqlite3_open_v2(path, &db, SQLITE_OPEN_READWRITE, nil) == SQLITE_OK, let db else {
+            if db != nil { sqlite3_close(db) }
+            trailNotes[path] = "integrity check skipped: not writable"
+            return false
+        }
+        defer { sqlite3_close(db) }
+        sqlite3_busy_timeout(db, 5000)
+
+        func quickCheck() -> String {
+            var stmt: OpaquePointer?
+            defer { sqlite3_finalize(stmt) }
+            guard sqlite3_prepare_v2(db, "PRAGMA quick_check", -1, &stmt, nil) == SQLITE_OK,
+                  sqlite3_step(stmt) == SQLITE_ROW,
+                  let text = sqlite3_column_text(stmt, 0)
+            else { return String(cString: sqlite3_errmsg(db)) }
+            return String(cString: text)
+        }
+
+        let first = quickCheck()
+        if first == "ok" {
+            trailNotes[path] = "integrity ok"
+            return true
+        }
+        if sqlite3_exec(db, "REINDEX", nil, nil, nil) != SQLITE_OK {
+            let msg = String(cString: sqlite3_errmsg(db))
+            trailNotes[path] = "integrity: \(first); reindex failed: \(msg)"
+            fault(path, "corrupt, repair failed: \(msg)")
+            return false
+        }
+        let second = quickCheck()
+        if second == "ok" {
+            trailNotes[path] = "repaired: \(first) -> ok after reindex"
+            trailFaults[path] = nil
+            return true
+        }
+        trailNotes[path] = "integrity still failing after reindex: \(second)"
+        fault(path, "corrupt: \(second)")
+        return false
     }
 
     private func maxSeq(_ path: String) -> Int64 {
