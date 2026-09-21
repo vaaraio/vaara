@@ -6,6 +6,8 @@ and this project follows [Semantic Versioning](https://semver.org/spec/v2.0.0.ht
 
 ## [Unreleased]
 
+## [1.92.0] - 2026-09-22
+
 ### Added
 - The plugin governs the agent's meta-actions. The PreToolUse matcher now names `Agent`, `Workflow`, `CronCreate`, `ScheduleWakeup`, `RemoteTrigger` and `Skill` alongside the tools it already matched, and nine deny rules cover subagent spawn (`Agent`, `Task`, `Workflow`), durable scheduled jobs, `RemoteTrigger` create, update and run, cross-session `SendMessage`, shell upload and copy egress (`curl -d`, `scp`, `rsync` to a remote host), and writes to the harness's own configuration (`.claude.json`, `.claude/settings*.json`, hooks, skills, agents, `.mcp.json`) from the file tools or the shell. Each of these rules names an operator lift (`VAARA_ALLOW_SPAWN`, `VAARA_ALLOW_SCHEDULE`, `VAARA_ALLOW_REMOTE`, `VAARA_ALLOW_XSESSION`, `VAARA_ALLOW_HARNESS_EDIT`) so a deliberate exception is one environment variable and is still recorded.
 - Deny rules accept `match_any` (fire on any call to the listed tools) and `unless_env` (a variable that lifts the rule), and boolean or numeric input fields match as their JSON text, so a rule can say `durable` must not be `true`.
