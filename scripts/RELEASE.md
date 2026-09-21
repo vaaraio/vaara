@@ -152,6 +152,30 @@ interactive `npm login`. Requires `VAARA_NPM_TOKEN` env var
 (npmjs.org > Access Tokens > Automation). Ships without provenance;
 restore the workflow before the next release.
 
+## 5. Upgrade the box's own install (do this every release)
+
+```
+uv tool upgrade vaara
+vaara --version        # must match the version just tagged
+```
+
+The Linux box runs Vaara against its own audit trail, so a stale install
+there means the trail and the menu-bar client show something other than
+what shipped. The install is a `uv` tool, not a pip package: the binary at
+`~/.local/bin/vaara` symlinks into `~/.local/share/uv/tools/vaara/`, and
+`pip show` will not see it.
+
+Sanity check after the upgrade: `~/.vaara/config.json` names the live trail
+under `trail_db`, and
+
+```
+python3 -c "import sqlite3,os;c=sqlite3.connect('file:%s?mode=ro'%os.path.expanduser('~/.vaara/trail/audit.db'),uri=True);[print(r[0]) for r in c.execute('pragma integrity_check(5)')]"
+```
+
+should print `ok`. A malformed index there fails silently: table scans keep
+working while any indexed query raises, and the client renders an empty feed
+instead of an error. `REINDEX` repairs it without touching the records.
+
 ## Cross-repo follow-up
 
 The release scripts do not touch cross-repo work. After v0.39.2-style
