@@ -268,12 +268,15 @@ struct ContentView: View {
                 .shadow(color: model.state.color.opacity(0.55), radius: 6)
                 .offset(y: -1)
             VStack(alignment: .leading, spacing: 3) {
-                Text(model.state.label)
+                // A trail the app cannot read is its own headline. It used to
+                // render as "Allowed" over an empty feed.
+                Text(model.trailFault == nil ? model.state.label : "Trail unreadable")
                     .font(.system(size: 24, weight: .light))
                     .foregroundStyle(p.ink)
-                Text(model.state.detail)
+                Text(model.trailFault ?? model.state.detail)
                     .font(.system(size: 12))
                     .foregroundStyle(p.faint)
+                    .lineLimit(2)
             }
             Spacer()
         }
@@ -680,22 +683,36 @@ struct ContentView: View {
                             VStack(alignment: .leading, spacing: 8) {
                                 ForEach(model.config.db_paths, id: \.self) { path in
                                     HStack {
-                                        Text(path)
-                                            .font(.system(size: 11, design: .monospaced))
-                                            .foregroundStyle(p.faint)
-                                            .lineLimit(1)
-                                            .truncationMode(.head)
-                                        Spacer()
-                                        if model.config.db_paths.count > 1 {
-                                            Button {
-                                                model.removeSource(path)
-                                            } label: {
-                                                Image(systemName: "xmark")
-                                                    .font(.system(size: 8, weight: .medium))
+                                        Circle()
+                                            .fill(model.trailFaults[path] == nil
+                                                  ? GateState.green.color : GateState.red.color)
+                                            .frame(width: 6, height: 6)
+                                        VStack(alignment: .leading, spacing: 2) {
+                                            Text(path)
+                                                .font(.system(size: 11, design: .monospaced))
+                                                .foregroundStyle(p.faint)
+                                                .lineLimit(1)
+                                                .truncationMode(.head)
+                                            if let note = model.trailFaults[path] ?? model.trailNotes[path] {
+                                                Text(note)
+                                                    .font(.system(size: 10))
+                                                    .foregroundStyle(model.trailFaults[path] == nil
+                                                                     ? p.ghost : GateState.red.color)
+                                                    .lineLimit(2)
                                             }
-                                            .buttonStyle(.plain)
-                                            .foregroundStyle(p.ghost)
                                         }
+                                        Spacer()
+                                        // Any source can go, including the last
+                                        // one: the engine config and discovery
+                                        // bring the real trail back on launch.
+                                        Button {
+                                            model.removeSource(path)
+                                        } label: {
+                                            Image(systemName: "xmark")
+                                                .font(.system(size: 8, weight: .medium))
+                                        }
+                                        .buttonStyle(.plain)
+                                        .foregroundStyle(p.ghost)
                                     }
                                 }
                                 HStack(spacing: 14) {
