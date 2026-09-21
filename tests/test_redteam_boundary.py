@@ -39,7 +39,13 @@ def test_settings_matcher_reads_only_the_vaara_hook(tmp_path):
 def test_controls_caught_and_benign_allowed(tmp_path, monkeypatch):
     monkeypatch.setenv("VAARA_BIN", "")
     monkeypatch.setattr(redteam, "shutil", type("S", (), {"which": staticmethod(lambda _: None)}))
-    doc = json.loads((_RUN.parent / "cases.json").read_text())
+    cases = redteam.CASES
+    if not cases.exists():
+        pytest.skip(
+            "no case file: the harness ships without one. Point "
+            "VAARA_REDTEAM_CASES at your own set to run this."
+        )
+    doc = json.loads(cases.read_text())
     matchers = {"plugin": redteam._matchers_from_plugin(redteam.PLUGIN_HOOKS)}
     rows = redteam.run(doc["cases"], matchers, tmp_path)
     by_id = {r["id"]: r for r in rows}
