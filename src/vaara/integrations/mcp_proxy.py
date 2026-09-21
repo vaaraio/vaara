@@ -239,7 +239,19 @@ class VaaraMCPProxy:
         shadow: bool = False,
         api_key: Optional[str] = None,
         allowed_origins: Optional[set[str]] = None,
+        deny_rules: Optional[list[dict]] = None,
     ) -> None:
+        # Layer-1 deny rules, shared with the Claude Code hook. Loaded from
+        # the bundled file unless the caller passes a list; an empty list
+        # switches the layer off, and VAARA_MCP_DENY_RULES=0 does the same
+        # from the environment.
+        if deny_rules is None:
+            if os.environ.get("VAARA_MCP_DENY_RULES", "1").strip().lower() in ("0", "false", "no", "off"):
+                deny_rules = []
+            else:
+                from vaara.deny_rules import load_deny_rules
+                deny_rules = load_deny_rules()
+        self._deny_rules: list[dict] = list(deny_rules)
         # Browser origins permitted on the Streamable HTTP transport. Empty by
         # default, which refuses every request that carries an Origin header at
         # all. Native MCP clients send none, so the default costs them nothing;
@@ -448,6 +460,17 @@ class VaaraMCPProxy:
         if allowlist is not None and not any(a.lower() == name_lower for a in allowlist):
             return True
         return False
+
+    def _deny_rule_match(self, arguments: dict) -> Optional[tuple[str, str]]:
+        if not self._deny_rules:
+            return None
+        from vaara.deny_rules import match_deny_rule_any_field
+
+        try:
+            return match_deny_rule_any_field(self._deny_rules, arguments)
+        except Exception as exc:  # a broken rule must not take the proxy down
+            logger.warning("deny rules failed (%r); skipping layer 1", exc)
+            return None
 
     def _tool_filtered(self, name: str) -> bool:
         return self._is_filtered(name, self._allowlist, self._denylist)
@@ -1246,13 +1269,56 @@ class VaaraMCPProxy:
         if isinstance(params, dict) and isinstance(params.get("arguments"), dict):
             params["arguments"].pop("_vaara_agent_id", None)
         agent_id = self._agent_id_default
+        gates.append("operator_filter:pass")
+        # Layer-1 deny rules, the same file the Claude Code hook applies.
+        # An MCP tool is named whatever its server likes, so the rules run
+        # over every string argument rather than by tool name. In shadow
+        # mode a match is recorded and the call proceeds.
+        deny_match = self._deny_rule_match(arguments)
+        if deny_match is not None:
+            rule_id, message = deny_match
+            if self._pipeline._enforce:
+                gates.append(f"deny_rules:deny:{rule_id}")
+                reason = f"Deny rule {rule_id}: {message}"
+                self._record_perimeter_audit(
+                    agent_id, tool_name, arguments, "deny", reason,
+                )
+                block_payload = {
+                    "vaara_blocked": True,
+                    "reason": reason,
+                    "decision": "DENY",
+                    "rule_id": rule_id,
+                    "tool": tool_name,
+                    "gates": list(gates),
+                }
+                self._overt_emit(
+                    surface="mcp.tool.call",
+                    identifier=tool_name,
+                    identifier_field="tool_name",
+                    request_obj={"tool": tool_name, "arguments": arguments},
+                    decision="DENY",
+                    reason=reason,
+                    extra={"agent_id": agent_id, "rule_id": rule_id, "gates": list(gates)},
+                )
+                return {
+                    "jsonrpc": "2.0", "id": request.get("id"),
+                    "result": {
+                        "content": [{"type": "text", "text": strict_json_dumps(block_payload, indent=2)}],
+                        "isError": True,
+                    },
+                }
+            gates.append(f"deny_rules:shadow:{rule_id}")
+            logger.warning(
+                "SHADOW deny rule %s on %s: %s", rule_id, _safe_log(tool_name), message,
+            )
+        else:
+            gates.append("deny_rules:pass" if self._deny_rules else "deny_rules:off")
         # Unknown upstream tool names classify as generic high-risk in the
         # registry (fail-closed). Correct default for runtime governance.
         result = self._pipeline.intercept(
             agent_id=agent_id, tool_name=tool_name, parameters=arguments,
             tenant_id=_REQUEST_TENANT.get(),
         )
-        gates.append("operator_filter:pass")
         progress_token = self._progress_token(params)
         if not result.allowed:
             gates.append("policy:deny")

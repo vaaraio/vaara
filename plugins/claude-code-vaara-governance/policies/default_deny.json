@@ -1,6 +1,6 @@
 {
   "version": "0.2",
-  "description": "Layer-1 regex deny patterns for the Vaara plugin. Covers shell and web input, file mutation (Write, Edit, NotebookEdit), and the agent's meta-actions: subagent spawn (Agent, Task, Workflow), scheduling (CronCreate), remote execution (RemoteTrigger), cross-session messaging (SendMessage) and writes to the harness's own configuration. Rules with match_any fire on any call to the tool; unless_env names a variable that, set to 1, lifts the rule for a deliberate exception.",
+  "description": "Layer-1 regex deny patterns for the Vaara plugin. Covers shell and web input, file mutation (Write, Edit, NotebookEdit), and the agent's meta-actions: subagent spawn (Agent, Task, Workflow), scheduling (CronCreate), remote execution (RemoteTrigger), cross-session messaging (SendMessage) and writes to the harness's own configuration. Rules with match_any fire on any call to the tool; unless_env names a variable that, set to 1, lifts the rule for a deliberate exception. Rules with any_field false only apply by tool name; their pattern reads a specific field and means nothing over arbitrary arguments.",
   "rules": [
     {
       "id": "ssrf_cloud_metadata_ipv4",
@@ -284,7 +284,8 @@
       ],
       "pattern": "^(create|update|run|create_webhook_trigger)$",
       "unless_env": "VAARA_ALLOW_REMOTE",
-      "message": "Creates or runs a cloud agent: remote execution and data egress. Set VAARA_ALLOW_REMOTE=1 to permit."
+      "message": "Creates or runs a cloud agent: remote execution and data egress. Set VAARA_ALLOW_REMOTE=1 to permit.",
+      "any_field": false
     },
     {
       "id": "cron_durable_job",
@@ -296,7 +297,8 @@
       ],
       "pattern": "^true$",
       "unless_env": "VAARA_ALLOW_SCHEDULE",
-      "message": "A durable scheduled job survives the session. Set VAARA_ALLOW_SCHEDULE=1 to permit; session-only jobs pass."
+      "message": "A durable scheduled job survives the session. Set VAARA_ALLOW_SCHEDULE=1 to permit; session-only jobs pass.",
+      "any_field": false
     },
     {
       "id": "cross_session_message",
@@ -308,7 +310,8 @@
       ],
       "pattern": "^(?!main$).+",
       "unless_env": "VAARA_ALLOW_XSESSION",
-      "message": "Message to another agent or session leaves the governed session. Set VAARA_ALLOW_XSESSION=1 to permit."
+      "message": "Message to another agent or session leaves the governed session. Set VAARA_ALLOW_XSESSION=1 to permit.",
+      "any_field": false
     },
     {
       "id": "shell_upload_egress",

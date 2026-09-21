@@ -21,7 +21,6 @@ from __future__ import annotations
 
 import json
 import os
-import re
 import shutil
 import subprocess
 import sys
@@ -171,81 +170,25 @@ def notify(cfg: dict, verdict: str, tool_name: str, detail: str) -> None:
 # ---------------------------------------------------------------------------
 # deny patterns
 
+from vaara.deny_rules import (  # noqa: E402
+    deny_rules_path as _deny_rules_path,
+    load_deny_rules as _load_deny_rules,
+    match_deny_rule as _match_deny_rule,
+)
+
+
 def deny_patterns_path(explicit: Optional[str] = None) -> Optional[Path]:
-    if explicit:
-        return Path(explicit).expanduser()
-    override = os.environ.get("VAARA_PLUGIN_DENY_PATTERNS_FILE")
-    if override:
-        return Path(override).expanduser()
-    plugin_root = os.environ.get("CLAUDE_PLUGIN_ROOT", "")
-    if plugin_root:
-        candidate = Path(plugin_root) / "policies" / "default_deny.json"
-        if candidate.exists():
-            return candidate
-    bundled = Path(__file__).parent / "claude_code_deny.json"
-    return bundled if bundled.exists() else None
+    return _deny_rules_path(explicit)
 
 
 def load_deny_rules(explicit: Optional[str] = None) -> list[dict]:
-    path = deny_patterns_path(explicit)
-    if path is None or not path.exists():
-        return []
-    try:
-        doc = json.loads(path.read_text(encoding="utf-8"))
-    except (OSError, json.JSONDecodeError) as exc:
-        _emit(f"vaara-governance: deny-patterns load failed ({exc!r}); skipping layer 1.")
-        return []
-    return doc.get("rules", [])
-
-
-def _rule_lifted(rule: dict) -> bool:
-    """A rule names ``unless_env``; that variable set to 1 lifts it.
-
-    This is how an operator exception is expressed: no subagents, unless
-    this named job says so. The lift is still recorded by the caller.
-    """
-    name = rule.get("unless_env", "")
-    return bool(name) and os.environ.get(name, "").strip().lower() in ("1", "true", "yes")
-
-
-def _field_text(value) -> Optional[str]:
-    if isinstance(value, str):
-        return value
-    if isinstance(value, (bool, int, float)):
-        return json.dumps(value)
-    return None
+    return _load_deny_rules(explicit)
 
 
 def match_deny_rule(
     rules: list[dict], tool_name: str, tool_input: dict
 ) -> Optional[tuple[str, str]]:
-    """Return (rule_id, message) for the first matching rule, else None.
-
-    ``match_any`` rules fire on any call to a listed tool. Booleans and
-    numbers in the input are matched as their JSON text, so a rule can
-    say ``durable`` must not be ``true``.
-    """
-    for rule in rules:
-        if tool_name not in rule.get("tools", []):
-            continue
-        if _rule_lifted(rule):
-            continue
-        if rule.get("match_any"):
-            return rule.get("id", "unknown"), rule.get("message", "deny rule matched")
-        pattern = rule.get("pattern", "")
-        if not pattern:
-            continue
-        try:
-            regex = re.compile(pattern)
-        except re.error:
-            continue
-        for field in rule.get("fields", []):
-            value = _field_text(tool_input.get(field, ""))
-            if value is None:
-                continue
-            if regex.search(value):
-                return rule.get("id", "unknown"), rule.get("message", "deny rule matched")
-    return None
+    return _match_deny_rule(rules, tool_name, tool_input)
 
 
 # ---------------------------------------------------------------------------
