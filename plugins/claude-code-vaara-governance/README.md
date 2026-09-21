@@ -20,9 +20,26 @@ SessionStart prints a one-line status (Vaara version, mode, protection preset, n
 
 | Hook | Matches | Mechanism |
 |---|---|---|
-| `PreToolUse` | `Bash`, `WebFetch`, `WebSearch`, `Write`, `Edit`, `NotebookEdit`, `Task`, `SendMessage`, `mcp__*` | Layer 1 regex on shell, web and file mutation. Layer 2 ML on MCP. Desktop notification on block/escalate. |
+| `PreToolUse` | `Bash`, `WebFetch`, `WebSearch`, `Write`, `Edit`, `NotebookEdit`, `Agent`, `Task`, `Workflow`, `CronCreate`, `ScheduleWakeup`, `RemoteTrigger`, `SendMessage`, `Skill`, `mcp__*` | Layer 1 regex on shell, web, file mutation and the agent's meta-actions (spawn, schedule, remote run, message out, harness config writes). Layer 2 ML on MCP. Desktop notification on block/escalate. |
 | `PostToolUse` | same set | Audit outcome + MWU feedback. |
 | `SessionStart` | n/a | Validate install, print status. |
+
+## Operator lifts
+
+The meta-action rules are operator policy, so each has a named exception.
+Set the variable to `1` in the environment for the job that needs it:
+
+| Variable | Lifts |
+|---|---|
+| `VAARA_ALLOW_SPAWN` | subagent spawn (`Agent`, `Task`) and `Workflow` fan-out |
+| `VAARA_ALLOW_SCHEDULE` | a durable `CronCreate` job (session-only jobs pass anyway) |
+| `VAARA_ALLOW_REMOTE` | `RemoteTrigger` create, update, run |
+| `VAARA_ALLOW_XSESSION` | `SendMessage` to anything but `main` |
+| `VAARA_ALLOW_HARNESS_EDIT` | writes to `.claude.json`, `.claude/settings*.json`, `.claude/hooks/`, `.claude/skills/`, `.claude/agents/`, `.claude-plugin/`, `.mcp.json` |
+
+A lifted call is still recorded. `ScheduleWakeup` is recorded and never
+denied. The boundary red-team in `conformance/redteam/` drives every one
+of these through the real hook.
 
 ## Install
 

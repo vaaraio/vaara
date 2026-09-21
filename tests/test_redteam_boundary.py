@@ -1,8 +1,7 @@
 """The boundary red-team harness in conformance/redteam.
 
 Pins the two things the harness must never get wrong: the control cases
-(existing deny rules) are caught, and benign calls are not blocked. The
-known gaps are reported, not asserted, so this stays green as they close.
+(existing deny rules) are caught, and benign calls are not blocked. With the in-tree rules every forbidden case must be caught.
 """
 from __future__ import annotations
 
@@ -51,5 +50,5 @@ def test_controls_caught_and_benign_allowed(tmp_path, monkeypatch):
     ):
         assert by_id[cid]["result"] == "CAUGHT", by_id[cid]
     assert [r["id"] for r in rows if r["result"] == "FALSE POSITIVE"] == []
-    # The harness must report, not hide, calls that pass the fence.
-    assert all(r["result"] in ("CAUGHT", "PASSED FENCE", "OK") for r in rows)
+    # With the in-tree rules nothing forbidden passes the fence.
+    assert [r["id"] for r in rows if r["result"] == "PASSED FENCE"] == []

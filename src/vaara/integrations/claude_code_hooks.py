@@ -198,12 +198,40 @@ def load_deny_rules(explicit: Optional[str] = None) -> list[dict]:
     return doc.get("rules", [])
 
 
+def _rule_lifted(rule: dict) -> bool:
+    """A rule names ``unless_env``; that variable set to 1 lifts it.
+
+    This is how an operator exception is expressed: no subagents, unless
+    this named job says so. The lift is still recorded by the caller.
+    """
+    name = rule.get("unless_env", "")
+    return bool(name) and os.environ.get(name, "").strip().lower() in ("1", "true", "yes")
+
+
+def _field_text(value) -> Optional[str]:
+    if isinstance(value, str):
+        return value
+    if isinstance(value, (bool, int, float)):
+        return json.dumps(value)
+    return None
+
+
 def match_deny_rule(
     rules: list[dict], tool_name: str, tool_input: dict
 ) -> Optional[tuple[str, str]]:
+    """Return (rule_id, message) for the first matching rule, else None.
+
+    ``match_any`` rules fire on any call to a listed tool. Booleans and
+    numbers in the input are matched as their JSON text, so a rule can
+    say ``durable`` must not be ``true``.
+    """
     for rule in rules:
         if tool_name not in rule.get("tools", []):
             continue
+        if _rule_lifted(rule):
+            continue
+        if rule.get("match_any"):
+            return rule.get("id", "unknown"), rule.get("message", "deny rule matched")
         pattern = rule.get("pattern", "")
         if not pattern:
             continue
@@ -212,8 +240,8 @@ def match_deny_rule(
         except re.error:
             continue
         for field in rule.get("fields", []):
-            value = tool_input.get(field, "")
-            if not isinstance(value, str):
+            value = _field_text(tool_input.get(field, ""))
+            if value is None:
                 continue
             if regex.search(value):
                 return rule.get("id", "unknown"), rule.get("message", "deny rule matched")
