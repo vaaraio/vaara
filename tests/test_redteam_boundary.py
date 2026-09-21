@@ -36,6 +36,41 @@ def test_settings_matcher_reads_only_the_vaara_hook(tmp_path):
     assert redteam._matchers_from_settings(s) == ["Bash|WebFetch"]
 
 
+def test_a_source_that_misses_the_tool_is_unmediated():
+    """Per-source, not any(): the live deployment gets its own verdict.
+
+    The plugin ships `.*`, so any() over the sources was satisfied by the
+    plugin for every case and a narrow settings.json matcher could never
+    fail a run. That is how six tools named by deny rules scored CAUGHT on
+    a box where the hook never sees them.
+    """
+    coverage = {"plugin": True, "settings": False}
+    assert redteam._verdict("deny", coverage, "deny") == ("unmediated", "UNMEDIATED")
+
+
+def test_covered_everywhere_and_denied_is_caught():
+    coverage = {"plugin": True, "settings": True}
+    assert redteam._verdict("deny", coverage, "deny") == ("deny", "CAUGHT")
+
+
+def test_covered_everywhere_and_allowed_passes_the_fence():
+    coverage = {"plugin": True, "settings": True}
+    assert redteam._verdict("deny", coverage, "allow") == ("allow", "PASSED FENCE")
+
+
+def test_benign_is_ok_whether_or_not_it_is_routed():
+    """An allow-expected call that no matcher routes is simply not mediated.
+
+    Nothing is being enforced on it, so there is no fence to fail.
+    """
+    assert redteam._verdict("allow", {"plugin": True}, "allow") == ("allow", "OK")
+    assert redteam._verdict("allow", {"plugin": False}, "allow") == ("unmediated", "OK")
+
+
+def test_benign_denied_is_a_false_positive():
+    assert redteam._verdict("allow", {"plugin": True}, "deny") == ("deny", "FALSE POSITIVE")
+
+
 def test_controls_caught_and_benign_allowed(tmp_path, monkeypatch):
     monkeypatch.setenv("VAARA_BIN", "")
     monkeypatch.setattr(redteam, "shutil", type("S", (), {"which": staticmethod(lambda _: None)}))
