@@ -408,6 +408,7 @@ class TestBedrockGuardrailsContract:
         )
 
         response = {
+            "action": "NONE",
             "assessments": [
                 {
                     "topicPolicy": {

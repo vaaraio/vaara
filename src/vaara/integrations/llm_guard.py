@@ -86,11 +86,13 @@ def parse_scan_result(
     }
     if sanitized_text is not None:
         raw["sanitized_text_length"] = len(sanitized_text)
+    # No scanner result at all is not a pass: nothing was scanned.
     return build_finding(
         provider=_PROVIDER,
         categories=cats,
         raw=raw,
         scanned_role=scanned_role,
+        understood=bool(results_valid),
     )
 
 

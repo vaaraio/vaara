@@ -65,8 +65,14 @@ def _malicious() -> dict[str, Any]:
 
 
 class TestParseSanitizeResponse:
-    def test_empty_response_allows(self):
+    def test_response_without_match_state_is_unparsed(self):
         finding = parse_sanitize_response(_wrap({}))
+        assert finding.verdict == "unparsed"
+        assert finding.categories == ()
+
+    def test_clean_response_allows(self):
+        finding = parse_sanitize_response({"sanitizationResult": {
+            "filterMatchState": "NO_MATCH_FOUND", "filterResults": {}}})
         assert finding.verdict == "allow"
         assert finding.categories == ()
 

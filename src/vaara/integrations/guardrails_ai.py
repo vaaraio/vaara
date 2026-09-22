@@ -149,6 +149,7 @@ def parse_validation_outcome(
         categories=cats,
         raw=raw,
         scanned_role=scanned_role,
+        understood=_raw_passed is not _ABSENT or bool(summaries),
     )
 
 

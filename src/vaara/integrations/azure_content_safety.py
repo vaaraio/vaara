@@ -148,11 +148,24 @@ def parse_responses(
     cats.extend(_shield_cats(shield))
     cats.extend(_protected_cats(protected))
     cats.extend(_groundedness_cats(grounded))
+    # Every response handed in must carry the field its parser reads, and at
+    # least one must be handed in. Otherwise an empty result is not a clean
+    # scan, it is a response nobody read.
+    expected = (
+        (analyze_text, ("categoriesAnalysis",)),
+        (shield, ("userPromptAnalysis", "documentsAnalysis")),
+        (protected, ("protectedMaterialAnalysis", "protectedMaterialCodeAnalysis")),
+        (grounded, ("ungroundedDetected",)),
+    )
+    supplied = [(r, keys) for r, keys in expected if r is not None]
+    understood = bool(supplied) and all(
+        isinstance(r, dict) and any(k in r for k in keys) for r, keys in supplied)
     return build_finding(
         provider=_PROVIDER, categories=cats,
         raw={"analyze_text": analyze_text, "shield": shield,
              "protected": protected, "grounded": grounded},
         scanned_role=scanned_role,
+        understood=understood,
     )
 
 

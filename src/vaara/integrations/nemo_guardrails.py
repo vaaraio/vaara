@@ -152,7 +152,10 @@ def parse_generation_response(
 
     activated = getattr(log, "activated_rails", None)
     if activated is None and isinstance(log, dict):
-        activated = log.get("activated_rails") or []
+        activated = log.get("activated_rails")
+    # generation options always ask for activated_rails. A response without
+    # the list was not read; an empty list is a run where no rail fired.
+    understood = activated is not None
     activated = activated or []
 
     cats: list[FindingCategory] = []
@@ -166,6 +169,7 @@ def parse_generation_response(
         categories=cats,
         raw=raw,
         scanned_role=scanned_role,
+        understood=understood,
     )
 
 
