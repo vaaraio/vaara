@@ -54,7 +54,7 @@ CLAUDE_SETTINGS = Path.home() / ".claude" / "settings.json"
 # The tool-call surface the hooks intercept: all of it. Kept identical to the
 # plugin's hooks.json matcher, and pinned by a test, because the two drifted.
 # This read "Bash|WebFetch|WebSearch|mcp__.*" while the plugin had grown to
-# fifteen names, so a `vaara init-governance` install ran deny rules for Write,
+# fifteen names, so a `vaara init` install ran deny rules for Write,
 # Edit, Agent and Workflow that the matcher never dispatched. A rule the
 # matcher drops is dead, and nothing said so.
 HOOK_MATCHER = ".*"
