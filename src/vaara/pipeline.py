@@ -570,20 +570,34 @@ class InterceptionPipeline:
         bucket_raw = raw.get("bucket_category")
         bucket_category = bucket_raw if isinstance(bucket_raw, str) and bucket_raw else None
 
+        # The thresholds this decision was made against. The receipt
+        # (`audit.receipts`) reads them off this record and, when they are
+        # absent, falls back to a legacy pair that matches no current mode.
+        # Every live receipt did exactly that until 2026-09-22, claiming
+        # 0.4 / 0.7 for an engine deciding at 0.55 / 0.85. The scorer's
+        # `evaluate` puts them at the top of its result (`to_dict`, the
+        # shape the pipeline sees); the per-class path puts them inside
+        # raw_result. Read both, top level first; carry them as floats.
+        assessment = {
+            "point_estimate": point_estimate,
+            "conformal_lower": interval[0],
+            "conformal_upper": interval[1],
+            "signals": signals,
+            "calibration_size": raw.get("calibration_size", 0),
+            "effective_alpha": effective_alpha,
+            "bucket_category": bucket_category,
+        }
+        for key in ("threshold_allow", "threshold_deny"):
+            value = scorer_result.get(key, raw.get(key))
+            if isinstance(value, (int, float)) and not isinstance(value, bool):
+                assessment[key] = float(value)
+
         # 5. Record risk scoring in audit
         self.trail.record_risk_scored(
             action_id=action_id,
             agent_id=agent_id,
             tool_name=tool_name,
-            assessment={
-                "point_estimate": point_estimate,
-                "conformal_lower": interval[0],
-                "conformal_upper": interval[1],
-                "signals": signals,
-                "calibration_size": raw.get("calibration_size", 0),
-                "effective_alpha": effective_alpha,
-                "bucket_category": bucket_category,
-            },
+            assessment=assessment,
             regulatory_domains=action_type.regulatory_domains,
         )
 
