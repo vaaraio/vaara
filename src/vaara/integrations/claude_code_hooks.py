@@ -656,13 +656,16 @@ def _report_hook_registration() -> None:
 def _report_trail_health(cfg: dict, db_path: Path, existed: bool) -> None:
     """Once per session, on the line the operator already reads.
 
-    Two questions, in order. Has this trail been failing to record — the
-    marker knows, across processes, which is the thing nothing knew on
-    2026-08-22. And if not, does the file still read clean — which catches a
-    trail damaged while nothing was writing to it, where the first symptom
-    would otherwise be the next record nobody is watching.
+    Three questions, in order of how bad the answer is. Has this trail been
+    failing to record — the marker knows, across processes, which is the
+    thing nothing knew on 2026-08-22. Does the file still read clean —
+    which catches a trail damaged while nothing was writing to it, where
+    the first symptom would otherwise be the next record nobody is
+    watching. And is it running in a journal mode its filesystem can
+    survive — the one that has not gone wrong yet.
     """
     try:
+        from vaara.audit.sqlite_backend import journal_mode_warning
         from vaara.audit.write_failure import active_failure, failure_banner, quick_check
 
         state = active_failure(db_path)
@@ -685,6 +688,18 @@ def _report_trail_health(cfg: dict, db_path: Path, existed: bool) -> None:
                 "`.recover`. Do not delete the file, it is the evidence."
             )
             notify(cfg, "TRAIL DAMAGED", "audit trail", problem)
+            return
+        unsafe = journal_mode_warning(db_path)
+        if unsafe is not None:
+            _emit(
+                f"vaara-governance: the audit trail at {db_path} is intact, but "
+                f"{unsafe}. Vaara asks for DELETE journal mode on these mounts "
+                "and the switch needs a brief exclusive lock it did not get. "
+                "Close other Vaara processes and reopen the trail, or set "
+                "VAARA_TRAIL_JOURNAL_MODE=delete. If that variable is set to "
+                "wal, unset it."
+            )
+            notify(cfg, "TRAIL AT RISK", "audit trail", unsafe)
     except Exception:
         # Reporting on the trail's health must never break the session it is
         # reporting to. There is nowhere left to escalate to from here: the

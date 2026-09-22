@@ -192,6 +192,63 @@ def _journal_mode_for(db_path: Path, in_memory: bool = False) -> str:
         return "delete"
     return "wal"
 
+
+def journal_mode_warning(db_path: Any) -> Optional[str]:
+    """``None`` when this trail's journal mode is safe on its filesystem.
+
+    Asks the question the backend cannot answer from inside a hook process.
+    ``_set_journal_mode`` gives up after half a second of retries and keeps
+    whatever mode the file is in, reporting that through ``logger``, which
+    from a hook reaches nobody: the hook is a fresh process per tool call
+    with no logging configured and its stderr read as tool noise. So a trail
+    could run WAL on a filesystem that corrupts it with nothing saying so.
+
+    Deliberately phrased as "is the file in WAL on a WAL-unsafe mount",
+    not "did the conversion fail". That catches the same hazard from the
+    other direction too: an operator who set ``VAARA_TRAIL_JOURNAL_MODE=wal``
+    on a virtiofs or NFS mount gets the mode they asked for, and it is still
+    the mode that eats the evidence.
+
+    Read-only and cheap. It opens nothing it does not close, and it never
+    raises: a check on the trail's health must not become the reason a
+    session fails.
+    """
+    if db_path is None:
+        return None
+    text = str(db_path)
+    if not text or text == ":memory:" or text.startswith("file::memory:"):
+        return None
+
+    try:
+        path = Path(text).expanduser()
+        if not path.is_file():
+            return None
+        fstype = _fstype_for(path.resolve())
+        if not _is_wal_unsafe(fstype):
+            return None
+        uri = f"{path.resolve().as_uri()}?mode=ro"
+        conn = sqlite3.connect(uri, uri=True, timeout=2.0)
+    except (OSError, ValueError, sqlite3.Error):
+        # Unreadable is a different fault with its own report. Saying
+        # nothing here leaves that one the only message, which is correct.
+        return None
+
+    try:
+        row = conn.execute("PRAGMA journal_mode").fetchone()
+    except sqlite3.Error:
+        return None
+    finally:
+        conn.close()
+
+    actual = str(row[0]).lower() if row else ""
+    if actual != "wal":
+        return None
+    return (
+        f"it is in WAL journal mode on a {fstype} filesystem. WAL needs "
+        "shared memory that filesystem cannot provide, so the trail can "
+        "corrupt and take the records with it"
+    )
+
 # Schema v2 — full DDL for fresh databases.
 # Migrations for v1 to v2 upgrades are in _MIGRATIONS below.
 SCHEMA_SQL = """
@@ -461,19 +518,38 @@ class SQLiteAuditBackend:
         a real change of mode. If the lock is still held after that, the
         database opens in the journal mode it is already in: worse
         concurrency, but recording evidence beats refusing to.
+
+        The result row is read back, because the pragma is allowed to
+        decline silently. Without that, a WAL trail on a filesystem that
+        cannot support WAL could fail to convert and report success. The
+        log line here reaches nobody from a hook process, so the operator
+        signal is :func:`journal_mode_warning`, read at session start.
         """
+        wanted = mode.lower()
         statement = f"PRAGMA journal_mode={mode.upper()}"
-        last: Optional[sqlite3.OperationalError] = None
+        last: Optional[str] = None
         for _ in range(self._WAL_RETRIES):
             try:
-                self._conn.execute(statement)
-                return
+                row = self._conn.execute(statement).fetchone()
             except sqlite3.OperationalError as exc:
                 msg = str(exc).lower()
                 if "locked" not in msg and "busy" not in msg:
                     raise
-                last = exc
+                last = f"{type(exc).__name__}: {exc}"
                 time.sleep(self._WAL_RETRY_SLEEP)
+                continue
+            actual = str(row[0]).lower() if row else ""
+            # An in-memory database answers "memory" whatever it is asked
+            # for, and that is the correct mode for it, not a refusal.
+            if actual in (wanted, "memory"):
+                return
+            # The pragma can decline without raising: a mode change needs a
+            # brief exclusive lock, and SQLite may simply answer with the
+            # mode the file is still in. That reads as success to a caller
+            # that does not look at the row, which is how a WAL to DELETE
+            # conversion could quietly not happen.
+            last = f"journal_mode stayed {actual or 'unknown'}"
+            time.sleep(self._WAL_RETRY_SLEEP)
         logger.warning(
             "audit DB %s stayed locked while setting journal mode %s (%s); "
             "continuing in the existing journal mode. Another Vaara process is "

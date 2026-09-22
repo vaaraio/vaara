@@ -290,6 +290,18 @@ def audit_db(tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> Path:
     db = tmp_path / "audit.db"
     monkeypatch.setenv("VAARA_PLUGIN_AUDIT_DB", str(db))
     monkeypatch.setenv("VAARA_PLUGIN_NOTIFY", "0")
+    # The developer's own ~/.vaara/claude-code/config.json decided these
+    # otherwise. The env vars do not cover it: each reader checks for the
+    # literal "1" and falls through to ``load_config()``, and CONFIG_PATH is
+    # resolved at import so moving HOME does not move it. A real config
+    # carrying ``mode: watch`` or ``fail_open: true`` turns the fail-closed
+    # assertions below into tests of that file. Proved 2026-09-22 by running
+    # this suite with VAARA_PLUGIN_DISABLE=1 in the environment: six tests
+    # fail here and pass on CI, which has a clean HOME.
+    monkeypatch.setattr(hooks, "CONFIG_PATH", tmp_path / "absent-config.json")
+    monkeypatch.setenv("VAARA_PLUGIN_SHADOW", "0")
+    monkeypatch.delenv("VAARA_PLUGIN_DISABLE", raising=False)
+    monkeypatch.delenv("VAARA_PLUGIN_FAIL_OPEN", raising=False)
     return db
 
 
@@ -374,6 +386,62 @@ class TestHookSurfacesTheOutage:
         _corrupt_a_later_page(db)
         hooks._report_trail_health({"notifications": False}, db, existed=True)
         assert "does not read clean" in capsys.readouterr().err
+
+    def test_session_start_reports_a_trail_running_wal_on_an_unsafe_mount(
+        self, tmp_path: Path, monkeypatch, capsys
+    ):
+        """Intact, recording, and on its way to being neither.
+
+        ``_set_journal_mode`` retries for half a second and then keeps
+        whatever mode the file is in, saying so through ``logger``. A hook
+        process configures no logging and exits, so that line reaches
+        nobody and the trail keeps running WAL on a mount that corrupts
+        it. Session start is where the operator actually looks.
+        """
+        from vaara.audit import sqlite_backend
+
+        db = tmp_path / "audit.db"
+        SQLiteAuditBackend(db).close()
+        con = sqlite3.connect(str(db))
+        con.execute("PRAGMA journal_mode=WAL")
+        con.close()
+
+        mounts = tmp_path / "mounts"
+        mounts.write_text(
+            "/dev/vda1 / ext4 rw,relatime 0 0\n"
+            f"host {tmp_path.resolve()} virtiofs rw,relatime 0 0\n"
+        )
+        monkeypatch.setattr(sqlite_backend, "_PROC_MOUNTS", mounts)
+
+        hooks._report_trail_health({"notifications": False}, db, existed=True)
+
+        err = capsys.readouterr().err
+        assert "virtiofs" in err
+        assert "VAARA_TRAIL_JOURNAL_MODE" in err
+        # Not the other two banners: nothing has failed and nothing is damaged.
+        assert "NOT RECORDING" not in err
+        assert "does not read clean" not in err
+
+    def test_a_damaged_trail_is_not_also_reported_as_at_risk(
+        self, tmp_path: Path, monkeypatch, capsys
+    ):
+        """One fault, one banner. The worse answer wins."""
+        from vaara.audit import sqlite_backend
+
+        db = _populated_trail(tmp_path)
+        _corrupt_a_later_page(db)
+        mounts = tmp_path / "mounts"
+        mounts.write_text(
+            "/dev/vda1 / ext4 rw,relatime 0 0\n"
+            f"host {tmp_path.resolve()} virtiofs rw,relatime 0 0\n"
+        )
+        monkeypatch.setattr(sqlite_backend, "_PROC_MOUNTS", mounts)
+
+        hooks._report_trail_health({"notifications": False}, db, existed=True)
+
+        err = capsys.readouterr().err
+        assert "does not read clean" in err
+        assert "VAARA_TRAIL_JOURNAL_MODE" not in err
 
     def test_session_start_on_a_healthy_trail_is_quiet(self, audit_db, monkeypatch, capsys):
         SQLiteAuditBackend(audit_db).close()

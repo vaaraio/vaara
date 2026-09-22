@@ -60,7 +60,7 @@ directory from provide neither. On those the write still goes through and the
 database corrupts.
 
 Vaara reads `/proc/mounts` when it opens a trail and, if the file sits on one
-of these, uses the DELETE journal instead and logs one line saying so:
+of these, uses the DELETE journal instead:
 
 `9p`, `afpfs`, `ceph`, `cifs`, `glusterfs`, `lustre`, `ncpfs`, `nfs`, `nfs4`,
 `smb2`, `smb3`, `smbfs`, `vboxsf`, `virtiofs`, `vmhgfs`, and any `fuse*`
@@ -75,6 +75,13 @@ virtiofs or FUSE), WSL2 writing to `/mnt/c`, and NFS or SMB network homes.
 | Detection | Linux only; `/proc/mounts` is the only portable source of a filesystem type |
 | Elsewhere | macOS and Windows keep WAL, since the type is not readable without platform calls |
 | Override | `VAARA_TRAIL_JOURNAL_MODE=wal` or `=delete`, in either direction |
+
+Switching an existing trail off WAL needs a brief exclusive lock, and SQLite may
+answer without it by leaving the file in the mode it is already in. Vaara reads
+the mode back and retries. If the trail is still in WAL afterwards, the Claude
+Code session-start hook names the file and the filesystem, because a log line
+from a hook process reaches nobody. A trail that stays in WAL on one of these
+filesystems is intact and recording, and it corrupts later.
 
 DELETE journalling costs concurrency. Readers block writers where WAL would let
 them run together, and durability is unaffected. For a trail written by one
