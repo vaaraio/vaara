@@ -38,15 +38,22 @@ _DROP_REQUEST_HEADERS = frozenset({
 
 _AUDIT_MAX_CHARS = 4096
 
+#: Content block types that carry plain text. ``text`` in the chat and
+#: messages APIs, ``input_text`` and ``output_text`` in the Responses API.
+_TEXT_BLOCKS = frozenset({"text", "input_text", "output_text"})
+
 
 def extract_messages(body: dict[str, Any]) -> list[dict[str, Any]]:
     """Extract messages list from any provider-shaped request body.
 
-    Handles OpenAI ``/v1/chat/completions`` and Anthropic ``/v1/messages``
-    shapes.  Returns an empty list if the body doesn't look like either.
+    Handles OpenAI ``/v1/chat/completions``, Anthropic ``/v1/messages`` and
+    OpenAI ``/v1/responses`` shapes.  Returns an empty list if the body looks
+    like none of them.
     """
     if "messages" in body:
         return body["messages"]
+    if "input" in body:
+        return responses_messages(body)
     msgs: list[dict[str, Any]] = []
     for block in (body.get("system") or []):
         if isinstance(block, dict) and block.get("type") == "text":
@@ -57,6 +64,36 @@ def extract_messages(body: dict[str, Any]) -> list[dict[str, Any]]:
         if isinstance(block, dict):
             msgs.append({"role": "assistant" if body.get("role") == "assistant" else "user",
                          "content": block.get("text", "")})
+    return msgs
+
+
+def responses_messages(body: dict[str, Any]) -> list[dict[str, Any]]:
+    """The Responses API body as a message list.
+
+    ``instructions`` is the system prompt. ``input`` is either one string, the
+    user turn, or a list of items: messages with a ``role``, tool calls, and
+    tool outputs. Tool calls and outputs keep their payload as the content so
+    the envelope and the scan see what left.
+    """
+    msgs: list[dict[str, Any]] = []
+    instructions = body.get("instructions")
+    if isinstance(instructions, str) and instructions:
+        msgs.append({"role": "system", "content": instructions})
+    items = body.get("input")
+    if isinstance(items, str):
+        msgs.append({"role": "user", "content": items})
+        return msgs
+    for item in items if isinstance(items, list) else []:
+        if not isinstance(item, dict):
+            continue
+        kind = item.get("type")
+        if "role" in item and kind in (None, "message"):
+            msgs.append({"role": item["role"], "content": item.get("content", "")})
+        elif kind == "function_call_output":
+            msgs.append({"role": "tool", "content": str(item.get("output", ""))})
+        elif kind == "function_call":
+            msgs.append({"role": "assistant",
+                         "content": str(item.get("arguments", ""))})
     return msgs
 
 
@@ -86,7 +123,7 @@ def flatten_messages(messages: list[dict[str, Any]]) -> str:
         content = msg.get("content") or ""
         if isinstance(content, list):
             for block in content:
-                if isinstance(block, dict) and block.get("type") == "text":
+                if isinstance(block, dict) and block.get("type") in _TEXT_BLOCKS:
                     parts.append(block.get("text", ""))
         elif isinstance(content, str):
             parts.append(content)
