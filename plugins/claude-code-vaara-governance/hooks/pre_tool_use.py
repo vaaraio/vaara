@@ -126,8 +126,8 @@ def _ungovernable(tool_name: str, reason: str, shadow: bool) -> int:
     _emit(
         f"vaara-governance: BLOCKED {tool_name} (fail-closed): {reason}, so "
         f"this MCP call cannot be scored or recorded. Repair the trail "
-        f"(`sqlite3 <db> 'PRAGMA integrity_check'`, then `.recover`; keep the "
-        f"damaged file, it is the evidence), or set \"fail_open\": true in "
+        f"(`vaara trail repair --db <db>` keeps every readable record and "
+        f"declares the rest; keep the damaged file, it is the evidence), or set \"fail_open\": true in "
         f"~/.vaara/claude-code/config.json to pass through unscored."
     )
     notify("BLOCKED", tool_name, f"cannot govern this call: {reason}")

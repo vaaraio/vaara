@@ -60,6 +60,7 @@ class EventType(str, Enum):
     OUTCOME_RECORDED = "outcome_recorded"   # Post-execution outcome observed
     POLICY_OVERRIDE = "policy_override"     # Manual override of policy decision
     ANCHOR_GAP = "anchor_gap"               # Auto-anchor attempt failed (fail-open marker)
+    REPAIR_GAP = "repair_gap"               # Store repair could not keep every record
     KEY_LIFECYCLE = "key_lifecycle"         # Signing-key custodian rotated/revoked/added
     DISCLOSURE_RECORDED = "disclosure_recorded"  # EU AI Act Art 50 transparency disclosure
     ACCESS_RECORDED = "access_recorded"     # Something was opened, and by whom
@@ -265,6 +266,11 @@ TRANSPARENCY_DEFAULTS: dict[EventType, dict[str, str]] = {
     EventType.ANCHOR_GAP: {
         "system_operation": "time_anchoring",
         "data_usage": "chain_head_digest",
+        "decision_making": "n/a",
+    },
+    EventType.REPAIR_GAP: {
+        "system_operation": "store_repair",
+        "data_usage": "surviving_record_seqs",
         "decision_making": "n/a",
     },
     EventType.KEY_LIFECYCLE: {
@@ -2139,6 +2145,54 @@ class AuditTrail:
                 "attempted_chain_position": position,
                 "chain_head_hash": head_hash,
                 "tsa_url": getattr(client, "tsa_url", ""),
+            },
+        ))
+
+    #: Sequence numbers listed individually in a REPAIR_GAP record. A larger
+    #: loss is still counted exactly; only the enumeration is capped.
+    _REPAIR_GAP_SEQ_LIMIT = 1000
+
+    def repair_store(self):
+        """Repair the backing store and declare anything the repair lost.
+
+        Returns the backend's ``TrailRepair``, or ``None`` when this trail has
+        no repairable store. When records were lost, a chained REPAIR_GAP
+        record naming them is appended to the repaired trail, so the hole is
+        part of the evidence rather than something a verifier trips over.
+        Nothing is appended when nothing was lost: a rebuilt index is not an
+        event in the record's history.
+        """
+        backend = self._chain_backend()
+        if backend is None or not hasattr(backend, "repair"):
+            return None
+        report = backend.repair()
+        if report.ok and report.lost:
+            self.record_repair_gap(report)
+        return report
+
+    def record_repair_gap(self, report) -> None:
+        """Append a REPAIR_GAP record describing a ``TrailRepair``."""
+        lost = list(report.lost_seqs)
+        logger.warning(
+            "audit trail repaired by %s; %d record(s) could not be kept",
+            report.method, len(lost),
+        )
+        self._append_chained(AuditRecord(
+            record_id=str(uuid.uuid4()),
+            action_id="repair-gap",
+            event_type=EventType.REPAIR_GAP,
+            timestamp=time.time(),
+            agent_id="vaara",
+            tool_name="trail.repair",
+            data={
+                "method": report.method,
+                "problem": self._cap_record_str(report.problem or "", 512),
+                "lost_seq_count": len(lost),
+                "lost_seqs": lost[: self._REPAIR_GAP_SEQ_LIMIT],
+                "unreadable_rowids": report.unreadable_rowids,
+                "tables_damaged": list(report.tables_damaged),
+                "records_kept": report.records_kept,
+                "damaged_copy": report.damaged_copy or "",
             },
         ))
 

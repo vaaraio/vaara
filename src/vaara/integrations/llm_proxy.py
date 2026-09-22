@@ -215,6 +215,14 @@ def main(args: Optional[list[str]] = None) -> int:
              "spending your upstream key. Native clients send no Origin.",
     )
     p.add_argument(
+        "--fail-open", action="store_true",
+        help="Forward a request even when its audit record could not be "
+             "written. Off by default: the proxy first repairs the trail and "
+             "retries, and if the record still cannot be written it answers "
+             "503 and forwards nothing. With this flag the request goes out "
+             "unrecorded and the log says so on every one.",
+    )
+    p.add_argument(
         # Read from the package rather than restated here. The literal that
         # used to sit in this line said 1.56.0 long after the package moved
         # on, so --version reported a release this code is not.
@@ -312,6 +320,7 @@ def main(args: Optional[list[str]] = None) -> int:
         allowed_origins=parsed.allow_origin,
         marker_watch=markers,
         compact_keep_turns=parsed.compact_history,
+        fail_open=parsed.fail_open,
     )
 
     seal_note = f", sealing {len(seal)} secret(s)" if seal.active \
@@ -320,6 +329,8 @@ def main(args: Optional[list[str]] = None) -> int:
         seal_note += f", watching {len(markers)} marker(s)"
     if parsed.compact_history > 0:
         seal_note += f", compacting history beyond {parsed.compact_history} turn(s)"
+    if parsed.fail_open:
+        seal_note += ", FAIL-OPEN (forwards requests it cannot record)"
 
     if parsed.seal_listen_unix:
         sock_path = str(Path(parsed.seal_listen_unix).expanduser())

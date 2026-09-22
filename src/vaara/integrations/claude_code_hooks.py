@@ -322,8 +322,8 @@ def _ungovernable(cfg: dict, tool_name: str, reason: str) -> int:
     _emit(
         f"vaara-governance: BLOCKED {tool_name} (fail-closed): {reason}, so "
         f"this MCP call cannot be scored or recorded. Repair the trail "
-        f"(`sqlite3 <db> 'PRAGMA integrity_check'`, then `.recover`; keep the "
-        f"damaged file, it is the evidence), or set \"fail_open\": true in "
+        f"(`vaara trail repair --db <db>` keeps every readable record and "
+        f"declares the rest; keep the damaged file, it is the evidence), or set \"fail_open\": true in "
         f"~/.vaara/claude-code/config.json to pass through unscored."
     )
     notify(cfg, "BLOCKED", tool_name, f"cannot govern this call: {reason}")
@@ -683,9 +683,10 @@ def _report_trail_health(cfg: dict, db_path: Path, existed: bool) -> None:
         if problem is not None:
             _emit(
                 f"vaara-governance: the audit trail at {db_path} does not read "
-                f"clean ({problem}). Records may not be persisting. Check it with "
-                f"`sqlite3 {db_path} 'PRAGMA integrity_check'` and recover with "
-                "`.recover`. Do not delete the file, it is the evidence."
+                f"clean ({problem}). Records may not be persisting. Repair it "
+                f"with `vaara trail repair --db {db_path}`, which keeps every "
+                "readable record and declares any it cannot keep. Do not "
+                "delete the file, it is the evidence."
             )
             notify(cfg, "TRAIL DAMAGED", "audit trail", problem)
             return
