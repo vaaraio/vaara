@@ -31,11 +31,11 @@ Set the variable to `1` in the environment for the job that needs it:
 
 | Variable | Lifts |
 |---|---|
-| `VAARA_ALLOW_SPAWN` | subagent spawn (`Agent`, `Task`) and `Workflow` fan-out |
-| `VAARA_ALLOW_SCHEDULE` | a durable `CronCreate` job (session-only jobs pass anyway) |
+| `VAARA_ALLOW_SPAWN` | subagent spawn (`Agent`, `Task`), `Workflow` fan-out, a `Skill` that spawns a subagent, and `TaskStop` on a background task |
+| `VAARA_ALLOW_SCHEDULE` | a durable `CronCreate` job (session-only jobs pass anyway) and `CronDelete` of a schedule |
 | `VAARA_ALLOW_REMOTE` | `RemoteTrigger` create, update, run |
 | `VAARA_ALLOW_XSESSION` | `SendMessage` to anything but `main` |
-| `VAARA_ALLOW_HARNESS_EDIT` | writes to `.claude.json`, `.claude/settings*.json`, `.claude/hooks/`, `.claude/skills/`, `.claude/agents/`, `.claude-plugin/`, `.mcp.json` |
+| `VAARA_ALLOW_HARNESS_EDIT` | writes to `.claude.json`, `.claude/settings*.json`, `.claude/hooks/`, `.claude/skills/`, `.claude/agents/`, `.claude-plugin/`, `.mcp.json`, whether by a file tool, a shell command, or an interpreter one-liner |
 | `VAARA_ALLOW_EGRESS` | a raw socket tool moving bytes to a remote host, and interpreter one-liners that open an outbound connection |
 | `VAARA_ALLOW_SECRET_READ` | `Read` and the MCP resource readers over dotenv files, private keys, the seal file, cloud and git credentials |
 | `VAARA_ALLOW_DISCARD` | `ExitWorktree` with the flag that discards uncommitted work |
