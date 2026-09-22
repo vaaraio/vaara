@@ -29,6 +29,7 @@ import sqlite3
 import threading
 import time
 from contextlib import contextmanager
+from dataclasses import dataclass, field
 from pathlib import Path
 from typing import Any, Optional
 
@@ -397,6 +398,234 @@ class AuditBackendUnreadable(RuntimeError):
     """
 
 
+@dataclass
+class TrailRepair:
+    """What ``repair_trail_file`` did to one trail, and what it could not keep.
+
+    ``method`` is the step that left the file reading clean: ``"clean"`` when
+    nothing was wrong, ``"reindex"`` when rebuilding the indexes was enough
+    (no record is touched by that), ``"salvage"`` when rows had to be copied
+    out into a fresh file, and ``"failed"`` when no step produced a readable
+    trail and the file was left exactly where it was.
+
+    ``lost_seqs`` is exact within the range of sequence numbers that survived.
+    Records after the last readable one cannot be named, because nothing that
+    survived says they existed; ``unreadable_rowids`` counts row positions
+    that raised on read and is an upper bound, since a damaged interior page
+    makes a whole range unreachable whether or not every slot held a row.
+    """
+
+    db: str
+    method: str
+    problem: Optional[str] = None
+    records_kept: int = 0
+    lost_seqs: list[int] = field(default_factory=list)
+    unreadable_rowids: int = 0
+    tables_damaged: list[str] = field(default_factory=list)
+    damaged_copy: Optional[str] = None
+    error: Optional[str] = None
+
+    @property
+    def ok(self) -> bool:
+        return self.method != "failed"
+
+    @property
+    def lost(self) -> bool:
+        return bool(self.lost_seqs or self.unreadable_rowids or self.tables_damaged)
+
+    def to_dict(self) -> dict[str, Any]:
+        return {
+            "db": self.db, "method": self.method, "problem": self.problem,
+            "records_kept": self.records_kept, "lost_seqs": list(self.lost_seqs),
+            "unreadable_rowids": self.unreadable_rowids,
+            "tables_damaged": list(self.tables_damaged),
+            "damaged_copy": self.damaged_copy, "error": self.error,
+        }
+
+
+#: Rows read per query while salvaging. A range that raises is split in half
+#: until the rows that cannot be read are isolated one position at a time.
+_SALVAGE_CHUNK = 256
+
+#: Tables besides ``audit_records`` carried over by a salvage. ``audit_meta``
+#: is not among them: the fresh file writes its own schema version.
+_SALVAGE_SIDE_TABLES = ("gdpr_redactions", "api_keys", "pending_outcomes")
+
+
+def _integrity_problem(conn: sqlite3.Connection) -> Optional[str]:
+    """``None`` when ``PRAGMA integrity_check`` reads clean, else what it said.
+
+    The full check, not ``quick_check``: only the full one compares each
+    index against its table, and an index out of step with the table is the
+    commonest damage these trails have taken. Repair runs after a failure or
+    by hand, never per write, so it can afford the whole-file read.
+    """
+    try:
+        rows = conn.execute("PRAGMA integrity_check(3)").fetchall()
+    except sqlite3.Error as exc:
+        return f"{type(exc).__name__}: {exc}"
+    results = [str(r[0]) for r in rows if r]
+    if not results or results == ["ok"]:
+        return None
+    return "; ".join(results)[:500]
+
+
+def _read_rows(conn: sqlite3.Connection, table: str, cols: list[str],
+               lo: int, hi: int) -> tuple[list[tuple], int]:
+    """Every row of ``table`` with rowid in ``[lo, hi]`` that can be read.
+
+    Seeks by rowid, which walks the table b-tree and never an index, so index
+    damage cannot hide a row here. A range that raises is halved until the
+    failing positions stand alone; those are counted and skipped.
+    """
+    select = f"SELECT {', '.join(cols)} FROM {table} WHERE rowid BETWEEN ? AND ?"
+    rows: list[tuple] = []
+    unreadable = 0
+    stack = [(lo, hi)]
+    while stack:
+        a, b = stack.pop()
+        try:
+            rows.extend(conn.execute(select, (a, b)).fetchall())
+        except sqlite3.DatabaseError:
+            if a == b:
+                unreadable += 1
+            else:
+                mid = (a + b) // 2
+                stack.append((mid + 1, b))
+                stack.append((a, mid))
+    return rows, unreadable
+
+
+def _salvage(path: Path, problem: str) -> TrailRepair:
+    stamp = time.strftime("%Y%m%dT%H%M%SZ", time.gmtime())
+    tmp = path.with_name(f"{path.name}.repair-{stamp}.tmp")
+    damaged = path.with_name(f"{path.name}.corrupt-{stamp}")
+    report = TrailRepair(db=str(path), method="salvage", problem=problem)
+
+    try:
+        src = sqlite3.connect(f"{path.as_uri()}?mode=ro", uri=True, timeout=5.0)
+    except sqlite3.Error as exc:
+        return TrailRepair(db=str(path), method="failed", problem=problem,
+                           error=f"cannot open for salvage: {exc}")
+    try:
+        cols = [r[1] for r in src.execute("PRAGMA table_info(audit_records)")]
+        if "seq" not in cols:
+            raise sqlite3.DatabaseError("audit_records schema is unreadable")
+        try:
+            hi = src.execute("SELECT max(rowid) FROM audit_records").fetchone()[0] or 0
+        except sqlite3.DatabaseError:
+            # The rightmost path is damaged. Bound the scan by what the file
+            # could physically hold; empty ranges cost one query each.
+            page_count = src.execute("PRAGMA page_count").fetchone()[0]
+            hi = max(1, page_count) * 64
+
+        if tmp.exists():
+            tmp.unlink()
+        fresh = SQLiteAuditBackend(tmp)
+        try:
+            dst = fresh._conn
+            dst_cols = {r[1] for r in dst.execute("PRAGMA table_info(audit_records)")}
+            use = [c for c in cols if c in dst_cols]
+            rows, report.unreadable_rowids = _read_rows(src, "audit_records", use, 1, hi)
+            placeholders = ", ".join("?" for _ in use)
+            dst.execute("BEGIN")
+            dst.executemany(
+                f"INSERT INTO audit_records ({', '.join(use)}) VALUES ({placeholders})",
+                rows,
+            )
+            for table in _SALVAGE_SIDE_TABLES:
+                try:
+                    side_cols = [r[1] for r in src.execute(f"PRAGMA table_info({table})")]
+                    if not side_cols:
+                        continue
+                    side_hi = src.execute(f"SELECT max(rowid) FROM {table}").fetchone()[0] or 0
+                    side_rows, side_bad = _read_rows(src, table, side_cols, 1, side_hi)
+                except sqlite3.DatabaseError:
+                    report.tables_damaged.append(table)
+                    continue
+                if side_bad:
+                    report.tables_damaged.append(table)
+                if side_rows:
+                    marks = ", ".join("?" for _ in side_cols)
+                    dst.execute(f"DELETE FROM {table}")
+                    dst.executemany(
+                        f"INSERT OR IGNORE INTO {table} ({', '.join(side_cols)}) "
+                        f"VALUES ({marks})",
+                        side_rows,
+                    )
+            dst.execute("COMMIT")
+            still = _integrity_problem(dst)
+            if still is not None:
+                raise sqlite3.DatabaseError(f"salvaged copy does not read clean: {still}")
+        finally:
+            fresh.close()
+    except sqlite3.Error as exc:
+        src.close()
+        for leftover in (tmp, tmp.with_name(tmp.name + "-journal")):
+            try:
+                leftover.unlink()
+            except OSError:
+                pass
+        return TrailRepair(db=str(path), method="failed", problem=problem,
+                           error=f"{type(exc).__name__}: {exc}")
+    src.close()
+
+    seq_at = use.index("seq")
+    seqs = sorted({int(r[seq_at]) for r in rows})
+    report.records_kept = len(rows)
+    if seqs:
+        present = set(seqs)
+        report.lost_seqs = [s for s in range(seqs[0], seqs[-1] + 1) if s not in present]
+
+    # The damaged file is kept beside the trail, never deleted: it is the
+    # original evidence, and a later, better tool may read more of it.
+    for suffix in ("", "-journal", "-wal", "-shm"):
+        src_file = path.with_name(path.name + suffix)
+        if src_file.exists():
+            os.replace(src_file, damaged.with_name(damaged.name + suffix))
+    os.replace(tmp, path)
+    report.damaged_copy = str(damaged)
+    return report
+
+
+def repair_trail_file(db_path: str | Path) -> TrailRepair:
+    """Bring a trail back to reading clean without losing a readable record.
+
+    Tries the cheap fix first. ``REINDEX`` rebuilds every index from the
+    table and touches no record, and every index-level corruption seen on
+    this project's own machines so far was cleared by it. Only when the
+    table itself is damaged does it salvage: every row that can still be
+    read is copied into a fresh file in its original order with its original
+    hashes, the damaged file is kept beside it, and the report names each
+    sequence number that did not survive so the caller can declare it.
+
+    Operates on the file, not on an open backend, so it also works on a
+    trail that no backend can open. Callers holding a connection must close
+    it first; ``SQLiteAuditBackend.repair`` does that.
+    """
+    path = Path(db_path).expanduser().resolve()
+    if not path.is_file():
+        return TrailRepair(db=str(path), method="failed", error="no such file")
+    try:
+        conn = sqlite3.connect(str(path), isolation_level=None, timeout=5.0)
+    except sqlite3.Error as exc:
+        return TrailRepair(db=str(path), method="failed", error=str(exc))
+    try:
+        problem = _integrity_problem(conn)
+        if problem is None:
+            return TrailRepair(db=str(path), method="clean")
+        try:
+            conn.execute("REINDEX")
+            after = _integrity_problem(conn)
+        except sqlite3.Error as exc:
+            after = f"{type(exc).__name__}: {exc}"
+        if after is None:
+            return TrailRepair(db=str(path), method="reindex", problem=problem)
+    finally:
+        conn.close()
+    return _salvage(path, problem)
+
+
 class SQLiteAuditBackend:
     """Persistent audit trail backed by SQLite.
 
@@ -442,17 +671,26 @@ class SQLiteAuditBackend:
                 "path traversal detected. Ensure this location is intentional.",
                 str(db_path), self._db_path,
             )
+        self._lock = threading.Lock()
+        self._corrupt_query_rows = 0
+        self._in_memory = str(db_path) == ":memory:"
+        self._open()
+
+    def _open(self) -> None:
+        """Connect, set pragmas, bring the schema current, load redactions.
+
+        Split out of ``__init__`` so ``repair`` can reopen the file it swapped
+        in through exactly the path a fresh start takes.
+        """
         # check_same_thread=False lets us use this connection from any
         # thread (LangChain tool execution, web servers, async workers).
-        # The Lock below serializes all access to the connection, which
-        # is the SQLite python binding's thread-safety contract.
+        # The Lock serializes all access to the connection, which is the
+        # SQLite python binding's thread-safety contract.
         self._conn = sqlite3.connect(
             str(self._db_path),
             isolation_level=None,  # Autocommit for WAL mode
             check_same_thread=False,
         )
-        self._lock = threading.Lock()
-        self._corrupt_query_rows = 0
         # sqlite3.connect() does not touch the file, so a damaged database
         # first surfaces here, on the pragma that reads page 1. The raw
         # DatabaseError ("file is not a database") names neither the path nor
@@ -460,7 +698,7 @@ class SQLiteAuditBackend:
         # investigation after the wrong thing. Say what broke and where.
         try:
             self._set_journal_mode(
-                _journal_mode_for(self._db_path, in_memory=str(db_path) == ":memory:")
+                _journal_mode_for(self._db_path, in_memory=self._in_memory)
             )
             self._conn.execute("PRAGMA synchronous=NORMAL")
             self._conn.execute("PRAGMA foreign_keys=ON")
@@ -470,14 +708,45 @@ class SQLiteAuditBackend:
                 f"the audit trail at {self._db_path} could not be opened "
                 f"({exc}). The evidence chain is the product, so this fails "
                 "rather than starting with a fresh trail and a silent gap. "
-                "Move the file aside to start a new trail, or point VAARA_DB "
-                "at a known-good one. Do not delete it: `sqlite3 <file> "
-                "'PRAGMA integrity_check'` and `.recover` often get the "
-                "records back, and they are the evidence."
+                "Run `vaara trail repair --db <file>`, which keeps every readable "
+                "record and declares the rest, or point VAARA_DB at a "
+                "known-good trail. Do not delete it: the records are the "
+                "evidence."
             ) from exc
         self._init_schema()
         # Load GDPR redaction map into memory for O(1) read-time substitution.
         self._redaction_cache: dict[str, str] = self._load_redaction_cache()
+        self._inode = self._current_inode()
+
+    def _current_inode(self) -> Optional[tuple[int, int]]:
+        if self._in_memory:
+            return None
+        try:
+            st = os.stat(self._db_path)
+        except OSError:
+            return None
+        return (st.st_dev, st.st_ino)
+
+    def _reopen_if_replaced_locked(self) -> None:
+        """Follow the path when the file under it was swapped out.
+
+        A trail repaired by hand, or moved aside and replaced, leaves an
+        open connection writing into the old inode: on 2026-09-22 the
+        llm-proxy kept appending to ``audit.db.corrupt-*`` until the process
+        was restarted. The path is the trail, so a write goes where the path
+        points now. One ``stat`` per write.
+        """
+        current = self._current_inode()
+        if current is None or current == self._inode:
+            return
+        logger.warning(
+            "the audit trail at %s was replaced on disk; reopening it", self._db_path,
+        )
+        try:
+            self._conn.close()
+        except sqlite3.Error:
+            pass
+        self._open()
 
     # Switching journal mode needs a brief exclusive lock, and SQLite answers
     # SQLITE_BUSY for it without consulting the busy handler, so the
@@ -880,6 +1149,7 @@ class SQLiteAuditBackend:
         Returns the ``previous_hash`` actually used.
         """
         with self._lock:
+            self._reopen_if_replaced_locked()
             self._conn.execute("BEGIN IMMEDIATE")
             with self._rollback_on_failure():
                 head = self._chain_head_locked()
@@ -1638,6 +1908,34 @@ class SQLiteAuditBackend:
         if count > 0:
             logger.info("Purged %d stale pending outcomes older than %d seconds", count, max_age_seconds)
         return count
+
+    def repair(self) -> TrailRepair:
+        """Repair this trail in place and reopen it; see ``repair_trail_file``.
+
+        Holds the lock across close, repair and reopen, so no writer in this
+        process can touch the file while it is being swapped. When the repair
+        fails and the file will not reopen either, the connection stays
+        closed and every later write raises, which is the honest state for a
+        trail that cannot record.
+        """
+        if self._in_memory:
+            return TrailRepair(db=":memory:", method="clean")
+        with self._lock:
+            try:
+                self._conn.close()
+            except sqlite3.Error:
+                pass
+            report = repair_trail_file(self._db_path)
+            try:
+                self._open()
+            except (AuditBackendUnreadable, sqlite3.Error) as exc:
+                if report.ok:
+                    report = TrailRepair(
+                        db=report.db, method="failed", problem=report.problem,
+                        damaged_copy=report.damaged_copy,
+                        error=f"repaired file did not reopen: {exc}",
+                    )
+            return report
 
     def close(self) -> None:
         """Close the database connection."""

@@ -351,7 +351,7 @@ class TestHookSurfacesTheOutage:
 
         err = capsys.readouterr().err
         assert "THE AUDIT TRAIL IS NOT RECORDING" in err
-        assert "integrity_check" in err
+        assert "vaara trail repair --db" in err
 
     def test_session_start_surfaces_a_damaged_trail_with_no_marker(
         self, audit_db, monkeypatch, capsys
@@ -362,7 +362,7 @@ class TestHookSurfacesTheOutage:
         assert hooks.run_session_start() == 0
 
         err = capsys.readouterr().err
-        assert "integrity_check" in err
+        assert "vaara trail repair --db" in err
         assert "Do not delete the file" in err
 
     def test_session_start_says_it_once(self, audit_db, monkeypatch, capsys):

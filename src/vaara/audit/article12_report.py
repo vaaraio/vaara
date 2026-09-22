@@ -282,6 +282,15 @@ def build_article12_report(
         for r in in_scope if r.event_type == EventType.KEY_LIFECYCLE
     ]
     anchor_gaps = sum(1 for r in in_scope if r.event_type == EventType.ANCHOR_GAP)
+    repair_gaps = [
+        {
+            "timestamp": _iso(r.timestamp),
+            "method": (r.data or {}).get("method", ""),
+            "lost_seq_count": (r.data or {}).get("lost_seq_count", 0),
+            "lost_seqs": (r.data or {}).get("lost_seqs", []),
+        }
+        for r in in_scope if r.event_type == EventType.REPAIR_GAP
+    ]
 
     timestamps = [r.timestamp for r in in_scope]
     threshold = None
@@ -346,6 +355,7 @@ def build_article12_report(
             "signature_algorithm": manifest.get("signature_algorithm", ""),
             "key_lifecycle_events": key_lifecycle,
             "anchor_gap_markers": anchor_gaps,
+            "repair_gaps": repair_gaps,
             "trust_model": (
                 "A valid signature proves the integrity and provenance of "
                 "these logs. It does not prove the truth of every recorded "
@@ -497,6 +507,16 @@ def render_report_md(report: dict) -> str:
         out.append(
             f"Anchor-gap markers: {integ['anchor_gap_markers']} "
             "(auto-anchor attempts that failed open and were recorded)."
+        )
+    for gap in integ.get("repair_gaps") or []:
+        out.append("")
+        shown = ", ".join(str(s) for s in gap["lost_seqs"][:20])
+        more = " and more" if gap["lost_seq_count"] > 20 else ""
+        out.append(
+            f"Repair gap at {gap['timestamp']}: the store was repaired by "
+            f"{gap['method']} and {gap['lost_seq_count']} record(s) could not "
+            f"be kept (seq {shown}{more}). The chain is broken at those "
+            "positions and this record is the trail's own statement of it."
         )
     out.append("")
     out.append(integ["trust_model"])

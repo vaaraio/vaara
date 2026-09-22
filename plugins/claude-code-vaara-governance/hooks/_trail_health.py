@@ -68,9 +68,10 @@ def report(db_path, existed: bool) -> None:
         if problem is not None:
             _emit(
                 f"vaara-governance: the audit trail at {db_path} does not read "
-                f"clean ({problem}). Records may not be persisting. Check it with "
-                f"`sqlite3 {db_path} 'PRAGMA integrity_check'` and recover with "
-                "`.recover`. Do not delete the file, it is the evidence."
+                f"clean ({problem}). Records may not be persisting. Repair it "
+                f"with `vaara trail repair --db {db_path}`, which keeps every "
+                "readable record and declares any it cannot keep. Do not "
+                "delete the file, it is the evidence."
             )
             _raw_notify("TRAIL DAMAGED", "audit trail", problem)
     except Exception:

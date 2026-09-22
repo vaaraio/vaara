@@ -113,7 +113,8 @@ def build_app(*, upstream: str, api_key: Optional[str], api_key_header: str,
               seal_registry: Optional[Any] = None,
               allowed_origins: Optional[list[str]] = None,
               marker_watch: Optional[Any] = None,
-              compact_keep_turns: int = 0) -> FastAPI:
+              compact_keep_turns: int = 0,
+              fail_open: bool = False) -> FastAPI:
     app = FastAPI(title="Vaara LLM Proxy")
     # This proxy holds the operator's upstream provider key and injects it
     # into every forwarded call, and it binds loopback with no inbound
@@ -178,6 +179,82 @@ def build_app(*, upstream: str, api_key: Optional[str], api_key_header: str,
     # left, by id. Like the seal it is refreshed per request and its strings
     # never reach a log line or the trail.
     _markers = marker_watch
+
+    # A request whose record did not reach the store is not forwarded. On
+    # 2026-09-22 this proxy forwarded 169 prompts across 68 minutes while the
+    # trail logged THE TRAIL IS NOT RECORDING on every one: the write failure
+    # was counted, and the request went out anyway. Before refusing, the
+    # proxy repairs the store and tries once more, because every agent that
+    # talks through it, including the one that would fix the trail, stops
+    # while it refuses. Repair reads the whole file, so it runs at most once
+    # per interval; between attempts a failing store is refused straight away.
+    _repair_state = {"last": 0.0}
+    _REPAIR_INTERVAL = 30.0
+
+    def _trail_failures() -> int:
+        return getattr(pipeline.trail, "persistence_failures", 0)
+
+    def _intercept_recorded(**kwargs: Any) -> tuple[Any, Optional[str]]:
+        """``(result, None)`` when the records landed, else ``(result, why)``."""
+        before = _trail_failures()
+        try:
+            result = pipeline.intercept(**kwargs)
+        except Exception as exc:
+            return None, f"the trail raised {type(exc).__name__}: {exc}"
+        if _trail_failures() == before:
+            return result, None
+
+        why = "the prompt record did not reach the audit store"
+        now = time.time()
+        repair = getattr(pipeline.trail, "repair_store", None)
+        if repair is None or now - _repair_state["last"] < _REPAIR_INTERVAL:
+            return result, why
+        _repair_state["last"] = now
+        try:
+            report = repair()
+        except Exception as exc:  # repair must never take the proxy down
+            logger.error("trail repair raised %s: %s", type(exc).__name__, exc)
+            return result, f"{why}, and repair raised {type(exc).__name__}"
+        if report is None or not report.ok:
+            detail = getattr(report, "error", None) or "no repairable store"
+            logger.error("trail repair failed: %s", detail)
+            return result, f"{why}, and repair failed ({detail})"
+        logger.warning(
+            "trail repaired by %s after a failed write; %d record(s) lost%s",
+            report.method, len(report.lost_seqs),
+            f", damaged file kept at {report.damaged_copy}"
+            if report.damaged_copy else "",
+        )
+        before = _trail_failures()
+        try:
+            result = pipeline.intercept(**kwargs)
+        except Exception as exc:
+            return None, f"{why}, repaired, and the retry raised {type(exc).__name__}"
+        if _trail_failures() == before:
+            return result, None
+        return result, f"{why}, and still after repair by {report.method}"
+
+    def _unrecorded_response(why: str) -> JSONResponse:
+        trail_path = None
+        backend = getattr(pipeline.trail, "_chain_backend", lambda: None)()
+        if backend is not None:
+            trail_path = getattr(backend, "db_path", None) or getattr(backend, "_db_path", None)
+        where = f" at {trail_path}" if trail_path else ""
+        return JSONResponse(
+            {
+                "error": (
+                    f"vaara llm-proxy: this request was not forwarded because "
+                    f"{why}. The audit trail{where} is not recording, and this "
+                    "proxy does not forward what it cannot record. It retries "
+                    "the repair on a later request by itself. By hand: `vaara "
+                    f"trail repair --db {trail_path or '<trail>'}`. Do not delete "
+                    "the file, it is the evidence. To forward unrecorded on "
+                    "purpose, restart the proxy with --fail-open."
+                ),
+                "type": "vaara_trail_not_recording",
+            },
+            status_code=503,
+        )
 
     @app.api_route("/{path:path}", methods=["GET", "POST", "PUT", "DELETE", "PATCH"])
     async def handle_request(path: str, request: Request):
@@ -301,10 +378,15 @@ def build_app(*, upstream: str, api_key: Optional[str], api_key_header: str,
         audit_params["enforce"] = enforce
         audit_params["audit_level"] = audit_level
 
-        result = pipeline.intercept(
+        result, unrecorded = _intercept_recorded(
             agent_id=agent_id, tool_name="llm.prompt",
             parameters=audit_params,
         )
+        if unrecorded is not None:
+            if not fail_open or result is None:
+                logger.error("refusing an unrecorded request: %s", unrecorded)
+                return _unrecorded_response(unrecorded)
+            logger.error("forwarding UNRECORDED (--fail-open): %s", unrecorded)
 
         if not result.allowed and enforce:
             pipeline.report_outcome(

@@ -264,8 +264,9 @@ def failure_banner(state: dict) -> str:
         f"({state.get('stage', 'append')}: {error}). "
         "Tool calls are still running and are NOT being recorded. "
         f"Trail: {state.get('db', 'unknown')}. "
-        "Check it with `sqlite3 <db> 'PRAGMA integrity_check'` and recover with "
-        "`.recover`. Do not delete the file, it is the evidence."
+        f"Repair it with `vaara trail repair --db {state.get('db', '<db>')}`, which "
+        "keeps every readable record and declares any it cannot keep. Do not "
+        "delete the file, it is the evidence."
     )
 
 

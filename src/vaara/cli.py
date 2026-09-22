@@ -410,6 +410,50 @@ def _cmd_trail_rotate(args: argparse.Namespace) -> int:
     return 0
 
 
+def _cmd_trail_repair(args: argparse.Namespace) -> int:
+    import json as _json
+
+    from vaara.audit.sqlite_backend import SQLiteAuditBackend, repair_trail_file
+    from vaara.audit.trail import AuditTrail
+
+    db_path = Path(args.db).expanduser()
+    if not db_path.is_file():
+        print(f"vaara trail repair: not a file: {db_path}", file=sys.stderr)
+        return 2
+    report = repair_trail_file(db_path)
+    if report.ok and report.lost:
+        # Declare the loss inside the chain, so the hole is part of the
+        # evidence and not something a verifier trips over later.
+        backend = SQLiteAuditBackend(db_path)
+        try:
+            AuditTrail(on_record=backend.write_record).record_repair_gap(report)
+        finally:
+            backend.close()
+
+    if args.format == "json":
+        print(_json.dumps(report.to_dict(), indent=2))
+    elif report.method == "clean":
+        print(f"{db_path}: reads clean, nothing to repair.")
+    elif report.method == "reindex":
+        print(f"{db_path}: indexes rebuilt, no record lost ({report.problem}).")
+    elif report.method == "salvage":
+        lost = report.lost_seqs
+        shown = ", ".join(str(s) for s in lost[:20]) + (" ..." if len(lost) > 20 else "")
+        print(f"{db_path}: salvaged {report.records_kept} record(s) into a fresh file.")
+        if lost:
+            print(f"  lost {len(lost)} record(s): seq {shown}")
+            print("  a repair_gap record naming them was appended to the trail")
+        if report.unreadable_rowids:
+            print(f"  {report.unreadable_rowids} row position(s) could not be read")
+        if report.tables_damaged:
+            print(f"  side tables with losses: {', '.join(report.tables_damaged)}")
+        print(f"  the damaged file is kept at {report.damaged_copy}")
+    else:
+        print(f"vaara trail repair: could not repair {db_path}: {report.error}. "
+              "The file was left exactly as it was.", file=sys.stderr)
+    return 0 if report.ok else 1
+
+
 def _cmd_trail_shadow_report(args: argparse.Namespace) -> int:
     import json as _json
 
@@ -5422,6 +5466,18 @@ def build_parser() -> argparse.ArgumentParser:
         help="Rotate across all tenants in this DB",
     )
     prot.set_defaults(func=_cmd_trail_rotate)
+
+    prep = tsub.add_parser(
+        "repair",
+        help="Repair a damaged trail: rebuild indexes, else salvage every "
+             "readable record and declare the rest in the chain",
+    )
+    prep.add_argument("--db", required=True, help="Path to the audit SQLite DB")
+    prep.add_argument(
+        "--format", choices=["text", "json"], default="text",
+        help="Output format (default text)",
+    )
+    prep.set_defaults(func=_cmd_trail_repair)
 
     psr = tsub.add_parser(
         "shadow-report",
