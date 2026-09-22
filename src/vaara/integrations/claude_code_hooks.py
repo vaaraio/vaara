@@ -292,6 +292,44 @@ def _note_trail_failure(cfg: dict, exc: BaseException, *, stage: str) -> None:
         pass
 
 
+def _ungovernable(cfg: dict, tool_name: str, reason: str) -> int:
+    """Verdict for an ``mcp__*`` call that cannot be scored or recorded.
+
+    The posture is not new. A missing ``vaara`` package already fails
+    closed on this path, with ``"fail_open": true`` as the documented
+    escape hatch, because a gate that waves everything through when its
+    engine is gone is not a gate. A trail that will not open is the same
+    condition reached by a different route, and the backend says so in
+    the exception it raises: the evidence chain is the product, so it
+    refuses rather than starting a fresh trail with a silent gap. That
+    refusal used to stop here, at a bare ``return 0``.
+
+    Measured 2026-09-22: 162 failed writes in a seventeen-minute window,
+    a loud marker on disk the whole time, and the calls in that window
+    still ran unscored. The marker was never the missing part.
+
+    Only the ``mcp__*`` path fails closed. Deny rules reach a verdict
+    without the trail, so a broken trail on the regex path costs evidence
+    and not enforcement; blocking every shell call there is how the hook
+    gets uninstalled, and an uninstalled hook records nothing at all.
+    """
+    if shadow_mode(cfg) or fail_open(cfg):
+        _emit(
+            f"vaara-governance: {reason}; passing {tool_name} through UNSCORED "
+            f"and UNRECORDED."
+        )
+        return 0
+    _emit(
+        f"vaara-governance: BLOCKED {tool_name} (fail-closed): {reason}, so "
+        f"this MCP call cannot be scored or recorded. Repair the trail "
+        f"(`sqlite3 <db> 'PRAGMA integrity_check'`, then `.recover`; keep the "
+        f"damaged file, it is the evidence), or set \"fail_open\": true in "
+        f"~/.vaara/claude-code/config.json to pass through unscored."
+    )
+    notify(cfg, "BLOCKED", tool_name, f"cannot govern this call: {reason}")
+    return 2
+
+
 def run_pre_tool_use(deny_patterns: Optional[str] = None) -> int:
     """PreToolUse: exit 0 allows, exit 2 blocks or holds for review."""
     cfg = load_config()
@@ -362,10 +400,11 @@ def run_pre_tool_use(deny_patterns: Optional[str] = None) -> int:
         trail = _open_trail(cfg)
     except Exception as exc:
         # A trail that will not open used to take the hook down with it, with
-        # a traceback and no statement of what that meant. Pass the call
-        # through, and say plainly that it is not being recorded.
+        # a traceback and no statement of what that meant. Record the outage
+        # durably, say plainly that nothing is being recorded, and do not let
+        # an MCP call through unscored on the strength of a warning.
         _note_trail_failure(cfg, exc, stage="open")
-        return 0
+        return _ungovernable(cfg, tool_name, "the audit trail cannot be opened")
     pipeline = InterceptionPipeline(trail=trail, enforce=not shadow)
 
     preset = protection_preset(cfg)
@@ -393,8 +432,12 @@ def run_pre_tool_use(deny_patterns: Optional[str] = None) -> int:
             parameters=tool_input, session_id=session_id,
         )
     except Exception as exc:
-        _emit(f"vaara-governance: classifier failed ({exc!r}); passing through.")
-        return 0
+        # The trail opened and the append failed underneath the scorer: the
+        # shape of the 05:08 window on 2026-09-22, where `load_trail` read
+        # the file and `intercept` raised on the write. Same outcome as a
+        # trail that never opened, so the same verdict.
+        _note_trail_failure(cfg, exc, stage="intercept")
+        return _ungovernable(cfg, tool_name, f"the classifier failed ({exc!r})")
 
     if result.allowed:
         return 0
@@ -585,9 +628,29 @@ def run_session_start() -> int:
         f"protection={preset}, notifications={notif}, audit_db={db_path} "
         f"[{db_state}]{disclosure}). Settings: /vaara-setup"
     )
+    _report_hook_registration()
     if not reported:
         _report_trail_health(cfg, db_path, existed)
     return 0
+
+
+def _report_hook_registration() -> None:
+    """Say what is registered to govern this session, when it is not one layer.
+
+    Silent on a healthy install. Session start is the only place this can
+    be said: the registration is fixed for the whole session, and from
+    inside a tool call neither a second layer nor a stale matcher is
+    visible. A doubled decision looks like two ordinary actions, and a
+    narrow matcher looks like a quiet day.
+    """
+    try:
+        from vaara.integrations.hook_registration import inspect_registration
+
+        for finding in inspect_registration():
+            _emit(finding.render())
+    except Exception:
+        # Reporting the wiring must never become the reason a session fails.
+        pass
 
 
 def _report_trail_health(cfg: dict, db_path: Path, existed: bool) -> None:

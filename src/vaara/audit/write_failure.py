@@ -10,7 +10,7 @@ that as success and carried on. Nothing anywhere said the trail was dead, and
 it was found only because someone went looking for an unrelated reason.
 
 Two things made it invisible, and both are addressed here rather than by
-making the hook fail closed:
+the exit code:
 
 * **The signal was per-record noise.** A traceback on every tool call reads
   as normal output within minutes. Volume is not visibility.
@@ -22,9 +22,15 @@ So the state lives next to the trail, in ``<db>.write-failure.json``. It
 survives the process, it accumulates, and the session-start hook reads it and
 says the trail is not recording in those words.
 
-Fail-open stays. A governance hook that blocks a session gets uninstalled,
-and an uninstalled hook records nothing at all. The defect was the silence,
-not the exit code.
+This module never changes a verdict. It counts and it reports, and on
+2026-09-22 that turned out not to be enough: the marker counted 162
+failed writes across seventeen minutes, loudly, while the MCP calls in
+that window ran unscored regardless. The hook now fails
+closed on ``mcp__*`` when the trail cannot be opened or written, matching
+what a missing engine has always done, with ``"fail_open": true`` as the
+documented way out. The regex path stays fail-open: deny rules reach a
+verdict without the trail, and a hook that blocks every shell call gets
+uninstalled, and an uninstalled hook records nothing at all.
 
 Nothing here raises. A failure to report a failure must not become the
 failure, and a read-only directory must not stop the agent from working.

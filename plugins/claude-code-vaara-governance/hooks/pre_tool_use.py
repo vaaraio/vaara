@@ -103,6 +103,37 @@ def _record_call(
         note_failure(db_path, exc, stage="record_call")
 
 
+def _ungovernable(tool_name: str, reason: str, shadow: bool) -> int:
+    """Verdict for an ``mcp__*`` call that cannot be scored or recorded.
+
+    Same posture as the missing engine below, reached by a different
+    route. The SQLite backend refuses to open a damaged trail on purpose
+    -- the evidence chain is the product, so it will not start a fresh
+    trail and leave a silent gap -- and that refusal used to end here at
+    a bare ``return 0``. Measured 2026-09-22: 162 failed writes in a
+    seventeen-minute window, a loud marker on disk throughout, and the
+    MCP calls in that window ran unscored anyway.
+
+    Only this path fails closed. Deny rules reach their verdict without
+    the trail, so a broken trail there costs evidence, not enforcement.
+    """
+    if shadow or _config.fail_open(CFG):
+        _emit(
+            f"vaara-governance: {reason}; passing {tool_name} through "
+            f"UNSCORED and UNRECORDED."
+        )
+        return 0
+    _emit(
+        f"vaara-governance: BLOCKED {tool_name} (fail-closed): {reason}, so "
+        f"this MCP call cannot be scored or recorded. Repair the trail "
+        f"(`sqlite3 <db> 'PRAGMA integrity_check'`, then `.recover`; keep the "
+        f"damaged file, it is the evidence), or set \"fail_open\": true in "
+        f"~/.vaara/claude-code/config.json to pass through unscored."
+    )
+    notify("BLOCKED", tool_name, f"cannot govern this call: {reason}")
+    return 2
+
+
 def _classify_mcp(
     tool_name: str, tool_input: dict, agent_id: str, session_id: str, shadow: bool
 ) -> int:
@@ -138,7 +169,7 @@ def _classify_mcp(
         trail._on_record = backend.write_record
     except Exception as exc:
         note_failure(db_path, exc, stage="open")
-        return 0
+        return _ungovernable(tool_name, "the audit trail cannot be opened", shadow)
     pipeline = InterceptionPipeline(trail=trail, enforce=not shadow)
 
     preset = _config.protection_preset(CFG)
@@ -170,8 +201,12 @@ def _classify_mcp(
             session_id=session_id,
         )
     except Exception as exc:
-        _emit(f"vaara-governance: classifier failed ({exc!r}); passing through.")
-        return 0
+        # The trail opened and the append failed underneath the scorer.
+        # Same outcome as a trail that never opened, so the same verdict.
+        note_failure(db_path, exc, stage="intercept")
+        return _ungovernable(
+            tool_name, f"the classifier failed ({exc!r})", shadow
+        )
 
     if result.allowed:
         return 0

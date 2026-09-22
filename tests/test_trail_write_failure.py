@@ -312,14 +312,24 @@ class TestHookSurfacesTheOutage:
         assert "NOT RECORDING" in err
         assert "Traceback" not in err
 
-    def test_an_mcp_call_passes_through_a_dead_trail(self, audit_db, monkeypatch):
-        """This path used to take the hook down with an unhandled exception."""
+    def test_an_mcp_call_is_held_by_a_dead_trail(self, audit_db, monkeypatch, capsys):
+        """This path used to take the hook down with an unhandled exception.
+
+        It then passed the call through instead, which was the defect
+        found on 2026-09-22: the outage was loud and the calls still ran
+        unscored. An ``mcp__*`` call that cannot be scored or recorded
+        now fails closed, the way a missing engine already did. Full
+        posture and the escape hatch: ``test_hook_trail_failure_posture``.
+        """
         audit_db.write_bytes(b"\x00" * 8192)
         _feed(monkeypatch, {
             "tool_name": "mcp__github__create_issue",
             "tool_input": {"title": "x"}, "session_id": "s1",
         })
-        assert hooks.run_pre_tool_use() == 0
+        assert hooks.run_pre_tool_use() == 2
+        err = capsys.readouterr().err
+        assert "fail-closed" in err
+        assert "Traceback" not in err
 
     def test_session_start_reports_a_standing_outage(self, audit_db, monkeypatch, capsys):
         audit_db.touch()
