@@ -211,7 +211,7 @@ def test_plugin_matcher_dispatches_every_tool():
 
 
 def test_package_init_matcher_equals_the_plugin_matcher():
-    """`vaara init-governance` and the plugin must dispatch the same surface.
+    """`vaara init` and the plugin must dispatch the same surface.
 
     They drifted. The package constant stayed at
     `Bash|WebFetch|WebSearch|mcp__.*` while the plugin grew to fifteen
