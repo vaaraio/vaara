@@ -1,0 +1,461 @@
+{
+  "_source": "tools/list from /usr/bin/safaridriver --mcp, Safari 27.0 on macOS 27.0 (26A428), captured 2026-09-22. serverInfo Safari 1.0.0, protocol 2024-11-05.",
+  "tools": [
+    {
+      "description": "Return buffered console logs for the current or specified tab. Clear-and-return by default.",
+      "inputSchema": {
+        "properties": {
+          "clear": {
+            "description": "If true, clear buffer after returning. Default true.",
+            "type": "boolean"
+          },
+          "level_filter": {
+            "items": {
+              "enum": [
+                "debug",
+                "info",
+                "warn",
+                "error"
+              ],
+              "type": "string"
+            },
+            "type": "array"
+          },
+          "limit": {
+            "description": "Max entries returned (default 100, max 500).",
+            "type": "integer"
+          },
+          "tab_handle": {
+            "description": "Optional; defaults to current browsing context.",
+            "type": "string"
+          }
+        },
+        "type": "object"
+      },
+      "name": "browser_console_messages"
+    },
+    {
+      "description": "List and respond to browser dialogs. Actions: \"list\" to query, \"respond\" to accept, \"dismiss\" to cancel. For JS prompt dialogs, provide inputText.",
+      "inputSchema": {
+        "properties": {
+          "action": {
+            "description": "Action to perform.",
+            "enum": [
+              "list",
+              "respond",
+              "dismiss"
+            ],
+            "type": "string"
+          },
+          "inputText": {
+            "description": "Text for JS prompt dialogs.",
+            "type": "string"
+          }
+        },
+        "required": [
+          "action"
+        ],
+        "type": "object"
+      },
+      "name": "browser_dialogs"
+    },
+    {
+      "description": "Close a browser tab by its handle.",
+      "inputSchema": {
+        "properties": {
+          "handle": {
+            "description": "Handle of the tab to close.",
+            "type": "string"
+          }
+        },
+        "required": [
+          "handle"
+        ],
+        "type": "object"
+      },
+      "name": "close_tab"
+    },
+    {
+      "description": "Create a new browser tab, optionally loading a URL. Returns the UUID and info of the new tab.",
+      "inputSchema": {
+        "properties": {
+          "url": {
+            "description": "Optional URL to load in the new tab.",
+            "type": "string"
+          }
+        },
+        "type": "object"
+      },
+      "name": "create_tab"
+    },
+    {
+      "description": "Execute a JavaScript function body within the page. The script may contain multiple statements; add an explicit `return` for any value you want back. Use `$uid(N)` to reference DOM elements by their UID from get_page_content output (e.g. `return $uid(42).href`). When `frameId` is set, runs inside that iframe. Prefer get_page_content for reading page text or structure — reach for it with `region: \"entire_page\"` or relaxed filters before scripting a DOM scrape here. Reserve this tool for actions or computations that text extraction can't express.",
+      "inputSchema": {
+        "properties": {
+          "expression": {
+            "description": "JavaScript code to evaluate, treated as a function body. Use an explicit `return` for a value. Supports $uid(N) macros.",
+            "type": "string"
+          },
+          "frameId": {
+            "description": "UID of an iframe element from get_page_content output. When set, the expression runs inside that iframe instead of the main frame.",
+            "type": "string"
+          }
+        },
+        "required": [
+          "expression"
+        ],
+        "type": "object"
+      },
+      "name": "evaluate_javascript"
+    },
+    {
+      "description": "Return full detail for a single recorded network request (headers, body when text and within size cap, timing).",
+      "inputSchema": {
+        "properties": {
+          "request_id": {
+            "description": "Inspector request id, as returned by list_network_requests.",
+            "type": "string"
+          }
+        },
+        "required": [
+          "request_id"
+        ],
+        "type": "object"
+      },
+      "name": "get_network_request"
+    },
+    {
+      "description": "Extract the text content of a page using WebKit's text extraction. This is the preferred way to read a page — favor it over screenshots or scripting the DOM with evaluate_javascript. If the content you need is missing, widen the extraction (e.g. `region: \"entire_page\"`, a larger `maxWordsPerParagraph`, or relaxed node/URL filters) before reaching for those tools. Use the returned node UIDs (e.g. `uid=42`) with `page_interactions` and `evaluate_javascript` (`$uid(42)`). Output ≥ 32 kB is saved to a temp file; the path is returned. Pass `savePath` to always write to disk.",
+      "inputSchema": {
+        "properties": {
+          "format": {
+            "description": "Output format (default: \"textTree\"). \"text\" is an alias for \"textTree\".",
+            "enum": [
+              "markdown",
+              "text",
+              "textTree",
+              "json",
+              "html",
+              "plainText"
+            ],
+            "type": "string"
+          },
+          "includeAccessibilityAttributes": {
+            "description": "Include accessibility attributes like role/aria-label (default: true).",
+            "type": "boolean"
+          },
+          "includeEventListeners": {
+            "description": "Include click/hover/touch event listener info (default: false).",
+            "type": "boolean"
+          },
+          "includeRects": {
+            "description": "Include bounding rects for text nodes (default: false).",
+            "type": "boolean"
+          },
+          "includeSelectOptions": {
+            "description": "Include options for <select> elements (default: false).",
+            "type": "boolean"
+          },
+          "includeSubframes": {
+            "description": "Also extract content from cross-origin subframes (default: false).",
+            "type": "boolean"
+          },
+          "includeURLs": {
+            "description": "Include URL attributes like href/src (default: true).",
+            "type": "boolean"
+          },
+          "maxWordsPerParagraph": {
+            "description": "Truncate paragraphs to this many words (default: 15). Use a larger value when you need full prose; smaller saves tokens.",
+            "type": "integer"
+          },
+          "nodeIds": {
+            "description": "Which nodes get UIDs (default: \"interactive\"; ignored when format is \"markdown\" or \"plainText\").",
+            "enum": [
+              "none",
+              "editable",
+              "interactive",
+              "allContainers"
+            ],
+            "type": "string"
+          },
+          "region": {
+            "description": "Extraction region (default: \"viewport\"). Use \"entire_page\" to capture beyond the visible scrollport.",
+            "enum": [
+              "entire_page",
+              "viewport"
+            ],
+            "type": "string"
+          },
+          "savePath": {
+            "description": "File path to write the extraction to. When set, the path is returned instead of inline content.",
+            "type": "string"
+          },
+          "shortenURLs": {
+            "description": "Strip query params and noise from URLs (default: true).",
+            "type": "boolean"
+          }
+        },
+        "type": "object"
+      },
+      "name": "get_page_content"
+    },
+    {
+      "description": "List network request summaries (URL, method, status, timing) recorded by Inspector for the current or specified tab.",
+      "inputSchema": {
+        "properties": {
+          "clear": {
+            "description": "If true, drain and reset the per-tab buffer.",
+            "type": "boolean"
+          },
+          "filter": {
+            "properties": {
+              "method": {
+                "description": "Exact HTTP method match (case-insensitive).",
+                "type": "string"
+              },
+              "status_max": {
+                "description": "Inclusive upper bound on response status.",
+                "type": "integer"
+              },
+              "status_min": {
+                "description": "Inclusive lower bound on response status.",
+                "type": "integer"
+              },
+              "url_substring": {
+                "description": "Case-insensitive substring match on URL.",
+                "type": "string"
+              }
+            },
+            "type": "object"
+          },
+          "since": {
+            "description": "ISO8601 timestamp; only requests started at or after this time are returned.",
+            "type": "string"
+          },
+          "tab_handle": {
+            "description": "Browsing-context handle. Defaults to active tab.",
+            "type": "string"
+          }
+        },
+        "type": "object"
+      },
+      "name": "list_network_requests"
+    },
+    {
+      "description": "List all open browser tabs with their handles, titles, and URLs.",
+      "inputSchema": {
+        "properties": {},
+        "type": "object"
+      },
+      "name": "list_tabs"
+    },
+    {
+      "description": "Navigate to a URL and return the loaded page's extracted content. Auto-creates a tab if none is open, waits for the navigation to complete, and uses the format/options from the most recent get_page_content call (or sensible defaults). Output ≥ 32 kB is saved to a temp file.",
+      "inputSchema": {
+        "properties": {
+          "tab_uuid": {
+            "description": "UUID of the tab to navigate. If omitted, uses the active tab.",
+            "type": "string"
+          },
+          "url": {
+            "description": "The URL to navigate to.",
+            "type": "string"
+          }
+        },
+        "required": [
+          "url"
+        ],
+        "type": "object"
+      },
+      "name": "navigate_to_url"
+    },
+    {
+      "description": "Get information about the current page including URL, title, and loading state.",
+      "inputSchema": {
+        "properties": {},
+        "type": "object"
+      },
+      "name": "page_info"
+    },
+    {
+      "description": "Perform DOM interactions in sequence. Actions: click, type, keyPress, scroll, selectText, selectMenuItem, hover, highlightText. **Prefer batch mode** whenever possible — provide all related interactions in a single call instead of separate calls (faster, single round-trip, single diff). Returns a diff of page changes after the batch (or full text if >50% changed); pass `fullText: true` to disable diffing. If a click triggers a navigation, the tool waits for it to finish and returns the loaded page's content. The diff/full text uses the format set by the most recent `get_page_content` call. Output ≥ 32 kB is saved to a temp file. Reference elements by node UID from `get_page_content`; fall back to `text` for find-in-page when no UID is available.",
+      "inputSchema": {
+        "properties": {
+          "fullText": {
+            "description": "Return the full updated page text instead of a diff (default: false).",
+            "type": "boolean"
+          },
+          "interactions": {
+            "description": "Sequence of interactions, executed sequentially with a 400 ms settle between each.",
+            "items": {
+              "properties": {
+                "node": {
+                  "description": "Node UID from get_page_content output. When omitted, `text` is treated as a find-in-page search; when both are set, the search is scoped to the subtree under `node`.",
+                  "type": "string"
+                },
+                "point": {
+                  "description": "Viewport coordinates. Last resort when node and text are unavailable.",
+                  "properties": {
+                    "x": {
+                      "type": "number"
+                    },
+                    "y": {
+                      "type": "number"
+                    }
+                  },
+                  "type": "object"
+                },
+                "pressReturn": {
+                  "description": "For `type`: simulate Return after typing to submit (default: false).",
+                  "type": "boolean"
+                },
+                "purpose": {
+                  "description": "Short description of the intended outcome.",
+                  "type": "string"
+                },
+                "replaceAll": {
+                  "description": "For `type`: replace existing field text instead of appending (default: false).",
+                  "type": "boolean"
+                },
+                "scrollDelta": {
+                  "properties": {
+                    "x": {
+                      "type": "number"
+                    },
+                    "y": {
+                      "type": "number"
+                    }
+                  },
+                  "type": "object"
+                },
+                "scrollToVisible": {
+                  "description": "Scroll the target element into view before interacting (default: false).",
+                  "type": "boolean"
+                },
+                "text": {
+                  "description": "Find-in-page query, scroll search term, or menu item label. Optional when `node` is provided.",
+                  "type": "string"
+                },
+                "type": {
+                  "enum": [
+                    "click",
+                    "type",
+                    "keyPress",
+                    "scroll",
+                    "selectText",
+                    "selectMenuItem",
+                    "hover",
+                    "highlightText"
+                  ],
+                  "type": "string"
+                },
+                "value": {
+                  "description": "Text to type, or key name to press.",
+                  "type": "string"
+                }
+              },
+              "required": [
+                "purpose",
+                "type"
+              ],
+              "type": "object"
+            },
+            "type": "array"
+          }
+        },
+        "required": [
+          "interactions"
+        ],
+        "type": "object"
+      },
+      "name": "page_interactions"
+    },
+    {
+      "description": "Capture a screenshot of the current page and save it as a PNG. Returns the file path (never inline base64). Defaults to the visible viewport; pass `full_page: true` for the entire scrollable page. Pass `savePath` to write to a specific location, otherwise the PNG is saved to a temporary file. Prefer get_page_content for reading a page — its text extraction is cheaper and more reliable than reading a screenshot. Use this only when the visual rendering itself matters (e.g. layout, charts, or verifying appearance).",
+      "inputSchema": {
+        "properties": {
+          "full_page": {
+            "description": "Capture the entire scrollable page instead of just the viewport.",
+            "type": "boolean"
+          },
+          "node": {
+            "description": "Node UID from get_page_content output to capture only that element. (Currently no-op pending dispatcher support; falls back to viewport.)",
+            "type": "string"
+          },
+          "savePath": {
+            "description": "File path to write the PNG to. If omitted, the PNG is written to a temporary file.",
+            "type": "string"
+          }
+        },
+        "type": "object"
+      },
+      "name": "screenshot"
+    },
+    {
+      "description": "Emulate a CSS media type (e.g. \"screen\" or \"print\") for responsive-design testing.",
+      "inputSchema": {
+        "properties": {
+          "media": {
+            "description": "CSS media type to emulate, e.g. \"screen\" or \"print\". Empty string clears the override.",
+            "type": "string"
+          }
+        },
+        "required": [
+          "media"
+        ],
+        "type": "object"
+      },
+      "name": "set_emulated_media"
+    },
+    {
+      "description": "Set the browser viewport size in CSS pixels.",
+      "inputSchema": {
+        "properties": {
+          "height": {
+            "description": "Viewport height in CSS pixels.",
+            "type": "integer"
+          },
+          "width": {
+            "description": "Viewport width in CSS pixels.",
+            "type": "integer"
+          }
+        },
+        "required": [
+          "width",
+          "height"
+        ],
+        "type": "object"
+      },
+      "name": "set_viewport_size"
+    },
+    {
+      "description": "Switch to a different browser tab by its handle.",
+      "inputSchema": {
+        "properties": {
+          "handle": {
+            "description": "Handle of the tab to switch to.",
+            "type": "string"
+          }
+        },
+        "required": [
+          "handle"
+        ],
+        "type": "object"
+      },
+      "name": "switch_tab"
+    },
+    {
+      "description": "Wait for the current page to finish loading. Returns the final URL and title.",
+      "inputSchema": {
+        "properties": {
+          "timeout_seconds": {
+            "description": "Maximum seconds to wait (default: 30).",
+            "type": "integer"
+          }
+        },
+        "type": "object"
+      },
+      "name": "wait_for_navigation"
+    }
+  ]
+}
