@@ -16,7 +16,7 @@ both invisible from inside a tool call:
 
 * **An install left behind by its own package.** ``HOOK_MATCHER`` widened
   to ``.*`` after an earlier drift, and ``write_claude_hooks`` strips and
-  re-adds on every run, so re-running ``vaara init-governance`` repairs a
+  re-adds on every run, so re-running ``vaara init`` repairs a
   stale file. Nothing ever asks anyone to re-run it. That machine was
   still dispatching PostToolUse on the enumerated list an older version
   had written, so tools outside the list were scored and never reported an
@@ -210,7 +210,7 @@ def inspect_registration(
             ),
             remedy=(
                 "This install predates the current matcher. Re-run "
-                "`vaara init-governance` to rewrite it."
+                "`vaara init` to rewrite it."
             ),
         ))
 
