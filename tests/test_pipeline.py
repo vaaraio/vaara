@@ -2,8 +2,11 @@
 
 import pytest
 
+from .conftest import ESCALATING_THRESHOLDS
+
 from vaara.audit.sqlite_backend import SQLiteAuditBackend
 from vaara.pipeline import InterceptionPipeline
+from vaara.scorer.adaptive import AdaptiveScorer
 from vaara.taxonomy.actions import (
     ActionCategory,
     ActionType,
@@ -19,7 +22,11 @@ def pipeline():
     backend = SQLiteAuditBackend(":memory:")
     trail = backend.load_trail()
     trail._on_record = backend.write_record
-    return InterceptionPipeline(trail=trail)
+    # See ESCALATING_THRESHOLDS in conftest: the default no longer puts
+    # these sample actions in the escalate band.
+    return InterceptionPipeline(
+        trail=trail, scorer=AdaptiveScorer(**ESCALATING_THRESHOLDS),
+    )
 
 
 class TestInterceptionPipeline:

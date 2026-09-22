@@ -16,6 +16,9 @@ from vaara.audit.sqlite_backend import SQLiteAuditBackend
 from vaara.audit.trail import EventType
 from vaara.integrations.mcp_server import VaaraMCPServer
 from vaara.pipeline import InterceptionPipeline
+from vaara.scorer.adaptive import AdaptiveScorer
+
+from .conftest import ESCALATING_THRESHOLDS
 
 
 @pytest.fixture
@@ -23,7 +26,11 @@ def server():
     backend = SQLiteAuditBackend(":memory:")
     trail = backend.load_trail()
     trail._on_record = backend.write_record
-    pipeline = InterceptionPipeline(trail=trail)
+    # See ESCALATING_THRESHOLDS in conftest: the handshake only engages
+    # on an escalate, and the default operating point allows this call.
+    pipeline = InterceptionPipeline(
+        trail=trail, scorer=AdaptiveScorer(**ESCALATING_THRESHOLDS),
+    )
     return VaaraMCPServer(pipeline=pipeline)
 
 

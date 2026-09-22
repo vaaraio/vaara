@@ -579,11 +579,19 @@ struct ContentView: View {
                         }
                         .pickerStyle(.segmented)
                         .labelsHidden()
+                        // Name what each level hides. "Everything else keeps
+                        // its defaults" was true and useless: it did not say
+                        // that a protection picker exists, so an operator on
+                        // Basic wondering why every call escalated had no way
+                        // to know the control was one click away.
                         Text(model.config.user_level == "basic"
-                             ? "The essentials. Everything else keeps its defaults."
+                             ? "The essentials. Protection presets, the fade "
+                               + "window and the menu bar graph are on Professional."
                              : model.config.user_level == "professional"
-                             ? "Adds thresholds and tuning."
-                             : "Adds multiple trails and every control.")
+                             ? "Adds protection presets and tuning. The approvals "
+                               + "folder, the popup style and multiple trails are "
+                               + "on Enterprise."
+                             : "Every control.")
                             .font(.system(size: 10.5))
                             .foregroundStyle(p.ghost)
                     }

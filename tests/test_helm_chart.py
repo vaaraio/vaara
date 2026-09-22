@@ -165,6 +165,40 @@ def test_chart_flags_exist_in_the_cli():
     assert used <= accepted, f"chart passes flags vaara proxy rejects: {sorted(used - accepted)}"
 
 
+# --- the files a chart repository expects to find --------------------------
+
+
+def test_the_chart_carries_an_app_readme():
+    """Rancher's partner-charts repository requires `app-readme.md`.
+
+    It is the text an operator reads in the Rancher Apps catalogue before
+    installing, which is a different audience from the repository README:
+    someone deciding whether to install, not someone reading the source.
+    Without it the chart is technically installable and fails submission.
+    """
+    readme = CHART / "app-readme.md"
+    assert readme.is_file(), "partner-charts requires deploy/helm/vaara/app-readme.md"
+
+    text = readme.read_text(encoding="utf-8")
+    # The three settings that decide whether a first install works. Each has
+    # a default that is right for a demo and wrong for somebody else's
+    # cluster, and none of them fails loudly when left alone.
+    for key in ("upstream.url", "proxy.mode", "signing.existingSecret"):
+        assert key in text, f"app-readme.md does not mention {key}"
+
+
+def test_the_app_readme_is_not_excluded_from_the_package():
+    """`.helmignore` decides what `helm package` puts in the tarball.
+
+    A pattern that swept up `app-readme.md` would leave the chart passing
+    every check here and arriving at the catalogue without the file.
+    """
+    ignored = (CHART / ".helmignore").read_text(encoding="utf-8").split()
+    assert not any(
+        pattern in {"app-readme.md", "*.md", "app-readme*"} for pattern in ignored
+    )
+
+
 # --- the documented platforms agree with the chart -------------------------
 
 

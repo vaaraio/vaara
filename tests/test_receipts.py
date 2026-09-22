@@ -24,7 +24,11 @@ from vaara.taxonomy.actions import (
 )
 
 
-def _trail_with_action(decision: str = "allow", with_outcome: bool = True):
+def _trail_with_action(
+    decision: str = "allow",
+    with_outcome: bool = True,
+    assessment: dict | None = None,
+):
     trail = AuditTrail()
     action_type = ActionType(
         name="data.read",
@@ -45,7 +49,7 @@ def _trail_with_action(decision: str = "allow", with_outcome: bool = True):
         action_id=action_id,
         agent_id="a-1",
         tool_name="data.read",
-        assessment={
+        assessment=assessment if assessment is not None else {
             "point_estimate": 0.3,
             "threshold_allow": 0.4,
             "threshold_deny": 0.7,
@@ -184,6 +188,40 @@ def test_verify_receipt_dict_rejects_tampered_serialized_form():
     d = receipt.to_dict()
     d["commit"]["payload"]["decision"] = "deny"  # tamper but keep hash
     assert verify_receipt_dict(d) is False
+
+
+def test_a_recorded_zero_threshold_survives_into_the_receipt():
+    """`_coerce_float(...) or 0.4` read a recorded 0.0 as absent.
+
+    A zero allow threshold is a real operating point: nothing auto-allows,
+    everything at or above zero escalates. A receipt is evidence of the
+    decision that was actually made, so restating it at 0.4 would have the
+    receipt assert an operating point the scorer never ran.
+    """
+    trail, action_id = _trail_with_action(assessment={
+        "point_estimate": 0.3,
+        "threshold_allow": 0.0,
+        "threshold_deny": 0.0,
+    })
+    receipt = extract_receipt(trail, action_id)
+    assert receipt is not None
+    assert receipt.commit.threshold_allow == 0.0
+    assert receipt.commit.threshold_deny == 0.0
+
+
+def test_a_record_with_no_thresholds_falls_back_to_the_pre_v040_pair():
+    """Only records older than v0.40.0 reach this path.
+
+    v0.40.0 is where the scorer began writing its thresholds into the risk
+    record. Those older records ran 0.40 / 0.70, so the fallback states
+    what they ran, not what today's scorer would run.
+    """
+    trail, action_id = _trail_with_action(assessment={"point_estimate": 0.3})
+    receipt = extract_receipt(trail, action_id)
+    assert receipt is not None
+    assert (receipt.commit.threshold_allow, receipt.commit.threshold_deny) == (
+        0.4, 0.7
+    )
 
 
 def test_verify_receipt_dict_handles_garbage():

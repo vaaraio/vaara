@@ -109,7 +109,10 @@ class TestAdaptiveScorer:
         assert result["allowed"] is True
 
     def test_high_risk_action_denied(self):
-        scorer = AdaptiveScorer(threshold_deny=0.5)
+        # Both thresholds, because the default allow is now 0.55 and a lone
+        # `threshold_deny=0.5` inverts the band. The constructor rejects that,
+        # correctly: allow above deny leaves no escalate band at all.
+        scorer = AdaptiveScorer(threshold_allow=0.3, threshold_deny=0.5)
         result = scorer.evaluate({
             "tool_name": "phy.safety_override",
             "agent_id": "unknown",

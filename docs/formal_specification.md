@@ -144,7 +144,7 @@ Let C(aₜ) = [f(aₜ) − q̂, f(aₜ) + q̂] be the conformal interval. The de
 
 This is **conservative by construction**: the decision is based on the worst-case risk within the 1 − α confidence set. If even the worst case is safe, allow. If even the best case is dangerous, deny. Between: escalate for human judgment.
 
-**Proposition 5.2**: Let θ_allow = 0.4 and θ_deny = 0.7 (the scorer defaults; the policy loader's own defaults are 0.55/0.85). With the seeded calibration prior (§8.3), the interval starts at [f(a) − 0.19, f(a) + 0.19]. A raw score of f(a) < 0.21 is then needed for auto-allow, and f(a) > 0.51 for auto-deny, with the band between routed to human review. Operators who disable the prior (`pre_seed_calibration=False`) get the strict cold start: the interval is [f(a) − 0.3, f(a) + 0.3] until ~30 real outcomes land, and most actions escalate — maximally cautious by design.
+**Proposition 5.2**: Let θ_allow = 0.55 and θ_deny = 0.85, which is the balanced mode and the default for the scorer and the policy loader alike. With the seeded calibration prior (§8.3), the interval starts at [f(a) − 0.19, f(a) + 0.19]. A raw score of f(a) < 0.36 is then needed for auto-allow, and f(a) > 0.66 for auto-deny, with the band between routed to human review. Operators who disable the prior (`pre_seed_calibration=False`) get the strict cold start: the interval is [f(a) − 0.3, f(a) + 0.3] until ~30 real outcomes land, and most actions escalate — maximally cautious by design.
 
 ## 6. Temporal Sequence Scoring
 
@@ -209,7 +209,7 @@ The FACI adaptive alpha further tightens this under stationarity and maintains a
 A just-constructed scorer is **calibrated from birth**: 50 synthetic benign calibration points are seeded at construction (`pre_seed_calibration=True`, the default), so the conformal quantile lands at ~0.19 and the starting interval is [f(a) − 0.19, f(a) + 0.19] rather than the ±0.3 zero-residual fallback. Real outcome reports overwrite the prior within max_calibration = 2000 reports; no migration or warm-up period is needed. During the prior window:
 
 - MWU weights start uniform, f(a) ≈ (s₁ + s₂ + s₃ + s₄ + s₅) / 5, and adapt with every reported outcome
-- The decision band comes from the thresholds alone: with defaults (0.4 / 0.7), raw scores below ~0.21 auto-allow and above ~0.51 auto-deny
+- The decision band comes from the thresholds alone: with defaults (0.55 / 0.85), raw scores below ~0.36 auto-allow and above ~0.66 auto-deny
 - Operators who want the strict historical behaviour — ±0.3 intervals and most actions escalating until ~30 outcomes — pass `pre_seed_calibration=False`
 
 This is **correct behavior**: a first deployment is useful immediately, and the conservative choice remains available as an explicit operator decision.

@@ -43,6 +43,27 @@ if not os.environ.get("VAARA_TEST_USE_REAL_HOME"):
     os.environ.setdefault("VAARA_DB", str(_sandbox / ".vaara" / "test-audit.db"))
 
 
+# --- An operating point that escalates -------------------------------------
+#
+# A test whose subject is what happens AFTER an escalation needs its sample
+# action to land in the escalate band. That used to come free: the scorer's
+# constructor defaulted to 0.40 / 0.70, and `tx.transfer` and
+# `phy.safety_override` both cleared 0.40 on the conformal upper bound.
+#
+# The default is now balanced, 0.55 / 0.85, sourced from the mode table. Those
+# same actions score under 0.55 and auto-allow, so every approval-path test
+# that relied on the default lost its precondition. Twenty-five of them, across
+# three files, all failing on the setup line rather than on anything they were
+# written to check.
+#
+# Pinning it here rather than tracking the default on purpose. These tests are
+# about the approval machinery, and their meaning should not move when the
+# shipped operating point is retuned. What the default IS belongs in
+# `tests/test_default_thresholds_are_balanced.py`, which asserts it directly.
+
+ESCALATING_THRESHOLDS = {"threshold_allow": 0.40, "threshold_deny": 0.70}
+
+
 # --- Gate bundles for the three trained scorer backends ---------------------
 #
 # Each backend loads a bundle from ``~/.vaara/cache/``. The redirect above

@@ -17,6 +17,9 @@ import pytest
 from vaara.audit.sqlite_backend import SQLiteAuditBackend
 from vaara.audit.trail import EventType
 from vaara.pipeline import InterceptionPipeline
+from vaara.scorer.adaptive import AdaptiveScorer
+
+from .conftest import ESCALATING_THRESHOLDS
 
 
 @pytest.fixture
@@ -24,7 +27,9 @@ def pipeline():
     backend = SQLiteAuditBackend(":memory:")
     trail = backend.load_trail()
     trail._on_record = backend.write_record
-    return InterceptionPipeline(trail=trail)
+    return InterceptionPipeline(
+        trail=trail, scorer=AdaptiveScorer(**ESCALATING_THRESHOLDS),
+    )
 
 
 def _escalate_and_approve(pipeline, amount, *, agent="agent-1", tenant=""):
@@ -133,13 +138,15 @@ class TestPriorApprovalAutoAllow:
         backend = SQLiteAuditBackend(db)
         trail = backend.load_trail()
         trail._on_record = backend.write_record
-        p1 = InterceptionPipeline(trail=trail)
+        p1 = InterceptionPipeline(
+            trail=trail, scorer=AdaptiveScorer(**ESCALATING_THRESHOLDS))
         _escalate_and_approve(p1, amount=10)
 
         backend2 = SQLiteAuditBackend(db)
         trail2 = backend2.load_trail()
         trail2._on_record = backend2.write_record
-        p2 = InterceptionPipeline(trail=trail2)
+        p2 = InterceptionPipeline(
+            trail=trail2, scorer=AdaptiveScorer(**ESCALATING_THRESHOLDS))
         second = p2.intercept(
             agent_id="agent-1",
             tool_name="tx.transfer",
@@ -301,7 +308,8 @@ class TestApprovalIndexStaysComplete:
         backend = SQLiteAuditBackend(str(db))
         trail = backend.load_trail()
         trail._on_record = backend.write_record
-        pipe = InterceptionPipeline(trail=trail)
+        pipe = InterceptionPipeline(
+            trail=trail, scorer=AdaptiveScorer(**ESCALATING_THRESHOLDS))
         _escalate_and_approve(pipe, amount=10)
         assert len(trail._resolved_approvals) == 1, "precondition"
 
@@ -323,7 +331,8 @@ class TestApprovalIndexStaysComplete:
         backend = SQLiteAuditBackend(str(db))
         trail = backend.load_trail()
         trail._on_record = backend.write_record
-        pipe = InterceptionPipeline(trail=trail)
+        pipe = InterceptionPipeline(
+            trail=trail, scorer=AdaptiveScorer(**ESCALATING_THRESHOLDS))
         first = _escalate_and_approve(pipe, amount=10)
 
         reloaded = SQLiteAuditBackend(str(db)).load_trail()

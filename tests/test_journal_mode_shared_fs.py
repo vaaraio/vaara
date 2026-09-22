@@ -142,6 +142,166 @@ def test_the_longest_matching_mount_wins(tmp_path, trail, monkeypatch):
     assert SQLiteAuditBackend(str(trail)).journal_mode == "delete"
 
 
+class TestTheDeclineIsNotSilent:
+    """The pragma may refuse without raising, and the log reaches nobody.
+
+    ``_set_journal_mode`` gives up after ten retries and keeps whatever mode
+    the file is in, reporting through ``logger``. In a Claude Code hook
+    there is no logging configured and the process is gone a moment later,
+    so a trail could stay in WAL on a mount that corrupts it with nothing
+    anywhere saying so. Two halves: notice the silent refusal, and give the
+    operator somewhere to read it.
+    """
+
+    def test_a_pragma_that_answers_with_the_old_mode_is_not_success(
+        self, tmp_path, trail, monkeypatch
+    ):
+        """SQLite answers a declined mode change with the current mode.
+
+        Taking the absence of an exception as success is what let a WAL to
+        DELETE conversion quietly not happen.
+        """
+        monkeypatch.setattr(sqlite_backend, "_PROC_MOUNTS", _mounts(tmp_path, "ext4"))
+        monkeypatch.delenv("VAARA_TRAIL_JOURNAL_MODE", raising=False)
+        backend = SQLiteAuditBackend(str(trail))
+
+        calls = []
+
+        class StubbornConnection:
+            def execute(self, statement):
+                calls.append(statement)
+
+                class Cursor:
+                    def fetchone(self):
+                        return ("wal",)
+
+                return Cursor()
+
+        monkeypatch.setattr(backend, "_conn", StubbornConnection())
+        monkeypatch.setattr(SQLiteAuditBackend, "_WAL_RETRY_SLEEP", 0)
+
+        # It must not raise: recording evidence in the wrong mode still
+        # beats refusing to open the trail at all.
+        backend._set_journal_mode("delete")
+
+        assert len(calls) == SQLiteAuditBackend._WAL_RETRIES, (
+            "a declined mode change should be retried like a lost lock"
+        )
+
+    def test_a_pragma_that_lands_returns_on_the_first_try(
+        self, tmp_path, trail, monkeypatch
+    ):
+        monkeypatch.setattr(sqlite_backend, "_PROC_MOUNTS", _mounts(tmp_path, "ext4"))
+        monkeypatch.delenv("VAARA_TRAIL_JOURNAL_MODE", raising=False)
+        backend = SQLiteAuditBackend(str(trail))
+
+        calls = []
+
+        class AgreeableConnection:
+            def execute(self, statement):
+                calls.append(statement)
+
+                class Cursor:
+                    def fetchone(self):
+                        return ("delete",)
+
+                return Cursor()
+
+        monkeypatch.setattr(backend, "_conn", AgreeableConnection())
+        backend._set_journal_mode("delete")
+
+        assert calls == ["PRAGMA journal_mode=DELETE"]
+
+    def test_an_in_memory_answer_is_accepted_not_retried(
+        self, tmp_path, trail, monkeypatch
+    ):
+        """``:memory:`` answers "memory" whatever it is asked for.
+
+        Treating that as a refusal would put ten sleeps into the
+        construction of every in-memory backend, which is most of the suite.
+        """
+        monkeypatch.setattr(sqlite_backend, "_PROC_MOUNTS", _mounts(tmp_path, "ext4"))
+        monkeypatch.delenv("VAARA_TRAIL_JOURNAL_MODE", raising=False)
+        backend = SQLiteAuditBackend(str(trail))
+
+        calls = []
+
+        class MemoryConnection:
+            def execute(self, statement):
+                calls.append(statement)
+
+                class Cursor:
+                    def fetchone(self):
+                        return ("memory",)
+
+                return Cursor()
+
+        monkeypatch.setattr(backend, "_conn", MemoryConnection())
+        backend._set_journal_mode("wal")
+
+        assert len(calls) == 1
+
+
+class TestJournalModeWarning:
+    """What the operator reads at session start."""
+
+    def test_wal_on_an_unsafe_mount_is_reported(self, tmp_path, trail, monkeypatch):
+        monkeypatch.setattr(sqlite_backend, "_PROC_MOUNTS", _mounts(tmp_path, "virtiofs"))
+        monkeypatch.setenv("VAARA_TRAIL_JOURNAL_MODE", "wal")
+        SQLiteAuditBackend(str(trail))
+
+        warning = sqlite_backend.journal_mode_warning(trail)
+
+        assert warning is not None
+        assert "WAL" in warning
+        assert "virtiofs" in warning
+
+    def test_delete_on_an_unsafe_mount_is_silent(self, tmp_path, trail, monkeypatch):
+        monkeypatch.setattr(sqlite_backend, "_PROC_MOUNTS", _mounts(tmp_path, "virtiofs"))
+        monkeypatch.delenv("VAARA_TRAIL_JOURNAL_MODE", raising=False)
+        SQLiteAuditBackend(str(trail))
+
+        assert sqlite_backend.journal_mode_warning(trail) is None
+
+    def test_wal_on_a_local_filesystem_is_silent(self, tmp_path, trail, monkeypatch):
+        monkeypatch.setattr(sqlite_backend, "_PROC_MOUNTS", _mounts(tmp_path, "ext4"))
+        monkeypatch.delenv("VAARA_TRAIL_JOURNAL_MODE", raising=False)
+        SQLiteAuditBackend(str(trail))
+
+        assert sqlite_backend.journal_mode_warning(trail) is None
+
+    def test_it_asks_about_the_file_not_about_the_conversion(
+        self, tmp_path, trail, monkeypatch
+    ):
+        """An operator who forced WAL gets the mode they asked for.
+
+        Nothing failed, so a "the conversion did not happen" check would
+        stay quiet, and the trail is in exactly the state that eats the
+        evidence. The question is the file's mode, not the switch.
+        """
+        conn = sqlite3.connect(str(trail))
+        conn.execute("PRAGMA journal_mode=WAL")
+        conn.close()
+        monkeypatch.setattr(sqlite_backend, "_PROC_MOUNTS", _mounts(tmp_path, "nfs4"))
+
+        assert sqlite_backend.journal_mode_warning(trail) is not None
+
+    @pytest.mark.parametrize("path", [None, "", ":memory:", "file::memory:?cache=shared"])
+    def test_nothing_to_warn_about(self, path):
+        assert sqlite_backend.journal_mode_warning(path) is None
+
+    def test_a_trail_that_does_not_exist_yet_is_silent(self, tmp_path):
+        assert sqlite_backend.journal_mode_warning(tmp_path / "absent.db") is None
+
+    def test_an_unreadable_trail_is_left_to_the_other_check(self, tmp_path, monkeypatch):
+        """``quick_check`` owns corruption. This one stays out of its way."""
+        broken = tmp_path / "audit.db"
+        broken.write_bytes(b"this is not a database" + b"\x00" * 200)
+        monkeypatch.setattr(sqlite_backend, "_PROC_MOUNTS", _mounts(tmp_path, "virtiofs"))
+
+        assert sqlite_backend.journal_mode_warning(broken) is None
+
+
 def test_mount_points_with_escaped_spaces_are_parsed(tmp_path, monkeypatch):
     """/proc/mounts octal-escapes spaces in mount points as \\040."""
     spaced = tmp_path / "my trail"

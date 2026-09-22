@@ -59,6 +59,13 @@ CLAUDE_SETTINGS = Path.home() / ".claude" / "settings.json"
 # matcher drops is dead, and nothing said so.
 HOOK_MATCHER = ".*"
 
+# The operating point a fresh install is written with. Equal to what the
+# engine and the macOS client both fall back to, so writing it changes no
+# behaviour. It makes the choice visible in the file instead of implied:
+# an install with no `protection` key gave the client one number to display
+# and the scorer another to run, and nothing in between said so.
+DEFAULT_PROTECTION_PRESET = "balanced"
+
 # Substring that marks a hook entry as Vaara-managed. Used to find and remove
 # our own entries on re-run / ungovern without touching the operator's other
 # hooks. Every command we write contains "vaara hook ".
@@ -261,9 +268,16 @@ def write_hook_config(config_path: Path, trail_db: Path) -> None:
 
     Merges ``audit_db`` into any existing config so a truncated or absent file
     is repaired without dropping the operator's other keys (mode, thresholds).
+
+    ``protection`` is written only when the key is absent, so an operator who
+    has chosen a preset keeps it. Writing it changes no behaviour, because the
+    engine and the macOS client already land on balanced without it. It makes
+    the operating point readable in the file, which is where an operator looks
+    when asking why a call was scored the way it was.
     """
     cfg = _load_json(config_path)
     cfg["audit_db"] = str(trail_db)
+    cfg.setdefault("protection", DEFAULT_PROTECTION_PRESET)
     _atomic_write_json(config_path, cfg)
 
 

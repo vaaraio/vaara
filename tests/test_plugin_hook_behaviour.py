@@ -41,9 +41,15 @@ def _run(hook: str, event: dict, db: Path) -> subprocess.CompletedProcess:
         "VAARA_PLUGIN_AUDIT_DB": str(db),
         "CLAUDE_PLUGIN_ROOT": str(HOOKS.parent),
         # Pin behaviour: the developer's own config must not decide the test.
+        # The env vars are not enough on their own, because each reader
+        # checks for "1" and otherwise falls through to config.json. In a
+        # subprocess the config is found under HOME, so HOME moves too.
+        "HOME": str(db.parent),
         "VAARA_PLUGIN_SHADOW": "0",
         "PYTHONPATH": str(ROOT / "src"),
     }
+    env.pop("VAARA_PLUGIN_DISABLE", None)
+    env.pop("VAARA_PLUGIN_FAIL_OPEN", None)
     return subprocess.run(
         [sys.executable, str(HOOKS / hook)],
         input=json.dumps(event), capture_output=True, text=True, env=env,
@@ -146,3 +152,63 @@ def test_an_ordinary_write_is_not_blocked(db):
         "session_id": "s1",
     }, db)
     assert result.returncode == 0, result.stderr
+
+
+def test_a_dead_trail_holds_an_mcp_call(db):
+    """The bundled fallback carries the same posture as the module.
+
+    hooks.json runs the vaara binary when it is on PATH and these
+    scripts when it is not, so a fix that lands only in the module
+    leaves half the installs passing MCP calls through an outage.
+    """
+    db.write_bytes(b"\x00" * 8192)
+    result = _run("pre_tool_use.py", {
+        "tool_name": "mcp__github__create_issue",
+        "tool_input": {"title": "x"},
+        "session_id": "s1",
+    }, db)
+    assert result.returncode == 2, result.stderr
+    assert "fail-closed" in result.stderr
+
+
+def test_a_dead_trail_does_not_hold_a_shell_call(db):
+    """Deny rules reach a verdict without the trail, so the regex path runs."""
+    db.write_bytes(b"\x00" * 8192)
+    result = _run("pre_tool_use.py", {
+        "tool_name": "Bash",
+        "tool_input": {"command": "ls -la"},
+        "session_id": "s1",
+    }, db)
+    assert result.returncode == 0, result.stderr
+
+
+def test_fail_open_passes_an_mcp_call_through_a_dead_trail(db):
+    db.write_bytes(b"\x00" * 8192)
+    env_db = db
+    env = {
+        **os.environ,
+        "VAARA_PLUGIN_AUDIT_DB": str(env_db),
+        "CLAUDE_PLUGIN_ROOT": str(HOOKS.parent),
+        # Isolated HOME as in _run; this test keeps the explicit fail-open
+        # override, which _run deliberately does not set.
+        "HOME": str(env_db.parent),
+        "VAARA_PLUGIN_SHADOW": "0",
+        "VAARA_PLUGIN_FAIL_OPEN": "1",
+        "PYTHONPATH": str(ROOT / "src"),
+    }
+    # An inherited VAARA_PLUGIN_DISABLE=1 short-circuits the hook before it
+    # reaches the trail at all, so the assertions below would pass on an
+    # exit code that means "governance off" rather than "passed through".
+    env.pop("VAARA_PLUGIN_DISABLE", None)
+    result = subprocess.run(
+        [sys.executable, str(HOOKS / "pre_tool_use.py")],
+        input=json.dumps({
+            "tool_name": "mcp__github__create_issue",
+            "tool_input": {"title": "x"},
+            "session_id": "s1",
+        }),
+        capture_output=True, text=True,
+        env=env,
+    )
+    assert result.returncode == 0, result.stderr
+    assert "UNSCORED" in result.stderr
