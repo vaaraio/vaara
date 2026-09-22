@@ -206,15 +206,32 @@ def _outcome_from_records(
     return None
 
 
+# The operating point a record is assumed to have run at when it does not
+# say. Deliberately NOT the scorer's current default: the scorer began
+# writing its thresholds into the risk record in v0.40.0, so the only
+# records that reach this fallback are older than that, and 0.40 / 0.70 is
+# what those actually ran. A receipt reconstructs history; it must not
+# restate an old decision at today's numbers. Do not point these at
+# DEFAULT_THRESHOLD_ALLOW / DEFAULT_THRESHOLD_DENY.
+_LEGACY_THRESHOLD_ALLOW = 0.4
+_LEGACY_THRESHOLD_DENY = 0.7
+
+
 def _thresholds_from_risk_record(
     risk_record: Optional[AuditRecord],
 ) -> tuple[float, float]:
     if risk_record is None:
-        return 0.4, 0.7
+        return _LEGACY_THRESHOLD_ALLOW, _LEGACY_THRESHOLD_DENY
     data = risk_record.data or {}
-    ta = _coerce_float(data.get("threshold_allow")) or 0.4
-    td = _coerce_float(data.get("threshold_deny")) or 0.7
-    return float(ta), float(td)
+    ta = _coerce_float(data.get("threshold_allow"))
+    td = _coerce_float(data.get("threshold_deny"))
+    # `or` would read a recorded 0.0 as absent. A zero allow threshold is a
+    # real operating point — nothing auto-allows — and a receipt claiming
+    # 0.4 for it would misstate the decision it is evidence of.
+    return (
+        _LEGACY_THRESHOLD_ALLOW if ta is None else float(ta),
+        _LEGACY_THRESHOLD_DENY if td is None else float(td),
+    )
 
 
 def _event_to_decision(event_type: EventType) -> str:

@@ -47,15 +47,32 @@ MCP_EVENT = {
 }
 
 
+def _isolate(tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> None:
+    """Cut the developer's own config out of the decision.
+
+    ``VAARA_PLUGIN_SHADOW=0`` and ``VAARA_PLUGIN_FAIL_OPEN=0`` do not
+    override the config file: each reader checks the env for ``"1"`` and
+    otherwise falls through to ``load_config()``. ``CONFIG_PATH`` is
+    resolved at import, so setting HOME does not move it either. A real
+    ``~/.vaara/claude-code/config.json`` carrying ``mode: watch``,
+    ``mode: off`` or ``fail_open: true`` would turn every fail-closed
+    assertion below into a test of that file, passing on CI and passing
+    here for the wrong reason.
+    """
+    monkeypatch.setattr(hooks, "CONFIG_PATH", tmp_path / "absent-config.json")
+    monkeypatch.setenv("VAARA_PLUGIN_SHADOW", "0")
+    monkeypatch.setenv("VAARA_PLUGIN_APPROVALS", "0")
+    monkeypatch.setenv("VAARA_PLUGIN_NOTIFY", "0")
+    monkeypatch.delenv("VAARA_PLUGIN_FAIL_OPEN", raising=False)
+    monkeypatch.delenv("VAARA_PLUGIN_DISABLE", raising=False)
+
+
 @pytest.fixture
 def corrupt_db(tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> Path:
     db = tmp_path / "audit.db"
     db.write_bytes(CORRUPT)
     monkeypatch.setenv("VAARA_PLUGIN_AUDIT_DB", str(db))
-    monkeypatch.setenv("VAARA_PLUGIN_SHADOW", "0")
-    monkeypatch.setenv("VAARA_PLUGIN_APPROVALS", "0")
-    monkeypatch.setenv("VAARA_PLUGIN_NOTIFY", "0")
-    monkeypatch.delenv("VAARA_PLUGIN_FAIL_OPEN", raising=False)
+    _isolate(tmp_path, monkeypatch)
     return db
 
 
@@ -63,10 +80,7 @@ def corrupt_db(tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> Path:
 def healthy_db(tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> Path:
     db = tmp_path / "audit.db"
     monkeypatch.setenv("VAARA_PLUGIN_AUDIT_DB", str(db))
-    monkeypatch.setenv("VAARA_PLUGIN_SHADOW", "0")
-    monkeypatch.setenv("VAARA_PLUGIN_APPROVALS", "0")
-    monkeypatch.setenv("VAARA_PLUGIN_NOTIFY", "0")
-    monkeypatch.delenv("VAARA_PLUGIN_FAIL_OPEN", raising=False)
+    _isolate(tmp_path, monkeypatch)
     return db
 
 

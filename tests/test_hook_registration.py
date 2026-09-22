@@ -122,6 +122,26 @@ class TestStackedRegistration:
         path = _write(tmp_path, _settings(plugins={"vaara-governance@henri-local": True}))
         assert "stacked" in _kinds(reg.inspect_registration([path]))
 
+    def test_two_groups_in_one_settings_file(self, tmp_path):
+        """Two groups in one file decide the call twice, same as two files.
+
+        Counting per file made this invisible: the path was appended once,
+        so the "more than one" test never fired. `write_claude_hooks`
+        strips and re-adds and so cannot produce this, but a hand-edited
+        settings file can, and catching double registration is the whole
+        point of the check.
+        """
+        settings = _settings()
+        settings["hooks"]["PreToolUse"].append(
+            {"matcher": ".*", "hooks": [{"type": "command", "command": VAARA_PRE}]}
+        )
+        path = _write(tmp_path, settings)
+        findings = reg.inspect_registration([path])
+        assert "stacked" in _kinds(findings)
+        detail = next(f.detail for f in findings if f.kind == "stacked")
+        assert "2 times" in detail
+        assert detail.count(str(path)) == 1, "one file should be named once"
+
     def test_two_settings_files_each_registering_the_hook(self, tmp_path):
         user = tmp_path / "user.json"
         user.write_text(json.dumps(_settings()))
@@ -229,6 +249,13 @@ class TestSessionStartReportsIt:
         monkeypatch.delenv("CLAUDE_PROJECT_DIR", raising=False)
         monkeypatch.setenv("VAARA_PLUGIN_AUDIT_DB", str(tmp_path / "audit.db"))
         monkeypatch.setenv("VAARA_PLUGIN_NOTIFY", "0")
+        # CONFIG_PATH is resolved at import, so setting HOME does not move it
+        # and the developer's own config.json would otherwise decide the
+        # outcome: `mode: off` or `mode: watch` in a real config silently
+        # turns these assertions into tests of that file.
+        monkeypatch.setattr(hooks, "CONFIG_PATH", tmp_path / "absent-config.json")
+        monkeypatch.delenv("VAARA_PLUGIN_DISABLE", raising=False)
+        monkeypatch.delenv("VAARA_PLUGIN_SHADOW", raising=False)
         monkeypatch.setattr(sys, "stdin", io.StringIO(json.dumps({"session_id": "s1"})))
         assert hooks.run_session_start() == 0
         return capsys.readouterr().err

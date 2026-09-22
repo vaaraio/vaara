@@ -41,6 +41,35 @@ if TYPE_CHECKING:
 logger = logging.getLogger(__name__)
 
 
+def _balanced_thresholds() -> tuple[float, float]:
+    """The allow/deny pair for the balanced mode, from the mode table.
+
+    ``vaara.policy.modes`` is the document of record for what a named
+    operating point means, and it says balanced is "Vaara's default
+    operating point (0.55 / 0.85). Current behaviour when no mode is
+    selected." That second sentence was false: the constructor below
+    used 0.40 / 0.70, a pair belonging to no mode in the table, so a
+    caller who selected nothing got thresholds nobody had chosen.
+
+    Measured 2026-09-22 on a Claude Code install whose config had no
+    ``protection`` key: every MCP call escalated, because an upper
+    conformal bound of 0.427 clears 0.40 and does not clear 0.55.
+
+    Read through a function rather than imported at module scope to keep
+    the policy package off this module's import path, which it has never
+    been on: ``Policy`` above is a typing-only import.
+    """
+    from vaara.policy.modes import get_mode
+
+    mode = get_mode("balanced")
+    return mode.escalate, mode.deny
+
+
+#: Thresholds a scorer runs with when the caller selects nothing. Equal to
+#: the balanced mode by construction, so the table stays the single source.
+DEFAULT_THRESHOLD_ALLOW, DEFAULT_THRESHOLD_DENY = _balanced_thresholds()
+
+
 # ── Context coercion helpers ─────────────────────────────────────────────
 
 def _coerce_unit_float(value: Any, fallback: float) -> float:
@@ -628,8 +657,8 @@ class AdaptiveScorer:
 
     def __init__(
         self,
-        threshold_allow: float = 0.4,
-        threshold_deny: float = 0.7,
+        threshold_allow: float = DEFAULT_THRESHOLD_ALLOW,
+        threshold_deny: float = DEFAULT_THRESHOLD_DENY,
         alpha: float = 0.10,
         mwu_eta: float = 0.1,
         sequence_patterns: Optional[list[SequencePattern]] = None,

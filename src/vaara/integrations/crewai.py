@@ -56,6 +56,7 @@ from vaara.integrations.langchain import (
     ToolExecutionBlocked,
 )
 from vaara.pipeline import InterceptionPipeline
+from vaara.scorer.adaptive import DEFAULT_THRESHOLD_ALLOW, DEFAULT_THRESHOLD_DENY
 
 logger = logging.getLogger(__name__)
 
@@ -290,8 +291,8 @@ class VaaraGovernance:
         self,
         *,
         boundary_id_for: Optional[Callable[[Any], Optional[str]]] = None,
-        threshold_allow: float = 0.4,
-        threshold_deny: float = 0.7,
+        threshold_allow: float = DEFAULT_THRESHOLD_ALLOW,
+        threshold_deny: float = DEFAULT_THRESHOLD_DENY,
     ) -> None:
         self._boundary_id_for = boundary_id_for
         self._threshold_allow = threshold_allow

@@ -147,7 +147,10 @@ def inspect_registration(
     resolved = list(paths) if paths is not None else settings_paths(env)
     findings: list[RegistrationFinding] = []
 
-    deciding_files: list[Path] = []
+    # One entry per registered PreToolUse group, not per file. Two Vaara
+    # groups inside a single settings file decide the call twice exactly
+    # as two files do, and a per-file list counted that as one.
+    deciding: list[Path] = []
     plugin: Optional[str] = None
     stale: list[tuple[str, str, Path]] = []
 
@@ -156,8 +159,7 @@ def inspect_registration(
         settings = _load(path)
         if not settings:
             continue
-        if _vaara_entries(settings, "PreToolUse"):
-            deciding_files.append(path)
+        deciding.extend(path for _ in _vaara_entries(settings, "PreToolUse"))
         if plugin is None:
             plugin = _enabled_plugin(settings)
         for event in _DISPATCH_EVENTS:
@@ -167,28 +169,35 @@ def inspect_registration(
                 if isinstance(matcher, str) and matcher != EXPECTED_MATCHER:
                     stale.append((event, matcher, path))
 
-    if deciding_files and plugin:
+    if deciding and plugin:
         findings.append(RegistrationFinding(
             kind="stacked",
             detail=(
                 f"two governance layers are registered, so every tool call is "
                 f"decided and recorded twice: the plugin {plugin} and the hook "
-                f"in {deciding_files[0]}."
+                f"in {deciding[0]}."
             ),
             remedy=(
                 "Keep one. Disable the plugin in Claude Code, or run "
                 "`vaara ungovern` to remove the hook."
             ),
         ))
-    elif len(deciding_files) > 1:
-        listed = " and ".join(str(p) for p in deciding_files)
+    elif len(deciding) > 1:
+        # Deduplicated for reading, counted above. Two registrations in one
+        # file name that file once and still report the count.
+        seen: list[str] = []
+        for path in deciding:
+            if str(path) not in seen:
+                seen.append(str(path))
+        where = " and ".join(seen)
         findings.append(RegistrationFinding(
             kind="stacked",
             detail=(
-                f"the PreToolUse hook is registered twice, so every tool call "
-                f"is decided and recorded twice: {listed}."
+                f"the PreToolUse hook is registered {len(deciding)} times, so "
+                f"every tool call is decided and recorded that many times: "
+                f"{where}."
             ),
-            remedy="Keep one. Remove the Vaara hook from one of those files.",
+            remedy="Keep one. Remove the extra Vaara hook entries.",
         ))
 
     for event, matcher, path in stale:
