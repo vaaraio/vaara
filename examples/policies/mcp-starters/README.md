@@ -2,7 +2,7 @@
 
 The Vaara MCP proxy is fail-closed: with no configuration, unknown tools score against
 default thresholds and risky calls get blocked or escalated. These starters give you a
-working perimeter for five widely used MCP servers so the first run is a config flip,
+working perimeter for six widely used MCP servers so the first run is a config flip,
 not a policy-authoring project.
 
 Each starter has two parts:
@@ -211,6 +211,53 @@ agent persist code, `manage_drive_access` can transfer ownership and revoke
 permissions, and Gmail filter manipulation is a classic silent-exfiltration and
 persistence vector. `send_gmail_message` sends as the account owner; allow it only
 with escalation review.
+
+## Safari (`safaridriver --mcp`, Safari 27 on macOS 27)
+
+Apple's own MCP server. It drives the user's real Safari: open URLs, read the page,
+click and type, run JavaScript in the page, read recorded network requests, and save
+screenshots or page text to disk. Turn it on in Safari > Settings > Developer >
+"Allow remote automation and external agents". It speaks stdio only.
+
+The catalog below is the server's own `tools/list`, captured from Safari 27.0 on
+macOS 27.0 on 2026-09-22 and pinned in `tests/fixtures/safari_mcp_tools_list.json`.
+The server publishes no tool annotations, so the tiers are ours.
+
+Under Claude Code you do not need the proxy. Add the server to your MCP config and the
+Vaara hook already governs every `mcp__<server>__<tool>` call, by name and by content.
+Use the proxy for clients that have no hook to sit in, Codex for instance:
+
+```
+vaara-mcp-proxy --upstream safari=/usr/bin/safaridriver --upstream-arg=--mcp \
+  --policy examples/policies/mcp-starters/mcp-starter.policy.json \
+  --deny-tool evaluate_javascript --deny-tool get_network_request
+```
+
+What reaches the agent, and why two tools are denied:
+
+- `evaluate_javascript` runs any script inside the user's logged-in session. A script
+  that posts `document.cookie` to another host matches no deny rule, because nothing in
+  its text looks like a shell command or a sensitive path. Deny it by name.
+- `get_network_request` returns a recorded request with its headers and body, which
+  on a logged-in site includes cookies and bearer tokens. Deny it by name;
+  `list_network_requests` still gives URLs, methods and status codes.
+
+What the deny rules catch by content, with no configuration:
+
+- `navigate_to_url` or `create_tab` to a cloud metadata address
+  (`ssrf_cloud_metadata_ipv4`, and the GCP and Azure host rules).
+- `screenshot` or `get_page_content` with a `savePath` into a launch agent, a shell
+  rc file, `authorized_keys` or the Claude Code harness config.
+
+Not covered, stated plainly: the proxy does not restrict which sites the agent may
+open, and a navigation carries whatever the agent puts in its query string.
+`page_interactions` can type into and submit any form on a page the user is logged
+into. If the agent should only look, add `--deny-tool page_interactions` and
+`--deny-tool browser_dialogs`. Every remote-controlled session also reports
+`navigator.webdriver` as true, so sites can see the browser is automated.
+
+Tests: `tests/test_mcp_proxy_safari.py` drives the proxy with this catalog and checks
+each claim in this section.
 
 ## Verifying what the perimeter did
 
