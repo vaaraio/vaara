@@ -5963,9 +5963,10 @@ def build_parser() -> argparse.ArgumentParser:
     pllp = sub.add_parser(
         "llm-proxy",
         add_help=False,
-        help="Govern LLM API calls from coding agents: record chat and "
-             "messages calls, enforce model and rate policy, hold back the "
-             "secrets named in --seal-file. Other paths pass unrecorded.",
+        help="Govern LLM API calls from coding agents: record every call "
+             "(chat and messages with their prompt, others by hash), enforce "
+             "model and rate policy, hold back the secrets named in "
+             "--seal-file.",
     )
     pllp.set_defaults(func=_cmd_llm_proxy)
 

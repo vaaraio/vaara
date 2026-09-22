@@ -1,20 +1,22 @@
 """`vaara llm-proxy --help` must say what the proxy does and no more.
 
 Until 1.94.0 the help and the module docstring said the proxy "strips
-secrets" and records "everything". It records two paths, and it holds back
-only the strings an operator lists in --seal-file. Every other path is
-forwarded with no record, and --seal-file is not applied to it: a sealed
-secret sent to /v1/responses leaves in the clear.
+secrets" and records "everything". It recorded two paths and forwarded every
+other one with no record and no sealing, so a --seal-file secret sent to
+/v1/responses left in the clear. 1.95.0 records every call and seals every
+path.
 
-These tests pin the text to the behaviour in both directions. If the
-pass-through starts recording or sealing, the behaviour tests fail and the
-help has to be rewritten to claim the wider coverage.
+These tests pin the text to the behaviour. The help names the two paths that
+are recorded with their prompt, and the behaviour tests hold the rest: a
+pass-through call is recorded by digest, never by content, and is sealed.
 """
 
 from __future__ import annotations
 
 import contextlib
+import hashlib
 import io
+import json
 import re
 
 import pytest
@@ -25,6 +27,7 @@ pytest.importorskip("fastapi", reason="proxy deps not installed: no fastapi")
 from fastapi.testclient import TestClient  # noqa: E402
 
 from vaara import cli  # noqa: E402
+from vaara.audit.trail import EventType  # noqa: E402
 from vaara.integrations._llm_proxy_app import _CHAT_PATH_LIST, build_app  # noqa: E402
 from vaara.integrations.llm_proxy import DESCRIPTION, _build_pipeline  # noqa: E402
 from vaara.integrations.llm_seal import SealRegistry  # noqa: E402
@@ -54,9 +57,10 @@ class TestHelpNamesTheEdge:
     def test_every_governed_path_is_named(self, path):
         assert path in DESCRIPTION
 
-    def test_other_paths_are_declared_unrecorded_and_unsealed(self):
-        assert "Every other path is forwarded unrecorded and unsealed" \
-            in DESCRIPTION
+    def test_other_paths_are_declared_recorded_by_hash(self):
+        assert "Every other call is recorded by method, path, size and " \
+            "sha256, never by content" in DESCRIPTION
+        assert "replaced on every path" in DESCRIPTION
 
     @pytest.mark.parametrize("claim", ["strip secrets", "strips secrets",
                                        "record everything",
@@ -96,14 +100,35 @@ class TestBehaviourMatchesTheHelp:
         )
         return app, pipeline
 
-    def test_pass_through_writes_no_record(self, sent, app_and_pipeline):
-        app, pipeline = app_and_pipeline
-        before = pipeline.trail.size
-        TestClient(app).post("/v1/responses", json={"input": "hello"})
-        assert len(sent) == 1
-        assert pipeline.trail.size == before
+    def _passthrough_records(self, pipeline):
+        return [r for r in pipeline.trail.get_records_by_type(
+            EventType.ACTION_REQUESTED) if r.tool_name == "llm.passthrough"]
 
-    def test_pass_through_is_not_sealed(self, sent, app_and_pipeline):
-        app, _ = app_and_pipeline
+    def test_pass_through_is_recorded_by_digest(self, sent, app_and_pipeline):
+        app, pipeline = app_and_pipeline
+        body = b'{"input": "hello there"}'
+        TestClient(app).post("/v1/responses", content=body,
+                             headers={"content-type": "application/json"})
+        assert len(sent) == 1
+        (rec,) = self._passthrough_records(pipeline)
+        params = rec.data["parameters"]
+        assert params["method"] == "POST"
+        assert params["path"] == "/v1/responses"
+        assert params["bytes_out"] == len(sent[0])
+        assert params["sha256_out"] == hashlib.sha256(sent[0]).hexdigest()
+        assert "hello there" not in json.dumps(rec.data)
+
+    def test_a_get_is_recorded_too(self, sent, app_and_pipeline):
+        app, pipeline = app_and_pipeline
+        TestClient(app).get("/v1/models")
+        (rec,) = self._passthrough_records(pipeline)
+        assert rec.data["parameters"]["method"] == "GET"
+
+    def test_pass_through_is_sealed(self, sent, app_and_pipeline):
+        app, pipeline = app_and_pipeline
         TestClient(app).post("/v1/responses", json={"input": SECRET})
-        assert SECRET.encode() in sent[0]
+        assert SECRET.encode() not in sent[0]
+        (rec,) = self._passthrough_records(pipeline)
+        assert rec.data["parameters"]["seal_active"] is True
+        assert rec.data["parameters"]["seal_count"] == 1
+        assert SECRET not in json.dumps(rec.data)

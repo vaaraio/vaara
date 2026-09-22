@@ -147,3 +147,21 @@ def test_a_healthy_trail_never_repairs(monkeypatch, pipeline, upstream):
         assert _post(client).status_code == 200
     assert calls == []
     assert len(upstream) == 3
+
+
+def test_a_pass_through_call_that_cannot_be_recorded_is_not_forwarded(
+        monkeypatch, pipeline, upstream):
+    _break_store(monkeypatch, pipeline, repair_result=TrailRepair(
+        db="x", method="failed", error="database disk image is malformed"))
+    resp = _client(pipeline).post("/v1/responses", json={"input": "hello"})
+    assert resp.status_code == 503
+    assert resp.json()["type"] == "vaara_trail_not_recording"
+    assert upstream == []
+
+
+def test_fail_open_forwards_a_pass_through_call(monkeypatch, pipeline, upstream):
+    _break_store(monkeypatch, pipeline, repair_result=TrailRepair(
+        db="x", method="failed", error="database disk image is malformed"))
+    resp = _client(pipeline, fail_open=True).get("/v1/models")
+    assert resp.status_code == 200
+    assert len(upstream) == 1
