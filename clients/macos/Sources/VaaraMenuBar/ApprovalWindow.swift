@@ -246,6 +246,11 @@ final class ApprovalWindowManager {
         }
     }
 
+    /// Card width where there is no cutout to match. Tuned by eye in July
+    /// against the two buttons and the tool name, and it is also what a
+    /// forced notch style falls back to on a display that has none.
+    static let offNotchCardWidth: CGFloat = 220
+
     /// Notch geometry from the screen. Width is the gap between the two
     /// auxiliary top areas; height is the safe-area top inset. Zero when
     /// the Mac has no notch (safeAreaInsets.top == 0).
@@ -280,8 +285,7 @@ final class ApprovalWindowManager {
         // It slides down as a unit; it does not expand.
         // Style: auto detects a real notch; notch/centered force one way.
         // When the user forces "notch" but the OS reports none (notch
-        // hidden via BetterDisplay), estimate a notch from the menu-bar
-        // height and ~8% of the display width so the drop still docks.
+        // hidden via BetterDisplay), estimate one from the menu-bar height.
         var notch = notchSize(screen)
         let style = model.config.approval_style
         let hasNotch: Bool
@@ -291,9 +295,14 @@ final class ApprovalWindowManager {
         default:         hasNotch = notch.height > 0
         }
         if hasNotch && notch.height == 0 {
+            // Height comes from the menu bar, which is real. Width is the
+            // tuned card width, because there is no cutout to hug: the old
+            // 8-percent-of-display estimate had nothing to match and drifted
+            // with the monitor, giving 180pt on a 1440-wide display and 260
+            // on a 5K. A synthesised notch and a no-notch display are the
+            // same situation, so they get the same width.
             let h = max(NSApp.mainMenu?.menuBarHeight ?? 32, 24)
-            let w = min(max(screen.frame.width * 0.08, 180), 260)
-            notch = CGSize(width: w, height: h)
+            notch = CGSize(width: Self.offNotchCardWidth, height: h)
         }
         // The display API reports the notch a hair wider than the visible
         // black cutout (the auxiliary areas do not butt exactly against
@@ -301,7 +310,9 @@ final class ApprovalWindowManager {
         // on each side (2 total) so it nests cleanly inside the cutout
         // with no overhang. Whole points only.
         let inset: CGFloat = hasNotch ? 1 : 0
-        let cardWidth = (hasNotch ? max(notch.width, 200) : 220).rounded(.down) - inset
+        let cardWidth = (hasNotch
+                         ? max(notch.width, 200)
+                         : Self.offNotchCardWidth).rounded(.down) - inset
 
         let host = NSHostingView(rootView: NotchApprovalView(
             pending: pending,

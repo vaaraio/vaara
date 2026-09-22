@@ -10,6 +10,61 @@ import Foundation
 import SQLite3
 import UserNotifications
 
+/// Where the `.vaara` tree of the engine this app watches actually sits.
+///
+/// Every engine path used to be built from the native home directory, which
+/// is right only when the engine runs on the same side of the filesystem as
+/// the app. It often does not. A Claude Code session inside a container sees
+/// the home directory the container mounts, so this app wrote settings into
+/// `/Users/<you>/.vaara` while the engine read them from the mount, and the
+/// two trees never met. Approval requests raised by the engine never reached
+/// the notch, and thresholds set in this UI never reached the scorer. Neither
+/// side reported a fault, because from each side its own tree looked fine.
+///
+/// Resolution order: the `VAARA_HOME` environment variable, then the
+/// `vaara_home` key in this app's own settings, then the native home, which
+/// is the behaviour every existing install already has.
+///
+/// This app's own `menubar.json` is deliberately not routed through here. It
+/// is the app's settings file, the app runs natively, and it is the file that
+/// would carry `vaara_home`, so it cannot live at a location it defines.
+enum VaaraHome {
+    /// Set from `Config.vaara_home` once settings are loaded. The
+    /// environment variable still wins, so a launch context can override a
+    /// stored setting without editing the file.
+    static var configured: String?
+
+    /// The directory `.vaara` sits in. Not `.vaara` itself.
+    static var root: URL {
+        let env = ProcessInfo.processInfo.environment["VAARA_HOME"] ?? ""
+        for candidate in [env, configured ?? ""] {
+            let trimmed = candidate.trimmingCharacters(in: .whitespacesAndNewlines)
+            guard !trimmed.isEmpty else { continue }
+            let url = URL(
+                fileURLWithPath: (trimmed as NSString).expandingTildeInPath,
+                isDirectory: true)
+            // Accept either the tree that holds `.vaara` or `.vaara` itself.
+            // Both readings are natural, and picking one silently would put
+            // the app one directory away from the engine with no message.
+            return url.lastPathComponent == ".vaara"
+                ? url.deletingLastPathComponent()
+                : url
+        }
+        return FileManager.default.homeDirectoryForCurrentUser
+    }
+
+    /// The `.vaara` directory itself.
+    static var directory: URL {
+        root.appendingPathComponent(".vaara")
+    }
+
+    /// `<root>/.vaara/<component>`. The only way this app should name a path
+    /// under the engine's tree.
+    static func path(_ component: String) -> URL {
+        directory.appendingPathComponent(component)
+    }
+}
+
 enum GateState: String {
     case green, yellow, red
 
@@ -115,6 +170,10 @@ struct Config: Codable {
     /// no safe area).
     var approval_style: String = "auto"
     var webkitGovernance: Bool = false
+    /// Where the engine's `.vaara` tree is, when it is not this user's home.
+    /// nil means the native home, which is every install that has never had
+    /// to think about it. See `VaaraHome` for why this exists.
+    var vaara_home: String?
 
     // Tolerate configs written before a field existed, including the
     // Python proto's single db_path key, which migrates into db_paths.
@@ -143,11 +202,13 @@ struct Config: Codable {
         approvals_dir = try c.decodeIfPresent(String.self, forKey: .approvals_dir)
         approval_style = try c.decodeIfPresent(String.self, forKey: .approval_style) ?? base.approval_style
         webkitGovernance = try c.decodeIfPresent(Bool.self, forKey: .webkitGovernance) ?? base.webkitGovernance
+        vaara_home = try c.decodeIfPresent(String.self, forKey: .vaara_home)
     }
 
     enum CodingKeys: String, CodingKey {
         case db_paths, alert_window_minutes, notifications, appearance, menubar_graph
         case notify_on, user_level, approvals_dir, approval_style, webkitGovernance
+        case vaara_home
         case legacy_db_path = "db_path"
     }
 
@@ -162,6 +223,10 @@ struct Config: Codable {
         try c.encode(user_level, forKey: .user_level)
         try c.encodeIfPresent(approvals_dir, forKey: .approvals_dir)
         try c.encode(approval_style, forKey: .approval_style)
+        // Both of these were decoded and never written, so the WebKit toggle
+        // and the Vaara home reverted to their defaults on the next load.
+        try c.encode(webkitGovernance, forKey: .webkitGovernance)
+        try c.encodeIfPresent(vaara_home, forKey: .vaara_home)
         // Keep the Python proto readable from the same file.
         if let first = db_paths.first {
             try c.encode(first, forKey: .legacy_db_path)
@@ -249,8 +314,7 @@ final class GateModel: ObservableObject {
         if let custom = config.approvals_dir, !custom.isEmpty {
             return URL(fileURLWithPath: (custom as NSString).expandingTildeInPath)
         }
-        return FileManager.default.homeDirectoryForCurrentUser
-            .appendingPathComponent(".vaara/approvals")
+        return VaaraHome.path("approvals")
     }
 
     func start() {
@@ -321,20 +385,54 @@ final class GateModel: ObservableObject {
     /// installs write their own DBs; this is how they get found.
     @discardableResult
     func discoverTrails() -> Int {
-        let root = FileManager.default.homeDirectoryForCurrentUser
-            .appendingPathComponent(".vaara")
         guard let walker = FileManager.default.enumerator(
-            at: root, includingPropertiesForKeys: nil,
+            at: VaaraHome.directory, includingPropertiesForKeys: nil,
             options: [.skipsHiddenFiles]) else { return 0 }
         var added = 0
         for case let url as URL in walker {
             guard url.pathExtension == "db",
                   !config.db_paths.contains(url.path),
                   isVaaraTrail(url.path) else { continue }
+            guard let newest = newestRecord(url.path),
+                  Date().timeIntervalSince(newest) < Self.staleTrailSeconds
+            else {
+                // A trail nothing has written to in months is a leftover from
+                // an older install, and auto-adding it put a July file in the
+                // list beside the live one. Watching the dead one is what made
+                // the app look broken while it was working. Still addable by
+                // hand: this decides what appears unasked, not what is allowed.
+                continue
+            }
             addSource(url.path)
             added += 1
         }
         return added
+    }
+
+    /// How quiet a discovered trail has to be before it stops arriving on its
+    /// own. Long enough that a machine left off over a holiday still finds its
+    /// own trail on the next launch.
+    static let staleTrailSeconds: TimeInterval = 30 * 24 * 60 * 60
+
+    /// When the newest record in this trail was written, or nil when the file
+    /// holds no records or cannot be read.
+    private func newestRecord(_ path: String) -> Date? {
+        // `withDB` is itself optional-returning, so this nests: the outer nil
+        // is "could not open", the inner is "opened, no usable timestamp".
+        // Both mean the same thing here.
+        let opened: Double?? = withDB(path) { db -> Double? in
+            var stmt: OpaquePointer?
+            defer { sqlite3_finalize(stmt) }
+            guard sqlite3_prepare_v2(
+                    db, "SELECT MAX(timestamp) FROM audit_records",
+                    -1, &stmt, nil) == SQLITE_OK,
+                  sqlite3_step(stmt) == SQLITE_ROW,
+                  sqlite3_column_type(stmt, 0) != SQLITE_NULL
+            else { return nil }
+            return sqlite3_column_double(stmt, 0)
+        }
+        guard let epoch = opened ?? nil, epoch > 0 else { return nil }
+        return Date(timeIntervalSince1970: epoch)
     }
 
     private func isVaaraTrail(_ path: String) -> Bool {
@@ -542,7 +640,10 @@ final class GateModel: ObservableObject {
 
         let first = quickCheck()
         if first == "ok" {
-            trailNotes[path] = "integrity ok"
+            // A trail can be perfectly intact and have nothing writing to it.
+            // Saying only "integrity ok" next to a file last touched in July
+            // is what let a dead source sit in the list looking healthy.
+            trailNotes[path] = staleNote(path) ?? "integrity ok"
             return true
         }
         if sqlite3_exec(db, "REINDEX", nil, nil, nil) != SQLITE_OK {
@@ -560,6 +661,22 @@ final class GateModel: ObservableObject {
         trailNotes[path] = "integrity still failing after reindex: \(second)"
         fault(path, "corrupt: \(second)")
         return false
+    }
+
+    /// "integrity ok, but nothing written since <date>", or nil when the
+    /// trail is live. Read by `checkTrail`, which otherwise reports only
+    /// whether the file is readable.
+    private func staleNote(_ path: String) -> String? {
+        guard let newest = newestRecord(path) else {
+            return "integrity ok, but the trail holds no records"
+        }
+        guard Date().timeIntervalSince(newest) >= Self.staleTrailSeconds else {
+            return nil
+        }
+        let when = DateFormatter()
+        when.dateStyle = .medium
+        when.timeStyle = .none
+        return "integrity ok, but nothing written since \(when.string(from: newest))"
     }
 
     private func maxSeq(_ path: String) -> Int64 {
@@ -793,16 +910,17 @@ final class GateModel: ObservableObject {
 
     // MARK: - Protection presets (the plugin's threshold profile)
 
-    private let pluginConfigURL = FileManager.default.homeDirectoryForCurrentUser
-        .appendingPathComponent(".vaara/claude-code/config.json")
+    // Computed, not stored: `VaaraHome.configured` is set once settings load,
+    // which happens after this object exists. A stored `let` would freeze the
+    // native home in before the setting had been read.
+    private var pluginConfigURL: URL { VaaraHome.path("claude-code/config.json") }
 
     /// The unified engine config (auto-init / `vaara menu` own its
     /// shape). The GATE picker must flip BOTH files: writing only the
     /// plugin config left every non-hook runtime (proxy, llm-proxy,
     /// MCP server) on its previous mode — the settings UI then showed
     /// "Block" while the engine was observing.
-    private let unifiedConfigURL = FileManager.default.homeDirectoryForCurrentUser
-        .appendingPathComponent(".vaara/config.json")
+    private var unifiedConfigURL: URL { VaaraHome.path("config.json") }
 
     private func readPluginPreset() -> String {
         guard let data = try? Data(contentsOf: pluginConfigURL),
