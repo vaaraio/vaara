@@ -75,7 +75,8 @@ def _grounding_response() -> dict[str, Any]:
 
 class TestParseApplyGuardrailResponse:
     def test_clean_response_yields_allow_verdict(self):
-        finding = parse_apply_guardrail_response({"assessments": []})
+        finding = parse_apply_guardrail_response(
+            {"action": "NONE", "assessments": []})
         assert finding.verdict == "allow"
         assert finding.categories == ()
         assert finding.severity == "0.0000"

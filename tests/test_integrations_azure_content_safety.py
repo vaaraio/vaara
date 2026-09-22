@@ -45,8 +45,13 @@ def _analyze_response(*severities: tuple[str, int]) -> dict[str, Any]:
 
 
 class TestParseResponses:
-    def test_empty_response_allows(self):
+    def test_no_response_is_unparsed(self):
         finding = parse_responses()
+        assert finding.verdict == "unparsed"
+        assert finding.categories == ()
+
+    def test_clean_response_allows(self):
+        finding = parse_responses(analyze_text={"categoriesAnalysis": []})
         assert finding.verdict == "allow"
         assert finding.categories == ()
 
