@@ -7,7 +7,8 @@ and this project follows [Semantic Versioning](https://semver.org/spec/v2.0.0.ht
 ## [Unreleased]
 
 ### Fixed
-- `vaara llm-proxy --help`, the subcommand list and the module docstring said the proxy strips secrets and records everything. It records `POST /v1/chat/completions` and `POST /v1/messages`, and forwards every other path with no record. It removes only the values listed in `--seal-file`, and those are not applied on the other paths either, so a sealed string sent to `/v1/responses` reaches the provider as written. The help now says so, and `--redact` says it masks the trail's copy of the prompt and leaves the request unchanged. `tests/test_llm_proxy_claims.py` holds the text to the behaviour: it fails if the help overclaims, and it fails if the pass-through starts recording or sealing without the help being updated.
+- The llm-proxy forwarded every path other than `POST /v1/chat/completions` and `POST /v1/messages` with no record and no sealing, so a `--seal-file` secret sent to `/v1/responses` reached the provider as written, and a call to any other endpoint left nothing in the trail. Every call is now recorded. The two chat paths keep their full record; any other call is recorded as `llm.passthrough` with its method, path, byte count and the sha256 of the bytes that left, never its content. The `--seal-file` values are replaced on every path, and the reply is unsealed when it is text. A pass-through call the trail cannot record is refused with the same 503 as a prompt, and `--fail-open` forwards it.
+- `vaara llm-proxy --help`, the subcommand list and the module docstring said the proxy strips secrets and records everything. It removes only the `--seal-file` values, and `--redact` masks the trail's copy of the prompt and leaves the request unchanged. The help now names what is recorded and how, and `tests/test_llm_proxy_claims.py` holds the text to the behaviour.
 
 ## [1.94.0] - 2026-09-22
 

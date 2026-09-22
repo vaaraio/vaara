@@ -3,11 +3,11 @@
 """``vaara llm-proxy`` — govern LLM API calls from coding agents.
 
 Governs ``POST /v1/chat/completions`` and ``POST /v1/messages``: each call is
-checked against the model and rate policy, recorded in the Vaara audit trail,
-and has the secrets named in ``--seal-file`` replaced before it leaves. Every
-other path is forwarded to the upstream unrecorded and unsealed. Nothing
-beyond the ``--seal-file`` values is removed from a request; ``--redact`` masks
-only the trail's copy of the prompt.
+checked against the model and rate policy and recorded in the Vaara audit trail
+with its prompt. Every other call is recorded by method, path, size and
+sha256. The secrets named in ``--seal-file`` are replaced on every path before
+the request leaves. Nothing beyond those values is removed from a request;
+``--redact`` masks only the trail's copy of the prompt.
 
 Usage::
 
@@ -47,11 +47,13 @@ from .llm_actions import LLM_ACTIONS
 #: ``vaara llm-proxy --help`` and the subcommand list so the two cannot differ.
 DESCRIPTION = (
     "Govern LLM API calls. POST /v1/chat/completions and POST /v1/messages "
-    "are checked against the model and rate policy, recorded in the Vaara "
-    "audit trail, and have the secrets named in --seal-file replaced before "
-    "they leave. Every other path is forwarded unrecorded and unsealed. "
+    "are checked against the model and rate policy and recorded in the Vaara "
+    "audit trail with their prompt. Every other call is recorded by method, "
+    "path, size and sha256, never by content. The secrets named in "
+    "--seal-file are replaced on every path before the request leaves. "
     "Nothing beyond the --seal-file values is removed from a request; "
-    "--redact masks only the trail's copy of the prompt."
+    "--redact masks only the trail's copy of the prompt. A call the trail "
+    "cannot record is refused unless --fail-open is set."
 )
 
 
