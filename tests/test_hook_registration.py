@@ -22,7 +22,7 @@ hook-versus-hook.
 
 The second is an install left behind by its own package. ``HOOK_MATCHER``
 widened to ``.*`` after an earlier drift, and ``write_claude_hooks``
-strips and re-adds on every run, so ``vaara init-governance`` repairs a
+strips and re-adds on every run, so ``vaara init`` repairs a
 stale file. Nothing ever asks anyone to re-run it. The machine that found
 this was still dispatching PostToolUse on the fifteen-name list written by
 an older version, so tools outside that list were scored and never
@@ -163,7 +163,7 @@ class TestStaleMatcher:
         assert _kinds(findings) == ["stale_matcher"]
         finding = findings[0]
         assert "PostToolUse" in finding.detail
-        assert "init-governance" in finding.remedy
+        assert "`vaara init`" in finding.remedy
 
     def test_a_narrow_pre_tool_use_is_reported(self, tmp_path):
         path = _write(tmp_path, _settings(pre_matcher="Bash|mcp__.*"))
@@ -265,7 +265,7 @@ class TestSessionStartReportsIt:
             tmp_path, _settings(post_matcher="Bash|mcp__.*"), monkeypatch, capsys
         )
         assert "PostToolUse" in err
-        assert "init-governance" in err
+        assert "`vaara init`" in err
 
     def test_a_second_layer_is_named(self, tmp_path, monkeypatch, capsys):
         err = self._run(
@@ -281,4 +281,4 @@ class TestSessionStartReportsIt:
     ):
         err = self._run(tmp_path, _settings(), monkeypatch, capsys)
         assert "twice" not in err
-        assert "init-governance" not in err
+        assert "`vaara init`" not in err
