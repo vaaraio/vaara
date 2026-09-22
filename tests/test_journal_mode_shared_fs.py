@@ -172,7 +172,7 @@ class TestTheDeclineIsNotSilent:
                 calls.append(statement)
 
                 class Cursor:
-                    def fetchone(self_inner):
+                    def fetchone(self):
                         return ("wal",)
 
                 return Cursor()
@@ -202,7 +202,7 @@ class TestTheDeclineIsNotSilent:
                 calls.append(statement)
 
                 class Cursor:
-                    def fetchone(self_inner):
+                    def fetchone(self):
                         return ("delete",)
 
                 return Cursor()
@@ -231,7 +231,7 @@ class TestTheDeclineIsNotSilent:
                 calls.append(statement)
 
                 class Cursor:
-                    def fetchone(self_inner):
+                    def fetchone(self):
                         return ("memory",)
 
                 return Cursor()
