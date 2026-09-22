@@ -47,6 +47,7 @@ _CONFIDENCE_SEVERITY = {
 # FilterMatchState.MATCH_FOUND is 2. Integer enums arrive whenever a
 # caller converted the proto with library defaults.
 _MATCH_FOUND = ("MATCH_FOUND", 2)
+_NO_MATCH_FOUND = ("NO_MATCH_FOUND", 1)
 
 # DetectionConfidenceLevel by ordinal, for the same integer-enum case.
 _CONFIDENCE_BY_VALUE = {1: "LOW_AND_ABOVE", 2: "MEDIUM_AND_ABOVE", 3: "HIGH"}
@@ -248,7 +249,11 @@ def parse_sanitize_response(
             },
         ))
 
-    return build_finding(provider=_PROVIDER, categories=cats, raw=response, scanned_role=scanned_role)
+    # filterMatchState is set on every sanitize reply. Absent or
+    # FILTER_MATCH_STATE_UNSPECIFIED means the result was not read.
+    understood = top_state in _MATCH_FOUND or top_state in _NO_MATCH_FOUND
+    return build_finding(provider=_PROVIDER, categories=cats, raw=response,
+                         scanned_role=scanned_role, understood=understood)
 
 
 class GcpModelArmorAdapter:

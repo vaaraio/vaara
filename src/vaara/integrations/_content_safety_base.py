@@ -72,6 +72,7 @@ class ContentSafetyFinding:
     """Adapter output. Shared shape across Bedrock, Azure, GCP."""
 
     provider: str
+    #: ``"allow"``, ``"flag"``, ``"block"`` or ``"unparsed"``.
     verdict: str
     severity: str
     categories: tuple[FindingCategory, ...]
@@ -165,17 +166,36 @@ def aggregate_severity(categories: Iterable[FindingCategory]) -> str:
     return max(severities)
 
 
+#: The fourth verdict. The adapter could not read the provider's response,
+#: so it cannot say the provider found nothing.
+UNPARSED = "unparsed"
+
+
 def build_finding(
     *,
     provider: str,
     categories: Iterable[FindingCategory],
     raw: dict[str, Any],
     scanned_role: str,
+    understood: bool = True,
 ) -> ContentSafetyFinding:
+    """Assemble a finding.
+
+    An empty category list means one of two things: the provider found
+    nothing, or the adapter could not read what the provider said. Until
+    1.95.0 both came out "allow" and landed in the trail as an upstream
+    pass. Each parser now states whether the response had the shape it
+    reads. When it did not and nothing triggered, the verdict is
+    ``"unparsed"``. A triggered category still wins, because a block the
+    adapter did read is a block whatever else the response carried.
+    """
     cats = tuple(categories)
+    verdict = aggregate_verdict(cats)
+    if not understood and verdict == "allow":
+        verdict = UNPARSED
     return ContentSafetyFinding(
         provider=provider,
-        verdict=aggregate_verdict(cats),
+        verdict=verdict,
         severity=aggregate_severity(cats),
         categories=cats,
         raw=raw,
@@ -188,6 +208,7 @@ def mapping_for(provider: str, provider_category: str) -> Optional[CategoryMappi
 
 
 __all__ = [
+    "UNPARSED",
     "ContentSafetyFinding",
     "ContentSafetyScorer",
     "FindingCategory",

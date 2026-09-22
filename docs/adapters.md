@@ -27,6 +27,8 @@ Adapters route findings from cloud and OSS guardrails into Vaara's audit trail a
 | LLM Guard | `LLMGuardAdapter` | `vaara[llm-guard]` | `scan_prompt` / `scan_output` |
 | Rebuff | `RebuffAdapter` | `vaara[rebuff]` | `DetectResponse` across heuristic, model, vector layers + canary-word leak check |
 
+A finding's `verdict` is `allow`, `flag`, `block` or `unparsed`. `unparsed` means the reply lacked the field the adapter reads to know a scan ran (Bedrock `action`, Model Armor `filterMatchState`, NeMo `activated_rails`, Rebuff `injectionDetected`, a Guardrails AI outcome with neither `validation_passed` nor summaries, an LLM Guard result with no scanners, an Azure reply missing its analysis field), so the trail does not record it as a pass. A category the adapter did read still decides the verdict.
+
 Mapping table at `src/vaara/integrations/_content_safety_articles.py`. Rationale in [COMPLIANCE.md](COMPLIANCE.md#cloud-guardrail-adapter-pattern).
 
 ## MCP proxy

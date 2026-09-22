@@ -186,11 +186,16 @@ def parse_apply_guardrail_response(
             },
         ))
 
+    # "action" is set on every ApplyGuardrail reply, NONE or intervened.
+    # A reply without a value this module knows was not read.
+    understood = (response.get("action") or "").upper() in (
+        "NONE", "GUARDRAIL_INTERVENED")
     return build_finding(
         provider=_PROVIDER,
         categories=cats,
         raw=response,
         scanned_role=scanned_role,
+        understood=understood,
     )
 
 
