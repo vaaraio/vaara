@@ -2,9 +2,12 @@
 # SPDX-License-Identifier: AGPL-3.0-or-later
 """``vaara llm-proxy`` — govern LLM API calls from coding agents.
 
-Intercepts prompts, strips secrets, enforces model/rate policies, and forwards
-to the configured upstream provider.  Everything recorded in the Vaara audit
-trail.
+Governs ``POST /v1/chat/completions`` and ``POST /v1/messages``: each call is
+checked against the model and rate policy, recorded in the Vaara audit trail,
+and has the secrets named in ``--seal-file`` replaced before it leaves. Every
+other path is forwarded to the upstream unrecorded and unsealed. Nothing
+beyond the ``--seal-file`` values is removed from a request; ``--redact`` masks
+only the trail's copy of the prompt.
 
 Usage::
 
@@ -39,6 +42,17 @@ from vaara.audit.sqlite_backend import SQLiteAuditBackend
 from vaara.pipeline import InterceptionPipeline
 from vaara.taxonomy.actions import create_default_registry
 from .llm_actions import LLM_ACTIONS
+
+#: What the proxy does, stated to the edge of what it does. Shared by
+#: ``vaara llm-proxy --help`` and the subcommand list so the two cannot differ.
+DESCRIPTION = (
+    "Govern LLM API calls. POST /v1/chat/completions and POST /v1/messages "
+    "are checked against the model and rate policy, recorded in the Vaara "
+    "audit trail, and have the secrets named in --seal-file replaced before "
+    "they leave. Every other path is forwarded unrecorded and unsealed. "
+    "Nothing beyond the --seal-file values is removed from a request; "
+    "--redact masks only the trail's copy of the prompt."
+)
 
 
 def _build_pipeline(db: Optional[Path] = None) -> InterceptionPipeline:
@@ -84,9 +98,7 @@ def main(args: Optional[list[str]] = None) -> int:
 
     p = argparse.ArgumentParser(
         prog="vaara llm-proxy",
-        description="Govern LLM API calls: intercept prompts, "
-                    "strip secrets, enforce model/rate policies, "
-                    "record everything in the Vaara audit trail.",
+        description=DESCRIPTION,
     )
     p.add_argument(
         "--upstream", required=True,
@@ -117,7 +129,7 @@ def main(args: Optional[list[str]] = None) -> int:
     p.add_argument(
         "--mode", default="relay", choices=["relay", "govern"],
         help="relay: blind route without inspecting prompts (default). "
-             "govern: inspect, scan, redact, full audit.",
+             "govern: inspect and scan the prompt, redact the trail copy.",
     )
     p.add_argument(
         "--audit", default="meta", choices=["meta", "hash", "full"],
@@ -151,7 +163,9 @@ def main(args: Optional[list[str]] = None) -> int:
     )
     p.add_argument(
         "--redact", action="append", default=None, metavar="REGEX",
-        help="Additional regex pattern for prompt redaction (repeatable)",
+        help="Regex masked in the trail's copy of the prompt (govern mode, "
+             "--audit full; repeatable). The request sent to the provider "
+             "is unchanged.",
     )
     p.add_argument(
         "--agent-id-header", default="x-agent-id",
