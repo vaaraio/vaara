@@ -482,8 +482,8 @@ struct ContentView: View {
                             .font(.system(size: 11))
                             .foregroundStyle(p.ghost)
                     }
-                    Text("Governs AI-bound traffic from Safari, Mail and every "
-                         + "WKWebView app. macOS asks for approval in System "
+                    Text("Governs AI-bound traffic by hostname from Safari, Mail "
+                         + "and every WKWebView app. macOS asks for approval in System "
                          + "Settings > General > Login Items & Extensions.")
                         .font(.system(size: 10))
                         .foregroundStyle(p.ghost)
@@ -748,37 +748,32 @@ struct ContentView: View {
                 }
 
                 // Row 5: WEBKIT GOVERNANCE  |  status
+                //
+                // WebKit traffic is governed by the network filter and by
+                // nothing else. This row used to carry its own toggle, bound
+                // to `config.webkitGovernance`, which no code path reads, and
+                // it showed a green "Active" from that flag alone. With no
+                // filter installed that was a status display failing open.
+                // The dot and text now come from the same system probe as the
+                // NETWORK FILTER row, so the two can never disagree.
                 GridRow {
                     VStack(alignment: .leading, spacing: 8) {
                         sectionLabelPlain("WEBKIT GOVERNANCE")
-                        Toggle(isOn: $model.config.webkitGovernance) {
-                            Text("Govern WebKit actions")
-                                .font(.system(size: 13)).foregroundStyle(p.ink)
-                        }
-                        .toggleStyle(.switch)
-                        .controlSize(.mini)
-                        .tint(model.state.color)
-                        Text("Intercepts AI traffic from Safari, Mail, and all "
-                             + "WebKit-based apps. Requires Network Extension.")
+                        Text("AI-bound traffic from Safari, Mail and WebKit "
+                             + "apps, governed by hostname through the network "
+                             + "filter. It needs the filter installed and "
+                             + "enabled; builds without a signed system "
+                             + "extension cannot load it.")
                             .font(.system(size: 9))
                             .foregroundStyle(p.ghost)
                     }
 
                     VStack(alignment: .leading, spacing: 8) {
-                        if model.config.webkitGovernance {
-                            HStack(spacing: 6) {
-                                Circle().fill(Color.green).frame(width: 7, height: 7)
-                                Text("Active")
-                                    .font(.system(size: 11))
-                                    .foregroundStyle(p.ghost)
-                            }
-                        } else {
-                            HStack(spacing: 6) {
-                                Circle().fill(Color.gray).frame(width: 7, height: 7)
-                                Text("Inactive")
-                                    .font(.system(size: 11))
-                                    .foregroundStyle(p.ghost)
-                            }
+                        HStack(spacing: 6) {
+                            Circle().fill(filterDotColor).frame(width: 7, height: 7)
+                            Text(systemExtension.state == .active ? "Active" : "Not active")
+                                .font(.system(size: 11))
+                                .foregroundStyle(p.ghost)
                         }
                     }
                 }

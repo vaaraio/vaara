@@ -169,6 +169,8 @@ struct Config: Codable {
     /// (e.g. when the notch is hidden via BetterDisplay and the OS reports
     /// no safe area).
     var approval_style: String = "auto"
+    /// Kept so existing menubar.json files round-trip. Nothing reads it: the
+    /// WebKit row shows the network filter's real state instead.
     var webkitGovernance: Bool = false
     /// Where the engine's `.vaara` tree is, when it is not this user's home.
     /// nil means the native home, which is every install that has never had
