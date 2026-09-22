@@ -6,6 +6,14 @@ and this project follows [Semantic Versioning](https://semver.org/spec/v2.0.0.ht
 
 ## [Unreleased]
 
+## [1.94.0] - 2026-09-22
+
+### Upgrading
+- Re-run `vaara init` after upgrading. It writes `protection: balanced` into `~/.vaara/claude-code/config.json` when the key is absent, and an install without that key has been scoring at 0.40 / 0.70, a pair belonging to no mode.
+- `AdaptiveScorer` now requires the allow threshold to sit strictly below the deny threshold, and the defaults moved to 0.55 / 0.85. A lone `threshold_deny` below 0.55, such as `AdaptiveScorer(threshold_deny=0.5)`, raises. Pass both thresholds or name a mode.
+- The llm-proxy answers 503 with `"type": "vaara_trail_not_recording"` when it cannot record a request, where it used to forward. `--fail-open` restores forwarding and says so on every request.
+- In a Claude Code session, an `mcp__*` call that cannot be scored or recorded is now refused. `"fail_open": true` in `~/.vaara/claude-code/config.json` or shadow mode lets it through.
+
 ### Fixed
 - The llm-proxy forwarded requests it could not record. A failed trail write was counted and logged as THE TRAIL IS NOT RECORDING, and the request went out anyway: on 2026-09-22, 169 prompts across 68 minutes reached the provider with no record. The proxy now checks that each prompt record reached the store. When it did not, the proxy repairs the store and tries once more, and if the record still cannot be written it answers 503 with `"type": "vaara_trail_not_recording"` and forwards nothing. Repair reads the whole file, so it runs at most once every 30 seconds; between attempts a failing store is refused straight away. `--fail-open` forwards unrecorded on purpose and says so at startup and on every request.
 - Repairing a damaged trail could drop records without saying so. Seq 1505 of one trail on the maintainer's machine was lost to a hand `.recover`, and seq 30415 of the llm-proxy trail is missing from every copy on disk with nothing in the trail marking it. `vaara trail repair --db <path>` runs `PRAGMA integrity_check` and tries `REINDEX` first, which rebuilds indexes and touches no record. Only when the table itself is damaged does it salvage: every row that can still be read is copied into a fresh file with its original seq and hash, the damaged file is kept beside it as `<db>.corrupt-<time>`, and a new `repair_gap` event is appended to the chain naming each sequence number that did not survive. A trail nothing can read is left exactly as it was. The Article 12 report lists repair gaps in its integrity section. The operator messages that used to recommend `.recover` now name this command.
