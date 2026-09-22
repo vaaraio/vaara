@@ -11,6 +11,9 @@ and this project follows [Semantic Versioning](https://semver.org/spec/v2.0.0.ht
 - The llm-proxy forwarded every path other than `POST /v1/chat/completions` and `POST /v1/messages` with no record and no sealing, so a `--seal-file` secret sent to `/v1/responses` reached the provider as written, and a call to any other endpoint left nothing in the trail. Every call is now recorded. The two chat paths keep their full record; any other call is recorded as `llm.passthrough` with its method, path, byte count and the sha256 of the bytes that left, never its content. The `--seal-file` values are replaced on every path, and the reply is unsealed when it is text. A pass-through call the trail cannot record is refused with the same 503 as a prompt, and `--fail-open` forwards it.
 - `vaara llm-proxy --help`, the subcommand list and the module docstring said the proxy strips secrets and records everything. It removes only the `--seal-file` values, and `--redact` masks the trail's copy of the prompt and leaves the request unchanged. The help now names what is recorded and how, and `tests/test_llm_proxy_claims.py` holds the text to the behaviour.
 
+### Added
+- `vaara llm-proxy --seal-known-secrets` seals values in published credential formats as well as the ones named in `--seal-file`: Anthropic, OpenAI, GitHub, AWS access key ids, Google API keys, Slack, Stripe, Hugging Face, JWTs and PEM private keys. Each matched value leaves as the same stable placeholder a named secret gets, so provider prompt caching is unaffected, and is restored in the reply, streamed or not. Every record carries `seal_kinds`, the count per format, and never the value. Emails, names and other personal data are not detected. Off by default.
+
 ## [1.94.0] - 2026-09-22
 
 ### Upgrading
