@@ -37,7 +37,7 @@ jobs:
         run: ruff check .
 
       - name: Run tests
-        run: pytest -q
+        run: pytest -q -rs
 
   adapter-contracts:
     name: Cloud adapter contracts
