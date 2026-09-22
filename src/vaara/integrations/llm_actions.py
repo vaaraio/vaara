@@ -27,4 +27,14 @@ LLM_PROMPT_EXFIL = ActionType(
     description="Prompt containing potentially sensitive data sent to LLM provider",
 )
 
-LLM_ACTIONS = [LLM_PROMPT, LLM_PROMPT_EXFIL]
+LLM_PASSTHROUGH = ActionType(
+    name="llm.passthrough",
+    category=ActionCategory.COMMUNICATION,
+    reversibility=Reversibility.FULLY,
+    blast_radius=BlastRadius.LOCAL,
+    urgency=UrgencyClass.DEFERRABLE,
+    regulatory_domains=frozenset({RegulatoryDomain.GDPR}),
+    description="Any other call forwarded to an LLM provider, recorded by hash",
+)
+
+LLM_ACTIONS = [LLM_PROMPT, LLM_PROMPT_EXFIL, LLM_PASSTHROUGH]

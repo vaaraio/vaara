@@ -470,17 +470,109 @@ def build_app(*, upstream: str, api_key: Optional[str], api_key_header: str,
         if safe_path is None:
             return JSONResponse(
                 {"error": "invalid upstream path"}, status_code=400)
+        agent_id = request.headers.get(agent_id_header, agent_id_default)
         body_bytes = await request.body()
+
+        # Until 1.95.0 every path outside _CHAT_PATHS left with no record and
+        # no sealing, so a --seal-file secret sent to /v1/responses reached
+        # the provider as written. The body here has no shape the proxy
+        # knows, so it is sealed as bytes and recorded by size and digest,
+        # never by content.
+        outbound = body_bytes
+        seal_state: dict[str, Any] = {
+            "seal_active": False, "seal_count": 0, "seal_fault": None}
+        if _seal is not None and body_bytes:
+            try:
+                _seal.refresh()
+            except Exception as exc:  # pragma: no cover - guard, not a path
+                logger.warning("seal refresh failed: %s", exc)
+            if _seal.active:
+                seal_state["seal_active"] = True
+                try:
+                    outbound = _seal.seal_bytes(body_bytes)
+                    seal_state["seal_count"] = _seal.count_sealed(outbound)
+                except Exception as exc:
+                    logger.warning(
+                        "sealing failed, forwarding unsealed: %s", exc)
+                    outbound = body_bytes
+                    seal_state["seal_fault"] = \
+                        f"{type(exc).__name__}: {exc}"[:200]
+        present: list[str] = []
+        if _markers is not None and outbound:
+            try:
+                _markers.refresh()
+                present = _markers.present(outbound)
+            except Exception as exc:  # pragma: no cover - guard, not a path
+                logger.warning("marker watch failed: %s", type(exc).__name__)
+
+        audit_params: dict[str, Any] = {
+            "method": request.method,
+            "path": safe_path,
+            "provider": provider,
+            "agent_id": agent_id,
+            "bytes_out": len(outbound),
+            "sha256_out": hashlib.sha256(outbound).hexdigest(),
+            "markers_present": present,
+            "enforce": enforce,
+        }
+        audit_params.update(seal_state)
+        result, unrecorded = _intercept_recorded(
+            agent_id=agent_id, tool_name="llm.passthrough",
+            parameters=audit_params,
+        )
+        if unrecorded is not None:
+            if not fail_open or result is None:
+                logger.error("refusing an unrecorded request: %s", unrecorded)
+                return _unrecorded_response(unrecorded)
+            logger.error("forwarding UNRECORDED (--fail-open): %s", unrecorded)
+
+        if not result.allowed and enforce:
+            pipeline.report_outcome(
+                result.action_id, outcome_severity=1.0,
+                description=_outcome("denied"))
+            return JSONResponse(
+                {"error": result.reason or "denied"}, status_code=403)
+
         headers = _upstream_headers(request.headers)
         try:
             resp = await client.request(
                 method=request.method, url=safe_path,
-                content=body_bytes, headers=headers,
+                content=outbound, headers=headers,
             )
         except httpx.RequestError as exc:
+            logger.error("Upstream request failed: %s: %s",
+                         type(exc).__name__, exc)
+            pipeline.report_outcome(
+                result.action_id, outcome_severity=0.5,
+                description=_outcome(
+                    "upstream_error", error=type(exc).__name__))
             return JSONResponse({"error": str(exc)}, status_code=502)
+
+        # A reply that is not UTF-8 (a file, an image) cannot carry a
+        # placeholder the caller needs back, so it passes as received.
+        content = resp.content
+        unseal_count = 0
+        unmapped: list[str] = []
+        if _seal is not None and _seal.active and content:
+            try:
+                text, unseal_count = _seal.unseal_text_counted(
+                    content.decode("utf-8"))
+                content = text.encode("utf-8")
+                unmapped = _seal.unmapped_placeholders(content)
+            except UnicodeDecodeError:
+                pass
+            except Exception as exc:
+                logger.warning("unsealing failed, passing through: %s", exc)
+                content = resp.content
+        pipeline.report_outcome(
+            result.action_id,
+            outcome_severity=0.0 if resp.is_success else 0.5,
+            description=_outcome(
+                "ok" if resp.is_success else "upstream_status",
+                http_status=resp.status_code,
+                unseal_count=unseal_count, unmapped_placeholders=unmapped))
         return Response(
-            content=resp.content, status_code=resp.status_code,
+            content=content, status_code=resp.status_code,
             headers=forward_response_headers(resp.headers),
         )
 
