@@ -5963,9 +5963,9 @@ def build_parser() -> argparse.ArgumentParser:
     pllp = sub.add_parser(
         "llm-proxy",
         add_help=False,
-        help="Govern LLM API calls from coding agents: intercept prompts, "
-             "strip secrets, enforce model/rate policies, "
-             "record everything in the Vaara audit trail.",
+        help="Govern LLM API calls from coding agents: record chat and "
+             "messages calls, enforce model and rate policy, hold back the "
+             "secrets named in --seal-file. Other paths pass unrecorded.",
     )
     pllp.set_defaults(func=_cmd_llm_proxy)
 
