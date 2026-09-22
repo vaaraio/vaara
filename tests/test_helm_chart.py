@@ -217,9 +217,13 @@ def test_supported_platforms_names_the_image_and_the_chart_version():
 
 
 def _helm() -> str:
-    path = shutil.which("helm") or str(Path.home() / ".local" / "bin" / "helm")
-    if not Path(path).exists():
-        pytest.skip("helm is not installed")
+    # PATH only. The old fallback to ~/.local/bin/helm read Path.home(),
+    # which conftest.py redirects to an empty sandbox at import, so the
+    # fallback could never hit and six tests skipped on any machine where
+    # helm lived only there. Put helm on PATH to run them.
+    path = shutil.which("helm")
+    if path is None:
+        pytest.skip("helm is not on PATH")
     return path
 
 
