@@ -69,9 +69,10 @@ def test_bedrock_does_not_double_report_a_modelled_block() -> None:
 
 
 def test_bedrock_missing_action_field_is_not_treated_as_intervention() -> None:
-    """An absent field asserts nothing."""
+    """An absent field asserts nothing: not a block, and not a pass either."""
     finding = parse_apply_guardrail_response({"assessments": []}, scanned_role="prompt")
-    assert finding.verdict == "allow"
+    assert finding.verdict == "unparsed"
+    assert finding.categories == ()
 
 
 # --------------------------------------------------------------------------
@@ -181,9 +182,59 @@ def test_aggregate_verdict_resolves_an_empty_category_list_to_allow() -> None:
     the adapter understood nothing. Both come out "allow".
 
     The cross-checks above close the cases where a provider states a verdict
-    the parser can compare against. A provider that returns something wholly
-    unparseable is still resolved to allow, and fixing that needs a third
-    state on the Finding rather than a change here, because making empty mean
-    block would turn every clean scan into a block.
+    the parser can compare against. A reply the parser could not read is
+    handled one level up: each parser tells ``build_finding`` whether it
+    understood the response, and an unread reply comes back ``"unparsed"``
+    (tests below). Making empty mean block here would turn every clean scan
+    into a block, so the aggregator itself stays as it is.
     """
     assert aggregate_verdict([]) == "allow"
+
+
+# --------------------------------------------------------------------------
+# The fourth verdict: a response the adapter could not read
+# --------------------------------------------------------------------------
+
+def test_unread_responses_come_back_unparsed_on_every_adapter() -> None:
+    """Each adapter, fed a reply missing the field it reads, says unparsed."""
+    from vaara.integrations.azure_content_safety import parse_responses
+    from vaara.integrations.llm_guard import parse_scan_result
+    from vaara.integrations.nemo_guardrails import parse_generation_response
+    from vaara.integrations.rebuff import parse_detect_response
+
+    assert parse_apply_guardrail_response({}).verdict == "unparsed"
+    assert parse_sanitize_response({"sanitizationResult": {}}).verdict == "unparsed"
+    assert parse_sanitize_response({"sanitizationResult": {
+        "filterMatchState": "FILTER_MATCH_STATE_UNSPECIFIED"}}).verdict == "unparsed"
+    assert parse_responses().verdict == "unparsed"
+    assert parse_responses(shield={"unexpected": True}).verdict == "unparsed"
+    assert parse_scan_result({}, {}, scanned_role="prompt").verdict == "unparsed"
+    assert parse_generation_response({}).verdict == "unparsed"
+    assert parse_detect_response({}).verdict == "unparsed"
+
+
+def test_read_clean_responses_still_allow() -> None:
+    """The same adapters, fed a clean reply they can read, still say allow."""
+    from vaara.integrations.azure_content_safety import parse_responses
+    from vaara.integrations.llm_guard import parse_scan_result
+    from vaara.integrations.nemo_guardrails import parse_generation_response
+    from vaara.integrations.rebuff import parse_detect_response
+
+    assert parse_apply_guardrail_response(
+        {"action": "NONE", "assessments": []}).verdict == "allow"
+    assert parse_sanitize_response({"sanitizationResult": {
+        "filterMatchState": "NO_MATCH_FOUND"}}).verdict == "allow"
+    assert parse_responses(
+        analyze_text={"categoriesAnalysis": []}).verdict == "allow"
+    assert parse_scan_result({"Toxicity": True}, {"Toxicity": 0.0},
+                             scanned_role="prompt").verdict == "allow"
+    assert parse_generation_response(
+        {"log": {"activated_rails": []}}).verdict == "allow"
+    assert parse_detect_response({"injectionDetected": False}).verdict == "allow"
+
+
+def test_a_read_block_is_not_downgraded_to_unparsed() -> None:
+    """A category the adapter did read wins over a missing aggregate field."""
+    response = {"assessments": [{"wordPolicy": {
+        "customWords": [{"match": "forbidden", "action": "BLOCKED"}]}}]}
+    assert parse_apply_guardrail_response(response).verdict == "block"

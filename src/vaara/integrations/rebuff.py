@@ -156,11 +156,16 @@ def parse_detect_response(
         ))
 
     raw = response if isinstance(response, dict) else {"injectionDetected": detected}
+    # Both response shapes carry the aggregate flag. Without it the layer
+    # scores above are defaults, not readings.
+    understood = _field(response, "injectionDetected", "injection_detected",
+                        default=_MISSING) is not _MISSING
     return build_finding(
         provider=_PROVIDER,
         categories=cats,
         raw=raw,
         scanned_role=scanned_role,
+        understood=understood,
     )
 
 
