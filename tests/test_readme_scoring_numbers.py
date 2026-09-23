@@ -62,11 +62,13 @@ def test_four_category_confirmation_numbers():
 def test_bipia_benign_numbers():
     d = _load("v041_bipia_benign_entries.json")
     v11, v9, v8 = (d[k]["pooled"] for k in ("v11", "v9", "v8"))
-    assert f"{pct(v11['fpr'])} {interval(v11['fpr_ci'])}" in README
-    assert f"none of {v11['n_benign']} calls" in README
+    (line,) = [ln for ln in (ROOT / "README.md").read_text().splitlines()
+               if ln.startswith("- BIPIA-pressure")]
+    assert f"{pct(v11['fpr'])} {interval(v11['fpr_ci'])}" in line
+    assert f"none of {v11['n_benign']} calls" in line
     assert v11["fp"] == 0
-    assert f"v9 flags {pct(v9['fpr'])}" in README
-    assert f"v8 {pct(v8['fpr'])}" in README
+    assert f"v9 flags {pct(v9['fpr'])}" in line
+    assert f"v8 {pct(v8['fpr'])}" in line
 
 
 def test_split_counts():
