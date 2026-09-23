@@ -6,7 +6,12 @@ and this project follows [Semantic Versioning](https://semver.org/spec/v2.0.0.ht
 
 ## [Unreleased]
 
+## [1.97.0] - 2026-09-23
+
 ### Upgrading
+- A trail migrates to schema v7 the first time 1.97.0 opens it, and `idx_seq` becomes unique. A trail that already holds two records at one seq keeps both and gets a unique index over the seqs after its last fork.
+- `vaara trail publish-head` run without a terminal publishes nothing and exits 2 unless `--yes` is given.
+- `vaara receipt anchor-scitt` appends to a persistent log under `~/.vaara/anchor-log/`; before, each run started a new log. `vaara receipt verify-scitt` without `--head` says the root was not checked.
 - Six compliance requirements and six record tags changed their article numbers to match the published texts; see Fixed. `ComplianceEngine.add_requirement` replaces a built-in requirement by domain and article, so an override registered under an old number now adds a row beside the renamed one instead of replacing it. Re-register it under the new number: EU AI Act 9(4)(a) is 9(5)(a), 9(7) is 9(6), 61(1) is 72(1), 26(10) is 26(6); DORA 10(1) is 9(1), 12(1) is 10(1). DORA 10(1) now means detection, so an override under that number replaces the detection requirement. Records already written keep the tags and requirement text they were written with.
 
 ### Fixed
