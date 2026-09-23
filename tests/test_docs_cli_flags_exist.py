@@ -52,6 +52,10 @@ NOT_OURS = {
     # undo it belong to git.
     "--cached",  # git rm --cached -r .
     "--hard",    # git reset --hard
+    # pip and gh, in docs/signing-keys.md. Verifying a Vaara release means
+    # downloading the wheel and checking its GitHub attestation.
+    "--no-deps",  # pip download
+    "--repo",     # gh attestation verify
 }
 
 

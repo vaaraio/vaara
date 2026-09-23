@@ -94,7 +94,7 @@ else:
     print(result.reason)
 ```
 
-Every call gets a risk score and an allow / block / escalate decision against your policy, then the call, the decision, and the real outcome are written to the audit trail. `report_outcome` closes the loop: the scorer reweights based on which signals actually predicted the outcome. Releases ship SLSA Build Level 3 provenance, verifiable with `slsa-verifier verify-artifact`. Optional ML classifier: `pip install 'vaara[ml]'`.
+Every call gets a risk score and an allow / block / escalate decision against your policy, then the call, the decision, and the real outcome are written to the audit trail. `report_outcome` closes the loop: the scorer reweights based on which signals actually predicted the outcome. Every release carries SLSA v1 build provenance as a GitHub artifact attestation (SLSA Build Level 2), and the PyPI wheel is the same file, so `gh attestation verify vaara-<version>-py3-none-any.whl --repo vaaraio/vaara` checks either download. Optional ML classifier: `pip install 'vaara[ml]'`.
 </details>
 
 <details>
