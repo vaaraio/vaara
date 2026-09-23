@@ -488,7 +488,15 @@ def _read_rows(conn: sqlite3.Connection, table: str, cols: list[str],
             rows.extend(conn.execute(select, (a, b)).fetchall())
         except sqlite3.DatabaseError:
             if a == b:
-                unreadable += 1
+                # A range scan steps past its last row to find the end, and
+                # past the last row of a leaf that step reads the next page.
+                # When that page is gone the row still reads by an exact seek.
+                try:
+                    rows.extend(conn.execute(
+                        f"SELECT {', '.join(cols)} FROM {table} WHERE rowid = ?", (a,)
+                    ).fetchall())
+                except sqlite3.DatabaseError:
+                    unreadable += 1
             else:
                 mid = (a + b) // 2
                 stack.append((mid + 1, b))
@@ -504,6 +512,11 @@ def _salvage(path: Path, problem: str) -> TrailRepair:
 
     try:
         src = sqlite3.connect(f"{path.as_uri()}?mode=ro", uri=True, timeout=5.0)
+        # A file shorter than the page count in its header, the last pages of
+        # a commit that never reached the disk, is refused as malformed before
+        # any row is read. writable_schema skips that check; the connection is
+        # read-only, so it cannot write the schema or anything else.
+        src.execute("PRAGMA writable_schema=ON")
     except sqlite3.Error as exc:
         return TrailRepair(db=str(path), method="failed", problem=problem,
                            error=f"cannot open for salvage: {exc}")
