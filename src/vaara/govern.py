@@ -175,11 +175,14 @@ def govern(
 
     On a fresh install the scorer has no outcome history, so its conformal
     interval is wide and a call whose point estimate sits under the allow
-    threshold can still escalate on the interval's upper bound. Expect
-    ``Blocked`` from early calls on a sensitive taxonomy name such as
-    ``tx.transfer``. The interval narrows as ``report_outcome`` feeds real
-    outcomes back. Use ``shadow=True`` to record decisions without acting
-    on them while that happens.
+    threshold can still escalate on the interval's upper bound. At the
+    default ``balanced`` point (0.55 / 0.85) a single first call is decided
+    mostly on its taxonomy name and allows: ``tx.transfer`` scores 0.275
+    [0.085, 0.465]. A burst of calls escalates, and so does a known sequence
+    such as a read followed by an export. Under ``strict``
+    (0.30 / 0.55) the same first call escalates. The interval narrows as
+    ``report_outcome`` feeds real outcomes back. Use ``shadow=True`` to
+    record decisions without acting on them while that happens.
 
     Args:
         agent_id: Identity recorded against the action ("default" if unset).

@@ -10,7 +10,7 @@ Vaara is the accountable autonomy layer: conformal risk scoring, hash-chained au
 npm install @vaara/client
 ```
 
-Requires Node.js 18+ (global `fetch`). Works in modern browsers too. Pass your own `fetch` if you want to inject one explicitly.
+Requires Node.js 18+ (global `fetch`). The package is ESM only: use `import`, not `require()`. Works in modern browsers too. Pass your own `fetch` if you want to inject one explicitly.
 
 ## Quick start
 
