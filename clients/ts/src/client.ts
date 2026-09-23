@@ -24,6 +24,7 @@
 
 import { VaaraError, VaaraTransportError, type VaaraErrorBody } from "./errors.js";
 import type {
+  AuditChain,
   AuditEventRequest,
   AuditEventResponse,
   DetectInjectionRequest,
@@ -93,18 +94,8 @@ export class VaaraClient {
     return this.post<AuditEventResponse>("/v1/audit/events", req);
   }
 
-  async getActionChain(actionId: string): Promise<{
-    action_id: string;
-    events: Array<{
-      record_id: string;
-      event_type: string;
-      record_hash: string;
-      previous_hash: string;
-      timestamp: string;
-      payload: Record<string, unknown>;
-    }>;
-  }> {
-    return this.get(
+  async getActionChain(actionId: string): Promise<AuditChain> {
+    return this.get<AuditChain>(
       `/v1/audit/actions/${encodeURIComponent(actionId)}/chain`,
     );
   }

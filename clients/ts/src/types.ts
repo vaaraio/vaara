@@ -91,10 +91,26 @@ export interface AuditEventRequest {
 }
 
 export interface AuditEventResponse {
-  record_id: string;
-  record_hash: string;
+  event_id: string;
+  chain_position: number;
+  event_hash: string;
   previous_hash: string;
   timestamp: string;
+}
+
+export interface AuditChainEvent {
+  event_id: string;
+  event_type: string;
+  chain_position: number;
+  event_hash: string;
+  previous_hash: string;
+  timestamp: string;
+  payload?: Record<string, unknown>;
+}
+
+export interface AuditChain {
+  action_id: string;
+  events: AuditChainEvent[];
 }
 
 export interface VerifyResponse {

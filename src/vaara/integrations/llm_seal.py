@@ -9,7 +9,10 @@ secret leaves as a stable placeholder and is restored in the response before
 the caller sees it.
 
 What this does NOT do, stated here because the gap matters more than the
-feature: it only covers what can be named in advance.  Novel thinking written
+feature: it only covers what can be named in advance, plus, when
+``known_formats`` is on, values matching a published credential format
+(``KNOWN_SECRET_FORMATS``). Emails, names and other personal data are not
+detected.  Novel thinking written
 as prose cannot be pre-registered, so it travels in the clear.  This bounds and
 records the channel rather than closing it.
 
@@ -42,6 +45,32 @@ _PLACEHOLDER_RE = re.compile(_PREFIX + r"[0-9a-f]{%d}" % _DIGEST_CHARS)
 PLACEHOLDER_LEN = len(_PREFIX) + _DIGEST_CHARS
 
 
+_EDGE = r"(?<![A-Za-z0-9_-])"
+
+#: Credential formats sealed when ``known_formats`` is on. Each is a format
+#: its issuer publishes, chosen so an ordinary word or identifier does not
+#: match. Order matters where one prefix contains another (``sk-ant-`` before
+#: ``sk-``). Matching runs on the JSON text as it goes out, so a PEM block is
+#: matched in its escaped form and restored in the same form.
+KNOWN_SECRET_FORMATS: tuple[tuple[str, re.Pattern[str]], ...] = (
+    ("private_key", re.compile(
+        r"-----BEGIN [A-Z ]*PRIVATE KEY-----(?:\\n|\n|[A-Za-z0-9+/=\s])+?"
+        r"-----END [A-Z ]*PRIVATE KEY-----")),
+    ("anthropic_key", re.compile(_EDGE + r"sk-ant-[A-Za-z0-9_-]{20,}")),
+    ("openai_key", re.compile(
+        _EDGE + r"sk-(?:proj-|svcacct-|admin-)?[A-Za-z0-9_-]{20,}")),
+    ("github_token", re.compile(
+        _EDGE + r"(?:gh[pousr]_[A-Za-z0-9]{36,}|github_pat_[A-Za-z0-9_]{22,})")),
+    ("aws_access_key_id", re.compile(_EDGE + r"(?:AKIA|ASIA)[0-9A-Z]{16}(?![0-9A-Z])")),
+    ("google_api_key", re.compile(_EDGE + r"AIza[0-9A-Za-z_-]{35}")),
+    ("slack_token", re.compile(_EDGE + r"xox[abprs]-[A-Za-z0-9-]{10,}")),
+    ("stripe_key", re.compile(_EDGE + r"(?:sk|rk)_(?:live|test)_[A-Za-z0-9]{16,}")),
+    ("huggingface_token", re.compile(_EDGE + r"hf_[A-Za-z0-9]{34,}")),
+    ("jwt", re.compile(
+        _EDGE + r"eyJ[A-Za-z0-9_-]{8,}\.eyJ[A-Za-z0-9_-]{8,}\.[A-Za-z0-9_-]{8,}")),
+)
+
+
 def placeholder_for(secret: str) -> str:
     """Stable placeholder for one secret, derived from its own digest."""
     digest = hashlib.sha256(secret.encode("utf-8")).hexdigest()
@@ -66,9 +95,17 @@ class SealRegistry:
     rewrite risks the provider's prompt-cache prefix.
     """
 
-    def __init__(self, secrets: Optional[dict[str, str]] = None) -> None:
+    def __init__(self, secrets: Optional[dict[str, str]] = None, *,
+                 known_formats: bool = False) -> None:
         self._pairs: list[tuple[str, str]] = []
         self._reverse: dict[str, str] = {}
+        #: Seal values matching ``KNOWN_SECRET_FORMATS`` as well as the named
+        #: ones. A matched value is learned for the life of the process so
+        #: the reply can be restored, and it survives a file reload.
+        self.known_formats = known_formats
+        self._learned: dict[str, str] = {}
+        #: Per-format counts from the most recent ``seal_bytes`` call.
+        self.last_kinds: dict[str, int] = {}
         #: Where the entries came from, if a file. ``refresh`` re-reads it.
         self._path: Optional[Path] = None
         self._mtime: Optional[float] = None
@@ -76,7 +113,10 @@ class SealRegistry:
 
     def _load(self, secrets: Optional[dict[str, str]]) -> None:
         self._pairs = []
-        self._reverse = {}
+        # Learned values outlive a reload: a reply to a request sealed before
+        # the file changed still has to be restored.
+        self._reverse = {token: value for value, token
+                         in getattr(self, "_learned", {}).items()}
         skipped = 0
         for name, secret in (secrets or {}).items():
             if not secret:
@@ -158,18 +198,40 @@ class SealRegistry:
 
     @property
     def active(self) -> bool:
-        return bool(self._pairs)
+        return bool(self._pairs) or self.known_formats
+
+    @property
+    def named(self) -> int:
+        """How many secrets the operator named. Learned values excluded."""
+        return len(self._pairs)
 
     def __len__(self) -> int:
         """How many secrets are registered. For startup reporting."""
         return len(self._pairs)
 
+    def _seal_known(self, text: str) -> str:
+        kinds: dict[str, int] = {}
+        for kind, pattern in KNOWN_SECRET_FORMATS:
+            def sub(m: re.Match[str], kind: str = kind) -> str:
+                value = m.group(0)
+                token = placeholder_for(value)
+                self._learned[value] = token
+                self._reverse[token] = value
+                kinds[kind] = kinds.get(kind, 0) + 1
+                return token
+            text = pattern.sub(sub, text)
+        self.last_kinds = kinds
+        return text
+
     def seal_text(self, text: str) -> str:
+        self.last_kinds = {}
         for secret, token in self._pairs:
             text = text.replace(secret, token)
             escaped = _json_inner(secret)
             if escaped != secret:
                 text = text.replace(escaped, token)
+        if self.known_formats:
+            text = self._seal_known(text)
         return text
 
     def unseal_text(self, text: str) -> str:
@@ -186,7 +248,7 @@ class SealRegistry:
         return text, restored
 
     def seal_bytes(self, raw: bytes) -> bytes:
-        if not self._pairs:
+        if not self.active:
             return raw
         try:
             return self.seal_text(raw.decode("utf-8")).encode("utf-8")
