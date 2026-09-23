@@ -3,22 +3,33 @@
 # SPDX-License-Identifier: AGPL-3.0-or-later
 """Vaara governance stats for the Claude Code audit trail.
 
-Reads ~/.vaara/claude-code/audit.db (or VAARA_PLUGIN_AUDIT_DB) and prints
-a summary: total records, counts by event type, top tools, last 5 actions.
+Reads the trail the hooks write to, resolved the way the hooks resolve it:
+VAARA_PLUGIN_AUDIT_DB, then the ``audit_db`` key in the plugin config (which
+``vaara init`` points at ~/.vaara/trail/audit.db), then
+~/.vaara/claude-code/audit.db. Prints total records, counts by event type,
+top tools and the last 5 actions.
 """
 from __future__ import annotations
 
-import os
 import sqlite3
 import sys
 from pathlib import Path
 
 
 def _audit_db_path() -> Path:
-    override = os.environ.get("VAARA_PLUGIN_AUDIT_DB")
-    if override:
-        return Path(override).expanduser()
-    return Path.home() / ".vaara" / "claude-code" / "audit.db"
+    """The hooks' own resolution, so stats read the trail the hooks write.
+
+    This used to stop at the environment override and the legacy default, so
+    after ``vaara init`` pointed the hooks at the unified trail, stats kept
+    reading the old file and reported it missing or stale.
+    """
+    hooks = Path(__file__).resolve().parent.parent / "hooks"
+    sys.path.insert(0, str(hooks))
+    try:
+        import _config  # type: ignore[import-not-found]
+    finally:
+        sys.path.remove(str(hooks))
+    return _config.audit_db_path(_config.load_config())
 
 
 def main() -> int:

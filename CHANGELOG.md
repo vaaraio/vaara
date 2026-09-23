@@ -7,6 +7,7 @@ and this project follows [Semantic Versioning](https://semver.org/spec/v2.0.0.ht
 ## [Unreleased]
 
 ### Fixed
+- `/vaara-stats` read the legacy trail. The hooks resolve their trail from the environment override, then the `audit_db` key that `vaara init` writes, then the legacy default; the stats script skipped the middle step, so after `vaara init` it reported on a file the hooks no longer write. It now uses the hooks' own resolution. `tests/test_vaara_stats_follows_config.py` runs the script against a config that points elsewhere.
 - `examples/data_locality_demo.py` imported a module removed when the SEP-2787 code was renamed, so it crashed on its verification step. It imports the canonicaliser the data-locality producer uses and runs again. `tests/test_examples_run.py` runs the five standalone examples from an empty home directory, and the signing-extras CI job installs `rich` so the three that render with it run there.
 
 ## [1.95.0] - 2026-09-23
