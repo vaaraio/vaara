@@ -9,6 +9,9 @@ first call. Each of those is checked here.
 from __future__ import annotations
 
 import importlib
+import json
+import re
+import sqlite3
 from pathlib import Path
 
 import pytest
@@ -36,9 +39,18 @@ def _transfer(pipeline=None):
     return transfer
 
 
-def test_first_call_allows_at_balanced():
-    assert "balanced" in DOC and "0.275" in DOC
+def test_first_call_allows_at_balanced(tmp_path):
+    assert "balanced" in DOC
     assert _transfer()("x", 1.0) == "sent"
+    db = tmp_path / ".vaara" / "trail" / "audit.db"
+    (data,) = sqlite3.connect(db).execute(
+        "select data from audit_records where event_type='decision_made'"
+    ).fetchone()
+    m = re.search(r"risk=([0-9.]+) (\[[0-9.]+, [0-9.]+\])",
+                  json.loads(data)["reason"])
+    assert m, data
+    doc = " ".join(DOC.split())
+    assert f"scores {m.group(1)} {m.group(2)}" in doc
 
 
 def test_a_burst_escalates_at_balanced():
