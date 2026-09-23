@@ -36,8 +36,15 @@ jobs:
       - name: Lint (ruff)
         run: ruff check .
 
-      - name: Run tests
-        run: pytest -q -rs
+      - name: Run tests, failing on an unreviewed skip
+        # This job installs only the server extra, so tests needing another
+        # extra skip here and run in the job that installs it. Each reason
+        # that may appear is listed in tests/ci_allowed_skips.txt; any other
+        # skip means a test stopped running and nothing said so.
+        run: |
+          set -o pipefail
+          pytest -q -rs | tee result.txt
+          python scripts/check_skips.py result.txt tests/ci_allowed_skips.txt
 
   adapter-contracts:
     name: Cloud adapter contracts
