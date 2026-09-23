@@ -37,10 +37,10 @@ Position: tamper-evident runtime evidence and enforcement layer. Signed attestat
 
 ## Numbers
 - 25,556-entry adversarial corpus (250 hand-curated + 25,306 LLM-generated); the v0.40 split assigns 24,619 leak-free by (category, generation batch) cell
-- Classifier v11 (236 hand-features + 384-dim MiniLM embeddings) at threshold 0.8800: held-out TEST recall 85.6% [83.4, 87.6] at FPR 5.1% [3.8, 6.9], n=1,827
+- Classifier v11 (254 hand-features + 384-dim MiniLM embeddings) at threshold 0.8800: held-out TEST recall 85.6% [83.4, 87.6] at FPR 5.1% [3.8, 6.9], n=1,827
 - Cross-model held-out recall 86.3% over n=5,600, against attacks written by Qwen2.5-72B, a model absent from TRAIN
-- BIPIA-pressure FPR on benign tool calls 0.0% [0.0, 1.6] across four agent backends
-- Multi-attacker PAIR ASR 0/25 per attacker across Qwen2.5-32B, Qwen2.5-72B, Llama-3.3-70B at identical seeds
+- BIPIA-pressure FPR on benign tool calls 0.0% [0.0, 0.5], none of 704 calls flagged across four agent backends
+- Multi-attacker PAIR ASR 0/25 per attacker across Qwen2.5-32B, Qwen2.5-72B, Llama-3.3-70B at identical seeds, measured on v0.31 and not re-run on v11
 - 140 µs mean / 210 µs p99 for the hot-path rule scorer, commodity CPU; the MiniLM classifier is opt-in (`vaara[ml]`) and not in that path
 
 ## Optional
