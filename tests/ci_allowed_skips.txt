@@ -6,7 +6,7 @@
 # One Python regular expression per line, matched against the reason pytest
 # prints after `SKIPPED [n] path:line: `. A skip whose reason matches none of
 # these fails the job: it means a test stopped running and nothing said so.
-could not import '(rfc8785|yaml|cbor2|asn1crypto|rebuff|joblib|dilithium_py|PIL\.Image)'
+could not import '(rfc8785|yaml|cbor2|asn1crypto|rebuff|joblib|dilithium_py|PIL\.Image|pycose)'
 attestation extra not installed
 the attestation extra
 record digest needs the attestation extra
