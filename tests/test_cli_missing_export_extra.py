@@ -7,8 +7,6 @@ README's own `vaara trail export` crashed with a traceback.
 """
 from __future__ import annotations
 
-import pytest
-
 from vaara import cli
 from vaara.audit import export as export_mod
 from vaara.audit import verify as verify_mod
