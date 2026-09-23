@@ -12,7 +12,9 @@ Two ways to apply the same rules:
 
 - ``match_deny_rule``: by tool name. A rule lists the tools it governs and
   the input fields it reads. This is the Claude Code shape, where tool
-  names are fixed (``Bash``, ``Write``, ``Agent``).
+  names are fixed (``Bash``, ``Write``, ``Agent``). Codex and Gemini CLI
+  name the same operations differently; ``HARNESS_ALIASES`` translates
+  their tool names and inputs into this shape before matching.
 - ``match_deny_rule_any_field``: by content, ignoring the tool name. An
   MCP server names its tools whatever it likes, so the proxy cannot know
   that ``run_command`` is a shell or ``put_file`` is a write. Every rule
@@ -78,6 +80,65 @@ def field_text(value: Any) -> Optional[str]:
     return None
 
 
+_PATCH_PATH = re.compile(
+    r"^\*\*\* (?:Add File|Update File|Delete File|Move to): (.+?)\s*$", re.M)
+
+
+def _codex_apply_patch(tool_input: dict) -> list[tuple[str, dict]]:
+    """A Codex patch as one Write and one Edit per file it touches.
+
+    Codex hands hooks the raw patch text under ``command``. The file rules
+    read ``file_path`` and the written text, so each path named in the patch
+    header is checked with the whole patch as its content.
+    """
+    patch = field_text(tool_input.get("command", "")) or ""
+    paths = _PATCH_PATH.findall(patch) or [""]
+    out: list[tuple[str, dict]] = []
+    for path in paths:
+        out.append(("Write", {"file_path": path, "content": patch}))
+        out.append(("Edit", {"file_path": path, "new_string": patch}))
+    return out
+
+
+def _rename(target: str, **fields: str):
+    """Translate to ``target``, copying input ``src`` to rule field ``dst``."""
+    def translate(tool_input: dict) -> list[tuple[str, dict]]:
+        if not fields:
+            return [(target, tool_input)]
+        return [(target, {dst: tool_input.get(src, "")
+                          for dst, src in fields.items()})]
+    return translate
+
+
+def _gemini_read_many(tool_input: dict) -> list[tuple[str, dict]]:
+    include = tool_input.get("include") or []
+    if isinstance(include, str):
+        include = [include]
+    return [("Read", {"file_path": p}) for p in include if isinstance(p, str)]
+
+
+#: Other harnesses' tool names, translated into the Claude Code tool and
+#: input shape the rules are written in. Checked against the harnesses' own
+#: sources: Codex ``codex-rs/core/src/tools`` (hooks already receive its shell
+#: tools as ``Bash`` with ``command``), Gemini CLI
+#: ``packages/core/src/tools/definitions/base-declarations.ts``.
+HARNESS_ALIASES = {
+    # Codex
+    "apply_patch": _codex_apply_patch,
+    "spawn_agent": _rename("Agent"),
+    # Gemini CLI
+    "run_shell_command": _rename("Bash", command="command"),
+    "write_file": _rename("Write", file_path="file_path", content="content"),
+    "replace": _rename("Edit", file_path="file_path",
+                       new_string="new_string"),
+    "read_file": _rename("Read", file_path="file_path"),
+    "read_many_files": _gemini_read_many,
+    "web_fetch": _rename("WebFetch", url="prompt"),
+    "read_mcp_resource": _rename("ReadMcpResourceTool", uri="uri"),
+    "activate_skill": _rename("Skill", skill="name"),
+}
+
+
 def _compiled(rule: dict) -> Optional[re.Pattern[str]]:
     pattern = rule.get("pattern", "")
     if not pattern:
@@ -91,7 +152,24 @@ def _compiled(rule: dict) -> Optional[re.Pattern[str]]:
 def match_deny_rule(
     rules: list[dict], tool_name: str, tool_input: dict
 ) -> Optional[tuple[str, str]]:
-    """First (rule_id, message) whose tool list names ``tool_name``, else None."""
+    """First (rule_id, message) whose tool list names ``tool_name``, else None.
+
+    A tool no rule names, but which ``HARNESS_ALIASES`` knows, is matched
+    as the Claude Code tool it translates to.
+    """
+    named = any(tool_name in rule.get("tools", []) for rule in rules)
+    if not named and tool_name in HARNESS_ALIASES:
+        for target, translated in HARNESS_ALIASES[tool_name](tool_input or {}):
+            hit = _match_named(rules, target, translated)
+            if hit is not None:
+                return hit
+        return None
+    return _match_named(rules, tool_name, tool_input)
+
+
+def _match_named(
+    rules: list[dict], tool_name: str, tool_input: dict
+) -> Optional[tuple[str, str]]:
     for rule in rules:
         if tool_name not in rule.get("tools", []):
             continue
