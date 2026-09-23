@@ -16,6 +16,8 @@ export {
   type VaaraErrorBody,
 } from "./errors.js";
 export type {
+  AuditChain,
+  AuditChainEvent,
   AuditEventRequest,
   AuditEventResponse,
   BlastRadius,
