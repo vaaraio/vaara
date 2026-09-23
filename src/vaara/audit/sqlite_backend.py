@@ -33,7 +33,13 @@ from dataclasses import dataclass, field
 from pathlib import Path
 from typing import Any, Optional
 
-from vaara.audit.trail import AuditRecord, AuditTrail, EventType
+from vaara.audit.trail import (
+    AuditRecord,
+    AuditTrail,
+    ChainVerdict,
+    EventType,
+    _GapLedger,
+)
 from vaara.auth import APIKey, Role, _hash_key, generate_api_key
 
 logger = logging.getLogger(__name__)
@@ -1188,6 +1194,10 @@ class SQLiteAuditBackend:
         export) fail loud rather than silently consuming tampered
         evidence.
 
+        A gap a REPAIR_GAP record declares is not a compromise: it is logged
+        at INFO, does not raise under ``strict``, and stays readable on
+        ``trail._load_verdict``. The trail still does not verify as intact.
+
         A single row with a corrupt ``data``/``regulatory`` JSON column
         no longer DoSes the entire load — that row is logged and loaded
         with empty dicts; the subsequent hash-chain verification will
@@ -1248,6 +1258,8 @@ class SQLiteAuditBackend:
             # time instead of being auto-allowed.
             trail._index_record(record)
             trail._last_hash = record.record_hash
+            if isinstance(row[10], int):
+                trail._store_seqs[record.record_id] = row[10]
 
         # Expose the skeleton-row count on the returned trail so callers
         # can observe reload-time corruption without parsing logs. This
@@ -1264,7 +1276,14 @@ class SQLiteAuditBackend:
                 corrupt_rows - CORRUPT_ROW_LOG_LIMIT,
             )
 
-        chain_error = trail.verify_chain()
+        verdict = trail.verify_chain_verdict()
+        trail._load_verdict = verdict
+        chain_error = verdict.error
+        if verdict.declared_gaps:
+            # Known, declared, and reported once per session by whoever owns
+            # the operator's attention (the hook's session start). Logging it
+            # at ERROR on every open printed the same line on every tool call.
+            logger.info("audit chain: %s", verdict.summary())
         if chain_error:
             logger.error("AUDIT CHAIN INTEGRITY FAILURE: %s", chain_error)
             if strict:
@@ -1328,9 +1347,36 @@ class SQLiteAuditBackend:
         memory (see ``_journal_mode_for``) does not, so on those a long verify
         does still contend. An in-memory store has no second connection to
         open and is read under the lock.
+
+        A gap a REPAIR_GAP record declares returns a string starting "Chain
+        not intact", never None; ``verify_chain_streaming_verdict`` tells it
+        apart from a break.
+        """
+        return self.verify_chain_streaming_verdict(
+            start_seq=start_seq,
+            expected_previous_hash=expected_previous_hash,
+            on_progress=on_progress,
+            progress_every=progress_every,
+        ).summary()
+
+    def verify_chain_streaming_verdict(
+        self,
+        *,
+        start_seq: int = 0,
+        expected_previous_hash: str = "",
+        on_progress: Optional[Any] = None,
+        progress_every: int = 100_000,
+    ) -> ChainVerdict:
+        """The walk behind ``verify_chain_streaming``, declared gaps apart.
+
+        Same rule as ``AuditTrail.verify_chain_verdict``: a break is declared
+        only across missing seqs that a later REPAIR_GAP record names in full.
+        Only the declarations themselves are held, not the records.
         """
         t_clause, t_params = self._tenant_clause()
+        ledger = _GapLedger()
         prev_hash = expected_previous_hash
+        prev_seq: Optional[int] = None
         seen = 0
         last_seq = start_seq - 1
         sql = (f"SELECT * FROM audit_records WHERE {t_clause} AND seq >= ? "
@@ -1351,24 +1397,29 @@ class SQLiteAuditBackend:
                 try:
                     record = self._row_to_record(row)
                 except (json.JSONDecodeError, ValueError, KeyError, TypeError) as exc:
-                    return (
+                    return ChainVerdict(error=(
                         f"Unreadable record at seq {seq} ({row[0]}): "
                         f"{type(exc).__name__}: {exc}"
-                    )
+                    ))
                 if record.previous_hash != prev_hash:
-                    return (
+                    error = (
                         f"Chain broken at seq {seq} ({record.record_id}): "
                         f"expected previous_hash={prev_hash!r}, "
                         f"got {record.previous_hash!r}"
                     )
+                    if prev_seq is None or seq <= prev_seq + 1:
+                        return ChainVerdict(error=error)
+                    ledger.hold(seen, tuple(range(prev_seq + 1, seq)), seq, error)
                 expected = record.compute_hash()
                 if record.record_hash != expected:
-                    return (
+                    return ChainVerdict(error=(
                         f"Hash mismatch at seq {seq} ({record.record_id}, "
                         f"agent_id={record.agent_id!r}): expected {expected!r}, "
                         f"got {record.record_hash!r}"
-                    )
+                    ))
+                ledger.see(seen, seq, record)
                 prev_hash = record.record_hash
+                prev_seq = seq
                 last_seq = seq
                 seen += 1
                 if on_progress is not None and progress_every and \
@@ -1381,7 +1432,7 @@ class SQLiteAuditBackend:
                 conn.close()
         if on_progress is not None and seen:
             on_progress(last_seq, prev_hash)
-        return None
+        return ledger.verdict()
 
     def count(self) -> int:
         """Total records (scoped to tenant_id if set)."""

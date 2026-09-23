@@ -615,6 +615,107 @@ class SegmentVerification:
         return asdict(self)
 
 
+@dataclass(frozen=True)
+class DeclaredGap:
+    """A break in the chain that a later REPAIR_GAP record names.
+
+    ``lost_seqs`` are the sequence numbers missing between the last record
+    before the break and ``resumes_at_seq``, the first record after it.
+    ``declared_by_seqs`` are the REPAIR_GAP records that name every one of
+    them; each sits later in the chain than the break and verified in the same
+    walk, so the declaration is itself chained evidence. ``record_index`` is
+    the position of the resuming record in the walk.
+    """
+
+    lost_seqs: tuple[int, ...]
+    resumes_at_seq: int
+    record_index: int
+    declared_by_seqs: tuple[Optional[int], ...]
+
+    def describe(self) -> str:
+        shown = ", ".join(str(s) for s in self.lost_seqs[:20])
+        if len(self.lost_seqs) > 20:
+            shown += f", ... ({len(self.lost_seqs)} in all)"
+        by = ", ".join("in this process" if s is None else str(s)
+                       for s in self.declared_by_seqs)
+        return f"seq {shown} lost, declared by repair record at seq {by}"
+
+
+@dataclass(frozen=True)
+class ChainVerdict:
+    """The full answer of a chain walk, which ``verify_chain`` flattens.
+
+    Three states. ``intact``: every record chains to the one before it.
+    ``broken``: a record does not, and nothing in the chain accounts for it,
+    or a record's hash does not match its content; ``error`` says where.
+    ``declared_gaps``: every break sits where records are missing and a later
+    REPAIR_GAP record names each missing seq. A declared gap is never intact:
+    the records in it cannot be shown to be what was written, and a
+    declaration only says the hole was known and recorded, not what was in it.
+    """
+
+    error: Optional[str] = None
+    declared_gaps: tuple[DeclaredGap, ...] = ()
+
+    @property
+    def state(self) -> str:
+        if self.error is not None:
+            return "broken"
+        return "declared_gaps" if self.declared_gaps else "intact"
+
+    def summary(self) -> Optional[str]:
+        """None when intact, else one line: the error, or the declared gaps."""
+        if self.error is not None:
+            return self.error
+        if not self.declared_gaps:
+            return None
+        n = len(self.declared_gaps)
+        return (
+            f"Chain not intact: {n} declared gap{'s' if n != 1 else ''} ("
+            + "; ".join(g.describe() for g in self.declared_gaps)
+            + "). Every other record verifies"
+        )
+
+
+class _GapLedger:
+    """Collects breaks at missing seqs, and the REPAIR_GAP records naming them.
+
+    A break is held open until the walk ends, because the record declaring
+    it is appended by the repair and so always sits later in the chain.
+    Only declarations seen after the break count.
+    """
+
+    def __init__(self) -> None:
+        self._pending: list[tuple[int, tuple[int, ...], int, str]] = []
+        self._declared: list[tuple[int, Optional[int], frozenset[int]]] = []
+
+    def hold(self, index: int, lost: tuple[int, ...], resumes_at_seq: int,
+             error: str) -> None:
+        self._pending.append((index, lost, resumes_at_seq, error))
+
+    def see(self, index: int, seq: Optional[int], record: "AuditRecord") -> None:
+        if record.event_type != EventType.REPAIR_GAP:
+            return
+        named = (record.data or {}).get("lost_seqs") or []
+        seqs = frozenset(s for s in named if isinstance(s, int) and not isinstance(s, bool))
+        if seqs:
+            self._declared.append((index, seq, seqs))
+
+    def verdict(self) -> ChainVerdict:
+        gaps = []
+        for index, lost, resumes, error in self._pending:
+            by = tuple(seq for at, seq, named in self._declared
+                       if at > index and set(lost) <= named)
+            if not by:
+                missing = ", ".join(str(s) for s in lost[:20])
+                return ChainVerdict(error=(
+                    f"{error} (seq {missing} missing and not declared by any "
+                    f"repair record)"
+                ))
+            gaps.append(DeclaredGap(lost, resumes, index, by))
+        return ChainVerdict(declared_gaps=tuple(gaps))
+
+
 # ── Audit Trail ───────────────────────────────────────────────────────────
 
 class AuditTrail:
@@ -664,6 +765,13 @@ class AuditTrail:
         # this to tell a legitimate foreign predecessor from a real break,
         # and accepts nothing it did not observe the store hand out.
         self._store_anchors: dict[str, str] = {}
+        # record_id -> store seq, filled by load_trail. verify_chain uses it to
+        # tell a break at missing seqs, which a REPAIR_GAP record can declare,
+        # from a break between adjacent seqs, which nothing can.
+        self._store_seqs: dict[str, int] = {}
+        # The verdict load_trail reached when it opened this trail, or None
+        # for a trail that was not loaded from a store.
+        self._load_verdict: Optional[ChainVerdict] = None
         # v0.40 multi-tenant: action_id -> tenant_id, seeded by
         # record_action_requested. Subsequent record_* calls (decision,
         # execution, escalation) look up the action_id so every record in
@@ -827,34 +935,70 @@ class AuditTrail:
         then NOT verified and no claim is made about it, which is the whole
         point of resuming and the reason the caller has to supply the hash it
         expects rather than have one read out of the records it is skipping.
+
+        **Declared gaps.** A break that a REPAIR_GAP record accounts for still
+        returns a string, starting "Chain not intact: N declared gap(s)", so
+        ``chain_intact`` stays False and every caller that treats non-None as
+        not intact keeps doing so. ``verify_chain_verdict`` tells the two
+        apart.
+        """
+        return self.verify_chain_verdict(
+            start_index=start_index,
+            expected_previous_hash=expected_previous_hash,
+        ).summary()
+
+    def verify_chain_verdict(
+        self,
+        *,
+        start_index: int = 0,
+        expected_previous_hash: str = "",
+    ) -> ChainVerdict:
+        """The walk behind ``verify_chain``, with declared gaps kept apart.
+
+        A break is declared only when the records either side of it came from
+        the store with seqs that are not adjacent, and a REPAIR_GAP record
+        later in the same walk names every seq between them. The resuming
+        record's own hash is still recomputed, and the walk continues from it.
+        A break between adjacent seqs, a break in records this process wrote,
+        or a gap no repair record names, is broken as before. See
+        :class:`ChainVerdict` for why a declared gap is never intact.
         """
         with self._lock:
             length = len(self._records)
             anchors = dict(self._store_anchors)
+            seqs = dict(self._store_seqs)
             if start_index < 0 or (start_index > length and length):
                 raise ValueError(
                     f"start_index {start_index} is outside the trail (len={length})"
                 )
             records = self._records
+        ledger = _GapLedger()
         prev_hash = expected_previous_hash
+        prev_seq: Optional[int] = None
         for i in range(start_index, length):
             record = records[i]
+            seq = seqs.get(record.record_id)
             if record.previous_hash != prev_hash:
                 anchor = anchors.get(record.record_id)
                 if anchor is None or record.previous_hash != anchor:
-                    return (
+                    error = (
                         f"Chain broken at record {i} ({record.record_id}): "
                         f"expected previous_hash={prev_hash!r}, "
                         f"got {record.previous_hash!r}"
                     )
+                    if seq is None or prev_seq is None or seq <= prev_seq + 1:
+                        return ChainVerdict(error=error)
+                    ledger.hold(i, tuple(range(prev_seq + 1, seq)), seq, error)
             expected = record.compute_hash()
             if record.record_hash != expected:
-                return (
+                return ChainVerdict(error=(
                     f"Hash mismatch at record {i} ({record.record_id}): "
                     f"expected {expected!r}, got {record.record_hash!r}"
-                )
+                ))
+            ledger.see(i, seq, record)
             prev_hash = record.record_hash
-        return None
+            prev_seq = seq
+        return ledger.verdict()
 
     # ── Recording events ──────────────────────────────────────────
 
