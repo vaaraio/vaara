@@ -266,9 +266,16 @@ def _record_call(cfg: dict, agent: str, tool_name: str, tool_input: dict,
         from vaara.pipeline import InterceptionPipeline
 
         pipeline = InterceptionPipeline(trail=_open_trail(cfg), enforce=False)
+        rule_id = context.get("rule_id")
         pipeline.intercept(
             agent_id=agent, tool_name=tool_name, parameters=tool_input,
             context=context, session_id=session_id,
+            # A deny rule's verdict is the decision on the record. Without
+            # this the chain carried the scorer's allow for a call the rule
+            # had blocked, so no view of the trail ever showed a block.
+            policy_decision="deny" if rule_id else None,
+            policy_reason=(f"deny rule {rule_id}: {context.get('rule_message', '')}"
+                           if rule_id else ""),
         )
     except Exception as exc:
         _note_trail_failure(cfg, exc, stage="record_call")
