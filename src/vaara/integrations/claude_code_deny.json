@@ -429,7 +429,7 @@
       "fields": [
         "command"
       ],
-      "pattern": "\\b(python3?|perl|ruby|node|install|dd)\\b(?=[^|\\n]*(?:\\.claude\\.json|\\.claude/(?:settings|hooks/|skills/|agents/|plugins/|scheduled_tasks|CLAUDE\\.md)|\\.vaara/config))(?=[^|\\n]*(?:['\\\"]w['\\\"]|>|write|truncate|unlink|shutil|os\\.remove))",
+      "pattern": "\\b(python3?|perl|ruby|node|install|dd)\\b(?=[^|\\n]*(?:\\.claude\\.json|\\.claude/(?:settings|hooks/|skills/|agents/|plugins/|scheduled_tasks|CLAUDE\\.md)|\\.vaara/config))(?=[^|\\n]*(?:['\\\"](?:[rwax]b?\\+|[wax][bt]?\\+?)['\\\"]|mode\\s*=\\s*['\\\"][wax+]|write|truncate|unlink|rmtree|shutil|os\\.(?:remove|rename|replace)))",
       "unless_env": "VAARA_ALLOW_HARNESS_EDIT",
       "message": "An interpreter writes the harness or governance configuration. The shell rule names sed, tee, cp, mv, rm, chmod, truncate and redirection; python, perl, ruby, node, install and dd write the same file through none of them. Set VAARA_ALLOW_HARNESS_EDIT=1."
     },
