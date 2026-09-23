@@ -6,6 +6,9 @@ and this project follows [Semantic Versioning](https://semver.org/spec/v2.0.0.ht
 
 ## [Unreleased]
 
+### Fixed
+- The macOS menu-bar app found no trails when `~/.vaara` was a symlink, which is how a Mac sees an engine running in a VM or container with a shared home. `FileManager`'s enumerator does not follow a symlink at its root, so discovery walked nothing, "Find trails in ~/.vaara" reported no new trails, and the app kept watching whatever paths it had saved before. Discovery now resolves the link first.
+
 ## [1.97.0] - 2026-09-23
 
 ### Upgrading
