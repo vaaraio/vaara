@@ -430,6 +430,7 @@ def run_init(
     # Auto-discovery.
     auto: bool = False,
     mode: str = "eco",
+    set_hook_mode: bool = True,
 ) -> InitReport:
     """Set up (or self-heal) local governance in one call.
 
@@ -461,8 +462,15 @@ def run_init(
         )
 
     report.hooks_changed = write_claude_hooks(settings_path, vaara_bin)
-    write_hook_config(config_path, trail_db, shadow=shadow, auto=auto,
-                      auto_preset=mode if auto else None)
+    # ``set_hook_mode=False`` keeps the hook's mode and preset as they are.
+    # The silent first-run setup uses it: it runs on the first use of any
+    # command, and letting it switch the hooks to watch would stop them
+    # blocking with no word to the operator.
+    if set_hook_mode:
+        write_hook_config(config_path, trail_db, shadow=shadow, auto=auto,
+                          auto_preset=mode if auto else None)
+    else:
+        write_hook_config(config_path, trail_db)
 
     report.clients = detect_clients(proxy_bin)
     if govern_mcp:

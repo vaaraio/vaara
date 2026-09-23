@@ -63,3 +63,23 @@ def test_run_init_shadow_reaches_the_file_the_hook_reads(tmp_path):
              config_path=cfg, vaara_bin="vaara", shadow=True, govern_mcp=False)
     # The predicate the hook itself uses to decide it must not block.
     assert hooks.shadow_mode(_cfg(cfg))
+
+
+def test_silent_first_run_setup_leaves_the_hooks_blocking(tmp_path):
+    """The first use of any command runs setup with shadow and auto. It must
+    not switch the hooks to watch: that would stop them blocking unasked."""
+    cfg = tmp_path / "config.json"
+    run_init(trail_db=tmp_path / "audit.db", settings_path=tmp_path / "s.json",
+             config_path=cfg, vaara_bin="vaara", shadow=True, auto=False,
+             govern_mcp=False, set_hook_mode=False)
+    assert not hooks.shadow_mode(_cfg(cfg))
+
+
+def test_the_cli_first_run_passes_set_hook_mode_false(monkeypatch):
+    from vaara import cli
+    from vaara.integrations import init_governance as ig
+
+    seen = {}
+    monkeypatch.setattr(ig, "run_init", lambda **kw: seen.update(kw))
+    cli._run_first_time_setup()
+    assert seen.get("set_hook_mode") is False

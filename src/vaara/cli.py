@@ -7220,8 +7220,10 @@ def _run_first_time_setup() -> None:
     from vaara.integrations import init_governance as ig
 
     try:
+        # set_hook_mode=False: this runs silently on the first use of any
+        # command, so it must not switch the hooks from blocking to watching.
         ig.run_init(shadow=True, auto=True, mode="balanced",
-                     trail_db=ig.DEFAULT_TRAIL_DB)
+                     trail_db=ig.DEFAULT_TRAIL_DB, set_hook_mode=False)
     except Exception:
         pass  # silent — next invocation will retry
 
