@@ -5964,7 +5964,7 @@ def build_parser() -> argparse.ArgumentParser:
         "llm-proxy",
         add_help=False,
         help="Govern LLM API calls from coding agents: record every call "
-             "(chat and messages with their prompt, others by hash), enforce "
+             "(chat, messages and responses with their prompt, others by hash), enforce "
              "model and rate policy, hold back the secrets named in "
              "--seal-file.",
     )

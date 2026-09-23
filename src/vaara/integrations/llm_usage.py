@@ -44,6 +44,17 @@ def _normalise(usage: Any) -> dict[str, int]:
     put("cache_creation_input_tokens",
         usage.get("cache_creation_input_tokens"))
 
+    # The Responses API borrows Anthropic's names with OpenAI's meaning: its
+    # input_tokens INCLUDES the cached share, reported in
+    # input_tokens_details. Anthropic never sends that key, so its presence
+    # says which meaning applies.
+    details = usage.get("input_tokens_details")
+    if isinstance(details, dict) and isinstance(
+            details.get("cached_tokens"), int) and "input_tokens" in out:
+        cached = details["cached_tokens"]
+        out["cache_read_input_tokens"] = cached
+        out["input_tokens"] = max(0, out["input_tokens"] - cached)
+
     # OpenAI uses prompt/completion, and hides the cached share one level
     # down. Its prompt_tokens INCLUDES the cached part, where Anthropic's
     # input_tokens excludes it, so the cached count is subtracted back out
@@ -134,9 +145,12 @@ class StreamUsage:
             if not isinstance(event, dict):
                 continue
             self._absorb(event.get("usage"))
-            message = event.get("message")
-            if isinstance(message, dict):
-                self._absorb(message.get("usage"))
+            # Anthropic nests it in message_start's "message", the
+            # Responses API in response.completed's "response".
+            for key in ("message", "response"):
+                inner = event.get(key)
+                if isinstance(inner, dict):
+                    self._absorb(inner.get("usage"))
 
     def _absorb(self, usage: Any) -> None:
         for key, value in _normalise(usage).items():

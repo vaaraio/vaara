@@ -2,9 +2,9 @@
 # SPDX-License-Identifier: AGPL-3.0-or-later
 """``vaara llm-proxy`` — govern LLM API calls from coding agents.
 
-Governs ``POST /v1/chat/completions`` and ``POST /v1/messages``: each call is
-checked against the model and rate policy and recorded in the Vaara audit trail
-with its prompt. Every other call is recorded by method, path, size and
+Governs ``POST /v1/chat/completions``, ``POST /v1/messages`` and
+``POST /v1/responses``: each call is checked against the model and rate policy
+and recorded in the Vaara audit trail with its prompt. Every other call is recorded by method, path, size and
 sha256. The secrets named in ``--seal-file`` are replaced on every path before
 the request leaves. Nothing beyond those values is removed from a request;
 ``--redact`` masks only the trail's copy of the prompt.
@@ -46,12 +46,13 @@ from .llm_actions import LLM_ACTIONS
 #: What the proxy does, stated to the edge of what it does. Shared by
 #: ``vaara llm-proxy --help`` and the subcommand list so the two cannot differ.
 DESCRIPTION = (
-    "Govern LLM API calls. POST /v1/chat/completions and POST /v1/messages "
-    "are checked against the model and rate policy and recorded in the Vaara "
-    "audit trail with their prompt. Every other call is recorded by method, "
+    "Govern LLM API calls. POST /v1/chat/completions, POST /v1/messages and "
+    "POST /v1/responses are checked against the model and rate policy and "
+    "recorded in the Vaara audit trail with their prompt. Every other call is recorded by method, "
     "path, size and sha256, never by content. The secrets named in "
     "--seal-file are replaced on every path before the request leaves. "
-    "Nothing beyond the --seal-file values is removed from a request; "
+    "With --seal-known-secrets, values in published credential formats are "
+    "sealed too. Nothing else is removed from a request; "
     "--redact masks only the trail's copy of the prompt. A call the trail "
     "cannot record is refused unless --fail-open is set."
 )
@@ -188,6 +189,16 @@ def main(args: Optional[list[str]] = None) -> int:
              "off and the proxy runs unchanged.",
     )
     p.add_argument(
+        "--seal-known-secrets", action="store_true",
+        help="Also seal values matching a published credential format: "
+             "Anthropic, OpenAI, GitHub, AWS access key id, Google API key, "
+             "Slack, Stripe, Hugging Face, JWT and PEM private keys. Each is "
+             "replaced with a stable placeholder before the request leaves "
+             "and restored in the reply, and each record counts what was "
+             "sealed by format. Emails, names and other personal data are "
+             "not detected. Off by default.",
+    )
+    p.add_argument(
         "--allow-unsealed", action="store_true",
         help="Start even when --seal-file loads no secrets. Without this the "
              "proxy refuses, because an operator who passed --seal-file "
@@ -292,7 +303,8 @@ def main(args: Optional[list[str]] = None) -> int:
     seal_path = str(parsed.seal_file) if parsed.seal_file else None
     seal = SealRegistry.from_file(seal_path) if seal_path \
         else SealRegistry()
-    if seal_path and not seal.active:
+    seal.known_formats = bool(parsed.seal_known_secrets)
+    if seal_path and not seal.named:
         # An operator who passed --seal-file believes secrets are being held
         # back. Running anyway would be the proxy claiming what it does not
         # do, so it refuses unless told the unsealed run is intended.
@@ -339,8 +351,10 @@ def main(args: Optional[list[str]] = None) -> int:
         fail_open=parsed.fail_open,
     )
 
-    seal_note = f", sealing {len(seal)} secret(s)" if seal.active \
+    seal_note = f", sealing {seal.named} named secret(s)" if seal.named \
         else ""
+    if seal.known_formats:
+        seal_note += ", sealing known credential formats"
     if markers is not None and markers.active:
         seal_note += f", watching {len(markers)} marker(s)"
     if parsed.compact_history > 0:
