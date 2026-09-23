@@ -7,6 +7,7 @@ and this project follows [Semantic Versioning](https://semver.org/spec/v2.0.0.ht
 ## [Unreleased]
 
 ### Fixed
+- `/vaara-setup` offered "Paranoid" as the tightest blocking and mapped it to `eco`. `strict` holds and denies at lower scores than `eco` on both thresholds (0.30 / 0.55 against 0.40 / 0.60), so a user asking for the most protection got less than the option labelled "Strict". The options are now listed loosest first, `eco` is offered as "Tight", and `strict` is the tightest. `tests/test_setup_preset_order.py` reads the order from the mode table.
 - `examples/data_locality_demo.py` imported a module removed when the SEP-2787 code was renamed, so it crashed on its verification step. It imports the canonicaliser the data-locality producer uses and runs again. `tests/test_examples_run.py` runs the five standalone examples from an empty home directory, and the signing-extras CI job installs `rich` so the three that render with it run there.
 
 ## [1.95.0] - 2026-09-23
