@@ -170,8 +170,9 @@ def to_hook_events(event: dict) -> list[dict]:
     return events
 
 
-def tool_response(output: Any) -> dict:
+def tool_response(event: dict) -> dict:
     """Map ``tool.execute.after``'s output onto the fields the outcome reads."""
+    output = event.get("output") if isinstance(event, dict) else None
     if not isinstance(output, dict):
         return {}
     metadata = output.get("metadata")

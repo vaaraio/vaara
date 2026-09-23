@@ -198,7 +198,14 @@ def match_deny_rule(
 # ---------------------------------------------------------------------------
 # runners
 
+#: The last line the runner emitted, for clients that carry the reason in
+#: their verdict (Cursor reads it from stdout JSON, not stderr).
+_last_message = ""
+
+
 def _emit(message: str) -> None:
+    global _last_message
+    _last_message = message
     print(message, file=sys.stderr, flush=True)
 
 
@@ -334,20 +341,62 @@ def _ungovernable(cfg: dict, tool_name: str, reason: str) -> int:
     return 2
 
 
-def _client_events(cfg: dict, client: Optional[str]) -> tuple[list[dict], str]:
-    """The hook events for this call, and the agent id they are recorded under.
+#: Clients whose events arrive in their own shape, and the module that
+#: translates them. Claude Code's events are already in the runner's shape.
+_CLIENT_MODULES = {
+    "opencode": "vaara.integrations.opencode",
+    "cursor": "vaara.integrations.cursor",
+}
 
-    Claude Code sends one event in the hook's own shape. OpenCode's plugin
-    sends its tool call as OpenCode names it, which is translated here; a
-    patch over several files becomes one event per file for the deny rules.
+
+def _client_module(client: Optional[str]):
+    name = _CLIENT_MODULES.get(client or "")
+    if name is None:
+        return None
+    import importlib
+
+    return importlib.import_module(name)
+
+
+def _client_events(
+    cfg: dict, client: Optional[str], event: dict,
+) -> tuple[list[dict], str, Optional[str], Optional[str]]:
+    """The hook events for this call, its agent id, its client, and who
+    renders the verdict.
+
+    A translated client's call becomes one or more events in the runner's
+    shape; a patch over several files becomes one per file for the deny
+    rules. Cursor also runs the Claude Code hooks it imports from
+    ``~/.claude/settings.json``, so a Cursor payload can arrive without
+    ``--client``. It is recognised by its shape and decided as Cursor's,
+    except when Vaara's native Cursor hook is installed too: then it
+    returns no events and the native hook decides, so one call is decided
+    once. The client is None for Claude Code. The renderer is None on the
+    imported path too, where Claude Code's exit codes apply.
     """
-    event = _read_event()
-    if client == "opencode":
-        from vaara.integrations import opencode
+    render: Optional[str] = client
+    if client in (None, "claude-code"):
+        from vaara.integrations import cursor
 
-        agent = os.environ.get("VAARA_PLUGIN_AGENT_ID") or opencode.AGENT_ID
-        return opencode.to_hook_events(event), agent
-    return [event], agent_id(cfg)
+        if cursor.is_cursor_event(event):
+            if cursor.native_hook_installed():
+                return [], cursor.AGENT_ID, "cursor", None
+            client, render = "cursor", None
+    module = _client_module(client)
+    if module is None:
+        return [event], agent_id(cfg), None, None
+    agent = os.environ.get("VAARA_PLUGIN_AGENT_ID") or module.AGENT_ID
+    return module.to_hook_events(event), agent, client, render
+
+
+def _render(render: Optional[str], code: int) -> int:
+    """Print the verdict the client expects on stdout, if it expects one."""
+    module = _client_module(render)
+    if module is None or not hasattr(module, "render_pre"):
+        return code
+    out, code = module.render_pre(code, _last_message)
+    print(out, flush=True)
+    return code
 
 
 def run_pre_tool_use(deny_patterns: Optional[str] = None,
@@ -355,8 +404,15 @@ def run_pre_tool_use(deny_patterns: Optional[str] = None,
     """PreToolUse: exit 0 allows, exit 2 blocks or holds for review."""
     cfg = load_config()
     if plugin_disabled(cfg):
+        return _render(client, 0)
+    events, agent, _, render = _client_events(cfg, client, _read_event())
+    if not events:
         return 0
-    events, agent = _client_events(cfg, client)
+    return _render(render, _decide_pre(cfg, events, agent, deny_patterns))
+
+
+def _decide_pre(cfg: dict, events: list[dict], agent: str,
+                deny_patterns: Optional[str]) -> int:
     event = events[0]
     tool_name = event.get("tool_name", "")
     tool_input = event.get("tool_input", {}) or {}
@@ -561,16 +617,14 @@ def run_post_tool_use(client: Optional[str] = None) -> int:
     cfg = load_config()
     if plugin_disabled(cfg):
         return 0
-    if client == "opencode":
-        from vaara.integrations import opencode
-
-        raw = _read_event()
-        event = opencode.to_hook_events(raw)[0]
-        event["tool_response"] = opencode.tool_response(raw.get("output"))
-        agent = os.environ.get("VAARA_PLUGIN_AGENT_ID") or opencode.AGENT_ID
-    else:
-        event = _read_event()
-        agent = agent_id(cfg)
+    raw = _read_event()
+    events, agent, resolved, _ = _client_events(cfg, client, raw)
+    if not events:
+        return 0
+    event = events[0]
+    module = _client_module(resolved)
+    if module is not None:
+        event["tool_response"] = module.tool_response(raw)
     tool_name = event.get("tool_name", "")
     severity = _outcome_severity(event.get("tool_response", {}))
 
