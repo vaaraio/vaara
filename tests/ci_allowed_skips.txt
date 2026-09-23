@@ -24,3 +24,4 @@ pq extra not installed
 ^environment skips \d+ suites against \d+ on the page
 ^no case file: the harness ships without one
 ^tomllib is Python 3\.11\+$
+^examples need rich$

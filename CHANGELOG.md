@@ -6,6 +6,9 @@ and this project follows [Semantic Versioning](https://semver.org/spec/v2.0.0.ht
 
 ## [Unreleased]
 
+### Fixed
+- `examples/data_locality_demo.py` imported a module removed when the SEP-2787 code was renamed, so it crashed on its verification step. It imports the canonicaliser the data-locality producer uses and runs again. `tests/test_examples_run.py` runs the five standalone examples from an empty home directory, and the signing-extras CI job installs `rich` so the three that render with it run there.
+
 ## [1.95.0] - 2026-09-23
 
 ### Upgrading
