@@ -803,7 +803,7 @@ class AuditTrail:
 
         This is the process's view. The complete chain is verified by
         reloading it from the store, which is what ``load_trail`` does on
-        every open and what ``vaara verify`` and the export path use.
+        every open and what ``vaara trail export`` and ``vaara dashboard`` use.
 
         **Memory.** The walk holds one record at a time. It used to open with
         ``snapshot = list(self._records)``, and measured, that copy was the

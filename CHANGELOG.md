@@ -6,6 +6,14 @@ and this project follows [Semantic Versioning](https://semver.org/spec/v2.0.0.ht
 
 ## [Unreleased]
 
+### Fixed
+- `vaara trail export` and `vaara trail verify` crashed with an ImportError traceback on an install without the `[export]` extra. They now print the install hint and exit 2, as `vaara keygen` already did. `tests/test_cli_missing_export_extra.py` runs both commands with cryptography missing.
+- The README quick-start said to sign a trail with `vaara trail export` after `pip install vaara`, which does not include the signing dependencies. It now says signing needs `pip install 'vaara[export]'`.
+- The README showed the conformance runner with no install step, so a reader who ran it after `pip install vaara` saw most suites fail on a missing `rfc8785`. The block now starts with the clone and `pip install cryptography rfc8785`, the only two packages the checkers need.
+- The `@vaara/client` README did not say the package is ESM only, and `require()` fails with `ERR_PACKAGE_PATH_NOT_EXPORTED`. It says so now.
+- The `vaara.govern` docstring said to expect `Blocked` from early calls on `tx.transfer` on a fresh install. That stopped being true in 1.94.0, when the default became balanced (0.55 / 0.85): a first `tx.transfer` allows at 0.275 [0.085, 0.465]. The docstring now says a single first call allows at balanced, that a burst or a known sequence escalates, and that `strict` escalates the first call. `tests/test_govern_docstring_claims.py` checks all three.
+- The `AuditTrail.verify_chain` docstring named a `vaara verify` command that does not exist. It names `vaara trail export` and `vaara dashboard`, which reload and verify the chain from the store.
+
 ## [1.96.0] - 2026-09-23
 
 ### Upgrading

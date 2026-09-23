@@ -46,7 +46,7 @@ def transfer_funds(to: str, amount: float) -> str:
     ...
 ```
 
-That is the whole thing. Every call to a governed function is risk-scored and decided against your policy before the body runs. An allowed call runs, and the decision, the call, and the outcome land in a hash-chained, tamper-evident record anyone can verify offline. Sign it at export (`vaara trail export`) for third-party proof. Records persist to `~/.vaara/trail/audit.db` by default, so evidence survives restarts. Python 3.10+, zero runtime dependencies.
+That is the whole thing. Every call to a governed function is risk-scored and decided against your policy before the body runs. An allowed call runs, and the decision, the call, and the outcome land in a hash-chained, tamper-evident record anyone can verify offline. Sign it at export (`vaara trail export`, which needs `pip install 'vaara[export]'`) for third-party proof. Records persist to `~/.vaara/trail/audit.db` by default, so evidence survives restarts. Python 3.10+, zero runtime dependencies.
 
 Both `deny` and `escalate` raise `vaara.Blocked`, since an escalation means a human has not answered yet. On a fresh install the example above runs. The default operating point is `balanced`, which allows below 0.55 and denies above 0.85, and a first call to `transfer_funds` scores 0.275 with a conformal interval of [0.085, 0.465]. Vaara decides on the interval's upper bound, and with no outcome history that interval is wide, so a riskier call escalates before its point estimate reaches the threshold. Feeding real outcomes back through `report_outcome` narrows it. The other presets are listed by `vaara mode list`. To watch decisions without acting on them, start with `@vaara.govern(shadow=True)`.
 
@@ -65,6 +65,8 @@ The explorer on the same page reads the public transparency log straight from yo
 The aggregate runner grades every suite at once, and grades another implementation's vectors the same way:
 
 ```bash
+git clone https://github.com/vaaraio/vaara && cd vaara
+pip install cryptography rfc8785                                     # the checkers' only dependencies
 python scripts/conformance_runner.py                                 # grade the reference corpus
 python scripts/conformance_runner.py --vectors-dir ./your_vectors    # grade your own
 ```

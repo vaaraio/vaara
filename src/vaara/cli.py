@@ -557,13 +557,18 @@ def _cmd_trail_export(args: argparse.Namespace) -> int:
     out = Path(args.out).expanduser()
     out.parent.mkdir(parents=True, exist_ok=True)
 
-    result = export_signed(
-        trail,
-        out_path=out,
-        signer_key=Path(args.key).expanduser(),
-        agent_id=args.agent_id or "",
-        revocation=revocation,
-    )
+    # The module imports without cryptography; the check fires on the call.
+    try:
+        result = export_signed(
+            trail,
+            out_path=out,
+            signer_key=Path(args.key).expanduser(),
+            agent_id=args.agent_id or "",
+            revocation=revocation,
+        )
+    except ImportError as exc:
+        print(exc, file=sys.stderr)
+        return 2
 
     print(f"Exported signed trail to {result.path}")
     print(f"  records:      {result.manifest['record_count']}")
@@ -641,7 +646,11 @@ def _cmd_trail_verify(args: argparse.Namespace) -> int:
         return 2
 
     pubkey = Path(args.pubkey).expanduser() if args.pubkey else None
-    result = verify_signed(Path(args.zip).expanduser(), public_key=pubkey)
+    try:
+        result = verify_signed(Path(args.zip).expanduser(), public_key=pubkey)
+    except ImportError as exc:
+        print(exc, file=sys.stderr)
+        return 2
 
     if result.manifest:
         print("Manifest:")
