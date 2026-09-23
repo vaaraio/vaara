@@ -443,6 +443,9 @@ def _cmd_trail_repair(args: argparse.Namespace) -> int:
         if lost:
             print(f"  lost {len(lost)} record(s): seq {shown}")
             print("  a repair_gap record naming them was appended to the trail")
+        if not report.tail_named:
+            print("  the seq index did not read, so records written after the last "
+                  "readable one, if any, cannot be named")
         if report.unreadable_rowids:
             print(f"  {report.unreadable_rowids} row position(s) could not be read")
         if report.tables_damaged:

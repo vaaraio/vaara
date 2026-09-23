@@ -311,3 +311,67 @@ def test_a_trail_cut_short_by_its_last_pages_is_salvaged(trail_db: Path):
     assert _integrity(trail_db) == ["ok"]
     assert _seqs(trail_db) == readable
     assert report.records_kept == len(readable)
+
+
+def _zero_the_last_leaf(path: Path) -> set[int]:
+    """Zero the newest table leaf in place; return the seqs it held."""
+    before = _seqs(path)
+    data = bytearray(path.read_bytes())
+    ps = _page_size(data)
+    victim = _leaves(bytes(data), _root(path, "audit_records"))[-1]
+    data[(victim - 1) * ps:victim * ps] = bytes(ps)
+    path.write_bytes(bytes(data))
+    return before - _readable_by_rowid(path)
+
+
+def test_records_lost_at_the_tail_are_named_from_the_seq_index(trail_db: Path):
+    gone = _zero_the_last_leaf(trail_db)
+    assert gone, "the newest leaf must have held records"
+
+    report = repair_trail_file(trail_db)
+
+    assert report.method == "salvage", report.error
+    assert report.tail_named is True
+    assert gone <= set(report.lost_seqs)
+    assert max(report.lost_seqs) == max(gone)
+
+
+def test_the_declaration_never_reuses_a_lost_seq(trail_db: Path, capsys):
+    import json
+
+    from vaara.cli import main as cli_main
+
+    gone = _zero_the_last_leaf(trail_db)
+    assert cli_main(["trail", "repair", "--db", str(trail_db), "--format", "json"]) == 0
+    report = json.loads(capsys.readouterr().out)
+    assert set(report["lost_seqs"]) >= gone
+
+    conn = sqlite3.connect(trail_db)
+    gap_seq, gap_data = conn.execute(
+        "SELECT seq, data FROM audit_records WHERE event_type = 'repair_gap'"
+    ).fetchone()
+    conn.close()
+    assert gap_seq > max(gone)
+    assert json.loads(gap_data)["lost_seqs"] == report["lost_seqs"]
+
+    backend = SQLiteAuditBackend(trail_db)
+    trail = backend.load_trail()
+    pipeline = InterceptionPipeline(trail=trail)
+    pipeline.intercept(agent_id="repair-test", tool_name="file.read",
+                       parameters={"path": "/srv/after-repair"})
+    backend.close()
+    after = _seqs(trail_db)
+    assert not (after & gone), "a lost seq number was issued again"
+
+
+def test_without_a_readable_seq_index_the_tail_is_reported_unnamed(trail_db: Path):
+    conn = sqlite3.connect(trail_db)
+    conn.execute("DROP INDEX idx_seq")
+    conn.commit()
+    conn.close()
+    _zero_the_last_leaf(trail_db)
+
+    report = repair_trail_file(trail_db)
+
+    assert report.method == "salvage", report.error
+    assert report.tail_named is False
