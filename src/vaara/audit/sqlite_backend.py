@@ -44,7 +44,7 @@ from vaara.auth import APIKey, Role, _hash_key, generate_api_key
 
 logger = logging.getLogger(__name__)
 
-SCHEMA_VERSION = 6
+SCHEMA_VERSION = 7
 
 # How many individual corrupt rows get a detailed log line before the rest
 # collapse into a single count. A trail damaged by an older writer holds tens
@@ -300,8 +300,9 @@ CREATE INDEX IF NOT EXISTS idx_tenant_id   ON audit_records(tenant_id);
 -- append scanned the whole table and built a temp B-tree to sort it, so the
 -- cost of writing one record grew with the number of records already there:
 -- 0.12 ms on an empty trail, 4.7 ms at 10k, 16 ms at 31k. With it, 0.13 ms
--- at 31k and flat.
-CREATE INDEX IF NOT EXISTS idx_seq         ON audit_records(seq);
+-- at 31k and flat. UNIQUE since v7: a second record at one seq is a fork,
+-- so it fails the write instead (_constrain_seq).
+CREATE UNIQUE INDEX IF NOT EXISTS idx_seq  ON audit_records(seq);
 
 -- GDPR Article 17 (Right to Erasure) redaction table.
 CREATE TABLE IF NOT EXISTS gdpr_redactions (
@@ -520,6 +521,48 @@ def _read_rows(conn: sqlite3.Connection, table: str, cols: list[str],
     return rows, unreadable
 
 
+def _constrain_seq(conn: sqlite3.Connection) -> list[int]:
+    """Make a second record at an existing seq a failed write, not a fork.
+
+    Every append takes seq as max(seq) + 1 inside ``BEGIN IMMEDIATE``, which
+    is correct only while every writer shares one SQLite lock. When they do
+    not, two writers read the same max and both insert at it: two records at
+    one seq, both chained to the same parent. With ``idx_seq`` UNIQUE the
+    second INSERT fails and the fork never reaches the file.
+
+    A trail that already holds a fork keeps it; those rows are evidence and
+    are never rewritten. It keeps the plain ``idx_seq`` and gains a partial
+    unique index over every seq above its last fork, so new writes are still
+    constrained. Returns the seqs held by more than one record.
+    """
+    forks = [int(r[0]) for r in conn.execute(
+        "SELECT seq FROM audit_records GROUP BY seq HAVING COUNT(*) > 1 ORDER BY seq"
+    )]
+    indexes = {r[1]: bool(r[2]) for r in conn.execute("PRAGMA index_list(audit_records)")}
+    if not forks:
+        if not indexes.get("idx_seq"):
+            conn.execute("DROP INDEX IF EXISTS idx_seq")
+            conn.execute("CREATE UNIQUE INDEX idx_seq ON audit_records(seq)")
+        return forks
+    logger.error(
+        "audit trail has %d seq(s) held by more than one record (a fork): %s. "
+        "Those rows are kept; seq is unique from %d on",
+        len(forks), forks[:20], forks[-1] + 1,
+    )
+    conn.execute("CREATE INDEX IF NOT EXISTS idx_seq ON audit_records(seq)")
+    conn.execute(
+        "CREATE UNIQUE INDEX IF NOT EXISTS idx_seq_after_fork "
+        f"ON audit_records(seq) WHERE seq > {forks[-1]:d}"
+    )
+    return forks
+
+
+# Migrations that need code rather than a fixed script, keyed like _MIGRATIONS
+# and run after that version's script.
+# v6 to v7: seq becomes unique (v1.97.0), see _constrain_seq.
+_CODE_MIGRATIONS = {6: _constrain_seq}
+
+
 def _indexed_seqs(conn: sqlite3.Connection) -> Optional[set[int]]:
     """Every seq ``idx_seq`` lists, read from the index alone, or ``None``.
 
@@ -584,10 +627,14 @@ def _salvage(path: Path, problem: str) -> TrailRepair:
             report.tail_named = witness is not None
             placeholders = ", ".join("?" for _ in use)
             dst.execute("BEGIN")
+            # A fork already in the file is kept like any other readable row,
+            # so the unique seq index comes back after the copy, not before.
+            dst.execute("DROP INDEX IF EXISTS idx_seq")
             dst.executemany(
                 f"INSERT INTO audit_records ({', '.join(use)}) VALUES ({placeholders})",
                 rows,
             )
+            _constrain_seq(dst)
             for table in _SALVAGE_SIDE_TABLES:
                 try:
                     side_cols = [r[1] for r in src.execute(f"PRAGMA table_info({table})")]
@@ -1043,8 +1090,9 @@ class SQLiteAuditBackend:
         version the database was actually at rather than a half-migrated one.
         """
         for v in range(from_version, to_version):
-            sql = _MIGRATIONS.get(v)
-            if not sql:
+            sql = _MIGRATIONS.get(v, "")
+            step = _CODE_MIGRATIONS.get(v)
+            if not sql and step is None:
                 continue
             logger.info(
                 "Migrating audit DB schema v%d to v%d at %s",
@@ -1062,6 +1110,8 @@ class SQLiteAuditBackend:
                         )
                         continue
                     raise
+            if step is not None:
+                step(self._conn)
             # Bump schema_version per-migration, not once at the end. If
             # v to v+1 succeeds but v+1 to v+2 fails, the DB ends up correctly
             # marked at v+1 instead of stuck at the original from_version.
@@ -1308,8 +1358,8 @@ class SQLiteAuditBackend:
         if corrupt_rows > CORRUPT_ROW_LOG_LIMIT:
             logger.error(
                 "load_trail: %d corrupt record rows in %s (%d detailed above, "
-                "%d not logged) — loaded as skeletons; run `vaara verify-chain` "
-                "for the full picture",
+                "%d not logged) — loaded as skeletons; the chain check below "
+                "flags them by hash mismatch",
                 corrupt_rows, self._db_path, CORRUPT_ROW_LOG_LIMIT,
                 corrupt_rows - CORRUPT_ROW_LOG_LIMIT,
             )
