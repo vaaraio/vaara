@@ -588,8 +588,9 @@ def run_session_start() -> int:
     db_path = audit_db_path(cfg)
     existed = db_path.exists()
     reported = False
+    verdict = None
     try:
-        _open_trail(cfg)
+        verdict = _open_trail(cfg)._load_verdict
         db_state = "existing" if existed else "created"
     except Exception as exc:
         db_state = f"unavailable ({exc!r})"
@@ -634,7 +635,7 @@ def run_session_start() -> int:
     )
     _report_hook_registration()
     if not reported:
-        _report_trail_health(cfg, db_path, existed)
+        _report_trail_health(cfg, db_path, existed, verdict)
     return 0
 
 
@@ -657,7 +658,8 @@ def _report_hook_registration() -> None:
         pass
 
 
-def _report_trail_health(cfg: dict, db_path: Path, existed: bool) -> None:
+def _report_trail_health(cfg: dict, db_path: Path, existed: bool,
+                         verdict=None) -> None:
     """Once per session, on the line the operator already reads.
 
     Three questions, in order of how bad the answer is. Has this trail been
@@ -667,6 +669,11 @@ def _report_trail_health(cfg: dict, db_path: Path, existed: bool) -> None:
     the first symptom would otherwise be the next record nobody is
     watching. And is it running in a journal mode its filesystem can
     survive — the one that has not gone wrong yet.
+
+    Last, a chain with gaps a repair declared. Opening the trail on every
+    tool call no longer logs them, because a known and recorded hole printed
+    as an integrity failure on every call reads the same as a new one. Here
+    it is said once, as what it is: not intact, and declared.
     """
     try:
         from vaara.audit.sqlite_backend import journal_mode_warning
@@ -705,6 +712,14 @@ def _report_trail_health(cfg: dict, db_path: Path, existed: bool) -> None:
                 "wal, unset it."
             )
             notify(cfg, "TRAIL AT RISK", "audit trail", unsafe)
+        if verdict is not None and verdict.declared_gaps:
+            _emit(
+                f"vaara-governance: the audit trail at {db_path} is not "
+                f"intact. {verdict.summary()}. A repair recorded these losses "
+                "in the chain itself, and `vaara trail export` still reports "
+                "the chain as not intact. A break no repair declares is still "
+                "reported as an integrity failure on every call."
+            )
     except Exception:
         # Reporting on the trail's health must never break the session it is
         # reporting to. There is nowhere left to escalate to from here: the
