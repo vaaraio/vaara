@@ -83,6 +83,8 @@ vaara = "vaara.cli:main"
 vaara-audit = "vaara.audit_cli:main"
 vaara-mcp-proxy = "vaara.integrations.mcp_proxy:main"
 vaara-mcp-server = "vaara.integrations.mcp_server:main"
+vaara-infer-proxy = "vaara.integrations.infer_proxy:main"
+vaara-console = "vaara.integrations.infer_console:main"
 
 [tool.setuptools]
 # Default (true) auto-includes every tracked file inside a package, which
