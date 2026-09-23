@@ -12,6 +12,8 @@ and this project follows [Semantic Versioning](https://semver.org/spec/v2.0.0.ht
 
 ### Fixed
 - The 1.53.0 release said `vaara init` detects and governs OpenCode automatically. It governed nothing. The entry `vaara init` scanned for OpenCode was a path in the maintainer's own checkout, and the rewrite read only the `mcpServers` key, which OpenCode does not use, so no OpenCode config was ever changed and OpenCode's built-in tools were never seen. OpenCode is now governed through its plugin; see Added.
+- The macOS app said the network filter "governs AI-bound traffic by hostname from Safari, Mail and every WKWebView app". macOS loads that filter only from a build signed with a Developer ID, and no released build is one, so it has never governed anything for a user. The text under its install button now says it works once loaded from a signed build and sees network connections only. The settings row that was labelled WEBKIT GOVERNANCE is now SAFARI and says what is governed: an agent driving Safari through Safari's MCP server, behind `vaara-mcp-proxy`.
+- The macOS menu-bar app found no trails when `~/.vaara` was a symlink, which is how a Mac sees an engine running in a VM or container with a shared home. `FileManager`'s enumerator does not follow a symlink at its root, so discovery walked nothing, "Find trails in ~/.vaara" reported no new trails, and the app kept watching whatever paths it had saved before. Discovery now resolves the link first.
 
 ## [1.97.0] - 2026-09-23
 
