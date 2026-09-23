@@ -270,3 +270,44 @@ def test_an_open_writer_follows_a_trail_replaced_under_it(trail_db: Path, tmp_pa
     conn.close()
     assert landed >= 1
     assert old_copy.read_bytes() == old_bytes
+
+
+def _readable_by_rowid(path: Path) -> set[int]:
+    conn = sqlite3.connect(f"{path.as_uri()}?mode=ro", uri=True)
+    conn.execute("PRAGMA writable_schema=ON")
+    out: set[int] = set()
+    try:
+        for rowid in range(1, N_CALLS * 8):
+            try:
+                row = conn.execute(
+                    "SELECT seq FROM audit_records WHERE rowid = ?", (rowid,)
+                ).fetchone()
+            except sqlite3.DatabaseError:
+                continue
+            if row:
+                out.add(row[0])
+    finally:
+        conn.close()
+    return out
+
+
+def test_a_trail_cut_short_by_its_last_pages_is_salvaged(trail_db: Path):
+    # The llm-proxy trail on 2026-09-23: the header counted 13614 pages, the
+    # file held 13612, and the missing two were the newest table leaf and an
+    # index page. SQLite refuses such a file outright as malformed, and the
+    # salvage opened it without the flag that lets it read the rest. Then the
+    # range read over the last surviving leaf stepped onto the missing page
+    # and dropped a row that reads fine on its own.
+    data = trail_db.read_bytes()
+    ps = _page_size(data)
+    last_leaf = _leaves(data, _root(trail_db, "audit_records"))[-1]
+    trail_db.write_bytes(data[:(last_leaf - 1) * ps])
+    readable = _readable_by_rowid(trail_db)
+    assert readable, "the leaves before the cut must still read"
+
+    report = repair_trail_file(trail_db)
+
+    assert report.method == "salvage", report.error
+    assert _integrity(trail_db) == ["ok"]
+    assert _seqs(trail_db) == readable
+    assert report.records_kept == len(readable)
