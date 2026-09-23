@@ -245,14 +245,14 @@ finalize. Status as of April 2026.
 | **ISO/IEC 42006** Requirements for AI Management System Auditors | WG2 | DIS Stage 40 | Vaara's hash-chained trail is the artefact 42006-qualified auditors examine for surveillance evidence. |
 | **prEN ISO/IEC 24970** AI System Logging | WG3 | Stage 30.2 (comment resolution) | Vaara aligns with the tamper-resistance, decision-factor logging, and audit-system integration requirements. Field-level alignment pending the published version. |
 | **prEN 18229-1** Trustworthiness Framework Pt 1 (logging, transparency, human oversight) | WG4 | Public enquiry | Implements AI Act Articles 12-14, which Vaara already maps to in the article table above. Field-level alignment pending the published version. |
-| **prEN ISO/IEC 12792** Transparency Taxonomy of AI Systems | WG4 | Stage 40 (final vote) | v0.6 ships per-action audit records tagged against the four-axis model (System Operation, Data Usage, Decision Making, Limitations) via four optional `AuditRecord` fields. Default classification heuristic by event type. Per-record override available. NOT tamper-evident in v0.6 - fields are metadata annotations excluded from `record_hash` so pre-v0.6 chains stay valid. |
+| **prEN ISO/IEC 12792** Transparency Taxonomy of AI Systems | WG4 | Stage 40 (final vote) | v0.6 ships per-action audit records tagged against the four-axis model (System Operation, Data Usage, Decision Making, Limitations) via four optional `AuditRecord` fields. Default classification heuristic by event type. Per-record override available. Not tamper-evident: the four fields are metadata annotations excluded from `record_hash`, which keeps chains written before they existed valid. |
 
 **What "alignment" means here.** Most of these standards have not
 published. The mapping above is pre-compliance positioning: Vaara is
 built so that when the finals drop, the gap to certified alignment is
-small. It is not a claim of certified compliance. Once a standard
-publishes, expect a v0.6 or v0.7 alignment audit and an updated entry
-in this table.
+small. It is not a claim of certified compliance. When a standard
+publishes, its row here is audited against the published text and
+updated.
 
 **What the deployer does with this table.** When listing harmonised
 standards applied (Annex IV §7), the deployer cites the published
@@ -281,7 +281,9 @@ Three artefact classes, all tied to a single `action_id`:
 
 **1. The hash-chained audit trail.** Every event is SHA-256 chained to
 its predecessor. Any insertion, deletion, or edit breaks the chain and
-is detected by `vaara trail verify`.
+is detected when the chain is walked: `vaara compliance report --db`
+reports `chain_intact` for a live trail, and `vaara trail verify --zip`
+re-walks an exported one.
 
 **2. The conformity report.** A structured per-article rollup. Each
 article gets an `EvidenceStatus` and an `EvidenceStrength`, based on

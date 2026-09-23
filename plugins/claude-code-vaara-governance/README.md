@@ -6,7 +6,7 @@ Runtime tool-call governance for Claude Code. Wires the [Vaara](https://github.c
 
 PreToolUse runs a two-layer check before Claude executes a tool:
 
-**Layer 1: regex deny patterns** (Bash, WebFetch, WebSearch, Write, Edit, NotebookEdit). A JSON deny-list (`policies/default_deny.json`) catches known-bad shapes on the shell and web surface: AWS / GCP / Azure metadata IPs, `/etc/shadow` reads, `curl | sh`, `rm -rf /`, fork bombs, `dd` to raw block devices, history purges, reverse shells, base64-piped exec, `~/.ssh/authorized_keys` writes.
+**Layer 1: regex deny patterns** (38 rules over 18 tools: `Bash`, `WebFetch`, `Read`, `Write`, `Edit`, `NotebookEdit`, the agent's meta-actions, and the MCP resource readers; `mcp__*` calls are matched by content). A JSON deny-list (`policies/default_deny.json`) catches known-bad shapes on the shell and web surface: AWS / GCP / Azure metadata IPs, `/etc/shadow` reads, `curl | sh`, `rm -rf /`, fork bombs, `dd` to raw block devices, history purges, reverse shells, base64-piped exec, `~/.ssh/authorized_keys` writes.
 
 The same layer covers the file surface, because an agent that cannot run `curl | sh` can still write it to a file: shell startup files (`.bashrc`, `.zshrc`, `.profile`), `~/.ssh/authorized_keys`, `/etc/shadow` and `/etc/sudoers`, git hooks, cron paths, launchd and systemd units, and file content carrying a remote-pipe-to-shell or reverse-shell payload. A match is a hard deny: fast, deterministic, no ML.
 
@@ -20,8 +20,8 @@ SessionStart prints a one-line status (Vaara version, mode, protection preset, n
 
 | Hook | Matches | Mechanism |
 |---|---|---|
-| `PreToolUse` | `Bash`, `WebFetch`, `WebSearch`, `Write`, `Edit`, `NotebookEdit`, `Agent`, `Task`, `Workflow`, `CronCreate`, `ScheduleWakeup`, `RemoteTrigger`, `SendMessage`, `Skill`, `mcp__*` | Layer 1 regex on shell, web, file mutation and the agent's meta-actions (spawn, schedule, remote run, message out, harness config writes). Layer 2 ML on MCP. Desktop notification on block/escalate. |
-| `PostToolUse` | same set | Audit outcome + MWU feedback. |
+| `PreToolUse` | every tool (`.*`) | Every call is dispatched and recorded. Layer 1 regex on shell, web, reads of secret material, file mutation and the agent's meta-actions (spawn, schedule, remote run, message out, harness config writes); a tool no rule names is recorded and allowed. Layer 2 ML on MCP. Desktop notification on block/escalate. |
+| `PostToolUse` | every tool (`.*`) | Audit outcome + MWU feedback. |
 | `SessionStart` | n/a | Validate install, print status. |
 
 ## Operator lifts
@@ -44,10 +44,13 @@ A lifted call is still recorded. `ScheduleWakeup` is recorded and never
 denied.
 
 The rules name tools in Claude Code's vocabulary (`Bash`, `Edit`, `Write`,
-`Agent` and the rest). A harness that names the same operation differently,
-for example `shell` or `apply_patch`, does not match a rule by name. Calls
-under an `mcp__*` name are matched on content instead, so MCP-routed tools
-are covered whatever the harness. Other harness vocabularies are not. The boundary red-team in `conformance/redteam/` drives every one
+`Agent` and the rest). Codex and Gemini CLI tool names are translated into
+that vocabulary before matching: Codex hands hooks its shell tools as `Bash`
+already, and its `apply_patch` and `spawn_agent` are translated, as are
+Gemini CLI's `run_shell_command`, `write_file`, `replace`, `read_file`,
+`read_many_files`, `web_fetch`, `read_mcp_resource` and `activate_skill`.
+Calls under an `mcp__*` name are matched on content, so MCP-routed tools are
+covered whatever the harness. Other harnesses' names do not match by name. The boundary red-team in `conformance/redteam/` drives every one
 of these through the real hook.
 
 ## Install
@@ -88,7 +91,7 @@ The config file, hand-editable:
 | `agent_id` | string | Agent id written to the audit chain (default `claude-code`). |
 | `audit_db` | path | Audit DB path (default `~/.vaara/claude-code/audit.db`). |
 | `article50_statement` | string | When set, SessionStart records this as an EU AI Act Article 50(1) disclosure event into the audit trail with the session id, before the session's first tool call. Off when absent. |
-| `fail_open` | `false` (default), `true` | What happens to `mcp__*` calls in protect mode when the `vaara` package is not importable. Default: fail closed (block with an install hint). `true` passes them through unscored. |
+| `fail_open` | `false` (default), `true` | What happens to `mcp__*` calls in protect mode when they cannot be scored or recorded: the `vaara` package is not importable, or the audit trail cannot be opened or written. Default: fail closed (block, and say why). `true` passes them through unscored. The deny rules do not need the trail, so they keep enforcing either way. |
 
 Environment variables override the file (useful for CI or a single session):
 

@@ -9,7 +9,7 @@ collect for Article X?" This document answers "given that evidence,
 what does Vaara conclude, and why?"
 
 The rules described here are the same rules executed by
-`vaara.compliance.engine.ComplianceEngine.assess_conformity`. Every
+`vaara.compliance.engine.ComplianceEngine.assess`. Every
 report produced by `vaara compliance report` surfaces the inputs and
 the rationale per article in the `verdict_inputs` block.
 
