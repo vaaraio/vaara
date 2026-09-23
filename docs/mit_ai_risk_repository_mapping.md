@@ -62,7 +62,7 @@ Direct coverage: 106 of 106 in domain 5.
 
 | Sub-domain | n | Vaara mechanism |
 |---|---|---|
-| 6.5 Governance failure | 61 | Regulator-handoff envelope via `vaara trail export` (Sigstore-signed, optional ML-DSA-65 / FIPS 204 post-quantum signer). Per-article evidence reports aligned to EU AI Act Articles 9, 11-15, 17, 61 and DORA Articles 10, 12, 13. |
+| 6.5 Governance failure | 61 | Regulator-handoff envelope via `vaara trail export` (Sigstore-signed, optional ML-DSA-65 / FIPS 204 post-quantum signer). Per-article evidence reports aligned to EU AI Act Articles 9, 11-15, 26, 50, 72, 73 and DORA Articles 9, 10, 13. |
 
 Direct coverage: 61 of 299 in domain 6. The remaining 238 entries in domain 6 (power centralisation, inequality, employment, devaluation, competitive dynamics, environmental harm) sit outside Vaara's scope by design.
 

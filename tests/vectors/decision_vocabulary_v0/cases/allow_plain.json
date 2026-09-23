@@ -31,13 +31,13 @@
       },
       {
         "domain": "dora",
-        "article": "Article 12(1)",
-        "requirement": "ICT-related incident detection, including automated alert mechanisms",
+        "article": "Article 10(1)",
+        "requirement": "Mechanisms to promptly detect anomalous activities, including ICT-related incidents",
         "how_satisfied": "All agent actions are logged as events for incident detection"
       }
     ],
     "previous_hash": "",
-    "record_hash": "8ed346dc4b07b34cd3050755d1fe27c9397407c45738ae6cae7c9cf1d4403d8c",
+    "record_hash": "e2df57b85143a168cea041a1e3af90e2d30a0140ec27f92acb126188aa458b08",
     "system_operation": "logging_intake",
     "data_usage": "tool_args+context",
     "decision_making": "n/a",
@@ -70,13 +70,13 @@
       },
       {
         "domain": "eu_ai_act",
-        "article": "Article 9(7)",
-        "requirement": "Testing shall be suitable to identify relevant risks",
+        "article": "Article 9(6)",
+        "requirement": "High-risk AI systems shall be tested to identify the most appropriate and targeted risk management measures",
         "how_satisfied": "Conformal calibration provides distribution-free coverage guarantees on risk estimates"
       }
     ],
-    "previous_hash": "8ed346dc4b07b34cd3050755d1fe27c9397407c45738ae6cae7c9cf1d4403d8c",
-    "record_hash": "b2600a1218ccb83b3b43d4481c441dd63558b902334d880fa7befbb6d37a6314",
+    "previous_hash": "e2df57b85143a168cea041a1e3af90e2d30a0140ec27f92acb126188aa458b08",
+    "record_hash": "73e2bbc8a6a8f8a2ff12c8bc81533fd25de98976a84972cf1379e13a4f7e734d",
     "system_operation": "scoring",
     "data_usage": "tool_args+history+policy",
     "decision_making": "heuristic_score",
@@ -106,12 +106,12 @@
       {
         "domain": "eu_ai_act",
         "article": "Article 14(4)(a)",
-        "requirement": "The human shall be able to fully understand the capacities and limitations of the system",
+        "requirement": "The human shall be able to properly understand the relevant capacities and limitations of the system and duly monitor its operation",
         "how_satisfied": "Decision records include risk scores, confidence intervals, and contributing signals"
       }
     ],
-    "previous_hash": "b2600a1218ccb83b3b43d4481c441dd63558b902334d880fa7befbb6d37a6314",
-    "record_hash": "9c18c3598f25e882781afa60e7bce31b9e2a37639c42111222338cf3ed1f9710",
+    "previous_hash": "73e2bbc8a6a8f8a2ff12c8bc81533fd25de98976a84972cf1379e13a4f7e734d",
+    "record_hash": "fa937f5bd54cebf0a64415c6a393c6c47f0b8be7e7d4324acf7eda457ee6bec2",
     "system_operation": "decision_threshold",
     "data_usage": "risk_score+thresholds",
     "decision_making": "threshold_match",

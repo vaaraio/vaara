@@ -1833,9 +1833,10 @@ class SQLiteAuditBackend:
     ) -> int:
         """Delete audit records older than ``retention_seconds`` from now.
 
-        Article 12(2) of the EU AI Act lets the deployer set the retention
-        period in accordance with the intended purpose and applicable law.
-        Vaara does not pick the policy. This method enforces it.
+        Articles 19(1) and 26(6) of the EU AI Act set the retention period:
+        appropriate to the intended purpose, at least six months unless
+        other Union or national law provides otherwise. Vaara does not
+        pick the policy. This method enforces it.
 
         HASH-CHAIN IMPACT — surviving records still reference deleted
         predecessors via ``previous_hash``, so ``vaara trail verify`` will

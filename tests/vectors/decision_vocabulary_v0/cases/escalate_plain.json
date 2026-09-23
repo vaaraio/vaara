@@ -31,13 +31,13 @@
       },
       {
         "domain": "dora",
-        "article": "Article 12(1)",
-        "requirement": "ICT-related incident detection, including automated alert mechanisms",
+        "article": "Article 10(1)",
+        "requirement": "Mechanisms to promptly detect anomalous activities, including ICT-related incidents",
         "how_satisfied": "All agent actions are logged as events for incident detection"
       }
     ],
     "previous_hash": "",
-    "record_hash": "a12c66ddd831fbbdb879b59ae2f9b011c99baa56ae2173b530ccc6d6353754e2",
+    "record_hash": "f46b30a16b9d52afb619565932f13aa47c04dc23b4686aee6f53f53d835ac29e",
     "system_operation": "logging_intake",
     "data_usage": "tool_args+context",
     "decision_making": "n/a",
@@ -70,13 +70,13 @@
       },
       {
         "domain": "eu_ai_act",
-        "article": "Article 9(7)",
-        "requirement": "Testing shall be suitable to identify relevant risks",
+        "article": "Article 9(6)",
+        "requirement": "High-risk AI systems shall be tested to identify the most appropriate and targeted risk management measures",
         "how_satisfied": "Conformal calibration provides distribution-free coverage guarantees on risk estimates"
       }
     ],
-    "previous_hash": "a12c66ddd831fbbdb879b59ae2f9b011c99baa56ae2173b530ccc6d6353754e2",
-    "record_hash": "f74af467b23202228ccf485883130b44e3c741f1b7ab8c610d678e195b0ad73c",
+    "previous_hash": "f46b30a16b9d52afb619565932f13aa47c04dc23b4686aee6f53f53d835ac29e",
+    "record_hash": "ecf649e064bfe617f3a8bcf47788226db6fb1c3d0b13582b08fd9f3bf66443bb",
     "system_operation": "scoring",
     "data_usage": "tool_args+history+policy",
     "decision_making": "heuristic_score",
@@ -106,12 +106,12 @@
       {
         "domain": "eu_ai_act",
         "article": "Article 14(4)(a)",
-        "requirement": "The human shall be able to fully understand the capacities and limitations of the system",
+        "requirement": "The human shall be able to properly understand the relevant capacities and limitations of the system and duly monitor its operation",
         "how_satisfied": "Decision records include risk scores, confidence intervals, and contributing signals"
       }
     ],
-    "previous_hash": "f74af467b23202228ccf485883130b44e3c741f1b7ab8c610d678e195b0ad73c",
-    "record_hash": "41ea155d370220b8cab47b080a183f55bbff0f825ce9bc1e7a49a195f4b703fd",
+    "previous_hash": "ecf649e064bfe617f3a8bcf47788226db6fb1c3d0b13582b08fd9f3bf66443bb",
+    "record_hash": "44c952136b77d31f0618d2efb4af3885b6a4523fbd8694c136d50ecacbaf96e0",
     "system_operation": "decision_threshold",
     "data_usage": "risk_score+thresholds",
     "decision_making": "threshold_match",
@@ -135,12 +135,12 @@
       {
         "domain": "eu_ai_act",
         "article": "Article 14(3)(a)",
-        "requirement": "Human oversight shall enable the human to properly monitor the AI system",
+        "requirement": "Human oversight measures shall be identified and built into the high-risk AI system by the provider",
         "how_satisfied": "Borderline decisions are escalated with full context for human review"
       }
     ],
-    "previous_hash": "41ea155d370220b8cab47b080a183f55bbff0f825ce9bc1e7a49a195f4b703fd",
-    "record_hash": "c16148e9b9d7e2e39bc4ba05a44eb5e78ebf0abf91941b88d471ffdb5dcd020a",
+    "previous_hash": "44c952136b77d31f0618d2efb4af3885b6a4523fbd8694c136d50ecacbaf96e0",
+    "record_hash": "3cfcaa29075bb9627345a26191721f5e3bd6b48fc7d5f6fe1846b3168806fc01",
     "system_operation": "escalation",
     "data_usage": "risk_score+context",
     "decision_making": "threshold_or_classifier_upgrade",

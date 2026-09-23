@@ -31,13 +31,13 @@
       },
       {
         "domain": "dora",
-        "article": "Article 12(1)",
-        "requirement": "ICT-related incident detection, including automated alert mechanisms",
+        "article": "Article 10(1)",
+        "requirement": "Mechanisms to promptly detect anomalous activities, including ICT-related incidents",
         "how_satisfied": "All agent actions are logged as events for incident detection"
       }
     ],
     "previous_hash": "",
-    "record_hash": "627bc8166010bb9f62196ef8db185f74d5f93c414103088e28f7b0ca5b6ba24c",
+    "record_hash": "264ead9206eff6157d8976861ab57904bd9f356cfbae8d6a1a7019a4b91fb7c8",
     "system_operation": "logging_intake",
     "data_usage": "tool_args+context",
     "decision_making": "n/a",
@@ -70,13 +70,13 @@
       },
       {
         "domain": "eu_ai_act",
-        "article": "Article 9(7)",
-        "requirement": "Testing shall be suitable to identify relevant risks",
+        "article": "Article 9(6)",
+        "requirement": "High-risk AI systems shall be tested to identify the most appropriate and targeted risk management measures",
         "how_satisfied": "Conformal calibration provides distribution-free coverage guarantees on risk estimates"
       }
     ],
-    "previous_hash": "627bc8166010bb9f62196ef8db185f74d5f93c414103088e28f7b0ca5b6ba24c",
-    "record_hash": "f457fa870eee5cd5a13a4551b4aed8f073740fe8964ccc0f87daee4214e08a2e",
+    "previous_hash": "264ead9206eff6157d8976861ab57904bd9f356cfbae8d6a1a7019a4b91fb7c8",
+    "record_hash": "21cff643be6a852f43198fa9ce1436aec8c1e79f8129299ec8436995be1c2b9f",
     "system_operation": "scoring",
     "data_usage": "tool_args+history+policy",
     "decision_making": "heuristic_score",
@@ -99,19 +99,19 @@
     "regulatory_articles": [
       {
         "domain": "eu_ai_act",
-        "article": "Article 9(4)(a)",
-        "requirement": "Appropriate risk management measures shall be adopted, including elimination or reduction of risks",
+        "article": "Article 9(5)(a)",
+        "requirement": "Elimination or reduction of identified risks as far as technically feasible through adequate design and development",
         "how_satisfied": "High-risk actions are automatically blocked with full audit trail"
       },
       {
         "domain": "dora",
-        "article": "Article 10(1)",
-        "requirement": "ICT risk management framework shall include protection and prevention mechanisms",
+        "article": "Article 9(1)",
+        "requirement": "Continuous monitoring and control of ICT systems, with security tools, policies and procedures that minimise ICT risk",
         "how_satisfied": "Automated blocking of high-risk actions with full incident trail"
       }
     ],
-    "previous_hash": "f457fa870eee5cd5a13a4551b4aed8f073740fe8964ccc0f87daee4214e08a2e",
-    "record_hash": "8a4656dd936a988f5decda7d95c73af32ada25c7fa09c5b9115d44850db7abb6",
+    "previous_hash": "21cff643be6a852f43198fa9ce1436aec8c1e79f8129299ec8436995be1c2b9f",
+    "record_hash": "cd80eca42e93338e59dc44630af47a453e69638ce7e43355ed58db3102917e92",
     "system_operation": "blocking",
     "data_usage": "risk_score+thresholds",
     "decision_making": "threshold_match",

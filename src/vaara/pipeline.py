@@ -998,7 +998,7 @@ class InterceptionPipeline:
         # Both writes attempted — remove from both database and in-memory dict.
         # A second report_outcome call after a successful trail write would
         # otherwise append a duplicate OUTCOME_RECORDED row, inflating
-        # Article 61(1) post-market monitoring evidence.
+        # Article 72(1) post-market monitoring evidence.
         backend = getattr(self.trail, "_backend", None)
         if backend is not None:
             try:
