@@ -46,7 +46,7 @@ logger = logging.getLogger("vaara.llm_proxy")
 #: for a path already known to be in this set, so forwarding the constant is
 #: both what we mean and the form that leaves no caller-controlled string in
 #: the outgoing URL at all.
-_CHAT_PATH_LIST = ["/v1/chat/completions", "/v1/messages"]
+_CHAT_PATH_LIST = ["/v1/chat/completions", "/v1/messages", "/v1/responses"]
 _CHAT_PATHS = frozenset(_CHAT_PATH_LIST)
 
 
@@ -334,7 +334,8 @@ def build_app(*, upstream: str, api_key: Optional[str], api_key_header: str,
                 compact_stats["bytes_before"] = len(body_bytes)
                 compact_stats["bytes_after"] = len(outbound)
         seal_state: dict[str, Any] = {
-            "seal_active": False, "seal_count": 0, "seal_fault": None}
+            "seal_active": False, "seal_count": 0, "seal_fault": None,
+            "seal_kinds": {}}
         if _seal is not None:
             try:
                 _seal.refresh()
@@ -346,6 +347,7 @@ def build_app(*, upstream: str, api_key: Optional[str], api_key_header: str,
                     unsealed = outbound
                     outbound = _seal.seal_bytes(unsealed)
                     seal_state["seal_count"] = _seal.count_sealed(outbound)
+                    seal_state["seal_kinds"] = dict(_seal.last_kinds)
                 except Exception as exc:
                     logger.warning(
                         "sealing failed, forwarding unsealed: %s", exc)
@@ -480,7 +482,8 @@ def build_app(*, upstream: str, api_key: Optional[str], api_key_header: str,
         # never by content.
         outbound = body_bytes
         seal_state: dict[str, Any] = {
-            "seal_active": False, "seal_count": 0, "seal_fault": None}
+            "seal_active": False, "seal_count": 0, "seal_fault": None,
+            "seal_kinds": {}}
         if _seal is not None and body_bytes:
             try:
                 _seal.refresh()
@@ -491,6 +494,7 @@ def build_app(*, upstream: str, api_key: Optional[str], api_key_header: str,
                 try:
                     outbound = _seal.seal_bytes(body_bytes)
                     seal_state["seal_count"] = _seal.count_sealed(outbound)
+                    seal_state["seal_kinds"] = dict(_seal.last_kinds)
                 except Exception as exc:
                     logger.warning(
                         "sealing failed, forwarding unsealed: %s", exc)
