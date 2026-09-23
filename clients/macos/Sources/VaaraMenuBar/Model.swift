@@ -539,7 +539,9 @@ final class GateModel: ObservableObject {
 
     /// Write custom thresholds; the plugin applies them over the preset.
     func setCustomThresholds(escalate: Double, deny: Double) {
-        let e = max(0, min(escalate, 1)), d = max(e, min(deny, 1))
+        // Deny must sit strictly above escalate: the engine rejects an equal
+        // pair and falls back to its defaults, preset included.
+        let e = max(0, min(escalate, 0.99)), d = max(e + 0.01, min(deny, 1))
         writePluginConfig(key: "thresholds",
                           value: ["escalate": e, "deny": d])
         customThresholds = [e, d]

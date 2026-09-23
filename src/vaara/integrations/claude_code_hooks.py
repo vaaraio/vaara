@@ -133,7 +133,11 @@ def custom_thresholds(cfg: dict) -> Optional[tuple[float, float]]:
         return None
     if isinstance(escalate, bool) or isinstance(deny, bool):
         return None
-    if not (0 <= escalate <= deny <= 1):
+    # Strictly below, as the policy schema requires. An equal pair used to
+    # pass this check, fail in apply_policy, and take the preset down with
+    # it, so the hook ran on the defaults while the operator's config named
+    # strict. Treated as malformed here, the preset still applies.
+    if not (0 <= escalate < deny <= 1):
         return None
     return float(escalate), float(deny)
 
