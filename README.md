@@ -48,7 +48,7 @@ def transfer_funds(to: str, amount: float) -> str:
 
 That is the whole thing. Every call to a governed function is risk-scored and decided against your policy before the body runs. An allowed call runs, and the decision, the call, and the outcome land in a hash-chained, tamper-evident record anyone can verify offline. Sign it at export (`vaara trail export`) for third-party proof. Records persist to `~/.vaara/trail/audit.db` by default, so evidence survives restarts. Python 3.10+, zero runtime dependencies.
 
-Both `deny` and `escalate` raise `vaara.Blocked`, since an escalation means a human has not answered yet. Run the example above on a fresh install and it will raise: with no outcome history the scorer's confidence interval is wide, and a `tx.transfer` escalates on the interval's upper bound even though its point estimate sits under the allow threshold. That is the intended direction to fail, and it settles. Feeding real outcomes back through `report_outcome` narrows the interval, and the same call starts allowing after a few dozen clean results. To watch decisions without acting on them while that happens, start with `@vaara.govern(shadow=True)`.
+Both `deny` and `escalate` raise `vaara.Blocked`, since an escalation means a human has not answered yet. On a fresh install the example above runs. The default operating point is `balanced`, which allows below 0.55 and denies above 0.85, and a first call to `transfer_funds` scores 0.275 with a conformal interval of [0.085, 0.465]. Vaara decides on the interval's upper bound, and with no outcome history that interval is wide, so a riskier call escalates before its point estimate reaches the threshold. Feeding real outcomes back through `report_outcome` narrows it. The other presets are listed by `vaara mode list`. To watch decisions without acting on them, start with `@vaara.govern(shadow=True)`.
 
 ### Check a receipt with nothing installed
 
@@ -123,7 +123,7 @@ For the whole loop in one runnable file, produce a signed record, verify it your
 <details>
 <summary><b>What the evidence looks like</b></summary>
 
-`vaara compliance report --format json` against a real trail produces an article-level evidence record an auditor reads directly. Articles with no recorded events return `evidence_insufficient`, not a rubber stamp.
+`vaara compliance report --db audit.db --format json` against a real trail produces an article-level evidence record an auditor reads directly. Articles with no recorded events return `evidence_insufficient`, not a rubber stamp.
 
 ```json
 {

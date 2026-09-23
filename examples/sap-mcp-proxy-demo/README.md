@@ -136,7 +136,7 @@ The PDF output is the format a Notified Body or internal compliance auditor read
 
 - **The proxy hangs on startup.** The upstream MCP server is probably failing its initialize handshake. Check the proxy's stderr. The upstream's stderr is forwarded through. Common cause: missing SAP credentials in env.
 - **Every tool call is blocked.** Default fail-closed policy. Define a policy file, or tune for your specific tool catalog.
-- **Audit DB grows quickly.** Each tool call writes 4 records. Use `vaara audit purge --before <date>` to prune old records (the chain integrity is preserved across pruning).
+- **Audit DB grows quickly.** Each tool call writes 4 records. `vaara trail rotate --db ./mcp_audit.db --out archive.zip --key signing.pem --retention-days 180 --all-tenants` exports the trail to a signed archive, verifies it, then deletes records older than the retention period. The live trail then begins at the retention boundary: its first surviving record points at a predecessor that is only in the archive, so keep the archive.
 
 ## The same pattern in front of any MCP server
 
