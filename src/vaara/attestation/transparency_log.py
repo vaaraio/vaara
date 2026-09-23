@@ -25,6 +25,7 @@ import hashlib
 import threading
 from dataclasses import dataclass
 from enum import Enum
+from typing import Optional
 
 
 class TransparencyLogError(RuntimeError):
@@ -269,15 +270,16 @@ def verify_consistency(
     return ConsistencyVerdict.INCONSISTENT
 
 
-def verify_inclusion(
-    *,
-    leaf_data: bytes,
-    proof: InclusionProof,
-    expected_root: bytes,
-) -> bool:
-    """Recompute the root from leaf_data + proof and compare."""
+def root_from_inclusion(*, leaf_data: bytes, proof: InclusionProof) -> Optional[bytes]:
+    """Recompute the Merkle root implied by ``leaf_data`` and ``proof``.
+
+    Returns ``None`` when the proof cannot describe a tree: an index outside
+    the tree, too few siblings, or siblings left over. RFC 9942 verifiers
+    need the root itself, because it is the detached payload the receipt's
+    signature covers.
+    """
     if not (0 <= proof.log_index < proof.tree_size):
-        return False
+        return None
     node = _hash_leaf(leaf_data)
     idx = proof.log_index
     size = proof.tree_size
@@ -291,7 +293,7 @@ def verify_inclusion(
             try:
                 sibling = next(sib_iter)
             except StopIteration:
-                return False
+                return None
             if idx % 2 == 0:
                 node = _hash_node(node, sibling)
             else:
@@ -300,8 +302,19 @@ def verify_inclusion(
         size = (size + 1) // 2
     # All proof entries must be consumed.
     if next(sib_iter, None) is not None:
-        return False
-    return node == expected_root
+        return None
+    return node
+
+
+def verify_inclusion(
+    *,
+    leaf_data: bytes,
+    proof: InclusionProof,
+    expected_root: bytes,
+) -> bool:
+    """Recompute the root from leaf_data + proof and compare."""
+    root = root_from_inclusion(leaf_data=leaf_data, proof=proof)
+    return root is not None and root == expected_root
 
 
 class InProcessTransparencyLog:
