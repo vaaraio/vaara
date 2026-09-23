@@ -37,7 +37,7 @@ def _text_len(content: Any) -> int:
         total = 0
         for block in content:
             if isinstance(block, dict):
-                if block.get("type") == "text":
+                if block.get("type") in ("text", "input_text", "output_text"):
                     total += len(str(block.get("text", "")).encode("utf-8"))
                 elif block.get("type") in ("tool_result", "tool_use"):
                     total += len(json.dumps(block, ensure_ascii=False)
@@ -52,8 +52,9 @@ def measure_envelope(body: dict[str, Any], outbound: bytes) -> dict[str, int]:
     """Split the forwarded request into the parts a reader cares about.
 
     Works for the Anthropic ``/v1/messages`` shape (top-level ``system`` and
-    ``tools``) and the OpenAI ``/v1/chat/completions`` shape (a ``system``
-    role inside ``messages``). Byte counts are of the text, not of the JSON
+    ``tools``), the OpenAI ``/v1/chat/completions`` shape (a ``system``
+    role inside ``messages``) and the OpenAI ``/v1/responses`` shape
+    (``instructions`` and ``input``). Byte counts are of the text, not of the JSON
     framing around it, except for ``tools`` which is counted whole because
     its structure is the payload.
     """
@@ -64,10 +65,17 @@ def measure_envelope(body: dict[str, Any], outbound: bytes) -> dict[str, int]:
     bytes_tools = len(json.dumps(tools, ensure_ascii=False).encode("utf-8")) \
         if tools else 0
 
+    messages = body.get("messages")
+    if messages is None and "input" in body:
+        # Responses API. Its system prompt is ``instructions``, and the
+        # helper folds that in as a system-role message, counted below.
+        from ._llm_proxy_shape import responses_messages
+        messages = responses_messages(body)
+
     bytes_messages = 0
     bytes_last_user = 0
     message_count = 0
-    for msg in body.get("messages") or []:
+    for msg in messages or []:
         if not isinstance(msg, dict):
             continue
         role = msg.get("role")

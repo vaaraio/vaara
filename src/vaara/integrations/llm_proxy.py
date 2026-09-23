@@ -2,9 +2,9 @@
 # SPDX-License-Identifier: AGPL-3.0-or-later
 """``vaara llm-proxy`` — govern LLM API calls from coding agents.
 
-Governs ``POST /v1/chat/completions`` and ``POST /v1/messages``: each call is
-checked against the model and rate policy and recorded in the Vaara audit trail
-with its prompt. Every other call is recorded by method, path, size and
+Governs ``POST /v1/chat/completions``, ``POST /v1/messages`` and
+``POST /v1/responses``: each call is checked against the model and rate policy
+and recorded in the Vaara audit trail with its prompt. Every other call is recorded by method, path, size and
 sha256. The secrets named in ``--seal-file`` are replaced on every path before
 the request leaves. Nothing beyond those values is removed from a request;
 ``--redact`` masks only the trail's copy of the prompt.
@@ -46,9 +46,9 @@ from .llm_actions import LLM_ACTIONS
 #: What the proxy does, stated to the edge of what it does. Shared by
 #: ``vaara llm-proxy --help`` and the subcommand list so the two cannot differ.
 DESCRIPTION = (
-    "Govern LLM API calls. POST /v1/chat/completions and POST /v1/messages "
-    "are checked against the model and rate policy and recorded in the Vaara "
-    "audit trail with their prompt. Every other call is recorded by method, "
+    "Govern LLM API calls. POST /v1/chat/completions, POST /v1/messages and "
+    "POST /v1/responses are checked against the model and rate policy and "
+    "recorded in the Vaara audit trail with their prompt. Every other call is recorded by method, "
     "path, size and sha256, never by content. The secrets named in "
     "--seal-file are replaced on every path before the request leaves. "
     "With --seal-known-secrets, values in published credential formats are "

@@ -46,7 +46,7 @@ logger = logging.getLogger("vaara.llm_proxy")
 #: for a path already known to be in this set, so forwarding the constant is
 #: both what we mean and the form that leaves no caller-controlled string in
 #: the outgoing URL at all.
-_CHAT_PATH_LIST = ["/v1/chat/completions", "/v1/messages"]
+_CHAT_PATH_LIST = ["/v1/chat/completions", "/v1/messages", "/v1/responses"]
 _CHAT_PATHS = frozenset(_CHAT_PATH_LIST)
 
 
