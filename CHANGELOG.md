@@ -12,6 +12,9 @@ and this project follows [Semantic Versioning](https://semver.org/spec/v2.0.0.ht
 - The llm-proxy forwarded every path other than `POST /v1/chat/completions` and `POST /v1/messages` with no record and no sealing, so a `--seal-file` secret sent to `/v1/responses` reached the provider as written, and a call to any other endpoint left nothing in the trail. Every call is now recorded. The two chat paths keep their full record; any other call is recorded as `llm.passthrough` with its method, path, byte count and the sha256 of the bytes that left, never its content. The `--seal-file` values are replaced on every path, and the reply is unsealed when it is text. A pass-through call the trail cannot record is refused with the same 503 as a prompt, and `--fail-open` forwards it.
 - `vaara llm-proxy --help`, the subcommand list and the module docstring said the proxy strips secrets and records everything. It removes only the `--seal-file` values, and `--redact` masks the trail's copy of the prompt and leaves the request unchanged. The help now names what is recorded and how, and `tests/test_llm_proxy_claims.py` holds the text to the behaviour.
 
+### Added
+- The deny rules recognise Codex's and Gemini CLI's tool names. The rules name tools as Claude Code does. Codex already hands hooks its shell tools as `Bash`, but its file edits arrive as `apply_patch` with the patch text under `command` and its sub-agents as `spawn_agent`, and Gemini CLI names every tool its own way, so none of those matched a rule by name. `vaara.deny_rules.HARNESS_ALIASES` translates each into the Claude Code tool and input shape before matching: a Codex patch is checked once per file its header names, with the whole patch as the content. Names and input shapes were taken from each harness's source. A rule that names a foreign tool directly still takes precedence, and operator lifts apply through the translation.
+
 ## [1.94.0] - 2026-09-22
 
 ### Upgrading
