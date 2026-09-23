@@ -83,17 +83,17 @@ the engine.
 |---|---|---|---|---|---|---|
 | 9(1) | Risk Management System | 10 | 720 h (30 d) | 20 | 180 h (7.5 d) | yes |
 | 9(2)(a) | Risk Identification and Analysis | 5 | 720 h | 10 | 180 h | yes |
-| 9(4)(a) | Risk Mitigation Measures | 3 | 720 h | 6 | 180 h | yes |
-| 9(7) | Testing Procedures | 10 | 720 h | 20 | 180 h | yes |
+| 9(5)(a) | Risk Mitigation Measures | 3 | 720 h | 6 | 180 h | yes |
+| 9(6) | Testing Procedures | 10 | 720 h | 20 | 180 h | yes |
 | 11(1) | Technical Documentation | n/a | n/a | n/a | n/a | yes (external) |
 | 12(1) | Record-Keeping (Logging) | 20 | 720 h | 40 | 180 h | yes |
 | 13(1) | Transparency and Provision of Information | 5 | 720 h | 10 | 180 h | yes |
 | 14(1) | Human Oversight: Design | 1 | 720 h | 2 | 180 h | yes |
 | 14(4)(d) | Human Oversight: Override Capability | 1 | 720 h | 2 | 180 h | no |
 | 15(1) | Accuracy, Robustness and Cybersecurity | 10 | 168 h (7 d) | 20 | 42 h | yes |
-| 26(10) | Deployer Obligations: Logging | 10 | 720 h | 20 | 180 h | yes |
+| 26(6) | Deployer Obligations: Logging | 10 | 720 h | 20 | 180 h | yes |
 | 50(1) | Transparency Obligation: AI System Disclosure | 1 | 720 h | 2 | 180 h | yes |
-| 61(1) | Post-Market Monitoring | 20 | 720 h | 40 | 180 h | yes |
+| 72(1) | Post-Market Monitoring | 20 | 720 h | 40 | 180 h | yes |
 | 73(1) | Serious Incident Reporting | 1 | 720 h | 2 | 180 h | no |
 
 Article 11(1) is the external-evidence row. It does not consume runtime
@@ -113,9 +113,9 @@ collapses the report to `evidence_insufficient` overall.
 
 | Article | Title | Min count | Staleness window | Strong-count | Strong-freshness | Critical |
 |---|---|---|---|---|---|---|
-| 10(1) | ICT Risk Management: Protection and Prevention | 5 | 720 h | 10 | 180 h | yes |
-| 12(1) | ICT Incident Detection | 10 | 720 h | 20 | 180 h | yes |
-| 13(1) | ICT Incident Response and Learning | 5 | 720 h | 10 | 180 h | no |
+| 9(1) | ICT Risk Management: Protection and Prevention | 5 | 720 h | 10 | 180 h | yes |
+| 10(1) | ICT Anomaly Detection | 10 | 720 h | 20 | 180 h | yes |
+| 13(1) | ICT Learning and Evolving | 5 | 720 h | 10 | 180 h | no |
 
 ## What an auditor sees
 

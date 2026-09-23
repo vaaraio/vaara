@@ -65,7 +65,7 @@ def _event_name(event_type: object) -> str:
     never found a target and this hook returned without recording an
     outcome, for every tool including MCP. No OUTCOME_RECORDED events
     meant no feedback to the online learner and no Article 15(1) or
-    61(1) evidence for anyone running the plugin.
+    72(1) evidence for anyone running the plugin.
     """
     value = getattr(event_type, "value", event_type)
     return str(value).upper()

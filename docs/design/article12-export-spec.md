@@ -21,7 +21,7 @@ This makes the package self-explaining.
 - `vaara trail export-incident` -> `incident_export.py`: Article 73
   serious-incident report from a trail.
 - `vaara trail export-prov` -> `prov_export.py`: W3C PROV-JSON lineage.
-- `vaara trail prune` (retention): Article 12(2) deletion.
+- `vaara trail prune` (retention): deletion past the Article 19(1) / 26(6) retention period.
 - `AuditRecord.regulatory_articles`: per-record article tags already
   carried in the chain.
 

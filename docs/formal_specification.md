@@ -184,7 +184,7 @@ Records form a hash chain. Each record carries a `previous_hash` field, and the 
 
 where canonical_json uses sorted keys, no whitespace, and rejects non-finite numbers. (Chain v2 additionally binds `tenant_id` and `chain_version` into the same payload.) **Proposition 7.1**: Tampering with any record rᵢ (i < t) changes hᵢ, which cascades to hₜ through the committed previous_hash fields. Chain verification is O(n).
 
-This satisfies EU AI Act Article 12(1) requirement for tamper-evident logging and DORA Article 12(1) requirement for ICT incident detection with automated alert mechanisms.
+This satisfies EU AI Act Article 12(1) requirement for tamper-evident logging and DORA Article 10(1) requirement for prompt detection of anomalous activities.
 
 ## 8. Convergence Properties
 

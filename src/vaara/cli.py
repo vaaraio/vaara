@@ -1257,7 +1257,7 @@ def _cmd_trail_export_article12(args: argparse.Namespace) -> int:
 
 
 def _cmd_trail_purge(args: argparse.Namespace) -> int:
-    """Delete audit records older than --retention-days. EU AI Act Article 12(2)."""
+    """Delete audit records older than --retention-days. EU AI Act Articles 19(1) and 26(6)."""
     from vaara.audit.sqlite_backend import SQLiteAuditBackend
 
     db_path = Path(args.db).expanduser()
@@ -5482,7 +5482,7 @@ def build_parser() -> argparse.ArgumentParser:
 
     pp = tsub.add_parser(
         "purge",
-        help="Delete audit records older than the retention period (Article 12(2))",
+        help="Delete audit records older than the retention period (Articles 19(1), 26(6))",
     )
     pp.add_argument("--db", required=True, help="Path to the audit SQLite DB")
     pp.add_argument(

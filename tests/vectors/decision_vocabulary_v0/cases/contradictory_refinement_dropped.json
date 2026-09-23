@@ -21,12 +21,12 @@
       {
         "domain": "eu_ai_act",
         "article": "Article 14(4)(a)",
-        "requirement": "The human shall be able to fully understand the capacities and limitations of the system",
+        "requirement": "The human shall be able to properly understand the relevant capacities and limitations of the system and duly monitor its operation",
         "how_satisfied": "Decision records include risk scores, confidence intervals, and contributing signals"
       }
     ],
     "previous_hash": "",
-    "record_hash": "96673c77e6b54867031b68beb442b78a35adc4b50c3d34b7dd9b7f5ed5e9860c",
+    "record_hash": "5cd5bdf7820746770019efc5dbd962153225b79bebe391d604eff5dc8390abe0",
     "system_operation": "decision_threshold",
     "data_usage": "risk_score+thresholds",
     "decision_making": "threshold_match",

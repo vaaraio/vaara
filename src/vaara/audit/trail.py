@@ -93,8 +93,8 @@ EU_AI_ACT_MAPPINGS: dict[EventType, list[RegulatoryArticle]] = {
             "Adaptive risk scoring with conformal prediction intervals quantifies risk for every action",
         ),
         RegulatoryArticle(
-            RegulatoryDomain.EU_AI_ACT, "Article 9(7)",
-            "Testing shall be suitable to identify relevant risks",
+            RegulatoryDomain.EU_AI_ACT, "Article 9(6)",
+            "High-risk AI systems shall be tested to identify the most appropriate and targeted risk management measures",
             "Conformal calibration provides distribution-free coverage guarantees on risk estimates",
         ),
     ],
@@ -106,21 +106,21 @@ EU_AI_ACT_MAPPINGS: dict[EventType, list[RegulatoryArticle]] = {
         ),
         RegulatoryArticle(
             RegulatoryDomain.EU_AI_ACT, "Article 14(4)(a)",
-            "The human shall be able to fully understand the capacities and limitations of the system",
+            "The human shall be able to properly understand the relevant capacities and limitations of the system and duly monitor its operation",
             "Decision records include risk scores, confidence intervals, and contributing signals",
         ),
     ],
     EventType.ACTION_BLOCKED: [
         RegulatoryArticle(
-            RegulatoryDomain.EU_AI_ACT, "Article 9(4)(a)",
-            "Appropriate risk management measures shall be adopted, including elimination or reduction of risks",
+            RegulatoryDomain.EU_AI_ACT, "Article 9(5)(a)",
+            "Elimination or reduction of identified risks as far as technically feasible through adequate design and development",
             "High-risk actions are automatically blocked with full audit trail",
         ),
     ],
     EventType.ESCALATION_SENT: [
         RegulatoryArticle(
             RegulatoryDomain.EU_AI_ACT, "Article 14(3)(a)",
-            "Human oversight shall enable the human to properly monitor the AI system",
+            "Human oversight measures shall be identified and built into the high-risk AI system by the provider",
             "Borderline decisions are escalated with full context for human review",
         ),
     ],
@@ -133,13 +133,13 @@ EU_AI_ACT_MAPPINGS: dict[EventType, list[RegulatoryArticle]] = {
     ],
     EventType.OUTCOME_RECORDED: [
         RegulatoryArticle(
-            RegulatoryDomain.EU_AI_ACT, "Article 9(2)(b)",
-            "Appropriate measures to eliminate or reduce risks as far as possible through adequate design",
+            RegulatoryDomain.EU_AI_ACT, "Article 9(2)(c)",
+            "Evaluation of other risks possibly arising, based on the analysis of data gathered from the post-market monitoring system",
             "Post-execution outcomes feed back into adaptive scoring to improve future risk estimates",
         ),
         RegulatoryArticle(
-            RegulatoryDomain.EU_AI_ACT, "Article 61(1)",
-            "Post-market monitoring system proportionate to the nature of the AI technologies",
+            RegulatoryDomain.EU_AI_ACT, "Article 72(1)",
+            "Post-market monitoring system proportionate to the nature of the AI technologies and the risks of the high-risk AI system",
             "Continuous outcome tracking enables post-deployment monitoring of risk accuracy",
         ),
     ],
@@ -184,15 +184,15 @@ EU_AI_ACT_MAPPINGS: dict[EventType, list[RegulatoryArticle]] = {
 DORA_MAPPINGS: dict[EventType, list[RegulatoryArticle]] = {
     EventType.ACTION_REQUESTED: [
         RegulatoryArticle(
-            RegulatoryDomain.DORA, "Article 12(1)",
-            "ICT-related incident detection, including automated alert mechanisms",
+            RegulatoryDomain.DORA, "Article 10(1)",
+            "Mechanisms to promptly detect anomalous activities, including ICT-related incidents",
             "All agent actions are logged as events for incident detection",
         ),
     ],
     EventType.ACTION_BLOCKED: [
         RegulatoryArticle(
-            RegulatoryDomain.DORA, "Article 10(1)",
-            "ICT risk management framework shall include protection and prevention mechanisms",
+            RegulatoryDomain.DORA, "Article 9(1)",
+            "Continuous monitoring and control of ICT systems, with security tools, policies and procedures that minimise ICT risk",
             "Automated blocking of high-risk actions with full incident trail",
         ),
     ],

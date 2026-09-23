@@ -28,18 +28,18 @@ partial, or insufficient, see [VERDICTS.md](VERDICTS.md).
 |---|---|---|
 | **9(1)** | Risk Management System | Every intercepted action is scored and the score is recorded with inputs. `RISK_SCORED` events. |
 | **9(2)(a)** | Risk Identification and Analysis | `RISK_SCORED` plus `ACTION_BLOCKED` records show which risks were detected and which were blocked. |
-| **9(4)(a)** | Risk Mitigation Measures | `ACTION_BLOCKED` and `DECISION_MADE` records show mitigation applied per action. |
-| **9(7)** | Testing Procedures | `RISK_SCORED` plus `OUTCOME_RECORDED` pairs form the test signal. Conformal intervals give distribution-free calibration metrics. |
+| **9(5)(a)** | Risk Mitigation Measures | `ACTION_BLOCKED` and `DECISION_MADE` records show mitigation applied per action. |
+| **9(6)** | Testing Procedures | `RISK_SCORED` plus `OUTCOME_RECORDED` pairs form the test signal. Conformal intervals give distribution-free calibration metrics. |
 | **11(1)** | Technical Documentation | Checked outside the audit trail. Vaara does not replace the Annex IV technical file. |
 | **12(1)** | Record-Keeping (Logging) | Every `ACTION_REQUESTED`, `RISK_SCORED`, and `DECISION_MADE` is written to a hash-chained, tamper-evident trail. See "Audit trail integrity" below. |
 | **13(1)** | Transparency and Provision of Information | `RISK_SCORED` and `DECISION_MADE` records carry the risk score, the interval, the decision, and the reason string shown to the operator. |
 | **14(1)** | Human Oversight -- Design | `ESCALATION_SENT` and `ESCALATION_RESOLVED` events prove the oversight path exists and was exercised. The `vaara.audit.review_queue` storage layer turns `escalate` into a substantive queued-for-review step rather than a fire-and-forget log line. The `vaara review` CLI is the operator surface. |
 | **14(4)(d)** | Human Oversight -- Override Capability | `ESCALATION_RESOLVED` and `POLICY_OVERRIDE` events prove a human can decide not to proceed or can override Vaara's decision. The `vaara review resolve --audit-db PATH` CLI writes the `ESCALATION_RESOLVED` row directly from an operator action, so the override is a single recorded transaction rather than an out-of-band promise. |
 | **15(1)** | Accuracy, Robustness and Cybersecurity | `OUTCOME_RECORDED` events feed the adaptive scorer. Recency is tracked (default weekly calibration window). |
-| **26(10)** | Deployer Obligations -- Logging | `ACTION_REQUESTED`, `RISK_SCORED` and `DECISION_MADE` events are the automatically generated logs the deployer must retain. The engine treats this as critical and wants at least 10 records inside the staleness window. |
+| **26(6)** | Deployer Obligations -- Logging | `ACTION_REQUESTED`, `RISK_SCORED` and `DECISION_MADE` events are the automatically generated logs the deployer must retain. The engine treats this as critical and wants at least 10 records inside the staleness window. |
 | **50(1)** | Transparency -- AI System Disclosure | `DISCLOSURE_RECORDED` events prove a natural person was informed they were interacting with an AI system. Recorded via `vaara.audit.article50`. Critical requirement; a single record inside the window satisfies it. |
-| **61(1)** | Post-Market Monitoring | `OUTCOME_RECORDED` events form the post-market signal, tied back to the original action via `action_id`. |
-| **73(1)** | Serious-Incident Reporting | `vaara trail export-incident` builds a standalone JSON report referencing the trigger audit record by `record_id`. INTERIM format pending the Commission template promised by Article 73(7). Reporting deadline is derived from the Article 3(49) sub-category (general 15 days, death 10 days, Article 3(49)(b) widespread or serious 2 days). |
+| **72(1)** | Post-Market Monitoring | `OUTCOME_RECORDED` events form the post-market signal, tied back to the original action via `action_id`. |
+| **73(1)** | Serious-Incident Reporting | `vaara trail export-incident` builds a standalone JSON report referencing the trigger audit record by `record_id`. INTERIM format pending the Commission guidance required by Article 73(7). Reporting deadline is derived from the Article 3(49) sub-category (general 15 days, death 10 days, Article 3(49)(b) widespread or serious 2 days). |
 
 ### Article 14 in particular
 
@@ -115,9 +115,9 @@ also ships with a DORA bundle:
 
 | Article | Requirement | Evidence Vaara produces |
 |---|---|---|
-| **10(1)** | ICT Risk Management -- Protection and Prevention | `ACTION_BLOCKED` and `DECISION_MADE` records. |
-| **12(1)** | ICT Incident Detection | `ACTION_REQUESTED` and `ACTION_BLOCKED` records, with risk score and reason. |
-| **13(1)** | ICT Incident Response and Learning | `OUTCOME_RECORDED` events close the loop and feed the adaptive scorer. |
+| **9(1)** | ICT Risk Management -- Protection and Prevention | `ACTION_BLOCKED` and `DECISION_MADE` records. |
+| **10(1)** | ICT Anomaly Detection | `ACTION_REQUESTED` and `ACTION_BLOCKED` records, with risk score and reason. |
+| **13(1)** | ICT Learning and Evolving | `OUTCOME_RECORDED` events close the loop and feed the adaptive scorer. |
 
 ## Cloud guardrail adapter pattern
 
@@ -203,8 +203,9 @@ table covers 69 provider categories across seven upstream guardrails.
 | `word_block` | LLM Guard `BanSubstrings` / `Regex` | Art. 5 | LLM05 |
 | `bias` | Guardrails AI `BiasCheck` · LLM Guard `Bias` | Art. 10 | LLM05 |
 | `schema_violation` | Guardrails AI `ValidJSON` / `RegexMatch` / `ValidLength` · LLM Guard `JSON` | Art. 15 | LLM05 |
-| `output_validation` | NeMo `output_rails.self_check` · LLM Guard `NoRefusal` | Art. 13 | - |
-| `grounding` | NeMo `output_rails.fact_check` / `retrieval_rails.relevance` · LLM Guard `Relevance` | Art. 13, Art. 15 | LLM09 |
+| `output_validation` | NeMo `output_rails.self_check` · LLM Guard `NoRefusal` | Art. 13 | LLM05 (NeMo only) |
+| `grounding` | NeMo `output_rails.fact_check` | Art. 13, Art. 15 | LLM09 |
+| `grounding` | NeMo `retrieval_rails.relevance` · LLM Guard `Relevance` | Art. 13 | LLM09 |
 | `malicious_uri` | LLM Guard `MaliciousURLs` | Art. 15 | LLM05 |
 | `language` | LLM Guard `Language` | Art. 13 | - |
 | `sentiment` | LLM Guard `Sentiment` | - | - |
@@ -336,10 +337,12 @@ liability.
 
 Vaara's hash-chained audit trail and Article 12 commit-prove receipts
 produce **technical evidence**. They are not Qualified Electronic
-Signatures, Qualified Electronic Seals, or Qualified Electronic
-Attestations of Attributes (QEAA) under Regulation (EU) 910/2014
-(eIDAS), Articles 3(12), 3(25), 3(45), or 3(46). Vaara does not
-operate as a qualified trust service under Article 3(16).
+Signatures, Qualified Electronic Seals, Qualified Electronic
+Attestations of Attributes (QEAA), or attestations of attributes issued
+by a public sector body under Regulation (EU) 910/2014 (eIDAS) as
+amended by Regulation (EU) 2024/1183, Articles 3(12), 3(27), 3(45), or
+3(46). Vaara does not operate as a qualified trust service under
+Article 3(17).
 
 If your conformity workstream requires evidence to be backed by a
 qualified trust service, layer that on top of Vaara's output. Vaara's
@@ -787,9 +790,10 @@ problem:
   submitted. It does not attest that the tool arguments were not
   tampered with before reaching Vaara. Run Vaara inside a trust
   boundary you control.
-- **Retention policy.** Article 12(2) allows log retention periods set
-  in accordance with the intended purpose and applicable law. The
-  deployer picks the period. Vaara enforces it via
+- **Retention policy.** Articles 19(1) (providers) and 26(6)
+  (deployers) require logs to be kept for a period appropriate to the
+  intended purpose, at least six months unless other Union or national
+  law provides otherwise. The deployer picks the period. Vaara enforces it via
   `vaara trail purge --db PATH --retention-days N --all-tenants` (or
   `SQLiteAuditBackend.purge_older_than(seconds)` from Python). The
   tenant selector is required, not optional: pass `--tenant ID` to purge
@@ -808,9 +812,10 @@ problem:
 
 Honest about the edges:
 
-- The DORA bundle ships today but the EU AI Act bundle is the
-  better-calibrated one. DORA mapping will be refined in the 0.5.x
-  series with input from deployers in scope.
+- The DORA bundle is three requirements (Articles 9(1), 10(1), 13(1))
+  against the EU AI Act bundle's fourteen. It covers the runtime
+  evidence Vaara records, not DORA's incident classification and
+  reporting chapter.
 - `min_evidence_count` thresholds on the default requirements are
   conservative starting points. For production, tune them against your
   own traffic volume and risk tolerance through `ComplianceEngine.

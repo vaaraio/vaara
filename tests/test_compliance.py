@@ -380,3 +380,54 @@ class TestAddRequirementIdempotent:
         assert after[0].title == "Custom override"
         # Built-in count for same article + domain was replaced, not duplicated
         assert before_count >= 1
+
+
+class TestArticleNumbersFollowTheFinalText:
+    """The engine and the record tags cite the Regulation as published.
+
+    Up to v1.96 they carried numbers from the 2021 proposal: 9(4)(a) and
+    9(7) for risk mitigation and testing (final 9(5)(a) and 9(6)), 61(1)
+    for post-market monitoring (final 72(1); final 61 is informed consent
+    for real-world testing) and 26(10) for deployer log keeping (final
+    26(6); final 26(10) is post-remote biometric identification). The DORA
+    bundle cited 10(1) for protection and 12(1) for detection, which are
+    Articles 9 and 10 in Regulation (EU) 2022/2554.
+    """
+
+    def test_eu_ai_act_requirement_articles(self):
+        assert [r.article for r in EU_AI_ACT_REQUIREMENTS] == [
+            "Article 9(1)", "Article 9(2)(a)", "Article 9(5)(a)",
+            "Article 9(6)", "Article 11(1)", "Article 12(1)",
+            "Article 13(1)", "Article 14(1)", "Article 14(4)(d)",
+            "Article 15(1)", "Article 72(1)", "Article 50(1)",
+            "Article 73(1)", "Article 26(6)",
+        ]
+
+    def test_dora_requirement_articles(self):
+        assert [r.article for r in DORA_REQUIREMENTS] == [
+            "Article 9(1)", "Article 10(1)", "Article 13(1)",
+        ]
+
+    def test_new_records_carry_final_text_tags(self):
+        from vaara.audit.trail import DORA_MAPPINGS, EU_AI_ACT_MAPPINGS
+
+        tags = {
+            a.article
+            for mapping in (EU_AI_ACT_MAPPINGS, DORA_MAPPINGS)
+            for articles in mapping.values()
+            for a in articles
+        }
+        proposal_era = {
+            "Article 9(4)(a)", "Article 9(7)", "Article 9(2)(b)",
+            "Article 61(1)", "Article 26(10)", "Article 12(1)",
+        }
+        eu_tags = {
+            a.article for articles in EU_AI_ACT_MAPPINGS.values() for a in articles
+        }
+        dora_tags = {
+            a.article for articles in DORA_MAPPINGS.values() for a in articles
+        }
+        # Article 12(1) is right for the AI Act (logging) and wrong for DORA.
+        assert not (eu_tags & (proposal_era - {"Article 12(1)"}))
+        assert not (dora_tags & proposal_era)
+        assert {"Article 9(5)(a)", "Article 9(6)", "Article 72(1)"} <= tags
