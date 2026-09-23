@@ -263,7 +263,9 @@ def remove_claude_hooks(settings_path: Path) -> bool:
     return True
 
 
-def write_hook_config(config_path: Path, trail_db: Path) -> None:
+def write_hook_config(config_path: Path, trail_db: Path, *,
+                      shadow: bool = False, auto: bool = False,
+                      auto_preset: Optional[str] = None) -> None:
     """Point the hook runner at the shared trail via its config.json.
 
     Merges ``audit_db`` into any existing config so a truncated or absent file
@@ -274,9 +276,21 @@ def write_hook_config(config_path: Path, trail_db: Path) -> None:
     engine and the macOS client already land on balanced without it. It makes
     the operating point readable in the file, which is where an operator looks
     when asking why a call was scored the way it was.
+
+    ``shadow`` sets ``mode: watch``: the operator asked for it. ``auto``
+    sets ``mode: watch`` and the ``auto_preset`` protection only where those
+    keys are absent, because ``--auto`` is documented as a shadow-mode start
+    at its preset. The hook reads this file and no other, so until this was
+    written ``--shadow`` and ``--auto`` left the hooks blocking.
     """
     cfg = _load_json(config_path)
     cfg["audit_db"] = str(trail_db)
+    if shadow:
+        cfg["mode"] = "watch"
+    if auto:
+        cfg.setdefault("mode", "watch")
+        if auto_preset:
+            cfg.setdefault("protection", auto_preset)
     cfg.setdefault("protection", DEFAULT_PROTECTION_PRESET)
     _atomic_write_json(config_path, cfg)
 
@@ -447,7 +461,8 @@ def run_init(
         )
 
     report.hooks_changed = write_claude_hooks(settings_path, vaara_bin)
-    write_hook_config(config_path, trail_db)
+    write_hook_config(config_path, trail_db, shadow=shadow, auto=auto,
+                      auto_preset=mode if auto else None)
 
     report.clients = detect_clients(proxy_bin)
     if govern_mcp:
@@ -461,7 +476,7 @@ def run_init(
                 if not client.exists or client.ungoverned == 0:
                     continue
                 count = govern_mcp_config(
-                    client.path, proxy_bin, trail_db, shadow=shadow,
+                    client.path, proxy_bin, trail_db, shadow=shadow or auto,
                 )
                 if count:
                     report.mcp_rewritten[client.name] = count
