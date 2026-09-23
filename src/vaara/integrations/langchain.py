@@ -300,6 +300,21 @@ def vaara_wrap_tool(
 
         safe_email = vaara_wrap_tool(send_email, pipeline)
     """
+    return _wrap_tool(tool, pipeline, agent_id, block_on_escalate)
+
+
+def _wrap_tool(
+    tool: Any,
+    pipeline: InterceptionPipeline,
+    agent_id: str,
+    block_on_escalate: bool,
+    via_func: bool = False,
+) -> Any:
+    """``vaara_wrap_tool``'s body. ``via_func`` wraps ``func`` alone, for a
+    tool whose ``run``, ``_run`` and ``_arun`` all call ``func``: wrapping
+    ``_run`` there leaves ``run`` ungoverned, and wrapping both would score
+    one call twice. CrewAI's ``Tool`` (what ``@tool`` returns) is that shape.
+    """
     # Idempotency: re-wrapping the same tool instance would stack
     # interceptors and double every scoring + outcome call, skewing
     # MWU weights. CrewAI's governed_kickoff can re-enter this path
@@ -310,6 +325,8 @@ def vaara_wrap_tool(
     has_run = hasattr(tool, "_run")
     has_func = hasattr(tool, "func")
     has_arun = hasattr(tool, "_arun")
+    if via_func and has_func:
+        has_run = has_arun = False
     if not (has_run or has_func or has_arun):
         raise TypeError(
             f"vaara_wrap_tool: {tool!r} has no _run, _arun, or func attribute; "

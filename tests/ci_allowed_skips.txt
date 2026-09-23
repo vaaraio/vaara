@@ -1,7 +1,8 @@
 # Skip reasons the CI `tests` matrix may print. The matrix installs the base
 # package plus fastapi, uvicorn and httpx and nothing else, on purpose, so a
 # test that needs another extra skips here and runs in the job that installs
-# it (signing extras, adapter contracts, framework contracts, classifier).
+# it (signing extras, adapter, framework, guardrail and llm-guard contracts,
+# classifier).
 #
 # One Python regular expression per line, matched against the reason pytest
 # prints after `SKIPPED [n] path:line: `. A skip whose reason matches none of
@@ -15,7 +16,7 @@ AdversarialClassifier requires vaara\[ml\] extras
 (trained|stacked) gate needs the ml extra
 mc dropout gate needs torch
 reportlab not installed
-^pip install (rebuff|openai-agents|langchain-core|google-cloud-modelarmor|boto3|azure-ai-contentsafety)$
+^pip install (rebuff|openai-agents|langchain-core|google-cloud-modelarmor|boto3|azure-ai-contentsafety|guardrails-ai|nemoguardrails|crewai|llm-guard)$
 ^proxy deps not installed$
 (inference-proxy|console) deps not installed: no rfc8785
 rfc8785 not installed in this environment
