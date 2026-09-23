@@ -365,7 +365,7 @@
           "name": "Is Vaara free and open source?",
           "acceptedAnswer": {
             "@type": "Answer",
-            "text": "Yes. Vaara is licensed under AGPL-3.0, with no SaaS, no telemetry, and no signup. It ships on PyPI, npm, and the MCP registry, with SLSA Build Level 3 and Sigstore-signed releases."
+            "text": "Yes. Vaara is licensed under AGPL-3.0, with no SaaS, no telemetry, and no signup. It ships on PyPI, npm, and the MCP registry, with SLSA build provenance and Sigstore-signed releases."
           }
         },
         {
@@ -438,7 +438,7 @@ conformance: <span class="ok">CONFORMS</span>
   <li>One-command regulator package: <code>vaara trail export-article12</code> writes the signed trail, per-article EU AI Act evidence, and the time anchor as Article 19 existence-in-time, in one file an authority checks offline.</li>
   <li>Product liability evidence: from 9 December 2026, software and AI systems placed on the EU market fall under the Product Liability Directive (EU) 2024/2853. A court can order the producer to disclose the evidence it holds about how the product behaved (Article 9), and if the producer cannot produce it, the product is presumed defective (Article 10). For an autonomous agent that means the record of what it did, and what it was refused, has to exist before anyone asks, and be readable by the claimant's expert without access to the producer's systems. A Vaara receipt is that record: signed, time-anchored, one per decision with its outcome, verifiable from the bytes alone. A liability defence is built on evidence like this, and the receipt supplies the evidence. Article mapping in <a href="https://github.com/vaaraio/vaara/blob/main/docs/COMPLIANCE.md#eu-product-liability-directive-20242853">COMPLIANCE.md</a>.</li>
   <li>Policy gating on every tool call: allow, block, or escalate each agent action against your own policy before it runs, through a transparent MCP proxy with native hooks for LangChain, CrewAI, and the OpenAI Agents SDK. TypeScript client on npm, Claude Code plugin in the same repo.</li>
-  <li>Author of the Vaara Receipt Internet-Draft (<code>draft-sirkkavaara-vaara-receipt</code>) at the IETF, an offline-verifiable execution-record format whose conformance vectors have been reproduced by <a href="/conformance.html">seven independent parties</a>, each run recorded in public by someone other than Vaara. Releases are SLSA Build Level 3 and Sigstore-signed, with continuous fuzzing on the decoder, audit, and policy loader.</li>
+  <li>Author of the Vaara Receipt Internet-Draft (<code>draft-sirkkavaara-vaara-receipt</code>) at the IETF, an offline-verifiable execution-record format whose conformance vectors have been reproduced by <a href="/conformance.html">seven independent parties</a>, each run recorded in public by someone other than Vaara. Releases carry SLSA build provenance and are Sigstore-signed, with continuous fuzzing on the decoder, audit, and policy loader.</li>
 </ul>
 <p class="stamp" id="pilots">Paid pilots</p>
 <ul>

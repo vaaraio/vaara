@@ -180,3 +180,24 @@ python scripts/verify_vaara_trail.py signed.zip --pubkey signer.pem
 
 The script in `scripts/verify_vaara_trail.py` depends only on the
 standard library and the `cryptography` package. Copy it to any machine.
+
+## Verifying a Vaara release
+
+This section covers Vaara's own packages. Keys for signing your trails are covered above.
+
+Every release is built by `.github/workflows/release.yml` on the tag push,
+which attaches SLSA v1 build provenance to the wheel, the sdist and the
+MCP bundle as a GitHub artifact attestation. The wheel on PyPI is the same
+file as the one on the GitHub release, so the check works on either
+download:
+
+```bash
+pip download vaara==<version> --no-deps
+gh attestation verify vaara-<version>-py3-none-any.whl --repo vaaraio/vaara
+```
+
+A pass means the file's digest matches provenance signed by GitHub's
+Sigstore instance for a run of `release.yml` in `vaaraio/vaara`. The
+builder is that workflow itself rather than an isolated reusable builder,
+so this is SLSA Build Level 2, and `slsa-verifier` rejects it for that
+reason.

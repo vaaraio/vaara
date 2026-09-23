@@ -167,7 +167,7 @@ into Vaara's own supply chain (strong) and the external agent / MCP
 supply chain the deployer connects through Vaara (mostly
 observational).
 
-- ✅ Provenance and SBOMs for Vaara itself: SLSA Build Level 3
+- ✅ Provenance for Vaara itself: SLSA v1 build provenance on every release (Build Level 2, GitHub artifact attestations), and an SBOM on the container image
   provenance on every release (`.github/workflows/release.yml`,
   v0.26.0), Sigstore-signed PyPI release with PEP 740 attestations
   (v0.4.3), npm provenance on `@vaara/client`.
