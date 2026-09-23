@@ -6,6 +6,13 @@ and this project follows [Semantic Versioning](https://semver.org/spec/v2.0.0.ht
 
 ## [Unreleased]
 
+## [1.96.0] - 2026-09-23
+
+### Upgrading
+- `vaara init --shadow` now puts the hook in watch mode: it records every call and blocks none. It used to leave the hook blocking. To block again, choose Protect in `/vaara-setup` or set `"mode": "protect"` in `~/.vaara/claude-code/config.json`; a plain `vaara init` leaves the mode as it is.
+- `vaara init --auto` starts the hook in watch mode at its `--mode` preset where neither is already set. The silent setup that runs on first use of any command leaves the hook's mode as it is.
+- A custom threshold pair with escalate equal to deny is now ignored as malformed and the preset applies. Before, the whole policy was dropped and the defaults applied.
+
 ### Fixed
 - `/vaara-stats` read the legacy trail. The hooks resolve their trail from the environment override, then the `audit_db` key that `vaara init` writes, then the legacy default; the stats script skipped the middle step, so after `vaara init` it reported on a file the hooks no longer write. It now uses the hooks' own resolution. `tests/test_vaara_stats_follows_config.py` runs the script against a config that points elsewhere.
 - `vaara init --shadow` is documented as watch-only, recording without blocking, and `--auto` as a shadow-mode start at its `--mode` preset. The Claude Code hook reads `~/.vaara/claude-code/config.json` and no other file, and neither flag wrote a mode there: `--shadow` reached only the MCP proxy rewrite, and `--auto` recorded its shadow setting in a policy file that nothing reads and in a `mode` key of the discovery config that nothing reads either. After either command the hooks went on blocking. `--shadow` now sets `mode: watch`. `--auto` sets `mode: watch` and its preset only where the operator has not set them, and its MCP rewrite runs in shadow too. The silent setup that runs on the first use of any command also passes shadow and auto; it leaves the hook's mode as it was, so a fresh install keeps blocking as documented. `tests/test_init_shadow_reaches_hook.py` checks the result with the hook's own shadow predicate.
