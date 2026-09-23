@@ -13,12 +13,13 @@ Two surfaces:
 
 * ``run_init`` — detect installed clients, write the Claude Code
   PreToolUse/PostToolUse/SessionStart hooks into ``~/.claude/settings.json``,
-  rewrite known MCP client configs through ``vaara-mcp-proxy``, and point
-  everything at one trail. Idempotent: it re-asserts the hooks on every run
+  install the OpenCode plugin where OpenCode is installed, rewrite known MCP
+  client configs through ``vaara-mcp-proxy``, and point everything at one
+  trail. Idempotent: it re-asserts the hooks on every run
   (self-heal — a settings.json that was reset or truncated is repaired), and
   re-running never duplicates entries or clobbers the pre-Vaara MCP backup.
-* ``run_ungovern`` — remove the Vaara-managed hooks and restore each MCP config
-  from its ``.vaara-backup``.
+* ``run_ungovern`` — remove the Vaara-managed hooks and the OpenCode plugin,
+  and restore each MCP config from its ``.vaara-backup``.
 
 The hooks call the ``vaara`` binary on PATH directly (``vaara hook
 pre-tool-use`` etc.), so this does not depend on the plugin marketplace being
@@ -72,14 +73,16 @@ DEFAULT_PROTECTION_PRESET = "balanced"
 _HOOK_MARKER = "vaara hook "
 
 # Known MCP client config locations. Paths are ~-relative and expanded at
-# scan time.
+# scan time. OpenCode is not here: its plugin gates every tool call, MCP
+# included (see vaara.integrations.opencode). The entry that was here named
+# a path in the maintainer's own checkout and a format OpenCode does not use,
+# so it governed nothing on any machine.
 KNOWN_MCP_CLIENTS: list[tuple[str, str]] = [
     ("Claude Desktop",
      "~/Library/Application Support/Claude/claude_desktop_config.json"),
     ("Claude Code", "~/.claude.json"),
     ("Cursor", "~/.cursor/mcp.json"),
     ("Windsurf", "~/.codeium/windsurf/mcp_config.json"),
-    ("OpenCode", "~/Projects/vaara/opencode.json"),
 ]
 
 _HOOK_EVENTS = (
@@ -119,6 +122,11 @@ class InitReport:
     discovery: Optional[DiscoverReport] = None
     policy_path: Optional[Path] = None
     config_path: Optional[Path] = None
+    # OpenCode plugin: where it was installed (None: OpenCode not found or
+    # skipped), whether this run changed it, and whether ungovern removed it.
+    opencode_plugin: Optional[Path] = None
+    opencode_changed: bool = False
+    opencode_removed: bool = False
 
 
 def resolve_vaara_bin() -> str:
@@ -431,6 +439,8 @@ def run_init(
     auto: bool = False,
     mode: str = "eco",
     set_hook_mode: bool = True,
+    govern_opencode: bool = True,
+    opencode_dir: Optional[Path] = None,
 ) -> InitReport:
     """Set up (or self-heal) local governance in one call.
 
@@ -471,6 +481,13 @@ def run_init(
                           auto_preset=mode if auto else None)
     else:
         write_hook_config(config_path, trail_db)
+
+    if govern_opencode:
+        from vaara.integrations import opencode
+
+        if opencode.detected(opencode_dir):
+            report.opencode_changed = opencode.install_plugin(vaara_bin, opencode_dir)
+            report.opencode_plugin = opencode.plugin_path(opencode_dir)
 
     report.clients = detect_clients(proxy_bin)
     if govern_mcp:
@@ -515,12 +532,16 @@ def run_ungovern(
     service_home: Optional[Path] = None,
     service_system: Optional[str] = None,
     service_runner: Any = None,
+    opencode_dir: Optional[Path] = None,
 ) -> InitReport:
-    """Reverse ``run_init``: remove the hooks, restore each MCP config, and
-    take down the proxy service if one was installed."""
+    """Reverse ``run_init``: remove the hooks and the OpenCode plugin, restore
+    each MCP config, and take down the proxy service if one was installed."""
+    from vaara.integrations import opencode
+
     proxy_bin = proxy_bin or (shutil.which("vaara-mcp-proxy") or "vaara-mcp-proxy")
     report = InitReport(hooks_path=settings_path)
     report.hooks_changed = remove_claude_hooks(settings_path)
+    report.opencode_removed = opencode.remove_plugin(opencode_dir)
     for name, raw_path in KNOWN_MCP_CLIENTS:
         path = Path(raw_path).expanduser()
         if restore_mcp_config(path):

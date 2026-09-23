@@ -334,22 +334,44 @@ def _ungovernable(cfg: dict, tool_name: str, reason: str) -> int:
     return 2
 
 
-def run_pre_tool_use(deny_patterns: Optional[str] = None) -> int:
+def _client_events(cfg: dict, client: Optional[str]) -> tuple[list[dict], str]:
+    """The hook events for this call, and the agent id they are recorded under.
+
+    Claude Code sends one event in the hook's own shape. OpenCode's plugin
+    sends its tool call as OpenCode names it, which is translated here; a
+    patch over several files becomes one event per file for the deny rules.
+    """
+    event = _read_event()
+    if client == "opencode":
+        from vaara.integrations import opencode
+
+        agent = os.environ.get("VAARA_PLUGIN_AGENT_ID") or opencode.AGENT_ID
+        return opencode.to_hook_events(event), agent
+    return [event], agent_id(cfg)
+
+
+def run_pre_tool_use(deny_patterns: Optional[str] = None,
+                     client: Optional[str] = None) -> int:
     """PreToolUse: exit 0 allows, exit 2 blocks or holds for review."""
     cfg = load_config()
     if plugin_disabled(cfg):
         return 0
-    event = _read_event()
+    events, agent = _client_events(cfg, client)
+    event = events[0]
     tool_name = event.get("tool_name", "")
     tool_input = event.get("tool_input", {}) or {}
     if not isinstance(tool_input, dict):
         tool_input = {"_raw": tool_input}
     session_id = event.get("session_id", "")
-    agent = agent_id(cfg)
     shadow = shadow_mode(cfg)
 
     rules = load_deny_rules(deny_patterns)
     match = match_deny_rule(rules, tool_name, tool_input)
+    for extra in events[1:]:
+        if match is not None:
+            break
+        match = match_deny_rule(rules, extra.get("tool_name", ""),
+                                extra.get("tool_input") or {})
     matched_by = "tool"
     if match is None and tool_name.startswith("mcp__"):
         # An MCP server names its tools whatever it likes, so no rule's
@@ -534,12 +556,21 @@ def _outcome_severity(tool_response: object) -> float:
     return 0.0
 
 
-def run_post_tool_use() -> int:
+def run_post_tool_use(client: Optional[str] = None) -> int:
     """PostToolUse: append the outcome, feed the online learner. Never blocks."""
     cfg = load_config()
     if plugin_disabled(cfg):
         return 0
-    event = _read_event()
+    if client == "opencode":
+        from vaara.integrations import opencode
+
+        raw = _read_event()
+        event = opencode.to_hook_events(raw)[0]
+        event["tool_response"] = opencode.tool_response(raw.get("output"))
+        agent = os.environ.get("VAARA_PLUGIN_AGENT_ID") or opencode.AGENT_ID
+    else:
+        event = _read_event()
+        agent = agent_id(cfg)
     tool_name = event.get("tool_name", "")
     severity = _outcome_severity(event.get("tool_response", {}))
 
@@ -548,7 +579,6 @@ def run_post_tool_use() -> int:
         return 0
     try:
         trail = _open_trail(cfg)
-        agent = agent_id(cfg)
         target_action_id = None
         for record in reversed(trail._records):
             if record.agent_id != agent:
