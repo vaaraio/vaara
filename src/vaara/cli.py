@@ -2197,22 +2197,71 @@ def _write_receipt_out(receipt: dict, args: argparse.Namespace,
 
 
 def _cmd_receipt_anchor_scitt(args: argparse.Namespace) -> int:
-    """Add a SCITT transparency-log witness anchor to a receipt."""
+    """Add a ``scitt`` Merkle-log anchor to a receipt."""
     from vaara.audit.scitt_anchor import ScittAnchor, ScittAnchorError
     receipt, path = _load_receipt(args.receipt, "anchor-scitt")
     if receipt is None or path is None:
         return 2
-    anchorer = ScittAnchor()
     try:
+        anchorer = ScittAnchor.load_or_create(args.log_dir, log_id=args.log_id)
         anchor = anchorer.anchor_receipt(receipt)
-    except ScittAnchorError as exc:
+    except (ScittAnchorError, OSError) as exc:
         print(f"vaara receipt anchor-scitt: {exc}", file=sys.stderr)
         return 2
     receipt.setdefault("timestampAnchors", []).append(anchor)
     _write_receipt_out(receipt, args, path)
     print(f"scitt anchor added: leafIndex={anchor['leafIndex']} "
-          f"treeSize={anchor['treeSize']}")
+          f"treeSize={anchor['treeSize']} log={anchorer.path}")
+    print("The root is the log operator's own claim until someone else holds "
+          "a tree head: publish `vaara receipt anchor-scitt-head`.")
     return 0
+
+
+def _cmd_receipt_anchor_scitt_head(args: argparse.Namespace) -> int:
+    """Print the ``scitt`` log's current tree head as JSON."""
+    from vaara.audit.scitt_anchor import ScittAnchor, ScittAnchorError
+    try:
+        head = ScittAnchor.load_or_create(args.log_dir, log_id=args.log_id).head(
+            consistency_from=args.consistency_from)
+    except (ScittAnchorError, OSError) as exc:
+        print(f"vaara receipt anchor-scitt-head: {exc}", file=sys.stderr)
+        return 2
+    print(json.dumps(head, indent=2))
+    return 0
+
+
+def _cmd_receipt_verify_scitt(args: argparse.Namespace) -> int:
+    """Verify every ``scitt`` anchor on a receipt, optionally against a head."""
+    from vaara.audit.scitt_anchor import ScittAnchorError, verify_scitt_anchor
+    receipt, _ = _load_receipt(args.receipt, "verify-scitt")
+    if receipt is None:
+        return 2
+    trusted_head = None
+    if args.head:
+        try:
+            trusted_head = json.loads(
+                Path(args.head).expanduser().read_text(encoding="utf-8"))
+        except (OSError, json.JSONDecodeError) as exc:
+            print(f"vaara receipt verify-scitt: cannot read head JSON: {exc}",
+                  file=sys.stderr)
+            return 2
+    anchors = [a for a in receipt.get("timestampAnchors") or []
+               if isinstance(a, dict) and a.get("method") == "scitt"]
+    if not anchors:
+        print("vaara receipt verify-scitt: the receipt carries no scitt anchor",
+              file=sys.stderr)
+        return 2
+    ok = True
+    for anchor in anchors:
+        try:
+            result = verify_scitt_anchor(receipt, anchor, trusted_head=trusted_head)
+        except ScittAnchorError as exc:
+            print(f"vaara receipt verify-scitt: {exc}", file=sys.stderr)
+            return 2
+        print(f"leaf {result['leaf_index']}: {result['status']}; "
+              f"root {result['root']}")
+        ok = ok and bool(result["verified"])
+    return 0 if ok else 1
 
 
 def _cmd_receipt_render(args: argparse.Namespace) -> int:
@@ -5863,12 +5912,24 @@ def build_parser() -> argparse.ArgumentParser:
     )
     prc_verify.set_defaults(func=_cmd_receipt_verify)
 
+    def _scitt_log_args(p: argparse.ArgumentParser) -> None:
+        p.add_argument(
+            "--log-dir", default=None,
+            help="Directory of the append-only log (default ~/.vaara/anchor-log)",
+        )
+        p.add_argument(
+            "--log-id", default="vaara-scitt-log",
+            help="Log name; the leaves live in <log-dir>/<log-id>.leaves",
+        )
+
     prc_scitt = rcsub.add_parser(
         "anchor-scitt",
-        help="Add a SCITT transparency-log witness anchor: append the "
-             "receipt's signed-payload digest to the in-process Merkle log "
-             "and record the inclusion proof. Instant, no third party, "
-             "verifiable by recomputation. Stacks with rfc3161 anchors.",
+        help="Add a scitt anchor: append the receipt's signed-payload digest "
+             "to a local append-only Merkle log (RFC 6962 hashing) and record "
+             "the inclusion proof and root. Not a submission to an IETF SCITT "
+             "service. The root is the operator's own claim until a tree head "
+             "is held by someone else (anchor-scitt-head). Stacks with "
+             "rfc3161 anchors.",
     )
     prc_scitt.add_argument(
         "receipt", help="Path to a receipt JSON file (SPEC.md envelope)",
@@ -5877,7 +5938,37 @@ def build_parser() -> argparse.ArgumentParser:
         "--out", default=None,
         help="Write the anchored receipt here instead of updating in place",
     )
+    _scitt_log_args(prc_scitt)
     prc_scitt.set_defaults(func=_cmd_receipt_anchor_scitt)
+
+    prc_scitt_head = rcsub.add_parser(
+        "anchor-scitt-head",
+        help="Print the scitt log's current tree head (logId, treeSize, "
+             "rootHash) as JSON, for publishing or handing to a third party.",
+    )
+    prc_scitt_head.add_argument(
+        "--consistency-from", type=int, default=None, metavar="N",
+        help="Also include the consistency proof from tree size N, so an "
+             "anchor made at size N can be checked against this head",
+    )
+    _scitt_log_args(prc_scitt_head)
+    prc_scitt_head.set_defaults(func=_cmd_receipt_anchor_scitt_head)
+
+    prc_verify_scitt = rcsub.add_parser(
+        "verify-scitt",
+        help="Recompute every scitt anchor on a receipt. With --head, also "
+             "check the anchor's root against a tree head held independently; "
+             "without it the root is reported as the producer's own claim.",
+    )
+    prc_verify_scitt.add_argument(
+        "receipt", help="Path to a receipt JSON file (SPEC.md envelope)",
+    )
+    prc_verify_scitt.add_argument(
+        "--head", default=None,
+        help="Tree head JSON from anchor-scitt-head, obtained independently "
+             "of the receipt",
+    )
+    prc_verify_scitt.set_defaults(func=_cmd_receipt_verify_scitt)
 
     prc_render = rcsub.add_parser(
         "render",
