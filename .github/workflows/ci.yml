@@ -276,13 +276,16 @@ jobs:
         # rfc8785 and no fastapi, so those four files skipped in every job
         # and nothing went red. This job now carries both, and the skip
         # reasons those files print are in COVERED below. Found 2026-09-22.
-        run: pip install -e '.[attestation,scitt,timeanchor,pq,yaml]' 'fastapi>=0.110' 'uvicorn>=0.27' 'httpx>=0.27'
+        # rich renders the standalone examples, which tests/test_examples_run.py
+        # starts as subprocesses; this is the job with the attestation extra
+        # the data-locality example needs, so it is the one that runs them.
+        run: pip install -e '.[attestation,scitt,timeanchor,pq,yaml]' 'fastapi>=0.110' 'uvicorn>=0.27' 'httpx>=0.27' 'rich>=13'
 
       - name: Run tests, failing on any skip these extras should have prevented
         run: |
           set -o pipefail
           pytest -q -rs | tee result.txt
-          COVERED='rfc8785|cbor2|asn1crypto|dilithium|yaml|attestation extra|timeanchor extra|pq extra|inference-proxy deps|console deps|proxy deps'
+          COVERED='rfc8785|cbor2|asn1crypto|dilithium|yaml|attestation extra|timeanchor extra|pq extra|inference-proxy deps|console deps|proxy deps|examples need rich'
           if grep '^SKIPPED' result.txt | grep -qiE "$COVERED"; then
             echo "::error::A test skipped for a dependency this job installs, so signing-critical code went unexecuted."
             grep '^SKIPPED' result.txt | grep -iE "$COVERED"
