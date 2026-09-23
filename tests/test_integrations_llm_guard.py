@@ -89,7 +89,12 @@ class TestAdapter:
         assert finding.verdict == "allow"
 
     def test_missing_llm_guard_raises_when_no_fn_injected(self):
-        # llm_guard is not installed in test env. When neither scan
-        # function is injected, construction must raise ImportError.
+        # When neither scan function is injected and llm_guard is not
+        # installed, construction must raise ImportError. The contract job
+        # installs it; test_integrations_llm_guard_contract covers that side.
+        import importlib.util
+
+        if importlib.util.find_spec("llm_guard") is not None:
+            pytest.skip("llm_guard is installed")
         with pytest.raises(ImportError):
             LLMGuardAdapter()
