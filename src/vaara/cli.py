@@ -898,7 +898,13 @@ def _cmd_trail_publish_head(args: argparse.Namespace) -> int:
         print("dry run, nothing published")
         return 0
 
-    if not args.yes and sys.stdin.isatty():
+    if not args.yes:
+        # With no terminal there is nobody to answer, and silence is not a
+        # yes: a script, CI job or agent has to pass --yes to publish.
+        if not sys.stdin.isatty():
+            print("nothing published: no terminal to confirm on, pass --yes "
+                  "to publish non-interactively", file=sys.stderr)
+            return 2
         try:
             if input("Publish? [y/N] ").strip().lower() not in ("y", "yes"):
                 print("nothing published")
