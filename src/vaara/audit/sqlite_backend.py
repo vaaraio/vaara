@@ -415,10 +415,18 @@ class TrailRepair:
     trail and the file was left exactly where it was.
 
     ``lost_seqs`` is exact within the range of sequence numbers that survived.
-    Records after the last readable one cannot be named, because nothing that
-    survived says they existed; ``unreadable_rowids`` counts row positions
-    that raised on read and is an upper bound, since a damaged interior page
-    makes a whole range unreachable whether or not every slot held a row.
+    Records after the last readable one are named too when the damaged file's
+    ``idx_seq`` index still reads, because that index is a separate b-tree
+    that lists every seq the table held; ``tail_named`` says whether it did.
+    When it did not, records past the last readable row cannot be named.
+    ``unreadable_rowids`` counts row positions that raised on read and is an
+    upper bound, since a damaged interior page makes a whole range
+    unreachable whether or not every slot held a row.
+
+    After a salvage the fresh file's ``audit_meta`` holds ``seq_floor``, the
+    highest seq known to have existed, so the next record written, usually
+    the repair-gap declaration, takes a seq above every lost one instead of
+    reusing a lost record's number.
     """
 
     db: str
@@ -430,6 +438,7 @@ class TrailRepair:
     tables_damaged: list[str] = field(default_factory=list)
     damaged_copy: Optional[str] = None
     error: Optional[str] = None
+    tail_named: bool = False
 
     @property
     def ok(self) -> bool:
@@ -446,6 +455,7 @@ class TrailRepair:
             "unreadable_rowids": self.unreadable_rowids,
             "tables_damaged": list(self.tables_damaged),
             "damaged_copy": self.damaged_copy, "error": self.error,
+            "tail_named": self.tail_named,
         }
 
 
@@ -510,6 +520,24 @@ def _read_rows(conn: sqlite3.Connection, table: str, cols: list[str],
     return rows, unreadable
 
 
+def _indexed_seqs(conn: sqlite3.Connection) -> Optional[set[int]]:
+    """Every seq ``idx_seq`` lists, read from the index alone, or ``None``.
+
+    Selecting only the indexed column makes this a covering scan of the
+    index b-tree, which lives on its own pages, so it can list rows whose
+    table leaf is gone. ``None`` when the index is missing or unreadable;
+    index damage drops entries, it does not invent them.
+    """
+    try:
+        return {
+            int(r[0]) for r in conn.execute(
+                "SELECT seq FROM audit_records INDEXED BY idx_seq WHERE seq IS NOT NULL"
+            )
+        }
+    except sqlite3.DatabaseError:
+        return None
+
+
 def _salvage(path: Path, problem: str) -> TrailRepair:
     stamp = time.strftime("%Y%m%dT%H%M%SZ", time.gmtime())
     tmp = path.with_name(f"{path.name}.repair-{stamp}.tmp")
@@ -546,6 +574,14 @@ def _salvage(path: Path, problem: str) -> TrailRepair:
             dst_cols = {r[1] for r in dst.execute("PRAGMA table_info(audit_records)")}
             use = [c for c in cols if c in dst_cols]
             rows, report.unreadable_rowids = _read_rows(src, "audit_records", use, 1, hi)
+            witness = _indexed_seqs(src)
+            seq_at = use.index("seq")
+            present = {int(r[seq_at]) for r in rows}
+            known = present | (witness or set())
+            if known:
+                report.lost_seqs = [s for s in range(min(known), max(known) + 1)
+                                    if s not in present]
+            report.tail_named = witness is not None
             placeholders = ", ".join("?" for _ in use)
             dst.execute("BEGIN")
             dst.executemany(
@@ -572,6 +608,11 @@ def _salvage(path: Path, problem: str) -> TrailRepair:
                         f"VALUES ({marks})",
                         side_rows,
                     )
+            if report.lost_seqs and (not present or max(report.lost_seqs) > max(present)):
+                dst.execute(
+                    "INSERT OR REPLACE INTO audit_meta (key, value) VALUES ('seq_floor', ?)",
+                    (str(max(report.lost_seqs)),),
+                )
             dst.execute("COMMIT")
             still = _integrity_problem(dst)
             if still is not None:
@@ -589,12 +630,7 @@ def _salvage(path: Path, problem: str) -> TrailRepair:
                            error=f"{type(exc).__name__}: {exc}")
     src.close()
 
-    seq_at = use.index("seq")
-    seqs = sorted({int(r[seq_at]) for r in rows})
     report.records_kept = len(rows)
-    if seqs:
-        present = set(seqs)
-        report.lost_seqs = [s for s in range(seqs[0], seqs[-1] + 1) if s not in present]
 
     # The damaged file is kept beside the trail, never deleted: it is the
     # original evidence, and a later, better tool may read more of it.
@@ -1080,7 +1116,9 @@ class SQLiteAuditBackend:
                     chain_version)
                    VALUES (
                      ?, ?, ?, ?, ?, ?, ?, ?, ?, ?,
-                     COALESCE((SELECT MAX(seq) FROM audit_records), -1) + 1,
+                     MAX(COALESCE((SELECT MAX(seq) FROM audit_records), -1),
+                         COALESCE((SELECT CAST(value AS INTEGER) FROM audit_meta
+                                   WHERE key = 'seq_floor'), -1)) + 1,
                      ?, ?, ?, ?, ?, ?
                    )""",
                 (
