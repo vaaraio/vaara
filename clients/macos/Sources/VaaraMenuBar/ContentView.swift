@@ -482,9 +482,11 @@ struct ContentView: View {
                             .font(.system(size: 11))
                             .foregroundStyle(p.ghost)
                     }
-                    Text("Governs AI-bound traffic by hostname from Safari, Mail "
-                         + "and every WKWebView app. macOS asks for approval in System "
-                         + "Settings > General > Login Items & Extensions.")
+                    Text("Allows or refuses AI-bound connections by hostname from "
+                         + "Safari, Mail and WKWebView apps, once loaded. macOS loads it "
+                         + "only from a build signed with a Developer ID, then asks for "
+                         + "approval in System Settings > General > Login Items & "
+                         + "Extensions. It sees network connections only.")
                         .font(.system(size: 10))
                         .foregroundStyle(p.ghost)
                 }
@@ -747,7 +749,7 @@ struct ContentView: View {
                     }
                 }
 
-                // Row 5: WEBKIT GOVERNANCE  |  status
+                // Row 5: SAFARI  |  network filter status
                 //
                 // WebKit traffic is governed by the network filter and by
                 // nothing else. This row used to carry its own toggle, bound
@@ -758,12 +760,13 @@ struct ContentView: View {
                 // NETWORK FILTER row, so the two can never disagree.
                 GridRow {
                     VStack(alignment: .leading, spacing: 8) {
-                        sectionLabelPlain("WEBKIT GOVERNANCE")
-                        Text("AI-bound traffic from Safari, Mail and WebKit "
-                             + "apps, governed by hostname through the network "
-                             + "filter. It needs the filter installed and "
-                             + "enabled; builds without a signed system "
-                             + "extension cannot load it.")
+                        sectionLabelPlain("SAFARI")
+                        Text("An agent that drives Safari through its MCP "
+                             + "server (safaridriver --mcp) is governed by "
+                             + "vaara-mcp-proxy. The hostname filter for Safari, "
+                             + "Mail and WebKit apps works only in a build with "
+                             + "a signed system extension; the dot shows whether "
+                             + "it is loaded.")
                             .font(.system(size: 9))
                             .foregroundStyle(p.ghost)
                     }
