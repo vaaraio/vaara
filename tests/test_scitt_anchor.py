@@ -280,3 +280,52 @@ def test_cli_verify_scitt_without_anchor_exits_2(receipt: dict, tmp_path: Path) 
     bare = tmp_path / "bare.json"
     bare.write_text(json.dumps(receipt))
     assert main(["receipt", "verify-scitt", str(bare)]) == 2
+
+
+@pytest.mark.parametrize("head", [
+    [], "head", 3,
+    {"treeSize": 2, "rootHash": "AA==", "consistency": []},
+    {"treeSize": 2, "rootHash": "AA==", "consistency": {"firstSize": 1, "hashes": "AA=="}},
+])
+def test_malformed_trusted_head_raises_the_anchor_error(receipt: dict, head: object) -> None:
+    log = ScittAnchor()
+    anchor = log.anchor_receipt(receipt)
+    with pytest.raises(ScittAnchorError, match="malformed trusted head"):
+        verify_scitt_anchor(receipt, anchor, trusted_head=head)  # type: ignore[arg-type]
+
+
+def test_cli_verify_scitt_with_a_non_object_head_exits_2(receipt: dict, tmp_path: Path) -> None:
+    from vaara.cli import main
+
+    mine = tmp_path / "receipt.json"
+    mine.write_text(json.dumps(receipt))
+    assert main(["receipt", "anchor-scitt", str(mine), "--log-dir", str(tmp_path / "log")]) == 0
+    head = tmp_path / "head.json"
+    head.write_text("[]")
+    assert main(["receipt", "verify-scitt", str(mine), "--head", str(head)]) == 2
+
+
+def test_reads_do_not_see_a_half_written_leaf(receipt: dict, tmp_path: Path) -> None:
+    """Readers open the log while appends run, and none of them fails."""
+    import threading
+
+    errors: list[Exception] = []
+    stop = threading.Event()
+
+    def reader() -> None:
+        while not stop.is_set():
+            try:
+                ScittAnchor.load_or_create(tmp_path).head()
+            except Exception as exc:  # any failure is the bug under test
+                errors.append(exc)
+                return
+
+    readers = [threading.Thread(target=reader) for _ in range(4)]
+    for t in readers:
+        t.start()
+    for n in range(60):
+        ScittAnchor.load_or_create(tmp_path).anchor_receipt(_other(receipt, n))
+    stop.set()
+    for t in readers:
+        t.join()
+    assert errors == []

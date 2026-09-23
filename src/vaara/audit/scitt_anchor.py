@@ -121,7 +121,7 @@ class ScittAnchor:
         self._path = path
         self._log = log or InProcessTransparencyLog()
         if path is not None:
-            self._reload(path)
+            self._locked_reload(path)
 
     @classmethod
     def load_or_create(cls, directory: Optional[Path] = None,
@@ -134,6 +134,16 @@ class ScittAnchor:
     @property
     def path(self) -> Optional[Path]:
         return self._path
+
+    @staticmethod
+    def _lock_path(path: Path) -> Path:
+        return path.with_name(path.name + ".lock")
+
+    def _locked_reload(self, path: Path) -> None:
+        """Read the log under the append lock, so no half-written line is seen."""
+        path.parent.mkdir(parents=True, exist_ok=True)
+        with _exclusive(self._lock_path(path)):
+            self._reload(path)
 
     def _reload(self, path: Path) -> None:
         log = InProcessTransparencyLog()
@@ -157,7 +167,7 @@ class ScittAnchor:
         if path is None:
             return self._append(raw)
         path.parent.mkdir(parents=True, exist_ok=True)
-        with _exclusive(path.with_name(path.name + ".lock")):
+        with _exclusive(self._lock_path(path)):
             self._reload(path)
             self._persist(path, raw)
             return self._append(raw)
@@ -183,7 +193,7 @@ class ScittAnchor:
         an anchor made at that size against this head.
         """
         if self._path is not None:
-            self._reload(self._path)
+            self._locked_reload(self._path)
         size = self._log.tree_size
         out: dict[str, Any] = {
             "logId": _log_id_digest(self._log_id),
@@ -213,6 +223,8 @@ def _decode(value: Any, what: str) -> bytes:
 def _check_head(anchor: dict[str, Any], size: int, root: bytes,
                 trusted_head: dict[str, Any]) -> tuple[bool, str]:
     """(witnessed, status) for the anchor's root against an independent head."""
+    if not isinstance(trusted_head, dict):
+        raise ScittAnchorError("malformed trusted head: not a JSON object")
     if trusted_head.get("logId") not in (None, anchor.get("logId")):
         return False, "INVALID: trusted head is from a different log"
     try:
@@ -226,14 +238,20 @@ def _check_head(anchor: dict[str, Any], size: int, root: bytes,
         return False, "INVALID: root differs from the trusted head of the same size"
     if head_size < size:
         return False, "INVALID: trusted head is older than the anchor"
-    consistency = trusted_head.get("consistency") or {}
-    if not isinstance(consistency, dict) or consistency.get("firstSize") != size:
+    consistency = trusted_head.get("consistency")
+    if consistency is None:
+        consistency = {}
+    if not isinstance(consistency, dict):
+        raise ScittAnchorError("malformed trusted head: consistency is not an object")
+    hashes = consistency.get("hashes", [])
+    if not isinstance(hashes, list):
+        raise ScittAnchorError("malformed trusted head: consistency hashes is not a list")
+    if consistency.get("firstSize") != size:
         return False, ("root not checked: the trusted head carries no "
                        f"consistency proof from tree size {size}")
     proof = ConsistencyProof(
         first_size=size, second_size=head_size,
-        hashes=tuple(_decode(h, "consistency hash")
-                     for h in consistency.get("hashes", [])),
+        hashes=tuple(_decode(h, "consistency hash") for h in hashes),
     )
     verdict = verify_consistency(first_size=size, first_root=root,
                                  second_size=head_size, second_root=head_root,
