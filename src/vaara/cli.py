@@ -4928,6 +4928,11 @@ def _cmd_init(args: argparse.Namespace) -> int:
         print(f"Claude Code hooks written to {report.hooks_path}")
     else:
         print(f"Claude Code hooks already current at {report.hooks_path}")
+    if report.opencode_plugin is not None:
+        state = "installed" if report.opencode_changed else "already current"
+        print(f"OpenCode plugin {state} at {report.opencode_plugin}")
+    else:
+        print("OpenCode: not found")
     print(f"Trail: {report.trail_db}")
 
     for client in report.clients:
@@ -4963,6 +4968,8 @@ def _cmd_ungovern(args: argparse.Namespace) -> int:
         print(f"Removed Vaara hooks from {report.hooks_path}")
     else:
         print(f"No Vaara hooks found in {report.hooks_path}")
+    if report.opencode_removed:
+        print("  OpenCode plugin removed")
     for name in report.mcp_restored:
         print(f"  {name}: MCP config restored from backup")
     if not report.mcp_restored:
@@ -7140,8 +7147,8 @@ def build_parser() -> argparse.ArgumentParser:
     phook = sub.add_parser(
         "hook",
         help=(
-            "Claude Code hook runner (called by the vaara-governance "
-            "plugin; reads the hook event JSON on stdin)"
+            "Hook runner for Claude Code and OpenCode (called by their "
+            "Vaara hooks and plugins; reads the event JSON on stdin)"
         ),
     )
     hooksub = phook.add_subparsers(dest="hook_cmd", metavar="COMMAND")
@@ -7158,17 +7165,26 @@ def build_parser() -> argparse.ArgumentParser:
              "then $CLAUDE_PLUGIN_ROOT/policies/default_deny.json, then the "
              "copy bundled with the package)",
     )
+    phpre.add_argument(
+        "--client", choices=["claude-code", "opencode"], default="claude-code",
+        help="Which agent sent the event. opencode: the event is OpenCode's "
+             "tool call as its plugin passes it (default: claude-code)",
+    )
     phpre.set_defaults(func=lambda args: __import__(
         "vaara.integrations.claude_code_hooks", fromlist=["run_pre_tool_use"]
-    ).run_pre_tool_use(args.deny_patterns))
+    ).run_pre_tool_use(args.deny_patterns, client=args.client))
 
     phpost = hooksub.add_parser(
         "post-tool-use",
         help="Append the outcome record and feed the online learner",
     )
+    phpost.add_argument(
+        "--client", choices=["claude-code", "opencode"], default="claude-code",
+        help="Which agent sent the event (default: claude-code)",
+    )
     phpost.set_defaults(func=lambda args: __import__(
         "vaara.integrations.claude_code_hooks", fromlist=["run_post_tool_use"]
-    ).run_post_tool_use())
+    ).run_post_tool_use(client=args.client))
 
     phss = hooksub.add_parser(
         "session-start",

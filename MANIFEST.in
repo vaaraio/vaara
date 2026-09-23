@@ -3,7 +3,7 @@ include README.md
 recursive-include src/vaara *.py
 recursive-include src/vaara/data *.joblib
 recursive-include src/vaara/attestation/profiles *.json
-recursive-include src/vaara/integrations *.json
+recursive-include src/vaara/integrations *.json *.js
 include src/vaara/py.typed
 recursive-include docs *.md
 recursive-include clients/macos/Sources *.swift *.plist *.png *.json

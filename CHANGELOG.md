@@ -6,6 +6,13 @@ and this project follows [Semantic Versioning](https://semver.org/spec/v2.0.0.ht
 
 ## [Unreleased]
 
+### Added
+- OpenCode is governed. `vaara init` installs a plugin into OpenCode's global plugin directory (`~/.config/opencode/plugin/vaara.js`, or under `$XDG_CONFIG_HOME`) wherever OpenCode is installed, and `vaara ungovern` removes it. The plugin sends every tool call, OpenCode's own and every MCP server's, to `vaara hook pre-tool-use --client opencode` before it runs, and the call runs only on exit 0. The same deny rules, classifier, approvals and trail apply as for Claude Code, and records carry the agent id `opencode`. When the engine cannot run, the call is stopped unless `"fail_open": true` is set. `tests/test_opencode_governance.py` covers the translation of OpenCode's tool names and arguments, the verdicts, the plugin under Node, and init. The same checks ran against the OpenCode 1.18.32 binary with a scripted local model: a permitted command ran, a denied one was stopped with Vaara's reason, and an MCP tool call was scored and recorded.
+- The harness deny rules protect OpenCode's configuration and plugin directories (`~/.config/opencode/opencode.json`, `plugin/`, a project's `.opencode/plugin/`) as they protect Claude Code's, so an agent cannot remove the gate it runs behind.
+
+### Fixed
+- The 1.53.0 release said `vaara init` detects and governs OpenCode automatically. It governed nothing. The entry `vaara init` scanned for OpenCode was a path in the maintainer's own checkout, and the rewrite read only the `mcpServers` key, which OpenCode does not use, so no OpenCode config was ever changed and OpenCode's built-in tools were never seen. OpenCode is now governed through its plugin; see Added.
+
 ## [1.97.0] - 2026-09-23
 
 ### Upgrading
