@@ -4928,6 +4928,11 @@ def _cmd_init(args: argparse.Namespace) -> int:
         print(f"Claude Code hooks written to {report.hooks_path}")
     else:
         print(f"Claude Code hooks already current at {report.hooks_path}")
+    if report.cursor_hooks is not None:
+        state = "written" if report.cursor_changed else "already current"
+        print(f"Cursor hooks {state} at {report.cursor_hooks}")
+    else:
+        print("Cursor: not found")
     if report.opencode_plugin is not None:
         state = "installed" if report.opencode_changed else "already current"
         print(f"OpenCode plugin {state} at {report.opencode_plugin}")
@@ -4970,6 +4975,8 @@ def _cmd_ungovern(args: argparse.Namespace) -> int:
         print(f"No Vaara hooks found in {report.hooks_path}")
     if report.opencode_removed:
         print("  OpenCode plugin removed")
+    if report.cursor_removed:
+        print("  Cursor hooks removed")
     for name in report.mcp_restored:
         print(f"  {name}: MCP config restored from backup")
     if not report.mcp_restored:
@@ -7166,9 +7173,11 @@ def build_parser() -> argparse.ArgumentParser:
              "copy bundled with the package)",
     )
     phpre.add_argument(
-        "--client", choices=["claude-code", "opencode"], default="claude-code",
-        help="Which agent sent the event. opencode: the event is OpenCode's "
-             "tool call as its plugin passes it (default: claude-code)",
+        "--client", choices=["claude-code", "opencode", "cursor"],
+        default="claude-code",
+        help="Which agent sent the event: its tool call in that agent's own "
+             "shape. cursor also prints Cursor's JSON verdict on stdout "
+             "(default: claude-code)",
     )
     phpre.set_defaults(func=lambda args: __import__(
         "vaara.integrations.claude_code_hooks", fromlist=["run_pre_tool_use"]
@@ -7179,7 +7188,8 @@ def build_parser() -> argparse.ArgumentParser:
         help="Append the outcome record and feed the online learner",
     )
     phpost.add_argument(
-        "--client", choices=["claude-code", "opencode"], default="claude-code",
+        "--client", choices=["claude-code", "opencode", "cursor"],
+        default="claude-code",
         help="Which agent sent the event (default: claude-code)",
     )
     phpost.set_defaults(func=lambda args: __import__(

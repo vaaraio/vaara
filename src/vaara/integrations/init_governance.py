@@ -13,7 +13,8 @@ Two surfaces:
 
 * ``run_init`` — detect installed clients, write the Claude Code
   PreToolUse/PostToolUse/SessionStart hooks into ``~/.claude/settings.json``,
-  install the OpenCode plugin where OpenCode is installed, rewrite known MCP
+  install the OpenCode plugin and the Cursor hooks where those clients are
+  installed, rewrite known MCP
   client configs through ``vaara-mcp-proxy``, and point everything at one
   trail. Idempotent: it re-asserts the hooks on every run
   (self-heal — a settings.json that was reset or truncated is repaired), and
@@ -127,6 +128,10 @@ class InitReport:
     opencode_plugin: Optional[Path] = None
     opencode_changed: bool = False
     opencode_removed: bool = False
+    # Cursor hooks.json, same three fields.
+    cursor_hooks: Optional[Path] = None
+    cursor_changed: bool = False
+    cursor_removed: bool = False
 
 
 def resolve_vaara_bin() -> str:
@@ -441,6 +446,8 @@ def run_init(
     set_hook_mode: bool = True,
     govern_opencode: bool = True,
     opencode_dir: Optional[Path] = None,
+    govern_cursor: bool = True,
+    cursor_dir: Optional[Path] = None,
 ) -> InitReport:
     """Set up (or self-heal) local governance in one call.
 
@@ -489,7 +496,23 @@ def run_init(
             report.opencode_changed = opencode.install_plugin(vaara_bin, opencode_dir)
             report.opencode_plugin = opencode.plugin_path(opencode_dir)
 
+    if govern_cursor:
+        from vaara.integrations import cursor
+
+        if cursor.detected(cursor_dir):
+            report.cursor_changed = cursor.install_hooks(vaara_bin, cursor_dir)
+            report.cursor_hooks = cursor.hooks_path(cursor_dir)
+
     report.clients = detect_clients(proxy_bin)
+    for client in report.clients:
+        if (client.name == "Cursor" and client.governed
+                and report.cursor_hooks is not None):
+            report.warnings.append(
+                f"Cursor's MCP servers in {client.path} also run through "
+                f"vaara-mcp-proxy from an earlier init, so each Cursor MCP call "
+                f"is decided twice. Restore that file from "
+                f"{client.path.name}.vaara-backup to leave it to the hook."
+            )
     if govern_mcp:
         if shutil.which("vaara-mcp-proxy") is None:
             report.warnings.append(
@@ -499,6 +522,10 @@ def run_init(
         else:
             for client in report.clients:
                 if not client.exists or client.ungoverned == 0:
+                    continue
+                if client.name == "Cursor" and report.cursor_hooks is not None:
+                    # Cursor's preToolUse hook already decides its MCP calls;
+                    # the proxy as well would decide each one twice.
                     continue
                 count = govern_mcp_config(
                     client.path, proxy_bin, trail_db, shadow=shadow or auto,
@@ -533,6 +560,7 @@ def run_ungovern(
     service_system: Optional[str] = None,
     service_runner: Any = None,
     opencode_dir: Optional[Path] = None,
+    cursor_dir: Optional[Path] = None,
 ) -> InitReport:
     """Reverse ``run_init``: remove the hooks and the OpenCode plugin, restore
     each MCP config, and take down the proxy service if one was installed."""
@@ -542,6 +570,9 @@ def run_ungovern(
     report = InitReport(hooks_path=settings_path)
     report.hooks_changed = remove_claude_hooks(settings_path)
     report.opencode_removed = opencode.remove_plugin(opencode_dir)
+    from vaara.integrations import cursor
+
+    report.cursor_removed = cursor.remove_hooks(cursor_dir)
     for name, raw_path in KNOWN_MCP_CLIENTS:
         path = Path(raw_path).expanduser()
         if restore_mcp_config(path):
