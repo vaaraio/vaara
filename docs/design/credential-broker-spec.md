@@ -137,7 +137,7 @@ attestation/receipt split already in the stack.
 
 ## F. Conformance
 
-`conformance/sep2828/credential_grant_v0/` ships vectors plus an independent
+`tests/vectors/credential_grant_v0/` ships vectors plus an independent
 checker that re-derives every verdict with no `import vaara` (RFC 8785 +
 standard library). Regenerate with
 `scripts/build_credential_grant_vectors.py`.
