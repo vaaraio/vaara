@@ -20,11 +20,18 @@ PLUGIN_README = (PLUGIN / "README.md").read_text()
 
 
 def test_quickstart_example_runs_as_the_readme_says(tmp_path, monkeypatch):
-    monkeypatch.setenv("HOME", str(tmp_path))
-    monkeypatch.setattr(Path, "home", lambda: tmp_path)
+    import importlib
     import sqlite3
 
     import vaara
+
+    monkeypatch.setenv("HOME", str(tmp_path))
+    monkeypatch.setattr(Path, "home", lambda: tmp_path)
+    # The bare decorator uses one process-wide default pipeline. An earlier
+    # test may have built it on another trail, so start from none, which is
+    # what a fresh install has.
+    monkeypatch.setattr(importlib.import_module("vaara.govern"),
+                        "_default_pipeline", None)
 
     @vaara.govern
     def transfer_funds(to: str, amount: float) -> str:
