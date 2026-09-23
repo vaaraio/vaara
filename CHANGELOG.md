@@ -7,7 +7,7 @@ and this project follows [Semantic Versioning](https://semver.org/spec/v2.0.0.ht
 ## [Unreleased]
 
 ### Fixed
-- `vaara init --shadow` is documented as watch-only, recording without blocking, and `--auto` as a shadow-mode start at its `--mode` preset. The Claude Code hook reads `~/.vaara/claude-code/config.json` and no other file, and neither flag wrote a mode there: `--shadow` reached only the MCP proxy rewrite, and `--auto` recorded its shadow setting in a policy file and a discovery config that nothing reads. After either command the hooks went on blocking. `--shadow` now sets `mode: watch`. `--auto` sets `mode: watch` and its preset only where the operator has not set them, and its MCP rewrite runs in shadow too. `tests/test_init_shadow_reaches_hook.py` checks the result with the hook's own shadow predicate.
+- `vaara init --shadow` is documented as watch-only, recording without blocking, and `--auto` as a shadow-mode start at its `--mode` preset. The Claude Code hook reads `~/.vaara/claude-code/config.json` and no other file, and neither flag wrote a mode there: `--shadow` reached only the MCP proxy rewrite, and `--auto` recorded its shadow setting in a policy file that nothing reads and in a `mode` key of the discovery config that nothing reads either. After either command the hooks went on blocking. `--shadow` now sets `mode: watch`. `--auto` sets `mode: watch` and its preset only where the operator has not set them, and its MCP rewrite runs in shadow too. `tests/test_init_shadow_reaches_hook.py` checks the result with the hook's own shadow predicate.
 
 ## [1.95.0] - 2026-09-23
 
