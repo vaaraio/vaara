@@ -387,8 +387,12 @@ final class GateModel: ObservableObject {
     /// installs write their own DBs; this is how they get found.
     @discardableResult
     func discoverTrails() -> Int {
+        // The enumerator does not follow a symlink at its root: it lists the
+        // link, not the directory, and finds nothing. ~/.vaara is a symlink
+        // wherever the engine runs in a VM or container whose home is shared.
         guard let walker = FileManager.default.enumerator(
-            at: VaaraHome.directory, includingPropertiesForKeys: nil,
+            at: VaaraHome.directory.resolvingSymlinksInPath(),
+            includingPropertiesForKeys: nil,
             options: [.skipsHiddenFiles]) else { return 0 }
         var added = 0
         for case let url as URL in walker {
