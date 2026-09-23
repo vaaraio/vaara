@@ -6,6 +6,11 @@ and this project follows [Semantic Versioning](https://semver.org/spec/v2.0.0.ht
 
 ## [Unreleased]
 
+## [1.97.1] - 2026-09-23
+
+### Fixed
+- A call a deny rule blocked was recorded as allowed. The hook records rule hits through the pipeline with enforcement off, and the pipeline wrote its own verdict, which scores the tool type and not the rule, so the chain said `decision_made: allow` for a call the hook had stopped. A live trail measured on 2026-09-23 held 3,258 decisions and 2 blocks while the hook had blocked calls all day, and the menu-bar light, which turns red on `action_blocked`, never changed. `InterceptionPipeline.intercept` takes `policy_decision` and `policy_reason`: the call is still scored and the score recorded, and the decision on the chain is the rule's, with the rule id as the reason. Rule hits are now recorded as `action_blocked`. Records already written keep what they say. `tests/test_rule_block_is_recorded_as_blocked.py` covers a blocked write, an allowed call and the override.
+
 ## [1.97.0] - 2026-09-23
 
 ### Upgrading
