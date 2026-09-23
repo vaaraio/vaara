@@ -20,6 +20,7 @@ not fail. The offline half always runs.
 from __future__ import annotations
 
 import json
+import os
 import re
 import urllib.error
 import urllib.request
@@ -65,8 +66,11 @@ def _pypi_dates() -> dict[str, str]:
 def _github_dates() -> dict[str, str]:
     """Release dates from the GitHub releases API.
 
-    Unauthenticated and paginated; a rate-limited or offline run skips
-    rather than failing, same as the PyPI check.
+    Paginated. Sends ``GITHUB_TOKEN`` when the environment has one, which CI
+    does: anonymous calls share a small per-address limit, and four matrix
+    jobs from one runner pool used it up and skipped the check. Without a
+    token, a rate-limited or offline run skips rather than failing, same as
+    the PyPI check.
 
     An empty first page is treated the same way. On 2026-08-17 this endpoint
     answered HTTP 200 with ``[]`` for a repository holding more than eighty
@@ -81,9 +85,11 @@ def _github_dates() -> dict[str, str]:
             f"?per_page=100&page={page}"
         )
         try:
-            request = urllib.request.Request(
-                url, headers={"Accept": "application/vnd.github+json"},
-            )
+            headers = {"Accept": "application/vnd.github+json"}
+            token = os.environ.get("GITHUB_TOKEN")
+            if token:
+                headers["Authorization"] = f"Bearer {token}"
+            request = urllib.request.Request(url, headers=headers)
             with urllib.request.urlopen(request, timeout=20) as response:
                 batch = json.load(response)
         except (urllib.error.URLError, TimeoutError, OSError) as exc:

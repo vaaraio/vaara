@@ -37,6 +37,9 @@ jobs:
         run: ruff check .
 
       - name: Run tests, failing on an unreviewed skip
+        env:
+          # Read-only, for the PRIOR_ART date check against the releases API.
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
         # This job installs only the server extra, so tests needing another
         # extra skip here and run in the job that installs it. Each reason
         # that may appear is listed in tests/ci_allowed_skips.txt; any other
