@@ -107,13 +107,13 @@ class TestBehaviourMatchesTheHelp:
     def test_pass_through_is_recorded_by_digest(self, sent, app_and_pipeline):
         app, pipeline = app_and_pipeline
         body = b'{"input": "hello there"}'
-        TestClient(app).post("/v1/responses", content=body,
+        TestClient(app).post("/v1/embeddings", content=body,
                              headers={"content-type": "application/json"})
         assert len(sent) == 1
         (rec,) = self._passthrough_records(pipeline)
         params = rec.data["parameters"]
         assert params["method"] == "POST"
-        assert params["path"] == "/v1/responses"
+        assert params["path"] == "/v1/embeddings"
         assert params["bytes_out"] == len(sent[0])
         assert params["sha256_out"] == hashlib.sha256(sent[0]).hexdigest()
         assert "hello there" not in json.dumps(rec.data)
@@ -126,7 +126,7 @@ class TestBehaviourMatchesTheHelp:
 
     def test_pass_through_is_sealed(self, sent, app_and_pipeline):
         app, pipeline = app_and_pipeline
-        TestClient(app).post("/v1/responses", json={"input": SECRET})
+        TestClient(app).post("/v1/embeddings", json={"input": SECRET})
         assert SECRET.encode() not in sent[0]
         (rec,) = self._passthrough_records(pipeline)
         assert rec.data["parameters"]["seal_active"] is True

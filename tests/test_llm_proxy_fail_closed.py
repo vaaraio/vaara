@@ -153,7 +153,7 @@ def test_a_pass_through_call_that_cannot_be_recorded_is_not_forwarded(
         monkeypatch, pipeline, upstream):
     _break_store(monkeypatch, pipeline, repair_result=TrailRepair(
         db="x", method="failed", error="database disk image is malformed"))
-    resp = _client(pipeline).post("/v1/responses", json={"input": "hello"})
+    resp = _client(pipeline).post("/v1/embeddings", json={"input": "hello"})
     assert resp.status_code == 503
     assert resp.json()["type"] == "vaara_trail_not_recording"
     assert upstream == []
