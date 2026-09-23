@@ -14,7 +14,7 @@ Steps:
 3. Ask, using the AskUserQuestion tool, one question at a time:
 
    - Mode: "Should Vaara protect or just watch?" Options: "Protect" (risky tool calls are stopped or held for your ok; the rest run normally), "Watch only" (nothing is ever blocked; everything is checked and recorded so you can see what protection would have done), "Off" (no checking, no records).
-   - Protection level (skip if mode is Off): "How strict should it be?" Options mapped to presets: "Relaxed" (performance: only clearly risky calls get flagged), "Balanced (recommended)" (balanced: the default), "Strict" (strict: anything doubtful gets held for your ok), "Paranoid" (eco: tightest blocking, expect interruptions).
+   - Protection level (skip if mode is Off): "How strict should it be?" Options mapped to presets, loosest first: "Relaxed" (performance: only clearly risky calls get flagged), "Balanced (recommended)" (balanced: the default), "Tight" (eco: borderline calls are stopped sooner, which cuts runaway loops short), "Strict" (strict: the tightest, anything doubtful is held for your ok and more is blocked outright; expect interruptions).
    - Notifications (skip if mode is Off): "Popup on your screen when something is blocked or held?" Options: "Yes (recommended)", "No, terminal only".
 
 4. Write the config file. Keys: `mode` ("protect" | "watch" | "off"), `protection` ("performance" | "balanced" | "strict" | "eco"), `notifications` (true | false). Preserve any other keys already in the file (for example `agent_id` or `audit_db`). Create the directory if needed.
