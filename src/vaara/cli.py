@@ -4938,6 +4938,13 @@ def _cmd_init(args: argparse.Namespace) -> int:
         print(f"OpenCode plugin {state} at {report.opencode_plugin}")
     else:
         print("OpenCode: not found")
+    if report.codex_hooks is not None:
+        state = "written" if report.codex_changed else "already current"
+        print(f"Codex hooks {state} at {report.codex_hooks}")
+        if report.codex_trust != "trusted":
+            print(f"  {ig.codex_trust_line(report.codex_trust)}")
+    else:
+        print("Codex: not found")
     print(f"Trail: {report.trail_db}")
 
     for client in report.clients:
@@ -4977,6 +4984,8 @@ def _cmd_ungovern(args: argparse.Namespace) -> int:
         print("  OpenCode plugin removed")
     if report.cursor_removed:
         print("  Cursor hooks removed")
+    if report.codex_removed:
+        print("  Codex hooks removed")
     for name in report.mcp_restored:
         print(f"  {name}: MCP config restored from backup")
     if not report.mcp_restored:
@@ -7154,8 +7163,8 @@ def build_parser() -> argparse.ArgumentParser:
     phook = sub.add_parser(
         "hook",
         help=(
-            "Hook runner for Claude Code and OpenCode (called by their "
-            "Vaara hooks and plugins; reads the event JSON on stdin)"
+            "Hook runner for Claude Code, OpenCode, Cursor and Codex (called "
+            "by their Vaara hooks and plugins; reads the event JSON on stdin)"
         ),
     )
     hooksub = phook.add_subparsers(dest="hook_cmd", metavar="COMMAND")
@@ -7173,7 +7182,7 @@ def build_parser() -> argparse.ArgumentParser:
              "copy bundled with the package)",
     )
     phpre.add_argument(
-        "--client", choices=["claude-code", "opencode", "cursor"],
+        "--client", choices=["claude-code", "opencode", "cursor", "codex"],
         default="claude-code",
         help="Which agent sent the event: its tool call in that agent's own "
              "shape. cursor also prints Cursor's JSON verdict on stdout "
@@ -7188,7 +7197,7 @@ def build_parser() -> argparse.ArgumentParser:
         help="Append the outcome record and feed the online learner",
     )
     phpost.add_argument(
-        "--client", choices=["claude-code", "opencode", "cursor"],
+        "--client", choices=["claude-code", "opencode", "cursor", "codex"],
         default="claude-code",
         help="Which agent sent the event (default: claude-code)",
     )

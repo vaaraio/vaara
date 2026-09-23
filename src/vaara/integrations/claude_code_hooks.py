@@ -199,7 +199,7 @@ def match_deny_rule(
 # runners
 
 #: The last line the runner emitted, for clients that carry the reason in
-#: their verdict (Cursor reads it from stdout JSON, not stderr).
+#: their verdict (Cursor and Codex read it from stdout JSON).
 _last_message = ""
 
 
@@ -266,9 +266,16 @@ def _record_call(cfg: dict, agent: str, tool_name: str, tool_input: dict,
         from vaara.pipeline import InterceptionPipeline
 
         pipeline = InterceptionPipeline(trail=_open_trail(cfg), enforce=False)
+        rule_id = context.get("rule_id")
         pipeline.intercept(
             agent_id=agent, tool_name=tool_name, parameters=tool_input,
             context=context, session_id=session_id,
+            # A deny rule's verdict is the decision on the record. Without
+            # this the chain carried the scorer's allow for a call the rule
+            # had blocked, so no view of the trail ever showed a block.
+            policy_decision="deny" if rule_id else None,
+            policy_reason=(f"deny rule {rule_id}: {context.get('rule_message', '')}"
+                           if rule_id else ""),
         )
     except Exception as exc:
         _note_trail_failure(cfg, exc, stage="record_call")
@@ -346,6 +353,7 @@ def _ungovernable(cfg: dict, tool_name: str, reason: str) -> int:
 _CLIENT_MODULES = {
     "opencode": "vaara.integrations.opencode",
     "cursor": "vaara.integrations.cursor",
+    "codex": "vaara.integrations.codex",
 }
 
 
@@ -395,7 +403,8 @@ def _render(render: Optional[str], code: int) -> int:
     if module is None or not hasattr(module, "render_pre"):
         return code
     out, code = module.render_pre(code, _last_message)
-    print(out, flush=True)
+    if out:
+        print(out, flush=True)
     return code
 
 

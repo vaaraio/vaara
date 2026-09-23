@@ -342,6 +342,8 @@ class InterceptionPipeline:
         tenant_id: str = "",
         capabilities: Optional[Sequence[Capability]] = None,
         _event_type_override: Optional[EventType] = None,
+        policy_decision: Optional[str] = None,
+        policy_reason: str = "",
     ) -> InterceptionResult:
         """Intercept an agent action request.
 
@@ -355,9 +357,18 @@ class InterceptionPipeline:
         delegation chain. A broadening grant is denied fail-closed regardless
         of risk score. With no capabilities the behaviour is unchanged.
 
+        ``policy_decision`` is a verdict a rule in front of the pipeline has
+        already reached (``"deny"`` from a deny rule). The action is still
+        scored, and the score is recorded, but the decision on the chain is
+        that verdict with ``policy_reason``. Without it a call a rule blocked
+        was recorded as the scorer's allow, which is evidence of the opposite
+        of what happened.
+
         Returns an InterceptionResult — check .allowed before executing.
         """
         start = time.monotonic()
+        if policy_decision is not None and policy_decision not in _FINE_TO_COARSE:
+            raise ValueError(f"policy_decision must be a decision, not {policy_decision!r}")
 
         # Cap oversized caller-supplied strings BEFORE classify/audit so
         # a 50MB tool_name cannot land in the hash chain, export, or
@@ -726,6 +737,18 @@ class InterceptionPipeline:
                 # have to parse prose to do it.
                 approver = _disposition.POLICY
                 human_disposed = False
+
+        # 7b. A verdict a rule already reached is the decision, whatever the
+        # score said. Policy disposed of it, not a human.
+        if policy_decision is not None:
+            decision_str = _FINE_TO_COARSE[policy_decision]
+            allowed = decision_str == "allow"
+            decision_detail = None
+            modified_parameters = None
+            reason = _cap_str(policy_reason or f"policy: {decision_str}",
+                              _MAX_DECISION_REASON_LEN, "reason")
+            approver = _disposition.POLICY
+            human_disposed = False
 
         # 8. Record the decision in audit. `decision` stays inside the
         # documented allow/escalate/deny enum; the refinement and any
