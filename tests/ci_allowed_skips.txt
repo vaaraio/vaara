@@ -1,0 +1,26 @@
+# Skip reasons the CI `tests` matrix may print. The matrix installs the base
+# package plus fastapi, uvicorn and httpx and nothing else, on purpose, so a
+# test that needs another extra skips here and runs in the job that installs
+# it (signing extras, adapter contracts, framework contracts, classifier).
+#
+# One Python regular expression per line, matched against the reason pytest
+# prints after `SKIPPED [n] path:line: `. A skip whose reason matches none of
+# these fails the job: it means a test stopped running and nothing said so.
+could not import '(rfc8785|yaml|cbor2|asn1crypto|rebuff|joblib|dilithium_py|PIL\.Image)'
+attestation extra not installed
+the attestation extra
+record digest needs the attestation extra
+qualified existence proof needs the timeanchor extra
+AdversarialClassifier requires vaara\[ml\] extras
+(trained|stacked) gate needs the ml extra
+mc dropout gate needs torch
+reportlab not installed
+^pip install (rebuff|openai-agents|langchain-core|google-cloud-modelarmor|boto3|azure-ai-contentsafety)$
+^proxy deps not installed$
+(inference-proxy|console) deps not installed: no rfc8785
+rfc8785 not installed in this environment
+pq_hybrid_v0 needs an optional dependency not installed
+pq extra not installed
+^environment skips \d+ suites against \d+ on the page
+^no case file: the harness ships without one
+^tomllib is Python 3\.11\+$
