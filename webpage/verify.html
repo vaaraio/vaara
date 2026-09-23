@@ -491,7 +491,8 @@ function hex(buf) {
 // the raw payload, so a payload cannot be lifted into a different payloadType
 // and still verify.
 function pae(payloadType, payloadBytes) {
-  const head = enc.encode(`DSSEv1 ${payloadType.length} ${payloadType} ${payloadBytes.length} `);
+  const typeBytes = enc.encode(payloadType).length;
+  const head = enc.encode(`DSSEv1 ${typeBytes} ${payloadType} ${payloadBytes.length} `);
   const out = new Uint8Array(head.length + payloadBytes.length);
   out.set(head, 0);
   out.set(payloadBytes, head.length);
@@ -545,9 +546,9 @@ async function verify(envelope, publicKeyPem) {
       "Paste the signer's PEM to complete the check. Without it this page has "
       + "confirmed the encoding only."));
     allOk = false;
-  } else if (!crypto.subtle || !("Ed25519" in { Ed25519: 1 })) {
-    checks.push(row("warn", "This browser has no Ed25519 in WebCrypto",
-      "Chrome 137+, Safari 17+ or Firefox 129+ can complete the check."));
+  } else if (envelope.signatures.length === 0) {
+    checks.push(row("no", "The envelope carries no signatures",
+      "There is nothing to check the key against, so nothing is verified."));
     allOk = false;
   } else {
     for (const s of envelope.signatures) {
@@ -560,7 +561,12 @@ async function verify(envelope, publicKeyPem) {
           `keyid ${s.keyid || "(none)"}`));
         if (!ok) allOk = false;
       } catch (e) {
-        checks.push(row("no", "Signature could not be checked", String(e)));
+        if (e && e.name === "NotSupportedError") {
+          checks.push(row("warn", "This browser has no Ed25519 in WebCrypto",
+            "Chrome 137+, Safari 17+ or Firefox 129+ can complete the check."));
+        } else {
+          checks.push(row("no", "Signature could not be checked", String(e)));
+        }
         allOk = false;
       }
     }
