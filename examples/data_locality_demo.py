@@ -56,7 +56,7 @@ def verdict(record: dict, payload: dict) -> str:
     if att is None:
         return "ok_asserted"
     body = {"attestedRegion": att["attestedRegion"], "attester": att["attester"], "nonce": att["nonce"]}
-    from vaara.attestation._sep2787_canonical import canonical_json
+    from vaara.attestation._attest_canonical import canonical_json
     if not ATTESTER_V.verify(canonical_json(body), bytes.fromhex(att["sig"])):
         return "attestation_bad_sig"
     if att["attestedRegion"] != t["endpointRegion"]:

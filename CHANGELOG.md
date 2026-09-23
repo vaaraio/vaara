@@ -8,6 +8,7 @@ and this project follows [Semantic Versioning](https://semver.org/spec/v2.0.0.ht
 
 ### Fixed
 - Custom thresholds with `escalate` equal to `deny` were accepted by the macOS app, the plugin README and both hook implementations, and rejected by the policy schema, which requires escalate below deny. The hook caught the error and dropped the whole policy, so an operator who picked `strict` and set an equal pair ran on the balanced defaults, with the only trace a line on the hook's stderr. An equal pair is now treated as malformed and ignored, so the preset still applies; the README says `0 <= E < D <= 1`; and the app keeps deny at least 0.01 above escalate. `tests/test_custom_thresholds_join.py` requires every pair either hook accepts to apply to a policy.
+- `examples/data_locality_demo.py` imported a module removed when the SEP-2787 code was renamed, so it crashed on its verification step. It imports the canonicaliser the data-locality producer uses and runs again. `tests/test_examples_run.py` runs the five standalone examples from an empty home directory, and the signing-extras CI job installs `rich` so the three that render with it run there.
 
 ## [1.95.0] - 2026-09-23
 
