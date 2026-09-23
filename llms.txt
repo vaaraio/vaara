@@ -21,7 +21,7 @@ Position: tamper-evident runtime evidence and enforcement layer. Signed attestat
 - [Tamper-evident audit trail for AI agents](https://github.com/vaaraio/vaara/blob/main/docs/tamper-evident-audit-trail.md): mechanics, honest limits, cost
 - [Vaara vs observability vs GRC](https://github.com/vaaraio/vaara/blob/main/docs/vaara-vs-observability-vs-grc.md): three different questions; comparison table and how they stack
 - [Our marketing runs under the gate](https://github.com/vaaraio/vaara/tree/main/docs/dogfood): the signed trail of Vaara's own marketing pipeline, with the policy and public key to verify it offline
-- [COMPLIANCE.md](https://github.com/vaaraio/vaara/blob/main/docs/COMPLIANCE.md): EU AI Act (Art. 9, 11 to 15, 61) and DORA (Art. 10, 12, 13) article-level mapping
+- [COMPLIANCE.md](https://github.com/vaaraio/vaara/blob/main/docs/COMPLIANCE.md): EU AI Act (Art. 9, 11 to 15, 26(10), 50(1), 61, 73(1)) and DORA (Art. 10, 12, 13) article-level mapping
 - [Formal specification](https://github.com/vaaraio/vaara/blob/main/docs/formal_specification.md): MWU regret bound O(sqrt(T log N)), conformal coverage, security properties
 - [vaara-bench-v1](https://github.com/vaaraio/vaara/blob/main/bench/vaara-bench-v1.md): 77-trace synthetic benchmark, frozen methodology
 - [CHANGELOG](https://github.com/vaaraio/vaara/blob/main/CHANGELOG.md): version-by-version evolution
@@ -30,14 +30,16 @@ Position: tamper-evident runtime evidence and enforcement layer. Signed attestat
 
 ## Integrations
 - Framework adapters: LangChain, CrewAI, OpenAI Agents SDK, MCP server
-- Cloud guardrail adapters: AWS Bedrock Guardrails, Azure AI Content Safety, GCP Model Armor (article-tagged findings into Vaara's audit trail and OVERT envelope)
+- Proxies: MCP proxy (`vaara-mcp-proxy`), LLM API proxy (`vaara llm-proxy`, records every call and seals named or known-format secrets), shell proxy (`vaara proxy-shell`)
+- Claude Code plugin: every tool call dispatched and recorded, deny rules on shell, web, file, secret reads and the agent's meta-actions
+- Guardrail adapters: AWS Bedrock Guardrails, Azure AI Content Safety, GCP Model Armor, NVIDIA NeMo Guardrails, Guardrails AI, LLM Guard, Rebuff (article-tagged findings into Vaara's audit trail and OVERT envelope; a reply the adapter cannot read is recorded as unparsed)
 - OVERT 1.0 emitter, verifier CLI, S3P (MEA-2) emitter with Clopper-Pearson intervals, experimental AMD SEV-SNP TEE attestation hook
 
 ## Numbers
-- 12,155-entry adversarial corpus (250 hand-curated + 11,905 LLM-generated), 70/15/15 split stratified by (category, source)
-- Classifier v9 (236 hand-features + 384-dim MiniLM embeddings) at calibrated threshold 0.9150: held-out TEST recall 84.7% [82.4, 86.7] at FPR 4.1% [2.9, 5.7], n=1,827
-- Cross-model held-out recall 66.8% [64.9, 68.7] over n=2,277 with no eval-set attacker model in TRAIN; weakest sub-cell (data_exfil, closed-weight) 38.9% [35.3, 42.5]
-- BIPIA-pressure FPR on benign tool calls 1.2% [0.4, 3.6] across four agent backends
+- 25,556-entry adversarial corpus (250 hand-curated + 25,306 LLM-generated); the v0.40 split assigns 24,619 leak-free by (category, generation batch) cell
+- Classifier v11 (236 hand-features + 384-dim MiniLM embeddings) at threshold 0.8800: held-out TEST recall 85.6% [83.4, 87.6] at FPR 5.1% [3.8, 6.9], n=1,827
+- Cross-model held-out recall 86.3% over n=5,600, against attacks written by Qwen2.5-72B, a model absent from TRAIN
+- BIPIA-pressure FPR on benign tool calls 0.0% [0.0, 1.6] across four agent backends
 - Multi-attacker PAIR ASR 0/25 per attacker across Qwen2.5-32B, Qwen2.5-72B, Llama-3.3-70B at identical seeds
 - 140 µs mean / 210 µs p99 for the hot-path rule scorer, commodity CPU; the MiniLM classifier is opt-in (`vaara[ml]`) and not in that path
 
