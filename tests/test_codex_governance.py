@@ -241,3 +241,36 @@ def test_init_skips_codex_when_it_is_not_installed(tmp_path, monkeypatch):
         cursor_dir=tmp_path / "no-cursor", opencode_dir=tmp_path / "no-opencode")
     assert report.codex_hooks is None
     assert not (tmp_path / "absent").exists()
+
+
+class TestCodexHomeElsewhere:
+    """Codex reads its hooks from $CODEX_HOME; the harness rules follow it."""
+
+    def _rules(self, monkeypatch, home):
+        from vaara.deny_rules import load_deny_rules
+
+        monkeypatch.setenv("CODEX_HOME", home)
+        return load_deny_rules()
+
+    def test_a_write_to_the_moved_hooks_file_is_refused(self, monkeypatch):
+        from vaara.deny_rules import match_deny_rule
+
+        rules = self._rules(monkeypatch, "/srv/agents/codexhome")
+        target = "/srv/agents/codexhome/" + "hooks.json"
+        assert match_deny_rule(rules, "Write", {"file_path": target})[0] == "harness_config_write"
+        sed = " ".join(["sed", "-i", "s/a/b/", "/srv/agents/codexhome/" + "config.toml"])
+        assert match_deny_rule(rules, "Bash", {"command": sed})[0] == "harness_config_shell_write"
+
+    def test_reading_it_is_still_allowed(self, monkeypatch):
+        from vaara.deny_rules import match_deny_rule
+
+        rules = self._rules(monkeypatch, "/srv/agents/codexhome")
+        read = "cat /srv/agents/codexhome/" + "hooks.json"
+        assert match_deny_rule(rules, "Bash", {"command": read}) is None
+
+    def test_the_default_home_leaves_the_rules_as_shipped(self, monkeypatch):
+        from vaara.deny_rules import load_deny_rules
+
+        monkeypatch.delenv("CODEX_HOME", raising=False)
+        shipped = load_deny_rules()
+        assert self._rules(monkeypatch, "/home/u/.codex") == shipped

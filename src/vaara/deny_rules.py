@@ -63,7 +63,36 @@ def load_deny_rules(explicit: Optional[str] = None) -> list[dict]:
     except (OSError, json.JSONDecodeError):
         return []
     rules = doc.get("rules", [])
-    return rules if isinstance(rules, list) else []
+    return _with_codex_home(rules) if isinstance(rules, list) else []
+
+
+#: The rules that protect harness configuration by path. Their patterns name
+#: ``.codex/``; Codex reads its hooks from ``$CODEX_HOME`` when that is set.
+_HARNESS_RULES = ("harness_config_write", "harness_config_shell_write",
+                  "interpreter_config_write")
+
+
+def _with_codex_home(rules: list) -> list:
+    """Extend the harness rules to a ``$CODEX_HOME`` outside ``~/.codex``.
+
+    Codex runs Vaara's hook from ``$CODEX_HOME/hooks.json``, and the hook
+    process inherits that variable, so a Codex home anywhere else would
+    otherwise leave the file that installs the gate unprotected.
+    """
+    home = os.environ.get("CODEX_HOME", "").rstrip("/")
+    if not home or Path(home).name == ".codex":
+        return rules
+    # Each rule names the directory as `\.codex/` inside its own structure
+    # (a write verb, an interpreter and a write call), so the directory is
+    # widened in place and every other condition still applies.
+    either = r"(?:\.codex/|" + re.escape(home + "/") + ")"
+    out = []
+    for rule in rules:
+        if (isinstance(rule, dict) and rule.get("id") in _HARNESS_RULES
+                and r"\.codex/" in str(rule.get("pattern", ""))):
+            rule = {**rule, "pattern": rule["pattern"].replace(r"\.codex/", either)}
+        out.append(rule)
+    return out
 
 
 def rule_lifted(rule: dict) -> bool:
