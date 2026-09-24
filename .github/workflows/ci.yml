@@ -458,6 +458,8 @@ jobs:
         run: sudo sysctl -w kernel.apparmor_restrict_unprivileged_userns=0 || true
 
       - name: Run the Codex end-to-end test, failing on any skip
+        env:
+          VAARA_CODEX_SANDBOX: '1'
         run: |
           set -o pipefail
           pytest tests/test_codex_real_binary.py -q -rs | tee result.txt

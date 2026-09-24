@@ -209,7 +209,9 @@ def test_codex_calls_are_decided_by_vaara_and_recorded(tmp_path):
     assert "call_0" in out and "PreToolUse" not in out["call_0"], log
     assert "rm_rf_root" in out.get("call_1", ""), log
     assert "call_2" in out and "PreToolUse" not in out["call_2"], log
-    if "bwrap: No permissions" not in log:
+    # CI allows the sandbox and sets VAARA_CODEX_SANDBOX=1, so there the
+    # allowed patch must really have written its file.
+    if os.environ.get("VAARA_CODEX_SANDBOX") == "1" or "bwrap: No permissions" not in log:
         assert (work / "ok.txt").exists(), log
     assert "harness_config_write" in out.get("call_3", ""), log
     assert not (work / "note.txt").exists(), "a blocked patch wrote part of itself"
