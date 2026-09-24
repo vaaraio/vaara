@@ -96,7 +96,14 @@ def _trust(home: Path, **state) -> None:
     (home / "config.toml").write_text("\n".join(lines) + "\n")
 
 
-@pytest.mark.skipif(sys.version_info < (3, 11), reason="tomllib")
+def _no_toml_reader() -> bool:
+    import importlib.util
+
+    return not (importlib.util.find_spec("tomllib") or importlib.util.find_spec("tomli"))
+
+
+# Python 3.10 reads config.toml through tomli, which the dev requirements pin.
+@pytest.mark.skipif(_no_toml_reader(), reason="tomllib is Python 3.11+")
 def test_trust_status_follows_config_toml(tmp_path):
     home = tmp_path / ".codex"
     assert codex.trust_status(home) == "missing"
