@@ -12,8 +12,9 @@ roll-up the package carries in ``evidence/attestations_summary.json`` plus the
 in-process test (Vaara) and ``_check_independent.py`` (Vaara-free, reading the
 folded bytes back out of the zip) both reproduce.
 
-No zip is committed: it carries a fresh signature and a runtime ``.vcek.pem``.
-The test rebuilds it in a temp dir and runs the Vaara-free checker over it.
+One built package per scenario is committed under ``packages/``, so a third
+party can run the Vaara-free checker from the vectors alone. Each regeneration
+signs with a fresh key, so the zip bytes change; the verdicts do not.
 
 Run: ``python tests/vectors/article12_fold_v0/_generate.py``.
 """
@@ -35,6 +36,7 @@ from vaara.audit.trail import AuditTrail
 from vaara.taxonomy.actions import ActionRequest, create_default_registry
 
 HERE = Path(__file__).resolve().parent
+PACKAGES = HERE / "packages"
 HANDOFF = HERE.parent / "cross_org_handoff_v0"
 ENFORCEMENT = HERE.parent / "enforcement_attestation_v0"
 
@@ -171,10 +173,12 @@ def main() -> int:
               for c in json.loads((ENFORCEMENT / "cases.json").read_text())["cases"]}
 
     expected: dict[str, dict] = {}
+    PACKAGES.mkdir(exist_ok=True)
     with tempfile.TemporaryDirectory() as tmp:
         work = Path(tmp)
         for name, spec in SCENARIOS.items():
             zip_path = _build(spec, hcases, ecases, work)
+            (PACKAGES / f"{name}.zip").write_bytes(zip_path.read_bytes())
             with zipfile.ZipFile(zip_path) as zf:
                 members = sorted(m for m in zf.namelist() if m.startswith("evidence/"))
                 summary = json.loads(zf.read("evidence/attestations_summary.json"))
@@ -191,7 +195,7 @@ def main() -> int:
     (HERE / "fold.json").write_text(json.dumps(fold_doc, indent=2, sort_keys=True) + "\n")
     (HERE / "expected.json").write_text(
         json.dumps(expected, indent=2, sort_keys=True) + "\n")
-    print(f"wrote {len(SCENARIOS)} scenarios to fold.json and expected.json")
+    print(f"wrote {len(SCENARIOS)} scenarios to fold.json, expected.json and packages/")
     return 0
 
 

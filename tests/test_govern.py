@@ -9,6 +9,8 @@ deterministic, then a real-pipeline smoke test in shadow mode proves the actual
 
 from __future__ import annotations
 
+import importlib
+
 import pytest
 
 import vaara
@@ -54,7 +56,7 @@ class _FakePipeline:
 def _reset_module_singletons():
     """Keep tests isolated: the default and shadow pipelines are process-wide
     singletons built lazily, so reset them around each test."""
-    import vaara.govern as g
+    g = importlib.import_module("vaara.govern")
 
     g._default_pipeline = None
     g._shadow_singleton = None

@@ -231,7 +231,9 @@ ships evidence it cannot back, and there is no `--skip-invalid`.
 `enforcement_attestation_v0` corpora into a real package and pin the roll-up and
 `evidence/` membership. The Vaara-free checker reproduces every folded verdict
 from the same bytes folded into the zip (not a re-snapshot), composing the two
-single-verb suites' own evaluators.
+single-verb suites' own evaluators. One sample package per scenario is
+committed under `packages/`, so the checker runs from the vectors alone, with
+no Vaara install to build a package first.
 
 ### CLI
 

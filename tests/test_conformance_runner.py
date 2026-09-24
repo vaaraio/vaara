@@ -3,7 +3,8 @@
 ``scripts/conformance_runner.py`` is the neutral runner over the whole vector
 corpus: it invokes each suite's ``_check_independent.py`` and aggregates one
 verdict. These tests pin its contract — discovery covers every suite that ships
-a checker, an argument-only suite is reported SKIP rather than failed, and the
+a checker, an argument-only suite is reported SKIP rather than failed, the
+article12 fold grades its committed packages bare, and the
 runner reaches a clean exit on a known-good suite — without re-running all 36
 subprocesses on every test invocation.
 """
@@ -36,12 +37,24 @@ def test_discovers_every_suite_with_a_checker() -> None:
     assert len(found) >= 36
 
 
-def test_argument_only_suite_is_skipped_not_failed() -> None:
+def test_argument_only_suite_is_skipped_not_failed(monkeypatch) -> None:
     runner = _load_runner()
-    row = runner.run_suite(VECTORS, "article12_fold_v0")
+    monkeypatch.setitem(runner.NEEDS_ARGUMENT, "tap_v0", "needs a built artifact")
+    row = runner.run_suite(VECTORS, "tap_v0")
     assert row["status"] == "SKIP"
-    assert row["reason"]
+    assert row["reason"] == "needs a built artifact"
     assert row["returncode"] is None
+
+
+def test_article12_fold_runs_bare_on_its_committed_packages() -> None:
+    # It used to skip on every run: its checker needed a package built with
+    # Vaara installed. The packages are committed now, so it grades bare.
+    pytest.importorskip("cryptography")
+    pytest.importorskip("rfc8785")
+    runner = _load_runner()
+    assert "article12_fold_v0" not in runner.NEEDS_ARGUMENT
+    row = runner.run_suite(VECTORS, "article12_fold_v0")
+    assert row["status"] == "PASS", row
 
 
 def test_optional_dependency_suite_skips_not_fails() -> None:

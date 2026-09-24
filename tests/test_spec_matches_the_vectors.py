@@ -126,8 +126,6 @@ def test_checkers_import_only_what_the_spec_promises(directory):
 def test_checkers_pass_without_vaara_importable(directory, tmp_path):
     """Run each checker with Vaara removed from the import path."""
     checker = directory / "_check_independent.py"
-    if "sys.argv" in checker.read_text() and directory.name == "article12_fold_v0":
-        pytest.skip("takes a package path as an argument, not a self-contained run")
     done = subprocess.run(
         [sys.executable, "-I", str(checker)],
         cwd=directory, capture_output=True, text=True, timeout=300,

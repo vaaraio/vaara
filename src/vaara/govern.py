@@ -202,8 +202,7 @@ def govern(
                 return pipeline
             return _shadow_pipeline() if shadow else default_pipeline()
 
-        @functools.wraps(fn)
-        def wrapper(*args: Any, **kwargs: Any) -> Any:
+        def _decide(args: tuple, kwargs: dict) -> tuple[InterceptionPipeline, Any]:
             pipe = _pipe()
             result = pipe.intercept(
                 agent_id=agent_id,
@@ -212,6 +211,30 @@ def govern(
             )
             if not result.allowed:
                 raise Blocked(result)
+            return pipe, result
+
+        if inspect.iscoroutinefunction(fn):
+            # Decided when awaited, immediately before the body, so a block
+            # raises where the caller awaits and the body never starts. The
+            # outcome is reported after the body finishes: the sync wrapper
+            # reported success when it handed back the coroutine, for a body
+            # that had not run yet, and never saw it fail.
+            @functools.wraps(fn)
+            async def async_wrapper(*args: Any, **kwargs: Any) -> Any:
+                pipe, result = _decide(args, kwargs)
+                try:
+                    outcome = await fn(*args, **kwargs)
+                except Exception:
+                    pipe.report_outcome(result.action_id, 1.0, description="raised exception")
+                    raise
+                pipe.report_outcome(result.action_id, 0.0)
+                return outcome
+
+            return async_wrapper  # type: ignore[return-value]
+
+        @functools.wraps(fn)
+        def wrapper(*args: Any, **kwargs: Any) -> Any:
+            pipe, result = _decide(args, kwargs)
             try:
                 outcome = fn(*args, **kwargs)
             except Exception:
