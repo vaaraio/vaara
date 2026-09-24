@@ -18,9 +18,14 @@ re-snapshot of the source fixtures). It imports only the standard library,
    expected measurement and strict flag, and reproduce that roll-up.
 4. Assert each reproduced roll-up equals the one folded into the package.
 
-The chain from folded bytes to set verdict never touches Vaara. Run:
-``python tests/vectors/article12_fold_v0/_check_independent.py <package.zip>``.
-Exit code 0 means every folded verdict reproduced and matched.
+Run with no argument, it grades every committed sample package under
+``packages/`` (one per scenario in ``expected.json``) and, beyond steps 1-4,
+asserts each package's ``evidence/`` membership and reproduced roll-ups equal
+the committed truth. Run with a path, it grades that one package (steps 1-4):
+``python tests/vectors/article12_fold_v0/_check_independent.py [package.zip]``.
+
+The chain from folded bytes to set verdict never touches Vaara. Exit code 0
+means every folded verdict reproduced and matched.
 """
 
 from __future__ import annotations
@@ -35,6 +40,7 @@ from pathlib import Path
 from cryptography.hazmat.primitives.serialization import load_pem_public_key
 
 HERE = Path(__file__).resolve().parent
+PACKAGES = HERE / "packages"
 HANDOFF = HERE.parent / "cross_org_handoff_v0"
 ENFORCEMENT = HERE.parent / "enforcement_attestation_v0"
 
@@ -99,7 +105,8 @@ def _enforcement_rollup(verdicts: list, *, strict: bool) -> dict:
     }
 
 
-def _check_zip(zip_path: Path) -> list:
+def _check_zip(zip_path: Path, want: dict | None = None) -> list:
+    """Reproduce every folded verdict; with ``want``, also match expected.json."""
     failures: list = []
     judge_handoff = _load_single_checker(
         HANDOFF / "_check_independent.py", "_h_single")
@@ -109,6 +116,15 @@ def _check_zip(zip_path: Path) -> list:
     with zipfile.ZipFile(zip_path) as zf:
         names = set(zf.namelist())
         summary = json.loads(zf.read("evidence/attestations_summary.json"))
+        if want is not None:
+            members = sorted(n for n in names if n.startswith("evidence/"))
+            if members != want["evidence_members"]:
+                failures.append(f"evidence members:\n    committed "
+                                f"{want['evidence_members']}\n    in zip {members}")
+            for kind in ("handoff", "enforcement"):
+                if summary[kind]["present"] != (kind in want):
+                    failures.append(f"{kind}: present={summary[kind]['present']} "
+                                    f"but expected.json says {kind in want}")
 
         h = summary["handoff"]
         if h["present"]:
@@ -126,9 +142,12 @@ def _check_zip(zip_path: Path) -> list:
                     case["trustedDidDocument"] = h["trustedDidDocument"]
                 verdicts.append(judge_handoff(case))
             got = _handoff_rollup(verdicts, strict=strict)
-            want = {k: h["report"][k] for k in HANDOFF_KEYS}
-            if {k: got[k] for k in HANDOFF_KEYS} != want:
-                failures.append(f"handoff:\n    folded {want}\n    reproduced {got}")
+            folded = {k: h["report"][k] for k in HANDOFF_KEYS}
+            if {k: got[k] for k in HANDOFF_KEYS} != folded:
+                failures.append(f"handoff:\n    folded {folded}\n    reproduced {got}")
+            elif want is not None and folded != want.get("handoff"):
+                failures.append(f"handoff:\n    committed {want.get('handoff')}"
+                                f"\n    folded {folded}")
             else:
                 print(f"handoff: OK ok={got['ok']} verifiable={got['verifiable']} "
                       f"corroborated={got['corroborated']} pinned={got['pinned']}")
@@ -153,21 +172,42 @@ def _check_zip(zip_path: Path) -> list:
                         "strict": strict}
                 verdicts.append(judge_enforcement(case))
             got = _enforcement_rollup(verdicts, strict=strict)
-            want = {k: e["report"][k] for k in ENFORCEMENT_KEYS}
-            if {k: got[k] for k in ENFORCEMENT_KEYS} != want:
+            folded = {k: e["report"][k] for k in ENFORCEMENT_KEYS}
+            if {k: got[k] for k in ENFORCEMENT_KEYS} != folded:
                 failures.append(
-                    f"enforcement:\n    folded {want}\n    reproduced {got}")
+                    f"enforcement:\n    folded {folded}\n    reproduced {got}")
+            elif want is not None and folded != want.get("enforcement"):
+                failures.append(f"enforcement:\n    committed "
+                                f"{want.get('enforcement')}\n    folded {folded}")
             else:
                 print(f"enforcement: OK ok={got['ok']} bound={got['bound']} "
                       f"pinned={got['measurementPinned']}")
     return failures
 
 
+def _check_committed() -> list:
+    """Grade every committed sample package against expected.json."""
+    expected = json.loads((HERE / "expected.json").read_text())
+    failures: list = []
+    for scenario in sorted(expected):
+        zip_path = PACKAGES / f"{scenario}.zip"
+        print(f"[{scenario}]")
+        if not zip_path.is_file():
+            failures.append(f"{scenario}: packages/{scenario}.zip is missing")
+            continue
+        failures += [f"{scenario}: {f}"
+                     for f in _check_zip(zip_path, expected[scenario])]
+    return failures
+
+
 def main() -> int:
-    if len(sys.argv) != 2:
-        print("usage: _check_independent.py <article12_package.zip>", file=sys.stderr)
+    if len(sys.argv) > 2:
+        print("usage: _check_independent.py [article12_package.zip]", file=sys.stderr)
         return 2
-    failures = _check_zip(Path(sys.argv[1]))
+    if len(sys.argv) == 2:
+        failures = _check_zip(Path(sys.argv[1]))
+    else:
+        failures = _check_committed()
     if failures:
         print("\nFAIL:\n  " + "\n  ".join(failures))
         return 1

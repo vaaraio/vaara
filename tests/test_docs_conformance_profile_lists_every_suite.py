@@ -64,10 +64,9 @@ def test_the_stated_count_is_the_real_count():
     assert int(stated.group(1)) == len(_shipped_suites())
 
 
-def test_the_always_skipping_suite_is_named():
-    """article12_fold_v0 takes a path argument, so it never runs bare."""
+def test_the_skipping_suites_are_named():
+    """Suites that skip without an optional dependency are named in the profile."""
     text = DOC.read_text()
-    assert "article12_fold_v0" in text
     for suite in ("pq_hybrid_v0", "qualified_time_v0"):
         assert suite in text, (
             f"{suite} skips without an optional dependency; the profile has to "

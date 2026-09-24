@@ -88,15 +88,17 @@ Inside a checker, two kinds of assertion are distinguished:
 
 Suites reported `SKIP`, not pass, in an aggregate run:
 
-- `article12_fold_v0` validates a bundle handed to it on the command line rather
-  than a bare directory of case files. It skips on every run. The runner lists
-  it explicitly so the gap reads as a gap, not as silent coverage.
 - `pq_hybrid_v0` and `qualified_time_v0` skip when their optional dependency is
   missing, with the reason printed. Install `dilithium_py` and `asn1crypto` and
   both run.
 
-So a clean checkout with `rfc8785` and `cryptography` alone grades 45 passed,
-0 failed, 3 skipped across the 50 suites.
+`article12_fold_v0` grades a produced regulator package rather than loose case
+files. One sample package per scenario is committed under its `packages/`
+directory, so its checker runs bare like every other suite. It can also be
+pointed at any package: `_check_independent.py <package.zip>`.
+
+So a clean checkout with `rfc8785` and `cryptography` alone grades 48 passed,
+0 failed, 2 skipped across the 50 suites.
 
 ## What a pass means, and what it does not
 

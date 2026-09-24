@@ -214,3 +214,54 @@ def test_no_attachments_states_none_folded(tmp_path):
     assert not any(n.startswith("evidence/") for n in names)
     assert "No cross-org handoff or confidential-VM enforcement evidence is folded" \
         in md
+
+
+# The committed sample packages: the I-D says every suite ships a checker a
+# third party can run from the vectors alone, which needs a package on disk.
+
+CHECK = _load(VEC / "_check_independent.py", "_a12_fold_check")
+
+
+def test_independent_checker_runs_bare_on_committed_packages():
+    proc = subprocess.run(
+        [sys.executable, str(VEC / "_check_independent.py")],
+        capture_output=True, text=True, cwd=VEC,
+    )
+    assert proc.returncode == 0, proc.stdout + proc.stderr
+    for scenario in EXPECTED:
+        assert f"[{scenario}]" in proc.stdout
+
+
+@pytest.mark.parametrize("scenario", sorted(EXPECTED))
+def test_committed_package_is_a_real_signed_package(scenario):
+    assert verify_signed(VEC / "packages" / f"{scenario}.zip").ok
+
+
+def test_committed_packages_are_exactly_the_scenarios():
+    on_disk = {p.stem for p in (VEC / "packages").glob("*.zip")}
+    assert on_disk == set(EXPECTED) == set(GEN.SCENARIOS)
+
+
+def test_checker_refuses_a_package_that_disagrees_with_expected():
+    # A committed package from one scenario graded against another's truth.
+    failures = CHECK._check_zip(
+        VEC / "packages" / "enforcement_only.zip", EXPECTED["full"])
+    assert failures
+
+
+def test_checker_refuses_a_tampered_rollup(tmp_path):
+    src = VEC / "packages" / "full.zip"
+    out = tmp_path / "tampered.zip"
+    with zipfile.ZipFile(src) as zin, zipfile.ZipFile(out, "w") as zout:
+        for item in zin.infolist():
+            data = zin.read(item.filename)
+            if item.filename == "evidence/attestations_summary.json":
+                doc = json.loads(data)
+                doc["handoff"]["report"]["corroborated"] = 2
+                data = json.dumps(doc).encode()
+            zout.writestr(item, data)
+    proc = subprocess.run(
+        [sys.executable, str(VEC / "_check_independent.py"), str(out)],
+        capture_output=True, text=True,
+    )
+    assert proc.returncode == 1, proc.stdout + proc.stderr

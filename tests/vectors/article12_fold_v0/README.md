@@ -21,15 +21,19 @@ subsets into a real package, and pin the roll-up the package carries in
   abort the export with no package written.
 - `expected.json`: for each producing scenario, the folded `evidence/`
   membership and the handoff / enforcement roll-up the package carries.
+- `packages/<scenario>.zip`: one package per scenario, built by `_generate.py`
+  and committed, so the checker runs from the vectors alone. Each regeneration
+  signs with a fresh key, so the zip bytes change and the verdicts do not.
 - `_generate.py`: builds each package with `export_article12` (reusing each
-  package's pre-verified anchor time, exactly as `handoff_set_v0` does) and
-  records `expected.json`. No zip is committed: it carries a fresh signature and
-  a runtime `.vcek.pem`. The test rebuilds it in a temp directory.
-- `_check_independent.py <package.zip>`: the Vaara-free checker. It opens a
+  package's pre-verified anchor time, exactly as `handoff_set_v0` does), writes
+  it to `packages/`, and records `expected.json`.
+- `_check_independent.py [package.zip]`: the Vaara-free checker. It opens a
   produced package and reproduces every folded verdict from the **same bytes
   folded into the zip**, composing the two single-verb suites' own `_evaluate`
   functions, then asserts each reproduced roll-up equals the one the package
-  claims. It never imports Vaara.
+  claims. With no argument it grades every committed package and also checks
+  its `evidence/` membership and roll-ups against `expected.json`. It never
+  imports Vaara.
 
 ## Honesty model
 
