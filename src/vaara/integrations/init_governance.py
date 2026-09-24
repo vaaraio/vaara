@@ -103,6 +103,9 @@ class MCPClientStatus:
     governed: int = 0
     ungoverned: int = 0
     has_backup: bool = False
+    # False when the file exists but holds no ``mcpServers`` map Vaara can
+    # read, so its servers can be neither counted nor routed.
+    readable: bool = True
 
 
 @dataclass
@@ -141,16 +144,98 @@ class InitReport:
 
 
 def codex_trust_line(status: str) -> str:
-    """What the operator has to do before Codex runs Vaara's hook."""
+    """Why Codex is not running Vaara's hook, and what to do about it."""
     if status == "disabled":
-        return ("Codex: Vaara's hook is turned off in /hooks, so Codex calls are "
-                "NOT governed. Turn it back on in /hooks.")
+        return "Vaara's hook is turned off in Codex's /hooks. Turn it back on there."
     if status == "unknown":
-        return ("Codex: could not read ~/.codex/config.toml to check whether the "
-                "hook is trusted. Codex runs a hook only once it is trusted.")
-    return ("Codex: NOT governed until you trust the hook. Codex asks at its next "
-            "start (choose \"Trust all and continue\"), or review it in /hooks. "
-            "codex exec skips an untrusted hook without asking.")
+        return ("could not read ~/.codex/config.toml to see whether the hook is "
+                "trusted, and Codex runs a hook only once it is.")
+    return ("until you trust the hook. Codex asks at its next start (choose "
+            "\"Trust all and continue\"), or review it in /hooks. codex exec "
+            "skips an untrusted hook without asking.")
+
+
+@dataclass
+class Coverage:
+    """What ``vaara init`` can say about one agent found on this machine."""
+
+    name: str
+    state: str  # "governed", "MCP only" or "NOT governed"
+    detail: str
+
+
+#: Agents Vaara has no adapter for yet, by the binaries and directories that
+#: show one is installed. Listing them is the point: an agent nobody names
+#: is an agent the operator believes is governed.
+_UNADAPTED = (
+    ("Gemini CLI", ("gemini",), ("~/.gemini",)),
+    ("Windsurf", ("windsurf",), ("~/.codeium/windsurf",)),
+)
+
+
+def _installed(binaries: tuple, dirs: tuple, which: Any) -> bool:
+    return (any(which(b) for b in binaries)
+            or any(Path(d).expanduser().is_dir() for d in dirs))
+
+
+def coverage(report: InitReport, *, which: Any = shutil.which) -> list[Coverage]:
+    """Every agent found on this machine, and whether Vaara governs it.
+
+    ``init`` used to print what it wrote and then "Vaara is governing",
+    whatever it had found. An agent with no adapter got no line at all, and
+    an MCP config in a shape Vaara could not read was skipped without a word.
+    """
+    rows: list[Coverage] = []
+    every = "every tool call, through its hooks"
+    if _installed(("claude",), ("~/.claude",), which):
+        rows.append(Coverage("Claude Code", "governed", every))
+    if report.cursor_hooks is not None:
+        rows.append(Coverage("Cursor", "governed", every))
+    if report.opencode_plugin is not None:
+        rows.append(Coverage("OpenCode", "governed",
+                             "every tool call, through its plugin"))
+    if report.codex_hooks is not None:
+        if report.codex_trust == "trusted":
+            rows.append(Coverage("Codex", "governed", every))
+        else:
+            rows.append(Coverage("Codex", "NOT governed",
+                                 codex_trust_line(report.codex_trust)))
+
+    mcp = {c.name: c for c in report.clients if c.exists}
+
+    def routed(client: MCPClientStatus) -> tuple[int, int]:
+        done = report.mcp_rewritten.get(client.name, 0)
+        return client.governed + done, client.ungoverned - done
+
+    desktop = mcp.get("Claude Desktop")
+    if desktop is not None:
+        on, off = routed(desktop)
+        if not desktop.readable:
+            rows.append(Coverage("Claude Desktop", "NOT governed",
+                                 f"could not read the MCP servers in {desktop.path}"))
+        elif off:
+            rows.append(Coverage("Claude Desktop", "NOT governed",
+                                 f"{off} MCP server(s) not routed through vaara-mcp-proxy"))
+        else:
+            rows.append(Coverage("Claude Desktop", "governed",
+                                 f"its {on} MCP server(s), through vaara-mcp-proxy"))
+
+    for name, binaries, dirs in _UNADAPTED:
+        client = mcp.get(name)
+        if client is None and not _installed(binaries, dirs, which):
+            continue
+        own = "no Vaara adapter yet, so its own tool calls run unchecked"
+        on, off = routed(client) if client is not None else (0, 0)
+        if client is not None and not client.readable:
+            own += f"; could not read the MCP servers in {client.path}"
+        elif off:
+            own += f"; {off} MCP server(s) not routed through vaara-mcp-proxy"
+        if on:
+            rows.append(Coverage(name, "MCP only",
+                                 f"{on} MCP server(s) through vaara-mcp-proxy; {own}"))
+        else:
+            rows.append(Coverage(name, "NOT governed", own))
+    return rows
 
 
 def resolve_vaara_bin() -> str:
@@ -355,7 +440,7 @@ def scan_mcp_client(name: str, raw_path: str, proxy_bin: str) -> MCPClientStatus
             raise ValueError
     except (OSError, json.JSONDecodeError, ValueError):
         return MCPClientStatus(name=name, path=path, exists=True,
-                               has_backup=has_backup)
+                               has_backup=has_backup, readable=False)
     governed = naked = 0
     for server in servers.values():
         if not isinstance(server, dict):
