@@ -705,9 +705,12 @@ final class GateModel: ObservableObject {
         let data = parseData(sqlite3_column_text(stmt, 4))
         let decision = (data["decision"] as? String) ?? ""
         let verdict: String
+        // An escalation is two records, decision_made "escalate" and then
+        // escalation_sent for the same action. Only the decision is shown,
+        // or every escalation lands twice in the feed and the register.
         if eventType == "action_blocked" || decision == "deny" {
             verdict = "deny"
-        } else if eventType == "escalation_sent" || decision == "escalate" {
+        } else if decision == "escalate" {
             verdict = "escalate"
         } else if includeAllows && eventType == "decision_made" && decision == "allow" {
             verdict = "allow"
@@ -872,10 +875,11 @@ final class GateModel: ObservableObject {
                     if acc[agent] == nil { acc[agent] = Acc() }
                     acc[agent]!.lastSeen = max(acc[agent]!.lastSeen, ts)
 
+                    // escalation_sent follows the decision_made "escalate"
+                    // it repeats; counting both counted each escalation twice.
                     let verdict: GateState?
                     switch eventType {
                     case "action_blocked":  verdict = .red
-                    case "escalation_sent": verdict = .yellow
                     case "decision_made":
                         switch (parseData(sqlite3_column_text(stmt, 2))["decision"] as? String) ?? "" {
                         case "deny":     verdict = .red
