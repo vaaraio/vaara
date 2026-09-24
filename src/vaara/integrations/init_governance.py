@@ -132,6 +132,25 @@ class InitReport:
     cursor_hooks: Optional[Path] = None
     cursor_changed: bool = False
     cursor_removed: bool = False
+    # Codex hooks.json, the same three fields, and whether Codex will run
+    # the hook (see codex.trust_status).
+    codex_hooks: Optional[Path] = None
+    codex_changed: bool = False
+    codex_removed: bool = False
+    codex_trust: str = "missing"
+
+
+def codex_trust_line(status: str) -> str:
+    """What the operator has to do before Codex runs Vaara's hook."""
+    if status == "disabled":
+        return ("Codex: Vaara's hook is turned off in /hooks, so Codex calls are "
+                "NOT governed. Turn it back on in /hooks.")
+    if status == "unknown":
+        return ("Codex: could not read ~/.codex/config.toml to check whether the "
+                "hook is trusted. Codex runs a hook only once it is trusted.")
+    return ("Codex: NOT governed until you trust the hook. Codex asks at its next "
+            "start (choose \"Trust all and continue\"), or review it in /hooks. "
+            "codex exec skips an untrusted hook without asking.")
 
 
 def resolve_vaara_bin() -> str:
@@ -448,6 +467,8 @@ def run_init(
     opencode_dir: Optional[Path] = None,
     govern_cursor: bool = True,
     cursor_dir: Optional[Path] = None,
+    govern_codex: bool = True,
+    codex_dir: Optional[Path] = None,
 ) -> InitReport:
     """Set up (or self-heal) local governance in one call.
 
@@ -502,6 +523,14 @@ def run_init(
         if cursor.detected(cursor_dir):
             report.cursor_changed = cursor.install_hooks(vaara_bin, cursor_dir)
             report.cursor_hooks = cursor.hooks_path(cursor_dir)
+
+    if govern_codex:
+        from vaara.integrations import codex
+
+        if codex.detected(codex_dir):
+            report.codex_changed = codex.install_hooks(vaara_bin, codex_dir)
+            report.codex_hooks = codex.hooks_path(codex_dir)
+            report.codex_trust = codex.trust_status(codex_dir)
 
     report.clients = detect_clients(proxy_bin)
     for client in report.clients:
@@ -561,6 +590,7 @@ def run_ungovern(
     service_runner: Any = None,
     opencode_dir: Optional[Path] = None,
     cursor_dir: Optional[Path] = None,
+    codex_dir: Optional[Path] = None,
 ) -> InitReport:
     """Reverse ``run_init``: remove the hooks and the OpenCode plugin, restore
     each MCP config, and take down the proxy service if one was installed."""
@@ -573,6 +603,9 @@ def run_ungovern(
     from vaara.integrations import cursor
 
     report.cursor_removed = cursor.remove_hooks(cursor_dir)
+    from vaara.integrations import codex
+
+    report.codex_removed = codex.remove_hooks(codex_dir)
     for name, raw_path in KNOWN_MCP_CLIENTS:
         path = Path(raw_path).expanduser()
         if restore_mcp_config(path):

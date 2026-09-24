@@ -26,3 +26,4 @@ pq extra not installed
 ^no case file: the harness ships without one
 ^tomllib is Python 3\.11\+$
 ^examples need rich$
+^no Codex binary$

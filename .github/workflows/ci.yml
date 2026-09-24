@@ -428,3 +428,42 @@ jobs:
 
       - name: Run preflight smoke test
         run: ./scripts/preflight.sh
+
+  codex-e2e:
+    name: Codex governed (real binary)
+    runs-on: ubuntu-latest
+    # Runs the Codex CLI itself against a scripted local model, with the
+    # hooks `vaara init` writes, and reads back what Codex told the model
+    # and what the trail recorded. Pinned so a Codex release that changes
+    # the hook contract fails here on purpose, when the pin is moved.
+    steps:
+      - uses: actions/checkout@9c091bb21b7c1c1d1991bb908d89e4e9dddfe3e0  # v7.0.0
+
+      - name: Set up Python 3.12
+        uses: actions/setup-python@5fda3b95a4ea91299a34e894583c3862153e4b97  # v7.0.0
+        with:
+          python-version: '3.12'
+
+      - name: Install Vaara and Codex
+        run: |
+          pip install --require-hashes -r requirements-dev.txt
+          pip install -e . --no-deps
+          npm install -g @openai/codex@0.156.1
+          codex --version
+
+      # Codex runs commands in a bubblewrap sandbox, which Ubuntu's AppArmor
+      # default stops from creating user namespaces. With it allowed, the
+      # test also checks that an allowed patch really wrote its file.
+      - name: Allow unprivileged user namespaces for Codex's sandbox
+        run: sudo sysctl -w kernel.apparmor_restrict_unprivileged_userns=0 || true
+
+      - name: Run the Codex end-to-end test, failing on any skip
+        env:
+          VAARA_CODEX_SANDBOX: '1'
+        run: |
+          set -o pipefail
+          pytest tests/test_codex_real_binary.py -q -rs | tee result.txt
+          if grep -qE '[0-9]+ skipped' result.txt; then
+            echo "::error::The Codex test skipped, so Codex was not found."
+            exit 1
+          fi
