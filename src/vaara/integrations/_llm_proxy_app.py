@@ -35,6 +35,7 @@ from ._llm_proxy_shape import (
     redact_body,
     truncate_for_audit,
 )
+from ._llm_proxy_toolgate import SseToolGate, ToolGate, gate_json_bytes
 from .llm_compact import compact_messages
 from .llm_envelope import measure_envelope
 from .llm_usage import StreamUsage, extract_usage, usage_fields
@@ -114,7 +115,8 @@ def build_app(*, upstream: str, api_key: Optional[str], api_key_header: str,
               allowed_origins: Optional[list[str]] = None,
               marker_watch: Optional[Any] = None,
               compact_keep_turns: int = 0,
-              fail_open: bool = False) -> FastAPI:
+              fail_open: bool = False,
+              gate_tool_calls: bool = True) -> FastAPI:
     app = FastAPI(title="Vaara LLM Proxy")
     # This proxy holds the operator's upstream provider key and injects it
     # into every forwarded call, and it binds loopback with no inbound
@@ -424,10 +426,14 @@ def build_app(*, upstream: str, api_key: Optional[str], api_key_header: str,
                     "upstream_error", error=type(exc).__name__))
             return JSONResponse({"error": f"upstream: {exc}"}, status_code=502)
 
+        # Every tool call the model asks for goes through the deny rules
+        # before the agent sees it. See _llm_proxy_toolgate.
+        gate = ToolGate(pipeline, agent_id, enforce) if gate_tool_calls else None
+
         if is_stream:
             return StreamingResponse(
                 _forward_stream(upstream_response, pipeline,
-                                result.action_id, _seal),
+                                result.action_id, _seal, gate),
                 status_code=upstream_response.status_code,
                 headers=forward_response_headers(upstream_response.headers),
                 media_type=upstream_response.headers.get("content-type"),
@@ -445,6 +451,8 @@ def build_app(*, upstream: str, api_key: Optional[str], api_key_header: str,
             except Exception as exc:
                 logger.warning("unsealing failed, passing through: %s", exc)
                 raw_response = upstream_response.content
+        if gate is not None and upstream_response.is_success:
+            raw_response = gate_json_bytes(raw_response, gate)
 
         # What the provider says it counted, including the cached share of
         # the input. Read off the reply the proxy already holds; the envelope
@@ -625,8 +633,10 @@ def _outcome(status: str, **fields: Any) -> str:
 async def _forward_stream(upstream_response: Any,
                            pipeline: InterceptionPipeline,
                            action_id: str,
-                           seal: Optional[Any] = None):
+                           seal: Optional[Any] = None,
+                           gate: Optional[ToolGate] = None):
     unsealer = None
+    sse_gate = SseToolGate(gate) if gate is not None else None
     if seal is not None and seal.active:
         # Frame-aware, not byte-aware: a placeholder that straddles two SSE
         # events has event framing between its halves and no byte regex can
@@ -641,22 +651,25 @@ async def _forward_stream(upstream_response: Any,
     try:
         async for chunk in upstream_response.aiter_bytes():
             usage.feed(chunk)
-            if unsealer is None:
-                yield chunk
-                continue
-            try:
-                out = unsealer.feed(chunk)
-            except Exception as exc:  # pragma: no cover - guard, not a path
-                logger.warning("stream unseal failed, passing through: %s", exc)
-                unsealer = None
-                yield chunk
-                continue
+            out = chunk
+            if unsealer is not None:
+                try:
+                    out = unsealer.feed(chunk)
+                except Exception as exc:  # pragma: no cover - guard, not a path
+                    logger.warning("stream unseal failed, passing through: %s", exc)
+                    unsealer = None
+                    out = chunk
+            # Gated after unsealing, so a rule reads the argument the agent
+            # will get, not a placeholder.
+            if sse_gate is not None and out:
+                out = sse_gate.feed(out)
             if out:
                 yield out
-        if unsealer is not None:
-            tail = unsealer.flush()
-            if tail:
-                yield tail
+        tail = unsealer.flush() if unsealer is not None else b""
+        if sse_gate is not None:
+            tail = sse_gate.feed(tail) + sse_gate.flush() if tail else sse_gate.flush()
+        if tail:
+            yield tail
         done = True
         pipeline.report_outcome(
             action_id, outcome_severity=0.0,

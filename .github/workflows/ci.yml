@@ -448,6 +448,7 @@ jobs:
         run: |
           pip install --require-hashes -r requirements-dev.txt
           pip install -e . --no-deps
+          pip install 'fastapi>=0.110' 'uvicorn>=0.27' 'httpx>=0.27'
           npm install -g @openai/codex@0.156.1
           codex --version
 
@@ -462,7 +463,8 @@ jobs:
           VAARA_CODEX_SANDBOX: '1'
         run: |
           set -o pipefail
-          pytest tests/test_codex_real_binary.py -q -rs | tee result.txt
+          pytest tests/test_codex_real_binary.py \
+                 tests/test_proxy_gates_codex_real_binary.py -q -rs | tee result.txt
           if grep -qE '[0-9]+ skipped' result.txt; then
             echo "::error::The Codex test skipped, so Codex was not found."
             exit 1

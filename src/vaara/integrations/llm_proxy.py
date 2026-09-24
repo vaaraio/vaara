@@ -5,8 +5,11 @@
 Governs ``POST /v1/chat/completions``, ``POST /v1/messages`` and
 ``POST /v1/responses``: each call is checked against the model and rate policy
 and recorded in the Vaara audit trail with its prompt. Every other call is recorded by method, path, size and
-sha256. The secrets named in ``--seal-file`` are replaced on every path before
-the request leaves. Nothing beyond those values is removed from a request;
+sha256. Every tool call a model reply asks for on those three paths, streamed
+or not, is run through the deny rules and recorded; with ``--enforce`` a rule
+hit is taken out of the reply and replaced by text naming the rule, so the
+agent never gets a call to run. The secrets named in ``--seal-file`` are
+replaced on every path before the request leaves. Nothing beyond those values is removed from a request;
 ``--redact`` masks only the trail's copy of the prompt.
 
 Usage::
@@ -48,7 +51,9 @@ from .llm_actions import LLM_ACTIONS
 DESCRIPTION = (
     "Govern LLM API calls. POST /v1/chat/completions, POST /v1/messages and "
     "POST /v1/responses are checked against the model and rate policy and "
-    "recorded in the Vaara audit trail with their prompt. Every other call is recorded by method, "
+    "recorded in the Vaara audit trail with their prompt, and every tool "
+    "call in their replies goes through the deny rules and is recorded. "
+    "Every other call is recorded by method, "
     "path, size and sha256, never by content. The secrets named in "
     "--seal-file are replaced on every path before the request leaves. "
     "With --seal-known-secrets, values in published credential formats are "
@@ -150,7 +155,10 @@ def main(args: Optional[list[str]] = None) -> int:
     )
     p.add_argument(
         "--enforce", action="store_true",
-        help="Gate instead of observe-only (only in govern mode)",
+        help="Block instead of observe. A prompt the scorer denies is "
+             "refused with 403, and a tool call in a model reply that a deny "
+             "rule matches is taken out of the reply and replaced by text "
+             "naming the rule. Without it both are recorded and forwarded.",
     )
     p.add_argument(
         "--model-allow", action="append", default=None, metavar="GLOB",
