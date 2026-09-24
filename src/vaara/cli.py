@@ -4943,6 +4943,11 @@ def _cmd_init(args: argparse.Namespace) -> int:
         print(f"Codex hooks {state} at {report.codex_hooks}")
     else:
         print("Codex: not found")
+    if report.gemini_settings is not None:
+        state = "written" if report.gemini_changed else "already current"
+        print(f"Gemini CLI hooks {state} in {report.gemini_settings}")
+    else:
+        print("Gemini CLI: not found")
     print(f"Trail: {report.trail_db}")
 
     for client in report.clients:
@@ -5000,6 +5005,8 @@ def _cmd_ungovern(args: argparse.Namespace) -> int:
         print("  Cursor hooks removed")
     if report.codex_removed:
         print("  Codex hooks removed")
+    if report.gemini_removed:
+        print("  Gemini CLI hooks removed")
     for name in report.mcp_restored:
         print(f"  {name}: MCP config restored from backup")
     if not report.mcp_restored:
@@ -7177,8 +7184,9 @@ def build_parser() -> argparse.ArgumentParser:
     phook = sub.add_parser(
         "hook",
         help=(
-            "Hook runner for Claude Code, OpenCode, Cursor and Codex (called "
-            "by their Vaara hooks and plugins; reads the event JSON on stdin)"
+            "Hook runner for Claude Code, OpenCode, Cursor, Codex and Gemini "
+            "CLI (called by their Vaara hooks and plugins; reads the event "
+            "JSON on stdin)"
         ),
     )
     hooksub = phook.add_subparsers(dest="hook_cmd", metavar="COMMAND")
@@ -7196,7 +7204,7 @@ def build_parser() -> argparse.ArgumentParser:
              "copy bundled with the package)",
     )
     phpre.add_argument(
-        "--client", choices=["claude-code", "opencode", "cursor", "codex"],
+        "--client", choices=["claude-code", "opencode", "cursor", "codex", "gemini"],
         default="claude-code",
         help="Which agent sent the event: its tool call in that agent's own "
              "shape. cursor also prints Cursor's JSON verdict on stdout "
@@ -7211,7 +7219,7 @@ def build_parser() -> argparse.ArgumentParser:
         help="Append the outcome record and feed the online learner",
     )
     phpost.add_argument(
-        "--client", choices=["claude-code", "opencode", "cursor", "codex"],
+        "--client", choices=["claude-code", "opencode", "cursor", "codex", "gemini"],
         default="claude-code",
         help="Which agent sent the event (default: claude-code)",
     )

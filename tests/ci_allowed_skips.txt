@@ -27,3 +27,4 @@ pq extra not installed
 ^tomllib is Python 3\.11\+$
 ^examples need rich$
 ^no Codex binary$
+^no Gemini CLI binary$
