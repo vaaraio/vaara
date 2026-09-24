@@ -35,10 +35,6 @@
 <meta property="og:image:height" content="346">
 <meta property="og:image:alt" content="Vaara">
 <meta property="og:locale" content="en_US">
-<meta property="og:video" content="https://vaara.io/vaara-launch.mp4">
-<meta property="og:video:type" content="video/mp4">
-<meta property="og:video:width" content="3420">
-<meta property="og:video:height" content="2224">
 
 <!-- Twitter / X -->
 <meta name="twitter:card" content="summary_large_image">
@@ -197,8 +193,6 @@
     html:not([data-theme]) .theme-toggle .i-sun{display:block}
   }
   /* Launch video, sits under the problem paragraph. */
-  .hero-video { margin: 0 0 40px; border: 1px solid var(--line); border-radius: 12px; overflow: hidden; background: var(--panel-2); line-height: 0; }
-  .hero-video video { width: 100%; height: auto; display: block; }
   /* Wordmark swaps with the theme: light-bg mark by default, dark-bg mark in dark. */
   .wordmark .wm-dark { display: none; }
   html[data-theme="dark"] .wordmark .wm-light { display: none; }
@@ -314,18 +308,6 @@
       "inLanguage": "en"
     },
     {
-      "@type": "VideoObject",
-      "name": "Vaara Launch Demo",
-      "description": "Demonstration of Vaara menu-bar app showing AI agent governance in real-time",
-      "thumbnailUrl": "https://vaara.io/vaara-poster.jpg",
-      "uploadDate": "2026-07-22",
-      "contentUrl": "https://vaara.io/vaara-launch.mp4",
-      "embedUrl": "https://vaara.io/vaara-launch.mp4",
-      "duration": "PT24S",
-      "width": "3420",
-      "height": "2224"
-    },
-    {
       "@type": "FAQPage",
       "mainEntity": [
         {
@@ -406,10 +388,6 @@
 <h1>Stop an AI agent before it acts, and hold proof of every decision that anyone can check.</h1>
 <p style="text-align:center;max-width:60ch;margin:0 auto 1rem;opacity:.82;line-height:1.5;">Vaara sits in front of your agents and decides, on every single tool call, whether it runs: allow, block, or escalate to a human. Each of those decisions leaves a signed record. When someone who does not trust you asks what your agent did and why, you hand them the record instead of your word. Your own logs will not settle it, because you could have edited them.</p>
 <p style="text-align:center;max-width:62ch;margin:0 auto 1.6rem;font-size:15px;color:var(--muted);line-height:1.5;">From 9 December 2026 the EU Product Liability Directive treats software and AI as products under strict liability, and Article 10 lets a court presume your product defective if you cannot disclose the evidence. The burden of proof moves to you. This is the artifact that answers it.</p>
-<div class="hero-video">
-  <video src="/vaara-launch.mp4" poster="/vaara-poster.jpg" autoplay muted loop playsinline preload="metadata" aria-label="Vaara launch demo">
-  </video>
-</div>
 <p class="stance">Open source. No SaaS. No telemetry. No signup.</p>
 <div class="evidence">
   <div class="evidence-head">
