@@ -187,18 +187,31 @@ def _match_named(
     return None
 
 
-def _string_leaves(value: Any, depth: int = 0):
-    """Every string in a JSON-shaped value, nested dicts and lists included."""
+def _string_leaves(value: Any, depth: int = 0, key: str = ""):
+    """Every string in a JSON-shaped value with the dict key it sits under,
+    nested dicts and lists included. A list item keeps its list's key."""
     if depth > 8:
         return
     if isinstance(value, str):
-        yield value
+        yield key, value
     elif isinstance(value, dict):
-        for v in value.values():
-            yield from _string_leaves(v, depth + 1)
+        for k, v in value.items():
+            yield from _string_leaves(v, depth + 1, str(k))
     elif isinstance(value, (list, tuple)):
         for v in value:
-            yield from _string_leaves(v, depth + 1)
+            yield from _string_leaves(v, depth + 1, key)
+
+
+#: Rule fields that hold a file path. A rule reading only these is a path
+#: rule: its pattern describes a path, not a command or written content.
+_PATH_FIELDS = frozenset({"file_path", "notebook_path", "uri"})
+
+_PATH_KEY = re.compile(r"path|file|dir|dest|target|uri|location", re.I)
+
+
+def _path_shaped(key: str, text: str) -> bool:
+    """An argument that is a path: under a path-like key, or one token."""
+    return bool(_PATH_KEY.search(key)) or not any(c.isspace() for c in text)
 
 
 def match_deny_rule_any_field(
@@ -207,7 +220,10 @@ def match_deny_rule_any_field(
     """First (rule_id, message) whose pattern matches any string argument.
 
     Tool name is ignored. ``match_any`` rules are skipped: without a known
-    tool name there is nothing for them to name.
+    tool name there is nothing for them to name. A path rule reads only
+    path-shaped arguments: run over every string, it fired on a note that
+    merely mentioned a harness config file (2026-09-23, a memory save refused
+    as ``harness_config_write``). Shell and content rules read every string.
     """
     leaves = list(_string_leaves(tool_input))
     if not leaves:
@@ -218,7 +234,11 @@ def match_deny_rule_any_field(
         regex = _compiled(rule)
         if regex is None:
             continue
-        for text in leaves:
+        fields = rule.get("fields") or []
+        path_rule = bool(fields) and set(fields) <= _PATH_FIELDS
+        for key, text in leaves:
+            if path_rule and not _path_shaped(key, text):
+                continue
             if regex.search(text):
                 return rule.get("id", "unknown"), rule.get("message", "deny rule matched")
     return None
