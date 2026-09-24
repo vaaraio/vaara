@@ -229,8 +229,8 @@ def test_init_writes_codex_hooks_and_reports_them_untrusted(tmp_path, monkeypatc
     assert report.codex_hooks == d / "hooks.json"
     assert report.codex_changed is True
     assert report.codex_trust in ("untrusted", "unknown")
-    assert "NOT governed" in ig.codex_trust_line(report.codex_trust) or \
-        report.codex_trust == "unknown"
+    [row] = [r for r in ig.coverage(report) if r.name == "Codex"]
+    assert row.state == "NOT governed"
     ung = ig.run_ungovern(settings_path=tmp_path / "s.json", service_home=tmp_path,
                           service_system="linux", service_runner=lambda c, **k: None,
                           opencode_dir=tmp_path / "no-opencode",

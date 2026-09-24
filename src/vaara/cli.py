@@ -4941,8 +4941,6 @@ def _cmd_init(args: argparse.Namespace) -> int:
     if report.codex_hooks is not None:
         state = "written" if report.codex_changed else "already current"
         print(f"Codex hooks {state} at {report.codex_hooks}")
-        if report.codex_trust != "trusted":
-            print(f"  {ig.codex_trust_line(report.codex_trust)}")
     else:
         print("Codex: not found")
     print(f"Trail: {report.trail_db}")
@@ -4964,10 +4962,26 @@ def _cmd_init(args: argparse.Namespace) -> int:
     for warning in report.warnings:
         print(f"  warning: {warning}", file=sys.stderr)
 
+    rows = ig.coverage(report)
+    print()
+    print("Agents on this machine:")
+    for row in rows:
+        print(f"  {row.name:<15}{row.state}: {row.detail}")
+    if not rows:
+        print("  none found. Claude Code's hooks are in place for when it is installed.")
+
     print()
     govern_mode = "shadow (observing)" if args.shadow or args.auto else "enforcing"
     mode_label = f" | Mode: {args.mode}" if hasattr(args, 'mode') and args.auto else ""
-    print(f"Vaara is governing. {govern_mode}{mode_label}")
+    short = [row.name for row in rows if row.state != "governed"]
+    if not rows:
+        print(f"Vaara is set up; no agent found yet. {govern_mode}{mode_label}")
+    elif short:
+        print(f"Vaara is governing {len(rows) - len(short)} of {len(rows)} agents found. "
+              f"{govern_mode}{mode_label}")
+        print(f"Not fully governed: {', '.join(short)}")
+    else:
+        print(f"Vaara is governing every agent found. {govern_mode}{mode_label}")
     print("Reverse with: vaara ungovern")
     return 0
 
