@@ -243,6 +243,38 @@ def _path_shaped(key: str, text: str) -> bool:
     return bool(_PATH_KEY.search(key)) or not any(c.isspace() for c in text)
 
 
+#: Rule fields that hold a shell command. A rule reading only these is a
+#: shell rule: its pattern describes a command line, not prose about one.
+_SHELL_FIELDS = frozenset({"command"})
+
+_COMMAND_KEY = re.compile(
+    r"command|cmd|script|shell|exec|argv|^args?$|^code$|^input$", re.I)
+
+#: A line read as a command line: env assignments, then a lowercase command
+#: name, then arguments. A word ending in sentence punctuation or starting
+#: with a capital marks prose ("The refused call was: ...").
+_COMMAND_LINE = re.compile(
+    r"\s*(?:[A-Za-z_]\w*=\S*\s+)*[a-z0-9_./~-]+"
+    r"(?:\s+(?![A-Z][a-z])\S*[^\s:,.!?])*\s*")
+
+
+def _shell_hit(regex: "re.Pattern[str]", key: str, text: str) -> bool:
+    """A shell rule hit on an argument that is a command: under a
+    command-like key, or a one-line string shaped like a command line
+    up to the match."""
+    if _COMMAND_KEY.search(key):
+        return bool(regex.search(text))
+    if "\n" in text.strip():
+        return False
+    m = regex.search(text)
+    if not m:
+        return False
+    # Judge only the command the match sits in: the text after the last
+    # shell separator before it.
+    lead = re.split(r";|&&|\|\||\||\$\(|`", text[:m.start()])[-1]
+    return lead.strip() == "" or bool(_COMMAND_LINE.fullmatch(lead))
+
+
 def match_deny_rule_any_field(
     rules: list[dict], tool_input: dict
 ) -> Optional[tuple[str, str]]:
@@ -252,7 +284,10 @@ def match_deny_rule_any_field(
     tool name there is nothing for them to name. A path rule reads only
     path-shaped arguments: run over every string, it fired on a note that
     merely mentioned a harness config file (2026-09-23, a memory save refused
-    as ``harness_config_write``). Shell and content rules read every string.
+    as ``harness_config_write``). A shell rule reads only command-shaped
+    arguments, for the same reason: a memory note describing a destructive
+    command was refused as ``rm_rf_root`` (2026-09-24). Written-content rules
+    read every string.
     """
     leaves = list(_string_leaves(tool_input))
     if not leaves:
@@ -265,8 +300,13 @@ def match_deny_rule_any_field(
             continue
         fields = rule.get("fields") or []
         path_rule = bool(fields) and set(fields) <= _PATH_FIELDS
+        shell_rule = bool(fields) and set(fields) <= _SHELL_FIELDS
         for key, text in leaves:
             if path_rule and not _path_shaped(key, text):
+                continue
+            if shell_rule:
+                if _shell_hit(regex, key, text):
+                    return rule.get("id", "unknown"), rule.get("message", "deny rule matched")
                 continue
             if regex.search(text):
                 return rule.get("id", "unknown"), rule.get("message", "deny rule matched")
