@@ -469,3 +469,39 @@ jobs:
             echo "::error::The Codex test skipped, so Codex was not found."
             exit 1
           fi
+
+  gemini-e2e:
+    name: Gemini CLI governed (real binary)
+    runs-on: ubuntu-latest
+    # Runs the Gemini CLI itself against a scripted local model, with the
+    # hooks `vaara init` writes, and reads back what Gemini CLI told the
+    # model and what the trail recorded. Pinned so a Gemini CLI release that
+    # changes the hook contract fails here on purpose, when the pin is moved.
+    steps:
+      - uses: actions/checkout@9c091bb21b7c1c1d1991bb908d89e4e9dddfe3e0  # v7.0.0
+
+      - name: Set up Python 3.12
+        uses: actions/setup-python@5fda3b95a4ea91299a34e894583c3862153e4b97  # v7.0.0
+        with:
+          python-version: '3.12'
+
+      - name: Set up Node 22
+        uses: actions/setup-node@820762786026740c76f36085b0efc47a31fe5020  # v6.0.0
+        with:
+          node-version: '22'
+
+      - name: Install Vaara and Gemini CLI
+        run: |
+          pip install --require-hashes -r requirements-dev.txt
+          pip install -e . --no-deps
+          npm install -g @google/gemini-cli@0.61.0
+          gemini --version
+
+      - name: Run the Gemini CLI end-to-end test, failing on any skip
+        run: |
+          set -o pipefail
+          pytest tests/test_gemini_real_binary.py -q -rs | tee result.txt
+          if grep -qE '[0-9]+ skipped' result.txt; then
+            echo "::error::The Gemini CLI test skipped, so Gemini CLI was not found."
+            exit 1
+          fi

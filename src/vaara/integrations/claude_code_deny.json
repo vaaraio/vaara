@@ -346,7 +346,7 @@
         "file_path",
         "notebook_path"
       ],
-      "pattern": "(^|/)(\\.claude\\.json|\\.claude/(settings(\\.local)?\\.json|hooks/|skills/|agents/|plugins/|scheduled_tasks\\.json|CLAUDE\\.md)|\\.claude-plugin/|\\.vaara/(config\\.json|claude-code/)|\\.mcp\\.json$|\\.config/opencode/(opencode\\.jsonc?|plugins?/)|\\.opencode/plugins?/|\\.cursor/(hooks\\.json|hooks/|mcp\\.json)|\\.codex/(hooks\\.json|config\\.toml))",
+      "pattern": "(^|/)(\\.claude\\.json|\\.claude/(settings(\\.local)?\\.json|hooks/|skills/|agents/|plugins/|scheduled_tasks\\.json|CLAUDE\\.md)|\\.claude-plugin/|\\.vaara/(config\\.json|claude-code/)|\\.mcp\\.json$|\\.config/opencode/(opencode\\.jsonc?|plugins?/)|\\.opencode/plugins?/|\\.cursor/(hooks\\.json|hooks/|mcp\\.json)|\\.codex/(hooks\\.json|config\\.toml)|\\.gemini/settings\\.json)",
       "unless_env": "VAARA_ALLOW_HARNESS_EDIT",
       "message": "Writes the agent harness configuration (hooks, skills, settings, MCP). Set VAARA_ALLOW_HARNESS_EDIT=1 for a deliberate edit."
     },
@@ -358,7 +358,7 @@
       "fields": [
         "command"
       ],
-      "pattern": "(^|[\\s;&|])(sed\\s+-i|tee|cp|mv|rm|chmod|truncate|>+)[^|\\n]*(\\.claude\\.json|\\.claude/(settings(\\.local)?\\.json|hooks/|skills/|agents/|plugins/|scheduled_tasks\\.json|CLAUDE\\.md)|\\.claude-plugin/|\\.vaara/config|\\.mcp\\.json|\\.config/opencode/(opencode\\.jsonc?|plugins?/)|\\.opencode/plugins?/|\\.cursor/(hooks\\.json|hooks/|mcp\\.json)|\\.codex/(hooks\\.json|config\\.toml))",
+      "pattern": "(^|[\\s;&|])(sed\\s+-i|tee|cp|mv|rm|chmod|truncate|>+)[^|\\n]*(\\.claude\\.json|\\.claude/(settings(\\.local)?\\.json|hooks/|skills/|agents/|plugins/|scheduled_tasks\\.json|CLAUDE\\.md)|\\.claude-plugin/|\\.vaara/config|\\.mcp\\.json|\\.config/opencode/(opencode\\.jsonc?|plugins?/)|\\.opencode/plugins?/|\\.cursor/(hooks\\.json|hooks/|mcp\\.json)|\\.codex/(hooks\\.json|config\\.toml)|\\.gemini/settings\\.json)",
       "unless_env": "VAARA_ALLOW_HARNESS_EDIT",
       "message": "Rewrites the agent harness configuration from the shell. Set VAARA_ALLOW_HARNESS_EDIT=1 for a deliberate edit."
     },
@@ -429,7 +429,7 @@
       "fields": [
         "command"
       ],
-      "pattern": "\\b(python3?|perl|ruby|node|install|dd)\\b(?=[^|\\n]*(?:\\.claude\\.json|\\.claude/(?:settings|hooks/|skills/|agents/|plugins/|scheduled_tasks|CLAUDE\\.md)|\\.vaara/config|\\.config/opencode/(?:opencode\\.jsonc?|plugins?/)|\\.opencode/plugins?/|\\.cursor/(?:hooks\\.json|hooks/|mcp\\.json)|\\.codex/(?:hooks\\.json|config\\.toml)))(?=[^|\\n]*(?:['\\\"](?:[rwax]b?\\+|[wax][bt]?\\+?)['\\\"]|mode\\s*=\\s*['\\\"][wax+]|write|truncate|unlink|rmtree|shutil|os\\.(?:remove|rename|replace)))",
+      "pattern": "\\b(python3?|perl|ruby|node|install|dd)\\b(?=[^|\\n]*(?:\\.claude\\.json|\\.claude/(?:settings|hooks/|skills/|agents/|plugins/|scheduled_tasks|CLAUDE\\.md)|\\.vaara/config|\\.config/opencode/(?:opencode\\.jsonc?|plugins?/)|\\.opencode/plugins?/|\\.cursor/(?:hooks\\.json|hooks/|mcp\\.json)|\\.codex/(?:hooks\\.json|config\\.toml)|\\.gemini/settings\\.json))(?=[^|\\n]*(?:['\\\"](?:[rwax]b?\\+|[wax][bt]?\\+?)['\\\"]|mode\\s*=\\s*['\\\"][wax+]|write|truncate|unlink|rmtree|shutil|os\\.(?:remove|rename|replace)))",
       "unless_env": "VAARA_ALLOW_HARNESS_EDIT",
       "message": "An interpreter writes the harness or governance configuration. The shell rule names sed, tee, cp, mv, rm, chmod, truncate and redirection; python, perl, ruby, node, install and dd write the same file through none of them. Set VAARA_ALLOW_HARNESS_EDIT=1."
     },

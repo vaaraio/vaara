@@ -1,7 +1,7 @@
 """``vaara init`` names every agent it finds and says whether it is governed.
 
 It used to print what it wrote and then "Vaara is governing", whatever it
-found. An agent with no Vaara adapter (Gemini CLI, Windsurf) got no line at
+found. An agent with no Vaara adapter (Windsurf) got no line at
 all, an untrusted Codex hook was a note above the verdict, and an MCP config
 Vaara could not read was skipped without a word.
 """
@@ -31,11 +31,12 @@ def _rows(report, which=_none):
 
 def test_hook_adapters_are_governed():
     rows = _rows(_report(cursor_hooks=Path("h"), opencode_plugin=Path("p"),
-                         codex_hooks=Path("c"), codex_trust="trusted"),
+                         codex_hooks=Path("c"), codex_trust="trusted",
+                         gemini_settings=Path("g"), gemini_status="active"),
                  which=lambda b: "/bin/claude" if b == "claude" else None)
     assert {n: s for n, (s, _) in rows.items()} == {
         "Claude Code": "governed", "Cursor": "governed",
-        "OpenCode": "governed", "Codex": "governed"}
+        "OpenCode": "governed", "Codex": "governed", "Gemini CLI": "governed"}
 
 
 def test_an_untrusted_codex_hook_is_not_governed():
@@ -45,8 +46,8 @@ def test_an_untrusted_codex_hook_is_not_governed():
 
 
 def test_an_agent_with_no_adapter_is_named_as_not_governed():
-    rows = _rows(_report(), which=lambda b: "/usr/bin/gemini" if b == "gemini" else None)
-    state, detail = rows["Gemini CLI"]
+    rows = _rows(_report(), which=lambda b: "/usr/bin/windsurf" if b == "windsurf" else None)
+    state, detail = rows["Windsurf"]
     assert state == "NOT governed"
     assert "no Vaara adapter" in detail
 

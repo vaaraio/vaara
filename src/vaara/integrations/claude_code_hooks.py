@@ -199,7 +199,7 @@ def match_deny_rule(
 # runners
 
 #: The last line the runner emitted, for clients that carry the reason in
-#: their verdict (Cursor and Codex read it from stdout JSON).
+#: their verdict (Cursor, Codex and Gemini CLI read it from stdout JSON).
 _last_message = ""
 
 
@@ -354,6 +354,7 @@ _CLIENT_MODULES = {
     "opencode": "vaara.integrations.opencode",
     "cursor": "vaara.integrations.cursor",
     "codex": "vaara.integrations.codex",
+    "gemini": "vaara.integrations.gemini",
 }
 
 

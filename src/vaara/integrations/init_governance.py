@@ -141,6 +141,12 @@ class InitReport:
     codex_changed: bool = False
     codex_removed: bool = False
     codex_trust: str = "missing"
+    # Gemini CLI settings.json, the same three fields, and whether Gemini
+    # CLI will run the hook (see gemini.hook_status).
+    gemini_settings: Optional[Path] = None
+    gemini_changed: bool = False
+    gemini_removed: bool = False
+    gemini_status: str = "missing"
 
 
 def codex_trust_line(status: str) -> str:
@@ -153,6 +159,17 @@ def codex_trust_line(status: str) -> str:
     return ("until you trust the hook. Codex asks at its next start (choose "
             "\"Trust all and continue\"), or review it in /hooks. codex exec "
             "skips an untrusted hook without asking.")
+
+
+def gemini_status_line(status: str) -> str:
+    """Why Gemini CLI is not running Vaara's hook, and what to do about it."""
+    if status == "disabled":
+        return ("its hooks are turned off (hooksConfig in ~/.gemini/settings.json, "
+                "or /hooks disable). Turn them back on with /hooks enable-all.")
+    if status == "unknown":
+        return ("could not read ~/.gemini/settings.json, so the hooks were not "
+                "written.")
+    return "the hooks are not in ~/.gemini/settings.json."
 
 
 @dataclass
@@ -168,7 +185,6 @@ class Coverage:
 #: show one is installed. Listing them is the point: an agent nobody names
 #: is an agent the operator believes is governed.
 _UNADAPTED = (
-    ("Gemini CLI", ("gemini",), ("~/.gemini",)),
     ("Windsurf", ("windsurf",), ("~/.codeium/windsurf",)),
 )
 
@@ -200,6 +216,12 @@ def coverage(report: InitReport, *, which: Any = shutil.which) -> list[Coverage]
         else:
             rows.append(Coverage("Codex", "NOT governed",
                                  codex_trust_line(report.codex_trust)))
+    if report.gemini_settings is not None:
+        if report.gemini_status == "active":
+            rows.append(Coverage("Gemini CLI", "governed", every))
+        else:
+            rows.append(Coverage("Gemini CLI", "NOT governed",
+                                 gemini_status_line(report.gemini_status)))
 
     mcp = {c.name: c for c in report.clients if c.exists}
 
@@ -554,6 +576,8 @@ def run_init(
     cursor_dir: Optional[Path] = None,
     govern_codex: bool = True,
     codex_dir: Optional[Path] = None,
+    govern_gemini: bool = True,
+    gemini_dir: Optional[Path] = None,
 ) -> InitReport:
     """Set up (or self-heal) local governance in one call.
 
@@ -617,6 +641,17 @@ def run_init(
             report.codex_hooks = codex.hooks_path(codex_dir)
             report.codex_trust = codex.trust_status(codex_dir)
 
+    if govern_gemini:
+        from vaara.integrations import gemini
+
+        if gemini.detected(gemini_dir):
+            report.gemini_settings = gemini.settings_path(gemini_dir)
+            try:
+                report.gemini_changed = gemini.install_hooks(vaara_bin, gemini_dir)
+            except (OSError, ValueError) as exc:
+                report.warnings.append(f"Gemini CLI hooks not written: {exc}")
+            report.gemini_status = gemini.hook_status(gemini_dir)
+
     report.clients = detect_clients(proxy_bin)
     for client in report.clients:
         if (client.name == "Cursor" and client.governed
@@ -676,6 +711,7 @@ def run_ungovern(
     opencode_dir: Optional[Path] = None,
     cursor_dir: Optional[Path] = None,
     codex_dir: Optional[Path] = None,
+    gemini_dir: Optional[Path] = None,
 ) -> InitReport:
     """Reverse ``run_init``: remove the hooks and the OpenCode plugin, restore
     each MCP config, and take down the proxy service if one was installed."""
@@ -691,6 +727,9 @@ def run_ungovern(
     from vaara.integrations import codex
 
     report.codex_removed = codex.remove_hooks(codex_dir)
+    from vaara.integrations import gemini
+
+    report.gemini_removed = gemini.remove_hooks(gemini_dir)
     for name, raw_path in KNOWN_MCP_CLIENTS:
         path = Path(raw_path).expanduser()
         if restore_mcp_config(path):
