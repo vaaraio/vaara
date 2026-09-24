@@ -6,7 +6,7 @@ fired on any text that mentioned such a path: on 2026-09-23 a vaara-memory
 ``mem_save`` whose note named the Claude settings file and the Cursor hooks
 file was refused as ``harness_config_write``. A path rule now reads only a
 path-shaped argument, one under a path-like key or a single token with no
-whitespace. Shell and written-content rules still read every argument.
+whitespace. Written-content rules still read every argument.
 
 Paths are assembled at runtime: a governed session writing this file would
 otherwise trip the rules under test.
@@ -59,11 +59,13 @@ def test_a_prose_argument_under_a_path_key_is_still_read(rules):
     assert match_deny_rule_any_field(rules, {"file": BASHRC})[0] == "shell_rc_persistence"
 
 
-def test_shell_and_content_rules_still_read_every_argument(rules):
+def test_written_content_rules_still_read_every_argument(rules):
+    # Shell rules read commands only (tests/test_shell_rules_read_commands_not_prose.py);
+    # the written-content rule still reads prose.
     assert match_deny_rule_any_field(
-        rules, {"note": f"run this: {PIPE_TO_SHELL}"})[0] == "remote_pipe_to_shell"
+        rules, {"note": f"run this: {PIPE_TO_SHELL}"})[0] == "written_remote_pipe_to_shell"
     assert match_deny_rule_any_field(
-        rules, {"body": "x\n" + PIPE_TO_SHELL + "\n"})[0] == "remote_pipe_to_shell"
+        rules, {"body": "x\n" + PIPE_TO_SHELL + "\n"})[0] == "written_remote_pipe_to_shell"
 
 
 def test_the_hook_lets_the_memory_save_through(tmp_path, monkeypatch):
