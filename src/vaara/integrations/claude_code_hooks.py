@@ -199,7 +199,7 @@ def match_deny_rule(
 # runners
 
 #: The last line the runner emitted, for clients that carry the reason in
-#: their verdict (Cursor reads it from stdout JSON, not stderr).
+#: their verdict (Cursor and Codex read it from stdout JSON).
 _last_message = ""
 
 
@@ -353,6 +353,7 @@ def _ungovernable(cfg: dict, tool_name: str, reason: str) -> int:
 _CLIENT_MODULES = {
     "opencode": "vaara.integrations.opencode",
     "cursor": "vaara.integrations.cursor",
+    "codex": "vaara.integrations.codex",
 }
 
 
@@ -402,7 +403,8 @@ def _render(render: Optional[str], code: int) -> int:
     if module is None or not hasattr(module, "render_pre"):
         return code
     out, code = module.render_pre(code, _last_message)
-    print(out, flush=True)
+    if out:
+        print(out, flush=True)
     return code
 
 

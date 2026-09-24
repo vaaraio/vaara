@@ -41,6 +41,9 @@ if not os.environ.get("VAARA_TEST_USE_REAL_HOME"):
     # OpenCode's config directory follows XDG_CONFIG_HOME before HOME, and
     # `vaara init` installs a plugin there.
     os.environ["XDG_CONFIG_HOME"] = str(_sandbox / ".config")
+    # Codex's home follows CODEX_HOME before HOME, and `vaara init` writes
+    # hooks there.
+    os.environ["CODEX_HOME"] = str(_sandbox / ".codex")
     # Anything reading the trail path from the environment follows the same
     # sandbox rather than the operator's file.
     os.environ.setdefault("VAARA_DB", str(_sandbox / ".vaara" / "test-audit.db"))

@@ -346,7 +346,7 @@
         "file_path",
         "notebook_path"
       ],
-      "pattern": "(^|/)(\\.claude\\.json|\\.claude/(settings(\\.local)?\\.json|hooks/|skills/|agents/|plugins/|scheduled_tasks\\.json|CLAUDE\\.md)|\\.claude-plugin/|\\.vaara/(config\\.json|claude-code/)|\\.mcp\\.json$|\\.config/opencode/(opencode\\.jsonc?|plugins?/)|\\.opencode/plugins?/|\\.cursor/(hooks\\.json|hooks/|mcp\\.json))",
+      "pattern": "(^|/)(\\.claude\\.json|\\.claude/(settings(\\.local)?\\.json|hooks/|skills/|agents/|plugins/|scheduled_tasks\\.json|CLAUDE\\.md)|\\.claude-plugin/|\\.vaara/(config\\.json|claude-code/)|\\.mcp\\.json$|\\.config/opencode/(opencode\\.jsonc?|plugins?/)|\\.opencode/plugins?/|\\.cursor/(hooks\\.json|hooks/|mcp\\.json)|\\.codex/(hooks\\.json|config\\.toml))",
       "unless_env": "VAARA_ALLOW_HARNESS_EDIT",
       "message": "Writes the agent harness configuration (hooks, skills, settings, MCP). Set VAARA_ALLOW_HARNESS_EDIT=1 for a deliberate edit."
     },
@@ -358,7 +358,7 @@
       "fields": [
         "command"
       ],
-      "pattern": "(^|[\\s;&|])(sed\\s+-i|tee|cp|mv|rm|chmod|truncate|>+)[^|\\n]*(\\.claude\\.json|\\.claude/(settings(\\.local)?\\.json|hooks/|skills/|agents/|plugins/|scheduled_tasks\\.json|CLAUDE\\.md)|\\.claude-plugin/|\\.vaara/config|\\.mcp\\.json|\\.config/opencode/(opencode\\.jsonc?|plugins?/)|\\.opencode/plugins?/|\\.cursor/(hooks\\.json|hooks/|mcp\\.json))",
+      "pattern": "(^|[\\s;&|])(sed\\s+-i|tee|cp|mv|rm|chmod|truncate|>+)[^|\\n]*(\\.claude\\.json|\\.claude/(settings(\\.local)?\\.json|hooks/|skills/|agents/|plugins/|scheduled_tasks\\.json|CLAUDE\\.md)|\\.claude-plugin/|\\.vaara/config|\\.mcp\\.json|\\.config/opencode/(opencode\\.jsonc?|plugins?/)|\\.opencode/plugins?/|\\.cursor/(hooks\\.json|hooks/|mcp\\.json)|\\.codex/(hooks\\.json|config\\.toml))",
       "unless_env": "VAARA_ALLOW_HARNESS_EDIT",
       "message": "Rewrites the agent harness configuration from the shell. Set VAARA_ALLOW_HARNESS_EDIT=1 for a deliberate edit."
     },
@@ -429,7 +429,7 @@
       "fields": [
         "command"
       ],
-      "pattern": "\\b(python3?|perl|ruby|node|install|dd)\\b(?=[^|\\n]*(?:\\.claude\\.json|\\.claude/(?:settings|hooks/|skills/|agents/|plugins/|scheduled_tasks|CLAUDE\\.md)|\\.vaara/config|\\.config/opencode/(?:opencode\\.jsonc?|plugins?/)|\\.opencode/plugins?/|\\.cursor/(?:hooks\\.json|hooks/|mcp\\.json)))(?=[^|\\n]*(?:['\\\"](?:[rwax]b?\\+|[wax][bt]?\\+?)['\\\"]|mode\\s*=\\s*['\\\"][wax+]|write|truncate|unlink|rmtree|shutil|os\\.(?:remove|rename|replace)))",
+      "pattern": "\\b(python3?|perl|ruby|node|install|dd)\\b(?=[^|\\n]*(?:\\.claude\\.json|\\.claude/(?:settings|hooks/|skills/|agents/|plugins/|scheduled_tasks|CLAUDE\\.md)|\\.vaara/config|\\.config/opencode/(?:opencode\\.jsonc?|plugins?/)|\\.opencode/plugins?/|\\.cursor/(?:hooks\\.json|hooks/|mcp\\.json)|\\.codex/(?:hooks\\.json|config\\.toml)))(?=[^|\\n]*(?:['\\\"](?:[rwax]b?\\+|[wax][bt]?\\+?)['\\\"]|mode\\s*=\\s*['\\\"][wax+]|write|truncate|unlink|rmtree|shutil|os\\.(?:remove|rename|replace)))",
       "unless_env": "VAARA_ALLOW_HARNESS_EDIT",
       "message": "An interpreter writes the harness or governance configuration. The shell rule names sed, tee, cp, mv, rm, chmod, truncate and redirection; python, perl, ruby, node, install and dd write the same file through none of them. Set VAARA_ALLOW_HARNESS_EDIT=1."
     },
@@ -456,6 +456,18 @@
       "pattern": "\\b(python3?|perl|ruby|node)\\b(?=[^|\\n]*(?:urlopen|urllib|requests\\.(?:post|put|get)|http\\.client|socket\\.socket|net\\.connect|fetch\\())",
       "unless_env": "VAARA_ALLOW_EGRESS",
       "message": "An interpreter one-liner opens an outbound connection. No shell rule reads inside a -c string. Set VAARA_ALLOW_EGRESS=1."
+    },
+    {
+      "id": "interactive_shell_session",
+      "tools": [
+        "Bash"
+      ],
+      "fields": [
+        "command"
+      ],
+      "pattern": "(?:^|;|&&|\\|\\|)\\s*(?:exec\\s+|sudo\\s+(?:-[A-Za-z]+\\s+)*|env\\s+(?:[A-Za-z_]\\w*=\\S*\\s+)*)*(?:\\S*/)?(?:(?:ba|z|da|k|mk|fi|c|tc|y)?sh|python[0-9.]*|ipython[0-9]*|node(?:js)?|bun|deno|ruby|irb|perl|php|lua|julia|tmux|screen|script|su)(?:\\s+(?:-[ilsuqEB]+|--(?:login|norc|noprofile|interactive|posix|quiet)|-))*\\s*$|^\\s*sudo\\s+-[is]\\s*$|^\\s*ssh(?:\\s+-[A-Za-z]+)*\\s+[\\w.@-]+\\s*$",
+      "unless_env": "VAARA_ALLOW_INTERACTIVE_SHELL",
+      "message": "Starts a bare interactive shell or interpreter. Codex types into a running session through write_stdin, which runs no hook, so nothing typed there could be checked or recorded. Run the command itself instead. Set VAARA_ALLOW_INTERACTIVE_SHELL=1 to allow."
     }
   ]
 }

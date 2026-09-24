@@ -6,7 +6,7 @@ Runtime tool-call governance for Claude Code. Wires the [Vaara](https://github.c
 
 PreToolUse runs a two-layer check before Claude executes a tool:
 
-**Layer 1: regex deny patterns** (38 rules over 18 tools: `Bash`, `WebFetch`, `Read`, `Write`, `Edit`, `NotebookEdit`, the agent's meta-actions, and the MCP resource readers; `mcp__*` calls are matched by content). A JSON deny-list (`policies/default_deny.json`) catches known-bad shapes on the shell and web surface: AWS / GCP / Azure metadata IPs, `/etc/shadow` reads, `curl | sh`, `rm -rf /`, fork bombs, `dd` to raw block devices, history purges, reverse shells, base64-piped exec, `~/.ssh/authorized_keys` writes.
+**Layer 1: regex deny patterns** (39 rules over 18 tools: `Bash`, `WebFetch`, `Read`, `Write`, `Edit`, `NotebookEdit`, the agent's meta-actions, and the MCP resource readers; `mcp__*` calls are matched by content). A JSON deny-list (`policies/default_deny.json`) catches known-bad shapes on the shell and web surface: AWS / GCP / Azure metadata IPs, `/etc/shadow` reads, `curl | sh`, `rm -rf /`, fork bombs, `dd` to raw block devices, history purges, reverse shells, base64-piped exec, `~/.ssh/authorized_keys` writes.
 
 The same layer covers the file surface, because an agent that cannot run `curl | sh` can still write it to a file: shell startup files (`.bashrc`, `.zshrc`, `.profile`), `~/.ssh/authorized_keys`, `/etc/shadow` and `/etc/sudoers`, git hooks, cron paths, launchd and systemd units, and file content carrying a remote-pipe-to-shell or reverse-shell payload. A match is a hard deny: fast, deterministic, no ML.
 
