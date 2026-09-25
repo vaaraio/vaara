@@ -1262,7 +1262,14 @@ class SQLiteAuditBackend:
                 head = self._chain_head_locked()
                 stamp(head)
                 self._insert_record(record)
-            return head
+        # The first record this process writes lists the trail in
+        # ~/.vaara/sources.json, which is where the macOS app looks.
+        if not getattr(self, "_registered", False):
+            self._registered = True
+            from vaara.audit import sources
+
+            sources.register(self._db_path)
+        return head
 
     # ── Read path ─────────────────────────────────────────────────
 
