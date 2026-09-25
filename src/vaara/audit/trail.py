@@ -64,6 +64,7 @@ class EventType(str, Enum):
     KEY_LIFECYCLE = "key_lifecycle"         # Signing-key custodian rotated/revoked/added
     DISCLOSURE_RECORDED = "disclosure_recorded"  # EU AI Act Art 50 transparency disclosure
     ACCESS_RECORDED = "access_recorded"     # Something was opened, and by whom
+    AGENT_SEEN = "agent_seen"               # vaara scan --watch saw an agent start
 
 
 # ── Regulatory article mappings ───────────────────────────────────────────
@@ -290,6 +291,11 @@ TRANSPARENCY_DEFAULTS: dict[EventType, dict[str, str]] = {
         # itself become a second copy of patient data.
         "data_usage": "returned_set_digest",
         "decision_making": "n/a",
+    },
+    EventType.AGENT_SEEN: {
+        "system_operation": "agent_discovery",
+        "data_usage": "process_table+connections",
+        "decision_making": "adapter_match",
     },
 }
 
@@ -1283,6 +1289,39 @@ class AuditTrail:
             data={"result_summary": self._cap_record_dict_bytes(
                 safe_result, self._MAX_EXECUTION_RESULT_JSON_BYTES
             )},
+            tenant_id=self._tenant_for(action_id),
+        ))
+
+    def record_agent_seen(
+        self,
+        agent: str,
+        state: str,
+        detail: str,
+        pid: int,
+        command: str = "",
+    ) -> None:
+        """Record that ``vaara scan --watch`` saw an AI agent process start.
+
+        ``state`` is ``governed``, ``reachable`` or ``ungoverned`` as
+        :mod:`vaara.integrations.scan` defines them. The watcher writes these
+        to a trail of its own, so an engine older than this event type never
+        loads one.
+        """
+        action_id = str(uuid.uuid4())
+        self._append(AuditRecord(
+            record_id=str(uuid.uuid4()),
+            action_id=action_id,
+            event_type=EventType.AGENT_SEEN,
+            timestamp=time.time(),
+            agent_id=self._cap_record_str(agent, self._MAX_AGENT_ID_LEN),
+            tool_name="",
+            data={
+                "state": self._cap_record_str(state, self._MAX_DECISION_LABEL_LEN),
+                "detail": self._cap_record_str(detail, self._MAX_DECISION_REASON_LEN),
+                "pid": int(pid),
+                "command": self._cap_record_str(command, self._MAX_DECISION_REASON_LEN),
+            },
+            regulatory_articles=[],
             tenant_id=self._tenant_for(action_id),
         ))
 
