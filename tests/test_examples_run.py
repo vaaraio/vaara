@@ -9,6 +9,7 @@ in this list.
 """
 from __future__ import annotations
 
+import os
 import subprocess
 import sys
 from pathlib import Path
@@ -35,9 +36,16 @@ def test_example_runs(path, needs, reason, tmp_path):
                 module, reason="attestation extra not installed (pip install 'vaara[attestation]')")
         else:
             pytest.importorskip(module, reason=reason)
+    env = {"HOME": str(tmp_path), "PATH": "/usr/bin:/bin"}
+    # Run the example against the code under test, not whatever vaara the
+    # interpreter has installed (a worktree run sets PYTHONPATH).
+    if "PYTHONPATH" in os.environ:
+        env["PYTHONPATH"] = os.pathsep.join(
+            os.path.abspath(p) for p in os.environ["PYTHONPATH"].split(os.pathsep) if p
+        )
     proc = subprocess.run(
         [sys.executable, str(ROOT / path)],
-        cwd=tmp_path, env={"HOME": str(tmp_path), "PATH": "/usr/bin:/bin"},
+        cwd=tmp_path, env=env,
         capture_output=True, text=True, timeout=180,
     )
     output = proc.stdout + proc.stderr

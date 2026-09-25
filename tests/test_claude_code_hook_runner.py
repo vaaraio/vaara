@@ -36,6 +36,14 @@ def _run_hook(args, event: dict, home: Path, extra_env: dict | None = None):
         "VAARA_PLUGIN_SHADOW": "0",
         **(extra_env or {}),
     }
+    # The hook must run the code under test. Without this, a run with
+    # PYTHONPATH pointing at a checkout (a worktree, a release tree) has the
+    # subprocess import whatever vaara the interpreter has installed, while
+    # the responder thread in this process signs with the checkout's code.
+    if "PYTHONPATH" in os.environ:
+        env["PYTHONPATH"] = os.pathsep.join(
+            os.path.abspath(p) for p in os.environ["PYTHONPATH"].split(os.pathsep) if p
+        )
     return subprocess.run(
         [sys.executable, "-c",
          "import sys; from vaara.cli import main; sys.exit(main(sys.argv[1:]))",

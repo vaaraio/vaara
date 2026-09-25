@@ -317,6 +317,14 @@ class InterceptionPipeline:
             str, tuple[float, dict[str, float]]
         ] = OrderedDict()
         self._pending_outcomes_lock = threading.Lock()
+        # action_id -> (agent_id, tool_name) for the pending entries that also
+        # reached the database. For those the database row is the claim: only
+        # the caller whose DELETE removes it may record the outcome, so two
+        # threads or two processes cannot both write one.
+        self._pending_in_db: dict[str, tuple[str, str]] = {}
+        # Serialises resolve_escalation's "already resolved?" check with its
+        # write, so two concurrent resolvers cannot both pass the check.
+        self._resolve_lock = threading.Lock()
 
         # Delegated-privilege attenuation: action_id -> the capability grant
         # under which that action ran. A child action carrying its own grant
@@ -812,7 +820,16 @@ class InterceptionPipeline:
         # When the trail has a SQLite backend, persist to database for
         # cross-process tracking (vaara check in one process, vaara outcome
         # in another). Always keep in-memory dict as fallback for tests.
-        backend = getattr(self.trail, "_backend", None)
+        #
+        # Only an action that can run gets an outcome slot: allowed, any
+        # decision in shadow mode (the caller is told allowed=True), or an
+        # escalation, which runs if a reviewer approves it. A denied action
+        # under enforcement never ran, and an outcome reported for it would
+        # teach the scorer and the calibration set a result that never
+        # happened.
+        can_run = allowed or not self._enforce or decision_str == "escalate"
+        backend = getattr(self.trail, "_backend", None) if can_run else None
+        in_db = False
         if backend is not None:
             try:
                 backend.store_pending_outcome(
@@ -822,17 +839,21 @@ class InterceptionPipeline:
                     risk_score=point_estimate,
                     signals=signals,
                 )
+                in_db = True
             except Exception:
                 logger.exception(
                     "backend.store_pending_outcome failed for action_id=%s; "
                     "falling back to in-memory dict",
                     action_id,
                 )
-                backend = None
-        with self._pending_outcomes_lock:
-            self._pending_outcomes[action_id] = (point_estimate, signals)
-            if len(self._pending_outcomes) > _MAX_PENDING_OUTCOMES:
-                self._pending_outcomes.popitem(last=False)
+        if can_run:
+            with self._pending_outcomes_lock:
+                self._pending_outcomes[action_id] = (point_estimate, signals)
+                if in_db:
+                    self._pending_in_db[action_id] = (agent_id, tool_name)
+                if len(self._pending_outcomes) > _MAX_PENDING_OUTCOMES:
+                    evicted, _ = self._pending_outcomes.popitem(last=False)
+                    self._pending_in_db.pop(evicted, None)
 
         elapsed_ms = (time.monotonic() - start) * 1000
 
@@ -898,36 +919,19 @@ class InterceptionPipeline:
         - Updates conformal calibration set
         - Records outcome in the audit trail
         """
-        # Peek rather than pop: if the audit-trail lookup below fails
-        # (transient backend error, partially-initialised trail on reload,
-        # caller race), a pop-first ordering destroys the pending entry so
-        # a retry with the same action_id becomes a silent no-op and the
-        # MWU/conformal learning signal is lost permanently. Only remove
-        # the entry once we've confirmed we can complete the outcome write.
-        #
-        # Cross-process support: when the in-memory dict doesn't have the
-        # pending outcome, check the database (if a backend is available).
-        # This allows vaara check in one process and vaara outcome in another.
-        with self._pending_outcomes_lock:
-            pending = self._pending_outcomes.get(action_id)
-        if pending is None:
-            backend = getattr(self.trail, "_backend", None)
-            if backend is not None:
-                try:
-                    db_entry = backend.get_pending_outcome(action_id)
-                    if db_entry is not None:
-                        pending = (db_entry["risk_score"], db_entry["signals"])
-                        # Restore to in-memory dict so subsequent lookups are fast
-                        with self._pending_outcomes_lock:
-                            self._pending_outcomes[action_id] = pending
-                except Exception:
-                    logger.exception(
-                        "backend.get_pending_outcome failed for action_id=%s",
-                        action_id,
-                    )
-        if pending is None:
+        # Claim first, write second. The claim is atomic: the in-memory
+        # entry is popped under the lock, and when the entry also lives in
+        # the database, the DELETE of its row decides. Only the claimant
+        # records, so two concurrent reports (threads, or `vaara outcome` in
+        # two processes) cannot both append an OUTCOME_RECORDED. A peek-then-
+        # pop ordering let both callers through (2026-09-26). If a later step
+        # fails the claim is put back, so a retry with the same action_id
+        # still works and the learning signal is not lost.
+        claim = self._claim_pending_outcome(action_id)
+        if claim is None:
             logger.warning("No pending outcome for action_id=%s", action_id)
             return
+        pending, db_ident = claim
 
         # Clamp severity to [0, 1]. MWU and conformal both assume this
         # range; out-of-range values would corrupt weight updates and
@@ -965,6 +969,7 @@ class InterceptionPipeline:
         trail = self.trail.get_action_trail(action_id)
         if not trail:
             logger.warning("No audit trail for action_id=%s", action_id)
+            self._restore_pending_outcome(action_id, pending, db_ident)
             return
 
         agent_id = trail[0].agent_id
@@ -973,16 +978,11 @@ class InterceptionPipeline:
         # Ordering matters for crash/error recovery:
         #   1. Trail write is authoritative for regulators — record it
         #      first so a later scorer failure never strands an outcome
-        #      out of the audit log.
+        #      out of the audit log. On failure the claim is restored for
+        #      a retry.
         #   2. Scorer update is best-effort — if it raises (corrupt
         #      bundle, malformed signals), log and continue; the audit
         #      record already exists and MWU divergence is advisory.
-        #   3. Pop last so that a failure on step 1 leaves the pending
-        #      entry in place for a retry. Popping earlier risks losing
-        #      both the learning signal and the audit record.
-        # Pre-pop-only-after-confirm (Loop 36) kept the pending entry
-        # safe on trail-read failure; this adds the same discipline on
-        # trail-WRITE failure and scorer-update failure.
         description = _cap_str(
             description, _MAX_OUTCOME_DESCRIPTION_LEN, "description"
         )
@@ -1001,6 +1001,7 @@ class InterceptionPipeline:
                 "pending entry preserved for retry",
                 action_id,
             )
+            self._restore_pending_outcome(action_id, pending, db_ident)
             return
 
         try:
@@ -1018,23 +1019,96 @@ class InterceptionPipeline:
                 action_id,
             )
 
-        # Both writes attempted — remove from both database and in-memory dict.
-        # A second report_outcome call after a successful trail write would
-        # otherwise append a duplicate OUTCOME_RECORDED row, inflating
-        # Article 72(1) post-market monitoring evidence.
+        with self._metrics_lock:
+            self._metrics.total_outcome_reports += 1
+
+    def _claim_pending_outcome(
+        self, action_id: str,
+    ) -> Optional[tuple[tuple[float, dict[str, float]], Optional[tuple[str, str]]]]:
+        """Take the pending outcome for ``action_id``, or None if another
+        caller already took it or none exists.
+
+        Returns ``(pending, db_ident)``; ``db_ident`` is ``(agent_id,
+        tool_name)`` when the claim removed a database row, so a restore
+        can write it back.
+        """
+        with self._pending_outcomes_lock:
+            pending = self._pending_outcomes.pop(action_id, None)
+            db_ident = self._pending_in_db.pop(action_id, None)
         backend = getattr(self.trail, "_backend", None)
-        if backend is not None:
+        if pending is not None and db_ident is None:
+            # Held in memory only (the database write failed at intercept, a
+            # caller placed the entry by hand, or there is no backend): the
+            # pop above was the claim. A row with the same id, if any, is
+            # cleared so it cannot be claimed a second time.
+            if backend is not None:
+                try:
+                    backend.remove_pending_outcome(action_id)
+                except Exception:
+                    logger.exception(
+                        "backend.remove_pending_outcome failed for action_id=%s",
+                        action_id,
+                    )
+            return pending, None
+        if backend is None:
+            return (pending, None) if pending is not None else None
+        # Cross-process support: an entry another process stored lives only
+        # in the database (vaara check in one process, vaara outcome in
+        # another).
+        try:
+            if pending is None:
+                db_entry = backend.get_pending_outcome(action_id)
+                if db_entry is None:
+                    return None
+                pending = (db_entry["risk_score"], db_entry["signals"])
+                db_ident = (db_entry["agent_id"], db_entry["tool_name"])
+            if not backend.remove_pending_outcome(action_id):
+                # Another thread or process deleted the row first: it owns
+                # this outcome.
+                return None
+        except Exception:
+            logger.exception(
+                "backend pending-outcome claim failed for action_id=%s",
+                action_id,
+            )
+            if db_ident is not None and pending is not None:
+                # The row is still there; put the memory entry back and let
+                # a retry claim it once the database answers.
+                self._restore_pending_outcome(action_id, pending, None)
+                with self._pending_outcomes_lock:
+                    self._pending_in_db[action_id] = db_ident
+            return None
+        return pending, db_ident
+
+    def _restore_pending_outcome(
+        self,
+        action_id: str,
+        pending: tuple[float, dict[str, float]],
+        db_ident: Optional[tuple[str, str]],
+    ) -> None:
+        """Undo a claim after a failed write, so a retry can succeed."""
+        restored_in_db = False
+        backend = getattr(self.trail, "_backend", None)
+        if db_ident is not None and backend is not None:
             try:
-                backend.remove_pending_outcome(action_id)
+                backend.store_pending_outcome(
+                    action_id=action_id,
+                    agent_id=db_ident[0],
+                    tool_name=db_ident[1],
+                    risk_score=pending[0],
+                    signals=pending[1],
+                )
+                restored_in_db = True
             except Exception:
                 logger.exception(
-                    "backend.remove_pending_outcome failed for action_id=%s",
+                    "backend.store_pending_outcome failed restoring action_id=%s; "
+                    "kept in memory only",
                     action_id,
                 )
         with self._pending_outcomes_lock:
-            self._pending_outcomes.pop(action_id, None)
-        with self._metrics_lock:
-            self._metrics.total_outcome_reports += 1
+            self._pending_outcomes[action_id] = pending
+            if restored_in_db:
+                self._pending_in_db[action_id] = db_ident  # type: ignore[assignment]
 
     def resolve_escalation(
         self,
@@ -1083,83 +1157,93 @@ class InterceptionPipeline:
         else:
             resolution = normalized
 
-        trail = self.trail.get_action_trail(action_id)
-        if not trail:
-            logger.warning("No audit trail for action_id=%s", action_id)
-            return
+        # The check below and the write at the end run under one lock: two
+        # resolvers reading "not resolved yet" at the same moment would
+        # otherwise both write ESCALATION_RESOLVED (2026-09-26).
+        with self._resolve_lock:
+            trail = self.trail.get_action_trail(action_id)
+            if not trail:
+                logger.warning("No audit trail for action_id=%s", action_id)
+                return
 
-        # Require a prior ESCALATION_SENT and reject duplicate resolutions.
-        # Without these guards an ESCALATION_RESOLVED record could appear
-        # without a matching ESCALATION_SENT (e.g., caller misuse, race
-        # where the initial decision was allow/deny), or a second
-        # resolution could silently overwrite the first in auditor-facing
-        # narratives. Both break Article 14(3)(a) evidence — the regulator
-        # dashboard assumes 1-to-1 sent/resolved pairing.
-        from vaara.audit.trail import EventType  # local import: avoid cycle
-        has_escalation = any(
-            r.event_type == EventType.ESCALATION_SENT for r in trail
-        )
-        already_resolved = any(
-            r.event_type == EventType.ESCALATION_RESOLVED for r in trail
-        )
-        if not has_escalation:
-            logger.warning(
-                "resolve_escalation called for action_id=%s that was never "
-                "escalated — ignoring to preserve trail integrity",
-                action_id,
+            # Require a prior ESCALATION_SENT and reject duplicate resolutions.
+            # Without these guards an ESCALATION_RESOLVED record could appear
+            # without a matching ESCALATION_SENT (e.g., caller misuse, race
+            # where the initial decision was allow/deny), or a second
+            # resolution could silently overwrite the first in auditor-facing
+            # narratives. Both break Article 14(3)(a) evidence — the regulator
+            # dashboard assumes 1-to-1 sent/resolved pairing.
+            from vaara.audit.trail import EventType  # local import: avoid cycle
+            has_escalation = any(
+                r.event_type == EventType.ESCALATION_SENT for r in trail
             )
-            return
-        if already_resolved:
-            logger.warning(
-                "resolve_escalation called twice for action_id=%s — ignoring "
-                "the second resolution; record a POLICY_OVERRIDE instead to "
-                "reverse a prior resolution",
-                action_id,
+            already_resolved = any(
+                r.event_type == EventType.ESCALATION_RESOLVED for r in trail
             )
-            return
+            if not has_escalation:
+                logger.warning(
+                    "resolve_escalation called for action_id=%s that was never "
+                    "escalated — ignoring to preserve trail integrity",
+                    action_id,
+                )
+                return
+            if already_resolved:
+                logger.warning(
+                    "resolve_escalation called twice for action_id=%s — ignoring "
+                    "the second resolution; record a POLICY_OVERRIDE instead to "
+                    "reverse a prior resolution",
+                    action_id,
+                )
+                return
 
-        agent_id = trail[0].agent_id
-        tool_name = trail[0].tool_name
+            agent_id = trail[0].agent_id
+            tool_name = trail[0].tool_name
 
-        # Carry the argument-shape digest from ESCALATION_SENT into the
-        # resolution record so find_prior_approval can require an exact
-        # shape match before auto-allowing. Records escalated before this
-        # field existed carry no digest; their resolutions simply never
-        # match a digested query (fail closed) and age out of the 24h
-        # window — no re-derivation from stored parameters, which could
-        # disagree with the intercept-time digest after caps/rounding.
-        args_digest = ""
-        for r in trail:
-            if r.event_type == EventType.ESCALATION_SENT:
-                data = r.data if isinstance(r.data, dict) else {}
-                digest = data.get("args_digest", "")
-                if isinstance(digest, str):
-                    args_digest = digest
-                break
+            # Carry the argument-shape digest from ESCALATION_SENT into the
+            # resolution record so find_prior_approval can require an exact
+            # shape match before auto-allowing. Records escalated before this
+            # field existed carry no digest; their resolutions simply never
+            # match a digested query (fail closed) and age out of the 24h
+            # window — no re-derivation from stored parameters, which could
+            # disagree with the intercept-time digest after caps/rounding.
+            args_digest = ""
+            for r in trail:
+                if r.event_type == EventType.ESCALATION_SENT:
+                    data = r.data if isinstance(r.data, dict) else {}
+                    digest = data.get("args_digest", "")
+                    if isinstance(digest, str):
+                        args_digest = digest
+                    break
 
-        # Cap free-text fields: resolution is already normalised to
-        # allow/deny above but a stray non-standard string gets a small
-        # label cap so it can't balloon the audit record. reviewer and
-        # justification are caller-controlled at the pipeline boundary
-        # and reach the hash chain like every other field — same L47
-        # amplification concern applies here.
-        resolution = _cap_str(resolution, _MAX_DECISION_LABEL_LEN, "resolution")
-        reviewer = _cap_str(reviewer, _MAX_REVIEWER_LEN, "reviewer")
-        justification = _cap_str(
-            justification, _MAX_JUSTIFICATION_LEN, "justification"
-        )
+            # Cap free-text fields: resolution is already normalised to
+            # allow/deny above but a stray non-standard string gets a small
+            # label cap so it can't balloon the audit record. reviewer and
+            # justification are caller-controlled at the pipeline boundary
+            # and reach the hash chain like every other field — same L47
+            # amplification concern applies here.
+            resolution = _cap_str(resolution, _MAX_DECISION_LABEL_LEN, "resolution")
+            reviewer = _cap_str(reviewer, _MAX_REVIEWER_LEN, "reviewer")
+            justification = _cap_str(
+                justification, _MAX_JUSTIFICATION_LEN, "justification"
+            )
 
-        self.trail.record_escalation_resolved(
-            action_id=action_id,
-            agent_id=agent_id,
-            tool_name=tool_name,
-            resolution=resolution,
-            reviewer=reviewer,
-            justification=justification,
-            args_digest=args_digest,
-            approver=approver,
-            human_disposed=human_disposed,
-        )
+            self.trail.record_escalation_resolved(
+                action_id=action_id,
+                agent_id=agent_id,
+                tool_name=tool_name,
+                resolution=resolution,
+                reviewer=reviewer,
+                justification=justification,
+                args_digest=args_digest,
+                approver=approver,
+                human_disposed=human_disposed,
+            )
+
+        if resolution == "deny":
+            # A denied escalation never runs, so it has no outcome to report.
+            claim = self._claim_pending_outcome(action_id)
+            if claim is not None:
+                logger.debug("dropped pending outcome of denied escalation %s", action_id)
 
     def run_compliance_assessment(
         self,
