@@ -5052,6 +5052,29 @@ def _cmd_init(args: argparse.Namespace) -> int:
 def _cmd_scan(args: argparse.Namespace) -> int:
     from vaara.integrations import scan
 
+    if args.install_watch or args.uninstall_watch or args.watch:
+        from vaara.integrations import scan_watch
+
+        if args.uninstall_watch:
+            removed = scan_watch.uninstall()
+            print("login watch removed" if removed else "no login watch installed")
+            return 0
+        if args.install_watch:
+            from vaara.integrations.init_governance import resolve_vaara_bin
+
+            path, message = scan_watch.install(resolve_vaara_bin(), interval=args.interval)
+            print(message)
+            return 0 if path else 1
+        trail_path = Path(args.trail).expanduser() if args.trail else scan_watch.default_trail()
+        watcher = scan_watch.Watcher(scan_watch.open_trail(trail_path))
+        print(f"vaara scan: watching every {args.interval:g}s, recording to {trail_path}",
+              file=sys.stderr)
+        try:
+            watcher.run(args.interval)
+        except KeyboardInterrupt:
+            pass
+        return 0
+
     findings = scan.run_scan(processes=not args.no_processes, mcp=not args.no_mcp,
                              apps=not args.no_apps)
     if args.json:
@@ -7456,6 +7479,20 @@ def build_parser() -> argparse.ArgumentParser:
         "--fail-on-ungoverned", action="store_true",
         help="Exit 1 when anything is ungoverned or reachable but not governed",
     )
+    pscan.add_argument(
+        "--watch", action="store_true",
+        help="Keep scanning and record each agent process the first time it "
+             "is seen, as an agent_seen record in its own trail. The macOS "
+             "app notifies when one that is not governed starts.",
+    )
+    pscan.add_argument("--interval", type=float, default=15.0,
+                       help="Seconds between passes with --watch (default 15)")
+    pscan.add_argument("--trail", default=None,
+                       help="Trail for --watch (default ~/.vaara/trail/agents/audit.db)")
+    pscan.add_argument("--install-watch", action="store_true",
+                       help="Run --watch at login (launchd on macOS, systemd user unit on Linux)")
+    pscan.add_argument("--uninstall-watch", action="store_true",
+                       help="Remove the login service --install-watch wrote")
     pscan.set_defaults(func=_cmd_scan)
 
     return p

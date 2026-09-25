@@ -319,6 +319,8 @@ final class GateModel: ObservableObject {
     private var lastHeal: [String: Date] = [:]
 
     private var cursors: [String: Int64] = [:]
+    /// Last agent_seen record read per trail (`vaara scan --watch`).
+    private var agentCursors: [String: Int64] = [:]
     private var handledApprovals = Set<String>()
     private var timer: Timer?
 
@@ -489,6 +491,7 @@ final class GateModel: ObservableObject {
     func removeSource(_ path: String) {
         config.db_paths.removeAll { $0 == path }
         cursors[path] = nil
+        agentCursors[path] = nil
         trailFaults[path] = nil
         trailNotes[path] = nil
         lastHeal[path] = nil
@@ -509,6 +512,13 @@ final class GateModel: ObservableObject {
                 cursors[path] = max(cursors[path] ?? -1, event.seq)
                 feed.insert(event, at: 0)
                 notify(event)
+            }
+        }
+        // `vaara scan --watch` records every agent that starts. One that
+        // Vaara does not govern is worth a notification of its own.
+        for path in config.db_paths {
+            for seen in newAgentsSeen(path) where seen.state != "governed" {
+                notifyAgent(seen)
             }
         }
         feed.sort { $0.timestamp > $1.timestamp }
@@ -726,6 +736,52 @@ final class GateModel: ObservableObject {
         when.dateStyle = .medium
         when.timeStyle = .none
         return "integrity ok, but nothing written since \(when.string(from: newest))"
+    }
+
+    struct AgentSeen { let agent: String; let state: String; let detail: String }
+
+    /// agent_seen records written since the last poll. The first read of a
+    /// trail only sets the cursor, so launching the app does not replay
+    /// every agent the watcher ever saw.
+    private func newAgentsSeen(_ path: String) -> [AgentSeen] {
+        guard let since = agentCursors[path] else {
+            agentCursors[path] = maxSeq(path)
+            return []
+        }
+        let rows: [(Int64, AgentSeen)] = withDB(path) { db in
+            var stmt: OpaquePointer?
+            defer { sqlite3_finalize(stmt) }
+            guard sqlite3_prepare_v2(db, """
+                SELECT seq, agent_id, data FROM audit_records
+                WHERE event_type = 'agent_seen' AND seq > ? ORDER BY seq
+                """, -1, &stmt, nil) == SQLITE_OK else { return [] }
+            sqlite3_bind_int64(stmt, 1, since)
+            var out: [(Int64, AgentSeen)] = []
+            while sqlite3_step(stmt) == SQLITE_ROW {
+                let data = parseData(sqlite3_column_text(stmt, 2))
+                out.append((sqlite3_column_int64(stmt, 0), AgentSeen(
+                    agent: String(cString: sqlite3_column_text(stmt, 1)),
+                    state: data["state"] as? String ?? "",
+                    detail: data["detail"] as? String ?? "")))
+            }
+            return out
+        } ?? []
+        if let last = rows.last?.0 { agentCursors[path] = last }
+        return rows.map(\.1)
+    }
+
+    private func notifyAgent(_ seen: AgentSeen) {
+        guard config.notifications, config.notify_on != "off" else { return }
+        let content = UNMutableNotificationContent()
+        content.title = seen.state == "reachable"
+            ? "Vaara: \(seen.agent) started, not governed yet"
+            : "Vaara: ungoverned agent started"
+        content.subtitle = seen.agent
+        content.body = seen.detail
+        content.sound = .default
+        UNUserNotificationCenter.current().add(
+            UNNotificationRequest(identifier: UUID().uuidString,
+                                  content: content, trigger: nil))
     }
 
     private func maxSeq(_ path: String) -> Int64 {
