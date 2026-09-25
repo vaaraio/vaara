@@ -5,6 +5,9 @@
 import AppKit
 import SwiftUI
 import UniformTypeIdentifiers
+#if canImport(Shared)
+import Shared
+#endif
 
 extension GateState {
     var color: Color {
@@ -83,8 +86,9 @@ struct ContentView: View {
     @State private var screen: Screen = .overview
     @State private var selectedAgent: AgentSummary?
     @State private var discoveredCount: Int?
+    @State private var openReceipt: ReceiptEntry?
 
-    enum Screen { case overview, settings, history, setup, anchor }
+    enum Screen { case overview, settings, history, receipts, setup, anchor }
     @State private var engine = SetupScanner.engineStatus()
     @State private var clients: [MCPClient] = SetupScanner.scan()
     @State private var installing = false
@@ -122,6 +126,7 @@ struct ContentView: View {
                 case .overview: overview
                 case .settings: settings
                 case .history:  historyView
+                case .receipts: receiptsView
                 case .setup:    setupView
                 case .anchor:   anchorView
                 }
@@ -255,6 +260,117 @@ struct ContentView: View {
                     .padding(.vertical, 8)
                 }
             }
+        }
+    }
+
+    // MARK: receipts — the engine's signed receipt for each decision,
+    // verified by this app's own code (Shared/DecisionReceipt.swift)
+
+    private var receiptsView: some View {
+        Group {
+            if let entry = openReceipt {
+                receiptDetail(entry)
+            } else {
+                let entries = model.receipts()
+                if entries.isEmpty {
+                    VStack(spacing: 10) {
+                        Text("No decision receipts beside the watched trails.")
+                            .font(.system(size: 12))
+                            .foregroundStyle(p.ghost)
+                        Text("The engine signs a receipt for every decision when\n`vaara[attestation]` is installed.")
+                            .font(.system(size: 11))
+                            .foregroundStyle(p.ghost)
+                            .multilineTextAlignment(.center)
+                    }
+                    .frame(maxWidth: .infinity)
+                    .padding(.vertical, 36)
+                } else {
+                    FittingScrollView(cap: 560) {
+                        VStack(alignment: .leading, spacing: 0) {
+                            let bad = entries.filter { !$0.check.ok }.count
+                            sectionLabel(bad == 0
+                                         ? "\(entries.count) RECEIPTS, ALL VERIFIED"
+                                         : "\(entries.count) RECEIPTS, \(bad) FAILED")
+                            ForEach(entries) { entry in
+                                Button { openReceipt = entry } label: {
+                                    ReceiptRow(entry: entry, p: p)
+                                }
+                                .buttonStyle(.plain)
+                            }
+                        }
+                        .padding(.vertical, 8)
+                    }
+                }
+            }
+        }
+    }
+
+    private func receiptDetail(_ entry: ReceiptEntry) -> some View {
+        let r = entry.receipt, c = entry.check
+        return VStack(alignment: .leading, spacing: 10) {
+            HStack {
+                Button { openReceipt = nil } label: {
+                    Image(systemName: "chevron.left").font(.system(size: 11))
+                }
+                .buttonStyle(.plain)
+                .foregroundStyle(p.faint)
+                Text("\(r.decision.uppercased())  \(r.tool)")
+                    .font(.system(size: 13, weight: .medium))
+                    .foregroundStyle(p.ink)
+                    .lineLimit(1).truncationMode(.middle)
+                Spacer()
+            }
+            VStack(alignment: .leading, spacing: 4) {
+                checkLine("Signature (ES256, key \(r.keyId))", c.signature)
+                checkLine("Evidence matches evidenceRef digest", c.evidence)
+                checkLine(c.trail == nil ? "Trail record not checked (trail unreadable)"
+                                         : "Record \(r.recordId.prefix(8)) is on the trail with this hash",
+                          c.trail)
+                if !c.detail.isEmpty {
+                    Text(c.detail)
+                        .font(.system(size: 10.5))
+                        .foregroundStyle(GateState.red.color)
+                }
+            }
+            Text("\(r.decidedAt)  risk \(r.riskScore)  agent \(r.agent)")
+                .font(.system(size: 10, design: .monospaced))
+                .foregroundStyle(p.faint)
+            if !r.reason.isEmpty {
+                Text(r.reason)
+                    .font(.system(size: 11))
+                    .foregroundStyle(p.faint)
+                    .lineLimit(3)
+            }
+            ScrollView {
+                Text(r.prettyJSON)
+                    .font(.system(size: 9.5, design: .monospaced))
+                    .foregroundStyle(p.ghost)
+                    .textSelection(.enabled)
+                    .frame(maxWidth: .infinity, alignment: .leading)
+            }
+            .frame(height: 200)
+            HStack(spacing: 14) {
+                Button("Export…") { model.exportReceipt(entry) }
+                Button("Show in Finder") {
+                    NSWorkspace.shared.activateFileViewerSelecting([r.url])
+                }
+            }
+            .buttonStyle(.plain)
+            .font(.system(size: 12))
+            .foregroundStyle(p.ink.opacity(0.8))
+        }
+        .padding(20)
+        .frame(maxWidth: .infinity, alignment: .leading)
+    }
+
+    private func checkLine(_ label: String, _ ok: Bool?) -> some View {
+        HStack(spacing: 6) {
+            Image(systemName: ok == nil ? "minus.circle" : ok! ? "checkmark.seal.fill" : "xmark.octagon.fill")
+                .font(.system(size: 11))
+                .foregroundStyle(ok == nil ? p.ghost : ok! ? GateState.green.color : GateState.red.color)
+            Text(label)
+                .font(.system(size: 11))
+                .foregroundStyle(p.ink)
         }
     }
 
@@ -1129,6 +1245,7 @@ struct ContentView: View {
         HStack(spacing: 14) {
             footerTab("Now", .overview)
             footerTab("History", .history)
+            footerTab("Receipts", .receipts)
             footerTab("Anchor", .anchor)
             footerTab("Setup", .setup)
             footerTab("Settings", .settings)
@@ -1156,6 +1273,7 @@ struct ContentView: View {
         Button(label) {
             withAnimation(.easeInOut(duration: 0.15)) {
                 selectedAgent = nil
+                openReceipt = nil
                 screen = target
             }
         }
@@ -1196,6 +1314,43 @@ private struct AgentRow: View {
         }
         .padding(.horizontal, 20)
         .padding(.vertical, 7)
+    }
+}
+
+private struct ReceiptRow: View {
+    let entry: ReceiptEntry
+    let p: Palette
+
+    private var color: Color {
+        switch entry.receipt.decision {
+        case "block":    return GateState.red.color
+        case "escalate": return GateState.yellow.color
+        default:         return GateState.green.color
+        }
+    }
+
+    var body: some View {
+        HStack(spacing: 10) {
+            Image(systemName: entry.check.ok ? "checkmark.seal.fill" : "xmark.octagon.fill")
+                .font(.system(size: 11))
+                .foregroundStyle(entry.check.ok ? GateState.green.color : GateState.red.color)
+                .help(entry.check.ok ? "Verified" : entry.check.detail)
+            Text(entry.receipt.decision)
+                .font(.system(size: 11, design: .monospaced))
+                .foregroundStyle(color)
+                .frame(width: 58, alignment: .leading)
+            Text(entry.receipt.tool)
+                .font(.system(size: 12))
+                .foregroundStyle(p.ink)
+                .lineLimit(1).truncationMode(.middle)
+            Spacer()
+            Text(String(entry.receipt.decidedAt.dropFirst(11).prefix(8)))
+                .font(.system(size: 10.5, design: .monospaced))
+                .foregroundStyle(p.ghost)
+        }
+        .contentShape(Rectangle())
+        .padding(.horizontal, 20)
+        .padding(.vertical, 6)
     }
 }
 

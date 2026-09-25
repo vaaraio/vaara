@@ -208,6 +208,7 @@ ships recomputable vectors, not because it is another instance of the binding.
 | release condition | `vaara.release-condition/v0` (consumes `vaara.authorization/v0`) | `vaara.receipt/v1` | `tests/vectors/release_condition_v0/` |
 | attribute attestation | `vaara.attribute-attestation/v0` | `vaara.receipt/v1` | `tests/vectors/attribute_attestation_v0/` |
 | hidden-value attribute attestation | `vaara.attribute-attestation-zk/v0` (proved by `vaara.attribute-predicate/v0`) | `vaara.receipt/v1` | `tests/vectors/attribute_attestation_zk_v0/` |
+| engine decision | `vaara.trail-decision/v0` | `vaara.receipt/v1` | `tests/vectors/trail_decision_v0/` |
 
 ### 5.2 Profile example: x402 settlement binding
 
@@ -653,6 +654,44 @@ parameters and imports no Vaara. It also asserts, before grading any case, that
 `H` recomputes from its label, that commitments are additively homomorphic, that
 the same value under two blinds gives two different commitments, and that a
 missing proof and a broken proof land in different states.
+
+### 5.10 Profile: engine decision (`vaara.trail-decision/v0`)
+
+The engine writes one of these receipts for every decision it records on its
+audit trail, beside the trail at `receipts/<YYYY-MM-DD>/<recordId>.json`. The
+file holds the envelope under `receipt` and the evidence record under
+`evidence`. The evidence record is the decision as the trail holds it:
+
+| Field | Meaning |
+|---|---|
+| `schema` | `vaara.trail-decision/v0` |
+| `recordId`, `actionId` | The trail record and the action it decided. |
+| `eventType` | `decision_made` or `action_blocked`. |
+| `agentId`, `toolName`, `tenantId` | As recorded. `tenantId` is `""` when unset. |
+| `decision`, `reason` | The trail's words: `allow`, `escalate` or `deny`, and its reason. |
+| `riskScore` | Decimal string. |
+| `decidedAt` | ISO 8601 UTC, milliseconds. |
+| `recordHash` | `sha256:` and the trail record's own hash. |
+| `previousHash` | `sha256:` and the hash of the record before it. An empty genesis link is written as the SHA-256 of the empty string. |
+| `decisionDetail`, `approver`, `humanDisposed` | Present only when the trail record carries them. |
+
+The envelope writes the trail's `deny` as `block`. `backLink.attestationDigest`
+is `previousHash`, `backLink.attestationNonce` is `recordId`, and
+`evidenceRef.ref` is `vaara:trail/<recordId>`. The issuer public key sits beside
+the receipts as `issuer-es256.pub.pem`, and `issuerAsserted.secretVersion` names
+it as `es256:` plus the first 16 hex characters of SHA-256 over its DER
+SubjectPublicKeyInfo.
+
+A verifier checks the signature and the evidence digest as in Sections 2.1 and
+3. With the trail in hand it also looks up `recordId` and confirms the stored
+record hash matches `recordHash`. A receipt whose record is missing from the
+trail, or whose hash differs, fails. The evidence record carries no tool
+arguments, so a receipt can leave the machine without them.
+
+Vectors are in `tests/vectors/trail_decision_v0/`: receipts written by the
+engine's own sink over a SQLite trail, tampered copies, the trail's record
+hashes, and `expected.json` with each file's verdict. The macOS app's verifier
+checks the same files.
 
 ## 6. The ingest envelope (`vaara.ingest/v0`)
 

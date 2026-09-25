@@ -1,0 +1,32 @@
+{
+  "invalid/envelope-tampered.json": {
+    "evidence": true,
+    "signature": false,
+    "trail": true
+  },
+  "invalid/evidence-tampered.json": {
+    "evidence": false,
+    "signature": true,
+    "trail": true
+  },
+  "invalid/not-in-trail.json": {
+    "evidence": true,
+    "signature": true,
+    "trail": false
+  },
+  "valid/0-allow.json": {
+    "evidence": true,
+    "signature": true,
+    "trail": true
+  },
+  "valid/2-deny.json": {
+    "evidence": true,
+    "signature": true,
+    "trail": true
+  },
+  "valid/3-deny.json": {
+    "evidence": true,
+    "signature": true,
+    "trail": true
+  }
+}

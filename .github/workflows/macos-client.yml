@@ -13,10 +13,12 @@ on:
     branches: [main]
     paths:
       - 'clients/macos/**'
+      - 'tests/vectors/trail_decision_v0/**'
       - '.github/workflows/macos-client.yml'
   pull_request:
     paths:
       - 'clients/macos/**'
+      - 'tests/vectors/trail_decision_v0/**'
       - '.github/workflows/macos-client.yml'
   workflow_dispatch:
 
@@ -84,6 +86,13 @@ jobs:
         # so every target referencing it stopped compiling while this job
         # stayed green.
         run: swift build --target VaaraMenuBar && swift build --target WebKitGovernance
+
+      - name: Verify the engine's receipt vectors with the app's verifier
+        working-directory: clients/macos
+        # The app checks decision receipts with its own JCS, SHA-256 and P-256
+        # code. These are the vectors the Python suite checks too, so the two
+        # verifiers cannot drift apart unnoticed.
+        run: swift test
 
       - name: Build the Homebrew path
         working-directory: clients/macos

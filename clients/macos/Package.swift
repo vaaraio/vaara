@@ -34,6 +34,12 @@ let package = Package(
             path: "Sources/VaaraMenuBar",
             resources: [.copy("Resources/icons")]
         ),
+        // The receipt verifier against the engine's vectors. `swift test`.
+        .testTarget(
+            name: "SharedTests",
+            dependencies: ["Shared"],
+            path: "Tests/SharedTests"
+        ),
         .target(
             name: "WebKitGovernance",
             dependencies: ["Shared"],
