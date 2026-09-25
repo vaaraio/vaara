@@ -336,6 +336,72 @@
       "message": "Copy to a remote host from the shell."
     },
     {
+      "id": "trail_file_write",
+      "tools": [
+        "Write",
+        "Edit",
+        "NotebookEdit"
+      ],
+      "fields": [
+        "file_path",
+        "notebook_path"
+      ],
+      "pattern": "(^|/)\\.vaara/(.*/)?([^/]*\\.db(-wal|-shm|-journal)?$|receipts/|keys/|sources\\.json$|session-receipts\\.jsonl$)|(^|/)vaara_audit\\.db(-wal|-shm|-journal)?$",
+      "unless_env": "VAARA_ALLOW_TRAIL_EDIT",
+      "message": "Writes Vaara's own evidence: a trail database, a signed receipt, the receipt signing key or the trail index. An agent that can rewrite the record of what it did is not governed by it. Set VAARA_ALLOW_TRAIL_EDIT=1 for a deliberate edit."
+    },
+    {
+      "id": "trail_shell_tamper",
+      "tools": [
+        "Bash"
+      ],
+      "fields": [
+        "command"
+      ],
+      "pattern": "(^|[\\s;&|(])(sed\\s+-i|tee|cp|mv|rm|rmdir|unlink|shred|chmod|chown|chattr|truncate|ln|install|rsync|dd)\\b(?=[^|\\n]*(?:\\.vaara(?:/(?:[^\\s'\"|;&<>()]*/)?(?:[^\\s'\"|;&<>()]*\\.db(?:-wal|-shm|-journal)?|receipts|keys|trail|llm-proxy|claude-code|proxy|sources\\.json|session-receipts\\.jsonl|\\*)(?=[/\\s'\"|;&<>)]|$)|/?(?=[\\s'\"|;&<>)]|$))|(?:^|[/\\s'\"=])vaara_audit\\.db(?:-wal|-shm|-journal)?(?=[\\s'\"|;&<>)]|$)))|>+\\s*['\\\"]?[^\\s'\"|;&<>()]*(?:\\.vaara(?:/(?:[^\\s'\"|;&<>()]*/)?(?:[^\\s'\"|;&<>()]*\\.db(?:-wal|-shm|-journal)?|receipts|keys|trail|llm-proxy|claude-code|proxy|sources\\.json|session-receipts\\.jsonl|\\*)(?=[/\\s'\"|;&<>)]|$)|/?(?=[\\s'\"|;&<>)]|$))|(?:^|[/\\s'\"=])vaara_audit\\.db(?:-wal|-shm|-journal)?(?=[\\s'\"|;&<>)]|$))|\\bfind\\b(?=[^|\\n]*(?:\\.vaara(?:/(?:[^\\s'\"|;&<>()]*/)?(?:[^\\s'\"|;&<>()]*\\.db(?:-wal|-shm|-journal)?|receipts|keys|trail|llm-proxy|claude-code|proxy|sources\\.json|session-receipts\\.jsonl|\\*)(?=[/\\s'\"|;&<>)]|$)|/?(?=[\\s'\"|;&<>)]|$))|(?:^|[/\\s'\"=])vaara_audit\\.db(?:-wal|-shm|-journal)?(?=[\\s'\"|;&<>)]|$)))(?=[^|\\n]*\\s-(delete|exec)\\b)",
+      "unless_env": "VAARA_ALLOW_TRAIL_EDIT",
+      "message": "Deletes, moves, overwrites or truncates Vaara's trail, receipts or signing key from the shell. Set VAARA_ALLOW_TRAIL_EDIT=1 for a deliberate edit."
+    },
+    {
+      "id": "trail_sql_tamper",
+      "tools": [
+        "Bash"
+      ],
+      "fields": [
+        "command"
+      ],
+      "pattern": "(?i)\\b(sqlite3|python3?|perl|ruby|node)\\b(?=[^|\\n]*(?:\\.vaara(?:/(?:[^\\s'\"|;&<>()]*/)?(?:[^\\s'\"|;&<>()]*\\.db(?:-wal|-shm|-journal)?|receipts|keys|trail|llm-proxy|claude-code|proxy|sources\\.json|session-receipts\\.jsonl|\\*)(?=[/\\s'\"|;&<>)]|$)|/?(?=[\\s'\"|;&<>)]|$))|(?:^|[/\\s'\"=])vaara_audit\\.db(?:-wal|-shm|-journal)?(?=[\\s'\"|;&<>)]|$)))(?=[^|\\n]*(\\b(delete\\s+from|update\\s+\\w+\\s+set|drop\\s+(table|trigger|index|view)|insert\\s+(or\\s+\\w+\\s+)?into|replace\\s+into|alter\\s+table|writable_schema|vacuum)\\b|['\\\"]([rwax]b?\\+|[wax][bt]?\\+?)['\\\"]|mode\\s*=\\s*['\\\"][wax+]|write|truncate|unlink|rmtree|shutil|os\\.(remove|rename|replace)))",
+      "unless_env": "VAARA_ALLOW_TRAIL_EDIT",
+      "message": "Rewrites Vaara's trail through SQL or an interpreter: deletes, updates or drops records, or opens the database for writing. Reading the trail is allowed. Set VAARA_ALLOW_TRAIL_EDIT=1 for a deliberate edit."
+    },
+    {
+      "id": "trail_signing_key_read",
+      "tools": [
+        "Read",
+        "ReadMcpResourceTool",
+        "ReadMcpResourceDirTool"
+      ],
+      "fields": [
+        "file_path",
+        "uri"
+      ],
+      "pattern": "(^|/)\\.vaara/(.*/)?keys/[^/]+(?<!\\.pub)\\.pem$",
+      "unless_env": "VAARA_ALLOW_SECRET_READ",
+      "message": "Reads the key Vaara signs decision receipts with. Whoever holds it can issue receipts for decisions the engine never made. Set VAARA_ALLOW_SECRET_READ=1 for a deliberate read."
+    },
+    {
+      "id": "trail_signing_key_shell_read",
+      "tools": [
+        "Bash"
+      ],
+      "fields": [
+        "command"
+      ],
+      "pattern": "\\b(cat|less|more|head|tail|base64|xxd|od|hexdump|strings|openssl|scp|curl|python3?|perl|ruby|node)\\b(?=[^|\\n]*\\.vaara/([^\\s'\"|;&<>()]*/)?keys/[^\\s'\"|;&<>()]*(?<!\\.pub)\\.pem)",
+      "unless_env": "VAARA_ALLOW_SECRET_READ",
+      "message": "Reads or sends the key Vaara signs decision receipts with, from the shell. Set VAARA_ALLOW_SECRET_READ=1 for a deliberate read."
+    },
+    {
       "id": "harness_config_write",
       "tools": [
         "Write",
