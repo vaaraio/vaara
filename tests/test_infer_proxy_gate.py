@@ -191,8 +191,8 @@ def test_escalate_approved_via_handshake_passes_through(tmp_path):
             reqs = list(approvals.glob("*.request.json")) if approvals.exists() else []
             if reqs:
                 action_id = reqs[0].name.removesuffix(".request.json")
-                (approvals / f"{action_id}.decision.json").write_text(
-                    json.dumps({"decision": "approve", "decided_at": time.time()}))
+                from vaara.approvals import write_decision
+                write_decision(action_id, "approve", approvals_dir=approvals)
                 return
             time.sleep(0.02)
 
