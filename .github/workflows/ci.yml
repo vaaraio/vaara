@@ -494,7 +494,9 @@ jobs:
       - name: Install Vaara and Claude Code
         run: |
           pip install --require-hashes -r requirements-dev.txt
-          pip install -e . --no-deps
+          # The attestation extra: the engine signs a receipt per decision
+          # only with it, and the test checks those receipts.
+          pip install -e '.[attestation]'
           npm install -g @anthropic-ai/claude-code@2.1.280
           claude --version
 

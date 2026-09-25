@@ -35,6 +35,7 @@ import pytest
 from vaara.integrations.init_governance import write_claude_hooks
 
 pytest.importorskip("cryptography")
+pytest.importorskip("rfc8785")
 
 CLAUDE = os.environ.get("VAARA_CLAUDE_BIN") or shutil.which("claude")
 pytestmark = pytest.mark.skipif(not CLAUDE, reason="no Claude Code binary")
