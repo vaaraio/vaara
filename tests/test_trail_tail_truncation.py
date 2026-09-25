@@ -26,14 +26,11 @@ N_CALLS = 5
 
 
 def _calls(path: Path, n: int, tag: str, tenant_id: str = "") -> None:
-    backend = SQLiteAuditBackend(path, tenant_id=tenant_id) if tenant_id else SQLiteAuditBackend(path)
-    try:
+    with SQLiteAuditBackend(path, tenant_id=tenant_id) as backend:
         pipeline = InterceptionPipeline(trail=backend.load_trail())
         for i in range(n):
             pipeline.intercept(agent_id="tail-test", tool_name="file.read",
                                parameters={"path": f"/srv/{tag}/{i}"})
-    finally:
-        backend.close()
 
 
 def _sql(path: Path, *statements: str) -> list:
@@ -57,12 +54,9 @@ def _truncate(path: Path, n: int) -> int:
 
 
 def _verdicts(path: Path):
-    backend = SQLiteAuditBackend(path)
-    try:
+    with SQLiteAuditBackend(path) as backend:
         trail = backend.load_trail()
         return trail, trail.verify_chain_verdict(), backend.verify_chain_streaming_verdict()
-    finally:
-        backend.close()
 
 
 def _head(path: Path, key: str = "chain_head") -> dict:
@@ -223,3 +217,27 @@ def test_an_unreadable_head_is_reported(tmp_path: Path):
     _sql(path, "UPDATE audit_meta SET value = 'not json' WHERE key = 'chain_head'")
     _, mem, _ = _verdicts(path)
     assert mem.error.startswith("Chain head record in audit_meta is unreadable")
+
+
+def test_the_head_check_and_the_rows_read_one_snapshot(tmp_path: Path, monkeypatch):
+    """A deletion committed between the head check and the row read must not
+    split them: the load sees the trail as it was when the check ran."""
+    from vaara.audit import sqlite_backend
+
+    path = tmp_path / "audit.db"
+    _calls(path, N_CALLS, "a")
+    top = _max_seq(path)
+    real = sqlite_backend._head_problem
+
+    def check_then_truncate(*args):
+        found = real(*args)
+        _sql(path, f"DELETE FROM audit_records WHERE seq = {top}")
+        return found
+
+    monkeypatch.setattr(sqlite_backend, "_head_problem", check_then_truncate)
+    with SQLiteAuditBackend(path) as backend:
+        trail = backend.load_trail()
+    assert trail.size == top + 1, "the rows came from after the deletion"
+    assert trail.chain_intact
+    monkeypatch.setattr(sqlite_backend, "_head_problem", real)
+    assert _verdicts(path)[1].error.startswith(f"Tail truncated: seq {top}")

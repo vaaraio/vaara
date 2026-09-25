@@ -1442,13 +1442,17 @@ class SQLiteAuditBackend:
         """
         t_clause, t_params = self._tenant_clause()
         with self._lock:
-            # The head before the rows: an append landing between the two adds
-            # a row past the head, which is fine, and cannot remove one.
-            head_error = _head_problem(self._conn, self._head_key(), t_clause, t_params)
-            rows = self._conn.execute(
-                f"SELECT * FROM audit_records WHERE {t_clause} ORDER BY seq ASC",
-                t_params,
-            ).fetchall()
+            # One read transaction, so the head check and the rows come from
+            # the same snapshot and a deletion cannot land between them.
+            self._conn.execute("BEGIN")
+            try:
+                head_error = _head_problem(self._conn, self._head_key(), t_clause, t_params)
+                rows = self._conn.execute(
+                    f"SELECT * FROM audit_records WHERE {t_clause} ORDER BY seq ASC",
+                    t_params,
+                ).fetchall()
+            finally:
+                self._rollback_quietly()
 
         trail = AuditTrail(on_record=self.write_record)
         trail._store_head_error = head_error
@@ -1640,7 +1644,11 @@ class SQLiteAuditBackend:
         else:
             conn = sqlite3.connect(
                 f"file:{self._db_path}?mode=ro", uri=True, check_same_thread=False,
+                isolation_level=None,
             )
+            # The head check and the walk read one snapshot. The connection
+            # is read-only and closed below, which ends the transaction.
+            conn.execute("BEGIN")
         try:
             head_error = _head_problem(conn, self._head_key(), t_clause, t_params)
             for row in conn.execute(sql, params):
