@@ -495,16 +495,21 @@ class ConformalCalibrator:
         key = self._bucket_key(category)
         with self._lock:
             bucket = self._ensure_bucket_locked(key)
-            bucket.append(residual)
             if len(bucket) >= self._min_calibration:
                 # FACI adaptive alpha update, scoped to this bucket so the
                 # default bucket's alpha trajectory cannot be perturbed by
                 # outcomes routed to a per-category bucket (and vice versa).
+                # Coverage is judged against the quantile the interval was
+                # built from, i.e. the calibration set BEFORE this residual:
+                # judging it against a set that already holds it lets the
+                # outcome widen the interval it is scored against, which
+                # overstates coverage (fixed 2026-09-26).
                 quantile = self._get_quantile_locked(key)
                 covered = residual <= quantile
                 err_t = 0.0 if covered else 1.0
                 alpha_t = self._alpha_t[key] + self._gamma * (self._alpha - err_t)
                 self._alpha_t[key] = min(0.5, max(0.001, alpha_t))
+            bucket.append(residual)
 
     def _get_quantile_locked(self, key: str) -> float:
         """Conformal quantile for the named bucket. Caller must hold ``self._lock``."""
@@ -514,10 +519,13 @@ class ConformalCalibrator:
         sorted_residuals = sorted(bucket)
         n = len(sorted_residuals)
         alpha_t = self._alpha_t.get(key, self._alpha)
-        # Quantile level: ceil((1 - alpha)(n + 1)) / n
-        level = math.ceil((1 - alpha_t) * (n + 1)) / n
-        level = min(1.0, level)
-        idx = min(int(level * n), n - 1)
+        # The k-th smallest residual, k = ceil((1 - alpha)(n + 1)), which is
+        # index k - 1. Kept in integers: the earlier level = k / n, then
+        # int(level * n), picked index k (one too high) and rested on a
+        # float product landing on a whole number. k > n clamps to the
+        # largest residual.
+        k = math.ceil((1 - alpha_t) * (n + 1))
+        idx = min(max(k, 1), n) - 1
         return sorted_residuals[idx]
 
     def _get_quantile(self, category: Optional[str] = None) -> float:
