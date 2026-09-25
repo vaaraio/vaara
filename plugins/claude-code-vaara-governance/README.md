@@ -152,6 +152,16 @@ PreToolUse on Bash / WebFetch / WebSearch is regex-only and sub-millisecond. Pre
 - This plugin does **not** wire OVERT attestation envelopes. Use `vaara-mcp-proxy` with `--overt-*` flags for envelopes.
 - The Vaara ML classifier is not run on raw Bash / WebFetch / WebSearch input. The classifier is trained on structured MCP tool patterns, not shell command strings; its output on raw bash is noise (measured 2026-05-28). Shell-surface coverage is the regex deny-list. Operators who want classifier coverage on shell can train Vaara on their own corpus and wire it in via `VAARA_PLUGIN_AGENT_ID` + a custom hook.
 
+## Privacy and data
+
+The plugin's own scripts make no network requests. Each hook calls `hooks/run.sh`, which runs the `vaara` CLI when it is on PATH and otherwise the bundled Python scripts in `hooks/`. On a block or escalation the plugin starts `osascript` (macOS) or `notify-send` (Linux) to show a desktop notification. Set `VAARA_PLUGIN_NOTIFY=0` to turn that off.
+
+Every tool call is written to a SQLite audit trail on your machine, by default `~/.vaara/claude-code/audit.db`. Each record holds the tool name, the input parameters Claude Code passed (a shell command, a file path, MCP arguments), the risk classification and the decision. Those parameters can contain personal data if the session handles any. Settings live in `~/.vaara/claude-code/config.json`.
+
+The plugin does not upload the trail or any usage data. A trail leaves the machine only when you export it yourself with `vaara trail export`. Records stay until you delete the database file. The trail is append-only, and the plugin never removes records by itself.
+
+Contact for privacy questions: hello@vaara.io.
+
 ## License
 
 AGPL-3.0-or-later. See [LICENSE](LICENSE).
