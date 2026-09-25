@@ -470,6 +470,45 @@ jobs:
             exit 1
           fi
 
+  claude-code-e2e:
+    name: Claude Code governed (real binary)
+    runs-on: ubuntu-latest
+    # Runs Claude Code itself against a scripted local Messages API, with the
+    # hooks `vaara init` writes, and reads back what Claude Code told the
+    # model, what the trail recorded and the signed receipt for each
+    # decision. Pinned so a Claude Code release that changes the hook
+    # contract fails here on purpose, when the pin is moved.
+    steps:
+      - uses: actions/checkout@9c091bb21b7c1c1d1991bb908d89e4e9dddfe3e0  # v7.0.0
+
+      - name: Set up Python 3.12
+        uses: actions/setup-python@5fda3b95a4ea91299a34e894583c3862153e4b97  # v7.0.0
+        with:
+          python-version: '3.12'
+
+      - name: Set up Node 22
+        uses: actions/setup-node@820762786026740c76f36085b0efc47a31fe5020  # v6.0.0
+        with:
+          node-version: '22'
+
+      - name: Install Vaara and Claude Code
+        run: |
+          pip install --require-hashes -r requirements-dev.txt
+          # The attestation extra: the engine signs a receipt per decision
+          # only with it, and the test checks those receipts.
+          pip install -e '.[attestation]'
+          npm install -g @anthropic-ai/claude-code@2.1.280
+          claude --version
+
+      - name: Run the Claude Code end-to-end test, failing on any skip
+        run: |
+          set -o pipefail
+          pytest tests/test_claude_code_real_binary.py -q -rs | tee result.txt
+          if grep -qE '[0-9]+ skipped' result.txt; then
+            echo "::error::The Claude Code test skipped, so Claude Code was not found."
+            exit 1
+          fi
+
   gemini-e2e:
     name: Gemini CLI governed (real binary)
     runs-on: ubuntu-latest
