@@ -1,0 +1,30 @@
+{
+  "description": "vaara-approval/v1 decision MACs. mac = hex HMAC-SHA256(key, 'vaara-approval/v1\\n' + action_id + '\\n' + nonce + '\\n' + decision). The engine (tests/test_approvals.py) and the macOS app (ApprovalSigningTests.swift) both check these.",
+  "key_hex": "000102030405060708090a0b0c0d0e0f101112131415161718191a1b1c1d1e1f",
+  "cases": [
+    {
+      "action_id": "act-123",
+      "nonce": "00112233445566778899aabbccddeeff",
+      "decision": "approve",
+      "mac": "7c0f8c0a3fece01293d5906a76c50de6789b53bfa9d26529d801513a93c663ba"
+    },
+    {
+      "action_id": "act-123",
+      "nonce": "00112233445566778899aabbccddeeff",
+      "decision": "deny",
+      "mac": "f1a5570a10c2d9b74276d2307a6f752822985d8cc07749a39cc6157cb70e06be"
+    },
+    {
+      "action_id": "7f3c2a90-1b4e-4c1d-9a55-0e2f7d6b8c41",
+      "nonce": "ffeeddccbbaa99887766554433221100",
+      "decision": "approve",
+      "mac": "b904c276f4616af72af7c4463856282b616ce8c292dbe3b64940361c197ac86b"
+    },
+    {
+      "action_id": "ä-unicode-id",
+      "nonce": "0123456789abcdef0123456789abcdef",
+      "decision": "approve",
+      "mac": "f411bed5fa4a9f74e3a278d0e4825cee8315e5a57dc76c342d7c261d56479d4f"
+    }
+  ]
+}

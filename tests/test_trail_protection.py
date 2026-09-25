@@ -23,7 +23,8 @@ from vaara.deny_rules import load_deny_rules, match_deny_rule, match_deny_rule_a
 from vaara.integrations import cursor, opencode
 
 TRAIL_RULES = {"trail_file_write", "trail_shell_tamper", "trail_sql_tamper",
-               "trail_signing_key_read", "trail_signing_key_shell_read"}
+               "trail_signing_key_read", "trail_signing_key_shell_read",
+               "approval_file_write", "approval_shell_write"}
 
 H = "/home/u/.vaara"
 
@@ -85,6 +86,18 @@ BLOCKED = [
     ("Read", {"file_path": f"{H}/trail/keys/receipt-es256.pem"}, "trail_signing_key_read"),
     ("Bash", "cat ~/.vaara/trail/keys/receipt-es256.pem", "trail_signing_key_shell_read"),
     ("Bash", "base64 < ~/.vaara/trail/keys/receipt-es256.pem", "trail_signing_key_shell_read"),
+    # Approvals: the agent must not answer its own escalation, or read the
+    # key a human surface signs the answer with.
+    ("Write", {"file_path": f"{H}/approvals/act-1.decision.json", "content": "{}"}, "approval_file_write"),
+    ("Bash", "echo '{}' > ~/.vaara/approvals/act-1.decision.json", "approval_shell_write"),
+    ("Bash", "cp /tmp/d.json ~/.vaara/approvals/act-1.decision.json", "approval_shell_write"),
+    ("Bash", "touch ~/.vaara/approvals/x", "approval_shell_write"),
+    ("Bash", rm("-rf", "~/.vaara/approvals"), "approval_shell_write"),
+    ("Bash", "python3 -c \"open('/home/u/.vaara/approvals/a.decision.json','w').write('{}')\"",
+     "approval_shell_write"),
+    ("Read", {"file_path": f"{H}/keys/approval-hmac.key"}, "trail_signing_key_read"),
+    ("Bash", "cat ~/.vaara/keys/approval-hmac.key", "trail_signing_key_shell_read"),
+    ("Write", {"file_path": f"{H}/keys/approval-hmac.key", "content": "00"}, "trail_file_write"),
 ]
 
 ALLOWED = [
@@ -98,6 +111,9 @@ ALLOWED = [
     ("Bash", "python3 -c \"import sqlite3; print(sqlite3.connect('/home/u/.vaara/trail/audit.db')"
              ".execute('select 1').fetchall())\""),
     ("Bash", "ls ~/.vaara/trail/keys"),
+    ("Bash", "ls ~/.vaara/approvals"),
+    ("Bash", "cat ~/.vaara/approvals/act-1.request.json"),
+    ("Read", {"file_path": f"{H}/approvals/act-1.request.json"}),
     ("Read", {"file_path": f"{H}/trail/receipts/2026/09/r.json"}),
     ("Read", {"file_path": f"{H}/trail/receipts/issuer-es256.pub.pem"}),
     ("Read", {"file_path": f"{H}/trail/keys/issuer-es256.pub.pem"}),

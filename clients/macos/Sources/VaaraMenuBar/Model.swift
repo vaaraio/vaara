@@ -1288,15 +1288,27 @@ final class GateModel: ObservableObject {
 
     /// Write the human's decision for an escalated action. The blocked
     /// hook (or proxy) is polling for this file and proceeds or fails
-    /// closed the moment it lands. Approve is the only way through.
+    /// closed the moment it lands. Approve is the only way through, and only
+    /// signed: the gate ignores a decision without a valid `mac` (see
+    /// ApprovalSigning), so without the key or the request's nonce the
+    /// request times out, which the gate treats as a deny.
     func resolveApproval(_ actionID: String, approve: Bool) {
         handledApprovals.insert(actionID)
-        let payload: [String: Any] =
-            ["decision": approve ? "approve" : "deny",
+        let decision = approve ? "approve" : "deny"
+        var payload: [String: Any] =
+            ["decision": decision,
              "decided_at": Date().timeIntervalSince1970]
+        let request = approvalsDir.appendingPathComponent("\(actionID).request.json")
+        if let data = try? Data(contentsOf: request),
+           let req = try? JSONSerialization.jsonObject(with: data) as? [String: Any],
+           let nonce = req["nonce"] as? String,
+           let key = ApprovalSigning.loadKey(approvalsDir: approvalsDir) {
+            payload["mac"] = ApprovalSigning.mac(
+                key: key, actionID: actionID, nonce: nonce, decision: decision)
+        }
         if let data = try? JSONSerialization.data(withJSONObject: payload) {
             try? data.write(to: approvalsDir
-                .appendingPathComponent("\(actionID).decision.json"))
+                .appendingPathComponent("\(actionID).decision.json"), options: .atomic)
         }
         if pendingApproval?.actionID == actionID { pendingApproval = nil }
     }

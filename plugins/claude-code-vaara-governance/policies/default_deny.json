@@ -385,9 +385,9 @@
         "file_path",
         "uri"
       ],
-      "pattern": "(^|/)\\.vaara/(.*/)?keys/[^/]+(?<!\\.pub)\\.pem$",
+      "pattern": "(^|/)\\.vaara/(.*/)?keys/[^/]+(?<!\\.pub)\\.(pem|key)$",
       "unless_env": "VAARA_ALLOW_SECRET_READ",
-      "message": "Reads the key Vaara signs decision receipts with. Whoever holds it can issue receipts for decisions the engine never made. Set VAARA_ALLOW_SECRET_READ=1 for a deliberate read."
+      "message": "Reads a key Vaara signs with (decision receipts, human approvals). Whoever holds it can sign receipts the engine never issued or approvals no human gave. Set VAARA_ALLOW_SECRET_READ=1 for a deliberate read."
     },
     {
       "id": "trail_signing_key_shell_read",
@@ -397,9 +397,36 @@
       "fields": [
         "command"
       ],
-      "pattern": "\\b(cat|less|more|head|tail|base64|xxd|od|hexdump|strings|openssl|scp|curl|python3?|perl|ruby|node)\\b(?=[^|\\n]*\\.vaara/([^\\s'\"|;&<>()]*/)?keys/[^\\s'\"|;&<>()]*(?<!\\.pub)\\.pem)",
+      "pattern": "\\b(cat|less|more|head|tail|base64|xxd|od|hexdump|strings|openssl|scp|curl|python3?|perl|ruby|node)\\b(?=[^|\\n]*\\.vaara/([^\\s'\"|;&<>()]*/)?keys/[^\\s'\"|;&<>()]*(?<!\\.pub)\\.(pem|key))",
       "unless_env": "VAARA_ALLOW_SECRET_READ",
-      "message": "Reads or sends the key Vaara signs decision receipts with, from the shell. Set VAARA_ALLOW_SECRET_READ=1 for a deliberate read."
+      "message": "Reads or sends a key Vaara signs with (decision receipts, human approvals), from the shell. Set VAARA_ALLOW_SECRET_READ=1 for a deliberate read."
+    },
+    {
+      "id": "approval_file_write",
+      "tools": [
+        "Write",
+        "Edit",
+        "NotebookEdit"
+      ],
+      "fields": [
+        "file_path",
+        "notebook_path"
+      ],
+      "pattern": "(^|/)\\.vaara/approvals/",
+      "unless_env": "VAARA_ALLOW_APPROVAL_EDIT",
+      "message": "Writes into Vaara's approvals directory, where a human's answer to an escalated action lands. An agent that writes there is answering its own escalation. Set VAARA_ALLOW_APPROVAL_EDIT=1 for a deliberate edit."
+    },
+    {
+      "id": "approval_shell_write",
+      "tools": [
+        "Bash"
+      ],
+      "fields": [
+        "command"
+      ],
+      "pattern": "(^|[\\s;&|(])(sed\\s+-i|tee|cp|mv|rm|unlink|touch|ln|install|rsync|dd|chmod|chown|truncate)\\b(?=[^|\\n]*\\.vaara/approvals(?=[/\\s'\"|;&<>)*]|$))|>+\\s*['\\\"]?[^\\s'\"|;&<>()]*\\.vaara/approvals(?=[/\\s'\"|;&<>)*]|$)|\\b(python3?|perl|ruby|node)\\b(?=[^|\\n]*\\.vaara/approvals(?=[/\\s'\"|;&<>)*]|$))(?=[^|\\n]*(['\\\"]([rwax]b?\\+|[wax][bt]?\\+?)['\\\"]|mode\\s*=\\s*['\\\"][wax+]|write|unlink|rename|replace|shutil))",
+      "unless_env": "VAARA_ALLOW_APPROVAL_EDIT",
+      "message": "Writes, moves or removes a file in Vaara's approvals directory from the shell. Set VAARA_ALLOW_APPROVAL_EDIT=1 for a deliberate edit."
     },
     {
       "id": "harness_config_write",

@@ -175,10 +175,8 @@ def _approval_responder(home: Path, decision: str):
         while _time.monotonic() < deadline:
             for req in approvals.glob("*.request.json") if approvals.exists() else []:
                 action_id = req.name.removesuffix(".request.json")
-                (approvals / f"{action_id}.decision.json").write_text(
-                    json.dumps({"decision": decision,
-                                "decided_at": _time.time()})
-                )
+                from vaara.approvals import write_decision
+                write_decision(action_id, decision, approvals_dir=approvals)
                 return
             _time.sleep(0.05)
 
