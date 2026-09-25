@@ -224,3 +224,13 @@ class TestLongRunCoverage:
             for alpha in (0.1, 0.05):
                 rate = self._miss_rate(seq, alpha)
                 assert abs(rate - alpha) < 0.01, (name, alpha, rate)
+class TestJsonSafeKeepsEveryKey:
+    def test_colliding_keys_are_both_kept(self):
+        from vaara._sanitize import json_safe
+        out = json_safe({1: "A", "1": "B"})
+        assert sorted(out.values()) == ["A", "B"]
+        assert json_safe({True: "x", "True": "y"}) == {"True": "x", "True<str>": "y"}
+
+    def test_a_dict_without_collisions_is_unchanged(self):
+        from vaara._sanitize import json_safe
+        assert json_safe({"a": 1, 2: "b", None: 3}) == {"a": 1, "2": "b", "None": 3}
