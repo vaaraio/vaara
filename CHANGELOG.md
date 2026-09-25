@@ -4,7 +4,7 @@ All notable changes to this project are documented here.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/)
 and this project follows [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
-## [Unreleased]
+## [1.99.0] - 2026-09-26
 
 ### Added
 - A human's answer to an escalated action is signed, and the governed agent cannot write one. Any process of the user could drop `<id>.decision.json` into `~/.vaara/approvals/` with `"approve"` in it, and the gate took it, so an escalated agent could approve itself. The gate now puts a random nonce in each request and accepts a decision only with a `mac`: HMAC-SHA256 under `~/.vaara/keys/approval-hmac.key` (made by the gate on first use, mode 0600) over the action id, the nonce and the decision. An unsigned, re-used or altered decision is ignored and the request times out, which the gate treats as a deny. The macOS app signs its decisions with the same key, checked against shared vectors (`tests/fixtures/approval_v1`) by the engine and the app's own tests. Scripts answer with `vaara.approvals.write_decision`. Two new deny rules, `approval_file_write` and `approval_shell_write`, refuse the agent any write into the approvals directory, and the signing-key read rules now cover `.key` files as well as `.pem`, so the agent cannot read the approval key. `VAARA_ALLOW_APPROVAL_EDIT=1` lifts the directory rules for a deliberate change.
