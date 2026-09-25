@@ -271,7 +271,7 @@ def cmdline(pid: int) -> str:
         if raw:
             return raw.replace(b"\0", b" ").decode(errors="replace").strip()
     except OSError:
-        pass
+        pass  # no /proc (macOS) or the process is gone; ps below answers either way
     try:
         return subprocess.run(["ps", "-o", "command=", "-p", str(pid)],
                               capture_output=True, text=True, timeout=5).stdout.strip()

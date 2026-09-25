@@ -96,6 +96,8 @@ def _register(trail: Path, now: datetime) -> bool:
             import fcntl
             fcntl.flock(fh, fcntl.LOCK_EX)
         except (ImportError, OSError):
+            # No flock (Windows, some network filesystems): the write below is
+            # still atomic, and a lost race costs one entry until next write.
             pass
         entries = [e for e in read() if Path(e["trail"]).exists() or e["trail"] == str(trail)]
         changed = len(entries) != len(read())

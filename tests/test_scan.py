@@ -48,7 +48,7 @@ def test_processes_are_marked_by_adapter_and_route():
     by_pid = {f.where: f for f in found}
     assert set(by_pid) == {"pid 10", "pid 11", "pid 12", "pid 14"}
     assert by_pid["pid 10"].state == "ungoverned"
-    assert "api.anthropic.com" in by_pid["pid 10"].detail
+    assert by_pid["pid 10"].detail.startswith("talks to an address of api.anthropic.com ")
     assert (by_pid["pid 11"].state, by_pid["pid 11"].name) == ("governed", "Claude Code")
     assert (by_pid["pid 12"].state, by_pid["pid 12"].name) == ("reachable", "Codex")
     assert by_pid["pid 14"].state == "ungoverned"
