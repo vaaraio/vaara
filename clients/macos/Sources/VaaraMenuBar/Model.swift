@@ -321,6 +321,7 @@ final class GateModel: ObservableObject {
     private var cursors: [String: Int64] = [:]
     private var handledApprovals = Set<String>()
     private var timer: Timer?
+
     /// Where approval requests are watched. Defaults to ~/.vaara/approvals
     /// (matching the hook), overridable in config for bridge/multi-machine
     /// setups where the governed engine writes elsewhere.
@@ -346,11 +347,12 @@ final class GateModel: ObservableObject {
             checkTrail(path)
             cursors[path] = maxSeq(path)  // start at now
         }
-        // Auto-add every Vaara trail under ~/.vaara on launch, so a normal
-        // user never has to hunt for or hand-add the audit DB. The default
-        // claude-code trail plus any MCP-proxy or older-install trails all
-        // light up on open. Explicit adds/removes still stick via config.
-        discoverTrails()
+        // An engine that lists its trails in sources.json has said where
+        // everything is. Walking ~/.vaara stays only for an older engine that
+        // writes no such file.
+        if !FileManager.default.fileExists(atPath: sourcesURL.path) {
+            discoverTrails()
+        }
         UNUserNotificationCenter.current()
             .requestAuthorization(options: [.alert, .sound]) { _, _ in }
         // Register in .common modes, not the default .scheduledTimer mode.
@@ -379,7 +381,7 @@ final class GateModel: ObservableObject {
     /// paths that exist; a named-but-missing trail is the engine's problem
     /// to report, not a source to watch.
     func engineTrailPaths() -> [String] {
-        var out: [String] = []
+        var out: [String] = listedTrails()
         for (url, key) in [(unifiedConfigURL, "trail_db"), (pluginConfigURL, "audit_db")] {
             guard let data = try? Data(contentsOf: url),
                   let obj = try? JSONSerialization.jsonObject(with: data) as? [String: Any],
@@ -391,6 +393,25 @@ final class GateModel: ObservableObject {
             }
         }
         return out
+    }
+
+    /// The trails in the engine's sources.json that exist on this machine.
+    func listedTrails() -> [String] {
+        guard let data = try? Data(contentsOf: sourcesURL),
+              let obj = try? JSONSerialization.jsonObject(with: data) as? [String: Any],
+              let entries = obj["sources"] as? [[String: Any]]
+        else { return [] }
+        let fm = FileManager.default
+        return entries.compactMap { $0["trail"] as? String }.compactMap { path in
+            if fm.fileExists(atPath: path) { return path }
+            // The engine wrote its own absolute path. When it runs in a VM or
+            // container with a shared home, this Mac sees the same file under
+            // its own ~/.vaara.
+            guard let r = path.range(of: "/.vaara/") else { return nil }
+            let local = VaaraHome.directory.appendingPathComponent(
+                String(path[r.upperBound...])).path
+            return fm.fileExists(atPath: local) ? local : nil
+        }
     }
 
     /// Scan ~/.vaara for SQLite files that hold a Vaara trail
@@ -474,6 +495,14 @@ final class GateModel: ObservableObject {
     }
 
     private func poll() {
+        // A trail the engine starts writing after launch appears here on its
+        // own: sources.json changes, and its new entries are watched.
+        let stamp = (try? FileManager.default.attributesOfItem(
+            atPath: sourcesURL.path)[.modificationDate]) as? Date
+        if stamp != sourcesStamp {
+            sourcesStamp = stamp
+            for path in listedTrails() { addSource(path) }
+        }
         for path in config.db_paths {
             let since = cursors[path] ?? maxSeq(path)
             for event in newDecisions(path, sinceSeq: since) {
@@ -1028,6 +1057,10 @@ final class GateModel: ObservableObject {
     /// MCP server) on its previous mode — the settings UI then showed
     /// "Block" while the engine was observing.
     private var unifiedConfigURL: URL { VaaraHome.path("config.json") }
+    /// Every trail the engine writes, listed by the engine itself
+    /// (src/vaara/audit/sources.py). Replaces walking ~/.vaara for .db files.
+    private var sourcesURL: URL { VaaraHome.path("sources.json") }
+    private var sourcesStamp: Date?
 
     private func readPluginPreset() -> String {
         guard let data = try? Data(contentsOf: pluginConfigURL),

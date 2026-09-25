@@ -5049,6 +5049,31 @@ def _cmd_init(args: argparse.Namespace) -> int:
     return 0
 
 
+def _cmd_scan(args: argparse.Namespace) -> int:
+    from vaara.integrations import scan
+
+    findings = scan.run_scan(processes=not args.no_processes, mcp=not args.no_mcp,
+                             apps=not args.no_apps)
+    if args.json:
+        print(scan.to_json(findings))
+    elif not findings:
+        print("No AI agents found: no process talking to a model, no MCP config, "
+              "no app bundling a model SDK.")
+    else:
+        width = max(len(f.name) for f in findings)
+        for f in findings:
+            print(f"{f.state.upper():<11} {f.kind:<8} {f.name:<{width}}  {f.detail}")
+            if f.where:
+                print(f"{'':<21}{'':<{width}}{f.where}")
+        counts = {s: sum(1 for f in findings if f.state == s)
+                  for s in ("governed", "reachable", "ungoverned")}
+        print(f"\n{counts['governed']} governed, {counts['reachable']} reachable, "
+              f"{counts['ungoverned']} ungoverned")
+    if args.fail_on_ungoverned and any(f.state != "governed" for f in findings):
+        return 1
+    return 0
+
+
 def _cmd_ungovern(args: argparse.Namespace) -> int:
     from vaara.integrations import init_governance as ig
 
@@ -7416,6 +7441,23 @@ def build_parser() -> argparse.ArgumentParser:
     )
     pungov.set_defaults(func=_cmd_ungovern)
 
+    pscan = sub.add_parser(
+        "scan",
+        help="Find AI agents on this machine and say whether Vaara governs "
+             "each: processes talking to model APIs or local model servers, "
+             "MCP configs anywhere under your home, and installed apps that "
+             "bundle a model or MCP SDK. Reads only; changes nothing.",
+    )
+    pscan.add_argument("--json", action="store_true", help="Print the findings as JSON")
+    pscan.add_argument("--no-processes", action="store_true", help="Skip open connections")
+    pscan.add_argument("--no-mcp", action="store_true", help="Skip the MCP config search")
+    pscan.add_argument("--no-apps", action="store_true", help="Skip installed apps")
+    pscan.add_argument(
+        "--fail-on-ungoverned", action="store_true",
+        help="Exit 1 when anything is ungoverned or reachable but not governed",
+    )
+    pscan.set_defaults(func=_cmd_scan)
+
     return p
 
 
@@ -7455,7 +7497,7 @@ def _should_auto_init(args: argparse.Namespace) -> bool:
     governance gestures.
     """
     func_name = getattr(args.func, "__name__", "")
-    if func_name in ("_cmd_init", "_cmd_ungovern"):
+    if func_name in ("_cmd_init", "_cmd_ungovern", "_cmd_scan"):
         return False
     return True
 

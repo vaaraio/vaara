@@ -6,6 +6,10 @@ and this project follows [Semantic Versioning](https://semver.org/spec/v2.0.0.ht
 
 ## [Unreleased]
 
+### Added
+- `vaara scan` finds AI agents on the machine and says whether Vaara governs each. It looks at processes with an open connection to a model API, a local model server (Ollama, LM Studio, Jan, GPT4All) or `vaara llm-proxy`; at MCP configs anywhere under the home directory, editor extension settings included; and at installed apps that bundle a model or MCP SDK, read from an Electron app's `app.asar` header or its unpacked `node_modules`. Each finding is governed, reachable (Vaara has an adapter that is not active yet, and the line says what to run) or ungoverned (no adapter, and the line names the proxy to route it through). An MCP config read by an agent whose hooks are active counts as governed, since its tool calls go through those hooks. `--json` prints the findings and `--fail-on-ungoverned` exits 1 when anything is not governed. It reads only and changes nothing. A connection is matched by the addresses a provider's API host resolves to at scan time, so on a shared CDN address the line names the host the address belongs to. `tests/test_scan.py` covers each state for processes, MCP configs and apps, a synthetic `app.asar`, and the `/proc` reader.
+- The engine lists every trail it writes in `~/.vaara/sources.json` (under `VAARA_HOME` when set). The first record a process appends to a trail registers it, `last_write` is refreshed at most once an hour, and a trail whose file is gone drops out. Opening a trail to read it registers nothing. The macOS app reads this file, watches every trail it names, trails outside `~/.vaara` included, and picks up new ones while it runs. It walks `~/.vaara` for trail files only when an older engine wrote no `sources.json`. A path the engine wrote from inside a VM or container is found under the Mac's own `~/.vaara`.
+
 ## [1.98.0] - 2026-09-25
 
 ### Added
