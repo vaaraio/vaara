@@ -2076,6 +2076,64 @@ def _cmd_attest_verify(args: argparse.Namespace) -> int:
     return 0
 
 
+def _cmd_receipt_verify_decision(args: argparse.Namespace) -> int:
+    """Verify engine-emitted decision receipts against their trail."""
+    import sqlite3
+
+    from vaara.audit import decision_receipts as dr
+
+    if not dr.signing_available():
+        print("vaara receipt verify-decision: needs pip install 'vaara[attestation]'",
+              file=sys.stderr)
+        return 2
+    db = Path(args.db or Path.home() / ".vaara" / "trail" / "audit.db").expanduser()
+    roots = [Path(p).expanduser() for p in args.paths] or [db.parent / dr.RECEIPTS_DIRNAME]
+    files: list[Path] = []
+    for root in roots:
+        if root.is_dir():
+            files.extend(sorted(root.rglob("*.json")))
+        elif root.is_file():
+            files.append(root)
+        else:
+            print(f"vaara receipt verify-decision: {root} not found", file=sys.stderr)
+            return 2
+    if not files:
+        print("vaara receipt verify-decision: no receipts found", file=sys.stderr)
+        return 1
+    hashes = None
+    if db.exists():
+        con = sqlite3.connect(f"file:{db}?mode=ro", uri=True)
+        try:
+            hashes = dict(con.execute("SELECT record_id, record_hash FROM audit_records"))
+        finally:
+            con.close()
+    key = Path(args.key).expanduser().read_bytes() if args.key else None
+    failed = 0
+    for f in files:
+        try:
+            c = dr.verify_receipt_file(f, public_key_pem=key, trail_hashes=hashes)
+        except (OSError, ValueError, KeyError) as exc:
+            failed += 1
+            print(f"FAIL  {f}: unreadable ({exc})")
+            continue
+        failed += 0 if c.ok else 1
+        if args.json:
+            print(json.dumps({
+                "path": c.path, "ok": c.ok, "signature": c.signature_ok,
+                "evidence": c.evidence_ok, "trail": c.trail_ok,
+                "decision": c.decision, "tool": c.tool, "decidedAt": c.decided_at,
+                "detail": c.detail,
+            }))
+        else:
+            mark = "OK  " if c.ok else "FAIL"
+            tail = f"  ({c.detail})" if c.detail else ""
+            print(f"{mark}  {c.decided_at}  {c.decision:<8}  {c.tool}{tail}")
+    if not args.json:
+        trail_note = "" if hashes is not None else " (no trail to check against)"
+        print(f"{len(files) - failed}/{len(files)} verified{trail_note}")
+    return 1 if failed else 0
+
+
 def _cmd_receipt_verify(args: argparse.Namespace) -> int:
     """Verify an execution receipt: signature, back-link, and optionally result."""
     try:
@@ -5955,6 +6013,27 @@ def build_parser() -> argparse.ArgumentParser:
              "result commitment, the commitment is verified against this.",
     )
     prc_verify.set_defaults(func=_cmd_receipt_verify)
+
+    prc_dec = rcsub.add_parser(
+        "verify-decision",
+        help="Verify the decision receipts the engine writes beside a trail: "
+             "ES256 signature, evidence digest, and the record in the trail. "
+             "Requires the attestation extra.",
+    )
+    prc_dec.add_argument(
+        "paths", nargs="*",
+        help="Receipt files or directories (default: the receipts beside --db)",
+    )
+    prc_dec.add_argument(
+        "--db", default=None,
+        help="Trail database the receipts belong to (default ~/.vaara/trail/audit.db)",
+    )
+    prc_dec.add_argument(
+        "--key", default=None,
+        help="Issuer public key PEM (default: issuer-es256.pub.pem in the receipts directory)",
+    )
+    prc_dec.add_argument("--json", action="store_true", help="One JSON object per receipt")
+    prc_dec.set_defaults(func=_cmd_receipt_verify_decision)
 
     def _scitt_log_args(p: argparse.ArgumentParser) -> None:
         p.add_argument(

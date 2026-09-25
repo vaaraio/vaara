@@ -756,6 +756,9 @@ class AuditTrail:
         # no records. Maintained ONLY by _index_record.
         self._pos_by_record_id: dict[str, int] = {}
         self._last_hash = ""
+        # Set by SQLiteAuditBackend.load_trail when receipts are on; called
+        # with every appended record and acts on decision records only.
+        self._receipt_sink: Optional[Callable[[AuditRecord], Any]] = None
         self._on_record = on_record
         # record_id -> the chain head the persistent store handed out for it,
         # recorded only when that head was not this trail's own previous
@@ -2181,6 +2184,11 @@ class AuditTrail:
         self._append_chained(record)
         self._maybe_auto_anchor()
         self._maybe_auto_publish()
+        # A signed receipt per decision (vaara.audit.decision_receipts). The
+        # decision is already on the chain; the sink logs its own failures.
+        sink = self._receipt_sink
+        if sink is not None:
+            sink(record)
 
     def _maybe_auto_publish(self) -> None:
         """Publish the head when the cadence is reached (fail-open)."""

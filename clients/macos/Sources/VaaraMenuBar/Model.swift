@@ -8,7 +8,11 @@
 import AppKit
 import Foundation
 import SQLite3
+import UniformTypeIdentifiers
 import UserNotifications
+#if canImport(Shared)
+import Shared
+#endif
 
 /// Where the `.vaara` tree of the engine this app watches actually sits.
 ///
@@ -83,6 +87,14 @@ enum GateState: String {
         case .red:    return "The gate blocked the AI's latest move."
         }
     }
+}
+
+/// A decision receipt read from beside a trail and what verifying it found.
+struct ReceiptEntry: Identifiable {
+    let receipt: DecisionReceipt
+    let check: ReceiptCheck
+    let trailPath: String
+    var id: String { receipt.id }
 }
 
 struct DecisionEvent: Identifiable {
@@ -776,6 +788,89 @@ final class GateModel: ObservableObject {
             all.append(contentsOf: events)
         }
         return Array(all.sorted { $0.timestamp > $1.timestamp }.prefix(limit))
+    }
+
+    /// The signed decision receipts the engine wrote beside every watched
+    /// trail (`<trail dir>/receipts/`), newest first, each verified here with
+    /// the app's own code: signature, evidence digest, and the record the
+    /// trail holds.
+    func receipts(limit: Int = 100) -> [ReceiptEntry] {
+        var all: [ReceiptEntry] = []
+        let fm = FileManager.default
+        for path in config.db_paths {
+            let dir = URL(fileURLWithPath: path).deletingLastPathComponent()
+                .appendingPathComponent("receipts")
+            let pem = try? String(contentsOf: dir.appendingPathComponent("issuer-es256.pub.pem"),
+                                  encoding: .utf8)
+            // Day folders sort by name; newest day first, newest file first.
+            let days = ((try? fm.contentsOfDirectory(atPath: dir.path)) ?? [])
+                .filter { $0.count == 10 && $0.hasPrefix("20") }
+                .sorted(by: >)
+            var loaded: [DecisionReceipt] = []
+            for day in days where loaded.count < limit {
+                let dayURL = dir.appendingPathComponent(day)
+                let files = ((try? fm.contentsOfDirectory(
+                    at: dayURL, includingPropertiesForKeys: [.contentModificationDateKey])) ?? [])
+                    .filter { $0.pathExtension == "json" }
+                for url in files {
+                    if let r = try? DecisionReceipt(url: url) { loaded.append(r) }
+                }
+            }
+            let hashes = recordHashes(path, ids: loaded.map(\.recordId))
+            for r in loaded {
+                // nil = the trail could not be read; "" = it has no such record.
+                let stored: String? = hashes.map { table in table[r.recordId] ?? "" }
+                let check: ReceiptCheck
+                if let pem {
+                    check = r.verify(publicKeyPEM: pem, trailRecordHash: stored)
+                } else {
+                    check = ReceiptCheck(signature: false, evidence: false, trail: nil,
+                                         detail: "issuer key missing beside the receipts")
+                }
+                all.append(ReceiptEntry(receipt: r, check: check, trailPath: path))
+            }
+        }
+        return Array(all.sorted { $0.receipt.decidedAt > $1.receipt.decidedAt }.prefix(limit))
+    }
+
+    /// Record hashes for the given record ids, or nil when the trail is unreadable.
+    private func recordHashes(_ path: String, ids: [String]) -> [String: String]? {
+        guard !ids.isEmpty else { return [:] }
+        return withDB(path) { db -> [String: String] in
+            var out: [String: String] = [:]
+            var stmt: OpaquePointer?
+            defer { sqlite3_finalize(stmt) }
+            guard sqlite3_prepare_v2(
+                    db, "SELECT record_hash FROM audit_records WHERE record_id = ?",
+                    -1, &stmt, nil) == SQLITE_OK else { return out }
+            for id in ids {
+                sqlite3_reset(stmt)
+                sqlite3_bind_text(stmt, 1, id, -1,
+                                  unsafeBitCast(-1, to: sqlite3_destructor_type.self))
+                if sqlite3_step(stmt) == SQLITE_ROW, let text = sqlite3_column_text(stmt, 0) {
+                    out[id] = String(cString: text)
+                }
+            }
+            return out
+        }
+    }
+
+    /// Save a copy of a receipt, with the issuer public key beside it, so it
+    /// verifies elsewhere (`vaara receipt verify-decision FILE --key KEY`).
+    func exportReceipt(_ entry: ReceiptEntry) {
+        let panel = NSSavePanel()
+        panel.nameFieldStringValue = "vaara-receipt-\(entry.receipt.recordId).json"
+        panel.allowedContentTypes = [.json]
+        NSApp.activate(ignoringOtherApps: true)
+        guard panel.runModal() == .OK, let dest = panel.url else { return }
+        let fm = FileManager.default
+        try? fm.removeItem(at: dest)
+        try? fm.copyItem(at: entry.receipt.url, to: dest)
+        let key = entry.receipt.url.deletingLastPathComponent().deletingLastPathComponent()
+            .appendingPathComponent("issuer-es256.pub.pem")
+        let keyDest = dest.deletingPathExtension().appendingPathExtension("issuer-es256.pub.pem")
+        try? fm.removeItem(at: keyDest)
+        try? fm.copyItem(at: key, to: keyDest)
     }
 
     /// Recent interventions (deny/escalate) for one agent, newest first.
