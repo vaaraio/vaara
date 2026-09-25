@@ -23,7 +23,7 @@ reproduce the published verdicts under the same checker. The aggregate runner
 `scripts/conformance_runner.py` discovers every suite, runs each checker in a
 subprocess, and returns a single pass/fail.
 
-Profile v1 covers the 50 suites listed below, at the `v0` vector format. The
+Profile v1 covers the 51 suites listed below, at the `v0` vector format. The
 authoritative, always-current enumeration for any tagged release is the runner's
 own `--list` output at that tag.
 
@@ -97,8 +97,8 @@ files. One sample package per scenario is committed under its `packages/`
 directory, so its checker runs bare like every other suite. It can also be
 pointed at any package: `_check_independent.py <package.zip>`.
 
-So a clean checkout with `rfc8785` and `cryptography` alone grades 48 passed,
-0 failed, 2 skipped across the 50 suites.
+So a clean checkout with `rfc8785` and `cryptography` alone grades 49 passed,
+0 failed, 2 skipped across the 51 suites.
 
 ## What a pass means, and what it does not
 
@@ -136,9 +136,9 @@ credential_binding_v0          release_condition_v0
 credential_grant_v0            revocation_freshness_v0
 crewai_enforcement_v0          sep2787_attestation_v0
 cross_org_handoff_v0           tap_v0
-cross_stack_revocation_v0      transparency_consistency_v0
-data_locality_v0               x402_settlement_v0
-decision_disposition_v0
+cross_stack_revocation_v0      trail_decision_v0
+data_locality_v0               transparency_consistency_v0
+decision_disposition_v0        x402_settlement_v0
 decision_pairing_v0
 ```
 
