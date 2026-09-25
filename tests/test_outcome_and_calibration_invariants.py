@@ -184,3 +184,43 @@ class TestConformalOrdering:
         before = c.effective_alpha
         c.add_calibration_point(0.1, 0.0)
         assert c.effective_alpha > before
+
+
+class TestLongRunCoverage:
+    """The README's promise: the miss rate settles at alpha whatever the
+    input sequence does (FACI, docs/formal_specification.md 5.2). Checked on
+    sequences built to break a fixed-alpha interval."""
+
+    T = 20_000
+
+    def _miss_rate(self, seq, alpha):
+        c = ConformalCalibrator(alpha=alpha)
+        miss = n = 0
+        for r in seq:
+            if c.is_calibrated_for(None):
+                miss += r > c._get_quantile()
+                n += 1
+            c.add_calibration_point(r, 0.0)
+        return miss / n
+
+    def _sequences(self):
+        import random
+        rng = random.Random(7)
+        T = self.T
+        yield "abrupt shift", [rng.random() * (0.15 if t < T // 2 else 0.75) for t in range(T)]
+        yield "regime switching", [rng.random() * (0.1 if (t // 2000) % 2 else 0.9) for t in range(T)]
+        adversarial, top = [], 0.001
+        for t in range(T):
+            # Every 500 steps, 50 residuals each above everything seen so far.
+            if t % 500 < 50:
+                top = min(1.0, top * 1.3)
+                adversarial.append(top)
+            else:
+                adversarial.append(rng.random() * top)
+        yield "always above the last maximum", adversarial
+
+    def test_miss_rate_settles_at_alpha_under_shift(self):
+        for name, seq in self._sequences():
+            for alpha in (0.1, 0.05):
+                rate = self._miss_rate(seq, alpha)
+                assert abs(rate - alpha) < 0.01, (name, alpha, rate)

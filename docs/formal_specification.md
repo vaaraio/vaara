@@ -12,7 +12,7 @@ Let an AI agent **A** operate in an environment **E** by executing a sequence of
 **Goal**: Construct an adaptive risk scorer **f: A × H to [0, 1]** and a conformal prediction set **C(aₜ) ⊆ [0, 1]** such that:
 
 1. The scorer learns from outcomes: f improves over time as action consequences are observed.
-2. The prediction set provides a distribution-free coverage guarantee: P(r*(aₜ) ∈ C(aₜ)) ≥ 1 − α for any α ∈ (0, 1), regardless of the underlying distribution of risks.
+2. The prediction set provides a distribution-free coverage guarantee: P(r*(aₜ) ∈ C(aₜ)) ≥ 1 − α for any α ∈ (0, 1) when the calibration points are exchangeable with the test point (§5.1), with no assumption on the shape of the risk distribution, and a long-run miss rate that tends to α under arbitrary distribution shift (§5.2).
 3. Temporal sequences are scored compositionally, not independently.
 
 ## 2. Action Space and Taxonomy
@@ -198,11 +198,11 @@ With K = 5 experts and η = 0.1:
 ### 8.2 Conformal Coverage Guarantee
 
 With n = 30 calibration points (minimum) and α = 0.10:
-- Finite-sample coverage: ≥ 1 − α − 1/(n+1) = 0.868 (worst case with 30 points)
-- With n = 100: ≥ 0.890
-- With n = 1000: ≥ 0.899 (approaching 0.90 asymptotically)
+- Finite-sample coverage under exchangeability: at least 1 − α = 0.90, and at most 1 − α + 1/(n+1) = 0.932 with 30 points
+- With n = 100: between 0.90 and 0.910
+- With n = 1000: between 0.90 and 0.901 (the interval tightens towards exactly 0.90)
 
-The FACI adaptive alpha further tightens this under stationarity and maintains approximate coverage under shift.
+Under shift the per-step bound no longer applies, and the FACI adaptive alpha holds the long-run miss rate at α instead. `tests/test_outcome_and_calibration_invariants.py` checks that the quantile is the ⌈(1−α)(n+1)⌉-th smallest residual and that the long-run miss rate stays within 0.01 of α on an abrupt shift, regime switching, and a sequence that keeps rising above its own maximum.
 
 ### 8.3 Cold Start Duration
 
