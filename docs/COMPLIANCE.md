@@ -490,9 +490,11 @@ correspondence.
 - **TOOL-1.3** (denial receipt with policy reference and violation
   type) - ✅. Every deny the pipeline, the deny-rule hook and the MCP
   proxy write lands on the hash chain as `action_blocked` with
-  `policy_id` (the rule, the scorer, or `capability_attenuation`) and
+  `policy_id` (the rule, the scorer, `capability_attenuation` or
+  `operator_perimeter`) and
   `violation_type` (`policy_rule`, `risk_threshold`,
-  `privilege_attenuation`, `invalid_decision`, `scorer_failure`)
+  `privilege_attenuation`, `invalid_decision`, `scorer_failure`,
+  `perimeter_filter`)
   alongside the reason. A custom scorer can name its own policy and
   violation type.
 - **TOOL-1.4** (provisional receipt before execution, upgrade to full
@@ -543,10 +545,12 @@ Vaara governs MCP servers it does not run. `vaara-mcp-proxy`
 (`vaara.integrations.mcp_proxy`) sits between an MCP client (Claude
 Code, Cursor, any MCP host) and one or more upstream MCP servers,
 reached over stdio (`--upstream`) or Streamable HTTP
-(`--upstream-url`), whoever operates them. Every `tools/call` runs
-through the Layer-1 deny rules and `intercept()` before it reaches the
-upstream. `resources/read` and `prompts/get` are gated by the operator
-allow/deny lists and recorded on the chain, and the `tools/list`,
+(`--upstream-url`), whoever operates them. A `tools/call` meets the
+operator allow/deny lists, then the Layer-1 deny rules, then
+`intercept()`, and reaches the upstream only when all three allow it.
+`resources/read` and `prompts/get` are gated by the operator allow/deny
+lists. Every one of these accesses lands on the chain, whether it was
+allowed, filtered or denied, and the `tools/list`,
 `resources/list` and `prompts/list` responses are filtered against the
 same lists before the client sees them. Vaara also ships its own MCP
 server (`vaara.integrations.mcp_server`) that exposes governance tools
@@ -560,8 +564,9 @@ to MCP clients.
 - **MCP-2.2** (network topology attestation) - ◯. Deployer concern.
   Vaara does not measure its own network position.
 - **MCP-2.3** (per-call authorization at the MCP server boundary) -
-  ✅. Every `tools/call` through the proxy passes through
-  `intercept()`, for any upstream server.
+  ✅. Every `tools/call` through the proxy is decided there by the
+  operator lists, the deny rules and `intercept()`, for any upstream
+  server, and each decision is recorded on the chain.
 - **MCP-2.4** (configuration change detection within an epoch) - ◯.
   A change to Vaara's own perimeter or policy changes the hash in
   `encoder_binary_identity`, so it shows between receipt batches. A

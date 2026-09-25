@@ -116,6 +116,31 @@ def test_verify_rejects_arbiter_acting_as_notary_without_arbiter_key():
     )
 
 
+def test_verify_rejects_an_envelope_without_an_arbiter_key_id():
+    # Nothing to compare the notary against means independence is unproven.
+    from vaara.attestation.iap import _NOTARY_SIGNING_PREFIX, _sha256
+    from vaara.attestation.overt import canonical_cbor
+
+    notary = Ed25519PrivateKey.generate()
+    envelope_cbor = canonical_cbor({"blinded_identifier": b"x" * 32})
+    log = InProcessTransparencyLog()
+    entry = log.append(envelope_cbor)
+    att = Phase3Attestation(
+        envelope_cbor=envelope_cbor,
+        notary_signature=notary.sign(_NOTARY_SIGNING_PREFIX + envelope_cbor),
+        notary_key_identifier=_sha256(_raw_pub(notary)),
+        log_index=entry.log_index,
+        log_tree_size=entry.tree_size_at_append,
+        log_root_at_append=entry.root_hash_at_append,
+        inclusion_proof_siblings=log.inclusion_proof(entry.log_index).siblings,
+        iap_identifier="iap-x",
+        attestation_timestamp_ns=1,
+    )
+    assert not verify_phase3_attestation(
+        attestation=att, notary_public_key_raw=_raw_pub(notary),
+    )
+
+
 def test_verify_rejects_wrong_notary_pubkey():
     arbiter = Ed25519PrivateKey.generate()
     notary = Ed25519PrivateKey.generate()

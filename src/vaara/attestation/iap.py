@@ -245,11 +245,14 @@ def verify_phase3_attestation(
         return False
     if not isinstance(decoded, dict):
         return False
-    if decoded.get("key_identifier") == attestation.notary_key_identifier:
+    arbiter_key_id = decoded.get("key_identifier")
+    if not isinstance(arbiter_key_id, bytes) or len(arbiter_key_id) != 32:
+        return False
+    if arbiter_key_id == attestation.notary_key_identifier:
         return False
 
     if arbiter_public_key_raw is not None:
-        if _sha256(arbiter_public_key_raw) != decoded.get("key_identifier"):
+        if _sha256(arbiter_public_key_raw) != arbiter_key_id:
             return False
 
         signing_payload = _canonical_signing_payload(
