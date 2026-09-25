@@ -781,6 +781,11 @@ class AuditTrail:
         # The verdict load_trail reached when it opened this trail, or None
         # for a trail that was not loaded from a store.
         self._load_verdict: Optional[ChainVerdict] = None
+        # Set by load_trail when the chain head the store recorded at its last
+        # write is no longer stored (sqlite_backend._HEAD_KEY). The walk below
+        # cannot see records missing from the end; this is how it hears of
+        # them, and every verify of this trail reports it.
+        self._store_head_error: Optional[str] = None
         # v0.40 multi-tenant: action_id -> tenant_id, seeded by
         # record_action_requested. Subsequent record_* calls (decision,
         # execution, escalation) look up the action_id so every record in
@@ -971,6 +976,10 @@ class AuditTrail:
         A break between adjacent seqs, a break in records this process wrote,
         or a gap no repair record names, is broken as before. See
         :class:`ChainVerdict` for why a declared gap is never intact.
+
+        A trail loaded from a store whose recorded chain head is gone is broken
+        as well, whatever the walk finds: records deleted from the end leave a
+        shorter chain that links cleanly.
         """
         with self._lock:
             length = len(self._records)
@@ -1007,7 +1016,10 @@ class AuditTrail:
             ledger.see(i, seq, record)
             prev_hash = record.record_hash
             prev_seq = seq
-        return ledger.verdict()
+        verdict = ledger.verdict()
+        if verdict.error is None and self._store_head_error is not None:
+            return ChainVerdict(error=self._store_head_error)
+        return verdict
 
     # ── Recording events ──────────────────────────────────────────
 
