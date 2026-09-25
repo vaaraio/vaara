@@ -563,6 +563,85 @@ def _constrain_seq(conn: sqlite3.Connection) -> list[int]:
 _CODE_MIGRATIONS = {6: _constrain_seq}
 
 
+#: ``audit_meta`` key for the chain head as last written: the seq and
+#: record_hash of the newest record, set in the transaction that inserts it. A
+#: tenant-scoped backend keeps its own under ``chain_head:<tenant>``.
+#:
+#: The chain alone cannot show that its newest records were deleted: what is
+#: left still links from genesis to a shorter tail. The recorded head names the
+#: record that should be there. It lives in the same file, so someone who
+#: rewrites it along with the rows defeats it, exactly as someone who rehashes
+#: the rows defeats the chain; against that, the signed receipts beside the
+#: trail are the check (``vaara receipt verify-decision --db``).
+_HEAD_KEY = "chain_head"
+
+
+def _read_head(conn: sqlite3.Connection, key: str) -> Optional[dict]:
+    """The head recorded under ``key``, or ``None`` when none is recorded.
+
+    A value that does not parse comes back as ``{"unreadable": value}``. This
+    code never writes one, so it is reported rather than skipped.
+    """
+    try:
+        row = conn.execute(
+            "SELECT value FROM audit_meta WHERE key = ?", (key,)
+        ).fetchone()
+    except sqlite3.OperationalError:
+        return None
+    if row is None:
+        return None
+    try:
+        head = json.loads(row[0])
+        if (not isinstance(head["seq"], int) or isinstance(head["seq"], bool)
+                or not isinstance(head["hash"], str)):
+            raise TypeError("seq or hash has the wrong type")
+    except (ValueError, TypeError, KeyError):
+        return {"unreadable": _as_text(row[0])[:200]}
+    return head
+
+
+def _stored_hash_at(conn: sqlite3.Connection, seq: int) -> Optional[str]:
+    """``record_hash`` at ``seq``. No tenant clause: seq is unique in the file,
+    and a tenant-scoped backend can write records carrying another tenant."""
+    row = conn.execute(
+        "SELECT record_hash FROM audit_records WHERE seq = ?", (seq,)
+    ).fetchone()
+    return None if row is None else _as_text(row[0])
+
+
+def _head_problem(conn: sqlite3.Connection, key: str, t_clause: str,
+                  t_params: list) -> Optional[str]:
+    """Why the recorded head is not on the stored chain, or ``None``.
+
+    The record at the recorded seq must still be there with the recorded
+    hash. Records past it are fine: a vaara older than the head record writes
+    without moving it. A head a purge removed is retention, not loss.
+    """
+    head = _read_head(conn, key)
+    if head is None or head.get("purged"):
+        return None
+    if "unreadable" in head:
+        return f"Chain head record in audit_meta is unreadable: {head['unreadable']!r}"
+    seq, digest = head["seq"], head["hash"]
+    stored = _stored_hash_at(conn, seq)
+    if stored == digest:
+        return None
+    if stored is not None:
+        return (
+            f"Chain head replaced: the record stored at seq {seq} is not the one "
+            f"written there (recorded hash {digest[:16]}..., stored "
+            f"{stored[:16]}...)"
+        )
+    newest = conn.execute(
+        f"SELECT MAX(seq) FROM audit_records WHERE {t_clause}", t_params
+    ).fetchone()[0]
+    left = "the trail is empty" if newest is None else f"the newest stored record is seq {newest}"
+    return (
+        f"Tail truncated: seq {seq} (record_hash {digest[:16]}...) was the newest "
+        f"record when it was written and is no longer stored; {left}"
+    )
+
+
 def _indexed_seqs(conn: sqlite3.Connection) -> Optional[set[int]]:
     """Every seq ``idx_seq`` lists, read from the index alone, or ``None``.
 
@@ -1235,6 +1314,68 @@ class SQLiteAuditBackend:
         ).fetchone()
         return (row[0] or "") if row else ""
 
+    def _head_key(self) -> str:
+        return f"{_HEAD_KEY}:{self._tenant_id}" if self._tenant_id else _HEAD_KEY
+
+    def _resume_head_locked(self, tail_hash: str) -> str:
+        """The hash the next record chains to. Caller holds the write lock.
+
+        The stored tail, unless the head recorded at the last write is gone.
+        Then the next record chains to the recorded head and takes a seq above
+        it, so the missing records stay a break in the chain that every later
+        verify reports. Chaining to the shortened tail instead would bury the
+        loss: the new record would overwrite the recorded head, and the chain
+        would verify clean from genesis to it.
+        """
+        recorded = _read_head(self._conn, self._head_key())
+        if recorded is None or "unreadable" in recorded or recorded["hash"] == tail_hash:
+            return tail_hash
+        t_clause, t_params = self._tenant_clause()
+        if _stored_hash_at(self._conn, recorded["seq"]) == recorded["hash"]:
+            return tail_hash
+        if not recorded.get("purged"):
+            logger.error(
+                "audit trail %s: %s. The next record chains to the recorded head, "
+                "so the loss stays a break in the chain",
+                self._db_path,
+                _head_problem(self._conn, self._head_key(), t_clause, t_params),
+            )
+        row = self._conn.execute(
+            "SELECT value FROM audit_meta WHERE key = 'seq_floor'"
+        ).fetchone()
+        try:
+            floor = int(row[0]) if row else -1
+        except (TypeError, ValueError):
+            floor = -1
+        if recorded["seq"] > floor:
+            self._conn.execute(
+                "INSERT OR REPLACE INTO audit_meta (key, value) VALUES ('seq_floor', ?)",
+                (str(recorded["seq"]),),
+            )
+        return recorded["hash"]
+
+    def _record_head_locked(self, record: AuditRecord) -> None:
+        """Record ``record`` as the head, inside the transaction that wrote it."""
+        seq = self._conn.execute(
+            "SELECT seq FROM audit_records WHERE record_id = ?", (record.record_id,)
+        ).fetchone()[0]
+        self._conn.execute(
+            "INSERT OR REPLACE INTO audit_meta (key, value) VALUES (?, ?)",
+            (self._head_key(),
+             json.dumps({"seq": seq, "hash": record.record_hash}, sort_keys=True)),
+        )
+
+    def head_problem(self) -> Optional[str]:
+        """Why the recorded chain head is not stored, or ``None`` when it is.
+
+        See ``_HEAD_KEY``. ``load_trail`` and ``verify_chain_streaming`` fold
+        this into their verdict; it is exposed for callers that only want the
+        tail checked.
+        """
+        t_clause, t_params = self._tenant_clause()
+        with self._lock:
+            return _head_problem(self._conn, self._head_key(), t_clause, t_params)
+
     def append_record(self, record: AuditRecord, stamp) -> str:
         """Read the chain head and insert, atomically against other writers.
 
@@ -1259,9 +1400,10 @@ class SQLiteAuditBackend:
             self._reopen_if_replaced_locked()
             self._conn.execute("BEGIN IMMEDIATE")
             with self._rollback_on_failure():
-                head = self._chain_head_locked()
+                head = self._resume_head_locked(self._chain_head_locked())
                 stamp(head)
                 self._insert_record(record)
+                self._record_head_locked(record)
         # The first record this process writes lists the trail in
         # ~/.vaara/sources.json, which is where the macOS app looks.
         if not getattr(self, "_registered", False):
@@ -1300,12 +1442,16 @@ class SQLiteAuditBackend:
         """
         t_clause, t_params = self._tenant_clause()
         with self._lock:
+            # The head before the rows: an append landing between the two adds
+            # a row past the head, which is fine, and cannot remove one.
+            head_error = _head_problem(self._conn, self._head_key(), t_clause, t_params)
             rows = self._conn.execute(
                 f"SELECT * FROM audit_records WHERE {t_clause} ORDER BY seq ASC",
                 t_params,
             ).fetchall()
 
         trail = AuditTrail(on_record=self.write_record)
+        trail._store_head_error = head_error
         # Expose the backend so the pipeline can use cross-process features
         # like pending outcomes persistence.
         trail._backend = self
@@ -1473,6 +1619,9 @@ class SQLiteAuditBackend:
         Same rule as ``AuditTrail.verify_chain_verdict``: a break is declared
         only across missing seqs that a later REPAIR_GAP record names in full.
         Only the declarations themselves are held, not the records.
+
+        A recorded chain head that is no longer stored is broken too (see
+        ``_HEAD_KEY``): the walk alone cannot see records missing from the end.
         """
         t_clause, t_params = self._tenant_clause()
         ledger = _GapLedger()
@@ -1493,6 +1642,7 @@ class SQLiteAuditBackend:
                 f"file:{self._db_path}?mode=ro", uri=True, check_same_thread=False,
             )
         try:
+            head_error = _head_problem(conn, self._head_key(), t_clause, t_params)
             for row in conn.execute(sql, params):
                 seq = row[10]
                 try:
@@ -1533,7 +1683,10 @@ class SQLiteAuditBackend:
                 conn.close()
         if on_progress is not None and seen:
             on_progress(last_seq, prev_hash)
-        return ledger.verdict()
+        verdict = ledger.verdict()
+        if verdict.error is None and head_error is not None:
+            return ChainVerdict(error=head_error)
+        return verdict
 
     def count(self) -> int:
         """Total records (scoped to tenant_id if set)."""
@@ -1890,12 +2043,24 @@ class SQLiteAuditBackend:
                 ).fetchone()
                 count = row[0]
             else:
-                cursor = self._conn.execute(
-                    f"DELETE FROM audit_records "
-                    f"WHERE timestamp < ? AND {t_clause}",
-                    [cutoff] + t_params,
-                )
-                count = cursor.rowcount
+                self._conn.execute("BEGIN IMMEDIATE")
+                with self._rollback_on_failure():
+                    heads = self._heads_on_chain_locked()
+                    cursor = self._conn.execute(
+                        f"DELETE FROM audit_records "
+                        f"WHERE timestamp < ? AND {t_clause}",
+                        [cutoff] + t_params,
+                    )
+                    count = cursor.rowcount
+                    # A head this purge deleted is retention, not truncation.
+                    # Only heads that were stored before the DELETE are
+                    # marked, so a purge cannot launder an earlier loss.
+                    for key, head in heads:
+                        if _stored_hash_at(self._conn, head["seq"]) is None:
+                            self._conn.execute(
+                                "UPDATE audit_meta SET value = ? WHERE key = ?",
+                                (json.dumps({**head, "purged": True}, sort_keys=True), key),
+                            )
 
         if count > 0:
             verb = "Would purge" if dry_run else "Purged"
@@ -1904,6 +2069,20 @@ class SQLiteAuditBackend:
                 verb, count, retention_seconds, cutoff,
             )
         return count
+
+    def _heads_on_chain_locked(self) -> list[tuple[str, dict]]:
+        """Every recorded head, any tenant, whose record is stored right now."""
+        rows = self._conn.execute(
+            "SELECT key FROM audit_meta WHERE key = ? OR key LIKE ?",
+            (_HEAD_KEY, _HEAD_KEY + ":%"),
+        ).fetchall()
+        heads = []
+        for (key,) in rows:
+            head = _read_head(self._conn, key)
+            if (head is not None and "unreadable" not in head
+                    and _stored_hash_at(self._conn, head["seq"]) == head["hash"]):
+                heads.append((key, head))
+        return heads
 
     # ── API Key management ────────────────────────────────────────
 

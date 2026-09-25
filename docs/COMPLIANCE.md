@@ -281,10 +281,13 @@ regret guarantee O(sqrt(T log N)) (see [formal_specification.md](formal_specific
 Three artefact classes, all tied to a single `action_id`:
 
 **1. The hash-chained audit trail.** Every event is SHA-256 chained to
-its predecessor. Any insertion, deletion, or edit breaks the chain and
-is detected when the chain is walked: `vaara compliance report --db`
-reports `chain_intact` for a live trail, and `vaara trail verify --zip`
-re-walks an exported one.
+its predecessor, and the store records the seq and hash of the newest
+record in the same transaction that writes it. Any insertion, deletion,
+or edit breaks the chain and is detected when the chain is walked,
+including records deleted from the end: the recorded head is then
+missing, and the next record written chains to it, so the gap stays in
+the chain. `vaara compliance report --db` reports `chain_intact` for a
+live trail, and `vaara trail verify --zip` re-walks an exported one.
 
 **2. The conformity report.** A structured per-article rollup. Each
 article gets an `EvidenceStatus` and an `EvidenceStrength`, based on
@@ -799,20 +802,29 @@ vaara trail verify \
 Properties the hash chain guarantees:
 
 - **Append-only.** Events are chained by SHA-256. Any mutation of a
-  prior event changes every downstream hash.
+  prior event changes every downstream hash. Deleting the newest events
+  is caught by the chain head the store records with each write.
 - **Tamper-evident.** `vaara trail verify` detects chain breaks,
   signature mismatches, and manifest divergence.
 - **Regulator-portable.** The handoff zip is self-contained. The
   regulator verifies against the deployer's public key without needing
   live access to the Vaara instance.
 
-Two things the chain does not give you, which are the deployer's
+Three things the chain does not give you, which are the deployer's
 problem:
 
 - **Content authenticity of the inputs.** Vaara records what the agent
   submitted. It does not attest that the tool arguments were not
   tampered with before reaching Vaara. Run Vaara inside a trust
   boundary you control.
+- **Protection from someone who can write the database file.** The
+  hashes are unkeyed and the recorded head sits in the same file, so a
+  writer who recomputes the chain and rewrites the head leaves a trail
+  that verifies. The signed decision receipts beside the trail are the
+  check against that: `vaara receipt verify-decision --db PATH` fails
+  every receipt whose record is no longer in the trail. On an agent
+  host, the deny rules keep the governed agent away from the trail,
+  the receipts and the signing key.
 - **Retention policy.** Articles 19(1) (providers) and 26(6)
   (deployers) require logs to be kept for a period appropriate to the
   intended purpose, at least six months unless other Union or national
