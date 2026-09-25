@@ -49,7 +49,23 @@ def json_safe(value: Any, _depth: int = 0) -> Any:
             key=lambda x: _json.dumps(x, sort_keys=True, default=str),
         )
     if isinstance(value, dict):
-        return {str(k): json_safe(v, _depth + 1) for k, v in value.items()}
+        out: dict[str, Any] = {}
+        for k, v in value.items():
+            key = k if isinstance(k, str) else str(k)
+            if key in out:
+                # Two keys that stringify alike ({1: .., "1": ..}, or True
+                # and "True"). Plain str() kept only the last one, so an
+                # input key vanished from the audited record. The later key
+                # takes its type in the name instead, which keeps both and
+                # shows the record was renamed. A dict with no collision is
+                # unchanged, so existing record hashes are unaffected.
+                key = f"{key}<{type(k).__name__}>"
+                n = 2
+                while key in out:
+                    key = f"{str(k)}<{type(k).__name__}#{n}>"
+                    n += 1
+            out[key] = json_safe(v, _depth + 1)
+        return out
     # Fallback for arbitrary objects. `repr(value)` is the obvious choice
     # but default `__repr__` bakes the memory address into the string
     # (`<pkg.Foo object at 0x7f...>`) — two live instances of the same
