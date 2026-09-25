@@ -1233,6 +1233,12 @@ class VaaraMCPProxy:
                 "tools/call rejected at perimeter (operator filter): %s",
                 _safe_log(tool_name),
             )
+            self._record_perimeter_audit(
+                self._agent_id_default, tool_name, arguments, "deny",
+                "Tool filtered by operator policy",
+                policy_id="operator_perimeter",
+                violation_type="perimeter_filter",
+            )
             block_payload = {
                 "vaara_blocked": True,
                 "reason": "Tool filtered by operator policy",
@@ -1282,6 +1288,8 @@ class VaaraMCPProxy:
                 reason = f"Deny rule {rule_id}: {message}"
                 self._record_perimeter_audit(
                     agent_id, tool_name, arguments, "deny", reason,
+                    policy_id=f"deny_rule:{rule_id}",
+                    violation_type="policy_rule",
                 )
                 block_payload = {
                     "vaara_blocked": True,
@@ -1523,6 +1531,15 @@ class VaaraMCPProxy:
                 "resources/read rejected at perimeter (operator filter): %s",
                 _safe_log(uri),
             )
+            self._record_perimeter_audit(
+                agent_id=self._agent_id_default,
+                tool_name="mcp.resource.read",
+                parameters={"uri": uri},
+                decision="deny",
+                reason="Resource filtered by operator policy",
+                policy_id="operator_perimeter",
+                violation_type="perimeter_filter",
+            )
             self._overt_emit(
                 surface="mcp.resource.read",
                 identifier=uri,
@@ -1574,6 +1591,15 @@ class VaaraMCPProxy:
             logger.warning(
                 "prompts/get rejected at perimeter (operator filter): %s",
                 _safe_log(name),
+            )
+            self._record_perimeter_audit(
+                agent_id=self._agent_id_default,
+                tool_name="mcp.prompt.get",
+                parameters={"name": name, "arguments": arguments},
+                decision="deny",
+                reason="Prompt filtered by operator policy",
+                policy_id="operator_perimeter",
+                violation_type="perimeter_filter",
             )
             self._overt_emit(
                 surface="mcp.prompt.get",
@@ -1637,6 +1663,8 @@ class VaaraMCPProxy:
         decision: str,
         reason: str,
         tenant_id: Optional[str] = None,
+        policy_id: str = "",
+        violation_type: str = "",
     ) -> None:
         """Write a request+decision audit pair for a read-oriented MCP access.
 
@@ -1675,6 +1703,8 @@ class VaaraMCPProxy:
                 reason=reason,
                 risk_score=0.0,
                 regulatory_domains=action_type.regulatory_domains,
+                policy_id=policy_id,
+                violation_type=violation_type,
             )
         except Exception:
             logger.exception("Failed to record perimeter audit for %s", tool_name)

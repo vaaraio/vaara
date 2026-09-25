@@ -4,6 +4,16 @@ All notable changes to this project are documented here.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/)
 and this project follows [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [Unreleased]
+
+### Fixed
+- `verify_phase3_attestation` checked that the notary key differs from the Arbiter key only when the caller also passed the Arbiter public key, so an attestation the Arbiter notarised itself verified for anyone holding just the notary key. The check now runs on every verify, and an envelope whose Arbiter key identifier is missing or not 32 bytes fails. A test builds such an attestation by hand, bypassing the emit-side check, and verify rejects it with and without the log root.
+- A `tools/call`, `resources/read` or `prompts/get` refused by the MCP proxy's operator allow/deny lists left nothing on the chain. Each is now recorded as a deny.
+- A deny on the chain named neither the policy that denied it nor the ground. Every deny the pipeline, the Claude Code deny-rule hook and the MCP proxy write now carries `policy_id` and `violation_type` in its `action_blocked` data: the deny rule (`deny_rule:<id>`, `policy_rule`), the scorer (`scorer:<class>`, `risk_threshold`, or `invalid_decision` for a verdict outside the vocabulary), `capability_attenuation` (`privilege_attenuation`), the MCP proxy's operator allow/deny lists (`operator_perimeter`, `perimeter_filter`), or a scorer crash (`scorer_failure`). A custom scorer can return its own `policy_id` and `violation_type`. `intercept()` takes `policy_id` alongside `policy_decision`. Allow and escalate records gain no keys, and a deny written straight through `AuditTrail.record_decision` without them hashes as before.
+
+### Changed
+- `docs/COMPLIANCE.md` and `docs/OVERT_CONTROLS.md` said Vaara does not act as an MCP client and that governing a third-party MCP server needed adapter work. `vaara-mcp-proxy` does that: it fronts any upstream server over stdio or Streamable HTTP, and a `tools/call` reaches it only after the operator lists, the deny rules and `intercept()` allow it. The MCP section now says so, and marks MCP-1 and MCP-3 as partial: per-call governance applies, identity measurement and change detection of the upstream server do not. `docs/OWASP_AGENTIC.md` said every audit record carries a policy id; it now says which records carry what.
+
 ## [1.99.0] - 2026-09-26
 
 ### Added

@@ -1146,6 +1146,8 @@ class AuditTrail:
         modified_parameters: Optional[dict] = None,
         approver: str = "",
         human_disposed: bool = False,
+        policy_id: str = "",
+        violation_type: str = "",
     ) -> None:
         """Record the allow/deny/escalate decision.
 
@@ -1162,6 +1164,11 @@ class AuditTrail:
         earlier decision by cache lookup, so a human did not act on THIS
         action and the record must not read as though one did. Same omission
         rule as above; empty approver adds no keys.
+
+        ``policy_id`` and ``violation_type`` say which policy denied the
+        action and on what ground. They are written on a deny only; the
+        pipeline, the deny-rule hook and the MCP proxy supply both on every
+        deny they write. Same omission rule: empty adds no keys.
         """
         event_type = (
             EventType.ACTION_BLOCKED if decision == "deny"
@@ -1242,6 +1249,15 @@ class AuditTrail:
                 self._MAX_EXECUTION_RESULT_JSON_BYTES,
             )
         data.update(disposition)
+        if decision == "deny":
+            if policy_id:
+                data["policy_id"] = self._cap_record_str(
+                    policy_id, self._MAX_TOOL_NAME_LEN,
+                )
+            if violation_type:
+                data["violation_type"] = self._cap_record_str(
+                    violation_type, self._MAX_DECISION_LABEL_LEN,
+                )
 
         self._append(AuditRecord(
             record_id=str(uuid.uuid4()),

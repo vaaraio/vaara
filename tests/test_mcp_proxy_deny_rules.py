@@ -90,6 +90,37 @@ def test_proxy_denies_and_names_the_gate(monkeypatch):
     upstream.request.assert_not_called()
 
 
+def test_proxy_deny_on_the_chain_names_the_rule(monkeypatch):
+    from vaara.audit.trail import EventType
+
+    p, _ = _proxy(monkeypatch)
+    _call(p, "run_command", {"command": PIPE_TO_SHELL})
+    [record] = p._pipeline.trail.get_records_by_type(EventType.ACTION_BLOCKED)
+    assert record.data["policy_id"] == "deny_rule:remote_pipe_to_shell"
+    assert record.data["violation_type"] == "policy_rule"
+
+
+def test_perimeter_filtered_access_is_a_deny_on_the_chain(monkeypatch):
+    from vaara.audit.trail import EventType
+
+    p, upstream = _proxy(monkeypatch)
+    for name in ("_tool_filtered", "_resource_filtered", "_prompt_filtered"):
+        monkeypatch.setattr(p, name, lambda _x: True)
+    _call(p, "run_command", {"command": "ls"})
+    p._handle_request({"jsonrpc": "2.0", "id": 2, "method": "resources/read",
+                       "params": {"uri": "file:///etc/hosts"}})
+    p._handle_request({"jsonrpc": "2.0", "id": 3, "method": "prompts/get",
+                       "params": {"name": "p"}})
+    blocked = p._pipeline.trail.get_records_by_type(EventType.ACTION_BLOCKED)
+    assert [r.tool_name for r in blocked] == [
+        "run_command", "mcp.resource.read", "mcp.prompt.get",
+    ]
+    for r in blocked:
+        assert r.data["policy_id"] == "operator_perimeter"
+        assert r.data["violation_type"] == "perimeter_filter"
+    upstream.request.assert_not_called()
+
+
 def test_proxy_passes_benign_and_records_the_gate(monkeypatch):
     p, upstream = _proxy(monkeypatch)
     gates = _gates(monkeypatch, p)
