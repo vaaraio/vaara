@@ -37,8 +37,13 @@ primitive in Section 9, MEA-2.
   approval gates. `policy.evaluate` returns the verdict carried in
   the per-call receipt.
 - **TOOL-1.3** (denial receipt with policy reference and violation
-  type) - ✅. Denials emit a `DENY` event on the hash chain with
-  policy id and violation reason.
+  type) - ✅. Every deny the pipeline, the deny-rule hook and the MCP
+  proxy write lands on the hash chain as `action_blocked` with
+  `policy_id` (the rule, the scorer, or `capability_attenuation`) and
+  `violation_type` (`policy_rule`, `risk_threshold`,
+  `privilege_attenuation`, `invalid_decision`, `scorer_failure`)
+  alongside the reason. A custom scorer can name its own policy and
+  violation type.
 - **TOOL-1.4** (provisional receipt before execution, upgrade to full
   attestation after notary validation) - ✅ structurally at AAL-3,
   with the AAL-3 to AAL-4 path now implementable in-tree. The Article
@@ -83,28 +88,40 @@ primitive in Section 9, MEA-2.
 
 ## Section 11.5 - MCP Server Trust Governance
 
-Vaara ships an MCP server (`vaara.integrations.mcp_server`) that
-exposes governance tools to MCP clients. It does not currently act
-as an MCP *client* governing tools hosted on third-party MCP
-servers. The MCP-1/2/3 control set therefore applies to Vaara only
-in the **custom (operator-hosted)** mode (MCP-2): the operator runs
-the Vaara MCP server in their own environment.
+Vaara governs MCP servers it does not run. `vaara-mcp-proxy`
+(`vaara.integrations.mcp_proxy`) sits between an MCP client (Claude
+Code, Cursor, any MCP host) and one or more upstream MCP servers,
+reached over stdio (`--upstream`) or Streamable HTTP
+(`--upstream-url`), whoever operates them. Every `tools/call` runs
+through the Layer-1 deny rules and `intercept()` before it reaches the
+upstream. `resources/read` and `prompts/get` are gated by the operator
+allow/deny lists and recorded on the chain, and the `tools/list`,
+`resources/list` and `prompts/list` responses are filtered against the
+same lists before the client sees them. Vaara also ships its own MCP
+server (`vaara.integrations.mcp_server`) that exposes governance tools
+to MCP clients.
 
-- **MCP-2.1** (server binary identity in co-epoch binding) - ◐ at
-  v0.12.0: arbiter binary identity is captured in
-  `encoder_binary_identity`. A dedicated MCP-server binary identity
-  field is future work.
+- **MCP-2.1** (server binary identity in co-epoch binding) - ◐. The
+  arbiter binary identity, the perimeter configuration and the
+  `--policy` file hash are bound into `encoder_binary_identity` on
+  every OVERT receipt. The upstream server's own binary identity is
+  not measured.
 - **MCP-2.2** (network topology attestation) - ◯. Deployer concern.
   Vaara does not measure its own network position.
 - **MCP-2.3** (per-call authorization at the MCP server boundary) -
-  ✅. Every MCP tool invocation passes through `intercept()`.
+  ✅. Every `tools/call` through the proxy passes through
+  `intercept()`, for any upstream server.
 - **MCP-2.4** (configuration change detection within an epoch) - ◯.
-  Future work.
+  A change to Vaara's own perimeter or policy changes the hash in
+  `encoder_binary_identity`, so it shows between receipt batches. A
+  change on the upstream server, such as a tool definition that
+  changes mid-epoch, is not detected.
 - **MCP-1** and **MCP-3** (managed-vendor and external-third-party
-  MCP servers) - outside Vaara's current surface. An operator using
-  Vaara as the *governor in front of* a third-party MCP server would
-  need adapter work. The architecture admits it but no implementation
-  ships today.
+  MCP servers) - ◐. The proxy governs these the same way as MCP-2:
+  per-call authorization, deny rules, perimeter filtering and the
+  audit record apply to any upstream it fronts. What is missing is
+  the same as MCP-2.1 and MCP-2.4: no identity measurement or change
+  detection of the upstream server itself.
 
 ## Section 12 - Multi-Agent System Controls
 

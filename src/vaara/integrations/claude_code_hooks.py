@@ -276,6 +276,7 @@ def _record_call(cfg: dict, agent: str, tool_name: str, tool_input: dict,
             policy_decision="deny" if rule_id else None,
             policy_reason=(f"deny rule {rule_id}: {context.get('rule_message', '')}"
                            if rule_id else ""),
+            policy_id=f"deny_rule:{rule_id}" if rule_id else "",
         )
     except Exception as exc:
         _note_trail_failure(cfg, exc, stage="record_call")

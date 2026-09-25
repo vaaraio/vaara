@@ -229,21 +229,27 @@ def verify_phase3_attestation(
         ):
             return False
 
-    if arbiter_public_key_raw is not None:
-        try:
-            import cbor2
-        except ImportError as exc:
-            raise EnvelopeError(
-                "cbor2 not installed. Install with: pip install "
-                "'vaara[attestation]'"
-            ) from exc
+    try:
+        import cbor2
+    except ImportError as exc:
+        raise EnvelopeError(
+            "cbor2 not installed. Install with: pip install "
+            "'vaara[attestation]'"
+        ) from exc
 
+    # Structural independence is checked on every verify, not only when
+    # the caller also holds the arbiter key.
+    try:
         decoded = cbor2.loads(attestation.envelope_cbor)
-        if not isinstance(decoded, dict):
-            return False
+    except Exception:
+        return False
+    if not isinstance(decoded, dict):
+        return False
+    if decoded.get("key_identifier") == attestation.notary_key_identifier:
+        return False
+
+    if arbiter_public_key_raw is not None:
         if _sha256(arbiter_public_key_raw) != decoded.get("key_identifier"):
-            return False
-        if decoded.get("key_identifier") == attestation.notary_key_identifier:
             return False
 
         signing_payload = _canonical_signing_payload(

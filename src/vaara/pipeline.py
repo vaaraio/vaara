@@ -337,6 +337,9 @@ class InterceptionPipeline:
         self._metrics = PipelineMetrics()
         self._metrics_lock = threading.Lock()
 
+    def _scorer_policy_id(self) -> str:
+        return f"scorer:{type(self.scorer).__name__}"
+
     def intercept(
         self,
         agent_id: str,
@@ -352,6 +355,7 @@ class InterceptionPipeline:
         _event_type_override: Optional[EventType] = None,
         policy_decision: Optional[str] = None,
         policy_reason: str = "",
+        policy_id: str = "",
     ) -> InterceptionResult:
         """Intercept an agent action request.
 
@@ -370,7 +374,13 @@ class InterceptionPipeline:
         scored, and the score is recorded, but the decision on the chain is
         that verdict with ``policy_reason``. Without it a call a rule blocked
         was recorded as the scorer's allow, which is evidence of the opposite
-        of what happened.
+        of what happened. ``policy_id`` names the rule that reached it.
+
+        Every deny on the chain carries ``policy_id`` (which policy denied)
+        and ``violation_type`` (on what ground): ``policy_rule``,
+        ``privilege_attenuation``, ``risk_threshold``, ``invalid_decision``
+        or ``scorer_failure``. A scorer may name its own by returning
+        ``policy_id`` and ``violation_type`` string keys.
 
         Returns an InterceptionResult — check .allowed before executing.
         """
@@ -485,6 +495,8 @@ class InterceptionPipeline:
                     reason=fail_reason,
                     risk_score=1.0,
                     regulatory_domains=action_type.regulatory_domains,
+                    policy_id=self._scorer_policy_id(),
+                    violation_type="scorer_failure",
                 )
             except Exception:
                 logger.exception(
@@ -634,7 +646,16 @@ class InterceptionPipeline:
             decision_str = raw_decision.strip().lower()
         else:
             decision_str = "deny"
+        # Which policy a deny came from and on what ground. The scorer's
+        # thresholds are the policy unless the scorer names its own.
+        deny_policy_id = scorer_result.get("policy_id")
+        if not isinstance(deny_policy_id, str) or not deny_policy_id:
+            deny_policy_id = self._scorer_policy_id()
+        violation_type = scorer_result.get("violation_type")
+        if not isinstance(violation_type, str) or not violation_type:
+            violation_type = "risk_threshold"
         if decision_str not in _FINE_TO_COARSE:
+            violation_type = "invalid_decision"
             logger.warning(
                 "Scorer returned unknown action=%r for action_id=%s; "
                 "failing closed to 'deny'",
@@ -694,6 +715,8 @@ class InterceptionPipeline:
             # applies, and a modification the caller must not retry.
             decision_detail = None
             modified_parameters = None
+            deny_policy_id = "capability_attenuation"
+            violation_type = "privilege_attenuation"
             reason = _cap_str(
                 f"privilege attenuation violation ({attenuation_reason})"
                 + (f"; {reason}" if reason else ""),
@@ -755,6 +778,8 @@ class InterceptionPipeline:
             modified_parameters = None
             reason = _cap_str(policy_reason or f"policy: {decision_str}",
                               _MAX_DECISION_REASON_LEN, "reason")
+            deny_policy_id = policy_id or "policy"
+            violation_type = "policy_rule"
             approver = _disposition.POLICY
             human_disposed = False
 
@@ -776,6 +801,8 @@ class InterceptionPipeline:
             modified_parameters=modified_parameters,
             approver=approver,
             human_disposed=human_disposed,
+            policy_id=deny_policy_id,
+            violation_type=violation_type,
         )
 
         if decision_str == "escalate":

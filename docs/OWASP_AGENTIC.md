@@ -341,8 +341,10 @@ information. Over-reliance bypasses oversight.
   reports ship in PDF and Markdown.
 - ✅ Content provenance and policy enforcement, verifiable metadata,
   source identifiers, timestamps, integrity hashes: every audit
-  record carries policy id, action context, conformal interval,
-  audit hash. OVERT envelope additionally signs the action class.
+  record carries action context and its chain hash, every risk score
+  carries its conformal interval, and every deny carries the policy id
+  and violation type. OVERT envelope additionally signs the action
+  class.
 - ◐ Adaptive Trust Calibration, adjust agent autonomy based on
   contextual risk scoring: the risk score per call is contextual.
   the reviewer's autonomy adjustment is policy-driven by the

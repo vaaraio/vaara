@@ -99,7 +99,9 @@
       "modified_parameters": {
         "amount": 5000,
         "to": "acct:9"
-      }
+      },
+      "policy_id": "scorer:_FixedScorer",
+      "violation_type": "risk_threshold"
     },
     "regulatory_articles": [
       {
@@ -116,7 +118,7 @@
       }
     ],
     "previous_hash": "3cf551f5fb4d4f80b1ce6e8b0e47ada1d1a501e5bd7542cdf12c98820a4a1a14",
-    "record_hash": "a195f91e24af2c6db4e2f97128f619a6950778b761dbf9d8015a3e5dec576634",
+    "record_hash": "389a0779965f88a9dc549d4b267c40fbdfde918b8fff5e17aa8090e0e614a87a",
     "system_operation": "blocking",
     "data_usage": "risk_score+thresholds",
     "decision_making": "threshold_match",
@@ -161,8 +163,8 @@
         "how_satisfied": "All agent actions are logged as events for incident detection"
       }
     ],
-    "previous_hash": "a195f91e24af2c6db4e2f97128f619a6950778b761dbf9d8015a3e5dec576634",
-    "record_hash": "2342bf5a871660e318de5be401ad876a75d3493e853b8830c64cae32b1a9fd67",
+    "previous_hash": "389a0779965f88a9dc549d4b267c40fbdfde918b8fff5e17aa8090e0e614a87a",
+    "record_hash": "e6f7cc743a4d43e7db82ca8bcdcc00b77905eafb6e59112f85afb4b573af827e",
     "system_operation": "logging_intake",
     "data_usage": "tool_args+context",
     "decision_making": "n/a",
@@ -200,8 +202,8 @@
         "how_satisfied": "Conformal calibration provides distribution-free coverage guarantees on risk estimates"
       }
     ],
-    "previous_hash": "2342bf5a871660e318de5be401ad876a75d3493e853b8830c64cae32b1a9fd67",
-    "record_hash": "ebf671652f40a34554d2724cb772b8c8ece3daee33372deadc07d5679314e5e9",
+    "previous_hash": "e6f7cc743a4d43e7db82ca8bcdcc00b77905eafb6e59112f85afb4b573af827e",
+    "record_hash": "7ae1f1da64b7c453759e2965d8df319c5f182e6751308bfdca1ed6259f97a4b4",
     "system_operation": "scoring",
     "data_usage": "tool_args+history+policy",
     "decision_making": "heuristic_score",
@@ -235,8 +237,8 @@
         "how_satisfied": "Decision records include risk scores, confidence intervals, and contributing signals"
       }
     ],
-    "previous_hash": "ebf671652f40a34554d2724cb772b8c8ece3daee33372deadc07d5679314e5e9",
-    "record_hash": "06ba40d23377722cc26ce4ad4aa23858969d622e434e08e5f872d7c8e2db43d2",
+    "previous_hash": "7ae1f1da64b7c453759e2965d8df319c5f182e6751308bfdca1ed6259f97a4b4",
+    "record_hash": "cf3418f3d6119180be713d29077799c17c1e5701f3322ec80dab1fb4a99589d0",
     "system_operation": "decision_threshold",
     "data_usage": "risk_score+thresholds",
     "decision_making": "threshold_match",

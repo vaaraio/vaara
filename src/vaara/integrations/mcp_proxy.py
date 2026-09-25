@@ -1282,6 +1282,8 @@ class VaaraMCPProxy:
                 reason = f"Deny rule {rule_id}: {message}"
                 self._record_perimeter_audit(
                     agent_id, tool_name, arguments, "deny", reason,
+                    policy_id=f"deny_rule:{rule_id}",
+                    violation_type="policy_rule",
                 )
                 block_payload = {
                     "vaara_blocked": True,
@@ -1637,6 +1639,8 @@ class VaaraMCPProxy:
         decision: str,
         reason: str,
         tenant_id: Optional[str] = None,
+        policy_id: str = "",
+        violation_type: str = "",
     ) -> None:
         """Write a request+decision audit pair for a read-oriented MCP access.
 
@@ -1675,6 +1679,8 @@ class VaaraMCPProxy:
                 reason=reason,
                 risk_score=0.0,
                 regulatory_domains=action_type.regulatory_domains,
+                policy_id=policy_id,
+                violation_type=violation_type,
             )
         except Exception:
             logger.exception("Failed to record perimeter audit for %s", tool_name)

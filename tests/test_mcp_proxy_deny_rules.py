@@ -90,6 +90,16 @@ def test_proxy_denies_and_names_the_gate(monkeypatch):
     upstream.request.assert_not_called()
 
 
+def test_proxy_deny_on_the_chain_names_the_rule(monkeypatch):
+    from vaara.audit.trail import EventType
+
+    p, _ = _proxy(monkeypatch)
+    _call(p, "run_command", {"command": PIPE_TO_SHELL})
+    [record] = p._pipeline.trail.get_records_by_type(EventType.ACTION_BLOCKED)
+    assert record.data["policy_id"] == "deny_rule:remote_pipe_to_shell"
+    assert record.data["violation_type"] == "policy_rule"
+
+
 def test_proxy_passes_benign_and_records_the_gate(monkeypatch):
     p, upstream = _proxy(monkeypatch)
     gates = _gates(monkeypatch, p)

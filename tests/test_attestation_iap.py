@@ -85,6 +85,37 @@ def test_rejects_arbiter_acting_as_notary():
         )
 
 
+def test_verify_rejects_arbiter_acting_as_notary_without_arbiter_key():
+    # Built by hand, bypassing emit's check: the verifier must catch it on
+    # its own, even when the caller does not hold the arbiter key.
+    from vaara.attestation.iap import _NOTARY_SIGNING_PREFIX, _sha256
+
+    arbiter = Ed25519PrivateKey.generate()
+    log = InProcessTransparencyLog()
+    envelope_cbor = envelope_to_canonical_cbor(_make_envelope(arbiter))
+    entry = log.append(envelope_cbor)
+    proof = log.inclusion_proof(entry.log_index)
+    forged = Phase3Attestation(
+        envelope_cbor=envelope_cbor,
+        notary_signature=arbiter.sign(_NOTARY_SIGNING_PREFIX + envelope_cbor),
+        notary_key_identifier=_sha256(_raw_pub(arbiter)),
+        log_index=entry.log_index,
+        log_tree_size=entry.tree_size_at_append,
+        log_root_at_append=entry.root_hash_at_append,
+        inclusion_proof_siblings=proof.siblings,
+        iap_identifier="iap-forged",
+        attestation_timestamp_ns=1,
+    )
+    assert not verify_phase3_attestation(
+        attestation=forged, notary_public_key_raw=_raw_pub(arbiter),
+    )
+    assert not verify_phase3_attestation(
+        attestation=forged,
+        notary_public_key_raw=_raw_pub(arbiter),
+        expected_log_root=log.root_hash,
+    )
+
+
 def test_verify_rejects_wrong_notary_pubkey():
     arbiter = Ed25519PrivateKey.generate()
     notary = Ed25519PrivateKey.generate()
