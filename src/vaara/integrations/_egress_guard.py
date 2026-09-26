@@ -30,14 +30,17 @@ import http.client
 import ipaddress
 import os
 import socket
+import ssl
 import urllib.error
 import urllib.request
-from typing import Any, Optional
+from typing import Any, Callable, Optional, Union
 from urllib.parse import urlsplit
 
 # urllib's default redirect cap is 10; a remote MCP endpoint that needs more
 # than a couple of redirects to answer a JSON-RPC POST is broken or hostile.
 _MAX_REDIRECTS = 3
+
+_IPAddress = Union[ipaddress.IPv4Address, ipaddress.IPv6Address]
 
 # Process-wide opt-in to permit private/loopback targets. Read at call time so
 # tests and embedders can set it per process.
@@ -55,7 +58,7 @@ def _env_allows_private() -> bool:
     return os.environ.get(_ALLOW_ENV, "").strip().lower() in ("1", "true", "yes", "on")
 
 
-def _is_metadata(ip: ipaddress._BaseAddress) -> bool:
+def _is_metadata(ip: _IPAddress) -> bool:
     """True iff the address is a cloud instance-metadata endpoint.
 
     Refused unconditionally (even under the private-host opt-in): there is no
@@ -67,7 +70,7 @@ def _is_metadata(ip: ipaddress._BaseAddress) -> bool:
     return ip == _METADATA_V4 or ip == _METADATA_V6
 
 
-def _ip_is_blocked(ip: ipaddress._BaseAddress, *, allow_private: bool = False) -> bool:
+def _ip_is_blocked(ip: _IPAddress, *, allow_private: bool = False) -> bool:
     """True iff this resolved address must not be reached.
 
     The metadata addresses, the unspecified address (0.0.0.0 / ::), reserved
@@ -87,7 +90,7 @@ def _ip_is_blocked(ip: ipaddress._BaseAddress, *, allow_private: bool = False) -
     return False
 
 
-def _coerce_dotless_host(host: str) -> Optional[ipaddress._BaseAddress]:
+def _coerce_dotless_host(host: str) -> Optional[_IPAddress]:
     """Parse a bare decimal or hex integer host (``2852039166``, ``0xa9fea9fe``).
 
     Browsers and ``inet_aton`` accept these as IPv4; ``ipaddress`` does not, so
@@ -207,7 +210,7 @@ def pick_egress_ip(host: str, port: Optional[int], *, allow_private: bool = Fals
         if _ip_is_blocked(ip, allow_private=allow_private):
             raise EgressBlocked(f"upstream host {host!r} resolves to a blocked address {ip}")
         if chosen is None:
-            chosen = addr
+            chosen = str(addr)
     if chosen is None:
         raise EgressBlocked(f"upstream host does not resolve: {host!r}")
     return chosen
@@ -220,6 +223,11 @@ class _PinnedHTTPConnection(http.client.HTTPConnection):
     opened to the validated IP literal so no re-resolution can occur
     between the egress check and the connect.
     """
+
+    # Set by CPython's HTTPConnection; typeshed does not declare them.
+    source_address: Optional[tuple[str, int]]
+    _tunnel_host: Optional[str]
+    _tunnel: Callable[[], None]
 
     def __init__(self, host: str, *, _allow_private: bool = False, **kwargs: Any) -> None:
         super().__init__(host, **kwargs)
@@ -239,6 +247,12 @@ class _PinnedHTTPSConnection(http.client.HTTPSConnection):
     original hostname for SNI and certificate verification, so a rebind to
     an unvalidated address cannot also present a valid certificate.
     """
+
+    # Set by CPython's HTTPSConnection; typeshed does not declare them.
+    source_address: Optional[tuple[str, int]]
+    _tunnel_host: Optional[str]
+    _tunnel: Callable[[], None]
+    _context: ssl.SSLContext
 
     def __init__(self, host: str, *, _allow_private: bool = False, **kwargs: Any) -> None:
         super().__init__(host, **kwargs)
@@ -274,6 +288,9 @@ class _PinnedHTTPHandler(urllib.request.HTTPHandler):
 
 class _PinnedHTTPSHandler(urllib.request.HTTPSHandler):
     """urllib handler that dials HTTPS through a validated, pinned IP."""
+
+    # Set by CPython's HTTPSHandler; typeshed does not declare it.
+    _context: ssl.SSLContext
 
     def __init__(self, allow_private: bool) -> None:
         super().__init__()

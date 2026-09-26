@@ -53,7 +53,7 @@ import json
 import random
 from dataclasses import dataclass, field
 from pathlib import Path
-from typing import Optional
+from typing import Any, Optional
 
 from vaara._sanitize import strict_json_dumps
 from vaara.pipeline import InterceptionPipeline
@@ -284,7 +284,7 @@ class TraceGenerator:
 
         Returns calibration statistics.
         """
-        stats = {
+        stats: dict[str, Any] = {
             "traces_processed": 0,
             "steps_processed": 0,
             "decisions": {"allow": 0, "deny": 0, "escalate": 0},

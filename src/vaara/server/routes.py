@@ -8,7 +8,7 @@ import secrets
 import time
 import uuid
 from datetime import datetime, timezone
-from typing import Optional
+from typing import Any, Optional
 
 from fastapi import FastAPI, Header, HTTPException, Request, status
 from fastapi.responses import JSONResponse
@@ -26,7 +26,7 @@ _SERVER_VERSION = "1.0.2"
 
 
 def _error(code: str, message: str, http_status: int, **details) -> HTTPException:
-    body = {"error": {"code": code, "message": message}}
+    body: dict[str, Any] = {"error": {"code": code, "message": message}}
     if details:
         body["error"]["details"] = details
     return HTTPException(status_code=http_status, detail=body)
@@ -318,18 +318,18 @@ def register(app: FastAPI, state: ServerState) -> None:
                 http_status=status.HTTP_409_CONFLICT,
             )
 
-        if (req.path is None) == (req.body is None):
+        source = req.body if req.body is not None else req.path
+        if source is None or (req.path is not None and req.body is not None):
             raise _error(
                 code="invalid_request",
                 message="Exactly one of `path` or `body` must be supplied.",
                 http_status=status.HTTP_400_BAD_REQUEST,
             )
 
-        source = req.body if req.body is not None else req.path
         try:
             if registry is not None:
                 result = registry.reload(tenant_id, source, format=req.format)
-            else:
+            elif controller is not None:
                 result = controller.reload(source, format=req.format)
         except PolicyError as exc:
             raise _error(

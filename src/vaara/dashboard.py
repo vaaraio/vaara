@@ -359,7 +359,7 @@ class _Handler(BaseHTTPRequestHandler):
         is_yaml = path.suffix in (".yaml", ".yml")
         if is_yaml:
             try:
-                import yaml
+                import yaml  # type: ignore[import-untyped]
             except ImportError:
                 self._json({"error": "editing a YAML policy needs the yaml extra"}, 400)
                 return
