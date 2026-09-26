@@ -32,6 +32,8 @@ import pytest
 
 from vaara.integrations import codex
 
+from tests.hook_breaks import BREAKS, break_engine
+
 pytest.importorskip("cryptography")
 
 CODEX = os.environ.get("VAARA_CODEX_BIN") or shutil.which("codex")
@@ -277,3 +279,24 @@ def test_codex_cannot_delete_or_rewrite_its_own_trail(tmp_path):
         ("Bash", "action_blocked"),
         ("Write", "action_blocked"),
     ], log
+
+
+@pytest.mark.parametrize("how", sorted(BREAKS))
+def test_codex_refuses_a_call_its_hook_cannot_decide(tmp_path, how):
+    model = _Model([
+        {"call": "exec_command", "args": {"cmd": "echo governed > ran.txt"}},
+        {"say": "done"},
+    ])
+    try:
+        env, work, _trail = _setup(tmp_path, model.port)
+        env.update(break_engine(tmp_path / "bin" / "vaara", how))
+        proc = subprocess.run(
+            [CODEX, "exec", "--skip-git-repo-check", "-C", str(work), "go"],
+            env=env, stdin=subprocess.DEVNULL, capture_output=True, text=True, timeout=180)
+    finally:
+        model.server.shutdown()
+    log = proc.stdout[-3000:] + proc.stderr[-3000:]
+
+    out = model.outputs()
+    assert "fail-closed" in out.get("call_0", ""), (out, log)
+    assert not (work / "ran.txt").exists(), log

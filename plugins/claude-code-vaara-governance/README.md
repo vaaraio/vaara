@@ -91,7 +91,7 @@ The config file, hand-editable:
 | `agent_id` | string | Agent id written to the audit chain (default `claude-code`). |
 | `audit_db` | path | Audit DB path (default `~/.vaara/claude-code/audit.db`). |
 | `article50_statement` | string | When set, SessionStart records this as an EU AI Act Article 50(1) disclosure event into the audit trail with the session id, before the session's first tool call. Off when absent. |
-| `fail_open` | `false` (default), `true` | What happens to `mcp__*` calls in protect mode when they cannot be scored or recorded: the `vaara` package is not importable, or the audit trail cannot be opened or written. Default: fail closed (block, and say why). `true` passes them through unscored. The deny rules do not need the trail, so they keep enforcing either way. |
+| `fail_open` | `false` (default), `true` | What happens to a tool call the hook cannot decide. That covers a hook that crashes, cannot find `vaara` or `python3`, or gives no verdict within 80 seconds, and `mcp__*` calls in protect mode that cannot be scored or recorded because the `vaara` package is not importable or the audit trail cannot be opened or written. Default: fail closed (block, and say why). `true` lets them run. The deny rules do not need the trail, so they keep enforcing whenever the hook runs. |
 
 Environment variables override the file (useful for CI or a single session):
 
@@ -106,6 +106,7 @@ Environment variables override the file (useful for CI or a single session):
 | `VAARA_PLUGIN_DENY_PATTERNS_FILE` | Replace the bundled `policies/default_deny.json` with your own. |
 | `VAARA_PLUGIN_ARTICLE50_STATEMENT` | Same as `"article50_statement"`. |
 | `VAARA_PLUGIN_FAIL_OPEN=1` | Same as `"fail_open": true`. |
+| `VAARA_HOOK_DEADLINE` | Seconds the PreToolUse hook has to give a verdict before the call is blocked. Can shorten the default 80, never lengthen it: past the 90 second hook timeout Claude Code would let the call run. |
 
 ## Extending the deny patterns
 

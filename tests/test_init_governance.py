@@ -4,6 +4,7 @@ from __future__ import annotations
 import json
 from pathlib import Path
 
+from vaara.integrations import _hook_gate
 from vaara.integrations import init_governance as ig
 
 
@@ -21,7 +22,8 @@ def test_write_claude_hooks_creates_all_three_events(tmp_path):
     hooks = _read(settings)["hooks"]
     assert set(hooks) == {"SessionStart", "PreToolUse", "PostToolUse"}
     cmd = hooks["PreToolUse"][0]["hooks"][0]["command"]
-    assert cmd == "/usr/bin/vaara hook pre-tool-use"
+    assert cmd == _hook_gate.pre_command("/usr/bin/vaara")
+    assert hooks["PreToolUse"][0]["hooks"][0]["timeout"] == _hook_gate.HOST_TIMEOUT
     assert hooks["PreToolUse"][0]["matcher"] == ig.HOOK_MATCHER
     # SessionStart has no matcher.
     assert "matcher" not in hooks["SessionStart"][0]
@@ -65,7 +67,7 @@ def test_write_claude_hooks_preserves_foreign_hooks_and_settings(tmp_path):
         for h in group["hooks"]
     ]
     assert "/opt/other-tool run" in commands
-    assert "/usr/bin/vaara hook pre-tool-use" in commands
+    assert _hook_gate.pre_command("/usr/bin/vaara") in commands
 
 
 def test_rewriting_with_new_binary_path_does_not_duplicate(tmp_path):
@@ -75,7 +77,7 @@ def test_rewriting_with_new_binary_path_does_not_duplicate(tmp_path):
     hooks = _read(settings)["hooks"]
     commands = [h["command"] for h in hooks["PreToolUse"][0]["hooks"]]
     # Old entry stripped, only the new one remains.
-    assert commands == ["/new/vaara hook pre-tool-use"]
+    assert commands == [_hook_gate.pre_command("/new/vaara")]
 
 
 def test_remove_claude_hooks_leaves_foreign_hooks(tmp_path):

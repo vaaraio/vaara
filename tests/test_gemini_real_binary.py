@@ -30,6 +30,8 @@ from pathlib import Path
 
 import pytest
 
+from tests.hook_breaks import BREAKS, break_engine
+
 from vaara.integrations import gemini
 
 pytest.importorskip("cryptography")
@@ -217,3 +219,25 @@ def test_gemini_cannot_delete_or_rewrite_its_own_trail(tmp_path):
         ("Bash", "action_blocked"),
         ("Bash", "action_blocked"),
     ], log
+
+
+@pytest.mark.parametrize("how", sorted(BREAKS))
+def test_gemini_refuses_a_call_its_hook_cannot_decide(tmp_path, how):
+    model = _Model([
+        _call("run_shell_command", command="echo governed > ran.txt"),
+        {"text": "done"},
+    ])
+    try:
+        env, work, _trail = _setup(tmp_path, model.port)
+        env.update(break_engine(tmp_path / "bin" / "vaara", how))
+        proc = subprocess.run(
+            [GEMINI, "-p", "go", "--yolo", "-m", "gemini-2.5-flash"],
+            cwd=work, env=env, stdin=subprocess.DEVNULL, capture_output=True,
+            text=True, timeout=180)
+    finally:
+        model.server.shutdown()
+    log = proc.stdout[-3000:] + proc.stderr[-3000:]
+
+    out = model.outputs()
+    assert out and "fail-closed" in out[0], (out, log)
+    assert not (work / "ran.txt").exists(), log

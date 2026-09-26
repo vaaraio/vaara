@@ -22,7 +22,7 @@ from pathlib import Path
 
 import pytest
 
-from vaara.integrations import codex
+from vaara.integrations import _hook_gate, codex
 from vaara.integrations import init_governance as ig
 
 pytest.importorskip("cryptography")
@@ -209,7 +209,7 @@ def test_install_keeps_other_hooks_and_is_idempotent(tmp_path):
     pre = cfg["hooks"]["PreToolUse"]
     assert pre[0] == mine
     assert pre[1] == {"hooks": [{"type": "command",
-                                 "command": "/opt/bin/vaara hook pre-tool-use --client codex",
+                                 "command": _hook_gate.pre_command("/opt/bin/vaara", "codex"),
                                  "timeout": codex.HOOK_TIMEOUT}]}
     assert "PostToolUse" in cfg["hooks"]
     assert codex.install_hooks("/opt/bin/vaara", d) is False

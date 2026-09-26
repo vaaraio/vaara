@@ -19,8 +19,10 @@ say whether Codex will actually run the hook. Vaara does not write the
 trust entry itself: that review is Codex's, and the user answers it.
 
 Codex has no fail-closed switch. A hook that crashes or outlives its
-timeout lets the call through, as in Claude Code, so the timeout sits
-above the approval handshake's 60 s wait.
+timeout lets the call through, as in Claude Code, so the pre-tool-use
+command is the gate in :mod:`vaara.integrations._hook_gate`: any ending
+but Vaara's own verdict blocks the call, and the gate's deadline sits
+inside the timeout and above the approval handshake's 60 s wait.
 
 Codex reports its shell tools as ``Bash`` with ``tool_input.command``, as
 Claude Code does. ``apply_patch`` carries the whole patch in
@@ -41,14 +43,16 @@ import shutil
 from pathlib import Path
 from typing import Any, Optional
 
+from vaara.integrations import _hook_gate
+
 AGENT_ID = "codex"
 
 #: Hook entries carry this in their command, as the Claude Code ones do.
 _MARKER = "vaara hook "
 
-#: Longer than the approval handshake's default 60 s wait, so an escalation
-#: held for a human is answered before Codex gives up on the hook.
-HOOK_TIMEOUT = 90
+#: Longer than the gate's deadline, which is longer than the approval
+#: handshake's default 60 s wait.
+HOOK_TIMEOUT = _hook_gate.HOST_TIMEOUT
 
 #: Codex's event names in hooks.json and the key labels in its trust state.
 _EVENTS = (("PreToolUse", "pre_tool_use", "pre-tool-use", HOOK_TIMEOUT),
@@ -86,9 +90,9 @@ def _ours(handler: Any) -> bool:
 
 
 def _handler(vaara_bin: str, verb: str, timeout: int) -> dict:
-    return {"type": "command",
-            "command": f"{vaara_bin} hook {verb} --client codex",
-            "timeout": timeout}
+    command = (_hook_gate.pre_command(vaara_bin, "codex") if verb == "pre-tool-use"
+               else f"{vaara_bin} hook {verb} --client codex")
+    return {"type": "command", "command": command, "timeout": timeout}
 
 
 def _strip(hooks: dict) -> dict:

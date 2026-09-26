@@ -90,12 +90,24 @@ def approvals_dir(cfg: dict) -> Path:
 
 
 def approvals_timeout(cfg: dict) -> float:
+    """Seconds an escalation waits for a human, ended inside the gate's
+    deadline so the wait closes on its own timeout record rather than being
+    cut off by the gate with nothing written."""
+    from vaara.integrations._hook_gate import DEADLINE
+
     raw = os.environ.get("VAARA_PLUGIN_APPROVALS_TIMEOUT") or cfg.get("approvals_timeout")
     try:
         timeout = float(raw)  # type: ignore[arg-type]
     except (TypeError, ValueError):
-        return 60.0
-    return timeout if timeout > 0 else 60.0
+        timeout = 60.0
+    if timeout <= 0:
+        timeout = 60.0
+    deadline = DEADLINE
+    try:
+        deadline = min(deadline, int(os.environ.get("VAARA_HOOK_DEADLINE", DEADLINE)))
+    except ValueError:
+        pass
+    return max(min(timeout, deadline - 5.0), 0.5)
 
 
 def protection_preset(cfg: dict) -> Optional[str]:
