@@ -204,3 +204,45 @@ def test_an_approval_wait_ends_inside_the_deadline(monkeypatch):
     assert approvals_timeout({"approvals_timeout": 600}) == _hook_gate.DEADLINE - 5
     monkeypatch.setenv("VAARA_HOOK_DEADLINE", "20")
     assert approvals_timeout({}) == 15.0
+
+
+def test_fail_open_is_read_as_a_value_not_as_text(tmp_path):
+    exe = _engine(tmp_path, "exit 1")
+    cfg = tmp_path / "home" / ".vaara" / "claude-code" / "config.json"
+    cfg.parent.mkdir(parents=True)
+    cfg.write_text(json.dumps({"fail_open": False, "note": '"fail_open": true',
+                               "nested": {"fail_open": True}}))
+    proc, _ = _run(_hook_gate.pre_command(str(exe), "codex"), tmp_path)
+    assert proc.returncode == 2
+    proc, _ = _plugin(tmp_path, "exit 1")
+    assert proc.returncode == 2
+
+
+def test_a_path_with_a_space_keeps_the_marker(tmp_path):
+    from vaara.integrations import codex
+
+    cmd = _hook_gate.pre_command("/opt/My Tools/vaara", "codex")
+    assert "vaara hook pre-tool-use" in cmd
+    d = tmp_path / ".codex"
+    d.mkdir()
+    assert codex.install_hooks("/opt/My Tools/vaara", d) is True
+    assert codex.install_hooks("/opt/Other Tools/vaara", d) is True
+    pre = json.loads((d / "hooks.json").read_text())["hooks"]["PreToolUse"]
+    assert len(pre) == 1
+
+    home = tmp_path / "spaced dir"
+    home.mkdir()
+    exe = _engine(home, 'echo "rule=x" >&2; exit 2')
+    proc, _ = _run(_hook_gate.pre_command(str(exe), "codex"), tmp_path)
+    assert proc.returncode == 2 and "rule=x" in proc.stderr
+
+
+def test_plugin_probe_runs_under_the_deadline(tmp_path):
+    bindir = _plugin_path(tmp_path, None)
+    exe = Path(bindir) / "vaara"
+    exe.write_text("#!/bin/sh\nexec sleep 30\n")
+    exe.chmod(0o755)
+    proc, took = _run(f"sh {RUN_SH} pre-tool-use", tmp_path, PATH=bindir,
+                      VAARA_HOOK_DEADLINE="2")
+    assert proc.returncode == 2 and "within 2 s" in proc.stderr
+    assert took < 10

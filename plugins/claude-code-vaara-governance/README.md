@@ -91,7 +91,7 @@ The config file, hand-editable:
 | `agent_id` | string | Agent id written to the audit chain (default `claude-code`). |
 | `audit_db` | path | Audit DB path (default `~/.vaara/claude-code/audit.db`). |
 | `article50_statement` | string | When set, SessionStart records this as an EU AI Act Article 50(1) disclosure event into the audit trail with the session id, before the session's first tool call. Off when absent. |
-| `fail_open` | `false` (default), `true` | What happens to a tool call the hook cannot decide. That covers a hook that crashes, cannot find `vaara` or `python3`, or gives no verdict within 80 seconds, and `mcp__*` calls in protect mode that cannot be scored or recorded because the `vaara` package is not importable or the audit trail cannot be opened or written. Default: fail closed (block, and say why). `true` lets them run. The deny rules do not need the trail, so they keep enforcing whenever the hook runs. |
+| `fail_open` | `false` (default), `true` | What happens to a tool call the hook cannot decide. That covers a hook that crashes, cannot find `vaara` or `python3`, or gives no verdict within 80 seconds, and `mcp__*` calls in protect mode that cannot be scored or recorded because the `vaara` package is not importable or the audit trail cannot be opened or written. Default: fail closed (block, and say why). `true` lets them run. The deny rules do not need the trail, so they keep enforcing whenever the hook runs. When the hook itself cannot run, the value is read with `python3`; without it, only `VAARA_PLUGIN_FAIL_OPEN=1` opts out. |
 
 Environment variables override the file (useful for CI or a single session):
 

@@ -17,9 +17,13 @@ set -eu
 kind="$1"
 deadline=80
 
+# The config's top-level "fail_open" read as a value: a text match also
+# fires on the same words inside a string. Without python3 to read it, only
+# VAARA_PLUGIN_FAIL_OPEN=1 opts out.
 fail_open() {
   [ "${VAARA_PLUGIN_FAIL_OPEN:-}" = 1 ] && return 0
-  grep -Eqs '"fail_open"[[:space:]]*:[[:space:]]*true' "$HOME/.vaara/claude-code/config.json"
+  python3 -c "import json,sys;d=json.load(open(sys.argv[1]));sys.exit(0 if isinstance(d,dict) and d.get('fail_open') is True else 1)" \
+    "$HOME/.vaara/claude-code/config.json" 2>/dev/null
 }
 
 refuse() {
@@ -51,8 +55,19 @@ gate() {
   refuse "could not run (exit $rc)"
 }
 
+dir="$(dirname "$0")"
+
+# pre-tool-use picks its engine inside the gate: the `vaara hook --help`
+# probe starts an interpreter, and a probe that hangs outside the gate would
+# run into Claude Code's timeout instead of the deadline.
+if [ "$kind" = pre-tool-use ] && { command -v vaara || command -v python3; } >/dev/null 2>&1; then
+  gate sh -c 'if command -v vaara >/dev/null 2>&1 && vaara hook --help >/dev/null 2>&1; then
+  exec vaara hook pre-tool-use
+fi
+exec python3 "$1/pre_tool_use.py"' sh "$dir"
+fi
+
 if command -v vaara >/dev/null 2>&1 && vaara hook --help >/dev/null 2>&1; then
-  if [ "$kind" = pre-tool-use ]; then gate vaara hook pre-tool-use; fi
   exec vaara hook "$kind"
 fi
 
@@ -79,9 +94,7 @@ install vaara, or set \"fail_open\": true in ~/.vaara/claude-code/config.json."
   exit 0
 fi
 
-dir="$(dirname "$0")"
 case "$kind" in
-  pre-tool-use)   gate python3 "$dir/pre_tool_use.py" ;;
   post-tool-use)  exec python3 "$dir/post_tool_use.py" ;;
   session-start)  exec python3 "$dir/session_start.py" ;;
   *) echo "vaara-governance: unknown hook kind: $kind" >&2; exit 0 ;;

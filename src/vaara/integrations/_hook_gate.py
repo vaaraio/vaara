@@ -47,6 +47,7 @@ DEADLINE = 80
 #: watchdog is given no host pipe for the same reason, and counts down in
 #: one-second sleeps so that stopping it leaves no long sleep behind.
 _SCRIPT = """\
+# vaara hook pre-tool-use gate
 d=${{VAARA_HOOK_DEADLINE:-{deadline}}}
 case $d in ''|*[!0-9]*) d={deadline};; esac
 [ "$d" -gt {deadline} ] && d={deadline}
@@ -63,19 +64,29 @@ else rc=125
 fi
 [ $rc -eq 0 ] || [ $rc -eq 2 ] && exit $rc
 [ "${{VAARA_PLUGIN_FAIL_OPEN:-}}" = 1 ] && exit $rc
-grep -Eqs '"fail_open"[[:space:]]*:[[:space:]]*true' "$HOME/.vaara/claude-code/config.json" && exit $rc
+python3 -c "{fail_open_py}" "$HOME/.vaara/claude-code/config.json" 2>/dev/null && exit $rc
 if [ $rc -gt 128 ]; then why="did not answer within $d s"; else why="could not run (exit $rc)"; fi
 echo "vaara-governance: BLOCKED (fail-closed): the Vaara hook $why. Reinstall vaara and re-run vaara init, or set \\"fail_open\\": true in ~/.vaara/claude-code/config.json." >&2
 exit 2"""
 
 
+#: Exit 0 when the config's top-level ``fail_open`` is ``true``. Read as a
+#: value, since a text match also fires on the same words inside a string
+#: or a nested object. Without ``python3`` to read it, only
+#: ``VAARA_PLUGIN_FAIL_OPEN=1`` opts out.
+FAIL_OPEN_PY = ("import json,sys;d=json.load(open(sys.argv[1]));"
+                "sys.exit(0 if isinstance(d,dict) and d.get('fail_open') is True else 1)")
+
+
 def pre_command(vaara_bin: str, client: Optional[str] = None) -> str:
     """The pre-tool-use hook command for a host config, gated.
 
-    It contains ``<vaara_bin> hook pre-tool-use`` verbatim, so every
-    detector that finds Vaara's hooks by that string still finds it.
+    Its first line is the comment ``# vaara hook pre-tool-use gate``, so
+    every detector that finds Vaara's hooks by that string finds this one,
+    whatever quoting the path needs.
     """
     hook = f"{shlex.quote(vaara_bin)} hook pre-tool-use"
     if client:
         hook += f" --client {client}"
-    return "sh -c " + shlex.quote(_SCRIPT.format(deadline=DEADLINE, hook=hook))
+    return "sh -c " + shlex.quote(_SCRIPT.format(deadline=DEADLINE, hook=hook,
+                                                 fail_open_py=FAIL_OPEN_PY))

@@ -103,10 +103,9 @@ def approvals_timeout(cfg: dict) -> float:
     if timeout <= 0:
         timeout = 60.0
     deadline = DEADLINE
-    try:
-        deadline = min(deadline, int(os.environ.get("VAARA_HOOK_DEADLINE", DEADLINE)))
-    except ValueError:
-        pass
+    raw_deadline = os.environ.get("VAARA_HOOK_DEADLINE", "")
+    if raw_deadline.isdigit():  # read as the gate reads it
+        deadline = min(deadline, int(raw_deadline))
     return max(min(timeout, deadline - 5.0), 0.5)
 
 
