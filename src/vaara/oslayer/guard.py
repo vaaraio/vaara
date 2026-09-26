@@ -322,8 +322,11 @@ class Guard:
 
     def _prepare_state(self) -> None:
         state = self.trail_path.parent
+        # Only the trail's own folder is narrow; /var/lib/vaara above it has
+        # to stay traversable for the operator's group to reach the trail.
+        state.parent.mkdir(parents=True, exist_ok=True)
         with _umask(0o027):
-            state.mkdir(parents=True, exist_ok=True)
+            state.mkdir(exist_ok=True)
         os.chown(state, 0, self.gid)
         if state.stat().st_mode & 0o777 != 0o750:
             logger.warning("%s is not mode 0750; the operator's group may not read the "
