@@ -30,7 +30,8 @@ class GuardRefused(GuardError):
     pass
 
 
-def _open(path: Path, timeout: float) -> socket.socket:
+def _open(path: Path | str, timeout: float) -> socket.socket:
+    """A connected socket; a ``str`` starting with NUL names an abstract socket."""
     sock = socket.socket(socket.AF_UNIX, socket.SOCK_STREAM)
     sock.settimeout(timeout)
     try:

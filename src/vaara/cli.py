@@ -7544,6 +7544,12 @@ def main(argv: list[str] | None = None) -> int:
     # first-run setup; the guard runs as root and `run` only starts an agent.
     if raw and raw[0] in ("run", "os-guard", "os-layer"):
         return _oslayer_main(raw[0])(raw[1:])
+    # Inside a `vaara run` launch the floor seals ~/.vaara, so a hook relays
+    # its event to `vaara run`, which decides it outside the floor. Before
+    # the parser: first-run setup reads ~/.vaara too.
+    if raw and raw[0] == "hook" and os.environ.get("VAARA_RUN_SOCKET"):
+        from vaara.oslayer.forward import relay
+        return relay(raw[1:])
 
     parser = build_parser()
     args = parser.parse_args(argv)

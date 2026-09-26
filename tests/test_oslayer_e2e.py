@@ -9,7 +9,9 @@ Copilot's own hooks folder through its native file tool), to write in a
 block folder, to read and write in a record folder, to read a file in an ask
 folder (which this test denies, signed, as the operator), and to write one
 file nothing governs. The test reads back the files, what Copilot CLI told
-the model, and the guard's own trail.
+the model, and the guard's own trail. A second test installs Vaara's Copilot
+hooks and checks that they decide from inside the tree, through the relay to
+``vaara run``.
 
 Skipped unless VAARA_OSLAYER_E2E=1 and a Copilot CLI binary is on PATH.
 """
@@ -253,3 +255,60 @@ def test_the_floor_holds_and_the_guard_decides(tmp_path):
     assert outcomes("os.open", recorded / "new.txt") == [["allow"]], actions
     assert outcomes("os.open", asked / "secret.txt") == [["escalate", "deny"]], actions
     assert {str(sentinel), str(hook)} <= floor_targets, sorted(floor_targets)
+
+
+def test_an_adapter_decides_under_vaara_run(tmp_path):
+    """Copilot CLI with Vaara's hooks, under ``vaara run``.
+
+    The hook starts inside the tree, where ~/.vaara is sealed, so it relays
+    each event to ``vaara run``. Without the relay it could not decide, and
+    the gate in front of it would block every call, the free one included.
+    """
+    from vaara.integrations import copilot
+
+    home = Path.home()
+    copilot_home = tmp_path / "copilot-home"
+    vaara_bin = shutil.which("vaara")
+    assert vaara_bin, "the vaara command is not on PATH"
+    copilot.install_hooks(vaara_bin, copilot_home)
+    free = tmp_path / "adapter-free.txt"
+    trail = home / ".vaara" / "claude-code" / "audit.db"
+
+    model = _Model([
+        [_sh(f"echo free > {free}")],
+        [_sh("cat /etc/shadow")],
+        "done",
+    ])
+    work = tmp_path / "work"
+    work.mkdir()
+    env = {"HOME": str(home), "COPILOT_HOME": str(copilot_home),
+           "COPILOT_PROVIDER_BASE_URL": f"http://127.0.0.1:{model.port}/v1",
+           "COPILOT_MODEL": "gpt-4.1", "COPILOT_OFFLINE": "true",
+           "PATH": os.environ.get("PATH", ""), "NO_COLOR": "1",
+           "PYTHONPATH": os.pathsep.join(sys.path)}
+    try:
+        proc = subprocess.run(
+            [sys.executable, "-m", "vaara.cli", "run", "copilot", "-p", "go",
+             "--allow-all-tools", "--allow-all-paths", "--no-auto-update", "--no-ask-user"],
+            cwd=work, env=env, stdin=subprocess.DEVNULL, capture_output=True,
+            text=True, timeout=300)
+    finally:
+        model.server.shutdown()
+    log = proc.stdout[-3000:] + proc.stderr[-3000:]
+
+    out = model.outputs()
+    assert len(out) == 2, (out, log)
+    assert not any("could not reach" in o or "fail-closed" in o for o in out), (out, log)
+    # The hook let the free call run, and it ran.
+    assert free.read_text() == "free\n", (out, log)
+    # The hook refused the deny-rule call with Vaara's own reason.
+    assert "etc_shadow_read" in out[1], (out[1], log)
+
+    # Both decisions are on the adapter's trail, written from outside the floor.
+    conn = sqlite3.connect(f"file:{trail}?mode=ro", uri=True)
+    try:
+        rows = [d for (d,) in conn.execute("SELECT data FROM audit_records ORDER BY seq")]
+    finally:
+        conn.close()
+    assert any("etc_shadow_read" in (d or "") for d in rows), rows[-5:]
+    assert any(str(free) in (d or "") for d in rows), rows[-5:]

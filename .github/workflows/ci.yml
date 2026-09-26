@@ -590,7 +590,8 @@ jobs:
     # runner's account; the test then runs as that account and starts Copilot
     # CLI, with no Vaara hooks, under `vaara run` against a scripted model.
     # It reads back the files the model asked Copilot CLI to change and the
-    # guard's own trail.
+    # guard's own trail, then runs Copilot CLI again with Vaara's hooks, whose
+    # verdicts reach it through the relay to `vaara run`.
     steps:
       - uses: actions/checkout@9c091bb21b7c1c1d1991bb908d89e4e9dddfe3e0  # v7.0.0
 

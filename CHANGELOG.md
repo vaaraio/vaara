@@ -4,6 +4,11 @@ All notable changes to this project are documented here.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/)
 and this project follows [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [Unreleased]
+
+### Fixed
+- A harness with a Vaara adapter works under `vaara run`. Its hook starts inside the agent's tree, where `~/.vaara` is sealed, so in 2.1.0 it could not decide and blocked every tool call. `vaara run` now binds a unix socket in the abstract namespace before the agent starts and names it in `VAARA_RUN_SOCKET`; `vaara hook` relays its event there, and `vaara run`, outside the floor, runs the same hook with its own environment and hands back the exit status and output. It answers only callers of the same user in the launch's cgroup, and the relay sends only to the process `VAARA_RUN_PID` names. When the relay cannot reach `vaara run`, the gate blocks the call. A process in the tree can relay an event of its own, as it could run the hook itself; it gets the hook's verdict and the event is recorded. The `os-layer-e2e` job runs Copilot CLI with Vaara's hooks under `vaara run` and checks that a free call runs, a deny-rule call is refused with Vaara's reason, and both land on the adapter's trail.
+
 ## [2.1.0] - 2026-09-26
 
 ### Added
