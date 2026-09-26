@@ -962,11 +962,22 @@ class AdaptiveScorer:
         # risk to be averaged away by the experts. Floor the decision score so
         # the base install (no ML extra) does not silently allow it. Benign
         # and private hosts return 0.0 and leave the score untouched.
-        from vaara.scorer._param_signals import metadata_endpoint_risk
+        from vaara.scorer._param_signals import (
+            destructive_action,
+            metadata_endpoint_risk,
+        )
         content_floor = metadata_endpoint_risk(context.get("parameters"))
         if content_floor > decision_score:
             decision_score = content_floor
             signals["parameter_content"] = content_floor
+
+        # A call that deletes or discards state is held for a human whatever
+        # the experts made of it: raised to the escalate line, never lowered,
+        # so a call already past the deny line stays denied.
+        destructive = destructive_action(tool_name, context.get("parameters"))
+        if destructive and decision_score < threshold_allow:
+            decision_score = threshold_allow
+            signals["destructive_action"] = threshold_allow
 
         if decision_score < threshold_allow:
             decision = Decision.ALLOW
@@ -999,6 +1010,8 @@ class AdaptiveScorer:
             # A reason that quoted only the interval read as "deny at 0.11
             # under a 0.7 threshold", which contradicts itself.
             explanation += f"; content floor {content_floor:.2f} decided"
+        if "destructive_action" in signals:
+            explanation += f"; destructive ({destructive}), held for a human"
 
         assessment = RiskAssessment(
             action_name=tool_name,
@@ -1078,12 +1091,18 @@ class AdaptiveScorer:
         # a parameter pointing at a cloud-metadata endpoint must preview
         # as deny, otherwise vaara_check / /v1/score can say allow where
         # vaara_intercept denies — an inconsistent preview contract.
-        from vaara.scorer._param_signals import metadata_endpoint_risk
+        from vaara.scorer._param_signals import (
+            destructive_action,
+            metadata_endpoint_risk,
+        )
         decision_score = upper
         content_floor = metadata_endpoint_risk(context.get("parameters"))
         if content_floor > decision_score:
             decision_score = content_floor
             signals["parameter_content"] = content_floor
+        if (destructive_action(tool_name, context.get("parameters"))
+                and decision_score < threshold_allow):
+            decision_score = threshold_allow
 
         if decision_score < threshold_allow:
             decision = Decision.ALLOW

@@ -120,11 +120,23 @@ def test_openai_buffered_deny_strips_tool_calls(tmp_path):
     assert doc["choices"][0]["finish_reason"] == "stop"
 
 
+def _reading(handler):
+    """The same upstream answering with a read. A tool named for deleting is
+    held for a human at any threshold, so the allow path is driven with one
+    that is not."""
+    def respond(request: httpx.Request) -> httpx.Response:
+        resp = handler(request)
+        return httpx.Response(resp.status_code, headers=resp.headers,
+                              content=resp.content.replace(b"delete_file", b"read_file"))
+    return respond
+
+
 def test_allow_passes_response_unchanged(tmp_path):
     # Thresholds so high nothing denies: enforcing pipeline, allow verdicts.
     app = build_app(
         emitter=None, upstream="http://up", pipeline=_pipeline(0.98, 0.99),
-        client=httpx.AsyncClient(transport=httpx.MockTransport(_anthropic_upstream)),
+        client=httpx.AsyncClient(
+            transport=httpx.MockTransport(_reading(_anthropic_upstream))),
     )
     status, raw = _drive(app, "/v1/messages", {
         "model": "claude-sonnet-5", "messages": MESSAGES, "stream": False,
@@ -173,7 +185,7 @@ def test_streamed_allow_replays_original_bytes(tmp_path):
     app = build_app(
         emitter=None, upstream="http://up", pipeline=_pipeline(0.98, 0.99),
         client=httpx.AsyncClient(
-            transport=httpx.MockTransport(_anthropic_stream_upstream)),
+            transport=httpx.MockTransport(_reading(_anthropic_stream_upstream))),
     )
     status, raw = _drive(app, "/v1/messages", {
         "model": "claude-sonnet-5", "messages": MESSAGES, "stream": True,

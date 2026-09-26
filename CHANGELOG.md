@@ -4,6 +4,17 @@ All notable changes to this project are documented here.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/)
 and this project follows [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [Unreleased]
+
+### Fixed
+- A tool call that deletes or discards state is held for a human. The scorer read only the tool name, so every shell call got the same score, whether it listed a directory or deleted one, and none of them reached the escalate line. A floor in the scorer now reads the call's arguments. It holds shell commands that delete files, truncate, drop tables, force-push, delete a branch or tag, reset or clean a work tree, or delete cloud or cluster resources. It also holds SQL that drops, truncates or deletes rows, code that removes files, and tools whose name says they delete. The floor raises a score to the escalate line and never lowers one, so a denied call stays denied. It lives in the scorer, so every path that scores a call gets it.
+- On the pre-tool-use hook, shell and file calls that passed the deny rules were only recorded. A destructive one now goes through the enforced pipeline and waits for a human. If nobody answers, it is denied, and the trail records no human decision.
+- The floor reads only command-like arguments and skips heredoc bodies, quoted text and file contents. Writing a script that contains `rm`, or a note about it, passes.
+
+### Added
+- An approval request carries the call's full arguments and their SHA-256. A surface that asks the human can now show the whole operation that will run. The request used to hold only the tool name and the risk reason.
+- Session start runs a canary through the installed engine with the configured thresholds: a delete must be held and a directory listing must pass. It scores against an in-memory trail, so nothing is written to the real one. If either check fails, session start says so and raises a notification.
+
 ## [2.1.2] - 2026-09-26
 
 ### Fixed
