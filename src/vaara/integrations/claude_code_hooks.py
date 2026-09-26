@@ -156,8 +156,26 @@ def custom_thresholds(cfg: dict) -> Optional[tuple[float, float]]:
 # ---------------------------------------------------------------------------
 # notify (fire-and-forget; must never break a hook)
 
+# notify_on, as the dashboard offers it: which decisions raise a notification.
+# A trail outage is not a decision, so no choice here silences it.
+_NOTIFY_CLASSES = {
+    "BLOCKED": "deny", "DENIED": "deny", "SHADOW deny": "deny",
+    "ESCALATE": "escalate", "APPROVAL NEEDED": "escalate",
+}
+
+
+def _wanted(cfg: dict, verdict: str) -> bool:
+    kind = _NOTIFY_CLASSES.get(verdict)
+    if kind is None:
+        return True
+    choice = cfg.get("notify_on", "all")
+    if choice == "off":
+        return False
+    return choice not in ("deny", "escalate") or choice == kind
+
+
 def notify(cfg: dict, verdict: str, tool_name: str, detail: str) -> None:
-    if not notifications_enabled(cfg):
+    if not notifications_enabled(cfg) or not _wanted(cfg, verdict):
         return
     try:
         clean = lambda text, limit: (  # noqa: E731
