@@ -4,7 +4,7 @@ All notable changes to this project are documented here.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/)
 and this project follows [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
-## [Unreleased]
+## [2.1.2] - 2026-09-26
 
 ### Fixed
 - The dashboard's Detail level and Approval style settings take effect. Both were written to the hook's config and read by nothing. Detail level sets how much a decision's notification says: basic names the decision and tool, professional adds risk and reason, enterprise adds the action id. Approval style sets how long an escalation waits before it is denied: timeout uses the approvals timeout, blocking waits as long as the hook may (75 s).
