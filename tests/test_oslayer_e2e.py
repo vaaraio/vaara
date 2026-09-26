@@ -196,7 +196,7 @@ def test_the_floor_holds_and_the_guard_decides(tmp_path):
     try:
         proc = subprocess.run(
             [sys.executable, "-m", "vaara.cli", "run", "copilot", "-p", "go",
-             "--allow-all-tools", "--no-auto-update", "--no-ask-user"],
+             "--allow-all-tools", "--allow-all-paths", "--no-auto-update", "--no-ask-user"],
             cwd=work, env=env, stdin=subprocess.DEVNULL, capture_output=True,
             text=True, timeout=300)
     finally:
@@ -206,6 +206,9 @@ def test_the_floor_holds_and_the_guard_decides(tmp_path):
 
     out = model.outputs()
     assert len(out) == 8, (out, log)
+    # Every call reached the system. Copilot CLI's own path guard refusing
+    # one would leave the floor untested while the file checks still pass.
+    assert not any("could not request permission" in o for o in out), (out, log)
 
     # The floor: nothing on it changed, and the key never reached the model.
     assert sentinel.read_text() == "sentinel\n", log
