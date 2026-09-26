@@ -158,7 +158,8 @@ def _check_updates() -> None:
 
     installed = vaara.__version__
     try:
-        with urllib.request.urlopen(
+        # Fixed https URL.
+        with urllib.request.urlopen(  # nosec B310
             "https://pypi.org/pypi/vaara/json", timeout=10
         ) as resp:
             latest = json.load(resp)["info"]["version"]

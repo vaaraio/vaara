@@ -413,6 +413,10 @@ Transport = Callable[[str, bytes, float], bytes]
 
 
 def _urllib_transport(url: str, der_request: bytes, timeout: float) -> bytes:
+    # An endpoint can be prefilled from a downloaded trusted list, so refuse
+    # anything but http(s) rather than let urllib open a file: URL.
+    if not url.startswith(("https://", "http://")):
+        raise TimeAnchorError(f"TSA URL must be http or https: {url!r}")
     req = urllib.request.Request(
         url,
         data=der_request,
@@ -423,7 +427,7 @@ def _urllib_transport(url: str, der_request: bytes, timeout: float) -> bytes:
         method="POST",
     )
     # URL is operator-supplied TSA configuration, not attacker-controlled.
-    with urllib.request.urlopen(req, timeout=timeout) as resp:  # noqa: S310
+    with urllib.request.urlopen(req, timeout=timeout) as resp:  # noqa: S310  # nosec B310
         return resp.read()
 
 

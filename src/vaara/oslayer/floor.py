@@ -131,8 +131,9 @@ LAUNCHER_SOCKETS = (
     "/run/docker.sock", "/var/run/docker.sock", "/run/containerd/",
     "/run/podman/", "/run/user/*/podman/", "/run/user/*/docker.sock",
     "/run/systemd/private", "/run/user/*/systemd/",
-    "/tmp/tmux-*/", "/run/screen/", "/var/run/screen/",
-    "/tmp/.X11-unix/", "/run/user/*/wayland-*", "/run/user/*/vscode-*.sock",
+    # AppArmor rule paths for launcher sockets, not temp files this code opens.
+    "/tmp/tmux-*/", "/run/screen/", "/var/run/screen/",  # nosec B108
+    "/tmp/.X11-unix/", "/run/user/*/wayland-*", "/run/user/*/vscode-*.sock",  # nosec B108
 )
 
 DENIED_CAPABILITIES = (

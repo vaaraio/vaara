@@ -4837,7 +4837,8 @@ def _cmd_policy_reload(args: argparse.Namespace) -> int:
         method="POST",
     )
     try:
-        with urllib.request.urlopen(req, timeout=args.timeout) as resp:
+        # --server is the operator's own Vaara server.
+        with urllib.request.urlopen(req, timeout=args.timeout) as resp:  # nosec B310
             body_bytes = resp.read()
     except urllib.error.HTTPError as exc:
         print(f"vaara policy reload: HTTP {exc.code}", file=sys.stderr)
@@ -5167,7 +5168,7 @@ def _http_fetch(url: str) -> bytes:
 
     if not url.startswith(("https://", "http://")):
         raise ValueError(f"refusing non-http url: {url!r}")
-    with urllib.request.urlopen(url, timeout=30) as resp:  # noqa: S310
+    with urllib.request.urlopen(url, timeout=30) as resp:  # noqa: S310  # nosec B310
         return resp.read()
 
 

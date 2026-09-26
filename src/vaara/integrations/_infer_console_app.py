@@ -233,7 +233,9 @@ def build_app(
     if client is None:  # pragma: no cover - real wiring, not exercised in tests
         import httpx
 
-        client = httpx.AsyncClient(timeout=None)
+        # Generation streams for as long as it takes, so reads are unbounded;
+        # a connect that never completes is bounded.
+        client = httpx.AsyncClient(timeout=httpx.Timeout(None, connect=10.0))
 
     if judge_factory is None:  # pragma: no cover - real wiring, not exercised in tests
         cc = crosscheck or {}

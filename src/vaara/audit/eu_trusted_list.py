@@ -40,7 +40,7 @@ def _parse_xml(data: bytes) -> ET.Element:
     head = data[:4096]
     if b"<!DOCTYPE" in head or b"<!ENTITY" in head:
         raise ValueError("trusted-list XML with a DTD is refused")
-    return ET.fromstring(data)
+    return ET.fromstring(data)  # nosec B314
 
 
 @dataclass(frozen=True)

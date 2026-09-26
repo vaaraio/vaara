@@ -185,7 +185,7 @@ class X402Gate:
                     method="POST",
                     headers={"Content-Type": "application/json"},
                 )
-                with urllib.request.urlopen(req, timeout=30) as resp:  # noqa: S310
+                with urllib.request.urlopen(req, timeout=30) as resp:  # noqa: S310  # nosec B310
                     report = json.load(resp)
             except Exception:
                 return False, None
