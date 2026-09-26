@@ -150,7 +150,8 @@ def main(args: Optional[list[str]] = None) -> int:
         pipeline=_build_pipeline(
             Path(parsed.db).expanduser() if parsed.db else None
         ),
-        shell=parsed.shell,
+        # The shell to wrap, not subprocess shell=True.
+        shell=parsed.shell,  # nosec B604
         agent_id=parsed.agent_id,
     )
 

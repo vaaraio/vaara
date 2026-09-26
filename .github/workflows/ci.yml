@@ -377,6 +377,26 @@ jobs:
       - name: mypy
         run: mypy src/vaara/policy/
 
+  security-lint:
+    name: Security lint (bandit, medium and up)
+    runs-on: ubuntu-latest
+    # Every medium or high finding was fixed or reviewed and marked with a
+    # reason on 2026-09-26, so a new one fails the build. Low findings
+    # (subprocess use, asserts) are not gated.
+    steps:
+      - uses: actions/checkout@9c091bb21b7c1c1d1991bb908d89e4e9dddfe3e0  # v7.0.0
+
+      - name: Set up Python 3.12
+        uses: actions/setup-python@5fda3b95a4ea91299a34e894583c3862153e4b97  # v7.0.0
+        with:
+          python-version: '3.12'
+
+      - name: Install bandit
+        run: pip install bandit==1.9.4
+
+      - name: bandit
+        run: bandit -c pyproject.toml -r src -ll
+
   helm-chart:
     name: Helm chart renders
     runs-on: ubuntu-latest

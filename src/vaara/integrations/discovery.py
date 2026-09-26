@@ -255,7 +255,8 @@ def run_discovery() -> DiscoverReport:
     from vaara import __version__
     return DiscoverReport(
         agents=discover_agents(),
-        shell=discover_shell(),
+        # A report field named shell, not subprocess shell=True.
+        shell=discover_shell(),  # nosec B604
         mcp_clients=discover_mcp_clients(),
         sensitive_paths=discover_sensitive_paths(),
         known_tools=discover_known_tools(),

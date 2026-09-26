@@ -620,7 +620,8 @@ class OllamaJudge:
             data=payload,
             headers={"Content-Type": "application/json"},
         )
-        with urllib.request.urlopen(req, timeout=self._timeout) as resp:
+        # Operator-configured model upstream.
+        with urllib.request.urlopen(req, timeout=self._timeout) as resp:  # nosec B310
             data = json.loads(resp.read().decode("utf-8"))
         return str(data.get("message", {}).get("content", ""))
 
@@ -638,7 +639,7 @@ class OllamaJudge:
                 data=json.dumps({"model": self._model}).encode("utf-8"),
                 headers={"Content-Type": "application/json"},
             )
-            with urllib.request.urlopen(req, timeout=self._timeout) as resp:
+            with urllib.request.urlopen(req, timeout=self._timeout) as resp:  # nosec B310
                 show = json.loads(resp.read().decode("utf-8"))
         except Exception:
             return fallback_model_derived(self._model)

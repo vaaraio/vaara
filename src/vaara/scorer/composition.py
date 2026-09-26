@@ -58,7 +58,8 @@ class ExternalScorer:
             self._url, data=body, headers=self._headers, method="POST",
         )
         try:
-            with urllib.request.urlopen(req, timeout=self._timeout) as resp:
+            # Operator-configured scoring backend.
+            with urllib.request.urlopen(req, timeout=self._timeout) as resp:  # nosec B310
                 payload = resp.read()
         except (urllib.error.URLError, urllib.error.HTTPError, TimeoutError) as exc:
             return _fail_closed(

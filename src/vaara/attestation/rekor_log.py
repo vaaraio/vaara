@@ -98,7 +98,8 @@ def _post(log_url: str, path: str, payload: dict) -> dict:
         method="POST",
     )
     try:
-        with urllib.request.urlopen(req, timeout=_TIMEOUT) as resp:
+        # Operator-configured transparency log URL.
+        with urllib.request.urlopen(req, timeout=_TIMEOUT) as resp:  # nosec B310
             return json.loads(resp.read().decode())
     except urllib.error.HTTPError as exc:
         detail = exc.read().decode()[:300]
@@ -109,7 +110,7 @@ def _post(log_url: str, path: str, payload: dict) -> dict:
 
 def _get(url: str) -> dict:
     try:
-        with urllib.request.urlopen(url, timeout=_TIMEOUT) as resp:
+        with urllib.request.urlopen(url, timeout=_TIMEOUT) as resp:  # nosec B310
             return json.loads(resp.read().decode())
     except Exception as exc:
         raise RekorError(f"could not fetch {url}: {exc}") from exc

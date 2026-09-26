@@ -386,3 +386,13 @@ def test_auto_anchor_fail_open_records_chained_gap():
     assert trail.verify_chain() is None
     # The gap marker sits inside the hash chain as the latest record.
     assert trail._records[-1].event_type == EventType.ANCHOR_GAP
+
+
+@pytest.mark.parametrize("url", ["file:///etc/passwd", "ftp://tsa.example/", "tsa.example"])
+def test_the_default_transport_refuses_a_non_http_tsa_url(url):
+    # An endpoint can come prefilled from a downloaded trusted list; urllib
+    # would open a file: URL as happily as an http one.
+    from vaara.audit.timeanchor import TimeAnchorError, _urllib_transport
+
+    with pytest.raises(TimeAnchorError, match="http or https"):
+        _urllib_transport(url, b"", 1.0)
