@@ -20,7 +20,7 @@ jobs:
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
-      - uses: vaaraio/vaara@v1
+      - uses: vaaraio/vaara@v2
         with:
           policy: policies/production.yaml
           cases: policies/production.cases.yaml
@@ -32,7 +32,7 @@ policy, since a case is evaluated through one.
 ## Verifying a trail a job produced
 
 ```yaml
-      - uses: vaaraio/vaara@v1
+      - uses: vaaraio/vaara@v2
         with:
           trail: artifacts/trail.zip
           pubkey: keys/signer_public.pem
@@ -66,7 +66,7 @@ is distinct from a check that ran and failed.
 also writes a summary to the job page listing every issue and every failing case by name.
 
 ```yaml
-      - uses: vaaraio/vaara@v1
+      - uses: vaaraio/vaara@v2
         id: gate
         with:
           policy: policies/production.yaml

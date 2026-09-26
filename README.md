@@ -181,7 +181,7 @@ Start with `--shadow`: every call is classified, scored, and recorded, nothing i
 A policy is code, so it belongs in the pull request that changes it. The action validates the policy, runs its cases, and fails the build on a policy that does not parse, a failing case, or a trail whose chain or signature does not hold.
 
 ```yaml
-- uses: vaaraio/vaara@v1
+- uses: vaaraio/vaara@v2
   with:
     policy: policies/production.yaml
     cases: policies/production.cases.yaml
