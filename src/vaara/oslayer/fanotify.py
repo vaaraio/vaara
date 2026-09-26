@@ -153,7 +153,8 @@ def _unescape_mountinfo(field: str) -> str:
 
 def mount_points(mountinfo: str = "/proc/self/mountinfo") -> list[str]:
     try:
-        text = open(mountinfo).read()
+        with open(mountinfo) as fh:
+            text = fh.read()
     except OSError:
         return ["/"]
     return [_unescape_mountinfo(line.split()[4]) for line in text.splitlines()

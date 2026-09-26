@@ -168,33 +168,27 @@ def _follow_netlink(stop: threading.Event) -> Iterator[str]:
 
 
 def _follow_file(path: str, stop: threading.Event) -> Iterator[str]:
-    handle = None
-    inode = None
     while not stop.is_set():
-        if handle is None:
-            try:
-                handle = open(path, "r", errors="replace")
-                inode = os.fstat(handle.fileno()).st_ino
-                handle.seek(0, os.SEEK_END)
-            except OSError:
-                handle = None
-                stop.wait(1.0)
-                continue
-        line = handle.readline()
-        if line:
-            yield line
-            continue
-        # Nothing new. A rotated log has a new inode at the same path.
         try:
-            if os.stat(path).st_ino != inode:
-                handle.close()
-                handle = None
-                continue
+            handle = open(path, "r", errors="replace")
         except OSError:
-            pass
-        stop.wait(0.2)
-    if handle is not None:
-        handle.close()
+            stop.wait(1.0)
+            continue
+        with handle:
+            inode = os.fstat(handle.fileno()).st_ino
+            handle.seek(0, os.SEEK_END)
+            while not stop.is_set():
+                line = handle.readline()
+                if line:
+                    yield line
+                    continue
+                # Nothing new. A rotated log has a new inode at the same path.
+                try:
+                    if os.stat(path).st_ino != inode:
+                        break
+                except OSError:
+                    pass
+                stop.wait(0.2)
 
 
 class Follower:

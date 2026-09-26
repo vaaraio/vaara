@@ -30,6 +30,7 @@ from __future__ import annotations
 
 import argparse
 import concurrent.futures
+import contextlib
 import fcntl
 import itertools
 import json
@@ -242,13 +243,15 @@ class Guard:
             p for p in (shutil.which(n) for n in KNOWN_HARNESSES) if p)
         self._load_profile()
 
+        # The socket first: its umask is process-wide, and no other thread
+        # that writes files may be running while it is narrowed.
+        self._serve()
         self._group = Group(nonblocking=True)
         self._apply_marks()
         for i in range(READERS):
             self._spawn(self._reader, f"vaara-fanotify-{i}")
         self._follower = Follower(self._on_denial)
         self._follower.start()
-        self._serve()
         self._spawn(self._housekeeping, "vaara-housekeeping")
         logger.info("guarding for %s: %d folder(s), %d app(s); trail %s",
                     self.user, len(self._selection.folders), len(self._selection.apps),
@@ -318,9 +321,13 @@ class Guard:
         self._threads.append(t)
 
     def _prepare_state(self) -> None:
-        self.trail_path.parent.mkdir(parents=True, exist_ok=True)
-        os.chown(self.trail_path.parent, 0, self.gid)
-        os.chmod(self.trail_path.parent, 0o750)
+        state = self.trail_path.parent
+        with _umask(0o027):
+            state.mkdir(parents=True, exist_ok=True)
+        os.chown(state, 0, self.gid)
+        if state.stat().st_mode & 0o777 != 0o750:
+            logger.warning("%s is not mode 0750; the operator's group may not read the "
+                           "trail, or others may", state)
 
     def _prepare_approvals(self) -> None:
         """The operator's approvals directory and key, owned by the operator.
@@ -620,12 +627,12 @@ class Guard:
         except FileNotFoundError:
             pass
         server = socket.socket(socket.AF_UNIX, socket.SOCK_STREAM)
-        server.bind(str(self.socket_path))
         # The operator's group reaches the socket; who is served is then
         # decided by the peer's credentials on each connection.
+        with _umask(0o117):
+            server.bind(str(self.socket_path))
         if os.geteuid() == 0:
             os.chown(self.socket_path, 0, self.gid)
-        os.chmod(self.socket_path, 0o660)
         server.listen(16)
         server.settimeout(0.5)
         self._server = server
@@ -773,6 +780,16 @@ class Guard:
             events = [self._held.pop(seq)[0] for seq in late]
         for event in events:
             self._respond(event, False)
+
+
+@contextlib.contextmanager
+def _umask(mask: int):
+    """Create with ``mask`` so a file is never wider than meant, even briefly."""
+    old = os.umask(mask)
+    try:
+        yield
+    finally:
+        os.umask(old)
 
 
 def _read_request(conn: socket.socket) -> dict:
