@@ -16,8 +16,10 @@ disable``); :func:`hook_status` reads both, so init says which.
 
 Gemini CLI has no fail-closed switch. A hook that crashes, exits with any
 code but 0 and 2, or outlives its timeout lets the call through, so the
-timeout sits above the approval handshake's 60 s wait. Its timeouts are in
-milliseconds.
+BeforeTool command is the gate in :mod:`vaara.integrations._hook_gate`:
+any ending but Vaara's own verdict blocks the call, and the gate's
+deadline sits inside the timeout and above the approval handshake's 60 s
+wait. Gemini CLI's timeouts are in milliseconds.
 
 The settings file may carry comments (Gemini CLI strips them before
 parsing). Writing the hooks drops them, so the first rewrite of a file that
@@ -32,6 +34,8 @@ import shutil
 from pathlib import Path
 from typing import Any, Optional
 
+from vaara.integrations import _hook_gate
+
 AGENT_ID = "gemini"
 
 #: The hook's ``name``: what ``/hooks`` lists and ``hooksConfig.disabled``
@@ -39,8 +43,9 @@ AGENT_ID = "gemini"
 HOOK_NAME = "vaara-governance"
 _MARKER = "vaara hook "
 
-#: Longer than the approval handshake's default 60 s wait, in milliseconds.
-HOOK_TIMEOUT_MS = 90_000
+#: Longer than the gate's deadline, which is longer than the approval
+#: handshake's default 60 s wait, in milliseconds.
+HOOK_TIMEOUT_MS = _hook_gate.HOST_TIMEOUT * 1000
 
 _EVENTS = (("BeforeTool", "pre-tool-use", HOOK_TIMEOUT_MS),
            ("AfterTool", "post-tool-use", 30_000))
@@ -127,8 +132,9 @@ def _ours(handler: Any) -> bool:
 
 
 def _handler(vaara_bin: str, verb: str, timeout: int) -> dict:
-    return {"type": "command", "name": HOOK_NAME,
-            "command": f"{vaara_bin} hook {verb} --client gemini",
+    command = (_hook_gate.pre_command(vaara_bin, "gemini") if verb == "pre-tool-use"
+               else f"{vaara_bin} hook {verb} --client gemini")
+    return {"type": "command", "name": HOOK_NAME, "command": command,
             "timeout": timeout}
 
 

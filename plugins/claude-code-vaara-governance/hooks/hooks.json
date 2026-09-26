@@ -18,7 +18,7 @@
           {
             "type": "command",
             "command": "sh \"${CLAUDE_PLUGIN_ROOT}/hooks/run.sh\" pre-tool-use",
-            "timeout": 30
+            "timeout": 90
           }
         ],
         "matcher": ".*"

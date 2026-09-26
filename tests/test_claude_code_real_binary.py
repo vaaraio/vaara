@@ -32,6 +32,8 @@ from pathlib import Path
 
 import pytest
 
+from tests.hook_breaks import BREAKS, break_engine
+
 from vaara.integrations.init_governance import write_claude_hooks
 
 pytest.importorskip("cryptography")
@@ -299,3 +301,27 @@ def test_claude_code_cannot_delete_or_rewrite_its_own_trail(tmp_path):
     ids = {json.loads(f.read_text())["evidence"]["recordId"] for f in receipts}
     assert ids == {r for r, *_ in rows}
     assert {dr.verify_receipt_file(f, trail_hashes=hashes).ok for f in receipts} == {True}
+
+
+@pytest.mark.parametrize("how", sorted(BREAKS))
+def test_claude_code_refuses_a_call_its_hook_cannot_decide(tmp_path, how):
+    model = _Model([
+        {"tool": "Bash", "input": {"command": "echo governed > ran.txt",
+                                   "description": "echo"}},
+        {"text": "done"},
+    ])
+    try:
+        env, work, _trail = _setup(tmp_path, model.port)
+        env.update(break_engine(tmp_path / "bin" / "vaara", how))
+        proc = subprocess.run(
+            [CLAUDE, "-p", "go", "--output-format", "json",
+             "--allowedTools", "Bash", "--model", "claude-sonnet-5"],
+            cwd=work, env=env, stdin=subprocess.DEVNULL, capture_output=True,
+            text=True, timeout=180)
+    finally:
+        model.server.shutdown()
+    log = proc.stdout[-3000:] + proc.stderr[-3000:]
+
+    out = model.outputs()
+    assert out and "fail-closed" in out[0], (out, log)
+    assert not (work / "ran.txt").exists(), log

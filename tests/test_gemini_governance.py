@@ -22,7 +22,7 @@ from pathlib import Path
 
 import pytest
 
-from vaara.integrations import gemini
+from vaara.integrations import _hook_gate, gemini
 from vaara.integrations import init_governance as ig
 
 pytest.importorskip("cryptography")
@@ -186,7 +186,7 @@ def test_install_keeps_other_settings_and_is_idempotent(tmp_path):
     assert pre[0] == mine
     assert pre[1] == {"matcher": ".*", "hooks": [{
         "type": "command", "name": gemini.HOOK_NAME,
-        "command": "/opt/bin/vaara hook pre-tool-use --client gemini",
+        "command": _hook_gate.pre_command("/opt/bin/vaara", "gemini"),
         "timeout": gemini.HOOK_TIMEOUT_MS}]}
     assert "AfterTool" in cfg["hooks"]
     assert gemini.install_hooks("/opt/bin/vaara", d) is False

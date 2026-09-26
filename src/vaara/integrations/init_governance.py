@@ -35,6 +35,7 @@ from dataclasses import dataclass, field
 from pathlib import Path
 from typing import Any, Optional
 
+from vaara.integrations import _hook_gate
 from vaara.integrations.discovery import (
     DiscoverReport,
     run_discovery,
@@ -271,6 +272,8 @@ def resolve_vaara_bin() -> str:
 
 
 def _hook_command(vaara_bin: str, subcommand: str) -> str:
+    if subcommand == "pre-tool-use":
+        return _hook_gate.pre_command(vaara_bin)
     return f"{vaara_bin} hook {subcommand}"
 
 
@@ -341,7 +344,11 @@ def _vaara_hook_groups(vaara_bin: str) -> dict:
                 {
                     "type": "command",
                     "command": _hook_command(vaara_bin, subcommand),
-                    "timeout": 30,
+                    # Claude Code lets a call through when its hook times
+                    # out, so pre-tool-use gets the gate's host timeout:
+                    # the gate refuses at its deadline, first.
+                    "timeout": (_hook_gate.HOST_TIMEOUT
+                                if subcommand == "pre-tool-use" else 30),
                 }
             ]
         }
