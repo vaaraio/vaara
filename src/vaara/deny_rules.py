@@ -266,6 +266,30 @@ _COMMAND_LINE = re.compile(
     r"(?:\s+(?![A-Z][a-z])\S*[^\s:,.!?])*\s*")
 
 
+#: Commands that run the next word as a command.
+_LAUNCHERS = frozenset({
+    "sudo", "doas", "env", "nohup", "nice", "ionice", "time", "timeout",
+    "stdbuf", "setsid", "exec", "command", "builtin", "xargs", "busybox",
+    "unbuffer", "flock", "chroot", "runuser", "git",
+})
+
+
+def _launchers_only(lead: str) -> bool:
+    """True when every word before a verb is a launcher, one of its flags or
+    numbers, or an env assignment: ``sudo``, ``FOO=1 env -i``, ``timeout 5``,
+    ``git`` (git rm, git mv). A find ``-exec`` counts from its last one."""
+    words = lead.split()
+    for i in range(len(words) - 1, -1, -1):
+        if words[i] in ("-exec", "-execdir", "-ok", "-okdir"):
+            words = words[i + 1:]
+            break
+    return all(
+        w in _LAUNCHERS or w.startswith("-") or w.isdigit()
+        or re.fullmatch(r"[A-Za-z_]\w*=\S*", w)
+        for w in words
+    )
+
+
 def _shell_hit(regex: "re.Pattern[str]", key: str, text: str) -> bool:
     """A shell rule hit on an argument that is a command: under a
     command-like key, or a one-line string shaped like a command line
@@ -280,7 +304,19 @@ def _shell_hit(regex: "re.Pattern[str]", key: str, text: str) -> bool:
     # Judge only the command the match sits in: the text after the last
     # shell separator before it.
     lead = re.split(r";|&&|\|\||\||\$\(|`", text[:m.start()])[-1]
-    return lead.strip() == "" or bool(_COMMAND_LINE.fullmatch(lead))
+    if lead.strip() == "":
+        return True
+    if not _COMMAND_LINE.fullmatch(lead):
+        return False
+    # A match that starts with a word is the rule's verb (rm, install, tee),
+    # so it has to be the command, with only launchers before it. Any
+    # lowercase sentence also reads as "name args", and "box install ...
+    # ~/.vaara" was refused on 2026-09-26 with "box" taken for the command.
+    # A match that starts elsewhere (/etc/shadow) is an argument, and any
+    # command name may come first.
+    if m.group(0).lstrip(" \t;&|(")[:1].isalpha():
+        return _launchers_only(lead)
+    return True
 
 
 def match_deny_rule_any_field(
