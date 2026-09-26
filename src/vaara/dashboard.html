@@ -145,6 +145,7 @@
     <div>
       <div id="latest">No decisions recorded yet.</div>
       <div class="muted" style="font-size:.82rem" id="latest-why"></div>
+      <div class="muted" style="font-size:.82rem" id="recent"></div>
     </div>
   </div>
 
@@ -267,6 +268,12 @@ async function load() {
     ? `${s.gaps} period(s) where anchoring or publishing failed. Those windows are `
       + `recorded in the chain rather than hidden, but nothing outside this machine `
       + `saw the records inside them.`
+    : "";
+
+  // Counted over the alert window set in the settings below.
+  const R = s.recent || {};
+  $("recent").textContent = R.minutes
+    ? `Last ${R.minutes} min: ${R.deny} denied, ${R.escalate} held for review.`
     : "";
 
   const L = s.latest || {};
