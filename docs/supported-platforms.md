@@ -1,6 +1,6 @@
 # Supported platforms
 
-Vaara 2.1.1, Helm chart 0.1.0.
+Vaara 2.1.2, Helm chart 0.1.0.
 
 Vaara is a Python package with no runtime dependencies and a container image
 built on SUSE's SLE Base Container Image. This page lists what it runs on and,
