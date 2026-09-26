@@ -165,6 +165,7 @@ def run(name: Optional[str], agent_argv: list[str], *,
         raise RunError("AppArmor is not enabled on this machine, so the agent would run "
                        "unconfined; not starting it")
     from vaara.oslayer.client import GuardRefused, GuardUnavailable, open_launch, request
+    from vaara.oslayer.forward import HookServer
 
     prefix, binary = resolve(agent_argv[0])
     argv = prefix + agent_argv[1:]
@@ -173,6 +174,11 @@ def run(name: Optional[str], agent_argv: list[str], *,
         request({"op": "status"}, socket_path=socket_path)
     except (GuardUnavailable, GuardRefused) as exc:
         raise RunError(str(exc)) from None
+
+    # Adapter hooks inside the tree cannot reach ~/.vaara; they relay to this
+    # process, which stays outside the floor. See vaara.oslayer.forward.
+    hooks = HookServer()
+    os.environ.update(hooks.environ())
 
     ready_r, ready_w = os.pipe()
     pid = os.fork()
@@ -185,12 +191,15 @@ def run(name: Optional[str], agent_argv: list[str], *,
         launch = open_launch({"op": "launch", "pid": pid, "agent": agent, "binary": binary,
                               "argv": argv, "cwd": os.getcwd()}, socket_path=socket_path)
     except (GuardUnavailable, GuardRefused, OSError) as exc:
+        hooks.close()
         os.kill(pid, signal.SIGKILL)
         os.waitpid(pid, 0)
         if isinstance(exc, OSError):
             raise RunError(f"the guard did not answer: {exc}") from None
         raise RunError(str(exc)) from None
 
+    hooks.set_cgroup(launch.cgroup)
+    hooks.start()
     guard_gone = threading.Event()
 
     def _watch() -> None:
@@ -225,6 +234,7 @@ def run(name: Optional[str], agent_argv: list[str], *,
         except InterruptedError:
             continue
     launch.close()
+    hooks.close()
     if guard_gone.is_set():
         print("vaara run: the OS guard stopped, so the agent was ended.", file=sys.stderr)
         return EXIT_GUARD_GONE
