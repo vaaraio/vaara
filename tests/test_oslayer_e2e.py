@@ -264,7 +264,7 @@ def test_an_adapter_decides_under_vaara_run(tmp_path):
     each event to ``vaara run``. Without the relay it could not decide, and
     the gate in front of it would block every call, the free one included.
     """
-    from vaara.integrations import copilot
+    from vaara.integrations import claude_code_hooks, copilot
 
     home = Path.home()
     copilot_home = tmp_path / "copilot-home"
@@ -272,7 +272,6 @@ def test_an_adapter_decides_under_vaara_run(tmp_path):
     assert vaara_bin, "the vaara command is not on PATH"
     copilot.install_hooks(vaara_bin, copilot_home)
     free = tmp_path / "adapter-free.txt"
-    trail = home / ".vaara" / "claude-code" / "audit.db"
 
     model = _Model([
         [_sh(f"echo free > {free}")],
@@ -305,8 +304,11 @@ def test_an_adapter_decides_under_vaara_run(tmp_path):
     assert "etc_shadow_read" in out[1], (out[1], log)
 
     # Both decisions are on the adapter's trail, written from outside the floor.
-    # A failed write does not change the verdict, it leaves a marker beside
-    # the trail instead, so say what is there before reading it.
+    # Resolved as the hook resolves it: `vaara init` points the adapter's
+    # config at the shared trail. A failed write does not change the verdict,
+    # it leaves a marker beside the trail, so say what is there before reading.
+    trail = claude_code_hooks.audit_db_path(json.loads(
+        (home / ".vaara" / "claude-code" / "config.json").read_text()))
     if not trail.exists():
         marker = trail.with_name(trail.name + ".write-failure.json")
         seen = sorted(str(p) for p in (home / ".vaara").rglob("*")) if (home / ".vaara").exists() else []
