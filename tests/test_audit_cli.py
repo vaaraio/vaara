@@ -171,7 +171,7 @@ def test_missing_completion_detects_orphan_request():
     records = [
         {"agent_id": "a", "event_type": "action_requested", "action_id": "act-1",
          "tool_name": "send", "record_id": "r1"},
-        {"agent_id": "a", "event_type": "decision_emitted", "action_id": "act-1",
+        {"agent_id": "a", "event_type": "decision_made", "action_id": "act-1",
          "record_id": "r2"},
         {"agent_id": "a", "event_type": "action_requested", "action_id": "act-2",
          "tool_name": "send", "record_id": "r3"},
@@ -181,6 +181,34 @@ def test_missing_completion_detects_orphan_request():
     assert len(findings) == 1
     assert findings[0]["rule"] == "missing_completion"
     assert findings[0]["action_id"] == "act-2"
+
+
+def test_missing_completion_on_a_real_exported_trail(tmp_path):
+    """The rule reads the event names the trail writes.
+
+    It keyed on ``decision_emitted``, which nothing writes, so on every real
+    trail it returned nothing: a trail with a decision cut out passed clean.
+    """
+    from vaara.audit_cli import _load_records_from_zip
+    from vaara.pipeline import InterceptionPipeline
+
+    trail = AuditTrail()
+    pipeline = InterceptionPipeline(trail=trail)
+    for i in range(3):
+        pipeline.intercept(agent_id="a", tool_name="Bash", parameters={"command": f"echo {i}"})
+    pipeline.intercept(agent_id="a", tool_name="mcp__x__y", parameters={},
+                       policy_decision="deny", policy_reason="r", policy_id="p")
+    zip_path = tmp_path / "trail.zip"
+    export_signed(trail, zip_path, Ed25519PrivateKey.generate(), agent_id="a")
+    records, _ = _load_records_from_zip(zip_path)
+
+    assert _rule_missing_completion(records) == []
+
+    cut = next(r["action_id"] for r in records if r["event_type"] == "action_requested")
+    truncated = [r for r in records
+                 if not (r["action_id"] == cut and r["event_type"] != "action_requested")]
+    findings = _rule_missing_completion(truncated)
+    assert [f["action_id"] for f in findings] == [cut]
 
 
 def test_timestamp_regression_rule():

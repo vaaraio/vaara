@@ -236,16 +236,16 @@ def _verify_threshold(
     # Count distinct authorized signers with a valid signature.
     valid: set[str] = set()
     for fp, sig in sigs.items():
-        raw_norm = authorized.get(fp)
-        if raw_norm is None:
+        member_key = authorized.get(fp)
+        if member_key is None:
             continue  # unknown or unauthorized signer; not counted
         if member_algorithm == "Ed25519":
             try:
-                Ed25519PublicKey.from_public_bytes(raw_norm).verify(sig, to_verify)
+                Ed25519PublicKey.from_public_bytes(member_key).verify(sig, to_verify)
                 valid.add(fp)
             except (InvalidSignature, ValueError):
                 pass
-        elif mldsa_cls(raw_norm).verify(to_verify, sig):
+        elif mldsa_cls is not None and mldsa_cls(member_key).verify(to_verify, sig):
             valid.add(fp)
 
     if len(valid) < k:

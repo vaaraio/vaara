@@ -60,6 +60,7 @@ from vaara.attestation._attest_types import (
     VALID_ALGS,
     Algorithm,
     ArgsCommitment,
+    ArgsProjection,
     AttestationError,
     IssuerAsserted,
     issuer_to_dict,
@@ -135,7 +136,7 @@ def make_request_commitment(
     )
 
 
-def make_output_commitment(output: Any) -> ArgsCommitment:
+def make_output_commitment(output: Any) -> ArgsProjection:
     """Hash-only commitment over the response payload.
 
     ``output`` is the assembled response object (e.g. ``{"content": "...",

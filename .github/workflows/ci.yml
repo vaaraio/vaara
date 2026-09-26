@@ -377,6 +377,11 @@ jobs:
       - name: mypy
         run: mypy src/vaara/policy/
 
+      # The whole tree under the project's default (lenient) config, which
+      # reported 93 errors before the 2026-09-26 sweep and none after.
+      - name: mypy, whole tree
+        run: mypy src
+
   helm-chart:
     name: Helm chart renders
     runs-on: ubuntu-latest

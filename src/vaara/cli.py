@@ -586,7 +586,7 @@ def _cmd_trail_export_threshold(args: argparse.Namespace) -> int:
             _load_private_key,
             export_signed_threshold,
         )
-        from vaara.audit.signer import Ed25519Signer
+        from vaara.audit.signer import Ed25519Signer, Signer
         from vaara.audit.trail import AuditRecord, AuditTrail
     except ImportError:
         print(_INSTALL_HINT, file=sys.stderr)
@@ -609,7 +609,7 @@ def _cmd_trail_export_threshold(args: argparse.Namespace) -> int:
             if rec.record_hash:
                 trail._last_hash = rec.record_hash
 
-    signers = []
+    signers: list[Signer] = []
     for key_path in args.key:
         try:
             signers.append(Ed25519Signer(_load_private_key(Path(key_path).expanduser())))
@@ -1030,6 +1030,8 @@ def _obtain_time_anchor(args: argparse.Namespace, trail):
         except (json.JSONDecodeError, OSError, KeyError, TypeError) as exc:
             raise ValueError(f"failed to read anchor file: {exc}") from exc
 
+    if not anchor_tsa:
+        return None
     try:
         client = RFC3161TimeAnchorClient(anchor_tsa)
         return client.anchor(head_position, head_hash)
@@ -4217,8 +4219,8 @@ def _cmd_verify_records(args: argparse.Namespace) -> int:
             mark = "FAIL" if finding.severity == "required" else "warn"
             print(f"  [{mark}] {finding.id}: {finding.detail}")
             print(f"         {', '.join(finding.records)}")
-        for name, exc in unreadable:
-            print(f"  [FAIL] {name}: unreadable ({exc})")
+        for name, err in unreadable:
+            print(f"  [FAIL] {name}: unreadable ({err})")
 
     return 0 if ok else 1
 
@@ -4411,8 +4413,8 @@ def _cmd_verify_bundles(args: argparse.Namespace) -> int:
                 failed = [ln for ln, st in entry.lens_states.items() if st == "fail"]
                 reason = ", ".join(failed) if failed else "authenticity not established"
                 print(f"  [FAIL] {entry.name}: {reason}")
-        for name, exc in unreadable:
-            print(f"  [FAIL] {name}: unreadable ({exc})")
+        for name, err in unreadable:
+            print(f"  [FAIL] {name}: unreadable ({err})")
 
     return 0 if ok else 1
 
@@ -4493,8 +4495,8 @@ def _cmd_verify_handoffs(args: argparse.Namespace) -> int:
                     "verifiable" if entry.verifiable else "not verifiable")
                 print(f"  [FAIL] {entry.name}: {tier}, "
                       f"identity {entry.producer_identity_basis}")
-        for name, exc in unreadable:
-            print(f"  [FAIL] {name}: unreadable ({exc})")
+        for name, err in unreadable:
+            print(f"  [FAIL] {name}: unreadable ({err})")
 
     return 0 if ok else 1
 
