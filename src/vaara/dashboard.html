@@ -179,13 +179,44 @@
   <div id="settings" class="panel"></div>
   <p class="muted" style="font-size:.78rem;margin-top:8px" id="cfg-path"></p>
 
+  <!-- Linux only: shown when the engine reports the OS layer is available. -->
+  <section id="os-section" hidden>
+    <p class="stamp">OS layer</p>
+    <div id="os-guard" class="panel"></div>
+    <div id="os-pending" style="margin-top:12px"></div>
+    <div class="panel" style="margin-top:12px">
+      <div id="os-folders"></div>
+      <div class="field">
+        <div class="lbl"><div class="n">Add a folder</div>
+          <div class="h" id="os-mode-help"></div></div>
+        <input id="os-folder-path" type="text" placeholder="/home/you/clients"
+               style="width:14rem;font-family:var(--mono);font-size:.82rem">
+        <select id="os-folder-mode"></select>
+        <button id="os-folder-add" style="margin:0">Add</button>
+      </div>
+    </div>
+    <div class="panel" style="margin-top:12px">
+      <div id="os-apps"></div>
+      <div class="field">
+        <div class="lbl"><div class="n">Attach an app</div>
+          <div class="h">The profile applies to this program however it is started,
+            from a menu or a dock, without vaara run.</div></div>
+        <input id="os-app-path" type="text" placeholder="/usr/local/bin/copilot"
+               style="width:14rem;font-family:var(--mono);font-size:.82rem">
+        <button id="os-app-add" style="margin:0">Attach</button>
+      </div>
+    </div>
+    <p class="muted" style="font-size:.78rem;margin-top:8px" id="os-note"></p>
+  </section>
+
   <p class="stamp">History</p>
   <div id="history"></div>
 
   <p class="muted" style="font-size:.78rem;margin-top:36px">
     Served from your own machine on 127.0.0.1 and not reachable from the
     network. Trail and witness figures are read-only; settings write to the same
-    config.json the macOS client reads. Nothing here is uploaded anywhere.
+    config.json the macOS client reads, and OS-layer picks to
+    ~/.vaara/os-layer.json. Nothing here is uploaded anywhere.
     <br><br>
     Vaara &copy; 2026 Henri Sirkkavaara. Licensed AGPL-3.0-or-later.
   </p>
@@ -380,6 +411,107 @@ async function loadSettings() {
   });
 }
 
+// What each mode does, and what it does not. The guard gets no event for a
+// delete or a move, so an ask folder cannot ask about one; only block stops it.
+const OS_MODES = {
+  record: "The agent opens and runs files here; the first open of each file per launch is recorded.",
+  ask: "Each file the agent opens or runs here waits for your answer. Deletes and moves here are not asked.",
+  block: "The agent cannot read, write, move or delete anything here, whether or not the guard runs.",
+};
+
+function osField(name, help, right) {
+  return `<div class="field"><div class="lbl"><div class="n">${name}</div>`
+    + `<div class="h">${help}</div></div>${right || ""}</div>`;
+}
+
+async function osPost(body) {
+  try {
+    const res = await fetch("/api/oslayer", {
+      method: "POST",
+      headers: { "Content-Type": "application/json", "X-Vaara-Token": TOKEN },
+      body: JSON.stringify(body),
+    });
+    const r = await res.json();
+    $("os-note").textContent = r.error ? r.error
+      : (r.guard_told === false ? "Saved. The guard picks it up when it runs." : "Saved.");
+    $("os-note").style.color = r.error ? "var(--deny)" : "";
+  } catch (e) {
+    $("os-note").textContent = e.message;
+    $("os-note").style.color = "var(--deny)";
+  }
+  loadOS();
+}
+
+async function loadOS() {
+  let o;
+  try { o = await (await fetch("/api/oslayer")).json(); } catch (e) { return; }
+  if (!o || !o.available) { $("os-section").hidden = true; return; }
+  $("os-section").hidden = false;
+  if (o.error) { $("os-guard").innerHTML = osField("OS layer", esc(o.error)); return; }
+
+  const g = o.guard;
+  $("os-guard").innerHTML = g
+    ? osField(`Guard running, pid ${esc(g.pid)}`,
+        `Floor ${g.profile_loaded ? "loaded" : "<strong>not loaded</strong>"} · `
+        + `${esc(g.launches.length)} launch(es) · trail <code>${esc(g.trail)}</code>`)
+    : osField("Guard not running", o.apparmor
+        ? "Start it with <code>sudo vaara os-guard</code>. Until it runs, "
+          + "<code>vaara run</code> starts no agent."
+        : "AppArmor is not enabled on this machine, so there is no floor to load.");
+
+  const waiting = o.pending || [];
+  $("os-pending").innerHTML = waiting.length
+    ? `<div class="panel">` + waiting.map(r => osField(
+        esc(r.reason), `<code>${esc(r.tool_name)}</code> · ${esc(r.action_id)}`,
+        `<button data-decide="approve" data-id="${esc(r.action_id)}" style="margin:0">Approve</button>`
+        + `<button data-decide="deny" data-id="${esc(r.action_id)}" style="margin:0">Deny</button>`
+      )).join("") + `</div>`
+    : "";
+  $("os-pending").querySelectorAll("button[data-decide]").forEach(b =>
+    b.addEventListener("click", () =>
+      osPost({ action: "decide", action_id: b.dataset.id, decision: b.dataset.decide })));
+
+  const modeSel = $("os-folder-mode");
+  if (!modeSel.options.length) {
+    modeSel.innerHTML = o.modes.map(m => `<option value="${esc(m)}">${esc(m)}</option>`).join("");
+    $("os-mode-help").textContent = OS_MODES[modeSel.value] || "";
+    modeSel.addEventListener("change", () => {
+      $("os-mode-help").textContent = OS_MODES[modeSel.value] || "";
+    });
+  }
+
+  const folders = o.selection.folders || [];
+  $("os-folders").innerHTML = folders.length
+    ? folders.map(f => osField(`<code>${esc(f.path)}</code>`, esc(OS_MODES[f.mode] || ""),
+        `<select data-folder="${esc(f.path)}">`
+        + o.modes.concat(["off"]).map(m =>
+            `<option value="${esc(m)}"${m === f.mode ? " selected" : ""}>${esc(m)}</option>`
+          ).join("") + `</select>`)).join("")
+    : osField("No folders picked", "The floor still keeps agents out of Vaara's own files, "
+        + "every harness's hooks and settings, and what your shell and the system start from.");
+  $("os-folders").querySelectorAll("select[data-folder]").forEach(sel =>
+    sel.addEventListener("change", () =>
+      osPost({ action: "folder", path: sel.dataset.folder, mode: sel.value })));
+
+  const apps = o.selection.apps || [];
+  $("os-apps").innerHTML = apps.map(a => osField(`<code>${esc(a)}</code>`, "attached",
+      `<button data-detach="${esc(a)}" style="margin:0">Detach</button>`)).join("");
+  $("os-apps").querySelectorAll("button[data-detach]").forEach(b =>
+    b.addEventListener("click", () =>
+      osPost({ action: "app", path: b.dataset.detach, attach: false })));
+}
+
+$("os-folder-add").addEventListener("click", () => {
+  const path = $("os-folder-path").value.trim();
+  if (path) osPost({ action: "folder", path, mode: $("os-folder-mode").value })
+    .then(() => { $("os-folder-path").value = ""; });
+});
+$("os-app-add").addEventListener("click", () => {
+  const path = $("os-app-path").value.trim();
+  if (path) osPost({ action: "app", path, attach: true })
+    .then(() => { $("os-app-path").value = ""; });
+});
+
 (function(){
   var root = document.documentElement;
   var btns = document.querySelectorAll('.theme-toggle [data-set-theme]');
@@ -408,8 +540,10 @@ async function loadSettings() {
 })();
 
 load();
-loadSettings().then(loadRules);
+loadSettings().then(loadRules).then(loadOS);
 setInterval(load, 5000);
+// Opens in an ask folder wait on this page, so it looks more often.
+setInterval(loadOS, 2000);
 </script>
 </body>
 </html>
