@@ -628,7 +628,10 @@ jobs:
       - name: Run the OS layer end-to-end test, failing on any skip
         run: |
           set -o pipefail
-          VAARA_OSLAYER_E2E=1 pytest tests/test_oslayer_e2e.py -q -rs | tee result.txt
+          # The suite points HOME at a sandbox; this test needs the operator's
+          # real home, which is the one the guard serves.
+          VAARA_TEST_USE_REAL_HOME=1 VAARA_OSLAYER_E2E=1 \
+            pytest tests/test_oslayer_e2e.py -q -rs | tee result.txt
           if grep -qE '[0-9]+ skipped' result.txt; then
             echo "::error::The OS layer test skipped, so it did not run."
             exit 1

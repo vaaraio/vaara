@@ -220,7 +220,7 @@ class Guard:
     def _take_lock(self) -> None:
         """One guard at a time: an exclusive lock held for the process's life."""
         self.lock_path.parent.mkdir(mode=0o755, parents=True, exist_ok=True)
-        fd = os.open(self.lock_path, os.O_RDWR | os.O_CREAT | os.O_CLOEXEC, 0o644)
+        fd = os.open(self.lock_path, os.O_RDWR | os.O_CREAT | os.O_CLOEXEC, 0o600)
         try:
             fcntl.flock(fd, fcntl.LOCK_EX | fcntl.LOCK_NB)
         except BlockingIOError:
@@ -380,7 +380,7 @@ class Guard:
             text = self.render_profile()
             tmp = self.profile_file.with_name(f".{self.profile_file.name}.tmp")
             tmp.write_text(text)
-            os.chmod(tmp, 0o644)
+            os.chmod(tmp, 0o600)
             os.replace(tmp, self.profile_file)
             done = subprocess.run([parser_path(), "-r", str(self.profile_file)],
                                   capture_output=True, text=True, timeout=120)
@@ -621,9 +621,11 @@ class Guard:
             pass
         server = socket.socket(socket.AF_UNIX, socket.SOCK_STREAM)
         server.bind(str(self.socket_path))
-        # Anyone may reach the socket; who is served is decided by the peer's
-        # credentials on each connection.
-        os.chmod(self.socket_path, 0o666)
+        # The operator's group reaches the socket; who is served is then
+        # decided by the peer's credentials on each connection.
+        if os.geteuid() == 0:
+            os.chown(self.socket_path, 0, self.gid)
+        os.chmod(self.socket_path, 0o660)
         server.listen(16)
         server.settimeout(0.5)
         self._server = server
