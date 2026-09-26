@@ -50,13 +50,16 @@ import time
 from collections import OrderedDict
 from dataclasses import dataclass, field
 from pathlib import Path
-from typing import Optional
+from typing import TYPE_CHECKING, Any, Optional
 
 from vaara.oslayer import cgroup, floor, selection
 from vaara.oslayer.denials import Denial, Follower
 from vaara.oslayer.fanotify import Event, Group, mount_point
 from vaara.taxonomy.actions import (ActionCategory, ActionType, BlastRadius,
                                     RegulatoryDomain, Reversibility, UrgencyClass)
+
+if TYPE_CHECKING:
+    from vaara.pipeline import InterceptionPipeline
 
 logger = logging.getLogger("vaara.os-guard")
 
@@ -105,7 +108,7 @@ class Launch:
     started: float = field(default_factory=time.time)
 
 
-def build_pipeline(trail_path: Path):
+def build_pipeline(trail_path: Path) -> InterceptionPipeline:
     from vaara.audit.sqlite_backend import SQLiteAuditBackend
     from vaara.pipeline import InterceptionPipeline
     from vaara.taxonomy.actions import create_default_registry
@@ -187,7 +190,7 @@ class Guard:
         self._profile_lock = threading.Lock()
 
         self._group: Optional[Group] = None
-        self._pipeline = None
+        self._pipeline: Optional[InterceptionPipeline] = None
         self._trail_lock = threading.Lock()
         self._pool = concurrent.futures.ThreadPoolExecutor(
             max_workers=WORKERS, thread_name_prefix="vaara-decide")
@@ -202,6 +205,25 @@ class Guard:
         self._threads: list[threading.Thread] = []
         self._server: Optional[socket.socket] = None
         self._follower: Optional[Follower] = None
+
+    # Set by start(); a use before it is a bug in the caller, said plainly.
+    @property
+    def _fan(self) -> Group:
+        if self._group is None:
+            raise GuardError("the guard is not started: no fanotify group")
+        return self._group
+
+    @property
+    def _trail(self) -> InterceptionPipeline:
+        if self._pipeline is None:
+            raise GuardError("the guard is not started: no trail")
+        return self._pipeline
+
+    @property
+    def _listening(self) -> socket.socket:
+        if self._server is None:
+            raise GuardError("the guard is not started: no launch socket")
+        return self._server
 
     # ── Start and stop ────────────────────────────────────────────
 
@@ -392,7 +414,10 @@ class Guard:
             tmp.write_text(text)
             os.chmod(tmp, 0o600)
             os.replace(tmp, self.profile_file)
-            done = subprocess.run([parser_path(), "-r", str(self.profile_file)],
+            parser = parser_path()
+            if parser is None:
+                raise GuardError("apparmor_parser was not found (package: apparmor)")
+            done = subprocess.run([parser, "-r", str(self.profile_file)],
                                   capture_output=True, text=True, timeout=120)
             if done.returncode != 0:
                 raise GuardError(f"apparmor_parser refused the profile: {done.stderr.strip()}")
@@ -401,9 +426,9 @@ class Guard:
         sel = self._selection
         wanted = {mount_point(p) for p in sel.folders_in("ask") + sel.folders_in("record")}
         for point in sorted(wanted - self._mounts):
-            self._group.mark_mount(point)
+            self._fan.mark_mount(point)
         for point in sorted(self._mounts - wanted):
-            self._group.unmark_mount(point)
+            self._fan.unmark_mount(point)
         self._mounts = wanted
 
     def reload(self) -> None:
@@ -433,7 +458,7 @@ class Guard:
     # ── Decisions ─────────────────────────────────────────────────
 
     def _reader(self) -> None:
-        group = self._group
+        group = self._fan
         poller = select.poll()
         poller.register(group.fd, select.POLLIN)
         while not self._stop.is_set():
@@ -490,7 +515,7 @@ class Guard:
 
     def _respond(self, event: Event, allow: bool) -> None:
         try:
-            self._group.respond(event, allow)
+            self._fan.respond(event, allow)
         except OSError:
             pass
 
@@ -551,7 +576,7 @@ class Guard:
                 return self._answers[key]
             future = self._asking.get(key)
             owner = future is None
-            if owner:
+            if future is None:
                 future = concurrent.futures.Future()
                 self._asking[key] = future
         if not owner:
@@ -588,7 +613,7 @@ class Guard:
         if human not in ("approve", "deny"):
             return False
         with self._trail_lock:
-            self._pipeline.resolve_escalation(
+            self._trail.resolve_escalation(
                 result.action_id, "allow" if human == "approve" else "deny",
                 reviewer="approvals-handshake",
                 justification="human decision via ~/.vaara/approvals",
@@ -603,7 +628,7 @@ class Guard:
     def _intercept(self, agent: str, session: str, tool: str, params: dict,
                    decision: str, reason: str, policy_id: str):
         with self._trail_lock:
-            return self._pipeline.intercept(
+            return self._trail.intercept(
                 agent_id=agent, tool_name=tool, parameters=params, session_id=session,
                 policy_decision=decision, policy_reason=reason, policy_id=policy_id)
 
@@ -650,7 +675,7 @@ class Guard:
     def _accept(self) -> None:
         while not self._stop.is_set():
             try:
-                conn, _ = self._server.accept()
+                conn, _ = self._listening.accept()
             except socket.timeout:
                 continue
             except OSError:
@@ -703,7 +728,8 @@ class Guard:
     def launch(self, request: dict, peer_pid: int, peer_uid: int,
                peer_gid: int) -> tuple[dict, Optional[Launch]]:
         try:
-            child = int(request.get("pid"))
+            raw_pid: Any = request.get("pid")
+            child = int(raw_pid)
         except (TypeError, ValueError):
             return {"ok": False, "error": "launch needs the pid of the waiting child"}, None
         if _status_field(child, "PPid") != str(peer_pid):

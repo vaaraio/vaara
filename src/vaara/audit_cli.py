@@ -47,7 +47,7 @@ import json
 import sys
 import zipfile
 from collections import Counter, defaultdict
-from datetime import datetime, timezone
+from datetime import datetime, timedelta, timezone
 from pathlib import Path
 from typing import Any, Iterable, Optional
 
@@ -114,7 +114,7 @@ def _emit_json(obj: Any, stream=None) -> None:
     stream.write("\n")
 
 
-def _emit_table(rows: Iterable[list[str]], headers: list[str], stream=None) -> None:
+def _emit_table(rows: Iterable[list[Any]], headers: list[str], stream=None) -> None:
     stream = stream or sys.stdout
     rows = list(rows)
     if not rows:
@@ -146,7 +146,7 @@ def cmd_verify(args) -> int:
         return 2
     pubkey = Path(args.pubkey) if args.pubkey else None
     result = verify_signed(zip_path, public_key=pubkey)
-    payload = {
+    payload: dict[str, Any] = {
         "ok": bool(result.ok),
         "trail": str(zip_path),
         "manifest": result.manifest,
@@ -200,11 +200,9 @@ def cmd_inspect(args) -> int:
             return False
         return True
 
-    filtered = (r for r in records if matches(r))
+    filtered = [r for r in records if matches(r)]
     if args.limit:
-        filtered = list(filtered)[: args.limit]
-    else:
-        filtered = list(filtered)
+        filtered = filtered[: args.limit]
 
     if args.json:
         _emit_json({"n": len(filtered), "records": filtered})
@@ -313,7 +311,7 @@ def _rule_missing_completion(records: list[dict]) -> list[dict]:
     that enforcement crashed, the trail was truncated, or the gate was
     bypassed. All three are anomalies worth surfacing.
     """
-    findings = []
+    findings: list[dict] = []
     event_types = {r.get("event_type") for r in records}
     if "decision_emitted" not in event_types:
         # Trail is request-log only (no decisions anywhere). Not enough
@@ -374,15 +372,16 @@ def _rule_rate_burst(
         aid = r.get("agent_id") or "(none)"
         by_agent[aid].append(r)
     for aid, rs in by_agent.items():
-        rs_ts = sorted([
-            (_record_ts(r), r)
-            for r in rs
-            if _record_ts(r) is not None
-        ], key=lambda x: x[0])
+        stamped: list[tuple[datetime, dict]] = []
+        for r in rs:
+            ts = _record_ts(r)
+            if ts is not None:
+                stamped.append((ts, r))
+        rs_ts = sorted(stamped, key=lambda x: x[0])
         # Sliding-window count
         left = 0
         for right in range(len(rs_ts)):
-            while rs_ts[right][0] - rs_ts[left][0] > __import__("datetime").timedelta(seconds=window_s):
+            while rs_ts[right][0] - rs_ts[left][0] > timedelta(seconds=window_s):
                 left += 1
             count = right - left + 1
             if count >= threshold:
