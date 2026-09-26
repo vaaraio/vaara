@@ -46,7 +46,12 @@ def _open(path: Path | str, timeout: float) -> socket.socket:
 
 
 def _exchange(sock: socket.socket, payload: dict) -> dict:
-    sock.sendall((json.dumps(payload) + "\n").encode())
+    try:
+        sock.sendall((json.dumps(payload) + "\n").encode())
+    except (BrokenPipeError, ConnectionResetError):
+        # A refusal is sent without reading the request, so a large request
+        # can meet a closed peer. The answer is already queued: read it.
+        pass
     data = b""
     while b"\n" not in data:
         chunk = sock.recv(65536)
