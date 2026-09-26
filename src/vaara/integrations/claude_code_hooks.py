@@ -92,7 +92,10 @@ def approvals_dir(cfg: dict) -> Path:
 def approvals_timeout(cfg: dict) -> float:
     """Seconds an escalation waits for a human, ended inside the gate's
     deadline so the wait closes on its own timeout record rather than being
-    cut off by the gate with nothing written."""
+    cut off by the gate with nothing written.
+
+    approval_style, as the dashboard offers it: "timeout" waits for
+    approvals_timeout, "blocking" waits as long as the gate allows."""
     from vaara.integrations._hook_gate import DEADLINE
 
     raw = os.environ.get("VAARA_PLUGIN_APPROVALS_TIMEOUT") or cfg.get("approvals_timeout")
@@ -106,6 +109,8 @@ def approvals_timeout(cfg: dict) -> float:
     raw_deadline = os.environ.get("VAARA_HOOK_DEADLINE", "")
     if raw_deadline.isdigit():  # read as the gate reads it
         deadline = min(deadline, int(raw_deadline))
+    if cfg.get("approval_style") == "blocking":
+        timeout = float(deadline)
     return max(min(timeout, deadline - 5.0), 0.5)
 
 
@@ -174,9 +179,30 @@ def _wanted(cfg: dict, verdict: str) -> bool:
     return choice not in ("deny", "escalate") or choice == kind
 
 
-def notify(cfg: dict, verdict: str, tool_name: str, detail: str) -> None:
+def _explained(cfg: dict, verdict: str, detail: str, action_id: Optional[str]) -> str:
+    """user_level, as the dashboard offers it: how much a decision's
+    notification explains. basic names the verdict and tool only,
+    professional adds risk and reason, enterprise also the action id.
+    A trail alarm is not a decision and always explains itself."""
+    if verdict not in _NOTIFY_CLASSES:
+        return detail
+    level = cfg.get("user_level", "professional")
+    if level == "basic":
+        return ""
+    if level == "enterprise" and action_id:
+        suffix = f" (action_id={action_id})"
+        # notify() clips the body at 180; the id is the part to keep.
+        return detail[: max(180 - len(suffix), 0)] + suffix
+    return detail
+
+
+def notify(
+    cfg: dict, verdict: str, tool_name: str, detail: str,
+    action_id: Optional[str] = None,
+) -> None:
     if not notifications_enabled(cfg) or not _wanted(cfg, verdict):
         return
+    detail = _explained(cfg, verdict, detail, action_id)
     try:
         clean = lambda text, limit: (  # noqa: E731
             text.replace('"', "'").replace("\\", "/").replace("\n", " ")[:limit]
@@ -575,7 +601,8 @@ def _decide_pre(cfg: dict, events: list[dict], agent: str,
         f"(risk {result.risk_score:.2f}, action_id={result.action_id}). "
         f"Reason: {result.reason}"
     )
-    notify(cfg, "BLOCKED", tool_name, f"risk {result.risk_score:.2f}: {result.reason}")
+    notify(cfg, "BLOCKED", tool_name, f"risk {result.risk_score:.2f}: {result.reason}",
+           action_id=result.action_id)
     return 2
 
 
@@ -589,7 +616,7 @@ def _handle_escalation(cfg: dict, pipeline, result, tool_name: str) -> int:
     """
     detail = f"risk {result.risk_score:.2f}: {result.reason}"
     if approvals_enabled(cfg):
-        notify(cfg, "APPROVAL NEEDED", tool_name, detail)
+        notify(cfg, "APPROVAL NEEDED", tool_name, detail, action_id=result.action_id)
         try:
             from vaara.approvals import request_approval
 
@@ -629,14 +656,14 @@ def _handle_escalation(cfg: dict, pipeline, result, tool_name: str) -> int:
                 f"vaara-governance: DENIED {tool_name} by human "
                 f"(action_id={result.action_id})."
             )
-            notify(cfg, "DENIED", tool_name, detail)
+            notify(cfg, "DENIED", tool_name, detail, action_id=result.action_id)
             return 2
     _emit(
         f"vaara-governance: ESCALATE {tool_name} blocked pending review "
         f"(risk {result.risk_score:.2f}, action_id={result.action_id}). "
         f"Reason: {result.reason}"
     )
-    notify(cfg, "ESCALATE", tool_name, detail)
+    notify(cfg, "ESCALATE", tool_name, detail, action_id=result.action_id)
     return 2
 
 
