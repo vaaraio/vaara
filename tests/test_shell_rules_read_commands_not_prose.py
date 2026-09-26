@@ -80,11 +80,11 @@ INSTALL, RM = "inst" + "all", "r" + "m"
 
 
 def test_a_one_line_note_with_a_verb_mid_sentence_passes(rules):
-    # 2026-09-26: a memory search whose query began "box install ..." and
-    # later named the trail folder was refused as trail_shell_tamper. The
-    # lead "box" looked like a command name, so the verb counted as its
-    # argument.
-    query = f"box {INSTALL} held at 1.99.0, sealed {V} under vaara run"
+    # 2026-09-26: a one-line search query that began with a lowercase word,
+    # used "install" and later named the trail folder was refused as
+    # trail_shell_tamper. Its first word looked like a command name, so the
+    # verb counted as that command's argument.
+    query = f"notes {INSTALL} steps, the trail is kept in {V}"
     assert match_deny_rule_any_field(rules, {"query": query}) is None
 
 

@@ -8,7 +8,7 @@ and this project follows [Semantic Versioning](https://semver.org/spec/v2.0.0.ht
 
 ### Fixed
 - The dashboard's Detail level and Approval style settings take effect. Both were written to the hook's config and read by nothing. Detail level sets how much a decision's notification says: basic names the decision and tool, professional adds risk and reason, enterprise adds the action id. Approval style sets how long an escalation waits before it is denied: timeout uses the approvals timeout, blocking waits as long as the hook may (75 s).
-- A shell deny rule on an MCP tool's arguments no longer refuses a one-line note whose words read like a command. A memory search that began "box install" and later named the trail folder was refused as `trail_shell_tamper`. A rule that matches a command verb (rm, install, tee) now fires only when the verb is the command itself: at the start, or after a launcher such as sudo, env, git or find -exec. Arguments named like commands (command, cmd, script, args) are still read in full.
+- A shell deny rule on an MCP tool's arguments no longer refuses a one-line note whose words read like a command. A search query that began with a lowercase word, used "install" and later named the trail folder was refused as `trail_shell_tamper`. A rule that matches a command verb (rm, install, tee) now fires only when the verb is the command itself: at the start, or after a launcher such as sudo, env, git or find -exec. Arguments named like commands (command, cmd, script, args) are still read in full.
 
 ## [2.1.1] - 2026-09-26
 
