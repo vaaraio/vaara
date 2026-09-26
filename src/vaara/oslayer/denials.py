@@ -133,6 +133,14 @@ def _follow_netlink(stop: threading.Event) -> Iterator[str]:
         sock.bind((0, _AUDIT_NLGRP_READLOG))
     except (OSError, AttributeError):
         return
+    # A profile load alone sends over a hundred records at once; the default
+    # buffer overflows on that and the refusals right after it are lost.
+    for opt in (getattr(socket, "SO_RCVBUFFORCE", 33), socket.SO_RCVBUF):
+        try:
+            sock.setsockopt(socket.SOL_SOCKET, opt, 8 * 1024 * 1024)
+            break
+        except OSError:
+            continue
     sock.settimeout(0.5)
     try:
         while not stop.is_set():
@@ -140,7 +148,13 @@ def _follow_netlink(stop: threading.Event) -> Iterator[str]:
                 data = sock.recv(65536)
             except socket.timeout:
                 continue
-            except OSError:
+            except OSError as exc:
+                # ENOBUFS: the buffer overflowed and records were dropped.
+                # Say so and keep reading; the next ones still count.
+                if exc.errno == errno.ENOBUFS:
+                    logger.warning("audit records were dropped before the guard read them")
+                    continue
+                logger.warning("stopped reading the audit multicast group: %s", exc)
                 return
             off = 0
             while off + _NLMSG.size <= len(data):
