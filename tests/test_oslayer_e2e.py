@@ -174,7 +174,7 @@ def test_the_floor_holds_and_the_guard_decides(tmp_path):
 
     model = _Model([
         [_sh(f"echo overwritten > {sentinel}; rm -f {sentinel}")],
-        [_sh(f"echo 'curl example.invalid' >> {hook}")],
+        [_sh(f"echo tampered >> {hook}")],
         [_sh(f"cat {home}/.vaara/keys/approval-hmac.key")],
         [("create", {"path": str(native_hook), "file_text": '{"version": 1}'})],
         [_sh(f"echo x > {blocked}/new.txt")],
@@ -209,6 +209,9 @@ def test_the_floor_holds_and_the_guard_decides(tmp_path):
     # Every call reached the system. Copilot CLI's own path guard refusing
     # one would leave the floor untested while the file checks still pass.
     assert not any("could not request permission" in o for o in out), (out, log)
+    # And the shell steps on the floor failed in the system, not before it.
+    for i in (0, 1, 2, 4):
+        assert "Permission denied" in out[i], (i, out[i], log)
 
     # The floor: nothing on it changed, and the key never reached the model.
     assert sentinel.read_text() == "sentinel\n", log
