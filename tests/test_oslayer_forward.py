@@ -96,6 +96,24 @@ def test_caller_outside_the_launch_is_refused(capfdbinary, monkeypatch):
         srv.close()
 
 
+def test_a_refusal_sent_before_the_request_is_read_still_arrives(capfdbinary, monkeypatch):
+    # A refused caller is answered without its request being read. A request
+    # larger than the socket buffer then meets a closed peer mid-send, and the
+    # reason used to be lost to "Broken pipe" (seen about one run in six).
+    srv = forward.HookServer(hook_cmd=[sys.executable, "-c", _FAKE_HOOK])
+    srv.set_cgroup("/sys/fs/cgroup/vaara/launch-abc")
+    monkeypatch.setattr(forward, "_cgroup_of", lambda pid: "/user.slice/session-1.scope")
+    srv.start()
+    try:
+        for key, value in srv.environ().items():
+            monkeypatch.setenv(key, value)
+        rc = forward.relay(["pre-tool-use"], stdin=b"x" * (8 << 20))
+        assert rc == forward.EXIT_UNREACHED
+        assert b"vaara run refused: caller is not in this launch" in capfdbinary.readouterr().err
+    finally:
+        srv.close()
+
+
 def test_launch_cgroup_membership(monkeypatch):
     srv = forward.HookServer()
     try:
