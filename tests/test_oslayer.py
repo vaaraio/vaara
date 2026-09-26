@@ -518,3 +518,38 @@ def test_panel_state_lists_the_guards_questions(operator_home, monkeypatch):
     assert state["available"] and state["guard"] is None
     assert [r["action_id"] for r in state["pending"]] == ["a"]
     assert state["modes"] == ["record", "ask", "block"]
+
+
+# ── The client, against the guard's own socket server ─────────────
+
+
+def test_client_asks_the_guard_over_its_socket(g):
+    from vaara.oslayer import client
+
+    g._serve()
+    try:
+        reply = client.request({"op": "status"}, socket_path=g.socket_path)
+        assert reply["ok"] and reply["user"] == g.user
+        with pytest.raises(client.GuardRefused, match="unknown op"):
+            client.request({"op": "nope"}, socket_path=g.socket_path)
+        with pytest.raises(client.GuardRefused, match="not a child"):
+            client.open_launch({"op": "launch", "pid": 1}, socket_path=g.socket_path)
+    finally:
+        g._stop.set()
+        g._server.close()
+
+
+def test_client_says_plainly_when_no_guard_runs(tmp_path):
+    from vaara.oslayer import client
+
+    with pytest.raises(client.GuardUnavailable, match="sudo vaara os-guard"):
+        client.request({"op": "status"}, socket_path=tmp_path / "none.sock")
+
+
+def test_run_refuses_without_a_guard(monkeypatch, tmp_path):
+    monkeypatch.setattr(run.sys, "platform", "linux")
+    monkeypatch.setattr(floor, "apparmor_enabled", lambda: True)
+    monkeypatch.chdir(tmp_path)
+    with pytest.raises(run.RunError, match="sudo vaara os-guard"):
+        run.run(None, ["sh", "-c", "touch ran"], socket_path=tmp_path / "none.sock")
+    assert not (tmp_path / "ran").exists()

@@ -164,11 +164,15 @@ def run(name: Optional[str], agent_argv: list[str], *,
     if not floor.apparmor_enabled():
         raise RunError("AppArmor is not enabled on this machine, so the agent would run "
                        "unconfined; not starting it")
-    from vaara.oslayer.client import GuardRefused, GuardUnavailable, open_launch
+    from vaara.oslayer.client import GuardRefused, GuardUnavailable, open_launch, request
 
     prefix, binary = resolve(agent_argv[0])
     argv = prefix + agent_argv[1:]
     agent = name or os.path.basename(agent_argv[0])
+    try:
+        request({"op": "status"}, socket_path=socket_path)
+    except (GuardUnavailable, GuardRefused) as exc:
+        raise RunError(str(exc)) from None
 
     ready_r, ready_w = os.pipe()
     pid = os.fork()
