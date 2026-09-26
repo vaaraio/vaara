@@ -45,5 +45,7 @@ Position: tamper-evident runtime evidence and enforcement layer. Signed attestat
 
 ## Optional
 - [Article 14 runtime](https://futurium.ec.europa.eu/ga/apply-ai-alliance/community-content/article-14-runtime-why-oversight-agentic-ai-has-be-evidenced-action-not-model): position post on EU Apply AI Alliance Futurium
+- [Article 12 and the difference between a log and evidence](https://futurium.ec.europa.eu/en/apply-ai-alliance/community-content/article-12-and-difference-between-log-and-evidence): companion position post on EU Apply AI Alliance Futurium
+- [Sovereign proof for the AI Act](https://futurium.ec.europa.eu/en/apply-ai-alliance/community-content/sovereign-proof-ai-act): position post on EU Apply AI Alliance Futurium
 - [OVERT 1.0 spec](https://overt.is/): open runtime-trust standard Vaara implements as Arbiter
 - [Microsoft Agent Governance Toolkit](https://github.com/microsoft/agent-governance-toolkit): broader agent-governance reference (zero-trust identity, capability-based access control)
