@@ -170,6 +170,12 @@ def test_other_profiles_and_allowed_records_are_ignored():
     assert denials.parse("usb 1-1: new high-speed USB device") is None
 
 
+def test_netlink_payload_parses_like_a_log_line():
+    # The multicast group carries the record without the "audit: type=1400" prefix.
+    payload = KMSG_LINE.split("audit: type=1400 ", 1)[1]
+    assert denials.parse(payload).stamp == "1758850000.123:456"
+
+
 def test_same_record_from_both_sources_counts_once():
     seen = []
     f = denials.Follower(seen.append, sources=())

@@ -641,4 +641,4 @@ jobs:
         if: always()
         run: |
           cat guard.log || true
-          sudo dmesg | grep 'apparmor="DENIED"' | tail -40 || true
+          sudo dmesg | grep -E 'apparmor="DENIED"|suppressed' | tail -40 || true

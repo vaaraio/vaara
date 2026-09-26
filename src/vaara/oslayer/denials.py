@@ -2,10 +2,12 @@
 # SPDX-License-Identifier: AGPL-3.0-or-later
 """The floor's refusals, as the kernel reports them.
 
-AppArmor writes each refusal as an audit record. With auditd running the
-record goes to ``/var/log/audit/audit.log``; without it the kernel prints it
-to its own log, ``/dev/kmsg``. The guard follows both and keys each record on
-its audit stamp, so a record seen twice is counted once.
+AppArmor writes each refusal as an audit record. The guard reads them from
+the kernel's audit multicast group, which delivers every record whether or
+not auditd runs. It also follows ``/var/log/audit/audit.log`` and the kernel
+log, ``/dev/kmsg``, where the kernel prints records when auditd is absent
+(rate limited, so a burst loses lines there). Each record is keyed on its
+audit stamp, so one seen twice is counted once.
 
     audit: type=1400 audit(1758850000.123:456): apparmor="DENIED"
       operation="open" class="file" profile="vaara-agent//tool"
@@ -19,6 +21,8 @@ import errno
 import logging
 import os
 import re
+import socket
+import struct
 import threading
 import time
 from collections import OrderedDict
@@ -31,6 +35,11 @@ logger = logging.getLogger("vaara.os-guard")
 
 KMSG = "/dev/kmsg"
 AUDIT_LOG = "/var/log/audit/audit.log"
+NETLINK = "netlink:audit"
+
+_NETLINK_AUDIT = 9
+_AUDIT_NLGRP_READLOG = 1
+_NLMSG = struct.Struct("=IHHII")
 
 _FIELD = re.compile(r'(\w+)=("[^"]*"|\S+)')
 _STAMP = re.compile(r"audit\((\d+\.\d+:\d+)\)")
@@ -117,6 +126,33 @@ def _follow_kmsg(stop: threading.Event) -> Iterator[str]:
         os.close(fd)
 
 
+def _follow_netlink(stop: threading.Event) -> Iterator[str]:
+    """Audit records from the kernel's read-only multicast group (CAP_AUDIT_READ)."""
+    try:
+        sock = socket.socket(socket.AF_NETLINK, socket.SOCK_RAW, _NETLINK_AUDIT)
+        sock.bind((0, _AUDIT_NLGRP_READLOG))
+    except (OSError, AttributeError):
+        return
+    sock.settimeout(0.5)
+    try:
+        while not stop.is_set():
+            try:
+                data = sock.recv(65536)
+            except socket.timeout:
+                continue
+            except OSError:
+                return
+            off = 0
+            while off + _NLMSG.size <= len(data):
+                length = _NLMSG.unpack_from(data, off)[0]
+                if length < _NLMSG.size:
+                    break
+                yield data[off + _NLMSG.size:off + length].decode("utf-8", "replace")
+                off += (length + 3) & ~3
+    finally:
+        sock.close()
+
+
 def _follow_file(path: str, stop: threading.Event) -> Iterator[str]:
     handle = None
     inode = None
@@ -151,7 +187,7 @@ class Follower:
     """Calls ``on_denial`` for each agent refusal the kernel reports from now on."""
 
     def __init__(self, on_denial: Callable[[Denial], None], *,
-                 sources: tuple[str, ...] = (KMSG, AUDIT_LOG)) -> None:
+                 sources: tuple[str, ...] = (NETLINK, KMSG, AUDIT_LOG)) -> None:
         self._on_denial = on_denial
         self._sources = sources
         self._stop = threading.Event()
@@ -171,7 +207,12 @@ class Follower:
             return True
 
     def _run(self, source: str) -> None:
-        lines = _follow_kmsg(self._stop) if source == KMSG else _follow_file(source, self._stop)
+        if source == NETLINK:
+            lines = _follow_netlink(self._stop)
+        elif source == KMSG:
+            lines = _follow_kmsg(self._stop)
+        else:
+            lines = _follow_file(source, self._stop)
         for line in lines:
             denial = parse(line)
             if denial is not None and self._fresh(denial):
