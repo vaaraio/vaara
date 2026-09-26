@@ -35,19 +35,19 @@ def _render(**kw) -> str:
 
 def test_block_folder_is_sealed_in_both_profiles():
     text = _render(block_folders=["/home/op/secret"])
-    rule = "deny /home/op/secret/** mrwlkx,"
+    rule = "audit deny /home/op/secret/** mrwlkx,"
     assert text.count(rule) == 2
 
 
 def test_watched_folders_keep_hard_links_from_pointing_in():
     text = _render(watched_folders=["/home/op/clients"])
-    assert text.count("deny link /** -> /home/op/clients/**,") == 2
+    assert text.count("audit deny link /** -> /home/op/clients/**,") == 2
 
 
 def test_guard_socket_and_trail_are_sealed():
     text = _render()
     for path in ("/run/vaara/", "/var/lib/vaara/", "/home/op/.vaara/"):
-        assert f"deny {path}** mrwlkx," in text
+        assert f"audit deny {path}** mrwlkx," in text
 
 
 def test_apps_attach_by_exact_path():
@@ -57,6 +57,12 @@ def test_apps_attach_by_exact_path():
         "/{opt/x/claude,usr/local/bin/copilot}"
     text = _render(apps=["/usr/local/bin/copilot"])
     assert "profile vaara-agent /usr/local/bin/copilot flags=(attach_disconnected) {" in text
+
+
+def test_floor_refusals_reach_the_kernel_log_and_the_harness_can_signal_its_tools():
+    text = _render()
+    assert "\n  deny " not in text and "\n    deny " not in text
+    assert "signal (send) peer=vaara-agent//*," in text
 
 
 def test_profile_without_apps_has_no_attachment():

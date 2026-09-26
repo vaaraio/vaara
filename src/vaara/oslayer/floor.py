@@ -271,25 +271,30 @@ def render(homes: Iterable[str], *,
             out.append(f"  {_q(b)} Px -> {PROFILE},")
         out += [
             "  capability,",
-            *[f"  deny capability {c}," for c in DENIED_CAPABILITIES],
+            *[f"  audit deny capability {c}," for c in DENIED_CAPABILITIES],
             "  network,",
             "  unix,",
             "  signal (receive),",
-            f"  signal (send) peer={PROFILE}*,",
+            # A peer glob does not cross the //, so the child profile is named.
+            f"  signal (send) peer={PROFILE},",
+            f"  signal (send) peer={PROFILE}//*,",
             "  ptrace (read, readby, tracedby),",
-            f"  ptrace (trace) peer={PROFILE}*,",
-            "  deny dbus send bus=session peer=(name=org.freedesktop.systemd1),",
-            "  deny dbus send bus=system peer=(name=org.freedesktop.systemd1),",
+            f"  ptrace (trace) peer={PROFILE},",
+            f"  ptrace (trace) peer={PROFILE}//*,",
+            "  audit deny dbus send bus=session peer=(name=org.freedesktop.systemd1),",
+            "  audit deny dbus send bus=system peer=(name=org.freedesktop.systemd1),",
             "  dbus,",
-            "  deny mount,",
-            "  deny umount,",
-            "  deny pivot_root,",
+            "  audit deny mount,",
+            "  audit deny umount,",
+            "  audit deny pivot_root,",
         ]
-        out += [f"  deny link /** -> {_q(p)}," for p in dict.fromkeys(watched)]
-        out += [f"  deny {_q(p)} mrwlkx," for p in dict.fromkeys(sealed)]
-        out += [f"  deny {_q(p)} wl," for p in dict.fromkeys(fixed)]
+        # `audit deny`, not `deny`: AppArmor keeps an explicit deny out of the
+        # kernel log, and the guard records the floor's refusals from there.
+        out += [f"  audit deny link /** -> {_q(p)}," for p in dict.fromkeys(watched)]
+        out += [f"  audit deny {_q(p)} mrwlkx," for p in dict.fromkeys(sealed)]
+        out += [f"  audit deny {_q(p)} wl," for p in dict.fromkeys(fixed)]
         if tool:
-            out += [f"  deny {_q(p)} wl," for p in dict.fromkeys(harness_files)]
+            out += [f"  audit deny {_q(p)} wl," for p in dict.fromkeys(harness_files)]
         return out
 
     abi = abi_line() if abi is None else abi
