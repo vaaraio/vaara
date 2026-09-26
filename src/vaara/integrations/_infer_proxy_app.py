@@ -278,7 +278,7 @@ def build_app(
             finally:
                 await stream_cm.__aexit__(None, None, None)
                 output, eval_stats = acc.finalize()
-                if emitted is not None:
+                if emitted is not None and emitter is not None:
                     attestation, counter = emitted
                     status = "completed" if 200 <= status_code < 300 else "errored"
                     emitter.emit_receipt(

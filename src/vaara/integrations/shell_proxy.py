@@ -38,7 +38,7 @@ SHELL_EXEC = ActionType(
     blast_radius=BlastRadius.LOCAL,
     urgency=UrgencyClass.IMMEDIATE,
     description="Shell command execution",
-    regulatory_domains=[],
+    regulatory_domains=frozenset(),
 )
 
 

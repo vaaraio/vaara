@@ -141,7 +141,7 @@ def policy_hash_from_perimeter(
     silent perimeter change between two envelope batches signed by the
     same arbiter instance.
     """
-    config = {
+    config: dict[str, Any] = {
         "tool_allow": sorted(tool_allow) if tool_allow else None,
         "tool_deny": sorted(tool_deny),
         "resource_allow": sorted(resource_allow) if resource_allow else None,
