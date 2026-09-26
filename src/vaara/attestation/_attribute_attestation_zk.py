@@ -352,7 +352,10 @@ class Opening:
             blind = int(obj["blind"])
         except (KeyError, TypeError, ValueError) as exc:
             raise AttestationError("opening.blind is not an integer") from exc
-        return cls(name=obj.get("name"), value=obj.get("value"), blind=blind)
+        # Checked by __post_init__, which raises AttestationError on either.
+        name: Any = obj.get("name")
+        value: Any = obj.get("value")
+        return cls(name=name, value=value, blind=blind)
 
 
 class IssuedAttestation:

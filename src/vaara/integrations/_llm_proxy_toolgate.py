@@ -156,7 +156,7 @@ def _gate_chat(body: dict, gate: ToolGate) -> dict:
     for choice in body["choices"]:
         message = choice.get("message") if isinstance(choice, dict) else None
         calls = message.get("tool_calls") if isinstance(message, dict) else None
-        if not isinstance(calls, list) or not calls:
+        if not isinstance(message, dict) or not isinstance(calls, list) or not calls:
             choices.append(choice)
             continue
         kept, notes = [], []
@@ -262,14 +262,14 @@ class SseToolGate:
         self.gate = gate
         self._buf = b""
         # Anthropic: content block index -> held tool_use block.
-        self._blocks: dict[int, _Held] = {}
+        self._blocks: dict[Optional[int], _Held] = {}
         self._anthropic_kept = 0
         self._anthropic_refused = 0
         # Chat: choice index -> tool call index -> held call.
         self._chat: dict[int, dict[int, _Held]] = {}
         self._chat_raws: dict[int, list] = {}
         # Responses: output index -> held item; item id -> replacement.
-        self._items: dict[int, _Held] = {}
+        self._items: dict[Optional[int], _Held] = {}
         self._decided: dict[str, Optional[dict]] = {}
 
     def feed(self, chunk: bytes) -> bytes:

@@ -294,7 +294,7 @@ def resolve_hosts(hosts: Iterable[str] = MODEL_HOSTS, timeout: float = 4.0) -> d
 
     def one(host: str) -> tuple[str, set[str]]:
         try:
-            return host, {i[4][0] for i in socket.getaddrinfo(host, 443, proto=socket.IPPROTO_TCP)}
+            return host, {str(i[4][0]) for i in socket.getaddrinfo(host, 443, proto=socket.IPPROTO_TCP)}
         except OSError:
             return host, set()
 

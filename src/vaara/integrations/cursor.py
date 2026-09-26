@@ -177,7 +177,8 @@ def _first(args: dict, keys: tuple[str, ...]) -> str:
 
 def to_hook_events(event: dict) -> list[dict]:
     """Translate a Cursor ``preToolUse`` or ``postToolUse`` payload."""
-    tool = event.get("tool_name") if isinstance(event.get("tool_name"), str) else ""
+    raw_tool = event.get("tool_name")
+    tool = raw_tool if isinstance(raw_tool, str) else ""
     args = event.get("tool_input")
     if isinstance(args, str):
         # beforeMCPExecution sends its params as a JSON string.

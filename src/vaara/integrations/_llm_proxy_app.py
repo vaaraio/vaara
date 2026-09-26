@@ -141,7 +141,7 @@ def build_app(*, upstream: str, api_key: Optional[str], api_key_header: str,
     def _upstream_headers(request_headers: Any) -> dict[str, str]:
         headers = forward_request_headers(
             request_headers, keep_auth=passthrough_auth)
-        if not passthrough_auth:
+        if api_key is not None:
             if api_key_header.lower() == "authorization":
                 headers["Authorization"] = f"Bearer {api_key}"
             else:
