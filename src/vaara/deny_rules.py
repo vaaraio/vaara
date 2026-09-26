@@ -310,8 +310,9 @@ def _shell_hit(regex: "re.Pattern[str]", key: str, text: str) -> bool:
         return False
     # A match that starts with a word is the rule's verb (rm, install, tee),
     # so it has to be the command, with only launchers before it. Any
-    # lowercase sentence also reads as "name args", and "box install ...
-    # ~/.vaara" was refused on 2026-09-26 with "box" taken for the command.
+    # lowercase sentence also reads as "name args": on 2026-09-26 a query
+    # "<word> install ... ~/.vaara" was refused with its first word taken
+    # for the command.
     # A match that starts elsewhere (/etc/shadow) is an argument, and any
     # command name may come first.
     if m.group(0).lstrip(" \t;&|(")[:1].isalpha():
