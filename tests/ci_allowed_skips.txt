@@ -28,3 +28,4 @@ pq extra not installed
 ^examples need rich$
 ^no Codex binary$
 ^no Gemini CLI binary$
+^no Copilot CLI binary$
