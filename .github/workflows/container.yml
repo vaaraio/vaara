@@ -16,7 +16,9 @@ name: Container image
 on:
   push:
     tags:
-      - "v*"
+      # Full versions only. A push of the floating major tag (v2) would
+      # rebuild the image and re-push <version> and latest under a new digest.
+      - 'v[0-9]+.[0-9]+.[0-9]+'
   release:
     types: [published]
   workflow_dispatch:

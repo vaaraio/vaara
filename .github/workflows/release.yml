@@ -186,6 +186,17 @@ jobs:
           body_path: release-notes.md
           fail_on_unmatched_files: true
 
+      - name: Move the floating major tag
+        # The action is used as vaaraio/vaara@v<major>, so that tag follows each
+        # release of its major. A dispatch republishes an older tag and must
+        # not move it back. A tag pushed with GITHUB_TOKEN starts no workflow.
+        if: github.event_name == 'push'
+        run: |
+          set -euo pipefail
+          MAJOR="${GITHUB_REF_NAME%%.*}"
+          git tag -f "$MAJOR" HEAD
+          git push -f origin "refs/tags/${MAJOR}"
+
   publish-npm:
     name: Publish TypeScript client to npm
     needs: build
