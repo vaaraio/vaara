@@ -228,7 +228,7 @@
         "new_string",
         "new_source"
       ],
-      "pattern": "(bash\\s+-i\\s*>&\\s*/dev/tcp/|nc\\s+(-[a-z]*e[a-z]*\\s+)|socket\\.socket\\([^)]*\\)[\\s\\S]{0,120}connect\\()",
+      "pattern": "(bash\\s+-i\\s*>&\\s*/dev/tcp/|nc\\s+(-[a-z]*e[a-z]*\\s+)|socket\\.socket\\([^)]*\\)[\\s\\S]{0,200}connect\\([\\s\\S]{0,300}(dup2\\(|pty\\.spawn\\(|std(in|out|err)\\s*=\\s*\\w+(\\.fileno\\(\\))?\\s*[,)]))",
       "message": "File content contains a reverse-shell pattern - hands an outside party an interactive session."
     },
     {

@@ -481,7 +481,8 @@ jobs:
     # Runs Claude Code itself against a scripted local Messages API, with the
     # hooks `vaara init` writes, and reads back what Claude Code told the
     # model, what the trail recorded and the signed receipt for each
-    # decision. Pinned so a Claude Code release that changes the hook
+    # decision. It also drives an escalated MCP call through a signed human
+    # approve and deny. Pinned so a Claude Code release that changes the hook
     # contract fails here on purpose, when the pin is moved.
     steps:
       - uses: actions/checkout@9c091bb21b7c1c1d1991bb908d89e4e9dddfe3e0  # v7.0.0
@@ -508,7 +509,8 @@ jobs:
       - name: Run the Claude Code end-to-end test, failing on any skip
         run: |
           set -o pipefail
-          pytest tests/test_claude_code_real_binary.py -q -rs | tee result.txt
+          pytest tests/test_claude_code_real_binary.py \
+            tests/test_claude_code_escalation_real_binary.py -q -rs | tee result.txt
           if grep -qE '[0-9]+ skipped' result.txt; then
             echo "::error::The Claude Code test skipped, so Claude Code was not found."
             exit 1
