@@ -14,9 +14,9 @@ Deliberate constraints, each of them the reason this exists:
 - Binds 127.0.0.1 by default. The trail is the most sensitive thing on the box
   and nothing here should be reachable from the network by accident.
 - Settings are editable, because a Linux or Windows user should not be reading
-  a window while a macOS user changes the same values. Writes go through the
-  same vaara.menu helpers the macOS client uses, so the two cannot drift, and
-  only declared keys with declared values are accepted.
+  a window while a macOS user changes settings. Writes go through vaara.menu
+  into the hook's config.json, and only declared keys with declared values are
+  accepted. The macOS app keeps its own display settings in menubar.json.
 
 What stays native: the always-on traffic light and the approval prompt, because
 both have to exist when no browser is open.
@@ -28,6 +28,7 @@ import json
 import secrets
 import socket
 import threading
+import time
 import webbrowser
 from http.server import BaseHTTPRequestHandler, ThreadingHTTPServer
 from pathlib import Path
@@ -93,19 +94,34 @@ def _load_trail(db_path: Optional[Path], trail_path: Optional[Path]) -> Any:
     return trail
 
 
-def _summarize(trail: Any) -> dict:
+def _alert_window(cfg: dict) -> int:
+    """Minutes the summary looks back for recent interventions (default 5)."""
+    try:
+        minutes = int(cfg.get("alert_window_minutes", 5))
+    except (TypeError, ValueError):
+        return 5
+    return minutes if minutes > 0 else 5
+
+
+def _summarize(trail: Any, window_minutes: int = 5) -> dict:
     records = list(trail._records)
     decisions = [r for r in records if (r.data or {}).get("decision")]
     counts = {"allow": 0, "escalate": 0, "deny": 0}
+    since = time.time() - window_minutes * 60
+    recent = {"minutes": window_minutes, "deny": 0, "escalate": 0}
     for r in decisions:
         d = str((r.data or {}).get("decision", "")).lower()
         if d in counts:
             counts[d] += 1
+        if d in ("deny", "escalate") and (r.timestamp or 0) >= since:
+            recent[d] += 1
     gaps = [r for r in records if getattr(r.event_type, "value", "") == "anchor_gap"]
     latest = decisions[-1] if decisions else None
     return {
         "records": len(records),
         "decisions": counts,
+        # Interventions inside the operator's alert window (alert_window_minutes).
+        "recent": recent,
         # A gap is not an error to hide. It is the period nobody witnessed, and
         # it belongs on the front of the dashboard rather than in a log file.
         "gaps": len(gaps),
@@ -189,8 +205,9 @@ def _oslayer_change(payload: dict) -> tuple[dict, int]:
     return {"saved": action, "path": str(path), "guard_told": told}, 200
 
 
-# Settings a non-macOS user was previously locked out of. Same config.json the
-# macOS client writes, via the same helpers, so the two cannot drift.
+# Settings a non-macOS user was previously locked out of, written to the hook's
+# config.json. notify_on is read by the hook's notify(); alert_window_minutes
+# by _summarize here. The macOS app reads its own copies from menubar.json.
 # macOS-only keys (menubar_graph, webkitGovernance) are deliberately absent
 # rather than shown and ignored.
 _SETTINGS: dict[str, dict] = {
@@ -254,8 +271,10 @@ class _Handler(BaseHTTPRequestHandler):
                 self._send(asset.read_bytes(), ctype)
                 return
             if path == "/api/summary":
+                from vaara.menu import _load_config
+
                 trail = _load_trail(self.db_path, self.trail_path)
-                self._json(_summarize(trail))
+                self._json(_summarize(trail, _alert_window(_load_config())))
                 return
             if path == "/api/history":
                 trail = _load_trail(self.db_path, self.trail_path)
