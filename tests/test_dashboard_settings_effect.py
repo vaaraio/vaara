@@ -2,9 +2,10 @@
 # SPDX-License-Identifier: AGPL-3.0-or-later
 """The dashboard's settings change what they say they change.
 
-The dashboard writes its settings into the hook's config.json. notify_on and
-alert_window_minutes were written there and read by nothing, so choosing a
-value changed nothing. These tests hold each one to its help text.
+The dashboard writes its settings into the hook's config.json. notify_on,
+alert_window_minutes, user_level and approval_style were written there and read
+by nothing, so choosing a value changed nothing. These tests hold each one to
+its help text.
 """
 from __future__ import annotations
 
@@ -91,3 +92,58 @@ def test_the_window_comes_from_the_setting(stored, minutes):
     from vaara.dashboard import _alert_window
 
     assert _alert_window(stored) == minutes
+
+
+def _bodies(sent: list[list[str]]) -> list[str]:
+    return [cmd[3] for cmd in sent]
+
+
+@pytest.mark.parametrize("user_level, body", [
+    ("basic", ""),
+    ("professional", "risk 0.91: rm outside the project"),
+    (None, "risk 0.91: rm outside the project"),
+    ("enterprise", "risk 0.91: rm outside the project (action_id=a-17)"),
+])
+def test_user_level_sets_how_much_a_notification_explains(sent, user_level, body):
+    cfg = {} if user_level is None else {"user_level": user_level}
+    hooks.notify(cfg, "BLOCKED", "Bash", "risk 0.91: rm outside the project",
+                 action_id="a-17")
+    assert _bodies(sent) == [body]
+    assert _verdicts(sent) == ["BLOCKED"]
+
+
+def test_basic_still_explains_a_trail_outage(sent):
+    hooks.notify({"user_level": "basic"}, "TRAIL NOT RECORDING", "audit trail", "3 failed")
+    assert _bodies(sent) == ["3 failed"]
+
+
+def test_enterprise_without_an_action_id_adds_nothing(sent):
+    hooks.notify({"user_level": "enterprise"}, "BLOCKED", "Bash", "rule rm_rf_root")
+    assert _bodies(sent) == ["rule rm_rf_root"]
+
+
+@pytest.fixture
+def no_env(monkeypatch):
+    for name in ("VAARA_PLUGIN_APPROVALS_TIMEOUT", "VAARA_HOOK_DEADLINE"):
+        monkeypatch.delenv(name, raising=False)
+
+
+@pytest.mark.parametrize("cfg, seconds", [
+    ({"approval_style": "timeout", "approvals_timeout": 20}, 20.0),
+    ({"approvals_timeout": 20}, 20.0),
+    ({"approval_style": "blocking", "approvals_timeout": 20}, 75.0),
+    ({"approval_style": "blocking"}, 75.0),
+])
+def test_approval_style_decides_how_long_an_escalation_waits(no_env, cfg, seconds):
+    assert hooks.approvals_timeout(cfg) == seconds
+
+
+def test_blocking_waits_to_the_gate_deadline_it_is_given(no_env, monkeypatch):
+    monkeypatch.setenv("VAARA_HOOK_DEADLINE", "30")
+    assert hooks.approvals_timeout({"approval_style": "blocking"}) == 25.0
+
+
+def test_enterprise_keeps_the_action_id_when_the_reason_is_long(sent):
+    hooks.notify({"user_level": "enterprise"}, "BLOCKED", "Bash", "x" * 400,
+                 action_id="a-17")
+    assert _bodies(sent)[0].endswith("(action_id=a-17)")
