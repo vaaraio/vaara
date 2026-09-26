@@ -235,8 +235,11 @@ def test_the_floor_holds_and_the_guard_decides(tmp_path):
     # Floor refusals reach the trail through the kernel log a moment later.
     deadline = time.time() + 15
     while True:
-        actions = [a for a in _actions() if a["agent"] == "copilot"]
-        floor_targets = {a["parameters"].get("target") for a in actions if a["tool"] == "os.floor"}
+        every = _actions()
+        actions = [a for a in every if a["agent"] == "copilot"]
+        # A refusal by a process that exited before it was read is recorded
+        # under the profile, so match floor refusals by target alone.
+        floor_targets = {a["parameters"].get("target") for a in every if a["tool"] == "os.floor"}
         if {str(sentinel), str(hook)} <= floor_targets or time.time() > deadline:
             break
         time.sleep(0.5)

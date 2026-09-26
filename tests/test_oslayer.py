@@ -428,6 +428,12 @@ def test_late_answers_are_refused_and_only_once(g, monkeypatch):
     assert answered == [False]
 
 
+def test_refusal_by_an_exited_process_is_recorded_under_the_profile(g):
+    line = KMSG_LINE.replace("pid=4321", "pid=999999999")
+    g._on_denial(denials.parse(line))
+    assert g._pipeline.calls[-1]["agent_id"] == "vaara-agent"
+
+
 def test_floor_refusal_is_recorded_as_a_deny(g):
     g._on_denial(denials.parse(KMSG_LINE))
     call = g._pipeline.calls[-1]

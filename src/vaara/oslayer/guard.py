@@ -612,7 +612,13 @@ class Guard:
         self._intercept(agent, session, tool, params, decision, reason, policy_id)
 
     def _on_denial(self, denial: Denial) -> None:
-        agent, session = self.who(denial.pid) if denial.pid else ("unknown", "")
+        # A short-lived process (one shell command) has often exited by the
+        # time its refusal is read, and its launch can no longer be looked
+        # up. It is recorded under the profile then, not under a guess.
+        if denial.pid and os.path.exists(f"/proc/{denial.pid}"):
+            agent, session = self.who(denial.pid)
+        else:
+            agent, session = denial.profile.split("//", 1)[0] or floor.PROFILE, ""
         self._record(agent, session, OS_FLOOR.name, {
             "operation": denial.operation, "target": denial.target,
             "requested": denial.requested, "denied": denial.denied,
