@@ -305,6 +305,13 @@ def test_an_adapter_decides_under_vaara_run(tmp_path):
     assert "etc_shadow_read" in out[1], (out[1], log)
 
     # Both decisions are on the adapter's trail, written from outside the floor.
+    # A failed write does not change the verdict, it leaves a marker beside
+    # the trail instead, so say what is there before reading it.
+    if not trail.exists():
+        marker = trail.with_name(trail.name + ".write-failure.json")
+        seen = sorted(str(p) for p in (home / ".vaara").rglob("*")) if (home / ".vaara").exists() else []
+        pytest.fail(f"no trail at {trail}\n~/.vaara: {seen}\n"
+                    f"marker: {marker.read_text() if marker.exists() else 'none'}\n{log}")
     conn = sqlite3.connect(f"file:{trail}?mode=ro", uri=True)
     try:
         rows = [d for (d,) in conn.execute("SELECT data FROM audit_records ORDER BY seq")]
