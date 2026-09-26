@@ -44,11 +44,12 @@ A lifted call is still recorded. `ScheduleWakeup` is recorded and never
 denied.
 
 The rules name tools in Claude Code's vocabulary (`Bash`, `Edit`, `Write`,
-`Agent` and the rest). Codex and Gemini CLI tool names are translated into
+`Agent` and the rest). Codex, Gemini CLI and Copilot CLI tool names are translated into
 that vocabulary before matching: Codex hands hooks its shell tools as `Bash`
 already, and its `apply_patch` and `spawn_agent` are translated, as are
 Gemini CLI's `run_shell_command`, `write_file`, `replace`, `read_file`,
-`read_many_files`, `web_fetch`, `read_mcp_resource` and `activate_skill`.
+`read_many_files`, `web_fetch`, `read_mcp_resource` and `activate_skill`,
+and Copilot CLI's `bash`, `create`, `edit`, `view`, `task` and `skill`.
 Calls under an `mcp__*` name are matched on content, so MCP-routed tools are
 covered whatever the harness. Other harnesses' names do not match by name. The boundary red-team in `conformance/redteam/` drives every one
 of these through the real hook.

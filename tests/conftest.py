@@ -46,6 +46,8 @@ if not os.environ.get("VAARA_TEST_USE_REAL_HOME"):
     os.environ["CODEX_HOME"] = str(_sandbox / ".codex")
     # Gemini CLI's home follows GEMINI_CLI_HOME before HOME, likewise.
     os.environ["GEMINI_CLI_HOME"] = str(_sandbox)
+    # Copilot CLI's home follows COPILOT_HOME before HOME, likewise.
+    os.environ["COPILOT_HOME"] = str(_sandbox / ".copilot")
     # Anything reading the trail path from the environment follows the same
     # sandbox rather than the operator's file.
     os.environ.setdefault("VAARA_DB", str(_sandbox / ".vaara" / "test-audit.db"))

@@ -367,6 +367,7 @@ _CLIENT_MODULES = {
     "cursor": "vaara.integrations.cursor",
     "codex": "vaara.integrations.codex",
     "gemini": "vaara.integrations.gemini",
+    "copilot": "vaara.integrations.copilot",
 }
 
 

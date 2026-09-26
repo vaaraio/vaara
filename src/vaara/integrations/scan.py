@@ -72,6 +72,7 @@ _ADAPTED: tuple[tuple[str, str, str], ...] = (
     ("claude-code", "Claude Code", r"(^|/)claude(\s|$)|@anthropic-ai/claude-code"),
     ("codex", "Codex", r"(^|/)codex(\s|$)|@openai/codex"),
     ("gemini", "Gemini CLI", r"(^|/)gemini(\s|$)|@google/gemini-cli"),
+    ("copilot", "Copilot CLI", r"(^|/)copilot(\s|$)|@github/copilot"),
     ("cursor", "Cursor", r"Cursor\.app|(^|/)cursor(\s|$)|cursor-server"),
     ("opencode", "OpenCode", r"(^|/)opencode(\s|$)|opencode-ai"),
     ("claude-desktop", "Claude Desktop", r"Claude\.app"),
@@ -148,6 +149,14 @@ def adapter_status(agent: str, home: Optional[Path] = None) -> tuple[bool, str]:
         if state == "missing":
             return False, "run `vaara init` to install the hooks"
         return False, f"hooks are {state} in Gemini CLI's settings"
+    if agent == "copilot":
+        from vaara.integrations import copilot
+        state = copilot.hook_status()
+        if state == "active":
+            return True, "every tool call, through its hooks"
+        if state == "missing":
+            return False, "run `vaara init` to install the hooks"
+        return False, f"hooks are {state} in ~/.copilot/hooks/vaara.json"
     if agent == "cursor":
         from vaara.integrations import cursor
         if cursor.native_hook_installed():

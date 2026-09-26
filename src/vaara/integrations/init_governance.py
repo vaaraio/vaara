@@ -148,6 +148,12 @@ class InitReport:
     gemini_changed: bool = False
     gemini_removed: bool = False
     gemini_status: str = "missing"
+    # Copilot CLI hooks/vaara.json, the same three fields, and whether
+    # Copilot CLI will run the hook (see copilot.hook_status).
+    copilot_hooks: Optional[Path] = None
+    copilot_changed: bool = False
+    copilot_removed: bool = False
+    copilot_status: str = "missing"
 
 
 def codex_trust_line(status: str) -> str:
@@ -171,6 +177,16 @@ def gemini_status_line(status: str) -> str:
         return ("could not read ~/.gemini/settings.json, so the hooks were not "
                 "written.")
     return "the hooks are not in ~/.gemini/settings.json."
+
+
+def copilot_status_line(status: str) -> str:
+    """Why Copilot CLI is not running Vaara's hook, and what to do about it."""
+    if status == "disabled":
+        return ("~/.copilot/hooks/vaara.json sets disableAllHooks. Re-run vaara "
+                "init to rewrite it.")
+    if status == "unknown":
+        return "could not read ~/.copilot/hooks/vaara.json."
+    return "the hooks are not in ~/.copilot/hooks/vaara.json."
 
 
 @dataclass
@@ -223,6 +239,12 @@ def coverage(report: InitReport, *, which: Any = shutil.which) -> list[Coverage]
         else:
             rows.append(Coverage("Gemini CLI", "NOT governed",
                                  gemini_status_line(report.gemini_status)))
+    if report.copilot_hooks is not None:
+        if report.copilot_status == "active":
+            rows.append(Coverage("Copilot CLI", "governed", every))
+        else:
+            rows.append(Coverage("Copilot CLI", "NOT governed",
+                                 copilot_status_line(report.copilot_status)))
 
     mcp = {c.name: c for c in report.clients if c.exists}
 
@@ -585,6 +607,8 @@ def run_init(
     codex_dir: Optional[Path] = None,
     govern_gemini: bool = True,
     gemini_dir: Optional[Path] = None,
+    govern_copilot: bool = True,
+    copilot_dir: Optional[Path] = None,
 ) -> InitReport:
     """Set up (or self-heal) local governance in one call.
 
@@ -659,6 +683,17 @@ def run_init(
                 report.warnings.append(f"Gemini CLI hooks not written: {exc}")
             report.gemini_status = gemini.hook_status(gemini_dir)
 
+    if govern_copilot:
+        from vaara.integrations import copilot
+
+        if copilot.detected(copilot_dir):
+            report.copilot_hooks = copilot.hooks_path(copilot_dir)
+            try:
+                report.copilot_changed = copilot.install_hooks(vaara_bin, copilot_dir)
+            except OSError as exc:
+                report.warnings.append(f"Copilot CLI hooks not written: {exc}")
+            report.copilot_status = copilot.hook_status(copilot_dir)
+
     report.clients = detect_clients(proxy_bin)
     for client in report.clients:
         if (client.name == "Cursor" and client.governed
@@ -719,6 +754,7 @@ def run_ungovern(
     cursor_dir: Optional[Path] = None,
     codex_dir: Optional[Path] = None,
     gemini_dir: Optional[Path] = None,
+    copilot_dir: Optional[Path] = None,
 ) -> InitReport:
     """Reverse ``run_init``: remove the hooks and the OpenCode plugin, restore
     each MCP config, and take down the proxy service if one was installed."""
@@ -737,6 +773,9 @@ def run_ungovern(
     from vaara.integrations import gemini
 
     report.gemini_removed = gemini.remove_hooks(gemini_dir)
+    from vaara.integrations import copilot
+
+    report.copilot_removed = copilot.remove_hooks(copilot_dir)
     for name, raw_path in KNOWN_MCP_CLIENTS:
         path = Path(raw_path).expanduser()
         if restore_mcp_config(path):
