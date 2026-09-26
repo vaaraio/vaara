@@ -75,6 +75,29 @@ def test_a_rule_matching_an_argument_fires_after_the_command_name(rules):
         rules, {"q": f"Checked whether {shadow} was readable."}) is None
 
 
+V = "~/." + "vaara"
+INSTALL, RM = "inst" + "all", "r" + "m"
+
+
+def test_a_one_line_note_with_a_verb_mid_sentence_passes(rules):
+    # 2026-09-26: a memory search whose query began "box install ..." and
+    # later named the trail folder was refused as trail_shell_tamper. The
+    # lead "box" looked like a command name, so the verb counted as its
+    # argument.
+    query = f"box {INSTALL} held at 1.99.0, sealed {V} under vaara run"
+    assert match_deny_rule_any_field(rules, {"query": query}) is None
+
+
+@pytest.mark.parametrize("text", [
+    f"{RM} -rf {V}/trail",
+    f"nohup {RM} -rf {V}/trail",
+    f"git {RM} -r {V}/trail",
+    f"env A=1 {RM} {V}/trail/audit.db",
+])
+def test_a_verb_in_command_position_is_still_refused(rules, text):
+    assert match_deny_rule_any_field(rules, {"q": text})[0] == "trail_shell_tamper"
+
+
 def test_the_hook_lets_the_memory_save_through(tmp_path, monkeypatch):
     monkeypatch.setenv("VAARA_PLUGIN_AUDIT_DB", str(tmp_path / "audit.db"))
     monkeypatch.setenv("VAARA_PLUGIN_SHADOW", "0")
