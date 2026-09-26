@@ -206,15 +206,16 @@ def _oslayer_change(payload: dict) -> tuple[dict, int]:
 
 
 # Settings a non-macOS user was previously locked out of, written to the hook's
-# config.json. notify_on is read by the hook's notify(); alert_window_minutes
-# by _summarize here. The macOS app reads its own copies from menubar.json.
+# config.json. notify_on and user_level are read by the hook's notify(),
+# approval_style by its approvals_timeout(), alert_window_minutes by
+# _summarize here. The macOS app reads its own copies from menubar.json.
 # macOS-only keys (menubar_graph, webkitGovernance) are deliberately absent
 # rather than shown and ignored.
 _SETTINGS: dict[str, dict] = {
     "user_level": {
         "label": "Detail level",
         "options": ["basic", "professional", "enterprise"],
-        "help": "How much a notification explains before you decide.",
+        "help": "How much a notification explains: basic names the decision and tool, professional adds risk and reason, enterprise adds the action id.",
     },
     "notify_on": {
         "label": "Notify on",
@@ -224,7 +225,7 @@ _SETTINGS: dict[str, dict] = {
     "approval_style": {
         "label": "Approval style",
         "options": ["blocking", "timeout"],
-        "help": "Whether an escalation waits for you, or denies when it times out.",
+        "help": "How long an escalation waits for you before it is denied: timeout waits for the approvals timeout (60 s unless set), blocking waits as long as the hook may (75 s).",
     },
     "alert_window_minutes": {
         "label": "Alert window (minutes)",
