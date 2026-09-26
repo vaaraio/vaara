@@ -439,7 +439,7 @@
         "file_path",
         "notebook_path"
       ],
-      "pattern": "(^|/)(\\.claude\\.json|\\.claude/(settings(\\.local)?\\.json|hooks/|skills/|agents/|plugins/|scheduled_tasks\\.json|CLAUDE\\.md)|\\.claude-plugin/|\\.vaara/(config\\.json|claude-code/)|\\.mcp\\.json$|\\.config/opencode/(opencode\\.jsonc?|plugins?/)|\\.opencode/plugins?/|\\.cursor/(hooks\\.json|hooks/|mcp\\.json)|\\.codex/(hooks\\.json|config\\.toml)|\\.gemini/settings\\.json)",
+      "pattern": "(^|/)(\\.claude\\.json|\\.claude/(settings(\\.local)?\\.json|hooks/|skills/|agents/|plugins/|scheduled_tasks\\.json|CLAUDE\\.md)|\\.claude-plugin/|\\.vaara/(config\\.json|claude-code/)|\\.mcp\\.json$|\\.config/opencode/(opencode\\.jsonc?|plugins?/)|\\.opencode/plugins?/|\\.cursor/(hooks\\.json|hooks/|mcp\\.json)|\\.codex/(hooks\\.json|config\\.toml)|\\.gemini/settings\\.json|\\.copilot/(hooks/|config\\.json|settings(\\.local)?\\.json|mcp-config\\.json)|\\.github/(hooks|copilot)/)",
       "unless_env": "VAARA_ALLOW_HARNESS_EDIT",
       "message": "Writes the agent harness configuration (hooks, skills, settings, MCP). Set VAARA_ALLOW_HARNESS_EDIT=1 for a deliberate edit."
     },
@@ -451,7 +451,7 @@
       "fields": [
         "command"
       ],
-      "pattern": "(^|[\\s;&|])(sed\\s+-i|tee|cp|mv|rm|chmod|truncate|>+)[^|\\n]*(\\.claude\\.json|\\.claude/(settings(\\.local)?\\.json|hooks/|skills/|agents/|plugins/|scheduled_tasks\\.json|CLAUDE\\.md)|\\.claude-plugin/|\\.vaara/config|\\.mcp\\.json|\\.config/opencode/(opencode\\.jsonc?|plugins?/)|\\.opencode/plugins?/|\\.cursor/(hooks\\.json|hooks/|mcp\\.json)|\\.codex/(hooks\\.json|config\\.toml)|\\.gemini/settings\\.json)",
+      "pattern": "(^|[\\s;&|])(sed\\s+-i|tee|cp|mv|rm|chmod|truncate|>+)[^|\\n]*(\\.claude\\.json|\\.claude/(settings(\\.local)?\\.json|hooks/|skills/|agents/|plugins/|scheduled_tasks\\.json|CLAUDE\\.md)|\\.claude-plugin/|\\.vaara/config|\\.mcp\\.json|\\.config/opencode/(opencode\\.jsonc?|plugins?/)|\\.opencode/plugins?/|\\.cursor/(hooks\\.json|hooks/|mcp\\.json)|\\.codex/(hooks\\.json|config\\.toml)|\\.gemini/settings\\.json|\\.copilot/(hooks/|config\\.json|settings(\\.local)?\\.json|mcp-config\\.json)|\\.github/(hooks|copilot)/)",
       "unless_env": "VAARA_ALLOW_HARNESS_EDIT",
       "message": "Rewrites the agent harness configuration from the shell. Set VAARA_ALLOW_HARNESS_EDIT=1 for a deliberate edit."
     },

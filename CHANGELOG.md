@@ -6,6 +6,9 @@ and this project follows [Semantic Versioning](https://semver.org/spec/v2.0.0.ht
 
 ## [Unreleased]
 
+### Added
+- Copilot CLI is governed. `vaara init` writes `~/.copilot/hooks/vaara.json` (under `$COPILOT_HOME` when set) with a `preToolUse` hook behind the fail-closed gate, since Copilot CLI runs a call whose hook outlives its timeout, and a post-tool hook for `postToolUse` and `postToolUseFailure`. Its `bash`, `create`, `edit`, `view`, `skill` and `task` calls are checked against the deny rules as `Bash`, `Write`, `Edit`, `Read`, `Skill` and `Task`, with paths resolved against the call's working directory, and the LLM proxy's tool gate translates the same names. The harness rules cover `~/.copilot/hooks/`, `config.json`, `settings.json` and `mcp-config.json` under `~/.copilot`, and a repository's `.github/hooks/` and `.github/copilot/`. `vaara scan` and `vaara init` report Copilot CLI, and `vaara ungovern` removes the hook file. A CI job runs Copilot CLI 1.0.88 against a scripted model through its own bring-your-own-model settings, offline and signed out. Allowed and denied calls, four calls in one model turn, and attempts to delete the trail, delete its rows, read the signing key or delete the hook file are each decided and recorded, and a call whose engine crashed, is missing or hangs is refused.
+
 ### Fixed
 - `vaaraio/vaara@v1` ran the action as it stood at 1.66.2. The 1.66.2 entry said the floating `v1` tag moves with each release, and no step moved it. The release job now moves `v<major>` to each full release of that major, and the container build runs only for full version tags, so moving the major tag does not re-push the image. `tests/test_floating_major_tag.py` holds both.
 

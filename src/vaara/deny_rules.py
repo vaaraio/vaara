@@ -150,7 +150,8 @@ def _gemini_read_many(tool_input: dict) -> list[tuple[str, dict]]:
 #: input shape the rules are written in. Checked against the harnesses' own
 #: sources: Codex ``codex-rs/core/src/tools`` (hooks already receive its shell
 #: tools as ``Bash`` with ``command``), Gemini CLI
-#: ``packages/core/src/tools/definitions/base-declarations.ts``.
+#: ``packages/core/src/tools/definitions/base-declarations.ts``, and the tool
+#: list Copilot CLI 1.0.88 sends its model.
 HARNESS_ALIASES = {
     # Codex
     "apply_patch": _codex_apply_patch,
@@ -165,6 +166,13 @@ HARNESS_ALIASES = {
     "web_fetch": _rename("WebFetch", url="prompt"),
     "read_mcp_resource": _rename("ReadMcpResourceTool", uri="uri"),
     "activate_skill": _rename("Skill", skill="name"),
+    # Copilot CLI
+    "bash": _rename("Bash", command="command"),
+    "create": _rename("Write", file_path="path", content="file_text"),
+    "edit": _rename("Edit", file_path="path", new_string="new_str"),
+    "view": _rename("Read", file_path="path"),
+    "task": _rename("Agent"),
+    "skill": _rename("Skill", skill="skill"),
 }
 
 
