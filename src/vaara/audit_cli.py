@@ -302,8 +302,18 @@ DEFAULT_UNKNOWN_FRAC = 0.25
 DEFAULT_UNKNOWN_WINDOW = 50
 
 
+def _decision_events() -> frozenset[str]:
+    """The event types that record a decision: the trail's own names."""
+    from vaara.audit.trail import EventType
+
+    return frozenset({EventType.DECISION_MADE.value, EventType.ACTION_BLOCKED.value})
+
+
 def _rule_missing_completion(records: list[dict]) -> list[dict]:
-    """Every action_requested should have a matching decision_emitted.
+    """Every action_requested should have a matching decision record.
+
+    A decision is ``decision_made`` (allow, escalate, deny by the scorer) or
+    ``action_blocked`` (deny by a rule or policy), as the trail writes them.
 
     Hash-chain integrity is already checked by the ``verify`` subcommand
     via the cryptographic path. This rule looks at the semantic lifecycle:
@@ -312,8 +322,9 @@ def _rule_missing_completion(records: list[dict]) -> list[dict]:
     bypassed. All three are anomalies worth surfacing.
     """
     findings: list[dict] = []
+    decisions = _decision_events()
     event_types = {r.get("event_type") for r in records}
-    if "decision_emitted" not in event_types:
+    if not event_types & decisions:
         # Trail is request-log only (no decisions anywhere). Not enough
         # semantic context to call missing completions an anomaly.
         return findings
@@ -324,7 +335,7 @@ def _rule_missing_completion(records: list[dict]) -> list[dict]:
             continue
         by_action[action_id][r.get("event_type", "")] = r
     for action_id, events in by_action.items():
-        if "action_requested" in events and "decision_emitted" not in events:
+        if "action_requested" in events and not events.keys() & decisions:
             req = events["action_requested"]
             findings.append({
                 "rule": "missing_completion",
