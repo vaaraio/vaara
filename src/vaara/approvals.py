@@ -34,7 +34,7 @@ import os
 import secrets
 import time
 from pathlib import Path
-from typing import Optional
+from typing import Any, Optional
 
 APPROVALS_DIR = Path.home() / ".vaara" / "approvals"
 KEY_NAME = "approval-hmac.key"
@@ -123,8 +123,13 @@ def request_approval(
     approvals_dir: Path = APPROVALS_DIR,
     timeout: float = 60.0,
     poll_interval: float = 0.2,
+    parameters: Optional[Any] = None,
 ) -> str:
     """Ask a human to approve ``action_id``; block until answered or timeout.
+
+    ``parameters`` are the call's full arguments. They go into the request
+    with their SHA-256, so whatever surface asks the human shows the whole
+    operation that will run, not a summary of it.
 
     Returns ``"approve"``, ``"deny"``, or ``"timeout"``. Any unreadable,
     unexpected or unsigned decision is ignored and polling continues, so a
@@ -144,7 +149,13 @@ def request_approval(
         "reason": reason,
         "requested_at": time.time(),
         "nonce": nonce,
-    }))
+        **({} if parameters is None else {
+            "parameters": parameters,
+            "parameters_sha256": hashlib.sha256(json.dumps(
+                parameters, sort_keys=True, separators=(",", ":"), default=str,
+            ).encode()).hexdigest(),
+        }),
+    }, default=str))
     deadline = time.monotonic() + timeout
     try:
         while time.monotonic() < deadline:

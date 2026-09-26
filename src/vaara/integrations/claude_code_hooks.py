@@ -478,6 +478,76 @@ def run_pre_tool_use(deny_patterns: Optional[str] = None,
     return _render(render, _decide_pre(cfg, events, agent, deny_patterns))
 
 
+def _apply_protection(cfg: dict, pipeline) -> None:
+    """Bind the configured preset and custom thresholds to the scorer."""
+    preset = protection_preset(cfg)
+    custom = custom_thresholds(cfg)
+    if preset or custom:
+        try:
+            from vaara.policy import from_dict
+            from vaara.policy.modes import get_mode, to_policy_dict
+
+            policy = to_policy_dict(get_mode(preset or "balanced"))
+            if custom:
+                escalate, deny = custom
+                policy["thresholds"]["default"] = {"escalate": escalate, "deny": deny}
+            pipeline.scorer.apply_policy(from_dict(policy))
+        except Exception as exc:
+            _emit(
+                f"vaara-governance: policy (preset={preset!r}, "
+                f"custom_thresholds={custom!r}) not applied ({exc}); "
+                f"using default thresholds."
+            )
+
+
+#: What the session-start canary sends: one call that must be held for a
+#: human and one that must pass. Built at runtime so this file's own text
+#: does not trip a shell rule in a governed session.
+_CANARY_HOLD = ("Bash", {"command": "r" + "m -rf ./vaara-canary"})
+_CANARY_PASS = ("Bash", {"command": "ls"})
+
+
+def _report_hold_canary(cfg: dict) -> bool:
+    """Prove, at every session start, that this install holds a delete.
+
+    Fixes were tested, passed, and then stopped working unnoticed, because
+    the tests ran in a development environment and not in the install that
+    governs agents. This runs the installed code with the configured
+    thresholds against an in-memory trail, so nothing lands in the real
+    trail, and says so loudly when a delete would not reach a human.
+    """
+    try:
+        from vaara.audit.trail import AuditTrail
+        from vaara.pipeline import InterceptionPipeline
+        from vaara.scorer._param_signals import destructive_action
+
+        pipeline = InterceptionPipeline(trail=AuditTrail(), enforce=True)
+        _apply_protection(cfg, pipeline)
+        tool, params = _CANARY_HOLD
+        routed = bool(destructive_action(tool, params))
+        held = pipeline.intercept(agent_id="vaara-canary", tool_name=tool,
+                                  parameters=params).decision
+        tool, params = _CANARY_PASS
+        passed = pipeline.intercept(agent_id="vaara-canary", tool_name=tool,
+                                    parameters=params).decision
+        problem = []
+        if not routed:
+            problem.append("the hook does not route a delete to the scorer")
+        if held not in ("escalate", "deny"):
+            problem.append(f"a delete scored {held!r}")
+        if passed != "allow":
+            problem.append(f"a listing scored {passed!r}")
+    except Exception as exc:
+        problem = [f"the canary could not run ({exc!r})"]
+    if not problem:
+        _emit("vaara-governance: canary ok, a delete is held for you and a listing passes.")
+        return True
+    detail = "; ".join(problem)
+    _emit(f"vaara-governance: CANARY FAILED: {detail}. Deletes are NOT reaching you.")
+    notify(cfg, "CANARY FAILED", "session start", detail)
+    return False
+
+
 def _decide_pre(cfg: dict, events: list[dict], agent: str,
                 deny_patterns: Optional[str]) -> int:
     event = events[0]
@@ -532,11 +602,15 @@ def _decide_pre(cfg: dict, events: list[dict], agent: str,
         notify(cfg, "BLOCKED", tool_name, message)
         return 2
 
-    if not tool_name.startswith("mcp__"):
+    from vaara.scorer._param_signals import destructive_action
+
+    if not tool_name.startswith("mcp__") and not destructive_action(tool_name, tool_input):
         # Passed the deny rules. Record it anyway: a trail holding only
         # the blocked calls cannot answer "what did the agent do", which
         # is the question it exists for, and PostToolUse needs an
         # ACTION_REQUESTED to correlate its outcome against.
+        # A call that deletes or discards state does not stop here: it goes
+        # through the enforced pipeline below, which holds it for a human.
         _record_call(
             cfg, agent, tool_name, tool_input,
             {"vaara_governance_layer": "regex_pass"}, session_id,
@@ -555,25 +629,7 @@ def _decide_pre(cfg: dict, events: list[dict], agent: str,
         _note_trail_failure(cfg, exc, stage="open")
         return _ungovernable(cfg, tool_name, "the audit trail cannot be opened")
     pipeline = InterceptionPipeline(trail=trail, enforce=not shadow)
-
-    preset = protection_preset(cfg)
-    custom = custom_thresholds(cfg)
-    if preset or custom:
-        try:
-            from vaara.policy import from_dict
-            from vaara.policy.modes import get_mode, to_policy_dict
-
-            policy = to_policy_dict(get_mode(preset or "balanced"))
-            if custom:
-                escalate, deny = custom
-                policy["thresholds"]["default"] = {"escalate": escalate, "deny": deny}
-            pipeline.scorer.apply_policy(from_dict(policy))
-        except Exception as exc:
-            _emit(
-                f"vaara-governance: policy (preset={preset!r}, "
-                f"custom_thresholds={custom!r}) not applied ({exc}); "
-                f"using default thresholds."
-            )
+    _apply_protection(cfg, pipeline)
 
     try:
         result = pipeline.intercept(
@@ -594,7 +650,7 @@ def _decide_pre(cfg: dict, events: list[dict], agent: str,
     # `allowed` is `decision == "allow"`, so escalate never reached the
     # branch above; the handshake below is what actually handles it.
     if result.decision == "escalate":
-        return _handle_escalation(cfg, pipeline, result, tool_name)
+        return _handle_escalation(cfg, pipeline, result, tool_name, tool_input)
 
     _emit(
         f"vaara-governance: BLOCKED {tool_name} "
@@ -606,7 +662,8 @@ def _decide_pre(cfg: dict, events: list[dict], agent: str,
     return 2
 
 
-def _handle_escalation(cfg: dict, pipeline, result, tool_name: str) -> int:
+def _handle_escalation(cfg: dict, pipeline, result, tool_name: str,
+                       tool_input: Optional[dict] = None) -> int:
     """Block on the file-based approval handshake for an escalated action.
 
     The approvals directory is watched by whatever surface fronts the
@@ -624,6 +681,7 @@ def _handle_escalation(cfg: dict, pipeline, result, tool_name: str) -> int:
                 result.action_id, tool_name, detail,
                 approvals_dir=approvals_dir(cfg),
                 timeout=approvals_timeout(cfg),
+                parameters=tool_input,
             )
         except Exception as exc:
             _emit(f"vaara-governance: approval handshake failed ({exc!r}); "
@@ -788,6 +846,7 @@ def run_session_start() -> int:
     _report_hook_registration()
     if not reported:
         _report_trail_health(cfg, db_path, existed, verdict)
+    _report_hold_canary(cfg)
     return 0
 
 
