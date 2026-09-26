@@ -4,7 +4,11 @@ All notable changes to this project are documented here.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/)
 and this project follows [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
-## [Unreleased]
+## [2.0.0] - 2026-09-26
+
+### Upgrading
+- A tool call whose Vaara hook cannot answer is now blocked on Claude Code, Codex and Gemini CLI; see Fixed. Hooks written by 1.x let the call run. Re-run `vaara init` to rewrite them. Codex skips the rewritten hook until it is trusted again. `"fail_open": true` or `VAARA_PLUGIN_FAIL_OPEN=1` lets such calls run.
+- The GitHub Action's major tag is `v2`. `vaaraio/vaara@v1` stays on 1.x.
 
 ### Fixed
 - A tool call ran when its Vaara hook could not answer. Claude Code, Codex and Gemini CLI all let the call through when the hook crashed. Claude Code and Codex also let it through when the hook binary was missing, and Claude Code when the hook outlived its timeout. A Claude Code approval wait of 60 seconds sat past the plugin's 30 second hook timeout, so an escalated call waiting for a person ran once the timeout hit. `vaara init` now writes the PreToolUse hook for Claude Code, Codex and Gemini CLI as a short `sh` command that runs `vaara hook pre-tool-use` under an 80 second deadline, inside the 90 second timeout it now sets on each: exit 0 and exit 2 pass through, and a crash, a missing binary or a hook still running at the deadline blocks the call with the reason. The plugin's `run.sh` does the same, and blocks when neither `vaara` nor `python3` can be found. An approval wait ends inside the deadline. `"fail_open": true` or `VAARA_PLUGIN_FAIL_OPEN=1` lets such calls run, as for OpenCode. A call refused this way has no record on the trail, since the engine that writes records is what did not answer. Cursor already blocked on a failed hook through `failClosed`. `tests/test_hook_gate.py` breaks the engine each way under dash and bash; the Claude Code 2.1.280, Codex 0.156.1 and Gemini CLI 0.61.0 real-binary tests now also crash, delete and hang the engine behind the hooks `init` writes, and each binary refuses the call in every case. Re-running `vaara init` rewrites existing hooks. Codex treats the rewritten hook as a new one and skips it until it is trusted again, which `init` reports.
@@ -16,7 +20,7 @@ and this project follows [Semantic Versioning](https://semver.org/spec/v2.0.0.ht
 ### Changed
 - `docs/COMPLIANCE.md` and `docs/OVERT_CONTROLS.md` said Vaara does not act as an MCP client and that governing a third-party MCP server needed adapter work. `vaara-mcp-proxy` does that: it fronts any upstream server over stdio or Streamable HTTP, and a `tools/call` reaches it only after the operator lists, the deny rules and `intercept()` allow it. The MCP section now says so, and marks MCP-1 and MCP-3 as partial: per-call governance applies, identity measurement and change detection of the upstream server do not. `docs/OWASP_AGENTIC.md` said every audit record carries a policy id; it now says which records carry what.
 
-## [1.99.0] - 2026-09-26
+## [1.99.0] - 2026-09-25
 
 ### Added
 - A human's answer to an escalated action is signed, and the governed agent cannot write one. Any process of the user could drop `<id>.decision.json` into `~/.vaara/approvals/` with `"approve"` in it, and the gate took it, so an escalated agent could approve itself. The gate now puts a random nonce in each request and accepts a decision only with a `mac`: HMAC-SHA256 under `~/.vaara/keys/approval-hmac.key` (made by the gate on first use, mode 0600) over the action id, the nonce and the decision. An unsigned, re-used or altered decision is ignored and the request times out, which the gate treats as a deny. The macOS app signs its decisions with the same key, checked against shared vectors (`tests/fixtures/approval_v1`) by the engine and the app's own tests. Scripts answer with `vaara.approvals.write_decision`. Two new deny rules, `approval_file_write` and `approval_shell_write`, refuse the agent any write into the approvals directory, and the signing-key read rules now cover `.key` files as well as `.pem`, so the agent cannot read the approval key. `VAARA_ALLOW_APPROVAL_EDIT=1` lifts the directory rules for a deliberate change.
