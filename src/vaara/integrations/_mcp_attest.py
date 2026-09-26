@@ -43,7 +43,10 @@ import json
 import logging
 import threading
 from pathlib import Path
-from typing import Any, Optional
+from typing import TYPE_CHECKING, Any, Literal, Optional, cast
+
+if TYPE_CHECKING:
+    from vaara.attestation._attest_types import Algorithm
 
 logger = logging.getLogger(__name__)
 
@@ -95,7 +98,8 @@ class AttestPairEmitter:
         if alg not in VALID_ALGS:
             raise AttestConfigError(f"unsupported alg: {alg!r}; use HS256, ES256, or RS256")
         self._signing_key = signing_key
-        self._alg = alg
+        # Checked against VALID_ALGS above.
+        self._alg: Algorithm = cast("Algorithm", alg)
         self._receipts_dir = Path(receipts_dir)
         self._receipts_dir.mkdir(parents=True, exist_ok=True)
         self._secret_version = secret_version
@@ -456,7 +460,8 @@ class AttestPairEmitter:
             from vaara.attestation._receipt_types import OutcomeDerived
             from vaara.attestation._attest_canonical import now_iso8601
 
-            status: str = "errored" if outcome_severity > 0.0 else "executed"
+            status: Literal["errored", "executed"] = (
+                "errored" if outcome_severity > 0.0 else "executed")
             back_link = make_back_link(attestation)
             outcome = OutcomeDerived(
                 status=status,

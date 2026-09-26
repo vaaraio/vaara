@@ -37,7 +37,7 @@ import shlex
 import sys
 import threading
 from pathlib import Path
-from typing import Any, Optional
+from typing import Any, Callable, Optional
 
 from vaara import __version__ as _VAARA_VERSION
 from vaara.attestation._receipt_task import related_task_id as _related_task_id
@@ -389,16 +389,14 @@ class VaaraMCPProxy:
             # cloning the transport so we never open a duplicate connection.
             default_alias_target = sorted(all_names)[0]
         # Wrap on_notification per upstream so the reader/listener callback
-        # carries the upstream's name. Default-arg ``n=name`` binds the loop
-        # variable at definition, avoiding the late-binding bug that would
-        # otherwise pin every upstream to the last name iterated.
+        # carries the upstream's name. ``_notifier`` binds the name at the
+        # call, avoiding the late-binding bug that would otherwise pin every
+        # upstream to the last name iterated.
         self._upstreams: dict[str, UpstreamClient] = {}
         for name, command in upstream_map.items():
             self._upstreams[name] = UpstreamMCPClient(
                 command=command,
-                on_notification=(
-                    lambda msg, n=name: self._on_upstream_notification(n, msg)
-                ),
+                on_notification=self._notifier(name),
             )
         for name, url in url_map.items():
             # SSRF egress floor defaults SAFE; allow_private_upstream_hosts (or
@@ -407,9 +405,7 @@ class VaaraMCPProxy:
             self._upstreams[name] = HttpUpstreamClient(
                 url=url,
                 headers=header_map.get(name),
-                on_notification=(
-                    lambda msg, n=name: self._on_upstream_notification(n, msg)
-                ),
+                on_notification=self._notifier(name),
                 allow_private_hosts=allow_private_upstream_hosts,
             )
         if default_alias_target is not None:
@@ -1393,14 +1389,12 @@ class VaaraMCPProxy:
                         upstream_name=upstream_name,
                         tenant_id=_REQUEST_TENANT.get(),
                     )
-        _gateway_present = (
-            self._mint_credentials
-            and self._attest is not None
-            and self._attest.gateway is not None
-        )
-        if _gateway_present and self._attest.is_constrained(tool_name):
+        attest = self._attest
+        gateway = attest.gateway if attest is not None and self._mint_credentials else None
+        _gateway_present = gateway is not None
+        if attest is not None and gateway is not None and attest.is_constrained(tool_name):
             _gw_params = request.get("params")
-            verdict = self._attest.gateway.authorize(
+            verdict = gateway.authorize(
                 _gw_params,
                 tool_name=tool_name,
                 arguments=arguments,
@@ -1764,6 +1758,12 @@ class VaaraMCPProxy:
         if isinstance(result, dict) and result.get("isError"):
             return 1.0
         return 0.0
+
+    def _notifier(self, name: str) -> Callable[[dict], None]:
+        """An on_notification callback that names the upstream it came from."""
+        def notify(msg: dict) -> None:
+            self._on_upstream_notification(name, msg)
+        return notify
 
     def _on_upstream_notification(self, upstream_name: str, message: dict) -> None:
         """Audit + OVERT-emit upstream-originated notifications, then forward.

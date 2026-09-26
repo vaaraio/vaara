@@ -102,11 +102,12 @@ def verify_inference_chain(
     receipts_all_valid = bool(per_receipt) and all(
         c.get("ok") for c in per_receipt
     )
-    tiers = sorted({c.get("tier") for c in per_receipt if c.get("tier")})
+    found_tiers: set[Any] = {c.get("tier") for c in per_receipt if c.get("tier")}
+    tiers = sorted(found_tiers)
 
     all_parsed = len(parsed_receipts) == len(receipts)
     matches = (
-        record_is_session
+        manifest is not None
         and all_parsed
         and session_manifest_matches_receipts(manifest, parsed_receipts)
     )
@@ -115,11 +116,11 @@ def verify_inference_chain(
     # strongly rooted as an exact match; the tail is disclosed, never folded in.
     # ``ok`` stays strict (exact match) -- coverage is presentation, not verdict.
     covers_prefix = (
-        record_is_session
+        manifest is not None
         and all_parsed
         and session_manifest_covers_prefix(manifest, parsed_receipts)
     )
-    bound_count = int(manifest["count"]) if record_is_session else 0
+    bound_count = int(manifest["count"]) if manifest is not None else 0
     unbound_tail = max(0, len(receipts) - bound_count) if covers_prefix else 0
 
     chain_bound = chain_verdict.tier != "unverified"

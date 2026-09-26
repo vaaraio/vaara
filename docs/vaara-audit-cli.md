@@ -30,11 +30,11 @@ Pass `--pubkey signer.pub.pem` with a key received out-of-band to check the sign
 Streams records matching every filter (AND semantics). Default output is tabular. `--json` emits one payload per line for piping into `jq`.
 
 ```
-$ vaara-audit inspect trail.zip --agent agent-0 --event-type decision_emitted --limit 5
+$ vaara-audit inspect trail.zip --agent agent-0 --event-type decision_made --limit 5
 seq    timestamp                  agent_id  event_type         decision  action_type
 -----  -------------------------  --------  -----------------  --------  -----------
-0      2026-04-22T11:30:01.123Z   agent-0   decision_emitted   allow     tx.transfer
-0      2026-04-22T11:30:04.871Z   agent-0   decision_emitted   escalate  data.delete
+0      2026-04-22T11:30:01.123Z   agent-0   decision_made      allow     tx.transfer
+0      2026-04-22T11:30:04.871Z   agent-0   decision_made      escalate  data.delete
 ...
 matched 5 / 143 records
 ```
@@ -58,7 +58,7 @@ deny       11   7.7%    0.732
 
 Four rule-based detectors:
 
-- `missing_completion` - `action_requested` without a matching `decision_emitted`. Flags trail truncation, enforcement crashes, or gate bypasses. Skipped if the trail has no `decision_emitted` events at all (pure request logs are not flagged).
+- `missing_completion` - `action_requested` without a matching decision record (`decision_made` or `action_blocked`). Flags trail truncation, enforcement crashes, or gate bypasses. Skipped if the trail has no decision records at all (pure request logs are not flagged).
 - `timestamp_regression` - a record with a timestamp earlier than the previous record for the same agent. Suggests clock skew, replay, or tampering that the signature check missed (it would not - but useful belt-and-braces).
 - `rate_burst` - agent emits ≥20 records in ≤10 seconds. Default thresholds catch automated loops running away. Tune in a follow-up PR if false positives appear on busy agents.
 - `unknown_spike` - ≥25% of an agent's recent 50-record window has `action_type=unknown`. Suggests the agent is using tools Vaara has no registered classification for, which is a classification gap worth investigating.
