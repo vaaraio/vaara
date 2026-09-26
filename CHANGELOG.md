@@ -4,6 +4,11 @@ All notable changes to this project are documented here.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/)
 and this project follows [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [Unreleased]
+
+### Fixed
+- `vaaraio/vaara@v1` ran the action as it stood at 1.66.2. The 1.66.2 entry said the floating `v1` tag moves with each release, and no step moved it. The release job now moves `v<major>` to each full release of that major, and the container build runs only for full version tags, so moving the major tag does not re-push the image. `tests/test_floating_major_tag.py` holds both.
+
 ## [2.0.0] - 2026-09-26
 
 ### Upgrading
