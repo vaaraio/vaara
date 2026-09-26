@@ -6257,6 +6257,19 @@ def build_parser() -> argparse.ArgumentParser:
     )
     pllp.set_defaults(func=_cmd_llm_proxy)
 
+    # The Linux OS layer. Each command owns its parser in vaara.oslayer and
+    # main() forwards argv to it untouched, as it does for llm-proxy; these
+    # entries put the three in `vaara --help`.
+    for name, summary in (
+        ("run", "Start an agent under the Linux OS layer: confined by the vaara-agent "
+                "AppArmor profile, in a cgroup the guard can end. Needs the guard."),
+        ("os-guard", "The OS layer's root half (sudo): loads the floor, decides agents' "
+                     "opens and execs in your folders, keeps its own trail."),
+        ("os-layer", "Pick OS-layer folders and apps, see the guard, answer its questions."),
+    ):
+        sub.add_parser(name, add_help=False, help=summary).set_defaults(
+            func=lambda args, _n=name: _oslayer_main(_n)(getattr(args, "oslayer_args", [])))
+
     pchk = sub.add_parser(
         "check",
         help="Check a single action through the Vaara pipeline "
@@ -7507,6 +7520,16 @@ def build_parser() -> argparse.ArgumentParser:
     return p
 
 
+def _oslayer_main(name: str):
+    if name == "run":
+        from vaara.oslayer.run import main as entry
+    elif name == "os-guard":
+        from vaara.oslayer.guard import main as entry
+    else:
+        from vaara.oslayer.manage import main as entry
+    return entry
+
+
 def main(argv: list[str] | None = None) -> int:
     # `llm-proxy` forwards its argv untouched to the parser that owns it.
     # argparse.REMAINDER cannot do this: it stops capturing when the first
@@ -7516,6 +7539,11 @@ def main(argv: list[str] | None = None) -> int:
     if raw and raw[0] == "llm-proxy":
         from vaara.integrations.llm_proxy import main as llm_main
         return llm_main(raw[1:])
+    # The OS layer's commands forward the same way. `run` has to: everything
+    # after the agent's name belongs to the agent. None of the three triggers
+    # first-run setup; the guard runs as root and `run` only starts an agent.
+    if raw and raw[0] in ("run", "os-guard", "os-layer"):
+        return _oslayer_main(raw[0])(raw[1:])
 
     parser = build_parser()
     args = parser.parse_args(argv)

@@ -137,6 +137,58 @@ def _history(trail: Any, limit: int) -> list[dict]:
     return out
 
 
+def _oslayer_state() -> dict:
+    """The Linux OS layer as the operator sees it: guard, picks, open questions."""
+    import sys
+
+    if not sys.platform.startswith("linux"):
+        return {"available": False}
+    from vaara.approvals import APPROVALS_DIR
+    from vaara.oslayer import floor, manage, selection
+
+    return {
+        "available": True,
+        "apparmor": floor.apparmor_enabled(),
+        "guard": manage.guard_status(),
+        "selection": selection.load(str(Path.home())).to_json(),
+        "modes": list(selection.MODES),
+        "pending": manage.pending(APPROVALS_DIR),
+    }
+
+
+def _oslayer_change(payload: dict) -> tuple[dict, int]:
+    """Apply one change from the page. Only these three actions exist."""
+    from vaara.oslayer import manage, selection
+
+    action = payload.get("action")
+    home = str(Path.home())
+    try:
+        if action == "folder":
+            mode = payload.get("mode")
+            if mode not in selection.MODES + ("off",):
+                return {"error": f"mode must be one of {', '.join(selection.MODES)} or off"}, 400
+            sel = selection.set_folder(selection.load(home), str(payload.get("path", "")),
+                                       None if mode == "off" else mode)
+        elif action == "app":
+            sel = selection.set_app(selection.load(home), str(payload.get("path", "")),
+                                    bool(payload.get("attach", True)))
+        elif action == "decide":
+            from vaara.approvals import write_decision
+
+            decision = payload.get("decision")
+            if decision not in ("approve", "deny"):
+                return {"error": "decision must be approve or deny"}, 400
+            if not write_decision(str(payload.get("action_id", "")), decision):
+                return {"error": "that request is no longer waiting"}, 409
+            return {"saved": decision}, 200
+        else:
+            return {"error": "unknown action"}, 400
+    except selection.SelectionError as exc:
+        return {"error": str(exc)}, 400
+    path, told = manage.save(sel, home)
+    return {"saved": action, "path": str(path), "guard_told": told}, 200
+
+
 # Settings a non-macOS user was previously locked out of. Same config.json the
 # macOS client writes, via the same helpers, so the two cannot drift.
 # macOS-only keys (menubar_graph, webkitGovernance) are deliberately absent
@@ -212,6 +264,9 @@ class _Handler(BaseHTTPRequestHandler):
             if path == "/api/policy":
                 self._json(_policy_state(self.policy_path))
                 return
+            if path == "/api/oslayer":
+                self._json(_oslayer_state())
+                return
             if path == "/api/config":
                 from vaara.menu import CONFIG_PATH, _load_config
 
@@ -228,7 +283,7 @@ class _Handler(BaseHTTPRequestHandler):
 
     def do_POST(self) -> None:  # noqa: N802  (BaseHTTPRequestHandler API)
         path = self.path.split("?", 1)[0]
-        if path not in ("/api/config", "/api/policy"):
+        if path not in ("/api/config", "/api/policy", "/api/oslayer"):
             self._json({"error": "not found"}, 404)
             return
         if self.headers.get("X-Vaara-Token", "") != self.token:
@@ -243,6 +298,13 @@ class _Handler(BaseHTTPRequestHandler):
 
         if path == "/api/policy":
             self._write_thresholds(payload)
+            return
+        if path == "/api/oslayer":
+            try:
+                body, code = _oslayer_change(payload if isinstance(payload, dict) else {})
+            except Exception as exc:
+                body, code = {"error": repr(exc)}, 500
+            self._json(body, code)
             return
 
         from vaara.menu import CONFIG_PATH, _load_config, _save_config

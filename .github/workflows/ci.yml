@@ -581,3 +581,61 @@ jobs:
             echo "::error::The Copilot CLI test skipped, so Copilot CLI was not found."
             exit 1
           fi
+
+  os-layer-e2e:
+    name: Linux OS layer (kernel floor, guard, real agent)
+    runs-on: ubuntu-24.04
+    # The floor is an AppArmor profile and the guard a root fanotify listener,
+    # so this job runs both for real. The guard starts under sudo for the
+    # runner's account; the test then runs as that account and starts Copilot
+    # CLI, with no Vaara hooks, under `vaara run` against a scripted model.
+    # It reads back the files the model asked Copilot CLI to change and the
+    # guard's own trail.
+    steps:
+      - uses: actions/checkout@9c091bb21b7c1c1d1991bb908d89e4e9dddfe3e0  # v7.0.0
+
+      - name: Set up Python 3.12
+        uses: actions/setup-python@5fda3b95a4ea91299a34e894583c3862153e4b97  # v7.0.0
+        with:
+          python-version: '3.12'
+
+      - name: Set up Node 22
+        uses: actions/setup-node@820762786026740c76f36085b0efc47a31fe5020  # v6.0.0
+        with:
+          node-version: '22'
+
+      - name: Install Vaara and Copilot CLI
+        run: |
+          pip install --require-hashes -r requirements-dev.txt
+          pip install -e . --no-deps
+          npm install -g @github/copilot@1.0.88
+          copilot --version
+          sudo aa-status --enabled && echo "AppArmor enabled"
+
+      - name: Start the guard
+        run: |
+          sudo "$(command -v python)" -m vaara.cli os-guard --user "$USER" > guard.log 2>&1 &
+          for _ in $(seq 60); do
+            [ -S /run/vaara/os-guard.sock ] && break
+            sleep 1
+          done
+          if [ ! -S /run/vaara/os-guard.sock ]; then
+            cat guard.log
+            echo "::error::The guard did not start."
+            exit 1
+          fi
+
+      - name: Run the OS layer end-to-end test, failing on any skip
+        run: |
+          set -o pipefail
+          VAARA_OSLAYER_E2E=1 pytest tests/test_oslayer_e2e.py -q -rs | tee result.txt
+          if grep -qE '[0-9]+ skipped' result.txt; then
+            echo "::error::The OS layer test skipped, so it did not run."
+            exit 1
+          fi
+
+      - name: Guard log and kernel refusals
+        if: always()
+        run: |
+          cat guard.log || true
+          sudo dmesg | grep 'apparmor="DENIED"' | tail -40 || true

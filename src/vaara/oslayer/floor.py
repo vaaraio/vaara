@@ -10,7 +10,13 @@ keeps write access to its own settings, because it writes them in normal use;
 its tools do not. Both keep no access at all to Vaara's own state.
 
 The operator's block folders join the floor: no process in the agent's tree
-reads, writes, moves or deletes anything in them.
+reads, writes, moves or deletes anything in them. In the ask and record
+folders the guard decides each open and exec; the profile only keeps a hard
+link from pointing into them, since a second name outside the folder would be
+opened without the guard seeing the folder's path.
+
+Apps the operator picked are attached by path, so the profile applies to them
+however they are started.
 """
 
 from __future__ import annotations
@@ -99,7 +105,7 @@ PROJECT_HARNESS = (
 )
 
 # System paths, for a process in the tree that runs as root through sudo.
-SYSTEM_SEALED = ("/var/lib/vaara/", "/etc/vaara/")
+SYSTEM_SEALED = ("/var/lib/vaara/", "/etc/vaara/", "/run/vaara/")
 SYSTEM_FIXED = (
     "/etc/passwd", "/etc/shadow", "/etc/group", "/etc/gshadow",
     "/etc/sudoers", "/etc/sudoers.d/",
@@ -212,13 +218,26 @@ def abi_line(abi_dir: Path = Path("/etc/apparmor.d/abi")) -> str:
     return ""
 
 
+def attachment(apps: Iterable[str]) -> str:
+    """The profile's attachment for exact app paths, or ``""`` for none."""
+    paths = sorted({a for a in apps if a.startswith("/") and len(a) > 1})
+    if not paths:
+        return ""
+    if len(paths) == 1:
+        return paths[0]
+    return "/{" + ",".join(p[1:] for p in paths) + "}"
+
+
 def render(homes: Iterable[str], *,
            block_folders: Iterable[str] = (),
+           watched_folders: Iterable[str] = (),
            harness_binaries: Iterable[str] = (),
+           apps: Iterable[str] = (),
            install_paths: Optional[Iterable[str]] = None,
            abi: Optional[str] = None) -> str:
-    """The profile text for ``homes``, the operator's block folders and apps."""
+    """The profile text for ``homes``, the operator's folders and apps."""
     homes = [str(Path(h)).rstrip("/") for h in homes]
+    watched = [str(Path(f)).rstrip("/") + "/**" for f in watched_folders]
     installs = list(vaara_install_paths() if install_paths is None else install_paths)
     harness = harness_paths(harness_binaries)
 
@@ -266,6 +285,7 @@ def render(homes: Iterable[str], *,
             "  deny umount,",
             "  deny pivot_root,",
         ]
+        out += [f"  deny link /** -> {_q(p)}," for p in dict.fromkeys(watched)]
         out += [f"  deny {_q(p)} mrwlkx," for p in dict.fromkeys(sealed)]
         out += [f"  deny {_q(p)} wl," for p in dict.fromkeys(fixed)]
         if tool:
@@ -277,7 +297,8 @@ def render(homes: Iterable[str], *,
         "# Written by vaara os-guard. Regenerated on every start; edits are lost.",
         *( [abi] if abi else [] ),
         "include <tunables/global>",
-        f"profile {PROFILE} flags=(attach_disconnected) {{",
+        f"profile {' '.join(filter(None, (PROFILE, attachment(apps))))} "
+        f"flags=(attach_disconnected) {{",
         *rules(tool=False),
         "",
         f"  profile {TOOL} flags=(attach_disconnected) {{",

@@ -2,13 +2,15 @@
 # SPDX-License-Identifier: AGPL-3.0-or-later
 """fanotify permission events, through ctypes. Linux only, root only.
 
-The kernel holds each open or exec under a marked directory until the
-listener answers allow or deny. Opens are decided whole: the event does not
-say whether the file is being opened to read or to write.
+The kernel holds each open or exec through a marked mount until the listener
+answers allow or deny. Opens are decided whole: the event does not say
+whether the file is being opened to read or to write. Unlink, rename and link
+raise no permission event at all.
 
-A listener must never open a path it watches itself, or it waits on its own
-event. The guard answers its own pid's events with allow before anything
-else, and reads only /proc and its own trail.
+A thread that opens a file on a marked mount waits for its own event to be
+answered. The guard answers its own pid's events with allow before anything
+else, and reads the group from more than one thread, so a reader that opens
+a file by accident is answered by another.
 """
 
 from __future__ import annotations
@@ -17,9 +19,10 @@ import ctypes
 import ctypes.util
 import errno
 import os
+import re
 import struct
 from dataclasses import dataclass
-from typing import Iterator
+from typing import Iterator, Optional
 
 FAN_CLOEXEC = 0x1
 FAN_NONBLOCK = 0x2
@@ -35,6 +38,7 @@ FAN_Q_OVERFLOW = 0x4000
 
 FAN_MARK_ADD = 0x1
 FAN_MARK_REMOVE = 0x2
+FAN_MARK_MOUNT = 0x10
 FAN_MARK_FLUSH = 0x80
 
 FAN_ALLOW = 0x01
@@ -44,7 +48,7 @@ AT_FDCWD = -100
 
 _META = struct.Struct("IBBHQii")
 _RESPONSE = struct.Struct("iI")
-WATCH_MASK = FAN_OPEN_PERM | FAN_OPEN_EXEC_PERM | FAN_EVENT_ON_CHILD | FAN_ONDIR
+MOUNT_MASK = FAN_OPEN_PERM | FAN_OPEN_EXEC_PERM | FAN_ONDIR
 
 _libc = None
 
@@ -87,31 +91,36 @@ class Event:
 class Group:
     """One fanotify group of permission events."""
 
-    def __init__(self) -> None:
-        fd = _lib().fanotify_init(
-            FAN_CLOEXEC | FAN_CLASS_CONTENT | FAN_UNLIMITED_QUEUE | FAN_UNLIMITED_MARKS,
-            os.O_RDONLY | os.O_LARGEFILE | os.O_CLOEXEC)
+    def __init__(self, *, nonblocking: bool = False) -> None:
+        flags = FAN_CLOEXEC | FAN_CLASS_CONTENT | FAN_UNLIMITED_QUEUE | FAN_UNLIMITED_MARKS
+        if nonblocking:
+            flags |= FAN_NONBLOCK
+        fd = _lib().fanotify_init(flags, os.O_RDONLY | os.O_LARGEFILE | os.O_CLOEXEC)
         if fd < 0:
             _raise("fanotify_init")
         self.fd = fd
 
-    def mark(self, directory: str) -> None:
-        """Hold every open and exec of ``directory`` and the files directly in it."""
-        if _lib().fanotify_mark(self.fd, FAN_MARK_ADD, WATCH_MASK, AT_FDCWD,
-                                os.fsencode(directory)) != 0:
-            _raise(f"fanotify_mark {directory}")
+    def mark_mount(self, mount_point: str) -> None:
+        """Hold every open and exec through the mount at ``mount_point``.
 
-    def unmark(self, directory: str) -> None:
-        if _lib().fanotify_mark(self.fd, FAN_MARK_REMOVE, WATCH_MASK, AT_FDCWD,
-                                os.fsencode(directory)) != 0:
+        A directory mark misses a subdirectory made after it was set, and an
+        agent can make one and work inside it. A mount mark sees the whole
+        mount, so the guard filters by path instead.
+        """
+        if _lib().fanotify_mark(self.fd, FAN_MARK_ADD | FAN_MARK_MOUNT, MOUNT_MASK,
+                                AT_FDCWD, os.fsencode(mount_point)) != 0:
+            _raise(f"fanotify_mark mount {mount_point}")
+
+    def unmark_mount(self, mount_point: str) -> None:
+        if _lib().fanotify_mark(self.fd, FAN_MARK_REMOVE | FAN_MARK_MOUNT, MOUNT_MASK,
+                                AT_FDCWD, os.fsencode(mount_point)) != 0:
             err = ctypes.get_errno()
             if err not in (errno.ENOENT, errno.EINVAL):
-                _raise(f"fanotify_mark remove {directory}")
+                _raise(f"fanotify_mark remove mount {mount_point}")
 
-    def read(self, size: int = 64 * 1024) -> Iterator[Event]:
-        """Block until events arrive, then yield each one."""
-        buf = os.read(self.fd, size)
-        yield from parse(buf)
+    def read(self, size: int = 64 * 1024) -> list[Event]:
+        """The events waiting now. Blocks for one unless the group is nonblocking."""
+        return list(parse(os.read(self.fd, size)))
 
     def respond(self, event: Event, allow: bool) -> None:
         try:
@@ -138,12 +147,23 @@ def parse(buf: bytes) -> Iterator[Event]:
         off += event_len
 
 
-def directories(root: str, *, limit: int = 20000) -> list[str]:
-    """``root`` and every directory under it, without following symlinks."""
-    out = []
-    for current, dirs, _files in os.walk(root, followlinks=False):
-        out.append(current)
-        if len(out) >= limit:
-            break
-        dirs[:] = [d for d in dirs if not os.path.islink(os.path.join(current, d))]
-    return out
+def _unescape_mountinfo(field: str) -> str:
+    return re.sub(r"\\([0-7]{3})", lambda m: chr(int(m.group(1), 8)), field)
+
+
+def mount_points(mountinfo: str = "/proc/self/mountinfo") -> list[str]:
+    try:
+        text = open(mountinfo).read()
+    except OSError:
+        return ["/"]
+    return [_unescape_mountinfo(line.split()[4]) for line in text.splitlines()
+            if len(line.split()) > 4]
+
+
+def mount_point(path: str, points: Optional[list[str]] = None) -> str:
+    """The mount ``path`` is on: the longest mount point it sits under."""
+    best = "/"
+    for point in mount_points() if points is None else points:
+        if (path == point or path.startswith(point.rstrip("/") + "/")) and len(point) > len(best):
+            best = point
+    return best
