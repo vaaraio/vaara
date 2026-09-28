@@ -153,7 +153,8 @@ def _load_or_create_key(path: Path) -> Optional[bytes]:
         except FileExistsError:
             pass  # another proxy made it first; read theirs
         except OSError as exc:
-            logger.warning("seal key %s could not be created (%s)", path, exc)
+            logger.warning("the seal key beside the seal file could not be "
+                           "created (%s)", type(exc).__name__)
             return None
         else:
             with os.fdopen(fd, "w") as fh:
@@ -161,7 +162,8 @@ def _load_or_create_key(path: Path) -> Optional[bytes]:
     try:
         key = bytes.fromhex(path.read_text().strip())
     except (OSError, ValueError) as exc:
-        logger.warning("seal key %s unreadable (%s)", path, exc)
+        logger.warning("the seal key beside the seal file is unreadable (%s)",
+                       type(exc).__name__)
         return None
     return key or None
 
@@ -265,8 +267,8 @@ class SealRegistry:
         key = _load_or_create_key(p.parent / KEY_RELPATH)
         if key is None:
             logger.warning(
-                "seal key beside %s unavailable; placeholders are stable for "
-                "this process only and change on restart", p,
+                "the seal key beside the seal file is unavailable; placeholders "
+                "are stable for this process only and change on restart",
             )
         reg = cls(key=key)
         reg._path = p
