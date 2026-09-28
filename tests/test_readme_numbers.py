@@ -79,10 +79,12 @@ def test_dependency_claims_match_pyproject():
     plain pip install signs receipts. The README and the platforms page still
     said the package had no runtime dependencies.
     """
-    import tomllib
-
-    project = tomllib.loads((ROOT / "pyproject.toml").read_text())["project"]
-    names = sorted(re.split(r"[<>=!~ ]", d, 1)[0] for d in project["dependencies"])
+    # Regex, not tomllib: the CI matrix starts at 3.10 and tomllib is 3.11+.
+    text = (ROOT / "pyproject.toml").read_text()
+    m = re.search(r"^dependencies = \[(.*?)\]", text, flags=re.M | re.S)
+    assert m, "could not find [project] dependencies in pyproject.toml"
+    deps = re.findall(r'"([^"]+)"', m.group(1))
+    names = sorted(re.split(r"[<>=!~ ]", d, 1)[0] for d in deps)
     platforms = (ROOT / "docs" / "supported-platforms.md").read_text()
     for text in (README, platforms):
         assert "zero runtime dependencies" not in text
