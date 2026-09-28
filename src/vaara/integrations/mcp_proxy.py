@@ -43,6 +43,10 @@ from vaara import __version__ as _VAARA_VERSION
 from vaara.attestation._receipt_task import related_task_id as _related_task_id
 from vaara.audit.sqlite_backend import SQLiteAuditBackend
 from vaara.audit.trail import AuditTrail
+from vaara.integrations._mcp_input_schema import (
+    check_arguments,
+    unchecked_keywords,
+)
 from vaara.integrations._mcp_notify import (
     HttpRouter,
     NotificationRouter,
@@ -340,6 +344,10 @@ class VaaraMCPProxy:
         # correctly. Request-id ownership is the only stable identifier.
         self._inflight_requests: dict[Any, str] = {}
         self._inflight_lock = threading.Lock()
+        # Each tool's inputSchema as the client saw it in tools/list, keyed
+        # by the client-facing tool name. tools/call is checked against it.
+        self._tool_schemas: dict[str, Any] = {}
+        self._tool_schemas_lock = threading.Lock()
         # v0.40 fan-out: hold N upstream MCP servers in a name -> client map.
         # The single-upstream legacy entry point (positional ``upstream_command``)
         # lands under the "default" name. ``--upstream NAME=CMD`` via CLI or
@@ -1169,6 +1177,17 @@ class VaaraMCPProxy:
             self._attest.update_manifest_fingerprint(
                 _REQUEST_UPSTREAM.get(), response
             )
+        result = response.get("result") if isinstance(response, dict) else None
+        tools = result.get("tools") if isinstance(result, dict) else None
+        if isinstance(tools, list):
+            with self._tool_schemas_lock:
+                for tool in tools:
+                    if isinstance(tool, dict) and isinstance(tool.get("name"), str):
+                        schema = tool.get("inputSchema")
+                        if isinstance(schema, dict):
+                            self._tool_schemas[tool["name"]] = schema
+                        else:
+                            self._tool_schemas.pop(tool["name"], None)
         return response
 
     def _handle_list(
@@ -1317,6 +1336,59 @@ class VaaraMCPProxy:
             )
         else:
             gates.append("deny_rules:pass" if self._deny_rules else "deny_rules:off")
+        # The tool's own inputSchema from tools/list. Arguments outside the
+        # declared shape are refused before the call is scored or run, and
+        # the record names the parameter that failed. In shadow mode the
+        # violation is recorded and the call proceeds.
+        with self._tool_schemas_lock:
+            schema = self._tool_schemas.get(tool_name)
+        if schema is None:
+            gates.append("parameter_schema:no_schema")
+        else:
+            violations = check_arguments(arguments, schema)
+            partial = unchecked_keywords(schema)
+            if violations and self._pipeline._enforce:
+                gates.append("parameter_schema:deny")
+                reason = "Arguments outside the tool's inputSchema: " + "; ".join(violations)
+                self._record_perimeter_audit(
+                    agent_id, tool_name, arguments, "deny", reason,
+                    policy_id="upstream_input_schema",
+                    violation_type="parameter_schema",
+                )
+                block_payload = {
+                    "vaara_blocked": True,
+                    "reason": reason,
+                    "decision": "DENY",
+                    "violations": violations,
+                    "tool": tool_name,
+                    "gates": list(gates),
+                }
+                self._overt_emit(
+                    surface="mcp.tool.call",
+                    identifier=tool_name,
+                    identifier_field="tool_name",
+                    request_obj={"tool": tool_name, "arguments": arguments},
+                    decision="DENY",
+                    reason=reason,
+                    extra={"agent_id": agent_id, "gates": list(gates)},
+                )
+                return {
+                    "jsonrpc": "2.0", "id": request.get("id"),
+                    "result": {
+                        "content": [{"type": "text", "text": strict_json_dumps(block_payload, indent=2)}],
+                        "isError": True,
+                    },
+                }
+            if violations:
+                gates.append("parameter_schema:shadow")
+                logger.warning(
+                    "SHADOW inputSchema violation on %s: %s",
+                    _safe_log(tool_name), "; ".join(violations),
+                )
+            elif partial:
+                gates.append("parameter_schema:pass_partial:" + ",".join(partial))
+            else:
+                gates.append("parameter_schema:pass")
         # Unknown upstream tool names classify as generic high-risk in the
         # registry (fail-closed). Correct default for runtime governance.
         result = self._pipeline.intercept(

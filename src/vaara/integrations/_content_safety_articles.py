@@ -226,20 +226,94 @@ _NORMALIZED_INDEX: dict[tuple[str, str], CategoryMapping] = {
 
 
 def lookup(provider: str, provider_category: str) -> Optional[CategoryMapping]:
-    """Return the canonical mapping, or None for unmapped categories.
+    """Return the mapping in force, or None for unmapped categories.
 
-    Exact match first, then a case and separator insensitive match, so a
-    provider that renames ``DetectPII`` to ``detect_pii`` keeps its
-    article mapping instead of degrading to "unmapped".
+    A deployer override wins over the published row. Then exact match,
+    then a case and separator insensitive match, so a provider that
+    renames ``DetectPII`` to ``detect_pii`` keeps its article mapping
+    instead of degrading to "unmapped".
 
     Adapter should still record the raw provider response and use
     ``vaara_category="unmapped"`` so evidence surfaces without
     article-level annotation.
     """
+    override = _OVERRIDES.get((provider, _normalize(provider_category)))
+    if override is not None:
+        return override
     exact = _INDEX.get((provider, provider_category))
     if exact is not None:
         return exact
     return _NORMALIZED_INDEX.get((provider, _normalize(provider_category)))
+
+
+_OVERRIDES: dict[tuple[str, str], CategoryMapping] = {}
+
+
+def override_mapping(mapping: CategoryMapping) -> None:
+    """Put ``mapping`` in force for its provider and category.
+
+    Replaces the published row, or maps a category the table does not
+    list. Matching is case and separator insensitive, like ``lookup``.
+    Every adapter reads through ``lookup``, so no adapter code changes.
+    """
+    _OVERRIDES[(mapping.provider, _normalize(mapping.provider_category))] = mapping
+
+
+def remove_override(provider: str, provider_category: str) -> None:
+    """Drop a deployer override; the published row applies again."""
+    _OVERRIDES.pop((provider, _normalize(provider_category)), None)
+
+
+def clear_overrides() -> None:
+    """Drop every deployer override."""
+    _OVERRIDES.clear()
+
+
+def load_overrides(path: str) -> int:
+    """Read overrides from a JSON file and put them in force.
+
+    The file holds a list of objects with the ``CategoryMapping`` fields:
+    ``provider``, ``provider_category``, ``vaara_category``,
+    ``ai_act_articles`` and ``owasp_llm`` (lists), and optional
+    ``notes``. The whole file is checked before any row is applied, so a
+    bad row leaves the mappings in force unchanged. Returns the number
+    of rows applied.
+    """
+    import json
+
+    with open(path, encoding="utf-8") as fh:
+        rows = json.load(fh)
+    if not isinstance(rows, list):
+        raise ValueError(f"{path}: expected a JSON list of mapping objects")
+    parsed: list[CategoryMapping] = []
+    for i, row in enumerate(rows):
+        if not isinstance(row, dict):
+            raise ValueError(f"{path}[{i}]: expected an object")
+        missing = [
+            k for k in ("provider", "provider_category", "vaara_category")
+            if not isinstance(row.get(k), str) or not row.get(k)
+        ]
+        if missing:
+            raise ValueError(f"{path}[{i}]: missing or empty {', '.join(missing)}")
+        lists = {}
+        for k in ("ai_act_articles", "owasp_llm"):
+            v = row.get(k, [])
+            if not isinstance(v, list) or not all(isinstance(x, str) for x in v):
+                raise ValueError(f"{path}[{i}].{k}: expected a list of strings")
+            lists[k] = tuple(v)
+        unknown = set(row) - {
+            "provider", "provider_category", "vaara_category",
+            "ai_act_articles", "owasp_llm", "notes",
+        }
+        if unknown:
+            raise ValueError(f"{path}[{i}]: unknown field(s) {', '.join(sorted(unknown))}")
+        parsed.append(CategoryMapping(
+            row["provider"], row["provider_category"], row["vaara_category"],
+            lists["ai_act_articles"], lists["owasp_llm"], str(row.get("notes", "")),
+        ))
+    for mapping in parsed:
+        override_mapping(mapping)
+    return len(parsed)
 
 
 def all_mappings_for(provider: str) -> tuple[CategoryMapping, ...]:
