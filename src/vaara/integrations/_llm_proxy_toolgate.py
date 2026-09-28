@@ -99,8 +99,12 @@ class ToolGate:
             params.update(rule_id=hit[0], rule_message=hit[1],
                           enforced=self.enforce)
             if self.enforce:
+                # The same policy_id the hook and the MCP proxy write for a
+                # rule deny, so a reader of the chain finds every rule deny
+                # under one name whichever surface refused it.
                 kwargs = {"policy_decision": "deny",
-                          "policy_reason": f"deny rule {hit[0]}: {hit[1]}"}
+                          "policy_reason": f"deny rule {hit[0]}: {hit[1]}",
+                          "policy_id": f"deny_rule:{hit[0]}"}
         try:
             self.pipeline.intercept(agent_id=self.agent_id,
                                     tool_name="llm.tool_call",
