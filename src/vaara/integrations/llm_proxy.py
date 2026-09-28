@@ -57,7 +57,8 @@ DESCRIPTION = (
     "path, size and sha256, never by content. The secrets named in "
     "--seal-file are replaced on every path before the request leaves. "
     "With --seal-known-secrets, values in published credential formats are "
-    "sealed too. Nothing else is removed from a request; "
+    "sealed too, and so are generated tokens of any format assigned to a "
+    "secret-named key or sent as a bearer token. Nothing else is removed from a request; "
     "--redact masks only the trail's copy of the prompt. A call the trail "
     "cannot record is refused unless --fail-open is set."
 )
@@ -200,7 +201,11 @@ def main(args: Optional[list[str]] = None) -> int:
         "--seal-known-secrets", action="store_true",
         help="Also seal values matching a published credential format: "
              "Anthropic, OpenAI, GitHub, AWS access key id, Google API key, "
-             "Slack, Stripe, Hugging Face, JWT and PEM private keys. Each is "
+             "Slack, Stripe, Hugging Face, JWT and PEM private keys. Also "
+             "seal a high-entropy value of any format assigned to a key that "
+             "ends in api_key, secret, token, password, access_key, "
+             "private_key, credential or auth, or sent as a bearer token. "
+             "Each is "
              "replaced with a stable placeholder before the request leaves "
              "and restored in the reply, and each record counts what was "
              "sealed by format. Emails, names and other personal data are "

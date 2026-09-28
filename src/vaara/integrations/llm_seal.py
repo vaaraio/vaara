@@ -11,8 +11,10 @@ the caller sees it.
 What this does NOT do, stated here because the gap matters more than the
 feature: it only covers what can be named in advance, plus, when
 ``known_formats`` is on, values matching a published credential format
-(``KNOWN_SECRET_FORMATS``). Emails, names and other personal data are not
-detected.  Novel thinking written
+(``KNOWN_SECRET_FORMATS``) and machine-generated tokens of any format that sit
+where a credential sits (``CONTEXT_SECRET_RULES``). A short or dictionary-word
+password is not caught by the context rule. Emails, names and other personal
+data are not detected.  Novel thinking written
 as prose cannot be pre-registered, so it travels in the clear.  This bounds and
 records the channel rather than closing it.
 
@@ -29,7 +31,9 @@ from __future__ import annotations
 import hashlib
 import json
 import logging
+import math
 import re
+from collections import Counter
 from pathlib import Path
 from typing import Optional
 
@@ -69,6 +73,48 @@ KNOWN_SECRET_FORMATS: tuple[tuple[str, re.Pattern[str]], ...] = (
     ("jwt", re.compile(
         _EDGE + r"eyJ[A-Za-z0-9_-]{8,}\.eyJ[A-Za-z0-9_-]{8,}\.[A-Za-z0-9_-]{8,}")),
 )
+
+
+#: Key names that hold a credential. The key has to END in one of these, so
+#: ``max_tokens``, ``token_count`` and ``secret_name`` are not secret-named.
+#: ``pwd`` is left out: ``PWD=`` is the shell's working directory.
+_SECRET_KEY_WORD = (r"(?:api[_-]?key|apikey|secret|token|password|passwd|"
+                    r"access[_-]?key|private[_-]?key|credentials?|auth)")
+#: An optional quote around a key or value, JSON-escaped or not: the rules run
+#: on the wire text, where a config pasted into a prompt is escaped once more.
+_Q = r"""(?:\\?["'])?"""
+_TOKEN = r"(?P<val>[A-Za-z0-9_\-+/=.~]{16,})"
+
+#: Credentials in no published format, caught by where they sit: a value
+#: assigned to a secret-named key (``API_KEY=...``, ``"client_secret": "..."``,
+#: ``x-api-key: ...``) or sent as a bearer token. Only the value is sealed, and
+#: only when ``_looks_generated`` holds, so ``password: changeme``, template
+#: text like ``YOUR_API_KEY_HERE`` and an id under an ordinary key stay as
+#: written. Runs after ``KNOWN_SECRET_FORMATS``.
+CONTEXT_SECRET_RULES: tuple[tuple[str, re.Pattern[str]], ...] = (
+    ("assigned_secret", re.compile(
+        r"(?i)(?<![A-Za-z0-9])[A-Za-z0-9_.-]*" + _SECRET_KEY_WORD
+        + _Q + r"\s*[:=]\s*" + _Q + _TOKEN)),
+    ("bearer_token", re.compile(r"(?i)(?<![A-Za-z0-9])Bearer\s+" + _TOKEN)),
+)
+
+#: Bits per character a value needs before the context rule seals it. Random
+#: base64 and hex sit near 4 and above at this length; words and repeated
+#: filler sit well under.
+_MIN_ENTROPY = 3.0
+
+
+def _looks_generated(value: str) -> bool:
+    """True when a value reads as a generated token, not a word or filler."""
+    if _PLACEHOLDER_RE.fullmatch(value):
+        return False
+    classes = (any(c.islower() for c in value) + any(c.isupper() for c in value)
+               + any(c.isdigit() for c in value))
+    if classes < 2:
+        return False
+    n = len(value)
+    entropy = -sum(k / n * math.log2(k / n) for k in Counter(value).values())
+    return entropy >= _MIN_ENTROPY
 
 
 def placeholder_for(secret: str) -> str:
@@ -209,16 +255,25 @@ class SealRegistry:
         """How many secrets are registered. For startup reporting."""
         return len(self._pairs)
 
+    def _learn(self, value: str, kind: str, kinds: dict[str, int]) -> str:
+        token = placeholder_for(value)
+        self._learned[value] = token
+        self._reverse[token] = value
+        kinds[kind] = kinds.get(kind, 0) + 1
+        return token
+
     def _seal_known(self, text: str) -> str:
         kinds: dict[str, int] = {}
         for kind, pattern in KNOWN_SECRET_FORMATS:
+            text = pattern.sub(
+                lambda m, kind=kind: self._learn(m.group(0), kind, kinds), text)
+        for kind, pattern in CONTEXT_SECRET_RULES:
             def sub(m: re.Match[str], kind: str = kind) -> str:
-                value = m.group(0)
-                token = placeholder_for(value)
-                self._learned[value] = token
-                self._reverse[token] = value
-                kinds[kind] = kinds.get(kind, 0) + 1
-                return token
+                value = m.group("val")
+                if not _looks_generated(value):
+                    return m.group(0)
+                head = m.group(0)[:m.start("val") - m.start()]
+                return head + self._learn(value, kind, kinds)
             text = pattern.sub(sub, text)
         self.last_kinds = kinds
         return text
