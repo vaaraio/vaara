@@ -1460,8 +1460,8 @@ class SQLiteAuditBackend:
         # like pending outcomes persistence.
         trail._backend = self
         # Each decision appended from here on also leaves a signed receipt
-        # beside the database (off without the signing libraries, or with
-        # VAARA_RECEIPTS=0).
+        # beside the database (off, with a warning, without the signing
+        # libraries; off with VAARA_RECEIPTS=0).
         from vaara.audit.decision_receipts import default_sink
 
         trail._receipt_sink = default_sink(self._db_path)

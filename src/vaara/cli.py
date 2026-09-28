@@ -2085,8 +2085,8 @@ def _cmd_receipt_verify_decision(args: argparse.Namespace) -> int:
     from vaara.audit import decision_receipts as dr
 
     if not dr.signing_available():
-        print("vaara receipt verify-decision: needs pip install 'vaara[attestation]'",
-              file=sys.stderr)
+        print("vaara receipt verify-decision: needs cryptography and rfc8785 "
+              "(reinstall vaara with its dependencies)", file=sys.stderr)
         return 2
     db = Path(args.db or Path.home() / ".vaara" / "trail" / "audit.db").expanduser()
     roots = [Path(p).expanduser() for p in args.paths] or [db.parent / dr.RECEIPTS_DIRNAME]
