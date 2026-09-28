@@ -7,7 +7,7 @@ Vaara's standards-aligned outputs: OVERT 1.0 envelopes, the SEP-2787 execution-r
 OVERT 1.0 is an open standard for runtime trust in AI systems ([overt.is](https://overt.is/), authored by Glacis Technologies, published 25 March 2026): a signed, schema-closed envelope a relying party can verify offline without trusting the emitter. Vaara is the **Arbiter** in OVERT terms and ships Protocol Profile 1.0 Base Envelopes (canonical CBOR per RFC 8949, Ed25519 signatures, HMAC-SHA256 commitments, closed 9-field schema) alongside every audit record when attestation is enabled.
 
 ```bash
-pip install 'vaara[attestation]'
+pip install vaara
 ```
 
 ```python

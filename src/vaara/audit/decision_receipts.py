@@ -18,8 +18,9 @@ arguments, so a receipt can leave the machine without them.
 The signing key is made on first use at ``<trail dir>/keys/receipt-es256.pem``
 (mode 0600) and its public half is written to
 ``<trail dir>/receipts/issuer-es256.pub.pem`` for verifiers. Signing needs
-``cryptography`` and ``rfc8785`` (``pip install 'vaara[attestation]'``);
-without them the engine records decisions as before and emits no receipts.
+``cryptography`` and ``rfc8785``, both in the base install. An install made
+without them (``--no-deps``, a vendored tree) records decisions as before,
+emits no receipts, and logs a warning once saying so.
 ``VAARA_RECEIPTS=0`` turns emission off.
 
 Emission never blocks a decision. The decision is on the chain before its
@@ -56,6 +57,9 @@ _VERDICT = {"allow": "allow", "escalate": "escalate", "deny": "block"}
 _DECISION_EVENTS = (EventType.DECISION_MADE, EventType.ACTION_BLOCKED)
 _HEX64 = re.compile(r"^[0-9a-f]{64}$")
 _SAFE_NAME = re.compile(r"[^A-Za-z0-9._-]")
+
+# One warning per process when the signing libraries are missing.
+_warned_unsigned = False
 
 
 def signing_available() -> bool:
@@ -272,6 +276,14 @@ def default_sink(db_path: Any) -> Optional[DecisionReceiptSink]:
     if not path or path == ":memory:" or path.startswith("file::memory:"):
         return None
     if not signing_available():
+        global _warned_unsigned
+        if not _warned_unsigned:
+            _warned_unsigned = True
+            logger.warning(
+                "decision receipts are OFF: cryptography and rfc8785 are not "
+                "importable, so decisions are recorded without a signed receipt. "
+                "Reinstall vaara with its dependencies to turn them on."
+            )
         return None
     return DecisionReceiptSink(trail_dir=Path(path).expanduser().resolve().parent)
 

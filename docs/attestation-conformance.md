@@ -101,7 +101,7 @@ null`.
 ## Quick start
 
 ```
-pip install 'vaara[attestation]'
+pip install vaara
 vaara keygen --attest --out attest_key.pem
 # point the proxy at the key, run some tool calls, then:
 vaara attest verify  RECEIPTS/0000000001-<nonce>-attest.json  --pubkey-file attest_key.pem.pub
