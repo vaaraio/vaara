@@ -259,7 +259,22 @@ class _Handler(BaseHTTPRequestHandler):
     def _json(self, payload: Any, code: int = 200) -> None:
         self._send(json.dumps(payload).encode(), "application/json", code)
 
+    def _host_refused(self) -> bool:
+        # The token guards against a page in another tab, which cannot read
+        # it. A page whose name was rebound to 127.0.0.1 is same-origin and
+        # can, so the request's Host has to be a name no DNS answer can move:
+        # an IP address or localhost.
+        from vaara.integrations._http_origin import host_is_trusted
+
+        if host_is_trusted(self.headers.get("Host", ""), allowed=set()):
+            return False
+        self._json({"error": "this dashboard only answers to 127.0.0.1 or "
+                             "localhost"}, 403)
+        return True
+
     def do_GET(self) -> None:  # noqa: N802  (BaseHTTPRequestHandler API)
+        if self._host_refused():
+            return
         path = self.path.split("?", 1)[0]
         try:
             if path in ("/", "/index.html"):
@@ -302,6 +317,8 @@ class _Handler(BaseHTTPRequestHandler):
             self._json({"error": repr(exc)}, 500)
 
     def do_POST(self) -> None:  # noqa: N802  (BaseHTTPRequestHandler API)
+        if self._host_refused():
+            return
         path = self.path.split("?", 1)[0]
         if path not in ("/api/config", "/api/policy", "/api/oslayer"):
             self._json({"error": "not found"}, 404)
