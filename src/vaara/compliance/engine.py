@@ -697,32 +697,58 @@ class ComplianceEngine:
         # tags would mislead an auditor filtering by status. Downgrade
         # every article to EVIDENCE_INSUFFICIENT + ABSENT with an explicit
         # gap, so dashboards cannot render green cells over broken evidence.
-        chain_error = trail.verify_chain()
+        # A gap a repair declared on the chain pins every article the same
+        # way, because the lost records cannot be shown to be what was
+        # written. It is named for what it is: the walk found a declared
+        # loss, not a rewrite. "Compromised" is kept for a break nothing on
+        # the chain accounts for, so a reader can tell the two apart.
+        verdict = trail.verify_chain_verdict()
+        chain_error = verdict.summary()
         chain_broken = chain_error is not None
+        declared = verdict.state == "declared_gaps"
+        if declared:
+            gap_text = (
+                f"Audit chain not intact: {chain_error}. The lost records "
+                f"were declared by a repair on the chain itself; what they "
+                f"held cannot be shown"
+            )
+            gap_fix = (
+                "Read the repair records and the damaged copy the repair "
+                "kept, then re-run the conformity assessment against a "
+                "trail that carries the lost period from a verified export"
+            )
+            reason_text = (
+                "Audit chain not intact (declared gap); status pinned to "
+                "INSUFFICIENT and strength to ABSENT regardless of "
+                "per-article evidence count."
+            )
+        else:
+            gap_text = (
+                f"Audit chain integrity compromised: {chain_error}; "
+                f"evidence cannot be trusted until chain is "
+                f"reconstructed or re-verified"
+            )
+            gap_fix = (
+                "Investigate chain break, restore from verified "
+                "backup, and re-run conformity assessment"
+            )
+            reason_text = (
+                "Audit chain integrity compromised; status pinned to "
+                "INSUFFICIENT and strength to ABSENT regardless of "
+                "per-article evidence count."
+            )
 
         for req in requirements_snapshot:
             evidence = self._assess_article(trail, req, now)
             if chain_broken:
                 evidence.status = EvidenceStatus.EVIDENCE_INSUFFICIENT
                 evidence.strength = EvidenceStrength.ABSENT
-                evidence.gaps.insert(
-                    0,
-                    f"Audit chain integrity compromised: {chain_error}; "
-                    f"evidence cannot be trusted until chain is "
-                    f"reconstructed or re-verified",
-                )
-                evidence.recommendations.insert(
-                    0,
-                    "Investigate chain break, restore from verified "
-                    "backup, and re-run conformity assessment",
-                )
+                evidence.gaps.insert(0, gap_text)
+                evidence.recommendations.insert(0, gap_fix)
                 if evidence.verdict_inputs:
                     evidence.verdict_inputs["chain_intact"] = False
                     evidence.verdict_inputs.setdefault("verdict_reasons", []).insert(
-                        0,
-                        "Audit chain integrity compromised; status pinned to "
-                        "INSUFFICIENT and strength to ABSENT regardless of "
-                        "per-article evidence count.",
+                        0, reason_text,
                     )
             articles.append(evidence)
 
