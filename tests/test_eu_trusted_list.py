@@ -127,3 +127,14 @@ def test_xml_with_doctype_is_refused():
         parse_lotl(hostile)
     with pytest.raises(ValueError):
         parse_trusted_list(hostile)
+
+
+def test_a_doctype_pushed_past_the_first_4k_is_refused():
+    """Comments are legal in the prolog, so a DTD can sit arbitrarily deep."""
+    import pytest
+
+    padding = b"<!--" + b"x" * 8192 + b"-->"
+    hostile = (b'<?xml version="1.0"?>' + padding
+               + b'<!DOCTYPE x [<!ENTITY a "b">]>' + LOTL_XML.split(b"?>", 1)[1])
+    with pytest.raises(ValueError):
+        parse_lotl(hostile)

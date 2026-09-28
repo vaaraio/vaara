@@ -716,7 +716,11 @@ def _salvage(path: Path, problem: str) -> TrailRepair:
             _constrain_seq(dst)
             for table in _SALVAGE_SIDE_TABLES:
                 try:
-                    side_cols = [r[1] for r in src.execute(f"PRAGMA table_info({table})")]
+                    # The names come from the damaged file. Only the ones the
+                    # fresh table has are read or written, like audit_records.
+                    side_dst = {r[1] for r in dst.execute(f"PRAGMA table_info({table})")}
+                    side_cols = [r[1] for r in src.execute(f"PRAGMA table_info({table})")
+                                 if r[1] in side_dst]
                     if not side_cols:
                         continue
                     side_hi = src.execute(f"SELECT max(rowid) FROM {table}").fetchone()[0] or 0

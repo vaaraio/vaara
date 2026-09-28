@@ -37,8 +37,10 @@ def _parse_xml(data: bytes) -> ET.Element:
     DOCTYPE here is malformed or hostile (XXE, entity-expansion). Refusing it
     up front keeps the stdlib parser safe without a new dependency.
     """
-    head = data[:4096]
-    if b"<!DOCTYPE" in head or b"<!ENTITY" in head:
+    # The whole buffer, not a prefix: comments are legal in the prolog, so a
+    # declaration can be pushed past any fixed offset. Signed list content is
+    # base64 and element text, where neither marker has a reason to appear.
+    if b"<!DOCTYPE" in data or b"<!ENTITY" in data:
         raise ValueError("trusted-list XML with a DTD is refused")
     return ET.fromstring(data)  # nosec B314
 
