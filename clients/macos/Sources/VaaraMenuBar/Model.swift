@@ -112,6 +112,11 @@ struct PendingApproval: Identifiable, Equatable {
     let toolName: String
     let reason: String
     let requestedAt: Date
+    /// The call's arguments as the human reads them (ApprovalOperation).
+    /// Empty when the request carries none.
+    var operation: String = ""
+    /// parameters_sha256 from the request: the digest of exactly what runs.
+    var operationSHA256: String = ""
     var id: String { actionID }
 }
 
@@ -1279,7 +1284,9 @@ final class GateModel: ObservableObject {
                 toolName: req["tool_name"] as? String ?? "?",
                 reason: req["reason"] as? String ?? "",
                 requestedAt: Date(timeIntervalSince1970:
-                    (req["requested_at"] as? Double) ?? Date().timeIntervalSince1970))
+                    (req["requested_at"] as? Double) ?? Date().timeIntervalSince1970),
+                operation: ApprovalOperation.render(req["parameters"]),
+                operationSHA256: req["parameters_sha256"] as? String ?? "")
             pendingApproval = pending
             NSApp.activate(ignoringOtherApps: true)
             return

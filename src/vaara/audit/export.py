@@ -238,6 +238,7 @@ def export_signed(
         )
 
     if signer is None:
+        assert signer_key is not None  # both None was refused above
         _require_crypto()
         signer = Ed25519Signer(_load_private_key(signer_key))
 

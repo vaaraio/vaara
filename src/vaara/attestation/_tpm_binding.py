@@ -244,15 +244,16 @@ def _verify_ak_signature(ak_pub_pem: bytes, attest_bytes: bytes, ts: Any) -> boo
     if not isinstance(ak, ec.EllipticCurvePublicKey):
         raise TPMAttestationError("AK public key is not an EC public key")
 
-    hash_cls = {"sha256": hashes.SHA256, "sha384": hashes.SHA384,
-                "sha512": hashes.SHA512}.get(hash_name(ts.hash_alg))
-    if hash_cls is None:
+    hash_alg: hashes.HashAlgorithm | None = {
+        "sha256": hashes.SHA256(), "sha384": hashes.SHA384(),
+        "sha512": hashes.SHA512()}.get(hash_name(ts.hash_alg))
+    if hash_alg is None:
         raise TPMAttestationError(
             f"unsupported ECDSA scheme hash 0x{ts.hash_alg:04x}"
         )
     der = encode_dss_signature(ts.r, ts.s)
     try:
-        ak.verify(der, attest_bytes, ec.ECDSA(hash_cls()))
+        ak.verify(der, attest_bytes, ec.ECDSA(hash_alg))
         return True
     except InvalidSignature:
         return False
