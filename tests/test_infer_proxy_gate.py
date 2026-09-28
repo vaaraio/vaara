@@ -275,3 +275,42 @@ def test_unmatched_pattern_still_gated(tmp_path):
     asyncio.run(
         gate_tool_calls(p, calls, model_name="m", allow_patterns=["read_*"]))
     assert p.seen == ["delete_repo"]
+
+
+def test_a_human_approval_at_the_model_layer_is_recorded_as_a_human_disposition(tmp_path):
+    """The hook, the MCP server and the OS guard write approver=human on the
+    resolution a person made through the approvals directory. The model-layer
+    gate records the same decision through the same handshake and must say
+    the same thing, or its receipts read as though policy replayed it."""
+    from vaara.audit.trail import EventType
+
+    approvals = tmp_path / "approvals"
+    pipeline = _escalate_all()
+
+    def responder():
+        deadline = time.monotonic() + 10
+        while time.monotonic() < deadline:
+            reqs = list(approvals.glob("*.request.json")) if approvals.exists() else []
+            if reqs:
+                action_id = reqs[0].name.removesuffix(".request.json")
+                from vaara.approvals import write_decision
+                write_decision(action_id, "approve", approvals_dir=approvals)
+                return
+            time.sleep(0.02)
+
+    thread = threading.Thread(target=responder, daemon=True)
+    thread.start()
+    app = build_app(
+        emitter=None, upstream="http://up", pipeline=pipeline,
+        approvals_dir=approvals, approvals_timeout=10,
+        client=httpx.AsyncClient(transport=httpx.MockTransport(_anthropic_upstream)),
+    )
+    status, _raw = _drive(app, "/v1/messages", {
+        "model": "claude-sonnet-5", "messages": MESSAGES, "stream": False,
+    })
+    thread.join(timeout=1)
+    assert status == 200
+    [resolved] = pipeline.trail.get_records_by_type(EventType.ESCALATION_RESOLVED)
+    assert resolved.data["resolution"] == "allow"
+    assert resolved.data["approver"] == "human"
+    assert resolved.data["human_disposed"] is True
