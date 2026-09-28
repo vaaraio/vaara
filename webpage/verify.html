@@ -378,7 +378,7 @@
     <h2>Search the Vaara Resin</h2>
     <p class="search-by">by receipt digest, entry digest, or public key</p>
     <div class="searchrow">
-      <input id="q" spellcheck="false" placeholder="sha256 digest, or paste your public key to see everything you published">
+      <input id="q" spellcheck="false" aria-label="Receipt digest, entry digest or public key" placeholder="sha256 digest, or paste your public key to see everything you published">
       <button id="look">Look up</button>
       <button id="latest" class="ghost">Latest entries</button>
     </div>
@@ -433,7 +433,7 @@
   <div class="drop" id="drop">
     Drop a receipt file here, or paste one below. It is read in this tab and
     never sent anywhere, so there is nothing to upload and no account to make.
-    <textarea id="input" spellcheck="false" placeholder='{"payload":"...","payloadType":"application/vnd.in-toto+json","signatures":[{"keyid":"...","sig":"..."}]}'></textarea>
+    <textarea id="input" spellcheck="false" aria-label="Receipt to verify" placeholder='{"payload":"...","payloadType":"application/vnd.in-toto+json","signatures":[{"keyid":"...","sig":"..."}]}'></textarea>
     <div>
       <button id="go">Verify</button>
       <button id="demo" class="ghost">Load an example</button>
