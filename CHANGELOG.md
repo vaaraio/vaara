@@ -4,7 +4,7 @@ All notable changes to this project are documented here.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/)
 and this project follows [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
-## [Unreleased]
+## [2.3.0] - 2026-09-28
 
 ### Added
 - `vaara-mcp-proxy` checks a `tools/call` against the tool's own `inputSchema` before the call is scored or forwarded. The proxy keeps the schema each tool advertised in `tools/list`; arguments outside it are refused, and the refusal lands on the chain as `action_blocked` with `policy_id` `upstream_input_schema`, `violation_type` `parameter_schema`, and a reason naming each failing parameter. The checker reads `type`, `required`, `properties`, `additionalProperties`, `enum`, `const`, numeric bounds, string length and `pattern`, and array `items` and length. It does not evaluate `anyOf`, `oneOf`, `allOf`, `not` or `$ref`, and the gate record says so (`parameter_schema:pass_partial:<keywords>`). In shadow mode a violation is recorded and the call proceeds. Under fan-out the schema is kept per upstream, so two upstreams that each expose a tool of the same name are checked against their own shapes. docs/COMPLIANCE.md marked OVERT TOOL-2.2 and TOOL-2.3 as met when nothing checked parameters.

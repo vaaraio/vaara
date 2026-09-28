@@ -17,7 +17,7 @@
     <key>CFBundlePackageType</key>
     <string>SYSX</string>
     <key>CFBundleShortVersionString</key>
-    <string>2.2.0</string>
+    <string>2.3.0</string>
     <key>CFBundleVersion</key>
     <string>1</string>
     <!-- System extension, not an appex. NSExtension/NSExtensionPrincipalClass
