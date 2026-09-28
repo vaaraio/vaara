@@ -17,6 +17,7 @@ and this project follows [Semantic Versioning](https://semver.org/spec/v2.0.0.ht
 ### Fixed
 - Trail salvage copied the side tables (`gdpr_redactions`, `api_keys`, `pending_outcomes`) by the column names the damaged file declared. A column the current schema lacks made the whole table read as damaged, so its rows were dropped while the salvage reported success. Only the columns the fresh table has are read and written now.
 - `write_decision` refuses an action id that is not a plain file name. The dashboard passes the id from its request body into the decision file's name, so `../` in it wrote the decision outside the approvals directory when a matching request file existed there.
+- The macOS app and its network filter extension reported version 1.60.1 in their bundle, which Finder and the About panel show. Both now carry the package version, and `tests/test_version.py` fails when either drifts from `pyproject.toml`.
 - The EU trusted-list parser refused a DTD only in the first 4 KB of the document. Comments are allowed before the DTD, so one could be pushed past that offset. The whole document is checked now.
 
 ### Changed
