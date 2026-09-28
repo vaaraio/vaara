@@ -62,3 +62,15 @@ def test_loopback_names_still_reach_the_dashboard(port, host):
     status, data = _call(port, "GET", "/api/config", host.format(p=port))
     assert status == 200
     assert json.loads(data)["token"] == "t0ken"
+
+
+@pytest.mark.parametrize("action_id", ["../escape", "a/b", "..", ".hidden", "x\\y", ""])
+def test_a_decision_id_names_a_file_in_the_approvals_dir_only(tmp_path, action_id):
+    from vaara.approvals import _approval_key, write_decision
+
+    approvals = tmp_path / "approvals"
+    approvals.mkdir()
+    (tmp_path / "escape.request.json").write_text('{"nonce": "n"}')
+    _approval_key(approvals, create=True)
+    assert write_decision(action_id, "approve", approvals_dir=approvals) is False
+    assert not (tmp_path / "escape.decision.json").exists()
