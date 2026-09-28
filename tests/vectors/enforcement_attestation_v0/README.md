@@ -32,14 +32,16 @@ The verdict tier is one of:
 - `measurement_pinned`: `bound`, and the report's measurement matches a
   caller-supplied vetted value.
 
-The tier `attested` is **reserved** for a future release that validates the VCEK
-chain to AMD's ARK; v0 never emits it, and `--strict` (which requires it) is
-honestly unsatisfiable in v0.
+- `attested`: `measurement_pinned`, and the VCEK chains to AMD's pinned root for
+  the product and matches the report's chip and TCB. It needs the AMD chain
+  (`amd_chain`), which these mock-signed vectors do not carry, so no case here
+  reaches it. `tests/test_sev_snp_chain.py` checks the chain on a real AMD Milan
+  report.
 
 ## What this does not establish
 
-`vcek_chain_basis` is always `caller_supplied_unverified`: the VCEK is trusted as
-supplied, its chain to AMD's Key Distribution Service is not validated, and a
+`vcek_chain_basis` is `caller_supplied_unverified` in every case: no AMD chain is
+supplied, so the VCEK is trusted as supplied, and a
 [`MockSEVSNPAttester`](../../../src/vaara/attestation/tee.py) report with no AMD
 provenance (exactly what generates these vectors) is byte-identical and passes
 the same check. `enforcement_logic_basis` is always `not_established`: binding a

@@ -73,6 +73,13 @@ from vaara.attestation.transparency_log import (
     verify_consistency,
     verify_inclusion,
 )
+from vaara.attestation._sev_snp_chain import (
+    SEVSNPChainVerdict,
+    fetch_amd_cert_chain,
+    fetch_vcek,
+    parse_certificate_table,
+    verify_sev_snp_chain,
+)
 from vaara.attestation.tee import (
     MockSEVSNPAttester,
     SEVSNPHostAttester,
@@ -251,4 +258,9 @@ __all__ = [
     "verify_receipt_signature",
     "verify_s3p_attestation",
     "verify_sev_snp_report_signature",
+    "SEVSNPChainVerdict",
+    "fetch_amd_cert_chain",
+    "fetch_vcek",
+    "parse_certificate_table",
+    "verify_sev_snp_chain",
 ]

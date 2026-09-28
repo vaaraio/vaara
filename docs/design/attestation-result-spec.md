@@ -98,13 +98,13 @@ integer = lower trust).
 
 ## The honest ceiling
 
-On the shipped capture path the TPM EK chain and the AMD KDS VCEK chain are not
-validated, so `ak_chain_basis` / `vcek_chain_basis` is `caller_supplied_unverified`.
+When the TPM EK chain or the AMD VCEK chain is not validated, `ak_chain_basis` /
+`vcek_chain_basis` is `caller_supplied_unverified`.
 The mapping then sets `hardware` and `instance-identity` to a warning, and the
 overall `ear_status` cannot read `affirming`. `affirming` is reachable only when a
-basis reports a validated root (`ek_chain_verified` / `kds_verified`): the same
-un-forgeable-root capability the reserved `attested` tier waits on across the rest of
-the attestation surface. The claim set never claims more than the verdict it was
+basis reports a validated root (`ek_chain_verified` / `kds_verified`, the latter
+set when an enforcement verdict was given the AMD chain): the same un-forgeable root
+the `attested` tier needs across the rest of the attestation surface. The claim set never claims more than the verdict it was
 built from.
 
 ## What it does not claim

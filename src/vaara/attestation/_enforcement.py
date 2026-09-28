@@ -12,11 +12,16 @@ pre-captured (the enforcement point requests it at runtime via the chip).
 What a passing check proves
 ---------------------------
 
-At the top tier reachable today (``bound``, or ``measurement_pinned`` when a
-measurement is pinned): an ECDSA-P384 SEV-SNP report carrying
-``SHA-512(jcs(record))`` in ``REPORT_DATA`` verifies against the VCEK the caller
-supplied, so this exact record's bytes were hashed inside *some* SEV-SNP CVM
-whose VCEK the caller chose to trust.
+``bound`` (or ``measurement_pinned`` when a measurement is pinned): an
+ECDSA-P384 SEV-SNP report carrying ``SHA-512(jcs(record))`` in ``REPORT_DATA``
+verifies against the VCEK the caller supplied, so this exact record's bytes
+were hashed inside *some* SEV-SNP CVM whose VCEK the caller chose to trust.
+
+``attested``: the caller also supplied the AMD chain (``amd_chain``), the VCEK
+chains to AMD's pinned root for the product and matches the report's chip and
+TCB (:func:`vaara.attestation._sev_snp_chain.verify_sev_snp_chain`), and the
+measurement is pinned. This record's bytes were hashed inside a genuine AMD
+SEV-SNP guest running the pinned image.
 
 What it does NOT prove
 ----------------------
@@ -25,25 +30,22 @@ What it does NOT prove
    only shows that something inside the measured VM hashed the record and asked
    the chip to attest. ``enforcement_logic_basis`` is therefore always
    ``not_established``.
-2. That the chip is a genuine AMD part. The VCEK -> ASK -> ARK chain to AMD's
-   Key Distribution Service is not validated here (deferred, like
-   :mod:`vaara.attestation.tee`); a :class:`~vaara.attestation.tee.MockSEVSNPAttester`
-   report with no AMD provenance is byte-identical and passes the same check.
-   ``vcek_chain_basis`` is therefore always ``caller_supplied_unverified`` in v0.
+2. That the chip is a genuine AMD part, unless ``amd_chain`` is supplied. Without
+   it a :class:`~vaara.attestation.tee.MockSEVSNPAttester` report with no AMD
+   provenance is byte-identical and passes the same check, and
+   ``vcek_chain_basis`` reads ``caller_supplied_unverified``. With it the basis
+   reads ``kds_verified`` or ``chain_failed``.
 3. *Which* image ran, unless ``expected_measurement`` pins ``report.measurement``
    against an independently vetted launch measurement.
 4. *When* enforcement happened. A SEV-SNP report has no timestamp or nonce, so a
    captured report can be re-presented against the same record; v0 makes no
    freshness claim.
 
-The honest summary, stated plainly: until ``vcek_chain_basis`` is
-``kds_verified`` *and* ``measurement_basis`` is ``pinned``, this verdict has no
-component the submitter cannot forge. This is the deliberate contrast with the
-cross-org handoff, where the eIDAS RFC 3161 anchor is the one un-forgeable
-component. AMD's ARK is the analogous root here, and it is exactly the part v0
-does not yet check, so a ``bound`` verdict is necessary but not sufficient for
-genuine AMD hardware. The word ``attested`` is reserved for the future tier that
-validates the AMD chain.
+Stated plainly: until ``vcek_chain_basis`` is ``kds_verified`` *and*
+``measurement_basis`` is ``pinned``, this verdict has no component the submitter
+cannot forge. AMD's ARK is the un-forgeable root here, as the eIDAS RFC 3161
+anchor is in the cross-org handoff, so a ``bound`` verdict is necessary but not
+sufficient for genuine AMD hardware.
 
 Install: ``pip install 'vaara[attestation]'``.
 """
@@ -56,6 +58,7 @@ from dataclasses import dataclass
 from typing import Any, Optional
 
 from vaara.attestation._attest_canonical import canonical_json
+from vaara.attestation._sev_snp_chain import _load_cert, verify_sev_snp_chain
 from vaara.attestation.tee import (
     SIGNATURE_ALGO_ECDSA_P384_SHA384,
     TEEAttestationError,
@@ -65,11 +68,11 @@ from vaara.attestation.tee import (
 
 ENFORCEMENT_SCHEMA = "vaara.enforcement-attestation/v0"
 
-# parse_sev_snp_report reads the AMD ABI rev 1.55 (Table 22) field offsets, which
-# match VERSION 2. v0 fails closed on any other version rather than misread a
-# differently-laid-out report; widening to VERSION 3 is additive once the offset
-# delta for REPORT_DATA / MEASUREMENT is confirmed against the AMD ABI.
-_SUPPORTED_REPORT_VERSIONS = frozenset({2})
+# parse_sev_snp_report reads the AMD ABI rev 1.55 (Table 22) field offsets.
+# Versions 3 to 5 only fill reserved bytes (CPUID at 0x188, mitigation vectors at
+# 0x1F8), so every field read here sits at the same offset. Any other version
+# fails closed rather than be misread.
+_SUPPORTED_REPORT_VERSIONS = frozenset({2, 3, 4, 5})
 
 
 def bind_record_to_report_data(record: dict[str, Any]) -> bytes:
@@ -99,13 +102,13 @@ class EnforcementVerdict:
     ``tier`` is the single label, one of ``unverified`` (signature or binding
     failed), ``bound`` (signature verifies against the supplied VCEK and
     ``REPORT_DATA`` binds to this record), or ``measurement_pinned`` (``bound``
-    and the report's measurement matches a caller-supplied vetted value). The
-    tier ``attested`` is reserved for a future release that validates the VCEK
-    chain to AMD's ARK and is never emitted in v0.
+    and the report's measurement matches a caller-supplied vetted value), or
+    ``attested`` (``measurement_pinned`` and the VCEK chains to AMD's root).
 
     ``vcek_chain_basis`` and ``measurement_basis`` are the two honesty fields:
-    they record that the VCEK was trusted without a chain check and whether the
-    measurement was pinned. ``enforcement_logic_basis`` is a constant disclaimer
+    they record whether the VCEK was checked against AMD's chain and whether the
+    measurement was pinned. ``amd_chain`` is the chain check's own verdict, or
+    None when no chain was supplied. ``enforcement_logic_basis`` is a constant disclaimer
     that binding a report to a record does not prove the record came from the
     image's decision path. The boolean sub-results (``signature_valid``,
     ``bound``, ...) make the tier reconstructable. ``report_context`` surfaces
@@ -114,9 +117,7 @@ class EnforcementVerdict:
 
     ``ok`` is the overall answer: in default mode, the signature verifies, the
     report binds to the record, and any supplied measurement matched. In
-    ``strict`` mode it additionally requires the chain-rooted ``attested`` tier,
-    which v0 cannot reach, so a strict pass is honestly unavailable until the
-    AMD KDS chain is validated.
+    ``strict`` mode it requires the ``attested`` tier.
     """
 
     schema: str
@@ -138,6 +139,7 @@ class EnforcementVerdict:
     ok: bool
     record: dict[str, Any]
     reason: str
+    amd_chain: Optional[dict[str, Any]] = None
 
     def to_dict(self) -> dict[str, Any]:
         return {
@@ -160,6 +162,7 @@ class EnforcementVerdict:
             "report_context": self.report_context,
             "record": self.record,
             "reason": self.reason,
+            "amd_chain": self.amd_chain,
         }
 
 
@@ -171,6 +174,19 @@ def _normalize_hex(value: Optional[str]) -> Optional[bytes]:
         return bytes.fromhex(value.strip())
     except ValueError:
         return None
+
+
+def _same_key(vcek_cert: bytes, vcek_pem: bytes) -> bool:
+    """True if the VCEK certificate carries the public key in ``vcek_pem``."""
+    from cryptography.hazmat.primitives import serialization
+
+    try:
+        pem = serialization.load_pem_public_key(vcek_pem)
+        cert_key = _load_cert(vcek_cert).public_key()
+    except (TEEAttestationError, ValueError):
+        return False
+    fmt = (serialization.Encoding.DER, serialization.PublicFormat.SubjectPublicKeyInfo)
+    return bool(pem.public_bytes(*fmt) == cert_key.public_bytes(*fmt))
 
 
 def _report_context(report: Any) -> dict[str, Any]:
@@ -200,6 +216,8 @@ def _enforcement_reason(
     signature_valid: bool,
     bound: bool,
     measurement_basis: str,
+    vcek_chain_basis: str,
+    chain_reason: Optional[str],
     strict: bool,
     ok: bool,
 ) -> str:
@@ -209,8 +227,8 @@ def _enforcement_reason(
         parts.append("the report did not parse as a 1184-byte SEV-SNP report")
     elif report_version not in _SUPPORTED_REPORT_VERSIONS:
         parts.append(
-            f"report version {report_version} is not supported (v0 reads the "
-            f"AMD ABI rev 1.55 / VERSION 2 layout)"
+            f"report version {report_version} is not supported (versions 2 "
+            f"to 5 are read)"
         )
     elif not signature_algo_ok:
         parts.append("the report signature algorithm is not ECDSA-P384-SHA384")
@@ -239,20 +257,24 @@ def _enforcement_reason(
                 "expected_measurement from a reproducible build or a trusted "
                 "channel to learn which image ran"
             )
-    # The always-on honesty caveats.
-    parts.append(
-        "the VCEK was trusted as supplied and not validated to AMD's ARK "
-        "(KDS chain deferred), so a report with no AMD provenance passes the "
-        "same check"
-    )
+    if vcek_chain_basis == "kds_verified":
+        parts.append("the VCEK chains to AMD's root and matches the report")
+    elif vcek_chain_basis == "chain_failed":
+        parts.append(f"the AMD chain check failed: {chain_reason}")
+    else:
+        parts.append(
+            "the VCEK was trusted as supplied and not validated to AMD's ARK "
+            "(no amd_chain given), so a report with no AMD provenance passes "
+            "the same check"
+        )
     parts.append(
         "binding a report to a record does not prove the enforcement decision "
         "logic ran in the enclave"
     )
     if strict and not ok:
         parts.append(
-            "strict mode requires a VCEK validated to AMD's ARK (KDS chain) and "
-            "a pinned measurement, which v0 cannot establish"
+            "strict mode requires a VCEK validated to AMD's ARK and a pinned "
+            "measurement"
         )
     return "; ".join(parts) + "."
 
@@ -264,15 +286,17 @@ def verify_enforcement(
     *,
     expected_measurement: Optional[str] = None,
     strict: bool = False,
+    amd_chain: Optional[tuple[bytes, bytes, bytes]] = None,
 ) -> EnforcementVerdict:
     """Verify a SEV-SNP attestation binds to a SEP-2828 record. One verdict.
 
     ``record`` is the on-disk record dict; ``report_bytes`` the binary SEV-SNP
     attestation report; ``vcek_pem`` the PEM-encoded VCEK to check the report
-    signature against (trusted as supplied; its AMD chain is not validated).
-    ``expected_measurement`` optionally pins ``report.measurement`` (hex) against
-    an independently vetted launch measurement. ``strict`` requires the
-    chain-rooted ``attested`` tier (unreachable in v0).
+    signature against. ``amd_chain`` is ``(vcek_cert, ask_cert, ark_cert)``, PEM
+    or DER; when given, the VCEK certificate must carry the same key as
+    ``vcek_pem`` and chain to AMD's pinned root. ``expected_measurement``
+    optionally pins ``report.measurement`` (hex) against an independently
+    vetted launch measurement. ``strict`` requires the ``attested`` tier.
 
     A malformed report yields ``tier='unverified'`` (``parsed=False``), never a
     traceback. Raises :class:`ValueError` if ``record`` is not a JSON object or
@@ -335,8 +359,22 @@ def verify_enforcement(
         else:
             measurement_basis = "pin_mismatch"
 
-    # v0 never validates the VCEK chain and never proves enclave decision logic.
     vcek_chain_basis = "caller_supplied_unverified"
+    chain_dict: Optional[dict[str, Any]] = None
+    chain_reason: Optional[str] = None
+    if amd_chain is not None:
+        vcek_chain_basis = "chain_failed"
+        if report is None:
+            chain_reason = "the report did not parse"
+        else:
+            chain = verify_sev_snp_chain(report, *amd_chain)
+            chain_dict = chain.to_dict()
+            chain_reason = chain.reason.rstrip(".")
+            if chain.ok and not _same_key(amd_chain[0], vcek_pem):
+                chain_reason = "the chain's VCEK is not the key in vcek_pem"
+            elif chain.ok:
+                vcek_chain_basis = "kds_verified"
+    # Binding a report to a record never proves the enclave's decision logic.
     enforcement_logic_basis = "not_established"
 
     crypto_ok = bool(
@@ -345,6 +383,8 @@ def verify_enforcement(
 
     if not crypto_ok:
         tier = "unverified"
+    elif measurement_basis == "pinned" and vcek_chain_basis == "kds_verified":
+        tier = "attested"
     elif measurement_basis == "pinned":
         tier = "measurement_pinned"
     else:
@@ -352,14 +392,13 @@ def verify_enforcement(
         tier = "bound"
 
     if strict:
-        # Requires the chain-rooted top tier, unreachable until KDS validation.
+        ok = tier == "attested"
+    else:
         ok = bool(
             crypto_ok
-            and measurement_basis == "pinned"
-            and vcek_chain_basis == "kds_verified"
+            and measurement_basis != "pin_mismatch"
+            and vcek_chain_basis != "chain_failed"
         )
-    else:
-        ok = bool(crypto_ok and measurement_basis != "pin_mismatch")
 
     reason = _enforcement_reason(
         tier=tier,
@@ -369,6 +408,8 @@ def verify_enforcement(
         signature_valid=signature_valid,
         bound=bound,
         measurement_basis=measurement_basis,
+        vcek_chain_basis=vcek_chain_basis,
+        chain_reason=chain_reason,
         strict=strict,
         ok=ok,
     )
@@ -393,6 +434,7 @@ def verify_enforcement(
         ok=ok,
         record=record,
         reason=reason,
+        amd_chain=chain_dict,
     )
 
 

@@ -427,10 +427,10 @@ consumer of the published v0 test vectors can parse JSON bytes,
 verify the signature, and re-emit byte-identically. The reference
 implementation is pinned at tag `sep2787-ref-v2`.
 
-### Hardware TEE attestation hook (experimental, v0.18.0)
+### Hardware TEE attestation hook (experimental)
 
 Beyond the software-signed attestation chain described above, Vaara
-since v0.18.0 supports binding an OVERT envelope to a hardware-rooted
+supports binding an OVERT envelope to a hardware-rooted
 attestation report from a Trusted Execution Environment. The initial
 backend is **AMD SEV-SNP**, the natural fit for the confidential-VM
 deployment model used in agent runtimes. Intel TDX and Intel SGX are
@@ -453,13 +453,18 @@ If both hold, the attestation says "this OVERT envelope was emitted by
 an arbiter running inside an AMD SEV-SNP confidential VM at the
 measured launch state recorded in the report."
 
-What ships in v0.18.0: report parser, binding helper, signature verifier
-against a caller-supplied VCEK, deterministic mock attester for tests,
-and a `vaara tee parse|verify` CLI. What does NOT ship in v0.18.0: full
-VCEK chain validation against AMD's Key Distribution Service (tracked
-for v0.19+) and the `/dev/sev-guest` ioctl emitter (tracked for v0.19+
-once a tested SEV-SNP guest is available). The hook is marked
-experimental until both land.
+What ships: report parser (report versions 2 to 5), binding helper,
+signature verifier, VCEK (or VLEK) chain validation to AMD's root, a
+live emitter for use inside a SEV-SNP guest (configfs-tsm or the
+`/dev/sev-guest` ioctl), a deterministic mock attester for tests, and
+the `vaara tee parse|verify|emit|fetch-chain` CLI. The chain check pins
+the SHA-256 of AMD's ARK public key for Milan, Genoa and Turin, then
+checks ARK to ASK to VCEK signatures, the VCEK's chip ID and TCB
+against the report, and the report signature, all offline. It passes
+on a report from real Milan hardware with the VCEK AMD issued for it
+(`tests/fixtures/sev_snp_milan`). The emitter follows the Linux UAPI
+and kernel sources but has not been run inside a SEV-SNP guest by this
+project, which is why the hook stays marked experimental.
 
 ## OVERT 1.0 Part 3 (Agentic AI Controls) mapping
 
