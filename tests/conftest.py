@@ -51,6 +51,11 @@ if not os.environ.get("VAARA_TEST_USE_REAL_HOME"):
     # Anything reading the trail path from the environment follows the same
     # sandbox rather than the operator's file.
     os.environ.setdefault("VAARA_DB", str(_sandbox / ".vaara" / "test-audit.db"))
+    # A VAARA_ALLOW_* in the operator's shell switches a deny rule off, so a
+    # machine with VAARA_ALLOW_SCHEDULE=1 set failed the rule-coverage tests
+    # that CI passed. Tests that need one set it themselves with monkeypatch.
+    for _name in [n for n in os.environ if n.startswith("VAARA_ALLOW_")]:
+        del os.environ[_name]
 
 
 # --- An operating point that escalates -------------------------------------

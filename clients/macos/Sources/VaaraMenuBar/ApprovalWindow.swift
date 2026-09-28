@@ -45,6 +45,27 @@ struct ApprovalPanelView: View {
                         .foregroundStyle(p.ink)
                         .lineLimit(2).truncationMode(.middle)
                 }
+                if !pending.operation.isEmpty {
+                    VStack(alignment: .leading, spacing: 4) {
+                        Text("WHAT WILL RUN")
+                            .font(.system(size: 9, weight: .medium)).tracking(1.2)
+                            .foregroundStyle(p.ghost)
+                        ScrollView {
+                            Text(pending.operation)
+                                .font(.system(size: 11, design: .monospaced))
+                                .foregroundStyle(p.ink)
+                                .textSelection(.enabled)
+                                .frame(maxWidth: .infinity, alignment: .leading)
+                                .fixedSize(horizontal: false, vertical: true)
+                        }
+                        .frame(maxHeight: 140)
+                        if !pending.operationSHA256.isEmpty {
+                            Text("sha256 \(String(pending.operationSHA256.prefix(16)))")
+                                .font(.system(size: 9, design: .monospaced))
+                                .foregroundStyle(p.ghost)
+                        }
+                    }
+                }
                 if !pending.reason.isEmpty {
                     VStack(alignment: .leading, spacing: 4) {
                         Text("WHY IT WAS FLAGGED")
@@ -189,6 +210,13 @@ struct NotchApprovalView: View {
                 .foregroundStyle(faint)
                 .lineLimit(1).truncationMode(.middle)
                 .frame(maxWidth: .infinity, alignment: .leading)
+            if !pending.operation.isEmpty {
+                Text(pending.operation)
+                    .font(.system(size: 10, design: .monospaced))
+                    .foregroundStyle(ink)
+                    .lineLimit(2).truncationMode(.tail)
+                    .frame(maxWidth: .infinity, alignment: .leading)
+            }
             HStack(spacing: 8) {
                 Button { onDecision(false) } label: {
                     Text("Block")
