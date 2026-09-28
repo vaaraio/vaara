@@ -131,8 +131,11 @@ article-mapping table at
 
 The adapter is thin. The mapping is the artefact. A deployer can read
 the table, dispute a row, and override mappings without touching
-adapter code. 28 rows total across the three vendors (10 Bedrock,
-9 Azure, 9 GCP).
+adapter code: `override_mapping(CategoryMapping(...))` in the same
+module, or `load_overrides(path)` with a JSON list of rows, puts a
+deployer's row in force for every adapter, and `remove_override`
+restores the published one. 28 rows total across the three vendors
+(10 Bedrock, 9 Azure, 9 GCP).
 
 ### Category to article mapping
 
@@ -401,31 +404,36 @@ Operators who need AAL-4 should pair Vaara with an independent
 attestation provider. The Vaara-emitted evidence is the input to
 that provider, not a replacement for it.
 
-### SEP-2787 v2 tool-call attestation (v0.39.2)
+### Tool-call attestation
 
-`vaara.attestation.sep2787` ships a reference implementation of
-SEP-2787, a per-tool-call JSON attestation envelope carried in MCP
-`_meta`. The v2 envelope shape groups envelope fields under three
+`vaara.attestation.tool_call_attestation` is Vaara's per-tool-call
+JSON attestation envelope, carried in MCP `_meta`. Vaara published
+the first implementation (v0.42.0 to v0.44.0) and the trust-surface
+grouping the community SEP-2787 draft later adopted. The older import
+path `vaara.attestation.sep2787` is a deprecated alias for the same
+module. The envelope groups its fields under three
 trust-surface blocks (`plannerDeclared`, `issuerAsserted`,
 `payloadDerived`) with `toolCalls` as a payload-derived fact, not a
 planner declaration. Signing modes are HS256 (HMAC-SHA256), ES256
 (ECDSA P-256 raw r||s), and RS256 (RSASSA-PKCS1-v1_5). The signature
-is computed over the JCS-canonical encoding of the four envelope
-blocks `{version, alg, plannerDeclared, issuerAsserted,
-payloadDerived}` and is excluded from its own input.
+is computed over the JCS-canonical encoding of `{version, alg,
+plannerDeclared, issuerAsserted, payloadDerived}` and is excluded
+from its own input.
 
 The two envelopes coexist. OVERT 1.0 is the operator-side attestation
-kernel emitting per-action CBOR Base Envelopes. SEP-2787 is the
-per-tool-call JSON envelope carried inside MCP transport. A
-deployment can run both: the OVERT envelope binds the action chain
-while the SEP-2787 envelope binds the specific tool-call payload.
+kernel emitting per-action CBOR Base Envelopes. The tool-call
+attestation is the per-tool-call JSON envelope carried inside MCP
+transport. A deployment can run both: the OVERT envelope binds the
+action chain while the tool-call envelope binds the specific
+tool-call payload.
 Field-level mapping between the two lives in
 [`attestation-overt-mapping.md`](attestation-overt-mapping.md).
 
 `parse_attestation(d)` provides full wire round-trip: a third-party
 consumer of the published v0 test vectors can parse JSON bytes,
-verify the signature, and re-emit byte-identically. The reference
-implementation is pinned at tag `sep2787-ref-v2`.
+verify the signature, and re-emit byte-identically. The
+implementation the vectors were cut from is pinned at tag
+`sep2787-ref-v2`.
 
 ### Hardware TEE attestation hook (experimental)
 
@@ -491,18 +499,23 @@ correspondence.
 - **TOOL-1.1** (intercept all tool calls before execution) - ✅.
   `InterceptionPipeline.intercept()` is the enforcement boundary. No
   tool call proceeds without a governance decision.
-- **TOOL-1.2** (evaluate against capability policy) - ✅. The policy
-  DSL declares permitted tools, parameter ranges, destinations, and
-  approval gates. `policy.evaluate` returns the verdict carried in
-  the per-call receipt.
+- **TOOL-1.2** (evaluate against capability policy) - ✅. Every
+  `tools/call` through `vaara-mcp-proxy` meets four gates in order:
+  the operator allow/deny lists (permitted tools), the Layer-1 deny
+  rules, which run over every string argument and so refuse named
+  destinations, paths and commands, the tool's own `inputSchema`
+  (parameter types and ranges, see TOOL-2.2), and `intercept()`,
+  whose policy thresholds and escalation routes are the approval
+  gates. The decision, and the list of gates that ran, is carried in
+  the per-call record.
 - **TOOL-1.3** (denial receipt with policy reference and violation
   type) - ✅. Every deny the pipeline, the deny-rule hook and the MCP
   proxy write lands on the hash chain as `action_blocked` with
-  `policy_id` (the rule, the scorer, `capability_attenuation` or
-  `operator_perimeter`) and
+  `policy_id` (the rule, the scorer, `capability_attenuation`,
+  `operator_perimeter` or `upstream_input_schema`) and
   `violation_type` (`policy_rule`, `risk_threshold`,
   `privilege_attenuation`, `invalid_decision`, `scorer_failure`,
-  `perimeter_filter`)
+  `perimeter_filter`, `parameter_schema`)
   alongside the reason. A custom scorer can name its own policy and
   violation type.
 - **TOOL-1.4** (provisional receipt before execution, upgrade to full
@@ -519,10 +532,20 @@ correspondence.
   attestation) - ✅. Policy hash flows into `encoder_binary_identity`
   in the Base Envelope (v0.11.0).
 - **TOOL-2.2** (parameter schema validation before execution) - ✅
-  for declared parameter shapes. ◐ for arbitrary deep schemas (the
-  policy DSL is intentionally bounded).
+  for declared parameter shapes. The proxy keeps each tool's
+  `inputSchema` from `tools/list` and checks a `tools/call` against
+  it before the call is scored or forwarded: `type`, `required`,
+  `properties`, `additionalProperties`, `enum`, `const`, numeric
+  bounds, string length and `pattern`, array `items` and length. ◐
+  for composed schemas: `anyOf`, `oneOf`, `allOf`, `not` and `$ref`
+  are not evaluated, and the record says so (gate
+  `parameter_schema:pass_partial:<keywords>`).
 - **TOOL-2.3** (rejection receipt with parameter violation detail) -
-  ✅.
+  ✅. A refused call lands on the chain as `action_blocked` with
+  `policy_id` `upstream_input_schema`, `violation_type`
+  `parameter_schema`, and a reason naming each failing parameter
+  (for example `count: 50 is above the maximum 10`). The client gets
+  the same list as `violations`.
 - **TOOL-3.1** (per-tool rate limits with attested enforcement) - ◐.
   The adaptive scorer applies velocity-aware risk signals. Explicit
   per-tool calls-per-epoch counters are not yet emitted as

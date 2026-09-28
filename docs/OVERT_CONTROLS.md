@@ -32,18 +32,23 @@ primitive in Section 9, MEA-2.
 - **TOOL-1.1** (intercept all tool calls before execution) - ✅.
   `InterceptionPipeline.intercept()` is the enforcement boundary. No
   tool call proceeds without a governance decision.
-- **TOOL-1.2** (evaluate against capability policy) - ✅. The policy
-  DSL declares permitted tools, parameter ranges, destinations, and
-  approval gates. `policy.evaluate` returns the verdict carried in
-  the per-call receipt.
+- **TOOL-1.2** (evaluate against capability policy) - ✅. Every
+  `tools/call` through `vaara-mcp-proxy` meets four gates in order:
+  the operator allow/deny lists (permitted tools), the Layer-1 deny
+  rules, which run over every string argument and so refuse named
+  destinations, paths and commands, the tool's own `inputSchema`
+  (parameter types and ranges, see TOOL-2.2), and `intercept()`,
+  whose policy thresholds and escalation routes are the approval
+  gates. The decision, and the list of gates that ran, is carried in
+  the per-call record.
 - **TOOL-1.3** (denial receipt with policy reference and violation
   type) - ✅. Every deny the pipeline, the deny-rule hook and the MCP
   proxy write lands on the hash chain as `action_blocked` with
-  `policy_id` (the rule, the scorer, `capability_attenuation` or
-  `operator_perimeter`) and
+  `policy_id` (the rule, the scorer, `capability_attenuation`,
+  `operator_perimeter` or `upstream_input_schema`) and
   `violation_type` (`policy_rule`, `risk_threshold`,
   `privilege_attenuation`, `invalid_decision`, `scorer_failure`,
-  `perimeter_filter`)
+  `perimeter_filter`, `parameter_schema`)
   alongside the reason. A custom scorer can name its own policy and
   violation type.
 - **TOOL-1.4** (provisional receipt before execution, upgrade to full
@@ -60,10 +65,20 @@ primitive in Section 9, MEA-2.
   attestation) - ✅. Policy hash flows into `encoder_binary_identity`
   in the Base Envelope (v0.11.0).
 - **TOOL-2.2** (parameter schema validation before execution) - ✅
-  for declared parameter shapes. ◐ for arbitrary deep schemas (the
-  policy DSL is intentionally bounded).
+  for declared parameter shapes. The proxy keeps each tool's
+  `inputSchema` from `tools/list` and checks a `tools/call` against
+  it before the call is scored or forwarded: `type`, `required`,
+  `properties`, `additionalProperties`, `enum`, `const`, numeric
+  bounds, string length and `pattern`, array `items` and length. ◐
+  for composed schemas: `anyOf`, `oneOf`, `allOf`, `not` and `$ref`
+  are not evaluated, and the record says so (gate
+  `parameter_schema:pass_partial:<keywords>`).
 - **TOOL-2.3** (rejection receipt with parameter violation detail) -
-  ✅.
+  ✅. A refused call lands on the chain as `action_blocked` with
+  `policy_id` `upstream_input_schema`, `violation_type`
+  `parameter_schema`, and a reason naming each failing parameter
+  (for example `count: 50 is above the maximum 10`). The client gets
+  the same list as `violations`.
 - **TOOL-3.1** (per-tool rate limits with attested enforcement) - ◐.
   The adaptive scorer applies velocity-aware risk signals. Explicit
   per-tool calls-per-epoch counters are not yet emitted as standalone

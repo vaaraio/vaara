@@ -4,6 +4,15 @@ All notable changes to this project are documented here.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/)
 and this project follows [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [Unreleased]
+
+### Added
+- `vaara-mcp-proxy` checks a `tools/call` against the tool's own `inputSchema` before the call is scored or forwarded. The proxy keeps the schema each tool advertised in `tools/list`; arguments outside it are refused, and the refusal lands on the chain as `action_blocked` with `policy_id` `upstream_input_schema`, `violation_type` `parameter_schema`, and a reason naming each failing parameter. The checker reads `type`, `required`, `properties`, `additionalProperties`, `enum`, `const`, numeric bounds, string length and `pattern`, and array `items` and length. It does not evaluate `anyOf`, `oneOf`, `allOf`, `not` or `$ref`, and the gate record says so (`parameter_schema:pass_partial:<keywords>`). In shadow mode a violation is recorded and the call proceeds. docs/COMPLIANCE.md marked OVERT TOOL-2.2 and TOOL-2.3 as met when nothing checked parameters.
+- A deployer can override a guardrail-to-article mapping without adapter code: `override_mapping`, `remove_override`, `clear_overrides` and `load_overrides(path)` (a JSON list of rows) in `vaara.integrations._content_safety_articles`. Every adapter reads through `lookup`, so an override reaches the findings they produce. docs/COMPLIANCE.md already said this was possible; there was no way to do it.
+
+### Changed
+- docs/COMPLIANCE.md: OVERT TOOL-1.2 names the gates that apply the capability policy (operator lists, deny rules, `inputSchema`, `intercept()`); it had named a `policy.evaluate` and policy-declared parameter ranges and destinations that do not exist. The tool-call attestation section names `vaara.attestation.tool_call_attestation`, with `vaara.attestation.sep2787` as its deprecated alias.
+
 ## [2.2.0] - 2026-09-28
 
 ### Fixed
