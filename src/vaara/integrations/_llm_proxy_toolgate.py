@@ -214,7 +214,7 @@ def _gate_responses(body: dict, gate: ToolGate,
     out, changed = [], False
     for item in body["output"]:
         if isinstance(item, dict) and item.get("type") in _RESPONSES_TOOLS:
-            key = item.get("id") or item.get("call_id")
+            key = str(item.get("id") or item.get("call_id") or "")
             if decided is not None and key in decided:
                 replacement = decided[key]
             else:
@@ -510,7 +510,8 @@ class SseToolGate:
         """
         held = self._items.pop(index)
         data = held.template
-        item = data.get("item") if isinstance(data.get("item"), dict) else {}
+        raw_item = data.get("item")
+        item: dict = raw_item if isinstance(raw_item, dict) else {}
         if held.args:
             key = "input" if item.get("type") == "custom_tool_call" else "arguments"
             item = {**item, key: held.args}
@@ -519,7 +520,7 @@ class SseToolGate:
     def _decide_responses_item(self, data: dict, item: dict, held: _Held) -> bytes:
         call_name, args = _responses_call(item)
         verdict = self.gate.decide(call_name, args)
-        key = item.get("id") or item.get("call_id")
+        key = str(item.get("id") or item.get("call_id") or "")
         if verdict.allowed:
             self._decided[key] = None
             return b"".join(held.raws)
