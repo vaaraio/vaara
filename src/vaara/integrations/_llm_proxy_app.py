@@ -357,8 +357,18 @@ def build_app(*, upstream: str, api_key: Optional[str], api_key_header: str,
                     seal_state["seal_fault"] = \
                         f"{type(exc).__name__}: {exc}"[:200]
 
+        # The record describes the bytes that leave. After sealing or
+        # compaction those differ from what came in, and a record built
+        # from the incoming body would carry the secret the seal kept out
+        # of the provider's copy, under a hash no provider ever received.
+        audit_body = body
+        if outbound is not body_bytes:
+            try:
+                audit_body = json.loads(outbound)
+            except ValueError:  # pragma: no cover - outbound is our own JSON
+                audit_body = body
         audit_params = _build_audit_params(
-            body, body_bytes, model_name, provider,
+            audit_body, outbound, model_name, provider,
             agent_id, mode, audit_level, _redact_pats)
         audit_params.update(seal_state)
         # Sizes, not content, so they are recorded at every audit level. The
