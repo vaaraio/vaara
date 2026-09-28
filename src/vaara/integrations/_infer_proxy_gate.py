@@ -117,6 +117,13 @@ async def gate_tool_calls(
                         "allow" if human == "approve" else "deny",
                         reviewer="approvals-handshake",
                         justification="human decision via approvals directory",
+                        # Only approve and deny reach here, and both come from
+                        # a signed decision file a person wrote. The plugin hook, the
+                        # MCP server and the OS guard say the same on their
+                        # resolutions; a record without it reads as a policy
+                        # disposition in every receipt built from it.
+                        approver="human",
+                        human_disposed=True,
                     )
                 except Exception:
                     logger.exception("could not record escalation resolution")
