@@ -46,6 +46,16 @@ def _cert(subject_key, issuer_key, cn: str, issuer_cn: str, ca: bool) -> bytes:
             .not_valid_before(now - datetime.timedelta(minutes=5))
             .not_valid_after(now + datetime.timedelta(days=1))
             .add_extension(x509.BasicConstraints(ca=ca, path_length=None), critical=True)
+            # The ledger's did:x509 check validates the chain as X.509 does and
+            # refuses a CA certificate without keyUsage.
+            .add_extension(x509.KeyUsage(
+                digital_signature=True, content_commitment=False, key_encipherment=False,
+                data_encipherment=False, key_agreement=False, key_cert_sign=ca,
+                crl_sign=ca, encipher_only=False, decipher_only=False), critical=True)
+            .add_extension(x509.SubjectKeyIdentifier.from_public_key(subject_key.public_key()),
+                           critical=False)
+            .add_extension(x509.AuthorityKeyIdentifier.from_issuer_public_key(
+                issuer_key.public_key()), critical=False)
             .sign(issuer_key, hashes.SHA256())
             .public_bytes(serialization.Encoding.DER))
 
