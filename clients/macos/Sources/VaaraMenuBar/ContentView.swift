@@ -790,18 +790,31 @@ struct ContentView: View {
                     }
                 }
 
-                // Row 4: graph toggle (pro)  |  GOVERN WHAT (enterprise)
+                // Row 4: MENU BAR ICON + graph toggle (pro)  |  GOVERN WHAT (enterprise)
                 GridRow {
-                    if pro {
-                        Toggle(isOn: $model.config.menubar_graph) {
-                            Text("Activity graph in the menu bar")
-                                .font(.system(size: 13)).foregroundStyle(p.ink)
+                    VStack(alignment: .leading, spacing: 8) {
+                        sectionLabelPlain("MENU BAR ICON")
+                        Picker("", selection: $model.config.menubar_icon) {
+                            Text("Colour").tag("color")
+                            Text("Mono").tag("mono")
                         }
-                        .toggleStyle(.switch)
-                        .controlSize(.mini)
-                        .tint(model.state.color)
-                    } else {
-                        Spacer().gridCellUnsizedAxes(.vertical)
+                        .pickerStyle(.segmented)
+                        .labelsHidden()
+                        Text(model.config.menubar_icon == "mono"
+                             ? "Black or white to match the bar. A hollow dot "
+                               + "means escalate, a filled one means deny."
+                             : "The mark in the gate's colour.")
+                            .font(.system(size: 10.5))
+                            .foregroundStyle(p.ghost)
+                        if pro {
+                            Toggle(isOn: $model.config.menubar_graph) {
+                                Text("Activity graph in the menu bar")
+                                    .font(.system(size: 13)).foregroundStyle(p.ink)
+                            }
+                            .toggleStyle(.switch)
+                            .controlSize(.mini)
+                            .tint(model.state.color)
+                        }
                     }
 
                     if enterprise {

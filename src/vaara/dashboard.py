@@ -210,7 +210,8 @@ def _oslayer_change(payload: dict) -> tuple[dict, int]:
 # config.json. notify_on and user_level are read by the hook's notify(),
 # approval_style by its approvals_timeout(), alert_window_minutes by
 # _summarize here. The macOS app reads its own copies from menubar.json.
-# macOS-only keys (menubar_graph, webkitGovernance) are deliberately absent
+# macOS-only keys (menubar_graph, menubar_icon, webkitGovernance) are deliberately
+# absent
 # rather than shown and ignored.
 _SETTINGS: dict[str, dict] = {
     "user_level": {

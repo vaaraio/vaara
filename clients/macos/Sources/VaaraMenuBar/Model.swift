@@ -172,6 +172,11 @@ struct Config: Codable {
     var notifications: Bool = true
     var appearance: String = "dark"       // dark | light
     var menubar_graph: Bool = true        // activity sparkline next to the mark
+    /// "color": the mark in the gate's colour (green, yellow, red).
+    /// "mono": a template glyph the menu bar tints black or white to match
+    /// its own appearance, like every other status item; the gate then
+    /// shows as a dot on the mark (none, hollow, filled).
+    var menubar_icon: String = "color"
     /// Which decisions raise a system notification:
     /// "off" | "deny" (denials only) | "interventions" (denials + escalations)
     var notify_on: String = "interventions"
@@ -211,6 +216,7 @@ struct Config: Codable {
         notifications = try c.decodeIfPresent(Bool.self, forKey: .notifications) ?? base.notifications
         appearance = try c.decodeIfPresent(String.self, forKey: .appearance) ?? base.appearance
         menubar_graph = try c.decodeIfPresent(Bool.self, forKey: .menubar_graph) ?? base.menubar_graph
+        menubar_icon = try c.decodeIfPresent(String.self, forKey: .menubar_icon) ?? base.menubar_icon
         // Migrate the old bool: false means off, true keeps the default.
         if let mode = try c.decodeIfPresent(String.self, forKey: .notify_on) {
             notify_on = mode
@@ -225,7 +231,7 @@ struct Config: Codable {
     }
 
     enum CodingKeys: String, CodingKey {
-        case db_paths, alert_window_minutes, notifications, appearance, menubar_graph
+        case db_paths, alert_window_minutes, notifications, appearance, menubar_graph, menubar_icon
         case notify_on, user_level, approvals_dir, approval_style, webkitGovernance
         case vaara_home
         case legacy_db_path = "db_path"
@@ -238,6 +244,7 @@ struct Config: Codable {
         try c.encode(notifications, forKey: .notifications)
         try c.encode(appearance, forKey: .appearance)
         try c.encode(menubar_graph, forKey: .menubar_graph)
+        try c.encode(menubar_icon, forKey: .menubar_icon)
         try c.encode(notify_on, forKey: .notify_on)
         try c.encode(user_level, forKey: .user_level)
         try c.encodeIfPresent(approvals_dir, forKey: .approvals_dir)

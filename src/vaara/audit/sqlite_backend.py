@@ -900,7 +900,6 @@ class SQLiteAuditBackend:
             ) from exc
         self._init_schema()
         # Load GDPR redaction map into memory for O(1) read-time substitution.
-        self._redaction_cache: dict[str, str] = self._load_redaction_cache()
         self._inode = self._current_inode()
 
     def _current_inode(self) -> Optional[tuple[int, int]]:
@@ -1869,62 +1868,6 @@ class SQLiteAuditBackend:
                 exported += 1
         return exported
 
-    # ── GDPR Article 17 ───────────────────────────────────────────
-
-    def _load_redaction_cache(self) -> dict[str, str]:
-        rows = self._conn.execute(
-            "SELECT original_id, replacement FROM gdpr_redactions"
-        ).fetchall()
-        return {r[0]: r[1] for r in rows}
-
-    def redact_agent_pii(
-        self,
-        original_id: str,
-        replacement: str = "[REDACTED:GDPR-Art17]",
-    ) -> int:
-        """Redact all occurrences of an agent_id from read results (GDPR Art. 17).
-
-        The stored records and hash chain are NOT modified — append-only
-        immutability is preserved for regulatory evidence integrity. Redaction
-        is applied at read time: every call to query_*, load_trail, and
-        export_jsonl substitutes ``replacement`` wherever ``original_id``
-        appears as agent_id.
-
-        **Hash chain note:** after redaction, chain verification will report
-        a mismatch for redacted records because agent_id contributes to the
-        hash input. This is expected and correct — the erasure event is itself
-        compliance evidence. Surface ``trail.chain_intact=False`` in the
-        conformity report with a note about GDPR redaction.
-
-        Returns the number of records that will be affected by the redaction.
-        """
-        if not isinstance(original_id, str) or not original_id:
-            raise ValueError("original_id must be a non-empty string")
-        with self._lock:
-            count = self._conn.execute(
-                "SELECT COUNT(*) FROM audit_records WHERE agent_id = ?",
-                (original_id,),
-            ).fetchone()[0]
-            self._conn.execute(
-                "INSERT OR REPLACE INTO gdpr_redactions "
-                "(original_id, replacement, redacted_at) VALUES (?, ?, ?)",
-                (original_id, replacement, time.time()),
-            )
-            self._redaction_cache[original_id] = replacement
-        logger.info(
-            "GDPR Art.17 redaction: agent_id %r to %r affects %d records",
-            original_id, replacement, count,
-        )
-        return count
-
-    def list_redactions(self) -> list[dict]:
-        """Return all active GDPR redactions (original_id redacted, not shown)."""
-        with self._lock:
-            rows = self._conn.execute(
-                "SELECT replacement, redacted_at FROM gdpr_redactions"
-            ).fetchall()
-        return [{"replacement": r[0], "redacted_at": r[1]} for r in rows]
-
     # ── Internal ──────────────────────────────────────────────────
 
     def _row_to_record(self, row: tuple) -> AuditRecord:
@@ -1946,8 +1889,6 @@ class SQLiteAuditBackend:
         the chain re-verifies exactly as written.
         """
         agent_id = row[4]
-        if self._redaction_cache and agent_id in self._redaction_cache:
-            agent_id = self._redaction_cache[agent_id]
         # Defensive indexing: rows from older queries may not include
         # later-schema columns. Use a guard so loading old DBs still works.
         tenant_id = row[11] if len(row) > 11 else ""

@@ -4,6 +4,18 @@ All notable changes to this project are documented here.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/)
 and this project follows [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [Unreleased]
+
+### Added
+- The macOS menu bar app can show a monochrome mark. Settings, Menu bar icon, Mono renders the Vaara mark as a template glyph that the menu bar paints black or white to match its own appearance, as every other status item is drawn. The gate then shows as a dot beside the mark: none for allow, a hollow one for escalate, a filled one for deny, and the activity graph draws in the same tint. Colour stays the default.
+
+### Fixed
+- `vaara trail export` answers a missing or malformed `--key`, and `vaara trail verify` a missing `--pubkey`, with one line and exit code 2. A path that did not exist raised out of the command as a traceback, while a missing database or zip already got a plain message.
+- `vaara llm-proxy` records the request that leaves. With a seal file, `--audit full` in govern mode stored the request as it came in, so the trail's copy carried every secret the seal had replaced before the request reached the provider, and `--audit hash` recorded the hash of bytes no provider received. Both now come from the sealed, compacted request that goes out. Without sealing or compaction nothing changes.
+
+### Removed
+- `SQLiteAuditBackend.redact_agent_pii` and `list_redactions`, a read-time substitution of agent ids that nothing in the tree called or documented. A record presented with an agent id other than the stored one cannot be recomputed, so a single redaction row made every verifier report a hash mismatch on a file nobody had touched. The `gdpr_redactions` table stays in the schema so existing files open unchanged, and a row in it no longer changes what is read.
+
 ## [2.3.0] - 2026-09-28
 
 ### Added

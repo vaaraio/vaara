@@ -64,8 +64,12 @@ struct VaaraApp: App {
         }
     }
 
+    private var monoIcon: Bool { model.config.menubar_icon == "mono" }
+
     private func markImage(for state: GateState) -> NSImage {
-        let name = "vaara-\(state.rawValue)"
+        // The mono glyph is one black silhouette with the hill knocked out;
+        // as a template image the bar paints it black or white itself.
+        let name = monoIcon ? "vaara-mono" : "vaara-\(state.rawValue)"
 
         // Xcode collapses a foo.png / foo@2x.png pair into a single
         // foo.tiff written to the top of Contents/Resources, so the
@@ -88,13 +92,37 @@ struct VaaraApp: App {
             }
         }
 
-        let color = stateColor(state)
+        let mono = monoIcon
+        let color = mono ? NSColor.black : stateColor(state)
         let img = NSImage(size: NSSize(width: 18, height: 18), flipped: false) { rect in
             color.setFill()
-            NSBezierPath(ovalIn: rect.insetBy(dx: 3, dy: 3)).fill()
+            if mono {
+                NSBezierPath(roundedRect: rect.insetBy(dx: 2, dy: 2),
+                             xRadius: 4, yRadius: 4).fill()
+            } else {
+                NSBezierPath(ovalIn: rect.insetBy(dx: 3, dy: 3)).fill()
+            }
             return true
         }
         return img
+    }
+
+    /// The gate beside a mono mark: nothing for green, a hollow dot for
+    /// yellow, a filled dot for red. Drawn with alpha only, so the bar's
+    /// template tint gives it the same black or white as the mark.
+    private func drawMonoBadge(_ state: GateState, at x: CGFloat, height: CGFloat) {
+        guard state != .green else { return }
+        let d: CGFloat = 5
+        let dot = NSRect(x: x, y: (height - d) / 2, width: d, height: d)
+        NSColor.black.setFill()
+        NSColor.black.setStroke()
+        if state == .red {
+            NSBezierPath(ovalIn: dot).fill()
+        } else {
+            let path = NSBezierPath(ovalIn: dot.insetBy(dx: 0.6, dy: 0.6))
+            path.lineWidth = 1.2
+            path.stroke()
+        }
     }
 
     /// The full label: mark, plus (when enabled) a 12-bar sparkline of
@@ -107,21 +135,27 @@ struct VaaraApp: App {
         let markSize: CGFloat = 18
         let barWidth: CGFloat = 2.5
         let barGap: CGFloat = 1.0
+        let mono = monoIcon
+        // A mono mark carries the gate as a dot in a slot to its right.
+        let badgeWidth: CGFloat = mono && model.state != .green ? 8 : 0
         let graphWidth: CGFloat = graphOn
             ? CGFloat(buckets.count) * (barWidth + barGap) + 5 : 0
-        let width = markSize + graphWidth
+        let width = markSize + badgeWidth + graphWidth
         let height: CGFloat = 18
 
         let img = NSImage(size: NSSize(width: width, height: height), flipped: false) { _ in
             mark.draw(in: NSRect(x: 0, y: 0, width: markSize, height: markSize))
+            if mono {
+                self.drawMonoBadge(self.model.state, at: markSize + 3, height: height)
+            }
             guard graphOn, !buckets.isEmpty else { return true }
             let maxCount = max(buckets.map(\.0).max() ?? 1, 1)
-            var x = markSize + 5
+            var x = markSize + badgeWidth + 5
             for (count, worst) in buckets {
                 let floorH: CGFloat = 1.5          // an empty bucket still shows a tick
                 let h = count == 0 ? floorH
                     : floorH + (height - 4 - floorH) * CGFloat(count) / CGFloat(maxCount)
-                let color = self.stateColor(worst)
+                let color = mono ? NSColor.black : self.stateColor(worst)
                 color.withAlphaComponent(count == 0 ? 0.30 : 0.95).setFill()
                 NSBezierPath(
                     roundedRect: NSRect(x: x, y: 2, width: barWidth, height: h),
@@ -131,7 +165,9 @@ struct VaaraApp: App {
             }
             return true
         }
-        img.isTemplate = false  // the colors ARE the signal
+        // In colour the colours ARE the signal, so the bar must not tint
+        // them. Mono is a template: the bar paints it to match itself.
+        img.isTemplate = mono
         return img
     }
 }

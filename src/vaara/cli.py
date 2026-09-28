@@ -557,6 +557,18 @@ def _cmd_trail_export(args: argparse.Namespace) -> int:
         print(f"vaara trail export: --revocations: {exc}", file=sys.stderr)
         return 2
 
+    # Missing extra first, so the install hint wins over any path complaint.
+    from vaara.audit import export as _export_mod
+    if not _export_mod._HAS_CRYPTO:
+        print(_INSTALL_HINT, file=sys.stderr)
+        return 2
+
+    key_path = Path(args.key).expanduser()
+    if not key_path.is_file():
+        print(f"vaara trail export: signing key not found: {key_path}",
+              file=sys.stderr)
+        return 2
+
     out = Path(args.out).expanduser()
     out.parent.mkdir(parents=True, exist_ok=True)
 
@@ -565,12 +577,15 @@ def _cmd_trail_export(args: argparse.Namespace) -> int:
         result = export_signed(
             trail,
             out_path=out,
-            signer_key=Path(args.key).expanduser(),
+            signer_key=key_path,
             agent_id=args.agent_id or "",
             revocation=revocation,
         )
     except ImportError as exc:
         print(exc, file=sys.stderr)
+        return 2
+    except (OSError, ValueError) as exc:
+        print(f"vaara trail export: --key: {exc}", file=sys.stderr)
         return 2
 
     print(f"Exported signed trail to {result.path}")
@@ -648,11 +663,23 @@ def _cmd_trail_verify(args: argparse.Namespace) -> int:
         print(_INSTALL_HINT, file=sys.stderr)
         return 2
 
+    from vaara.audit import verify as _verify_mod
+    if not _verify_mod._HAS_CRYPTO:
+        print(_INSTALL_HINT, file=sys.stderr)
+        return 2
+
     pubkey = Path(args.pubkey).expanduser() if args.pubkey else None
+    if pubkey is not None and not pubkey.is_file():
+        print(f"vaara trail verify: public key not found: {pubkey}",
+              file=sys.stderr)
+        return 2
     try:
         result = verify_signed(Path(args.zip).expanduser(), public_key=pubkey)
     except ImportError as exc:
         print(exc, file=sys.stderr)
+        return 2
+    except (OSError, ValueError) as exc:
+        print(f"vaara trail verify: --pubkey: {exc}", file=sys.stderr)
         return 2
 
     if result.manifest:
