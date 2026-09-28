@@ -303,6 +303,46 @@ jobs:
       - name: Scan the tree
         run: python scripts/check_no_private_keys.py --tree
 
+  default-install:
+    name: Plain pip install emits verifying receipts
+    runs-on: ubuntu-latest
+    # The README promises a receipt for every decision and leads with a plain
+    # `pip install vaara`. This builds the wheel, installs it into an empty
+    # venv with no extras, sends one allowed and one denied call through the
+    # Claude Code hook, and verifies both receipts offline against the trail.
+    steps:
+      - uses: actions/checkout@9c091bb21b7c1c1d1991bb908d89e4e9dddfe3e0  # v7.0.0
+
+      - name: Set up Python 3.12
+        uses: actions/setup-python@5fda3b95a4ea91299a34e894583c3862153e4b97  # v7.0.0
+        with:
+          python-version: '3.12'
+
+      - name: Build the wheel
+        run: |
+          pip install --require-hashes -r .github/requirements-build.txt
+          python -m build --wheel --outdir dist
+
+      - name: Install it into an empty venv, no extras
+        run: |
+          python -m venv /tmp/plain
+          /tmp/plain/bin/pip install dist/vaara-*.whl
+
+      - name: One allow and one deny through the hook, then verify
+        env:
+          HOME: ${{ runner.temp }}/home
+        run: |
+          mkdir -p "$HOME"
+          echo '{"session_id":"ci","tool_name":"Read","tool_input":{"file_path":"/etc/hostname"},"hook_event_name":"PreToolUse","cwd":"/tmp"}' \
+            | /tmp/plain/bin/vaara hook pre-tool-use
+          set +e
+          echo '{"session_id":"ci","tool_name":"Bash","tool_input":{"command":"rm -rf /"},"hook_event_name":"PreToolUse","cwd":"/tmp"}' \
+            | /tmp/plain/bin/vaara hook pre-tool-use
+          test $? -eq 2 || { echo "::error::the deny call was not blocked"; exit 1; }
+          set -e
+          /tmp/plain/bin/vaara receipt verify-decision | tee verify.txt
+          grep -q '^2/2 verified' verify.txt
+
   signing-extras:
     name: Signing extras (attestation, scitt, timeanchor, pq, yaml)
     runs-on: ubuntu-latest
