@@ -46,15 +46,18 @@ That is the whole thing. Every call to a governed function is risk-scored and de
 
 Both `deny` and `escalate` raise `vaara.Blocked`, since an escalation means a human has not answered yet. On a fresh install the example above runs. The default operating point is `balanced`, which allows below 0.55 and denies above 0.85, and a first call to `transfer_funds` scores 0.275 with a conformal interval of [0.085, 0.465]. Vaara decides on the interval's upper bound, and with no outcome history that interval is wide, so a riskier call escalates before its point estimate reaches the threshold. Feeding real outcomes back through `report_outcome` narrows it. The other presets are listed by `vaara mode list`. To watch decisions without acting on them, start with `@vaara.govern(shadow=True)`.
 
-### Check a receipt with nothing installed
+<details>
+<summary><b>Check a receipt with nothing installed</b></summary>
 
 [vaara.io/verify.html](https://vaara.io/verify.html) is the Vaara Resin. One HTML file, no build step and no dependencies. Paste in a receipt and it recomputes the DSSE pre-authentication encoding, takes its digest, and checks the Ed25519 signature with WebCrypto. The receipt never leaves the tab, nothing uploads, and the page works with the network off, so verification is not a service and Vaara is not a party to it. Save the file and it keeps working.
 
 It also states what a passing check does not establish: that the key belongs to the party you expect, that the signed statement is true, that `decided_at` means anything without an external time authority, or that one receipt is a whole history.
 
 The explorer on the same page reads the public transparency log straight from your browser. Look a trail head up by digest, or paste a public key to see everything published under it. No account and no sign-in, because the key is the identity. Publishing to that log is opt-in and off by default (`vaara trail publish-head`), so an absence there means nothing was published rather than nothing happened.
+</details>
 
-### See who else has checked it
+<details>
+<summary><b>See who else has checked it</b></summary>
 
 [vaara.io/conformance.html](https://vaara.io/conformance.html) is the results page. It carries every suite and its verdict, and every party other than the maintainer who ran the checkers and reported what they found in public. Rows are chained, each holding the digest of the row before it, so removing or reordering one breaks every digest after it and the break is visible to anyone. The maintainer cannot take a row down either. A run that disagrees with ours is a row too, with the reason stated, and there is no blacklist.
 
@@ -68,6 +71,7 @@ python scripts/conformance_runner.py --vectors-dir ./your_vectors    # grade you
 ```
 
 It prints a prefilled link at the end of every run, so asking for a row takes one click. The named, versioned rule set, what a pass does and does not establish, and the full suite list are in [docs/conformance-profile.md](docs/conformance-profile.md).
+</details>
 
 <details>
 <summary><b>Prefer the explicit pipeline?</b></summary>
