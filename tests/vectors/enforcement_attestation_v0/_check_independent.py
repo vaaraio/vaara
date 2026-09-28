@@ -19,10 +19,9 @@ not import Vaara. For each committed case it reproduces the verdict
    is ECDSA-P384-SHA384.
 4. Pin the measurement against ``expected_measurement`` when supplied.
 
-The VCEK is trusted as supplied; its chain to AMD's ARK is not validated (the
-same v0 deferral the verdict discloses), so ``vcek_chain_basis`` is always
-``caller_supplied_unverified`` and the chain-rooted ``attested`` tier (and a
-strict pass) is unreachable. Verdicts are compared against ``expected.json``
+The cases carry no AMD chain, so the VCEK is trusted as supplied,
+``vcek_chain_basis`` is ``caller_supplied_unverified`` and the chain-rooted
+``attested`` tier (and a strict pass) is not reached. Verdicts are compared against ``expected.json``
 (the non-normative ``reason`` is not compared). Run:
 ``python tests/vectors/enforcement_attestation_v0/_check_independent.py``.
 Exit code 0 means every case matched its expected verdict.
@@ -47,7 +46,7 @@ HERE = Path(__file__).resolve().parent
 REPORT_SIZE = 1184
 BODY_SIZE = 0x2A0
 SIG_SIZE = 512
-SUPPORTED_VERSIONS = frozenset({2})
+SUPPORTED_VERSIONS = frozenset({2, 3, 4, 5})
 ALGO_ECDSA_P384_SHA384 = 1
 COMPARE = (
     "tier", "parsed", "report_version", "signature_algo_ok", "signature_valid",

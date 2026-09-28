@@ -1830,10 +1830,9 @@ def _cmd_tee_parse(args: argparse.Namespace) -> int:
 def _cmd_tee_verify(args: argparse.Namespace) -> int:
     """Verify a SEV-SNP report signature, optionally against an OVERT envelope.
 
-    The VCEK (Versioned Chip Endorsement Key) must be supplied as PEM. AMD
-    KDS-based cert-chain validation (VCEK -> ASK -> ARK) is tracked for a
-    later release; v0.18.0 only validates the report signature against a
-    caller-supplied VCEK.
+    The VCEK (Versioned Chip Endorsement Key) must be supplied as PEM. With
+    --amd-chain the signing key is also checked against AMD's pinned root, and
+    the command fails if that chain does not hold.
     """
     try:
         import cbor2
@@ -1880,11 +1879,23 @@ def _cmd_tee_verify(args: argparse.Namespace) -> int:
         print(f"vaara tee verify: {exc}", file=sys.stderr)
         return 1
 
-    result = {
+    result: dict[str, Any] = {
         "signature_valid": signature_ok,
         "report_data": report.report_data.hex(),
         "measurement": report.measurement.hex(),
     }
+
+    chain_ok = True
+    if args.amd_chain:
+        from vaara.attestation._sev_snp_chain import verify_sev_snp_chain
+
+        try:
+            chain = verify_sev_snp_chain(report, *_read_amd_chain(args.amd_chain))
+        except (OSError, ValueError, TEEAttestationError) as exc:
+            print(f"vaara tee verify: {exc}", file=sys.stderr)
+            return 1
+        result["amd_chain"] = chain.to_dict()
+        chain_ok = chain.ok
 
     if args.overt:
         overt_path = Path(args.overt).expanduser()
@@ -1914,10 +1925,101 @@ def _cmd_tee_verify(args: argparse.Namespace) -> int:
         result["envelope_binding_valid"] = None
 
     print(json.dumps(result, indent=2))
-    if not signature_ok:
+    if not signature_ok or not chain_ok:
         return 1
     if args.overt and result["envelope_binding_valid"] is False:
         return 1
+    return 0
+
+
+def _read_amd_chain(paths: "list[str]") -> "tuple[bytes, bytes, bytes]":
+    """(signing cert, intermediate, ARK) from one combined PEM or three files.
+
+    Raises OSError on an unreadable file and ValueError (TEEAttestationError is
+    a RuntimeError, so it is re-raised as ValueError) on a bad chain file.
+    """
+    from vaara.attestation._sev_snp_chain import split_pem_chain
+    from vaara.attestation.tee import TEEAttestationError
+
+    blobs = [Path(p).expanduser().read_bytes() for p in paths]
+    if len(blobs) == 3:
+        return blobs[0], blobs[1], blobs[2]
+    if len(blobs) != 1:
+        raise ValueError("--amd-chain takes one combined PEM file or three files")
+    try:
+        return split_pem_chain(blobs[0])
+    except TEEAttestationError as exc:
+        raise ValueError(str(exc)) from exc
+
+
+def _pem_from_cert_bytes(data: bytes) -> bytes:
+    from vaara.attestation._sev_snp_chain import _load_cert
+    from cryptography.hazmat.primitives import serialization
+
+    return bytes(_load_cert(data).public_bytes(serialization.Encoding.PEM))
+
+
+def _cmd_tee_emit(args: argparse.Namespace) -> int:
+    """Request a live SEV-SNP report inside a confidential VM."""
+    try:
+        from vaara.attestation._sev_snp_chain import parse_certificate_table
+        from vaara.attestation.tee import SEVSNPHostAttester, TEEAttestationError
+    except ImportError:
+        print(_ATTESTATION_HINT, file=sys.stderr)
+        return 2
+    try:
+        report_data = bytes.fromhex(args.report_data.strip())
+    except ValueError:
+        print("vaara tee emit: --report-data is not valid hex", file=sys.stderr)
+        return 2
+    try:
+        report, table = SEVSNPHostAttester(
+            privlevel=args.privlevel
+        ).emit_with_certificates(report_data)
+    except TEEAttestationError as exc:
+        print(f"vaara tee emit: {exc}", file=sys.stderr)
+        return 1
+    Path(args.out).expanduser().write_bytes(report)
+    print(f"report: {args.out} ({len(report)} bytes)")
+    if args.certs_out:
+        try:
+            certs = parse_certificate_table(table) if table else {}
+            signing = certs.get("vcek") or certs.get("vlek")
+            if not (signing and certs.get("ask") and certs.get("ark")):
+                print("vaara tee emit: the host published no certificate chain; "
+                      "use `vaara tee fetch-chain`", file=sys.stderr)
+                return 1
+            pem = b"".join(
+                _pem_from_cert_bytes(c) for c in (signing, certs["ask"], certs["ark"])
+            )
+        except TEEAttestationError as exc:
+            print(f"vaara tee emit: {exc}", file=sys.stderr)
+            return 1
+        Path(args.certs_out).expanduser().write_bytes(pem)
+        print(f"chain:  {args.certs_out}")
+    return 0
+
+
+def _cmd_tee_fetch_chain(args: argparse.Namespace) -> int:
+    """Fetch a report's VCEK, ASK and ARK from AMD's KDS as one PEM file."""
+    try:
+        from vaara.attestation._sev_snp_chain import (
+            fetch_amd_cert_chain,
+            fetch_vcek,
+        )
+        from vaara.attestation.tee import TEEAttestationError, parse_sev_snp_report
+    except ImportError:
+        print(_ATTESTATION_HINT, file=sys.stderr)
+        return 2
+    try:
+        report = parse_sev_snp_report(Path(args.report).expanduser().read_bytes())
+        vcek = _pem_from_cert_bytes(fetch_vcek(report, args.product))
+        ask, ark = fetch_amd_cert_chain(args.product)
+    except (OSError, TEEAttestationError) as exc:
+        print(f"vaara tee fetch-chain: {exc}", file=sys.stderr)
+        return 1
+    Path(args.out).expanduser().write_bytes(vcek + ask + ark)
+    print(f"chain: {args.out} (VCEK, ASK, ARK for {args.product})")
     return 0
 
 
@@ -2996,16 +3098,21 @@ def _load_handoff_docs(
 
 def _discover_enforcement_triples(
     record_paths: "list[Path]", directory: Path,
-) -> "tuple[list[tuple[str, Any, bytes, bytes]], list[tuple[str, str]]]":
+) -> "tuple[list[tuple[Any, ...]], list[tuple[str, str]]]":
     """Discover ``(stem, record, report_bytes, vcek_pem)`` triples by stem.
 
     Shared by ``verify-enforcements`` and the ``export-article12`` fold:
     ``NAME.record.json`` pairs with ``NAME.report.bin`` and ``NAME.vcek.pem`` in
-    the same directory. A record missing either companion, or an unreadable
-    file, becomes a failing entry in the returned ``missing`` list, never a
-    silent skip.
+    the same directory. An optional ``NAME.amd-chain.pem`` (the VCEK
+    certificate, the ASK and the ARK, in that order) is passed on as the AMD
+    chain. A record missing either required companion, or an unreadable file,
+    becomes a failing entry in the returned ``missing`` list, never a silent
+    skip.
     """
-    triples: list[tuple[str, Any, bytes, bytes]] = []
+    from vaara.attestation._sev_snp_chain import split_pem_chain
+    from vaara.attestation.tee import TEEAttestationError
+
+    triples: list[tuple[Any, ...]] = []
     missing: list[tuple[str, str]] = []
     for record_path in record_paths:
         if record_path.name.endswith(".record.json"):
@@ -3025,13 +3132,21 @@ def _discover_enforcement_triples(
         if not vcek_path.is_file():
             missing.append((record_path.name, f"no companion {vcek_path.name}"))
             continue
+        chain_path = directory / f"{stem}.amd-chain.pem"
         try:
             report_bytes = report_path.read_bytes()
             vcek_pem = vcek_path.read_bytes()
-        except OSError as exc:
+            chain = (
+                split_pem_chain(chain_path.read_bytes())
+                if chain_path.is_file() else None
+            )
+        except (OSError, TEEAttestationError) as exc:
             missing.append((record_path.name, f"cannot read companion ({exc})"))
             continue
-        triples.append((stem, record, report_bytes, vcek_pem))
+        if chain is None:
+            triples.append((stem, record, report_bytes, vcek_pem))
+        else:
+            triples.append((stem, record, report_bytes, vcek_pem, chain))
     return triples, missing
 
 
@@ -3684,8 +3799,8 @@ def _cmd_verify_enforcement(args: argparse.Namespace) -> int:
 
     Reads the record, the binary SEV-SNP report, and the VCEK PEM, and prints one
     verdict. The verdict is honest about its limits: a pass proves a report
-    carrying sha512(jcs(record)) verifies against the VCEK you supplied, not that
-    the VCEK is genuine AMD silicon (the KDS chain is not validated) or that the
+    carrying sha512(jcs(record)) verifies against the VCEK you supplied; with
+    --amd-chain, that the VCEK is genuine AMD silicon. It never proves the
     decision logic ran in the enclave. Pass --expected-measurement to pin which
     image ran. Exit 0 iff ``ok``.
     """
@@ -3736,7 +3851,8 @@ def _cmd_verify_enforcement(args: argparse.Namespace) -> int:
     try:
         report_bytes = report_path.read_bytes()
         vcek_pem = vcek_path.read_bytes()
-    except OSError as exc:
+        amd_chain = _read_amd_chain(args.amd_chain) if args.amd_chain else None
+    except (OSError, ValueError) as exc:
         print(f"vaara verify-enforcement: cannot read input: {exc}",
               file=sys.stderr)
         return 1
@@ -3745,6 +3861,7 @@ def _cmd_verify_enforcement(args: argparse.Namespace) -> int:
         verdict = verify_enforcement(
             record, report_bytes, vcek_pem,
             expected_measurement=expected, strict=args.strict,
+            amd_chain=amd_chain,
         )
     except (TEEAttestationError, ValueError, KeyError, TypeError) as exc:
         print(f"vaara verify-enforcement: {exc}", file=sys.stderr)
@@ -4537,8 +4654,9 @@ def _cmd_verify_enforcements(args: argparse.Namespace) -> int:
     directory of enforced records and gets the roll-up. How many bind to a
     confidential VM, at what tier, and whether any pinned a vetted launch image.
     Triples are discovered by stem: ``NAME.record.json`` pairs with
-    ``NAME.report.bin`` and ``NAME.vcek.pem``. A record missing either companion
-    is a failing entry, never a silent skip. Requires the attestation extra.
+    ``NAME.report.bin``, ``NAME.vcek.pem`` and, optionally,
+    ``NAME.amd-chain.pem``. A record missing a required companion is a failing
+    entry, never a silent skip. Requires the attestation extra.
     """
     try:
         import rfc8785  # noqa: F401
@@ -6537,9 +6655,9 @@ def build_parser() -> argparse.ArgumentParser:
              "record to a confidential VM whose VCEK you supply: the report's "
              "REPORT_DATA must carry sha512(jcs(record)) and its signature must "
              "verify against the VCEK, with an optional pinned launch "
-             "measurement. It does not validate the VCEK chain to AMD's ARK (KDS "
-             "deferred) or prove the decision logic ran in the enclave, so it "
-             "does not by itself establish genuine AMD hardware. Requires the "
+             "measurement. With --amd-chain it also checks the VCEK chains to "
+             "AMD's root, which establishes genuine AMD hardware. It does not "
+             "prove the decision logic ran in the enclave. Requires the "
              "attestation extra.",
     )
     pve.add_argument(
@@ -6552,9 +6670,18 @@ def build_parser() -> argparse.ArgumentParser:
     )
     pve.add_argument(
         "--vcek", required=True,
-        help="Path to the PEM-encoded VCEK to check the report signature "
-             "against. Trusted as supplied; its AMD KDS chain is not validated "
-             "in v0.",
+        help="Path to the PEM-encoded VCEK public key to check the report "
+             "signature against. Trusted as supplied unless --amd-chain is given.",
+    )
+    pve.add_argument(
+        "--amd-chain", nargs="+", default=None, dest="amd_chain",
+        metavar="CERT",
+        help="Certificates that chain the VCEK to AMD's root: one PEM file "
+             "holding the VCEK certificate, the ASK and the ARK (as `vaara tee "
+             "emit` and `vaara tee fetch-chain` write it), or the three as "
+             "separate PEM or DER files. The ARK must be AMD's pinned root for the "
+             "product and the VCEK certificate must match the report's chip and "
+             "TCB.",
     )
     pve.add_argument(
         "--expected-measurement", default=None, dest="expected_measurement",
@@ -6564,8 +6691,8 @@ def build_parser() -> argparse.ArgumentParser:
     pve.add_argument(
         "--strict", action="store_true",
         help="Regulator-grade: pass only at the chain-rooted attested tier "
-             "(validated VCEK chain plus a pinned measurement), which v0 cannot "
-             "yet reach, so a strict pass is honestly unavailable",
+             "(VCEK chained to AMD's root with --amd-chain, plus a pinned "
+             "measurement)",
     )
     pve.add_argument(
         "--json", action="store_true",
@@ -6936,8 +7063,8 @@ def build_parser() -> argparse.ArgumentParser:
     pves.add_argument(
         "--strict", action="store_true",
         help="Regulator-grade: every record must reach the chain-rooted attested "
-             "tier, which v0 cannot yet reach, so a strict pass is honestly "
-             "unavailable",
+             "tier, which needs NAME.amd-chain.pem beside each record and a "
+             "pinned measurement",
     )
     pves.add_argument(
         "--json", action="store_true",
@@ -7325,9 +7452,19 @@ def build_parser() -> argparse.ArgumentParser:
         "--vcek",
         required=True,
         help=(
-            "Path to a PEM-encoded VCEK (Versioned Chip Endorsement Key). "
-            "Must be supplied out of band. AMD KDS chain validation is "
-            "tracked for v0.19+."
+            "Path to a PEM-encoded VCEK (Versioned Chip Endorsement Key) "
+            "public key. Trusted as supplied unless --amd-chain is given."
+        ),
+    )
+    ptee_verify.add_argument(
+        "--amd-chain", nargs="+", default=None, dest="amd_chain",
+        metavar="CERT",
+        help=(
+            "Certificates that chain the signing key to AMD's root: one PEM "
+            "file holding the VCEK or VLEK certificate, the ASK or ASVK and "
+            "the ARK, or the three as separate PEM or DER files. "
+            "The ARK must be AMD's pinned root for the product and the "
+            "certificate must match the report's chip and TCB."
         ),
     )
     ptee_verify.add_argument(
@@ -7340,6 +7477,54 @@ def build_parser() -> argparse.ArgumentParser:
         ),
     )
     ptee_verify.set_defaults(func=_cmd_tee_verify)
+
+    ptee_emit = tsub.add_parser(
+        "emit",
+        help=(
+            "Inside an AMD SEV-SNP guest, request an attestation report "
+            "carrying 64 bytes of REPORT_DATA, through configfs-tsm or "
+            "/dev/sev-guest. Needs root. Requires the attestation extra."
+        ),
+    )
+    ptee_emit.add_argument(
+        "--report-data", required=True, dest="report_data",
+        help="REPORT_DATA as 128 hex characters (64 bytes)",
+    )
+    ptee_emit.add_argument(
+        "--out", required=True, help="Where to write the 1184-byte report",
+    )
+    ptee_emit.add_argument(
+        "--certs-out", default=None, dest="certs_out",
+        help=(
+            "Write the certificates the host published with the report "
+            "(VCEK or VLEK, ASK, ARK) as one PEM file, usable as --amd-chain"
+        ),
+    )
+    ptee_emit.add_argument(
+        "--privlevel", type=int, default=None,
+        help="VMPL to request the report for (default: the lowest allowed)",
+    )
+    ptee_emit.set_defaults(func=_cmd_tee_emit)
+
+    ptee_fetch = tsub.add_parser(
+        "fetch-chain",
+        help=(
+            "Fetch a report's VCEK and AMD's ASK and ARK from AMD's Key "
+            "Distribution Service into one PEM file, usable as --amd-chain. "
+            "Requires the attestation extra and network access."
+        ),
+    )
+    ptee_fetch.add_argument(
+        "report", help="Path to a binary SEV-SNP attestation report",
+    )
+    ptee_fetch.add_argument(
+        "--product", required=True, choices=("Milan", "Genoa", "Turin"),
+        help="The EPYC product line the report came from",
+    )
+    ptee_fetch.add_argument(
+        "--out", required=True, help="Where to write the PEM chain",
+    )
+    ptee_fetch.set_defaults(func=_cmd_tee_fetch_chain)
 
     preload = psub.add_parser(
         "reload",

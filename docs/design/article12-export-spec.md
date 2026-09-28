@@ -220,10 +220,11 @@ ships evidence it cannot back, and there is no `--skip-invalid`.
   window and not revoked; it is `corroborated` only with a verified anchor that
   predates retirement, and `pinned` only against a `--trusted-did-document`. It
   is never silently upgraded.
-- An enforcement binding is never "attested" in v0: `vcek_chain_basis` stays
-  `caller_supplied_unverified` and `enforcement_logic_basis` stays
-  `not_established`. `--expected-measurement` pins a launch image; the
-  `attested` tier and a strict pass are reserved for the future KDS-chained tier.
+- An enforcement binding in the fold carries no AMD chain, so
+  `vcek_chain_basis` stays `caller_supplied_unverified` and
+  `enforcement_logic_basis` stays `not_established`. `--expected-measurement`
+  pins a launch image; the `attested` tier needs the AMD chain
+  (`vaara verify-enforcements` with `NAME.amd-chain.pem`).
 
 ### Conformance
 

@@ -15,8 +15,8 @@ Each triple is run through :func:`verify_enforcement`. The set then rolls up:
   whose report does not parse, whose signature fails, or whose ``REPORT_DATA``
   does not bind is a failing entry that gates the set, never a silent drop.
 * **Tier tally.** How many landed at each tier (``unverified`` / ``bound`` /
-  ``measurement_pinned``). The tier ``attested`` is reserved for the future
-  KDS-chained release and is never emitted in v0, so it never appears here.
+  ``measurement_pinned``, and ``attested`` for an entry that carried an AMD
+  chain to AMD's root and a pinned measurement).
 * **Pinning coverage.** How many records pinned a launch measurement. The
   coverage note (advisory) fires when no record in the set pinned an image:
   the whole set bound to *a* CVM but never to a *vetted* one, the enforcement
@@ -39,9 +39,8 @@ from vaara.attestation.tee import TEEAttestationError
 ENFORCEMENT_SET_SCHEMA_NAME = "sep2828-enforcement-set"
 ENFORCEMENT_SET_SCHEMA_VERSION = 1
 
-# The tiers a v0 verdict can carry, in ascending order. ``attested`` is
-# deliberately absent: it is reserved for the chain-rooted future tier and is
-# never emitted, so it is not a key the tally pre-seeds.
+# The tiers every set tallies, in ascending order. ``attested`` needs an AMD
+# chain on the entry, so it is counted when it occurs rather than pre-seeded.
 TIER_NAMES = ("unverified", "bound", "measurement_pinned")
 
 
@@ -108,12 +107,15 @@ class EnforcementSetReport:
 
 
 def check_enforcement_set(
-    triples: Sequence[tuple[str, Any, bytes, bytes]],
+    triples: Sequence[tuple[Any, ...]],
     *,
     expected_measurement: Optional[str] = None,
     strict: bool = False,
 ) -> EnforcementSetReport:
     """Bind a set of ``(name, record, report_bytes, vcek_pem)`` triples.
+
+    A triple may carry a fifth element, ``(vcek_cert, ask_cert, ark_cert)``,
+    passed to :func:`verify_enforcement` as ``amd_chain``.
 
     Each triple is run through :func:`verify_enforcement`. The set rolls up the
     pass count, the per-tier tally, and the pinning coverage. Never raises on a
@@ -129,11 +131,14 @@ def check_enforcement_set(
     bound = 0
     measurement_pinned = 0
 
-    for name, record, report_bytes, vcek_pem in triples:
+    for item in triples:
+        name, record, report_bytes, vcek_pem = item[:4]
+        amd_chain = item[4] if len(item) > 4 else None
         try:
             verdict = verify_enforcement(
                 record, report_bytes, vcek_pem,
                 expected_measurement=expected_measurement, strict=strict,
+                amd_chain=amd_chain,
             )
         except (TEEAttestationError, ValueError, KeyError, TypeError) as exc:
             entries.append(
@@ -144,7 +149,7 @@ def check_enforcement_set(
             continue
 
         loaded += 1
-        # A future tier outside the v0 set would still be counted, never dropped.
+        # A tier outside TIER_NAMES (attested) is counted, never dropped.
         tier_counts[verdict.tier] = tier_counts.get(verdict.tier, 0) + 1
         if verdict.bound:
             bound += 1

@@ -6,7 +6,7 @@ Status: experimental. Adds an optional hardware-rooted attestation layer
 alongside the Ed25519 (or ML-DSA-65) signature already on the OVERT 1.0
 Base Envelope. Initial backend is AMD SEV-SNP, the natural fit for the
 confidential-VM deployment model used in agent runtimes. Intel TDX and
-Intel SGX backends are tracked for later releases.
+Intel SGX backends would sit beside it.
 
 Architectural framing
 ---------------------
@@ -28,37 +28,27 @@ If both hold, the attestation says "this OVERT envelope was emitted by
 an arbiter running inside an AMD SEV-SNP confidential VM at the measured
 launch state recorded in the report."
 
-What ships in v0.18.0
----------------------
+What this module holds
+----------------------
 
 - ``parse_sev_snp_report``: binary parser for the 1184-byte
   attestation-report structure (AMD SEV-SNP ABI Specification rev. 1.55,
-  Table 22).
+  Table 22). Report versions 2 to 5 share these offsets.
 - ``bind_overt_envelope_to_report_data``: computes the 64-byte
   REPORT_DATA value that binds a TEE report to a specific OVERT envelope.
 - ``verify_sev_snp_report_signature``: validates the ECDSA P-384 over the
-  report body against a caller-supplied VCEK PEM.
+  report body against a VCEK or VLEK public key.
 - ``verify_envelope_binding``: confirms the report's REPORT_DATA matches
   SHA-512 of the supplied envelope.
 - ``MockSEVSNPAttester``: deterministic in-memory attester for tests and
   CI, building byte-compatible report blobs signed with a caller-supplied
   ECDSA P-384 key.
-- ``SEVSNPHostAttester``: skeleton that wraps ``/dev/sev-guest``. Raises
-  a clear error when not on an SEV-SNP host; the real ioctl path is
-  tracked for v0.19+.
+- ``SEVSNPHostAttester``: requests a real report inside a SEV-SNP guest,
+  through configfs-tsm or the ``/dev/sev-guest`` ioctl.
 
-What does NOT ship in v0.18.0
------------------------------
-
-- AMD KDS-based cert-chain validation (VCEK to ASK to ARK). Validating a
-  VCEK against AMD's Key Distribution Service requires a network fetch
-  against https://kdsintf.amd.com/ and is tracked for v0.19+. For now,
-  callers must obtain a trusted VCEK out of band and supply it directly.
-- ``/dev/sev-guest`` ioctl emission. The SNP_GET_REPORT ioctl is
-  well-defined in linux/sev-guest.h but not exercised here until a tested
-  SEV-SNP guest host is available.
-- Intel TDX, Intel SGX backends. Same module shape will accommodate them
-  via additional attester classes.
+The signing key's chain to AMD's root (VCEK or VLEK, ASK or ASVK, ARK) is
+checked by :func:`vaara.attestation._sev_snp_chain.verify_sev_snp_chain`.
+Intel TDX and Intel SGX would be further attester classes of the same shape.
 
 Install: ``pip install 'vaara[attestation]'``.
 """
@@ -69,7 +59,7 @@ import hashlib
 import struct
 from dataclasses import dataclass
 from pathlib import Path
-from typing import Protocol
+from typing import Optional, Protocol
 
 from vaara.attestation.overt import BaseEnvelope
 
@@ -210,14 +200,14 @@ def verify_sev_snp_report_signature(report: SEVSNPReport, vcek_pem: bytes) -> bo
     """Verify the ECDSA P-384 signature on a SEV-SNP report against a VCEK.
 
     The VCEK (Versioned Chip Endorsement Key) is AMD's per-CPU signing key
-    used to sign attestation reports. v0.18.0 only validates the report
-    signature against a supplied VCEK; full chain validation against AMD's
-    Key Distribution Service is tracked for v0.19+.
+    used to sign attestation reports (a VLEK public key works the same way).
+    This checks the signature only; whether the key is AMD's is
+    :func:`vaara.attestation._sev_snp_chain.verify_sev_snp_chain`.
     """
     if report.signature_algo != SIGNATURE_ALGO_ECDSA_P384_SHA384:
         raise TEEAttestationError(
             f"Unsupported SEV-SNP signature algo {report.signature_algo}; "
-            f"only ECDSA P-384 SHA-384 (=1) is supported in v0.18.0"
+            f"only ECDSA P-384 SHA-384 (=1) is supported"
         )
 
     try:
@@ -345,22 +335,46 @@ class MockSEVSNPAttester:
 
 
 class SEVSNPHostAttester:
-    """Live SEV-SNP attester that requests reports from /dev/sev-guest.
+    """Live SEV-SNP attester for a Linux guest in an AMD SEV-SNP confidential VM.
 
-    Only functional inside an actual SEV-SNP confidential VM. Raises a
-    clear error on non-SEV-SNP hosts. The SNP_GET_REPORT ioctl path is
-    documented in linux/sev-guest.h and is tracked for v0.19+ once a
-    tested SEV-SNP guest is available for integration testing.
+    Asks the AMD secure processor for a report through the kernel. It uses the
+    configfs-tsm interface (``/sys/kernel/config/tsm/report``, Linux 6.7+) when
+    the kernel offers it, else the ``SNP_GET_REPORT`` ioctl on
+    ``/dev/sev-guest``. Both need root or a group with access to them.
+
+    ``privlevel`` is the VMPL the report is requested for; ``None`` asks for the
+    lowest the guest is allowed (``privlevel_floor``, 0 without an SVSM).
+
+    :meth:`emit_with_certificates` also returns the certificates the host
+    published for the extended report (VCEK or VLEK, ASK, ARK), when it did.
     """
 
-    def __init__(self, device: str = "/dev/sev-guest"):
+    def __init__(
+        self,
+        device: str = "/dev/sev-guest",
+        *,
+        tsm_root: str = "/sys/kernel/config/tsm/report",
+        privlevel: Optional[int] = None,
+    ):
         self._device = Path(device)
+        self._tsm_root = Path(tsm_root)
+        self._privlevel = privlevel
 
     def emit(self, report_data: bytes) -> bytes:
+        return self.emit_with_certificates(report_data)[0]
+
+    def emit_with_certificates(self, report_data: bytes) -> tuple[bytes, bytes]:
+        """(report, certificate table); the table is empty when none was given.
+
+        Read the table with
+        :func:`vaara.attestation._sev_snp_chain.parse_certificate_table`.
+        """
         if len(report_data) != SEV_SNP_REPORT_DATA_SIZE:
             raise TEEAttestationError(
                 f"report_data must be exactly {SEV_SNP_REPORT_DATA_SIZE} bytes"
             )
+        # The sev-guest driver creates /dev/sev-guest in every SEV-SNP guest;
+        # configfs-tsm can exist without it (other TEEs, or none at all).
         if not self._device.exists():
             raise TEEAttestationError(
                 f"{self._device} not present. This host is not an SEV-SNP "
@@ -368,11 +382,102 @@ class SEVSNPHostAttester:
                 f"environments, or capture a report from a real SEV-SNP "
                 f"guest out of band."
             )
-        raise TEEAttestationError(
-            "SEV-SNP /dev/sev-guest ioctl emission is not implemented in "
-            "v0.18.0. Tracked for v0.19+ once a tested SEV-SNP host is "
-            "available. Use MockSEVSNPAttester or pre-captured reports."
+        if self._tsm_root.is_dir():
+            return self._emit_configfs(report_data)
+        return self._emit_ioctl(report_data), b""
+
+    def _emit_configfs(self, report_data: bytes) -> tuple[bytes, bytes]:
+        import os
+
+        entry = self._tsm_root / f"vaara-{os.getpid()}-{os.urandom(8).hex()}"
+        try:
+            entry.mkdir()
+        except OSError as exc:
+            raise TEEAttestationError(f"cannot create {entry}: {exc}") from exc
+        try:
+            provider = (entry / "provider").read_text().strip()
+            if provider != "sev_guest":
+                raise TEEAttestationError(
+                    f"configfs-tsm provider is {provider!r}, not sev_guest"
+                )
+            level = self._privlevel
+            floor_file = entry / "privlevel_floor"
+            if level is None and floor_file.exists():
+                level = int(floor_file.read_text().strip() or 0)
+            if level is not None and (entry / "privlevel").exists():
+                (entry / "privlevel").write_text(str(level))
+            (entry / "inblob").write_bytes(report_data)
+            written = int((entry / "generation").read_text().strip())
+            report = (entry / "outblob").read_bytes()
+            certs = b""
+            if (entry / "auxblob").exists():
+                certs = (entry / "auxblob").read_bytes()
+            # A write by anyone else between ours and the reads bumps generation.
+            if int((entry / "generation").read_text().strip()) != written:
+                raise TEEAttestationError(
+                    "configfs-tsm entry changed while the report was read"
+                )
+        except OSError as exc:
+            raise TEEAttestationError(f"configfs-tsm report failed: {exc}") from exc
+        finally:
+            try:
+                entry.rmdir()
+            except OSError:
+                pass
+        if len(report) != SEV_SNP_REPORT_SIZE:
+            raise TEEAttestationError(
+                f"configfs-tsm returned {len(report)} bytes, not a "
+                f"{SEV_SNP_REPORT_SIZE}-byte SEV-SNP report"
+            )
+        return report, certs
+
+    def _emit_ioctl(self, report_data: bytes) -> bytes:
+        import ctypes
+        import fcntl
+        import os
+
+        level = self._privlevel or 0
+        # struct snp_report_req: user_data[64], u32 vmpl, rsvd[28].
+        req = ctypes.create_string_buffer(
+            report_data + struct.pack("<I", level) + bytes(28), 96
         )
+        # struct snp_report_resp: the firmware's MSG_REPORT_RSP in 4000 bytes.
+        resp = ctypes.create_string_buffer(4000)
+        # struct snp_guest_request_ioctl: u8 msg_version, u64 req, u64 resp,
+        # u64 exitinfo2, naturally aligned.
+        arg = bytearray(
+            struct.pack(
+                "<B7xQQQ", 1, ctypes.addressof(req), ctypes.addressof(resp), 0
+            )
+        )
+        try:
+            fd = os.open(self._device, os.O_RDWR)
+        except OSError as exc:
+            raise TEEAttestationError(f"cannot open {self._device}: {exc}") from exc
+        try:
+            fcntl.ioctl(fd, _SNP_GET_REPORT, arg, True)
+        except OSError as exc:
+            exitinfo2 = struct.unpack_from("<Q", arg, 24)[0]
+            raise TEEAttestationError(
+                f"SNP_GET_REPORT failed: {exc} (firmware error "
+                f"{exitinfo2 & 0xFFFFFFFF:#x}, VMM error {exitinfo2 >> 32:#x})"
+            ) from exc
+        finally:
+            os.close(fd)
+        # MSG_REPORT_RSP: u32 status, u32 report_size, 24 reserved, report.
+        status, size = struct.unpack_from("<II", resp.raw, 0)
+        if status != 0:
+            raise TEEAttestationError(f"SNP_GET_REPORT status {status:#x}")
+        if size != SEV_SNP_REPORT_SIZE:
+            raise TEEAttestationError(
+                f"SNP_GET_REPORT returned a {size}-byte report, not "
+                f"{SEV_SNP_REPORT_SIZE}"
+            )
+        return resp.raw[32:32 + SEV_SNP_REPORT_SIZE]
+
+
+# _IOWR('S', 0x0, struct snp_guest_request_ioctl), linux/sev-guest.h.
+_SNP_GET_REPORT = (3 << 30) | (32 << 16) | (ord("S") << 8) | 0x0
 
 
 __all__ = [
