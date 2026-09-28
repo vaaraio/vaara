@@ -53,10 +53,12 @@ What runs:
 1. Verifies the three pre-flight files exist, the CHANGELOG entry is
    present, and that `v<VERSION>`, the co-tag and `release/v<VERSION>`
    do not already exist locally.
-2. Bumps six manifests to `<VERSION>`: `pyproject.toml`,
+2. Bumps every file that carries the version to `<VERSION>`: `pyproject.toml`,
    `clients/ts/package.json`, `src/vaara/__init__.py`, `server.json`,
-   `server-vaara-server.json`, and the Claude Code plugin manifest under
-   `plugins/claude-code-vaara-governance/`. Each one is read back with a
+   `server-vaara-server.json`, the plugin manifest under
+   `plugins/claude-code-vaara-governance/`, the Helm chart `appVersion`,
+   `docs/supported-platforms.md`, and `CFBundleShortVersionString` in both
+   macOS bundles under `clients/macos/Sources/`. Each one is read back with a
    grep, so a sed that matched nothing fails the step.
 3. `ruff check` on changed Python paths, or on all of `src/vaara` and
    `tests` when the diff has no Python in it.
