@@ -369,3 +369,12 @@ def test_an_allowed_call_held_at_the_end_is_released_as_received(pipeline):
     ]
     assert _run(ToolGate(pipeline, "a", enforce=True), chunks) == b"".join(chunks)
     assert len(_calls(pipeline)) == 1 and _blocked(pipeline) == []
+
+
+def test_a_refused_call_names_the_rule_as_its_policy(pipeline):
+    """The hook and the MCP proxy write deny_rule:<id> as policy_id on every
+    rule deny (docs/COMPLIANCE.md TOOL-1.3). The gate's denies said 'policy'."""
+    gate_reply(ANTHROPIC, ToolGate(pipeline, "a", enforce=True))
+    [record] = _blocked(pipeline)
+    assert record.data["policy_id"] == "deny_rule:rm_rf_root"
+    assert record.data["violation_type"] == "policy_rule"
