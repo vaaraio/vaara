@@ -26,7 +26,7 @@ jobs:
   policy-and-cases:
     runs-on: ubuntu-latest
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262  # v4.4.0
 
       - name: Validate the example policy and run its cases
         id: check
@@ -51,7 +51,7 @@ jobs:
     # that does not parse, which is the property every other use of it depends on.
     runs-on: ubuntu-latest
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262  # v4.4.0
 
       - name: Write a policy that does not parse
         shell: bash

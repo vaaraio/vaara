@@ -18,6 +18,7 @@ and this project follows [Semantic Versioning](https://semver.org/spec/v2.0.0.ht
 - The EU trusted-list parser refused a DTD only in the first 4 KB of the document. Comments are allowed before the DTD, so one could be pushed past that offset. The whole document is checked now.
 
 ### Changed
+- The Vaara GitHub Action (`action.yml`) pins `actions/setup-python` by commit SHA. It named the `v7` tag, which its owner can move. Every workflow in the repository now pins its actions the same way, and Dependabot waits 7 days before proposing an update.
 - docs/COMPLIANCE.md: OVERT TOOL-1.2 names the gates that apply the capability policy (operator lists, deny rules, `inputSchema`, `intercept()`); it had named a `policy.evaluate` and policy-declared parameter ranges and destinations that do not exist. The tool-call attestation section names `vaara.attestation.tool_call_attestation`, with `vaara.attestation.sep2787` as its deprecated alias.
 
 ## [2.2.0] - 2026-09-28
