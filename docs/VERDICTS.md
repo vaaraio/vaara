@@ -174,6 +174,14 @@ The second and third lines are preserved so an auditor can see what the
 verdict would have been on the underlying evidence had the chain held.
 The first line is the pin.
 
+A chain whose only breaks are gaps a repair declared on the chain itself
+(`REPAIR_GAP` records naming every lost sequence number) is pinned the
+same way, because what the lost records held cannot be shown. Its first
+line reads `Audit chain not intact (declared gap); ...` instead, and the
+gap names the lost sequence numbers and the repair record that declared
+them, so a reader can tell a declared loss from a break nothing accounts
+for.
+
 ## What this document is not
 
 This is an evidence-sufficiency reference, not a conformity
