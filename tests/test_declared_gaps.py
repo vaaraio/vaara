@@ -155,3 +155,47 @@ def test_the_hook_says_it_once_at_session_start(tmp_path: Path, monkeypatch):
     lines = [s for s in said if "declared gap" in s]
     assert len(lines) == 1
     assert "is not intact" in lines[0] and "seq 7 lost" in lines[0]
+
+
+def test_the_compliance_report_names_a_declared_gap_as_what_it_is(tmp_path: Path):
+    """Every article stays insufficient on a trail that is not intact, and
+    the gap text says the walk found a loss a repair declared, not a
+    rewrite. "Compromised" and "tampered" belong to a break nothing
+    accounts for; a regulator reading the report has to be able to tell the
+    two apart."""
+    from vaara.compliance.engine import ComplianceEngine, EvidenceStatus
+
+    path = _build(tmp_path)
+    _delete(path, 7, 8)
+    backend = SQLiteAuditBackend(path)
+    _declare(backend, [7, 8])
+    trail = backend.load_trail()
+    backend.close()
+
+    report = ComplianceEngine().assess(trail)
+    assert report.trail_chain_intact is False
+    runtime = [a for a in report.articles if a.requirement.evidence_event_types]
+    assert runtime
+    for art in runtime:
+        assert art.status is EvidenceStatus.EVIDENCE_INSUFFICIENT
+        gap = art.gaps[0].lower()
+        assert "declared gap" in gap
+        assert "seq 7, 8" in gap
+        assert "compromised" not in gap and "tamper" not in gap
+        reason = " ".join(art.verdict_inputs.get("verdict_reasons", [])).lower()
+        assert "declared" in reason
+        assert "compromised" not in reason
+
+
+def test_the_compliance_report_still_calls_an_undeclared_break_compromised(tmp_path: Path):
+    from vaara.compliance.engine import ComplianceEngine
+
+    path = _build(tmp_path)
+    _delete(path, 7)
+    backend = SQLiteAuditBackend(path)
+    trail = backend.load_trail()
+    backend.close()
+
+    report = ComplianceEngine().assess(trail)
+    runtime = [a for a in report.articles if a.requirement.evidence_event_types]
+    assert all("compromised" in a.gaps[0].lower() for a in runtime)

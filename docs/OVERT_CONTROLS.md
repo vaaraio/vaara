@@ -192,10 +192,14 @@ to MCP clients.
 - **SESS-1..5** (session-scoped attestation) - ◯.
 - **STATE-1, STATE-2** (durable state sealing and prompt artifact
   binding) - ◯.
-- **IDENT-1** (federated identity / token provenance chain) - ◐.
-  `vaara.auth` accepts authenticated caller identity into the audit
-  record. Full delegation-chain attestation per IDENT-1.2 is future
-  work.
+- **IDENT-1** (federated identity / token provenance chain) - ◯.
+  The HTTP surfaces (`vaara serve`, `vaara-mcp-proxy` over HTTP, the
+  MCP server) authenticate a caller with one shared bearer key, which
+  admits the caller and names nobody. The identity on a record is the
+  `agent_id` the client asserts. The `vaara.auth` role and key-store
+  module ships in the package but nothing in the tree calls it, so no
+  authenticated identity reaches a record through it. Delegation-chain
+  attestation per IDENT-1.2 is future work.
 
 ## Section 16 - Behavioural Drift Governance
 

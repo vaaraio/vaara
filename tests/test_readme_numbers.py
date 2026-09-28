@@ -70,3 +70,29 @@ def test_plugin_readme_matchers_match_hooks_json():
         row = re.search(rf"^\| `{event}` \| ([^|]+)\|", PLUGIN_README, re.M)
         assert row and "every tool" in row.group(1), event
 
+
+
+def test_dependency_claims_match_pyproject():
+    """The base install carries what pyproject says, and the docs say the same.
+
+    2.2.0 moved cbor2, cryptography and rfc8785 into the base install so a
+    plain pip install signs receipts. The README and the platforms page still
+    said the package had no runtime dependencies.
+    """
+    # Regex, not tomllib: the CI matrix starts at 3.10 and tomllib is 3.11+.
+    text = (ROOT / "pyproject.toml").read_text()
+    m = re.search(r"^dependencies = \[(.*?)\]", text, flags=re.M | re.S)
+    assert m, "could not find [project] dependencies in pyproject.toml"
+    deps = re.findall(r'"([^"]+)"', m.group(1))
+    names = sorted(re.split(r"[<>=!~ ]", d, 1)[0] for d in deps)
+    platforms = (ROOT / "docs" / "supported-platforms.md").read_text()
+    for text in (README, platforms):
+        assert "zero runtime dependencies" not in text
+        assert "no runtime dependencies" not in text
+        assert "zero dependencies" not in text
+        assert "none for the base install" not in text
+    if names:
+        for name in names:
+            assert name in README, f"README does not name the base dependency {name}"
+            assert name in platforms, f"supported-platforms.md does not name {name}"
+    assert "vaara[export]" not in README, "the export extra is in the base install now"

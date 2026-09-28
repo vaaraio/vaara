@@ -18,9 +18,14 @@ data are not detected.  Novel thinking written
 as prose cannot be pre-registered, so it travels in the clear.  This bounds and
 records the channel rather than closing it.
 
-Placeholders are derived from the secret's own digest, so they are stable
-across restarts.  That is deliberate: a placeholder that changed per run would
-alter the prompt prefix on every turn and defeat provider-side prompt caching.
+Placeholders are a keyed digest of the secret (HMAC-SHA256 under a key that
+lives beside the seal file), so they are stable across restarts.  That is
+deliberate: a placeholder that changed per run would alter the prompt prefix
+on every turn and defeat provider-side prompt caching.  The key is what keeps
+the placeholder from saying anything about the secret: the provider sees every
+placeholder, and a named secret is often a phrase or a name rather than a
+random token, so a plain digest would let anyone holding the prompt confirm a
+guess at it offline.  A registry with no file uses a key drawn for the process.
 
 Everything here fails open.  A sealing bug must not cost a working session, so
 every entry point returns its input unchanged when anything goes wrong.
@@ -29,10 +34,13 @@ every entry point returns its input unchanged when anything goes wrong.
 from __future__ import annotations
 
 import hashlib
+import hmac
 import json
 import logging
 import math
+import os
 import re
+import secrets as _secrets
 from collections import Counter
 from pathlib import Path
 from typing import Optional
@@ -117,10 +125,47 @@ def _looks_generated(value: str) -> bool:
     return entropy >= _MIN_ENTROPY
 
 
-def placeholder_for(secret: str) -> str:
-    """Stable placeholder for one secret, derived from its own digest."""
-    digest = hashlib.sha256(secret.encode("utf-8")).hexdigest()
+#: The key file beside a seal file, under ``keys/`` so the deny rules that
+#: keep a governed agent away from Vaara's other signing keys cover it too.
+KEY_RELPATH = Path("keys") / "seal-hmac.key"
+
+
+def placeholder_for(secret: str, key: bytes) -> str:
+    """Stable placeholder for one secret under ``key``.
+
+    HMAC-SHA256, truncated to the placeholder's digest field. Stable for a
+    given key, and unrelated to the secret for anyone without it.
+    """
+    digest = hmac.new(key, secret.encode("utf-8"), hashlib.sha256).hexdigest()
     return _PREFIX + digest[:_DIGEST_CHARS]
+
+
+def _load_or_create_key(path: Path) -> Optional[bytes]:
+    """The key at ``path`` (hex text), made with mode 0600 when missing.
+
+    Returns None when the key can neither be read nor created, so the caller
+    can fall back to a process key and say so: sealing must keep working.
+    """
+    if not path.exists():
+        try:
+            path.parent.mkdir(parents=True, exist_ok=True)
+            fd = os.open(path, os.O_WRONLY | os.O_CREAT | os.O_EXCL, 0o600)
+        except FileExistsError:
+            pass  # another proxy made it first; read theirs
+        except OSError as exc:
+            logger.warning("the seal key beside the seal file could not be "
+                           "created (%s)", type(exc).__name__)
+            return None
+        else:
+            with os.fdopen(fd, "w") as fh:
+                fh.write(_secrets.token_hex(32))
+    try:
+        key = bytes.fromhex(path.read_text().strip())
+    except (OSError, ValueError) as exc:
+        logger.warning("the seal key beside the seal file is unreadable (%s)",
+                       type(exc).__name__)
+        return None
+    return key or None
 
 
 def _json_inner(value: str) -> str:
@@ -142,7 +187,10 @@ class SealRegistry:
     """
 
     def __init__(self, secrets: Optional[dict[str, str]] = None, *,
-                 known_formats: bool = False) -> None:
+                 known_formats: bool = False, key: Optional[bytes] = None) -> None:
+        #: The placeholder key. ``from_file`` reads it from beside the seal
+        #: file; a registry built in memory draws one for the process.
+        self._key: bytes = key if key else _secrets.token_bytes(32)
         self._pairs: list[tuple[str, str]] = []
         self._reverse: dict[str, str] = {}
         #: Seal values matching ``KNOWN_SECRET_FORMATS`` as well as the named
@@ -176,8 +224,12 @@ class SealRegistry:
             logger.warning("%d seal entr%s had an empty secret and were "
                            "skipped", skipped, "y" if skipped == 1 else "ies")
 
+    def placeholder(self, secret: str) -> str:
+        """The placeholder this registry gives ``secret``."""
+        return placeholder_for(secret, self._key)
+
     def add(self, name: str, secret: str) -> None:
-        token = placeholder_for(secret)
+        token = self.placeholder(secret)
         self._pairs.append((secret, token))
         self._reverse[token] = secret
         # Longest first, so a secret that contains another is sealed whole.
@@ -212,7 +264,13 @@ class SealRegistry:
         waiting for a restart while the monitor already reports the new state.
         """
         p = Path(path)
-        reg = cls()
+        key = _load_or_create_key(p.parent / KEY_RELPATH)
+        if key is None:
+            logger.warning(
+                "the seal key beside the seal file is unavailable; placeholders "
+                "are stable for this process only and change on restart",
+            )
+        reg = cls(key=key)
         reg._path = p
         reg._mtime = cls._stat_mtime(p)
         if reg._mtime is None:
@@ -256,7 +314,7 @@ class SealRegistry:
         return len(self._pairs)
 
     def _learn(self, value: str, kind: str, kinds: dict[str, int]) -> str:
-        token = placeholder_for(value)
+        token = self.placeholder(value)
         self._learned[value] = token
         self._reverse[token] = value
         kinds[kind] = kinds.get(kind, 0) + 1

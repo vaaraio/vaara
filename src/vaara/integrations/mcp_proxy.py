@@ -345,8 +345,12 @@ class VaaraMCPProxy:
         self._inflight_requests: dict[Any, str] = {}
         self._inflight_lock = threading.Lock()
         # Each tool's inputSchema as the client saw it in tools/list, keyed
-        # by the client-facing tool name. tools/call is checked against it.
-        self._tool_schemas: dict[str, Any] = {}
+        # by the upstream that advertised it and the client-facing tool name.
+        # tools/call is checked against it. The upstream is part of the key
+        # because two upstreams in a fan-out can each expose a tool of the
+        # same name with a different shape, and a call is routed to one of
+        # them.
+        self._tool_schemas: dict[tuple[str, str], Any] = {}
         self._tool_schemas_lock = threading.Lock()
         # v0.40 fan-out: hold N upstream MCP servers in a name -> client map.
         # The single-upstream legacy entry point (positional ``upstream_command``)
@@ -1180,14 +1184,16 @@ class VaaraMCPProxy:
         result = response.get("result") if isinstance(response, dict) else None
         tools = result.get("tools") if isinstance(result, dict) else None
         if isinstance(tools, list):
+            upstream_name = _REQUEST_UPSTREAM.get()
             with self._tool_schemas_lock:
                 for tool in tools:
                     if isinstance(tool, dict) and isinstance(tool.get("name"), str):
+                        key = (upstream_name, tool["name"])
                         schema = tool.get("inputSchema")
                         if isinstance(schema, dict):
-                            self._tool_schemas[tool["name"]] = schema
+                            self._tool_schemas[key] = schema
                         else:
-                            self._tool_schemas.pop(tool["name"], None)
+                            self._tool_schemas.pop(key, None)
         return response
 
     def _handle_list(
@@ -1341,7 +1347,7 @@ class VaaraMCPProxy:
         # the record names the parameter that failed. In shadow mode the
         # violation is recorded and the call proceeds.
         with self._tool_schemas_lock:
-            schema = self._tool_schemas.get(tool_name)
+            schema = self._tool_schemas.get((_REQUEST_UPSTREAM.get(), tool_name))
         if schema is None:
             gates.append("parameter_schema:no_schema")
         else:

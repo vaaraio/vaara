@@ -101,6 +101,14 @@ CHART="deploy/helm/vaara/Chart.yaml"
 PLATFORMS="docs/supported-platforms.md"
 sed "${SED_I[@]}" "s/^appVersion: \"[0-9]+\.[0-9]+\.[0-9]+\"$/appVersion: \"${VERSION}\"/" "$CHART"
 sed "${SED_I[@]}" "s/^Vaara [0-9]+\.[0-9]+\.[0-9]+, Helm chart/Vaara ${VERSION}, Helm chart/" "$PLATFORMS"
+# The two macOS bundles. tests/test_version.py fails the suite when either
+# CFBundleShortVersionString drifts from pyproject.toml (they said 1.60.1
+# through every 2.x release), and the value sits on the line after the key.
+PLISTS=(clients/macos/Sources/VaaraMenuBar/Info.plist
+        clients/macos/Sources/WebKitGovernance/Info.plist)
+for plist in "${PLISTS[@]}"; do
+  sed "${SED_I[@]}" "/CFBundleShortVersionString/{n;s/<string>[0-9]+\.[0-9]+\.[0-9]+<\/string>/<string>${VERSION}<\/string>/;}" "$plist"
+done
 
 grep -E "^version = \"${VERSION}\"$" pyproject.toml >/dev/null
 grep -E "\"version\": \"${VERSION}\"" clients/ts/package.json >/dev/null
@@ -110,6 +118,9 @@ grep -E "\"version\": \"${VERSION}\"" server-vaara-server.json >/dev/null
 grep -E "\"version\": \"${VERSION}\"" "$PLUGIN_MANIFEST" >/dev/null
 grep -E "^appVersion: \"${VERSION}\"$" "$CHART" >/dev/null
 grep -E "^Vaara ${VERSION}, Helm chart" "$PLATFORMS" >/dev/null
+for plist in "${PLISTS[@]}"; do
+  grep -A1 CFBundleShortVersionString "$plist" | grep -E "<string>${VERSION}</string>" >/dev/null
+done
 
 # 3. Lint changed paths (best-effort; lint all of src + tests if no
 # precise change list)
@@ -140,6 +151,8 @@ git add CHANGELOG.md pyproject.toml clients/ts/package.json src/vaara/__init__.p
   server.json server-vaara-server.json \
   plugins/claude-code-vaara-governance/.claude-plugin/plugin.json \
   deploy/helm/vaara/Chart.yaml docs/supported-platforms.md \
+  clients/macos/Sources/VaaraMenuBar/Info.plist \
+  clients/macos/Sources/WebKitGovernance/Info.plist \
   scripts/release_prepare.sh
 # Re-add any other paths the caller has already staged
 git status --short
