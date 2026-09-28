@@ -265,8 +265,9 @@ class SealRegistry:
     def _seal_known(self, text: str) -> str:
         kinds: dict[str, int] = {}
         for kind, pattern in KNOWN_SECRET_FORMATS:
-            text = pattern.sub(
-                lambda m, kind=kind: self._learn(m.group(0), kind, kinds), text)
+            def known(m: re.Match[str], kind: str = kind) -> str:
+                return self._learn(m.group(0), kind, kinds)
+            text = pattern.sub(known, text)
         for kind, pattern in CONTEXT_SECRET_RULES:
             def sub(m: re.Match[str], kind: str = kind) -> str:
                 value = m.group("val")
