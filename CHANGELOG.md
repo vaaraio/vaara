@@ -7,6 +7,7 @@ and this project follows [Semantic Versioning](https://semver.org/spec/v2.0.0.ht
 ## [Unreleased]
 
 ### Fixed
+- `vaara release-check --condition-key` and `vaara attribute-check --key` given a key that is not Ed25519 now say "not an Ed25519 public key" instead of printing a Python attribute error.
 - A tool call that deletes or discards state is held for a human. The scorer read only the tool name, so every shell call got the same score, whether it listed a directory or deleted one, and none of them reached the escalate line. A floor in the scorer now reads the call's arguments. It holds shell commands that delete files, truncate, drop tables, force-push, delete a branch or tag, reset or clean a work tree, or delete cloud or cluster resources. It also holds SQL that drops, truncates or deletes rows, code that removes files, and tools whose name says they delete. The floor raises a score to the escalate line and never lowers one, so a denied call stays denied. It lives in the scorer, so every path that scores a call gets it.
 - On the pre-tool-use hook, shell and file calls that passed the deny rules were only recorded. A destructive one now goes through the enforced pipeline and waits for a human. If nobody answers, it is denied, and the trail records no human decision.
 - The floor reads only command-like arguments and skips heredoc bodies, quoted text and file contents. Writing a script that contains `rm`, or a note about it, passes.

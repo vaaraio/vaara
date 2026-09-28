@@ -452,12 +452,12 @@ class MockTPMQuoter:
             decode_dss_signature,
         )
 
-        hash_cls = {
-            TPM_ALG_SHA256: hashes.SHA256,
-            TPM_ALG_SHA384: hashes.SHA384,
-            TPM_ALG_SHA512: hashes.SHA512,
+        hash_alg: hashes.HashAlgorithm = {
+            TPM_ALG_SHA256: hashes.SHA256(),
+            TPM_ALG_SHA384: hashes.SHA384(),
+            TPM_ALG_SHA512: hashes.SHA512(),
         }[self._scheme_hash]
-        der = self._key.sign(attest_bytes, ec.ECDSA(hash_cls()))
+        der = self._key.sign(attest_bytes, ec.ECDSA(hash_alg))
         r, s = decode_dss_signature(der)
         size = (self._key.curve.key_size + 7) // 8
         out = struct.pack(">HH", TPM_ALG_ECDSA, self._scheme_hash)
