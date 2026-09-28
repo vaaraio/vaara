@@ -38,3 +38,19 @@ def test_py_typed_marker_ships_with_package():
     # installed package.
     marker = Path(vaara.__file__).with_name("py.typed")
     assert marker.is_file(), "src/vaara/py.typed is missing"
+
+
+_PLISTS = sorted((_PYPROJECT.parent / "clients" / "macos" / "Sources").glob("*/Info.plist"))
+
+
+@pytest.mark.skipif(not _PLISTS, reason="macOS client sources not present (installed wheel)")
+@pytest.mark.parametrize("plist", _PLISTS, ids=lambda p: p.parent.name)
+def test_macos_bundle_version_matches_pyproject(plist):
+    # The app's Info.plist is edited by hand too. It said 1.60.1 through the
+    # 2.x releases, so Finder and the About panel named a version long gone.
+    text = plist.read_text(encoding="utf-8")
+    match = re.search(
+        r"<key>CFBundleShortVersionString</key>\s*<string>([^<]+)</string>", text,
+    )
+    assert match, f"{plist} has no CFBundleShortVersionString"
+    assert match.group(1) == _pyproject_version()
