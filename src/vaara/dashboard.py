@@ -24,6 +24,7 @@ both have to exist when no browser is open.
 
 from __future__ import annotations
 
+import ipaddress
 import json
 import secrets
 import socket
@@ -431,6 +432,17 @@ class _Handler(BaseHTTPRequestHandler):
         """Silence the default stderr access log; this is a desktop tool."""
 
 
+def _is_loopback_bind(host: str) -> bool:
+    """Whether a bind address can only be reached from this machine."""
+    name = (host or "").strip().lower()
+    if name == "localhost":
+        return True
+    try:
+        return ipaddress.ip_address(name).is_loopback
+    except ValueError:
+        return False
+
+
 def serve(
     *,
     db: Optional[str] = None,
@@ -439,9 +451,30 @@ def serve(
     host: str = "127.0.0.1",
     port: int = 7517,
     open_browser: bool = True,
+    allow_network: bool = False,
 ) -> int:
     if not _PAGE.exists():
         print(f"dashboard page missing: {_PAGE}")
+        return 2
+
+    # Bind guard, the same one `vaara serve` applies. The page carries the
+    # write token, and GET /api/config hands it to whoever fetches it. On a
+    # loopback bind that is the operator's own browser. On any other address
+    # it is anyone who can reach the port, who can then move the policy
+    # thresholds, rewrite the hook config and approve pending OS-layer
+    # escalations. The dashboard has no credential of its own, so a bind off
+    # loopback is refused unless the operator says the network is theirs.
+    local = _is_loopback_bind(host)
+    if not local and not allow_network:
+        print(
+            f"vaara dashboard: refusing to bind {host!r}.\n"
+            "The page carries the write token for policy thresholds, the hook\n"
+            "config and OS-layer approvals, and GET /api/config serves it to\n"
+            "any client that can reach the port. Keep the dashboard on\n"
+            "127.0.0.1 and reach it over an SSH tunnel (ssh -L 7517:127.0.0.1:7517),\n"
+            "or pass --allow-network if this bind is protected another way\n"
+            "(a private network segment, a container mapped to loopback)."
+        )
         return 2
 
     _Handler.db_path = Path(db).expanduser() if db else None
@@ -459,9 +492,17 @@ def serve(
     source = db or trail or "(none: pass --db or --trail)"
     print(f"Vaara dashboard on {url}")
     print(f"  reading   {source}")
-    print(f"  bound to  {host} only, not reachable from the network")
-    print("  settings and policy thresholds are writable from the page")
-    print("  writes need a token served only in that page, Ctrl-C to stop")
+    if local:
+        print(f"  bound to  {host} only, not reachable from the network")
+        print("  settings and policy thresholds are writable from the page")
+        print("  writes need a token served only in that page, Ctrl-C to stop")
+    else:
+        print(
+            f"  WARNING   bound to {host}: anyone who can reach this port reads\n"
+            "            the trail and the write token, and can change policy\n"
+            "            thresholds, the hook config and OS-layer approvals"
+        )
+        print("  Ctrl-C to stop")
     if open_browser:
         threading.Timer(0.4, lambda: webbrowser.open(url)).start()
     try:
