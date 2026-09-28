@@ -79,6 +79,11 @@ def write_decision(action_id: str, decision: str, *,
 
     Returns False when there is no such request or no key to sign with.
     """
+    # The id arrives from a surface (the dashboard posts it), and it becomes a
+    # file name. Anything but a plain name inside the directory is refused.
+    if (not action_id or action_id.startswith(".")
+            or Path(action_id).name != action_id or "\\" in action_id):
+        return False
     approvals_dir = Path(approvals_dir)
     key = _approval_key(approvals_dir, create=False)
     try:
