@@ -2,21 +2,23 @@
 
 Vaara 2.2.0, Helm chart 0.1.0.
 
-Vaara is a Python package with no runtime dependencies and a container image
-built on SUSE's SLE Base Container Image. This page lists what it runs on and,
-separately, what it has been run on.
+Vaara is a Python package with three runtime dependencies (`cryptography`,
+`rfc8785` and `cbor2`, which sign and canonicalise receipts) and a container
+image built on SUSE's SLE Base Container Image. This page lists what it runs
+on and, separately, what it has been run on.
 
 ## Package
 
 | Requirement | Supported |
 | --- | --- |
 | Python | 3.10, 3.11, 3.12, 3.13 |
-| Runtime dependencies | none for the base install |
+| Runtime dependencies | `cryptography`, `rfc8785`, `cbor2` |
 | Operating system | any platform CPython supports |
 
 The proxy needs the `proxy` extra (fastapi, uvicorn, httpx). Signed
-attestation and receipt pairs need the `attestation` extra (cbor2,
-cryptography, rfc8785). The container image ships both.
+attestation and receipt pairs use the same three packages the base install
+carries; `vaara[attestation]` still installs and names them. The container
+image ships the proxy extra as well.
 
 ## Container image
 
