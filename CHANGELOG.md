@@ -4,7 +4,7 @@ All notable changes to this project are documented here.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/)
 and this project follows [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
-## [Unreleased]
+## [2.2.0] - 2026-09-28
 
 ### Fixed
 - `verify-enforcement` and `verify-enforcements` read SEV-SNP report versions 3, 4 and 5. They accepted only version 2, so a report from current AMD firmware was marked unverified. Versions 3 to 5 only fill bytes that are reserved in version 2, so every field Vaara reads sits at the same offset.
