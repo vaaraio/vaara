@@ -85,11 +85,16 @@ jobs:
       - name: Install mcp-publisher CLI
         run: |
           set -euo pipefail
-          os="$(uname -s | tr '[:upper:]' '[:lower:]')"
-          arch="$(uname -m | sed 's/x86_64/amd64/;s/aarch64/arm64/')"
-          url="https://github.com/modelcontextprotocol/registry/releases/download/${MCP_PUBLISHER_VERSION}/mcp-publisher_${os}_${arch}.tar.gz"
+          # This binary runs with the registry publish token, so it is checked
+          # against the digest published in the release's checksums file before
+          # it runs. Bumping MCP_PUBLISHER_VERSION means bumping this digest.
+          sha256="ab128162b0616090b47cf245afe0a23f3ef08936fdce19074f5ba0a4469281ac"
+          tarball="mcp-publisher_linux_amd64.tar.gz"
+          url="https://github.com/modelcontextprotocol/registry/releases/download/${MCP_PUBLISHER_VERSION}/${tarball}"
           echo "Downloading mcp-publisher from ${url}"
-          curl -fsSL "$url" | tar xz mcp-publisher
+          curl -fsSL --proto '=https' --tlsv1.2 -o "$tarball" "$url"
+          echo "${sha256}  ${tarball}" | sha256sum -c -
+          tar xzf "$tarball" mcp-publisher
           ./mcp-publisher --version || true
       - name: Authenticate to the MCP Registry (GitHub OIDC)
         run: ./mcp-publisher login github-oidc
