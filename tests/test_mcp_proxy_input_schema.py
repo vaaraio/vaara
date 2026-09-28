@@ -228,3 +228,62 @@ def test_a_relisted_tool_uses_its_new_schema(monkeypatch):
     _call(p, upstream, {"path": "/var/log/app.log"})
 
     assert gates[-1][2] == "parameter_schema:pass"
+
+
+# Fan-out: the schema belongs to the upstream that advertised it
+
+
+def _fanout_proxy(monkeypatch):
+    from vaara.audit.trail import AuditTrail
+    from vaara.integrations import mcp_proxy
+    from vaara.pipeline import InterceptionPipeline
+
+    pipeline = InterceptionPipeline(trail=AuditTrail(on_record=lambda _r: None), enforce=True)
+    monkeypatch.setattr(
+        "vaara.integrations._mcp_upstream.UpstreamMCPClient.__init__",
+        lambda self, command, **kw: None,
+    )
+    p = mcp_proxy.VaaraMCPProxy(upstreams={"a": ["echo"], "b": ["echo"]}, pipeline=pipeline)
+    clients = {"a": MagicMock(), "b": MagicMock()}
+    p._upstreams["a"], p._upstreams["b"] = clients["a"], clients["b"]
+    p._upstreams["default"] = clients["a"]
+    return p, clients
+
+
+def _on(name, fn, *args, **kw):
+    from vaara.integrations import mcp_proxy
+
+    token = mcp_proxy._REQUEST_UPSTREAM.set(name)
+    try:
+        return fn(*args, **kw)
+    finally:
+        mcp_proxy._REQUEST_UPSTREAM.reset(token)
+
+
+def test_same_named_tools_on_two_upstreams_keep_their_own_schemas(monkeypatch):
+    p, clients = _fanout_proxy(monkeypatch)
+    open_schema = {"type": "object"}
+    _on("a", _list, p, clients["a"], [{"name": "read_log", "inputSchema": SCHEMA}])
+    _on("b", _list, p, clients["b"], [{"name": "read_log", "inputSchema": open_schema}])
+    gates = _gates(monkeypatch, p)
+
+    # Listed last, b's open schema must not stand in for a's strict one.
+    resp = _on("a", _call, p, clients["a"], {"path": "/var/log/app.log"})
+    assert resp["result"]["isError"] is True
+    assert gates[-1][2] == "parameter_schema:deny"
+    clients["a"].request.assert_not_called()
+
+    # And a's strict schema must not refuse a call b's schema allows.
+    resp = _on("b", _call, p, clients["b"], {"path": "/var/log/app.log"})
+    assert resp["result"]["content"][0]["text"] == "ok"
+    assert gates[-1][2] == "parameter_schema:pass"
+
+
+def test_a_tool_listed_on_one_upstream_has_no_schema_on_the_other(monkeypatch):
+    p, clients = _fanout_proxy(monkeypatch)
+    _on("a", _list, p, clients["a"], [{"name": "read_log", "inputSchema": SCHEMA}])
+    gates = _gates(monkeypatch, p)
+
+    _on("b", _call, p, clients["b"], {"path": "/var/log/app.log"})
+
+    assert gates[-1][2] == "parameter_schema:no_schema"
