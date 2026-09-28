@@ -283,14 +283,36 @@ class SseToolGate:
             out += self._on_event(raw + b"\n\n")
 
     def flush(self) -> bytes:
-        out, self._buf = self._buf, b""
-        for held in self._blocks.values():
-            out += b"".join(held.raws)
-        for raws in self._chat_raws.values():
-            out += b"".join(raws)
-        for held in self._items.values():
-            out += b"".join(held.raws)
-        self._blocks, self._chat_raws, self._items = {}, {}, {}
+        """What is left when the stream ends: the unparsed tail, after every
+        held call has been decided."""
+        out = self._settle()
+        out += self._buf
+        self._buf = b""
+        return out
+
+    def _settle(self) -> bytes:
+        """Decide every call still held, on what arrived.
+
+        A call is held until its terminal event, and a stream can end without
+        one: a provider that omits ``finish_reason``, ``content_block_stop`` or
+        ``output_item.done``, or a connection cut mid-call. Releasing what was
+        held would hand the agent a call no rule read, and the sender who
+        leaves the terminal event out is the one the gate exists for. So the
+        held call is decided as it stands and, when refused, replaced in the
+        same position, exactly as it would have been at its terminal event.
+        """
+        out = b""
+        for index in list(self._blocks):
+            out += self._decide_anthropic(index)
+        for ci in list(self._chat):
+            calls = self._chat[ci]
+            template = next((h.template for h in calls.values() if h.template), {})
+            out += self._release_chat(
+                ci, template, {"index": ci, "delta": {}, "finish_reason": None},
+            )
+        for index in list(self._items):
+            out += self._decide_responses(index)
+        self._chat_raws = {}
         return out
 
     def _split(self) -> Optional[tuple[int, int]]:
@@ -301,7 +323,8 @@ class SseToolGate:
         return None
 
     @staticmethod
-    def _parse(raw: bytes) -> tuple[Optional[str], Any]:
+    def _parse(raw: bytes) -> tuple[Optional[str], Any, bool]:
+        """``(event name, parsed data or None, whether this is [DONE])``."""
         name, data = None, []
         for line in raw.decode("utf-8", "replace").splitlines():
             if line.startswith("event:"):
@@ -309,15 +332,22 @@ class SseToolGate:
             elif line.startswith("data:"):
                 data.append(line[5:].lstrip())
         text = "\n".join(data)
-        if not text or text == "[DONE]":
-            return name, None
+        if text == "[DONE]":
+            return name, None, True
+        if not text:
+            return name, None, False
         try:
-            return name, json.loads(text)
+            return name, json.loads(text), False
         except ValueError:
-            return name, None
+            return name, None, False
 
     def _on_event(self, raw: bytes) -> bytes:
-        name, data = self._parse(raw)
+        name, data, done = self._parse(raw)
+        if done:
+            # The chat stream's terminal sentinel. Whatever is still held is
+            # decided before it, so the client reads the verdict as part of
+            # the reply and not after its end.
+            return self._settle() + raw
         if not isinstance(data, dict):
             return raw
         kind = data.get("type")
@@ -346,27 +376,36 @@ class SseToolGate:
                 held.args += str(delta.get("partial_json", ""))
             if kind != "content_block_stop":
                 return b""
-            del self._blocks[index]
-            verdict = self.gate.decide(held.name, tool_args(held.args or "{}"))
-            if verdict.allowed:
-                self._anthropic_kept += 1
-                return b"".join(held.raws)
-            self._anthropic_refused += 1
-            text = refusal_text(held.name, verdict)
-            return (_event("content_block_start", {
-                        "type": "content_block_start", "index": index,
-                        "content_block": {"type": "text", "text": ""}})
-                    + _event("content_block_delta", {
-                        "type": "content_block_delta", "index": index,
-                        "delta": {"type": "text_delta", "text": text}})
-                    + _event("content_block_stop", {
-                        "type": "content_block_stop", "index": index}))
+            return self._decide_anthropic(index)
+        settled = b""
+        if kind in ("message_delta", "message_stop") and self._blocks:
+            # The message is ending with a block still open: no
+            # content_block_stop came. Decide it now, ahead of the end.
+            settled = self._settle()
         if (kind == "message_delta" and self._anthropic_refused
                 and not self._anthropic_kept
                 and (data.get("delta") or {}).get("stop_reason") == "tool_use"):
             data = {**data, "delta": {**data["delta"], "stop_reason": "end_turn"}}
-            return _event(name, data)
-        return raw
+            return settled + _event(name, data)
+        return settled + raw
+
+    def _decide_anthropic(self, index: Optional[int]) -> bytes:
+        """Decide the held block at ``index`` and return what replaces it."""
+        held = self._blocks.pop(index)
+        verdict = self.gate.decide(held.name, tool_args(held.args or "{}"))
+        if verdict.allowed:
+            self._anthropic_kept += 1
+            return b"".join(held.raws)
+        self._anthropic_refused += 1
+        text = refusal_text(held.name, verdict)
+        return (_event("content_block_start", {
+                    "type": "content_block_start", "index": index,
+                    "content_block": {"type": "text", "text": ""}})
+                + _event("content_block_delta", {
+                    "type": "content_block_delta", "index": index,
+                    "delta": {"type": "text_delta", "text": text}})
+                + _event("content_block_stop", {
+                    "type": "content_block_stop", "index": index}))
 
     # OpenAI chat -------------------------------------------------------
 
@@ -420,7 +459,7 @@ class SseToolGate:
         out += _event(None, {**base, "choices": [{"index": ci, "delta": {
             "content": "\n".join(notes)}, "finish_reason": None}]})
         finish = choice.get("finish_reason")
-        if not kept and finish == "tool_calls":
+        if not kept and finish in ("tool_calls", None):
             finish = "stop"
         closing = {**choice, "delta": {}, "finish_reason": finish}
         return out + _event(None, {**final, "choices": [closing]})
@@ -433,34 +472,63 @@ class SseToolGate:
         item = data.get("item") if isinstance(data.get("item"), dict) else None
         if kind == "response.output_item.added" and item \
                 and item.get("type") in _RESPONSES_TOOLS:
-            self._items[index] = _Held([raw])
+            self._items[index] = _Held([raw], template=data)
             return b""
         if kind == "response.output_item.done" and item \
                 and item.get("type") in _RESPONSES_TOOLS:
-            held = self._items.pop(index, _Held())
+            held = self._items.pop(index, _Held(template=data))
             held.raws.append(raw)
-            call_name, args = _responses_call(item)
-            verdict = self.gate.decide(call_name, args)
-            key = item.get("id") or item.get("call_id")
-            if verdict.allowed:
-                self._decided[key] = None
-                return b"".join(held.raws)
-            replacement = _refusal_item(item, refusal_text(call_name, verdict))
-            self._decided[key] = replacement
-            return (_event("response.output_item.added", {
-                        **data, "type": "response.output_item.added",
-                        "item": {**replacement, "status": "in_progress"}})
-                    + _event("response.output_item.done", {**data, "item": replacement}))
+            return self._decide_responses_item(data, item, held)
         if index is not None and index in self._items:
-            self._items[index].raws.append(raw)
+            held = self._items[index]
+            held.raws.append(raw)
+            if isinstance(data.get("delta"), str) and kind in (
+                "response.function_call_arguments.delta",
+                "response.custom_tool_call_input.delta",
+            ):
+                held.args += data["delta"]
             return b""
+        settled = b""
+        if kind in ("response.completed", "response.incomplete",
+                    "response.failed") and self._items:
+            # The response is ending with an item still open: no
+            # output_item.done came. Decide it now, ahead of the end.
+            settled = self._settle()
         if kind in ("response.completed", "response.incomplete") \
                 and isinstance(data.get("response"), dict) \
                 and isinstance(data["response"].get("output"), list):
             gated = _gate_responses(data["response"], self.gate, self._decided)
             if gated is not data["response"]:
-                return _event(name, {**data, "response": gated})
-        return raw
+                return settled + _event(name, {**data, "response": gated})
+        return settled + raw
+
+    def _decide_responses(self, index: Optional[int]) -> bytes:
+        """Decide a held item that never reached ``output_item.done``.
+
+        The item is the one ``output_item.added`` carried, with the argument
+        deltas that arrived after it in place of its (usually empty) arguments.
+        """
+        held = self._items.pop(index)
+        data = held.template
+        item = data.get("item") if isinstance(data.get("item"), dict) else {}
+        if held.args:
+            key = "input" if item.get("type") == "custom_tool_call" else "arguments"
+            item = {**item, key: held.args}
+        return self._decide_responses_item(data, item, held)
+
+    def _decide_responses_item(self, data: dict, item: dict, held: _Held) -> bytes:
+        call_name, args = _responses_call(item)
+        verdict = self.gate.decide(call_name, args)
+        key = item.get("id") or item.get("call_id")
+        if verdict.allowed:
+            self._decided[key] = None
+            return b"".join(held.raws)
+        replacement = _refusal_item(item, refusal_text(call_name, verdict))
+        self._decided[key] = replacement
+        return (_event("response.output_item.added", {
+                    **data, "type": "response.output_item.added",
+                    "item": {**replacement, "status": "in_progress"}})
+                + _event("response.output_item.done", {**data, "item": replacement}))
 
 
 def gate_json_bytes(content: bytes, gate: ToolGate) -> bytes:
