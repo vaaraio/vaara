@@ -557,6 +557,12 @@ def _cmd_trail_export(args: argparse.Namespace) -> int:
         print(f"vaara trail export: --revocations: {exc}", file=sys.stderr)
         return 2
 
+    # Missing extra first, so the install hint wins over any path complaint.
+    from vaara.audit import export as _export_mod
+    if not _export_mod._HAS_CRYPTO:
+        print(_INSTALL_HINT, file=sys.stderr)
+        return 2
+
     key_path = Path(args.key).expanduser()
     if not key_path.is_file():
         print(f"vaara trail export: signing key not found: {key_path}",
@@ -654,6 +660,11 @@ def _cmd_trail_verify(args: argparse.Namespace) -> int:
     try:
         from vaara.audit.verify import verify_signed
     except ImportError:
+        print(_INSTALL_HINT, file=sys.stderr)
+        return 2
+
+    from vaara.audit import verify as _verify_mod
+    if not _verify_mod._HAS_CRYPTO:
         print(_INSTALL_HINT, file=sys.stderr)
         return 2
 
