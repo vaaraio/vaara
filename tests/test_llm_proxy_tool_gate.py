@@ -278,3 +278,94 @@ def test_the_proxy_in_watch_mode_forwards_and_records(pipeline, upstream):
     body = _client(pipeline, False).post("/v1/messages", json=REQUEST).json()
     assert body["content"][1]["type"] == "tool_use"
     assert _calls(pipeline)[0].data["parameters"]["rule_id"] == "rm_rf_root"
+
+
+# --- streams that end without the terminal event ---------------------------
+#
+# A held call was released as received when the stream ended before its
+# terminal event, so a provider that omits finish_reason, content_block_stop
+# or output_item.done handed the agent a call no rule had read.
+
+
+def test_chat_stream_without_finish_reason_is_still_decided(pipeline):
+    args = json.dumps({"command": PIPE})
+    base = {"id": "c", "object": "chat.completion.chunk", "model": "m"}
+    chunks = [
+        _sse(None, {**base, "choices": [{"index": 0, "delta": {"tool_calls": [
+            {"index": 0, "id": "call_1", "type": "function",
+             "function": {"name": "bash", "arguments": args[:7]}}]},
+            "finish_reason": None}]}),
+        _sse(None, {**base, "choices": [{"index": 0, "delta": {"tool_calls": [
+            {"index": 0, "function": {"arguments": args[7:]}}]}, "finish_reason": None}]}),
+        b"data: [DONE]\n\n",
+    ]
+    raw = _run(ToolGate(pipeline, "a", enforce=True), chunks)
+    events = _events(raw)
+    assert not any(c["delta"].get("tool_calls") for e in events for c in e["choices"])
+    assert "remote_pipe_to_shell" in "".join(
+        c["delta"].get("content") or "" for e in events for c in e["choices"])
+    assert raw.endswith(b"data: [DONE]\n\n")
+    assert len(_blocked(pipeline)) == 1
+
+
+def test_chat_stream_cut_off_before_the_end_is_still_decided(pipeline):
+    args = json.dumps({"command": WIPE})
+    base = {"id": "c", "object": "chat.completion.chunk", "model": "m"}
+    chunks = [
+        _sse(None, {**base, "choices": [{"index": 0, "delta": {"tool_calls": [
+            {"index": 0, "id": "call_1", "type": "function",
+             "function": {"name": "bash", "arguments": args}}]},
+            "finish_reason": None}]}),
+    ]
+    events = _events(_run(ToolGate(pipeline, "a", enforce=True), chunks))
+    assert not any(c["delta"].get("tool_calls") for e in events for c in e["choices"])
+    assert len(_blocked(pipeline)) == 1
+
+
+def test_anthropic_stream_without_content_block_stop_is_still_decided(pipeline):
+    chunks = [c for c in _anthropic_stream(WIPE)
+              if b'"content_block_stop", "index": 1' not in c]
+    out = _events(_run(ToolGate(pipeline, "a", enforce=True), chunks))
+    assert not any(e.get("content_block", {}).get("type") == "tool_use" for e in out)
+    texts = "".join(e["delta"].get("text", "") for e in out
+                    if e["type"] == "content_block_delta")
+    assert "rm_rf_root" in texts
+    [delta] = [e for e in out if e["type"] == "message_delta"]
+    assert delta["delta"]["stop_reason"] == "end_turn"
+    assert out[-1]["type"] == "message_stop"
+    assert len(_blocked(pipeline)) == 1
+
+
+def test_responses_stream_without_output_item_done_is_still_decided(pipeline):
+    call = {"type": "function_call", "id": "fc_1", "call_id": "c1",
+            "name": "exec_command", "arguments": json.dumps({"cmd": WIPE})}
+    chunks = [
+        _sse("response.output_item.added", {"type": "response.output_item.added",
+                                            "output_index": 0,
+                                            "item": {**call, "arguments": ""}}),
+        _sse("response.function_call_arguments.delta", {
+            "type": "response.function_call_arguments.delta", "output_index": 0,
+            "delta": call["arguments"]}),
+        _sse("response.completed", {"type": "response.completed",
+                                    "response": {"id": "r", "output": [call]}}),
+    ]
+    events = _events(_run(ToolGate(pipeline, "a", enforce=True), chunks))
+    assert all(e.get("item", {}).get("type") != "function_call" for e in events)
+    [completed] = [e for e in events if e["type"] == "response.completed"]
+    assert completed["response"]["output"][0]["type"] == "message"
+    assert len(_blocked(pipeline)) == 1
+    assert len(_calls(pipeline)) == 1
+
+
+def test_an_allowed_call_held_at_the_end_is_released_as_received(pipeline):
+    args = json.dumps({"command": "ls"})
+    base = {"id": "c", "object": "chat.completion.chunk", "model": "m"}
+    chunks = [
+        _sse(None, {**base, "choices": [{"index": 0, "delta": {"tool_calls": [
+            {"index": 0, "id": "call_1", "type": "function",
+             "function": {"name": "bash", "arguments": args}}]},
+            "finish_reason": None}]}),
+        b"data: [DONE]\n\n",
+    ]
+    assert _run(ToolGate(pipeline, "a", enforce=True), chunks) == b"".join(chunks)
+    assert len(_calls(pipeline)) == 1 and _blocked(pipeline) == []
