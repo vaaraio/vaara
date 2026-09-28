@@ -161,6 +161,12 @@ def test_resolve_writes_escalation_resolved_when_trail_supplied() -> None:
     assert resolved[0].data["resolution"] == RESOLUTION_ALLOW
     assert resolved[0].data["reviewer"] == "alice"
     assert resolved[0].data["justification"] == "ok"
+    # A named reviewer resolved it, so the record says a human disposed of
+    # it, as the approvals handshake does on every other surface. Without
+    # these keys the row COMPLIANCE.md cites for Article 14(4)(d) reads as a
+    # policy disposition in every receipt built from it.
+    assert resolved[0].data["approver"] == "human"
+    assert resolved[0].data["human_disposed"] is True
 
 
 def test_expire_stale_marks_old_pending_items_expired() -> None:

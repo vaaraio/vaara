@@ -377,6 +377,13 @@ class ReviewQueue:
                     resolution=resolution,
                     reviewer=reviewer_capped,
                     justification=justification_capped,
+                    # A named reviewer resolved the item, so the row says a
+                    # human disposed of it, as the approvals handshake does on
+                    # the hook, the MCP server, the OS guard and the model
+                    # layer. This row is the Article 14(4)(d) override
+                    # evidence; without the keys it reads as policy.
+                    approver="human",
+                    human_disposed=True,
                 )
             except Exception:
                 logger.exception(
