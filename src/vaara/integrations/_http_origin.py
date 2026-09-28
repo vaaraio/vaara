@@ -28,12 +28,24 @@ The rule:
 * **Origin in the operator's allow-list** — allowed, compared exactly, so
   ``https://app.example.evil.test`` never passes for ``https://app.example``.
 * **Anything else** — 403.
+
+The server's own host only counts as "self" when the name cannot be pointed
+somewhere else: an IP literal, ``localhost`` or a ``.localhost`` name, or a
+host from the allow-list. DNS rebinding is the reason. A page at
+``http://evil.test:8765`` whose name is re-resolved to ``127.0.0.1`` reaches
+the loopback port with ``Origin`` and ``Host`` both naming ``evil.test``, so
+matching one against the other proves nothing. The same page's same-origin
+GETs carry no ``Origin`` at all, so a browser request (one with ``Origin`` or
+``Sec-Fetch-Site``) addressed to an untrusted name is refused outright. Native
+clients send neither header and are not affected by the name they use.
 """
 
 from __future__ import annotations
 
+import ipaddress
 import logging
 from typing import Iterable, Optional
+from urllib.parse import urlsplit
 
 logger = logging.getLogger(__name__)
 
@@ -76,6 +88,29 @@ def origin_is_allowed(
     return origin in set(self_origins)
 
 
+def _hostname(host: str) -> str:
+    """The name part of a Host header value, lower-cased, without the port."""
+    host = host.strip().lower()
+    if host.startswith("["):
+        return host[1:host.find("]")] if "]" in host else ""
+    return host.rsplit(":", 1)[0] if host.count(":") == 1 else host
+
+
+def host_is_trusted(host: str, *, allowed: set[str]) -> bool:
+    """Whether ``host`` is a name DNS rebinding cannot hand to an attacker."""
+    name = _hostname(host)
+    if not name:
+        return False
+    if name == "localhost" or name.endswith(".localhost"):
+        return True
+    try:
+        ipaddress.ip_address(name)
+        return True
+    except ValueError:
+        pass
+    return name in {(urlsplit(o).hostname or "").lower() for o in allowed}
+
+
 def install_origin_guard(
     app,
     *,
@@ -95,18 +130,42 @@ def install_origin_guard(
     allowed = normalise_origins(allowed_origins)
     exempt = frozenset(exempt_paths)
 
+    def _refused():
+        return JSONResponse(
+            status_code=403,
+            content={"error": {
+                "code": "origin_not_allowed",
+                "message": (
+                    "This endpoint refuses requests carrying an Origin "
+                    "header from another site, and browser requests addressed "
+                    "to a host name it cannot trust. That is what stops a web "
+                    "page you visit from driving a loopback-bound Vaara "
+                    "service. Allow the origin explicitly if a browser "
+                    "client needs it."
+                ),
+            }},
+        )
+
     @app.middleware("http")
     async def _origin_guard(request, call_next):
         origin = request.headers.get("origin")
-        if origin is not None and request.url.path not in exempt:
+        browser = origin is not None or "sec-fetch-site" in request.headers
+        if browser and request.url.path not in exempt:
             # The origin the server is being addressed as. Host carries the
             # port, which Origin includes and request.url.hostname does not.
+            # A name that could have been rebound is never "self".
             host = request.headers.get("host", "")
+            trusted = host_is_trusted(host, allowed=allowed)
             self_origins = (
                 {f"{request.url.scheme}://{host}", f"http://{host}", f"https://{host}"}
-                if host else set()
+                if trusted else set()
             )
-            if not origin_is_allowed(
+            if origin is None and not trusted:
+                logger.warning(
+                    "%s: refused browser request addressed as untrusted host", surface,
+                )
+                return _refused()
+            if origin is not None and not origin_is_allowed(
                 origin, allowed=allowed, self_origins=self_origins,
             ):
                 cleaned = "".join(
@@ -116,17 +175,5 @@ def install_origin_guard(
                 logger.warning(
                     "%s: refused cross-origin request from %s", surface, cleaned,
                 )
-                return JSONResponse(
-                    status_code=403,
-                    content={"error": {
-                        "code": "origin_not_allowed",
-                        "message": (
-                            "This endpoint refuses requests carrying an Origin "
-                            "header from another site. That is what stops a web "
-                            "page you visit from driving a loopback-bound Vaara "
-                            "service. Allow the origin explicitly if a browser "
-                            "client needs it."
-                        ),
-                    }},
-                )
+                return _refused()
         return await call_next(request)

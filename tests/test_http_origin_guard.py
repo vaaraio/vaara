@@ -101,6 +101,15 @@ def _guarded_app(**kwargs) -> TestClient:
     return TestClient(app)
 
 
+LOOPBACK = "http://127.0.0.1:8765"
+
+
+def _loopback_app(**kwargs) -> TestClient:
+    client = _guarded_app(**kwargs)
+    client.base_url = client.base_url.copy_with(scheme="http", host="127.0.0.1", port=8765)
+    return client
+
+
 def test_middleware_refuses_a_cross_site_post():
     response = _guarded_app().post("/do", headers={"Origin": EVIL})
     assert response.status_code == 403
@@ -121,9 +130,15 @@ def test_middleware_allows_a_request_with_no_origin():
 
 
 def test_middleware_allows_the_servers_own_page():
-    """TestClient addresses the app as 'testserver'; its page posts back."""
-    response = _guarded_app().post("/do", headers={"Origin": "http://testserver"})
+    """The page the server served on its loopback port posts back to it."""
+    response = _loopback_app().post("/do", headers={"Origin": LOOPBACK})
     assert response.status_code == 200
+
+
+def test_a_name_that_could_be_rebound_is_not_self():
+    """TestClient's default 'testserver' is a DNS name like any other."""
+    response = _guarded_app().post("/do", headers={"Origin": "http://testserver"})
+    assert response.status_code == 403
 
 
 def test_middleware_allows_a_listed_origin():
@@ -198,5 +213,61 @@ def test_console_own_page_still_works(tmp_path):
         proxy_url="http://127.0.0.1:11435", receipts_dir=tmp_path,
         client=MagicMock(), judge_factory=lambda m: MagicMock(),
     )
-    response = TestClient(app).get("/", headers={"Origin": "http://testserver"})
+    response = TestClient(app, base_url="http://127.0.0.1:8765").get(
+        "/", headers={"Origin": "http://127.0.0.1:8765"},
+    )
+    assert response.status_code == 200
+
+
+# ── DNS rebinding ─────────────────────────────────────────────────────────
+#
+# A page at http://evil.test:8765 whose name is then pointed at 127.0.0.1
+# reaches the loopback port as its own origin: the browser sends
+# Origin: http://evil.test:8765 and Host: evil.test:8765, which agree. Only
+# a name the attacker cannot point anywhere makes Host worth trusting.
+
+def test_a_rebound_name_is_not_its_own_origin():
+    response = _loopback_app().post("/do", headers={
+        "Origin": "http://evil.test:8765", "Host": "evil.test:8765",
+    })
+    assert response.status_code == 403
+
+
+def test_a_rebound_same_origin_read_is_refused():
+    """Same-origin GETs carry no Origin; Sec-Fetch-Site still marks a browser."""
+    response = _loopback_app().post("/do", headers={
+        "Host": "evil.test:8765", "Sec-Fetch-Site": "same-origin",
+    })
+    assert response.status_code == 403
+
+
+def test_a_native_client_by_name_is_untouched():
+    """No Origin, no Sec-Fetch-*: curl or an SDK reaching a service by DNS name."""
+    response = _loopback_app().post("/do", headers={"Host": "vaara-mcp:8765"})
+    assert response.status_code == 200
+
+
+@pytest.mark.parametrize("host", [
+    "127.0.0.1:8765", "localhost:8765", "[::1]:8765", "app.localhost:8765",
+])
+def test_loopback_names_stay_their_own_origin(host):
+    response = _loopback_app().post("/do", headers={
+        "Origin": f"http://{host}", "Host": host, "Sec-Fetch-Site": "same-origin",
+    })
+    assert response.status_code == 200
+
+
+def test_a_listed_origin_makes_its_name_trusted():
+    """A console behind a reverse proxy under a real name lists that name."""
+    client = _loopback_app(allowed_origins=["https://vaara.example"])
+    response = client.post("/do", headers={
+        "Host": "vaara.example", "Sec-Fetch-Site": "same-origin",
+    })
+    assert response.status_code == 200
+
+
+def test_health_stays_open_to_any_host():
+    response = _loopback_app().get("/health", headers={
+        "Host": "evil.test:8765", "Sec-Fetch-Site": "same-origin",
+    })
     assert response.status_code == 200

@@ -375,3 +375,35 @@ def test_without_a_readable_seq_index_the_tail_is_reported_unnamed(trail_db: Pat
 
     assert report.method == "salvage", report.error
     assert report.tail_named is False
+
+
+def test_a_side_table_column_the_new_trail_lacks_does_not_sink_the_salvage(trail_db: Path):
+    """Side-table columns come from the damaged file, so they are filtered.
+
+    Salvage copies gdpr_redactions, api_keys and pending_outcomes by the
+    column names the damaged file declares. A file from another version, or
+    one written by hand, can declare a column the fresh trail has no place
+    for, or a name that is not a plain identifier at all. Only the columns
+    the fresh table has are copied; the rest is left behind with the file.
+    """
+    from vaara.auth import Role
+
+    backend = SQLiteAuditBackend(trail_db)
+    backend.create_api_key("ops", Role.ADMIN)
+    backend.close()
+    conn = sqlite3.connect(trail_db)
+    conn.execute("ALTER TABLE api_keys ADD COLUMN legacy_note TEXT")
+    conn.execute('ALTER TABLE api_keys ADD COLUMN "x) VALUES (1); --" TEXT')
+    conn.commit()
+    conn.close()
+    _zero_a_middle_leaf(trail_db)
+
+    report = repair_trail_file(trail_db)
+
+    assert report.method == "salvage", report.error
+    conn = sqlite3.connect(trail_db)
+    names = [r[0] for r in conn.execute("SELECT name FROM api_keys")]
+    cols = {r[1] for r in conn.execute("PRAGMA table_info(api_keys)")}
+    conn.close()
+    assert names == ["ops"]
+    assert "legacy_note" not in cols
