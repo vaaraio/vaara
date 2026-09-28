@@ -2078,6 +2078,29 @@ def _cmd_attest_verify(args: argparse.Namespace) -> int:
     return 0
 
 
+def _cmd_receipt_verify_transparency(args: argparse.Namespace) -> int:
+    """Check a SCITT Transparency Service receipt offline."""
+    from vaara.audit import scitt_service as ss
+
+    try:
+        receipt = Path(args.receipt).expanduser().read_bytes()
+        statement = Path(args.statement).expanduser().read_bytes()
+        keys = ss.load_key_set(Path(args.keys).expanduser().read_bytes())
+    except (OSError, ValueError) as exc:
+        print(f"vaara receipt verify-transparency: {exc}", file=sys.stderr)
+        return 2
+    check = ss.verify_receipt(receipt, statement=statement, keys=keys)
+    if args.json:
+        print(json.dumps({
+            "ok": check.ok, "detail": check.detail,
+            "kid": check.kid.decode("ascii", "replace") if check.kid else None,
+            "root": check.root.hex() if check.root else None,
+        }))
+    else:
+        print(("OK    " if check.ok else "FAIL  ") + check.detail)
+    return 0 if check.ok else 1
+
+
 def _cmd_receipt_verify_decision(args: argparse.Namespace) -> int:
     """Verify engine-emitted decision receipts against their trail."""
     import sqlite3
@@ -6098,6 +6121,20 @@ def build_parser() -> argparse.ArgumentParser:
     )
     prc_dec.add_argument("--json", action="store_true", help="One JSON object per receipt")
     prc_dec.set_defaults(func=_cmd_receipt_verify_decision)
+
+    prc_ts = rcsub.add_parser(
+        "verify-transparency",
+        help="Check a receipt from an IETF SCITT Transparency Service offline: "
+             "the inclusion proof commits to the statement bytes and the "
+             "service signature holds over the ledger root (CCF profile).",
+    )
+    prc_ts.add_argument("receipt", help="COSE receipt the service returned")
+    prc_ts.add_argument("--statement", required=True,
+                           help="The signed statement exactly as registered")
+    prc_ts.add_argument("--keys", required=True,
+                           help="The service's /.well-known/scitt-keys COSE_Key_Set, saved earlier")
+    prc_ts.add_argument("--json", action="store_true", help="Print the result as JSON")
+    prc_ts.set_defaults(func=_cmd_receipt_verify_transparency)
 
     def _scitt_log_args(p: argparse.ArgumentParser) -> None:
         p.add_argument(

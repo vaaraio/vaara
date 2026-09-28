@@ -1,0 +1,88 @@
+name: SCITT round-trip
+
+# Registers a Vaara decision receipt with a real IETF SCITT Transparency
+# Service and verifies the receipt it returns, offline, after the service is
+# gone. The service is Microsoft's scitt-ccf-ledger (the ledger behind Azure
+# Code Transparency), built from a pinned release and run in virtual mode.
+#
+# The build takes a while, so this runs weekly, on demand, and on a PR that
+# touches the client or this file. The verifier's branches run on every PR in
+# tests/test_scitt_service.py against a stand-in ledger.
+
+on:
+  schedule:
+    - cron: "23 4 * * 1"
+  workflow_dispatch:
+  pull_request:
+    branches: [main]
+    paths:
+      - src/vaara/audit/scitt_service.py
+      - scripts/scitt_roundtrip.py
+      - .github/workflows/scitt-roundtrip.yml
+
+permissions: read-all
+
+env:
+  # scitt-ccf-ledger 0.20.1 (2026-09-24).
+  LEDGER_REF: 00101f769d872711356e080fbb089ac48589c60a
+
+jobs:
+  roundtrip:
+    runs-on: ubuntu-latest
+    timeout-minutes: 90
+    steps:
+      - uses: actions/checkout@9c091bb21b7c1c1d1991bb908d89e4e9dddfe3e0  # v7.0.0
+
+      - name: Check out the ledger
+        uses: actions/checkout@9c091bb21b7c1c1d1991bb908d89e4e9dddfe3e0  # v7.0.0
+        with:
+          repository: microsoft/scitt-ccf-ledger
+          ref: ${{ env.LEDGER_REF }}
+          path: ledger
+          fetch-depth: 0
+
+      - name: Set up Python 3.12
+        uses: actions/setup-python@5fda3b95a4ea91299a34e894583c3862153e4b97  # v7.0.0
+        with:
+          python-version: '3.12'
+
+      - name: Build the ledger image (virtual mode)
+        working-directory: ledger
+        run: ./docker/build.sh
+
+      - name: Start a single-node ledger and open it for development
+        working-directory: ledger
+        run: |
+          nohup ./docker/run-dev.sh > "$RUNNER_TEMP/ledger.log" 2>&1 &
+          for i in $(seq 1 300); do
+            grep -q "SCITT is running" "$RUNNER_TEMP/ledger.log" && exit 0
+            sleep 2
+          done
+          echo "::error::the ledger did not come up"
+          tail -100 "$RUNNER_TEMP/ledger.log"
+          exit 1
+
+      - name: Install Vaara, no extras
+        run: pip install .
+
+      - name: Register a decision receipt and fetch the service keys
+        run: python scripts/scitt_roundtrip.py --url https://localhost:8000 --insecure --out scitt-out
+
+      - name: Stop the ledger
+        run: docker ps -q | xargs -r docker stop
+
+      - name: Verify the receipt offline
+        run: |
+          vaara receipt verify-transparency scitt-out/receipt.cose \
+            --statement scitt-out/statement.cose --keys scitt-out/scitt-keys.cbor --json | tee verify.json
+          python -c "import json,sys; sys.exit(0 if json.load(open('verify.json'))['ok'] else 1)"
+
+      - name: Keep the evidence
+        if: always()
+        uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a  # v7.0.1
+        with:
+          name: scitt-roundtrip
+          path: |
+            scitt-out/
+            ${{ runner.temp }}/ledger.log
+          if-no-files-found: ignore
