@@ -65,7 +65,7 @@ The aggregate runner grades every suite at once, and grades another implementati
 
 ```bash
 git clone https://github.com/vaaraio/vaara && cd vaara
-pip install cryptography rfc8785                                     # the checkers' only dependencies
+pip install cryptography rfc8785                                     # enough for 49 of the 51 suites; the two that skip name their extra
 python scripts/conformance_runner.py                                 # grade the reference corpus
 python scripts/conformance_runner.py --vectors-dir ./your_vectors    # grade your own
 ```
