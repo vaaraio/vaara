@@ -40,7 +40,7 @@ jobs:
       attestations: write   # store attestations on the workflow run
     steps:
       - name: Checkout
-        uses: actions/checkout@9c091bb21b7c1c1d1991bb908d89e4e9dddfe3e0  # v7.0.0
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1  # v7.0.1
         with:
           # On a dispatch the default ref is the branch, which would build
           # main's tree and label it with the tag being republished.
@@ -127,7 +127,7 @@ jobs:
       id-token: write
     steps:
       - name: Checkout (for CHANGELOG)
-        uses: actions/checkout@9c091bb21b7c1c1d1991bb908d89e4e9dddfe3e0  # v7.0.0
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1  # v7.0.1
         with:
           # On a dispatch the default ref is the branch, which would build
           # main's tree and label it with the tag being republished.
@@ -210,7 +210,7 @@ jobs:
         working-directory: clients/ts
     steps:
       - name: Checkout
-        uses: actions/checkout@9c091bb21b7c1c1d1991bb908d89e4e9dddfe3e0  # v7.0.0
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1  # v7.0.1
         with:
           # On a dispatch the default ref is the branch, which would build
           # main's tree and label it with the tag being republished.
@@ -276,7 +276,7 @@ jobs:
       MCP_PUBLISHER_VERSION: v1.7.9
     steps:
       - name: Checkout (for server.json manifests)
-        uses: actions/checkout@9c091bb21b7c1c1d1991bb908d89e4e9dddfe3e0  # v7.0.0
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1  # v7.0.1
         with:
           # On a dispatch the default ref is the branch, which would build
           # main's tree and label it with the tag being republished.
