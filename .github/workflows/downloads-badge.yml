@@ -31,7 +31,7 @@ jobs:
     runs-on: ubuntu-latest
     steps:
       - name: Check out the badges branch
-        uses: actions/checkout@v4
+        uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262  # v4.4.0
         with:
           ref: badges
 
@@ -40,7 +40,7 @@ jobs:
       # drifted: this one still put white on brand green at 2.92:1, the contrast
       # failure the Python one fixed in August, and it forced the glyph width.
       - name: Check out main for the badge renderer
-        uses: actions/checkout@v4
+        uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262  # v4.4.0
         with:
           ref: main
           path: .renderer
