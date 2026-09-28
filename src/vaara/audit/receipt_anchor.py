@@ -78,7 +78,10 @@ class SelfHostedTSA:
     @property
     def authority(self) -> str:
         cn = self._cert.subject.get_attributes_for_oid(NameOID.COMMON_NAME)
-        return cn[0].value if cn else "vaara-self-hosted-tsa"
+        if not cn:
+            return "vaara-self-hosted-tsa"
+        value = cn[0].value
+        return value if isinstance(value, str) else value.decode("utf-8", "replace")
 
     @classmethod
     def create(cls, common_name: str = "vaara-self-hosted-tsa",

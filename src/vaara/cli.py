@@ -3337,11 +3337,14 @@ def _cmd_release_check(args: argparse.Namespace) -> int:
     if args.condition_key:
         from cryptography.exceptions import UnsupportedAlgorithm
         from cryptography.hazmat.primitives import serialization
+        from cryptography.hazmat.primitives.asymmetric.ed25519 import Ed25519PublicKey
 
         try:
             key = serialization.load_pem_public_key(
                 Path(args.condition_key).expanduser().read_bytes()
             )
+            if not isinstance(key, Ed25519PublicKey):
+                raise ValueError("not an Ed25519 public key")
             condition_verifier = Ed25519Verifier(key.public_bytes_raw())
         except (OSError, ValueError, TypeError, AttributeError, UnsupportedAlgorithm) as exc:
             print(f"vaara release-check: --condition-key: {exc}", file=sys.stderr)
@@ -3468,11 +3471,14 @@ def _cmd_attribute_check(args: argparse.Namespace) -> int:
     if args.key:
         from cryptography.exceptions import UnsupportedAlgorithm
         from cryptography.hazmat.primitives import serialization
+        from cryptography.hazmat.primitives.asymmetric.ed25519 import Ed25519PublicKey
 
         try:
             key = serialization.load_pem_public_key(
                 Path(args.key).expanduser().read_bytes()
             )
+            if not isinstance(key, Ed25519PublicKey):
+                raise ValueError("not an Ed25519 public key")
             verifier = Ed25519Verifier(key.public_bytes_raw())
         except (OSError, ValueError, TypeError, AttributeError, UnsupportedAlgorithm) as exc:
             print(f"vaara attribute-check: --key: {exc}", file=sys.stderr)
