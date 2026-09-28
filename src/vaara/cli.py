@@ -824,6 +824,7 @@ def _cmd_dashboard(args: argparse.Namespace) -> int:
         host=args.host,
         port=port,
         open_browser=not args.no_browser,
+        allow_network=args.allow_network,
     )
 
 
@@ -5501,6 +5502,11 @@ def build_parser() -> argparse.ArgumentParser:
                             "(.yaml/.yml/.json). Read-only without it.")
     pdash.add_argument("--host", default="127.0.0.1",
                        help="Bind address. Defaults to loopback only.")
+    pdash.add_argument("--allow-network", action="store_true",
+                       help="Permit a bind off loopback. The page carries the "
+                            "write token, so anyone who can reach the port "
+                            "can change policy thresholds and approve "
+                            "OS-layer requests; refused without this flag.")
     pdash.add_argument("--port", type=int, default=0,
                        help="Port. Defaults to 7517, or a free one if taken.")
     pdash.add_argument("--no-browser", action="store_true",
