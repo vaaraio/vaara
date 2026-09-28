@@ -373,16 +373,18 @@ class SEVSNPHostAttester:
             raise TEEAttestationError(
                 f"report_data must be exactly {SEV_SNP_REPORT_DATA_SIZE} bytes"
             )
+        # The sev-guest driver creates /dev/sev-guest in every SEV-SNP guest;
+        # configfs-tsm can exist without it (other TEEs, or none at all).
+        if not self._device.exists():
+            raise TEEAttestationError(
+                f"{self._device} not present. This host is not an SEV-SNP "
+                f"guest. Use MockSEVSNPAttester for non-SEV-SNP test "
+                f"environments, or capture a report from a real SEV-SNP "
+                f"guest out of band."
+            )
         if self._tsm_root.is_dir():
             return self._emit_configfs(report_data)
-        if self._device.exists():
-            return self._emit_ioctl(report_data), b""
-        raise TEEAttestationError(
-            f"{self._tsm_root} and {self._device} not present. This "
-            f"host is not an SEV-SNP guest. Use MockSEVSNPAttester for "
-            f"non-SEV-SNP test environments, or capture a report from a real "
-            f"SEV-SNP guest out of band."
-        )
+        return self._emit_ioctl(report_data), b""
 
     def _emit_configfs(self, report_data: bytes) -> tuple[bytes, bytes]:
         import os

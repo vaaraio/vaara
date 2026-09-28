@@ -16,11 +16,12 @@ from pathlib import Path
 
 import pytest
 
-if importlib.util.find_spec("cryptography") is None:
-    pytest.skip(
-        "attestation extra not installed (pip install 'vaara[attestation]')",
-        allow_module_level=True,
-    )
+for _mod in ("rfc8785", "cryptography"):
+    if importlib.util.find_spec(_mod) is None:
+        pytest.skip(
+            "attestation extra not installed (pip install 'vaara[attestation]')",
+            allow_module_level=True,
+        )
 
 from cryptography import x509  # noqa: E402
 from cryptography.hazmat.primitives import hashes, serialization  # noqa: E402
@@ -378,6 +379,12 @@ def test_host_attester_without_a_guest_raises(tmp_path):
         attester.emit(b"short")
 
 
+def _guest_device(tmp_path) -> str:
+    device = tmp_path / "sev-guest"
+    device.touch()
+    return str(device)
+
+
 def _fake_configfs(monkeypatch, report: bytes, aux: bytes, provider="sev_guest",
                    bump_generation=False):
     """Make mkdir under the fake tsm root behave like configfs-tsm."""
@@ -413,7 +420,9 @@ def test_configfs_emission(tmp_path, monkeypatch):
     tsm = tmp_path / "tsm"
     tsm.mkdir()
     written = _fake_configfs(monkeypatch, report, b"aux")
-    out, aux = SEVSNPHostAttester(tsm_root=str(tsm)).emit_with_certificates(b"\x07" * 64)
+    out, aux = SEVSNPHostAttester(
+        _guest_device(tmp_path), tsm_root=str(tsm)
+    ).emit_with_certificates(b"\x07" * 64)
     assert out == report and aux == b"aux"
     assert (written["dir"] / "inblob").read_bytes() == b"\x07" * 64
     assert (written["dir"] / "privlevel").read_text() == "0"
@@ -424,7 +433,7 @@ def test_configfs_rejects_another_provider(tmp_path, monkeypatch):
     tsm.mkdir()
     _fake_configfs(monkeypatch, bytes(1184), b"", provider="tdx_guest")
     with pytest.raises(TEEAttestationError, match="not sev_guest"):
-        SEVSNPHostAttester(tsm_root=str(tsm)).emit(bytes(64))
+        SEVSNPHostAttester(_guest_device(tmp_path), tsm_root=str(tsm)).emit(bytes(64))
 
 
 def test_configfs_detects_a_concurrent_write(tmp_path, monkeypatch):
@@ -432,7 +441,16 @@ def test_configfs_detects_a_concurrent_write(tmp_path, monkeypatch):
     tsm.mkdir()
     _fake_configfs(monkeypatch, bytes(1184), b"", bump_generation=True)
     with pytest.raises(TEEAttestationError, match="changed while"):
-        SEVSNPHostAttester(tsm_root=str(tsm)).emit(bytes(64))
+        SEVSNPHostAttester(_guest_device(tmp_path), tsm_root=str(tsm)).emit(bytes(64))
+
+
+def test_configfs_without_the_sev_guest_device_is_not_a_guest(tmp_path):
+    # CI runners expose configfs-tsm with no SEV-SNP guest behind it.
+    tsm = tmp_path / "tsm"
+    tsm.mkdir()
+    attester = SEVSNPHostAttester(str(tmp_path / "sev-guest"), tsm_root=str(tsm))
+    with pytest.raises(TEEAttestationError, match="not an SEV-SNP guest"):
+        attester.emit(bytes(64))
 
 
 # ---- report versions ---------------------------------------------------------
