@@ -18,12 +18,11 @@ from vaara.integrations.llm_seal import (
     SseUnsealer,
     StreamUnsealer,
     _partial_placeholder_tail,
-    placeholder_for,
 )
 
 TERM = "anti-note"
 REG = SealRegistry({"concept": TERM})
-PH = placeholder_for(TERM)
+PH = REG.placeholder(TERM)
 
 
 def _delta(text, index=0, dtype="input_json_delta", field="partial_json"):
@@ -90,7 +89,7 @@ def test_whole_placeholder_in_one_event():
 
 
 def test_unknown_placeholder_is_reported_not_swallowed():
-    other = placeholder_for("something-else")
+    other = REG.placeholder("something-else")
     cut = 5
     u = SseUnsealer(REG)
     out = u.feed(_delta("q " + other[:cut]) + _delta(other[cut:]) + _stop()) + u.flush()

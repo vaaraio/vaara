@@ -39,7 +39,8 @@ from vaara.integrations.llm_seal import (  # noqa: E402
 )
 
 SECRET = "northern-lights"
-TOKEN = placeholder_for(SECRET)
+KEY = bytes(range(32))
+TOKEN = placeholder_for(SECRET, KEY)
 STRANGER = "VAARA_SEAL_0123456789ab"   # a placeholder no registry here knows
 
 
@@ -89,7 +90,7 @@ class TestPromptRecordCarriesSealState:
         app = build_app(
             upstream="https://upstream.invalid", api_key="k",
             api_key_header="x-api-key", pipeline=pipeline,
-            seal_registry=SealRegistry({"concept": SECRET}),
+            seal_registry=SealRegistry({"concept": SECRET}, key=KEY),
         )
         _post(TestClient(app), f"{SECRET} twice: {SECRET}")
         (req,) = _records(pipeline, EventType.ACTION_REQUESTED)
@@ -114,7 +115,7 @@ class TestPromptRecordCarriesSealState:
     def test_sealing_fault_is_recorded_not_hidden(
             self, monkeypatch, pipeline):
         _mount(monkeypatch, _echo_handler)
-        reg = SealRegistry({"concept": SECRET})
+        reg = SealRegistry({"concept": SECRET}, key=KEY)
 
         def boom(raw: bytes) -> bytes:
             raise RuntimeError("seal exploded")
@@ -142,7 +143,7 @@ class TestOutcomeCarriesUnsealState:
         app = build_app(
             upstream="https://upstream.invalid", api_key="k",
             api_key_header="x-api-key", pipeline=pipeline,
-            seal_registry=SealRegistry({"concept": SECRET}),
+            seal_registry=SealRegistry({"concept": SECRET}, key=KEY),
         )
         _post(TestClient(app))
         (out,) = _records(pipeline, EventType.OUTCOME_RECORDED)
@@ -164,7 +165,7 @@ class TestOutcomeCarriesUnsealState:
         app = build_app(
             upstream="https://upstream.invalid", api_key="k",
             api_key_header="x-api-key", pipeline=pipeline,
-            seal_registry=SealRegistry({"concept": SECRET}),
+            seal_registry=SealRegistry({"concept": SECRET}, key=KEY),
         )
         resp = TestClient(app).post("/v1/messages", json={
             "model": "m", "stream": True,
@@ -301,7 +302,7 @@ class TestSealFileReload:
 class TestStreamUnsealerCounts:
 
     def test_counts_survive_a_split_placeholder(self):
-        reg = SealRegistry({"c": SECRET})
+        reg = SealRegistry({"c": SECRET}, key=KEY)
         u = StreamUnsealer(reg)
         out = b""
         for ch in f"x {TOKEN} y {STRANGER} z".encode():

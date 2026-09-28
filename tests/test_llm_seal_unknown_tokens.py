@@ -14,7 +14,6 @@ import pytest
 from vaara.integrations.llm_seal import (
     CONTEXT_SECRET_RULES,
     SealRegistry,
-    placeholder_for,
 )
 
 # Generated with secrets.token_urlsafe / token_hex; none has a known prefix.
@@ -40,7 +39,7 @@ def test_an_unknown_token_is_sealed_and_restored(text, value, kind):
     raw = _body(text)
     out = reg.seal_bytes(raw)
     assert value.encode() not in out
-    assert placeholder_for(value).encode() in out
+    assert reg.placeholder(value).encode() in out
     assert reg.last_kinds == {kind: 1}
     assert reg.unseal_bytes(out) == raw
 
@@ -48,7 +47,7 @@ def test_an_unknown_token_is_sealed_and_restored(text, value, kind):
 def test_only_the_value_is_sealed_not_the_key():
     reg = SealRegistry(known_formats=True)
     out = reg.seal_bytes(_body(f"STRIPE_WEBHOOK_SECRET={OPAQUE}")).decode()
-    assert "STRIPE_WEBHOOK_SECRET=" + placeholder_for(OPAQUE) in out
+    assert "STRIPE_WEBHOOK_SECRET=" + reg.placeholder(OPAQUE) in out
 
 
 @pytest.mark.parametrize("text", [
