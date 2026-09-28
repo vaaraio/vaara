@@ -32,7 +32,8 @@ from vaara.integrations.llm_seal import (  # noqa: E402
 )
 
 SECRET = "anti-note"
-TOKEN = placeholder_for(SECRET)
+KEY = bytes(range(32))
+TOKEN = placeholder_for(SECRET, KEY)
 
 
 @pytest.fixture
@@ -67,7 +68,7 @@ def client(monkeypatch, seen):
         api_key="test-key",
         api_key_header="x-api-key",
         pipeline=_build_pipeline(None),
-        seal_registry=SealRegistry({"concept": SECRET}),
+        seal_registry=SealRegistry({"concept": SECRET}, key=KEY),
     )
     return TestClient(app)
 

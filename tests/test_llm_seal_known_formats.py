@@ -75,10 +75,11 @@ def test_off_by_default():
 
 
 def test_placeholder_is_stable_across_processes():
-    a = SealRegistry(known_formats=True).seal_bytes(_body(SAMPLES["openai_key"]))
-    b = SealRegistry(known_formats=True).seal_bytes(_body(SAMPLES["openai_key"]))
+    key = bytes(range(32))
+    a = SealRegistry(known_formats=True, key=key).seal_bytes(_body(SAMPLES["openai_key"]))
+    b = SealRegistry(known_formats=True, key=key).seal_bytes(_body(SAMPLES["openai_key"]))
     assert a == b
-    assert placeholder_for(SAMPLES["openai_key"]).encode() in a
+    assert placeholder_for(SAMPLES["openai_key"], key).encode() in a
 
 
 def test_a_learned_value_survives_a_seal_file_reload(tmp_path):
@@ -97,7 +98,7 @@ def test_a_learned_value_survives_a_seal_file_reload(tmp_path):
 def test_a_streamed_reply_is_restored():
     reg = SealRegistry(known_formats=True)
     reg.seal_bytes(_body(SAMPLES["stripe_key"]))
-    token = placeholder_for(SAMPLES["stripe_key"]).encode()
+    token = reg.placeholder(SAMPLES["stripe_key"]).encode()
     frame = b'data: {"delta":"your key is ' + token + b'"}\n\n'
     un = StreamUnsealer(reg)
     out = b"".join(un.feed(frame[i:i + 3]) for i in range(0, len(frame), 3))
