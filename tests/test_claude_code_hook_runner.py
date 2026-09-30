@@ -212,6 +212,38 @@ def test_hook_pre_escalate_approved_by_human_allows(tmp_path):
     assert json.loads(rows[0][0])["resolution"] == "allow"
 
 
+def test_hook_pre_human_approval_is_an_allow_decision_for_claude_code(tmp_path):
+    # Exit 0 with nothing on stdout is "no opinion" to Claude Code: the call
+    # then went through Claude Code's own permission flow, which refused a
+    # call the human had just approved (2026-09-30). The approval has to
+    # reach Claude Code as an explicit allow.
+    _escalate_config(tmp_path)
+    thread = _approval_responder(tmp_path, "approve")
+    proc = _run_hook(
+        ["hook", "pre-tool-use"],
+        {"tool_name": "mcp__files__read", "tool_input": {"path": "notes.txt"}},
+        tmp_path,
+    )
+    thread.join(timeout=1)
+    assert proc.returncode == 0, proc.stderr
+    out = json.loads(proc.stdout)["hookSpecificOutput"]
+    assert out["hookEventName"] == "PreToolUse"
+    assert out["permissionDecision"] == "allow"
+    assert "action_id=" in out["permissionDecisionReason"]
+
+
+def test_hook_pre_pass_without_a_human_stays_silent(tmp_path):
+    # Only a human approval speaks for the call. A call that merely passed
+    # the rules keeps Claude Code's own permission flow in charge.
+    proc = _run_hook(
+        ["hook", "pre-tool-use"],
+        {"tool_name": "Bash", "tool_input": {"command": "ls"}},
+        tmp_path,
+    )
+    assert proc.returncode == 0, proc.stderr
+    assert proc.stdout.strip() == ""
+
+
 def test_hook_pre_escalate_denied_by_human_blocks(tmp_path):
     _escalate_config(tmp_path)
     thread = _approval_responder(tmp_path, "deny")
