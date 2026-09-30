@@ -257,6 +257,12 @@ def match_deny_rule(
 #: their verdict (Cursor, Codex and Gemini CLI read it from stdout JSON).
 _last_message = ""
 
+#: The reason line when a human approved this call through the approvals
+#: handshake, else None. Claude Code reads a silent exit 0 as "no opinion"
+#: and runs its own permission flow, which can refuse the call the human
+#: just approved; run_pre_tool_use turns this into an explicit allow.
+_human_approval: Optional[str] = None
+
 
 def _emit(message: str) -> None:
     global _last_message
@@ -472,10 +478,21 @@ def run_pre_tool_use(deny_patterns: Optional[str] = None,
     cfg = load_config()
     if plugin_disabled(cfg):
         return _render(client, 0)
-    events, agent, _, render = _client_events(cfg, client, _read_event())
+    events, agent, client, render = _client_events(cfg, client, _read_event())
     if not events:
         return 0
-    return _render(render, _decide_pre(cfg, events, agent, deny_patterns))
+    code = _decide_pre(cfg, events, agent, deny_patterns)
+    if client is None and code == 0 and _human_approval:
+        # Claude Code itself: only a human's approval speaks for the call.
+        # Anything else that passed stays silent, so Claude Code's own
+        # rules and mode still decide it.
+        print(json.dumps({"hookSpecificOutput": {
+            "hookEventName": "PreToolUse",
+            "permissionDecision": "allow",
+            "permissionDecisionReason": _human_approval,
+        }}), flush=True)
+        return 0
+    return _render(render, code)
 
 
 def _apply_protection(cfg: dict, pipeline) -> None:
@@ -704,10 +721,12 @@ def _handle_escalation(cfg: dict, pipeline, result, tool_name: str,
             except Exception as exc:
                 _emit(f"vaara-governance: could not record resolution ({exc!r}).")
         if human == "approve":
+            global _human_approval
             _emit(
                 f"vaara-governance: APPROVED {tool_name} by human "
                 f"(action_id={result.action_id})."
             )
+            _human_approval = _last_message
             return 0
         if human == "deny":
             _emit(
