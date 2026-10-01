@@ -273,9 +273,17 @@ def test_hook_pre_escalate_timeout_stays_blocked(tmp_path):
     # Escalate stays fail-closed: no human answer means no execution.
     assert proc.returncode == 2, proc.stderr
     assert "ESCALATE" in proc.stderr
-    # No decision arrived, so nothing was resolved and no files linger.
     approvals = tmp_path / ".vaara" / "approvals"
     assert not approvals.exists() or list(approvals.iterdir()) == []
+    # The hold closes on the record as a deny by policy, so the trail can
+    # tell an expired hold from one still waiting. No human acted.
+    conn = sqlite3.connect(tmp_path / ".vaara" / "claude-code" / "audit.db")
+    rows = [json.loads(r[0]) for r in conn.execute(
+        "SELECT data FROM audit_records WHERE event_type = 'escalation_resolved'"
+    ).fetchall()]
+    assert len(rows) == 1
+    assert rows[0]["resolution"] == "deny"
+    assert rows[0].get("human_disposed") is not True
 
 
 def test_hook_pre_escalate_approvals_disabled_blocks_as_before(tmp_path):

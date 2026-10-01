@@ -155,8 +155,19 @@ def test_the_hook_holds_a_shell_delete_and_nobody_answering_denies_it(
     assert code == 2
     events = _events(db)
     assert "escalation_sent" in events
-    # Nobody answered, so no one is recorded as having decided.
-    assert "escalation_resolved" not in events
+    # Nobody answered, so the hold closes as a deny by policy and no person
+    # is recorded as having decided.
+    assert events.count("escalation_resolved") == 1
+    con = sqlite3.connect(db)
+    try:
+        [data] = [json.loads(r[0]) for r in con.execute(
+            "select data from audit_records "
+            "where event_type = 'escalation_resolved'")]
+    finally:
+        con.close()
+    assert data["resolution"] == "deny"
+    assert data.get("approver") == "policy"
+    assert data.get("human_disposed") is not True
 
 
 def test_the_hook_lets_an_ordinary_shell_call_through(tmp_path, monkeypatch):

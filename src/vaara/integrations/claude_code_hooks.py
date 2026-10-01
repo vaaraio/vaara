@@ -785,6 +785,20 @@ def _handle_escalation(cfg: dict, pipeline, result, tool_name: str,
             )
             notify(cfg, "DENIED", tool_name, detail, action_id=result.action_id)
             return 2
+        # Nobody answered. The hold ends here as a deny, and the trail says
+        # so: an escalation with no resolution reads the same as one still
+        # waiting, and AARM's conformance test for an unanswered STEP_UP or
+        # DEFER expects the deny and its resolution on the receipt. Policy
+        # disposed of it, so no human is claimed.
+        try:
+            pipeline.resolve_escalation(
+                result.action_id, "deny",
+                reviewer="approvals-timeout",
+                justification="no human decision before the approval timeout",
+                approver="policy",
+            )
+        except Exception as exc:
+            _emit(f"vaara-governance: could not record resolution ({exc!r}).")
     _emit(
         f"vaara-governance: ESCALATE {tool_name} blocked pending review "
         f"(risk {result.risk_score:.2f}, action_id={result.action_id}). "
