@@ -222,6 +222,34 @@ class SequencePattern:
     risk_boost: float              # Additive risk when pattern detected
     window_size: int = 10          # How many recent actions to scan
     description: str = ""
+    escalate: bool = False         # A match also holds the call for a human
+
+
+#: Label carried by any call that sends data off the machine (see
+#: _param_signals.outbound_action). Sequence steps match it like an action name.
+OUTBOUND_LABEL = "net.outbound"
+
+
+def action_labels(tool_name: str, context: dict[str, Any]) -> frozenset[str]:
+    """Names a sequence step can match for this call.
+
+    The raw tool name, the classified action type the pipeline passes as
+    ``action_name`` (so ``read_file`` and ``Read`` both match ``data.read``),
+    and OUTBOUND_LABEL when the call sends data out. A web fetch classifies as
+    ``data.read`` by its name, but what it reads is the remote page, not the
+    agent's data, so an outbound fetch does not also count as the read.
+    """
+    from vaara.scorer._param_signals import outbound_action
+    labels = {tool_name}
+    action_name = context.get("action_name")
+    if isinstance(action_name, str) and action_name and action_name != "unknown":
+        labels.add(action_name)
+    if outbound_action(tool_name, action_name if isinstance(action_name, str) else None,
+                       context.get("parameters")):
+        labels.add(OUTBOUND_LABEL)
+        if tool_name != "data.read":
+            labels.discard("data.read")
+    return frozenset(labels)
 
 
 # Built-in dangerous sequences — extensible at runtime
@@ -232,6 +260,15 @@ BUILTIN_SEQUENCES = [
         risk_boost=0.4,
         window_size=5,
         description="Read then export — possible data exfiltration",
+    ),
+    SequencePattern(
+        "read_then_outbound",
+        ("data.read", OUTBOUND_LABEL),
+        risk_boost=0.4,
+        window_size=5,
+        description="Read then an outbound call (mail, web fetch or search, "
+                    "shell network command) — data can leave through a "
+                    "different tool than the one that read it",
     ),
     SequencePattern(
         "data_destruction",
@@ -572,6 +609,8 @@ class AgentProfile:
     bad_outcomes: int = 0        # Actions that resulted in harm
     action_counts: dict[str, int] = field(default_factory=dict)
     recent_actions: deque = field(default_factory=lambda: deque(maxlen=50))
+    # Per entry of recent_actions, the names a sequence step can match.
+    recent_labels: deque = field(default_factory=lambda: deque(maxlen=50))
     first_seen: float = 0.0
     last_seen: float = 0.0
 
@@ -593,10 +632,14 @@ class AgentProfile:
             return 0.0
         return self.last_seen - self.first_seen
 
-    def record_action(self, action_name: str, timestamp: float) -> None:
+    def record_action(
+        self, action_name: str, timestamp: float,
+        labels: Optional[frozenset[str]] = None,
+    ) -> None:
         self.total_actions += 1
         self.action_counts[action_name] = self.action_counts.get(action_name, 0) + 1
         self.recent_actions.append((action_name, timestamp))
+        self.recent_labels.append(labels or frozenset({action_name}))
         if self.first_seen == 0:
             self.first_seen = timestamp
         self.last_seen = timestamp
@@ -745,6 +788,7 @@ class AdaptiveScorer:
 
         # Sequence patterns
         self._sequences = list(sequence_patterns or BUILTIN_SEQUENCES)
+        self._seq_escalate: Optional[str] = None
 
         # Agent profiles (agent_id to AgentProfile). OrderedDict provides
         # LRU semantics: move_to_end on access, popitem(last=False) to
@@ -800,6 +844,7 @@ class AdaptiveScorer:
                 risk_boost=sp.risk_boost,
                 window_size=max(len(sp.pattern), 10),
                 description=", ".join(sp.regulatory),
+                escalate=sp.escalate,
             )
             for sp in policy.sequences
         ]
@@ -932,6 +977,7 @@ class AdaptiveScorer:
         threshold_allow, threshold_deny = self._thresholds_for(tenant_id, tool_name)
 
         # Build risk signals from each expert
+        labels = action_labels(tool_name, context)
         signals = self._compute_signals(
             tool_name=tool_name,
             agent_id=agent_id,
@@ -939,6 +985,7 @@ class AdaptiveScorer:
             agent_confidence=agent_confidence,
             reversibility=reversibility,
             blast_radius=blast_radius,
+            labels=labels,
         )
 
         # MWU-weighted combination
@@ -979,6 +1026,12 @@ class AdaptiveScorer:
             decision_score = threshold_allow
             signals["destructive_action"] = threshold_allow
 
+        # A matched sequence marked escalate holds the call the same way.
+        held_by = self._seq_escalate
+        if held_by and decision_score < threshold_allow:
+            decision_score = threshold_allow
+            signals["sequence_escalate"] = threshold_allow
+
         if decision_score < threshold_allow:
             decision = Decision.ALLOW
         elif decision_score > threshold_deny:
@@ -989,7 +1042,7 @@ class AdaptiveScorer:
         # Record this action in agent profile
         now = time.time()
         profile = self._get_or_create_agent(agent_id)
-        profile.record_action(tool_name, now)
+        profile.record_action(tool_name, now, labels)
         if decision == Decision.DENY:
             profile.denied_actions += 1
         elif decision == Decision.ESCALATE:
@@ -1012,6 +1065,8 @@ class AdaptiveScorer:
             explanation += f"; content floor {content_floor:.2f} decided"
         if "destructive_action" in signals:
             explanation += f"; destructive ({destructive}), held for a human"
+        if "sequence_escalate" in signals:
+            explanation += f"; sequence {held_by}, held for a human"
 
         assessment = RiskAssessment(
             action_name=tool_name,
@@ -1077,6 +1132,7 @@ class AdaptiveScorer:
                 agent_confidence=agent_confidence,
                 reversibility=reversibility,
                 blast_radius=blast_radius,
+                labels=action_labels(tool_name, context),
             )
         finally:
             seq_logger.setLevel(prev_level)
@@ -1102,6 +1158,8 @@ class AdaptiveScorer:
             signals["parameter_content"] = content_floor
         if (destructive_action(tool_name, context.get("parameters"))
                 and decision_score < threshold_allow):
+            decision_score = threshold_allow
+        if self._seq_escalate and decision_score < threshold_allow:
             decision_score = threshold_allow
 
         if decision_score < threshold_allow:
@@ -1134,6 +1192,7 @@ class AdaptiveScorer:
         agent_confidence: Optional[float],
         reversibility: str,
         blast_radius: str,
+        labels: Optional[frozenset[str]] = None,
     ) -> dict[str, float]:
         """Compute risk signals from each expert."""
         signals: dict[str, float] = {}
@@ -1145,7 +1204,9 @@ class AdaptiveScorer:
         signals["agent_history"] = self._agent_history_signal(agent_id)
 
         # Expert 3: Temporal sequence patterns
-        signals["sequence_pattern"] = self._sequence_signal(agent_id, tool_name)
+        signals["sequence_pattern"] = self._sequence_signal(
+            agent_id, tool_name, labels
+        )
 
         # Expert 4: Action frequency / burst detection
         signals["action_frequency"] = self._burst_signal(agent_id)
@@ -1173,7 +1234,10 @@ class AdaptiveScorer:
 
         return min(1.0, max(0.0, risk))
 
-    def _sequence_signal(self, agent_id: str, current_tool: str) -> float:
+    def _sequence_signal(
+        self, agent_id: str, current_tool: str,
+        current_labels: Optional[frozenset[str]] = None,
+    ) -> float:
         """Detect dangerous action sequences in recent history.
 
         Runs two layers: (1) exact match against BUILTIN_SEQUENCES, and
@@ -1184,6 +1248,10 @@ class AdaptiveScorer:
         (e.g., data.export to infra.deploy to gov.vote) without producing
         false positives on single-category legitimate workflows.
         """
+        # Name of the first matched pattern marked escalate, read by the
+        # caller under the same lock; reset first so a call never inherits
+        # the previous call's hold.
+        self._seq_escalate = None
         profile = self._agents.get(agent_id)
         if profile is None:
             return 0.0
@@ -1191,16 +1259,21 @@ class AdaptiveScorer:
         recent = list(profile.recent_actions)
         # Append current action for matching
         recent_names = [name for name, _ in recent] + [current_tool]
+        recent_labels = list(profile.recent_labels) + [
+            current_labels or frozenset({current_tool})
+        ]
 
         max_boost = 0.0
         for pattern in self._sequences:
             matched = self._matches_subsequence(
-                recent_names[-pattern.window_size:], pattern.actions
+                recent_labels[-pattern.window_size:], pattern.actions
             )
             key = (agent_id, pattern.name)
             was_matched = self._seq_match_state.get(key, False)
             if matched:
                 max_boost = max(max_boost, pattern.risk_boost)
+                if pattern.escalate and self._seq_escalate is None:
+                    self._seq_escalate = pattern.name
                 if not was_matched:
                     # Transition: new trip. Log once per entry into the
                     # matched state so the risk signal stays strong
@@ -1243,13 +1316,19 @@ class AdaptiveScorer:
         return min(1.0, max_boost)
 
     @staticmethod
-    def _matches_subsequence(history: list[str], pattern: tuple[str, ...]) -> bool:
-        """Check if pattern appears as an ordered subsequence in history."""
+    def _matches_subsequence(history: list, pattern: tuple[str, ...]) -> bool:
+        """Check if pattern appears as an ordered subsequence in history.
+
+        A history entry is an action name or a set of names (action_labels);
+        a set matches a step when it contains the step's name.
+        """
         if not pattern:
             return False
         pi = 0
         for action in history:
-            if action == pattern[pi]:
+            hit = (pattern[pi] in action if isinstance(action, (set, frozenset))
+                   else action == pattern[pi])
+            if hit:
                 pi += 1
                 if pi == len(pattern):
                     return True

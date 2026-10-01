@@ -47,7 +47,17 @@ thresholds:
     deny: 0.65
 
 # Sequence patterns. If matched in the sliding window, risk gets boosted.
+# A step matches a tool name or a classified action type (data.read,
+# comm.send_email); net.outbound matches any call that sends data off the
+# machine. escalate: true also holds the completing call for a human.
 sequences:
+  read_then_outbound:
+    pattern: [data.read, net.outbound]
+    risk_boost: 0.4
+    window_seconds: 300
+    escalate: true
+    regulatory: ["aiact:14"]
+
   data_exfiltration:
     pattern: [read_data, export_data, delete_data]
     risk_boost: 0.4

@@ -4,6 +4,15 @@ All notable changes to this project are documented here.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/)
 and this project follows [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [Unreleased]
+
+### Added
+- A built-in sequence pattern, `read_then_outbound`: a read followed within five calls by a call that sends data off the machine raises the sequence risk by 0.4. Outbound means a `comm.*` action, an export, a web fetch or web search, or a shell command that runs curl, wget, scp, ssh, rsync, netcat or git push. A web fetch counts only as outbound, so fetch after fetch does not match.
+- A policy sequence takes `escalate: true`. A call that completes the sequence is then held for a human whatever its score, the same way a destructive call is held.
+
+### Fixed
+- Sequence patterns match on the classified action type as well as the tool name. The built-in patterns are written in action types (`data.read`, `data.export`), and the scorer compared them with the raw tool name, so they fired only for tools literally named after an action type. `read_file` followed by `export_csv` now matches `data_exfiltration`, and `Read` followed by `WebFetch` matches `read_then_outbound`. The pipeline passes the classified type to the scorer as `action_name`.
+
 ## [2.3.2] - 2026-10-01
 
 ### Fixed
