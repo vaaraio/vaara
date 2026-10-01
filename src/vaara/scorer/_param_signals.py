@@ -380,3 +380,71 @@ def destructive_action(tool_name: str, parameters: Any) -> Optional[str]:
                 and _SQL_DESTRUCTIVE.search(text)):
             return f"{key} drops or deletes rows"
     return None
+
+
+# ---------------------------------------------------------------------------
+# Outbound calls
+#
+# A call that sends something off the machine: mail and other comm.* actions,
+# an export, a web fetch or web search (the URL and the query carry data out),
+# and a shell command that dials a remote host. The sequence detector pairs
+# this with an earlier read, so data read by one tool and sent by another is
+# seen even when the two tools never meet.
+# ---------------------------------------------------------------------------
+
+#: Name-word pairs that mark a tool as a network fetch or search.
+_OUTBOUND_NAME_PAIRS = (
+    ("web", "fetch"), ("web", "search"), ("fetch", "url"), ("http", "get"),
+    ("http", "post"), ("http", "request"), ("browser", "navigate"),
+)
+
+#: Shell commands that send data to a remote host.
+_OUTBOUND_VERBS = frozenset({
+    "curl", "wget", "nc", "ncat", "netcat", "socat", "telnet", "ftp", "sftp",
+    "scp", "ssh", "rsync", "http", "https", "xh",
+})
+
+
+def _command_outbound(command: str, depth: int = 0) -> Optional[str]:
+    command = _strip_heredocs(command)
+    for part in _segments(command):
+        words = _strip_launchers(_words(part))
+        if not words:
+            continue
+        verb = words[0].rsplit("/", 1)[-1]
+        args = words[1:]
+        if depth < 3 and (verb in _SHELLS or verb == "eval"):
+            inner = args[args.index("-c") + 1] if "-c" in args[:-1] else (
+                " ".join(args) if verb == "eval" else "")
+            hit = _command_outbound(inner, depth + 1) if inner else None
+            if hit:
+                return hit
+            continue
+        if verb in _OUTBOUND_VERBS:
+            return verb
+        if verb == "git" and "push" in args[:3]:
+            return "git push"
+    return None
+
+
+def outbound_action(
+    tool_name: str, action_name: Optional[str], parameters: Any,
+) -> Optional[str]:
+    """Name what makes this call send data off the machine, or return None.
+
+    ``action_name`` is the classified action type (``comm.send_email``,
+    ``data.export``). Only command-like parameters are read as commands, so a
+    file whose content mentions ``curl`` is not an outbound call.
+    """
+    if action_name and (action_name.startswith("comm.") or action_name == "data.export"):
+        return action_name
+    words = _name_words(tool_name or "")
+    for a, b in _OUTBOUND_NAME_PAIRS:
+        if a in words and b in words:
+            return f"tool name says {a} {b}"
+    for key, text in _leaves(parameters):
+        if _COMMAND_KEYS.search(key):
+            hit = _command_outbound(text)
+            if hit:
+                return f"{key} runs {hit}"
+    return None

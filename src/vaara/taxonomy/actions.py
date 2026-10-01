@@ -153,6 +153,7 @@ class ActionRequest:
             "agent_id": self.agent_id,
             "tool_name": self.tool_name,
             "action_type": self.action_type.category.value,
+            "action_name": self.action_type.name,
             "reversibility": self.action_type.reversibility.value,
             "blast_radius": self.action_type.blast_radius.value,
             "urgency": self.action_type.urgency.value,

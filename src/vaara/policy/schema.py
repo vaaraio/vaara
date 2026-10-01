@@ -59,12 +59,17 @@ class ActionClassDef:
 
 @dataclass(frozen=True)
 class SequencePattern:
-    """A dangerous action sequence. If matched in window, risk gets boosted."""
+    """A dangerous action sequence. If matched in window, risk gets boosted.
+
+    ``escalate`` also holds the matching call for a human, whatever the
+    boosted score is.
+    """
     name: str
     pattern: tuple[str, ...]
     risk_boost: float
     window_seconds: int
     regulatory: tuple[str, ...] = ()
+    escalate: bool = False
 
     def __post_init__(self) -> None:
         if not 0.0 <= self.risk_boost <= 1.0:
@@ -73,6 +78,8 @@ class SequencePattern:
             raise PolicyError(f"sequence {self.name!r} window_seconds must be > 0")
         if not self.pattern:
             raise PolicyError(f"sequence {self.name!r} pattern must be non-empty")
+        if not isinstance(self.escalate, bool):
+            raise PolicyError(f"sequence {self.name!r} escalate must be true or false")
 
 
 @dataclass(frozen=True)

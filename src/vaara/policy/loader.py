@@ -117,6 +117,7 @@ def from_dict(data: dict) -> Policy:
             regulatory=tuple(_require_sequence(
                 raw_dict.get("regulatory"), f"sequences.{name}.regulatory"
             )),
+            escalate=raw_dict.get("escalate", False),
         ))
     sequences = tuple(sequences_list)
 
