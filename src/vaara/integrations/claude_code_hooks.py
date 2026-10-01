@@ -481,7 +481,8 @@ def run_pre_tool_use(deny_patterns: Optional[str] = None,
     events, agent, client, render = _client_events(cfg, client, _read_event())
     if not events:
         return 0
-    code = _decide_pre(cfg, events, agent, deny_patterns)
+    code = _decide_pre(cfg, events, agent, deny_patterns,
+                       claude_code=client is None)
     if client is None and code == 0 and _human_approval:
         # Claude Code itself: only a human's approval speaks for the call.
         # Anything else that passed stays silent, so Claude Code's own
@@ -566,7 +567,7 @@ def _report_hold_canary(cfg: dict) -> bool:
 
 
 def _decide_pre(cfg: dict, events: list[dict], agent: str,
-                deny_patterns: Optional[str]) -> int:
+                deny_patterns: Optional[str], claude_code: bool = False) -> int:
     event = events[0]
     tool_name = event.get("tool_name", "")
     tool_input = event.get("tool_input", {}) or {}
@@ -667,6 +668,11 @@ def _decide_pre(cfg: dict, events: list[dict], agent: str,
     # `allowed` is `decision == "allow"`, so escalate never reached the
     # branch above; the handshake below is what actually handles it.
     if result.decision == "escalate":
+        if claude_code:
+            refused = _claude_code_denies(cfg, pipeline, result, tool_name,
+                                          tool_input, event.get("cwd"))
+            if refused is not None:
+                return refused
         return _handle_escalation(cfg, pipeline, result, tool_name, tool_input)
 
     _emit(
@@ -675,6 +681,50 @@ def _decide_pre(cfg: dict, events: list[dict], agent: str,
         f"Reason: {result.reason}"
     )
     notify(cfg, "BLOCKED", tool_name, f"risk {result.risk_score:.2f}: {result.reason}",
+           action_id=result.action_id)
+    return 2
+
+
+def _claude_code_denies(cfg: dict, pipeline, result, tool_name: str,
+                        tool_input: dict, cwd: object) -> Optional[int]:
+    """Refuse, without asking, a call a Claude Code deny rule refuses.
+
+    Claude Code applies its deny rules after this hook and a deny rule
+    beats the hook's allow, so a human approval of such a call is spent
+    on nothing (2026-10-01, twice in one evening). The rule's refusal is
+    recorded as the resolution, by policy and not by a person, and said
+    in the words the operator needs: which rule, and that nobody was asked.
+    None when no rule certainly refuses the call; the human is asked.
+    """
+    try:
+        from vaara.integrations.claude_code_permissions import (
+            deny_rules, matching_deny_rule,
+        )
+
+        rule = matching_deny_rule(
+            tool_name, tool_input,
+            deny_rules(cwd=cwd if isinstance(cwd, str) else None),
+        )
+    except Exception:
+        return None
+    if rule is None:
+        return None
+    try:
+        pipeline.resolve_escalation(
+            result.action_id, "deny",
+            reviewer="claude-code-deny-rule",
+            justification=f"Claude Code deny rule {rule} refuses this call",
+            approver="policy",
+        )
+    except Exception as exc:
+        _emit(f"vaara-governance: could not record resolution ({exc!r}).")
+    _emit(
+        f"vaara-governance: BLOCKED {tool_name} by Claude Code deny rule {rule} "
+        f"(action_id={result.action_id}). Not asking for approval: Claude Code "
+        f"refuses this call whatever the answer. Change the command, or the "
+        f"rule in your Claude Code settings."
+    )
+    notify(cfg, "BLOCKED", tool_name, f"Claude Code deny rule {rule}",
            action_id=result.action_id)
     return 2
 

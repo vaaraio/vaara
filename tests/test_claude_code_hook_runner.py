@@ -293,3 +293,99 @@ def test_hook_pre_escalate_approvals_disabled_blocks_as_before(tmp_path):
         "SELECT data FROM audit_records WHERE event_type = 'escalation_resolved'"
     ).fetchall()
     assert rows == []
+
+
+# ---------------------------------------------------------------------------
+# A Claude Code deny rule beats a hook allow, so asking a human about a call
+# such a rule refuses only wastes the human's approval (2026-10-01: two
+# approvals of delete calls, both refused by a deny rule in
+# settings.local.json).
+
+_DEL = "r" + "m"  # built at runtime so this file does not trip a shell rule
+
+
+def _cc_deny(path: Path, *rules: str) -> None:
+    path.parent.mkdir(parents=True, exist_ok=True)
+    path.write_text(json.dumps({"permissions": {"deny": list(rules)}}))
+
+
+def _resolutions(home: Path) -> list[dict]:
+    conn = sqlite3.connect(home / ".vaara" / "claude-code" / "audit.db")
+    return [json.loads(r[0]) for r in conn.execute(
+        "SELECT data FROM audit_records WHERE event_type = 'escalation_resolved'"
+    ).fetchall()]
+
+
+def test_hook_pre_does_not_ask_about_a_call_a_claude_code_deny_rule_refuses(tmp_path):
+    _escalate_config(tmp_path)
+    _cc_deny(tmp_path / ".claude" / "settings.json", f"Bash({_DEL} *)")
+    thread = _approval_responder(tmp_path, "approve")
+    proc = _run_hook(
+        ["hook", "pre-tool-use"],
+        {"tool_name": "Bash", "tool_input": {"command": f"{_DEL} notes.txt"}},
+        tmp_path,
+    )
+    thread.join(timeout=1)
+    assert proc.returncode == 2, proc.stderr
+    assert f"Claude Code deny rule Bash({_DEL} *)" in proc.stderr
+    assert "APPROVED" not in proc.stderr
+    assert proc.stdout.strip() == ""
+    [resolved] = _resolutions(tmp_path)
+    assert resolved["resolution"] == "deny"
+
+
+def test_hook_pre_project_local_deny_rule_matches_a_compound_command(tmp_path):
+    _escalate_config(tmp_path)
+    project = tmp_path / "project"
+    _cc_deny(project / ".claude" / "settings.local.json", f"Bash({_DEL} *)")
+    proc = _run_hook(
+        ["hook", "pre-tool-use"],
+        {"tool_name": "Bash",
+         "tool_input": {"command": f"cd build && {_DEL} -f x.log"}},
+        tmp_path,
+        extra_env={"CLAUDE_PROJECT_DIR": str(project),
+                   "VAARA_PLUGIN_APPROVALS_TIMEOUT": "30"},
+    )
+    assert proc.returncode == 2, proc.stderr
+    assert "Claude Code deny rule" in proc.stderr
+    approvals = tmp_path / ".vaara" / "approvals"
+    assert not approvals.exists() or not list(approvals.glob("*.request.json"))
+
+
+def test_hook_pre_quoted_operator_is_not_a_subcommand(tmp_path):
+    # The delete inside quotes is an argument to echo, not a command Claude
+    # Code refuses, so the human is still asked.
+    _escalate_config(tmp_path)
+    _cc_deny(tmp_path / ".claude" / "settings.json", f"Bash({_DEL} *)")
+    proc = _run_hook(
+        ["hook", "pre-tool-use"],
+        {"tool_name": "Bash", "tool_input": {"command": f"echo 'a; {_DEL} x'"}},
+        tmp_path, extra_env={"VAARA_PLUGIN_APPROVALS_TIMEOUT": "0.3"},
+    )
+    assert "Claude Code deny rule" not in proc.stderr
+
+
+def test_hook_pre_unrelated_deny_rule_still_asks_the_human(tmp_path):
+    _escalate_config(tmp_path)
+    _cc_deny(tmp_path / ".claude" / "settings.json", "Bash(git push *)", "WebFetch")
+    thread = _approval_responder(tmp_path, "approve")
+    proc = _run_hook(
+        ["hook", "pre-tool-use"],
+        {"tool_name": "Bash", "tool_input": {"command": f"{_DEL} notes.txt"}},
+        tmp_path,
+    )
+    thread.join(timeout=1)
+    assert proc.returncode == 0, proc.stderr
+    assert "APPROVED" in proc.stderr
+
+
+def test_hook_pre_mcp_server_deny_rule_skips_the_question(tmp_path):
+    _escalate_config(tmp_path)
+    _cc_deny(tmp_path / ".claude" / "settings.json", "mcp__files")
+    proc = _run_hook(
+        ["hook", "pre-tool-use"],
+        {"tool_name": "mcp__files__read", "tool_input": {"path": "notes.txt"}},
+        tmp_path, extra_env={"VAARA_PLUGIN_APPROVALS_TIMEOUT": "30"},
+    )
+    assert proc.returncode == 2, proc.stderr
+    assert "Claude Code deny rule mcp__files" in proc.stderr
