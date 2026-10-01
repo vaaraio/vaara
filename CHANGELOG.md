@@ -4,6 +4,11 @@ All notable changes to this project are documented here.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/)
 and this project follows [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [2.3.2] - 2026-10-01
+
+### Fixed
+- `vaara hook pre-tool-use` hands a human approval to the agent host as an explicit allow. A call held for a human and approved through the approvals handshake ended with exit 0 and empty stdout, which the host reads as no opinion, so its own permission flow decided the call and could refuse one the human had just approved. The hook now prints a PreToolUse decision of `allow` with the approval line as the reason. A call that passes the rules without a human stays silent, so the host's own rules and mode still decide it, and deny rules in the host settings still win.
+
 ## [2.3.1] - 2026-09-28
 
 ### Added
