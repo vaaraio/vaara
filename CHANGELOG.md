@@ -6,12 +6,16 @@ and this project follows [Semantic Versioning](https://semver.org/spec/v2.0.0.ht
 
 ## [Unreleased]
 
+## [2.4.0] - 2026-10-02
+
 ### Added
 - A built-in sequence pattern, `read_then_outbound`: a read followed within five calls by a call that sends data off the machine raises the sequence risk by 0.4. Outbound means a `comm.*` action, an export, a web fetch or web search, or a shell command that runs curl, wget, scp, ssh, rsync, netcat or git push. A web fetch counts only as outbound, so fetch after fetch does not match.
 - A policy sequence takes `escalate: true`. A call that completes the sequence is then held for a human whatever its score, the same way a destructive call is held.
 
 ### Fixed
 - Sequence patterns match on the classified action type as well as the tool name. The built-in patterns are written in action types (`data.read`, `data.export`), and the scorer compared them with the raw tool name, so they fired only for tools literally named after an action type. `read_file` followed by `export_csv` now matches `data_exfiltration`, and `Read` followed by `WebFetch` matches `read_then_outbound`. The pipeline passes the classified type to the scorer as `action_name`.
+- `vaara hook pre-tool-use` no longer asks a human about a call the agent host's own deny rules refuse. The host applies `permissions.deny` from its settings after the hook, and a deny rule beats the hook's allow, so an approval of such a call changed nothing. Before asking, the hook reads the deny rules in the user settings and in the project's `settings.json` and `settings.local.json`. When a rule certainly matches, the call is blocked with the rule named and the hold is resolved as deny by policy. The hook matches a bare tool name, an MCP server or tool, and `Bash(...)` patterns against each subcommand of a compound command, with quotes respected. Path and domain specifiers are not interpreted, and for those the human is asked as before.
+- An approval that nobody answers before the timeout closes the hold as a deny on the record, with approver `policy` and reviewer `approvals-timeout`. The call was already blocked, but the trail kept an escalation with no resolution, which reads the same as a hold still waiting.
 
 ## [2.3.2] - 2026-10-01
 
