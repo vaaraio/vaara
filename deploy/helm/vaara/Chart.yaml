@@ -9,7 +9,7 @@ description: >-
 type: application
 
 # Chart version, bumped when the templates change.
-version: 0.1.0
+version: 0.1.1
 
 # Application version. tests/test_helm_chart.py asserts this equals
 # vaara.__version__, so a release that bumps the package without bumping the

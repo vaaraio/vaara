@@ -2244,9 +2244,18 @@ def _cmd_receipt_verify_decision(args: argparse.Namespace) -> int:
     db = Path(args.db or Path.home() / ".vaara" / "trail" / "audit.db").expanduser()
     roots = [Path(p).expanduser() for p in args.paths] or [db.parent / dr.RECEIPTS_DIRNAME]
     files: list[Path] = []
+    # The inference proxy writes its signed pairs into the same receipts
+    # directory the chart gives the engine, so a directory walk meets them.
+    # They are a different receipt type with their own verifier; counting
+    # them here as unreadable decision receipts failed every healthy run.
+    inference: list[Path] = []
     for root in roots:
         if root.is_dir():
-            files.extend(sorted(root.rglob("*.json")))
+            for f in sorted(root.rglob("*.json")):
+                if f.name.endswith(("-infer-attest.json", "-infer-receipt.json")):
+                    inference.append(f)
+                else:
+                    files.append(f)
         elif root.is_file():
             files.append(root)
         else:
@@ -2286,7 +2295,28 @@ def _cmd_receipt_verify_decision(args: argparse.Namespace) -> int:
     if not args.json:
         trail_note = "" if hashes is not None else " (no trail to check against)"
         print(f"{len(files) - failed}/{len(files)} verified{trail_note}")
+        if inference:
+            dirs = sorted({str(f.parent) for f in inference})
+            print(f"skipped {len(inference)} inference receipt file(s); check them with "
+                  f"vaara receipt verify-inference --dir {dirs[0]} --pubkey PUBKEY.pem")
     return 1 if failed else 0
+
+
+def _cmd_receipt_verify_inference(args: argparse.Namespace) -> int:
+    """Verify inference-proxy attestation and receipt pairs."""
+    try:
+        from vaara.attestation._inference_verify import main as verify_inference
+    except ImportError:
+        print(_ATTESTATION_HINT, file=sys.stderr)
+        return 2
+    argv: list[str] = [args.receipt] if args.receipt else []
+    for flag, value in (("--attestation", args.attestation), ("--dir", args.dir),
+                        ("--pubkey", args.pubkey), ("--secret", args.secret)):
+        if value:
+            argv += [flag, value]
+    if args.json:
+        argv.append("--json")
+    return verify_inference(argv)
 
 
 def _cmd_receipt_verify(args: argparse.Namespace) -> int:
@@ -6272,6 +6302,23 @@ def build_parser() -> argparse.ArgumentParser:
     )
     prc_dec.add_argument("--json", action="store_true", help="One JSON object per receipt")
     prc_dec.set_defaults(func=_cmd_receipt_verify_decision)
+
+    prc_inf = rcsub.add_parser(
+        "verify-inference",
+        help="Verify the attestation and receipt pairs the inference proxy "
+             "writes per chat call: signatures and the back-link. Requires the "
+             "attestation extra.",
+    )
+    prc_inf.add_argument("receipt", nargs="?", help="One *-infer-receipt.json file")
+    prc_inf.add_argument("--attestation", default=None,
+                         help="The paired *-infer-attest.json; enables the back-link check")
+    prc_inf.add_argument("--dir", default=None,
+                         help="A receipts directory; pairs are matched by filename")
+    prc_inf.add_argument("--pubkey", default=None,
+                         help="PEM public key of the proxy's signing key (ES256 / RS256)")
+    prc_inf.add_argument("--secret", default=None, help="Raw shared-secret file (HS256)")
+    prc_inf.add_argument("--json", action="store_true", help="Emit JSON")
+    prc_inf.set_defaults(func=_cmd_receipt_verify_inference)
 
     prc_ts = rcsub.add_parser(
         "verify-transparency",

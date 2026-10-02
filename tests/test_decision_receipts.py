@@ -180,3 +180,22 @@ def test_vectors(name):
     assert (c.signature_ok, c.evidence_ok, c.trail_ok) == (
         want["signature"], want["evidence"], want["trail"]
     )
+
+
+def test_verify_decision_leaves_the_proxys_inference_pairs_alone(tmp_path, capsys):
+    # The Helm chart points the inference proxy's --receipts-dir at the same
+    # receipts directory the engine writes decision receipts into, so the
+    # default `vaara receipt verify-decision --db` walk meets both. Inference
+    # pairs are a different type; they must not turn a healthy run into exit 1.
+    from vaara.cli import main
+
+    db, trail = _trail(tmp_path)
+    _record(trail, "allow")
+    receipts = db.parent / "receipts"
+    (receipts / "0000000001-abc-infer-attest.json").write_text("{}")
+    (receipts / "0000000001-abc-infer-receipt.json").write_text("{}")
+
+    assert main(["receipt", "verify-decision", "--db", str(db)]) == 0
+    out = capsys.readouterr().out
+    assert "1/1 verified" in out
+    assert "skipped 2 inference receipt file(s)" in out

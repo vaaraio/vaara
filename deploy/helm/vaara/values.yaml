@@ -53,8 +53,10 @@ trail:
 
 # Signed attestation and receipt pairs for every chat call.
 # The chart never generates a key: a template-generated key would rotate on
-# every upgrade and land in the release secret. Create the Secret yourself
-# from `vaara keygen` output and name it here.
+# every upgrade and land in the release secret. Create the Secret yourself and
+# name it here. It holds signing_key.pem, an EC P-256 key from
+# `vaara keygen --attest` for the proxy, and trail_key.pem, an Ed25519 key from
+# `vaara keygen --dev` for `vaara trail export`.
 signing:
   enabled: false
   existingSecret: ""

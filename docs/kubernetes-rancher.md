@@ -70,14 +70,14 @@ a Helm release should not destroy an audit trail. Set
 `persistence.retainOnDelete=false` if you have exported the trail and want the
 volume to go with the release.
 
-Export before you need it. The export is signed, so it needs a key, which
-means this step assumes you have turned on signing (see below):
+Export before you need it. The export is signed with the Ed25519 trail key,
+so this step assumes the signing Secret is in place (see below):
 
 ```
 kubectl -n vaara exec vaara-0 -- vaara trail export \
   --db /var/lib/vaara/audit.db \
   --out /var/lib/vaara/handoff.zip \
-  --key /etc/vaara/signing/signing_key.pem
+  --key /etc/vaara/signing/trail_key.pem
 ```
 
 ## Turning on enforcement
@@ -105,23 +105,36 @@ Observe and enforce both record. Signing also emits an attestation and receipt
 pair per chat call, which is the part a third party can verify without access
 to your cluster.
 
+Two keys are involved, and they are different types:
+
+| File in the Secret | Type | Used by |
+| --- | --- | --- |
+| `signing_key.pem` | EC P-256 (ES256) | the proxy, for attestation and receipt pairs |
+| `trail_key.pem` | Ed25519 | `vaara trail export`, for the signed handoff zip |
+
+The proxy refuses an Ed25519 key and the export refuses an EC key, so one key
+cannot do both jobs. Put both files in one Secret; the chart mounts the whole
+Secret at `/etc/vaara/signing`.
+
 The chart never generates a key. A key minted in a template would rotate on
 every upgrade, and every receipt signed by the old one would stop verifying.
-Create it yourself and hand the chart a Secret:
+Create them yourself and hand the chart the Secret:
 
 ```
-vaara keygen --dev --out signing_key.pem
+vaara keygen --attest --out signing_key.pem
+vaara keygen --dev --out trail_key.pem
 kubectl -n vaara create secret generic vaara-signing \
-  --from-file=signing_key.pem=signing_key.pem
+  --from-file=signing_key.pem=signing_key.pem \
+  --from-file=trail_key.pem=trail_key.pem
 
 helm upgrade vaara ./deploy/helm/vaara --namespace vaara \
   --set signing.enabled=true \
   --set signing.existingSecret=vaara-signing
 ```
 
-`vaara keygen --dev` produces a development key. For anything whose receipts
-you intend to show someone, use a key from your own KMS or HSM and mount it
-the same way. [signing-keys.md](signing-keys.md) covers the options.
+`vaara keygen` writes development keys. For anything whose receipts you intend
+to show someone, use keys from your own KMS or HSM and mount them the same way.
+[signing-keys.md](signing-keys.md) covers the options.
 
 ## Keeping the model reachable only through Vaara
 
@@ -179,6 +192,28 @@ vaara-audit verify ./handoff.zip
 
 Add `--pubkey` if the checker holds the public key separately instead of
 taking the copy inside the zip.
+
+With signing on, the receipts directory on the volume holds two more kinds of
+evidence, each with its own check.
+
+Decision receipts, one per allow, block or escalate decision, are checked
+against the trail they belong to. Run this inside the pod, where it reads the
+live trail safely:
+
+```
+kubectl -n vaara exec vaara-0 -- vaara receipt verify-decision --db /var/lib/vaara/audit.db
+```
+
+The proxy's attestation and receipt pairs, one per chat call, are files that
+never change once written, so they can be copied out and checked anywhere
+against the public half of `signing_key.pem`. The proxy also writes that key
+into the directory as `pubkey.pem`, but a checker should hold its own copy:
+
+```
+openssl pkey -in signing_key.pem -pubout -out signing_pub.pem
+kubectl -n vaara cp vaara/vaara-0:/var/lib/vaara/receipts ./receipts
+vaara receipt verify-inference --dir ./receipts --pubkey signing_pub.pem
+```
 
 Verification is the point of the whole arrangement, so run it on a schedule
 and not only when something looks wrong. A chain that fails verification tells

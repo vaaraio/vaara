@@ -17,7 +17,7 @@ Signing: {{ if .Values.signing.enabled }}on, key from secret {{ .Values.signing.
 3. The trail is a SQLite file on the volume. To hand it to someone who does
    not have cluster access, export it signed and let them verify the export:
 
-     kubectl -n {{ .Release.Namespace }} exec {{ include "vaara.fullname" . }}-0 -- vaara trail export --db {{ .Values.trail.path }} --out /var/lib/vaara/handoff.zip --key KEY
+     kubectl -n {{ .Release.Namespace }} exec {{ include "vaara.fullname" . }}-0 -- vaara trail export --db {{ .Values.trail.path }} --out /var/lib/vaara/handoff.zip --key /etc/vaara/signing/trail_key.pem
      vaara-audit verify handoff.zip
 
 {{ if not .Values.persistence.enabled }}
@@ -33,8 +33,10 @@ agents actually call, then set proxy.mode=enforce with an allow list.
 
 Receipts are off. In observe mode Vaara records what happened; with
 signing.enabled it also emits signed attestation and receipt pairs a third
-party can verify without access to this cluster. Create the key with
-`vaara keygen`, put it in a Secret, and set signing.existingSecret.
+party can verify without access to this cluster. Create an EC P-256 key with
+`vaara keygen --attest` as signing_key.pem and an Ed25519 key with
+`vaara keygen --dev` as trail_key.pem, put both in one Secret, and set
+signing.existingSecret.
 {{- end }}
 
 Supported platforms and the versions this release was tested against:
