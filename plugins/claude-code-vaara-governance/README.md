@@ -88,6 +88,7 @@ The config file, hand-editable:
 | `mode` | `protect` (default), `watch`, `off` | `watch` checks and records everything but never blocks; `off` disables the plugin. |
 | `protection` | `eco`, `balanced` (default), `performance`, `strict` | Policy preset applied to MCP scoring; these are the `vaara mode` presets. |
 | `thresholds` | `{"escalate": E, "deny": D}` with `0 <= E < D <= 1` | Optional custom decision thresholds, overriding the preset's defaults. The preset still provides the rest of the policy shape. Malformed values are ignored. |
+| `policy` | path | A policy file, the format `vaara serve --policy` takes. It replaces `protection` and `thresholds`, and every tool call that passes the deny rules is then scored against it, shell and file calls included, not only `mcp__*` calls and deletes. A policy that cannot be read or fails validation blocks every call, with the reason, unless `mode` is `watch` or `fail_open` is set. Off when absent. |
 | `notifications` | `true` (default), `false` | Desktop popups on block/escalate. |
 | `agent_id` | string | Agent id written to the audit chain (default `claude-code`). |
 | `audit_db` | path | Audit DB path (default `~/.vaara/claude-code/audit.db`). |
@@ -101,6 +102,7 @@ Environment variables override the file (useful for CI or a single session):
 | `VAARA_PLUGIN_DISABLE=1` | Disable the whole plugin. All hooks pass through. |
 | `VAARA_PLUGIN_SHADOW=1` | Same as `"mode": "watch"`: record every decision, never block. |
 | `VAARA_PLUGIN_PROTECTION` | Same as `"protection"`: preset name. |
+| `VAARA_PLUGIN_POLICY` | Same as `"policy"`: path to a policy file. |
 | `VAARA_PLUGIN_NOTIFY=0` | Turn desktop notifications off. |
 | `VAARA_PLUGIN_AGENT_ID` | Override the agent_id written to the audit chain. |
 | `VAARA_PLUGIN_AUDIT_DB` | Override the audit DB path. |
