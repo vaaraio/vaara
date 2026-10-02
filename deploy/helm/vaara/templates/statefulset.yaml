@@ -42,9 +42,14 @@ spec:
         {{- with .Values.podLabels }}
         {{- toYaml . | nindent 8 }}
         {{- end }}
-      {{- with .Values.podAnnotations }}
+      {{- if or .Values.podAnnotations .Values.proxy.policy }}
       annotations:
+        {{- with .Values.podAnnotations }}
         {{- toYaml . | nindent 8 }}
+        {{- end }}
+        {{- if .Values.proxy.policy }}
+        checksum/policy: {{ toJson .Values.proxy.policy | sha256sum }}
+        {{- end }}
       {{- end }}
     spec:
       serviceAccountName: {{ include "vaara.serviceAccountName" . }}
@@ -71,6 +76,10 @@ spec:
             - {{ .Values.upstream.url | quote }}
             - --trail
             - {{ .Values.trail.path | quote }}
+            {{- if .Values.proxy.policy }}
+            - --policy
+            - /etc/vaara/policy/policy.json
+            {{- end }}
             {{- if eq .Values.proxy.mode "enforce" }}
             - --enforce
             {{- range .Values.proxy.allow }}
@@ -118,6 +127,11 @@ spec:
               mountPath: /etc/vaara/signing
               readOnly: true
             {{- end }}
+            {{- if .Values.proxy.policy }}
+            - name: policy
+              mountPath: /etc/vaara/policy
+              readOnly: true
+            {{- end }}
       volumes:
         - name: tmp
           emptyDir: {}
@@ -132,6 +146,11 @@ spec:
           secret:
             secretName: {{ .Values.signing.existingSecret | quote }}
             defaultMode: 0400
+        {{- end }}
+        {{- if .Values.proxy.policy }}
+        - name: policy
+          configMap:
+            name: {{ include "vaara.fullname" . }}-policy
         {{- end }}
       {{- with .Values.nodeSelector }}
       nodeSelector:

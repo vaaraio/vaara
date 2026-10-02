@@ -2550,14 +2550,14 @@ def _cmd_proxy(args: argparse.Namespace) -> int:
         )
         return 2
 
-    if args.enforce and not args.allow and not args.approvals_dir:
+    if (args.enforce and not args.allow and not args.approvals_dir
+            and not args.policy):
         print(
-            "vaara proxy: --enforce needs --allow PATTERN (repeatable) "
-            "and/or --approvals-dir. Without an allow-list every tool call "
-            "is gated and clients appear to lose their tools (nothing is "
-            "damaged, but the session is unusable). Start with --allow "
-            "'mcp__*' and tighten from there, or run without --enforce to "
-            "observe first.",
+            "vaara proxy: --enforce needs --policy FILE, --allow PATTERN "
+            "(repeatable) or --approvals-dir. With none of them the built-in "
+            "defaults decide alone and every escalation fails closed with "
+            "nobody to answer it. Run without --enforce first with your "
+            "policy, read `vaara trail shadow-report`, then enforce.",
             file=sys.stderr,
         )
         return 2
@@ -2574,6 +2574,20 @@ def _cmd_proxy(args: argparse.Namespace) -> int:
     trail = backend.load_trail()
     trail._on_record = backend.write_record
     pipeline = InterceptionPipeline(trail=trail, enforce=args.enforce)
+    if args.policy:
+        from vaara.policy.validate import validate_source
+
+        policy_path = Path(args.policy).expanduser()
+        policy, report = validate_source(policy_path)
+        if policy is None:
+            print(f"vaara proxy: policy {policy_path} failed validation:",
+                  file=sys.stderr)
+            for issue in report.issues:
+                print(f"  {issue.level.value}: {issue.message}", file=sys.stderr)
+            return 2
+        # Same rebinding `vaara serve` and vaara-mcp-proxy do: thresholds,
+        # per-tool overrides and sequence patterns come from the policy.
+        pipeline.scorer.apply_policy(policy)
 
     emitter = None
     if args.signing_key:
@@ -2608,7 +2622,8 @@ def _cmd_proxy(args: argparse.Namespace) -> int:
     )
     mode = "enforce" if args.enforce else "observe"
     print(f"vaara proxy: listening on {host}:{port} -> {args.upstream}, "
-          f"trail {trail_path}, mode {mode}")
+          f"trail {trail_path}, mode {mode}, "
+          f"policy {args.policy or 'built-in defaults'}")
 
     import uvicorn
 
@@ -6447,6 +6462,14 @@ def build_parser() -> argparse.ArgumentParser:
     pproxy.add_argument(
         "--approvals-timeout", type=float, default=60.0,
         help="Seconds to wait for a human decision (default 60)",
+    )
+    pproxy.add_argument(
+        "--policy", default=None,
+        help="YAML or JSON policy file (thresholds, per-tool overrides, "
+             "sequences) applied to the pipeline. Same format as `vaara "
+             "serve --policy`; check it first with `vaara policy validate`. "
+             "In observe mode the policy decides what the trail records as "
+             "would-have-been blocked. YAML needs the [yaml] extra.",
     )
     pproxy.add_argument(
         "--signing-key", default=None,

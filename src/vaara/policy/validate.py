@@ -78,7 +78,8 @@ def validate(policy: Policy) -> ValidationReport:
     if not action_class_names:
         issues.append(PolicyIssue(
             IssueLevel.WARNING, "no_action_classes", "action_classes",
-            "policy declares no action classes — pipeline cannot route any tool",
+            "policy declares no action classes: tools are classified by the "
+            "built-in taxonomy, and threshold overrides still apply by tool name",
         ))
 
     default = policy.thresholds_default
@@ -94,8 +95,9 @@ def validate(policy: Policy) -> ValidationReport:
         if name not in action_class_names:
             issues.append(PolicyIssue(
                 IssueLevel.WARNING, "threshold_override_dangling", path,
-                f"threshold override targets action class {name!r} that is not "
-                f"declared in action_classes — override will never fire",
+                f"threshold override names {name!r}, which action_classes does "
+                f"not declare. It applies to a tool called exactly {name!r} and "
+                f"to nothing else, so check the spelling",
             ))
         merged = policy.threshold_for(name)
         if merged.deny - merged.escalate < _MIN_THRESHOLD_GAP:

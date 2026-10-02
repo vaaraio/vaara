@@ -111,3 +111,88 @@ def test_observe_mode_needs_no_allow(monkeypatch):
         lambda **k: object())
     monkeypatch.setattr("uvicorn.run", lambda *a, **k: None)
     assert cli.main(["proxy", "--trail", "/tmp/t-obs.db"]) == 0
+
+
+# --- --policy: the organisation's rules on the model proxy -------------------
+#
+# Found running v2.5.0 on the Kubernetes path: with only the built-in defaults,
+# enforce mode let a shell command, an outbound email and a large transfer
+# through, because nothing let the operator's policy reach this proxy.
+
+_POLICY = {
+    "version": "0.1",
+    "domains": ["eu_ai_act"],
+    "action_classes": {},
+    "thresholds": {
+        "default": {"escalate": 0.35, "deny": 0.65},
+        "shell.exec": {"escalate": 0.01, "deny": 0.1},
+        "email.send": {"escalate": 0.01},
+    },
+}
+
+
+def _capture_pipeline(monkeypatch) -> dict:
+    captured: dict = {}
+
+    def fake_build_app(**kwargs):
+        captured.update(kwargs)
+        return object()
+
+    monkeypatch.setattr(
+        "vaara.integrations._infer_proxy_app.build_app", fake_build_app)
+    monkeypatch.setattr("uvicorn.run", lambda *a, **k: None)
+    return captured
+
+
+def _decide(pipeline, tool: str, parameters: dict) -> str:
+    return pipeline.intercept(
+        agent_id="infer-proxy", tool_name=tool, parameters=parameters,
+    ).decision
+
+
+def test_policy_decides_on_the_model_proxy(tmp_path, monkeypatch):
+    import json
+
+    policy = tmp_path / "policy.json"
+    policy.write_text(json.dumps(_POLICY), encoding="utf-8")
+    captured = _capture_pipeline(monkeypatch)
+    rc = main(["proxy", "--enforce", "--policy", str(policy),
+               "--trail", str(tmp_path / "t.db")])
+    assert rc == 0
+    pipeline = captured["pipeline"]
+    assert _decide(pipeline, "shell.exec",
+                   {"command": "sudo systemctl stop firewalld"}) == "deny"
+    assert _decide(pipeline, "email.send",
+                   {"to": "someone@example.org"}) == "escalate"
+
+
+def test_without_a_policy_the_defaults_decide(tmp_path, monkeypatch):
+    captured = _capture_pipeline(monkeypatch)
+    rc = main(["proxy", "--enforce", "--allow", "fs.*",
+               "--trail", str(tmp_path / "t.db")])
+    assert rc == 0
+    assert _decide(captured["pipeline"], "shell.exec",
+                   {"command": "sudo systemctl stop firewalld"}) == "allow"
+
+
+def test_an_invalid_policy_refuses_to_start(tmp_path, fake_uvicorn, capsys):
+    import json
+
+    bad = dict(_POLICY, thresholds={"default": {"escalate": 0.9, "deny": 0.1}})
+    policy = tmp_path / "policy.json"
+    policy.write_text(json.dumps(bad), encoding="utf-8")
+    rc = main(["proxy", "--policy", str(policy),
+               "--trail", str(tmp_path / "t.db")])
+    assert rc == 2
+    assert fake_uvicorn == []
+    assert "failed validation" in capsys.readouterr().err
+
+
+def test_enforce_with_only_a_policy_starts(tmp_path, monkeypatch):
+    import json
+
+    policy = tmp_path / "policy.json"
+    policy.write_text(json.dumps(_POLICY), encoding="utf-8")
+    _capture_pipeline(monkeypatch)
+    assert main(["proxy", "--enforce", "--policy", str(policy),
+                 "--trail", str(tmp_path / "t.db")]) == 0

@@ -56,8 +56,8 @@ cluster with an argparse error in the logs.
 {{- fail (printf "proxy.mode must be \"observe\" or \"enforce\", got %q" .Values.proxy.mode) -}}
 {{- end -}}
 {{- if eq .Values.proxy.mode "enforce" -}}
-{{- if and (not .Values.proxy.allow) (not .Values.proxy.approvals.enabled) -}}
-{{- fail "proxy.mode=enforce needs proxy.allow (tool-name globs) and/or proxy.approvals.enabled. With neither, every tool call is gated and clients appear to lose their tools. Nothing is damaged, but the session is unusable. Start with proxy.allow: ['mcp__*'] and tighten, or run observe first." -}}
+{{- if and (not .Values.proxy.allow) (not .Values.proxy.approvals.enabled) (not .Values.proxy.policy) -}}
+{{- fail "proxy.mode=enforce needs proxy.policy, proxy.allow (tool-name globs) or proxy.approvals.enabled. With none of them, the built-in defaults decide alone and every escalation fails closed with nobody to answer it. Run observe first with your policy, read `vaara trail shadow-report`, then enforce." -}}
 {{- end -}}
 {{- end -}}
 {{- if .Values.signing.enabled -}}

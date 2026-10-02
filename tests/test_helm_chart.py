@@ -307,3 +307,55 @@ def test_the_helm_test_pod_checks_vaara_not_the_model():
     assert pod["metadata"]["annotations"]["helm.sh/hook"] == "test"
     command = json.dumps(pod["spec"]["containers"][0]["command"])
     assert "/healthz" in command
+
+
+_POLICY_JSON = json.dumps({
+    "version": "0.1",
+    "domains": ["eu_ai_act"],
+    "action_classes": {},
+    "thresholds": {
+        "default": {"escalate": 0.35, "deny": 0.65},
+        "shell.exec": {"escalate": 0.01, "deny": 0.1},
+    },
+})
+
+
+def test_a_policy_reaches_the_proxy_as_json():
+    done = subprocess.run(
+        [_helm(), "template", "release", str(CHART),
+         "--set-json", f"proxy.policy={_POLICY_JSON}"],
+        capture_output=True, text=True, timeout=120,
+    )
+    assert done.returncode == 0, done.stderr
+    docs = [doc for doc in _yaml().safe_load_all(done.stdout) if doc]
+    config = next(doc for doc in docs if doc["kind"] == "ConfigMap")
+    assert json.loads(config["data"]["policy.json"]) == json.loads(_POLICY_JSON)
+    sts = next(doc for doc in docs if doc["kind"] == "StatefulSet")
+    pod = sts["spec"]["template"]
+    args = pod["spec"]["containers"][0]["args"]
+    assert args[args.index("--policy") + 1] == "/etc/vaara/policy/policy.json"
+    volume = next(v for v in pod["spec"]["volumes"] if v["name"] == "policy")
+    assert volume["configMap"]["name"] == config["metadata"]["name"]
+    # A changed policy has to roll the pod, or the old one keeps deciding.
+    assert pod["metadata"]["annotations"]["checksum/policy"]
+
+
+def test_no_policy_renders_no_configmap_and_no_flag():
+    done = subprocess.run(
+        [_helm(), "template", "release", str(CHART)],
+        capture_output=True, text=True, timeout=120,
+    )
+    assert done.returncode == 0, done.stderr
+    docs = [doc for doc in _yaml().safe_load_all(done.stdout) if doc]
+    assert not any(doc["kind"] == "ConfigMap" for doc in docs)
+    sts = next(doc for doc in docs if doc["kind"] == "StatefulSet")
+    assert "--policy" not in sts["spec"]["template"]["spec"]["containers"][0]["args"]
+
+
+def test_enforce_with_only_a_policy_renders():
+    done = subprocess.run(
+        [_helm(), "template", "release", str(CHART),
+         "--set", "proxy.mode=enforce", "--set-json", f"proxy.policy={_POLICY_JSON}"],
+        capture_output=True, text=True, timeout=120,
+    )
+    assert done.returncode == 0, done.stderr

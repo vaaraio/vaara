@@ -18,11 +18,16 @@ Point `upstream.url` at your model service inside the cluster. The default is
 `http://ollama.suse-ai.svc.cluster.local:11434`. Vaara decides what leaves, so
 it should be the only workload that can reach the model directly.
 
+Put your policy in `proxy.policy`: default thresholds, per-tool overrides and
+sequence patterns, the format `vaara policy validate` checks. Without one the
+built-in defaults decide, and they hold back very little at first.
+
 Leave `proxy.mode` on `observe` for the first install. Observe records every
-tool call and changes nothing. Enforce also gates: denied calls are rewritten
-out of the response, and escalations wait on a human decision. An enforce
-deployment with an empty `proxy.allow` list gates every tool call, and clients
-see their tools disappear.
+tool call, changes nothing, and records what your policy would have blocked;
+`vaara trail shadow-report` sums it up. Enforce also gates: denied calls are
+rewritten out of the response, and escalations wait on a human decision.
+Enforce needs `proxy.policy`, `proxy.allow` or the approvals handshake, and
+the chart refuses to render it with none of them.
 
 You need a StorageClass providing ReadWriteOnce. On RKE2 that is usually
 `local-path`. The chart keeps the volume on uninstall, because the trail is the
