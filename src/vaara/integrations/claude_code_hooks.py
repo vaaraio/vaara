@@ -119,6 +119,33 @@ def protection_preset(cfg: dict) -> Optional[str]:
     return preset if isinstance(preset, str) and preset else None
 
 
+def policy_path(cfg: dict) -> Optional[Path]:
+    """The operator's policy file, the format ``vaara serve --policy`` takes."""
+    raw = os.environ.get("VAARA_PLUGIN_POLICY") or cfg.get("policy")
+    return Path(raw).expanduser() if isinstance(raw, str) and raw else None
+
+
+def load_policy(cfg: dict):
+    """The configured policy, or why it could not be loaded.
+
+    Returns ``(None, None)`` when no policy is configured, ``(policy, None)``
+    when it loaded, and ``(None, reason)`` when it is named and unusable.
+    """
+    path = policy_path(cfg)
+    if path is None:
+        return None, None
+    try:
+        from vaara.policy.validate import validate_source
+
+        policy, report = validate_source(path)
+    except Exception as exc:
+        return None, f"policy {path} could not be read ({exc!r})"
+    if policy is None:
+        issues = "; ".join(issue.message for issue in report.issues)
+        return None, f"policy {path} failed validation: {issues}"
+    return policy, None
+
+
 def article50_statement(cfg: dict) -> Optional[str]:
     statement = (
         os.environ.get("VAARA_PLUGIN_ARTICLE50_STATEMENT")
@@ -497,7 +524,12 @@ def run_pre_tool_use(deny_patterns: Optional[str] = None,
 
 
 def _apply_protection(cfg: dict, pipeline) -> None:
-    """Bind the configured preset and custom thresholds to the scorer."""
+    """Bind the configured policy, or else the preset and custom thresholds,
+    to the scorer. A policy file is the whole policy and replaces both."""
+    policy, _ = load_policy(cfg)
+    if policy is not None:
+        pipeline.scorer.apply_policy(policy)
+        return
     preset = protection_preset(cfg)
     custom = custom_thresholds(cfg)
     if preset or custom:
@@ -622,7 +654,24 @@ def _decide_pre(cfg: dict, events: list[dict], agent: str,
 
     from vaara.scorer._param_signals import destructive_action
 
-    if not tool_name.startswith("mcp__") and not destructive_action(tool_name, tool_input):
+    policy, policy_error = load_policy(cfg)
+    if policy_error is not None:
+        # The operator named a policy and believes it decides. Deciding on
+        # the defaults instead would be the hook claiming what it does not do.
+        if shadow or fail_open(cfg):
+            _emit(f"vaara-governance: {policy_error}; deciding {tool_name} "
+                  f"WITHOUT the policy.")
+        else:
+            _emit(f"vaara-governance: BLOCKED {tool_name} (fail-closed): "
+                  f"{policy_error}. Fix the file, or remove \"policy\" from "
+                  f"~/.vaara/claude-code/config.json.")
+            notify(cfg, "BLOCKED", tool_name, policy_error)
+            return 2
+
+    if (policy is None and not tool_name.startswith("mcp__")
+            and not destructive_action(tool_name, tool_input)):
+        # With a policy configured every call is the policy's to decide, so
+        # this shortcut is taken only without one.
         # Passed the deny rules. Record it anyway: a trail holding only
         # the blocked calls cannot answer "what did the agent do", which
         # is the question it exists for, and PostToolUse needs an

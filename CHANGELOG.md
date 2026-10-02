@@ -6,6 +6,13 @@ and this project follows [Semantic Versioning](https://semver.org/spec/v2.0.0.ht
 
 ## [Unreleased]
 
+### Added
+- `vaara llm-proxy --policy FILE` scores the tool calls in model replies against a policy, the format `vaara serve --policy` takes. A call no deny rule matches is scored under its own name, and with `--enforce` a call the policy denies or holds for a human is taken out of the reply and replaced by text naming the policy verdict. The proxy has no approval channel, so a held call is refused and the hold is closed on the record as a deny by policy. An invalid policy stops the proxy at startup. Without the flag nothing changes.
+- The Claude Code hook takes a policy file: `"policy"` in `~/.vaara/claude-code/config.json`, or `VAARA_PLUGIN_POLICY`. It replaces the preset and custom thresholds, and every call that passes the deny rules is scored against it, shell and file calls included. A policy that cannot be read or fails validation blocks every call with the reason, unless the hook is in watch mode or `fail_open` is set. Without the key nothing changes.
+
+### Fixed
+- The shell command, outbound email and transfer of 250,000 that v2.5.0's model proxy let through in enforce mode also went through the llm-proxy and the Claude Code hook, and neither could be given the operator's policy. The llm-proxy decided tool calls by the deny rules alone, and no rule names any of the three; the hook passed a shell call that deletes nothing without scoring it, and could not load a policy. `tests/test_hostile_replay_per_surface.py` replays the three calls on the hook, the MCP proxy, the model proxy and the llm-proxy, each loaded with one policy, and requires each to be refused or held while a plain read still passes.
+
 ## [2.6.0] - 2026-10-02
 
 ### Added

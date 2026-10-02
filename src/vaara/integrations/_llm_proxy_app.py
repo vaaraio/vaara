@@ -116,7 +116,8 @@ def build_app(*, upstream: str, api_key: Optional[str], api_key_header: str,
               marker_watch: Optional[Any] = None,
               compact_keep_turns: int = 0,
               fail_open: bool = False,
-              gate_tool_calls: bool = True) -> FastAPI:
+              gate_tool_calls: bool = True,
+              score_tool_calls: bool = False) -> FastAPI:
     app = FastAPI(title="Vaara LLM Proxy")
     # This proxy holds the operator's upstream provider key and injects it
     # into every forwarded call, and it binds loopback with no inbound
@@ -437,8 +438,10 @@ def build_app(*, upstream: str, api_key: Optional[str], api_key_header: str,
             return JSONResponse({"error": f"upstream: {exc}"}, status_code=502)
 
         # Every tool call the model asks for goes through the deny rules
-        # before the agent sees it. See _llm_proxy_toolgate.
-        gate = ToolGate(pipeline, agent_id, enforce) if gate_tool_calls else None
+        # before the agent sees it, and through the policy when one is
+        # loaded. See _llm_proxy_toolgate.
+        gate = (ToolGate(pipeline, agent_id, enforce, score=score_tool_calls)
+                if gate_tool_calls else None)
 
         if is_stream:
             return StreamingResponse(

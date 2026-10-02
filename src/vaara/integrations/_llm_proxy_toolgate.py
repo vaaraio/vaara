@@ -63,21 +63,55 @@ def tool_args(raw: Any) -> dict:
 
 
 def refusal_text(name: str, verdict: Verdict) -> str:
-    return (f"[Vaara refused the tool call {name} (rule {verdict.rule_id}): "
-            f"{verdict.message}]")
+    by = (verdict.rule_id if verdict.rule_id.startswith("policy ")
+          else f"rule {verdict.rule_id}")
+    return f"[Vaara refused the tool call {name} ({by}): {verdict.message}]"
 
 
 class ToolGate:
     """Decides and records the tool calls in one reply."""
 
     def __init__(self, pipeline: Any, agent_id: str, enforce: bool,
-                 rules: Optional[list] = None):
+                 rules: Optional[list] = None, score: bool = False):
         self.pipeline = pipeline
         self.agent_id = agent_id
         self.enforce = enforce
         self.rules = load_deny_rules() if rules is None else rules
+        # With a policy loaded (``--policy``), a call no rule matches is also
+        # scored under its own name. No rule names a shell command that
+        # deletes nothing, an email or a transfer, so without this the
+        # operator's policy never reached them on this surface.
+        self.score = score
         self.refused = 0
         self.passed = 0
+
+    def _score(self, name: str, args: dict) -> Optional[tuple[str, str, str]]:
+        """``(decision, reason, action_id)`` from the policy; None if it allows.
+
+        This proxy has no approval channel, so under enforcement a call the
+        policy holds for a human is refused, and the hold is closed on the
+        record as a deny by policy rather than left reading as one waiting.
+        """
+        try:
+            result = self.pipeline.intercept(agent_id=self.agent_id,
+                                             tool_name=name, parameters=args)
+        except Exception as exc:
+            logger.error("policy could not decide tool call %s: %r", name, exc)
+            return ("deny", f"the policy could not decide this call ({exc!r})", "")
+        if result.decision == "allow":
+            return None
+        if result.decision == "escalate" and self.enforce:
+            try:
+                self.pipeline.resolve_escalation(
+                    result.action_id, "deny", reviewer="llm-proxy",
+                    justification=("held for a human; the llm-proxy has no "
+                                   "approval channel, so the hold is refused"),
+                    approver="policy",
+                )
+            except Exception as exc:
+                logger.error("could not record resolution of %s: %r",
+                             result.action_id, exc)
+        return (result.decision, result.reason, result.action_id)
 
     def match(self, name: str, args: dict) -> Optional[tuple[str, str]]:
         hit = match_deny_rule(self.rules, name, args)
@@ -95,7 +129,19 @@ class ToolGate:
         params: dict[str, Any] = {"tool": name, "args_sha256": digest,
                                   "enforce": self.enforce}
         kwargs: dict[str, Any] = {}
-        if hit is not None:
+        scored = self._score(name, args) if hit is None and self.score else None
+        if scored is not None:
+            decision, reason, action_id = scored
+            # Recorded as the policy's verdict, never as a rule match: a
+            # reader looking for a rule's denials must not find these.
+            params.update(policy_verdict=decision, policy_reason=reason,
+                          scored_action_id=action_id, enforced=self.enforce)
+            if self.enforce:
+                kwargs = {"policy_decision": "deny",
+                          "policy_reason": f"policy {decision}: {reason}",
+                          "policy_id": f"policy:{decision}"}
+            hit = (f"policy {decision}", reason)
+        elif hit is not None:
             params.update(rule_id=hit[0], rule_message=hit[1],
                           enforced=self.enforce)
             if self.enforce:

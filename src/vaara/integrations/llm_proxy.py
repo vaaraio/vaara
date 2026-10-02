@@ -6,8 +6,9 @@ Governs ``POST /v1/chat/completions``, ``POST /v1/messages`` and
 ``POST /v1/responses``: each call is checked against the model and rate policy
 and recorded in the Vaara audit trail with its prompt. Every other call is recorded by method, path, size and
 sha256. Every tool call a model reply asks for on those three paths, streamed
-or not, is run through the deny rules and recorded; with ``--enforce`` a rule
-hit is taken out of the reply and replaced by text naming the rule, so the
+or not, is run through the deny rules, and through the policy given with
+``--policy``, and recorded; with ``--enforce`` a rule hit or a call the policy
+denies or holds is taken out of the reply and replaced by text naming the rule, so the
 agent never gets a call to run. The secrets named in ``--seal-file`` are
 replaced on every path before the request leaves. Nothing beyond those values is removed from a request;
 ``--redact`` masks only the trail's copy of the prompt.
@@ -38,7 +39,7 @@ from __future__ import annotations
 import sys
 import time
 from pathlib import Path
-from typing import Optional
+from typing import Any, Optional
 
 from vaara import __version__ as _VAARA_VERSION
 from vaara.audit.sqlite_backend import SQLiteAuditBackend
@@ -52,7 +53,8 @@ DESCRIPTION = (
     "Govern LLM API calls. POST /v1/chat/completions, POST /v1/messages and "
     "POST /v1/responses are checked against the model and rate policy and "
     "recorded in the Vaara audit trail with their prompt, and every tool "
-    "call in their replies goes through the deny rules and is recorded. "
+    "call in their replies goes through the deny rules, and through the "
+    "policy given with --policy, and is recorded. "
     "Every other call is recorded by method, "
     "path, size and sha256, never by content. The secrets named in "
     "--seal-file are replaced on every path before the request leaves. "
@@ -64,8 +66,10 @@ DESCRIPTION = (
 )
 
 
-def _build_pipeline(db: Optional[Path] = None) -> InterceptionPipeline:
-    """Create a pipeline with LLM action types registered."""
+def _build_pipeline(db: Optional[Path] = None,
+                    policy: Optional[Any] = None) -> InterceptionPipeline:
+    """Create a pipeline with LLM action types registered, and the
+    operator's policy bound to its scorer when one is given."""
     registry = create_default_registry()
     for at in LLM_ACTIONS:
         registry.register(at)
@@ -75,7 +79,10 @@ def _build_pipeline(db: Optional[Path] = None) -> InterceptionPipeline:
         trail = SQLiteAuditBackend(str(db)).load_trail()
     else:
         trail = None
-    return InterceptionPipeline(registry=registry, trail=trail)
+    pipeline = InterceptionPipeline(registry=registry, trail=trail)
+    if policy is not None:
+        pipeline.scorer.apply_policy(policy)
+    return pipeline
 
 
 def add_arguments(parser): ...
@@ -160,6 +167,17 @@ def main(args: Optional[list[str]] = None) -> int:
              "refused with 403, and a tool call in a model reply that a deny "
              "rule matches is taken out of the reply and replaced by text "
              "naming the rule. Without it both are recorded and forwarded.",
+    )
+    p.add_argument(
+        "--policy", default=None, metavar="FILE",
+        help="Policy file (thresholds, per-tool overrides, sequence "
+             "patterns), the format `vaara serve --policy` takes. A tool "
+             "call in a model reply that no deny rule matches is then also "
+             "scored under its own name, and with --enforce a call the "
+             "policy denies or holds for a human is taken out of the reply. "
+             "This proxy has no approval channel, so a held call is refused "
+             "and the hold is closed on the record as a deny by policy. "
+             "An invalid policy stops the proxy at startup.",
     )
     p.add_argument(
         "--model-allow", action="append", default=None, metavar="GLOB",
@@ -293,7 +311,20 @@ def main(args: Optional[list[str]] = None) -> int:
     if not trail_path:
         trail_path = str(Path.home() / ".vaara" / "llm-proxy" / "audit.db")
 
-    pipeline = _build_pipeline(Path(trail_path).expanduser())
+    policy = None
+    if parsed.policy:
+        from vaara.policy.validate import validate_source
+
+        policy_path = Path(parsed.policy).expanduser()
+        policy, report = validate_source(policy_path)
+        if policy is None:
+            print(f"vaara llm-proxy: policy {policy_path} failed validation:",
+                  file=sys.stderr)
+            for issue in report.issues:
+                print(f"  {issue.level.value}: {issue.message}", file=sys.stderr)
+            return 2
+
+    pipeline = _build_pipeline(Path(trail_path).expanduser(), policy=policy)
 
     try:
         from uvicorn import Config, Server
@@ -362,6 +393,7 @@ def main(args: Optional[list[str]] = None) -> int:
         marker_watch=markers,
         compact_keep_turns=parsed.compact_history,
         fail_open=parsed.fail_open,
+        score_tool_calls=policy is not None,
     )
 
     seal_note = f", sealing {seal.named} named secret(s)" if seal.named \
@@ -372,6 +404,8 @@ def main(args: Optional[list[str]] = None) -> int:
         seal_note += f", watching {len(markers)} marker(s)"
     if parsed.compact_history > 0:
         seal_note += f", compacting history beyond {parsed.compact_history} turn(s)"
+    if policy is not None:
+        seal_note += f", tool calls scored against policy {parsed.policy}"
     if parsed.fail_open:
         seal_note += ", FAIL-OPEN (forwards requests it cannot record)"
 
