@@ -6,6 +6,15 @@ and this project follows [Semantic Versioning](https://semver.org/spec/v2.0.0.ht
 
 ## [Unreleased]
 
+## [2.6.0] - 2026-10-02
+
+### Added
+- `vaara proxy --policy FILE` loads a policy into the model proxy: default thresholds, per-tool overrides and sequence patterns, the same format `vaara serve --policy` takes. An invalid policy stops the proxy at startup with the validation errors. Before this the proxy, which the Helm chart runs, decided with the built-in defaults only, and in enforce mode those let a shell command, an outbound email and a large transfer through.
+- Helm chart 0.2.0: `proxy.policy` takes the policy as YAML, renders it to JSON in a ConfigMap and passes it with `--policy`. A changed policy restarts the pod. Enforce now renders with a policy alone; it still refuses with no policy, no allow list and no approvals.
+
+### Fixed
+- `vaara policy validate` warned that a threshold override for a tool not declared in `action_classes` would never fire, and that a policy with no action classes could not route any tool. Both were wrong: overrides apply by exact tool name, and undeclared tools are classified by the built-in taxonomy. The warnings now say what happens.
+
 ## [2.5.0] - 2026-10-02
 
 ### Added

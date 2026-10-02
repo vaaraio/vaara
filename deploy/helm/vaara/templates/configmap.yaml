@@ -1,0 +1,19 @@
+{{/*
+SPDX-FileCopyrightText: 2026 Henri Sirkkavaara
+SPDX-License-Identifier: AGPL-3.0-or-later
+
+The policy as JSON, so the image needs no YAML parser. The StatefulSet carries
+a checksum of this file, so a changed policy rolls the pod rather than waiting
+for the next restart.
+*/}}
+{{- if .Values.proxy.policy }}
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: {{ include "vaara.fullname" . }}-policy
+  labels:
+    {{- include "vaara.labels" . | nindent 4 }}
+data:
+  policy.json: |
+    {{- toPrettyJson .Values.proxy.policy | nindent 4 }}
+{{- end }}

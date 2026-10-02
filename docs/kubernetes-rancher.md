@@ -80,24 +80,62 @@ kubectl -n vaara exec vaara-0 -- vaara trail export \
   --key /etc/vaara/signing/trail_key.pem
 ```
 
+## Your policy
+
+The proxy decides each tool call against a policy: default thresholds,
+per-tool overrides keyed on the exact tool name, and sequence patterns. Put
+yours in `proxy.policy` as YAML. The chart renders it to JSON in a ConfigMap,
+passes it with `--policy`, and restarts the pod when it changes.
+
+```yaml
+# policy-values.yaml
+proxy:
+  policy:
+    version: "0.1"
+    domains: [eu_ai_act]
+    action_classes: {}
+    thresholds:
+      default: {escalate: 0.35, deny: 0.65}
+      shell.exec: {escalate: 0.01, deny: 0.1}
+      email.send: {escalate: 0.01}
+```
+
+Check it before installing. Write the same policy as a file and run
+`vaara policy validate policy.yaml`, and `vaara policy test` runs it against
+cases you write down.
+
+Without a policy the built-in defaults decide, and before the scorer has
+seen any outcomes they hold back very little. Write the policy first.
+
 ## Turning on enforcement
 
-Enforce mode gates instead of observing. Denied tool calls are rewritten out
-of the model's response and escalations block on the approvals handshake.
+Run observe with your policy first. Observe never blocks, but the trail
+records the decision the policy would have made, and the shadow report sums
+it up:
 
-An enforce deployment with no allow list gates every tool call, and clients
-see their tools disappear. Nothing is damaged and the trail records all of
-it, but the session is unusable. The chart refuses to render that
-configuration rather than let you find out in a crash loop.
+```
+kubectl -n vaara exec vaara-0 -- vaara trail shadow-report --db /var/lib/vaara/audit.db
+```
 
-Start wide and tighten:
+Enforce mode then gates. Denied tool calls are rewritten out of the model's
+response, and escalations block on the approvals handshake, or fail closed
+when no one can answer. A streamed reply is buffered, then replayed as it
+was when everything is allowed, or replaced with a policy message when
+anything is denied.
+
+Enforce needs a policy, an allow list or the approvals handshake. With none
+of them the chart refuses to render, rather than let you find out in a crash
+loop.
 
 ```
 helm upgrade vaara ./deploy/helm/vaara \
   --namespace vaara \
-  --set proxy.mode=enforce \
-  --set 'proxy.allow[0]=mcp__*'
+  -f policy-values.yaml \
+  --set proxy.mode=enforce
 ```
+
+`proxy.allow` takes tool-name globs that pass without being decided, for
+tools you trust outright. They are still recorded.
 
 ## Signed receipts
 

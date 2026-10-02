@@ -28,13 +28,30 @@ proxy:
   # observe records every tool call the model requests and changes nothing.
   # enforce also gates: denied calls are rewritten out of the response and
   # escalations block on the approvals handshake.
-  # Start on observe. An enforce deployment with no allow list gates every
-  # tool call, and clients see their tools vanish.
+  # Start on observe. Enforce needs a policy, an allow list or the approvals
+  # handshake; the chart refuses to render it with none of them.
   mode: observe
 
   # Tool-name globs that pass without gating under enforce. Ignored in
   # observe mode. Allowed calls are still recorded.
   allow: []
+
+  # The organisation's own policy: default thresholds, per-tool overrides and
+  # sequence patterns, in the format `vaara policy validate` checks. Written
+  # here as YAML, rendered to JSON in a ConfigMap and passed with --policy;
+  # changing it restarts the pod. Empty uses the built-in defaults, which hold
+  # back very little under enforce. In observe mode the policy decides what
+  # the trail records as would-have-been blocked (`vaara trail shadow-report`).
+  # Example:
+  #   policy:
+  #     version: "0.1"
+  #     domains: [eu_ai_act]
+  #     action_classes: {}
+  #     thresholds:
+  #       default: {escalate: 0.35, deny: 0.65}
+  #       shell.exec: {escalate: 0.01, deny: 0.1}
+  #       email.send: {escalate: 0.01}
+  policy: {}
 
   approvals:
     # Mounts a directory a human decision writes into. Without it, an

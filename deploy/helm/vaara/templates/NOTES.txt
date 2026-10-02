@@ -3,6 +3,7 @@ Vaara {{ .Chart.AppVersion }} is installed as {{ include "vaara.fullname" . }}.
 Mode: {{ .Values.proxy.mode }}{{ if eq .Values.proxy.mode "observe" }} (records every tool call the model requests, changes nothing){{ else }} (gates: denied tool calls are rewritten out of the response){{ end }}
 Upstream: {{ .Values.upstream.url }}
 Trail: {{ .Values.trail.path }}{{ if not .Values.persistence.enabled }}  <-- on an emptyDir, discarded when the pod restarts{{ end }}
+Policy: {{ if .Values.proxy.policy }}from proxy.policy (ConfigMap {{ include "vaara.fullname" . }}-policy){{ else }}built-in defaults (set proxy.policy to decide with your own){{ end }}
 Signing: {{ if .Values.signing.enabled }}on, key from secret {{ .Values.signing.existingSecret }}{{ else }}off (no attestation or receipt pairs are produced){{ end }}
 
 1. Point your agents at Vaara instead of at the model:
@@ -27,7 +28,11 @@ test only.
 {{ end }}
 {{- if eq .Values.proxy.mode "observe" }}
 Nothing is being blocked. Run in observe until the trail shows you what your
-agents actually call, then set proxy.mode=enforce with an allow list.
+agents actually call and what your policy would have stopped:
+
+     kubectl -n {{ .Release.Namespace }} exec {{ include "vaara.fullname" . }}-0 -- vaara trail shadow-report --db {{ .Values.trail.path }}
+
+then set proxy.mode=enforce.
 {{- end }}
 {{- if not .Values.signing.enabled }}
 
