@@ -32,8 +32,11 @@ evidence. Set `persistence.retainOnDelete: false` once you have exported it.
 
 Signed attestation and receipt pairs need a key, and the chart will not
 generate one. A template-generated key rotates on every upgrade and lands in
-the release secret. Create the Secret yourself from `vaara keygen` output and
-name it in `signing.existingSecret`.
+the release secret. Create the Secret yourself and name it in
+`signing.existingSecret`. It holds two files: `signing_key.pem`, an EC P-256
+key from `vaara keygen --attest` that the proxy signs receipts with, and
+`trail_key.pem`, an Ed25519 key from `vaara keygen --dev` that signs trail
+exports.
 
 ## Requirements
 

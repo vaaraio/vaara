@@ -6,6 +6,14 @@ and this project follows [Semantic Versioning](https://semver.org/spec/v2.0.0.ht
 
 ## [Unreleased]
 
+### Added
+- `vaara receipt verify-inference` checks the attestation and receipt pairs the inference proxy writes per chat call, one file or a whole receipts directory, against the proxy's public key. It was reachable only as a private module before.
+
+### Fixed
+- The Rancher guide and the Helm chart told operators to create one signing key with `vaara keygen` and use it for both the proxy and `vaara trail export`. The proxy needs an EC P-256 key and the export needs an Ed25519 key, so following the guide made one of the two commands fail. The guide, the chart's readme, NOTES and values now create both keys into one Secret: `signing_key.pem` from `vaara keygen --attest` and `trail_key.pem` from `vaara keygen --dev`. Helm chart 0.1.1.
+- `vaara receipt verify-decision` walked the whole receipts directory and reported the inference proxy's `*-infer-attest.json` and `*-infer-receipt.json` files as unreadable decision receipts. The Helm chart puts both kinds in the same directory, so on any deployment with signing on the default check exited 1 with every receipt valid. The walk now skips the inference pairs and names `vaara receipt verify-inference`, which checks them. Files passed by name are still checked.
+- The Rancher guide now shows how to verify decision receipts and the proxy's attestation and receipt pairs, alongside the trail export.
+
 ## [2.4.0] - 2026-10-02
 
 ### Added

@@ -62,7 +62,7 @@ cluster with an argparse error in the logs.
 {{- end -}}
 {{- if .Values.signing.enabled -}}
 {{- if not .Values.signing.existingSecret -}}
-{{- fail "signing.enabled requires signing.existingSecret. This chart does not generate signing keys: a key minted in a template would rotate on every upgrade and every receipt signed by the old one would stop verifying. Run `vaara keygen`, create the Secret, and name it here." -}}
+{{- fail "signing.enabled requires signing.existingSecret. This chart does not generate signing keys: a key minted in a template would rotate on every upgrade and every receipt signed by the old one would stop verifying. Run `vaara keygen --attest` for signing_key.pem (and `vaara keygen --dev` for trail_key.pem, used by trail export), create the Secret, and name it here." -}}
 {{- end -}}
 {{- end -}}
 {{- if not .Values.persistence.enabled -}}

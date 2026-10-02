@@ -433,3 +433,32 @@ def test_e2e_anthropic_streamed_records_tool_use(tmp_path):
     assert recorded, "streamed anthropic tool_use was never recorded"
     assert any(r.data.get("parameters", {}).get("cmd") == "rm -rf /"
                for r in recorded if isinstance(r.data, dict))
+
+
+def test_cli_verify_inference_checks_a_receipts_directory(tmp_path, capsys):
+    # The Rancher guide tells an auditor to run this verb over the receipts
+    # directory copied out of the pod, so it has to pass a good pair and fail
+    # a pair signed by a different key.
+    from cryptography.hazmat.primitives import serialization
+
+    from vaara.cli import main
+
+    emitter, pub = _es256_emitter(tmp_path)
+    att, counter = emitter.emit_attestation(
+        model_ref="qwen3:30b-a3b", model_derived=MODEL,
+        messages=MESSAGES, sampling={"temperature": 0.7},
+    )
+    emitter.emit_receipt(
+        attestation=att, counter=counter, status="completed",
+        output={"content": "ok"}, eval_stats={"evalCount": 1},
+    )
+    good = tmp_path / "good.pem"
+    good.write_bytes(pub.public_bytes(
+        serialization.Encoding.PEM, serialization.PublicFormat.SubjectPublicKeyInfo))
+    other = tmp_path / "other.pem"
+    other.write_bytes(ec.generate_private_key(ec.SECP256R1()).public_key().public_bytes(
+        serialization.Encoding.PEM, serialization.PublicFormat.SubjectPublicKeyInfo))
+
+    assert main(["receipt", "verify-inference", "--dir", str(tmp_path), "--pubkey", str(good)]) == 0
+    assert "VALID" in capsys.readouterr().out
+    assert main(["receipt", "verify-inference", "--dir", str(tmp_path), "--pubkey", str(other)]) == 1
