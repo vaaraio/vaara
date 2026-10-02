@@ -6,6 +6,8 @@ and this project follows [Semantic Versioning](https://semver.org/spec/v2.0.0.ht
 
 ## [Unreleased]
 
+## [2.5.0] - 2026-10-02
+
 ### Added
 - `vaara receipt verify-inference` checks the attestation and receipt pairs the inference proxy writes per chat call, one file or a whole receipts directory, against the proxy's public key. It was reachable only as a private module before.
 
