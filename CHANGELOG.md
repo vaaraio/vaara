@@ -12,6 +12,7 @@ and this project follows [Semantic Versioning](https://semver.org/spec/v2.0.0.ht
 
 ### Fixed
 - The shell command, outbound email and transfer of 250,000 that v2.5.0's model proxy let through in enforce mode also went through the llm-proxy and the Claude Code hook, and neither could be given the operator's policy. The llm-proxy decided tool calls by the deny rules alone, and no rule names any of the three; the hook passed a shell call that deletes nothing without scoring it, and could not load a policy. `tests/test_hostile_replay_per_surface.py` replays the three calls on the hook, the MCP proxy, the model proxy and the llm-proxy, each loaded with one policy, and requires each to be refused or held while a plain read still passes.
+- `vaara-mcp-proxy` takes `--upstream-arg` values that start with a dash. Given `--upstream-arg -y`, argparse read `-y` as an option and the proxy exited at startup, so the configs in the README, docs/adapters.md and the SAP and GitHub demos that pass flags to the upstream (`npx -y`, `docker run -i --rm`) did not start. The SAP demo README now lists the four records a call writes and the arguments `vaara trail export` requires.
 
 ## [2.6.0] - 2026-10-02
 
