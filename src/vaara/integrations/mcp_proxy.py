@@ -2265,7 +2265,8 @@ def main(argv: Optional[list[str]] = None) -> None:
              "names it on stderr and continues (default), 'fail' refuses to "
              "start, 'ignore' says nothing. Detection never changes what is "
              "recorded.")
-    args = parser.parse_args(argv)
+    args = parser.parse_args(_bind_upstream_arg_values(
+        sys.argv[1:] if argv is None else argv))
     logging.basicConfig(level=logging.INFO,
                         format="%(asctime)s %(name)s %(levelname)s %(message)s",
                         stream=sys.stderr)
@@ -2390,6 +2391,26 @@ def main(argv: Optional[list[str]] = None) -> None:
 # stops _parse_upstream_specs from confusing a command that itself
 # contains '=' (e.g. ``python -m foo --bar=baz``) with a NAME=CMD prefix.
 _UPSTREAM_NAME_RE = re.compile(r"^[a-zA-Z0-9_\-]{1,64}$")
+
+
+def _bind_upstream_arg_values(argv: list[str]) -> list[str]:
+    """Join each ``--upstream-arg`` with the token after it as ``--upstream-arg=VALUE``.
+
+    Upstream arguments are often flags of their own (``npx -y``, ``docker run
+    -i --rm``). Given ``--upstream-arg -y``, argparse takes ``-y`` for a new
+    option and exits with "expected one argument", which broke every config
+    in the docs that passes a flag through to the upstream.
+    """
+    out: list[str] = []
+    i = 0
+    while i < len(argv):
+        if argv[i] == "--upstream-arg" and i + 1 < len(argv):
+            out.append(f"--upstream-arg={argv[i + 1]}")
+            i += 2
+        else:
+            out.append(argv[i])
+            i += 1
+    return out
 
 
 def _parse_upstream_specs(

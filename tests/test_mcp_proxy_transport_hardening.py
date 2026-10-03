@@ -320,3 +320,28 @@ def test_two_bare_upstreams_collide_on_default_and_raise():
 def test_unparseable_command_is_a_clean_error():
     with pytest.raises(SystemExit, match="invalid --upstream"):
         _parse_upstream_specs(["srv=server --flag 'unbalanced"], [])
+
+
+# ── --upstream-arg values that start with a dash ───────────────────────────
+
+def test_upstream_arg_values_starting_with_a_dash_reach_the_upstream(monkeypatch):
+    """The README, docs/adapters.md and the SAP and GitHub demo configs all pass
+    ``--upstream-arg -y`` and ``--upstream-arg --schema-version``. argparse read
+    each dash-leading value as a new option and exited with "expected one
+    argument", so every one of those documented configs failed at startup.
+    """
+    seen = {}
+
+    def capture(specs, legacy):
+        seen["specs"], seen["legacy"] = specs, legacy
+        raise SystemExit(0)
+
+    monkeypatch.setattr(mcp_proxy, "_parse_upstream_specs", capture)
+    with pytest.raises(SystemExit):
+        mcp_proxy.main([
+            "--upstream", "npx",
+            "--upstream-arg", "-y", "--upstream-arg", "@sap/mdk-mcp-server",
+            "--upstream-arg", "--schema-version", "--upstream-arg", "26.3",
+        ])
+    assert seen["specs"] == ["npx"]
+    assert seen["legacy"] == ["-y", "@sap/mdk-mcp-server", "--schema-version", "26.3"]
