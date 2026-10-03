@@ -22,6 +22,7 @@ Each is checkable at the link:
 - Participant on the IETF scitt, agentproto and rats mailing lists, where the receipt format is discussed publicly by other participants. Participation in a working group discussion is not authorship of a standard.
 - Contributor to the European Commission's Apply AI Alliance community on Futurium, writing on EU AI Act Article 12, Article 14 and sovereign proof for the Act. A community contributor, not a Commission official or appointee.
 - Vaara appears in the industry acknowledgements of Singapore IMDA's Model AI Governance Framework for Agentic AI v1.5 (20 May 2026). An acknowledgement of the project, not an advisory role.
+- Vaara is listed in the [OECD.AI Catalogue of Tools & Metrics](https://oecd.ai/en/catalogue/tools/vaara) for trustworthy AI. A catalogue listing, not an OECD endorsement or certification.
 - Subject of an AMD AI Developer Program testimonial (May 2026). A testimonial about his work. He is not and has never been employed by AMD.
 
 <!-- generated: conformance register, by scripts/stamp_site.py -->
