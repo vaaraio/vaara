@@ -1,9 +1,9 @@
 """Vaara runtime governance demo for HuggingFace Spaces.
 
 Pick a tool call the way an agent would propose it. Vaara classifies the
-action, emits a conformal risk interval, decides allow/escalate/deny, and
-writes a hash-chained audit record aligned with EU AI Act Articles 12
-(record-keeping) and 14 (human oversight).
+action, emits a conformal risk interval, decides allow/escalate/deny against
+the policy in policy.json, and writes a hash-chained audit record aligned
+with EU AI Act Articles 12 (record-keeping) and 14 (human oversight).
 
 Repo: https://github.com/vaaraio/vaara
 PyPI: https://pypi.org/project/vaara/
@@ -12,12 +12,40 @@ Site: https://vaara.io
 from __future__ import annotations
 
 import json
+import threading
+from collections import OrderedDict
+from pathlib import Path
 
 import gradio as gr
 
 from vaara import Pipeline
+from vaara.audit.trail import AuditTrail
+from vaara.policy import from_json
 
-pipeline = Pipeline()
+# The demo policy. Without one, Pipeline() runs on the default thresholds
+# (allow below 0.55), and every preset here scores under that line.
+POLICY_TEXT = (Path(__file__).parent / "policy.json").read_text()
+POLICY = from_json(POLICY_TEXT)
+
+# One pipeline per browser session, so one visitor's call history does not
+# move the scores another visitor sees. Bounded, oldest session evicted.
+_MAX_SESSIONS = 256
+_pipelines: OrderedDict[str, Pipeline] = OrderedDict()
+_pipelines_lock = threading.Lock()
+
+
+def _pipeline_for(session: str) -> Pipeline:
+    with _pipelines_lock:
+        pipeline = _pipelines.get(session)
+        if pipeline is None:
+            pipeline = Pipeline(trail=AuditTrail())
+            pipeline.scorer.apply_policy(POLICY)
+            _pipelines[session] = pipeline
+            while len(_pipelines) > _MAX_SESSIONS:
+                _pipelines.popitem(last=False)
+        else:
+            _pipelines.move_to_end(session)
+        return pipeline
 
 PRESETS: dict[str, dict] = {
     "Transfer funds": {
@@ -53,13 +81,14 @@ DECISION_LABEL = {
 }
 
 
-def intercept(agent_id: str, tool_name: str, parameters_json: str):
+def intercept(agent_id: str, tool_name: str, parameters_json: str, request: gr.Request):
     try:
         parameters = json.loads(parameters_json) if parameters_json.strip() else {}
     except json.JSONDecodeError as exc:
         err = f"Invalid JSON in parameters: {exc}"
         return err, "", "", "", ""
 
+    pipeline = _pipeline_for(request.session_hash or "anonymous")
     result = pipeline.intercept(
         agent_id=agent_id or "demo-agent",
         tool_name=tool_name,
@@ -69,7 +98,8 @@ def intercept(agent_id: str, tool_name: str, parameters_json: str):
     badge = DECISION_LABEL.get(result.decision, result.decision.upper())
     risk_line = (
         f"Point estimate: {result.risk_score:.3f}   "
-        f"Conformal interval: [{result.risk_interval[0]:.3f}, {result.risk_interval[1]:.3f}]"
+        f"Conformal interval: [{result.risk_interval[0]:.3f}, {result.risk_interval[1]:.3f}]   "
+        f"The decision compares the upper bound with the policy thresholds."
     )
     action_line = f"{result.action_type.name} (action_id={result.action_id})"
 
@@ -108,7 +138,9 @@ action, emits a conformal risk interval, decides allow/escalate/deny, and
 writes a hash-chained audit record aligned with EU AI Act Articles 12 and 14.
 
 Pick a preset or write your own tool call. The decision happens in a few
-milliseconds against the same pipeline you would run in production.
+milliseconds against the same pipeline you would run in production, under
+the demo policy shown below the result. A tool the policy does not name
+falls back to its default thresholds.
 
 [GitHub](https://github.com/vaaraio/vaara) ·
 [PyPI](https://pypi.org/project/vaara/) ·
@@ -173,7 +205,7 @@ html, body, gradio-app, .gradio-container, .main, .app, footer {
 }
 """
 
-with gr.Blocks(title="Vaara", theme=VAARA_THEME, css=VAARA_CSS) as demo:
+with gr.Blocks(title="Vaara") as demo:
     gr.HTML(WORDMARK_HTML)
     gr.Markdown(INTRO)
 
@@ -210,6 +242,14 @@ with gr.Blocks(title="Vaara", theme=VAARA_THEME, css=VAARA_CSS) as demo:
 
     run_btn = gr.Button("Intercept", variant="primary")
 
+    gr.Code(
+        label="Policy in force (policy.json)",
+        value=POLICY_TEXT,
+        language="json",
+        lines=20,
+        interactive=False,
+    )
+
     preset.change(apply_preset, inputs=[preset], outputs=[tool_name, parameters_json])
     run_btn.click(
         intercept,
@@ -218,4 +258,4 @@ with gr.Blocks(title="Vaara", theme=VAARA_THEME, css=VAARA_CSS) as demo:
     )
 
 if __name__ == "__main__":
-    demo.launch()
+    demo.launch(theme=VAARA_THEME, css=VAARA_CSS)
