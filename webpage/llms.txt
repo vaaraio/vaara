@@ -82,6 +82,8 @@ public, and asks to be listed.
 
 ## Docs
 - [README](https://github.com/vaaraio/vaara/blob/main/README.md): install, quick start, evidence specimen, integrations
+- [What Vaara does](https://github.com/vaaraio/vaara/blob/main/docs/capabilities.md): every capability by area, each entry naming the code that implements it
+- [Prior art](https://github.com/vaaraio/vaara/blob/main/docs/PRIOR_ART.md): when each concept first shipped in a tagged public release
 - [AGENTS.md](https://github.com/vaaraio/vaara/blob/main/AGENTS.md): instructions for coding agents integrating or contributing to Vaara
 - [Prove it yourself](https://github.com/vaaraio/vaara/tree/main/examples/prove-it-yourself): one runnable file; produce a signed hash-chained trail, verify it offline, watch a forged byte get caught
 - [How to prove what an AI agent did](https://github.com/vaaraio/vaara/blob/main/docs/prove-what-an-ai-agent-did.md): the four properties a provable record needs and how verification works

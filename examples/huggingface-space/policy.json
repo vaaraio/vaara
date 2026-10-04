@@ -1,0 +1,18 @@
+{
+  "version": "0.1",
+  "domains": ["eu_ai_act"],
+  "action_classes": {
+    "transfer_funds": {"category": "financial", "reversibility": "irreversible", "blast_radius": "shared", "urgency": "irrevocable", "regulatory": ["aiact:14"]},
+    "delete_user":    {"category": "data", "reversibility": "irreversible", "blast_radius": "local", "urgency": "timely", "regulatory": ["aiact:12"]},
+    "drop_table":     {"category": "data", "reversibility": "irreversible", "blast_radius": "shared", "urgency": "irrevocable", "regulatory": ["aiact:12"]},
+    "post_public":    {"category": "communication", "reversibility": "irreversible", "blast_radius": "global", "urgency": "timely", "regulatory": ["aiact:50"]},
+    "fetch_url":      {"category": "data", "reversibility": "fully_reversible", "blast_radius": "self", "urgency": "deferrable"}
+  },
+  "thresholds": {
+    "default":        {"escalate": 0.55, "deny": 0.85},
+    "transfer_funds": {"escalate": 0.30, "deny": 0.80},
+    "delete_user":    {"escalate": 0.30, "deny": 0.80},
+    "drop_table":     {"escalate": 0.10, "deny": 0.30},
+    "post_public":    {"escalate": 0.30, "deny": 0.80}
+  }
+}
