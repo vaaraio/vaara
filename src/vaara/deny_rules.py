@@ -24,7 +24,9 @@ Two ways to apply the same rules:
 Rule keys: ``id``, ``tools``, ``fields``, ``pattern``, ``message``,
 optional ``match_any`` (fire on any call to the listed tools),
 ``unless_env`` (a variable that, set to 1, lifts the rule for a deliberate
-exception) and ``any_field: false`` (the pattern reads one named field and
+exception), ``shell_syntax: true`` (the pattern is shell syntax, so a
+heredoc body read by Python or Node is not matched; see
+``without_inert_heredocs``) and ``any_field: false`` (the pattern reads one named field and
 must not run over arbitrary arguments). Booleans and numbers in the input match as their JSON text.
 """
 from __future__ import annotations
@@ -219,9 +221,99 @@ def _match_named(
             continue
         for field in rule.get("fields", []):
             value = field_text(tool_input.get(field, ""))
+            if value is not None and field in _SHELL_FIELDS:
+                value = without_inert_heredocs(value, bool(rule.get("shell_syntax")))
             if value is not None and regex.search(value):
                 return rule.get("id", "unknown"), rule.get("message", "deny rule matched")
     return None
+
+
+#: A heredoc operator: ``<<EOF``, ``<<-EOF``, ``<< 'EOF'``, ``<<"EOF"``.
+#: A here-string (``<<<``) carries no body and is not one.
+_HEREDOC = re.compile(r"(?<!<)<<(?!<)(-)?[ \t]*(['\"]?)([A-Za-z_][\w.-]*)\2")
+
+#: Commands whose heredoc body becomes bytes in a file or on the screen.
+_WRITERS = frozenset({"cat", "tee"})
+
+#: Interpreters that do not read shell syntax. A ``shell_syntax`` rule's
+#: pattern in their body is text: a Python string, a comment, a markdown
+#: line being written. Every other rule still reads it: the metadata address
+#: in ``urlopen`` is a real request, ``sqlite3.connect`` on the trail is real.
+_NON_SHELL_INTERPRETER = re.compile(r"(?:python[\d.]*|node)")
+
+#: Redirects that send bytes somewhere other than a file: bash network
+#: paths and process substitution.
+_LIVE_REDIRECT = re.compile(r"/dev/(?:tcp|udp)/|[<>]\(")
+
+
+def _stage_command(stage: str) -> str:
+    """The command a pipeline stage runs, past env assignments and launchers.
+    ``xargs`` runs its input as arguments, so it names itself."""
+    for word in stage.split():
+        if word == "xargs":
+            return word
+        if (word in _LAUNCHERS or word.startswith("-") or word.isdigit()
+                or re.fullmatch(r"[A-Za-z_]\w*=\S*", word)):
+            continue
+        return word.rsplit("/", 1)[-1]
+    return ""
+
+
+def _heredoc_reader(line: str, at: int) -> str:
+    """Who reads the heredoc opened at ``line[at]``: ``"file"`` when only
+    ``cat`` or ``tee`` handle it, ``"interpreter"`` when a Python or Node
+    interpreter is among them, ``""`` (a shell, or anything unknown)."""
+    left = re.split(r";|&&|\|\||\(|`|\$\(", line[:at])[-1]
+    right = re.split(r";|&&|\|\||\)|`", line[at:])[0]
+    pipeline = left + right
+    if _LIVE_REDIRECT.search(pipeline):
+        return ""
+    names = [_stage_command(s) for s in pipeline.split("|")[left.count("|"):]]
+    if not names or any(n not in _WRITERS and not _NON_SHELL_INTERPRETER.fullmatch(n)
+                        for n in names):
+        return ""
+    return "file" if all(n in _WRITERS for n in names) else "interpreter"
+
+
+def without_inert_heredocs(command: str, shell_syntax: bool) -> str:
+    """``command`` with the heredoc bodies no shell will run taken out.
+
+    A body that ``cat`` or ``tee`` writes to a file is bytes, the same bytes
+    the Write tool would carry, and no Bash rule reads the Write tool's
+    content. A body a Python or Node interpreter reads is not shell, so a
+    rule marked ``shell_syntax`` does not read it. Everything else is kept: a body piped into
+    a shell, sent over ssh, or read by anything not named here. The lines
+    that open and close each heredoc are always kept, so a pipe or redirect
+    on them is still matched. An unterminated heredoc keeps the whole text.
+
+    On 2026-10-04 notes about netcat and rsync, written to markdown through
+    ``cat > file <<EOF`` and ``python3 - <<EOF``, were refused as
+    ``shell_netcat_egress`` and ``shell_copy_egress``; 13 of 16 refusals by
+    four shell rules over two weeks were text of this kind.
+    """
+    if "<<" not in command:
+        return command
+    lines = command.split("\n")
+    out: list[str] = []
+    i = 0
+    while i < len(lines):
+        line = lines[i]
+        out.append(line)
+        i += 1
+        for op in _HEREDOC.finditer(line):
+            delim, strip_tabs = op.group(3), bool(op.group(1))
+            end = i
+            while end < len(lines) and (
+                    lines[end].lstrip("\t") if strip_tabs else lines[end]) != delim:
+                end += 1
+            if end == len(lines):
+                return command
+            reader = _heredoc_reader(line, op.start())
+            if not (reader == "file" or (reader == "interpreter" and shell_syntax)):
+                out.extend(lines[i:end])
+            out.append(lines[end])
+            i = end + 1
+    return "\n".join(out)
 
 
 def _string_leaves(value: Any, depth: int = 0, key: str = ""):
@@ -349,6 +441,8 @@ def match_deny_rule_any_field(
         for key, text in leaves:
             if path_rule and not _path_shaped(key, text):
                 continue
+            if _COMMAND_KEY.search(key):
+                text = without_inert_heredocs(text, bool(rule.get("shell_syntax")))
             if shell_rule:
                 if _shell_hit(regex, key, text):
                     return rule.get("id", "unknown"), rule.get("message", "deny rule matched")

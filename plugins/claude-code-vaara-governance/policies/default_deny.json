@@ -83,6 +83,7 @@
         "command"
       ],
       "pattern": "\\brm\\s+(-[rRf]+|--recursive|--force)[^|;]*\\s+/(\\s|$|;|&|\\|)",
+      "shell_syntax": true,
       "message": "rm -rf / or equivalent \u2014 non-recoverable filesystem destruction."
     },
     {
@@ -333,6 +334,7 @@
         "command"
       ],
       "pattern": "\\b(scp|rsync|sftp)\\b[^|\\n]*\\s(?:[^\\s@]+@)?[^\\s/@:][^\\s:]*:(?!//)",
+      "shell_syntax": true,
       "message": "Copy to a remote host from the shell."
     },
     {
@@ -535,6 +537,7 @@
         "command"
       ],
       "pattern": "\\b(ncat|netcat|socat)\\b|\\bnc\\s+(?:-[A-Za-z]+\\s+)*[A-Za-z0-9_.\\-]+\\s+\\d{1,5}\\b",
+      "shell_syntax": true,
       "unless_env": "VAARA_ALLOW_EGRESS",
       "message": "netcat or socat moves bytes to a remote host without curl or wget. Set VAARA_ALLOW_EGRESS=1."
     },
