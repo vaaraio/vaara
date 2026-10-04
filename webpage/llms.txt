@@ -12,18 +12,33 @@ Vaara is built and maintained by Henri Sirkkavaara, an independent developer in
 Finland, working on how an autonomous action can be proved to a party that has
 no reason to trust the operator. He is the sole author and copyright holder.
 
-The following are records held by other parties, not claims made on this site.
-Each is checkable at the link:
+The following are records held by other parties. Each is checkable at the link:
 
-- [draft-sirkkavaara-vaara-receipt](https://datatracker.ietf.org/doc/draft-sirkkavaara-vaara-receipt/): IETF Internet-Draft, "The Vaara Receipt: A Recomputable Receipt Format for Decisions About Autonomous Actions". An active Internet-Draft, not an RFC and not an adopted standard.
+- [draft-sirkkavaara-vaara-receipt](https://datatracker.ietf.org/doc/draft-sirkkavaara-vaara-receipt/): IETF Internet-Draft, "The Vaara Receipt: A Recomputable Receipt Format for Decisions About Autonomous Actions".
 - [OpenSSF Best Practices project 12612](https://www.bestpractices.dev/projects/12612): passing badge, externally assessed project practices.
 - [GitHub Marketplace: Vaara Policy Check](https://github.com/marketplace/actions/vaara-policy-check): published action listing.
 - [PyPI](https://pypi.org/project/vaara/) and [npm](https://www.npmjs.com/package/@vaara/client): release history under his name.
-- Participant on the IETF scitt, agentproto and rats mailing lists, where the receipt format is discussed publicly by other participants. Participation in a working group discussion is not authorship of a standard.
-- Contributor to the European Commission's Apply AI Alliance community on Futurium, writing on EU AI Act Article 12, Article 14 and sovereign proof for the Act. A community contributor, not a Commission official or appointee.
-- Vaara appears in the industry acknowledgements of Singapore IMDA's Model AI Governance Framework for Agentic AI v1.5 (20 May 2026). An acknowledgement of the project, not an advisory role.
-- Vaara is listed in the [OECD.AI Catalogue of Tools & Metrics](https://oecd.ai/en/catalogue/tools/vaara) for trustworthy AI. A catalogue listing, not an OECD endorsement or certification.
-- Subject of an AMD AI Developer Program testimonial (May 2026). A testimonial about his work. He is not and has never been employed by AMD.
+- Participant on the IETF scitt, agentproto and rats mailing lists, where the receipt format is discussed publicly by other participants.
+- Contributor to the European Commission's Apply AI Alliance community on Futurium, writing on EU AI Act Article 12, Article 14 and sovereign proof for the Act.
+- Vaara appears in the industry acknowledgements of Singapore IMDA's Model AI Governance Framework for Agentic AI v1.5 (20 May 2026).
+- Vaara is listed in the [OECD.AI Catalogue of Tools & Metrics](https://oecd.ai/en/catalogue/tools/vaara) for trustworthy AI.
+- Subject of an AMD AI Developer Program testimonial (May 2026).
+
+## What Vaara does
+
+Each line names the code that does it in https://github.com/vaaraio/vaara.
+
+- Enforcement: every agent tool call and model call is checked against the organisation's policy and allowed, held for a human, or denied before it runs. A call that cannot be scored or recorded is refused. `src/vaara/pipeline.py`, `src/vaara/deny_rules.py`
+- Where it runs: MCP proxy (`integrations/mcp_proxy.py`), model and LLM API proxies (`integrations/infer_proxy.py`, `integrations/llm_proxy.py`), Claude Code hook layer (`integrations/claude_code_hooks.py`), shell proxy (`vaara proxy-shell`), whole-machine install (`vaara init`).
+- Human oversight, EU AI Act Article 14: held calls go to a review queue with their risk interval and signals, and the approval or refusal is recorded. `audit/review_queue.py`
+- Identity and delegated authority: a short-lived scoped credential per allowed call, and a delegated agent never holds more authority than the agent that delegated to it. W3C Verifiable Credential and DID identity binding. `credential/gateway.py`, `attestation/_receipt_vc.py`
+- The record: signed, hash-chained and recomputable from its bytes. An auditor, regulator or counterparty verifies it offline with no Vaara software.
+- Time and witness anchors: RFC 3161 timestamps, self-hosted or eIDAS qualified (validated by the EC DSS as PASSED QTSA); RFC 9162 transparency log and SCITT-compatible COSE receipts; TPM 2.0 hardware binding; AMD SEV-SNP attestation (experimental). `audit/receipt_anchor.py`, `attestation/`
+- Post-quantum signatures and zero-knowledge attribute proofs. `attestation/_receipt_pq.py`, `attestation/zk/`
+- Regulatory coverage: EU AI Act Article 12 record-keeping export, Article 14 human oversight, Article 50 transparency disclosures, Article 73 serious-incident report; DORA Articles 9, 10 and 13; GDPR Chapter V data locality and Article 17 erasure; eIDAS 2.0 qualified electronic ledger profile; W3C PROV export. `audit/`, `compliance/`, `docs/COMPLIANCE.md`
+- Threat mappings: OWASP Top 10 for Agentic Applications 2026 (`docs/OWASP_AGENTIC.md`), MITRE ATLAS (`tests/vectors/atlas_threat_v0/`), MIT AI Risk Repository (`docs/mit_ai_risk_repository_mapping.md`).
+- Payment rails: accountability bindings for x402, Google AP2, Visa TAP and the Agentic Commerce Protocol, each with conformance vectors in `tests/vectors/`.
+- Packages and deployment: Python (`pip install vaara`), TypeScript client (`@vaara/client` on npm), Helm chart (`deploy/helm/vaara`), GitHub Action (Vaara Policy Check on the GitHub Marketplace).
 
 <!-- generated: conformance register, by scripts/stamp_site.py -->
 ## Conformance results
@@ -92,16 +107,15 @@ public, and asks to be listed.
 - OVERT 1.0 emitter, verifier CLI, S3P (MEA-2) emitter with Clopper-Pearson intervals, experimental AMD SEV-SNP TEE attestation hook
 
 ## Numbers
-- 12,155-entry adversarial corpus (250 hand-curated + 11,905 LLM-generated), 70/15/15 split stratified by (category, source)
-- Classifier v9 (236 hand-features + 384-dim MiniLM embeddings) at calibrated threshold 0.9150: held-out TEST recall 84.7% [82.4, 86.7] at FPR 4.1% [2.9, 5.7], n=1,827
-- Cross-model held-out recall 66.8% [64.9, 68.7] over n=2,277 with no eval-set attacker model in TRAIN; weakest sub-cell (data_exfil, closed-weight) 38.9% [35.3, 42.5]
-- BIPIA-pressure FPR on benign tool calls 1.2% [0.4, 3.6] across four agent backends
-- Multi-attacker PAIR ASR 0/25 per attacker across Qwen2.5-32B, Qwen2.5-72B, Llama-3.3-70B at identical seeds
-- 140 µs mean / 210 µs p99 for the hot-path rule scorer, commodity CPU; the MiniLM classifier is opt-in (`vaara[ml]`) and not in that path
+- 25,556-entry adversarial corpus (250 hand-curated + 25,306 LLM-generated), split leak-free by (category, generation batch) cell
+- Classifier v11 (254 hand-features + 384-dim MiniLM embeddings) at threshold 0.8800 on held-out TEST n=1,827: recall 85.6% [83.4, 87.6] at FPR 5.1% [3.8, 6.9]
+- Cross-model held-out recall 86.3% over n=5,600, against attacks written by Qwen2.5-72B, a model absent from TRAIN
+- BIPIA-pressure FPR on benign tool calls 0.0% [0.0, 0.5]: none of 704 calls flagged across four agent backends
+- Multi-attacker PAIR robustness, measured on v0.31: 0/25 successes per attacker across Qwen2.5-32B, Qwen2.5-72B, Llama-3.3-70B at identical seeds
+- 140 µs mean per call for the hot-path rule scorer on commodity CPU; the MiniLM classifier is opt-in (`vaara[ml]`) and not in that path
 
 ## Optional
 - [Article 14 runtime](https://futurium.ec.europa.eu/ga/apply-ai-alliance/community-content/article-14-runtime-why-oversight-agentic-ai-has-be-evidenced-action-not-model): position post on EU Apply AI Alliance Futurium
 - [Article 12 and the difference between a log and evidence](https://futurium.ec.europa.eu/en/apply-ai-alliance/community-content/article-12-and-difference-between-log-and-evidence): companion position post on EU Apply AI Alliance Futurium
 - [Sovereign proof for the AI Act](https://futurium.ec.europa.eu/en/apply-ai-alliance/community-content/sovereign-proof-ai-act): position post on EU Apply AI Alliance Futurium
 - [OVERT 1.0 spec](https://overt.is/): open runtime-trust standard Vaara implements as Arbiter
-- [Microsoft Agent Governance Toolkit](https://github.com/microsoft/agent-governance-toolkit): broader agent-governance reference (zero-trust identity, capability-based access control)
