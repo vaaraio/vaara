@@ -246,8 +246,21 @@ _PATH_FIELDS = frozenset({"file_path", "notebook_path", "uri"})
 _PATH_KEY = re.compile(r"path|file|dir|dest|target|uri|location", re.I)
 
 
+#: A remote address. ``file:`` is left out: that one IS a local path.
+_REMOTE_URL = re.compile(r"^(?!file:)[a-z][a-z0-9+.\-]*://", re.I)
+
+
 def _path_shaped(key: str, text: str) -> bool:
-    """An argument that is a path: under a path-like key, or one token."""
+    """An argument that is a path: under a path-like key, or one token.
+
+    A remote URL is neither. It is one token, so it used to pass as a path,
+    and a path rule then fired on the path inside it: on 2026-10-04 a fetch
+    of ``https://.../.claude-plugin/marketplace.json`` was refused as
+    ``harness_config_write``. Reading a page is not writing a config file.
+    """
+    text = text.strip()
+    if _REMOTE_URL.match(text):
+        return False
     return bool(_PATH_KEY.search(key)) or not any(c.isspace() for c in text)
 
 

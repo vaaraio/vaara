@@ -53,6 +53,26 @@ def test_a_path_argument_is_still_refused(rules, args):
     assert match_deny_rule_any_field(rules, args)[0] == "harness_config_write"
 
 
+MARKETPLACE_URL = "https://raw.githubusercontent.com/o/r/main/" + ".claude-plugin/marketplace.json"
+
+
+@pytest.mark.parametrize("args", [
+    {"url": MARKETPLACE_URL},
+    {"urls": [MARKETPLACE_URL, "https://example.org/"]},
+    {"uri": MARKETPLACE_URL},
+    {"url": "https://example.org/dotfiles/" + ".claude/settings.json"},
+])
+def test_a_remote_url_is_a_read_not_a_config_write(rules, args):
+    # 2026-10-04: mcp__rednet__fetch_many on a marketplace.json URL was refused
+    # as harness_config_write. A URL is one token, which passed as a path.
+    assert match_deny_rule_any_field(rules, args) is None
+
+
+def test_a_file_url_is_still_a_path(rules):
+    assert match_deny_rule_any_field(
+        rules, {"uri": "file://" + SETTINGS})[0] == "harness_config_write"
+
+
 def test_a_prose_argument_under_a_path_key_is_still_read(rules):
     assert match_deny_rule_any_field(
         rules, {"file": f"write to {SETTINGS} please"})[0] == "harness_config_write"
