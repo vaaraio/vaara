@@ -145,3 +145,23 @@ def test_the_mcp_content_path_skips_the_same_bodies(rules):
     assert match_deny_rule_any_field(rules, written) is None
     piped = {"command": _heredoc("bash <<EOF", NETCAT)}
     assert match_deny_rule_any_field(rules, piped)[0] == "shell_netcat_egress"
+
+
+@pytest.mark.parametrize("prefix", [
+    "cat() { bash; }; ",
+    "function cat { bash; }; ",
+    "tee () { sh; }\n",
+    "python3() { bash; }; ",
+    "alias cat=bash; ",
+    "PATH=/tmp/bin:$PATH ",
+    "BASH_ENV=/tmp/x ",
+    "enable -n echo; ",
+])
+def test_a_shadowed_reader_keeps_every_body(rules, prefix):
+    opener = "python3 - <<EOF" if "python3" in prefix else "cat <<EOF"
+    assert _bash(rules, prefix + _heredoc(opener, NETCAT)) == "shell_netcat_egress"
+
+
+def test_a_call_in_a_python_body_is_not_a_shadowing_definition(rules):
+    body = f'print()\nopen("notes.md", "w").write("{NETCAT}")'
+    assert _bash(rules, _heredoc("python3 - <<EOF", body)) is None
