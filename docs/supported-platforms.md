@@ -1,6 +1,6 @@
 # Supported platforms
 
-Vaara 2.6.0, Helm chart 0.2.0.
+Vaara 2.7.0, Helm chart 0.2.0.
 
 Vaara is a Python package with three runtime dependencies (`cryptography`,
 `rfc8785` and `cbor2`, which sign and canonicalise receipts) and a container
