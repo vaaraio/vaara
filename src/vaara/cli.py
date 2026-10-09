@@ -6533,8 +6533,10 @@ def build_parser() -> argparse.ArgumentParser:
         ("os-guard", "The OS layer's root half (sudo): loads the floor, decides agents' "
                      "opens and execs in your folders, keeps its own trail."),
         ("os-layer", "Pick OS-layer folders and apps, see the guard, answer its questions."),
-        ("cage", "Start, stop and read an agent's cage through a driver (vaara-cage, "
-                 "openshell); `observe` prints the cage block a decision here would carry."),
+        ("cage", "Start, stop and read an agent's cage through one of twelve drivers "
+                 "(Vaara's own, OpenShell, gVisor, Firecracker, apple/container...); "
+                 "`drivers` shows which are ready here, `observe` the block a decision "
+                 "here would carry."),
     ):
         sub.add_parser(name, add_help=False, help=summary).set_defaults(
             func=lambda args, _n=name: _oslayer_main(_n)(getattr(args, "oslayer_args", [])))

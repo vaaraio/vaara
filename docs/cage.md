@@ -29,7 +29,7 @@ confinement into evidence. Vaara does: every decision record carries a
 
 | Key | Meaning |
 |---|---|
-| `driver` | Which cage: one of the eleven driver names below, or `none` for a run outside any cage. |
+| `driver` | Which cage: one of the twelve driver names below, or `none` for a run outside any cage. |
 | `confirmed` | Whether the kernel confirmed, on the deciding process at decision time, the confinement that cage imposes. |
 | `upstream` | The cage's own name and version. |
 | `config_digest` | `sha256:` over the cage's effective configuration. For the Vaara cage, the rendered AppArmor profile. For OpenShell, the sandbox policy YAML as submitted at create. |
@@ -94,14 +94,35 @@ repository.
 | `firecracker` | Firecracker: a microVM from a kernel and a root filesystem (Apache-2.0) | `firecracker --api-sock S --id N --config-file C` | the microVM configuration JSON | a hypervisor; the declaration arrives on the kernel command line | the API on the socket: instance state and the active configuration |
 | `microsandbox` | microsandbox: a libkrun microVM per sandbox, `msb` (Apache-2.0) | `msb run --conf C --name N --detach --no-tty -e ... -- agent` | the sandbox YAML | a hypervisor | `msb status N --format json` |
 | `e2b` | E2B self-hosted infra: Firecracker microVMs behind an HTTP API, envd inside (Apache-2.0) | `POST /sandboxes`, then `process.Process/Start` on envd | the `NewSandbox` request JSON | a hypervisor | `GET /sandboxes/{id}`: `running` or `paused` |
+| `apple-container` | Apple's `container`: each Linux container in its own lightweight VM on a Mac with Apple silicon (Apache-2.0) | `container run -d --name N -e ... IMAGE agent` | none; `--image`, `--read-only`, `--cap-drop` | a hypervisor | `container inspect N`: the container's state |
 
 Each driver depends on the release of the cage the operator installed and
 shells out to it, or speaks its published API. `docker` is the default
 engine for the runtime-backed cages; `VAARA_CAGE_ENGINE=podman` switches.
 Every tool's path can be set with its own variable (`OPENSHELL_BIN`,
 `CODEX_BIN`, `SRT_BIN`, `NONO_BIN`, `RUNSC_BIN`, `KATA_RUNTIME_BIN`,
-`KUBECTL_BIN`, `FIRECRACKER_BIN`, `MSB_BIN`); E2B takes `E2B_API_URL`,
+`KUBECTL_BIN`, `FIRECRACKER_BIN`, `MSB_BIN`, `APPLE_CONTAINER_BIN`); E2B takes `E2B_API_URL`,
 `E2B_API_KEY` and `E2B_DOMAIN`.
+
+## Which cages run where
+
+Vaara ships the drivers. The cages are installed by the operator from
+their own releases; Vaara's own cage is the one that comes built in.
+`vaara cage drivers` checks the machine it runs on and says, for every
+driver, whether it is ready, the version the cage reports, and what is
+missing with the install hint. It installs nothing and starts nothing.
+
+| Runs on | Drivers |
+|---|---|
+| Linux | all but `apple-container` |
+| macOS | `openshell` (its sandbox in a Linux VM), `codex`, `sandbox-runtime`, `nono` (Seatbelt), `microsandbox`, `apple-container` (a VM per sandbox) |
+| Windows | `microsandbox` (Windows Hypervisor Platform); OpenShell under WSL 2 |
+| any OS | `agent-sandbox` (a client of a cluster), `e2b` (a client of a service) |
+
+The Vaara cage needs Linux with AppArmor (Ubuntu, Debian, SUSE). On macOS
+the Seatbelt cages are not confirmed from inside yet: their block says
+`declared`. The VM cages are confirmed by the hypervisor on every
+platform.
 
 ```
 vaara cage drivers
@@ -138,7 +159,7 @@ refused there. The OpenShell driver finds the CLI on `PATH` or at
 - `basis: gvisor_kernel_log` is the strongest of the container checks:
   the kernel log read from inside is gVisor's own text, which a real
   kernel never produces.
-- `basis: hypervisor_present` (Kata, Firecracker, microsandbox, E2B)
+- `basis: hypervisor_present` (Kata, Firecracker, microsandbox, E2B, apple/container)
   means the CPU reports a hypervisor underneath. It says the deciding
   process ran in a VM; it does not say which VM, and a Vaara run on any
   cloud VM shows the same flag. The declaration says which cage; the

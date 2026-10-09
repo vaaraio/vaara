@@ -308,6 +308,74 @@ class TestMicrosandbox:
             MicrosandboxDriver(binary=binary).start(["agent"], None)
 
 
+# ── apple/container ────────────────────────────────────────────────────
+
+APPLE_VERSION = [{"appName": "container", "buildType": "release", "commit": "abc1234",
+                  "version": "0.6.0"},
+                 {"appName": "container-apiserver", "buildType": "release",
+                  "commit": "abc1234", "version": "container-apiserver version 0.6.0"}]
+
+
+def _apple_inspect(status):
+    return [{"id": "rev",
+             "configuration": {"id": "rev", "image": {"reference": "python:3.12"},
+                               "runtimeHandler": "container-runtime-linux",
+                               "readOnly": True, "capDrop": ["CAP_NET_RAW"],
+                               "initProcess": {"arguments": ["agent"]}},
+             "status": status}]
+
+
+class TestAppleContainer:
+    def test_run_inspect_logs(self, fake):
+        binary, calls = fake("container", [
+            [["system", "version"], APPLE_VERSION],
+            [["run"], "rev\n"],
+            [["inspect"], _apple_inspect({"state": "running", "networks": []})],
+            [["logs"], "booted\nworking\n"],
+            [["stop"], ""], [["delete"], ""],
+        ])
+        from vaara.cage.apple_container import AppleContainerDriver
+        d = AppleContainerDriver(binary=binary)
+        launch = d.start(["agent", "go"], None, name="rev", image="python:3.12",
+                         read_only=True, cap_drop=["CAP_NET_RAW"])
+        c = _call(calls, "run")
+        assert c["argv"][:6] == ["run", "-d", "--name", "rev", "--read-only", "--cap-drop"]
+        envs = [c["argv"][i + 1] for i, a in enumerate(c["argv"]) if a == "-e"]
+        assert "VAARA_CAGE=apple-container" in envs
+        assert "VAARA_CAGE_UPSTREAM=apple-container 0.6.0" in envs
+        assert "VAARA_CAGE_NAME=rev" in envs
+        digest = next(e for e in envs if e.startswith("VAARA_CAGE_DIGEST="))
+        assert digest.split("=", 1)[1] == launch.detail["declared"]["config_digest"]
+        assert c["argv"][-3:] == ["python:3.12", "agent", "go"]
+        assert launch.state.confirmed and launch.state.basis == "control_plane"
+        assert launch.state.detail["image"] == "python:3.12"
+        assert [e["message"] for e in d.events("rev")] == ["booted", "working"]
+        d.stop("rev"); d.remove("rev")
+        assert _call(calls, "delete")["argv"] == ["delete", "rev"]
+
+    def test_released_versions_report_status_as_a_string(self, fake):
+        binary, _ = fake("container", [[["system", "version"], APPLE_VERSION],
+                                       [["inspect"], _apple_inspect("stopped")]])
+        from vaara.cage.apple_container import AppleContainerDriver
+        state = AppleContainerDriver(binary=binary).enforcement_state("rev")
+        assert not state.confirmed and state.detail["status"] == "stopped"
+
+    def test_needs_an_image_and_refuses_a_policy_file(self, fake, tmp_path):
+        binary, _ = fake("container", [])
+        from vaara.cage.apple_container import AppleContainerDriver
+        d = AppleContainerDriver(binary=binary)
+        with pytest.raises(CageError, match="image"):
+            d.start(["agent"], None)
+        with pytest.raises(CageError, match="no policy file"):
+            d.start(["agent"], tmp_path / "p.yaml", image="python:3.12")
+
+    def test_inside_check_is_the_hypervisor(self, monkeypatch):
+        monkeypatch.setitem(cage._CONFIRM, "apple-container",
+                            ((lambda: True, cage.BASIS_VM),))
+        state = cage.observe({cage.CAGE_ENV: "apple-container"})
+        assert state.confirmed and state.basis == "hypervisor_present"
+
+
 # ── Firecracker ────────────────────────────────────────────────────────
 
 class TestFirecracker:

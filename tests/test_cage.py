@@ -375,7 +375,9 @@ def test_cli_drivers_and_observe(capsys, monkeypatch):
     from vaara.cage.cli import main
     monkeypatch.delenv(cage.CAGE_ENV, raising=False)
     assert main(["drivers"]) == 0
-    assert capsys.readouterr().out.split() == list(cage.DRIVERS)
+    heads = [line.split()[0] for line in capsys.readouterr().out.splitlines()
+             if line and not line[0].isspace()]
+    assert heads == list(cage.DRIVERS)
     assert main(["observe"]) == 0
     assert json.loads(capsys.readouterr().out) == {"driver": "none", "confirmed": False}
 

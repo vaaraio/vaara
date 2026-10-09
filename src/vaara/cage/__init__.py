@@ -48,6 +48,7 @@ NAME_ENV = "VAARA_CAGE_NAME"
 DRIVERS = (
     "vaara-cage", "openshell", "codex", "sandbox-runtime", "gvisor",
     "firecracker", "kata", "agent-sandbox", "microsandbox", "nono", "e2b",
+    "apple-container",
 )
 
 NONE = "none"
@@ -243,6 +244,7 @@ _CONFIRM: dict[str, tuple[tuple[Any, str], ...]] = {
     "firecracker": ((hypervisor_present, BASIS_VM),),
     "microsandbox": ((hypervisor_present, BASIS_VM),),
     "e2b": ((hypervisor_present, BASIS_VM),),
+    "apple-container": ((hypervisor_present, BASIS_VM),),
 }
 
 
@@ -290,6 +292,7 @@ _MODULES = {
     "microsandbox": ("vaara.cage.microsandbox", "MicrosandboxDriver"),
     "nono": ("vaara.cage.nono", "NonoDriver"),
     "e2b": ("vaara.cage.e2b", "E2BDriver"),
+    "apple-container": ("vaara.cage.apple_container", "AppleContainerDriver"),
 }
 
 

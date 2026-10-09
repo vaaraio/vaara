@@ -3,14 +3,18 @@
 """``vaara cage``: start, stop and read an agent's cage through a driver.
 
     vaara cage drivers
+    vaara cage drivers --json
     vaara cage run --driver openshell --policy policy.yaml -- claude
     vaara cage run --driver vaara-cage -- codex
     vaara cage run --driver gvisor --image python:3.12 -- python agent.py
+    vaara cage run --driver apple-container --image python:3.12 --read-only -- python agent.py
     vaara cage status --driver openshell demo
     vaara cage events --driver openshell demo --since 10m
     vaara cage stop --driver openshell demo
     vaara cage observe
 
+``drivers`` says which cages are ready on this machine: Vaara ships the
+drivers, the operator installs the cages (Vaara's own is built in).
 ``observe`` prints the block a decision made by this process would carry,
 which is how to check from inside a sandbox what the records will say.
 """
@@ -43,7 +47,9 @@ def build_parser() -> argparse.ArgumentParser:
     p = argparse.ArgumentParser(prog="vaara cage", description=__doc__.split("\n\n")[0])
     sub = p.add_subparsers(dest="cmd", required=True)
 
-    sub.add_parser("drivers", help="List the cage drivers Vaara ships.")
+    pd = sub.add_parser("drivers", help="The cage drivers Vaara ships, and which are "
+                        "ready on this machine.")
+    pd.add_argument("--json", action="store_true", help="Print the readiness as JSON.")
 
     pr = sub.add_parser("run", help="Start an agent inside a cage.")
     pr.add_argument("--driver", required=True, choices=DRIVERS)
@@ -51,7 +57,8 @@ def build_parser() -> argparse.ArgumentParser:
                     help="The cage's policy file (OpenShell: sandbox policy YAML).")
     pr.add_argument("--name", default=None, help="The launch's name in the cage.")
     pr.add_argument("--image", default=None,
-                    help="The sandbox image: openshell (--from), gvisor, kata, microsandbox.")
+                    help="The sandbox image: openshell (--from), gvisor, kata, microsandbox, "
+                         "apple-container.")
     pr.add_argument("--provider", action="append", default=[],
                     help="openshell: attach a credential provider. Repeatable.")
     pr.add_argument("--template", default=None, help="e2b: the template id.")
@@ -59,6 +66,10 @@ def build_parser() -> argparse.ArgumentParser:
                     help="codex: a named permission profile instead of --policy.")
     pr.add_argument("--security-opt", action="append", default=[],
                     help="gvisor, kata: an engine security option. Repeatable.")
+    pr.add_argument("--read-only", action="store_true",
+                    help="apple-container: mount the root filesystem read-only.")
+    pr.add_argument("--cap-drop", action="append", default=[],
+                    help="apple-container: drop a Linux capability. Repeatable.")
     pr.add_argument("--allow", action="append", default=[],
                     help="nono: a directory to allow read and write. Repeatable.")
     pr.add_argument("agent", nargs=argparse.REMAINDER, help="The agent and its arguments, after --")
@@ -91,8 +102,19 @@ def main(argv: Optional[list[str]] = None) -> int:
 
 def _dispatch(args: argparse.Namespace) -> int:
     if args.cmd == "drivers":
-        for name in DRIVERS:
-            print(name)
+        from vaara.cage.readiness import check_all, platform_names
+
+        found = check_all()
+        if args.json:
+            print(json.dumps([r.to_dict() for r in found], indent=2))
+            return 0
+        width = max(len(name) for name in DRIVERS)
+        for r in found:
+            state = f"ready  {r.version}".rstrip() if r.ready else "missing"
+            print(f"{r.driver:<{width}}  {state}")
+            print(f"{'':<{width}}  runs on {platform_names(r.driver)}")
+            for problem in r.missing:
+                print(f"{'':<{width}}  - {problem}")
         return 0
     if args.cmd == "observe":
         print(json.dumps(observe().to_record(), indent=2))
@@ -107,7 +129,8 @@ def _dispatch(args: argparse.Namespace) -> int:
 
         offered = {"image": args.image, "providers": args.provider or None,
                    "template": args.template, "permission_profile": args.permission_profile,
-                   "security_opt": args.security_opt or None, "allow": args.allow or None}
+                   "security_opt": args.security_opt or None, "allow": args.allow or None,
+                   "read_only": args.read_only or None, "cap_drop": args.cap_drop or None}
         accepted = inspect.signature(d.start).parameters
         kwargs = {k: v for k, v in offered.items() if k in accepted and v is not None}
         launch = d.start(agent, args.policy, name=args.name, **kwargs)
