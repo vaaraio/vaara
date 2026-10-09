@@ -69,7 +69,8 @@ def test_profile_without_apps_has_no_attachment():
     assert "profile vaara-agent flags=(attach_disconnected) {" in _render()
 
 
-def test_parser_accepts_the_profile(tmp_path):
+@pytest.mark.parametrize("stacked", [False, True])
+def test_parser_accepts_the_profile(tmp_path, stacked):
     parser = guard.parser_path()
     if parser is None:
         pytest.skip("apparmor_parser not installed")
@@ -80,7 +81,7 @@ def test_parser_accepts_the_profile(tmp_path):
         watched_folders=["/home/op/clients"],
         apps=["/usr/local/bin/copilot", "/opt/x/claude"],
         install_paths=floor.vaara_install_paths(),
-        abi=abi)
+        abi=abi, stacked=stacked)
     profile = tmp_path / "vaara-agent"
     profile.write_text(text)
     done = subprocess.run([parser, "-Q", "-K", str(profile)], capture_output=True, text=True)

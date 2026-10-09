@@ -235,8 +235,18 @@ def render(homes: Iterable[str], *,
            harness_binaries: Iterable[str] = (),
            apps: Iterable[str] = (),
            install_paths: Optional[Iterable[str]] = None,
-           abi: Optional[str] = None) -> str:
-    """The profile text for ``homes``, the operator's folders and apps."""
+           abi: Optional[str] = None,
+           stacked: bool = False) -> str:
+    """The profile text for ``homes``, the operator's folders and apps.
+
+    ``stacked`` renders the move into ``//tool`` as a stack on the harness
+    profile (``Cx -> &tool``) instead of a plain transition. A launch with
+    ``no_new_privs`` set (the hardening of :mod:`vaara.oslayer.harden`)
+    needs it: under no_new_privs AppArmor refuses a transition that leaves
+    the profile the task was confined by, and allows one that stacks on it
+    (``security/apparmor/domain.c``). The tool tree is then confined by
+    both profiles at once, which is no wider than ``//tool`` alone.
+    """
     homes = [str(Path(h)).rstrip("/") for h in homes]
     watched = [str(Path(f)).rstrip("/") + "/**" for f in watched_folders]
     installs = list(vaara_install_paths() if install_paths is None else install_paths)
@@ -267,7 +277,7 @@ def render(homes: Iterable[str], *,
         if tool:
             out.append("  /** ix,")
         else:
-            out.append(f"  /** Cx -> {TOOL},")
+            out.append(f"  /** Cx -> {'&' if stacked else ''}{TOOL},")
         for b in harness:
             out.append(f"  {_q(b)} Px -> {PROFILE},")
         out += [

@@ -405,6 +405,7 @@ class Guard:
             watched_folders=sel.folders_in("ask") + sel.folders_in("record"),
             harness_binaries=list(self._harness),
             apps=sel.apps,
+            stacked=sel.hardened,
         )
 
     def _load_profile(self) -> None:
@@ -789,6 +790,7 @@ class Guard:
             "trail": str(self.trail_path),
             "folders": [{"path": f.path, "mode": f.mode} for f in sel.folders],
             "apps": list(sel.apps), "ask_timeout": sel.ask_timeout,
+            "harden": sel.hardened, "egress": sel.egress,
             "launches": launches, "waiting": waiting,
         }
 

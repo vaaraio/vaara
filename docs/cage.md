@@ -138,6 +138,61 @@ keeps with `vaara os-layer`, not from a file per launch; `--policy` is
 refused there. The OpenShell driver finds the CLI on `PATH` or at
 `OPENSHELL_BIN`.
 
+## The Vaara cage: hardening and egress
+
+`vaara run` confines an agent with the `vaara-agent` AppArmor profile, a
+cgroup per launch and the guard's decisions on opens and execs. Two more
+layers are the operator's to switch on, for every launch:
+
+```
+vaara os-layer harden on
+vaara os-layer egress api.anthropic.com '*.github.com' db.internal:5432
+vaara os-layer egress --none      # locked, nothing allowed out
+vaara os-layer egress --off       # unlocked
+```
+
+`harden` applies, in the child before it execs the agent:
+
+- `no_new_privs`, so nothing in the tree gains privileges on exec.
+- A seccomp filter (`vaara-seccomp/1`) that refuses with `EPERM` loading
+  kernel modules, kexec, eBPF, perf, ptrace and cross-process memory
+  access, mounts and the new mount API, swap, reboot, the kernel keyring,
+  `userfaultfd`, `open_by_handle_at`, setting the clock, and io_uring,
+  whose socket and file operations seccomp would not see. System calls of
+  a foreign ABI (32-bit compat, x32) are refused as a whole.
+
+`egress` implies `harden` and locks the network:
+
+- Landlock (ABI 4, Linux 6.7 and later) lets the tree open TCP connections
+  only to the egress proxy `vaara run` starts for the launch. The filter
+  also refuses UDP and raw IP sockets, so nothing leaves by DNS or ICMP.
+  With Landlock ABI 6 the tree cannot signal processes outside itself.
+- The proxy (`HTTPS_PROXY`, `HTTP_PROXY`, set for the tree) understands
+  `CONNECT` and plain HTTP and resolves names itself. A host passes when
+  it matches an entry: `example.com` (ports 443 and 80), `*.example.com`
+  (subdomains) or `host:port`. A name that resolves to loopback,
+  link-local (cloud metadata), multicast or the unspecified address is
+  refused unless the entry names that address literally.
+- Every connection, allowed or refused, is a decision on the operator's
+  trail (`egress.connect`), with the host, port and the reason, and the
+  launch's cage block.
+- A launch whose kernel cannot apply a layer that was asked for does not
+  start.
+
+With either switch on, the floor renders the move into `//tool` as a stack
+on the harness profile (`Cx -> &tool`): AppArmor refuses a plain
+transition under no_new_privs and allows a stacked one. A tool is then
+confined by both profiles at once, which is no wider than `//tool` alone.
+`vaara cage status --driver vaara-cage` reports both switches.
+
+What these layers do not do:
+
+- Landlock rules name ports, not addresses. The proxy's port number on a
+  remote host is reachable as well; a server would have to listen there.
+- The proxy decides by name and does not look inside TLS. A credential the
+  model must not see goes through `vaara llm-proxy`, which holds the key.
+- Binding a listening TCP port is left open, so development servers work.
+
 ## What the block does and does not establish
 
 - `confirmed: true` with `basis: apparmor_label` means the deciding

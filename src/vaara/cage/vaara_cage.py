@@ -133,7 +133,8 @@ class VaaraCageDriver:
             config_digest=str(status.get("profile_digest") or ""),
             confirmed=loaded and running, basis=BASIS_GUARD, name=name or "",
             detail={"profile": status.get("profile"), "folders": status.get("folders", []),
-                    "apps": status.get("apps", []), "launches": status.get("launches", [])},
+                    "apps": status.get("apps", []), "launches": status.get("launches", []),
+                    "harden": bool(status.get("harden")), "egress": status.get("egress")},
         )
 
     def events(self, name: str, since: float = 0.0) -> Iterator[dict[str, Any]]:
