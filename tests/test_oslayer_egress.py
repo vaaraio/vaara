@@ -177,8 +177,8 @@ def test_the_floor_stacks_the_tool_profile_only_when_hardened():
     plain = floor.render(["/home/op"], abi="abi <abi/4.0>,", install_paths=[])
     stacked = floor.render(["/home/op"], abi="abi <abi/4.0>,", install_paths=[], stacked=True)
     assert "  /** Cx -> tool," in plain and "&" not in plain
-    assert "  /** Px -> &vaara-agent//tool," in stacked
-    assert plain.replace("Cx -> tool", "Px -> &vaara-agent//tool") == stacked
+    assert "  /** Cix -> &tool," in stacked
+    assert plain.replace("Cx -> tool", "Cix -> &tool") == stacked
 
 
 def test_os_layer_cli_sets_and_shows_both(tmp_path, monkeypatch, capsys):

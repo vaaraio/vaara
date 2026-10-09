@@ -180,7 +180,7 @@ vaara os-layer egress --off       # unlocked
   start.
 
 With either switch on, the floor renders the move into `//tool` as a stack
-on the harness profile (`Px -> &vaara-agent//tool`): AppArmor refuses a plain
+on the harness profile (`Cix -> &tool`): AppArmor refuses a plain
 transition under no_new_privs and allows a stacked one. A tool is then
 confined by both profiles at once, which is no wider than `//tool` alone.
 `vaara cage status --driver vaara-cage` reports both switches.

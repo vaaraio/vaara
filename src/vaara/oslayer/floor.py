@@ -240,15 +240,16 @@ def render(homes: Iterable[str], *,
     """The profile text for ``homes``, the operator's folders and apps.
 
     ``stacked`` renders the move into ``//tool`` as a stack on the harness
-    profile (``Px -> &vaara-agent//tool``) instead of a plain transition.
-    The child is named in full: the kernel joins ``Cx -> &tool`` to the
-    current profile as ``vaara-agent//&tool``, a stack with a top-level
-    profile ``tool`` that does not exist. A launch with
+    profile (``Cix -> &tool``) instead of a plain transition. A launch with
     ``no_new_privs`` set (the hardening of :mod:`vaara.oslayer.harden`)
     needs it: under no_new_privs AppArmor refuses a transition that leaves
-    the profile the task was confined by, and allows one that stacks on it
-    (``security/apparmor/domain.c``). The tool tree is then confined by
-    both profiles at once, which is no wider than ``//tool`` alone.
+    the profile the task was confined by, and allows one whose label still
+    holds it (``security/apparmor/domain.c``). For a stacked rule the kernel
+    first looks for a child profile attached to the binary's path; none is,
+    so the ``ix`` fallback keeps ``vaara-agent`` and the label becomes
+    ``vaara-agent`` stacked with ``//tool``, which is no wider than
+    ``//tool`` alone. Without ``ix`` the exec fails ("profile transition
+    not found").
     """
     homes = [str(Path(h)).rstrip("/") for h in homes]
     watched = [str(Path(f)).rstrip("/") + "/**" for f in watched_folders]
@@ -280,7 +281,7 @@ def render(homes: Iterable[str], *,
         if tool:
             out.append("  /** ix,")
         else:
-            out.append(f"  /** Px -> &{PROFILE}//{TOOL}," if stacked else f"  /** Cx -> {TOOL},")
+            out.append(f"  /** Cix -> &{TOOL}," if stacked else f"  /** Cx -> {TOOL},")
         for b in harness:
             out.append(f"  {_q(b)} Px -> {PROFILE},")
         out += [
