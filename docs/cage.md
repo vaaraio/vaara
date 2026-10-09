@@ -185,10 +185,16 @@ transition under no_new_privs and allows a stacked one. A tool is then
 confined by both profiles at once, which is no wider than `//tool` alone.
 `vaara cage status --driver vaara-cage` reports both switches.
 
+Landlock rules name ports, not addresses, so the guard adds the address:
+when a launch locks egress it attaches eBPF programs to the launch's
+cgroup that allow an IPv4 `connect()` only to `127.0.0.1` on the proxy's
+port and refuse IPv6 connects and UDP sends. The proxy's port number on a
+remote host is refused with `EPERM` before a packet leaves. A guard that
+cannot attach them refuses the launch, and `vaara run` refuses a guard
+that answers without them.
+
 What these layers do not do:
 
-- Landlock rules name ports, not addresses. The proxy's port number on a
-  remote host is reachable as well; a server would have to listen there.
 - The proxy decides by name and does not look inside TLS. A credential the
   model must not see goes through `vaara llm-proxy`, which holds the key.
 - Binding a listening TCP port is left open, so development servers work.
@@ -197,7 +203,10 @@ What these layers do not do:
 
 - `confirmed: true` with `basis: apparmor_label` means the deciding
   process carried the `vaara-agent` label when it decided. The label is
-  set by the kernel at exec and cannot be dropped by the process.
+  set by the kernel at exec and cannot be dropped by the process. Under
+  `vaara run` the hook decides outside the floor, so the check is made on
+  the agent process that asked, named by the relay socket's peer
+  credentials, which the kernel supplies.
 - `confirmed: true` with `basis: seccomp_filter` means a seccomp filter
   and `no_new_privs` were on the deciding process. That is what OpenShell,
   the Codex sandbox and nono set, and it is also what a container

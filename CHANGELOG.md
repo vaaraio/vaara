@@ -6,6 +6,17 @@ and this project follows [Semantic Versioning](https://semver.org/spec/v2.0.0.ht
 
 ## [Unreleased]
 
+### Fixed
+- With egress locked, a `vaara run` launch could reach the egress proxy's port number on any remote host, because Landlock's network rules name ports and not addresses. The guard now attaches eBPF programs to the launch's cgroup (`vaara.oslayer.netlock`) that allow an IPv4 `connect()` only to `127.0.0.1` on the proxy's port and refuse IPv6 connects and UDP sends. A guard that cannot attach them refuses the launch, and `vaara run` refuses a guard that answers without them.
+- With egress locked, a stream socket of a protocol other than TCP (MPTCP, SCTP) is refused. Landlock's TCP rules bind TCP sockets only, so such a socket could connect anywhere.
+- The egress proxy carries one plain HTTP request per client connection. A keep-alive request for another host on the same connection reached the first request's upstream without a decision or a record.
+- The egress proxy judges an IPv4-mapped IPv6 address as the IPv4 address it carries, on every Python version, and refuses the IPv6 instance metadata address `fd00:ec2::254`.
+- A tunnel through the egress proxy whose client half-closes after sending its request still gets the reply.
+- `vaara run` hands the egress proxy variables to the agent's tree only. They also reached the hook it runs outside the floor, whose requests then went through the agent's proxy.
+- Decisions relayed from inside the Vaara cage are confirmed on the agent that asked. The hook runs outside the floor, so checking its own label always failed and every such decision was recorded as `declared`; `vaara run` now hands it the asking agent's pid from the relay socket's peer credentials.
+- `vaara cage run` stays with a launch that is its own child (codex, sandbox-runtime, firecracker, the Vaara cage), passes the cage's stderr on and exits with the agent's status. Returning at once closed the stderr pipe under the agent and lost the launch. Only the leading `--` is taken off the agent's command; one inside it belongs to the agent.
+- The guard's status reports the digest of the profile text the kernel last took, recorded when it loads, instead of rendering the profile on every call.
+
 ## [2.7.0] - 2026-10-09
 
 ### Added

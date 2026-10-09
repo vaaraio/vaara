@@ -43,6 +43,9 @@ CAGE_ENV = "VAARA_CAGE"
 DIGEST_ENV = "VAARA_CAGE_DIGEST"
 UPSTREAM_ENV = "VAARA_CAGE_UPSTREAM"
 NAME_ENV = "VAARA_CAGE_NAME"
+# Set by ``vaara run`` for the hook it runs on behalf of an agent inside the
+# Vaara cage: the agent's pid, from the relay socket's peer credentials.
+PEER_ENV = "VAARA_CAGE_PEER_PID"
 
 #: The driver names Vaara ships, in the order of .shared's driver list.
 DRIVERS = (
@@ -268,6 +271,16 @@ def observe(environ: Optional[dict[str, str]] = None) -> CageState:
                 config_digest=state.config_digest, confirmed=True, basis=basis,
                 name=state.name,
             )
+    # Inside the Vaara cage the hook runs outside the floor, in vaara run, so
+    # the process to check is the agent that asked: vaara run names it.
+    env = os.environ if environ is None else environ
+    peer = (env.get(PEER_ENV) or "").strip()
+    if state.driver == "vaara-cage" and peer.isdigit() and apparmor_agent_label(int(peer)):
+        return CageState(
+            driver=state.driver, upstream=state.upstream,
+            config_digest=state.config_digest, confirmed=True, basis=BASIS_APPARMOR,
+            name=state.name, detail={"pid": int(peer)},
+        )
     return state
 
 

@@ -14,7 +14,8 @@ so the agent and everything it starts inherit them and none can lift them:
   ``open_by_handle_at``, setting the clock, and io_uring (whose socket and
   file operations seccomp never sees). System calls of a foreign ABI (32-bit
   compat, x32) are refused as a whole. With the network locked it also
-  refuses UDP and raw IP sockets, so nothing leaves by DNS or ICMP.
+  refuses UDP and raw IP sockets, so nothing leaves by DNS or ICMP, and
+  stream sockets of any protocol but TCP (MPTCP, SCTP).
 - Landlock network rules (Landlock ABI 4 and later): TCP connections reach
   only the ports given, which is the egress proxy's. With ABI 6 and later
   the tree is also scoped so it cannot signal processes outside itself.
@@ -22,9 +23,9 @@ so the agent and everything it starts inherit them and none can lift them:
   is one (:mod:`vaara.oslayer.forward`).
 
 Landlock rules name ports, not addresses, so the proxy's port number on a
-remote host is reachable too. The guard closes that where it runs as root
-by an address rule on the launch's cgroup; this module says which layers it
-applied and the caller records them.
+remote host would be reachable too. The guard closes that as root with an
+address rule on the launch's cgroup (:mod:`vaara.oslayer.netlock`), and
+``vaara run`` refuses a launch the guard did not lock.
 
 The system call numbers are pinned from the kernel's own tables
 (``arch/x86/entry/syscalls/syscall_64.tbl`` and
@@ -58,10 +59,11 @@ _AND_K = 0x54
 _RET_K = 0x06
 
 # Offsets into struct seccomp_data (little-endian on both arches).
-_NR, _ARCH, _ARG0, _ARG1 = 0, 4, 16, 24
+_NR, _ARCH, _ARG0, _ARG1, _ARG2 = 0, 4, 16, 24, 32
 
 AF_INET, AF_INET6, AF_PACKET = 2, 10, 17
 SOCK_STREAM = 1
+IPPROTO_TCP = 6
 SOCK_TYPE_MASK = 0xF
 
 # The calls refused outright, by name, then per arch.
@@ -185,7 +187,13 @@ def seccomp_program(arch: Optional[str] = None, lock_network: bool = False) -> b
         a.label("inet")
         a.op(_LD_W_ABS, _ARG1)
         a.op(_AND_K, SOCK_TYPE_MASK)
-        a.op(_JEQ_K, SOCK_STREAM, jt="allow", jf="deny")
+        a.op(_JEQ_K, SOCK_STREAM, jt="stream", jf="deny")
+        # Landlock's TCP rules bind TCP sockets only: a stream socket of
+        # another protocol (MPTCP, SCTP) would connect anywhere.
+        a.label("stream")
+        a.op(_LD_W_ABS, _ARG2)
+        a.op(_JEQ_K, 0, jt="allow")
+        a.op(_JEQ_K, IPPROTO_TCP, jt="allow", jf="deny")
     a.label("allow")
     a.op(_RET_K, SECCOMP_RET_ALLOW)
     a.label("deny")
