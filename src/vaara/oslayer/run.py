@@ -181,6 +181,7 @@ def _child(ready_fd: int, argv: list[str], hardening: Optional[dict] = None) -> 
             # Set while still unconfined: AppArmor allows the exec into the
             # profile, and the floor renders //tool as a stack on it.
             harden.apply(egress_ports=hardening.get("egress_ports"))
+            os.environ.update(hardening.get("environ") or {})
         # Python ignores these two; an ignored signal stays ignored across
         # exec, and the agent should start with the defaults.
         signal.signal(signal.SIGPIPE, signal.SIG_DFL)
@@ -246,7 +247,9 @@ def run(name: Optional[str], agent_argv: list[str], *,
             egress = EgressProxy(list(allow), record=_egress_recorder(
                 agent, declared.to_record()))
             hardening["egress_ports"] = [egress.start()]
-            os.environ.update(egress.environ())
+            # The agent's tree only: the hook this process runs unconfined
+            # must not send its own requests through the agent's proxy.
+            hardening["environ"] = egress.environ()
 
     def _close() -> None:
         hooks.close()

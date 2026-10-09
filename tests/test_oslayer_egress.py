@@ -247,8 +247,12 @@ def test_vaara_run_starts_the_proxy_and_hardens_the_child(monkeypatch):
     from unittest import mock
     with mock.patch.dict(os.environ), pytest.raises(StopHere):
         run_mod.run("reviewer", ["claude"])
-    port = int(seen["proxy"].rsplit(":", 1)[1])
-    assert seen["hardening"] == {"egress_ports": [port]}
+    # The proxy reaches the agent's tree only, never this process's own
+    # environment, which the unconfined hook inherits.
+    assert seen["proxy"] is None
+    url = seen["hardening"]["environ"]["HTTPS_PROXY"]
+    port = int(url.rsplit(":", 1)[1])
+    assert seen["hardening"]["egress_ports"] == [port]
 
 
 def test_egress_records_land_on_the_trail(tmp_path, monkeypatch):

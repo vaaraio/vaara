@@ -426,3 +426,33 @@ def test_vaara_run_declares_the_cage(monkeypatch):
         run_mod.run("reviewer", ["claude"])
     assert seen == {cage.CAGE_ENV: "vaara-cage", cage.DIGEST_ENV: "sha256:11",
                     cage.UPSTREAM_ENV: "apparmor 4.0.1", cage.NAME_ENV: "reviewer"}
+
+
+def test_cage_run_keeps_a_dash_dash_inside_the_agent_and_follows_a_child(monkeypatch, capsys):
+    """Only the leading separator goes, and a process-backed launch is waited for."""
+    import subprocess
+
+    from vaara.cage import cli as cage_cli
+    from vaara.cage._cli import ChildLaunch, ChildLaunches
+    from vaara.cage.driver import CageLaunch
+
+    class Fake:
+        def __init__(self):
+            self._launches = ChildLaunches()
+
+        def start(self, agent, policy, name=None):
+            self.argv = agent
+            proc = subprocess.Popen([sys.executable, "-c",
+                                     "import sys; print('from the cage', file=sys.stderr); sys.exit(3)"],
+                                    stderr=subprocess.PIPE)
+            from vaara.cage import CageState
+            state = CageState(driver="fake", name="n1")
+            self._launches.add(ChildLaunch("n1", proc, state))
+            return CageLaunch(driver="fake", name="n1", state=state, pid=proc.pid)
+
+    fake = Fake()
+    monkeypatch.setattr(cage_cli, "load_driver", lambda name: fake)
+    code = cage_cli.main(["run", "--driver", "codex", "--", "git", "log", "--", "src/"])
+    assert fake.argv == ["git", "log", "--", "src/"]
+    assert code == 3
+    assert "from the cage" in capsys.readouterr().err
