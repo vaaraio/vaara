@@ -6,6 +6,8 @@ and this project follows [Semantic Versioning](https://semver.org/spec/v2.0.0.ht
 
 ## [Unreleased]
 
+## [2.7.1] - 2026-10-09
+
 ### Fixed
 - With egress locked, a `vaara run` launch could reach the egress proxy's port number on any remote host, because Landlock's network rules name ports and not addresses. The guard now attaches eBPF programs to the launch's cgroup (`vaara.oslayer.netlock`) that allow an IPv4 `connect()` only to `127.0.0.1` on the proxy's port and refuse IPv6 connects and UDP sends. A guard that cannot attach them refuses the launch, and `vaara run` refuses a guard that answers without them.
 - With egress locked, a stream socket of a protocol other than TCP (MPTCP, SCTP) is refused. Landlock's TCP rules bind TCP sockets only, so such a socket could connect anywhere.
