@@ -5,6 +5,7 @@
     vaara cage drivers
     vaara cage run --driver openshell --policy policy.yaml -- claude
     vaara cage run --driver vaara-cage -- codex
+    vaara cage run --driver gvisor --image python:3.12 -- python agent.py
     vaara cage status --driver openshell demo
     vaara cage events --driver openshell demo --since 10m
     vaara cage stop --driver openshell demo
@@ -49,9 +50,17 @@ def build_parser() -> argparse.ArgumentParser:
     pr.add_argument("--policy", type=Path, default=None,
                     help="The cage's policy file (OpenShell: sandbox policy YAML).")
     pr.add_argument("--name", default=None, help="The launch's name in the cage.")
-    pr.add_argument("--image", default=None, help="OpenShell: the sandbox image (--from).")
+    pr.add_argument("--image", default=None,
+                    help="The sandbox image: openshell (--from), gvisor, kata, microsandbox.")
     pr.add_argument("--provider", action="append", default=[],
-                    help="OpenShell: attach a credential provider. Repeatable.")
+                    help="openshell: attach a credential provider. Repeatable.")
+    pr.add_argument("--template", default=None, help="e2b: the template id.")
+    pr.add_argument("--permission-profile", default=None,
+                    help="codex: a named permission profile instead of --policy.")
+    pr.add_argument("--security-opt", action="append", default=[],
+                    help="gvisor, kata: an engine security option. Repeatable.")
+    pr.add_argument("--allow", action="append", default=[],
+                    help="nono: a directory to allow read and write. Repeatable.")
     pr.add_argument("agent", nargs=argparse.REMAINDER, help="The agent and its arguments, after --")
 
     for name, text in (("status", "What the cage reports about a launch."),
@@ -94,9 +103,13 @@ def _dispatch(args: argparse.Namespace) -> int:
         agent = [a for a in args.agent if a != "--"] if args.agent else []
         if not agent:
             raise CageError("give the agent after --")
-        kwargs = {}
-        if args.driver == "openshell":
-            kwargs = {"image": args.image, "providers": args.provider}
+        import inspect
+
+        offered = {"image": args.image, "providers": args.provider or None,
+                   "template": args.template, "permission_profile": args.permission_profile,
+                   "security_opt": args.security_opt or None, "allow": args.allow or None}
+        accepted = inspect.signature(d.start).parameters
+        kwargs = {k: v for k, v in offered.items() if k in accepted and v is not None}
         launch = d.start(agent, args.policy, name=args.name, **kwargs)
         print(json.dumps({"driver": launch.driver, "name": launch.name, "pid": launch.pid,
                           "cage": launch.state.to_record()}, indent=2))

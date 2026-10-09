@@ -44,18 +44,30 @@ DIGEST_ENV = "VAARA_CAGE_DIGEST"
 UPSTREAM_ENV = "VAARA_CAGE_UPSTREAM"
 NAME_ENV = "VAARA_CAGE_NAME"
 
-#: The driver names Vaara ships. The registry maps each to its module.
-DRIVERS = ("vaara-cage", "openshell")
+#: The driver names Vaara ships, in the order of .shared's driver list.
+DRIVERS = (
+    "vaara-cage", "openshell", "codex", "sandbox-runtime", "gvisor",
+    "firecracker", "kata", "agent-sandbox", "microsandbox", "nono", "e2b",
+)
 
 NONE = "none"
 
-# How a confirmation was reached.
+# How a confirmation was reached. The deciding side names the kernel fact it
+# read; the operator side names the cage's own control plane.
 BASIS_NONE = "none"                   # nothing declared, nothing claimed
 BASIS_DECLARED = "declared"           # declared by the launcher, not confirmed
 BASIS_APPARMOR = "apparmor_label"     # the process carries the vaara-agent label
 BASIS_SECCOMP = "seccomp_filter"      # a seccomp filter and no_new_privs are on
+BASIS_NO_NEW_PRIVS = "no_new_privs"   # no_new_privs is on (what Landlock requires)
+BASIS_BWRAP = "bwrap_init"            # pid 1 of this pid namespace is bubblewrap
+BASIS_GVISOR = "gvisor_kernel_log"    # the kernel log is gVisor's own
+BASIS_VM = "hypervisor_present"       # the CPU reports a hypervisor underneath
 BASIS_GUARD = "guard_status"          # the Vaara OS guard reports it (operator side)
 BASIS_GATEWAY = "gateway_status"      # the OpenShell gateway reports it (operator side)
+BASIS_PROCESS = "process_alive"       # the launcher's child is still running (operator side)
+BASIS_ENGINE = "engine_status"        # the container engine reports it (operator side)
+BASIS_API = "api_status"              # the cage's HTTP API reports it (operator side)
+BASIS_CONTROL = "control_plane"       # a cluster or session store reports it (operator side)
 
 
 @dataclass(frozen=True)
@@ -88,9 +100,38 @@ class CageState:
         return block
 
 
+# The same declaration on a guest kernel's command line, for the microVM
+# cages: a launcher cannot set environment variables inside a guest it only
+# boots, but it writes the boot arguments.
+CMDLINE_KEYS = {
+    "vaara.cage": CAGE_ENV, "vaara.cage.digest": DIGEST_ENV,
+    "vaara.cage.upstream": UPSTREAM_ENV, "vaara.cage.name": NAME_ENV,
+}
+
+
+def cmdline_declaration(path: str = "/proc/cmdline") -> dict[str, str]:
+    """The ``vaara.cage*`` tokens of the kernel command line, as env names."""
+    try:
+        text = Path(path).read_text()
+    except OSError:
+        return {}
+    out: dict[str, str] = {}
+    for token in text.split():
+        key, sep, value = token.partition("=")
+        if sep and key in CMDLINE_KEYS:
+            out[CMDLINE_KEYS[key]] = value
+    return out
+
+
 def declared(environ: Optional[dict[str, str]] = None) -> Optional[CageState]:
-    """The cage the launcher declared to this tree, unconfirmed, or None."""
+    """The cage the launcher declared to this tree, unconfirmed, or None.
+
+    The environment is read first; a guest with no declaration there is
+    checked for one on its kernel command line.
+    """
     env = os.environ if environ is None else environ
+    if not (env.get(CAGE_ENV) or "").strip():
+        env = cmdline_declaration() if environ is None else env
     driver = (env.get(CAGE_ENV) or "").strip()
     if not driver:
         return None
@@ -136,10 +177,72 @@ def apparmor_agent_label(pid: int | str = "self") -> bool:
     return floor.is_agent_label(label)
 
 
+def no_new_privs_on(pid: str = "self") -> bool:
+    """True when the process cannot gain privileges. Landlock requires it,
+    so a Landlock-only cage (nono with ``--sandbox-policy landlock``) shows
+    this and nothing else from inside."""
+    return _proc_status(pid).get("NoNewPrivs") == "1"
+
+
+def bwrap_is_init() -> bool:
+    """True when pid 1 of this pid namespace is bubblewrap, which is what
+    sandbox-runtime's ``--unshare-pid`` leaves in place."""
+    try:
+        return Path("/proc/1/comm").read_text().strip() == "bwrap"
+    except OSError:
+        return False
+
+
+def gvisor_kernel_log() -> bool:
+    """True when the kernel log is gVisor's: its sentry answers
+    ``syslog(SYSLOG_ACTION_READ_ALL)`` with its own fixed opening line."""
+    import ctypes
+    import ctypes.util
+
+    try:
+        libc = ctypes.CDLL(ctypes.util.find_library("c") or "libc.so.6", use_errno=True)
+        buf = ctypes.create_string_buffer(8192)
+        n = libc.klogctl(3, buf, len(buf))  # SYSLOG_ACTION_READ_ALL
+    except (OSError, AttributeError):
+        return False
+    if n <= 0:
+        return False
+    return b"Starting gVisor" in buf.raw[:n]
+
+
+def hypervisor_present() -> bool:
+    """True when the CPU reports a hypervisor underneath this kernel: the
+    ``hypervisor`` flag on x86, the hypervisor node of the device tree on
+    arm64, or a ``/sys/hypervisor/type``. What a microVM or a VM-backed
+    container shows from inside; a bare container does not."""
+    try:
+        for line in Path("/proc/cpuinfo").read_text().splitlines():
+            if line.startswith("flags") and " hypervisor" in line:
+                return True
+    except OSError:
+        pass
+    for probe in ("/sys/hypervisor/type", "/proc/device-tree/hypervisor/compatible",
+                  "/sys/firmware/devicetree/base/hypervisor/compatible"):
+        if Path(probe).exists():
+            return True
+    return False
+
+
 # Per driver: the kernel check that confirms the declaration from inside.
-_CONFIRM = {
-    "vaara-cage": (apparmor_agent_label, BASIS_APPARMOR),
-    "openshell": (seccomp_filter_on, BASIS_SECCOMP),
+# A driver maps to a tuple of (probe, basis) pairs tried in order; the first
+# that holds names the basis.
+_CONFIRM: dict[str, tuple[tuple[Any, str], ...]] = {
+    "vaara-cage": ((apparmor_agent_label, BASIS_APPARMOR),),
+    "openshell": ((seccomp_filter_on, BASIS_SECCOMP),),
+    "codex": ((seccomp_filter_on, BASIS_SECCOMP),),
+    "sandbox-runtime": ((bwrap_is_init, BASIS_BWRAP),),
+    "nono": ((seccomp_filter_on, BASIS_SECCOMP), (no_new_privs_on, BASIS_NO_NEW_PRIVS)),
+    "gvisor": ((gvisor_kernel_log, BASIS_GVISOR),),
+    "agent-sandbox": ((gvisor_kernel_log, BASIS_GVISOR), (hypervisor_present, BASIS_VM)),
+    "kata": ((hypervisor_present, BASIS_VM),),
+    "firecracker": ((hypervisor_present, BASIS_VM),),
+    "microsandbox": ((hypervisor_present, BASIS_VM),),
+    "e2b": ((hypervisor_present, BASIS_VM),),
 }
 
 
@@ -152,20 +255,18 @@ def observe(environ: Optional[dict[str, str]] = None) -> CageState:
     state = declared(environ)
     if state is None:
         return CageState()
-    check = _CONFIRM.get(state.driver)
-    if check is None:
-        return state
-    probe, basis = check
-    try:
-        held = bool(probe())
-    except Exception:  # noqa: BLE001 - a probe never raises into a decision
-        held = False
-    if not held:
-        return state
-    return CageState(
-        driver=state.driver, upstream=state.upstream, config_digest=state.config_digest,
-        confirmed=True, basis=basis, name=state.name,
-    )
+    for probe, basis in _CONFIRM.get(state.driver, ()):
+        try:
+            held = bool(probe())
+        except Exception:  # noqa: BLE001 - a probe never raises into a decision
+            held = False
+        if held:
+            return CageState(
+                driver=state.driver, upstream=state.upstream,
+                config_digest=state.config_digest, confirmed=True, basis=basis,
+                name=state.name,
+            )
+    return state
 
 
 def environ_for(state: CageState) -> dict[str, str]:
@@ -177,21 +278,38 @@ def environ_for(state: CageState) -> dict[str, str]:
     return env
 
 
+_MODULES = {
+    "vaara-cage": ("vaara.cage.vaara_cage", "VaaraCageDriver"),
+    "openshell": ("vaara.cage.openshell", "OpenShellDriver"),
+    "codex": ("vaara.cage.codex", "CodexSandboxDriver"),
+    "sandbox-runtime": ("vaara.cage.sandbox_runtime", "SandboxRuntimeDriver"),
+    "gvisor": ("vaara.cage.gvisor", "GVisorDriver"),
+    "firecracker": ("vaara.cage.firecracker", "FirecrackerDriver"),
+    "kata": ("vaara.cage.kata", "KataDriver"),
+    "agent-sandbox": ("vaara.cage.agent_sandbox", "AgentSandboxDriver"),
+    "microsandbox": ("vaara.cage.microsandbox", "MicrosandboxDriver"),
+    "nono": ("vaara.cage.nono", "NonoDriver"),
+    "e2b": ("vaara.cage.e2b", "E2BDriver"),
+}
+
+
 def load_driver(name: str, **kwargs: Any):
     """The driver called ``name``. Raises ``ValueError`` for an unknown one."""
-    if name == "vaara-cage":
-        from vaara.cage.vaara_cage import VaaraCageDriver
+    try:
+        module_name, class_name = _MODULES[name]
+    except KeyError:
+        raise ValueError(
+            f"unknown cage driver {name!r}; Vaara ships {', '.join(DRIVERS)}"
+        ) from None
+    import importlib
 
-        return VaaraCageDriver(**kwargs)
-    if name == "openshell":
-        from vaara.cage.openshell import OpenShellDriver
-
-        return OpenShellDriver(**kwargs)
-    raise ValueError(f"unknown cage driver {name!r}; Vaara ships {', '.join(DRIVERS)}")
+    module = importlib.import_module(module_name)
+    return getattr(module, class_name)(**kwargs)
 
 
 __all__ = [
     "CAGE_ENV", "DIGEST_ENV", "UPSTREAM_ENV", "NAME_ENV", "DRIVERS", "NONE",
     "CageState", "declared", "observe", "environ_for", "load_driver",
-    "seccomp_filter_on", "apparmor_agent_label",
+    "seccomp_filter_on", "apparmor_agent_label", "no_new_privs_on", "bwrap_is_init",
+    "gvisor_kernel_log", "hypervisor_present", "cmdline_declaration",
 ]

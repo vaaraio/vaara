@@ -29,11 +29,11 @@ confinement into evidence. Vaara does: every decision record carries a
 
 | Key | Meaning |
 |---|---|
-| `driver` | Which cage: `vaara-cage`, `openshell`, or `none` for a run outside any cage. |
+| `driver` | Which cage: one of the eleven driver names below, or `none` for a run outside any cage. |
 | `confirmed` | Whether the kernel confirmed, on the deciding process at decision time, the confinement that cage imposes. |
 | `upstream` | The cage's own name and version. |
 | `config_digest` | `sha256:` over the cage's effective configuration. For the Vaara cage, the rendered AppArmor profile. For OpenShell, the sandbox policy YAML as submitted at create. |
-| `basis` | What was checked. `apparmor_label`: the deciding process carries the `vaara-agent` label. `seccomp_filter`: it runs under a seccomp filter with `no_new_privs`, which is what OpenShell sets on its main process and everything under it. `declared`: the launcher said so and the kernel check did not pass. |
+| `basis` | What was checked. `apparmor_label`: the deciding process carries the `vaara-agent` label. `seccomp_filter`: it runs under a seccomp filter with `no_new_privs`. `no_new_privs`: that flag alone. `bwrap_init`: pid 1 of its pid namespace is bubblewrap. `gvisor_kernel_log`: the kernel log is gVisor's. `hypervisor_present`: the CPU reports a hypervisor underneath. `declared`: the launcher said so and no kernel check passed. |
 | `name` | The launch's name in the cage, when set. |
 
 A run outside any cage writes `{"driver": "none", "confirmed": false}`.
@@ -43,8 +43,13 @@ A record is never silent about its confinement.
 
 The launcher side starts the agent inside the cage and hands the governed
 tree four environment variables: `VAARA_CAGE`, `VAARA_CAGE_DIGEST`,
-`VAARA_CAGE_UPSTREAM`, `VAARA_CAGE_NAME`. `vaara run` sets them itself.
-The OpenShell driver passes them as `--env` on `sandbox create`.
+`VAARA_CAGE_UPSTREAM`, `VAARA_CAGE_NAME`. `vaara run` sets them itself;
+the other drivers pass them through the cage's own environment option.
+A microVM booted from a kernel image has no environment to receive them,
+so the Firecracker driver writes the same four as `vaara.cage=`,
+`vaara.cage.digest=`, `vaara.cage.upstream=` and `vaara.cage.name=` on the
+kernel command line, and the deciding side reads `/proc/cmdline` when the
+environment carries nothing.
 
 The deciding side is `vaara.cage.observe()`, which the trail calls for
 every decision it records. It reads the declaration and then asks the
@@ -76,10 +81,27 @@ Five calls, the same for every cage: `start(agent, policy, name=)`,
 shell out to the cage's own tools. No forks; no driver code outside this
 repository.
 
-| Driver | Cage | Starts with | Confirmed from inside by | Operator-side state from |
-|---|---|---|---|---|
-| `vaara-cage` | `vaara-agent` AppArmor profile, a cgroup per launch, the fanotify guard | `vaara run --name N -- agent` | the process's own AppArmor label | the guard's status: profile loaded, profile digest, launches |
-| `openshell` | Landlock, seccomp, per-sandbox egress proxy, credentials at the boundary | `openshell sandbox create --name N --policy P --detach --env ... -- agent` | a seccomp filter and `no_new_privs` on the process | `openshell sandbox get N -o json`: phase, policy version, policy hash |
+| Driver | Cage (licence) | Starts with | Policy file | Confirmed from inside by | Operator-side state from |
+|---|---|---|---|---|---|
+| `vaara-cage` | Vaara's own: `vaara-agent` AppArmor profile, a cgroup per launch, the fanotify guard (AGPL-3.0) | `vaara run --name N -- agent` | none; the OS-layer selection | the process's own AppArmor label | the guard's status: profile loaded, profile digest, launches |
+| `openshell` | NVIDIA OpenShell: Landlock, seccomp, per-sandbox egress proxy, credentials at the boundary (Apache-2.0) | `openshell sandbox create --name N --policy P --detach --env ... -- agent` | sandbox policy YAML | a seccomp filter and `no_new_privs` on the process | `openshell sandbox get N -o json`: phase, policy version, policy hash |
+| `codex` | OpenAI Codex sandbox: bubblewrap, Landlock, seccomp on Linux; Seatbelt on macOS (Apache-2.0) | `codex sandbox --sandbox-state-json ... -- agent` | sandbox state JSON | a seccomp filter and `no_new_privs` (Linux) | the launcher's child process |
+| `sandbox-runtime` | Anthropic sandbox-runtime: bubblewrap namespaces and a filtering proxy on Linux; Seatbelt on macOS (Apache-2.0) | `srt --settings S -- agent` | `srt` settings JSON | bubblewrap as pid 1 of the process's pid namespace (Linux) | the launcher's child process |
+| `nono` | nono: Landlock first with a seccomp baseline on Linux; Seatbelt on macOS (Apache-2.0) | `nono run --profile P --name N --detached -- agent` | a profile file or catalogue name | a seccomp filter, or `no_new_privs` alone under the Landlock-only policy | `nono ps --json`: session status |
+| `gvisor` | gVisor: a user-space kernel, as the `runsc` OCI runtime (Apache-2.0) | `docker run -d --runtime=runsc --name N -e ... IMAGE agent` | none; `--image` and `--security-opt` | the kernel log is gVisor's own | `docker inspect N`: state and runtime |
+| `kata` | Kata Containers: a VM per container with its own guest kernel (Apache-2.0) | `docker run -d --runtime=io.containerd.kata.v2 ...` | none; `--image` and `--security-opt` | a hypervisor under the CPU | `docker inspect N`: state and runtime |
+| `agent-sandbox` | kubernetes-sigs/agent-sandbox: a `Sandbox` object whose pod runs under gVisor or Kata (Apache-2.0) | `kubectl apply` of the manifest with the agent as the container command | the `Sandbox` manifest, JSON or YAML | gVisor's kernel log, or a hypervisor | `kubectl get sandboxes.agents.x-k8s.io N`: the `Ready` condition |
+| `firecracker` | Firecracker: a microVM from a kernel and a root filesystem (Apache-2.0) | `firecracker --api-sock S --id N --config-file C` | the microVM configuration JSON | a hypervisor; the declaration arrives on the kernel command line | the API on the socket: instance state and the active configuration |
+| `microsandbox` | microsandbox: a libkrun microVM per sandbox, `msb` (Apache-2.0) | `msb run --conf C --name N --detach --no-tty -e ... -- agent` | the sandbox YAML | a hypervisor | `msb status N --format json` |
+| `e2b` | E2B self-hosted infra: Firecracker microVMs behind an HTTP API, envd inside (Apache-2.0) | `POST /sandboxes`, then `process.Process/Start` on envd | the `NewSandbox` request JSON | a hypervisor | `GET /sandboxes/{id}`: `running` or `paused` |
+
+Each driver depends on the release of the cage the operator installed and
+shells out to it, or speaks its published API. `docker` is the default
+engine for the runtime-backed cages; `VAARA_CAGE_ENGINE=podman` switches.
+Every tool's path can be set with its own variable (`OPENSHELL_BIN`,
+`CODEX_BIN`, `SRT_BIN`, `NONO_BIN`, `RUNSC_BIN`, `KATA_RUNTIME_BIN`,
+`KUBECTL_BIN`, `FIRECRACKER_BIN`, `MSB_BIN`); E2B takes `E2B_API_URL`,
+`E2B_API_KEY` and `E2B_DOMAIN`.
 
 ```
 vaara cage drivers
@@ -101,12 +123,26 @@ refused there. The OpenShell driver finds the CLI on `PATH` or at
   process carried the `vaara-agent` label when it decided. The label is
   set by the kernel at exec and cannot be dropped by the process.
 - `confirmed: true` with `basis: seccomp_filter` means a seccomp filter
-  and `no_new_privs` were on the deciding process. That is what OpenShell
-  sets, and it is also what a container runtime's default profile sets.
-  The check confirms the kind of confinement OpenShell imposes; it does
-  not identify OpenShell's filter from inside. The operator-side
-  `enforcement_state` (the gateway's phase, policy version and hash) is
-  the other half, and `vaara cage status` shows it.
+  and `no_new_privs` were on the deciding process. That is what OpenShell,
+  the Codex sandbox and nono set, and it is also what a container
+  runtime's default profile sets. The check confirms the kind of
+  confinement the cage imposes; it does not identify that cage's filter
+  from inside. The operator-side `enforcement_state` is the other half,
+  and `vaara cage status` shows it.
+- `basis: no_new_privs` (nono under its Landlock-only policy) is weaker
+  still: Landlock cannot be queried from inside, only the flag it requires.
+- `basis: bwrap_init` means pid 1 of the deciding process's pid namespace
+  is bubblewrap, which sandbox-runtime leaves there. A process started by
+  bubblewrap without a pid namespace would not show it, and the block
+  would stay at `declared`.
+- `basis: gvisor_kernel_log` is the strongest of the container checks:
+  the kernel log read from inside is gVisor's own text, which a real
+  kernel never produces.
+- `basis: hypervisor_present` (Kata, Firecracker, microsandbox, E2B)
+  means the CPU reports a hypervisor underneath. It says the deciding
+  process ran in a VM; it does not say which VM, and a Vaara run on any
+  cloud VM shows the same flag. The declaration says which cage; the
+  flag says only that a VM boundary was there.
 - For OpenShell, the record's `config_digest` is over the policy YAML as
   submitted. The gateway may merge a global policy on top; `status`
   reports the digest of the policy the gateway holds as active beside the

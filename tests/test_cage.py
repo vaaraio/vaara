@@ -37,7 +37,7 @@ class TestObserve:
 
     def test_declared_openshell_confirmed_by_the_kernel(self, monkeypatch):
         monkeypatch.setattr(cage, "seccomp_filter_on", lambda: True)
-        monkeypatch.setitem(cage._CONFIRM, "openshell", (cage.seccomp_filter_on, cage.BASIS_SECCOMP))
+        monkeypatch.setitem(cage._CONFIRM, "openshell", ((cage.seccomp_filter_on, cage.BASIS_SECCOMP),))
         block = cage.observe(DECLARED).to_record()
         assert block == {
             "driver": "openshell", "confirmed": True, "upstream": "openshell 0.1.5",
@@ -45,13 +45,13 @@ class TestObserve:
         }
 
     def test_declared_but_not_held_stays_unconfirmed(self, monkeypatch):
-        monkeypatch.setitem(cage._CONFIRM, "openshell", (lambda: False, cage.BASIS_SECCOMP))
+        monkeypatch.setitem(cage._CONFIRM, "openshell", ((lambda: False, cage.BASIS_SECCOMP),))
         block = cage.observe(DECLARED).to_record()
         assert block["confirmed"] is False and block["basis"] == "declared"
         assert block["driver"] == "openshell"
 
     def test_declared_vaara_cage_confirmed_by_the_apparmor_label(self, monkeypatch):
-        monkeypatch.setitem(cage._CONFIRM, "vaara-cage", (lambda: True, cage.BASIS_APPARMOR))
+        monkeypatch.setitem(cage._CONFIRM, "vaara-cage", ((lambda: True, cage.BASIS_APPARMOR),))
         env = {cage.CAGE_ENV: "vaara-cage", cage.DIGEST_ENV: "sha256:00",
                cage.UPSTREAM_ENV: "apparmor 4.0.1"}
         state = cage.observe(env)
@@ -61,7 +61,7 @@ class TestObserve:
     def test_a_probe_that_raises_never_confirms(self, monkeypatch):
         def boom():
             raise OSError("no /proc")
-        monkeypatch.setitem(cage._CONFIRM, "openshell", (boom, cage.BASIS_SECCOMP))
+        monkeypatch.setitem(cage._CONFIRM, "openshell", ((boom, cage.BASIS_SECCOMP),))
         assert cage.observe(DECLARED).confirmed is False
 
     def test_unknown_driver_is_declared_only(self):
@@ -87,7 +87,7 @@ class TestObserve:
     def test_registry(self):
         assert isinstance(cage.load_driver("openshell", binary="/nonexistent/openshell"), OpenShellDriver)
         with pytest.raises(ValueError):
-            cage.load_driver("gvisor")
+            cage.load_driver("chroot")
 
 
 # ── On the record and in the receipt ──────────────────────────────────
@@ -108,7 +108,7 @@ class TestOnTheRecord:
     def test_the_trail_observes_the_declaration(self, monkeypatch):
         for k, v in DECLARED.items():
             monkeypatch.setenv(k, v)
-        monkeypatch.setitem(cage._CONFIRM, "openshell", (lambda: True, cage.BASIS_SECCOMP))
+        monkeypatch.setitem(cage._CONFIRM, "openshell", ((lambda: True, cage.BASIS_SECCOMP),))
         trail = AuditTrail()
         trail.record_decision(action_id="a", agent_id="x", tool_name="t",
                               decision="allow", reason="r", risk_score=0.1)
@@ -374,7 +374,7 @@ def test_cli_drivers_and_observe(capsys, monkeypatch):
     from vaara.cage.cli import main
     monkeypatch.delenv(cage.CAGE_ENV, raising=False)
     assert main(["drivers"]) == 0
-    assert capsys.readouterr().out.split() == ["vaara-cage", "openshell"]
+    assert capsys.readouterr().out.split() == list(cage.DRIVERS)
     assert main(["observe"]) == 0
     assert json.loads(capsys.readouterr().out) == {"driver": "none", "confirmed": False}
 
