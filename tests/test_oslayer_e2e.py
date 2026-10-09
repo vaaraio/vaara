@@ -335,12 +335,30 @@ def test_hardened_launch_with_egress_locked(tmp_path):
 
     home = Path.home()
     free = tmp_path / "hardened-free.txt"
+    # This machine's own outbound address: the proxy's port on a host that is
+    # not loopback. Landlock lets the port through; the guard's address rule
+    # on the launch's cgroup refuses it (EPERM) before a packet leaves.
+    probe = socket.socket(socket.AF_INET, socket.SOCK_DGRAM)
+    probe.connect(("192.0.2.1", 9))
+    host_ip = probe.getsockname()[0]
+    probe.close()
+    direct = tmp_path / "proxyport.py"
+    direct.write_text(
+        "import os, socket\n"
+        "port = int(os.environ['HTTPS_PROXY'].rsplit(':', 1)[1])\n"
+        "s = socket.socket()\n"
+        "try:\n"
+        f"    s.connect(({host_ip!r}, port))\n"
+        "    print('proxyport=0')\n"
+        "except OSError as e:\n"
+        "    print('proxyport=%d' % e.errno)\n")
     model = _Model([
         [_sh(f"echo hardened > {free}")],
         [_sh("grep -E '^(NoNewPrivs|Seccomp):' /proc/self/status")],
         [_sh("curl -sS -m 10 https://example.com/ -o /dev/null; echo curl=$?")],
         [_sh("python3 -c 'import socket; socket.create_connection((\"1.1.1.1\", 443), "
              "timeout=5)' 2>&1 | tail -1")],
+        [_sh(f"python3 {direct}")],
         [_sh(f"cat {home}/.vaara/keys/approval-hmac.key")],
         "done",
     ])
@@ -368,12 +386,13 @@ def test_hardened_launch_with_egress_locked(tmp_path):
     log = proc.stdout[-3000:] + proc.stderr[-3000:]
 
     out = model.outputs()
-    assert len(out) == 5, (out, log)
+    assert len(out) == 6, (out, log)
     assert free.read_text() == "hardened\n", (out, log)
     assert "NoNewPrivs:\t1" in out[1] and "Seccomp:\t2" in out[1], (out[1], log)
     assert "curl=0" not in out[2] and "403" in out[2], (out[2], log)
     assert "Permission denied" in out[3], (out[3], log)
-    assert "Permission denied" in out[4], (out[4], log)
+    assert "proxyport=1" in out[4], (out[4], log)  # EPERM from the address rule
+    assert "Permission denied" in out[5], (out[5], log)
 
     trail = Path(os.environ.get("VAARA_DB") or home / ".vaara" / "trail" / "audit.db")
     conn = sqlite3.connect(f"file:{trail}?mode=ro", uri=True)

@@ -76,6 +76,18 @@ def test_decide_refuses_metadata_and_loopback_behind_an_allowed_name():
     assert not ok and "allow list" in reason
 
 
+def test_decide_looks_through_mapped_addresses_and_refuses_ipv6_metadata():
+    p = EgressProxy(["m4.example.com", "m6.example.com", "v6.example.com"],
+                    resolve=_resolver({"m4.example.com": "::ffff:127.0.0.2",
+                                       "m6.example.com": "fd00:ec2::254",
+                                       "v6.example.com": "2001:db8::10"}))
+    ok, reason, _ = p.decide("m4.example.com", 443)
+    assert not ok and "loopback" in reason
+    ok, reason, _ = p.decide("m6.example.com", 443)
+    assert not ok and "metadata" in reason
+    assert p.decide("v6.example.com", 443)[0]
+
+
 def test_plain_http_through_the_proxy_is_recorded(upstream):
     seen = []
     p = EgressProxy([f"127.0.0.1:{upstream}"], record=seen.append)
@@ -235,8 +247,12 @@ def test_vaara_run_starts_the_proxy_and_hardens_the_child(monkeypatch):
     from unittest import mock
     with mock.patch.dict(os.environ), pytest.raises(StopHere):
         run_mod.run("reviewer", ["claude"])
-    port = int(seen["proxy"].rsplit(":", 1)[1])
-    assert seen["hardening"] == {"egress_ports": [port]}
+    # The proxy reaches the agent's tree only, never this process's own
+    # environment, which the unconfined hook inherits.
+    assert seen["proxy"] is None
+    url = seen["hardening"]["environ"]["HTTPS_PROXY"]
+    port = int(url.rsplit(":", 1)[1])
+    assert seen["hardening"]["egress_ports"] == [port]
 
 
 def test_egress_records_land_on_the_trail(tmp_path, monkeypatch):
@@ -259,3 +275,81 @@ def test_egress_records_land_on_the_trail(tmp_path, monkeypatch):
     assert "evil.example:443" in blocked[0].data["reason"]
     assert blocked[0].data["policy_id"] == "os-layer.egress"
     assert allowed[0].data["cage"]["driver"] == "vaara-cage"
+
+
+def _raw_upstream(reply_after_eof: bool):
+    """A one-shot TCP server that records every byte it receives."""
+    srv = socket.socket()
+    srv.bind(("127.0.0.1", 0))
+    srv.listen(1)
+    got = bytearray()
+
+    def serve():
+        conn, _ = srv.accept()
+        conn.settimeout(3)
+        try:
+            while True:
+                data = conn.recv(65536)
+                if not data:
+                    break
+                got.extend(data)
+                if not reply_after_eof and b"\r\n\r\n" in got:
+                    conn.sendall(b"HTTP/1.1 200 OK\r\nContent-Length: 5\r\n\r\nfirst")
+        except socket.timeout:
+            pass
+        if reply_after_eof:
+            conn.sendall(b"reply")
+        conn.close()
+        srv.close()
+
+    t = threading.Thread(target=serve, daemon=True)
+    t.start()
+    return srv.getsockname()[1], got, t
+
+
+def _read_all(s: socket.socket) -> bytes:
+    out = b""
+    while True:
+        data = s.recv(65536)
+        if not data:
+            return out
+        out += data
+
+
+def test_plain_http_carries_one_request_per_connection():
+    """A second keep-alive request on the connection never reaches the first host."""
+    up, got, t = _raw_upstream(reply_after_eof=False)
+    p = EgressProxy([f"127.0.0.1:{up}"])
+    port = p.start()
+    try:
+        c = socket.create_connection(("127.0.0.1", port), timeout=10)
+        c.sendall(f"GET http://127.0.0.1:{up}/first HTTP/1.1\r\nHost: 127.0.0.1\r\n\r\n"
+                  f"GET http://denied.example/second HTTP/1.1\r\nHost: denied.example\r\n\r\n"
+                  .encode())
+        reply = _read_all(c)
+        c.close()
+        t.join(timeout=5)
+    finally:
+        p.close()
+    assert reply.endswith(b"first")
+    assert b"/first" in got and b"Connection: close" in got
+    assert b"/second" not in got and b"denied.example" not in got
+
+
+def test_a_half_closed_tunnel_still_gets_its_reply():
+    up, got, t = _raw_upstream(reply_after_eof=True)
+    p = EgressProxy([f"127.0.0.1:{up}"])
+    port = p.start()
+    try:
+        c = socket.create_connection(("127.0.0.1", port), timeout=10)
+        c.sendall(f"CONNECT 127.0.0.1:{up} HTTP/1.1\r\n\r\n".encode())
+        assert c.recv(4096).startswith(b"HTTP/1.1 200")
+        c.sendall(b"request")
+        c.shutdown(socket.SHUT_WR)
+        reply = _read_all(c)
+        c.close()
+        t.join(timeout=5)
+    finally:
+        p.close()
+    assert bytes(got) == b"request"
+    assert reply == b"reply"

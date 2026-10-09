@@ -27,7 +27,7 @@ import re
 import sys
 import time
 from pathlib import Path
-from typing import Optional
+from typing import Any, Optional
 
 from vaara.cage import DRIVERS, load_driver, observe
 from vaara.cage.driver import CageError
@@ -122,7 +122,9 @@ def _dispatch(args: argparse.Namespace) -> int:
 
     d = load_driver(args.driver)
     if args.cmd == "run":
-        agent = [a for a in args.agent if a != "--"] if args.agent else []
+        agent = list(args.agent or [])
+        if agent[:1] == ["--"]:  # the separator only; a "--" inside is the agent's
+            agent = agent[1:]
         if not agent:
             raise CageError("give the agent after --")
         import inspect
@@ -135,8 +137,8 @@ def _dispatch(args: argparse.Namespace) -> int:
         kwargs = {k: v for k, v in offered.items() if k in accepted and v is not None}
         launch = d.start(agent, args.policy, name=args.name, **kwargs)
         print(json.dumps({"driver": launch.driver, "name": launch.name, "pid": launch.pid,
-                          "cage": launch.state.to_record()}, indent=2))
-        return 0
+                          "cage": launch.state.to_record()}, indent=2), flush=True)
+        return _follow(d, launch.name)
     if args.cmd == "status":
         state = d.enforcement_state(args.name)
         out = state.to_record()
@@ -152,3 +154,47 @@ def _dispatch(args: argparse.Namespace) -> int:
             print(json.dumps(event, default=str))
         return 0
     raise CageError(f"unknown command {args.cmd}")
+
+
+def _follow(d: Any, name: str) -> int:
+    """Stay with a launch that lives as this process's child.
+
+    A process-backed cage (codex, sandbox-runtime, firecracker, the Vaara
+    cage) is a child of this process, and its stderr is read here: returning
+    would close that pipe under the agent and lose the launch. Wait for it,
+    pass its stderr on, and exit with its status. A cage that keeps its own
+    state (a container engine, a cluster, a service) is left running.
+    """
+    from vaara.cage._cli import ChildLaunches
+
+    held = getattr(d, "_launches", None)
+    launch = None
+    if isinstance(held, ChildLaunches) and name in held.names():
+        launch = held.get(name)
+        proc = launch.proc
+    elif isinstance(held, dict) and name in held:
+        proc = held[name]
+    else:
+        return 0
+    shown = 0.0  # the newest line passed on; the buffer is bounded, so not a count
+
+    def relay() -> None:
+        nonlocal shown
+        if launch is not None:
+            for ts, line in list(launch.lines):
+                if ts > shown:
+                    print(line, file=sys.stderr, flush=True)
+                    shown = ts
+
+    try:
+        while proc.poll() is None:
+            relay()
+            time.sleep(0.2)
+    except KeyboardInterrupt:
+        d.stop(name)
+    code = proc.wait()
+    if launch is not None and launch._reader is not None:
+        launch._reader.join(timeout=2)
+    relay()
+    return code if code >= 0 else 128 - code
+

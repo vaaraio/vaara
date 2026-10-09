@@ -115,6 +115,11 @@ def test_locked_egress_reaches_only_the_proxy_port():
             except OSError as e:
                 out["udp6"] = e.errno
             a, b = socket.socketpair(); out["unix"] = a.fileno() > 0
+            for name, proto in (("tcp0", 0), ("tcp6", 6), ("mptcp", 262), ("sctp", 132)):
+                try:
+                    socket.socket(socket.AF_INET, socket.SOCK_STREAM, proto).close(); out[name] = 0
+                except OSError as e:
+                    out[name] = e.errno
         ''')
     finally:
         proxy.close()
@@ -125,6 +130,9 @@ def test_locked_egress_reaches_only_the_proxy_port():
     assert out["other"] == 13  # EACCES from Landlock
     assert out["SOCK_DGRAM"] == 1 and out["SOCK_RAW"] == 1 and out["udp6"] == 1
     assert out["unix"] is True
+    # Landlock binds TCP only: other stream protocols are refused outright.
+    assert out["tcp0"] == 0 and out["tcp6"] == 0
+    assert out["mptcp"] == 1 and out["sctp"] == 1
 
 
 def test_locking_egress_without_landlock_net_refuses(monkeypatch):
