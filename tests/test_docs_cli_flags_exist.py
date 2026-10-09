@@ -56,6 +56,21 @@ NOT_OURS = {
     # downloading the wheel and checking its GitHub attestation.
     "--no-deps",  # pip download
     "--repo",     # gh attestation verify
+    # openshell, in docs/cage.md: the OpenShell driver's own `sandbox create`
+    # line, shown so a reader sees what the driver runs.
+    "--detach",  # openshell sandbox create
+    "--env",     # openshell sandbox create
+    # the other cages, in docs/cage.md: each driver's start line, in the
+    # cage's own CLI.
+    "--sandbox-state-json",  # codex sandbox
+    "--settings",            # srt
+    "--profile",             # nono run
+    "--detached",            # nono run
+    "--runtime",             # docker run (gVisor, Kata)
+    "--api-sock",            # firecracker
+    "--config-file",         # firecracker
+    "--conf",                # msb run
+    "--no-tty",              # msb run
 }
 
 

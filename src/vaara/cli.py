@@ -6533,6 +6533,10 @@ def build_parser() -> argparse.ArgumentParser:
         ("os-guard", "The OS layer's root half (sudo): loads the floor, decides agents' "
                      "opens and execs in your folders, keeps its own trail."),
         ("os-layer", "Pick OS-layer folders and apps, see the guard, answer its questions."),
+        ("cage", "Start, stop and read an agent's cage through one of twelve drivers "
+                 "(Vaara's own, OpenShell, gVisor, Firecracker, apple/container...); "
+                 "`drivers` shows which are ready here, `observe` the block a decision "
+                 "here would carry."),
     ):
         sub.add_parser(name, add_help=False, help=summary).set_defaults(
             func=lambda args, _n=name: _oslayer_main(_n)(getattr(args, "oslayer_args", [])))
@@ -7859,6 +7863,8 @@ def _oslayer_main(name: str):
         from vaara.oslayer.run import main as entry
     elif name == "os-guard":
         from vaara.oslayer.guard import main as entry
+    elif name == "cage":
+        from vaara.cage.cli import main as entry
     else:
         from vaara.oslayer.manage import main as entry
     return entry
@@ -7876,7 +7882,7 @@ def main(argv: list[str] | None = None) -> int:
     # The OS layer's commands forward the same way. `run` has to: everything
     # after the agent's name belongs to the agent. None of the three triggers
     # first-run setup; the guard runs as root and `run` only starts an agent.
-    if raw and raw[0] in ("run", "os-guard", "os-layer"):
+    if raw and raw[0] in ("run", "os-guard", "os-layer", "cage"):
         return _oslayer_main(raw[0])(raw[1:])
     # Inside a `vaara run` launch the floor seals ~/.vaara, so a hook relays
     # its event to `vaara run`, which decides it outside the floor. Before

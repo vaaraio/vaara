@@ -206,6 +206,96 @@ DORA_MAPPINGS: dict[EventType, list[RegulatoryArticle]] = {
     ],
 }
 
+# SOC 2 Trust Services Criteria (AICPA TSC 2017, 2022 points of focus).
+# The common criteria a service auditor asks runtime evidence for: logical
+# access (CC6), system operations (CC7) and change management (CC8). The
+# criterion text is paraphrased in ``requirement``; the auditor reads the
+# original. Attached to records whose action carries the SOC2 domain
+# (data, infrastructure and identity actions in the built-in taxonomy),
+# and to the control events the trail writes about itself (key lifecycle,
+# escalations, policy overrides), which are control evidence whatever the
+# action was.
+SOC2_MAPPINGS: dict[EventType, list[RegulatoryArticle]] = {
+    EventType.ACTION_REQUESTED: [
+        RegulatoryArticle(
+            RegulatoryDomain.SOC2, "CC7.2",
+            "The entity monitors system components and their operation for anomalies indicative of malicious acts, natural disasters and errors",
+            "Every agent action is recorded with its arguments before it runs, so the monitored set is complete rather than sampled",
+        ),
+    ],
+    EventType.RISK_SCORED: [
+        RegulatoryArticle(
+            RegulatoryDomain.SOC2, "CC7.2",
+            "Anomalies are analysed to determine whether they represent security events",
+            "Each action is scored before the decision, with the contributing signals in the record",
+        ),
+    ],
+    EventType.DECISION_MADE: [
+        RegulatoryArticle(
+            RegulatoryDomain.SOC2, "CC6.1",
+            "Logical access security over protected information assets",
+            "The gate decided before the effect; the record names the agent, the tool, the decision and the policy behind it",
+        ),
+        RegulatoryArticle(
+            RegulatoryDomain.SOC2, "CC6.3",
+            "Access is authorised, modified or removed based on roles and responsibilities, with least privilege",
+            "Access is granted per action against the declared policy, never standing; the record names the approver when a human disposed",
+        ),
+    ],
+    EventType.ACTION_BLOCKED: [
+        RegulatoryArticle(
+            RegulatoryDomain.SOC2, "CC6.1",
+            "Logical access security over protected information assets",
+            "The action was refused before any effect; the record names the policy and the ground",
+        ),
+        RegulatoryArticle(
+            RegulatoryDomain.SOC2, "CC7.3",
+            "Security events are evaluated and action is taken to prevent or address a failure to meet objectives",
+            "The refusal is the action taken, recorded on the hash chain with its reason",
+        ),
+    ],
+    EventType.ESCALATION_SENT: [
+        RegulatoryArticle(
+            RegulatoryDomain.SOC2, "CC7.3",
+            "Security events are evaluated to determine whether they could result in a failure to meet objectives",
+            "The event is handed to a human with its context for that evaluation",
+        ),
+    ],
+    EventType.ESCALATION_RESOLVED: [
+        RegulatoryArticle(
+            RegulatoryDomain.SOC2, "CC7.3",
+            "Security events are evaluated to determine whether they could result in a failure to meet objectives",
+            "The human's determination and justification are recorded against the event",
+        ),
+    ],
+    EventType.OUTCOME_RECORDED: [
+        RegulatoryArticle(
+            RegulatoryDomain.SOC2, "CC7.3",
+            "Security events are evaluated to determine whether they have resulted in a failure to meet objectives",
+            "The outcome after execution is recorded against the action that caused it",
+        ),
+    ],
+    EventType.POLICY_OVERRIDE: [
+        RegulatoryArticle(
+            RegulatoryDomain.SOC2, "CC8.1",
+            "Changes to infrastructure, data, software and procedures are authorised, approved and implemented",
+            "A change to a policy decision names the overrider, the reason, and the prior and new decisions",
+        ),
+    ],
+    EventType.KEY_LIFECYCLE: [
+        RegulatoryArticle(
+            RegulatoryDomain.SOC2, "CC6.2",
+            "System credentials are registered and authorised before access, and removed when no longer authorised",
+            "Signing-key custodians added, rotated or revoked are recorded as hash-chained, time-anchored events",
+        ),
+        RegulatoryArticle(
+            RegulatoryDomain.SOC2, "CC8.1",
+            "Changes to infrastructure, data, software and procedures are authorised, approved and implemented",
+            "A change to the signing-key set is itself a recorded, approved change",
+        ),
+    ],
+}
+
 
 # ── Transparency taxonomy (prEN ISO/IEC 12792 four-axis) ─────────────────
 #
@@ -1160,6 +1250,7 @@ class AuditTrail:
         human_disposed: bool = False,
         policy_id: str = "",
         violation_type: str = "",
+        cage: Optional[dict] = None,
     ) -> None:
         """Record the allow/deny/escalate decision.
 
@@ -1181,11 +1272,22 @@ class AuditTrail:
         action and on what ground. They are written on a deny only; the
         pipeline, the deny-rule hook and the MCP proxy supply both on every
         deny they write. Same omission rule: empty adds no keys.
+
+        ``cage`` is the block :func:`vaara.cage.observe` returns: which cage
+        the deciding process runs in and whether the kernel confirmed it at
+        this moment. Every decision carries one; when the caller passes
+        none, the trail observes now. A run outside any cage is recorded as
+        ``{"driver": "none", "confirmed": false}``, so a record is never
+        silent about its confinement.
         """
         event_type = (
             EventType.ACTION_BLOCKED if decision == "deny"
             else EventType.DECISION_MADE
         )
+        if cage is None:
+            from vaara.cage import observe
+
+            cage = observe().to_record()
 
         articles = self._get_regulatory_articles(
             event_type, regulatory_domains,
@@ -1270,6 +1372,10 @@ class AuditTrail:
                 data["violation_type"] = self._cap_record_str(
                     violation_type, self._MAX_DECISION_LABEL_LEN,
                 )
+        data["cage"] = self._cap_record_dict_bytes(
+            {str(k): json_safe(v) for k, v in cage.items()},
+            self._MAX_ASSESSMENT_JSON_BYTES,
+        )
 
         self._append(AuditRecord(
             record_id=str(uuid.uuid4()),
@@ -1370,7 +1476,8 @@ class AuditTrail:
         gate for every shape of this agent + tool.
         """
         articles = self._get_regulatory_articles(
-            EventType.ESCALATION_SENT, frozenset({RegulatoryDomain.EU_AI_ACT}),
+            EventType.ESCALATION_SENT,
+            frozenset({RegulatoryDomain.EU_AI_ACT, RegulatoryDomain.SOC2}),
         )
 
         self._append(AuditRecord(
@@ -1420,7 +1527,8 @@ class AuditTrail:
         before these parameters existed.
         """
         articles = self._get_regulatory_articles(
-            EventType.ESCALATION_RESOLVED, frozenset({RegulatoryDomain.EU_AI_ACT}),
+            EventType.ESCALATION_RESOLVED,
+            frozenset({RegulatoryDomain.EU_AI_ACT, RegulatoryDomain.SOC2}),
         )
 
         disposition: dict = {}
@@ -1664,7 +1772,8 @@ class AuditTrail:
         overrides even though Article 14(4)(d) evidence hinges on them.
         """
         articles = self._get_regulatory_articles(
-            EventType.POLICY_OVERRIDE, frozenset({RegulatoryDomain.EU_AI_ACT}),
+            EventType.POLICY_OVERRIDE,
+            frozenset({RegulatoryDomain.EU_AI_ACT, RegulatoryDomain.SOC2}),
         )
 
         override_reason = self._cap_record_str(
@@ -1753,7 +1862,8 @@ class AuditTrail:
             raise ValueError("record_key_lifecycle: fingerprint is required")
 
         articles = self._get_regulatory_articles(
-            EventType.KEY_LIFECYCLE, frozenset({RegulatoryDomain.EU_AI_ACT}),
+            EventType.KEY_LIFECYCLE,
+            frozenset({RegulatoryDomain.EU_AI_ACT, RegulatoryDomain.SOC2}),
         )
         data: dict = {
             "action": action,
@@ -2611,6 +2721,17 @@ class AuditTrail:
         # DORA mappings (for financial actions)
         if RegulatoryDomain.DORA in action_domains:
             for article in DORA_MAPPINGS.get(event_type, []):
+                articles.append({
+                    "domain": article.domain.value,
+                    "article": article.article,
+                    "requirement": article.requirement,
+                    "how_satisfied": article.how_satisfied,
+                })
+
+        # SOC 2 mappings (data, infrastructure, identity actions, and the
+        # trail's own control events)
+        if RegulatoryDomain.SOC2 in action_domains:
+            for article in SOC2_MAPPINGS.get(event_type, []):
                 articles.append({
                     "domain": article.domain.value,
                     "article": article.article,

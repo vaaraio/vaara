@@ -405,6 +405,7 @@ class Guard:
             watched_folders=sel.folders_in("ask") + sel.folders_in("record"),
             harness_binaries=list(self._harness),
             apps=sel.apps,
+            stacked=sel.hardened,
         )
 
     def _load_profile(self) -> None:
@@ -779,12 +780,17 @@ class Guard:
                         for x in self._launches.values()]
         with self._held_lock:
             waiting = len(self._held)
+        from vaara.cage.vaara_cage import profile_digest
+
         return {
             "ok": True, "pid": self.pid, "user": self.user,
             "profile": floor.PROFILE, "profile_loaded": floor.profile_loaded(),
+            # The effective cage configuration is the rendered profile text.
+            "profile_digest": profile_digest(self.render_profile()),
             "trail": str(self.trail_path),
             "folders": [{"path": f.path, "mode": f.mode} for f in sel.folders],
             "apps": list(sel.apps), "ask_timeout": sel.ask_timeout,
+            "harden": sel.hardened, "egress": sel.egress,
             "launches": launches, "waiting": waiting,
         }
 

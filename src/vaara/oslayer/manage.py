@@ -5,6 +5,9 @@
     vaara os-layer status
     vaara os-layer folder ~/clients ask        # record | ask | block | off
     vaara os-layer app /usr/local/bin/copilot  # --remove to detach
+    vaara os-layer harden on                   # no_new_privs + seccomp on every launch
+    vaara os-layer egress api.anthropic.com '*.github.com'   # lock the network
+    vaara os-layer egress --off
     vaara os-layer pending
     vaara os-layer approve <action_id>         # or: deny <action_id>
 
@@ -61,6 +64,7 @@ def _cmd_status(args: argparse.Namespace) -> int:
         print("guard: not running (start it with: sudo vaara os-guard)")
         print(f"floor: {_floor_state()}")
         folders, apps = sel.folders, sel.apps
+        harden, egress = sel.hardened, sel.egress
         launches: list = []
     else:
         print(f"guard: running as pid {status['pid']} for {status['user']}")
@@ -68,12 +72,18 @@ def _cmd_status(args: argparse.Namespace) -> int:
         print(f"trail: {status['trail']}")
         folders = [selection.Folder(f["path"], f["mode"]) for f in status["folders"]]
         apps, launches = status["apps"], status["launches"]
+        harden, egress = status.get("harden", False), status.get("egress")
     print("folders:" if folders else "folders: none picked")
     for f in folders:
         print(f"  {f.mode:<7} {f.path}")
     print("apps:" if apps else "apps: none attached")
     for a in apps:
         print(f"  {a}")
+    print(f"harden: {'on (no_new_privs, seccomp)' if harden else 'off'}")
+    if egress is None:
+        print("egress: open")
+    else:
+        print("egress: locked; out through the proxy to: " + (", ".join(egress) or "nothing"))
     for launch in launches:
         age = int(time.time() - launch["started"])
         print(f"launch {launch['launch']}: {launch['agent']} pid {launch['pid']} ({age}s)")
@@ -106,6 +116,20 @@ def _cmd_folder(args: argparse.Namespace) -> int:
 def _cmd_app(args: argparse.Namespace) -> int:
     sel = selection.set_app(selection.load(_home()), args.path, not args.remove)
     return _save(sel)
+
+
+def _cmd_harden(args: argparse.Namespace) -> int:
+    return _save(selection.set_harden(selection.load(_home()), args.state == "on"))
+
+
+def _cmd_egress(args: argparse.Namespace) -> int:
+    if args.off and args.hosts:
+        raise selection.SelectionError("give hosts or --off, not both")
+    if not args.off and not args.hosts and not args.none:
+        raise selection.SelectionError("give the hosts to allow, --none to let nothing out, "
+                                       "or --off to unlock")
+    allow = None if args.off else list(args.hosts)
+    return _save(selection.set_egress(selection.load(_home()), allow))
 
 
 def pending(approvals_dir: Path) -> list[dict]:
@@ -168,6 +192,18 @@ def build_parser() -> argparse.ArgumentParser:
     pa.add_argument("path")
     pa.add_argument("--remove", action="store_true", help="Detach instead")
     pa.set_defaults(func=_cmd_app)
+
+    ph = sub.add_parser("harden", help="Add no_new_privs and a seccomp filter to every "
+                                       "launch (on), or not (off)")
+    ph.add_argument("state", choices=("on", "off"))
+    ph.set_defaults(func=_cmd_harden)
+
+    pe = sub.add_parser("egress", help="Lock every launch's network to an egress proxy that "
+                                       "lets out only the hosts given")
+    pe.add_argument("hosts", nargs="*", help="example.com, *.example.com or host:port")
+    pe.add_argument("--none", action="store_true", help="Lock with nothing allowed out")
+    pe.add_argument("--off", action="store_true", help="Unlock the network")
+    pe.set_defaults(func=_cmd_egress)
 
     pp = sub.add_parser("pending", help="Opens and execs waiting on your answer")
     pp.add_argument("--json", action="store_true")

@@ -244,6 +244,73 @@ DORA_REQUIREMENTS = [
     ),
 ]
 
+# SOC 2 Trust Services Criteria (AICPA, 2017 with 2022 points of focus).
+# Six common criteria a service auditor asks runtime evidence for. The
+# titles are the TSC headings; the descriptions paraphrase the criterion.
+# What Vaara shows is that the control operated: a decision before every
+# effect, a score before every decision, a human on every escalation, a
+# recorded approver on every override and key change. Whether that meets
+# the entity's own control description is the auditor's call.
+SOC2_REQUIREMENTS = [
+    RegulatoryRequirement(
+        RegulatoryDomain.SOC2,
+        "CC6.1",
+        "Logical Access Security",
+        "The entity implements logical access security software, infrastructure and architectures over protected information assets",
+        (EventType.DECISION_MADE, EventType.ACTION_BLOCKED),
+        min_evidence_count=10,
+        is_critical=True,
+    ),
+    RegulatoryRequirement(
+        RegulatoryDomain.SOC2,
+        "CC6.2",
+        "Credential Registration and Removal",
+        "System credentials are registered and authorised before access is granted, and removed when access is no longer authorised",
+        (EventType.KEY_LIFECYCLE,),
+        min_evidence_count=1,
+        staleness_hours=8760.0,  # Key custodians change yearly, not daily
+        is_critical=False,
+    ),
+    RegulatoryRequirement(
+        RegulatoryDomain.SOC2,
+        "CC6.3",
+        "Access Authorisation by Role and Least Privilege",
+        "Access to data, software, functions and other protected information assets is authorised, modified or removed based on roles and responsibilities, with least privilege and segregation of duties",
+        (EventType.DECISION_MADE, EventType.ESCALATION_RESOLVED, EventType.POLICY_OVERRIDE),
+        min_evidence_count=5,
+        is_critical=True,
+    ),
+    RegulatoryRequirement(
+        RegulatoryDomain.SOC2,
+        "CC7.2",
+        "Monitoring for Anomalies",
+        "System components and their operation are monitored for anomalies indicative of malicious acts, natural disasters and errors, and anomalies are analysed to determine whether they are security events",
+        (EventType.ACTION_REQUESTED, EventType.RISK_SCORED),
+        min_evidence_count=20,
+        is_critical=True,
+    ),
+    RegulatoryRequirement(
+        RegulatoryDomain.SOC2,
+        "CC7.3",
+        "Evaluation of Security Events",
+        "Security events are evaluated to determine whether they could or have resulted in a failure to meet objectives, and action is taken to prevent or address such failures",
+        (EventType.ACTION_BLOCKED, EventType.ESCALATION_SENT,
+         EventType.ESCALATION_RESOLVED, EventType.OUTCOME_RECORDED),
+        min_evidence_count=5,
+        is_critical=True,
+    ),
+    RegulatoryRequirement(
+        RegulatoryDomain.SOC2,
+        "CC8.1",
+        "Change Management",
+        "Changes to infrastructure, data, software and procedures are authorised, designed, tested, approved and implemented",
+        (EventType.POLICY_OVERRIDE, EventType.KEY_LIFECYCLE),
+        min_evidence_count=1,
+        staleness_hours=8760.0,
+        is_critical=False,
+    ),
+]
+
 
 # ── Evidence assessment ───────────────────────────────────────────────────
 
@@ -667,10 +734,11 @@ class ComplianceEngine:
         """
         Args:
             requirements: Regulatory requirements to check.
-                          Defaults to EU AI Act + DORA.
+                          Defaults to EU AI Act + DORA + SOC 2.
         """
         self._requirements = list(
-            requirements or (EU_AI_ACT_REQUIREMENTS + DORA_REQUIREMENTS)
+            requirements
+            or (EU_AI_ACT_REQUIREMENTS + DORA_REQUIREMENTS + SOC2_REQUIREMENTS)
         )
         self._lock = threading.Lock()
 

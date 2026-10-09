@@ -101,7 +101,11 @@
         "to": "acct:9"
       },
       "policy_id": "scorer:_FixedScorer",
-      "violation_type": "risk_threshold"
+      "violation_type": "risk_threshold",
+      "cage": {
+        "driver": "none",
+        "confirmed": false
+      }
     },
     "regulatory_articles": [
       {
@@ -118,7 +122,7 @@
       }
     ],
     "previous_hash": "3cf551f5fb4d4f80b1ce6e8b0e47ada1d1a501e5bd7542cdf12c98820a4a1a14",
-    "record_hash": "29325c19291b839f6ab657f9153f1d2ce75df2c5f209adaf2a0028913a76744c",
+    "record_hash": "82d31777a37b7cafb61ef3614dc9f02efa05c8e4c9d5cf5143e59236030c113d",
     "system_operation": "blocking",
     "data_usage": "risk_score+thresholds",
     "decision_making": "threshold_match",
@@ -163,8 +167,8 @@
         "how_satisfied": "All agent actions are logged as events for incident detection"
       }
     ],
-    "previous_hash": "29325c19291b839f6ab657f9153f1d2ce75df2c5f209adaf2a0028913a76744c",
-    "record_hash": "ad6955136368bfb226e8b479181fd4754cdb293039e90ec377b8814755cf6096",
+    "previous_hash": "82d31777a37b7cafb61ef3614dc9f02efa05c8e4c9d5cf5143e59236030c113d",
+    "record_hash": "686b5cacac2c3d97926fe3b76f0cd570b7d8f73671c904929a4b89da3b790e58",
     "system_operation": "logging_intake",
     "data_usage": "tool_args+context",
     "decision_making": "n/a",
@@ -202,8 +206,8 @@
         "how_satisfied": "Conformal calibration provides distribution-free coverage guarantees on risk estimates"
       }
     ],
-    "previous_hash": "ad6955136368bfb226e8b479181fd4754cdb293039e90ec377b8814755cf6096",
-    "record_hash": "cb3fe8b459510fc8d2c5a250c2a84f4f585bc8320ee58f31e183d9c13cadd374",
+    "previous_hash": "686b5cacac2c3d97926fe3b76f0cd570b7d8f73671c904929a4b89da3b790e58",
+    "record_hash": "b487363f3d9caa8a7219fdb054849eb761bc687888cf5c035299117c8afaa6ad",
     "system_operation": "scoring",
     "data_usage": "tool_args+history+policy",
     "decision_making": "heuristic_score",
@@ -221,7 +225,11 @@
     "data": {
       "decision": "allow",
       "reason": "vector: policy returned allow",
-      "risk_score": 0.5
+      "risk_score": 0.5,
+      "cage": {
+        "driver": "none",
+        "confirmed": false
+      }
     },
     "regulatory_articles": [
       {
@@ -237,8 +245,8 @@
         "how_satisfied": "Decision records include risk scores, confidence intervals, and contributing signals"
       }
     ],
-    "previous_hash": "cb3fe8b459510fc8d2c5a250c2a84f4f585bc8320ee58f31e183d9c13cadd374",
-    "record_hash": "fc2e29cce913f243a2a011303d7208b68dcd819279fdb60ad1084db2372f59ab",
+    "previous_hash": "b487363f3d9caa8a7219fdb054849eb761bc687888cf5c035299117c8afaa6ad",
+    "record_hash": "f27297dd08b4c77575ada636327ad8a06e863be44620b9256294eb407e38a8e7",
     "system_operation": "decision_threshold",
     "data_usage": "risk_score+thresholds",
     "decision_making": "threshold_match",

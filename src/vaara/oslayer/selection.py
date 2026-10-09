@@ -7,7 +7,9 @@
                  {"path": "/home/me/notes", "mode": "record"},
                  {"path": "/home/me/keys-offline", "mode": "block"}],
      "apps": ["/usr/local/bin/copilot"],
-     "ask_timeout": 60}
+     "ask_timeout": 60,
+     "harden": true,
+     "egress": ["api.anthropic.com", "*.github.com"]}
 
 A folder's mode applies to every agent process:
 
@@ -22,6 +24,13 @@ A folder's mode applies to every agent process:
 An app is a harness binary the profile attaches to by path, so it is governed
 when started from a menu or a dock, without ``vaara run``.
 
+``harden`` adds the kernel layers of :mod:`vaara.oslayer.harden` to every
+``vaara run`` launch: ``no_new_privs`` and the seccomp filter. ``egress``
+locks the network as well: the launch reaches only the egress proxy, which
+lets through the hosts listed (:mod:`vaara.oslayer.egress`); an empty list
+lets nothing out. ``egress`` implies ``harden``. Both are off when absent,
+and the profile then renders as before.
+
 The file lives under ``~/.vaara``, which no process in an agent's tree can
 open, so an agent cannot change its own rules.
 """
@@ -31,7 +40,7 @@ from __future__ import annotations
 import json
 import os
 import tempfile
-from dataclasses import dataclass, field
+from dataclasses import dataclass, field, replace
 from pathlib import Path
 from typing import Optional
 
@@ -64,6 +73,13 @@ class Selection:
     folders: list[Folder] = field(default_factory=list)
     apps: list[str] = field(default_factory=list)
     ask_timeout: float = DEFAULT_ASK_TIMEOUT
+    harden: bool = False
+    egress: Optional[list[str]] = None
+
+    @property
+    def hardened(self) -> bool:
+        """The kernel layers apply: asked for, or implied by locked egress."""
+        return self.harden or self.egress is not None
 
     def folders_in(self, mode: str) -> list[str]:
         return [f.path for f in self.folders if f.mode == mode]
@@ -78,12 +94,18 @@ class Selection:
         return best
 
     def to_json(self) -> dict:
-        return {
+        out: dict = {
             "version": 1,
             "folders": [{"path": f.path, "mode": f.mode} for f in self.folders],
             "apps": list(self.apps),
             "ask_timeout": self.ask_timeout,
         }
+        # Written only when set, so a selection without them reads as before.
+        if self.harden:
+            out["harden"] = True
+        if self.egress is not None:
+            out["egress"] = list(self.egress)
+        return out
 
 
 def path_for(home: str) -> Path:
@@ -140,7 +162,19 @@ def parse(data: object) -> Selection:
     timeout = data.get("ask_timeout", DEFAULT_ASK_TIMEOUT)
     if not isinstance(timeout, (int, float)) or isinstance(timeout, bool) or not 1 <= timeout <= 3600:
         timeout = DEFAULT_ASK_TIMEOUT
-    return Selection(folders=list(folders.values()), apps=list(apps), ask_timeout=float(timeout))
+    egress: Optional[list[str]] = None
+    if isinstance(data.get("egress"), list):
+        from vaara.oslayer.egress import parse_rule
+
+        egress = []
+        for entry in data["egress"]:
+            try:
+                parse_rule(str(entry))
+            except ValueError:
+                continue
+            egress.append(str(entry).strip().lower())
+    return Selection(folders=list(folders.values()), apps=list(apps), ask_timeout=float(timeout),
+                     harden=data.get("harden") is True, egress=egress)
 
 
 def load(home: str) -> Selection:
@@ -170,8 +204,7 @@ def set_folder(selection: Selection, path: str, mode: Optional[str]) -> Selectio
     folders = [f for f in selection.folders if f.path != real]
     if mode is not None:
         folders.append(Folder(real, mode))
-    return Selection(folders=folders, apps=list(selection.apps),
-                     ask_timeout=selection.ask_timeout)
+    return replace(selection, folders=folders)
 
 
 def set_app(selection: Selection, path: str, attached: bool) -> Selection:
@@ -179,5 +212,22 @@ def set_app(selection: Selection, path: str, attached: bool) -> Selection:
     apps = [a for a in selection.apps if a != real]
     if attached:
         apps.append(real)
-    return Selection(folders=list(selection.folders), apps=apps,
-                     ask_timeout=selection.ask_timeout)
+    return replace(selection, apps=apps)
+
+
+def set_harden(selection: Selection, on: bool) -> Selection:
+    return replace(selection, harden=on)
+
+
+def set_egress(selection: Selection, allow: Optional[list[str]]) -> Selection:
+    """``allow`` hosts out of every launch; None unlocks the network."""
+    if allow is None:
+        return replace(selection, egress=None)
+    from vaara.oslayer.egress import parse_rule
+
+    for entry in allow:
+        try:
+            parse_rule(entry)
+        except ValueError as exc:
+            raise SelectionError(str(exc)) from None
+    return replace(selection, egress=list(dict.fromkeys(e.strip().lower() for e in allow)))

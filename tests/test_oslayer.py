@@ -10,18 +10,23 @@ from __future__ import annotations
 
 import json
 import os
-import pwd
 import socket
 import struct
 import subprocess
+import sys
 import threading
 import time
 from pathlib import Path
 
 import pytest
 
-from vaara.approvals import write_decision
-from vaara.oslayer import cgroup, denials, fanotify, floor, guard, manage, run, selection
+if not sys.platform.startswith("linux"):
+    pytest.skip("the Linux OS layer", allow_module_level=True)
+
+import pwd  # noqa: E402
+
+from vaara.approvals import write_decision  # noqa: E402
+from vaara.oslayer import cgroup, denials, fanotify, floor, guard, manage, run, selection  # noqa: E402
 
 
 # ── The floor ─────────────────────────────────────────────────────
@@ -69,7 +74,8 @@ def test_profile_without_apps_has_no_attachment():
     assert "profile vaara-agent flags=(attach_disconnected) {" in _render()
 
 
-def test_parser_accepts_the_profile(tmp_path):
+@pytest.mark.parametrize("stacked", [False, True])
+def test_parser_accepts_the_profile(tmp_path, stacked):
     parser = guard.parser_path()
     if parser is None:
         pytest.skip("apparmor_parser not installed")
@@ -80,7 +86,7 @@ def test_parser_accepts_the_profile(tmp_path):
         watched_folders=["/home/op/clients"],
         apps=["/usr/local/bin/copilot", "/opt/x/claude"],
         install_paths=floor.vaara_install_paths(),
-        abi=abi)
+        abi=abi, stacked=stacked)
     profile = tmp_path / "vaara-agent"
     profile.write_text(text)
     done = subprocess.run([parser, "-Q", "-K", str(profile)], capture_output=True, text=True)

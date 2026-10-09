@@ -2,7 +2,8 @@
 
 This document maps what Vaara produces at runtime to the specific article
 references a deployer needs to assemble conformity evidence under the
-EU AI Act and DORA.
+EU AI Act and DORA, and the criterion references a SOC 2 service auditor
+asks for.
 
 ## Scope
 
@@ -118,6 +119,37 @@ also ships with a DORA bundle:
 | **9(1)** | ICT Risk Management -- Protection and Prevention | `ACTION_BLOCKED` and `DECISION_MADE` records. |
 | **10(1)** | ICT Anomaly Detection | `ACTION_REQUESTED` and `ACTION_BLOCKED` records, with risk score and reason. |
 | **13(1)** | ICT Learning and Evolving | `OUTCOME_RECORDED` events close the loop and feed the adaptive scorer. |
+
+## SOC 2 Trust Services Criteria mapping
+
+For a deployer whose own SOC 2 report has to cover what its agents do.
+The default `ComplianceEngine` carries six common criteria from the
+AICPA 2017 Trust Services Criteria (revised points of focus 2022), and
+records of data, infrastructure and identity actions carry the
+criterion tags beside the EU AI Act ones. The trail's own control
+events (escalations, policy overrides, signing-key changes) carry them
+whatever the action was.
+
+| Criterion | Heading | Evidence Vaara produces |
+|---|---|---|
+| **CC6.1** | Logical access security over protected information assets | `DECISION_MADE` and `ACTION_BLOCKED` records: a decision before every effect, with the policy behind it. |
+| **CC6.2** | Credentials registered before access and removed when no longer authorised | `KEY_LIFECYCLE` records: signing-key custodians added, rotated or revoked, hash-chained and time-anchored. |
+| **CC6.3** | Access authorised, modified or removed by role, least privilege | `DECISION_MADE`, `ESCALATION_RESOLVED` and `POLICY_OVERRIDE` records: access granted per action against the declared policy, with the approver named when a human disposed. |
+| **CC7.2** | Monitoring for anomalies, analysed for security events | `ACTION_REQUESTED` and `RISK_SCORED` records: every action recorded before it runs and scored before the decision. |
+| **CC7.3** | Security events evaluated, action taken | `ACTION_BLOCKED`, `ESCALATION_SENT`, `ESCALATION_RESOLVED` and `OUTCOME_RECORDED` records: the refusal, the hand-off to a human, the determination, the outcome. |
+| **CC8.1** | Changes authorised, tested, approved and implemented | `POLICY_OVERRIDE` and `KEY_LIFECYCLE` records: a change to a decision or to the key set names who made it and why. |
+
+Which built-in actions carry the SOC 2 tag: `data.read`, `data.write`,
+`data.delete`, `data.export`, `infra.deploy`, `infra.config_change`,
+`infra.terminate`, `id.grant_permission`, `id.create_key`, `id.revoke`.
+A deployer's own action classes opt in by listing `soc2` among their
+regulatory domains.
+
+What the evidence shows is that the control operated during the period.
+Whether that matches the control as the entity described it in its
+system description is the service auditor's call, as with every other
+mapping here. CC6.2 and CC8.1 are judged against a one-year staleness
+window, since key custodians and procedures do not change daily.
 
 ## Cloud guardrail adapter pattern
 
@@ -883,6 +915,11 @@ Honest about the edges:
   against the EU AI Act bundle's fourteen. It covers the runtime
   evidence Vaara records, not DORA's incident classification and
   reporting chapter.
+- The SOC 2 bundle is six common criteria (CC6.1, CC6.2, CC6.3, CC7.2,
+  CC7.3, CC8.1). It covers what the agent did under the gate. The
+  availability, processing integrity, confidentiality and privacy
+  categories, and the entity-level criteria (CC1 to CC5), are outside
+  what a runtime record can show.
 - `min_evidence_count` thresholds on the default requirements are
   conservative starting points. For production, tune them against your
   own traffic volume and risk tolerance through `ComplianceEngine.

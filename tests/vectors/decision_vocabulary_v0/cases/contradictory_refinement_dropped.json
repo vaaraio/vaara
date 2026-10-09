@@ -9,7 +9,11 @@
     "data": {
       "decision": "allow",
       "reason": "vector: allow carrying a modify refinement",
-      "risk_score": 0.1
+      "risk_score": 0.1,
+      "cage": {
+        "driver": "none",
+        "confirmed": false
+      }
     },
     "regulatory_articles": [
       {
@@ -26,7 +30,7 @@
       }
     ],
     "previous_hash": "",
-    "record_hash": "5cd5bdf7820746770019efc5dbd962153225b79bebe391d604eff5dc8390abe0",
+    "record_hash": "d38b873fa0ce9d90fdd3ca747289267529c611d268311520b8f5bedcfeafb308",
     "system_operation": "decision_threshold",
     "data_usage": "risk_score+thresholds",
     "decision_making": "threshold_match",

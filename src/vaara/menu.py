@@ -150,6 +150,14 @@ def _settings() -> None:
     print("Saved.")
 
 
+def _cages() -> None:
+    """Which cages are ready on this machine, and how to start one."""
+    _cli(["cage", "drivers"])
+    print()
+    print("Start an agent in a ready cage:")
+    print("  vaara cage run --driver <name> [--policy FILE | --image IMAGE] -- <agent>")
+
+
 def _check_updates() -> None:
     """Check whether a newer version of Vaara is available."""
     import urllib.request
@@ -182,6 +190,7 @@ ITEMS: list[tuple[str, Callable[[], None]]] = [
     ("Shadow report: what would have been blocked", _shadow_report),
     ("Export evidence package from the trail", _export),
     ("Verify a signed evidence package", _verify),
+    ("Cages: which are ready on this machine", _cages),
     ("Settings", _settings),
     ("Check for updates", _check_updates),
 ]
