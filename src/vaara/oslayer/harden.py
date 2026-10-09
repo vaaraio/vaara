@@ -38,6 +38,7 @@ import errno
 import os
 import platform
 import struct
+import sys
 from typing import Iterable, Optional
 
 PR_SET_NO_NEW_PRIVS = 38
@@ -216,7 +217,7 @@ def no_new_privs() -> None:
 
 def landlock_abi() -> int:
     """The kernel's Landlock ABI version, 0 when Landlock is unavailable."""
-    if not os.uname().sysname == "Linux":
+    if not sys.platform.startswith("linux"):
         return 0
     r = _libc().syscall(_LL_CREATE, None, ctypes.c_size_t(0),
                         ctypes.c_uint32(_LL_CREATE_RULESET_VERSION))

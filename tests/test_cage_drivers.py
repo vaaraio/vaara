@@ -8,8 +8,11 @@ from __future__ import annotations
 
 import hashlib
 import json
+import os
+import shutil
 import stat
 import struct
+import tempfile
 import threading
 import time
 from http.server import BaseHTTPRequestHandler, ThreadingHTTPServer
@@ -419,7 +422,8 @@ class TestFirecracker:
         """A fake Firecracker API on a unix socket."""
         import socket as _socket
         from vaara.cage.firecracker import FirecrackerDriver
-        run = tmp_path / "run"; run.mkdir()
+        # A short directory: macOS caps a unix socket path at 104 bytes.
+        run = Path(tempfile.mkdtemp(prefix="fc", dir="/tmp" if os.name == "posix" else None))
         sock_path = run / "vm2.firecracker.sock"
         server = _socket.socket(_socket.AF_UNIX, _socket.SOCK_STREAM)
         server.bind(str(sock_path)); server.listen(2)
@@ -455,6 +459,7 @@ class TestFirecracker:
             assert state.config_digest.startswith("sha256:")
         finally:
             stop.set(); t.join(timeout=2); server.close()
+            shutil.rmtree(run, ignore_errors=True)
 
 
 # ── agent-sandbox ──────────────────────────────────────────────────────

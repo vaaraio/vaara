@@ -46,7 +46,7 @@ def load_manifest(path: Path) -> dict[str, Any]:
         data = json.loads(text)
     except ValueError:
         try:
-            import yaml  # type: ignore[import-not-found]
+            import yaml  # type: ignore[import-untyped,import-not-found,unused-ignore]
         except ImportError:
             raise CageError(f"{path} is not JSON, and reading YAML needs the vaara[yaml] "
                             "extra (pip install 'vaara[yaml]')") from None

@@ -176,9 +176,9 @@ def test_the_floor_stacks_the_tool_profile_only_when_hardened():
     from vaara.oslayer import floor
     plain = floor.render(["/home/op"], abi="abi <abi/4.0>,", install_paths=[])
     stacked = floor.render(["/home/op"], abi="abi <abi/4.0>,", install_paths=[], stacked=True)
-    assert "  /** Cx -> tool," in plain and "&tool" not in plain
-    assert "  /** Cx -> &tool," in stacked
-    assert plain.replace("Cx -> tool", "Cx -> &tool") == stacked
+    assert "  /** Cx -> tool," in plain and "&" not in plain
+    assert "  /** Px -> &vaara-agent//tool," in stacked
+    assert plain.replace("Cx -> tool", "Px -> &vaara-agent//tool") == stacked
 
 
 def test_os_layer_cli_sets_and_shows_both(tmp_path, monkeypatch, capsys):
@@ -200,6 +200,7 @@ def test_os_layer_cli_sets_and_shows_both(tmp_path, monkeypatch, capsys):
     assert selection.load(str(tmp_path)).egress == []
 
 
+@pytest.mark.skipif(not sys.platform.startswith("linux"), reason="vaara run is Linux")
 def test_vaara_run_starts_the_proxy_and_hardens_the_child(monkeypatch):
     import os
 

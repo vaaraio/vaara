@@ -240,7 +240,10 @@ def render(homes: Iterable[str], *,
     """The profile text for ``homes``, the operator's folders and apps.
 
     ``stacked`` renders the move into ``//tool`` as a stack on the harness
-    profile (``Cx -> &tool``) instead of a plain transition. A launch with
+    profile (``Px -> &vaara-agent//tool``) instead of a plain transition.
+    The child is named in full: the kernel joins ``Cx -> &tool`` to the
+    current profile as ``vaara-agent//&tool``, a stack with a top-level
+    profile ``tool`` that does not exist. A launch with
     ``no_new_privs`` set (the hardening of :mod:`vaara.oslayer.harden`)
     needs it: under no_new_privs AppArmor refuses a transition that leaves
     the profile the task was confined by, and allows one that stacks on it
@@ -277,7 +280,7 @@ def render(homes: Iterable[str], *,
         if tool:
             out.append("  /** ix,")
         else:
-            out.append(f"  /** Cx -> {'&' if stacked else ''}{TOOL},")
+            out.append(f"  /** Px -> &{PROFILE}//{TOOL}," if stacked else f"  /** Cx -> {TOOL},")
         for b in harness:
             out.append(f"  {_q(b)} Px -> {PROFILE},")
         out += [

@@ -10,18 +10,23 @@ from __future__ import annotations
 
 import json
 import os
-import pwd
 import socket
 import struct
 import subprocess
+import sys
 import threading
 import time
 from pathlib import Path
 
 import pytest
 
-from vaara.approvals import write_decision
-from vaara.oslayer import cgroup, denials, fanotify, floor, guard, manage, run, selection
+if not sys.platform.startswith("linux"):
+    pytest.skip("the Linux OS layer", allow_module_level=True)
+
+import pwd  # noqa: E402
+
+from vaara.approvals import write_decision  # noqa: E402
+from vaara.oslayer import cgroup, denials, fanotify, floor, guard, manage, run, selection  # noqa: E402
 
 
 # ── The floor ─────────────────────────────────────────────────────

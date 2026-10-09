@@ -227,7 +227,7 @@ class EgressProxy:
         allowed, reason, target = self.decide(host, port)
         event = {"ts": time.time(), "host": host, "port": port, "method": method.upper(),
                  "allowed": allowed, "reason": reason}
-        if not allowed:
+        if not allowed or target is None:
             self._record(event)
             conn.sendall(b"HTTP/1.1 403 Forbidden\r\nContent-Type: text/plain\r\n"
                          b"Connection: close\r\n\r\nvaara egress: " + reason.encode() + b"\n")

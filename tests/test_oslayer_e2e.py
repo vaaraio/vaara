@@ -382,5 +382,6 @@ def test_hardened_launch_with_egress_locked(tmp_path):
             "SELECT tool_name, data FROM audit_records WHERE tool_name = 'egress.connect'")]
     finally:
         conn.close()
-    assert any("example.com:443" in d and '"deny"' in d for _t, d in rows), rows[-5:]
-    assert any(f"127.0.0.1:{model.port}" in d and '"allow"' in d for _t, d in rows), rows[-5:]
+    seen = [(r["decision"], r["reason"].split(" ")[1].rstrip(":")) for r in map(json.loads, (d for _t, d in rows))]
+    assert ("deny", "example.com:443") in seen, seen[-5:]
+    assert ("allow", f"127.0.0.1:{model.port}") in seen, seen[-5:]

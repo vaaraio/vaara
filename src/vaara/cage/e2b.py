@@ -62,13 +62,15 @@ class E2BDriver:
     def _request(self, method: str, url: str, body: Optional[Any] = None,
                  headers: Optional[dict[str, str]] = None, raw: Optional[bytes] = None) -> Any:
         data = raw if raw is not None else (json.dumps(body).encode() if body is not None else None)
+        if not url.startswith(("http://", "https://")):
+            raise CageError(f"E2B {method} {url}: not an http(s) URL")
         req = urllib.request.Request(url, data=data, method=method)
         for k, v in (headers or {}).items():
             req.add_header(k, v)
         if raw is None and body is not None:
             req.add_header("Content-Type", "application/json")
         try:
-            with urllib.request.urlopen(req, timeout=self._timeout) as resp:
+            with urllib.request.urlopen(req, timeout=self._timeout) as resp:  # nosec B310
                 payload = resp.read()
         except urllib.error.HTTPError as exc:
             detail = exc.read().decode("utf-8", "replace").strip()

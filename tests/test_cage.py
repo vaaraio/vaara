@@ -8,6 +8,7 @@ import json
 import os
 import socket
 import stat
+import sys
 import threading
 from unittest import mock
 
@@ -318,6 +319,7 @@ def fake_guard(tmp_path):
     server.close()
 
 
+@pytest.mark.skipif(not sys.platform.startswith("linux"), reason="the guard socket is Linux")
 class TestVaaraCageDriver:
     def test_enforcement_state_from_the_guard(self, fake_guard, monkeypatch):
         path, reply = fake_guard
@@ -391,6 +393,7 @@ def test_cli_status_through_the_fake_openshell(fake_openshell, capsys, monkeypat
     assert out["driver"] == "openshell" and out["confirmed"] is True
 
 
+@pytest.mark.skipif(not sys.platform.startswith("linux"), reason="the guard socket is Linux")
 def test_vaara_run_declares_the_cage(monkeypatch):
     """`vaara run` hands the tree the declaration from the guard's status."""
     from vaara.oslayer import run as run_mod
