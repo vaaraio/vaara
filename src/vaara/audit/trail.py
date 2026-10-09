@@ -1250,6 +1250,7 @@ class AuditTrail:
         human_disposed: bool = False,
         policy_id: str = "",
         violation_type: str = "",
+        cage: Optional[dict] = None,
     ) -> None:
         """Record the allow/deny/escalate decision.
 
@@ -1271,11 +1272,22 @@ class AuditTrail:
         action and on what ground. They are written on a deny only; the
         pipeline, the deny-rule hook and the MCP proxy supply both on every
         deny they write. Same omission rule: empty adds no keys.
+
+        ``cage`` is the block :func:`vaara.cage.observe` returns: which cage
+        the deciding process runs in and whether the kernel confirmed it at
+        this moment. Every decision carries one; when the caller passes
+        none, the trail observes now. A run outside any cage is recorded as
+        ``{"driver": "none", "confirmed": false}``, so a record is never
+        silent about its confinement.
         """
         event_type = (
             EventType.ACTION_BLOCKED if decision == "deny"
             else EventType.DECISION_MADE
         )
+        if cage is None:
+            from vaara.cage import observe
+
+            cage = observe().to_record()
 
         articles = self._get_regulatory_articles(
             event_type, regulatory_domains,
@@ -1360,6 +1372,10 @@ class AuditTrail:
                 data["violation_type"] = self._cap_record_str(
                     violation_type, self._MAX_DECISION_LABEL_LEN,
                 )
+        data["cage"] = self._cap_record_dict_bytes(
+            {str(k): json_safe(v) for k, v in cage.items()},
+            self._MAX_ASSESSMENT_JSON_BYTES,
+        )
 
         self._append(AuditRecord(
             record_id=str(uuid.uuid4()),

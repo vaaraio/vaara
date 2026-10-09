@@ -171,7 +171,7 @@ def run(name: Optional[str], agent_argv: list[str], *,
     argv = prefix + agent_argv[1:]
     agent = name or os.path.basename(agent_argv[0])
     try:
-        request({"op": "status"}, socket_path=socket_path)
+        status = request({"op": "status"}, socket_path=socket_path)
     except (GuardUnavailable, GuardRefused) as exc:
         raise RunError(str(exc)) from None
 
@@ -179,6 +179,16 @@ def run(name: Optional[str], agent_argv: list[str], *,
     # process, which stays outside the floor. See vaara.oslayer.forward.
     hooks = HookServer()
     os.environ.update(hooks.environ())
+    # The tree is told which cage it runs in and what the cage's effective
+    # configuration is; every decision made inside confirms it against the
+    # process's own AppArmor label and writes both into the record.
+    from vaara.cage import CageState, environ_for
+    from vaara.cage.vaara_cage import NAME as CAGE_NAME, apparmor_version
+
+    os.environ.update(environ_for(CageState(
+        driver=CAGE_NAME, upstream=apparmor_version(),
+        config_digest=str(status.get("profile_digest") or ""), name=agent,
+    )))
 
     ready_r, ready_w = os.pipe()
     pid = os.fork()

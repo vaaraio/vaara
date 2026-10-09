@@ -94,7 +94,11 @@
     "data": {
       "decision": "step_up",
       "reason": "vector: policy returned step_up",
-      "risk_score": 0.5
+      "risk_score": 0.5,
+      "cage": {
+        "driver": "none",
+        "confirmed": false
+      }
     },
     "regulatory_articles": [
       {
@@ -111,7 +115,7 @@
       }
     ],
     "previous_hash": "84df0164b93d411f6f50e7d7b4af9cb363549e71583701c4a0cfeb0d791fb0d7",
-    "record_hash": "b84ecc71bb285bd118b42622ba9e90c5c4c705d10ae14ed2292ce7a1f0d0a01b",
+    "record_hash": "d93cca011d0539e96151d3b735603da40fef16041e9d11d54620721d44a56d9f",
     "system_operation": "decision_threshold",
     "data_usage": "risk_score+thresholds",
     "decision_making": "threshold_match",
@@ -145,8 +149,8 @@
         "how_satisfied": "The event is handed to a human with its context for that evaluation"
       }
     ],
-    "previous_hash": "b84ecc71bb285bd118b42622ba9e90c5c4c705d10ae14ed2292ce7a1f0d0a01b",
-    "record_hash": "dcdc787755a7194d50a501909f82c5ef91621bc8904cb92c1f5c2b208544793b",
+    "previous_hash": "d93cca011d0539e96151d3b735603da40fef16041e9d11d54620721d44a56d9f",
+    "record_hash": "8bb27b50cf0f11b613e41a838f86e5be43d1b4e700fbee2b024f8d6ffd3cafa1",
     "system_operation": "escalation",
     "data_usage": "risk_score+context",
     "decision_making": "threshold_or_classifier_upgrade",
