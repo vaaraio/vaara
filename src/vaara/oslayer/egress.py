@@ -38,6 +38,8 @@ from typing import Callable, Optional
 MAX_HEAD = 64 * 1024
 DEFAULT_PORTS = (443, 80)
 _REFUSED_NETS = ("loopback", "link_local", "multicast", "unspecified")
+# Instance metadata on IPv6 sits in unique-local space, not link-local: AWS.
+_METADATA_V6 = (ipaddress.ip_network("fd00:ec2::254/128"),)
 
 
 @dataclass(frozen=True)
@@ -89,6 +91,13 @@ def _literal(host: str) -> Optional[ipaddress._BaseAddress]:
 
 
 def _refused_address(addr: ipaddress._BaseAddress) -> Optional[str]:
+    # An IPv4 address carried in IPv6 is judged as the IPv4 address: Python
+    # releases before the CVE-2024-4032 fix do not look through the mapping.
+    mapped = getattr(addr, "ipv4_mapped", None)
+    if mapped is not None:
+        addr = mapped
+    if any(addr in net for net in _METADATA_V6):
+        return "metadata"
     for kind in _REFUSED_NETS:
         if getattr(addr, f"is_{kind}"):
             return kind.replace("_", "-")
@@ -198,10 +207,26 @@ class EgressProxy:
             elif target.lower().startswith("http://"):
                 host, port, path = _split_url(target)
                 lines = head.split(b"\r\n")
+                # One request per client connection: a keep-alive request for
+                # another host on the same connection would reach this
+                # upstream without a decision, so the upstream is told to close.
                 kept = [f"{method} {path} {_version}".encode("latin-1")]
-                kept += [h for h in lines[1:] if h and not h.lower().startswith(b"proxy-")]
+                kept += [h for h in lines[1:] if h and not h.lower().startswith(
+                    (b"proxy-", b"connection:", b"keep-alive:"))]
+                kept.append(b"Connection: close")
+                lower = [h.lower() for h in lines[1:]]
+                chunked = any(h.startswith(b"transfer-encoding:") and b"chunked" in h
+                              for h in lower)
+                body_left: Optional[int] = None
+                if not chunked:
+                    # Without a length the body is empty. Bytes past the body
+                    # are the next request, and they do not go to this host.
+                    length = next((int(h.split(b":", 1)[1]) for h in lower
+                                   if h.startswith(b"content-length:")), 0)
+                    rest, body_left = rest[:length], max(length - len(rest), 0)
                 request = b"\r\n".join(kept) + b"\r\n\r\n" + rest
-                self._tunnel(conn, method, host, port, request, connect_reply=False)
+                self._tunnel(conn, method, host, port, request, connect_reply=False,
+                             body_left=body_left)
             else:
                 conn.sendall(b"HTTP/1.1 400 Bad Request\r\n\r\n")
         except (OSError, ValueError):
@@ -223,7 +248,8 @@ class EgressProxy:
         return head, rest
 
     def _tunnel(self, conn: socket.socket, method: str, host: str, port: int,
-                first: bytes, connect_reply: bool) -> None:
+                first: bytes, connect_reply: bool,
+                body_left: Optional[int] = None) -> None:
         allowed, reason, target = self.decide(host, port)
         event = {"ts": time.time(), "host": host, "port": port, "method": method.upper(),
                  "allowed": allowed, "reason": reason}
@@ -247,7 +273,14 @@ class EgressProxy:
             conn.sendall(b"HTTP/1.1 200 Connection Established\r\n\r\n")
         if first:
             upstream.sendall(first)
-        up, down = _pipe(conn, upstream)
+        if body_left is not None:
+            # A plain request with a known body: send the rest of the body,
+            # then nothing more from the client reaches this upstream.
+            sent = _copy_exact(conn, upstream, body_left)
+            up, down = sent, _drain(upstream, conn)
+            upstream.close()
+        else:
+            up, down = _pipe(conn, upstream)
         event.update(bytes_up=up + len(first), bytes_down=down)
         self._record(event)
 
@@ -284,17 +317,47 @@ def _pipe(a: socket.socket, b: socket.socket) -> tuple[int, int]:
         except OSError:
             pass
         finally:
-            for s in (src, dst):
-                try:
-                    s.shutdown(socket.SHUT_RDWR)
-                except OSError:
-                    pass
+            # Pass the end of this direction on and leave the other running:
+            # a client that half-closes after its request still gets the reply.
+            try:
+                dst.shutdown(socket.SHUT_WR)
+            except OSError:
+                pass
 
     a.settimeout(None)
     b.settimeout(None)
     t = threading.Thread(target=copy, args=(b, a, 1), daemon=True)
     t.start()
     copy(a, b, 0)
-    t.join(timeout=5)
+    t.join()
     b.close()
     return counts[0], counts[1]
+
+
+def _copy_exact(src: socket.socket, dst: socket.socket, n: int) -> int:
+    """Copy exactly ``n`` bytes from ``src`` to ``dst``, fewer if it closes."""
+    src.settimeout(None)
+    done = 0
+    while done < n:
+        data = src.recv(min(65536, n - done))
+        if not data:
+            break
+        dst.sendall(data)
+        done += len(data)
+    return done
+
+
+def _drain(src: socket.socket, dst: socket.socket) -> int:
+    """Copy ``src`` to ``dst`` until ``src`` closes."""
+    src.settimeout(None)
+    done = 0
+    try:
+        while True:
+            data = src.recv(65536)
+            if not data:
+                break
+            dst.sendall(data)
+            done += len(data)
+    except OSError:
+        pass
+    return done
