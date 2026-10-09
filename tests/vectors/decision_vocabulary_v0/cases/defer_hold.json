@@ -138,10 +138,16 @@
         "article": "Article 14(3)(a)",
         "requirement": "Human oversight measures shall be identified and built into the high-risk AI system by the provider",
         "how_satisfied": "Borderline decisions are escalated with full context for human review"
+      },
+      {
+        "domain": "soc2",
+        "article": "CC7.3",
+        "requirement": "Security events are evaluated to determine whether they could result in a failure to meet objectives",
+        "how_satisfied": "The event is handed to a human with its context for that evaluation"
       }
     ],
     "previous_hash": "afc319835d01ebf475bf0d99cdcd905b3b496e7c5540b104434f9bd294b325ea",
-    "record_hash": "608cfb9d5d0b7ffb5c5096be046f6e93f2714eb66fe7b7a0df222ad5d80046f3",
+    "record_hash": "f0011d2e5d7ac2638e3c3c4ffce10fc0855c097d621d2e7cbf2ea384d7f51eae",
     "system_operation": "escalation",
     "data_usage": "risk_score+context",
     "decision_making": "threshold_or_classifier_upgrade",

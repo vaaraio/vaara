@@ -33,7 +33,7 @@ Architecture::
         ├── ActionRegistry (classify)
         ├── AdaptiveScorer (risk score + conformal interval)
         ├── AuditTrail (hash-chained log)
-        └── ComplianceEngine (EU AI Act, DORA)
+        └── ComplianceEngine (EU AI Act, DORA, SOC 2)
 
 Protocol: JSON-RPC 2.0 over stdio (default) or SSE.
 
@@ -285,7 +285,7 @@ VAARA_STATUS_RESOURCE = MCPResourceDefinition(
 VAARA_COMPLIANCE_RESOURCE = MCPResourceDefinition(
     uri="vaara://compliance",
     name="Vaara Compliance Report",
-    description="Latest EU AI Act and DORA compliance assessment against the audit trail",
+    description="Latest EU AI Act, DORA and SOC 2 compliance assessment against the audit trail",
 )
 
 

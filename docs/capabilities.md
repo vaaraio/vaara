@@ -98,6 +98,7 @@ Provider, and S3P, a safety-violation-rate measurement an auditor can reproduce.
 - EU AI Act Article 50, transparency disclosures: `audit/article50.py`
 - EU AI Act Article 73, serious-incident report (interim): `audit/incident_export.py`, `vaara trail export-incident`
 - DORA Articles 9, 10 and 13: event-to-article mappings in `audit/trail.py`, `compliance/engine.py`
+- SOC 2 Trust Services Criteria CC6.1 to CC6.3, CC7.2, CC7.3 and CC8.1: event-to-criterion mappings in `audit/trail.py`, `compliance/engine.py`, `docs/COMPLIANCE.md`
 - GDPR Chapter V, data locality and transfers: `attestation/data_locality.py`, `data_locality_v0`
 - GDPR Article 17, erasure: read-time redaction in `audit/sqlite_backend.py`
 - eIDAS 2.0 qualified electronic ledger profile: `docs/eidas-qel-profile.md`
@@ -105,7 +106,7 @@ Provider, and S3P, a safety-violation-rate measurement an auditor can reproduce.
 - W3C PROV-DM and PROV-JSON export: `audit/prov_export.py`, `vaara trail export-prov`
 - IETF RATS EAR (AR4SI) trustworthiness claims: `vaara export-attestation-result`
 - Guardrail findings tagged to articles, with deployer overrides: `integrations/_content_safety_articles.py`
-- Threat and control mappings: OWASP Top 10 for Agentic Applications 2026 (`docs/OWASP_AGENTIC.md`), OWASP AISVS C9.2.3 and C9.2.4, MITRE ATLAS (`tests/vectors/atlas_threat_v0/`), MIT AI Risk Repository (`docs/mit_ai_risk_repository_mapping.md`), article-level EU AI Act and DORA mapping (`docs/COMPLIANCE.md`)
+- Threat and control mappings: OWASP Top 10 for Agentic Applications 2026 (`docs/OWASP_AGENTIC.md`), OWASP AISVS C9.2.3 and C9.2.4, MITRE ATLAS (`tests/vectors/atlas_threat_v0/`), MIT AI Risk Repository (`docs/mit_ai_risk_repository_mapping.md`), article-level EU AI Act, DORA and SOC 2 mapping (`docs/COMPLIANCE.md`)
 
 ## 8. Payment and commerce rails
 
