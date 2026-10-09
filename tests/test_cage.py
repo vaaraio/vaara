@@ -9,6 +9,7 @@ import os
 import socket
 import stat
 import threading
+from unittest import mock
 
 import pytest
 
@@ -414,7 +415,9 @@ def test_vaara_run_declares_the_cage(monkeypatch):
     monkeypatch.setattr(run_mod.os, "fork", lambda: 4242)
     monkeypatch.setattr(run_mod.os, "kill", lambda pid, sig: None)
     monkeypatch.setattr(run_mod.os, "waitpid", lambda pid, flags: (pid, 0))
-    with pytest.raises(StopHere):
+    # run() writes the declaration into its own environment before the fork;
+    # with fork faked that is this process, and every later test would see it.
+    with mock.patch.dict(os.environ), pytest.raises(StopHere):
         run_mod.run("reviewer", ["claude"])
     assert seen == {cage.CAGE_ENV: "vaara-cage", cage.DIGEST_ENV: "sha256:11",
                     cage.UPSTREAM_ENV: "apparmor 4.0.1", cage.NAME_ENV: "reviewer"}
