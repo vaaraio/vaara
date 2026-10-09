@@ -23,9 +23,9 @@ so the agent and everything it starts inherit them and none can lift them:
   is one (:mod:`vaara.oslayer.forward`).
 
 Landlock rules name ports, not addresses, so the proxy's port number on a
-remote host is reachable too. The guard closes that where it runs as root
-by an address rule on the launch's cgroup; this module says which layers it
-applied and the caller records them.
+remote host would be reachable too. The guard closes that as root with an
+address rule on the launch's cgroup (:mod:`vaara.oslayer.netlock`), and
+``vaara run`` refuses a launch the guard did not lock.
 
 The system call numbers are pinned from the kernel's own tables
 (``arch/x86/entry/syscalls/syscall_64.tbl`` and

@@ -755,6 +755,18 @@ class Guard:
         except OSError:
             cgroup.remove(path)
             raise
+        netlocked: list[str] = []
+        egress_ports = request.get("egress_ports")
+        if egress_ports:
+            # Landlock in the tree limits the port; this limits the address,
+            # so the proxy's port on another host is not reachable either.
+            from vaara.oslayer import netlock
+
+            try:
+                netlocked = netlock.lock(path, egress_ports)
+            except (OSError, TypeError, ValueError) as exc:
+                cgroup.remove(path)
+                return {"ok": False, "error": f"egress address rule not attached: {exc}"}, None
         launch = Launch(launch_id=launch_id, agent=agent, binary=binary, uid=peer_uid,
                         pid=child, cgroup=path)
         with self._launch_lock:
@@ -763,9 +775,10 @@ class Guard:
         self._record(agent, f"launch-{launch_id}", OS_LAUNCH.name, {
             "binary": binary, "argv": argv, "cwd": str(request.get("cwd") or "")[:1024],
             "uid": peer_uid, "pid": child, "launch": launch_id,
+            **({"netlock": netlocked} if netlocked else {}),
         }, "allow", "vaara run started the agent under the floor", "os-layer:launch")
         return {"ok": True, "launch": launch_id, "cgroup": str(path),
-                "profile": floor.PROFILE}, launch
+                "profile": floor.PROFILE, "netlock": netlocked}, launch
 
     def _end_launch(self, launch: Launch) -> None:
         cgroup.remove(launch.cgroup)
