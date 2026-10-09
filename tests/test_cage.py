@@ -456,3 +456,48 @@ def test_cage_run_keeps_a_dash_dash_inside_the_agent_and_follows_a_child(monkeyp
     assert fake.argv == ["git", "log", "--", "src/"]
     assert code == 3
     assert "from the cage" in capsys.readouterr().err
+
+
+def test_a_relayed_decision_confirms_the_vaara_cage_on_the_asking_agent(monkeypatch):
+    """The hook runs outside the floor; the agent that asked carries the label."""
+    import vaara.cage as cage
+
+    seen = []
+
+    def label(pid="self"):
+        seen.append(pid)
+        return pid == 4242
+
+    monkeypatch.setattr(cage, "apparmor_agent_label", label)
+    monkeypatch.setitem(cage._CONFIRM, "vaara-cage", ((label, cage.BASIS_APPARMOR),))
+    env = {cage.CAGE_ENV: "vaara-cage", cage.DIGEST_ENV: "sha256:aa"}
+    assert cage.observe(env).basis == cage.BASIS_DECLARED
+    got = cage.observe({**env, cage.PEER_ENV: "4242"})
+    assert got.confirmed and got.basis == cage.BASIS_APPARMOR
+    assert not cage.observe({**env, cage.PEER_ENV: "77"}).confirmed
+    # Another cage's declaration is never confirmed through the peer.
+    monkeypatch.setitem(cage._CONFIRM, "codex", ((lambda: False, cage.BASIS_SECCOMP),))
+    assert not cage.observe({cage.CAGE_ENV: "codex", cage.PEER_ENV: "4242"}).confirmed
+
+
+def test_the_relay_hands_the_hook_the_asking_pid(monkeypatch, tmp_path):
+    import subprocess as sp
+
+    from vaara.cage import PEER_ENV
+    from vaara.oslayer import forward
+
+    captured = {}
+
+    def fake_run(argv, **kw):
+        captured.update(kw["env"])
+        return sp.CompletedProcess(argv, 0, b"", b"")
+
+    monkeypatch.setattr(forward.subprocess, "run", fake_run)
+    monkeypatch.setenv(PEER_ENV, "999")  # never inherited from vaara run itself
+    server = forward.HookServer.__new__(forward.HookServer)
+    server._hook_cmd = ["vaara"]
+    server.answer({"argv": ["pre-tool-use"], "stdin": ""}, peer=1234)
+    assert captured[PEER_ENV] == "1234"
+    captured.clear()
+    server.answer({"argv": ["pre-tool-use"], "stdin": ""})
+    assert PEER_ENV not in captured

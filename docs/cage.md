@@ -197,7 +197,10 @@ What these layers do not do:
 
 - `confirmed: true` with `basis: apparmor_label` means the deciding
   process carried the `vaara-agent` label when it decided. The label is
-  set by the kernel at exec and cannot be dropped by the process.
+  set by the kernel at exec and cannot be dropped by the process. Under
+  `vaara run` the hook decides outside the floor, so the check is made on
+  the agent process that asked, named by the relay socket's peer
+  credentials, which the kernel supplies.
 - `confirmed: true` with `basis: seccomp_filter` means a seccomp filter
   and `no_new_privs` were on the deciding process. That is what OpenShell,
   the Codex sandbox and nono set, and it is also what a container

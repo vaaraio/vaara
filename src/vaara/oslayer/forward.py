@@ -152,7 +152,7 @@ class HookServer:
                 if not self.allowed(pid, uid):
                     reply = {"ok": False, "error": "caller is not in this launch"}
                 else:
-                    reply = self.answer(_read(conn))
+                    reply = self.answer(_read(conn), peer=pid)
             except Exception as exc:  # noqa: BLE001 - the caller gets the reason
                 reply = {"ok": False, "error": str(exc)}
             try:
@@ -160,8 +160,13 @@ class HookServer:
             except OSError:
                 pass
 
-    def answer(self, request: dict) -> dict:
-        """Run the hook outside the floor for one relayed event."""
+    def answer(self, request: dict, peer: Optional[int] = None) -> dict:
+        """Run the hook outside the floor for one relayed event.
+
+        ``peer`` is the asking agent's pid, from the socket's peer
+        credentials: the hook confirms the cage on it, since the hook itself
+        runs unconfined.
+        """
         argv = request.get("argv")
         if not isinstance(argv, list) or not all(isinstance(a, str) for a in argv):
             raise ValueError("argv must be a list of strings")
@@ -169,7 +174,12 @@ class HookServer:
         cwd = request.get("cwd")
         if not isinstance(cwd, str) or not os.path.isdir(cwd):
             cwd = None
-        env = {k: v for k, v in os.environ.items() if k not in (SOCKET_ENV, PID_ENV)}
+        from vaara.cage import PEER_ENV
+
+        env = {k: v for k, v in os.environ.items()
+               if k not in (SOCKET_ENV, PID_ENV, PEER_ENV)}
+        if peer is not None:
+            env[PEER_ENV] = str(peer)
         limit = _deadline() - 2
         try:
             done = subprocess.run([*self._hook_cmd, "hook", *argv], input=stdin,

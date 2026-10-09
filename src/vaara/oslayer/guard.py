@@ -188,6 +188,8 @@ class Guard:
         self._launches: dict[str, Launch] = {}
         self._launch_lock = threading.Lock()
         self._profile_lock = threading.Lock()
+        # Digest of the profile text the kernel last took, for status().
+        self._loaded_digest = ""
 
         self._group: Optional[Group] = None
         self._pipeline: Optional[InterceptionPipeline] = None
@@ -422,6 +424,9 @@ class Guard:
                                   capture_output=True, text=True, timeout=120)
             if done.returncode != 0:
                 raise GuardError(f"apparmor_parser refused the profile: {done.stderr.strip()}")
+            from vaara.cage.vaara_cage import profile_digest
+
+            self._loaded_digest = profile_digest(text)
 
     def _apply_marks(self) -> None:
         sel = self._selection
@@ -780,13 +785,12 @@ class Guard:
                         for x in self._launches.values()]
         with self._held_lock:
             waiting = len(self._held)
-        from vaara.cage.vaara_cage import profile_digest
-
         return {
             "ok": True, "pid": self.pid, "user": self.user,
             "profile": floor.PROFILE, "profile_loaded": floor.profile_loaded(),
-            # The effective cage configuration is the rendered profile text.
-            "profile_digest": profile_digest(self.render_profile()),
+            # The effective cage configuration is the profile text the kernel
+            # last took: a reload it refused leaves the old one in force.
+            "profile_digest": self._loaded_digest,
             "trail": str(self.trail_path),
             "folders": [{"path": f.path, "mode": f.mode} for f in sel.folders],
             "apps": list(sel.apps), "ask_timeout": sel.ask_timeout,
