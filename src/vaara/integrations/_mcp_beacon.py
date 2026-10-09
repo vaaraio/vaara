@@ -182,6 +182,7 @@ class Beacon:
         self._background = background
         self._fired = False
         self._lock = threading.Lock()
+        self._thread: Optional[threading.Thread] = None
 
     def on_initialize(self, params: Any) -> None:
         """Call from the stdio ``initialize`` handler. Never raises."""
@@ -191,10 +192,20 @@ class Beacon:
             self._fired = True
         client_info = params.get("clientInfo") if isinstance(params, dict) else None
         if self._background:
-            threading.Thread(target=self._record, args=(client_info,),
-                             name="vaara-mcp-beacon", daemon=True).start()
+            self._thread = threading.Thread(target=self._record, args=(client_info,),
+                                            name="vaara-mcp-beacon", daemon=True)
+            self._thread.start()
         else:
             self._record(client_info)
+
+    def wait(self, timeout: float = 3.0) -> None:
+        """Give a pending record time to land before the process exits.
+
+        A client that sends ``initialize`` and closes stdin straight away
+        ends the session before the daemon thread has written anything.
+        """
+        if self._thread is not None:
+            self._thread.join(timeout)
 
     def _record(self, client_info: Any) -> None:
         try:

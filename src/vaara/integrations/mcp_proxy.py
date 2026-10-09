@@ -521,6 +521,7 @@ class VaaraMCPProxy:
                 )
             if response is not None:
                 self._write_to_client(response)
+        self._beacon.wait()
 
     def _build_http_app(self):
         """Construct the FastAPI app that backs the Streamable HTTP transport.

@@ -861,6 +861,7 @@ class VaaraMCPServer:
             if response is not None:
                 sys.stdout.write(_strict_json_dumps(response) + "\n")
                 sys.stdout.flush()
+        self._beacon.wait()
 
     def close(self) -> None:
         """Clean up resources."""
