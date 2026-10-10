@@ -182,3 +182,13 @@ main section.stats { padding: 30px 0 22px; }
 .stat:hover b { color: var(--accent); }
 .stats .note { font-size: 12px; color: var(--muted); margin: 16px 0 0; }
 @media (max-width: 820px) { .statrow { grid-template-columns: 1fr 1fr; gap: 18px; } .stat { border-left: 0; padding-left: 0; } }
+
+/* one accent per block, so the six read apart at a glance */
+.f-gate { --fa: #1B7A5A; } .f-person { --fa: #B7791F; } .f-receipt { --fa: #2F6FB0; }
+.f-cage { --fa: #6B4FA3; } .f-rules { --fa: #B4513A; } .f-house { --fa: #0E7490; }
+html[data-theme="dark"] .f-gate { --fa: #5CC49A; } html[data-theme="dark"] .f-person { --fa: #E3B25A; }
+html[data-theme="dark"] .f-receipt { --fa: #7AA9E0; } html[data-theme="dark"] .f-cage { --fa: #A88BE0; }
+html[data-theme="dark"] .f-rules { --fa: #E08A6E; } html[data-theme="dark"] .f-house { --fa: #4FB8CF; }
+.feat { border-top: 3px solid var(--fa); }
+.feat svg { background: color-mix(in srgb, var(--fa) 10%, var(--card)); }
+.feat h3::before { content: ""; display: inline-block; width: 9px; height: 9px; border-radius: 50%; background: var(--fa); margin-right: 9px; vertical-align: 2px; }
