@@ -38,9 +38,9 @@ a { color: var(--accent); }
 
 /* the bar: logo and menus, stays at the top while the page scrolls */
 .bar { background: var(--night); position: sticky; top: 0; z-index: 50; border-bottom: 1px solid rgba(185,204,221,.14); }
-nav.top { display: flex; align-items: center; gap: 28px; height: 64px; }
+nav.top { display: flex; align-items: center; gap: 26px; height: 56px; }
 nav.top .brand { margin-right: auto; display: flex; align-items: center; }
-nav.top .brand img { height: 30px; width: auto; display: block; }
+nav.top .brand img { height: 24px; width: auto; display: block; }
 .dd { position: relative; height: 100%; display: flex; align-items: center; }
 .dd .caret { font-size: 11px; color: var(--on-night-muted); }
 .dd .menu { display: none; position: absolute; top: 100%; left: -16px; min-width: 260px; background: var(--card);
@@ -143,9 +143,8 @@ nav.top .theme { font-family: inherit; width: 32px; height: 32px; border-radius:
 nav.top .theme::before { content: "\263E"; }
 html[data-theme="dark"] nav.top .theme::before { content: "\2600"; }
 nav.top .theme:hover { color: var(--on-night); border-color: var(--on-night-soft); }
-nav.top a.get { background: var(--accent); color: #fff; text-decoration: none; font-size: 14px; font-weight: 600;
+nav.top a.get { background: #6CC3A0; color: #0F1820; text-decoration: none; font-size: 14px; font-weight: 600;
   padding: 8px 14px; border-radius: 6px; white-space: nowrap; }
-html[data-theme="dark"] nav.top a.get { color: #0F1820; }
 nav.top a.get:hover { filter: brightness(1.1); }
 
 /* home: the release line, then text left and the real run right */
@@ -192,3 +191,21 @@ html[data-theme="dark"] .f-rules { --fa: #E08A6E; } html[data-theme="dark"] .f-h
 .feat { border-top: 3px solid var(--fa); }
 .feat svg { background: color-mix(in srgb, var(--fa) 10%, var(--card)); }
 .feat h3::before { content: ""; display: inline-block; width: 9px; height: 9px; border-radius: 50%; background: var(--fa); margin-right: 9px; vertical-align: 2px; }
+
+/* phones: one row (logo, language, theme, menu); the links open underneath */
+nav.top .burger { display: none; }
+@media (max-width: 820px) {
+  nav.top { flex-wrap: wrap; height: auto; min-height: 56px; padding: 10px 0; gap: 12px; }
+  nav.top .brand { margin-right: auto; }
+  nav.top .dd, nav.top > a.l { display: none; }
+  nav.top .burger { display: block; order: 3; width: 36px; height: 32px; border-radius: 6px; border: 1px solid rgba(185,204,221,.3);
+    background: transparent; color: var(--on-night); font-size: 18px; line-height: 1; cursor: pointer; padding: 0; }
+  nav.top .burger::before { content: "\2630"; }
+  nav.top.open .burger::before { content: "\2715"; }
+  nav.top.open .dd, nav.top.open > a.l { display: block; width: 100%; order: 10; height: auto; padding: 10px 0;
+    border-top: 1px solid rgba(185,204,221,.14); }
+  nav.top .dd .menu, nav.top .dd .caret { display: none !important; }
+  .hero.home h1 { font-size: 30px; }
+  .release a { border-radius: 10px; }
+}
+@media (max-width: 820px) { .term pre { white-space: pre; font-size: 11px; } }
