@@ -468,3 +468,16 @@ def test_decide_refuses_private_ranges_behind_an_allowed_name_unless_named_liter
     assert p.decide("pub.example.com", 443)[0]
     assert p.decide("10.1.2.3", 443)[0]
     assert p.decide("fd12:3456::1", 443)[0]
+
+
+def test_selection_says_which_egress_entry_it_dropped(caplog):
+    # Audit 2026-10-10 (finding 8): a malformed entry narrowed the allow list
+    # without a word; the operator saw 403s from the proxy.
+    import logging
+    from vaara.oslayer import selection
+    with caplog.at_level(logging.WARNING, logger="vaara.oslayer.selection"):
+        sel = selection.parse({"egress": ["api.example.com", "http://nope", "two words"]})
+    assert sel.egress == ["api.example.com"]
+    dropped = [r.getMessage() for r in caplog.records]
+    assert any("http://nope" in m and "dropped" in m for m in dropped)
+    assert any("two words" in m for m in dropped)

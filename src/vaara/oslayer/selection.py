@@ -38,6 +38,7 @@ open, so an agent cannot change its own rules.
 from __future__ import annotations
 
 import json
+import logging
 import os
 import tempfile
 from dataclasses import dataclass, field, replace
@@ -170,7 +171,12 @@ def parse(data: object) -> Selection:
         for entry in data["egress"]:
             try:
                 parse_rule(str(entry))
-            except ValueError:
+            except ValueError as exc:
+                # Fail closed, out loud: the list narrows and the operator
+                # otherwise learns it from a 403 on a host they listed.
+                logging.getLogger(__name__).warning(
+                    "os-layer selection: egress entry %r dropped (%s); the allow "
+                    "list is narrower than written", entry, exc)
                 continue
             egress.append(str(entry).strip().lower())
     return Selection(folders=list(folders.values()), apps=list(apps), ask_timeout=float(timeout),
