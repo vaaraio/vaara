@@ -29,4 +29,11 @@ pq extra not installed
 ^no Codex binary$
 ^no Gemini CLI binary$
 ^no Copilot CLI binary$
+^no Claude Code binary$
 ^the OS layer end-to-end test runs in the os-layer-e2e job$
+# The CDDL schema check needs the cddl tool (cargo install cddl); no CI job
+# installs it yet, so it runs on a developer machine before a draft commit.
+^the cddl tool is not installed$
+# The matrix checks out a shallow clone; the one test that reads a historical
+# tree skips there and runs wherever the full history is checked out.
+^shallow clone cannot see the tree at that commit$
