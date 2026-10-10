@@ -2618,14 +2618,14 @@ Internet-Draft                Vaara Receipt                 October 2026
    [VAARA-REPO]
               Vaara, "Vaara Receipt Specification (vaara.receipt/v1) and
               conformance vectors", 2026,
-              <https://github.com/vaaraio/vaara/blob/main/SPEC.md>.
+              <https://github.com/vaaraio/vaara/tree/
+              f0b09b096a2c458519fad7aa8586c46a012e14f7>.
 
    [VCP]      Kamimura, T., "A SCITT Profile for Verifiable Audit Trails
               in Algorithmic Trading: The VeritasChain Protocol (VCP)",
               Work in Progress, Internet-Draft, draft-kamimura-scitt-
               vcp, January 2026, <https://datatracker.ietf.org/doc/
               draft-kamimura-scitt-vcp/>.
-
 
 
 
