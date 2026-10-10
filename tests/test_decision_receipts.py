@@ -9,6 +9,7 @@ import importlib
 import json
 import sqlite3
 import stat
+import sys
 from pathlib import Path
 
 import pytest
@@ -124,6 +125,7 @@ def test_a_failing_sink_does_not_stop_the_decision(tmp_path, monkeypatch):
     assert events[-1] == "action_blocked"
 
 
+@pytest.mark.skipif(sys.platform == "win32", reason="Windows files have no POSIX mode bits")
 def test_key_is_private(tmp_path):
     db, trail = _trail(tmp_path)
     _record(trail, "allow")

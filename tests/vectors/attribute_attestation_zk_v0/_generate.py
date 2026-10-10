@@ -137,7 +137,9 @@ def _case(attestation, *, name, predicate, minimum, state, reason,
 
 def _write(path: Path, obj) -> None:
     path.parent.mkdir(parents=True, exist_ok=True)
-    path.write_text(json.dumps(obj, indent=2, sort_keys=True) + "\n", encoding="utf-8")
+    # newline="\n": the committed bytes are LF on every platform.
+    with path.open("w", encoding="utf-8", newline="\n") as fh:
+        fh.write(json.dumps(obj, indent=2, sort_keys=True) + "\n")
 
 
 def main() -> None:

@@ -134,6 +134,10 @@ conflicts = [
 
 [tool.pytest.ini_options]
 testpaths = ["tests"]
+# A test that runs past this many seconds gets its stack printed to stderr
+# by the faulthandler, so a hung CI job names the test instead of timing out
+# after six hours with an empty log. The test keeps running; nothing fails.
+faulthandler_timeout = 300
 markers = [
     "network: reaches a public service (PyPI, npm); skips when unreachable",
 ]
