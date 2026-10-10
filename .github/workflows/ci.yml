@@ -742,8 +742,20 @@ jobs:
           # makes pytest's faulthandler print every thread's stack before it
           # dies, so a hang names its line instead of holding the runner for
           # six hours with an empty log.
+          # Output goes to a file, not through a pipe: an agent process left
+          # behind by a killed run would hold a pipe open and the step with it.
+          set +e
           VAARA_TEST_USE_REAL_HOME=1 VAARA_OSLAYER_E2E=1 \
-            timeout -s ABRT 20m pytest tests/test_oslayer_e2e.py -q -rs | tee result.txt
+            timeout -s ABRT -k 30 20m pytest tests/test_oslayer_e2e.py -q -rs > result.txt 2>&1
+          rc=$?
+          set -e
+          cat result.txt
+          sudo pkill -9 -f 'vaara.cli run' || true
+          sudo pkill -9 -f copilot || true
+          if [ "$rc" -ne 0 ]; then
+            echo "::error::pytest exited $rc"
+            exit "$rc"
+          fi
           if grep -qE '[0-9]+ skipped' result.txt; then
             echo "::error::The OS layer test skipped, so it did not run."
             exit 1
