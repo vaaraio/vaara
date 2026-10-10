@@ -49,7 +49,7 @@ Both `deny` and `escalate` raise `vaara.Blocked`, since an escalation means a hu
 <details>
 <summary><b>Check a receipt with nothing installed</b></summary>
 
-[vaara.io/verify.html](https://vaara.io/verify.html) is the Vaara Resin. One HTML file, no build step and no dependencies. Paste in a receipt and it recomputes the DSSE pre-authentication encoding, takes its digest, and checks the Ed25519 signature with WebCrypto. The receipt never leaves the tab, nothing uploads, and the page works with the network off, so verification is not a service and Vaara is not a party to it. Save the file and it keeps working.
+[vaara.io/verify.html](https://vaara.io/verify.html) is the receipt explorer, in English and Finnish. A static page and one script, no build step and no dependencies. Paste in a receipt and it recomputes the DSSE pre-authentication encoding, takes its digest, and checks the Ed25519 signature with WebCrypto. The receipt never leaves the tab, nothing uploads, and the page works with the network off, so verification is not a service and Vaara is not a party to it. Save the page with its script and it keeps working.
 
 It also states what a passing check does not establish: that the key belongs to the party you expect, that the signed statement is true, that `decided_at` means anything without an external time authority, or that one receipt is a whole history.
 

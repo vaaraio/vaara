@@ -516,7 +516,7 @@ CERTIFICATE_TEMPLATE = """<!doctype html>
     against
     https://vaara.io/badge/{slug}.json, whose sha256 is the row digest above.
     <br><br>
-    Vaara&trade; and Vaara Resin&trade; &copy; 2026 Henri Sirkkavaara, Helsinki. AGPL-3.0-or-later.
+    Vaara&trade; &copy; 2026 Henri Sirkkavaara, Helsinki. AGPL-3.0-or-later.
   </footer>
 </div>
 </body>
