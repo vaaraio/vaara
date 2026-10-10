@@ -785,7 +785,8 @@ class InterceptionPipeline:
             decay_reason = None
             try:
                 decay_reason = _authority_check(
-                    self.trail.get_session_records(agent_id, session_id), session_id,
+                    self.trail.get_session_records(agent_id, session_id, tenant_id),
+                    session_id,
                     point_estimate, self.authority, time.time(),
                     exclude_action=action_id,
                 )

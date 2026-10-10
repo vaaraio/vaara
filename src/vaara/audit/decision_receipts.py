@@ -144,7 +144,9 @@ def _cage_block(cage: dict[str, Any], record_id: str) -> dict[str, Any]:
     when custom code passes a hand-built block to ``record_decision``.
     """
     driver = str(cage["driver"])
-    confirmed = bool(cage.get("confirmed", False))
+    # Only the boolean true confirms. A string "false", or any other value a
+    # hand-built block carries, is unconfirmed; truthiness would sign it.
+    confirmed = cage.get("confirmed", False) is True
     if driver == "none":
         if confirmed:
             logger.warning("cage block for record_id=%s claims confirmed with "
@@ -241,6 +243,24 @@ class DecisionReceiptSink:
                 self.key_path or self.trail_dir / KEY_RELPATH, self.public_key_path
             )
         return self._key
+
+    def prepare(self) -> None:
+        """Load the key and import the code that mint() needs, ahead of the first decision.
+
+        For a caller that must not import anything once it is serving. The OS
+        guard is one: it holds every open on a mount until one of its threads
+        answers, and a compiled module imported in a worker thread is opened
+        with the GIL held, so the thread that would answer never runs.
+        """
+        from cryptography.hazmat.primitives import hashes
+        from cryptography.hazmat.primitives.asymmetric import ec
+
+        from vaara.attestation import _attest_canonical, decision  # noqa: F401
+
+        with self._lock:
+            # One signature nobody keeps, so whatever the library sets up on
+            # first use (providers, the random pool) is set up now.
+            self._signing_key().sign(b"vaara", ec.ECDSA(hashes.SHA256()))
 
     def mint(self, record: AuditRecord) -> dict[str, Any]:
         """Build and sign the receipt file contents for one decision record."""

@@ -1880,7 +1880,7 @@ decision-receipt = {
   alg: alg,
   backLink: back-link,
   decisionDerived: decision-derived,
-  issuerAsserted: issuer-block,
+  issuerAsserted: decision-issuer-block,
   signature: hex,
   ? timestampAnchors: [* anchor],
 }
@@ -1910,6 +1910,17 @@ back-link = {
 }
 
 issuer-block = {
+  issuer-members,
+  ? sigSuite: "ES256+ML-DSA-65" / "RS256+ML-DSA-65",
+}
+
+; A decision receipt has no pqSignature, so its issuer block
+; names no sigSuite (SPEC.md 2.5).
+decision-issuer-block = {
+  issuer-members,
+}
+
+issuer-members = (
   iss: tstr,
   sub: tstr,
   iat: date-time,
@@ -1919,9 +1930,8 @@ issuer-block = {
   ? aud: nonempty,
   ? taskId: nonempty,
   ? completeness: completeness,
-  ? sigSuite: "ES256+ML-DSA-65" / "RS256+ML-DSA-65",
   ? cryptoPosture: crypto-posture,
-}
+)
 
 completeness = {
   boundaryId: nonempty,
@@ -2037,7 +2047,11 @@ log-anchor = {
 }
 
 ; A method this document does not define: carried, never
-; treated as verified.
+; treated as verified. CDDL cannot say "any method name but
+; the three above", so this alternative also admits a
+; registered name with members missing; the prose rule that
+; a registered method keeps its own shape is checked by the
+; verifier, not by this schema.
 other-anchor = {
   method: tstr,
   anchoredDigest: digest,

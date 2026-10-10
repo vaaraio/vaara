@@ -314,9 +314,15 @@ def _heredoc_targets(left: str, right: str) -> list[str]:
     descriptor, a launcher or a reader name. ``/dev/null`` is never one."""
     statement = _HEREDOC.sub(" ", left + right)
     targets: list[str] = []
+    after_operator = False
     for word in statement.replace("|", " ").split():
+        redirected = after_operator or _REDIRECT_PREFIX.match(word) is not None
+        after_operator = _REDIRECT_PREFIX.fullmatch(word) is not None
         word = _REDIRECT_PREFIX.sub("", word).strip("'\"")
-        if (not word or word.startswith("-") or re.fullmatch(r"&?\d*", word)
+        # A word after a redirect operator is a file name even when it starts
+        # with "-": ``cat > -x.sh`` writes -x.sh, and ``./-x.sh`` runs it.
+        if (not word or (word.startswith("-") and not redirected)
+                or re.fullmatch(r"&?\d*", word)
                 or word in _LAUNCHERS or word in _WRITERS
                 or _NON_SHELL_INTERPRETER.fullmatch(word)
                 or word == "/dev/null" or re.fullmatch(r"[A-Za-z_]\w*=\S*", word)):

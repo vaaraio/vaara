@@ -699,6 +699,12 @@ jobs:
     # It reads back the files the model asked Copilot CLI to change and the
     # guard's own trail, then runs Copilot CLI again with Vaara's hooks, whose
     # verdicts reach it through the relay to `vaara run`.
+    #
+    # The guard marks the whole mount. If it stops answering, every open and
+    # exec on the runner waits with it, so this job has no log to show and
+    # cannot be cancelled, and no step inside it can report that state. The
+    # unit test in tests/test_oslayer.py covers the one cause seen so far: it
+    # fails when a decision loads compiled code after start().
     steps:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1  # v7.0.1
 
@@ -735,11 +741,26 @@ jobs:
 
       - name: Run the OS layer end-to-end test, failing on any skip
         run: |
-          set -o pipefail
           # The suite points HOME at a sandbox; this test needs the operator's
           # real home, which is the one the guard serves.
+          # Twenty minutes is three bounded runs with room. Past that, SIGABRT
+          # makes pytest's faulthandler print every thread's stack before it
+          # dies, so a hang in the test names its line instead of holding the
+          # runner for six hours with an empty log.
+          # Output goes to a file, not through a pipe: an agent process left
+          # behind by a killed run would hold a pipe open and the step with it.
+          set +e
           VAARA_TEST_USE_REAL_HOME=1 VAARA_OSLAYER_E2E=1 \
-            pytest tests/test_oslayer_e2e.py -q -rs | tee result.txt
+            timeout -s ABRT -k 30 20m pytest tests/test_oslayer_e2e.py -q -rs > result.txt 2>&1
+          rc=$?
+          set -e
+          cat result.txt
+          sudo pkill -9 -f 'vaara.cli run' || true
+          sudo pkill -9 -f copilot || true
+          if [ "$rc" -ne 0 ]; then
+            echo "::error::pytest exited $rc"
+            exit "$rc"
+          fi
           if grep -qE '[0-9]+ skipped' result.txt; then
             echo "::error::The OS layer test skipped, so it did not run."
             exit 1

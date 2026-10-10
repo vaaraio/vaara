@@ -670,8 +670,10 @@ ENVELOPE_VERSION = 1
 
 
 def require_envelope_version(value: Any, where: str) -> None:
-    # bool is an int subclass; True must not pass as version 1.
-    if isinstance(value, bool) or value != ENVELOPE_VERSION:
+    # bool is an int subclass; True must not pass as version 1, and a JSON
+    # 1.0 arrives as a float that compares equal to 1 and is not the integer
+    # the envelope names.
+    if type(value) is not int or value != ENVELOPE_VERSION:
         raise AttestationError(
             f"{where} version MUST be {ENVELOPE_VERSION}; got {value!r}"
         )

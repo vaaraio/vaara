@@ -851,6 +851,11 @@ class AuditTrail:
         # SQLiteAuditBackend.verify_chain_streaming, which holds no index and
         # no records. Maintained ONLY by _index_record.
         self._pos_by_record_id: dict[str, int] = {}
+        # (tenant_id, agent_id, session_id) -> the action ids of that session,
+        # in the order their action_requested records landed, so authority
+        # decay replays one session without scanning every agent's history
+        # on every allowed call. Maintained ONLY by _index_record.
+        self._actions_by_session: dict[tuple[str, str, str], list[str]] = defaultdict(list)
         self._last_hash = ""
         # Set by SQLiteAuditBackend.load_trail when receipts are on; called
         # with every appended record and acts on decision records only.
@@ -1944,22 +1949,27 @@ class AuditTrail:
         records = [r for r in snapshot if r.agent_id == agent_id]
         return records[-limit:]
 
-    def get_session_records(self, agent_id: str, session_id: str) -> list[AuditRecord]:
+    def get_session_records(self, agent_id: str, session_id: str,
+                            tenant_id: str = "") -> list[AuditRecord]:
         """Every record of one agent's session, in trail order, with no limit.
 
         A session is the set of actions whose ``action_requested`` record
-        carries ``data.session_id``; the records of those actions follow.
-        Authority decay replays the budget from this list, so it must be the
-        whole session: a window would let a session outrun its own spend.
+        carries ``data.session_id``, within one tenant; the records of those
+        actions follow. Authority decay replays the budget from this list, so
+        it must be the whole session: a window would let a session outrun
+        its own spend, and another tenant's session under the same ids must
+        not be charged to this one. Served from the per-session index, so
+        the cost is the session's own records and not the whole trail.
         """
         with self._lock:
-            snapshot = list(self._records)
-        actions = {
-            r.action_id for r in snapshot
-            if r.agent_id == agent_id and r.event_type == EventType.ACTION_REQUESTED
-            and (r.data or {}).get("session_id") == session_id
-        }
-        return [r for r in snapshot if r.agent_id == agent_id and r.action_id in actions]
+            actions = list(self._actions_by_session.get(
+                (tenant_id or "", agent_id, session_id), ()))
+            records = [
+                r for action_id in actions for r in self._by_action.get(action_id, ())
+                if r.agent_id == agent_id and (r.tenant_id or "") == (tenant_id or "")
+            ]
+        records.sort(key=lambda r: self._pos_by_record_id.get(r.record_id, 0))
+        return records
 
     def get_records_by_type(
         self, event_type: EventType, limit: int = 100
@@ -2638,6 +2648,12 @@ class AuditTrail:
         self._pos_by_record_id.setdefault(record.record_id, len(self._records) - 1)
         if record.event_type == EventType.ESCALATION_RESOLVED:
             self._resolved_approvals.append(record)
+        if record.event_type == EventType.ACTION_REQUESTED:
+            session = (record.data or {}).get("session_id")
+            if session:
+                self._actions_by_session[
+                    (record.tenant_id or "", record.agent_id, str(session))
+                ].append(record.action_id)
 
     def _chain_backend(self):
         """The store that owns the persistent chain head, or ``None``.

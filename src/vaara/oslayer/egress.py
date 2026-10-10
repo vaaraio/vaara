@@ -285,18 +285,26 @@ class EgressProxy:
             self._record(dict(event, kind="failed", error=f"upstream did not answer: {exc}"))
             conn.sendall(b"HTTP/1.1 502 Bad Gateway\r\nConnection: close\r\n\r\n")
             return
-        if connect_reply:
-            conn.sendall(b"HTTP/1.1 200 Connection Established\r\n\r\n")
-        if first:
-            upstream.sendall(first)
-        if body_left is not None:
-            # A plain request with a known body: send the rest of the body,
-            # then nothing more from the client reaches this upstream.
-            sent = _copy_exact(conn, upstream, body_left)
-            up, down = sent, _drain(upstream, conn)
+        try:
+            if connect_reply:
+                conn.sendall(b"HTTP/1.1 200 Connection Established\r\n\r\n")
+            if first:
+                upstream.sendall(first)
+            if body_left is not None:
+                # A plain request with a known body: send the rest of the body,
+                # then nothing more from the client reaches this upstream.
+                sent = _copy_exact(conn, upstream, body_left)
+                up, down = sent, _drain(upstream, conn)
+            else:
+                up, down = _pipe(conn, upstream)
+        except OSError as exc:
+            # The connection was opened on the record; it ends with an
+            # outcome either way, so a failure mid-stream is not an open
+            # decision with nothing after it.
+            self._record(dict(event, kind="failed", error=f"connection failed: {exc}"))
+            raise
+        finally:
             upstream.close()
-        else:
-            up, down = _pipe(conn, upstream)
         self._record(dict(event, kind="closed", bytes_up=up + len(first), bytes_down=down))
 
 
