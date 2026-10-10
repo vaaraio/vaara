@@ -245,6 +245,15 @@ _NON_SHELL_INTERPRETER = re.compile(r"(?:python[\d.]*|node)")
 #: paths and process substitution.
 _LIVE_REDIRECT = re.compile(r"/dev/(?:tcp|udp)/|[<>]\(")
 
+#: A shell line that changes what a reader's name runs: a function or alias
+#: named after one, PATH or BASH_ENV, or ``enable``. With one present no
+#: heredoc body is taken for text: ``cat() { bash; }; cat <<EOF`` runs it.
+_SHADOWED = re.compile(
+    r"(?:^|[\s;&|(])(?:function\s+)?(?:cat|tee|python[\d.]*|node)\s*\(\s*\)"
+    r"|\bfunction\s+(?:cat|tee|python[\d.]*|node)\b"
+    r"|\balias\s+(?:cat|tee|python[\d.]*|node)="
+    r"|(?:^|[\s;&|(])(?:PATH|BASH_ENV|ENV)=|\benable\s")
+
 
 def _stage_command(stage: str) -> str:
     """The command a pipeline stage runs, past env assignments and launchers.
@@ -295,10 +304,12 @@ def without_inert_heredocs(command: str, shell_syntax: bool) -> str:
         return command
     lines = command.split("\n")
     out: list[str] = []
+    shell_lines: list[str] = []
     i = 0
     while i < len(lines):
         line = lines[i]
         out.append(line)
+        shell_lines.append(line)
         i += 1
         for op in _HEREDOC.finditer(line):
             delim, strip_tabs = op.group(3), bool(op.group(1))
@@ -312,7 +323,10 @@ def without_inert_heredocs(command: str, shell_syntax: bool) -> str:
             if not (reader == "file" or (reader == "interpreter" and shell_syntax)):
                 out.extend(lines[i:end])
             out.append(lines[end])
+            shell_lines.append(lines[end])
             i = end + 1
+    if _SHADOWED.search("\n".join(shell_lines)):
+        return command
     return "\n".join(out)
 
 
