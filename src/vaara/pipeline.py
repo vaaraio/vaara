@@ -49,6 +49,8 @@ from pathlib import Path
 
 from vaara.audit.sqlite_backend import SQLiteAuditBackend
 from vaara.audit.trail import AuditTrail, EventType
+from vaara.authority import AuthorityPolicy, policy_from_env
+from vaara.authority import check as _authority_check
 
 if TYPE_CHECKING:
     # Capability appears only in annotations, which `from __future__ import
@@ -271,6 +273,7 @@ class InterceptionPipeline:
         compliance: Optional[ComplianceEngine] = None,
         enforce: bool = True,
         review_queue: Optional[Any] = None,
+        authority: Optional[AuthorityPolicy] = None,
     ) -> None:
         """
         Args:
@@ -295,7 +298,11 @@ class InterceptionPipeline:
                 with its conformal interval and signals. Default ``None``
                 preserves prior behaviour — pipeline writes the
                 ``ESCALATION_SENT`` audit record only.
+            authority: Authority decay for sessions (see
+                ``vaara.authority``). Defaults to the policy
+                ``VAARA_AUTHORITY_BUDGET`` describes: on, budget 3.0.
         """
+        self.authority = authority if authority is not None else policy_from_env()
         self.registry = registry or create_default_registry()
         self.scorer = scorer or AdaptiveScorer()
         if trail is None:
@@ -768,6 +775,32 @@ class InterceptionPipeline:
                 # have to parse prose to do it.
                 approver = _disposition.POLICY
                 human_disposed = False
+
+        # 7a. Authority decay. A session whose risk has added up past its
+        # budget gets its allows escalated until a person approves one. Placed
+        # after the prior-approval replay so a cached approval cannot undo it,
+        # and replayed from the session's own records so a hook that starts
+        # fresh per call sees the same budget. Only ever tightens.
+        if decision_str == "allow" and session_id and self.authority.enabled:
+            decay_reason = None
+            try:
+                decay_reason = _authority_check(
+                    self.trail.get_agent_records(agent_id), session_id,
+                    point_estimate, self.authority, time.time(),
+                    exclude_action=action_id,
+                )
+            except Exception:
+                logger.exception("authority decay check failed for action_id=%s; "
+                                 "leaving the decision as scored", action_id)
+            if decay_reason is not None:
+                decision_str = "escalate"
+                allowed = False
+                decision_detail = None
+                modified_parameters = None
+                approver = ""
+                human_disposed = False
+                reason = _cap_str(decay_reason + (f"; scorer: {reason}" if reason else ""),
+                                  _MAX_DECISION_REASON_LEN, "reason")
 
         # 7b. A verdict a rule already reached is the decision, whatever the
         # score said. Policy disposed of it, not a human.
