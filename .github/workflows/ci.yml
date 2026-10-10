@@ -52,10 +52,8 @@ jobs:
   tests-other-os:
     # Until this job existed the suite ran on Ubuntu only, so nothing said
     # whether Vaara works on the macOS laptops most developers carry, or on
-    # Windows. It reports without blocking while the first failures are
-    # fixed; drop continue-on-error once both legs are green.
+    # Windows. Both legs are green and both now fail the run when they break.
     runs-on: ${{ matrix.os }}
-    continue-on-error: true
     strategy:
       fail-fast: false
       matrix:
