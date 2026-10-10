@@ -56,7 +56,8 @@ def test_builtins_become_the_tools_the_rules_name(tool, args, name, field, value
 
 def test_read_many_files_is_one_read_per_path():
     events = gemini.to_hook_events(_payload("read_many_files", {"include": ["a", "/b"]}))
-    assert [(e["tool_name"], e["tool_input"]["file_path"]) for e in events] == [
+    # Paths resolve with the host's separator; compare them as POSIX.
+    assert [(e["tool_name"], e["tool_input"]["file_path"].replace("\\", "/")) for e in events] == [
         ("Read", "/w/a"), ("Read", "/b")]
 
 

@@ -9,9 +9,12 @@ zero dependencies, and the gate cleans up its own files whatever happens.
 from __future__ import annotations
 
 import json
+import sys
 import threading
 import time
 from pathlib import Path
+
+import pytest
 
 from vaara.approvals import approval_key_path, decision_mac, request_approval, write_decision
 
@@ -188,6 +191,7 @@ def test_a_signed_approve_cannot_be_turned_into_another_decision(tmp_path):
     assert request_approval("act-s", "t", "r", approvals_dir=approvals, timeout=0.6) == "timeout"
 
 
+@pytest.mark.skipif(sys.platform == "win32", reason="Windows files have no POSIX mode bits")
 def test_key_is_created_private_beside_the_approvals_dir(tmp_path):
     approvals = tmp_path / "approvals"
     request_approval("a", "t", "r", approvals_dir=approvals, timeout=0.05)

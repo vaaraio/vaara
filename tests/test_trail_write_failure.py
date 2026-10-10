@@ -387,6 +387,7 @@ class TestHookSurfacesTheOutage:
         hooks._report_trail_health({"notifications": False}, db, existed=True)
         assert "does not read clean" in capsys.readouterr().err
 
+    @pytest.mark.skipif(sys.platform == "win32", reason="mount detection reads /proc/mounts")
     def test_session_start_reports_a_trail_running_wal_on_an_unsafe_mount(
         self, tmp_path: Path, monkeypatch, capsys
     ):

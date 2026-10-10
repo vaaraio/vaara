@@ -21,6 +21,7 @@ posing a risk.  SQLite's ACID guarantees that no event is silently lost.
 
 from __future__ import annotations
 
+import contextlib
 import json
 import logging
 import math
@@ -764,11 +765,26 @@ def _salvage(path: Path, problem: str) -> TrailRepair:
 
     # The damaged file is kept beside the trail, never deleted: it is the
     # original evidence, and a later, better tool may read more of it.
-    for suffix in ("", "-journal", "-wal", "-shm"):
-        src_file = path.with_name(path.name + suffix)
-        if src_file.exists():
-            os.replace(src_file, damaged.with_name(damaged.name + suffix))
-    os.replace(tmp, path)
+    # Windows refuses to move a file another process holds open. Undo any
+    # move already made and report the repair as failed, leaving the trail
+    # where it was.
+    moved: list[tuple[Path, Path]] = []
+    try:
+        for suffix in ("", "-journal", "-wal", "-shm"):
+            src_file = path.with_name(path.name + suffix)
+            if src_file.exists():
+                target = damaged.with_name(damaged.name + suffix)
+                os.replace(src_file, target)
+                moved.append((target, src_file))
+        os.replace(tmp, path)
+    except OSError as exc:
+        for target, src_file in reversed(moved):
+            with contextlib.suppress(OSError):
+                os.replace(target, src_file)
+        with contextlib.suppress(OSError):
+            tmp.unlink()
+        return TrailRepair(db=str(path), method="failed", problem=problem,
+                           error=f"{type(exc).__name__}: {exc}")
     report.damaged_copy = str(damaged)
     return report
 

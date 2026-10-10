@@ -1,5 +1,6 @@
 """Tests for the SQLite audit backend."""
 
+import contextlib
 import multiprocessing
 import tempfile
 from pathlib import Path
@@ -24,10 +25,10 @@ def db_path():
     with tempfile.NamedTemporaryFile(suffix=".db", delete=False) as f:
         path = Path(f.name)
     yield path
-    path.unlink(missing_ok=True)
-    # Clean WAL files
-    Path(str(path) + "-wal").unlink(missing_ok=True)
-    Path(str(path) + "-shm").unlink(missing_ok=True)
+    # Windows keeps a file a test left open; the temp directory takes it later.
+    for leftover in (path, Path(str(path) + "-wal"), Path(str(path) + "-shm")):
+        with contextlib.suppress(PermissionError):
+            leftover.unlink(missing_ok=True)
 
 
 def _append_from_child(db_path: str, label: str, count: int) -> None:
