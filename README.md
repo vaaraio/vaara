@@ -17,7 +17,7 @@
 </p>
 
 <p align="center">
-  <img src="https://raw.githubusercontent.com/vaaraio/vaara/badges/downloads.svg" alt="Downloads">
+  <a href="https://pepy.tech/projects/vaara"><img src="https://static.pepy.tech/badge/vaara" alt="PyPI downloads"></a>
 </p>
 
 <p align="center"><b>Accountable Autonomy.</b></p>
