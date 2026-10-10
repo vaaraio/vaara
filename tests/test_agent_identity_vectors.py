@@ -34,12 +34,12 @@ VECTORS = Path(__file__).resolve().parent / "vectors" / "agent_identity_v0"
 
 
 def _expected():
-    return json.loads((VECTORS / "expected.json").read_text())
+    return json.loads((VECTORS / "expected.json").read_text(encoding="utf-8"))
 
 
 @pytest.mark.parametrize("name", ["bound", "unbound", "revoked"])
 def test_vaara_reproduces_vector_verdict(name):
-    case = json.loads((VECTORS / f"{name}.json").read_text())
+    case = json.loads((VECTORS / f"{name}.json").read_text(encoding="utf-8"))
     receipt = parse_receipt(case["receipt"])
     result = verify_receipt_identity(receipt, case["didDocument"])
     want = _expected()[name]
@@ -52,7 +52,7 @@ def test_vaara_reproduces_vector_verdict(name):
 def test_vaara_live_reproduces_vector_verdict(name):
     # Level 3 against the captured document via an offline fetcher: the
     # full verdict, including revoked/trusted, reproduces with no network.
-    case = json.loads((VECTORS / f"{name}.json").read_text())
+    case = json.loads((VECTORS / f"{name}.json").read_text(encoding="utf-8"))
     receipt = parse_receipt(case["receipt"])
     raw = json.dumps(case["didDocument"]).encode("utf-8")
     result = verify_receipt_identity_live(receipt, fetcher=lambda url: raw)

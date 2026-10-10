@@ -31,12 +31,10 @@ from __future__ import annotations
 import argparse
 import concurrent.futures
 import contextlib
-import fcntl
 import itertools
 import json
 import logging
 import os
-import pwd
 import secrets
 import select
 import shutil
@@ -59,6 +57,8 @@ from vaara.taxonomy.actions import (ActionCategory, ActionType, BlastRadius,
                                     RegulatoryDomain, Reversibility, UrgencyClass)
 
 if TYPE_CHECKING:
+    import pwd
+
     from vaara.pipeline import InterceptionPipeline
 
 logger = logging.getLogger("vaara.os-guard")
@@ -244,6 +244,10 @@ class Guard:
 
     def _take_lock(self) -> None:
         """One guard at a time: an exclusive lock held for the process's life."""
+        # Imported here and not at the top: the module's constants are read on
+        # every platform, and fcntl and pwd exist on POSIX only.
+        import fcntl
+
         self.lock_path.parent.mkdir(mode=0o755, parents=True, exist_ok=True)
         fd = os.open(self.lock_path, os.O_RDWR | os.O_CREAT | os.O_CLOEXEC, 0o600)
         try:
@@ -901,6 +905,8 @@ def unload(profile_file: Path = PROFILE_FILE) -> str:
 
 
 def operator_account(name: Optional[str]) -> pwd.struct_passwd:
+    import pwd
+
     name = name or os.environ.get("SUDO_USER") or ""
     if not name:
         raise GuardError("name the operator: sudo vaara os-guard, or --user NAME under systemd")

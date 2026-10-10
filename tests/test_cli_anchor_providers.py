@@ -86,7 +86,7 @@ def test_anchor_providers_set_writes_choice_to_shared_config(
     rc = main(["anchor-providers", "--country", "AT", "--set", "2"])
 
     assert rc == 0
-    saved = json.loads(cfg.read_text())
+    saved = json.loads(cfg.read_text(encoding="utf-8"))
     # The sample carries endpoints, so the listed one is used directly.
     assert saved["anchor_tsa_url"] == "https://tsa.example.at/beta"
     assert saved["anchor_provider"] == "Beta Trust"
@@ -136,7 +136,7 @@ def test_anchor_providers_set_with_explicit_endpoint(
     ])
 
     assert rc == 0
-    saved = json.loads(cfg.read_text())
+    saved = json.loads(cfg.read_text(encoding="utf-8"))
     assert saved["anchor_tsa_url"] == "https://tsa.a-trust.at/tsp"
     assert saved["anchor_provider"] == "A-Trust GmbH"
 
@@ -151,7 +151,7 @@ def test_anchor_providers_set_preserves_other_config_keys(
     rc = main(["anchor-providers", "--country", "AT", "--set", "1"])
 
     assert rc == 0
-    saved = json.loads(cfg.read_text())
+    saved = json.loads(cfg.read_text(encoding="utf-8"))
     assert saved["user_level"] == "enterprise"
     assert saved["mode"] == "protect"
     assert saved["anchor_tsa_url"] == "https://tsa.example.at/tsa"
@@ -181,7 +181,7 @@ def test_anchor_providers_interactive_pick_sets_config(
     rc = main(["anchor-providers", "--country", "AT"])
 
     assert rc == 0
-    saved = json.loads(cfg.read_text())
+    saved = json.loads(cfg.read_text(encoding="utf-8"))
     assert saved["anchor_tsa_url"] == "https://tsa.example.at/beta"
 
 
@@ -215,7 +215,7 @@ def test_anchor_providers_interactive_prompts_for_missing_url(
     rc = main(["anchor-providers", "--country", "AT"])
 
     assert rc == 0
-    saved = json.loads(cfg.read_text())
+    saved = json.loads(cfg.read_text(encoding="utf-8"))
     assert saved["anchor_tsa_url"] == "https://tsa.a-trust.at/tsp"
 
 

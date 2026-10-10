@@ -211,7 +211,7 @@ class TestSaveLoad:
             assert count > 0
             assert path.exists()
 
-            lines = path.read_text().strip().split("\n")
+            lines = path.read_text(encoding="utf-8").strip().split("\n")
             assert len(lines) == count
         finally:
             path.unlink(missing_ok=True)

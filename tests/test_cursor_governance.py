@@ -174,7 +174,7 @@ def test_install_keeps_other_hooks_and_is_idempotent(tmp_path):
         "beforeShellExecution": [{"command": "./mine.sh"}],
         "preToolUse": [{"command": "./audit.sh"}]}}))
     assert cursor.install_hooks("/opt/bin/vaara", d) is True
-    cfg = json.loads((d / "hooks.json").read_text())
+    cfg = json.loads((d / "hooks.json").read_text(encoding="utf-8"))
     pre = cfg["hooks"]["preToolUse"]
     assert {"command": "./audit.sh"} in pre
     ours = [e for e in pre if "vaara hook" in e["command"]]
@@ -184,7 +184,7 @@ def test_install_keeps_other_hooks_and_is_idempotent(tmp_path):
     assert "postToolUseFailure" in cfg["hooks"]
     assert cursor.install_hooks("/opt/bin/vaara", d) is False
     assert cursor.remove_hooks(d) is True
-    cfg = json.loads((d / "hooks.json").read_text())
+    cfg = json.loads((d / "hooks.json").read_text(encoding="utf-8"))
     assert cfg["hooks"] == {"beforeShellExecution": [{"command": "./mine.sh"}],
                             "preToolUse": [{"command": "./audit.sh"}]}
 
@@ -204,7 +204,7 @@ def test_init_writes_cursor_hooks_and_leaves_its_mcp_to_them(tmp_path, monkeypat
     assert report.cursor_hooks == d / "hooks.json"
     assert cursor.native_hook_installed(d)
     assert "Cursor" not in report.mcp_rewritten
-    assert "vaara-mcp-proxy" not in mcp.read_text()
+    assert "vaara-mcp-proxy" not in mcp.read_text(encoding="utf-8")
     ung = ig.run_ungovern(settings_path=tmp_path / "s.json", service_home=tmp_path,
                           service_system="linux", service_runner=lambda c, **k: None,
                           opencode_dir=tmp_path / "no-opencode", cursor_dir=d)

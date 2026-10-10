@@ -74,7 +74,7 @@ def test_tampered_evidence_fails(tmp_path):
     db, trail = _trail(tmp_path)
     _record(trail, "deny")
     f = _files(db)[0]
-    body = json.loads(f.read_text())
+    body = json.loads(f.read_text(encoding="utf-8"))
     body["evidence"]["decision"] = "allow"
     f.write_text(json.dumps(body))
     c = dr.verify_receipt_file(f)
@@ -85,7 +85,7 @@ def test_tampered_envelope_fails_signature(tmp_path):
     db, trail = _trail(tmp_path)
     _record(trail, "deny")
     f = _files(db)[0]
-    body = json.loads(f.read_text())
+    body = json.loads(f.read_text(encoding="utf-8"))
     body["receipt"]["decisionDerived"]["decision"] = "allow"
     f.write_text(json.dumps(body))
     assert not dr.verify_receipt_file(f).signature_ok
@@ -95,7 +95,7 @@ def test_receipt_for_a_record_the_trail_does_not_hold_fails(tmp_path):
     db, trail = _trail(tmp_path)
     _record(trail, "allow")
     f = _files(db)[0]
-    rid = json.loads(f.read_text())["evidence"]["recordId"]
+    rid = json.loads(f.read_text(encoding="utf-8"))["evidence"]["recordId"]
     hashes = _hashes(db)
     hashes[rid] = "0" * 64
     c = dr.verify_receipt_file(f, trail_hashes=hashes)
@@ -136,7 +136,7 @@ def test_verifies_without_vaara(tmp_path):
     """What the app does: JCS, SHA-256 and P-256 only, no vaara code."""
     db, trail = _trail(tmp_path)
     _record(trail, "escalate")
-    body = json.loads(_files(db)[0].read_text())
+    body = json.loads(_files(db)[0].read_text(encoding="utf-8"))
     env, evidence = body["receipt"], body["evidence"]
     signed = {k: env[k] for k in ("version", "alg", "backLink", "decisionDerived", "issuerAsserted")}
     pub = serialization.load_pem_public_key(
@@ -158,7 +158,7 @@ def test_one_key_across_trail_loads(tmp_path):
     _record(trail, "allow")
     trail2 = SQLiteAuditBackend(db).load_trail()
     _record(trail2, "deny", tool="shell")
-    kids = {json.loads(f.read_text())["receipt"]["issuerAsserted"]["secretVersion"] for f in _files(db)}
+    kids = {json.loads(f.read_text(encoding="utf-8"))["receipt"]["issuerAsserted"]["secretVersion"] for f in _files(db)}
     assert len(kids) == 1
     assert all(dr.verify_receipt_file(f, trail_hashes=_hashes(db)).ok for f in _files(db))
 
@@ -167,11 +167,11 @@ VECTORS = Path(__file__).parent / "vectors" / "trail_decision_v0"
 
 
 @pytest.mark.parametrize(
-    "name", sorted(json.loads((VECTORS / "expected.json").read_text()))
+    "name", sorted(json.loads((VECTORS / "expected.json").read_text(encoding="utf-8")))
 )
 def test_vectors(name):
-    want = json.loads((VECTORS / "expected.json").read_text())[name]
-    hashes = json.loads((VECTORS / "trail-hashes.json").read_text())
+    want = json.loads((VECTORS / "expected.json").read_text(encoding="utf-8"))[name]
+    hashes = json.loads((VECTORS / "trail-hashes.json").read_text(encoding="utf-8"))
     c = dr.verify_receipt_file(
         VECTORS / name,
         public_key_pem=(VECTORS / dr.PUBKEY_NAME).read_bytes(),

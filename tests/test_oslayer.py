@@ -349,7 +349,7 @@ def _answer_requests(approvals_dir: Path, decision: str, seen: list) -> threadin
                 if action_id in seen:
                     continue
                 seen.append(action_id)
-                seen.append(json.loads(req.read_text()))
+                seen.append(json.loads(req.read_text(encoding="utf-8")))
                 write_decision(action_id, decision, approvals_dir=approvals_dir)
                 return
             time.sleep(0.02)

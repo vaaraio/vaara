@@ -120,7 +120,7 @@ def test_install_linux_writes_unit_and_enables(tmp_path):
     path = unit_path("linux", tmp_path)
     assert report.installed
     assert path.exists()
-    assert "ExecStart=/opt/venv/bin/vaara proxy" in path.read_text()
+    assert "ExecStart=/opt/venv/bin/vaara proxy" in path.read_text(encoding="utf-8")
     assert ["systemctl", "--user", "daemon-reload"] in runner.calls
     assert ["systemctl", "--user", "enable", "--now",
             SYSTEMD_UNIT] in runner.calls
@@ -160,7 +160,7 @@ def test_install_is_idempotent(tmp_path):
     first = install_proxy_service(**kwargs)
     second = install_proxy_service(**kwargs)
     assert first.installed and second.installed
-    assert unit_path("linux", tmp_path).read_text().count("[Service]") == 1
+    assert unit_path("linux", tmp_path).read_text(encoding="utf-8").count("[Service]") == 1
 
 
 # ---------------------------------------------------------------------------
@@ -291,6 +291,6 @@ def test_install_enforce_respects_explicit_approvals_dir(tmp_path):
         allow=["mcp__github__*"],
         approvals_dir="/custom/approvals",
     )
-    text = report.path.read_text()
+    text = report.path.read_text(encoding="utf-8")
     assert "--approvals-dir /custom/approvals" in text
     assert "--allow mcp__github__*" in text

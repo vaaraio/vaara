@@ -42,7 +42,7 @@ def _load_checker():
 
 
 def _load(rail: str, step: str, name: str) -> dict:
-    return json.loads((VECTORS / rail / step / name).read_text())
+    return json.loads((VECTORS / rail / step / name).read_text(encoding="utf-8"))
 
 
 def test_independent_checker_passes_all_cases():

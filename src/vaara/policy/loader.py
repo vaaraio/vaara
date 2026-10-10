@@ -219,6 +219,9 @@ def _read_policy_text(path: Path, *, fallback_msg: str | None = None) -> str:
     except IsADirectoryError as e:
         raise PolicyError(f"policy path is a directory, not a file: {path}") from e
     except PermissionError as e:
+        # Windows refuses to open a directory with PermissionError.
+        if path.is_dir():
+            raise PolicyError(f"policy path is a directory, not a file: {path}") from e
         raise PolicyError(f"policy file not readable (permissions): {path}") from e
     except UnicodeDecodeError as e:
         raise PolicyError(f"policy file is not valid utf-8: {path}: {e}") from e

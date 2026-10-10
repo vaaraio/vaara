@@ -13,7 +13,7 @@ import re
 from pathlib import Path
 
 ROOT = Path(__file__).resolve().parents[1]
-RELEASE = (ROOT / ".github" / "workflows" / "release.yml").read_text()
+RELEASE = (ROOT / ".github" / "workflows" / "release.yml").read_text(encoding="utf-8")
 SURFACES = [
     "README.md",
     "llms.txt",
@@ -41,13 +41,13 @@ def test_no_public_surface_claims_level_3_without_an_isolated_builder():
         f"{rel}: {m.group(0)}"
         for rel in SURFACES
         if (ROOT / rel).exists()
-        for m in LEVEL3.finditer((ROOT / rel).read_text())
+        for m in LEVEL3.finditer((ROOT / rel).read_text(encoding="utf-8"))
     ]
     assert offenders == []
 
 
 def test_the_documented_verifier_is_one_that_accepts_the_attestation():
-    text = (ROOT / "README.md").read_text() + (ROOT / "docs" / "signing-keys.md").read_text()
+    text = (ROOT / "README.md").read_text(encoding="utf-8") + (ROOT / "docs" / "signing-keys.md").read_text(encoding="utf-8")
     assert "gh attestation verify" in text
     if not _uses_an_isolated_builder():
         assert "slsa-verifier verify-artifact" not in text

@@ -31,7 +31,7 @@ def _cases():
 
 def _load_set(name: str):
     files = sorted((RECORD_SETS / name).glob("*.json"))
-    return [(p.name, json.loads(p.read_text())) for p in files]
+    return [(p.name, json.loads(p.read_text(encoding="utf-8"))) for p in files]
 
 
 # ── Golden pages ──────────────────────────────────────────────────────────────
@@ -147,7 +147,7 @@ def test_cli_no_matching_files(tmp_path, capsys):
 
 def test_cli_unreadable_file_notes_and_gates(tmp_path, capsys):
     (tmp_path / "good.json").write_text(
-        (RECORD_SETS / "clean" / "r1.json").read_text())
+        (RECORD_SETS / "clean" / "r1.json").read_text(encoding="utf-8"))
     (tmp_path / "bad.json").write_text("{ not json")
     rc = main(["audit-summary", str(tmp_path)])
     out = capsys.readouterr().out

@@ -13,7 +13,7 @@ from pathlib import Path
 from vaara.policy.modes import get_mode
 
 SETUP = (Path(__file__).resolve().parents[1]
-         / "plugins/claude-code-vaara-governance/commands/vaara-setup.md").read_text()
+         / "plugins/claude-code-vaara-governance/commands/vaara-setup.md").read_text(encoding="utf-8")
 
 
 def _offered_order() -> list[str]:

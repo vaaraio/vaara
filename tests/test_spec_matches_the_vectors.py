@@ -80,7 +80,7 @@ def _profile_receipts() -> list[tuple[str, dict]]:
     for name in registered:
         for path in sorted((VECTORS / name).rglob("*.json")):
             try:
-                doc = json.loads(path.read_text())
+                doc = json.loads(path.read_text(encoding="utf-8"))
             except json.JSONDecodeError:
                 continue
             found.extend(
@@ -103,7 +103,7 @@ def test_every_vector_directory_spec_names_exists(directory):
 @pytest.mark.parametrize("directory", _named_vector_dirs(), ids=lambda p: p.name)
 def test_checkers_import_only_what_the_spec_promises(directory):
     """"imports only the standard library, cryptography, and rfc8785"."""
-    source = (directory / "_check_independent.py").read_text()
+    source = (directory / "_check_independent.py").read_text(encoding="utf-8")
     imported = set()
     for node in ast.walk(ast.parse(source)):
         if isinstance(node, ast.Import):
@@ -185,14 +185,14 @@ def test_both_completeness_conventions_are_the_shipped_ones():
     authorization = [
         block
         for path in sorted((VECTORS / "contiguity_v0" / "complete").glob("*.json"))
-        for block in [json.loads(path.read_text())["evidence"]["completeness"]]
+        for block in [json.loads(path.read_text(encoding="utf-8"))["evidence"]["completeness"]]
     ]
     assert authorization, "no contiguity vectors found"
     assert min(b["seq"] for b in authorization) == 0
     assert all(b["runningCount"] == b["seq"] + 1 for b in authorization)
 
     ingest = [
-        json.loads(path.read_text())["record"]["completeness"]
+        json.loads(path.read_text(encoding="utf-8"))["record"]["completeness"]
         for path in sorted((VECTORS / "ingest_v0" / "cases").glob("*.json"))
     ]
     assert ingest, "no ingest vectors carry a completeness block"

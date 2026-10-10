@@ -311,11 +311,11 @@ def test_standalone_verifier_rejects_tampered_revocation(tmp_path):
 
 
 def _cases():
-    return json.loads((VECTORS / "cases.json").read_text())["cases"]
+    return json.loads((VECTORS / "cases.json").read_text(encoding="utf-8"))["cases"]
 
 
 def _expected():
-    return json.loads((VECTORS / "expected.json").read_text())
+    return json.loads((VECTORS / "expected.json").read_text(encoding="utf-8"))
 
 
 @pytest.mark.parametrize("case", _cases(), ids=lambda c: c["name"])

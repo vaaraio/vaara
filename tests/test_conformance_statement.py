@@ -46,7 +46,7 @@ def _records(scenario: str):
     records, unreadable = [], []
     for p in sorted((EMITTER / sub).glob("*.json")):
         try:
-            records.append((p.name, json.loads(p.read_text())))
+            records.append((p.name, json.loads(p.read_text(encoding="utf-8"))))
         except (json.JSONDecodeError, OSError) as exc:
             unreadable.append((p.name, type(exc).__name__))
     return records, unreadable
@@ -190,7 +190,7 @@ def test_as_of_default_is_omitted():
 
 def test_statement_names_the_exact_corpus_byte_set():
     page = render_conformance_statement(build_conformance_statement(CORPUS))
-    manifest = json.loads((CORPUS / "MANIFEST.json").read_text())
+    manifest = json.loads((CORPUS / "MANIFEST.json").read_text(encoding="utf-8"))
     assert manifest["corpusDigest"] in page
     assert manifest["version"] in page
 
@@ -206,7 +206,7 @@ def _copy_corpus(dst: Path) -> Path:
 def test_tampered_fixture_breaks_integrity_and_gates(tmp_path):
     corpus = _copy_corpus(tmp_path / "corpus")
     victim = corpus / "record_conformance_v0" / "records" / "conforming_refused_no_commitment.json"
-    victim.write_text(victim.read_text() + "\n", encoding="utf-8")  # one byte changes the digest
+    victim.write_text(victim.read_text(encoding="utf-8") + "\n", encoding="utf-8")  # one byte changes the digest
     statement = build_conformance_statement(corpus)
     assert not statement.corpus.verified
     assert statement.corpus.problems
@@ -285,7 +285,7 @@ def test_line_ending_detection_is_exact_not_a_guess(tmp_path):
     """
     corpus = _copy_corpus(tmp_path / "corpus")
     victim = corpus / "record_set_v0" / "sets" / "clean" / "r1.json"
-    doc = json.loads(victim.read_text())
+    doc = json.loads(victim.read_text(encoding="utf-8"))
     doc["alg"] = "HS256-tampered"
     victim.write_bytes(json.dumps(doc, indent=2).encode() + b"\r\n")  # CRLF *and* edited
     statement = build_conformance_statement(corpus)
@@ -443,7 +443,7 @@ def test_cli_records_no_matching_files(tmp_path, capsys):
 
 def test_cli_unreadable_record_gates(tmp_path, capsys):
     (tmp_path / "good.json").write_text(
-        (EMITTER / "clean" / "decision.json").read_text(), "utf-8")
+        (EMITTER / "clean" / "decision.json").read_text(encoding="utf-8"), "utf-8")
     (tmp_path / "bad.json").write_text("{ not json", "utf-8")
     rc = main(["conformance-statement", "--corpus", str(CORPUS), "--records", str(tmp_path)])
     out = capsys.readouterr().out

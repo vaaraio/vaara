@@ -10,7 +10,7 @@ _spec = importlib.util.spec_from_file_location(
 check_skips = importlib.util.module_from_spec(_spec)
 _spec.loader.exec_module(check_skips)  # type: ignore[union-attr]
 
-ALLOW = (ROOT / "tests" / "ci_allowed_skips.txt").read_text()
+ALLOW = (ROOT / "tests" / "ci_allowed_skips.txt").read_text(encoding="utf-8")
 
 
 def test_a_reviewed_skip_passes():

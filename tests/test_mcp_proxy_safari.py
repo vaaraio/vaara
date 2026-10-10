@@ -30,7 +30,7 @@ from unittest.mock import MagicMock
 from vaara.deny_rules import load_deny_rules, match_deny_rule_any_field
 
 FIXTURE = Path(__file__).parent / "fixtures" / "safari_mcp_tools_list.json"
-TOOLS = json.loads(FIXTURE.read_text())["tools"]
+TOOLS = json.loads(FIXTURE.read_text(encoding="utf-8"))["tools"]
 
 METADATA_URL = "http://169.254." + "169.254/latest/meta-data/"
 LAUNCH_AGENT = "/Users/u/Library/" + "LaunchAgents/io.evil.plist"

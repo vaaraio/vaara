@@ -168,13 +168,13 @@ def test_result_is_json_serializable_and_deterministic():
 # ── conformance vectors ──────────────────────────────────────────────────────
 
 def _cases():
-    return json.loads((VECTORS / "cases.json").read_text())["cases"]
+    return json.loads((VECTORS / "cases.json").read_text(encoding="utf-8"))["cases"]
 
 
 @pytest.mark.parametrize("case", _cases(), ids=lambda c: c["name"])
 def test_vaara_reproduces_vector_ear(case):
-    doc = json.loads((VECTORS / "cases.json").read_text())
-    expected = json.loads((VECTORS / "expected.json").read_text())[case["name"]]
+    doc = json.loads((VECTORS / "cases.json").read_text(encoding="utf-8"))
+    expected = json.loads((VECTORS / "expected.json").read_text(encoding="utf-8"))[case["name"]]
     got = build_attestation_result(
         case["verdict"], issued_at=doc["iat"], verifier_build=doc["verifier_build"])
     assert got == expected
@@ -189,5 +189,5 @@ def test_independent_checker_passes():
 
 
 def test_independent_checker_is_vaara_free():
-    source = (VECTORS / "_check_independent.py").read_text()
+    source = (VECTORS / "_check_independent.py").read_text(encoding="utf-8")
     assert "import vaara" not in source and "from vaara" not in source

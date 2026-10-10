@@ -198,7 +198,7 @@ def fake_openshell(tmp_path, monkeypatch):
     monkeypatch.delenv("FAKE_PHASE", raising=False)
 
     def calls():
-        return [json.loads(line) for line in log.read_text().splitlines()] if log.exists() else []
+        return [json.loads(line) for line in log.read_text(encoding="utf-8").splitlines()] if log.exists() else []
 
     return OpenShellDriver(binary=str(binary)), calls
 
@@ -364,7 +364,7 @@ class TestVaaraCageDriver:
         driver = VaaraCageDriver(socket_path=path, vaara_argv=[str(fake)])
         launch = driver.start(["claude", "-p", "hi"], name="reviewer")
         driver._launches["reviewer"].wait(timeout=10)
-        assert json.loads(marker.read_text()) == ["run", "--name", "reviewer", "--", "claude", "-p", "hi"]
+        assert json.loads(marker.read_text(encoding="utf-8")) == ["run", "--name", "reviewer", "--", "claude", "-p", "hi"]
         assert launch.state.confirmed and launch.state.name == "reviewer"
         driver.stop("reviewer")
         with pytest.raises(CageError):

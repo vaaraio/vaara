@@ -73,14 +73,14 @@ def _make_proxy(monkeypatch, *, emitter, **kwargs):
 
 def _attests(receipts_dir: Path) -> list[dict]:
     return [
-        json.loads(f.read_text())
+        json.loads(f.read_text(encoding="utf-8"))
         for f in sorted(receipts_dir.glob("*-attest.json"))
     ]
 
 
 def _receipts(receipts_dir: Path) -> list[dict]:
     return [
-        json.loads(f.read_text())
+        json.loads(f.read_text(encoding="utf-8"))
         for f in sorted(receipts_dir.glob("*-receipt.json"))
     ]
 

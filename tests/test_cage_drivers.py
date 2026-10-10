@@ -62,7 +62,7 @@ def fake(tmp_path, monkeypatch):
         def calls():
             if not log.exists():
                 return []
-            return [json.loads(line) for line in log.read_text().splitlines()]
+            return [json.loads(line) for line in log.read_text(encoding="utf-8").splitlines()]
 
         return str(binary), calls
 
@@ -98,7 +98,7 @@ class TestCodex:
         launch = d.start(["claude", "-p", "hi"], policy, name="rev")
         try:
             c = _call(calls, "sandbox")
-            assert c["argv"] == ["sandbox", "--sandbox-state-json", policy.read_text(),
+            assert c["argv"] == ["sandbox", "--sandbox-state-json", policy.read_text(encoding="utf-8"),
                                  "--", "claude", "-p", "hi"]
             assert c["env"][cage.CAGE_ENV] == "codex"
             assert c["env"][cage.DIGEST_ENV] == _sha(policy.read_bytes())
@@ -398,7 +398,7 @@ class TestFirecracker:
             c = _call(calls, "--api-sock")
             assert c["argv"][:4] == ["--api-sock", str(tmp_path / "run" / "vm1.firecracker.sock"),
                                      "--id", "vm1"]
-            effective = json.loads(Path(c["argv"][5]).read_text())
+            effective = json.loads(Path(c["argv"][5]).read_text(encoding="utf-8"))
             boot_args = effective["boot-source"]["boot_args"]
             assert boot_args.startswith("console=ttyS0 reboot=k vaara.cage=firecracker ")
             assert f"vaara.cage.digest={_sha(config.read_bytes())}" in boot_args

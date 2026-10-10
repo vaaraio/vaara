@@ -179,7 +179,7 @@ class TestSQLiteBackend:
             export_path = db_path.with_suffix(".jsonl")
             count = backend.export_jsonl(export_path)
             assert count == 3
-            lines = export_path.read_text().strip().split("\n")
+            lines = export_path.read_text(encoding="utf-8").strip().split("\n")
             assert len(lines) == 3
             export_path.unlink(missing_ok=True)
 

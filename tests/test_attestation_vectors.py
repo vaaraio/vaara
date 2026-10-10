@@ -79,8 +79,8 @@ def test_at_least_seven_cases_present():
 
 @pytest.mark.parametrize("case", _cases(), ids=lambda p: p.name)
 def test_library_verdicts_match_expected(case):
-    raw = json.loads((case / "attestation.json").read_text())
-    expected = json.loads((case / "expected.json").read_text())
+    raw = json.loads((case / "attestation.json").read_text(encoding="utf-8"))
+    expected = json.loads((case / "expected.json").read_text(encoding="utf-8"))
 
     # An unsupported `alg` is refused fail-closed at the parse boundary,
     # before any signature work -- the independent walker reaches the same
@@ -110,7 +110,7 @@ def test_library_verdicts_match_expected(case):
 
     runtime_args_path = case / "runtime_args.json"
     if runtime_args_path.exists():
-        runtime_args = json.loads(runtime_args_path.read_text())
+        runtime_args = json.loads(runtime_args_path.read_text(encoding="utf-8"))
         result = verify_args_commitment(
             att.payload_derived.tool_calls[0].args,
             runtime_arguments=runtime_args,

@@ -21,7 +21,7 @@ SETS = Path(__file__).resolve().parent / "vectors" / "record_set_v0" / "sets"
 
 def test_check_file_conforms_exit_0(tmp_path, capsys):
     target = tmp_path / "record.json"
-    target.write_text((REC / "conforming_executed_projection.json").read_text())
+    target.write_text((REC / "conforming_executed_projection.json").read_text(encoding="utf-8"))
     rc = main(["conformance", "check", str(target)])
     out = capsys.readouterr().out
     assert rc == 0
@@ -30,7 +30,7 @@ def test_check_file_conforms_exit_0(tmp_path, capsys):
 
 def test_check_file_non_conforming_exit_1(tmp_path, capsys):
     target = tmp_path / "record.json"
-    target.write_text((REC / "neg_digest_mismatch.json").read_text())
+    target.write_text((REC / "neg_digest_mismatch.json").read_text(encoding="utf-8"))
     rc = main(["conformance", "check", str(target)])
     out = capsys.readouterr().out
     assert rc == 1
@@ -54,7 +54,7 @@ def test_check_directory_gap_fails(capsys):
 
 def test_check_file_json(tmp_path, capsys):
     target = tmp_path / "record.json"
-    target.write_text((REC / "conforming_executed_projection.json").read_text())
+    target.write_text((REC / "conforming_executed_projection.json").read_text(encoding="utf-8"))
     rc = main(["conformance", "check", str(target), "--json"])
     payload = json.loads(capsys.readouterr().out)
     assert rc == 0
@@ -71,7 +71,7 @@ def test_check_directory_json(capsys):
 def test_check_verdict_matches_verify_record(tmp_path, capsys):
     """The front door must reach the same verdict as the command it wraps."""
     target = tmp_path / "record.json"
-    target.write_text((REC / "conforming_executed_projection.json").read_text())
+    target.write_text((REC / "conforming_executed_projection.json").read_text(encoding="utf-8"))
     rc_new = main(["conformance", "check", str(target)])
     capsys.readouterr()
     rc_old = main(["verify-record", str(target)])

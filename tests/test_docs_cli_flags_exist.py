@@ -130,7 +130,7 @@ def _known_flags() -> set[str]:
 def _cited_flags() -> dict[str, str]:
     cited: dict[str, str] = {}
     for doc in sorted(ROOT.glob("docs/**/*.md")) + [ROOT / "README.md"]:
-        for flag in re.findall(r"(--[a-z][\w-]{2,})", doc.read_text()):
+        for flag in re.findall(r"(--[a-z][\w-]{2,})", doc.read_text(encoding="utf-8")):
             cited.setdefault(flag, str(doc.relative_to(ROOT)))
     return cited
 
@@ -157,7 +157,7 @@ def test_docs_cite_flags_that_exist(known):
 
 def test_the_compliance_handoff_block_uses_real_flags(known):
     """The block a regulator-facing reader copies verbatim."""
-    block = (ROOT / "docs" / "COMPLIANCE.md").read_text()
+    block = (ROOT / "docs" / "COMPLIANCE.md").read_text(encoding="utf-8")
     assert "vaara keygen --dev --out " in block
     assert "--out-dir" not in block
     assert "--public-key" not in block

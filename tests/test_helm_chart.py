@@ -119,7 +119,7 @@ def test_the_trail_is_written_onto_the_mounted_volume():
     assert values["trail"]["path"].startswith(mount + "/")
     assert values["signing"]["receiptsDir"].startswith(mount)
     assert values["proxy"]["approvals"]["path"].startswith(mount)
-    assert f"mountPath: {mount}" in (TEMPLATES / "statefulset.yaml").read_text()
+    assert f"mountPath: {mount}" in (TEMPLATES / "statefulset.yaml").read_text(encoding="utf-8")
 
 
 def test_the_chart_does_not_offer_to_scale_the_chain():
@@ -143,7 +143,7 @@ def test_probe_path_is_a_route_the_proxy_answers_itself():
         ROOT / "src" / "vaara" / "integrations" / "_infer_proxy_app.py"
     ).read_text(encoding="utf-8")
     assert '@app.get("/healthz")' in app_source
-    assert "path: /healthz" in (TEMPLATES / "statefulset.yaml").read_text()
+    assert "path: /healthz" in (TEMPLATES / "statefulset.yaml").read_text(encoding="utf-8")
 
 
 def test_chart_flags_exist_in_the_cli():
@@ -160,7 +160,7 @@ def test_chart_flags_exist_in_the_cli():
     )
     accepted = set(re.findall(r"(--[a-z][\w-]+)", help_text.stdout + help_text.stderr))
     assert accepted, "vaara proxy --help produced no flags"
-    used = set(re.findall(r"- (--[a-z][\w-]+)", (TEMPLATES / "statefulset.yaml").read_text()))
+    used = set(re.findall(r"- (--[a-z][\w-]+)", (TEMPLATES / "statefulset.yaml").read_text(encoding="utf-8")))
     assert used, "the statefulset passes no flags at all"
     assert used <= accepted, f"chart passes flags vaara proxy rejects: {sorted(used - accepted)}"
 

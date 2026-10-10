@@ -42,6 +42,6 @@ def test_every_accepted_pair_applies_to_a_policy(impl, pair):
 
 
 def test_the_app_never_writes_an_equal_pair():
-    swift = (ROOT / "clients/macos/Sources/VaaraMenuBar/Model.swift").read_text()
+    swift = (ROOT / "clients/macos/Sources/VaaraMenuBar/Model.swift").read_text(encoding="utf-8")
     assert "d = max(e + 0.01, min(deny, 1))" in swift
     assert "min(escalate, 0.99)" in swift

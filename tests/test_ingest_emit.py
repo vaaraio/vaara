@@ -52,7 +52,7 @@ def _corpus():
 
 
 def _doc(name: str) -> dict:
-    return json.loads((INPUTS / f"{name}.json").read_text())
+    return json.loads((INPUTS / f"{name}.json").read_text(encoding="utf-8"))
 
 
 def _emit(name: str, **over):
@@ -193,11 +193,11 @@ VECTORS = Path(__file__).resolve().parent / "vectors" / "ingest_v0"
 def test_committed_vectors_match_fresh_emit():
     # Drift guard: if emit logic changes without regenerating the corpus, the
     # committed pairs stop matching and this fails, forcing a conscious regen.
-    meta = json.loads((VECTORS / "corpus.json").read_text())
+    meta = json.loads((VECTORS / "corpus.json").read_text(encoding="utf-8"))
     secret = bytes.fromhex(meta["sharedSecretHex"])
     f = meta["fixed"]
     for name in meta["cases"]:
-        committed = json.loads((VECTORS / "cases" / f"{name}.json").read_text())
+        committed = json.loads((VECTORS / "cases" / f"{name}.json").read_text(encoding="utf-8"))
         r = emit_ingest_receipt(
             normalized=normalize(_doc(name)),
             iss=f["iss"], sub=f["sub"], secret_version=f["secretVersion"],
@@ -209,7 +209,7 @@ def test_committed_vectors_match_fresh_emit():
 
 def test_corpus_tracks_the_full_input_registry():
     # The corpus is a loop over the registry's input fixtures: every one is in.
-    meta = json.loads((VECTORS / "corpus.json").read_text())
+    meta = json.loads((VECTORS / "corpus.json").read_text(encoding="utf-8"))
     assert sorted(meta["cases"]) == _corpus()
 
 
@@ -251,7 +251,7 @@ def test_cli_ingest_writes_out_file(tmp_path):
         "--hs256-secret-file", str(sec), "--out", str(out),
     ])
     assert rc == 0
-    d = json.loads(out.read_text())
+    d = json.loads(out.read_text(encoding="utf-8"))
     assert verify_ingest_signature(d["record"], d["evidence"], KEY)
 
 

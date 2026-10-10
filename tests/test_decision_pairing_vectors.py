@@ -62,10 +62,10 @@ def test_vaara_verifier_reproduces_fallback_binding():
 
     case = VECTORS / "normative" / "fallback_envelope_binding"
     decision = parse_decision_record(
-        json.loads((case / "decision.json").read_text()))
+        json.loads((case / "decision.json").read_text(encoding="utf-8")))
 
     def env(name: str) -> dict:
-        return json.loads((case / name).read_text())
+        return json.loads((case / name).read_text(encoding="utf-8"))
 
     provider = env("request_envelope.json")
     gateway = env("request_envelope_gateway_view.json")

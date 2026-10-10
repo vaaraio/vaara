@@ -210,7 +210,7 @@ def test_claude_code_calls_are_decided_by_vaara_and_recorded(tmp_path):
     assert len(out) == 4, (out, log)
     assert "governed" in out[0] and "rm_rf_root" not in out[0], log
     assert "rm_rf_root" in out[1], log
-    assert (work / "ok.txt").read_text() == "fine", log
+    assert (work / "ok.txt").read_text(encoding="utf-8") == "fine", log
     assert "harness_config_write" in out[3], log
     assert not (work / ".vaara" / "config.json").exists(), "a blocked write landed"
 
@@ -234,7 +234,7 @@ def test_claude_code_calls_are_decided_by_vaara_and_recorded(tmp_path):
     hashes = dict(con.execute("SELECT record_id, record_hash FROM audit_records"))
     receipts = sorted((trail.parent / "receipts").rglob("*.json"))
     checked = {dr.verify_receipt_file(f, trail_hashes=hashes).ok for f in receipts}
-    ids = {json.loads(f.read_text())["evidence"]["recordId"] for f in receipts}
+    ids = {json.loads(f.read_text(encoding="utf-8"))["evidence"]["recordId"] for f in receipts}
     assert ids == {r for r, *_ in rows} and checked == {True}
 
 
@@ -298,7 +298,7 @@ def test_claude_code_cannot_delete_or_rewrite_its_own_trail(tmp_path):
 
     hashes = dict(con.execute("SELECT record_id, record_hash FROM audit_records"))
     receipts = sorted((trail.parent / "receipts").rglob("*.json"))
-    ids = {json.loads(f.read_text())["evidence"]["recordId"] for f in receipts}
+    ids = {json.loads(f.read_text(encoding="utf-8"))["evidence"]["recordId"] for f in receipts}
     assert ids == {r for r, *_ in rows}
     assert {dr.verify_receipt_file(f, trail_hashes=hashes).ok for f in receipts} == {True}
 

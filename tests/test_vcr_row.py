@@ -462,7 +462,7 @@ def test_a_row_records_which_terms_it_agreed_to():
 
 def test_the_committed_table_ships_with_no_rows_and_no_badges():
     """Nobody appears on the page until they have asked to be there."""
-    data = json.loads((ROOT / "conformance" / "reproductions.json").read_text())
+    data = json.loads((ROOT / "conformance" / "reproductions.json").read_text(encoding="utf-8"))
     assert data["reproductions"] == []
     assert render.badge_drift(data) == []
 
@@ -524,6 +524,6 @@ def test_the_first_row_links_to_the_declared_genesis():
 
 def test_the_committed_file_declares_a_genesis_and_verifies():
     """Whatever ships has to pass its own checker, empty or not."""
-    data = json.loads((ROOT / "conformance" / "reproductions.json").read_text())
+    data = json.loads((ROOT / "conformance" / "reproductions.json").read_text(encoding="utf-8"))
     assert data.get("genesis", "").startswith("sha256:")
     assert vcr.verify_chain(data) == []

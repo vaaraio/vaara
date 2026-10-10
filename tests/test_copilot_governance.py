@@ -185,7 +185,7 @@ def test_install_writes_its_own_file_leaves_others_and_is_idempotent(tmp_path):
     other = d / "hooks" / "team.json"
     other.write_text('{"version": 1, "hooks": {}}')
     assert copilot.install_hooks("/opt/bin/vaara", d) is True
-    cfg = json.loads((d / "hooks" / "vaara.json").read_text())
+    cfg = json.loads((d / "hooks" / "vaara.json").read_text(encoding="utf-8"))
     [pre] = cfg["hooks"]["preToolUse"]
     assert pre["bash"] == _hook_gate.pre_command("/opt/bin/vaara", "copilot")
     assert pre["timeoutSec"] == _hook_gate.HOST_TIMEOUT
@@ -193,7 +193,7 @@ def test_install_writes_its_own_file_leaves_others_and_is_idempotent(tmp_path):
     assert copilot.install_hooks("/opt/bin/vaara", d) is False
     assert copilot.remove_hooks(d) is True
     assert not (d / "hooks" / "vaara.json").exists()
-    assert other.read_text() == '{"version": 1, "hooks": {}}'
+    assert other.read_text(encoding="utf-8") == '{"version": 1, "hooks": {}}'
 
 
 def test_remove_leaves_a_vaara_json_that_is_not_vaaras(tmp_path):
@@ -210,7 +210,7 @@ def test_hook_status(tmp_path):
     copilot.install_hooks("/opt/bin/vaara", d)
     assert copilot.hook_status(d) == "active"
     path = copilot.hooks_path(d)
-    cfg = json.loads(path.read_text())
+    cfg = json.loads(path.read_text(encoding="utf-8"))
     path.write_text(json.dumps({**cfg, "disableAllHooks": True}))
     assert copilot.hook_status(d) == "disabled"
     path.write_text("{ not json")

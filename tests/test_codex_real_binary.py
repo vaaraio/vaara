@@ -151,7 +151,7 @@ def _setup(tmp: Path, port: int) -> tuple[dict, Path, Path]:
     shim.chmod(0o755)
 
     codex.install_hooks(str(shim), codex_home)
-    hooks = json.loads(codex.hooks_path(codex_home).read_text())["hooks"]
+    hooks = json.loads(codex.hooks_path(codex_home).read_text(encoding="utf-8"))["hooks"]
     path = codex.hooks_path(codex_home).resolve()
     trust = ""
     for event, label in (("PreToolUse", "pre_tool_use"), ("PostToolUse", "post_tool_use")):

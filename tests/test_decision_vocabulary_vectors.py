@@ -48,7 +48,7 @@ def test_the_adversarial_cases_really_are_non_conforming():
     """A corpus where nothing ever fails proves nothing about the checker."""
     import json
 
-    expected = json.loads((VECTORS / "expected.json").read_text())
+    expected = json.loads((VECTORS / "expected.json").read_text(encoding="utf-8"))
     rejected = {name for name, case in expected.items() if not case["conforms"]}
     assert rejected == {
         "verdict_outside_the_enum",
@@ -66,11 +66,11 @@ def test_no_record_says_allow_against_arguments_it_did_not_decide():
     """
     import json
 
-    expected = json.loads((VECTORS / "expected.json").read_text())
+    expected = json.loads((VECTORS / "expected.json").read_text(encoding="utf-8"))
     for case in sorted((VECTORS / "cases").glob("*.json")):
         if not expected[case.stem]["conforms"]:
             continue
-        records = json.loads(case.read_text())
+        records = json.loads(case.read_text(encoding="utf-8"))
         for record in records:
             data = record.get("data") or {}
             if data.get("decision_detail") == "modify":

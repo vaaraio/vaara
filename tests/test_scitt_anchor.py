@@ -17,7 +17,7 @@ VECTOR = (Path(__file__).resolve().parents[0]
 
 @pytest.fixture
 def receipt() -> dict:
-    return json.loads(VECTOR.read_text())
+    return json.loads(VECTOR.read_text(encoding="utf-8"))
 
 
 def test_anchor_receipt_adds_scitt_entry(receipt: dict) -> None:
@@ -97,7 +97,7 @@ def test_file_backed_log_grows_across_runs(receipt: dict, tmp_path: Path) -> Non
     a2 = ScittAnchor.load_or_create(tmp_path).anchor_receipt(receipt)
     assert (a1["leafIndex"], a1["treeSize"]) == (0, 1)
     assert (a2["leafIndex"], a2["treeSize"]) == (1, 2)
-    assert (tmp_path / "vaara-scitt-log.leaves").read_text().count("\n") == 2
+    assert (tmp_path / "vaara-scitt-log.leaves").read_text(encoding="utf-8").count("\n") == 2
 
 
 def test_default_log_dir_is_not_ignored(receipt: dict, tmp_path: Path,
@@ -112,7 +112,7 @@ def test_default_log_dir_is_not_ignored(receipt: dict, tmp_path: Path,
 def test_truncated_log_line_is_refused(receipt: dict, tmp_path: Path) -> None:
     ScittAnchor.load_or_create(tmp_path).anchor_receipt(receipt)
     leaves = tmp_path / "vaara-scitt-log.leaves"
-    leaves.write_text(leaves.read_text() + "abc")
+    leaves.write_text(leaves.read_text(encoding="utf-8") + "abc")
     with pytest.raises(ScittAnchorError, match="line 2 is not a complete leaf"):
         ScittAnchor.load_or_create(tmp_path)
 
@@ -249,7 +249,7 @@ def test_cli_anchor_head_and_verify_round_trip(receipt: dict, tmp_path: Path,
     mine.write_text(json.dumps(receipt))
     assert main(["receipt", "anchor-scitt", str(first), "--log-dir", str(log_dir)]) == 0
     assert main(["receipt", "anchor-scitt", str(mine), "--log-dir", str(log_dir)]) == 0
-    anchor = json.loads(mine.read_text())["timestampAnchors"][-1]
+    anchor = json.loads(mine.read_text(encoding="utf-8"))["timestampAnchors"][-1]
     assert (anchor["leafIndex"], anchor["treeSize"]) == (1, 2)
 
     assert main(["receipt", "verify-scitt", str(mine)]) == 0
@@ -263,12 +263,12 @@ def test_cli_anchor_head_and_verify_round_trip(receipt: dict, tmp_path: Path,
                  "--consistency-from", str(anchor["treeSize"])]) == 0
     head = tmp_path / "head.json"
     head.write_text(capsys.readouterr().out)
-    assert json.loads(head.read_text())["treeSize"] == 3
+    assert json.loads(head.read_text(encoding="utf-8"))["treeSize"] == 3
 
     assert main(["receipt", "verify-scitt", str(mine), "--head", str(head)]) == 0
     assert "prefix of the trusted head" in capsys.readouterr().out
 
-    forged = json.loads(mine.read_text())
+    forged = json.loads(mine.read_text(encoding="utf-8"))
     forged["timestampAnchors"][-1] = ScittAnchor().anchor_receipt(receipt)
     mine.write_text(json.dumps(forged))
     assert main(["receipt", "verify-scitt", str(mine), "--head", str(head)]) == 1

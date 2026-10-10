@@ -38,12 +38,12 @@ def _text() -> str:
 
 
 def _dist(key: str) -> dict:
-    buckets = json.loads(DIST.read_text())["buckets"]
+    buckets = json.loads(DIST.read_text(encoding="utf-8"))["buckets"]
     return next(b for b in buckets if b["key"] == key)
 
 
 def _ablation(config: str, key: str) -> dict:
-    rows = json.loads(ABLATION.read_text())["rows"]
+    rows = json.loads(ABLATION.read_text(encoding="utf-8"))["rows"]
     return next(r for r in rows if r["config"] == config and r["key"] == key)
 
 
@@ -143,7 +143,7 @@ def test_the_two_artifacts_diverge_only_where_the_doc_says_they_do():
 
 def test_pair_calibration_numbers_match_the_artifact():
     text = _text()
-    pair = json.loads(PAIR.read_text())
+    pair = json.loads(PAIR.read_text(encoding="utf-8"))
     verdicts = [h["vaara"] for r in pair["results"] for h in r["history"]]
 
     asr = re.search(r"\*\*ASR: ([\d.]+)% \((\d+)/(\d+)\)\*\*", text)

@@ -24,7 +24,7 @@ VECTORS = Path(__file__).parent / "vectors" / "decision_disposition_v0"
 
 
 def _load(name):
-    return json.loads((VECTORS / f"{name}.json").read_text())
+    return json.loads((VECTORS / f"{name}.json").read_text(encoding="utf-8"))
 
 
 CASES = _load("cases")

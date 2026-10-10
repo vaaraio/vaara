@@ -425,7 +425,7 @@ def test_configfs_emission(tmp_path, monkeypatch):
     ).emit_with_certificates(b"\x07" * 64)
     assert out == report and aux == b"aux"
     assert (written["dir"] / "inblob").read_bytes() == b"\x07" * 64
-    assert (written["dir"] / "privlevel").read_text() == "0"
+    assert (written["dir"] / "privlevel").read_text(encoding="utf-8") == "0"
 
 
 def test_configfs_rejects_another_provider(tmp_path, monkeypatch):

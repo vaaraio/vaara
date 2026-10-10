@@ -46,7 +46,7 @@ VECTOR = (Path(__file__).resolve().parents[1]
 
 @pytest.fixture
 def receipt() -> dict:
-    return json.loads(VECTOR.read_text())
+    return json.loads(VECTOR.read_text(encoding="utf-8"))
 
 
 def _token_imprint(anchor: dict) -> bytes:

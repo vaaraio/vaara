@@ -421,7 +421,7 @@ def _config_owner(path: Path) -> Optional[str]:
     A hook-based agent decides its MCP tool calls in the same hook as its
     own, so its servers are governed without vaara-mcp-proxy.
     """
-    text = str(path)
+    text = path.as_posix()
     if "/.claude/" in text or path.name in (".claude.json", ".mcp.json"):
         return "claude-code"
     if "/.cursor/" in text:
@@ -448,7 +448,7 @@ def scan_mcp(home: Optional[Path] = None,
         entries = [s for s in servers.values() if isinstance(s, dict)]
         routed = sum(1 for s in entries if _routed(s))
         naked = len(entries) - routed
-        where = str(path).replace(str(home), "~", 1)
+        where = path.as_posix().replace(home.as_posix(), "~", 1)
         name = path.name
         owner = _config_owner(path)
         if owner and naked:

@@ -14,7 +14,7 @@ import re
 from pathlib import Path
 
 ROOT = Path(__file__).resolve().parents[1]
-SCRIPT = (ROOT / "scripts" / "release_prepare.sh").read_text()
+SCRIPT = (ROOT / "scripts" / "release_prepare.sh").read_text(encoding="utf-8")
 PLISTS = sorted((ROOT / "clients" / "macos" / "Sources").glob("*/Info.plist"))
 
 

@@ -180,7 +180,7 @@ def test_install_keeps_other_settings_and_is_idempotent(tmp_path):
     before = {"theme": "Dracula", "hooks": {"BeforeTool": [mine]}}
     (d / "settings.json").write_text(json.dumps(before))
     assert gemini.install_hooks("/opt/bin/vaara", d) is True
-    cfg = json.loads((d / "settings.json").read_text())
+    cfg = json.loads((d / "settings.json").read_text(encoding="utf-8"))
     assert cfg["theme"] == "Dracula"
     pre = cfg["hooks"]["BeforeTool"]
     assert pre[0] == mine
@@ -191,7 +191,7 @@ def test_install_keeps_other_settings_and_is_idempotent(tmp_path):
     assert "AfterTool" in cfg["hooks"]
     assert gemini.install_hooks("/opt/bin/vaara", d) is False
     assert gemini.remove_hooks(d) is True
-    assert json.loads((d / "settings.json").read_text()) == before
+    assert json.loads((d / "settings.json").read_text(encoding="utf-8")) == before
 
 
 def test_a_commented_settings_file_is_read_and_kept_as_a_backup(tmp_path):
@@ -201,10 +201,10 @@ def test_a_commented_settings_file_is_read_and_kept_as_a_backup(tmp_path):
             '  /* block */ "general": {"vimMode": true}\n}\n')
     (d / "settings.json").write_text(text)
     assert gemini.install_hooks("/opt/bin/vaara", d) is True
-    cfg = json.loads((d / "settings.json").read_text())
+    cfg = json.loads((d / "settings.json").read_text(encoding="utf-8"))
     assert cfg["theme"] == "a // not a comment"
     assert cfg["general"] == {"vimMode": True}
-    assert (d / "settings.json.vaara-backup").read_text() == text
+    assert (d / "settings.json.vaara-backup").read_text(encoding="utf-8") == text
 
 
 def test_a_settings_file_that_does_not_parse_is_left_alone(tmp_path):
@@ -213,7 +213,7 @@ def test_a_settings_file_that_does_not_parse_is_left_alone(tmp_path):
     (d / "settings.json").write_text("{ not json")
     with pytest.raises(ValueError):
         gemini.install_hooks("/opt/bin/vaara", d)
-    assert (d / "settings.json").read_text() == "{ not json"
+    assert (d / "settings.json").read_text(encoding="utf-8") == "{ not json"
     assert gemini.hook_status(d) == "unknown"
 
 
@@ -223,7 +223,7 @@ def test_hook_status_follows_hooks_config(tmp_path):
     gemini.install_hooks("/opt/bin/vaara", d)
     assert gemini.hook_status(d) == "active"
     path = d / "settings.json"
-    cfg = json.loads(path.read_text())
+    cfg = json.loads(path.read_text(encoding="utf-8"))
     path.write_text(json.dumps({**cfg, "hooksConfig": {"enabled": False}}))
     assert gemini.hook_status(d) == "disabled"
     path.write_text(json.dumps({**cfg, "hooksConfig": {"disabled": [gemini.HOOK_NAME]}}))

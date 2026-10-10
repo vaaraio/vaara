@@ -89,7 +89,7 @@ def test_hook_hash_matches_what_codex_reported():
 
 
 def _trust(home: Path, **state) -> None:
-    hooks = json.loads((home / "hooks.json").read_text())["hooks"]["PreToolUse"]
+    hooks = json.loads((home / "hooks.json").read_text(encoding="utf-8"))["hooks"]["PreToolUse"]
     handler = hooks[0]["hooks"][0]
     key = f"{(home / 'hooks.json').resolve()}:pre_tool_use:0:0"
     lines = [f'[hooks.state."{key}"]']
@@ -210,7 +210,7 @@ def test_install_keeps_other_hooks_and_is_idempotent(tmp_path):
     mine = {"matcher": "Bash", "hooks": [{"type": "command", "command": "./mine.sh"}]}
     (d / "hooks.json").write_text(json.dumps({"hooks": {"PreToolUse": [mine]}}))
     assert codex.install_hooks("/opt/bin/vaara", d) is True
-    cfg = json.loads((d / "hooks.json").read_text())
+    cfg = json.loads((d / "hooks.json").read_text(encoding="utf-8"))
     pre = cfg["hooks"]["PreToolUse"]
     assert pre[0] == mine
     assert pre[1] == {"hooks": [{"type": "command",
@@ -219,7 +219,7 @@ def test_install_keeps_other_hooks_and_is_idempotent(tmp_path):
     assert "PostToolUse" in cfg["hooks"]
     assert codex.install_hooks("/opt/bin/vaara", d) is False
     assert codex.remove_hooks(d) is True
-    assert json.loads((d / "hooks.json").read_text()) == {"hooks": {"PreToolUse": [mine]}}
+    assert json.loads((d / "hooks.json").read_text(encoding="utf-8")) == {"hooks": {"PreToolUse": [mine]}}
 
 
 def test_init_writes_codex_hooks_and_reports_them_untrusted(tmp_path, monkeypatch):

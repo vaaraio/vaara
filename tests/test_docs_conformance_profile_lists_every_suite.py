@@ -36,7 +36,7 @@ def _shipped_suites() -> set[str]:
 
 def _documented_suites() -> set[str]:
     block = re.search(
-        r"## Suites in Profile v1\s*\n+```\n(.*?)```", DOC.read_text(), re.S
+        r"## Suites in Profile v1\s*\n+```\n(.*?)```", DOC.read_text(encoding="utf-8"), re.S
     )
     assert block, "conformance-profile.md no longer lists its suites"
     return set(block.group(1).split())
@@ -59,14 +59,14 @@ def test_the_profile_lists_no_suite_that_does_not_ship():
 
 
 def test_the_stated_count_is_the_real_count():
-    stated = re.search(r"Profile v1 covers the (\d+) suites", DOC.read_text())
+    stated = re.search(r"Profile v1 covers the (\d+) suites", DOC.read_text(encoding="utf-8"))
     assert stated, "conformance-profile.md no longer states a suite count"
     assert int(stated.group(1)) == len(_shipped_suites())
 
 
 def test_the_skipping_suites_are_named():
     """Suites that skip without an optional dependency are named in the profile."""
-    text = DOC.read_text()
+    text = DOC.read_text(encoding="utf-8")
     for suite in ("pq_hybrid_v0", "qualified_time_v0"):
         assert suite in text, (
             f"{suite} skips without an optional dependency; the profile has to "

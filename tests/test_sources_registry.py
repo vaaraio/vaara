@@ -12,7 +12,7 @@ from vaara.audit.sqlite_backend import SQLiteAuditBackend
 
 
 def _entries(home):
-    return json.loads((home / ".vaara" / "sources.json").read_text())["sources"]
+    return json.loads((home / ".vaara" / "sources.json").read_text(encoding="utf-8"))["sources"]
 
 
 def test_a_written_trail_is_listed(tmp_path, monkeypatch):

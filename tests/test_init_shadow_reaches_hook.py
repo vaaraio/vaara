@@ -16,7 +16,7 @@ from vaara.integrations.init_governance import run_init, write_hook_config
 
 
 def _cfg(path):
-    return json.loads(path.read_text())
+    return json.loads(path.read_text(encoding="utf-8"))
 
 
 def test_shadow_sets_watch(tmp_path):

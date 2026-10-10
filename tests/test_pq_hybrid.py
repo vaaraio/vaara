@@ -162,8 +162,8 @@ def test_injected_unmodeled_field_is_rejected(world):
 
 
 def test_vectors_match_vaara():
-    cases = json.loads((VECTORS / "cases.json").read_text())["cases"]
-    expected = json.loads((VECTORS / "expected.json").read_text())
+    cases = json.loads((VECTORS / "cases.json").read_text(encoding="utf-8"))["cases"]
+    expected = json.loads((VECTORS / "expected.json").read_text(encoding="utf-8"))
     compare = ("tier", "classical_bound", "pq_bound", "suite", "pq_keyid",
                "quantum_resistant", "downgrade_resistant")
     for case in cases:

@@ -221,7 +221,7 @@ def _squash(text: str) -> str:
 
 
 def test_model_swift_still_says_this():
-    swift = _squash(MODEL_SWIFT.read_text())
+    swift = _squash(MODEL_SWIFT.read_text(encoding="utf-8"))
     columns = "SELECT seq, event_type, tool_name, timestamp, data FROM audit_records"
     assert f'"{columns}"' in swift, "Model.swift eventColumns changed"
     for sql in (NEW_DECISIONS_SQL, HISTORY_SQL, OVERALL_STATE_SQL, AGENT_SUMMARIES_SQL):

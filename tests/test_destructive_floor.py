@@ -212,7 +212,7 @@ def test_the_approval_request_carries_the_whole_call(tmp_path, monkeypatch):
         import time
         for _ in range(100):
             for f in approvals.glob("*.request.json") if approvals.exists() else []:
-                seen.update(json.loads(f.read_text()))
+                seen.update(json.loads(f.read_text(encoding="utf-8")))
                 return
             time.sleep(0.02)
 

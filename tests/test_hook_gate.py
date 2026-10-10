@@ -189,10 +189,10 @@ def test_plugin_fail_open_still_opts_out(tmp_path):
 
 
 def test_plugin_and_installer_share_deadline_and_timeout():
-    manifest = json.loads((RUN_SH.parent / "hooks.json").read_text())
+    manifest = json.loads((RUN_SH.parent / "hooks.json").read_text(encoding="utf-8"))
     pre = manifest["hooks"]["PreToolUse"][0]["hooks"][0]
     assert pre["timeout"] == _hook_gate.HOST_TIMEOUT
-    assert f"deadline={_hook_gate.DEADLINE}\n" in RUN_SH.read_text()
+    assert f"deadline={_hook_gate.DEADLINE}\n" in RUN_SH.read_text(encoding="utf-8")
 
 
 def test_an_approval_wait_ends_inside_the_deadline(monkeypatch):
@@ -227,7 +227,7 @@ def test_a_path_with_a_space_keeps_the_marker(tmp_path):
     d.mkdir()
     assert codex.install_hooks("/opt/My Tools/vaara", d) is True
     assert codex.install_hooks("/opt/Other Tools/vaara", d) is True
-    pre = json.loads((d / "hooks.json").read_text())["hooks"]["PreToolUse"]
+    pre = json.loads((d / "hooks.json").read_text(encoding="utf-8"))["hooks"]["PreToolUse"]
     assert len(pre) == 1
 
     home = tmp_path / "spaced dir"
