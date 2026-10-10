@@ -774,6 +774,8 @@ jobs:
             # So: /tmp for the report, a bounded tail on the logs, curl to post.
             comment_id=""
             api="https://api.github.com/repos/${GITHUB_REPOSITORY}"
+            export HOME=/tmp   # curl's rc file, python's startup, anything that looks for a home
+            cd /tmp
             for _ in $(seq 20); do
               sleep 60
               {
@@ -783,16 +785,16 @@ jobs:
                 for p in $(pgrep -f 'pytest tests/test_oslayer_e2e' || true); do timeout 20 sudo "$(command -v py-spy)" dump --nonblocking --pid "$p" || true; done
                 for p in $(pgrep -f 'vaara.cli run' || true); do timeout 20 sudo "$(command -v py-spy)" dump --nonblocking --pid "$p" || true; done
                 for p in $(pgrep -f 'vaara.cli os-guard' || true); do timeout 20 sudo "$(command -v py-spy)" dump --nonblocking --pid "$p" || true; done
-                echo '--- result.txt'; timeout 5 tail -40 result.txt || echo "(read blocked)"
-                echo '--- guard.log'; timeout 5 tail -30 guard.log || echo "(read blocked)"
+                echo '--- result.txt'; timeout 5 tail -40 "$GITHUB_WORKSPACE/result.txt" || echo "(read blocked)"
+                echo '--- guard.log'; timeout 5 tail -30 "$GITHUB_WORKSPACE/guard.log" || echo "(read blocked)"
                 echo '```'
               } > /tmp/watchdog.md 2>&1
               python3 -c 'import json; print(json.dumps({"body": open("/tmp/watchdog.md").read()}))' > /tmp/watchdog.json
               if [ -n "$PR_NUMBER" ]; then
                 if [ -z "$comment_id" ]; then
-                  comment_id=$(curl -sS -m 20 -X POST -H "Authorization: Bearer $GH_TOKEN" -H "Accept: application/vnd.github+json" "$api/issues/${PR_NUMBER}/comments" -d @/tmp/watchdog.json | python3 -c 'import json,sys; print(json.load(sys.stdin).get("id",""))' || true)
+                  comment_id=$(curl -q -sS -m 20 -X POST -H "Authorization: Bearer $GH_TOKEN" -H "Accept: application/vnd.github+json" "$api/issues/${PR_NUMBER}/comments" -d @/tmp/watchdog.json | python3 -c 'import json,sys; print(json.load(sys.stdin).get("id",""))' || true)
                 else
-                  curl -sS -m 20 -X PATCH -H "Authorization: Bearer $GH_TOKEN" -H "Accept: application/vnd.github+json" "$api/issues/comments/${comment_id}" -d @/tmp/watchdog.json >/dev/null || true
+                  curl -q -sS -m 20 -X PATCH -H "Authorization: Bearer $GH_TOKEN" -H "Accept: application/vnd.github+json" "$api/issues/comments/${comment_id}" -d @/tmp/watchdog.json >/dev/null || true
                 fi
               fi
               sleep 30
