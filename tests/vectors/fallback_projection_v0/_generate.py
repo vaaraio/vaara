@@ -1,120 +1,89 @@
 #!/usr/bin/env python3
-"""Generate fallback_projection_v0 conformance vectors.
+# SPDX-FileCopyrightText: 2026 Henri Sirkkavaara
+# SPDX-License-Identifier: AGPL-3.0-or-later
+"""Generate fallback_projection_v0: the SEP-2828 fallback projection, version
+tools_call_params_plus_meta_authorization_binding_v1.
 
-Writes projections/<name>.json and expected.json.
-Run once to regenerate; check output into source control.
+Writes envelopes/<name>.json (raw tools/call request envelopes, _meta sidecars
+included) and expected.json. The expected digests come from the library's own
+projection, the one the signed receipts in decision_pairing_v0 were bound
+under; the independent checker recomputes them without importing Vaara.
+
+    .venv/bin/python tests/vectors/fallback_projection_v0/_generate.py
 """
 from __future__ import annotations
 
-import hashlib
 import json
+import sys
 from pathlib import Path
 
 HERE = Path(__file__).resolve().parent
-PROJECTIONS_DIR = HERE / "projections"
-PROJECTIONS_DIR.mkdir(exist_ok=True)
+sys.path.insert(0, str(HERE.parents[2] / "src"))
 
-VECTORS: dict[str, dict] = {
-    # Positive: no authBinding — the explicit unauthenticated fallback profile.
-    # Projection = {arguments, toolName} with authBinding absent.
-    # Raw _meta example: {"progressToken": "pt-1", "traceId": "tr-001"}
-    # (no "authorization_binding" key → authBinding absent from projection).
-    "basic_no_auth_binding": {
-        "arguments": {"action": "read", "path": "/docs/report.pdf"},
-        "toolName": "filesystem_read",
-    },
-    # Positive: authBinding present (scope + policy carried through).
-    "with_auth_binding": {
-        "arguments": {"bucket": "prod-data", "object": "reports/q1.csv"},
-        "authBinding": {
-            "capabilityGrant": "read-only",
-            "policyId": "pol-2026-001",
-            "scope": "storage",
-        },
-        "toolName": "gcs_read",
-    },
-    # Observer-stability pair (item 1).
-    # Raw calls have DIFFERENT _meta sidecars:
-    #   observer_stable_a raw _meta: {"progressToken": "pt-aaa", "traceId": "tr-001",
-    #                                  "authorization_binding": {"policyId": "pol-abc",
-    #                                                            "scope": "read"}}
-    #   observer_stable_b raw _meta: {"progressToken": "pt-bbb", "x-injected-id": "inj-999",
-    #                                  "authorization_binding": {"policyId": "pol-abc",
-    #                                                            "scope": "read"}}
-    # progressToken and x-injected-id are stripped; authorization_binding becomes authBinding.
-    # Checker asserts: observer_stable_a.digest == observer_stable_b.digest.
-    "observer_stable_a": {
-        "arguments": {"file": "invoice.pdf"},
-        "authBinding": {"policyId": "pol-abc", "scope": "read"},
-        "toolName": "document_fetch",
-    },
-    "observer_stable_b": {
-        "arguments": {"file": "invoice.pdf"},
-        "authBinding": {"policyId": "pol-abc", "scope": "read"},
-        "toolName": "document_fetch",
-    },
-    # Negative: different toolName → different digest (same other fields).
-    "neg_different_tool": {
-        "arguments": {"file": "invoice.pdf"},
-        "authBinding": {"policyId": "pol-abc", "scope": "read"},
-        "toolName": "document_fetch_v2",
-    },
-    # Negative (item 2): same toolName and authBinding, different arguments → different digest.
-    # Isolates the arguments contribution to the projection preimage.
-    "neg_different_args": {
-        "arguments": {"file": "statement.pdf"},
-        "authBinding": {"policyId": "pol-abc", "scope": "read"},
-        "toolName": "document_fetch",
-    },
-    # Negative (item 3): same toolName and arguments, different authBinding → different digest.
-    # Isolates the authBinding contribution to the projection preimage.
-    "neg_different_auth_binding": {
-        "arguments": {"file": "invoice.pdf"},
-        "authBinding": {"policyId": "pol-xyz", "scope": "write"},
-        "toolName": "document_fetch",
-    },
+from vaara.attestation._decision_verifier import (  # noqa: E402
+    FALLBACK_PROJECTION_V1,
+    MalformedFallbackBindingError,
+    request_envelope_digest,
+)
+from vaara.attestation._attest_canonical import canonical_json  # noqa: E402
+from vaara.attestation._decision_verifier import fallback_projection  # noqa: E402
+
+BINDING = {"nonce": "srv-nonce-7f3a", "scope": "read"}
+CALL = {"name": "document_fetch", "arguments": {"file": "invoice.pdf"}}
+
+ENVELOPES: dict[str, dict] = {
+    # The same call seen by the provider and by a gateway: the sidecars differ,
+    # the projection does not.
+    "provider_view": {**CALL, "_meta": {"progressToken": "pt-aaa",
+                                        "authorization_binding": BINDING}},
+    "gateway_view": {**CALL, "_meta": {"traceparent": "00-4bf92f3577b34da6-00f067aa0ba902b7-01",
+                                       "x-injected-id": "inj-999",
+                                       "authorization_binding": BINDING}},
+    "binding_with_policy": {"name": "gcs_read",
+                            "arguments": {"bucket": "prod-data", "object": "reports/q1.csv"},
+                            "_meta": {"authorization_binding": {
+                                "nonce": "srv-nonce-0001", "policyId": "pol-2026-001",
+                                "scope": "storage"}}},
+    "non_ascii_arguments": {"name": "write_note",
+                            "arguments": {"text": "Päätös € é"},
+                            "_meta": {"authorization_binding": {"nonce": "srv-nonce-0002"}}},
+    # Each changes one bound field of provider_view, so the digest must change.
+    "different_tool": {**CALL, "name": "document_fetch_v2",
+                       "_meta": {"authorization_binding": BINDING}},
+    "different_arguments": {**CALL, "arguments": {"file": "statement.pdf"},
+                            "_meta": {"authorization_binding": BINDING}},
+    "replayed_binding": {**CALL, "_meta": {"authorization_binding": {
+        "nonce": "srv-nonce-other", "scope": "read"}}},
+    # No projection exists; a verifier fails closed instead of widening the preimage.
+    "no_binding": {**CALL, "_meta": {"progressToken": "pt-aaa"}},
+    "binding_without_nonce": {**CALL, "_meta": {"authorization_binding": {"scope": "read"}}},
+    "binding_not_object": {**CALL, "_meta": {"authorization_binding": "srv-nonce-7f3a"}},
+    "missing_arguments": {"name": "document_fetch", "_meta": {"authorization_binding": BINDING}},
+    "unsupported_version": {**CALL, "_meta": {"authorization_binding": BINDING}},
 }
+VERSION = {"unsupported_version": "tools_call_params_v0"}
 
 
-def jcs(obj: object) -> bytes:
-    """RFC 8785 JCS: sorted keys, no whitespace, UTF-8."""
-    return json.dumps(obj, sort_keys=True, separators=(",", ":"), ensure_ascii=False).encode("utf-8")
-
-
-def sha256(b: bytes) -> str:
-    return "sha256:" + hashlib.sha256(b).hexdigest()
-
-
-def main() -> None:
+def main() -> int:
+    out = HERE / "envelopes"
+    out.mkdir(exist_ok=True)
     expected: dict[str, dict] = {}
-    for name, proj in VECTORS.items():
-        canonical = jcs(proj)
-        digest = sha256(canonical)
-        (PROJECTIONS_DIR / f"{name}.json").write_text(
-            json.dumps(proj, indent=2, sort_keys=True) + "\n"
-        )
-        expected[name] = {
-            "projectionBytes": canonical.decode("utf-8"),
-            "attestationDigest": digest,
-        }
-
-    (HERE / "expected.json").write_text(json.dumps(expected, indent=2, sort_keys=True) + "\n")
-    print(f"wrote {len(expected)} vectors to {HERE}")
-    a = expected["observer_stable_a"]["attestationDigest"]
-    b = expected["observer_stable_b"]["attestationDigest"]
-    assert a == b, f"observer stability broken: {a} != {b}"
-    n = expected["neg_different_tool"]["attestationDigest"]
-    assert a != n, "neg_different_tool should differ from observer_stable"
-    d_args = expected["neg_different_args"]["attestationDigest"]
-    assert a != d_args, "neg_different_args should differ from observer_stable (args change moves digest)"
-    d_auth = expected["neg_different_auth_binding"]["attestationDigest"]
-    assert a != d_auth, "neg_different_auth_binding should differ from observer_stable (authBinding change moves digest)"
-    assert d_args != d_auth, "neg_different_args and neg_different_auth_binding must not collide"
-    print("observer stability: OK")
-    print("neg_different_tool divergence: OK")
-    print("neg_different_args divergence: OK")
-    print("neg_different_auth_binding divergence: OK")
+    for name, env in ENVELOPES.items():
+        (out / f"{name}.json").write_text(json.dumps(env, indent=2, ensure_ascii=False) + "\n",
+                                          encoding="utf-8")
+        version = VERSION.get(name, FALLBACK_PROJECTION_V1)
+        try:
+            proj = fallback_projection(env, version=version)
+            expected[name] = {"version": version,
+                              "projectionBytes": canonical_json(proj).decode("utf-8"),
+                              "attestationDigest": request_envelope_digest(env, version=version)}
+        except MalformedFallbackBindingError:
+            expected[name] = {"version": version, "malformed": True}
+    (HERE / "expected.json").write_text(
+        json.dumps(expected, indent=2, sort_keys=True, ensure_ascii=False) + "\n", encoding="utf-8")
+    print(f"wrote {len(expected)} cases")
+    return 0
 
 
 if __name__ == "__main__":
-    main()
+    raise SystemExit(main())

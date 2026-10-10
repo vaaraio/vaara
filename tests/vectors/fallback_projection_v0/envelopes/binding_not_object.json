@@ -1,0 +1,9 @@
+{
+  "name": "document_fetch",
+  "arguments": {
+    "file": "invoice.pdf"
+  },
+  "_meta": {
+    "authorization_binding": "srv-nonce-7f3a"
+  }
+}

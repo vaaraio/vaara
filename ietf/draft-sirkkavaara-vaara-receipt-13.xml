@@ -245,9 +245,22 @@ execution receipt:
         binding by recomputing attestationDigest from the predecessor and
         comparing attestationNonce, with no access to the issuer. A profile
         that permits fallbackProjection <bcp14>MUST</bcp14> define each projection value it
-        uses; the one in use is listed in <xref target="profile-registry"/>.
-        A consumer <bcp14>MUST</bcp14> reject a fallbackProjection value it does not
+        uses. A consumer <bcp14>MUST</bcp14> reject a fallbackProjection value it does not
         implement.</t>
+        <t>This document defines one value,
+        "tools_call_params_plus_meta_authorization_binding_v1", for a Model
+        Context Protocol tools/call request. The projection is the object
+        {"projection": the value, "name": params.name, "arguments":
+        params.arguments, "authorizationBinding":
+        params._meta.authorization_binding}, and attestationDigest is its digest.
+        authorization_binding is <bcp14>REQUIRED</bcp14> and is an object with a non-empty
+        string nonce, chosen by the server for the call; name and arguments are
+        <bcp14>REQUIRED</bcp14>. No other member of _meta enters the projection, so a gateway
+        and a provider that see the same call with different _meta members
+        compute the same digest. Where the projection cannot be built, the
+        binding fails and a consumer <bcp14>MUST NOT</bcp14> widen the projection to recover
+        it. See tests/vectors/fallback_projection_v0/ and
+        tests/vectors/decision_pairing_v0/.</t>
       </section>
 
       <section anchor="asserted" numbered="true">
@@ -587,7 +600,6 @@ execution receipt:
             <tr><td>AP2 checkout binding</td><td>vaara.authorization/v0 (names AP2 PEF frame_id)</td><td>tests/vectors/ap2_v0/</td></tr>
             <tr><td>TAP request binding</td><td>tap.request/v0</td><td>tests/vectors/tap_v0/</td></tr>
             <tr><td>generic external execution evidence</td><td>vaara.authorization/v0 (names an external_execution_evidence slot)</td><td>tests/vectors/external_evidence_v0/</td></tr>
-            <tr><td>fallback projection</td><td>vaara.fallback_projection/v0 (SEP-2828 observer-stable binding)</td><td>tests/vectors/fallback_projection_v0/</td></tr>
             <tr><td>credential binding</td><td>vaara.credential_binding/v0 (MCP gateway enforcement)</td><td>tests/vectors/credential_binding_v0/</td></tr>
             <tr><td>ATLAS threat detection</td><td>vaara.atlas_threat/v0 (MITRE ATLAS AI agent threat patterns)</td><td>tests/vectors/atlas_threat_v0/</td></tr>
             <tr><td>engine decision</td><td>vaara.trail-decision/v0</td><td>tests/vectors/trail_decision_v0/, tests/vectors/cage_v0/</td></tr>

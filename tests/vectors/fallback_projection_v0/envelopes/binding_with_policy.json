@@ -1,0 +1,14 @@
+{
+  "name": "gcs_read",
+  "arguments": {
+    "bucket": "prod-data",
+    "object": "reports/q1.csv"
+  },
+  "_meta": {
+    "authorization_binding": {
+      "nonce": "srv-nonce-0001",
+      "policyId": "pol-2026-001",
+      "scope": "storage"
+    }
+  }
+}

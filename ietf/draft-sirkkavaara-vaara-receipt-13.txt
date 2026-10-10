@@ -80,7 +80,7 @@ Table of Contents
      3.1.  Algorithms and Signature Encoding . . . . . . . . . . . .   6
      3.2.  Signed Payload  . . . . . . . . . . . . . . . . . . . . .   7
      3.3.  Back Link . . . . . . . . . . . . . . . . . . . . . . . .   7
-     3.4.  Issuer Block  . . . . . . . . . . . . . . . . . . . . . .   8
+     3.4.  Issuer Block  . . . . . . . . . . . . . . . . . . . . . .   9
      3.5.  Post-Quantum Signature and Crypto Posture . . . . . . . .  10
      3.6.  Existence Proof . . . . . . . . . . . . . . . . . . . . .  11
      3.7.  Execution Receipt . . . . . . . . . . . . . . . . . . . .  11
@@ -427,21 +427,21 @@ Internet-Draft                Vaara Receipt                 October 2026
    the same backLink.  A consumer confirms the binding by recomputing
    attestationDigest from the predecessor and comparing
    attestationNonce, with no access to the issuer.  A profile that
-   permits fallbackProjection MUST define each projection value it uses;
-   the one in use is listed in Table 8.  A consumer MUST reject a
-   fallbackProjection value it does not implement.
+   permits fallbackProjection MUST define each projection value it uses.
+   A consumer MUST reject a fallbackProjection value it does not
+   implement.
 
-3.4.  Issuer Block
-
-   issuerAsserted (in a decision receipt) and receiptAsserted (in an
-   execution receipt) have the same members.  Both are inside the signed
-   payload.
-
-
-
-
-
-
+   This document defines one value,
+   "tools_call_params_plus_meta_authorization_binding_v1", for a Model
+   Context Protocol tools/call request.  The projection is the object
+   {"projection": the value, "name": params.name, "arguments":
+   params.arguments, "authorizationBinding":
+   params._meta.authorization_binding}, and attestationDigest is its
+   digest.  authorization_binding is REQUIRED and is an object with a
+   non-empty string nonce, chosen by the server for the call; name and
+   arguments are REQUIRED.  No other member of _meta enters the
+   projection, so a gateway and a provider that see the same call with
+   different _meta members compute the same digest.  Where the
 
 
 
@@ -449,6 +449,16 @@ Sirkkavaara               Expires 14 April 2027                 [Page 8]
 
 Internet-Draft                Vaara Receipt                 October 2026
 
+
+   projection cannot be built, the binding fails and a consumer MUST NOT
+   widen the projection to recover it.  See tests/vectors/
+   fallback_projection_v0/ and tests/vectors/decision_pairing_v0/.
+
+3.4.  Issuer Block
+
+   issuerAsserted (in a decision receipt) and receiptAsserted (in an
+   execution receipt) have the same members.  Both are inside the signed
+   payload.
 
     +===============+========+==========+============================+
     | Member        | Type   | Presence | Meaning                    |
@@ -488,6 +498,14 @@ Internet-Draft                Vaara Receipt                 October 2026
     |               |        |          | action belongs to.         |
     +---------------+--------+----------+----------------------------+
     | completeness  | object | OPTIONAL | The per-boundary sequence  |
+
+
+
+Sirkkavaara               Expires 14 April 2027                 [Page 9]
+
+Internet-Draft                Vaara Receipt                 October 2026
+
+
     |               |        |          | (Section 6.4).             |
     +---------------+--------+----------+----------------------------+
     | sigSuite      | string | OPTIONAL | The hybrid signature suite |
@@ -498,14 +516,6 @@ Internet-Draft                Vaara Receipt                 October 2026
     | cryptoPosture | object | OPTIONAL | The algorithms protecting  |
     |               |        |          | the receipt and their      |
     |               |        |          | post-quantum level         |
-
-
-
-Sirkkavaara               Expires 14 April 2027                 [Page 9]
-
-Internet-Draft                Vaara Receipt                 October 2026
-
-
     |               |        |          | (Section 3.5).             |
     +---------------+--------+----------+----------------------------+
 
@@ -538,6 +548,20 @@ Internet-Draft                Vaara Receipt                 October 2026
    hexadecimal ML-DSA-65 signature over the same signed payload bytes
    the classical signature covers).
 
+
+
+
+
+
+
+
+
+
+Sirkkavaara               Expires 14 April 2027                [Page 10]
+
+Internet-Draft                Vaara Receipt                 October 2026
+
+
    A consumer MUST reject a receipt whose sigSuite has any other value.
    A consumer that verifies ML-DSA MUST reject a receipt whose sigSuite
    names a hybrid suite and whose pqSignature is absent or does not
@@ -554,14 +578,6 @@ Internet-Draft                Vaara Receipt                 October 2026
    from 0 to 5, the highest level in algorithms).  The levels are 0 for
    HS256 (primitive "mac"), ES256, and RS256 (primitive "signature"),
    and 3 for ML-DSA-65 (primitive "signature").  A consumer checks
-
-
-
-Sirkkavaara               Expires 14 April 2027                [Page 10]
-
-Internet-Draft                Vaara Receipt                 October 2026
-
-
    cryptoPosture by recomputing it from alg and sigSuite.  A posture
    that does not match the recomputation, or that claims an ML-DSA leg
    without a sigSuite that commits it, is a claim the receipt does not
@@ -589,22 +605,6 @@ Internet-Draft                Vaara Receipt                 October 2026
    governed.  Its conformance vectors are tests/vectors/
    execution_receipt_v0/, with a standalone checker that imports no
    issuer code.
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
 
 
 
@@ -1039,10 +1039,6 @@ Internet-Draft                Vaara Receipt                 October 2026
     |execution    |external_execution_evidence|                       |
     |evidence     |slot)                      |                       |
     +-------------+---------------------------+-----------------------+
-    |fallback     |vaara.fallback_projection/ |tests/vectors/         |
-    |projection   |v0 (SEP-2828 observer-     |fallback_projection_v0/|
-    |             |stable binding)            |                       |
-    +-------------+---------------------------+-----------------------+
     |credential   |vaara.credential_binding/v0|tests/vectors/         |
     |binding      |(MCP gateway enforcement)  |credential_binding_v0/ |
     +-------------+---------------------------+-----------------------+
@@ -1056,6 +1052,10 @@ Internet-Draft                Vaara Receipt                 October 2026
     +-------------+---------------------------+-----------------------+
 
                          Table 8: Profile registry
+
+
+
+
 
 
 

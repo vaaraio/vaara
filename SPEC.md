@@ -125,6 +125,17 @@ same `backLink` as its decision receipt. A profile that permits
 `fallbackProjection` MUST define each value it uses, and a consumer MUST reject a
 value it does not implement.
 
+This document defines one value, `tools_call_params_plus_meta_authorization_binding_v1`,
+for an MCP `tools/call` request: the projection is `{"projection": <value>,
+"name": params.name, "arguments": params.arguments, "authorizationBinding":
+params._meta.authorization_binding}` and `attestationDigest` is its digest.
+`authorization_binding` is required and is an object with a non-empty string
+`nonce`; `name` and `arguments` are required. No other `_meta` member enters, so a
+gateway and a provider seeing one call with different sidecars agree. When the
+projection cannot be built the binding fails, and a consumer MUST NOT widen it.
+Vectors at `tests/vectors/fallback_projection_v0/` and
+`tests/vectors/decision_pairing_v0/`.
+
 ### 2.4 Issuer block
 
 `issuerAsserted` and `receiptAsserted` have the same members, all inside the

@@ -1,0 +1,14 @@
+{
+  "name": "document_fetch",
+  "arguments": {
+    "file": "invoice.pdf"
+  },
+  "_meta": {
+    "traceparent": "00-4bf92f3577b34da6-00f067aa0ba902b7-01",
+    "x-injected-id": "inj-999",
+    "authorization_binding": {
+      "nonce": "srv-nonce-7f3a",
+      "scope": "read"
+    }
+  }
+}
