@@ -40,8 +40,9 @@ nav.top .brand img { height: 30px; width: auto; display: block; }
 .dd.on > a.l { color: var(--on-night); }
 
 /* the navy band under it */
-.band { background: var(--night); color: var(--on-night); }
-.band a { color: var(--on-night); }
+/* the heading area sits on a light tint; the bar is the only dark element, as on SUSE, Ubuntu and Red Hat */
+.band { background: var(--tint); color: var(--body); border-bottom: 1px solid var(--rule); }
+.band a { color: var(--accent); }
 nav.top a.l { color: var(--on-night-soft); text-decoration: none; font-size: 15px; }
 nav.top a.l:hover, nav.top a.l.on { color: var(--on-night); }
 nav.top .lang { font-size: 14px; color: var(--on-night-muted); }
@@ -49,17 +50,18 @@ nav.top .lang a { color: var(--on-night-soft); text-decoration: none; }
 nav.top .lang b { color: var(--on-night); font-weight: 600; }
 .hero { padding: 26px 0 30px; }
 .hero.home { padding: 40px 0 44px; }
-.hero .kicker { color: var(--on-night-soft); font-size: 13px; letter-spacing: .12em; text-transform: uppercase; margin: 0 0 8px; }
-.hero h1 { font-size: 30px; line-height: 1.2; color: var(--on-night); margin: 0 0 10px; max-width: 30em; font-weight: 650; }
+.hero .kicker { color: var(--accent); font-weight: 600; font-size: 13px; letter-spacing: .12em; text-transform: uppercase; margin: 0 0 8px; }
+.hero h1 { font-size: 30px; line-height: 1.2; color: var(--ink); margin: 0 0 10px; max-width: 30em; font-weight: 650; }
 .hero.home h1 { font-size: 36px; max-width: 24em; margin-bottom: 14px; }
-.hero p.lead { font-size: 17px; color: var(--on-night-soft); max-width: 46em; margin: 0; }
+.hero p.lead { font-size: 17px; color: var(--body); max-width: 46em; margin: 0; }
 .hero.home p.lead { font-size: 18px; margin-bottom: 24px; }
 .btns { display: flex; gap: 14px; flex-wrap: wrap; }
 .btn { display: inline-block; padding: 12px 22px; border-radius: 6px; text-decoration: none; font-weight: 600; font-size: 16px; }
-.btn.primary { background: var(--on-night); color: var(--night) !important; }
-.btn.ghost { border: 1px solid var(--on-night-muted); color: var(--on-night) !important; }
-.crumbs { color: var(--on-night-muted); font-size: 13px; margin: 0 0 10px; }
-.crumbs a { color: var(--on-night-soft); text-decoration: none; }
+.btn.primary { background: var(--night); color: #fff !important; }
+.btn.ghost { border: 1px solid var(--night); color: var(--night) !important; background: #fff; }
+.crumbs { color: var(--muted); font-size: 13px; margin: 0 0 10px; }
+.crumbs a { color: var(--muted); text-decoration: none; }
+.crumbs a:hover { color: var(--accent); text-decoration: underline; }
 
 /* white body */
 main section { padding: 56px 0; border-bottom: 1px solid var(--rule); }
