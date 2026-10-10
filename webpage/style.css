@@ -303,12 +303,12 @@ body > main { flex: 1 0 auto; }
 
 /* everything Vaara publishes: the party list, then link groups in two columns */
 .parties { list-style: none; margin: 28px 0 0; padding: 0; border-top: 1px solid var(--rule); }
-.parties li { display: grid; grid-template-columns: minmax(180px, 1.1fr) 2fr auto; gap: 6px 28px; align-items: baseline;
+.parties li { display: grid; grid-template-columns: 220px 1fr 230px; gap: 6px 28px; align-items: baseline;
   padding: 16px 0; border-bottom: 1px solid var(--rule); }
 .parties .who { color: var(--ink); font-weight: 600; text-decoration: none; }
 .parties .who:hover { color: var(--accent); }
 .parties .aff { color: var(--muted); font-size: 15px; }
-.parties .res { color: var(--accent); font-size: 15px; white-space: nowrap; }
+.parties .res { color: var(--accent); font-size: 15px; text-align: right; }
 .lgrid { display: grid; grid-template-columns: repeat(2, 1fr); gap: 52px 72px; }
 .lgroup h2 { font-size: 20px; margin-bottom: 14px; }
 .links { list-style: none; margin: 0; padding: 0; }
