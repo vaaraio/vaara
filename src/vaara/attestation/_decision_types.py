@@ -145,7 +145,7 @@ class DecisionRecord:
     timestamp_anchors: Optional[list[dict[str, Any]]] = None
 
     def to_dict(self) -> dict[str, Any]:
-        out = {
+        out: dict[str, Any] = {
             "version": self.version,
             "alg": self.alg,
             "backLink": back_link_to_dict(self.back_link),
