@@ -265,6 +265,7 @@ class Guard:
         self._prepare_state()
         self._prepare_approvals()
         self._pipeline = build_pipeline(self.trail_path)
+        self._prepare_decision_path()
         self._register_trail()
         self._selection = self._read_selection()
         self._harness = dict.fromkeys(
@@ -381,6 +382,27 @@ class Guard:
             with os.fdopen(fd, "w") as fh:
                 os.fchown(fh.fileno(), self.uid, self.gid)
                 fh.write(secrets.token_hex(32))
+
+    def _prepare_decision_path(self) -> None:
+        """Load every piece of code a decision runs, before any mark goes on.
+
+        A mark holds each open on the mount until a reader thread answers it,
+        and a reader needs the GIL to answer. CPython holds the GIL across
+        dlopen, so a worker thread that imports a compiled module after the
+        marks are on opens the shared object, waits for its own event, and
+        the readers wait for the GIL: the guard stops, and every open and
+        exec on the mount with it. A pure Python import releases the GIL
+        around its open and is answered. So the compiled code the decision
+        path reaches, the signing libraries behind the receipt, is loaded
+        here, with the signing key, while nothing is held.
+        """
+        import vaara.approvals  # noqa: F401  request_approval, in _ask_operator
+        import vaara.attestation._attest_canonical  # noqa: F401  the evidence digest
+        import vaara.attestation.decision  # noqa: F401  the receipt envelope
+
+        sink = getattr(self._trail.trail, "_receipt_sink", None)
+        if sink is not None:
+            sink.prepare()
 
     def _register_trail(self) -> None:
         """List the trail in the operator's ~/.vaara/sources.json, as the operator."""

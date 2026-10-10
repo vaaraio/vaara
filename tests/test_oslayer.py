@@ -340,6 +340,59 @@ def test_an_agent_outside_a_launch_is_named_by_its_program(g):
     assert agent.startswith("app:") and session == f"pid-{os.getpid()}"
 
 
+def _compiled_modules() -> set[str]:
+    """The extension modules loaded now, each one a shared object dlopen'd in."""
+    return {name for name, mod in list(sys.modules.items())
+            if (getattr(mod, "__file__", None) or "").endswith(".so")}
+
+
+def test_a_decision_loads_no_compiled_code_after_the_guard_starts(tmp_path):
+    """Every import a decision needs is made before the marks go on.
+
+    The guard is a fanotify permission listener on the whole mount. CPython
+    holds the GIL across dlopen, dlopen opens the shared object on that
+    mount, and the reader thread that would allow that open waits for the
+    GIL: a worker that imports a compiled module after the marks are on
+    stops the guard, and every open and exec on the mount with it. So
+    start() loads the decision path first, and this test runs one decision
+    of each kind against the real trail with the signed receipt: no new
+    shared object may appear.
+    """
+    pytest.importorskip("rfc8785")
+    pytest.importorskip("cryptography")
+    me = pwd.getpwuid(os.getuid())
+    instance = guard.Guard(me, trail_path=tmp_path / "trail" / "audit.db",
+                           socket_path=tmp_path / "run" / "os-guard.sock")
+    instance.home = str(tmp_path)
+    instance.approvals_dir = tmp_path / ".vaara" / "approvals"
+    instance.trail_path.parent.mkdir(parents=True)
+    instance._pipeline = guard.build_pipeline(instance.trail_path)
+    instance._selection = selection.Selection(ask_timeout=5)
+    sink = instance._pipeline.trail._receipt_sink
+    assert sink is not None, "receipts are on for a file-backed trail with the signing libraries"
+    try:
+        instance._prepare_decision_path()
+        before = _compiled_modules()
+        record = selection.Folder(str(tmp_path / "notes"), "record")
+        block = selection.Folder(str(tmp_path / "secret"), "block")
+        assert instance.verdict(_event(), f"{record.path}/a", record, "vaara-agent") is True
+        assert instance.verdict(_event(exec_=True), f"{block.path}/x", block, "vaara-agent") is False
+        asked = instance._intercept("app:x", "pid-1", guard.OS_OPEN.name, {"path": "/p"},
+                                    "escalate", "ask folder: the operator decides", "os-layer:ask")
+        instance._trail.resolve_escalation(asked.action_id, "allow", reviewer="approvals-handshake",
+                                           justification="t", approver="human", human_disposed=True)
+        # The ask itself, unanswered: the request file and the wait for a decision.
+        instance._selection = selection.Selection(ask_timeout=0.3)
+        ask = selection.Folder(str(tmp_path / "ask"), "ask")
+        instance.approvals_dir.mkdir(parents=True)
+        assert instance.verdict(_event(), f"{ask.path}/q", ask, "vaara-agent") is False
+        assert _compiled_modules() - before == set()
+        assert sink.written >= 4 and sink.failures == 0, \
+            "the receipts were signed, so the path tested is the live one"
+    finally:
+        instance._pool.shutdown(wait=False)
+
+
 def _answer_requests(approvals_dir: Path, decision: str, seen: list) -> threading.Thread:
     def responder() -> None:
         deadline = time.monotonic() + 20

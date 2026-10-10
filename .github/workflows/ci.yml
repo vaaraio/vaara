@@ -677,7 +677,6 @@ jobs:
         run: |
           pip install --require-hashes -r requirements-dev.txt
           pip install -e . --no-deps
-          pip install py-spy
           npm install -g @github/copilot@1.0.88
           copilot --version
 
@@ -691,19 +690,8 @@ jobs:
           fi
 
   os-layer-e2e:
-    name: Linux OS layer (kernel floor, guard, real agent, ${{ matrix.leg }})
+    name: Linux OS layer (kernel floor, guard, real agent)
     runs-on: ubuntu-24.04
-    strategy:
-      fail-fast: false
-      matrix:
-        # Two legs, each a subset of the one test file, so a hang names the
-        # test it sits in: the floor and the hooks, then the hardened launch
-        # with the egress proxy and the kernel address rule.
-        include:
-          - leg: floor and hooks
-            select: "not hardened"
-          - leg: hardened egress
-            select: "hardened"
     # The floor is an AppArmor profile and the guard a root fanotify listener,
     # so this job runs both for real. The guard starts under sudo for the
     # runner's account; the test then runs as that account and starts Copilot
@@ -712,13 +700,11 @@ jobs:
     # guard's own trail, then runs Copilot CLI again with Vaara's hooks, whose
     # verdicts reach it through the relay to `vaara run`.
     #
-    # pull-requests: write is for the watchdog in the test step, which
-    # posts the process table and the Python stacks as a PR comment when the
-    # test runs past its limit. A hung step keeps its log until the job ends,
-    # and a process in an uninterruptible kernel wait never lets it end.
-    permissions:
-      contents: read
-      pull-requests: write
+    # The guard marks the whole mount. If it stops answering, every open and
+    # exec on the runner waits with it, so this job has no log to show and
+    # cannot be cancelled, and no step inside it can report that state. The
+    # unit test in tests/test_oslayer.py covers the one cause seen so far: it
+    # fails when a decision loads compiled code after start().
     steps:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1  # v7.0.1
 
@@ -754,63 +740,18 @@ jobs:
           fi
 
       - name: Run the OS layer end-to-end test, failing on any skip
-        env:
-          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
-          PR_NUMBER: ${{ github.event.pull_request.number }}
         run: |
-          set -o pipefail
-          # Watchdog: twenty-five minutes in, whatever the state, the process
-          # table with kernel wait channels, every Python stack (nonblocking,
-          # so a process that cannot be stopped is still read) and the tails
-          # of the test and guard logs go out as a PR comment. Nothing else
-          # gets evidence out of a step that cannot end.
-          # It posts from the first minute and every 90 seconds after, editing
-          # one comment, so if the runner loses its network mid-test the last
-          # edit shows the state right before it did.
-          (
-            # Nothing here opens a file under the home tree: the guard is a
-            # fanotify permission listener, and if it stalls, every open under
-            # that tree sleeps uninterruptibly, gh's own config read included.
-            # So: /tmp for the report, a bounded tail on the logs, curl to post.
-            comment_id=""
-            api="https://api.github.com/repos/${GITHUB_REPOSITORY}"
-            export HOME=/tmp   # curl's rc file, python's startup, anything that looks for a home
-            cd /tmp
-            for _ in $(seq 20); do
-              sleep 60
-              {
-                echo "OS layer watchdog (${{ matrix.leg }}), $(date -u +%H:%M:%S) UTC, run ${GITHUB_RUN_ID}"
-                echo '```'
-                ps -eo pid,ppid,stat,wchan:32,etime,cmd | grep -vE ' \[[^]]+\]$' | head -80
-                for p in $(pgrep -f 'pytest tests/test_oslayer_e2e' || true); do timeout 20 sudo "$(command -v py-spy)" dump --nonblocking --pid "$p" || true; done
-                for p in $(pgrep -f 'vaara.cli run' || true); do timeout 20 sudo "$(command -v py-spy)" dump --nonblocking --pid "$p" || true; done
-                for p in $(pgrep -f 'vaara.cli os-guard' || true); do timeout 20 sudo "$(command -v py-spy)" dump --nonblocking --pid "$p" || true; done
-                echo '--- result.txt'; timeout 5 tail -40 "$GITHUB_WORKSPACE/result.txt" || echo "(read blocked)"
-                echo '--- guard.log'; timeout 5 tail -30 "$GITHUB_WORKSPACE/guard.log" || echo "(read blocked)"
-                echo '```'
-              } > /tmp/watchdog.md 2>&1
-              python3 -c 'import json; print(json.dumps({"body": open("/tmp/watchdog.md").read()}))' > /tmp/watchdog.json
-              if [ -n "$PR_NUMBER" ]; then
-                if [ -z "$comment_id" ]; then
-                  comment_id=$(curl -q -sS -m 20 -X POST -H "Authorization: Bearer $GH_TOKEN" -H "Accept: application/vnd.github+json" "$api/issues/${PR_NUMBER}/comments" -d @/tmp/watchdog.json | python3 -c 'import json,sys; print(json.load(sys.stdin).get("id",""))' || true)
-                else
-                  curl -q -sS -m 20 -X PATCH -H "Authorization: Bearer $GH_TOKEN" -H "Accept: application/vnd.github+json" "$api/issues/comments/${comment_id}" -d @/tmp/watchdog.json >/dev/null || true
-                fi
-              fi
-              sleep 30
-            done
-          ) &
           # The suite points HOME at a sandbox; this test needs the operator's
           # real home, which is the one the guard serves.
           # Twenty minutes is three bounded runs with room. Past that, SIGABRT
           # makes pytest's faulthandler print every thread's stack before it
-          # dies, so a hang names its line instead of holding the runner for
-          # six hours with an empty log.
+          # dies, so a hang in the test names its line instead of holding the
+          # runner for six hours with an empty log.
           # Output goes to a file, not through a pipe: an agent process left
           # behind by a killed run would hold a pipe open and the step with it.
           set +e
           VAARA_TEST_USE_REAL_HOME=1 VAARA_OSLAYER_E2E=1 \
-            timeout -s ABRT -k 30 20m pytest tests/test_oslayer_e2e.py -q -rs -k "${{ matrix.select }}" > result.txt 2>&1
+            timeout -s ABRT -k 30 20m pytest tests/test_oslayer_e2e.py -q -rs > result.txt 2>&1
           rc=$?
           set -e
           cat result.txt
@@ -825,10 +766,8 @@ jobs:
             exit 1
           fi
 
-      - name: Guard log, guard stack and kernel refusals
+      - name: Guard log and kernel refusals
         if: always()
         run: |
-          pip install -q py-spy || true
-          for p in $(pgrep -f 'vaara.cli os-guard'); do sudo "$(command -v py-spy)" dump --pid "$p" || true; done
           cat guard.log || true
           sudo dmesg | grep -E 'apparmor="DENIED"|suppressed' | tail -40 || true

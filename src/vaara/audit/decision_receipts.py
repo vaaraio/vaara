@@ -244,6 +244,24 @@ class DecisionReceiptSink:
             )
         return self._key
 
+    def prepare(self) -> None:
+        """Load the key and import the code that mint() needs, ahead of the first decision.
+
+        For a caller that must not import anything once it is serving. The OS
+        guard is one: it holds every open on a mount until one of its threads
+        answers, and a compiled module imported in a worker thread is opened
+        with the GIL held, so the thread that would answer never runs.
+        """
+        from cryptography.hazmat.primitives import hashes
+        from cryptography.hazmat.primitives.asymmetric import ec
+
+        from vaara.attestation import _attest_canonical, decision  # noqa: F401
+
+        with self._lock:
+            # One signature nobody keeps, so whatever the library sets up on
+            # first use (providers, the random pool) is set up now.
+            self._signing_key().sign(b"vaara", ec.ECDSA(hashes.SHA256()))
+
     def mint(self, record: AuditRecord) -> dict[str, Any]:
         """Build and sign the receipt file contents for one decision record."""
         from vaara.attestation.decision import (
