@@ -35,7 +35,7 @@ Years later, on a plane with the wifi off, without Vaara installed and without t
 
 On your own machines. Nothing is sent to us, there is no account and no telemetry. The code is open, so your own people or your supplier can read every line.
 
-Free to download and use, with nothing to sign up for. Paid work, such as a readiness review or a pilot in your own environment, is scoped to your case and priced as a fixed amount agreed before it starts. No subscription, no per-seat fee. Write to hello@vaara.io.
+Free to download and use, with nothing to sign up for. Paid work, such as a readiness review or a pilot in your own environment, is scoped to your case and priced as a fixed amount agreed before it starts. No subscription, no per-seat fee. Vaara is dual-licensed: free under the AGPL-3.0, or under a commercial licence when you build it into a product you ship closed, run a modified version as a service without publishing your changes, or your policy does not allow copyleft. Write to hello@vaara.io.
 
 ### Who has looked at it
 
@@ -61,7 +61,7 @@ Automate night locking, alarms and documentation without losing the right to say
 Having only your own logs to show when a family, an inspector or a court asks. Automation that quietly drifts outside your self-monitoring plan. Arguments about whether a note was approved before it reached the record system.
 
 ### Care and social services: What does Vaara cost?
-Free to download and use, with nothing to sign up for. Paid work, such as a readiness review or a pilot in your own environment, is scoped to your case and priced as a fixed amount agreed before it starts. No subscription, no per-seat fee. Write to hello@vaara.io.
+Free to download and use, with nothing to sign up for. Paid work, such as a readiness review or a pilot in your own environment, is scoped to your case and priced as a fixed amount agreed before it starts. No subscription, no per-seat fee. Vaara is dual-licensed: free under the AGPL-3.0, or under a commercial licence when you build it into a product you ship closed, run a modified version as a service without publishing your changes, or your policy does not allow copyleft. Write to hello@vaara.io.
 
 ### Care and social services: What does Vaara save us?
 Hours of reconstruction for every complaint or inspection question. A rollout that would otherwise stall at the first supervisory question. The cost of re-auditing automation each time a supplier changes it.
@@ -80,7 +80,7 @@ Let agents and automations initiate payments within a mandate the user set. Hold
 Payments that leave because a prompt or a document told the software to send them. Disputes where the only record is the operator's own database. Rebuilding evidence by hand when an incident has to be reported.
 
 ### Payments and finance: What does Vaara cost?
-Free to download and use, with nothing to sign up for. Paid work, such as a readiness review or a pilot in your own environment, is scoped to your case and priced as a fixed amount agreed before it starts. No subscription, no per-seat fee. Write to hello@vaara.io.
+Free to download and use, with nothing to sign up for. Paid work, such as a readiness review or a pilot in your own environment, is scoped to your case and priced as a fixed amount agreed before it starts. No subscription, no per-seat fee. Vaara is dual-licensed: free under the AGPL-3.0, or under a commercial licence when you build it into a product you ship closed, run a modified version as a service without publishing your changes, or your policy does not allow copyleft. Write to hello@vaara.io.
 
 ### Payments and finance: What does Vaara save us?
 Investigation time per disputed or reported payment. Losses from payments to payees nobody approved. Engineering work to make each automation auditable on its own.
@@ -99,7 +99,7 @@ Bring AI assistants and automation into services without opening a gap in accoun
 Being unable to show who or what made an automated decision. Lock-in to one supplier's logs for your own evidence. Re-tendering because the evidence requirement was missed the first time.
 
 ### Public sector: What does Vaara cost?
-Free to download and use, with nothing to sign up for. Paid work, such as a readiness review or a pilot in your own environment, is scoped to your case and priced as a fixed amount agreed before it starts. No subscription, no per-seat fee. Write to hello@vaara.io.
+Free to download and use, with nothing to sign up for. Paid work, such as a readiness review or a pilot in your own environment, is scoped to your case and priced as a fixed amount agreed before it starts. No subscription, no per-seat fee. Vaara is dual-licensed: free under the AGPL-3.0, or under a commercial licence when you build it into a product you ship closed, run a modified version as a service without publishing your changes, or your policy does not allow copyleft. Write to hello@vaara.io.
 
 ### Public sector: What does Vaara save us?
 Staff time spent answering information requests about automated steps. An audit trail you would otherwise commission as a separate project. Supplier changes that no longer reset your evidence.
@@ -118,7 +118,7 @@ Use decision support and documentation assistants with the approval step on reco
 An approval claim that rests on screenshots and goodwill. Supplier logs that you cannot read without the supplier. Rebuilding a timeline by hand after an incident.
 
 ### Healthcare: What does Vaara cost?
-Free to download and use, with nothing to sign up for. Paid work, such as a readiness review or a pilot in your own environment, is scoped to your case and priced as a fixed amount agreed before it starts. No subscription, no per-seat fee. Write to hello@vaara.io.
+Free to download and use, with nothing to sign up for. Paid work, such as a readiness review or a pilot in your own environment, is scoped to your case and priced as a fixed amount agreed before it starts. No subscription, no per-seat fee. Vaara is dual-licensed: free under the AGPL-3.0, or under a commercial licence when you build it into a product you ship closed, run a modified version as a service without publishing your changes, or your policy does not allow copyleft. Write to hello@vaara.io.
 
 ### Healthcare: What does Vaara save us?
 Clinician and quality-team time per incident review. A separate audit project for every new AI tool. Delay in rollouts that wait on the evidence question.
@@ -137,7 +137,7 @@ Let automation handle routine operations while risky changes wait for an operato
 Changes that nobody can attribute after an outage. Evidence split across every vendor's own logging. An AI assistant acting on a system it was never meant to reach.
 
 ### Energy, industry and infrastructure: What does Vaara cost?
-Free to download and use, with nothing to sign up for. Paid work, such as a readiness review or a pilot in your own environment, is scoped to your case and priced as a fixed amount agreed before it starts. No subscription, no per-seat fee. Write to hello@vaara.io.
+Free to download and use, with nothing to sign up for. Paid work, such as a readiness review or a pilot in your own environment, is scoped to your case and priced as a fixed amount agreed before it starts. No subscription, no per-seat fee. Vaara is dual-licensed: free under the AGPL-3.0, or under a commercial licence when you build it into a product you ship closed, run a modified version as a service without publishing your changes, or your policy does not allow copyleft. Write to hello@vaara.io.
 
 ### Energy, industry and infrastructure: What does Vaara save us?
 Root-cause time after incidents. Duplicate evidence work for each regulator and insurer. Downtime from changes that should have waited for a person.
@@ -156,7 +156,7 @@ Allow coding agents broadly, with one policy across every agent your teams use. 
 An agent that deletes, leaks or pushes because a file told it to. A hook that crashes and lets everything through: Vaara's hooks fail closed. Finding out from a customer what an agent did.
 
 ### Software teams: What does Vaara cost?
-Free to download and use, with nothing to sign up for. Paid work, such as a readiness review or a pilot in your own environment, is scoped to your case and priced as a fixed amount agreed before it starts. No subscription, no per-seat fee. Write to hello@vaara.io.
+Free to download and use, with nothing to sign up for. Paid work, such as a readiness review or a pilot in your own environment, is scoped to your case and priced as a fixed amount agreed before it starts. No subscription, no per-seat fee. Vaara is dual-licensed: free under the AGPL-3.0, or under a commercial licence when you build it into a product you ship closed, run a modified version as a service without publishing your changes, or your policy does not allow copyleft. Write to hello@vaara.io.
 
 ### Software teams: What does Vaara save us?
 Security review time per agent rollout. Incident time when something goes wrong. Building a separate guardrail for every agent tool.
