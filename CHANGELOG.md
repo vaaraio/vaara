@@ -9,6 +9,9 @@ and this project follows [Semantic Versioning](https://semver.org/spec/v2.0.0.ht
 ### Added
 - The Vaara MCP server and `vaara-mcp-proxy` record the client that connects to them over stdio. On `initialize` they walk the process table above themselves, past launchers such as `npx`, `uvx` and `sh`, to the first agent Vaara has an adapter for, and keep the client's own `clientInfo` beside it. One `agent_seen` record goes to the agents trail that `vaara scan --watch` writes, as governed, reachable or ungoverned, so the macOS app notifies when an agent Vaara does not govern connects. When only `clientInfo` names the client, the record says so. The record is written once per process, off the request path, and a session that ends straight after `initialize` waits up to three seconds for it. `VAARA_BEACON=0` turns it off. Over HTTP nothing is recorded, since there is no parent process to read.
 
+### Fixed
+- A heredoc body is matched again when the same command changes what its reader runs. `cat() { bash; }; cat <<EOF` ran the body as shell while the Bash rules skipped it as file content. A function or alias named `cat`, `tee`, `python` or `node`, an assignment to `PATH`, `BASH_ENV` or `ENV`, or `enable` now keeps every body matched.
+
 ## [2.7.1] - 2026-10-09
 
 ### Fixed
