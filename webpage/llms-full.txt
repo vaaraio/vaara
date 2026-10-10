@@ -303,3 +303,24 @@ Every surface in one line each, with a link to the thing itself. Nothing here as
 - llms.txt: The same ground in one file, for machine readers
 
 Vaara produces evidence. It does not certify anyone, and a passing run establishes portability rather than correctness. Two of the defects found so far were in the claims on this site rather than in the code, and both were found by people running the tests somewhere Vaara had never run them.
+
+## Receipt explorer | Vaara
+URL: https://vaara.io/verify.html
+
+Check a receipt in your own browser, or look one up in the public log. The check runs in this tab: nothing is uploaded and there is no account.
+
+This is the public log Vaara publishes heads to. Publishing is opt-in and off by default, so an absence here means nothing was published, not that nothing happened.
+
+A digest reveals no content, no size and no identity. What it does reveal is that something was published, and when.
+
+Entries carry a public key that is generated on your own machine, so they are pseudonymous rather than anonymous: everything published with one key can be grouped by anyone, and the moment you point someone at an entry, that key is publicly yours. Use a separate key per context if you do not want two trails sharing one pseudonym.
+
+Publication is permanent and irreversible. It cannot be withdrawn, deleted or corrected once the log integrates it, so there is no erasure to request afterwards. The log is public and enumerable, which means everyone rather than only whoever runs it.
+
+The default log, Sigstore Rekor, is operated in the United States by the Linux Foundation. That matters much less than publishing to everyone, but some buyers will ask, and Vaara can publish to a self-hosted or EU-operated log instead.
+
+Publishing is also the only usage signal Vaara ever receives, and it exists because you switched it on, not because anything here collects it.
+
+A passing signature proves the payload is byte-identical to what the holder of that key signed. It says nothing about whether the key belongs to who you think, or whether the statement is true. Pin the public key from a source the signer does not control before treating a pass as meaningful.
+
+The independent Python checker this page mirrors ships in the repository under tests/vectors/.

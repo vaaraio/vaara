@@ -43,7 +43,7 @@ NAV = {
         "product_items": [("gate", "Portti"), ("receipts", "Kuitit"), ("cage", "Häkki"),
                           ("app", "Työpöytäsovellus"), ("test-it-yourself", "Testaa itse")],
         "test_items": [("/fi/products/test-it-yourself.html", "Testaa itse"),
-                       ("/verify.html", "Kuittien tarkistus"), ("/conformance.html", "Vaatimustenmukaisuustulokset")],
+                       ("/fi/verify.html", "Kuittien tarkistus"), ("/conformance.html", "Vaatimustenmukaisuustulokset")],
         "foot_open": "Avointa lähdekoodia. Toimii omilla koneillanne. Mitään ei lähetetä meille.",
         "foot_code": "Lähdekoodi", "foot_draft": "IETF-luonnos", "foot_conf": "Vaatimustenmukaisuustulokset",
         "foot_tech": "Tekninen yleiskuva", "foot_pub": "Kaikki, mitä Vaara julkaisee",
