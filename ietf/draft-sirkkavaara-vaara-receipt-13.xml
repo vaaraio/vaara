@@ -1847,7 +1847,7 @@ execution receipt:
           <date year="2023" month="December"/>
         </front>
       </reference>
-      <reference anchor="VAARA-REPO" target="https://github.com/vaaraio/vaara/tree/f0b09b096a2c458519fad7aa8586c46a012e14f7">
+      <reference anchor="VAARA-REPO" target="https://github.com/vaaraio/vaara/tree/35e3d6c5ae21f322a230e63c4f104adb3d3b0494">
         <front>
           <title>Vaara Receipt Specification (vaara.receipt/v1) and conformance vectors</title>
           <author>
