@@ -177,9 +177,9 @@
       govern members they do not define.</t>
       <t><xref target="cddl"/> gives the envelope in CDDL
       (<xref target="RFC8610"/>). The CDDL and the prose are both normative.
-      Rules the CDDL cannot express, such as runningCount equal to seq + 1 and
-      the issuer block alg equal to the envelope alg, are stated in the prose
-      only.</t>
+      Rules the CDDL cannot express, such as runningCount equal to seq + 1,
+      the issuer block alg equal to the envelope alg, and the absence of
+      sigSuite from a decision receipt, are stated in the prose only.</t>
 
       <section anchor="algs" numbered="true">
         <name>Algorithms and Signature Encoding</name>
@@ -282,14 +282,14 @@ execution receipt:
             <tr><td>secretVersion</td><td>string</td><td><bcp14>REQUIRED</bcp14></td><td>Names the verification key. A consumer resolves the key from iss and secretVersion out of band; this document defines no resolution protocol.</td></tr>
             <tr><td>aud</td><td>string</td><td><bcp14>OPTIONAL</bcp14></td><td>The relying party the receipt was issued for.</td></tr>
             <tr><td>taskId</td><td>string</td><td><bcp14>OPTIONAL</bcp14></td><td>The long-running task the action belongs to.</td></tr>
-            <tr><td>completeness</td><td>object</td><td><bcp14>OPTIONAL</bcp14></td><td>The per-boundary sequence (<xref target="profile-authz"/>).</td></tr>
+            <tr><td>completeness</td><td>object</td><td><bcp14>OPTIONAL</bcp14></td><td>The per-boundary sequence of this receipt, in the issuer block. The same block, carried in the evidence record, is the completeness layer of <xref target="profile-authz"/>.</td></tr>
             <tr><td>sigSuite</td><td>string</td><td><bcp14>OPTIONAL</bcp14></td><td>The hybrid signature suite the issuer committed to (<xref target="pq"/>). Execution receipts only.</td></tr>
             <tr><td>cryptoPosture</td><td>object</td><td><bcp14>OPTIONAL</bcp14></td><td>The algorithms protecting the receipt and their post-quantum level (<xref target="pq"/>).</td></tr>
           </tbody>
         </table>
         <t>aud and taskId, when present, are non-empty strings. A consumer asked
         to check either against an expected value reports three outcomes:
-        bound (present and equal), contradicted (present and different), or
+        bound (present and equal), conflict (present and different), or
         unsupported (absent). An absent aud or taskId states that the issuer
         bound none. It does not state that the receipt was issued for any
         relying party or task.</t>
@@ -697,8 +697,11 @@ execution receipt:
         <ul>
           <li>An authorization record (schema = vaara.authorization/v0) whose JCS
           digest is the receipt's evidenceRef.digest. It binds toolName, tenantId,
-          the grant by content address (grantFingerprint = sha256(JCS(signed
-          grant))), the runtime argument commitment (argsCommitment =
+          the grant by content address (grantFingerprint = sha256(JCS(grant))
+          over the grant with its signature member removed, the bytes the
+          grant's signature covers; an ECDSA signature has two valid encodings
+          for one signing act, so a digest over the signature would give one
+          grant two identities), the runtime argument commitment (argsCommitment =
           sha256(JCS(args))), the evaluated capabilities, and the verdict /
           reason.</li>
           <li>The raw arguments never enter the record; only their commitment
@@ -730,33 +733,7 @@ execution receipt:
           byte-identical. The seal may also carry maxClass, the highest action class
           the boundary authorized; it bounds a gap's worst case and is itself
           optional.</li>
-
-          <li>An optional disposition block names what kind of party disposed of
-          the decision, inside the record and therefore under the signature. It
-          binds approver, exactly "human" or "policy", and humanDisposed, a
-          boolean. humanDisposed is true only when a human acted on this
-          decision. A producer <bcp14>MUST NOT</bcp14> emit humanDisposed true with an approver
-          other than "human". The converse is permitted: approver "human" with
-          humanDisposed false records a human who reviewed while the disposition
-          stayed automatic, which only narrows the claim. The
-          block is absent when no disposition is asserted, leaving the record
-          byte-identical to a disposition-free decision.</li>
         </ul>
-        <t>The disposition block exists because one verdict word covers
-        dispositions a relying party has to separate. A decision admitted because
-        a human approved it, and a decision admitted because an earlier human
-        approval was replayed against a matching argument commitment, both carry
-        the verdict "allow". The second was disposed of by the deployment, against
-        an argument commitment some human approved at another time and on another
-        action. Where that difference reaches a consumer only as free text, a
-        consumer that must branch on human involvement cannot do it from the
-        signed members. The approver vocabulary is closed at two values: a value an implementation may invent is a value a relying party
-        cannot branch on.</t>
-        <t>A consumer <bcp14>MUST NOT</bcp14> infer human involvement from an absent disposition
-        block. Absence states that no disposition was asserted, and records
-        written before this block existed carry none. See
-        tests/vectors/decision_disposition_v0/ for the live-approval,
-        replayed-approval and policy-claiming-human cases.</t>
         <t>A verdict is only as meaningful as what the issuer could see. "allow"
         over an unbounded surface and "allow" over a stated one are identical bytes
         with opposite meaning, so an absent refusal reads as fact only against a
@@ -895,7 +872,8 @@ execution receipt:
         of. It takes any external execution-evidence artifact, content-addresses it,
         and binds it through this envelope unchanged, with no field names that depend
         on what produced it. A verifier carrying an external_execution_evidence slot
-        (linked_call_id / evidence_hash / evidence_type) resolves that slot against a
+        (linked_call_id / evidence_hash / evidence_type, written linkedCallId,
+        evidenceHash and evidenceType in the vectors) resolves that slot against a
         vaara.receipt/v1 authorization receipt as the recomputable producer:</t>
         <ul>
           <li>evidence_hash = sha256(JCS(evidence_record)), equal to the receipt's
@@ -943,7 +921,8 @@ execution receipt:
             <tr><td>decidedAt</td><td>ISO 8601 UTC with milliseconds.</td></tr>
             <tr><td>recordHash</td><td>"sha256:" and the trail record's own hash.</td></tr>
             <tr><td>previousHash</td><td>"sha256:" and the hash of the record before it. An empty genesis link is written as the SHA-256 of the empty string.</td></tr>
-            <tr><td>decisionDetail, approver, humanDisposed</td><td>Present only when the trail record carries them.</td></tr>
+            <tr><td>decisionDetail</td><td>The refinement behind the verdict, present only when the trail record carries one.</td></tr>
+            <tr><td>approver, humanDisposed</td><td>The disposition: present together, only when the trail record carries an approver. See below.</td></tr>
             <tr><td>cage</td><td><bcp14>OPTIONAL</bcp14>. The cage block (<xref target="cage-block"/>).</td></tr>
           </tbody>
         </table>
@@ -956,6 +935,31 @@ execution receipt:
         hash matches recordHash; a receipt whose record is missing from the trail,
         or whose hash differs, fails. See
         tests/vectors/trail_decision_v0/_check_independent.py.</t>
+        <t>approver and humanDisposed name what kind of party disposed of the
+        decision, inside the evidence record and therefore under the signature.
+        approver is exactly "human" or "policy", and humanDisposed is a boolean
+        that is true only when a human acted on this decision. A producer
+        <bcp14>MUST NOT</bcp14> emit humanDisposed true with an approver other than
+        "human". The converse is permitted: approver "human" with humanDisposed
+        false records a human who reviewed while the disposition stayed automatic,
+        which only narrows the claim. Both members are absent when no disposition
+        was asserted, leaving the record byte-identical to a disposition-free
+        decision.</t>
+        <t>The disposition exists because one verdict word covers dispositions a
+        relying party has to separate. A decision admitted because a human
+        approved it, and a decision admitted because an earlier human approval was
+        replayed against a matching argument commitment, both carry the verdict
+        "allow". The second was disposed of by the deployment, against an argument
+        commitment some human approved at another time and on another action.
+        Where that difference reaches a consumer only as free text, a consumer that
+        must branch on human involvement cannot do it from the signed members. The
+        approver vocabulary is closed at two values: a value an implementation may
+        invent is a value a relying party cannot branch on.</t>
+        <t>A consumer <bcp14>MUST NOT</bcp14> infer human involvement from absent
+        disposition members. Absence states that no disposition was asserted, and
+        records written before these members existed carry none. See
+        tests/vectors/decision_disposition_v0/ for the live-approval,
+        replayed-approval and policy-claiming-human cases.</t>
 
         <section anchor="cage-block" numbered="true">
           <name>Cage Block</name>
@@ -1068,12 +1072,13 @@ execution receipt:
         second party recomputes every digest, signature, back link, and
         completeness verdict from the bytes alone. Independent reimplementations
         have reproduced these vectors.</li>
-        <li>An end-user application that applies the allow, escalate, or deny
-        decision and emits the receipt over actions an operator selects, and
-        surfaces the decision and the receipt to a non-technical user. The operator
-        can point it at arbitrary actions, including local file operations, not
-        only AI agent tool calls, which makes it a general accountable-autonomy
-        surface rather than an agent-specific one.</li>
+        <li>A desktop application for macOS that reads the engine's audit
+        trails, shows each allow, escalate, or deny decision as it is recorded,
+        routes the machine's agent clients through the governance proxy, and
+        verifies decision receipts with its own JCS, SHA-256, and P-256 code
+        written in Swift. That verifier runs against the same conformance
+        vectors as the library in continuous integration, so the two cannot
+        drift apart unnoticed.</li>
       </ul>
       <t>A default install of the library signs a receipt for every decision.
       The signing dependencies are part of the base package, not an optional
@@ -1093,8 +1098,9 @@ execution receipt:
       production hardware. It does not consult AMD's certificate revocation list.
       The in-guest report emitter follows the kernel interface and has not yet
       been run inside a guest by the implementation.</t>
-      <t>The library, vectors, and checkers are exercised on every release; the
-      application is distributed as a signed build.</t>
+      <t>The library, vectors, and checkers are exercised on every release.
+      The application is built from source on the installing machine by its
+      package formula and is not distributed as a notarized build.</t>
     </section>
 
     <section anchor="versioning" numbered="true">
@@ -1118,14 +1124,15 @@ execution receipt:
       <name>Security Considerations</name>
       <t>The integrity of a receipt rests on the <xref target="signed-payload"/>
       signature over the JCS-canonical signed payload, not on any timestamp anchor
-      or trust root. A consumer <bcp14>MUST</bcp14> verify that signature against the public key
-      named under "alg" before relying on any field. Because the signed payload
+      or trust root. A consumer <bcp14>MUST</bcp14> verify that signature, under the
+      algorithm "alg" names and with the key the issuer block names through iss
+      and secretVersion, before relying on any field. Because the signed payload
       excludes "signature" and "timestampAnchors", anchors added after signing
       cannot alter the signed content; a consumer <bcp14>MUST</bcp14> recompute each
       anchoredDigest from the signed payload rather than trusting the anchor's
       stated value.</t>
-      <t>Verifying that signature establishes that the key named under "alg"
-      produced the signed payload and that the payload has not changed since. It
+      <t>Verifying that signature establishes that the key the issuer block
+      names produced the signed payload and that the payload has not changed since. It
       says nothing about the state of that key now. Offline verification is a
       computation over the parameters the consumer holds, while revocation is a
       property of the present, and this document defines no revocation mechanism
@@ -1241,7 +1248,7 @@ execution receipt:
         <dt><xref target="AIACT"/> Art. 13: Operation transparent enough for deployers to interpret output.</dt>
         <dd>The one-page audit summary rendered from a record set: verdict, counts, findings, with pinned bytes. Suites: audit_summary_v0, record_set_v0.</dd>
         <dt><xref target="eIDAS"/> Art. 41 and 42: A qualified electronic time stamp enjoys a presumption of accuracy of the date and time it indicates.</dt>
-        <dd>The rfc3161-eidas-qualified anchor type (<xref target="anchors"/>), an RFC 3161 token from a qualified trust service over the record's canonical bytes. Suites: qualified_time_v0.</dd>
+        <dd>An RFC 3161 token from a qualified trust service over the record's canonical bytes: the rfc3161-eidas-qualified anchor on a decision receipt (<xref target="anchors"/>) and existenceProof on an execution receipt (<xref target="existence"/>). Suites: qualified_time_v0, which exercises existenceProof.</dd>
         <dt><xref target="GDPR"/> Art. 5(1)(c): Data minimisation.</dt>
         <dd>Evidence enters the receipt by content digest, never by value (<xref target="evidence"/>); the record proves what was decided on without carrying it. Suites: evidence_ref_v0.</dd>
         <dt><xref target="GDPR"/> Chapter V: Transfers of personal data to third countries.</dt>

@@ -23,7 +23,7 @@ from vaara.attestation._decision_types import (
     decision_record_from_dict,
 )
 from vaara.attestation._receipt_emit import emit_receipt, verify_receipt_signature
-from vaara.attestation._receipt_types import BackLink, OutcomeDerived
+from vaara.attestation._receipt_types import BackLink, OutcomeDerived, receipt_from_dict
 
 KEY = ec.generate_private_key(ec.SECP256R1())
 LINK = BackLink(attestation_digest="sha256:" + "0" * 64, attestation_nonce="n-1")
@@ -74,4 +74,30 @@ def test_a_member_the_format_does_not_define_is_refused(where):
     wire = _decision().to_dict()
     (wire if where == "top" else wire["decisionDerived"])["extra"] = "x"
     with pytest.raises(AttestationError, match="unrecognized"):
+        decision_record_from_dict(wire)
+
+
+def test_a_pq_signature_member_the_format_does_not_define_is_refused():
+    wire = _receipt().to_dict()
+    wire["pqSignature"] = {"alg": "ML-DSA-65", "keyid": "k", "sig": "ab", "extra": "x"}
+    with pytest.raises(AttestationError, match="unrecognized"):
+        receipt_from_dict(wire)
+
+
+@pytest.mark.parametrize("version", [0, 2, "1", True])
+def test_a_version_other_than_one_is_refused_on_both_kinds(version):
+    decision = _decision().to_dict()
+    decision["version"] = version
+    with pytest.raises(AttestationError, match="version"):
+        decision_record_from_dict(decision)
+    receipt = _receipt().to_dict()
+    receipt["version"] = version
+    with pytest.raises(AttestationError, match="version"):
+        receipt_from_dict(receipt)
+
+
+def test_a_decision_receipt_carrying_a_hybrid_suite_is_refused():
+    wire = _decision().to_dict()
+    wire["issuerAsserted"]["sigSuite"] = "ES256+ML-DSA-65"
+    with pytest.raises(AttestationError, match="sigSuite"):
         decision_record_from_dict(wire)

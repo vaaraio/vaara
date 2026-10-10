@@ -93,19 +93,19 @@ Table of Contents
      6.4.  Profile Example: Authorization Decision . . . . . . . . .  22
      6.5.  Profile Example: AP2 Checkout Binding . . . . . . . . . .  25
      6.6.  Profile Example: TAP Request Binding  . . . . . . . . . .  26
-     6.7.  Profile: Generic External Execution Evidence  . . . . . .  27
+     6.7.  Profile: Generic External Execution Evidence  . . . . . .  26
      6.8.  Profile: Engine Decision  . . . . . . . . . . . . . . . .  27
        6.8.1.  Cage Block  . . . . . . . . . . . . . . . . . . . . .  29
-   7.  Conformance . . . . . . . . . . . . . . . . . . . . . . . . .  30
-   8.  Implementation Status . . . . . . . . . . . . . . . . . . . .  31
-   9.  Versioning  . . . . . . . . . . . . . . . . . . . . . . . . .  32
+   7.  Conformance . . . . . . . . . . . . . . . . . . . . . . . . .  31
+   8.  Implementation Status . . . . . . . . . . . . . . . . . . . .  32
+   9.  Versioning  . . . . . . . . . . . . . . . . . . . . . . . . .  33
    10. Security Considerations . . . . . . . . . . . . . . . . . . .  33
-   11. Privacy Considerations  . . . . . . . . . . . . . . . . . . .  34
-   12. Regulatory Applicability  . . . . . . . . . . . . . . . . . .  35
-   13. Related Work  . . . . . . . . . . . . . . . . . . . . . . . .  37
-   14. IANA Considerations . . . . . . . . . . . . . . . . . . . . .  39
-   15. Normative References  . . . . . . . . . . . . . . . . . . . .  39
-   16. Informative References  . . . . . . . . . . . . . . . . . . .  40
+   11. Privacy Considerations  . . . . . . . . . . . . . . . . . . .  35
+   12. Regulatory Applicability  . . . . . . . . . . . . . . . . . .  36
+   13. Related Work  . . . . . . . . . . . . . . . . . . . . . . . .  38
+   14. IANA Considerations . . . . . . . . . . . . . . . . . . . . .  40
+   15. Normative References  . . . . . . . . . . . . . . . . . . . .  40
+   16. Informative References  . . . . . . . . . . . . . . . . . . .  41
 
 
 
@@ -114,9 +114,9 @@ Sirkkavaara               Expires 14 April 2027                 [Page 2]
 Internet-Draft                Vaara Receipt                 October 2026
 
 
-   Appendix A.  Envelope Schema (CDDL) . . . . . . . . . . . . . . .  43
-   Appendix B.  Cage Drivers and Bases in Use  . . . . . . . . . . .  47
-   Author's Address  . . . . . . . . . . . . . . . . . . . . . . . .  49
+   Appendix A.  Envelope Schema (CDDL) . . . . . . . . . . . . . . .  44
+   Appendix B.  Cage Drivers and Bases in Use  . . . . . . . . . . .  48
+   Author's Address  . . . . . . . . . . . . . . . . . . . . . . . .  50
 
 1.  Introduction
 
@@ -309,8 +309,9 @@ Internet-Draft                Vaara Receipt                 October 2026
 
    Appendix A gives the envelope in CDDL ([RFC8610]).  The CDDL and the
    prose are both normative.  Rules the CDDL cannot express, such as
-   runningCount equal to seq + 1 and the issuer block alg equal to the
-   envelope alg, are stated in the prose only.
+   runningCount equal to seq + 1, the issuer block alg equal to the
+   envelope alg, and the absence of sigSuite from a decision receipt,
+   are stated in the prose only.
 
 3.1.  Algorithms and Signature Encoding
 
@@ -326,7 +327,6 @@ Internet-Draft                Vaara Receipt                 October 2026
    of the shared secret, so it is not recomputable by an arbitrary third
    party.  Producers that intend receipts for parties outside their own
    trust domain SHOULD use ES256 or RS256.
-
 
 
 
@@ -460,44 +460,44 @@ Internet-Draft                Vaara Receipt                 October 2026
    execution receipt) have the same members.  Both are inside the signed
    payload.
 
-    +===============+========+==========+============================+
-    | Member        | Type   | Presence | Meaning                    |
-    +===============+========+==========+============================+
-    | iss           | string | REQUIRED | The issuer.                |
-    +---------------+--------+----------+----------------------------+
-    | sub           | string | REQUIRED | The subject: the agent or  |
-    |               |        |          | principal the action was   |
-    |               |        |          | taken by or for.           |
-    +---------------+--------+----------+----------------------------+
-    | iat           | string | REQUIRED | Issuance time, an          |
-    |               |        |          | [RFC3339] date-time in     |
-    |               |        |          | UTC.  This is a string,    |
-    |               |        |          | not a JSON Web Token       |
-    |               |        |          | NumericDate.               |
-    +---------------+--------+----------+----------------------------+
-    | nonce         | string | REQUIRED | Unique per receipt.        |
-    |               |        |          | Producers SHOULD draw at   |
-    |               |        |          | least 128 bits from a      |
-    |               |        |          | cryptographic random       |
-    |               |        |          | source.                    |
-    +---------------+--------+----------+----------------------------+
-    | alg           | string | REQUIRED | Equal to the envelope alg  |
-    |               |        |          | (Section 3.1).             |
-    +---------------+--------+----------+----------------------------+
-    | secretVersion | string | REQUIRED | Names the verification     |
-    |               |        |          | key.  A consumer resolves  |
-    |               |        |          | the key from iss and       |
-    |               |        |          | secretVersion out of band; |
-    |               |        |          | this document defines no   |
-    |               |        |          | resolution protocol.       |
-    +---------------+--------+----------+----------------------------+
-    | aud           | string | OPTIONAL | The relying party the      |
-    |               |        |          | receipt was issued for.    |
-    +---------------+--------+----------+----------------------------+
-    | taskId        | string | OPTIONAL | The long-running task the  |
-    |               |        |          | action belongs to.         |
-    +---------------+--------+----------+----------------------------+
-    | completeness  | object | OPTIONAL | The per-boundary sequence  |
+   +===============+========+==========+==============================+
+   | Member        | Type   | Presence | Meaning                      |
+   +===============+========+==========+==============================+
+   | iss           | string | REQUIRED | The issuer.                  |
+   +---------------+--------+----------+------------------------------+
+   | sub           | string | REQUIRED | The subject: the agent or    |
+   |               |        |          | principal the action was     |
+   |               |        |          | taken by or for.             |
+   +---------------+--------+----------+------------------------------+
+   | iat           | string | REQUIRED | Issuance time, an [RFC3339]  |
+   |               |        |          | date-time in UTC.  This is a |
+   |               |        |          | string, not a JSON Web Token |
+   |               |        |          | NumericDate.                 |
+   +---------------+--------+----------+------------------------------+
+   | nonce         | string | REQUIRED | Unique per receipt.          |
+   |               |        |          | Producers SHOULD draw at     |
+   |               |        |          | least 128 bits from a        |
+   |               |        |          | cryptographic random source. |
+   +---------------+--------+----------+------------------------------+
+   | alg           | string | REQUIRED | Equal to the envelope alg    |
+   |               |        |          | (Section 3.1).               |
+   +---------------+--------+----------+------------------------------+
+   | secretVersion | string | REQUIRED | Names the verification key.  |
+   |               |        |          | A consumer resolves the key  |
+   |               |        |          | from iss and secretVersion   |
+   |               |        |          | out of band; this document   |
+   |               |        |          | defines no resolution        |
+   |               |        |          | protocol.                    |
+   +---------------+--------+----------+------------------------------+
+   | aud           | string | OPTIONAL | The relying party the        |
+   |               |        |          | receipt was issued for.      |
+   +---------------+--------+----------+------------------------------+
+   | taskId        | string | OPTIONAL | The long-running task the    |
+   |               |        |          | action belongs to.           |
+   +---------------+--------+----------+------------------------------+
+   | completeness  | object | OPTIONAL | The per-boundary sequence of |
+   |               |        |          | this receipt, in the issuer  |
+   |               |        |          | block.  The same block,      |
 
 
 
@@ -506,24 +506,25 @@ Sirkkavaara               Expires 14 April 2027                 [Page 9]
 Internet-Draft                Vaara Receipt                 October 2026
 
 
-    |               |        |          | (Section 6.4).             |
-    +---------------+--------+----------+----------------------------+
-    | sigSuite      | string | OPTIONAL | The hybrid signature suite |
-    |               |        |          | the issuer committed to    |
-    |               |        |          | (Section 3.5).  Execution  |
-    |               |        |          | receipts only.             |
-    +---------------+--------+----------+----------------------------+
-    | cryptoPosture | object | OPTIONAL | The algorithms protecting  |
-    |               |        |          | the receipt and their      |
-    |               |        |          | post-quantum level         |
-    |               |        |          | (Section 3.5).             |
-    +---------------+--------+----------+----------------------------+
+   |               |        |          | carried in the evidence      |
+   |               |        |          | record, is the completeness  |
+   |               |        |          | layer of Section 6.4.        |
+   +---------------+--------+----------+------------------------------+
+   | sigSuite      | string | OPTIONAL | The hybrid signature suite   |
+   |               |        |          | the issuer committed to      |
+   |               |        |          | (Section 3.5).  Execution    |
+   |               |        |          | receipts only.               |
+   +---------------+--------+----------+------------------------------+
+   | cryptoPosture | object | OPTIONAL | The algorithms protecting    |
+   |               |        |          | the receipt and their post-  |
+   |               |        |          | quantum level (Section 3.5). |
+   +---------------+--------+----------+------------------------------+
 
                       Table 3: Issuer block members
 
    aud and taskId, when present, are non-empty strings.  A consumer
    asked to check either against an expected value reports three
-   outcomes: bound (present and equal), contradicted (present and
+   outcomes: bound (present and equal), conflict (present and
    different), or unsupported (absent).  An absent aud or taskId states
    that the issuer bound none.  It does not state that the receipt was
    issued for any relying party or task.
@@ -547,7 +548,6 @@ Internet-Draft                Vaara Receipt                 October 2026
    (names the ML-DSA verification key), and sig (the lowercase
    hexadecimal ML-DSA-65 signature over the same signed payload bytes
    the classical signature covers).
-
 
 
 
@@ -1192,9 +1192,12 @@ Internet-Draft                Vaara Receipt                 October 2026
    *  An authorization record (schema = vaara.authorization/v0) whose
       JCS digest is the receipt's evidenceRef.digest.  It binds
       toolName, tenantId, the grant by content address (grantFingerprint
-      = sha256(JCS(signed grant))), the runtime argument commitment
-      (argsCommitment = sha256(JCS(args))), the evaluated capabilities,
-      and the verdict / reason.
+      = sha256(JCS(grant)) over the grant with its signature member
+      removed, the bytes the grant's signature covers; an ECDSA
+      signature has two valid encodings for one signing act, so a digest
+      over the signature would give one grant two identities), the
+      runtime argument commitment (argsCommitment = sha256(JCS(args))),
+      the evaluated capabilities, and the verdict / reason.
 
    *  The raw arguments never enter the record; only their commitment
       does, so the receipt is publishable while the arguments stay
@@ -1220,12 +1223,9 @@ Internet-Draft                Vaara Receipt                 October 2026
       is absent when no sequence is asserted, leaving the record byte-
       identical to a completeness-free decision.
 
-
-
-
-
-
-
+   *  An optional sealing record finalizes the boundary: a terminal
+      completeness block ({boundaryId, sealed: true, total: N}) that
+      pins the boundary's final count independently of the per-record
 
 
 
@@ -1234,44 +1234,11 @@ Sirkkavaara               Expires 14 April 2027                [Page 22]
 Internet-Draft                Vaara Receipt                 October 2026
 
 
-   *  An optional sealing record finalizes the boundary: a terminal
-      completeness block ({boundaryId, sealed: true, total: N}) that
-      pins the boundary's final count independently of the per-record
       sequence.  It is additive and emitted once the boundary is closed;
       a boundary that is never sealed verifies exactly as before, with
       the seal absent and the stream byte-identical.  The seal may also
       carry maxClass, the highest action class the boundary authorized;
       it bounds a gap's worst case and is itself optional.
-
-   *  An optional disposition block names what kind of party disposed of
-      the decision, inside the record and therefore under the signature.
-      It binds approver, exactly "human" or "policy", and humanDisposed,
-      a boolean. humanDisposed is true only when a human acted on this
-      decision.  A producer MUST NOT emit humanDisposed true with an
-      approver other than "human".  The converse is permitted: approver
-      "human" with humanDisposed false records a human who reviewed
-      while the disposition stayed automatic, which only narrows the
-      claim.  The block is absent when no disposition is asserted,
-      leaving the record byte-identical to a disposition-free decision.
-
-   The disposition block exists because one verdict word covers
-   dispositions a relying party has to separate.  A decision admitted
-   because a human approved it, and a decision admitted because an
-   earlier human approval was replayed against a matching argument
-   commitment, both carry the verdict "allow".  The second was disposed
-   of by the deployment, against an argument commitment some human
-   approved at another time and on another action.  Where that
-   difference reaches a consumer only as free text, a consumer that must
-   branch on human involvement cannot do it from the signed members.
-   The approver vocabulary is closed at two values: a value an
-   implementation may invent is a value a relying party cannot branch
-   on.
-
-   A consumer MUST NOT infer human involvement from an absent
-   disposition block.  Absence states that no disposition was asserted,
-   and records written before this block existed carry none.  See
-   tests/vectors/decision_disposition_v0/ for the live-approval,
-   replayed-approval and policy-claiming-human cases.
 
    A verdict is only as meaningful as what the issuer could see. "allow"
    over an unbounded surface and "allow" over a stated one are identical
@@ -1282,13 +1249,6 @@ Internet-Draft                Vaara Receipt                 October 2026
    trust root.  The verdict stays a thin read over it.  The chokepoint
    remains an observer of what passes through it, not a claim about what
    does not.
-
-
-
-Sirkkavaara               Expires 14 April 2027                [Page 23]
-
-Internet-Draft                Vaara Receipt                 October 2026
-
 
    The deny case is the point.  A refused call leaves a signed, content-
    addressed, portable proof of the non-action: a third party recomputes
@@ -1308,6 +1268,27 @@ Internet-Draft                Vaara Receipt                 October 2026
    no issuer access and no external witness.  The tests/vectors/
    contiguity_v0/ vectors and the "vaara verify-contiguity" surface
    carry that check.
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+Sirkkavaara               Expires 14 April 2027                [Page 23]
+
+Internet-Draft                Vaara Receipt                 October 2026
+
 
    The per-record running count alone cannot tell a pure tail truncation
    (holding 0..k with nothing after) from a complete stream, since the
@@ -1338,14 +1319,6 @@ Internet-Draft                Vaara Receipt                 October 2026
    next unattended action holds a policy set of action classes it will
    proceed under and permits if and only if the sealed worst-case class
    is a member of that set, failing closed when no class is sealed.
-
-
-
-Sirkkavaara               Expires 14 April 2027                [Page 24]
-
-Internet-Draft                Vaara Receipt                 October 2026
-
-
    This is a membership test, not an ordering: this document computes no
    ordering over class labels, so the recipient asks "is the sealed
    class one I permit", never "is it at or below a ceiling".  Because
@@ -1365,6 +1338,14 @@ Internet-Draft                Vaara Receipt                 October 2026
    verify each receipt's signature and that its evidence recomputes to
    the signed digest; a seal whose binding fails is not trusted,
    contributes no class, and the gate fails closed.  Without this, an
+
+
+
+Sirkkavaara               Expires 14 April 2027                [Page 24]
+
+Internet-Draft                Vaara Receipt                 October 2026
+
+
    agent loosens the gate by relabeling an irreversible action's class
    into a permitted one while the record signature, which never covered
    the evidence, still verifies.  The conformance vectors are in
@@ -1394,14 +1375,6 @@ Internet-Draft                Vaara Receipt                 October 2026
       task scope is the coverage.boundary (Section 6.4), and the
       completeness block sequences the actions under it.
 
-
-
-
-Sirkkavaara               Expires 14 April 2027                [Page 25]
-
-Internet-Draft                Vaara Receipt                 October 2026
-
-
    The identity of the checkout is the PEF frame_id, a content address
    the payment side already computes; the completeness of the actions
    taken under it is the vaara.authorization/v0 contiguity stream.  A
@@ -1413,6 +1386,21 @@ Internet-Draft                Vaara Receipt                 October 2026
    hand.  See tests/vectors/ap2_v0/_check_independent.py.  AP2 can pin
    from the point the Checkout Receipt ends rather than define a new
    post-settlement primitive.
+
+
+
+
+
+
+
+
+
+
+
+Sirkkavaara               Expires 14 April 2027                [Page 25]
+
+Internet-Draft                Vaara Receipt                 October 2026
+
 
 6.6.  Profile Example: TAP Request Binding
 
@@ -1448,6 +1436,18 @@ Internet-Draft                Vaara Receipt                 October 2026
    to vaara.receipt/v1 for the post-authorization record rather than
    define a new primitive.
 
+6.7.  Profile: Generic External Execution Evidence
+
+   This is the schema-agnostic binding the named profiles above are
+   instances of.  It takes any external execution-evidence artifact,
+   content-addresses it, and binds it through this envelope unchanged,
+   with no field names that depend on what produced it.  A verifier
+   carrying an external_execution_evidence slot (linked_call_id /
+   evidence_hash / evidence_type, written linkedCallId, evidenceHash and
+   evidenceType in the vectors) resolves that slot against a
+   vaara.receipt/v1 authorization receipt as the recomputable producer:
+
+
 
 
 
@@ -1457,16 +1457,6 @@ Sirkkavaara               Expires 14 April 2027                [Page 26]
 
 Internet-Draft                Vaara Receipt                 October 2026
 
-
-6.7.  Profile: Generic External Execution Evidence
-
-   This is the schema-agnostic binding the named profiles above are
-   instances of.  It takes any external execution-evidence artifact,
-   content-addresses it, and binds it through this envelope unchanged,
-   with no field names that depend on what produced it.  A verifier
-   carrying an external_execution_evidence slot (linked_call_id /
-   evidence_hash / evidence_type) resolves that slot against a
-   vaara.receipt/v1 authorization receipt as the recomputable producer:
 
    *  evidence_hash = sha256(JCS(evidence_record)), equal to the
       receipt's decisionDerived.evidenceRef.digest, so the slot and the
@@ -1509,6 +1499,16 @@ Internet-Draft                Vaara Receipt                 October 2026
 
 
 
+
+
+
+
+
+
+
+
+
+
 Sirkkavaara               Expires 14 April 2027                [Page 27]
 
 Internet-Draft                Vaara Receipt                 October 2026
@@ -1539,9 +1539,12 @@ Internet-Draft                Vaara Receipt                 October 2026
    |                    | it.  An empty genesis link is written as    |
    |                    | the SHA-256 of the empty string.            |
    +--------------------+---------------------------------------------+
-   | decisionDetail,    | Present only when the trail record carries  |
-   | approver,          | them.                                       |
-   | humanDisposed      |                                             |
+   | decisionDetail     | The refinement behind the verdict, present  |
+   |                    | only when the trail record carries one.     |
+   +--------------------+---------------------------------------------+
+   | approver,          | The disposition: present together, only     |
+   | humanDisposed      | when the trail record carries an approver.  |
+   |                    | See below.                                  |
    +--------------------+---------------------------------------------+
    | cage               | OPTIONAL.  The cage block (Section 6.8.1).  |
    +--------------------+---------------------------------------------+
@@ -1562,13 +1565,39 @@ Internet-Draft                Vaara Receipt                 October 2026
 
 
 
-
-
-
 Sirkkavaara               Expires 14 April 2027                [Page 28]
 
 Internet-Draft                Vaara Receipt                 October 2026
 
+
+   approver and humanDisposed name what kind of party disposed of the
+   decision, inside the evidence record and therefore under the
+   signature.  approver is exactly "human" or "policy", and
+   humanDisposed is a boolean that is true only when a human acted on
+   this decision.  A producer MUST NOT emit humanDisposed true with an
+   approver other than "human".  The converse is permitted: approver
+   "human" with humanDisposed false records a human who reviewed while
+   the disposition stayed automatic, which only narrows the claim.  Both
+   members are absent when no disposition was asserted, leaving the
+   record byte-identical to a disposition-free decision.
+
+   The disposition exists because one verdict word covers dispositions a
+   relying party has to separate.  A decision admitted because a human
+   approved it, and a decision admitted because an earlier human
+   approval was replayed against a matching argument commitment, both
+   carry the verdict "allow".  The second was disposed of by the
+   deployment, against an argument commitment some human approved at
+   another time and on another action.  Where that difference reaches a
+   consumer only as free text, a consumer that must branch on human
+   involvement cannot do it from the signed members.  The approver
+   vocabulary is closed at two values: a value an implementation may
+   invent is a value a relying party cannot branch on.
+
+   A consumer MUST NOT infer human involvement from absent disposition
+   members.  Absence states that no disposition was asserted, and
+   records written before these members existed carry none.  See
+   tests/vectors/decision_disposition_v0/ for the live-approval,
+   replayed-approval and policy-claiming-human cases.
 
 6.8.1.  Cage Block
 
@@ -1579,6 +1608,23 @@ Internet-Draft                Vaara Receipt                 October 2026
    profile, a system call filter, a user-space kernel, or a virtual
    machine.  The block is a member of the evidence record, so
    evidenceRef.digest and the signature bind it like any other member.
+
+
+
+
+
+
+
+
+
+
+
+
+
+Sirkkavaara               Expires 14 April 2027                [Page 29]
+
+Internet-Draft                Vaara Receipt                 October 2026
+
 
     +==============+=========+==========+=============================+
     | Field        | Type    | Required | Meaning                     |
@@ -1618,14 +1664,6 @@ Internet-Draft                Vaara Receipt                 October 2026
    carry any other member.  A block with any other driver MUST carry
    basis.
 
-
-
-
-Sirkkavaara               Expires 14 April 2027                [Page 29]
-
-Internet-Draft                Vaara Receipt                 October 2026
-
-
    confirmed true means exactly this: at decision time the issuer read,
    on the deciding process or on the platform under it, the fact that
    basis names, and the fact held. confirmed true MUST be accompanied by
@@ -1634,6 +1672,15 @@ Internet-Draft                Vaara Receipt                 October 2026
    free of defects, or that any party other than the issuer observed the
    fact. confirmed false with basis "declared" means that a launcher
    declared the cage and the issuer did not confirm it.
+
+
+
+
+
+Sirkkavaara               Expires 14 April 2027                [Page 30]
+
+Internet-Draft                Vaara Receipt                 October 2026
+
 
    Each driver defines which bytes its configDigest covers.  A consumer
    uses configDigest as a comparator: two receipts with the same driver
@@ -1673,15 +1720,6 @@ Internet-Draft                Vaara Receipt                 October 2026
    2.  The Section 3.2 signature verifies against the stated alg and
        key.
 
-
-
-
-
-Sirkkavaara               Expires 14 April 2027                [Page 30]
-
-Internet-Draft                Vaara Receipt                 October 2026
-
-
    3.  evidenceRef.digest equals sha256(JCS(evidence_record)) for the
        referenced record, under one of the Section 2 canonicalization
        labels.
@@ -1690,6 +1728,15 @@ Internet-Draft                Vaara Receipt                 October 2026
        signed payload of the same receipt, and any
        existenceProof.recordDigest equals the digest of the receipt with
        existenceProof removed.
+
+
+
+
+
+Sirkkavaara               Expires 14 April 2027                [Page 31]
+
+Internet-Draft                Vaara Receipt                 October 2026
+
 
    5.  For an execution receipt (Section 3.7),
        backLink.attestationDigest equals "sha256:" of the JCS-canonical
@@ -1731,20 +1778,21 @@ Internet-Draft                Vaara Receipt                 October 2026
       back link, and completeness verdict from the bytes alone.
       Independent reimplementations have reproduced these vectors.
 
+   *  A desktop application for macOS that reads the engine's audit
+      trails, shows each allow, escalate, or deny decision as it is
+      recorded, routes the machine's agent clients through the
+      governance proxy, and verifies decision receipts with its own JCS,
+      SHA-256, and P-256 code written in Swift.  That verifier runs
+      against the same conformance vectors as the library in continuous
+      integration, so the two cannot drift apart unnoticed.
 
 
-Sirkkavaara               Expires 14 April 2027                [Page 31]
+
+
+Sirkkavaara               Expires 14 April 2027                [Page 32]
 
 Internet-Draft                Vaara Receipt                 October 2026
 
-
-   *  An end-user application that applies the allow, escalate, or deny
-      decision and emits the receipt over actions an operator selects,
-      and surfaces the decision and the receipt to a non-technical user.
-      The operator can point it at arbitrary actions, including local
-      file operations, not only AI agent tool calls, which makes it a
-      general accountable-autonomy surface rather than an agent-specific
-      one.
 
    A default install of the library signs a receipt for every decision.
    The signing dependencies are part of the base package, not an
@@ -1766,8 +1814,9 @@ Internet-Draft                Vaara Receipt                 October 2026
    The in-guest report emitter follows the kernel interface and has not
    yet been run inside a guest by the implementation.
 
-   The library, vectors, and checkers are exercised on every release;
-   the application is distributed as a signed build.
+   The library, vectors, and checkers are exercised on every release.
+   The application is built from source on the installing machine by its
+   package formula and is not distributed as a notarized build.
 
 9.  Versioning
 
@@ -1785,36 +1834,36 @@ Internet-Draft                Vaara Receipt                 October 2026
    consumers omits the new member.  New anchor methods and new profiles
    do not change how the envelope is parsed.
 
-
-
-
-
-Sirkkavaara               Expires 14 April 2027                [Page 32]
-
-Internet-Draft                Vaara Receipt                 October 2026
-
-
 10.  Security Considerations
 
    The integrity of a receipt rests on the Section 3.2 signature over
    the JCS-canonical signed payload, not on any timestamp anchor or
-   trust root.  A consumer MUST verify that signature against the public
-   key named under "alg" before relying on any field.  Because the
+   trust root.  A consumer MUST verify that signature, under the
+   algorithm "alg" names and with the key the issuer block names through
+   iss and secretVersion, before relying on any field.  Because the
    signed payload excludes "signature" and "timestampAnchors", anchors
+
+
+
+Sirkkavaara               Expires 14 April 2027                [Page 33]
+
+Internet-Draft                Vaara Receipt                 October 2026
+
+
    added after signing cannot alter the signed content; a consumer MUST
    recompute each anchoredDigest from the signed payload rather than
    trusting the anchor's stated value.
 
-   Verifying that signature establishes that the key named under "alg"
-   produced the signed payload and that the payload has not changed
-   since.  It says nothing about the state of that key now.  Offline
-   verification is a computation over the parameters the consumer holds,
-   while revocation is a property of the present, and this document
-   defines no revocation mechanism and places no freshness requirement
-   on key material.  A consumer MUST NOT treat a signature that verifies
-   as evidence that the signing key is still valid.  Where a decision
-   depends on revocation state, the key resolution path and the
-   staleness a deployment accepts are operational parameters of that
+   Verifying that signature establishes that the key the issuer block
+   names produced the signed payload and that the payload has not
+   changed since.  It says nothing about the state of that key now.
+   Offline verification is a computation over the parameters the
+   consumer holds, while revocation is a property of the present, and
+   this document defines no revocation mechanism and places no freshness
+   requirement on key material.  A consumer MUST NOT treat a signature
+   that verifies as evidence that the signing key is still valid.  Where
+   a decision depends on revocation state, the key resolution path and
+   the staleness a deployment accepts are operational parameters of that
    deployment and MUST be stated by it; the receipt does not carry them.
 
    Recomputability depends entirely on canonicalization.  A producer and
@@ -1842,20 +1891,20 @@ Internet-Draft                Vaara Receipt                 October 2026
    A decision receipt records what was decided.  It does not record what
    followed.  A decision receipt carrying the verdict "allow", with no
    execution receipt bound to it by backLink, establishes that the
-
-
-
-Sirkkavaara               Expires 14 April 2027                [Page 33]
-
-Internet-Draft                Vaara Receipt                 October 2026
-
-
    action was permitted and establishes nothing about whether it ran.  A
    consumer MUST NOT read a decision receipt as evidence that the action
    took effect: the executed status lives in the execution receipt's
    outcomeDerived and is signed there (Section 3.7).  Only the pair
    establishes that an action was permitted and then took effect, which
    is why backLink is a required member.
+
+
+
+
+Sirkkavaara               Expires 14 April 2027                [Page 34]
+
+Internet-Draft                Vaara Receipt                 October 2026
+
 
    A recipient that consumes a sealed maxClass to gate its own next
    action (Section 6.4) MUST bind the class to the signature before
@@ -1898,14 +1947,6 @@ Internet-Draft                Vaara Receipt                 October 2026
    text as potentially personal data where the subject or the operator
    is a natural person, and SHOULD keep personal data out of reason.
 
-
-
-
-Sirkkavaara               Expires 14 April 2027                [Page 34]
-
-Internet-Draft                Vaara Receipt                 October 2026
-
-
    The format keeps the action's inputs and results out of the receipt
    by design.  Arguments and results enter only as commitments
    (Section 3.7, Section 6.4), and the evidence record is bound by
@@ -1913,6 +1954,13 @@ Internet-Draft                Vaara Receipt                 October 2026
    operator.  A commitment over a small or predictable value can be
    reversed by guessing; the dictionary-attack paragraph in Section 10
    applies to every commitment in this document, not only to arguments.
+
+
+
+Sirkkavaara               Expires 14 April 2027                [Page 35]
+
+Internet-Draft                Vaara Receipt                 October 2026
+
 
    Receipts are durable and have no expiry.  A receipt that has left the
    issuer cannot be withdrawn, and its signature keeps verifying.
@@ -1954,17 +2002,21 @@ Internet-Draft                Vaara Receipt                 October 2026
    [AIACT] Art. 12(1): A record of events, which a reader can only
    rely on if it can tell a missing record from an event that did not
    occur.
-
-
-
-Sirkkavaara               Expires 14 April 2027                [Page 35]
-
-Internet-Draft                Vaara Receipt                 October 2026
-
-
       Gap-evident contiguity over a declared coverage boundary,
       checkable from the held receipts and the issuer's public key
       alone.  Suites: contiguity_v0.
+
+
+
+
+
+
+
+
+Sirkkavaara               Expires 14 April 2027                [Page 36]
+
+Internet-Draft                Vaara Receipt                 October 2026
+
 
    [AIACT] Art. 14: Human oversight, including the ability to
    intervene and override.
@@ -1980,9 +2032,11 @@ Internet-Draft                Vaara Receipt                 October 2026
 
    [eIDAS] Art. 41 and 42: A qualified electronic time stamp enjoys a
    presumption of accuracy of the date and time it indicates.
-      The rfc3161-eidas-qualified anchor type (Section 5), an RFC 3161
-      token from a qualified trust service over the record's canonical
-      bytes.  Suites: qualified_time_v0.
+      An RFC 3161 token from a qualified trust service over the record's
+      canonical bytes: the rfc3161-eidas-qualified anchor on a decision
+      receipt (Section 5) and existenceProof on an execution receipt
+      (Section 3.6).  Suites: qualified_time_v0, which exercises
+      existenceProof.
 
    [GDPR] Art. 5(1)(c): Data minimisation.
       Evidence enters the receipt by content digest, never by value
@@ -2006,23 +2060,19 @@ Internet-Draft                Vaara Receipt                 October 2026
       with no access to the producer's systems.  Suites:
       record_conformance_v0, article12_fold_v0.
 
-
-
-
-
-
-
-
-Sirkkavaara               Expires 14 April 2027                [Page 36]
-
-Internet-Draft                Vaara Receipt                 October 2026
-
-
    [ISO42001] Annex A, event logging control: Recording of AI system
    event logs.
       The same decision and receipt pair; the summary page is the
       management-system artefact.  Suites: execution_receipt_v0,
       audit_summary_v0.
+
+
+
+
+Sirkkavaara               Expires 14 April 2027                [Page 37]
+
+Internet-Draft                Vaara Receipt                 October 2026
+
 
    Two limits apply to every row.  First, a receipt records what its
    issuer observed at signing time; the revocation and key-status limits
@@ -2066,19 +2116,19 @@ Internet-Draft                Vaara Receipt                 October 2026
    obligations under the EU AI Act and DORA and tightening optional
    fields to required ones for audit use.  [AGENTROA] places an
    enforcement proxy outside the agent process that authorizes an action
-
-
-
-Sirkkavaara               Expires 14 April 2027                [Page 37]
-
-Internet-Draft                Vaara Receipt                 October 2026
-
-
    before it runs, binds the MCP tool call by a hash of its canonical
    arguments, and can register the authorization with a SCITT
    transparency service ([RFC9943]).  [VCP] profiles the same SCITT
    substrate for audit trails in algorithmic trading, a different
    domain.
+
+
+
+
+Sirkkavaara               Expires 14 April 2027                [Page 38]
+
+Internet-Draft                Vaara Receipt                 October 2026
+
 
    [AGENT-ACTION-RECEIPTS] specifies a newline-delimited log of per-
    action receipts, and uses one construction this document does not.
@@ -2122,20 +2172,20 @@ Internet-Draft                Vaara Receipt                 October 2026
    wire format; its illustrative field names are stated to be
    placeholders.  The envelope specified here is a candidate for its
    Action Record class: it is produced at the boundary where an action
-
-
-
-Sirkkavaara               Expires 14 April 2027                [Page 38]
-
-Internet-Draft                Vaara Receipt                 October 2026
-
-
    took effect, it carries a stable reference to the evidence a decision
    was derived from (Section 4), and it is re-expressible as a RATS
    Entity Attestation Result.  This document defines no equivalent of
    that architecture's Authorization Transition record, which carries a
    change in permission state and is replayable to reconstruct the
    authorization in force at an instant.  The envelope's backLink binds
+
+
+
+Sirkkavaara               Expires 14 April 2027                [Page 39]
+
+Internet-Draft                Vaara Receipt                 October 2026
+
+
    a decision to its predecessor attestation, while the architecture's
    correlation identifier ties a record to the interaction that
    motivated it.  Those are different edges, so a deployment using both
@@ -2177,20 +2227,20 @@ Internet-Draft                Vaara Receipt                 October 2026
               2119 Key Words", BCP 14, RFC 8174, DOI 10.17487/RFC8174,
               May 2017, <https://www.rfc-editor.org/info/rfc8174>.
 
-
-
-
-
-Sirkkavaara               Expires 14 April 2027                [Page 39]
-
-Internet-Draft                Vaara Receipt                 October 2026
-
-
    [RFC8610]  Birkholz, H., Vigano, C., and C. Bormann, "Concise Data
               Definition Language (CDDL): A Notational Convention to
               Express Concise Binary Object Representation (CBOR) and
               JSON Data Structures", RFC 8610, DOI 10.17487/RFC8610,
               June 2019, <https://www.rfc-editor.org/info/rfc8610>.
+
+
+
+
+
+Sirkkavaara               Expires 14 April 2027                [Page 40]
+
+Internet-Draft                Vaara Receipt                 October 2026
+
 
    [RFC8785]  Rundgren, A., Jordan, B., and S. Erdtman, "JSON
               Canonicalization Scheme (JCS)", RFC 8785,
@@ -2231,17 +2281,6 @@ Internet-Draft                Vaara Receipt                 October 2026
               June 2026, <https://github.com/OWASP/AISVS/blob/main/1.0/
               en/0x10-C09-Orchestration-and-Agentic-Action.md>.
 
-
-
-
-
-
-
-Sirkkavaara               Expires 14 April 2027                [Page 40]
-
-Internet-Draft                Vaara Receipt                 October 2026
-
-
    [AMD-SNP-ABI]
               Advanced Micro Devices, "SEV Secure Nested Paging Firmware
               ABI Specification", AMD Publication 56860, Revision 1.58,
@@ -2250,6 +2289,14 @@ Internet-Draft                Vaara Receipt                 October 2026
    [AMD-VCEK] Advanced Micro Devices, "Versioned Chip Endorsement Key
               (VCEK) Certificate and KDS Interface Specification", AMD
               Publication 57230, <https://docs.amd.com/v/u/en-US/57230>.
+
+
+
+
+Sirkkavaara               Expires 14 April 2027                [Page 41]
+
+Internet-Draft                Vaara Receipt                 October 2026
+
 
    [ASQAV-COMPLIANCE]
               Marques, J., "Compliance Profile of Signed Action Receipts
@@ -2289,15 +2336,6 @@ Internet-Draft                Vaara Receipt                 October 2026
               Regulation)", April 2016,
               <https://eur-lex.europa.eu/eli/reg/2016/679/oj>.
 
-
-
-
-
-Sirkkavaara               Expires 14 April 2027                [Page 41]
-
-Internet-Draft                Vaara Receipt                 October 2026
-
-
    [He2026SAB]
               He, J., "Sovereign Assurance Boundary: Certificate-Bound
               Admission for Agentic Infrastructure", arXiv 2606.11632,
@@ -2308,6 +2346,13 @@ Internet-Draft                Vaara Receipt                 October 2026
               Certificate-Bound Authority in Agentic Control Planes",
               arXiv 2606.20520, June 2026,
               <https://arxiv.org/abs/2606.20520>.
+
+
+
+Sirkkavaara               Expires 14 April 2027                [Page 42]
+
+Internet-Draft                Vaara Receipt                 October 2026
+
 
    [I-D.ietf-rats-ear]
               Fossati, T. and S. Frost, "Attestation Results for Secure
@@ -2344,16 +2389,6 @@ Internet-Draft                Vaara Receipt                 October 2026
               Transparency Version 2.0", RFC 9162, DOI 10.17487/RFC9162,
               December 2021, <https://www.rfc-editor.org/info/rfc9162>.
 
-
-
-
-
-
-Sirkkavaara               Expires 14 April 2027                [Page 42]
-
-Internet-Draft                Vaara Receipt                 October 2026
-
-
    [RFC9334]  Birkholz, H., Thaler, D., Richardson, M., Smith, N., and
               W. Pan, "Remote ATtestation procedureS (RATS)
               Architecture", RFC 9334, DOI 10.17487/RFC9334, January
@@ -2364,6 +2399,16 @@ Internet-Draft                Vaara Receipt                 October 2026
               Transparent Digital Supply Chains", RFC 9943,
               DOI 10.17487/RFC9943, June 2026,
               <https://www.rfc-editor.org/info/rfc9943>.
+
+
+
+
+
+
+Sirkkavaara               Expires 14 April 2027                [Page 43]
+
+Internet-Draft                Vaara Receipt                 October 2026
+
 
    [Salfeld2026]
               Salfeld-Nebgen, J., "Governing Actions, Not Agents:
@@ -2403,13 +2448,6 @@ Appendix A.  Envelope Schema (CDDL)
    ; seq + 1, the issuer block alg equals the envelope alg, and
    ; the classical part of sigSuite equals alg.
 
-
-
-Sirkkavaara               Expires 14 April 2027                [Page 43]
-
-Internet-Draft                Vaara Receipt                 October 2026
-
-
    receipt = decision-receipt / execution-receipt
 
    decision-receipt = {
@@ -2420,6 +2458,14 @@ Internet-Draft                Vaara Receipt                 October 2026
      issuerAsserted: issuer-block,
      signature: hex,
      ? timestampAnchors: [* anchor],
+
+
+
+Sirkkavaara               Expires 14 April 2027                [Page 44]
+
+Internet-Draft                Vaara Receipt                 October 2026
+
+
    }
 
    execution-receipt = {
@@ -2458,14 +2504,6 @@ Internet-Draft                Vaara Receipt                 October 2026
      ? completeness: completeness,
      ? sigSuite: "ES256+ML-DSA-65" / "RS256+ML-DSA-65",
      ? cryptoPosture: crypto-posture,
-
-
-
-Sirkkavaara               Expires 14 April 2027                [Page 44]
-
-Internet-Draft                Vaara Receipt                 October 2026
-
-
    }
 
    completeness = {
@@ -2476,6 +2514,14 @@ Internet-Draft                Vaara Receipt                 October 2026
 
    crypto-posture = {
      assetType: "algorithm",
+
+
+
+Sirkkavaara               Expires 14 April 2027                [Page 45]
+
+Internet-Draft                Vaara Receipt                 October 2026
+
+
      nistQuantumSecurityLevel: 0..5,
      algorithms: [+ crypto-algorithm],
    }
@@ -2515,13 +2561,6 @@ Internet-Draft                Vaara Receipt                 October 2026
      ? intentSatisfied: bool,
    }
 
-
-
-Sirkkavaara               Expires 14 April 2027                [Page 45]
-
-Internet-Draft                Vaara Receipt                 October 2026
-
-
    binding = {
      policyDigest: digest,
      intentDigest: digest,
@@ -2531,6 +2570,14 @@ Internet-Draft                Vaara Receipt                 October 2026
 
    outcome-derived = {
      status: "executed" / "refused" / "errored",
+
+
+
+Sirkkavaara               Expires 14 April 2027                [Page 46]
+
+Internet-Draft                Vaara Receipt                 October 2026
+
+
      completedAt: date-time,
      ? resultCommitment: projection-commitment / reference-commitment,
      ? decisionDigest: digest,
@@ -2570,14 +2617,6 @@ Internet-Draft                Vaara Receipt                 October 2026
    }
 
    blinded-anchor = {
-
-
-
-Sirkkavaara               Expires 14 April 2027                [Page 46]
-
-Internet-Draft                Vaara Receipt                 October 2026
-
-
      method: "rfc3161-blinded" / "rfc3161-eidas-qualified-blinded",
      anchoredDigest: digest,
      token: nonempty,
@@ -2587,6 +2626,14 @@ Internet-Draft                Vaara Receipt                 October 2026
 
    log-anchor = {
      method: "scitt",
+
+
+
+Sirkkavaara               Expires 14 April 2027                [Page 47]
+
+Internet-Draft                Vaara Receipt                 October 2026
+
+
      anchoredDigest: digest,
      logId: nonempty,
      leafIndex: uint,
@@ -2629,7 +2676,16 @@ Appendix B.  Cage Drivers and Bases in Use
 
 
 
-Sirkkavaara               Expires 14 April 2027                [Page 47]
+
+
+
+
+
+
+
+
+
+Sirkkavaara               Expires 14 April 2027                [Page 48]
 
 Internet-Draft                Vaara Receipt                 October 2026
 
@@ -2685,7 +2741,7 @@ Internet-Draft                Vaara Receipt                 October 2026
 
 
 
-Sirkkavaara               Expires 14 April 2027                [Page 48]
+Sirkkavaara               Expires 14 April 2027                [Page 49]
 
 Internet-Draft                Vaara Receipt                 October 2026
 
@@ -2741,4 +2797,4 @@ Author's Address
 
 
 
-Sirkkavaara               Expires 14 April 2027                [Page 49]
+Sirkkavaara               Expires 14 April 2027                [Page 50]

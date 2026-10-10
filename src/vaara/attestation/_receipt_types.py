@@ -232,7 +232,13 @@ def pq_signature_to_dict(pq: PqSignature) -> dict[str, Any]:
     return {"alg": pq.alg, "keyid": pq.keyid, "sig": pq.sig}
 
 
+_PQ_SIGNATURE_KEYS = frozenset({"alg", "keyid", "sig"})
+
+
 def pq_signature_from_dict(d: dict[str, Any]) -> PqSignature:
+    # Outside the signed payload, so an extra member here is covered by nothing
+    # at all; it is refused like every other block rather than carried unseen.
+    _reject_unknown_keys(d, _PQ_SIGNATURE_KEYS, "pqSignature")
     for required in ("alg", "keyid", "sig"):
         value = d.get(required)
         if not isinstance(value, str) or not value:
@@ -657,6 +663,20 @@ def outcome_from_dict(d: dict[str, Any]) -> OutcomeDerived:
     )
 
 
+#: The one envelope version this library reads. A later version may change the
+#: signed member set or the canonicalization, so an unknown version is refused
+#: rather than parsed under v1 rules and reported as verified.
+ENVELOPE_VERSION = 1
+
+
+def require_envelope_version(value: Any, where: str) -> None:
+    # bool is an int subclass; True must not pass as version 1.
+    if isinstance(value, bool) or value != ENVELOPE_VERSION:
+        raise AttestationError(
+            f"{where} version MUST be {ENVELOPE_VERSION}; got {value!r}"
+        )
+
+
 def receipt_from_dict(d: dict[str, Any]) -> ExecutionReceipt:
     """Reconstruct an ExecutionReceipt from its wire JSON dict.
 
@@ -671,6 +691,7 @@ def receipt_from_dict(d: dict[str, Any]) -> ExecutionReceipt:
     ):
         if required not in d:
             raise AttestationError(f"receipt missing required field {required!r}")
+    require_envelope_version(d["version"], "receipt")
     if d["alg"] not in VALID_ALGS:
         raise AttestationError(f"unsupported alg {d['alg']!r}")
     pq_raw = d.get("pqSignature")

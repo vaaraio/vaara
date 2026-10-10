@@ -156,7 +156,7 @@ signed payload:
 | `cryptoPosture` | object | OPTIONAL | Algorithms protecting the receipt (Section 2.5). |
 
 `aud` and `taskId`, when present, are non-empty. Checked against an expected
-value they give bound, contradicted, or unsupported (absent): absence means the
+value they give bound, conflict, or unsupported (absent): absence means the
 issuer bound none. `completeness` carries exactly `boundaryId` (non-empty
 string), `seq` (integer, 0 or more) and `runningCount` (= `seq + 1`), all
 required; a consumer MUST reject a partial or inconsistent block. An execution
@@ -390,7 +390,9 @@ machine reason (`capability_exceeded`, `binding_unknown`, `missing_credential`,
 
 - An authorization record (`schema` = `vaara.authorization/v0`) whose JCS digest
   is the receipt's `evidenceRef.digest`. It binds `toolName`, `tenantId`, the
-  grant by content address (`grantFingerprint` = `sha256(JCS(signed grant))`),
+  grant by content address (`grantFingerprint` = `sha256(JCS(grant))` over the
+  grant with its `signature` member removed, the bytes the grant's signature
+  covers),
   the runtime argument commitment (`argsCommitment` = `sha256(JCS(args))`), the
   evaluated `capabilities`, and the `verdict` / `reason`.
 - The raw arguments never enter the record; only their commitment does, so the
@@ -826,7 +828,8 @@ file holds the envelope under `receipt` and the evidence record under
 | `decidedAt` | ISO 8601 UTC, milliseconds. |
 | `recordHash` | `sha256:` and the trail record's own hash. |
 | `previousHash` | `sha256:` and the hash of the record before it. An empty genesis link is written as the SHA-256 of the empty string. |
-| `decisionDetail`, `approver`, `humanDisposed` | Present only when the trail record carries them. |
+| `decisionDetail` | The refinement behind the verdict, present only when the trail record carries one. |
+| `approver`, `humanDisposed` | Who disposed of the decision: `approver` is exactly `human` or `policy`, `humanDisposed` is true only when a human acted on this decision, and a producer MUST NOT write `humanDisposed` true with any other approver. Present together, only when the trail record carries an approver; absent means no disposition was asserted, never that a human acted. Vectors: `tests/vectors/decision_disposition_v0/`. |
 | `cage` | The cage the deciding process ran in. See "The cage block" below. Absent on records written before the cage layer. |
 
 The envelope writes the trail's `deny` as `block`. `backLink.attestationDigest`
