@@ -874,6 +874,15 @@ does not mean that the cage enforced the configuration `configDigest` names,
 that the cage is free of defects, or that anyone other than the issuer
 observed the fact. A verifier ignores members it does not know.
 
+The block names the deciding process, not the agent the decision was about.
+One launch can therefore produce blocks that differ by surface: a decision
+made inside the caged tree (a harness hook) names the cage and confirms it;
+a decision made by a process outside the tree about that tree (the OS-layer
+guard on a folder, the egress proxy on a connection) names that process's own
+confinement, which may be `none` or the declared block unconfirmed. Each is
+true of the process that signed it. A reader collecting one launch's
+receipts groups them by agent and `name`, not by the block.
+
 `configDigest` is a comparator, not a recomputation target. Two receipts with
 the same `driver` and `configDigest` ran under the same declared
 configuration; a verifier holding that configuration and the driver's rule
