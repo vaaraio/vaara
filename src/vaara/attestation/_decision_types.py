@@ -213,7 +213,20 @@ def decision_to_dict(dd: DecisionDerived) -> dict[str, Any]:
     return out
 
 
+_DECISION_DERIVED_KEYS = frozenset(
+    {"decision", "decidedAt", "reason", "riskScore", "thresholdAllow",
+     "thresholdBlock", "policyId", "clientTurnId", "evidenceRef", "rationale",
+     "binding", "decisionProof"}
+)
+# timestampAnchors rides outside the signed payload, beside the signature.
+_DECISION_RECORD_KEYS = frozenset(
+    {"version", "alg", "backLink", "decisionDerived", "issuerAsserted",
+     "signature", "timestampAnchors"}
+)
+
+
 def decision_from_dict(d: dict[str, Any]) -> DecisionDerived:
+    _reject_unknown_keys(d, _DECISION_DERIVED_KEYS, "decisionDerived")
     for required in ("decision", "decidedAt"):
         if required not in d:
             raise AttestationError(
@@ -247,6 +260,7 @@ def decision_record_from_dict(d: dict[str, Any]) -> DecisionRecord:
     only; signature verification still requires the caller's keying
     material.
     """
+    _reject_unknown_keys(d, _DECISION_RECORD_KEYS, "decision record")
     for required in (
         "version", "alg", "backLink", "decisionDerived",
         "issuerAsserted", "signature",

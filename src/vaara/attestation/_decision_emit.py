@@ -209,6 +209,11 @@ def verify_decision_signature(
     ``verifying_material`` is either a bytes shared secret (HS256) or a
     public-key object from ``cryptography.hazmat`` (ES256 / RS256).
     """
+    # The issuer block names the algorithm too, inside the signed bytes. A
+    # record whose two names disagree is refused before any key is tried, so
+    # no verifier has to pick which one to believe.
+    if record.issuer_asserted.alg != record.alg:
+        return False
     payload = _signing_payload(
         version=record.version,
         alg=record.alg,
