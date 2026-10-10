@@ -204,7 +204,7 @@ def test_verdicts_strong_columns_are_twice_the_minimum():
 
 def _documented_enum_values(enum_name: str) -> set[str]:
     """Values COMPLIANCE.md lists in the table under `enum_name`."""
-    text = DOC.read_text()
+    text = DOC.read_text(encoding="utf-8")
     header = re.search(rf"\|\s*`{enum_name}`\s*\|[^\n]*\n\|[-\s|]+\n", text)
     assert header, f"no table found for {enum_name} in docs/COMPLIANCE.md"
     values = set()

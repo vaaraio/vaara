@@ -34,7 +34,7 @@ BUNDLES = VECTORS / "bundles"
 
 
 def _expected() -> dict:
-    return json.loads((VECTORS / "expected.json").read_text())
+    return json.loads((VECTORS / "expected.json").read_text(encoding="utf-8"))
 
 
 def _cases():
@@ -47,7 +47,7 @@ def _cases():
 @pytest.mark.parametrize("name", _cases())
 def test_loader_reproduces_vector_verdict(name):
     want = _expected()[name]
-    doc = json.loads((BUNDLES / f"{name}.json").read_text())
+    doc = json.loads((BUNDLES / f"{name}.json").read_text(encoding="utf-8"))
     verdict = verify_evidence_bundle(evidence_bundle_from_json(doc))
     assert verdict.ok is want["ok"]
     assert verdict.authenticity_established is want["authenticity_established"]
@@ -69,7 +69,7 @@ def test_independent_checker_passes():
 
 
 def test_verdict_to_dict_round_trips():
-    doc = json.loads((BUNDLES / "all_lenses_pass.json").read_text())
+    doc = json.loads((BUNDLES / "all_lenses_pass.json").read_text(encoding="utf-8"))
     verdict = verify_evidence_bundle(evidence_bundle_from_json(doc))
     d = verdict.to_dict()
     assert d["ok"] is True
@@ -93,14 +93,14 @@ def test_loader_requires_receipt():
 
 
 def test_loader_reports_malformed_block():
-    doc = json.loads((BUNDLES / "all_lenses_pass.json").read_text())
+    doc = json.loads((BUNDLES / "all_lenses_pass.json").read_text(encoding="utf-8"))
     doc["inclusion"]["root_hex"] = "nothex"
     with pytest.raises(ValueError, match="inclusion.root_hex"):
         evidence_bundle_from_json(doc)
 
 
 def test_loader_rejects_bool_for_int_field():
-    doc = json.loads((BUNDLES / "all_lenses_pass.json").read_text())
+    doc = json.loads((BUNDLES / "all_lenses_pass.json").read_text(encoding="utf-8"))
     doc["inclusion"]["log_index"] = True
     with pytest.raises(ValueError, match="inclusion.log_index"):
         evidence_bundle_from_json(doc)
@@ -112,7 +112,7 @@ def test_loader_rejects_bool_for_int_field():
 def test_cli_file_ok(tmp_path, capsys):
     src = BUNDLES / "all_lenses_pass.json"
     target = tmp_path / "bundle.json"
-    target.write_text(src.read_text())
+    target.write_text(src.read_text(encoding="utf-8"))
     rc = main(["verify-bundle", str(target)])
     out = capsys.readouterr().out
     assert rc == 0
@@ -123,7 +123,7 @@ def test_cli_file_ok(tmp_path, capsys):
 def test_cli_file_failed_exit_1(tmp_path, capsys):
     src = BUNDLES / "tampered_inclusion.json"
     target = tmp_path / "bundle.json"
-    target.write_text(src.read_text())
+    target.write_text(src.read_text(encoding="utf-8"))
     rc = main(["verify-bundle", str(target)])
     out = capsys.readouterr().out
     assert rc == 1
@@ -133,14 +133,14 @@ def test_cli_file_failed_exit_1(tmp_path, capsys):
 def test_cli_unauthenticated_in_log_is_not_ok(tmp_path, capsys):
     src = BUNDLES / "unauthenticated_in_log.json"
     target = tmp_path / "b.json"
-    target.write_text(src.read_text())
+    target.write_text(src.read_text(encoding="utf-8"))
     rc = main(["verify-bundle", str(target)])
     assert rc == 1
     assert "authenticity established: False" in capsys.readouterr().out
 
 
 def test_cli_directory_mode(tmp_path, capsys):
-    (tmp_path / "bundle.json").write_text((BUNDLES / "all_lenses_pass.json").read_text())
+    (tmp_path / "bundle.json").write_text((BUNDLES / "all_lenses_pass.json").read_text(encoding="utf-8"))
     rc = main(["verify-bundle", str(tmp_path)])
     assert rc == 0
     assert "OK" in capsys.readouterr().out
@@ -148,7 +148,7 @@ def test_cli_directory_mode(tmp_path, capsys):
 
 def test_cli_json_output(tmp_path, capsys):
     target = tmp_path / "bundle.json"
-    target.write_text((BUNDLES / "all_lenses_pass.json").read_text())
+    target.write_text((BUNDLES / "all_lenses_pass.json").read_text(encoding="utf-8"))
     rc = main(["verify-bundle", str(target), "--json"])
     payload = json.loads(capsys.readouterr().out)
     assert rc == 0

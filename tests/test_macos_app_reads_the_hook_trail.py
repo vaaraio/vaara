@@ -167,7 +167,7 @@ def _hook(home: Path, event: dict) -> int:
         # is held and answered by nobody, as on an unattended machine.
         cfg.write_text(json.dumps({"thresholds": {"escalate": 0.0, "deny": 0.99},
                                    "notifications": False}))
-    env = {"HOME": str(home), "PATH": f"{bindir}{os.pathsep}{os.environ.get('PATH', '')}",
+    env = {"HOME": str(home), "USERPROFILE": str(home), "PATH": f"{bindir}{os.pathsep}{os.environ.get('PATH', '')}",
            "PYTHONPATH": os.pathsep.join(sys.path), "VAARA_PLUGIN_APPROVALS": "0"}
     proc = subprocess.run(["sh", str(RUN_SH), "pre-tool-use"],
                           input=json.dumps({"session_id": "s", **event}),
@@ -221,7 +221,7 @@ def _squash(text: str) -> str:
 
 
 def test_model_swift_still_says_this():
-    swift = _squash(MODEL_SWIFT.read_text())
+    swift = _squash(MODEL_SWIFT.read_text(encoding="utf-8"))
     columns = "SELECT seq, event_type, tool_name, timestamp, data FROM audit_records"
     assert f'"{columns}"' in swift, "Model.swift eventColumns changed"
     for sql in (NEW_DECISIONS_SQL, HISTORY_SQL, OVERALL_STATE_SQL, AGENT_SUMMARIES_SQL):

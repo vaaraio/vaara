@@ -112,7 +112,7 @@ class FirecrackerDriver:
             raise CageError("start needs the microVM configuration JSON (--policy)")
         launch_name = name or re.sub(r"[^A-Za-z0-9_.-]", "-", os.path.basename(agent[0]))
         try:
-            config = json.loads(Path(policy).read_text())
+            config = json.loads(Path(policy).read_text(encoding="utf-8"))
         except OSError as exc:
             raise CageError(f"cannot read {policy}: {exc}") from None
         except ValueError:
@@ -135,7 +135,7 @@ class FirecrackerDriver:
         if sock.exists():
             sock.unlink()
         effective = self._run_dir / f"{launch_name}.config.json"
-        effective.write_text(json.dumps(config, indent=2))
+        effective.write_text(json.dumps(config, indent=2), encoding="utf-8", newline="\n")
         proc = self._tool.spawn("--api-sock", str(sock), "--id", launch_name,
                                 "--config-file", str(effective), stderr_to=subprocess.PIPE)
         self._sockets[launch_name] = str(sock)
@@ -210,7 +210,7 @@ class FirecrackerDriver:
         def _gen() -> Iterator[dict[str, Any]]:
             if log_path and os.path.exists(log_path):
                 try:
-                    for line in Path(log_path).read_text(errors="replace").splitlines():
+                    for line in Path(log_path).read_text(encoding="utf-8", errors="replace").splitlines():
                         yield {"ts": time.time(), "source": "firecracker-log", "message": line}
                 except OSError:
                     pass

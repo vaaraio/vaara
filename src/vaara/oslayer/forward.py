@@ -72,7 +72,7 @@ def _b64(data: bytes) -> str:
 def _cgroup_of(pid: int) -> str:
     """The cgroup v2 path of ``pid``, as ``/proc/<pid>/cgroup`` gives it."""
     try:
-        text = Path(f"/proc/{pid}/cgroup").read_text()
+        text = Path(f"/proc/{pid}/cgroup").read_text(encoding="utf-8")
     except OSError:
         return ""
     for line in text.splitlines():

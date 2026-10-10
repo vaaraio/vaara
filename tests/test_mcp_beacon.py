@@ -10,6 +10,8 @@ import os
 import sqlite3
 import sys
 
+import pytest
+
 from vaara.integrations import _mcp_beacon as beacon
 from vaara.integrations.mcp_server import VaaraMCPServer
 
@@ -80,6 +82,7 @@ def test_ancestors_stop_at_init_and_cycles():
     assert len(beacon.ancestors(100, lambda p: p + 1, hops=3)) == 4
 
 
+@pytest.mark.skipif(sys.platform == "win32", reason="the beacon reads the process table on Linux and macOS only")
 def test_parent_pid_of_this_process():
     assert beacon.parent_pid(os.getpid()) == os.getppid()
 

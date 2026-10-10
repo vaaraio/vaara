@@ -78,5 +78,5 @@ def test_login_service_files(tmp_path):
 
     path, _msg = scan_watch.install("/usr/bin/vaara", home=tmp_path, system="linux",
                                     runner=lambda cmd, **kw: None)
-    assert "ExecStart=/usr/bin/vaara scan --watch" in path.read_text()
+    assert "ExecStart=/usr/bin/vaara scan --watch" in path.read_text(encoding="utf-8")
     assert scan_watch.install("x", home=tmp_path, system="win32")[0] is None

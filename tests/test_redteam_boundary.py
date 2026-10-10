@@ -101,7 +101,7 @@ def test_controls_caught_and_benign_allowed(tmp_path, monkeypatch):
             "no case file: the harness ships without one. Point "
             "VAARA_REDTEAM_CASES at your own set to run this."
         )
-    doc = json.loads(cases.read_text())
+    doc = json.loads(cases.read_text(encoding="utf-8"))
     matchers = {"plugin": redteam._matchers_from_plugin(redteam.PLUGIN_HOOKS)}
     rows = redteam.run(doc["cases"], matchers, tmp_path)
     by_id = {r["id"]: r for r in rows}

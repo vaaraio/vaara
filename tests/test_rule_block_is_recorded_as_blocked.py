@@ -27,7 +27,7 @@ pytest.importorskip("cryptography")
 def _run(event: dict, home: Path):
     (home / ".vaara").mkdir(parents=True, exist_ok=True)
     (home / ".vaara" / "config.json").write_text("{}")
-    env = {"HOME": str(home), "PATH": os.environ.get("PATH", ""),
+    env = {"HOME": str(home), "USERPROFILE": str(home), "PATH": os.environ.get("PATH", ""),
            "VAARA_PLUGIN_SHADOW": "0", "PYTHONPATH": os.pathsep.join(sys.path)}
     return subprocess.run(
         [sys.executable, "-c",

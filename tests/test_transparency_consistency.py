@@ -255,8 +255,8 @@ def test_root_at_out_of_range_raises() -> None:
 # ── Committed conformance vectors ───────────────────────────────────────────
 
 def test_vaara_reproduces_committed_vectors() -> None:
-    cases = json.loads((VECTORS / "cases.json").read_text())
-    expected = json.loads((VECTORS / "expected.json").read_text())
+    cases = json.loads((VECTORS / "cases.json").read_text(encoding="utf-8"))
+    expected = json.loads((VECTORS / "expected.json").read_text(encoding="utf-8"))
     for case in cases:
         proof = ConsistencyProof(
             first_size=case["first_size"],

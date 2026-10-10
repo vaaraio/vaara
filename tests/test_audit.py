@@ -171,7 +171,7 @@ class TestAuditTrail:
             path = Path(f.name)
         count = trail.export_json(path)
         assert count == 1
-        data = json.loads(path.read_text())
+        data = json.loads(path.read_text(encoding="utf-8"))
         assert len(data) == 1
         path.unlink()
 
@@ -185,7 +185,7 @@ class TestAuditTrail:
             path = Path(f.name)
         count = trail.export_jsonl(path)
         assert count == 2
-        lines = path.read_text().strip().split("\n")
+        lines = path.read_text(encoding="utf-8").strip().split("\n")
         assert len(lines) == 2
         path.unlink()
 

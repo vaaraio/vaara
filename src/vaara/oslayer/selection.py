@@ -179,7 +179,7 @@ def parse(data: object) -> Selection:
 
 def load(home: str) -> Selection:
     try:
-        return parse(json.loads(path_for(home).read_text()))
+        return parse(json.loads(path_for(home).read_text(encoding="utf-8")))
     except (OSError, ValueError):
         return Selection()
 

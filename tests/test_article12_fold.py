@@ -32,7 +32,7 @@ from vaara.audit.article12_export import export_article12
 from vaara.audit.verify import verify_signed
 
 VEC = Path(__file__).resolve().parent / "vectors" / "article12_fold_v0"
-EXPECTED = json.loads((VEC / "expected.json").read_text())
+EXPECTED = json.loads((VEC / "expected.json").read_text(encoding="utf-8"))
 
 
 def _load(path: Path, name: str):
@@ -48,9 +48,9 @@ EXPORT_TEST = _load(
     Path(__file__).parent / "test_article12_export.py", "_a12_export_test")
 
 HCASES = {c["name"]: c
-          for c in json.loads((GEN.HANDOFF / "cases.json").read_text())["cases"]}
+          for c in json.loads((GEN.HANDOFF / "cases.json").read_text(encoding="utf-8"))["cases"]}
 ECASES = {c["name"]: c
-          for c in json.loads((GEN.ENFORCEMENT / "cases.json").read_text())["cases"]}
+          for c in json.loads((GEN.ENFORCEMENT / "cases.json").read_text(encoding="utf-8"))["cases"]}
 
 
 def _build(scenario: str, tmp_path: Path) -> Path:

@@ -48,7 +48,7 @@ def test_no_page_asset_is_fetched_from_another_origin():
     """A page that promises to work offline cannot depend on someone else."""
     offenders = {}
     for page in PAGES:
-        external = re.findall(r'src="(https?://[^"]+)"', (WEBPAGE / page).read_text())
+        external = re.findall(r'src="(https?://[^"]+)"', (WEBPAGE / page).read_text(encoding="utf-8"))
         if external:
             offenders[page] = sorted(set(external))
     assert offenders == {}, f"off-origin assets: {offenders}"

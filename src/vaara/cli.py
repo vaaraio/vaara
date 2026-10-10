@@ -1551,7 +1551,7 @@ def _cmd_trail_receipt(args: argparse.Namespace) -> int:
 
     text = json.dumps(receipt.to_dict(), indent=2, sort_keys=False)
     if args.out:
-        Path(args.out).expanduser().write_text(text, encoding="utf-8")
+        Path(args.out).expanduser().write_text(text, encoding="utf-8", newline="\n")
     else:
         print(text)
     return 0
@@ -1586,7 +1586,7 @@ def _cmd_compliance_dashboard(args: argparse.Namespace) -> int:
         out = out / "index.html"
     else:
         out.parent.mkdir(parents=True, exist_ok=True)
-    out.write_text(render_html(report), encoding="utf-8")
+    out.write_text(render_html(report), encoding="utf-8", newline="\n")
     print(str(out))
     return 0
 
@@ -1650,7 +1650,7 @@ def _cmd_compliance_report(args: argparse.Namespace) -> int:
 
     if args.out:
         out_path = Path(args.out).expanduser()
-        out_path.write_text(text, encoding="utf-8")
+        out_path.write_text(text, encoding="utf-8", newline="\n")
     else:
         print(text)
     return 0
@@ -2435,7 +2435,7 @@ def _write_receipt_out(receipt: dict, args: argparse.Namespace,
                        fallback: Path) -> None:
     text = json.dumps(receipt, indent=2)
     out = Path(args.out).expanduser() if args.out else fallback
-    out.write_text(text + "\n", encoding="utf-8")
+    out.write_text(text + "\n", encoding="utf-8", newline="\n")
     print(f"wrote {out}")
 
 
@@ -2521,7 +2521,7 @@ def _cmd_receipt_render(args: argparse.Namespace) -> int:
         return 2
     out = (Path(args.out).expanduser() if args.out
            else path.with_suffix(".html"))
-    out.write_text(page, encoding="utf-8")
+    out.write_text(page, encoding="utf-8", newline="\n")
     print(f"wrote {out}")
     return 0
 
@@ -4142,7 +4142,7 @@ def _cmd_export_attestation_result(args: argparse.Namespace) -> int:
     rendered = json.dumps(ear, indent=2)
     if args.out:
         try:
-            Path(args.out).expanduser().write_text(rendered + "\n", encoding="utf-8")
+            Path(args.out).expanduser().write_text(rendered + "\n", encoding="utf-8", newline="\n")
         except OSError as exc:
             print(f"vaara export-attestation-result: cannot write output: {exc}",
                   file=sys.stderr)
@@ -4205,7 +4205,7 @@ def _cmd_build_handoff(args: argparse.Namespace) -> int:
 
     out_path = Path(args.out).expanduser()
     try:
-        out_path.write_text(rendered, encoding="utf-8")
+        out_path.write_text(rendered, encoding="utf-8", newline="\n")
     except OSError as exc:
         print(f"vaara build-handoff: cannot write {out_path}: {exc}", file=sys.stderr)
         return 2
@@ -4326,7 +4326,7 @@ def _cmd_ingest(args: argparse.Namespace) -> int:
     if args.out:
         out_path = Path(args.out).expanduser()
         try:
-            out_path.write_text(text + "\n", encoding="utf-8")
+            out_path.write_text(text + "\n", encoding="utf-8", newline="\n")
         except OSError as exc:
             print(f"vaara ingest: cannot write {out_path}: {exc}", file=sys.stderr)
             return 1
@@ -4481,7 +4481,7 @@ def _cmd_audit_summary(args: argparse.Namespace) -> int:
         page += f"\n> Note: {len(unreadable)} file(s) could not be read: {names}\n"
 
     if args.out:
-        Path(args.out).expanduser().write_text(page, encoding="utf-8")
+        Path(args.out).expanduser().write_text(page, encoding="utf-8", newline="\n")
         print(f"wrote audit summary to {args.out}", file=sys.stderr)
     else:
         print(page, end="")
@@ -4544,7 +4544,7 @@ def _cmd_conformance_statement(args: argparse.Namespace) -> int:
     else:
         page = render_conformance_statement(statement)
         if args.out:
-            Path(args.out).expanduser().write_text(page, encoding="utf-8")
+            Path(args.out).expanduser().write_text(page, encoding="utf-8", newline="\n")
             print(f"wrote conformance statement to {args.out}", file=sys.stderr)
         else:
             print(page, end="")
@@ -4888,7 +4888,7 @@ def _cmd_build_bundle(args: argparse.Namespace) -> int:
     if args.out is not None:
         out_path = Path(args.out).expanduser()
         try:
-            out_path.write_text(rendered, encoding="utf-8")
+            out_path.write_text(rendered, encoding="utf-8", newline="\n")
         except OSError as exc:
             print(f"vaara build-bundle: cannot write {out_path}: {exc}", file=sys.stderr)
             return 2
@@ -5118,7 +5118,7 @@ def _cmd_mode_emit(args: argparse.Namespace) -> int:
         print(f"vaara mode emit: {e}", file=sys.stderr)
         return 1
     if args.output:
-        Path(args.output).write_text(text, encoding="utf-8")
+        Path(args.output).write_text(text, encoding="utf-8", newline="\n")
     else:
         sys.stdout.write(text)
     return 0

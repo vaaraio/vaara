@@ -14,9 +14,9 @@ from pathlib import Path
 
 
 ROOT = Path(__file__).resolve().parents[1]
-README = (ROOT / "README.md").read_text()
+README = (ROOT / "README.md").read_text(encoding="utf-8")
 PLUGIN = ROOT / "plugins" / "claude-code-vaara-governance"
-PLUGIN_README = (PLUGIN / "README.md").read_text()
+PLUGIN_README = (PLUGIN / "README.md").read_text(encoding="utf-8")
 
 
 def test_quickstart_example_runs_as_the_readme_says(tmp_path, monkeypatch):
@@ -52,7 +52,7 @@ def test_quickstart_example_runs_as_the_readme_says(tmp_path, monkeypatch):
 
 
 def test_plugin_readme_counts_match_the_rule_file():
-    rules = json.loads((PLUGIN / "policies" / "default_deny.json").read_text())
+    rules = json.loads((PLUGIN / "policies" / "default_deny.json").read_text(encoding="utf-8"))
     rules = rules if isinstance(rules, list) else rules["rules"]
     tools: set[str] = set()
     for r in rules:
@@ -63,7 +63,7 @@ def test_plugin_readme_counts_match_the_rule_file():
 
 
 def test_plugin_readme_matchers_match_hooks_json():
-    hooks = json.loads((PLUGIN / "hooks" / "hooks.json").read_text())["hooks"]
+    hooks = json.loads((PLUGIN / "hooks" / "hooks.json").read_text(encoding="utf-8"))["hooks"]
     for event in ("PreToolUse", "PostToolUse"):
         matchers = {m.get("matcher") for m in hooks[event]}
         assert matchers == {".*"}, event
@@ -80,12 +80,12 @@ def test_dependency_claims_match_pyproject():
     said the package had no runtime dependencies.
     """
     # Regex, not tomllib: the CI matrix starts at 3.10 and tomllib is 3.11+.
-    text = (ROOT / "pyproject.toml").read_text()
+    text = (ROOT / "pyproject.toml").read_text(encoding="utf-8")
     m = re.search(r"^dependencies = \[(.*?)\]", text, flags=re.M | re.S)
     assert m, "could not find [project] dependencies in pyproject.toml"
     deps = re.findall(r'"([^"]+)"', m.group(1))
     names = sorted(re.split(r"[<>=!~ ]", d, 1)[0] for d in deps)
-    platforms = (ROOT / "docs" / "supported-platforms.md").read_text()
+    platforms = (ROOT / "docs" / "supported-platforms.md").read_text(encoding="utf-8")
     for text in (README, platforms):
         assert "zero runtime dependencies" not in text
         assert "no runtime dependencies" not in text

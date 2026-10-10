@@ -116,7 +116,7 @@ CMDLINE_KEYS = {
 def cmdline_declaration(path: str = "/proc/cmdline") -> dict[str, str]:
     """The ``vaara.cage*`` tokens of the kernel command line, as env names."""
     try:
-        text = Path(path).read_text()
+        text = Path(path).read_text(encoding="utf-8")
     except OSError:
         return {}
     out: dict[str, str] = {}
@@ -151,7 +151,7 @@ def declared(environ: Optional[dict[str, str]] = None) -> Optional[CageState]:
 
 def _proc_status(pid: str = "self") -> dict[str, str]:
     try:
-        text = Path(f"/proc/{pid}/status").read_text()
+        text = Path(f"/proc/{pid}/status").read_text(encoding="utf-8")
     except OSError:
         return {}
     out: dict[str, str] = {}
@@ -192,7 +192,7 @@ def bwrap_is_init() -> bool:
     """True when pid 1 of this pid namespace is bubblewrap, which is what
     sandbox-runtime's ``--unshare-pid`` leaves in place."""
     try:
-        return Path("/proc/1/comm").read_text().strip() == "bwrap"
+        return Path("/proc/1/comm").read_text(encoding="utf-8").strip() == "bwrap"
     except OSError:
         return False
 
@@ -220,7 +220,7 @@ def hypervisor_present() -> bool:
     arm64, or a ``/sys/hypervisor/type``. What a microVM or a VM-backed
     container shows from inside; a bare container does not."""
     try:
-        for line in Path("/proc/cpuinfo").read_text().splitlines():
+        for line in Path("/proc/cpuinfo").read_text(encoding="utf-8").splitlines():
             if line.startswith("flags") and " hypervisor" in line:
                 return True
     except OSError:

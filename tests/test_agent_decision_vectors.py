@@ -48,6 +48,6 @@ def test_independent_remint_reproduces():
 def test_module_reproduces_committed_mapping():
     from vaara.attestation.receipt import normalize
 
-    statement = json.loads((VECTORS / "statement.json").read_text())
-    expected = json.loads((VECTORS / "expected.json").read_text())
+    statement = json.loads((VECTORS / "statement.json").read_text(encoding="utf-8"))
+    expected = json.loads((VECTORS / "expected.json").read_text(encoding="utf-8"))
     assert normalize(statement).to_dict() == expected["normalized"]

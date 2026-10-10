@@ -109,7 +109,7 @@ def _deny_asks(approvals: Path, stop: threading.Event, seen: list) -> threading.
         while not stop.is_set():
             for req in approvals.glob("*.request.json"):
                 try:
-                    request = json.loads(req.read_text())
+                    request = json.loads(req.read_text(encoding="utf-8"))
                 except (OSError, ValueError):
                     continue
                 if request.get("action_id") in {r.get("action_id") for r in seen}:
@@ -159,7 +159,7 @@ def test_the_floor_holds_and_the_guard_decides(tmp_path):
     hook = home / ".claude" / "hooks" / "e2e.sh"
     hook.parent.mkdir(parents=True, exist_ok=True)
     hook.write_text("#!/bin/sh\nexit 0\n")
-    key = (home / ".vaara" / "keys" / "approval-hmac.key").read_text().strip()
+    key = (home / ".vaara" / "keys" / "approval-hmac.key").read_text(encoding="utf-8").strip()
     native_hook = home / ".copilot" / "hooks" / "e2e.json"
     free = tmp_path / "free.txt"
 
@@ -187,7 +187,7 @@ def test_the_floor_holds_and_the_guard_decides(tmp_path):
     ])
     work = tmp_path / "work"
     work.mkdir()
-    env = {"HOME": str(home), "COPILOT_HOME": str(tmp_path / "copilot-home"),
+    env = {"HOME": str(home), "USERPROFILE": str(home), "COPILOT_HOME": str(tmp_path / "copilot-home"),
            "COPILOT_PROVIDER_BASE_URL": f"http://127.0.0.1:{model.port}/v1",
            "COPILOT_MODEL": "gpt-4.1", "COPILOT_OFFLINE": "true",
            "PATH": os.environ.get("PATH", ""), "NO_COLOR": "1",
@@ -216,15 +216,15 @@ def test_the_floor_holds_and_the_guard_decides(tmp_path):
         assert "Permission denied" in out[i], (i, out[i], log)
 
     # The floor: nothing on it changed, and the key never reached the model.
-    assert sentinel.read_text() == "sentinel\n", log
-    assert hook.read_text() == "#!/bin/sh\nexit 0\n", log
+    assert sentinel.read_text(encoding="utf-8") == "sentinel\n", log
+    assert hook.read_text(encoding="utf-8") == "#!/bin/sh\nexit 0\n", log
     assert key not in "".join(out), "the approval key reached the model"
     assert not native_hook.exists(), "the native file tool wrote into a hook folder"
     assert not (blocked / "new.txt").exists(), log
 
     # The record folder: read and written, both recorded.
     assert "notes" in out[5], (out[5], log)
-    assert (recorded / "new.txt").read_text() == "more\n", log
+    assert (recorded / "new.txt").read_text(encoding="utf-8") == "more\n", log
 
     # The ask folder: asked once, denied, not read.
     assert [r["tool_name"] for r in seen] == ["os.open"], seen
@@ -232,7 +232,7 @@ def test_the_floor_holds_and_the_guard_decides(tmp_path):
     assert "the-asked-secret" not in out[6], (out[6], log)
 
     # Nothing governs this one.
-    assert free.read_text() == "free\n", log
+    assert free.read_text(encoding="utf-8") == "free\n", log
 
     # Floor refusals reach the trail through the kernel log a moment later.
     deadline = time.time() + 15
@@ -280,7 +280,7 @@ def test_an_adapter_decides_under_vaara_run(tmp_path):
     ])
     work = tmp_path / "work"
     work.mkdir()
-    env = {"HOME": str(home), "COPILOT_HOME": str(copilot_home),
+    env = {"HOME": str(home), "USERPROFILE": str(home), "COPILOT_HOME": str(copilot_home),
            "COPILOT_PROVIDER_BASE_URL": f"http://127.0.0.1:{model.port}/v1",
            "COPILOT_MODEL": "gpt-4.1", "COPILOT_OFFLINE": "true",
            "PATH": os.environ.get("PATH", ""), "NO_COLOR": "1",
@@ -299,7 +299,7 @@ def test_an_adapter_decides_under_vaara_run(tmp_path):
     assert len(out) == 2, (out, log)
     assert not any("could not reach" in o or "fail-closed" in o for o in out), (out, log)
     # The hook let the free call run, and it ran.
-    assert free.read_text() == "free\n", (out, log)
+    assert free.read_text(encoding="utf-8") == "free\n", (out, log)
     # The hook refused the deny-rule call with Vaara's own reason.
     assert "etc_shadow_read" in out[1], (out[1], log)
 
@@ -308,12 +308,12 @@ def test_an_adapter_decides_under_vaara_run(tmp_path):
     # config at the shared trail. A failed write does not change the verdict,
     # it leaves a marker beside the trail, so say what is there before reading.
     trail = claude_code_hooks.audit_db_path(json.loads(
-        (home / ".vaara" / "claude-code" / "config.json").read_text()))
+        (home / ".vaara" / "claude-code" / "config.json").read_text(encoding="utf-8")))
     if not trail.exists():
         marker = trail.with_name(trail.name + ".write-failure.json")
         seen = sorted(str(p) for p in (home / ".vaara").rglob("*")) if (home / ".vaara").exists() else []
         pytest.fail(f"no trail at {trail}\n~/.vaara: {seen}\n"
-                    f"marker: {marker.read_text() if marker.exists() else 'none'}\n{log}")
+                    f"marker: {marker.read_text(encoding='utf-8') if marker.exists() else 'none'}\n{log}")
     conn = sqlite3.connect(f"file:{trail}?mode=ro", uri=True)
     try:
         rows = [d for (d,) in conn.execute("SELECT data FROM audit_records ORDER BY seq")]
@@ -369,7 +369,7 @@ def test_hardened_launch_with_egress_locked(tmp_path):
     assert status and status["profile_loaded"] and status["harden"], status
     work = tmp_path / "work"
     work.mkdir()
-    env = {"HOME": str(home), "COPILOT_HOME": str(tmp_path / "copilot-home"),
+    env = {"HOME": str(home), "USERPROFILE": str(home), "COPILOT_HOME": str(tmp_path / "copilot-home"),
            "COPILOT_PROVIDER_BASE_URL": f"http://127.0.0.1:{model.port}/v1",
            "COPILOT_MODEL": "gpt-4.1", "COPILOT_OFFLINE": "true",
            "PATH": os.environ.get("PATH", ""), "NO_COLOR": "1",
@@ -387,7 +387,7 @@ def test_hardened_launch_with_egress_locked(tmp_path):
 
     out = model.outputs()
     assert len(out) == 6, (out, log)
-    assert free.read_text() == "hardened\n", (out, log)
+    assert free.read_text(encoding="utf-8") == "hardened\n", (out, log)
     assert "NoNewPrivs:\t1" in out[1] and "Seccomp:\t2" in out[1], (out[1], log)
     assert "curl=0" not in out[2] and "403" in out[2], (out[2], log)
     assert "Permission denied" in out[3], (out[3], log)

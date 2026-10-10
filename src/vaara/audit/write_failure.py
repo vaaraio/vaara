@@ -145,7 +145,7 @@ def active_failure(db_path: Any) -> Optional[dict]:
 
 def _write_marker(path: Path, state: dict) -> None:
     tmp = path.with_name(f"{path.name}.{os.getpid()}.tmp")
-    tmp.write_text(json.dumps(state, indent=2, sort_keys=True), encoding="utf-8")
+    tmp.write_text(json.dumps(state, indent=2, sort_keys=True), encoding="utf-8", newline="\n")
     os.replace(tmp, path)
 
 

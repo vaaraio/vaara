@@ -2010,7 +2010,7 @@ class AuditTrail:
         # _sanitize.json_safe at ingress is still rendered clean for the
         # regulator-facing export.
         path.write_text(
-            strict_json_dumps(records, indent=2), encoding="utf-8"
+            strict_json_dumps(records, indent=2), encoding="utf-8", newline="\n"
         )
         return len(records)
 

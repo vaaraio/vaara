@@ -59,15 +59,15 @@ def _jwk_to_pem(jwk: dict) -> bytes:
 
 def _cases() -> dict:
     return {c["name"]: c
-            for c in json.loads((SIBLING / "cases.json").read_text())["cases"]}
+            for c in json.loads((SIBLING / "cases.json").read_text(encoding="utf-8"))["cases"]}
 
 
 def _sets() -> dict:
-    return json.loads((VECTORS / "sets.json").read_text())["sets"]
+    return json.loads((VECTORS / "sets.json").read_text(encoding="utf-8"))["sets"]
 
 
 def _expected() -> dict:
-    return json.loads((VECTORS / "expected.json").read_text())
+    return json.loads((VECTORS / "expected.json").read_text(encoding="utf-8"))
 
 
 def _triples_for(spec: dict, cases: dict):

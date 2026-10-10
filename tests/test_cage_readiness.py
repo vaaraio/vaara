@@ -6,6 +6,9 @@ from __future__ import annotations
 
 import json
 import stat
+import sys
+
+import pytest
 
 from vaara import cage
 from vaara.cage import cli as cage_cli
@@ -13,6 +16,8 @@ from vaara.cage import readiness
 
 
 def _tool(tmp_path, name, version_line):
+    if sys.platform == "win32":
+        pytest.skip("the fake tool is an executable script, which Windows does not run")
     path = tmp_path / name
     path.write_text(f"#!/bin/sh\necho '{version_line}'\n")
     path.chmod(path.stat().st_mode | stat.S_IXUSR)

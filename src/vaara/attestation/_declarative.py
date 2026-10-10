@@ -225,7 +225,7 @@ def compile_profile(spec: dict[str, Any]) -> SourceProfile:
 
 def load_profile_file(path: Path) -> SourceProfile:
     """Compile and register the declarative profile at ``path``."""
-    profile = compile_profile(json.loads(Path(path).read_text()))
+    profile = compile_profile(json.loads(Path(path).read_text(encoding="utf-8")))
     register(profile)
     return profile
 

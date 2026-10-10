@@ -334,7 +334,7 @@ def label_of(pid: int) -> str:
     """The AppArmor label of ``pid``, without the mode suffix, or ``""``."""
     for attr in (f"/proc/{pid}/attr/apparmor/current", f"/proc/{pid}/attr/current"):
         try:
-            raw = Path(attr).read_text().strip()
+            raw = Path(attr).read_text(encoding="utf-8").strip()
         except OSError:
             continue
         return raw.rsplit(" (", 1)[0] if raw.endswith(")") else raw
@@ -347,7 +347,7 @@ def is_agent_label(label: str) -> bool:
 
 def apparmor_enabled() -> bool:
     try:
-        return Path("/sys/module/apparmor/parameters/enabled").read_text().strip() == "Y"
+        return Path("/sys/module/apparmor/parameters/enabled").read_text(encoding="utf-8").strip() == "Y"
     except OSError:
         return False
 
@@ -355,7 +355,7 @@ def apparmor_enabled() -> bool:
 def profile_loaded(name: str = PROFILE) -> bool:
     """Whether the kernel has ``name`` loaded (root, or a readable policy dir)."""
     try:
-        text = Path("/sys/kernel/security/apparmor/profiles").read_text()
+        text = Path("/sys/kernel/security/apparmor/profiles").read_text(encoding="utf-8")
     except OSError:
         return False
     return any(line.split(" (", 1)[0] == name for line in text.splitlines())

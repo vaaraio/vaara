@@ -28,7 +28,7 @@ def _trail(path: Path) -> None:
 
 
 def _run(home: Path, env_extra: dict | None = None) -> subprocess.CompletedProcess:
-    env = {"HOME": str(home), "PATH": "/usr/bin:/bin", **(env_extra or {})}
+    env = {"HOME": str(home), "USERPROFILE": str(home), "PATH": "/usr/bin:/bin", **(env_extra or {})}
     return subprocess.run([sys.executable, str(SCRIPT)], env=env,
                           capture_output=True, text=True, timeout=60)
 

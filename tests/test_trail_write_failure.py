@@ -89,7 +89,7 @@ class TestRecordFailure:
         assert state["notify"] is True
         assert state["resolved"] is False
         assert "malformed" in state["error"]
-        on_disk = json.loads((tmp_path / "audit.db.write-failure.json").read_text())
+        on_disk = json.loads((tmp_path / "audit.db.write-failure.json").read_text(encoding="utf-8"))
         assert on_disk["count"] == 1
         # `notify` is a decision for the caller, not persisted state.
         assert "notify" not in on_disk
@@ -161,7 +161,7 @@ class TestRecovery:
 
         marker = tmp_path / "audit.db.write-failure.json"
         assert marker.exists()
-        assert json.loads(marker.read_text())["count"] == 1
+        assert json.loads(marker.read_text(encoding="utf-8"))["count"] == 1
 
     def test_recovering_twice_is_a_no_op(self, tmp_path: Path):
         db = tmp_path / "audit.db"
@@ -387,6 +387,7 @@ class TestHookSurfacesTheOutage:
         hooks._report_trail_health({"notifications": False}, db, existed=True)
         assert "does not read clean" in capsys.readouterr().err
 
+    @pytest.mark.skipif(sys.platform == "win32", reason="mount detection reads /proc/mounts")
     def test_session_start_reports_a_trail_running_wal_on_an_unsafe_mount(
         self, tmp_path: Path, monkeypatch, capsys
     ):

@@ -92,7 +92,7 @@ def build_records() -> list[AuditRecord]:
 
 
 def _write(path: Path, obj: object) -> None:
-    path.write_text(json.dumps(obj, indent=2, ensure_ascii=False) + "\n", encoding="utf-8")
+    path.write_text(json.dumps(obj, indent=2, ensure_ascii=False) + "\n", encoding="utf-8", newline="\n")
 
 
 def main() -> int:

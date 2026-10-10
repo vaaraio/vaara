@@ -241,7 +241,7 @@ def main(argv: "list[str] | None" = None) -> int:
         print(f"inference-session: {exc}", file=sys.stderr)
         return 1
     Path(args.out).expanduser().write_text(
-        json.dumps(manifest, indent=2, sort_keys=True) + "\n", encoding="utf-8"
+        json.dumps(manifest, indent=2, sort_keys=True) + "\n", encoding="utf-8", newline="\n"
     )
     print(
         f"wrote {args.out}: {manifest['count']} inference(s), root {manifest['root']}",

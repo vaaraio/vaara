@@ -43,7 +43,7 @@ BUNDLE_DOC = Path(__file__).resolve().parent / "vectors" / "bundle_doc_v0" / "bu
 
 
 def _expected() -> dict:
-    return json.loads((VECTORS / "expected.json").read_text())
+    return json.loads((VECTORS / "expected.json").read_text(encoding="utf-8"))
 
 
 def _cases():
@@ -58,7 +58,7 @@ def test_assembled_pieces_match_verifier_document(name):
     pieces = load_bundle_pieces_from_dir(PIECES / name)
     doc = build_bundle_document(**pieces)
     rendered = json.dumps(doc, indent=2, sort_keys=True) + "\n"
-    assert rendered == (DOCUMENTS / f"{name}.json").read_text()
+    assert rendered == (DOCUMENTS / f"{name}.json").read_text(encoding="utf-8")
 
 
 @pytest.mark.parametrize("name", _cases())
@@ -75,9 +75,9 @@ def test_documents_equal_bundle_doc_vectors():
     # The two vector sets stay in lockstep: the issuer assembles exactly the
     # file the verifier reads.
     for name in _cases():
-        assert (DOCUMENTS / f"{name}.json").read_text() == (
+        assert (DOCUMENTS / f"{name}.json").read_text(encoding="utf-8") == (
             BUNDLE_DOC / f"{name}.json"
-        ).read_text()
+        ).read_text(encoding="utf-8")
 
 
 def test_independent_checker_passes():
@@ -125,7 +125,7 @@ def test_cli_from_dir_round_trips(tmp_path, capsys):
     )
     assert rc == 0
     assert "verify-bundle verdict OK" in capsys.readouterr().err
-    assert out.read_text() == (BUNDLE_DOC / "all_lenses_pass.json").read_text()
+    assert out.read_text(encoding="utf-8") == (BUNDLE_DOC / "all_lenses_pass.json").read_text(encoding="utf-8")
     assert main(["verify-bundle", str(out)]) == 0
     assert "OK" in capsys.readouterr().out
 
@@ -140,7 +140,7 @@ def test_cli_explicit_flags(tmp_path, capsys):
         "--out", str(out),
     ])
     assert rc == 0
-    assert out.read_text() == (BUNDLE_DOC / "signature_only.json").read_text()
+    assert out.read_text(encoding="utf-8") == (BUNDLE_DOC / "signature_only.json").read_text(encoding="utf-8")
     assert main(["verify-bundle", str(out)]) == 0
 
 
@@ -184,7 +184,7 @@ def test_cli_unreadable_flag_file(tmp_path, capsys):
 
 def test_cli_malformed_piece(tmp_path, capsys):
     src = PIECES / "all_lenses_pass"
-    doc = json.loads((src / "inclusion.json").read_text())
+    doc = json.loads((src / "inclusion.json").read_text(encoding="utf-8"))
     doc["root_hex"] = "nothex"
     bad = tmp_path / "inclusion.json"
     bad.write_text(json.dumps(doc))

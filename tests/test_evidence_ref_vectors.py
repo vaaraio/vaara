@@ -48,8 +48,8 @@ def test_valid_digest_matches_published_worked_example():
     second canonicalizer (the checker's), not the generator's."""
     checker = _load_checker()
     case = VECTORS / "normative" / "valid_evidence_ref_resolves"
-    drift = json.loads((case / "drift_record.json").read_text())
-    decision = json.loads((case / "decision.json").read_text())
+    drift = json.loads((case / "drift_record.json").read_text(encoding="utf-8"))
+    decision = json.loads((case / "decision.json").read_text(encoding="utf-8"))
     recomputed = checker._sha256_hex(checker._jcs(drift))
     cited = decision["decisionDerived"]["evidenceRef"]["digest"]
     assert recomputed == cited
@@ -64,8 +64,8 @@ def test_signature_and_resolution_are_independent():
     substitution. Confirms the two verdicts are not collapsible into one."""
     checker = _load_checker()
     case = VECTORS / "normative" / "tampered_drift_record"
-    decision = json.loads((case / "decision.json").read_text())
-    drift = json.loads((case / "drift_record.json").read_text())
+    decision = json.loads((case / "decision.json").read_text(encoding="utf-8"))
+    drift = json.loads((case / "drift_record.json").read_text(encoding="utf-8"))
     assert checker.verify_signature(decision, checker._DECISION_BLOCKS) is True
     assert checker.evidence_ref_resolves(decision, drift) is False
 
@@ -78,7 +78,7 @@ def test_vaara_round_trips_the_valid_evidence_ref():
 
     case = VECTORS / "normative" / "valid_evidence_ref_resolves"
     decision = parse_decision_record(
-        json.loads((case / "decision.json").read_text()))
+        json.loads((case / "decision.json").read_text(encoding="utf-8")))
     ref = decision.decision_derived.evidence_ref
     assert ref is not None
     assert ref.canonicalization == "JCS"

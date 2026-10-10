@@ -299,12 +299,12 @@ def test_malformed_evidence_fails_closed_with_valueerror():
 
 
 def _cases():
-    return json.loads((VECTORS / "cases.json").read_text())["cases"]
+    return json.loads((VECTORS / "cases.json").read_text(encoding="utf-8"))["cases"]
 
 
 @pytest.mark.parametrize("case", _cases(), ids=lambda c: c["name"])
 def test_vaara_reproduces_vector_verdict(case):
-    expected = json.loads((VECTORS / "expected.json").read_text())[case["name"]]
+    expected = json.loads((VECTORS / "expected.json").read_text(encoding="utf-8"))[case["name"]]
     verdict = verify_handoff(
         case["package"],
         anchor_attested_time=case.get("anchoredTime"),

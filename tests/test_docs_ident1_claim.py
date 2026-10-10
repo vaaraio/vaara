@@ -23,7 +23,7 @@ def _callers(symbol: str) -> list[Path]:
     for path in SRC.rglob("*.py"):
         if path.name in ("auth.py", "sqlite_backend.py"):
             continue
-        if re.search(rf"\b{symbol}\b", path.read_text()):
+        if re.search(rf"\b{symbol}\b", path.read_text(encoding="utf-8")):
             hits.append(path)
     return hits
 
@@ -31,7 +31,7 @@ def _callers(symbol: str) -> list[Path]:
 def test_ident1_row_matches_whether_anything_calls_vaara_auth():
     wired = bool(_callers("authenticate_api_key") or _callers("require_role"))
     for doc in DOCS:
-        text = doc.read_text()
+        text = doc.read_text(encoding="utf-8")
         row = re.search(r"\*\*IDENT-1\*\*.*?(?=\n- \*\*|\n#)", text, re.S)
         assert row, f"{doc.name} has no IDENT-1 row"
         claims_identity = "accepts authenticated caller identity" in row.group(0)

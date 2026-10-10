@@ -31,7 +31,7 @@ def _run_hook(args, event: dict, home: Path, extra_env: dict | None = None):
     ack_dir.mkdir(parents=True, exist_ok=True)
     (ack_dir / "config.json").write_text("{}")
     env = {
-        "HOME": str(home),
+        "HOME": str(home), "USERPROFILE": str(home),
         "PATH": os.environ.get("PATH", ""),
         "VAARA_PLUGIN_SHADOW": "0",
         **(extra_env or {}),
@@ -144,7 +144,7 @@ def test_shim_prefers_vaara_binary(tmp_path):
     if not (bindir / "vaara").exists():
         pytest.skip("no vaara console script next to this interpreter")
     env = {
-        "HOME": str(tmp_path),
+        "HOME": str(tmp_path), "USERPROFILE": str(tmp_path),
         "PATH": f"{bindir}:/usr/bin:/bin",
         "VAARA_PLUGIN_SHADOW": "0",
     }

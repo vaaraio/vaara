@@ -41,6 +41,11 @@ def _payload(tool: str, tool_input, **extra) -> dict:
 # --- mapping ----------------------------------------------------------------
 
 
+def _posix(path: str) -> str:
+    """Paths resolve with the host's separator; compare them as POSIX."""
+    return path.replace("\\", "/")
+
+
 def test_shell_arrives_as_bash():
     [e] = codex.to_hook_events(_payload("Bash", {"command": "ls"}))
     assert e == {"tool_name": "Bash", "tool_input": {"command": "ls"}, "session_id": "s1"}
@@ -48,7 +53,7 @@ def test_shell_arrives_as_bash():
 
 def test_patch_becomes_one_event_per_file_resolved_against_cwd():
     events = codex.to_hook_events(_payload("apply_patch", {"command": PATCH}))
-    assert [(e["tool_name"], e["tool_input"]["file_path"]) for e in events] == [
+    assert [(e["tool_name"], _posix(e["tool_input"]["file_path"])) for e in events] == [
         ("Write", "/w/a.txt"), ("Edit", "/w/sub/b.txt")]
     assert all(e["tool_input"]["content"] == PATCH for e in events)
 
@@ -61,7 +66,7 @@ def test_patch_without_file_headers_is_still_checked_as_an_edit():
 def test_view_image_is_a_read():
     [e] = codex.to_hook_events(_payload("view_image", {"path": "../.ssh/id_ed25519"}))
     assert e["tool_name"] == "Read"
-    assert e["tool_input"]["file_path"] == "/.ssh/id_ed25519"
+    assert _posix(e["tool_input"]["file_path"]) == "/.ssh/id_ed25519"
 
 
 def test_mcp_keeps_its_name_and_other_tools_go_to_the_classifier():
@@ -84,10 +89,11 @@ def test_hook_hash_matches_what_codex_reported():
 
 
 def _trust(home: Path, **state) -> None:
-    hooks = json.loads((home / "hooks.json").read_text())["hooks"]["PreToolUse"]
+    hooks = json.loads((home / "hooks.json").read_text(encoding="utf-8"))["hooks"]["PreToolUse"]
     handler = hooks[0]["hooks"][0]
     key = f"{(home / 'hooks.json').resolve()}:pre_tool_use:0:0"
-    lines = [f'[hooks.state."{key}"]']
+    # A literal TOML string: a Windows path's backslashes are not escapes.
+    lines = [f"[hooks.state.'{key}']"]
     if state.get("hash", True):
         value = state.get("value") or codex.hook_hash("pre_tool_use", None, handler)
         lines.append(f'trusted_hash = "{value}"')
@@ -123,7 +129,7 @@ def test_trust_status_follows_config_toml(tmp_path):
 def _run_hook(args, event: dict, home: Path, extra_env: dict | None = None):
     (home / ".vaara").mkdir(parents=True, exist_ok=True)
     (home / ".vaara" / "config.json").write_text("{}")
-    env = {"HOME": str(home), "PATH": os.environ.get("PATH", ""),
+    env = {"HOME": str(home), "USERPROFILE": str(home), "PATH": os.environ.get("PATH", ""),
            "VAARA_PLUGIN_SHADOW": "0", "PYTHONPATH": os.pathsep.join(sys.path),
            **(extra_env or {})}
     return subprocess.run(
@@ -205,7 +211,7 @@ def test_install_keeps_other_hooks_and_is_idempotent(tmp_path):
     mine = {"matcher": "Bash", "hooks": [{"type": "command", "command": "./mine.sh"}]}
     (d / "hooks.json").write_text(json.dumps({"hooks": {"PreToolUse": [mine]}}))
     assert codex.install_hooks("/opt/bin/vaara", d) is True
-    cfg = json.loads((d / "hooks.json").read_text())
+    cfg = json.loads((d / "hooks.json").read_text(encoding="utf-8"))
     pre = cfg["hooks"]["PreToolUse"]
     assert pre[0] == mine
     assert pre[1] == {"hooks": [{"type": "command",
@@ -214,7 +220,7 @@ def test_install_keeps_other_hooks_and_is_idempotent(tmp_path):
     assert "PostToolUse" in cfg["hooks"]
     assert codex.install_hooks("/opt/bin/vaara", d) is False
     assert codex.remove_hooks(d) is True
-    assert json.loads((d / "hooks.json").read_text()) == {"hooks": {"PreToolUse": [mine]}}
+    assert json.loads((d / "hooks.json").read_text(encoding="utf-8")) == {"hooks": {"PreToolUse": [mine]}}
 
 
 def test_init_writes_codex_hooks_and_reports_them_untrusted(tmp_path, monkeypatch):

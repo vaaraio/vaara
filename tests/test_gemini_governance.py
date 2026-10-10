@@ -50,13 +50,16 @@ def _payload(tool: str, tool_input, **extra) -> dict:
 def test_builtins_become_the_tools_the_rules_name(tool, args, name, field, value):
     [e] = gemini.to_hook_events(_payload(tool, args))
     assert e["tool_name"] == name
-    assert e["tool_input"][field] == value
+    got = e["tool_input"][field]
+    # Paths resolve with the host's separator; compare them as POSIX.
+    assert (got.replace("\\", "/") if field == "file_path" else got) == value
     assert e["session_id"] == "s1"
 
 
 def test_read_many_files_is_one_read_per_path():
     events = gemini.to_hook_events(_payload("read_many_files", {"include": ["a", "/b"]}))
-    assert [(e["tool_name"], e["tool_input"]["file_path"]) for e in events] == [
+    # Paths resolve with the host's separator; compare them as POSIX.
+    assert [(e["tool_name"], e["tool_input"]["file_path"].replace("\\", "/")) for e in events] == [
         ("Read", "/w/a"), ("Read", "/b")]
 
 
@@ -99,7 +102,7 @@ def test_render_pre_carries_the_reason_as_json():
 def _run_hook(args, event: dict, home: Path):
     (home / ".vaara").mkdir(parents=True, exist_ok=True)
     (home / ".vaara" / "config.json").write_text("{}")
-    env = {"HOME": str(home), "PATH": os.environ.get("PATH", ""),
+    env = {"HOME": str(home), "USERPROFILE": str(home), "PATH": os.environ.get("PATH", ""),
            "VAARA_PLUGIN_SHADOW": "0", "PYTHONPATH": os.pathsep.join(sys.path)}
     return subprocess.run(
         [sys.executable, "-c",
@@ -180,7 +183,7 @@ def test_install_keeps_other_settings_and_is_idempotent(tmp_path):
     before = {"theme": "Dracula", "hooks": {"BeforeTool": [mine]}}
     (d / "settings.json").write_text(json.dumps(before))
     assert gemini.install_hooks("/opt/bin/vaara", d) is True
-    cfg = json.loads((d / "settings.json").read_text())
+    cfg = json.loads((d / "settings.json").read_text(encoding="utf-8"))
     assert cfg["theme"] == "Dracula"
     pre = cfg["hooks"]["BeforeTool"]
     assert pre[0] == mine
@@ -191,7 +194,7 @@ def test_install_keeps_other_settings_and_is_idempotent(tmp_path):
     assert "AfterTool" in cfg["hooks"]
     assert gemini.install_hooks("/opt/bin/vaara", d) is False
     assert gemini.remove_hooks(d) is True
-    assert json.loads((d / "settings.json").read_text()) == before
+    assert json.loads((d / "settings.json").read_text(encoding="utf-8")) == before
 
 
 def test_a_commented_settings_file_is_read_and_kept_as_a_backup(tmp_path):
@@ -201,10 +204,10 @@ def test_a_commented_settings_file_is_read_and_kept_as_a_backup(tmp_path):
             '  /* block */ "general": {"vimMode": true}\n}\n')
     (d / "settings.json").write_text(text)
     assert gemini.install_hooks("/opt/bin/vaara", d) is True
-    cfg = json.loads((d / "settings.json").read_text())
+    cfg = json.loads((d / "settings.json").read_text(encoding="utf-8"))
     assert cfg["theme"] == "a // not a comment"
     assert cfg["general"] == {"vimMode": True}
-    assert (d / "settings.json.vaara-backup").read_text() == text
+    assert (d / "settings.json.vaara-backup").read_text(encoding="utf-8") == text
 
 
 def test_a_settings_file_that_does_not_parse_is_left_alone(tmp_path):
@@ -213,7 +216,7 @@ def test_a_settings_file_that_does_not_parse_is_left_alone(tmp_path):
     (d / "settings.json").write_text("{ not json")
     with pytest.raises(ValueError):
         gemini.install_hooks("/opt/bin/vaara", d)
-    assert (d / "settings.json").read_text() == "{ not json"
+    assert (d / "settings.json").read_text(encoding="utf-8") == "{ not json"
     assert gemini.hook_status(d) == "unknown"
 
 
@@ -223,7 +226,7 @@ def test_hook_status_follows_hooks_config(tmp_path):
     gemini.install_hooks("/opt/bin/vaara", d)
     assert gemini.hook_status(d) == "active"
     path = d / "settings.json"
-    cfg = json.loads(path.read_text())
+    cfg = json.loads(path.read_text(encoding="utf-8"))
     path.write_text(json.dumps({**cfg, "hooksConfig": {"enabled": False}}))
     assert gemini.hook_status(d) == "disabled"
     path.write_text(json.dumps({**cfg, "hooksConfig": {"disabled": [gemini.HOOK_NAME]}}))

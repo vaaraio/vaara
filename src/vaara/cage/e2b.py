@@ -106,7 +106,7 @@ class E2BDriver:
         digest = ""
         if policy is not None:
             try:
-                body = json.loads(Path(policy).read_text())
+                body = json.loads(Path(policy).read_text(encoding="utf-8"))
             except OSError as exc:
                 raise CageError(f"cannot read {policy}: {exc}") from None
             except ValueError:

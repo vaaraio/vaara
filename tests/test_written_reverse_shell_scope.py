@@ -44,7 +44,7 @@ def _fires(content: str) -> bool:
     "tests/test_oslayer_forward.py",
 ])
 def test_a_plain_socket_client_is_not_a_reverse_shell(path):
-    assert not _fires((ROOT / path).read_text())
+    assert not _fires((ROOT / path).read_text(encoding="utf-8"))
 
 
 def _socket_branch() -> str:

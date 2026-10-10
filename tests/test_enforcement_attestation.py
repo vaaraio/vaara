@@ -245,12 +245,12 @@ def _jwk_to_pem(jwk: dict) -> bytes:
 
 
 def _cases():
-    return json.loads((VECTORS / "cases.json").read_text())["cases"]
+    return json.loads((VECTORS / "cases.json").read_text(encoding="utf-8"))["cases"]
 
 
 @pytest.mark.parametrize("case", _cases(), ids=lambda c: c["name"])
 def test_vaara_reproduces_vector_verdict(case):
-    expected = json.loads((VECTORS / "expected.json").read_text())[case["name"]]
+    expected = json.loads((VECTORS / "expected.json").read_text(encoding="utf-8"))[case["name"]]
     verdict = verify_enforcement(
         case["record"],
         base64.b64decode(case["report_b64"]),

@@ -23,7 +23,7 @@ VECTOR = (Path(__file__).resolve().parents[1]
 
 @pytest.fixture
 def receipt() -> dict:
-    return json.loads(VECTOR.read_text())
+    return json.loads(VECTOR.read_text(encoding="utf-8"))
 
 
 def test_anchor_has_spec_shape_and_verifies(receipt: dict) -> None:

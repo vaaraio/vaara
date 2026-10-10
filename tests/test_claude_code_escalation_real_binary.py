@@ -74,7 +74,7 @@ def _operator(approvals: Path, answers: list[str], stop: threading.Event,
         while not stop.is_set():
             for req in sorted(approvals.glob("*.request.json"), key=lambda p: p.stat().st_mtime):
                 try:
-                    request = json.loads(req.read_text())
+                    request = json.loads(req.read_text(encoding="utf-8"))
                 except (OSError, ValueError):
                     continue
                 if any(r.get("action_id") == request.get("action_id") for r in seen):
@@ -140,7 +140,7 @@ def test_an_escalated_mcp_call_waits_for_a_signed_human_decision(tmp_path):
 
     out = model.outputs()
     assert len(out) == 2, (out, log)
-    assert (work / "approved.txt").read_text() == "ran\n", (out, log)
+    assert (work / "approved.txt").read_text(encoding="utf-8") == "ran\n", (out, log)
     assert "created approved.txt" in out[0], (out, log)
     assert not (work / "denied.txt").exists(), (out, log)
     assert "DENIED mcp__e2e__touch by human" in out[1], (out, log)

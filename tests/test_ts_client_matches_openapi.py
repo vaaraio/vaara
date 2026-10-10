@@ -18,8 +18,8 @@ import pytest
 yaml = pytest.importorskip("yaml")
 
 ROOT = Path(__file__).resolve().parents[1]
-TYPES = (ROOT / "clients" / "ts" / "src" / "types.ts").read_text()
-SCHEMAS = yaml.safe_load((ROOT / "docs" / "openapi.yaml").read_text())[
+TYPES = (ROOT / "clients" / "ts" / "src" / "types.ts").read_text(encoding="utf-8")
+SCHEMAS = yaml.safe_load((ROOT / "docs" / "openapi.yaml").read_text(encoding="utf-8"))[
     "components"]["schemas"]
 
 

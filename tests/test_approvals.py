@@ -9,9 +9,12 @@ zero dependencies, and the gate cleans up its own files whatever happens.
 from __future__ import annotations
 
 import json
+import sys
 import threading
 import time
 from pathlib import Path
+
+import pytest
 
 from vaara.approvals import approval_key_path, decision_mac, request_approval, write_decision
 
@@ -24,7 +27,7 @@ def _respond(approvals_dir: Path, decision: str, captured: dict) -> threading.Th
         while time.monotonic() < deadline:
             requests = list(approvals_dir.glob("*.request.json"))
             if requests:
-                captured.update(json.loads(requests[0].read_text()))
+                captured.update(json.loads(requests[0].read_text(encoding="utf-8")))
                 action_id = requests[0].name.removesuffix(".request.json")
                 write_decision(action_id, decision, approvals_dir=approvals_dir)
                 return
@@ -116,7 +119,7 @@ def test_watcher_never_sees_a_half_written_request(tmp_path):
             deadline = time.monotonic() + 10
             while time.monotonic() < deadline:
                 for req in d.glob("*.request.json"):
-                    seen.append(req.read_text())
+                    seen.append(req.read_text(encoding="utf-8"))
                     action_id = req.name.removesuffix(".request.json")
                     write_decision(action_id, "approve", approvals_dir=d)
                     return
@@ -144,7 +147,7 @@ def _answer_with(approvals_dir: Path, make) -> threading.Thread:
         while time.monotonic() < deadline:
             for req in approvals_dir.glob("*.request.json"):
                 action_id = req.name.removesuffix(".request.json")
-                body = make(action_id, json.loads(req.read_text()))
+                body = make(action_id, json.loads(req.read_text(encoding="utf-8")))
                 (approvals_dir / f"{action_id}.decision.json").write_text(json.dumps(body))
                 return
             time.sleep(0.02)
@@ -173,7 +176,7 @@ def test_a_signed_decision_does_not_answer_a_later_request(tmp_path):
     """The nonce binds a decision to one request: an old approval cannot be replayed."""
     approvals = tmp_path / "approvals"
     request_approval("warmup", "t", "r", approvals_dir=approvals, timeout=0.05)
-    key = bytes.fromhex(approval_key_path(approvals).read_text())
+    key = bytes.fromhex(approval_key_path(approvals).read_text(encoding="utf-8"))
     _answer_with(approvals, lambda a, r: {
         "decision": "approve", "mac": decision_mac(key, a, "an-earlier-nonce", "approve")})
     assert request_approval("act-r", "t", "r", approvals_dir=approvals, timeout=0.6) == "timeout"
@@ -182,18 +185,19 @@ def test_a_signed_decision_does_not_answer_a_later_request(tmp_path):
 def test_a_signed_approve_cannot_be_turned_into_another_decision(tmp_path):
     approvals = tmp_path / "approvals"
     request_approval("warmup", "t", "r", approvals_dir=approvals, timeout=0.05)
-    key = bytes.fromhex(approval_key_path(approvals).read_text())
+    key = bytes.fromhex(approval_key_path(approvals).read_text(encoding="utf-8"))
     _answer_with(approvals, lambda a, r: {
         "decision": "approve", "mac": decision_mac(key, a, r["nonce"], "deny")})
     assert request_approval("act-s", "t", "r", approvals_dir=approvals, timeout=0.6) == "timeout"
 
 
+@pytest.mark.skipif(sys.platform == "win32", reason="Windows files have no POSIX mode bits")
 def test_key_is_created_private_beside_the_approvals_dir(tmp_path):
     approvals = tmp_path / "approvals"
     request_approval("a", "t", "r", approvals_dir=approvals, timeout=0.05)
     key = approval_key_path(approvals)
     assert key == tmp_path / "keys" / "approval-hmac.key"
-    assert len(bytes.fromhex(key.read_text())) == 32
+    assert len(bytes.fromhex(key.read_text(encoding="utf-8"))) == 32
     assert key.stat().st_mode & 0o777 == 0o600
 
 
@@ -205,7 +209,7 @@ def test_write_decision_refuses_without_a_request(tmp_path):
 
 def test_mac_matches_the_shared_vectors():
     """The app signs with its own code (ApprovalSigning.swift) against these same vectors."""
-    doc = json.loads((Path(__file__).parent / "fixtures" / "approval_v1" / "vectors.json").read_text())
+    doc = json.loads((Path(__file__).parent / "fixtures" / "approval_v1" / "vectors.json").read_text(encoding="utf-8"))
     key = bytes.fromhex(doc["key_hex"])
     assert len(doc["cases"]) >= 4
     for case in doc["cases"]:

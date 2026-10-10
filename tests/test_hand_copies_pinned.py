@@ -19,7 +19,7 @@ SWIFT = ROOT / "clients" / "macos" / "Sources" / "VaaraMenuBar" / "Model.swift"
 
 
 def _swift_presets() -> dict[str, tuple[float, float]]:
-    text = SWIFT.read_text()
+    text = SWIFT.read_text(encoding="utf-8")
     pat = re.compile(
         r'Preset\(id:\s*"(\w+)".*?escalate:\s*([0-9.]+),\s*deny:\s*([0-9.]+)\)',
         re.S)
@@ -35,7 +35,7 @@ def test_swift_presets_match_the_mode_table():
 
 def _pyproject_version() -> str:
     m = re.search(r'^version\s*=\s*"([^"]+)"',
-                  (ROOT / "pyproject.toml").read_text(), re.M)
+                  (ROOT / "pyproject.toml").read_text(encoding="utf-8"), re.M)
     assert m
     return m.group(1)
 
@@ -52,4 +52,4 @@ def test_every_version_manifest_matches_pyproject():
         "server-vaara-server.json": lambda d: d["version"],
     }
     for rel, get in manifests.items():
-        assert get(json.loads((ROOT / rel).read_text())) == v, rel
+        assert get(json.loads((ROOT / rel).read_text(encoding="utf-8"))) == v, rel

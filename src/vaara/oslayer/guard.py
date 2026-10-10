@@ -31,12 +31,10 @@ from __future__ import annotations
 import argparse
 import concurrent.futures
 import contextlib
-import fcntl
 import itertools
 import json
 import logging
 import os
-import pwd
 import secrets
 import select
 import shutil
@@ -59,6 +57,8 @@ from vaara.taxonomy.actions import (ActionCategory, ActionType, BlastRadius,
                                     RegulatoryDomain, Reversibility, UrgencyClass)
 
 if TYPE_CHECKING:
+    import pwd
+
     from vaara.pipeline import InterceptionPipeline
 
 logger = logging.getLogger("vaara.os-guard")
@@ -127,7 +127,7 @@ def build_pipeline(trail_path: Path) -> InterceptionPipeline:
 
 def _comm(pid: int) -> str:
     try:
-        return Path(f"/proc/{pid}/comm").read_text().strip()
+        return Path(f"/proc/{pid}/comm").read_text(encoding="utf-8").strip()
     except OSError:
         return ""
 
@@ -141,7 +141,7 @@ def _exe(pid: int) -> str:
 
 def _status_field(pid: int, name: str) -> Optional[str]:
     try:
-        for line in Path(f"/proc/{pid}/status").read_text().splitlines():
+        for line in Path(f"/proc/{pid}/status").read_text(encoding="utf-8").splitlines():
             if line.startswith(name + ":"):
                 return line.split(":", 1)[1].strip()
     except OSError:
@@ -244,6 +244,10 @@ class Guard:
 
     def _take_lock(self) -> None:
         """One guard at a time: an exclusive lock held for the process's life."""
+        # Imported here and not at the top: the module's constants are read on
+        # every platform, and fcntl and pwd exist on POSIX only.
+        import fcntl
+
         self.lock_path.parent.mkdir(mode=0o755, parents=True, exist_ok=True)
         fd = os.open(self.lock_path, os.O_RDWR | os.O_CREAT | os.O_CLOEXEC, 0o600)
         try:
@@ -414,7 +418,7 @@ class Guard:
         with self._profile_lock:
             text = self.render_profile()
             tmp = self.profile_file.with_name(f".{self.profile_file.name}.tmp")
-            tmp.write_text(text)
+            tmp.write_text(text, encoding="utf-8", newline="\n")
             os.chmod(tmp, 0o600)
             os.replace(tmp, self.profile_file)
             parser = parser_path()
@@ -901,6 +905,8 @@ def unload(profile_file: Path = PROFILE_FILE) -> str:
 
 
 def operator_account(name: Optional[str]) -> pwd.struct_passwd:
+    import pwd
+
     name = name or os.environ.get("SUDO_USER") or ""
     if not name:
         raise GuardError("name the operator: sudo vaara os-guard, or --user NAME under systemd")

@@ -126,7 +126,7 @@ class TestTheInstallWritesThePreset:
 
         config = tmp_path / "config.json"
         write_hook_config(config, tmp_path / "audit.db")
-        written = json.loads(config.read_text())
+        written = json.loads(config.read_text(encoding="utf-8"))
         assert written["protection"] == DEFAULT_PROTECTION_PRESET
         assert written["audit_db"] == str(tmp_path / "audit.db")
 
@@ -143,7 +143,7 @@ class TestTheInstallWritesThePreset:
         config = tmp_path / "config.json"
         config.write_text(json.dumps({"protection": "strict", "mode": "watch"}))
         write_hook_config(config, tmp_path / "audit.db")
-        written = json.loads(config.read_text())
+        written = json.loads(config.read_text(encoding="utf-8"))
         assert written["protection"] == "strict"
         assert written["mode"] == "watch"
 
@@ -156,4 +156,4 @@ class TestTheInstallWritesThePreset:
 
         config = tmp_path / "config.json"
         write_hook_config(config, tmp_path / "audit.db")
-        assert protection_preset(json.loads(config.read_text())) == "balanced"
+        assert protection_preset(json.loads(config.read_text(encoding="utf-8"))) == "balanced"

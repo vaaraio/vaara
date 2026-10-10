@@ -6,6 +6,15 @@ and this project follows [Semantic Versioning](https://semver.org/spec/v2.0.0.ht
 
 ## [Unreleased]
 
+### Fixed
+- Deny rules that name a file path hold on Windows. Their patterns are written with `/`, so a path a Windows harness sends, such as `C:\Users\me\.ssh\id_ed25519`, passed `secret_material_read` and every other path rule. Path arguments are now matched with their separators turned, for named tools, harness aliases and MCP arguments alike.
+- Text that Vaara reads and writes is UTF-8 with `\n` line endings on every platform. On Windows the code page decoded agent configs that carry a non-ASCII path or user name wrong, and text mode wrote `\r\n`, so the trail export, receipt files and the decision vocabulary vectors were different bytes there than on Linux and macOS.
+- The cage layer loads on Windows. The OS guard imported `fcntl` and `pwd` at module load, so every module that reads its socket path failed to import, `vaara cage drivers` included.
+- `vaara scan` attributes an MCP config to its agent on Windows and shows its path with `/`. It matched the agent directories with `/` against a path written with `\`.
+- Trail repair leaves the trail in place when another process holds it open on Windows. It raised `PermissionError` half way through moving the files; it now puts back what it moved and reports the repair as failed.
+- A directory given as a policy file is reported as a directory on Windows, where opening one raises `PermissionError`.
+- The pipeline times each decision with `perf_counter`. The monotonic clock's resolution on Windows reported most decisions as taking 0.0 ms.
+
 ## [2.8.0] - 2026-10-10
 
 ### Added

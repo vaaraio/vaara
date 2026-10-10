@@ -42,7 +42,7 @@ ROW = re.compile(r"\| (v\d+\.\d+\.\d+)(†?), (\d{4}-\d{2}-\d{2}) \|")
 def _rows() -> list[tuple[str, bool, str]]:
     return [
         (tag, bool(dagger), date)
-        for tag, dagger, date in ROW.findall(PRIOR_ART.read_text())
+        for tag, dagger, date in ROW.findall(PRIOR_ART.read_text(encoding="utf-8"))
     ]
 
 
@@ -122,7 +122,7 @@ def test_only_the_yanked_releases_carry_a_dagger():
 
 def test_daggered_dates_match_the_changelog():
     """The changelog is the record those rows actually rest on."""
-    changelog = CHANGELOG.read_text()
+    changelog = CHANGELOG.read_text(encoding="utf-8")
     for tag, daggered, date in _rows():
         if not daggered:
             continue
@@ -164,7 +164,7 @@ def test_evidence_paths_in_the_table_exist():
     """A citation a reader cannot open is not evidence."""
     root = PRIOR_ART.resolve().parents[1]
     missing = set()
-    for line in PRIOR_ART.read_text().splitlines():
+    for line in PRIOR_ART.read_text(encoding="utf-8").splitlines():
         if not line.startswith("| "):
             continue
         for cited in re.findall(r"`([^`]+)`", line):

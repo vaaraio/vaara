@@ -87,7 +87,7 @@ def _config(vaara_bin: str) -> dict:
 def _load(path: Path) -> Optional[dict]:
     """The hook file, ``{}`` when there is none, None when it cannot be read."""
     try:
-        data = json.loads(path.read_text())
+        data = json.loads(path.read_text(encoding="utf-8"))
     except FileNotFoundError:
         return {}
     except (OSError, ValueError):
@@ -106,7 +106,7 @@ def install_hooks(vaara_bin: str, directory: Optional[Path] = None) -> bool:
         return False
     path.parent.mkdir(parents=True, exist_ok=True)
     tmp = path.with_name(path.name + ".vaara-tmp")
-    tmp.write_text(json.dumps(config, indent=2) + "\n")
+    tmp.write_text(json.dumps(config, indent=2) + "\n", encoding="utf-8", newline="\n")
     os.replace(tmp, path)
     return True
 

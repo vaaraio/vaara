@@ -14,6 +14,7 @@ from __future__ import annotations
 import hashlib
 import os
 import stat
+import sys
 
 from vaara.integrations.llm_seal import (
     PLACEHOLDER_LEN,
@@ -57,7 +58,8 @@ def test_a_file_backed_registry_keeps_its_placeholders_across_restarts(tmp_path)
     token = first.placeholder("northern lights")
     key_file = tmp_path / "keys" / "seal-hmac.key"
     assert key_file.is_file()
-    assert stat.S_IMODE(os.stat(key_file).st_mode) == 0o600
+    if sys.platform != "win32":  # Windows files have no POSIX mode bits
+        assert stat.S_IMODE(os.stat(key_file).st_mode) == 0o600
     second = SealRegistry.from_file(seal)
     assert second.placeholder("northern lights") == token
     assert second.seal_bytes(b"northern lights") == token.encode()

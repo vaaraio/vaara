@@ -27,6 +27,10 @@ pytest.importorskip("cryptography")
 
 PLUGIN = Path(opencode.__file__).with_name("opencode_plugin.js")
 
+#: Windows processes, node above all, do not start without these.
+_WINDOWS_ENV = {k: os.environ[k] for k in ("SYSTEMROOT", "SYSTEMDRIVE", "TEMP", "TMP")
+                if k in os.environ}
+
 
 # --- mapping ----------------------------------------------------------------
 
@@ -94,10 +98,11 @@ def _run_hook(args, event: dict, home: Path, extra_env: dict | None = None):
     (home / ".vaara").mkdir(parents=True, exist_ok=True)
     (home / ".vaara" / "config.json").write_text("{}")
     env = {
-        "HOME": str(home),
+        "HOME": str(home), "USERPROFILE": str(home),
         "PATH": os.environ.get("PATH", ""),
         "VAARA_PLUGIN_SHADOW": "0",
         "PYTHONPATH": os.pathsep.join(sys.path),
+        **_WINDOWS_ENV,
         **(extra_env or {}),
     }
     return subprocess.run(
@@ -152,7 +157,8 @@ def test_hook_blocks_edits_to_the_opencode_plugin(tmp_path):
     assert "harness_config_write" in proc.stderr
     proc = _run_hook(
         ["hook", "pre-tool-use", "--client", "opencode"],
-        {"tool": "bash", "args": {"command": f"rm {target}"}}, tmp_path)
+        # Shell rules read POSIX paths; Git Bash on Windows takes them too.
+        {"tool": "bash", "args": {"command": f"rm {Path(target).as_posix()}"}}, tmp_path)
     assert proc.returncode == 2, proc.stderr
     assert "harness_config_shell_write" in proc.stderr
 
@@ -189,10 +195,10 @@ def _call_plugin(tmp_path: Path, vaara_bin: str, home: Path | None = None) -> di
     if node is None:
         pytest.skip("node is not installed")
     installed = tmp_path / "plugin.mjs"
-    installed.write_text(PLUGIN.read_text().replace("__VAARA_BIN__", vaara_bin))
+    installed.write_text(PLUGIN.read_text(encoding="utf-8").replace("__VAARA_BIN__", vaara_bin))
     driver = tmp_path / "driver.mjs"
     driver.write_text(textwrap.dedent(f"""\
-        import {{ VaaraGovernance }} from {json.dumps(str(installed))};
+        import {{ VaaraGovernance }} from {json.dumps(installed.as_uri())};
         const hooks = await VaaraGovernance({{}});
         try {{
           await hooks["tool.execute.before"](
@@ -204,7 +210,7 @@ def _call_plugin(tmp_path: Path, vaara_bin: str, home: Path | None = None) -> di
         }}
         """))
     env = {"PATH": os.environ.get("PATH", ""),
-           "HOME": str(home or tmp_path)}
+           "HOME": str(home or tmp_path), "USERPROFILE": str(home or tmp_path), **_WINDOWS_ENV}
     out = subprocess.run([node, str(driver)], capture_output=True, text=True,
                          env=env, timeout=60)
     assert out.returncode == 0, out.stderr
@@ -257,10 +263,10 @@ def test_plugin_through_the_real_engine_blocks_a_denied_call(tmp_path):
         "'import sys; from vaara.cli import main; sys.exit(main(sys.argv[1:]))' \"$@\"\n")
     shim.chmod(0o755)
     installed = tmp_path / "plugin.mjs"
-    installed.write_text(PLUGIN.read_text().replace("__VAARA_BIN__", str(shim)))
+    installed.write_text(PLUGIN.read_text(encoding="utf-8").replace("__VAARA_BIN__", str(shim)))
     driver = tmp_path / "driver.mjs"
     driver.write_text(textwrap.dedent(f"""\
-        import {{ VaaraGovernance }} from {json.dumps(str(installed))};
+        import {{ VaaraGovernance }} from {json.dumps(installed.as_uri())};
         const hooks = await VaaraGovernance({{}});
         const out = [];
         for (const command of ["ls -la", "cat /etc/shadow"]) {{
@@ -275,7 +281,8 @@ def test_plugin_through_the_real_engine_blocks_a_denied_call(tmp_path):
         }}
         console.log(JSON.stringify(out));
         """))
-    env = {"PATH": os.environ.get("PATH", ""), "HOME": str(home),
+    env = {"PATH": os.environ.get("PATH", ""), "HOME": str(home), "USERPROFILE": str(home),
+           **_WINDOWS_ENV,
            "VAARA_PLUGIN_SHADOW": "0",
            "PYTHONPATH": os.pathsep.join(sys.path)}
     proc = subprocess.run([node, str(driver)], capture_output=True, text=True,
@@ -300,7 +307,7 @@ def test_init_installs_the_plugin_pinned_to_the_binary(tmp_path, monkeypatch):
     plugin = oc_dir / "plugin" / "vaara.js"
     assert report.opencode_plugin == plugin
     assert report.opencode_changed is True
-    text = plugin.read_text()
+    text = plugin.read_text(encoding="utf-8")
     assert '"/opt/bin/vaara"' in text
     assert "__VAARA_BIN__" not in text
     again = ig.run_init(

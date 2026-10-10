@@ -14,12 +14,12 @@ from pathlib import Path
 import pytest
 
 ROOT = Path(__file__).resolve().parents[1]
-README = " ".join((ROOT / "README.md").read_text().split())
+README = " ".join((ROOT / "README.md").read_text(encoding="utf-8").split())
 BENCH = ROOT / "bench"
 
 
 def _load(name: str) -> dict:
-    return json.loads((BENCH / name).read_text())
+    return json.loads((BENCH / name).read_text(encoding="utf-8"))
 
 
 def pct(x: float) -> str:
@@ -62,7 +62,7 @@ def test_four_category_confirmation_numbers():
 def test_bipia_benign_numbers():
     d = _load("v041_bipia_benign_entries.json")
     v11, v9, v8 = (d[k]["pooled"] for k in ("v11", "v9", "v8"))
-    (line,) = [ln for ln in (ROOT / "README.md").read_text().splitlines()
+    (line,) = [ln for ln in (ROOT / "README.md").read_text(encoding="utf-8").splitlines()
                if ln.startswith("- BIPIA-pressure")]
     assert f"{pct(v11['fpr'])} {interval(v11['fpr_ci'])}" in line
     assert f"none of {v11['n_benign']} calls" in line
@@ -72,7 +72,7 @@ def test_bipia_benign_numbers():
 
 
 def test_split_counts():
-    counts = json.loads((ROOT / "tests" / "adversarial" / "v040_split.json").read_text())["counts"]
+    counts = json.loads((ROOT / "tests" / "adversarial" / "v040_split.json").read_text(encoding="utf-8"))["counts"]
     total = sum(counts.values())
     assert f"assigns {total:,} of them" in README
     for fold in ("train", "val", "test", "holdout"):
@@ -91,4 +91,4 @@ def test_classifier_shape_and_threshold():
 
 def test_pair_results_are_dated():
     assert "measured on v0.31 and not re-run on v11" in README
-    assert "0/25" in (BENCH / "vaara-bench-v0.31.md").read_text()
+    assert "0/25" in (BENCH / "vaara-bench-v0.31.md").read_text(encoding="utf-8")

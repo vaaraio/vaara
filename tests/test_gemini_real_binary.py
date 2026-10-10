@@ -125,7 +125,7 @@ def _setup(tmp: Path, port: int) -> tuple[dict, Path, Path]:
     assert gemini.install_hooks(str(shim), settings) is True
     assert gemini.hook_status(settings) == "active"
 
-    env = {"HOME": str(home), "GEMINI_CLI_HOME": str(home), "GEMINI_API_KEY": "x",
+    env = {"HOME": str(home), "USERPROFILE": str(home), "GEMINI_CLI_HOME": str(home), "GEMINI_API_KEY": "x",
            "GOOGLE_GEMINI_BASE_URL": f"http://127.0.0.1:{port}",
            "PATH": os.environ.get("PATH", ""), "PYTHONPATH": os.pathsep.join(sys.path),
            "VAARA_PLUGIN_SHADOW": "0", "VAARA_PLUGIN_APPROVALS": "0",
@@ -157,7 +157,7 @@ def test_gemini_calls_are_decided_by_vaara_and_recorded(tmp_path):
     assert len(out) == 4, (out, log)
     assert "governed" in out[0] and "blocked" not in out[0], log
     assert "rm_rf_root" in out[1], log
-    assert (work / "ok.txt").read_text() == "fine", log
+    assert (work / "ok.txt").read_text(encoding="utf-8") == "fine", log
     assert "harness_config_write" in out[3], log
     assert not (work / ".gemini" / "settings.json").exists(), "a blocked write landed"
 

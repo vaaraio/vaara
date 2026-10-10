@@ -15,7 +15,9 @@ from __future__ import annotations
 
 import hashlib
 import sqlite3
+import os
 import struct
+import sys
 from pathlib import Path
 
 import pytest
@@ -248,6 +250,8 @@ def test_the_cli_says_clean_and_changes_nothing(trail_db: Path, capsys):
     assert hashlib.sha256(trail_db.read_bytes()).hexdigest() == before
 
 
+@pytest.mark.skipif(sys.platform == "win32",
+                    reason="Windows does not move a file another process holds open")
 def test_an_open_writer_follows_a_trail_replaced_under_it(trail_db: Path, tmp_path: Path):
     backend = SQLiteAuditBackend(trail_db)
     trail = backend.load_trail()
@@ -270,6 +274,27 @@ def test_an_open_writer_follows_a_trail_replaced_under_it(trail_db: Path, tmp_pa
     conn.close()
     assert landed >= 1
     assert old_copy.read_bytes() == old_bytes
+
+
+def test_a_trail_that_cannot_be_moved_is_left_in_place(trail_db: Path, monkeypatch):
+    """Windows refuses to move an open file: the repair fails and undoes itself."""
+    _zero_a_middle_leaf(trail_db)
+    before = trail_db.read_bytes()
+    real = os.replace
+    calls = []
+
+    def refuse_second(src, dst):
+        calls.append((src, dst))
+        if len(calls) == 2:
+            raise PermissionError(32, "The process cannot access the file")
+        return real(src, dst)
+
+    monkeypatch.setattr(os, "replace", refuse_second)
+    report = repair_trail_file(trail_db)
+    assert report.method == "failed" and "PermissionError" in report.error
+    assert trail_db.read_bytes() == before
+    assert not any(p.name.startswith(trail_db.name + ".corrupt")
+                   for p in trail_db.parent.iterdir())
 
 
 def _readable_by_rowid(path: Path) -> set[int]:

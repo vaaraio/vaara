@@ -265,7 +265,7 @@ class DecisionReceiptSink:
                 name = _SAFE_NAME.sub("_", record.record_id) + ".json"
                 path = out_dir / name
                 tmp = path.with_suffix(".tmp")
-                tmp.write_text(json.dumps(body, indent=2, sort_keys=True) + "\n")
+                tmp.write_text(json.dumps(body, indent=2, sort_keys=True) + "\n", encoding="utf-8", newline="\n")
                 os.replace(tmp, path)
                 self.written += 1
                 return path
@@ -338,7 +338,7 @@ def verify_receipt_file(
 
     from vaara.attestation.decision import parse_decision_record, verify_decision_signature
 
-    body = json.loads(Path(path).read_text())
+    body = json.loads(Path(path).read_text(encoding="utf-8"))
     envelope = body["receipt"]
     evidence = body["evidence"]
     if public_key_pem is None:

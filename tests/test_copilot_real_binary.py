@@ -121,7 +121,7 @@ def _setup(tmp: Path, port: int) -> tuple[dict, Path, Path]:
     assert copilot.install_hooks(str(shim), home / ".copilot") is True
     assert copilot.hook_status(home / ".copilot") == "active"
 
-    env = {"HOME": str(home), "COPILOT_HOME": str(home / ".copilot"),
+    env = {"HOME": str(home), "USERPROFILE": str(home), "COPILOT_HOME": str(home / ".copilot"),
            "COPILOT_PROVIDER_BASE_URL": f"http://127.0.0.1:{port}/v1",
            "COPILOT_MODEL": "gpt-4.1", "COPILOT_OFFLINE": "true",
            "PATH": os.environ.get("PATH", ""), "PYTHONPATH": os.pathsep.join(sys.path),
@@ -166,7 +166,7 @@ def test_copilot_calls_are_decided_by_vaara_and_recorded(tmp_path):
     assert len(out) == 4, (out, log)
     assert "governed" in out[0] and "Denied" not in out[0], log
     assert "rm_rf_root" in out[1], log
-    assert (work / "ok.txt").read_text() == "fine", log
+    assert (work / "ok.txt").read_text(encoding="utf-8") == "fine", log
     assert "harness_config_write" in out[3], log
     assert not (work / ".github" / "hooks" / "off.json").exists(), "a blocked write landed"
     assert _verdicts(trail) == [

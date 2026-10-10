@@ -208,7 +208,7 @@ def install(vaara_bin: str, *, interval: float = DEFAULT_INTERVAL, home: Optiona
         activate = [["systemctl", "--user", "daemon-reload"],
                     ["systemctl", "--user", "enable", "--now", SYSTEMD_UNIT]]
     path.parent.mkdir(parents=True, exist_ok=True)
-    path.write_text(text)
+    path.write_text(text, encoding="utf-8", newline="\n")
     if not all(_run_quiet(runner, cmd) for cmd in activate):
         return path, f"wrote {path}; it starts at the next login"
     return path, f"installed and started {path}"

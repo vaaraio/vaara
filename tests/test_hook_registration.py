@@ -87,7 +87,7 @@ class TestExpectedMatcherIsPinned:
         manifest = json.loads(
             (Path(__file__).resolve().parent.parent
              / "plugins" / "claude-code-vaara-governance"
-             / "hooks" / "hooks.json").read_text()
+             / "hooks" / "hooks.json").read_text(encoding="utf-8")
         )
         for event in ("PreToolUse", "PostToolUse"):
             for entry in manifest["hooks"][event]:

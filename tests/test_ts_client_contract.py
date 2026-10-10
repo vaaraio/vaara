@@ -45,7 +45,7 @@ CLIENT_TS = Path(__file__).resolve().parents[1] / "clients" / "ts" / "src" / "cl
 
 def _interface_fields(name: str) -> set[str]:
     """Field names declared on a TypeScript interface in types.ts."""
-    source = TYPES_TS.read_text()
+    source = TYPES_TS.read_text(encoding="utf-8")
     match = re.search(
         rf"export interface {name} \{{(.*?)\n\}}", source, re.DOTALL,
     )
@@ -142,7 +142,7 @@ def test_risk_block_declares_every_field_the_server_sends(client):
 
 def test_report_outcome_is_not_typed_as_returning_a_body():
     """/v1/score/outcome answers 204; the client returned undefined as {ok:true}."""
-    source = CLIENT_TS.read_text()
+    source = CLIENT_TS.read_text(encoding="utf-8")
     signature = re.search(r"async reportOutcome\([^)]*\):\s*([^{]+)\{", source)
     assert signature, "client.ts has no reportOutcome"
     assert "ok: true" not in signature.group(1), (
@@ -173,7 +173,7 @@ def test_openapi_yaml_matches_the_server_models(name):
     yaml = pytest.importorskip("yaml")
 
     spec = yaml.safe_load(
-        (Path(__file__).resolve().parents[1] / "docs" / "openapi.yaml").read_text()
+        (Path(__file__).resolve().parents[1] / "docs" / "openapi.yaml").read_text(encoding="utf-8")
     )
     documented = set(
         (spec["components"]["schemas"][name].get("properties") or {})
@@ -186,10 +186,10 @@ def test_openapi_yaml_matches_the_server_models(name):
 
 
 def test_every_path_the_client_calls_exists_on_the_server(client):
-    paths = set(re.findall(r'"(/v1/[^"`]*)"', CLIENT_TS.read_text()))
+    paths = set(re.findall(r'"(/v1/[^"`]*)"', CLIENT_TS.read_text(encoding="utf-8")))
     paths |= {
         p.replace("${encodeURIComponent(actionId)}", "{action_id}")
-        for p in re.findall(r"`(/v1/[^`]*)`", CLIENT_TS.read_text())
+        for p in re.findall(r"`(/v1/[^`]*)`", CLIENT_TS.read_text(encoding="utf-8"))
     }
     served = set(client.app.openapi()["paths"])
     assert paths <= served, f"client calls routes the server does not serve: {paths - served}"

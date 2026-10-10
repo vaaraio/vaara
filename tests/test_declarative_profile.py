@@ -366,7 +366,7 @@ def test_every_normalize_input_has_an_expected_entry():
 
     root = Path(__file__).resolve().parent / "vectors" / "normalize_v0"
     inputs = {p.stem for p in (root / "inputs").glob("*.json")}
-    expected = set(json.loads((root / "expected.json").read_text()))
+    expected = set(json.loads((root / "expected.json").read_text(encoding="utf-8")))
     assert inputs == expected, (
         f"inputs without an expected entry: {sorted(inputs - expected)}; "
         f"expected entries without an input: {sorted(expected - inputs)}"

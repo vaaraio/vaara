@@ -57,7 +57,7 @@ def enabled() -> bool:
 def parent_pid(pid: int) -> Optional[int]:
     """The parent of ``pid`` from /proc, else ``ps``; None when unknown."""
     try:
-        stat = Path(f"/proc/{pid}/stat").read_text()
+        stat = Path(f"/proc/{pid}/stat").read_text(encoding="utf-8")
         # The command name is in parentheses and may itself hold spaces.
         return int(stat.rsplit(")", 1)[1].split()[1])
     except (OSError, IndexError, ValueError):

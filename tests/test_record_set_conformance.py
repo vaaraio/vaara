@@ -28,7 +28,7 @@ SETS = VECTORS / "sets"
 
 
 def _expected() -> dict:
-    return json.loads((VECTORS / "expected.json").read_text())
+    return json.loads((VECTORS / "expected.json").read_text(encoding="utf-8"))
 
 
 def _cases():
@@ -37,7 +37,7 @@ def _cases():
 
 def _load_set(name: str):
     files = sorted((SETS / name).glob("*.json"))
-    return [(p.name, json.loads(p.read_text())) for p in files]
+    return [(p.name, json.loads(p.read_text(encoding="utf-8"))) for p in files]
 
 
 # ── Vectors ───────────────────────────────────────────────────────────────────
@@ -269,7 +269,7 @@ def test_cli_json_includes_verdict_counts(capsys):
 
 def test_cli_unreadable_file_gates(tmp_path, capsys):
     (tmp_path / "good.json").write_text(
-        (SETS / "clean" / "r1.json").read_text()
+        (SETS / "clean" / "r1.json").read_text(encoding="utf-8")
     )
     (tmp_path / "bad.json").write_text("{ not json")
     rc = main(["verify-records", str(tmp_path)])

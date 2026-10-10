@@ -84,7 +84,7 @@ base_url = "http://127.0.0.1:{proxy.port}/v1"
 wire_api = "responses"
 env_key = "FAKE_KEY"
 """)
-    env = {"HOME": str(home), "CODEX_HOME": str(codex_home), "FAKE_KEY": "x",
+    env = {"HOME": str(home), "USERPROFILE": str(home), "CODEX_HOME": str(codex_home), "FAKE_KEY": "x",
            "PATH": os.environ.get("PATH", ""), "PYTHONPATH": os.pathsep.join(sys.path)}
     try:
         proc = subprocess.run(

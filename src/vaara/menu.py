@@ -26,7 +26,7 @@ DEFAULT_DB = Path.home() / ".vaara" / "trail" / "audit.db"
 
 def _load_config() -> dict:
     try:
-        data = json.loads(CONFIG_PATH.read_text())
+        data = json.loads(CONFIG_PATH.read_text(encoding="utf-8"))
         return data if isinstance(data, dict) else {}
     except Exception:
         return {}
@@ -34,7 +34,7 @@ def _load_config() -> dict:
 
 def _save_config(cfg: dict) -> None:
     CONFIG_PATH.parent.mkdir(parents=True, exist_ok=True)
-    CONFIG_PATH.write_text(json.dumps(cfg, indent=2, sort_keys=True))
+    CONFIG_PATH.write_text(json.dumps(cfg, indent=2, sort_keys=True), encoding="utf-8", newline="\n")
 
 
 def _ask(prompt: str, default: str = "") -> str:

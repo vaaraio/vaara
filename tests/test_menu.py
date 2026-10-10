@@ -44,13 +44,13 @@ def test_menu_renders_and_quits(cfg, monkeypatch, capsys):
 def test_settings_gate_mode(cfg, monkeypatch, capsys):
     _feed(monkeypatch, ["1", "watch"])
     menu._settings()
-    assert json.loads(cfg.read_text())["mode"] == "watch"
+    assert json.loads(cfg.read_text(encoding="utf-8"))["mode"] == "watch"
 
 
 def test_settings_protection_preset(cfg, monkeypatch, capsys):
     _feed(monkeypatch, ["2", "strict"])
     menu._settings()
-    assert json.loads(cfg.read_text())["protection"] == "strict"
+    assert json.loads(cfg.read_text(encoding="utf-8"))["protection"] == "strict"
 
 
 def test_status_without_trail(cfg, monkeypatch, tmp_path, capsys):

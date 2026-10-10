@@ -23,7 +23,7 @@ INPUTS = VECTORS / "inputs"
 
 
 def _expected() -> dict:
-    return json.loads((VECTORS / "expected.json").read_text())
+    return json.loads((VECTORS / "expected.json").read_text(encoding="utf-8"))
 
 
 def _cases():
@@ -31,7 +31,7 @@ def _cases():
 
 
 def _input(name: str) -> dict:
-    return json.loads((INPUTS / f"{name}.json").read_text())
+    return json.loads((INPUTS / f"{name}.json").read_text(encoding="utf-8"))
 
 
 # ── Vectors ───────────────────────────────────────────────────────────────────
@@ -154,7 +154,7 @@ def test_attestation_backlink_matches_the_paired_receipt():
     pytest.importorskip("rfc8785")
     receipt = json.loads(
         (Path(__file__).resolve().parent / "vectors" / "execution_receipt_v0"
-         / "normative" / "es256_executed_projection" / "receipt.json").read_text()
+         / "normative" / "es256_executed_projection" / "receipt.json").read_text(encoding="utf-8")
     )
     r = normalize(_input("sep2787_attestation"))
     assert r.sep2828["backLink"] == receipt["backLink"]
@@ -177,7 +177,7 @@ def test_forced_format_mismatch_is_unrecognized():
 
 def test_cli_denial_exit_0(tmp_path, capsys):
     target = tmp_path / "denial.json"
-    target.write_text((INPUTS / "sep2643_url_denial.json").read_text())
+    target.write_text((INPUTS / "sep2643_url_denial.json").read_text(encoding="utf-8"))
     rc = main(["normalize", str(target)])
     out = capsys.readouterr().out
     assert rc == 0
@@ -187,7 +187,7 @@ def test_cli_denial_exit_0(tmp_path, capsys):
 
 def test_cli_invocation_exit_0(tmp_path, capsys):
     target = tmp_path / "inv.json"
-    target.write_text((INPUTS / "sep2817_single.json").read_text())
+    target.write_text((INPUTS / "sep2817_single.json").read_text(encoding="utf-8"))
     rc = main(["normalize", str(target)])
     out = capsys.readouterr().out
     assert rc == 0
@@ -197,7 +197,7 @@ def test_cli_invocation_exit_0(tmp_path, capsys):
 def test_cli_attestation_json(tmp_path, capsys):
     pytest.importorskip("rfc8785")
     target = tmp_path / "att.json"
-    target.write_text((INPUTS / "sep2787_attestation.json").read_text())
+    target.write_text((INPUTS / "sep2787_attestation.json").read_text(encoding="utf-8"))
     rc = main(["normalize", str(target), "--json"])
     payload = json.loads(capsys.readouterr().out)
     assert rc == 0
@@ -208,7 +208,7 @@ def test_cli_attestation_json(tmp_path, capsys):
 
 def test_cli_unknown_exit_1(tmp_path, capsys):
     target = tmp_path / "u.json"
-    target.write_text((INPUTS / "unknown.json").read_text())
+    target.write_text((INPUTS / "unknown.json").read_text(encoding="utf-8"))
     rc = main(["normalize", str(target)])
     out = capsys.readouterr().out
     assert rc == 1

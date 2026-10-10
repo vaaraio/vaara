@@ -8,12 +8,16 @@ days on one container-mounted home directory produced this file.
 """
 
 import sqlite3
+import sys
 from pathlib import Path
 
 import pytest
 
 from vaara.audit import sqlite_backend
 from vaara.audit.sqlite_backend import SQLiteAuditBackend
+
+# The shared-filesystem check reads the Linux mount table.
+pytestmark = pytest.mark.skipif(sys.platform == "win32", reason="mount detection reads /proc/mounts")
 
 
 def _mounts(tmp_path: Path, fstype: str) -> Path:

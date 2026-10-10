@@ -167,7 +167,7 @@ def _run_single(args: argparse.Namespace, material: Any) -> int:
     receipt_doc = json.loads(receipt_path.read_text(encoding="utf-8"))
     att_doc = None
     if args.attestation:
-        att_doc = json.loads(Path(args.attestation).expanduser().read_text("utf-8"))
+        att_doc = json.loads(Path(args.attestation).expanduser().read_text(encoding="utf-8"))
     try:
         checks = _verify_one(receipt_doc, att_doc, material)
     except Exception as exc:

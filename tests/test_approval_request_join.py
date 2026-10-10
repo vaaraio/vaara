@@ -28,7 +28,7 @@ def _request_keys(tmp_path: Path) -> set[str]:
         for _ in range(200):
             files = list(tmp_path.glob("*.request.json"))
             if files:
-                seen.update(json.loads(files[0].read_text()))
+                seen.update(json.loads(files[0].read_text(encoding="utf-8")))
                 return
             threading.Event().wait(0.01)
 

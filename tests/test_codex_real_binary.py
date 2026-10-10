@@ -151,7 +151,7 @@ def _setup(tmp: Path, port: int) -> tuple[dict, Path, Path]:
     shim.chmod(0o755)
 
     codex.install_hooks(str(shim), codex_home)
-    hooks = json.loads(codex.hooks_path(codex_home).read_text())["hooks"]
+    hooks = json.loads(codex.hooks_path(codex_home).read_text(encoding="utf-8"))["hooks"]
     path = codex.hooks_path(codex_home).resolve()
     trust = ""
     for event, label in (("PreToolUse", "pre_tool_use"), ("PostToolUse", "post_tool_use")):
@@ -175,7 +175,7 @@ env_key = "FAKE_KEY"
 {trust}""")
     assert codex.trust_status(codex_home) == "trusted"
 
-    env = {"HOME": str(home), "CODEX_HOME": str(codex_home), "FAKE_KEY": "x",
+    env = {"HOME": str(home), "USERPROFILE": str(home), "CODEX_HOME": str(codex_home), "FAKE_KEY": "x",
            "PATH": os.environ.get("PATH", ""), "PYTHONPATH": os.pathsep.join(sys.path),
            "VAARA_PLUGIN_SHADOW": "0", "VAARA_PLUGIN_APPROVALS": "0",
            "VAARA_PLUGIN_NOTIFY": "0"}

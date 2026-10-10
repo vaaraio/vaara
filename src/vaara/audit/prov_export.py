@@ -322,5 +322,5 @@ def write_prov_json(
     doc = audit_to_prov_json(rec_list, action_id=action_id, include_chain=include_chain)
     out_path = Path(out_path)
     out_path.parent.mkdir(parents=True, exist_ok=True)
-    out_path.write_text(json.dumps(doc, indent=2, default=str), encoding="utf-8")
+    out_path.write_text(json.dumps(doc, indent=2, default=str), encoding="utf-8", newline="\n")
     return len(rec_list)

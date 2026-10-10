@@ -37,7 +37,7 @@ DOC_BUNDLES = Path(__file__).resolve().parent / "vectors" / "bundle_doc_v0" / "b
 
 
 def _expected() -> dict:
-    return json.loads((VECTORS / "expected.json").read_text())
+    return json.loads((VECTORS / "expected.json").read_text(encoding="utf-8"))
 
 
 def _cases():
@@ -46,7 +46,7 @@ def _cases():
 
 def _load_set(name: str):
     files = sorted((SETS / name).glob("*.json"))
-    return [(p.name, json.loads(p.read_text())) for p in files]
+    return [(p.name, json.loads(p.read_text(encoding="utf-8"))) for p in files]
 
 
 # ── Vectors ───────────────────────────────────────────────────────────────────
@@ -189,7 +189,7 @@ def test_cli_no_matching_files(tmp_path, capsys):
 
 
 def test_cli_unreadable_file_gates(tmp_path, capsys):
-    (tmp_path / "good.json").write_text((DOC_BUNDLES / "all_lenses_pass.json").read_text())
+    (tmp_path / "good.json").write_text((DOC_BUNDLES / "all_lenses_pass.json").read_text(encoding="utf-8"))
     (tmp_path / "bad.json").write_text("{ not json")
     rc = main(["verify-bundles", str(tmp_path), "--json"])
     payload = json.loads(capsys.readouterr().out)

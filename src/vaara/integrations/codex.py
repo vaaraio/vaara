@@ -79,7 +79,7 @@ def detected(directory: Optional[Path] = None) -> bool:
 
 def _load(path: Path) -> dict:
     try:
-        data = json.loads(path.read_text())
+        data = json.loads(path.read_text(encoding="utf-8"))
     except (OSError, ValueError):
         return {}
     return data if isinstance(data, dict) else {}
@@ -118,7 +118,7 @@ def _strip(hooks: dict) -> dict:
 def _write(path: Path, obj: dict) -> None:
     path.parent.mkdir(parents=True, exist_ok=True)
     tmp = path.with_suffix(".json.vaara-tmp")
-    tmp.write_text(json.dumps(obj, indent=2) + "\n")
+    tmp.write_text(json.dumps(obj, indent=2) + "\n", encoding="utf-8", newline="\n")
     os.replace(tmp, path)
 
 
@@ -198,7 +198,7 @@ def _hook_states(directory: Optional[Path]) -> Optional[dict]:
             return None
     path = (directory or home_dir()) / "config.toml"
     try:
-        config = tomllib.loads(path.read_text())
+        config = tomllib.loads(path.read_text(encoding="utf-8"))
     except FileNotFoundError:
         return {}
     except (OSError, ValueError):

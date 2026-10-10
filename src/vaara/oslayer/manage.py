@@ -94,7 +94,7 @@ def _floor_state() -> str:
     if not floor.apparmor_enabled():
         return "AppArmor is not enabled"
     try:
-        Path("/sys/kernel/security/apparmor/profiles").read_text()
+        Path("/sys/kernel/security/apparmor/profiles").read_text(encoding="utf-8")
     except OSError:
         return "unknown (reading the loaded profiles needs root)"
     return "loaded" if floor.profile_loaded() else "not loaded"
@@ -137,7 +137,7 @@ def pending(approvals_dir: Path) -> list[dict]:
     out = []
     for path in sorted(approvals_dir.glob("*.request.json")):
         try:
-            request = json.loads(path.read_text())
+            request = json.loads(path.read_text(encoding="utf-8"))
         except (OSError, ValueError):
             continue
         if isinstance(request, dict) and str(request.get("tool_name", "")).startswith("os."):

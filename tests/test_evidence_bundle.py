@@ -225,7 +225,7 @@ def _bundle_from_json(b: dict) -> EvidenceBundle:
 
 
 def _cases():
-    return json.loads((VECTORS / "cases.json").read_text())["cases"]
+    return json.loads((VECTORS / "cases.json").read_text(encoding="utf-8"))["cases"]
 
 
 @pytest.mark.parametrize("case", _cases(), ids=lambda c: c["name"])

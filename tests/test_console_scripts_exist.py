@@ -20,14 +20,14 @@ ROOT = Path(__file__).resolve().parents[1]
 
 
 def _scripts() -> dict[str, str]:
-    data = tomllib.loads((ROOT / "pyproject.toml").read_text())
+    data = tomllib.loads((ROOT / "pyproject.toml").read_text(encoding="utf-8"))
     return data["project"]["scripts"]
 
 
 def _prog_names() -> set[str]:
     found: set[str] = set()
     for path in (ROOT / "src" / "vaara").rglob("*.py"):
-        for m in re.finditer(r'prog\s*=\s*"(vaara[\w-]*)"', path.read_text()):
+        for m in re.finditer(r'prog\s*=\s*"(vaara[\w-]*)"', path.read_text(encoding="utf-8")):
             found.add(m.group(1))
     return found
 
@@ -47,5 +47,5 @@ def test_every_script_target_exists():
         src = path.with_suffix(".py") if path.with_suffix(".py").exists() \
             else path / "__init__.py"
         assert src.exists(), f"{name}: no module {module}"
-        assert re.search(rf"^def {attr}\(", src.read_text(), re.M), \
+        assert re.search(rf"^def {attr}\(", src.read_text(encoding="utf-8"), re.M), \
             f"{name}: {module} defines no {attr}()"

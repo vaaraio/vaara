@@ -196,10 +196,10 @@ def _build_adversarial(out: Path) -> None:
     checker rejects them, rather than only confirming it accepts good records.
     """
     def load(name):
-        return json.loads((out / f"{name}.json").read_text())
+        return json.loads((out / f"{name}.json").read_text(encoding="utf-8"))
 
     def write(name, records):
-        (out / f"{name}.json").write_text(json.dumps(records, indent=2) + "\n")
+        (out / f"{name}.json").write_text(json.dumps(records, indent=2) + "\n", encoding="utf-8", newline="\n")
 
     # Route B, the road not taken: the refinement used as the verdict itself.
     # This is what renaming escalate to step_up would have put on the chain.

@@ -395,7 +395,7 @@ class SEVSNPHostAttester:
         except OSError as exc:
             raise TEEAttestationError(f"cannot create {entry}: {exc}") from exc
         try:
-            provider = (entry / "provider").read_text().strip()
+            provider = (entry / "provider").read_text(encoding="utf-8").strip()
             if provider != "sev_guest":
                 raise TEEAttestationError(
                     f"configfs-tsm provider is {provider!r}, not sev_guest"
@@ -403,17 +403,17 @@ class SEVSNPHostAttester:
             level = self._privlevel
             floor_file = entry / "privlevel_floor"
             if level is None and floor_file.exists():
-                level = int(floor_file.read_text().strip() or 0)
+                level = int(floor_file.read_text(encoding="utf-8").strip() or 0)
             if level is not None and (entry / "privlevel").exists():
-                (entry / "privlevel").write_text(str(level))
+                (entry / "privlevel").write_text(str(level), encoding="utf-8", newline="\n")
             (entry / "inblob").write_bytes(report_data)
-            written = int((entry / "generation").read_text().strip())
+            written = int((entry / "generation").read_text(encoding="utf-8").strip())
             report = (entry / "outblob").read_bytes()
             certs = b""
             if (entry / "auxblob").exists():
                 certs = (entry / "auxblob").read_bytes()
             # A write by anyone else between ours and the reads bumps generation.
-            if int((entry / "generation").read_text().strip()) != written:
+            if int((entry / "generation").read_text(encoding="utf-8").strip()) != written:
                 raise TEEAttestationError(
                     "configfs-tsm entry changed while the report was read"
                 )

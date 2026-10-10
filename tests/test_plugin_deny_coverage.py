@@ -35,7 +35,7 @@ from _deny_patterns import match_deny_rule  # noqa: E402
 
 
 def _rules() -> list[dict]:
-    return json.loads(PACKAGE_POLICY.read_text())["rules"]
+    return json.loads(PACKAGE_POLICY.read_text(encoding="utf-8"))["rules"]
 
 
 BLOCKED = [
@@ -87,8 +87,8 @@ def test_shell_surface_still_governed():
 
 def test_the_two_policy_copies_are_identical():
     """pip install and plugin install must enforce the same rules."""
-    assert json.loads(PACKAGE_POLICY.read_text()) == json.loads(
-        PLUGIN_POLICY.read_text()
+    assert json.loads(PACKAGE_POLICY.read_text(encoding="utf-8")) == json.loads(
+        PLUGIN_POLICY.read_text(encoding="utf-8")
     ), "claude_code_deny.json and policies/default_deny.json have drifted"
 
 
@@ -109,7 +109,7 @@ def test_every_rule_compiles_and_is_well_formed():
 
 def test_hook_matcher_covers_every_tool_named_by_a_rule():
     """A rule naming a tool the matcher ignores can never fire."""
-    hooks = json.loads((PLUGIN / "hooks" / "hooks.json").read_text())
+    hooks = json.loads((PLUGIN / "hooks" / "hooks.json").read_text(encoding="utf-8"))
     matchers = {
         entry["matcher"]
         for event in ("PreToolUse", "PostToolUse")
@@ -201,7 +201,7 @@ def test_plugin_matcher_dispatches_every_tool():
     recorded. A call that is seen and allowed is on the trail; a call
     the matcher drops is not.
     """
-    doc = json.loads((PLUGIN / "hooks" / "hooks.json").read_text())
+    doc = json.loads((PLUGIN / "hooks" / "hooks.json").read_text(encoding="utf-8"))
     matcher = doc["hooks"]["PreToolUse"][0]["matcher"]
     for tool in ("Agent", "Task", "Workflow", "CronCreate", "ScheduleWakeup",
                  "RemoteTrigger", "SendMessage", "Skill", "TaskStop",
@@ -220,7 +220,7 @@ def test_package_init_matcher_equals_the_plugin_matcher():
     present, loaded and dead, and the only symptom was silence.
     """
     from vaara.integrations import init_governance as ig
-    doc = json.loads((PLUGIN / "hooks" / "hooks.json").read_text())
+    doc = json.loads((PLUGIN / "hooks" / "hooks.json").read_text(encoding="utf-8"))
     assert ig.HOOK_MATCHER == doc["hooks"]["PreToolUse"][0]["matcher"]
     for rule in _rules():
         for tool in rule["tools"]:
