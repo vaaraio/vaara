@@ -466,3 +466,7 @@ main section.accentband h3 { color: var(--accent); }
 .feed { position: relative; }
 .feed figcaption { position: absolute; top: 100%; left: 0; right: 0; }
 @media (max-width: 820px) { .feed figcaption { position: static; } }
+
+/* dark mode: the why section takes the same band as "a receipt that outlasts", not green */
+html[data-theme="dark"] main section.accentband { background: var(--tint); border-color: var(--rule); }
+html[data-theme="dark"] main section.accentband h3 { color: var(--ink); }
