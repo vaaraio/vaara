@@ -768,26 +768,31 @@ jobs:
           # one comment, so if the runner loses its network mid-test the last
           # edit shows the state right before it did.
           (
+            # Nothing here opens a file under the home tree: the guard is a
+            # fanotify permission listener, and if it stalls, every open under
+            # that tree sleeps uninterruptibly, gh's own config read included.
+            # So: /tmp for the report, a bounded tail on the logs, curl to post.
             comment_id=""
+            api="https://api.github.com/repos/${GITHUB_REPOSITORY}"
             for _ in $(seq 20); do
               sleep 60
               {
                 echo "OS layer watchdog (${{ matrix.leg }}), $(date -u +%H:%M:%S) UTC, run ${GITHUB_RUN_ID}"
                 echo '```'
                 ps -eo pid,ppid,stat,wchan:32,etime,cmd | grep -vE ' \[[^]]+\]$' | head -80
-                for p in $(pgrep -f 'pytest tests/test_oslayer_e2e' || true); do sudo "$(command -v py-spy)" dump --nonblocking --pid "$p" || true; done
-                for p in $(pgrep -f 'vaara.cli run' || true); do sudo "$(command -v py-spy)" dump --nonblocking --pid "$p" || true; done
-                for p in $(pgrep -f 'vaara.cli os-guard' || true); do sudo "$(command -v py-spy)" dump --nonblocking --pid "$p" || true; done
-                echo '--- result.txt'; tail -40 result.txt || true
-                echo '--- guard.log'; tail -30 guard.log || true
-                echo '--- cgroups of the agent tree'; grep -rl . /sys/fs/cgroup/vaara*/cgroup.procs 2>/dev/null | head; cat /proc/self/cgroup
+                for p in $(pgrep -f 'pytest tests/test_oslayer_e2e' || true); do timeout 20 sudo "$(command -v py-spy)" dump --nonblocking --pid "$p" || true; done
+                for p in $(pgrep -f 'vaara.cli run' || true); do timeout 20 sudo "$(command -v py-spy)" dump --nonblocking --pid "$p" || true; done
+                for p in $(pgrep -f 'vaara.cli os-guard' || true); do timeout 20 sudo "$(command -v py-spy)" dump --nonblocking --pid "$p" || true; done
+                echo '--- result.txt'; timeout 5 tail -40 result.txt || echo "(read blocked)"
+                echo '--- guard.log'; timeout 5 tail -30 guard.log || echo "(read blocked)"
                 echo '```'
-              } > watchdog.md 2>&1
+              } > /tmp/watchdog.md 2>&1
+              python3 -c 'import json; print(json.dumps({"body": open("/tmp/watchdog.md").read()}))' > /tmp/watchdog.json
               if [ -n "$PR_NUMBER" ]; then
                 if [ -z "$comment_id" ]; then
-                  comment_id=$(gh api -X POST "repos/${GITHUB_REPOSITORY}/issues/${PR_NUMBER}/comments" -F body=@watchdog.md --jq .id 2>/dev/null || true)
+                  comment_id=$(curl -sS -m 20 -X POST -H "Authorization: Bearer $GH_TOKEN" -H "Accept: application/vnd.github+json" "$api/issues/${PR_NUMBER}/comments" -d @/tmp/watchdog.json | python3 -c 'import json,sys; print(json.load(sys.stdin).get("id",""))' || true)
                 else
-                  gh api -X PATCH "repos/${GITHUB_REPOSITORY}/issues/comments/${comment_id}" -F body=@watchdog.md >/dev/null 2>&1 || true
+                  curl -sS -m 20 -X PATCH -H "Authorization: Bearer $GH_TOKEN" -H "Accept: application/vnd.github+json" "$api/issues/comments/${comment_id}" -d @/tmp/watchdog.json >/dev/null || true
                 fi
               fi
               sleep 30
