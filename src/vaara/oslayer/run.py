@@ -134,12 +134,20 @@ def resolve(agent: str, path_env: Optional[str] = None) -> tuple[list[str], str]
 
 
 def _egress_recorder(agent: str, cage_block: dict):
-    """Write each egress connection to the operator's trail as a decision."""
+    """Write each egress connection to the operator's trail.
+
+    A connection the proxy refused is a deny with a violation. A connection
+    it allowed is a decision at open, under the proxy's connection id, and
+    an outcome at close with the bytes. An upstream that did not answer is
+    the same allow followed by an outcome that says so: a transport
+    failure, not a refusal by policy.
+    """
     lock = threading.Lock()
     held: dict = {}
 
     def record(event: dict) -> None:
-        allowed = bool(event.get("allowed"))
+        kind = event.get("kind") or ("opened" if event.get("allowed") else "refused")
+        where = f"{event.get('method')} {event.get('host')}:{event.get('port')}"
         try:
             with lock:
                 if "trail" not in held:
@@ -148,16 +156,34 @@ def _egress_recorder(agent: str, cage_block: dict):
                     db = os.environ.get("VAARA_DB") or str(
                         Path.home() / ".vaara" / "trail" / "audit.db")
                     held["trail"] = SQLiteAuditBackend(db).load_trail()
-                held["trail"].record_decision(
-                    action_id=str(uuid.uuid4()), agent_id=agent, tool_name="egress.connect",
-                    decision="allow" if allowed else "deny",
-                    reason=f"{event.get('method')} {event.get('host')}:{event.get('port')}: "
-                           f"{event.get('reason')}",
-                    risk_score=0.0 if allowed else 1.0,
-                    policy_id="" if allowed else "os-layer.egress",
-                    violation_type="" if allowed else "egress_not_allowed",
-                    cage=cage_block,
-                )
+                trail = held["trail"]
+                action_id = str(event.get("connection") or uuid.uuid4())
+                if kind == "refused":
+                    trail.record_decision(
+                        action_id=action_id, agent_id=agent, tool_name="egress.connect",
+                        decision="deny", reason=f"{where}: {event.get('reason')}",
+                        risk_score=1.0, policy_id="os-layer.egress",
+                        violation_type="egress_not_allowed", cage=cage_block,
+                    )
+                elif kind == "opened":
+                    trail.record_decision(
+                        action_id=action_id, agent_id=agent, tool_name="egress.connect",
+                        decision="allow", reason=f"{where}: {event.get('reason')}",
+                        risk_score=0.0, policy_id="", violation_type="", cage=cage_block,
+                    )
+                elif kind == "failed":
+                    trail.record_outcome(
+                        action_id=action_id, agent_id=agent, tool_name="egress.connect",
+                        outcome_severity=0.0,
+                        description=f"{where}: {event.get('error')}",
+                    )
+                elif kind == "closed":
+                    trail.record_outcome(
+                        action_id=action_id, agent_id=agent, tool_name="egress.connect",
+                        outcome_severity=0.0,
+                        description=f"{where}: closed, {event.get('bytes_up', 0)} bytes up, "
+                                    f"{event.get('bytes_down', 0)} bytes down",
+                    )
         except Exception as exc:  # noqa: BLE001 - a lost record is reported, never fatal
             print(f"vaara run: egress record not written: {exc}", file=sys.stderr)
 

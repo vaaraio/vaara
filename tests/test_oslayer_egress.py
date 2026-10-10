@@ -108,14 +108,14 @@ def test_plain_http_through_the_proxy_is_recorded(upstream):
         with pytest.raises(urllib.error.HTTPError) as refused:
             opener.open("http://not-allowed.example/", timeout=10)
         assert refused.value.code == 403
-        _wait_for(seen, 2)
+        _wait_for(seen, 3)
     finally:
         p.close()
-    allowed = [e for e in seen if e["allowed"]]
-    denied = [e for e in seen if not e["allowed"]]
+    allowed = [e for e in seen if e["kind"] == "closed"]
+    denied = [e for e in seen if e["kind"] == "refused"]
     assert allowed[0]["host"] == "127.0.0.1" and allowed[0]["method"] == "GET"
     assert allowed[0]["bytes_down"] > 0
-    assert denied[0]["host"] == "not-allowed.example"
+    assert denied[0]["host"] == "not-allowed.example" and not denied[0]["allowed"]
 
 
 def test_connect_tunnel(upstream):
@@ -364,3 +364,90 @@ def test_a_half_closed_tunnel_still_gets_its_reply():
         p.close()
     assert bytes(got) == b"request"
     assert reply == b"reply"
+
+
+# Audit 2026-10-10 finding 3: an upstream that did not answer was recorded as
+# a policy deny with risk 1.0 and a violation, and an allowed connection was
+# absent from the trail until it closed. Four event kinds now: refused (by
+# policy), opened (allowed, at the decision), closed (bytes, at the end) and
+# failed (allowed, the upstream did not answer). The last three share one
+# connection id.
+
+def _free_port() -> int:
+    s = socket.socket()
+    s.bind(("127.0.0.1", 0))
+    port = s.getsockname()[1]
+    s.close()
+    return port
+
+
+def test_an_upstream_that_does_not_answer_is_a_transport_failure_not_a_refusal():
+    seen = []
+    dead = _free_port()
+    p = EgressProxy([f"127.0.0.1:{dead}"], record=seen.append, connect_timeout=2)
+    port = p.start()
+    try:
+        opener = urllib.request.build_opener(urllib.request.ProxyHandler(
+            {"http": f"http://127.0.0.1:{port}"}))
+        with pytest.raises(urllib.error.HTTPError) as failed:
+            opener.open(f"http://127.0.0.1:{dead}/x", timeout=10)
+        assert failed.value.code == 502
+        _wait_for(seen, 2)
+    finally:
+        p.close()
+    assert [e["kind"] for e in seen] == ["opened", "failed"]
+    assert all(e["allowed"] for e in seen)
+    assert seen[0]["connection"] == seen[1]["connection"]
+    assert "did not answer" in seen[1]["error"]
+
+
+def test_an_allowed_connection_is_recorded_at_open_and_at_close(upstream):
+    seen = []
+    p = EgressProxy([f"127.0.0.1:{upstream}"], record=seen.append)
+    port = p.start()
+    try:
+        opener = urllib.request.build_opener(urllib.request.ProxyHandler(
+            {"http": f"http://127.0.0.1:{port}"}))
+        opener.open(f"http://127.0.0.1:{upstream}/x", timeout=10).read()
+        with pytest.raises(urllib.error.HTTPError):
+            opener.open("http://not-allowed.example/", timeout=10)
+        _wait_for(seen, 3)
+    finally:
+        p.close()
+    kinds = [e["kind"] for e in seen]
+    assert kinds == ["opened", "closed", "refused"]
+    assert seen[0]["connection"] == seen[1]["connection"]
+    assert "bytes_down" not in seen[0] and seen[1]["bytes_down"] > 0
+    assert seen[2]["allowed"] is False and "connection" not in seen[2]
+
+
+def test_the_recorder_files_a_transport_failure_without_a_violation(tmp_path, monkeypatch):
+    from vaara.audit.sqlite_backend import SQLiteAuditBackend
+    from vaara.audit.trail import EventType
+    from vaara.oslayer.run import _egress_recorder
+    db = tmp_path / "audit.db"
+    monkeypatch.setenv("VAARA_DB", str(db))
+    record = _egress_recorder("reviewer", {"driver": "none", "confirmed": False})
+    record({"kind": "opened", "connection": "c1", "method": "CONNECT",
+            "host": "api.example.com", "port": 443, "allowed": True,
+            "reason": "allowed by api.example.com"})
+    record({"kind": "failed", "connection": "c1", "method": "CONNECT",
+            "host": "api.example.com", "port": 443, "allowed": True,
+            "reason": "allowed by api.example.com",
+            "error": "upstream did not answer: [Errno 111] Connection refused"})
+    record({"kind": "opened", "connection": "c2", "method": "GET",
+            "host": "api.example.com", "port": 80, "allowed": True,
+            "reason": "allowed by api.example.com"})
+    record({"kind": "closed", "connection": "c2", "method": "GET",
+            "host": "api.example.com", "port": 80, "allowed": True,
+            "reason": "allowed by api.example.com", "bytes_up": 120, "bytes_down": 4096})
+    trail = SQLiteAuditBackend(str(db)).load_trail()
+    assert trail.get_records_by_type(EventType.ACTION_BLOCKED) == []
+    decisions = trail.get_records_by_type(EventType.DECISION_MADE)
+    outcomes = trail.get_records_by_type(EventType.OUTCOME_RECORDED)
+    assert [d.action_id for d in decisions] == ["c1", "c2"]
+    assert all(d.data["decision"] == "allow" and d.data["risk_score"] == 0.0
+               and not d.data.get("violation_type") for d in decisions)
+    assert [o.action_id for o in outcomes] == ["c1", "c2"]
+    assert "did not answer" in outcomes[0].data["description"]
+    assert "4096" in outcomes[1].data["description"]

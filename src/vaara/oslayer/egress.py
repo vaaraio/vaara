@@ -32,6 +32,7 @@ import ipaddress
 import socket
 import threading
 import time
+import uuid
 from dataclasses import dataclass
 from typing import Callable, Optional
 
@@ -254,10 +255,18 @@ class EgressProxy:
         event = {"ts": time.time(), "host": host, "port": port, "method": method.upper(),
                  "allowed": allowed, "reason": reason}
         if not allowed or target is None:
-            self._record(event)
+            # Refused by policy: the one event kind that is a deny.
+            self._record(dict(event, kind="refused"))
             conn.sendall(b"HTTP/1.1 403 Forbidden\r\nContent-Type: text/plain\r\n"
                          b"Connection: close\r\n\r\nvaara egress: " + reason.encode() + b"\n")
             return
+        # Allowed: recorded now, before the connect, so a long stream is on
+        # the record while it runs and stays there if this process dies.
+        # What follows for the same connection id is an outcome, not a
+        # decision: closed with the bytes, or failed when the upstream did
+        # not answer. A 502 is transport, not policy.
+        event["connection"] = str(uuid.uuid4())
+        self._record(dict(event, kind="opened"))
         family, sockaddr = target
         upstream = socket.socket(family, socket.SOCK_STREAM)
         upstream.settimeout(self._timeout)
@@ -265,8 +274,7 @@ class EgressProxy:
             upstream.connect(sockaddr)
         except OSError as exc:
             upstream.close()
-            event.update(allowed=False, reason=f"upstream did not answer: {exc}")
-            self._record(event)
+            self._record(dict(event, kind="failed", error=f"upstream did not answer: {exc}"))
             conn.sendall(b"HTTP/1.1 502 Bad Gateway\r\nConnection: close\r\n\r\n")
             return
         if connect_reply:
@@ -281,8 +289,7 @@ class EgressProxy:
             upstream.close()
         else:
             up, down = _pipe(conn, upstream)
-        event.update(bytes_up=up + len(first), bytes_down=down)
-        self._record(event)
+        self._record(dict(event, kind="closed", bytes_up=up + len(first), bytes_down=down))
 
 
 def _split_hostport(target: str, default: int) -> tuple[str, int]:

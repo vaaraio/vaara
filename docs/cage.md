@@ -175,7 +175,11 @@ vaara os-layer egress --off       # unlocked
   refused unless the entry names that address literally.
 - Every connection, allowed or refused, is a decision on the operator's
   trail (`egress.connect`), with the host, port and the reason, and the
-  launch's cage block.
+  launch's cage block. A refused connection is a deny. An allowed one is
+  recorded when it is decided, before the connect, and closed by an
+  outcome with the bytes moved; an upstream that does not answer closes
+  the same decision with an outcome that says so, a transport failure
+  and not a refusal.
 - A launch whose kernel cannot apply a layer that was asked for does not
   start.
 
