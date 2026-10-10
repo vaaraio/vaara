@@ -10,6 +10,7 @@ import json
 import socket
 import subprocess
 import sys
+import time
 import textwrap
 import threading
 import urllib.request
@@ -88,6 +89,13 @@ def test_decide_looks_through_mapped_addresses_and_refuses_ipv6_metadata():
     assert p.decide("v6.example.com", 443)[0]
 
 
+def _wait_for(seen: list, count: int, timeout: float = 5.0) -> None:
+    """The proxy records a connection when it ends, from its own thread."""
+    deadline = time.monotonic() + timeout
+    while len(seen) < count and time.monotonic() < deadline:
+        time.sleep(0.02)
+
+
 def test_plain_http_through_the_proxy_is_recorded(upstream):
     seen = []
     p = EgressProxy([f"127.0.0.1:{upstream}"], record=seen.append)
@@ -100,6 +108,7 @@ def test_plain_http_through_the_proxy_is_recorded(upstream):
         with pytest.raises(urllib.error.HTTPError) as refused:
             opener.open("http://not-allowed.example/", timeout=10)
         assert refused.value.code == 403
+        _wait_for(seen, 2)
     finally:
         p.close()
     allowed = [e for e in seen if e["allowed"]]
@@ -123,6 +132,7 @@ def test_connect_tunnel(upstream):
             data += chunk
         assert data.endswith(b"hello from /tunnel")
         s.close()
+        _wait_for(seen, 1)
     finally:
         p.close()
     assert seen and seen[0]["method"] == "CONNECT" and seen[0]["allowed"]
@@ -155,6 +165,7 @@ def test_a_hardened_child_gets_out_only_through_the_proxy(upstream):
     try:
         done = subprocess.run([sys.executable, "-c", code], capture_output=True, text=True,
                               env=env, timeout=60)
+        _wait_for(seen, 1)
     finally:
         p.close()
     assert done.returncode == 0, done.stderr

@@ -141,6 +141,9 @@ class _RedirectHandler(BaseHTTPRequestHandler):
     def _do(self):
         cfg = self.server.cfg
         cfg["last_headers"] = dict(self.headers)
+        # Read the request body before answering: closing a socket with unread
+        # data makes macOS send a reset, which the client can see before the 302.
+        self.rfile.read(int(self.headers.get("Content-Length") or 0))
         location = cfg.get("location")
         if location is not None:
             # 302 so urllib follows it (it refuses to auto-follow 307 on POST);
