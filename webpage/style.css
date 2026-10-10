@@ -460,3 +460,4 @@ main section.accentband > .wrap > :last-child { margin-bottom: 0; }
 main section.accentband + section { padding-top: 84px; }
 main section.accentband h3 { color: var(--accent); }
 @media (max-width: 820px) { main section.accentband { padding: 48px 0; } main section.accentband + section { padding-top: 56px; } }
+.plain ul.links { max-width: 42em; margin-top: 4px; } .plain .links li { border-bottom-color: color-mix(in srgb, var(--ink) 12%, transparent); }
