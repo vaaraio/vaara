@@ -694,3 +694,16 @@ class TestEngineDigestIsTheOneTheReceiptsCarry:
         engine, _ = fake("docker", [[["inspect"], INSPECT]])
         state = GVisorDriver(engine=engine, runsc="/nonexistent/runsc").enforcement_state("g")
         assert state.config_digest == state.detail["active_digest"]
+
+
+def test_digest_json_is_the_receipts_canonical_form():
+    # Audit 2026-10-10 (R3): every other digest in the tree is JCS; the cage
+    # digests were sorted JSON with floats allowed. Same bytes for a
+    # driver's request, and a float is now refused like everywhere else.
+    from vaara.audit.hcs27 import canonical_json
+    from vaara.cage._cli import digest_bytes, digest_json
+    request = {"engine": "docker", "runtime": "runsc", "image": "python:3.12",
+               "security_opt": [], "agent": ["python", "agent.py"]}
+    assert digest_json(request) == digest_bytes(canonical_json(request))
+    with pytest.raises(Exception):
+        digest_json({"timeout": 1.5})
