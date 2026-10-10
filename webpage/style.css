@@ -321,3 +321,12 @@ body > main { flex: 1 0 auto; }
   .parties li { grid-template-columns: 1fr; gap: 2px; }
   .lgrid { grid-template-columns: 1fr; gap: 40px; }
 }
+
+/* sector and product boxes: a light frame with the block's own colour on top, like the six on the home page */
+.card.box, a.card.box { border: 1px solid var(--rule); border-top: 3px solid var(--fa); border-radius: 10px;
+  padding: 26px 26px 28px; background: var(--card); }
+a.card.box:hover { border-color: var(--fa); }
+.card.box .ico { background: color-mix(in srgb, var(--fa) 11%, var(--card)); }
+.card.box .ico .a { stroke: var(--fa); }
+.grid:has(.box) { gap: 24px; }
+.grid.two:has(.box) { gap: 24px; }
