@@ -40,8 +40,9 @@
       recomputable record that binds a decision about an autonomous action to the
       evidence the decision was made on, and optionally to one or more external
       timestamp anchors. The format is canonicalized with the JSON
-      Canonicalization Scheme (JCS) so that any third party can recompute its
-      digests and verify its signature without access to the issuer. A decision
+      Canonicalization Scheme (JCS) so that a third party can recompute its
+      digests, and, for a receipt signed with a public-key algorithm, verify
+      its signature, without access to the issuer. A decision
       and the execution receipt that answers it form one recomputable pair through
       the envelope's back link.</t>
       <t>The receipt's trust is root-agnostic: the same record is verifiable with
@@ -53,10 +54,8 @@
       deployed, and its receipts are independently recomputable from public
       conformance vectors that ship with standalone checkers importing no
       issuer code. The minimal profile is a governance decision over a single
-      autonomous action, bound to the action's own intent with no external rail; it
-      is the floor of the format, and a reference library offers a matching
-      adoption floor at the API layer as a one-line decorator over the governed
-      function.</t>
+      autonomous action, bound to the action's own intent with no external
+      rail.</t>
     </abstract>
   </front>
 
@@ -87,242 +86,480 @@
       <t>This document packages a format that already ships and is
       independently recomputable from public conformance vectors. The executable
       conformance fixtures live under tests/vectors/ in the source repository
-      (<xref target="VAARA-REPO"/>) with a dependency-light checker
-      (_check_independent.py) that imports only the standard library, a signature
-      library, and a JCS implementation.</t>
+      (<xref target="VAARA-REPO"/>), each directory with a checker
+      (_check_independent.py) that imports no issuer code: only the standard
+      library and, as its profile needs, libraries for signatures, JCS, ASN.1,
+      or ML-DSA.</t>
 
       <t>The floor of the format is a governance decision over a single agent
       action (<xref target="profile-govern"/>): a verdict bound to the action's
       own intent, with no payment rail, settlement artifact, or external evidence
       record to join. It is the smallest conforming receipt, and the entry point
-      a producer reaches for first. A reference library offers a matching adoption
-      floor at the API layer, a one-line decorator over the governed function;
-      that decorator is an implementation convenience, not part of this format,
-      while the normative target is the profile itself, which any producer can
-      emit from the bytes alone.</t>
+      a producer reaches for first.</t>
 
       <section anchor="terminology" numbered="true">
         <name>Terminology</name>
-        <t>The key words "MUST", "MUST NOT", "REQUIRED", "SHALL", "SHALL NOT",
-        "SHOULD", "SHOULD NOT", "RECOMMENDED", "NOT RECOMMENDED", "MAY", and
-        "OPTIONAL" in this document are to be interpreted as described in
+        <t>The key words "<bcp14>MUST</bcp14>", "<bcp14>MUST NOT</bcp14>", "<bcp14>REQUIRED</bcp14>", "<bcp14>SHALL</bcp14>", "<bcp14>SHALL NOT</bcp14>",
+        "<bcp14>SHOULD</bcp14>", "<bcp14>SHOULD NOT</bcp14>", "<bcp14>RECOMMENDED</bcp14>", "<bcp14>NOT RECOMMENDED</bcp14>", "<bcp14>MAY</bcp14>", and
+        "<bcp14>OPTIONAL</bcp14>" in this document are to be interpreted as described in
         BCP 14 <xref target="RFC2119"/> <xref target="RFC8174"/> when, and
         only when, they appear in all capitals, as shown here.</t>
       </section>
     </section>
 
     <section anchor="canon" numbered="true">
-      <name>Canonicalization</name>
-      <t>All digests and all signed payloads in this specification are computed
-      over the JSON Canonicalization Scheme (JCS, <xref target="RFC8785"/>). The
-      canonicalization label for the evidenceRef.canonicalization field
-      (<xref target="evidence"/>) is "jcs-rfc8785". The values "JCS" and
-      "jcs-json-v1" are accepted aliases for the same algorithm; producers SHOULD
-      emit "jcs-rfc8785", and consumers MUST accept all three.</t>
-      <t>A digest is written "sha256:" followed by the lowercase hexadecimal
-      SHA-256 (<xref target="FIPS180-4"/>) of the JCS-canonical bytes of the
-      referenced object.</t>
+      <name>Canonicalization, Digests, Numbers, and Times</name>
+      <t>Every digest of a JSON value in this document, and every signed
+      payload, is computed over the JSON Canonicalization Scheme (JCS,
+      <xref target="RFC8785"/>). The canonicalization label for the
+      evidenceRef.canonicalization member (<xref target="evidence"/>) is
+      "jcs-rfc8785". The values "JCS" and "jcs-json-v1" are accepted aliases
+      for the same algorithm; producers <bcp14>SHOULD</bcp14> emit "jcs-rfc8785", and
+      consumers <bcp14>MUST</bcp14> accept all three.</t>
+      <t>A digest is written "sha256:" followed by the 64 lowercase
+      hexadecimal characters of a SHA-256 (<xref target="FIPS180-4"/>) value.
+      Unless the definition of a member says otherwise, the hashed bytes are
+      the JCS encoding of the referenced JSON value. Where a member is a
+      digest over bytes that are not a JSON value (a UTF-8 string, a
+      configuration file, a joined preimage), its definition names those
+      bytes.</t>
+      <t>No signed block and no evidence record defined in this document
+      carries a non-integer number. Quantities that are not integers, such as
+      risk scores and thresholds, are carried as decimal strings (for example
+      "0.12"). A producer <bcp14>MUST NOT</bcp14> emit a non-integer JSON number in any of
+      them, because two JCS implementations are only guaranteed to agree on
+      integers within the range JCS defines.</t>
+      <t>Times are date-time strings as defined in <xref target="RFC3339"/>,
+      in UTC with the "Z" designator. Fractional seconds <bcp14>MAY</bcp14> be present. A
+      consumer <bcp14>MUST NOT</bcp14> reorder or compare receipts by these strings without
+      parsing them, because two producers can write the same instant with a
+      different number of fractional digits.</t>
     </section>
 
     <section anchor="envelope" numbered="true">
       <name>The Receipt Envelope</name>
-      <t>A receipt is a JSON object with these top-level members:</t>
+      <t>A receipt is a JSON object. It is either a decision receipt, which
+      records a decision about an action, or an execution receipt, which
+      records what followed. Both kinds share the envelope below and differ in
+      their derived block and their asserted block.</t>
 
       <table anchor="envelope-fields">
         <name>Receipt envelope members</name>
         <thead>
-          <tr><th>Field</th><th>Type</th><th>Required</th><th>Meaning</th></tr>
+          <tr><th>Member</th><th>Type</th><th>Kind</th><th>Presence</th><th>Meaning</th></tr>
         </thead>
         <tbody>
-          <tr><td>version</td><td>integer</td><td>MUST</td><td>Envelope version. 1 for this document.</td></tr>
-          <tr><td>alg</td><td>string</td><td>MUST</td><td>Signature algorithm. One of ES256 (default; ECDSA P-256), RS256 (RSA PKCS#1 v1.5), or HS256 (HMAC-SHA-256, symmetric) in v1; ML-DSA-65 MAY be offered as a post-quantum scheme. See <xref target="envelope"/>.</td></tr>
-          <tr><td>backLink</td><td>object</td><td>MUST</td><td>Binds this receipt to its attestation/predecessor: attestationDigest, attestationNonce.</td></tr>
-          <tr><td>decisionDerived</td><td>object</td><td>decision receipt</td><td>The decision and the evidence it derives from, in a decision receipt. See <xref target="evidence"/>.</td></tr>
-          <tr><td>issuerAsserted</td><td>object</td><td>decision receipt</td><td>Issuer-asserted identity claims in a decision receipt: iss, sub, iat, nonce, alg, secretVersion.</td></tr>
-          <tr><td>outcomeDerived</td><td>object</td><td>execution receipt</td><td>The executed outcome and its result commitment, in an execution receipt. See <xref target="exec-receipt"/>.</td></tr>
-          <tr><td>receiptAsserted</td><td>object</td><td>execution receipt</td><td>Issuer-asserted identity claims in an execution receipt: iss, sub, iat, nonce, alg, secretVersion.</td></tr>
-          <tr><td>signature</td><td>string</td><td>MUST</td><td>Detached signature, hex. For ES256, the 64-byte r||s pair (128 hex chars).</td></tr>
-          <tr><td>timestampAnchors</td><td>array</td><td>MAY</td><td>External time attestations over this receipt. See <xref target="anchors"/>.</td></tr>
+          <tr><td>version</td><td>integer</td><td>both</td><td><bcp14>REQUIRED</bcp14></td><td>1 for this document.</td></tr>
+          <tr><td>alg</td><td>string</td><td>both</td><td><bcp14>REQUIRED</bcp14></td><td>"ES256", "RS256", or "HS256". See <xref target="algs"/>.</td></tr>
+          <tr><td>backLink</td><td>object</td><td>both</td><td><bcp14>REQUIRED</bcp14></td><td>The predecessor this receipt answers. See <xref target="backlink"/>.</td></tr>
+          <tr><td>decisionDerived</td><td>object</td><td>decision</td><td><bcp14>REQUIRED</bcp14></td><td>The decision and its basis. See <xref target="evidence"/>.</td></tr>
+          <tr><td>issuerAsserted</td><td>object</td><td>decision</td><td><bcp14>REQUIRED</bcp14></td><td>The issuer block. See <xref target="asserted"/>.</td></tr>
+          <tr><td>outcomeDerived</td><td>object</td><td>execution</td><td><bcp14>REQUIRED</bcp14></td><td>The outcome. See <xref target="exec-receipt"/>.</td></tr>
+          <tr><td>receiptAsserted</td><td>object</td><td>execution</td><td><bcp14>REQUIRED</bcp14></td><td>The issuer block. See <xref target="asserted"/>.</td></tr>
+          <tr><td>signature</td><td>string</td><td>both</td><td><bcp14>REQUIRED</bcp14></td><td>The signature over the signed payload (<xref target="signed-payload"/>). See <xref target="algs"/>.</td></tr>
+          <tr><td>timestampAnchors</td><td>array</td><td>decision</td><td><bcp14>OPTIONAL</bcp14></td><td>External time attestations. See <xref target="anchors"/>.</td></tr>
+          <tr><td>pqSignature</td><td>object</td><td>execution</td><td><bcp14>OPTIONAL</bcp14></td><td>A post-quantum signature beside the classical one. See <xref target="pq"/>.</td></tr>
+          <tr><td>existenceProof</td><td>object</td><td>execution</td><td><bcp14>OPTIONAL</bcp14></td><td>A timestamp over the whole signed receipt. See <xref target="existence"/>.</td></tr>
         </tbody>
       </table>
 
-      <t>The ES256 algorithm label and its 64-byte r||s signature encoding are as
-      defined for "ES256" in JSON Web Algorithms (<xref target="RFC7518"/>). RS256
-      is RSASSA-PKCS1-v1_5 with SHA-256 and HS256 is HMAC with SHA-256, both as
-      defined in <xref target="RFC7518"/>; each signature is the lowercase
-      hexadecimal of its raw bytes. HS256 is symmetric: it is verified with the
-      shared secret rather than a public key, so an HS256 receipt is recomputable
-      only by a holder of that secret. The ML-DSA-65 scheme is as defined in
-      <xref target="FIPS204"/>.</t>
-      <t>A receipt takes one of two kinds that share this envelope and differ only
-      in the derived-payload and asserted-identity members. A decision receipt
-      carries decisionDerived and issuerAsserted (<xref target="evidence"/>); an
-      execution receipt carries outcomeDerived and receiptAsserted
-      (<xref target="exec-receipt"/>). The version, alg, backLink, signature, and
-      optional timestampAnchors members are common to both. The backLink member
-      binds a receipt to the predecessor it answers, so a decision or attestation
-      and its execution receipt form one recomputable pair.</t>
+      <t>A decision receipt carries decisionDerived and issuerAsserted and
+      neither outcomeDerived nor receiptAsserted; an execution receipt carries
+      the reverse. The schema is closed. A consumer <bcp14>MUST</bcp14> reject a receipt that
+      carries a member not listed for its kind in <xref target="envelope-fields"/>,
+      and <bcp14>MUST</bcp14> reject any member not defined by this document inside backLink,
+      decisionDerived, evidenceRef, issuerAsserted, receiptAsserted,
+      outcomeDerived, completeness, cryptoPosture, pqSignature, or
+      existenceProof. A consumer that rebuilds a signed block from the members
+      it understands would otherwise leave out signed bytes, and could report a
+      receipt as verified over content it never checked. Evidence records are
+      defined by profiles (<xref target="profiles"/>), and their own rules
+      govern members they do not define.</t>
+      <t><xref target="cddl"/> gives the envelope in CDDL
+      (<xref target="RFC8610"/>). The CDDL and the prose are both normative.
+      Rules the CDDL cannot express, such as runningCount equal to seq + 1 and
+      the issuer block alg equal to the envelope alg, are stated in the prose
+      only.</t>
+
+      <section anchor="algs" numbered="true">
+        <name>Algorithms and Signature Encoding</name>
+        <t>alg names the algorithm of signature. ES256 is ECDSA using P-256
+        and SHA-256, and the signature is the 64-byte r||s pair as defined for
+        "ES256" in <xref target="RFC7518"/>. RS256 is RSASSA-PKCS1-v1_5 using
+        SHA-256, and HS256 is HMAC using SHA-256, both as defined in
+        <xref target="RFC7518"/>. signature is the lowercase hexadecimal
+        encoding of the raw signature or MAC bytes. No other alg value is
+        defined in this version, and a consumer <bcp14>MUST</bcp14> reject a receipt that
+        names one.</t>
+        <t>HS256 is symmetric. An HS256 receipt is verifiable only by a holder
+        of the shared secret, so it is not recomputable by an arbitrary third
+        party. Producers that intend receipts for parties outside their own
+        trust domain <bcp14>SHOULD</bcp14> use ES256 or RS256.</t>
+        <t>The asserted block repeats the algorithm in its own alg member,
+        inside the signed bytes. The two <bcp14>MUST</bcp14> be equal. A consumer <bcp14>MUST</bcp14> reject
+        a receipt whose envelope alg and asserted-block alg differ, before
+        trying any key.</t>
+      </section>
 
       <section anchor="signed-payload" numbered="true">
         <name>Signed Payload</name>
-        <t>The signature is computed over the JCS-canonical bytes of the object
-        containing exactly these members, in this set, with their receipt
-        values:</t>
+        <t>The signature is computed over the JCS encoding of the object
+        containing exactly these members, with their receipt values:</t>
         <sourcecode type="abnf" markers="true"><![CDATA[
 decision receipt:
   ("version", "alg", "backLink", "decisionDerived", "issuerAsserted")
 execution receipt:
   ("version", "alg", "backLink", "outcomeDerived", "receiptAsserted")
 ]]></sourcecode>
-        <t>The member set is fixed per receipt kind (<xref target="envelope"/>): a
-        decision receipt signs decisionDerived and issuerAsserted, an execution
-        receipt signs outcomeDerived and receiptAsserted. "signature" and
-        "timestampAnchors" are NOT part of the signed payload: a receipt can gain
-        anchors after signing without invalidating the signature. A consumer MUST
-        verify the signature by reconstructing the payload for the receipt's kind,
-        canonicalizing it, and checking it against the verification key under "alg"
-        (the public key for ES256, RS256, and ML-DSA-65, or the shared secret for
-        HS256).</t>
+        <t>"signature", "timestampAnchors", "pqSignature", and
+        "existenceProof" are not part of the signed payload. Each is either
+        the signature itself or evidence attached after signing, so attaching
+        one does not invalidate the signature. A consumer <bcp14>MUST</bcp14> verify the
+        signature by reconstructing the payload for the receipt's kind from
+        the members as received, canonicalizing it, and checking it under alg
+        with the verification key (the public key for ES256 and RS256, the
+        shared secret for HS256).</t>
       </section>
+
+      <section anchor="backlink" numbered="true">
+        <name>Back Link</name>
+        <t>backLink binds a receipt to the object it answers.</t>
+        <table anchor="backlink-fields">
+          <name>backLink members</name>
+          <thead>
+            <tr><th>Member</th><th>Presence</th><th>Meaning</th></tr>
+          </thead>
+          <tbody>
+            <tr><td>attestationDigest</td><td><bcp14>REQUIRED</bcp14></td><td>A digest (<xref target="canon"/>) of the predecessor, computed over its complete JSON form including its own signature.</td></tr>
+            <tr><td>attestationNonce</td><td><bcp14>REQUIRED</bcp14></td><td>A non-empty string: the predecessor's nonce, or the identifier the profile names in its place.</td></tr>
+            <tr><td>fallbackProjection</td><td><bcp14>OPTIONAL</bcp14></td><td>Present only when no predecessor attestation exists and attestationDigest is computed over a named projection of the originating request instead. The value names the projection and its version.</td></tr>
+          </tbody>
+        </table>
+        <t>For a decision receipt the predecessor is the attestation of the
+        request the decision governs, unless the receipt's profile names a
+        different predecessor; the engine decision profile
+        (<xref target="profile-engine"/>) names the previous record on the
+        issuer's audit trail. For an execution receipt the predecessor is the
+        same request attestation its decision receipt names, so a decision and
+        its execution receipt carry the same backLink. A consumer confirms the
+        binding by recomputing attestationDigest from the predecessor and
+        comparing attestationNonce, with no access to the issuer. A profile
+        that permits fallbackProjection <bcp14>MUST</bcp14> define each projection value it
+        uses; the one in use is listed in <xref target="profile-registry"/>.
+        A consumer <bcp14>MUST</bcp14> reject a fallbackProjection value it does not
+        implement.</t>
+      </section>
+
+      <section anchor="asserted" numbered="true">
+        <name>Issuer Block</name>
+        <t>issuerAsserted (in a decision receipt) and receiptAsserted (in an
+        execution receipt) have the same members. Both are inside the signed
+        payload.</t>
+        <table anchor="asserted-fields">
+          <name>Issuer block members</name>
+          <thead>
+            <tr><th>Member</th><th>Type</th><th>Presence</th><th>Meaning</th></tr>
+          </thead>
+          <tbody>
+            <tr><td>iss</td><td>string</td><td><bcp14>REQUIRED</bcp14></td><td>The issuer.</td></tr>
+            <tr><td>sub</td><td>string</td><td><bcp14>REQUIRED</bcp14></td><td>The subject: the agent or principal the action was taken by or for.</td></tr>
+            <tr><td>iat</td><td>string</td><td><bcp14>REQUIRED</bcp14></td><td>Issuance time, an <xref target="RFC3339"/> date-time in UTC. This is a string, not a JSON Web Token NumericDate.</td></tr>
+            <tr><td>nonce</td><td>string</td><td><bcp14>REQUIRED</bcp14></td><td>Unique per receipt. Producers <bcp14>SHOULD</bcp14> draw at least 128 bits from a cryptographic random source.</td></tr>
+            <tr><td>alg</td><td>string</td><td><bcp14>REQUIRED</bcp14></td><td>Equal to the envelope alg (<xref target="algs"/>).</td></tr>
+            <tr><td>secretVersion</td><td>string</td><td><bcp14>REQUIRED</bcp14></td><td>Names the verification key. A consumer resolves the key from iss and secretVersion out of band; this document defines no resolution protocol.</td></tr>
+            <tr><td>aud</td><td>string</td><td><bcp14>OPTIONAL</bcp14></td><td>The relying party the receipt was issued for.</td></tr>
+            <tr><td>taskId</td><td>string</td><td><bcp14>OPTIONAL</bcp14></td><td>The long-running task the action belongs to.</td></tr>
+            <tr><td>completeness</td><td>object</td><td><bcp14>OPTIONAL</bcp14></td><td>The per-boundary sequence (<xref target="profile-authz"/>).</td></tr>
+            <tr><td>sigSuite</td><td>string</td><td><bcp14>OPTIONAL</bcp14></td><td>The hybrid signature suite the issuer committed to (<xref target="pq"/>). Execution receipts only.</td></tr>
+            <tr><td>cryptoPosture</td><td>object</td><td><bcp14>OPTIONAL</bcp14></td><td>The algorithms protecting the receipt and their post-quantum level (<xref target="pq"/>).</td></tr>
+          </tbody>
+        </table>
+        <t>aud and taskId, when present, are non-empty strings. A consumer asked
+        to check either against an expected value reports three outcomes:
+        bound (present and equal), contradicted (present and different), or
+        unsupported (absent). An absent aud or taskId states that the issuer
+        bound none. It does not state that the receipt was issued for any
+        relying party or task.</t>
+        <t>completeness, when present, carries exactly three members, all
+        <bcp14>REQUIRED</bcp14>: boundaryId (a non-empty string), seq (an integer, 0 or
+        greater), and runningCount (an integer equal to seq + 1). A consumer
+        <bcp14>MUST</bcp14> reject a completeness object that is partial or breaks these
+        rules. The boundary of an execution receipt is the boundary of its
+        decision receipts with "#execution" appended, so a refused decision,
+        which has no execution receipt, does not read as a gap.</t>
+      </section>
+
+      <section anchor="pq" numbered="true">
+        <name>Post-Quantum Signature and Crypto Posture</name>
+        <t>There is no post-quantum alg value in this version. An execution
+        receipt <bcp14>MAY</bcp14> carry a post-quantum signature beside the classical one.
+        The issuer commits to it inside the signed payload with sigSuite, whose
+        defined values are "ES256+ML-DSA-65" and "RS256+ML-DSA-65". The
+        classical part of the value <bcp14>MUST</bcp14> equal alg. pqSignature then carries
+        three non-empty strings: alg ("ML-DSA-65", <xref target="FIPS204"/>),
+        keyid (names the ML-DSA verification key), and sig (the lowercase
+        hexadecimal ML-DSA-65 signature over the same signed payload bytes the
+        classical signature covers).</t>
+        <t>A consumer <bcp14>MUST</bcp14> reject a receipt whose sigSuite has any other value.
+        A consumer that verifies ML-DSA <bcp14>MUST</bcp14> reject a receipt whose sigSuite
+        names a hybrid suite and whose pqSignature is absent or does not
+        verify: that is a stripped signature, and the committed sigSuite is
+        what makes the stripping detectable. A pqSignature on a receipt without
+        sigSuite commits nothing, and a consumer <bcp14>MUST NOT</bcp14> treat it as
+        post-quantum protection. A decision receipt <bcp14>MUST NOT</bcp14> carry sigSuite.</t>
+        <t>cryptoPosture records which algorithms protect the receipt, in the
+        shape of CycloneDX cryptographic properties. It has three <bcp14>REQUIRED</bcp14>
+        members: assetType ("algorithm"), algorithms (a non-empty array of
+        objects, each with exactly algorithm, primitive, and
+        nistQuantumSecurityLevel), and nistQuantumSecurityLevel (an integer
+        from 0 to 5, the highest level in algorithms). The levels are 0 for
+        HS256 (primitive "mac"), ES256, and RS256 (primitive "signature"), and
+        3 for ML-DSA-65 (primitive "signature"). A consumer checks
+        cryptoPosture by recomputing it from alg and sigSuite. A posture that
+        does not match the recomputation, or that claims an ML-DSA leg without
+        a sigSuite that commits it, is a claim the receipt does not back, and a
+        consumer <bcp14>MUST NOT</bcp14> rely on it.</t>
+      </section>
+
+      <section anchor="existence" numbered="true">
+        <name>Existence Proof</name>
+        <t>An execution receipt <bcp14>MAY</bcp14> carry existenceProof, an RFC 3161
+        (<xref target="RFC3161"/>) timestamp over the whole signed receipt. It
+        has exactly four members, all non-empty strings: backend
+        ("rfc3161-eidas-qualified" in this version), hashAlgorithm
+        ("sha256"), recordDigest (a digest of the receipt with existenceProof
+        removed, signature included), and token (the base64 DER TimeStampToken
+        whose message imprint is that digest). A consumer recomputes
+        recordDigest from the receipt and requires the token's imprint to
+        equal it. It is outside the signed payload; its integrity rests on the
+        token, which covers the signed receipt including its signature. The
+        attested time is qualified only when the consumer pins the token
+        signer's issuing authority from a trusted list it holds; the backend
+        value alone proves nothing.</t>
+      </section>
+
       <section anchor="exec-receipt" numbered="true">
         <name>Execution Receipt</name>
         <t>An execution receipt records the outcome of the action a decision
-        authorized and links back to the predecessor it answers. It uses the
-        envelope of <xref target="envelope"/> with outcomeDerived in place of
-        decisionDerived and receiptAsserted in place of issuerAsserted. Its
-        conformance vectors are tests/vectors/execution_receipt_v0/ with a
-        standalone checker that imports no issuer code.</t>
-        <t>outcomeDerived carries completedAt, a status of "executed" or
-        "refused", and, when the action executed, a resultCommitment:</t>
+        governed. Its conformance vectors are
+        tests/vectors/execution_receipt_v0/, with a standalone checker that
+        imports no issuer code.</t>
         <table anchor="outcome-fields">
           <name>outcomeDerived members</name>
           <thead>
-            <tr><th>Field</th><th>Meaning</th></tr>
+            <tr><th>Member</th><th>Presence</th><th>Meaning</th></tr>
           </thead>
           <tbody>
-            <tr><td>completedAt</td><td>Time the outcome was recorded.</td></tr>
-            <tr><td>status</td><td>"executed" or "refused". A refused outcome carries no resultCommitment.</td></tr>
-            <tr><td>resultCommitment</td><td>{projection, projectionDigest}. projectionDigest is "sha256:" of the UTF-8 bytes of projection. projection is either the JCS-canonical bytes of the runtime result, or the object {"digest": "sha256:" of the JCS-canonical runtime result}, so the result is committed by value or by digest while the raw result stays private.</td></tr>
+            <tr><td>status</td><td><bcp14>REQUIRED</bcp14></td><td>"executed" (the action ran), "refused" (it did not run), or "errored" (it was attempted and failed). A consumer <bcp14>MUST</bcp14> reject any other value.</td></tr>
+            <tr><td>completedAt</td><td><bcp14>REQUIRED</bcp14></td><td>Time the outcome was recorded (<xref target="canon"/>).</td></tr>
+            <tr><td>resultCommitment</td><td><bcp14>OPTIONAL</bcp14></td><td>A commitment to the result, or to the error for "errored". Absent for "refused".</td></tr>
+            <tr><td>decisionDigest</td><td><bcp14>OPTIONAL</bcp14></td><td>A digest of the decision receipt this outcome answers, over its signed members and its signature, without timestampAnchors.</td></tr>
           </tbody>
         </table>
-        <t>receiptAsserted carries the same identity claims as issuerAsserted
-        (iss, sub, iat, nonce, alg, secretVersion) for the execution receipt.</t>
-        <t>The backLink binds the execution receipt to its predecessor. Its
-        attestationDigest is "sha256:" of the JCS-canonical predecessor, and its
-        attestationNonce equals the predecessor's issuerAsserted.nonce. A consumer
-        confirms the pair by recomputing the predecessor digest and matching the
-        nonce, with no issuer access. Because the outcome status is inside the
-        signed payload, replaying an executed receipt with the status changed to
-        "refused" while keeping the original signature does not verify: the signed
-        envelope, not any single sub-check, binds the outcome claim. See
-        tests/vectors/execution_receipt_v0/normative/ for the executed, refused,
-        broken-back-link, result-mismatch, and replay cases.</t>
+        <t>resultCommitment takes one of two forms. The projection form is
+        {projection, projectionDigest}: projection is a string holding the JCS
+        encoding of a JSON value, and projectionDigest is "sha256:" over the
+        UTF-8 bytes of that string. The value is either the result itself or
+        the object {"digest": "sha256:..."} over the JCS encoding of the
+        result, so a result is committed by value or by digest while the raw
+        result stays private. The reference form is {ref, digest,
+        canonicalization}: ref locates the result, digest is a digest of it,
+        and canonicalization is "jcs". A consumer that holds the result
+        recomputes the commitment.</t>
+        <t>The backLink pair (<xref target="backlink"/>) binds the execution
+        receipt to the call it answers. decisionDigest binds it to the content
+        of one decision, so an outcome cannot be reattached to a different
+        decision about the same call. Because status is inside the signed
+        payload, an executed receipt replayed with its status changed to
+        "refused" does not verify: the signed envelope, not any single
+        sub-check, binds the outcome. See
+        tests/vectors/execution_receipt_v0/normative/ and
+        tests/vectors/decision_pairing_v0/.</t>
       </section>
     </section>
+
     <section anchor="evidence" numbered="true">
-      <name>Evidence Binding (decisionDerived.evidenceRef)</name>
-      <t>decisionDerived carries the decision (decision, decidedAt, policyId,
-      reason, riskScore, thresholdAllow, thresholdBlock) and one evidenceRef
-      object that binds the decision to a recomputable evidence record:</t>
+      <name>Decision and Evidence Binding (decisionDerived)</name>
+      <table anchor="decision-fields">
+        <name>decisionDerived members</name>
+        <thead>
+          <tr><th>Member</th><th>Presence</th><th>Meaning</th></tr>
+        </thead>
+        <tbody>
+          <tr><td>decision</td><td><bcp14>REQUIRED</bcp14></td><td>"allow", "block", or "escalate". A consumer <bcp14>MUST</bcp14> reject any other value.</td></tr>
+          <tr><td>decidedAt</td><td><bcp14>REQUIRED</bcp14></td><td>Time of the decision (<xref target="canon"/>).</td></tr>
+          <tr><td>reason</td><td><bcp14>OPTIONAL</bcp14></td><td>The issuer's reason, a string.</td></tr>
+          <tr><td>policyId</td><td><bcp14>OPTIONAL</bcp14></td><td>Names the policy the decision was made under.</td></tr>
+          <tr><td>riskScore, thresholdAllow, thresholdBlock</td><td><bcp14>OPTIONAL</bcp14></td><td>Decimal strings (<xref target="canon"/>): the score the decision rested on and the thresholds it was compared with.</td></tr>
+          <tr><td>clientTurnId</td><td><bcp14>OPTIONAL</bcp14></td><td>A turn identifier the client supplied. It records that the client claimed it, not that the issuer vouches for it.</td></tr>
+          <tr><td>evidenceRef</td><td><bcp14>OPTIONAL</bcp14></td><td>Binds the decision to an evidence record. Every profile in <xref target="profiles"/> requires it.</td></tr>
+          <tr><td>rationale</td><td><bcp14>OPTIONAL</bcp14></td><td>The rule that decided and why, in words.</td></tr>
+          <tr><td>binding</td><td><bcp14>OPTIONAL</bcp14></td><td>Digests binding the decision to its policy, intent, and inputs.</td></tr>
+          <tr><td>decisionProof</td><td><bcp14>OPTIONAL</bcp14></td><td>A zero-knowledge proof over binding.</td></tr>
+        </tbody>
+      </table>
+      <t>"allow" means the action was permitted. "block" means it was refused.
+      "escalate" means it was referred to a person or another authority and was
+      not permitted at the time of the decision; a later decision, with its own
+      receipt, settles it. These are the only values. Profiles below name
+      verdicts that a verifier computes, such as "deny" or "revise"; those are
+      outputs of a checker, not values of decision.</t>
+      <t>rationale has the members rule, reason, and declaredIntent (strings,
+      <bcp14>REQUIRED</bcp14>) and intentSatisfied (a boolean, <bcp14>OPTIONAL</bcp14>). binding has four
+      <bcp14>REQUIRED</bcp14> digests: policyDigest over the JCS encoding of the policy,
+      intentDigest over the UTF-8 bytes of the declared intent, inputsDigest
+      over the JCS encoding of the evaluation inputs, and bindingDigest over
+      the UTF-8 bytes of policyDigest, intentDigest, inputsDigest, and
+      decision joined in that order by the single byte 0x1F. decisionProof is a
+      proof that the committed values reach the stated decision, opened
+      against bindingDigest; its format is not defined by this document. A
+      consumer that does not verify decisionProof <bcp14>MUST NOT</bcp14> read it as evidence
+      of anything, and the signature covers it either way.</t>
 
       <table anchor="evidenceref-fields">
         <name>evidenceRef members</name>
         <thead>
-          <tr><th>Field</th><th>Meaning</th></tr>
+          <tr><th>Member</th><th>Presence</th><th>Meaning</th></tr>
         </thead>
         <tbody>
-          <tr><td>canonicalization</td><td>The label from <xref target="canon"/> (jcs-rfc8785 / JCS / jcs-json-v1).</td></tr>
-          <tr><td>digest</td><td>"sha256:" of the JCS-canonical evidence record.</td></tr>
-          <tr><td>ref</td><td>An advisory, profile-defined locator for the evidence record. Not an identifier; see below.</td></tr>
-          <tr><td>schema</td><td>The schema id of the evidence record (profile-defined).</td></tr>
+          <tr><td>canonicalization</td><td><bcp14>REQUIRED</bcp14></td><td>A label from <xref target="canon"/>.</td></tr>
+          <tr><td>digest</td><td><bcp14>REQUIRED</bcp14></td><td>A digest of the evidence record.</td></tr>
+          <tr><td>schema</td><td><bcp14>REQUIRED</bcp14></td><td>The schema identifier of the evidence record, defined by its profile.</td></tr>
+          <tr><td>ref</td><td><bcp14>OPTIONAL</bcp14></td><td>An advisory locator for the evidence record, defined by the profile. Not an identifier; see below.</td></tr>
         </tbody>
       </table>
 
-      <t>The binding is recomputable: given the receipt and the evidence record, a
-      third party confirms that sha256(JCS(evidence_record)) equals
-      evidenceRef.digest with no access to the issuer. Any third party recomputes
-      this property from the public vectors, running standard libraries and never
-      the issuer's stack.</t>
+      <t>The binding is recomputable: given the receipt and the evidence record,
+      a third party confirms that the digest of the evidence record equals
+      evidenceRef.digest with no access to the issuer.</t>
 
-      <t>The digest is the binding; ref is advisory. Revisions of this document up
-      to -06 called ref an opaque locator, which implies that it names exactly one
-      record. It does not. A profile MAY assign the same ref to more than one
-      evidence record, and profiles in use already do: where a single action
-      settles to several parties, each party's record is a separate evidence
-      record carried under one shared ref. Those records differ under digest
-      because their contents differ.</t>
+      <t>The digest is the binding; ref is advisory. A profile <bcp14>MAY</bcp14> assign the
+      same ref to more than one evidence record, and profiles in use do: where
+      a single action settles to several parties, each party's record is a
+      separate evidence record carried under one shared ref. Those records
+      differ under digest because their contents differ.</t>
 
-      <t>A consumer therefore MUST NOT resolve an evidence record by ref alone,
-      and MUST confirm that sha256(JCS(evidence_record)) equals evidenceRef.digest
-      before treating the record as the one the receipt decided over. Resolving by
-      ref alone admits a record that shares the locator but is not the record the
-      issuer signed over, and no check in this document fails when that
-      happens.</t>
+      <t>A consumer therefore <bcp14>MUST NOT</bcp14> resolve an evidence record by ref alone,
+      and <bcp14>MUST</bcp14> confirm that the digest of the evidence record equals
+      evidenceRef.digest before treating the record as the one the receipt
+      decided over. Resolving by ref alone admits a record that shares the
+      locator but is not the record the issuer signed over, and no check in
+      this document fails when that happens.</t>
     </section>
 
     <section anchor="anchors" numbered="true">
       <name>Timestamp Anchors (timestampAnchors)</name>
-      <t>A timestamp anchor is an external attestation that this receipt existed no
-      later than a stated time. Anchors are additive and optional. Each anchor
-      binds the anchored digest, which is "sha256:" of the JCS-canonical signed
-      payload (<xref target="signed-payload"/>), so an anchor commits to the exact
-      signed receipt without depending on later anchors.</t>
+      <t>A timestamp anchor is evidence from outside the issuer that a
+      decision receipt existed no later than a stated time. Anchors are
+      optional and are attached to decision receipts; an execution receipt
+      carries its time evidence in existenceProof (<xref target="existence"/>).
+      Every anchor binds anchoredDigest, the digest of the receipt's signed
+      payload (<xref target="signed-payload"/>), so an anchor commits to the
+      exact signed receipt and does not depend on any other anchor.</t>
 
       <sourcecode type="json" markers="true"><![CDATA[
 {
   "method": "rfc3161",
   "anchoredDigest": "sha256:...",
-  "token": "<method-specific time token>",
-  "authority": "<optional human-readable authority id>"
+  "token": "<base64 DER RFC 3161 TimeStampToken>",
+  "authority": "<optional human-readable authority name>"
 }
 ]]></sourcecode>
 
-      <t>Registered methods (the registry is open; a profile MAY register more,
-      for example a commitment to a SCITT transparency log
-      (<xref target="RFC9943"/>) or a Sigstore Rekor log):</t>
+      <t>method is <bcp14>REQUIRED</bcp14> and selects the members that follow. anchoredDigest
+      is <bcp14>REQUIRED</bcp14> for every method. authority is <bcp14>OPTIONAL</bcp14> and informative.</t>
 
       <table anchor="anchor-methods">
         <name>Timestamp anchor methods</name>
         <thead>
-          <tr><th>method</th><th>What it is</th><th>Who can produce it</th></tr>
+          <tr><th>method</th><th>What it is</th><th>Further members</th></tr>
         </thead>
         <tbody>
           <tr>
             <td>rfc3161</td>
-            <td>An RFC 3161 (<xref target="RFC3161"/>) timestamp token from any Time-Stamping Authority.</td>
-            <td>Self-hostable (e.g. OpenSSL ts); needs no third party.</td>
+            <td>An RFC 3161 (<xref target="RFC3161"/>) timestamp token whose message imprint is anchoredDigest, from any time-stamping authority, including one the producer runs.</td>
+            <td>token</td>
           </tr>
           <tr>
             <td>rfc3161-eidas-qualified</td>
-            <td>An RFC 3161 token from a qualified TSA under eIDAS (<xref target="eIDAS"/>).</td>
-            <td>A qualified trust service provider. Adds legal / court-admissible weight; this is the only thing the qualification adds over rfc3161.</td>
+            <td>As rfc3161, from a qualified time-stamping authority under eIDAS (<xref target="eIDAS"/>). The qualification adds legal weight and nothing else.</td>
+            <td>token</td>
+          </tr>
+          <tr>
+            <td>rfc3161-blinded</td>
+            <td>As rfc3161, with the authority shown a salted digest instead of anchoredDigest.</td>
+            <td>token, anchorSalt</td>
+          </tr>
+          <tr>
+            <td>rfc3161-eidas-qualified-blinded</td>
+            <td>As rfc3161-eidas-qualified, blinded the same way.</td>
+            <td>token, anchorSalt</td>
+          </tr>
+          <tr>
+            <td>scitt</td>
+            <td>Inclusion of anchoredDigest as a leaf of an append-only Merkle log hashed as in <xref target="RFC6962"/>. The identifier is kept for receipts that already carry it; this method is not registration with a SCITT Transparency Service and its entry is not a COSE receipt.</td>
+            <td>logId, leafIndex, treeSize, inclusionProof, rootHash</td>
           </tr>
         </tbody>
       </table>
+
+      <t>For every method a consumer <bcp14>MUST</bcp14> first recompute anchoredDigest from
+      the receipt and reject the anchor if it differs. For the rfc3161 methods
+      token is the base64 DER TimeStampToken, and a consumer requires its
+      message imprint to equal anchoredDigest, or the blinded imprint below.
+      The method name is not proof of who signed the token: a consumer treats
+      the attested time as independent of the issuer only when it checks the
+      token signer against a certificate or trusted list it holds, and as
+      qualified only when that list is a qualified trust list.</t>
+
+      <t>A blinded method keeps the authority's request log from being matched
+      against published receipts. The producer draws a fresh 32-byte salt from
+      a cryptographic random source, sends the authority the imprint
+      SHA-256("vaara/anchor-blind/v1" || salt || D), where D is the 32 raw
+      bytes of anchoredDigest and the label is ASCII, and carries the salt as
+      anchorSalt (64 lowercase hexadecimal characters). A producer <bcp14>MUST NOT</bcp14>
+      reuse a salt. A consumer <bcp14>MUST</bcp14> recompute the imprint, <bcp14>MUST</bcp14> reject a
+      blinded anchor whose anchorSalt is absent or malformed, and <bcp14>MUST</bcp14> reject
+      an unblinded method that carries anchorSalt, so that a blinded anchor is
+      never read as a plain one. Blinding does not hide the anchor from anyone
+      holding the receipt, since the salt travels with it, and it does not hide
+      the timing or volume of requests from the authority.</t>
+
+      <t>For the scitt method logId is the base64 SHA-256 of the log's name,
+      leafIndex and treeSize are integers, inclusionProof is an array of base64
+      sibling hashes, and rootHash is the base64 root at the time of append. A
+      consumer recomputes the root from the leaf (the 32 raw bytes of
+      anchoredDigest) and inclusionProof. rootHash is the log operator's own
+      claim. The anchor witnesses the receipt only when the consumer checks
+      rootHash against a tree head it holds independently of the receipt,
+      directly at the same tree size or through a consistency proof
+      (<xref target="RFC9162"/>) to a later head.</t>
+
+      <t>The method registry is maintained by this document. A consumer <bcp14>MUST</bcp14>
+      NOT treat an anchor whose method it does not implement as verified, and
+      <bcp14>MUST NOT</bcp14> reject the receipt because of it: the receipt's integrity rests
+      on its signature, and an anchor is additional evidence.</t>
 
       <t>Registration with a SCITT Transparency Service
       (<xref target="RFC9943"/>) complements an anchor and is not one. A
       receipt's bytes can be the attached payload of a SCITT Signed Statement.
       The service's receipt commits to that Signed Statement as registered, not
-      to an anchoredDigest over the signed payload, so it travels beside the
-      receipt and is not carried in timestampAnchors. A consumer verifies it
-      against the statement bytes and the service's published keys, with no call
-      to the service.</t>
+      to anchoredDigest, so it travels beside the receipt and is not carried in
+      timestampAnchors. A consumer verifies it against the statement bytes and
+      the service's published keys, with no call to the service.</t>
 
-      <t>A receipt MAY carry several anchors of different methods. The technical
-      anchor (rfc3161) and the legal anchor (rfc3161-eidas-qualified) are
-      independent: a producer can stand up its own time evidence and add qualified
-      legal weight as a separate, swappable method. The receipt's integrity does
-      not depend on any anchor method; it rests on the
-      <xref target="signed-payload"/> signature.</t>
+      <t>A receipt <bcp14>MAY</bcp14> carry several anchors of different methods. The
+      producer's own time evidence (rfc3161 from its own authority, or scitt)
+      and the legal anchor (rfc3161-eidas-qualified) are independent and can
+      be added separately.</t>
     </section>
 
     <section anchor="profiles" numbered="true">
       <name>Profiles</name>
       <t>A profile is a downstream specification that uses this envelope unchanged
       and defines only its own evidence record (the schema and contents behind
-      evidenceRef), plus any join keys it needs. A profile MUST state the
-      vaara.receipt/vN version it pins to and SHOULD ship recomputable vectors.</t>
+      evidenceRef), plus any join keys it needs. A profile <bcp14>MUST</bcp14> state the
+      vaara.receipt/vN version it pins to and <bcp14>SHOULD</bcp14> ship recomputable vectors.</t>
 
       <t>There is one binding mechanism, not one per plane. Each named profile
       (<xref target="profile-x402"/>, <xref target="profile-authz"/>,
@@ -415,14 +652,6 @@ execution receipt:
         completeness, and this binding with no Vaara import, running only a JCS
         library and a signature library. See
         tests/vectors/governance_decision_v0/_check_independent.py.</t>
-        <t>At the implementation layer, a reference library offers the same floor
-        as a one-line decorator over the governed function (import vaara;
-        @vaara.govern): it classifies the call, decides allow, deny, or escalate,
-        records the decision, and fails closed, raising before the governed body
-        runs on any non-allow verdict. That decorator is an API convenience, not
-        part of this format. The normative target is the governance_decision/v0
-        record described above, which any producer can emit and any third party
-        can recompute from the bytes alone.</t>
       </section>
 
       <section anchor="profile-x402" numbered="true">
@@ -494,7 +723,7 @@ execution receipt:
           the decision, inside the record and therefore under the signature. It
           binds approver, exactly "human" or "policy", and humanDisposed, a
           boolean. humanDisposed is true only when a human acted on this
-          decision. A producer MUST NOT emit humanDisposed true with an approver
+          decision. A producer <bcp14>MUST NOT</bcp14> emit humanDisposed true with an approver
           other than "human". The converse is permitted: approver "human" with
           humanDisposed false records a human who reviewed while the disposition
           stayed automatic, which only narrows the claim. The
@@ -511,7 +740,7 @@ execution receipt:
         consumer that must branch on human involvement cannot do it from the
         signed members. The approver vocabulary is closed at two values: a value an implementation may invent is a value a relying party
         cannot branch on.</t>
-        <t>A consumer MUST NOT infer human involvement from an absent disposition
+        <t>A consumer <bcp14>MUST NOT</bcp14> infer human involvement from an absent disposition
         block. Absence states that no disposition was asserted, and records
         written before this block existed carry none. See
         tests/vectors/decision_disposition_v0/ for the live-approval,
@@ -572,11 +801,11 @@ execution receipt:
         under the honest issuer whose seal commits before any tail is trimmed; a seal
         that under-states the class is a reconciliation question against the issuer's
         log, not one this held-set-alone gate answers.</t>
-        <t>maxClass lives in the unsigned evidence block, so a recipient MUST NOT
+        <t>maxClass lives in the unsigned evidence block, so a recipient <bcp14>MUST NOT</bcp14>
         consume it raw. It rides under signature only through the binding: the seal's
         signed decisionDerived.evidenceRef.digest is "sha256:" + JCS(evidence), so
         recomputing that digest proves the class is the class that was signed. Before
-        gating, a recipient MUST verify each receipt's signature and that its
+        gating, a recipient <bcp14>MUST</bcp14> verify each receipt's signature and that its
         evidence recomputes to the signed digest; a seal whose binding fails is not
         trusted, contributes no class, and the gate fails closed. Without this, an
         agent loosens the gate by relabeling an irreversible action's class into a
@@ -703,7 +932,7 @@ execution receipt:
             <tr><td>recordHash</td><td>"sha256:" and the trail record's own hash.</td></tr>
             <tr><td>previousHash</td><td>"sha256:" and the hash of the record before it. An empty genesis link is written as the SHA-256 of the empty string.</td></tr>
             <tr><td>decisionDetail, approver, humanDisposed</td><td>Present only when the trail record carries them.</td></tr>
-            <tr><td>cage</td><td>OPTIONAL. The cage block (<xref target="cage-block"/>).</td></tr>
+            <tr><td>cage</td><td><bcp14>OPTIONAL</bcp14>. The cage block (<xref target="cage-block"/>).</td></tr>
           </tbody>
         </table>
         <t>The envelope writes the trail's "deny" as "block".
@@ -731,20 +960,20 @@ execution receipt:
               <tr><th>Field</th><th>Type</th><th>Required</th><th>Meaning</th></tr>
             </thead>
             <tbody>
-              <tr><td>driver</td><td>string</td><td>MUST</td><td>The name of the cage's driver, never empty, or "none" when no cage was declared to the deciding process.</td></tr>
-              <tr><td>confirmed</td><td>boolean</td><td>MUST</td><td>Whether the confinement was confirmed at decision time, as defined below.</td></tr>
-              <tr><td>basis</td><td>string</td><td>MUST unless driver is "none"</td><td>What the confirmation rests on: "declared" when only the launcher's declaration stands, otherwise the name of the fact that was read.</td></tr>
-              <tr><td>configDigest</td><td>string</td><td>MAY</td><td>"sha256:" and 64 lowercase hexadecimal characters over the cage's effective configuration.</td></tr>
-              <tr><td>upstream</td><td>string</td><td>MAY</td><td>Informative. The cage's own name and version.</td></tr>
-              <tr><td>name</td><td>string</td><td>MAY</td><td>Informative. The name of this launch inside the cage.</td></tr>
+              <tr><td>driver</td><td>string</td><td><bcp14>MUST</bcp14></td><td>The name of the cage's driver, never empty, or "none" when no cage was declared to the deciding process.</td></tr>
+              <tr><td>confirmed</td><td>boolean</td><td><bcp14>MUST</bcp14></td><td>Whether the confinement was confirmed at decision time, as defined below.</td></tr>
+              <tr><td>basis</td><td>string</td><td><bcp14>MUST</bcp14> unless driver is "none"</td><td>What the confirmation rests on: "declared" when only the launcher's declaration stands, otherwise the name of the fact that was read.</td></tr>
+              <tr><td>configDigest</td><td>string</td><td><bcp14>MAY</bcp14></td><td>"sha256:" and 64 lowercase hexadecimal characters over the cage's effective configuration.</td></tr>
+              <tr><td>upstream</td><td>string</td><td><bcp14>MAY</bcp14></td><td>Informative. The cage's own name and version.</td></tr>
+              <tr><td>name</td><td>string</td><td><bcp14>MAY</bcp14></td><td>Informative. The name of this launch inside the cage.</td></tr>
             </tbody>
           </table>
-          <t>A block with driver "none" MUST carry confirmed false and MUST NOT
-          carry any other member. A block with any other driver MUST carry
+          <t>A block with driver "none" <bcp14>MUST</bcp14> carry confirmed false and <bcp14>MUST NOT</bcp14>
+          carry any other member. A block with any other driver <bcp14>MUST</bcp14> carry
           basis.</t>
           <t>confirmed true means exactly this: at decision time the issuer read,
           on the deciding process or on the platform under it, the fact that basis
-          names, and the fact held. confirmed true MUST be accompanied by a basis
+          names, and the fact held. confirmed true <bcp14>MUST</bcp14> be accompanied by a basis
           other than "none" or "declared". It does not mean that the cage enforced
           the configuration configDigest names, that the cage is free of defects,
           or that any party other than the issuer observed the fact. confirmed
@@ -753,14 +982,14 @@ execution receipt:
           <t>Each driver defines which bytes its configDigest covers. A consumer
           uses configDigest as a comparator: two receipts with the same driver and
           configDigest ran under the same declared configuration. A consumer that
-          holds the configuration and the driver's rule MAY recompute the digest;
+          holds the configuration and the driver's rule <bcp14>MAY</bcp14> recompute the digest;
           one that does not treats it as an opaque value. A configDigest that does
           not match the stated form makes the block non-conforming.</t>
           <t>The values of driver and basis form open sets. Their names carry no
           normative meaning beyond the rules above; <xref target="cage-drivers"/>
-          lists the values in use at the time of writing. A consumer MUST ignore
+          lists the values in use at the time of writing. A consumer <bcp14>MUST</bcp14> ignore
           cage block members it does not recognize. An evidence record without a
-          cage block makes no claim about confinement, and a consumer MUST NOT
+          cage block makes no claim about confinement, and a consumer <bcp14>MUST NOT</bcp14>
           read its absence as either confined or unconfined.</t>
           <t>The conformance vectors are tests/vectors/cage_v0/: a run outside any
           cage, a cage declared and not confirmed, and a confirmed cage, written by
@@ -778,13 +1007,19 @@ execution receipt:
       <t>An implementation conforms to vaara.receipt/v1 if, for every receipt it
       emits:</t>
       <ol>
+        <li>The receipt keeps the rules of <xref target="envelope"/> and
+        <xref target="evidence"/>: one kind, no undefined members, an alg
+        defined in <xref target="algs"/> and repeated unchanged in the issuer
+        block, a decision or status value defined there, and a well-formed
+        completeness block where one is present.</li>
         <li>The <xref target="signed-payload"/> signature verifies against the
         stated alg and key.</li>
         <li>evidenceRef.digest equals sha256(JCS(evidence_record)) for the
         referenced record, under one of the <xref target="canon"/>
         canonicalization labels.</li>
-        <li>Any timestampAnchors[].anchoredDigest equals the "sha256:" of the JCS
-        signed payload of the same receipt.</li>
+        <li>Any timestampAnchors[].anchoredDigest equals the digest of the
+        signed payload of the same receipt, and any existenceProof.recordDigest
+        equals the digest of the receipt with existenceProof removed.</li>
         <li>For an execution receipt (<xref target="exec-receipt"/>),
         backLink.attestationDigest equals "sha256:" of the JCS-canonical
         predecessor and backLink.attestationNonce equals the predecessor's
@@ -814,10 +1049,8 @@ execution receipt:
       <t>A reference implementation ships the format at three layers, all in the
       source repository (<xref target="VAARA-REPO"/>):</t>
       <ul>
-        <li>A library that emits and verifies receipts, exposing the floor profile
-        (<xref target="profile-govern"/>) as a one-line decorator over a governed
-        function. The decorator is an adoption convenience, not part of the
-        format.</li>
+        <li>A library that emits and verifies receipts, including the floor
+        profile (<xref target="profile-govern"/>).</li>
         <li>The public conformance vectors under tests/vectors/ with per-profile
         standalone checkers (_check_independent.py) that import no issuer code, so a
         second party recomputes every digest, signature, back link, and
@@ -849,29 +1082,34 @@ execution receipt:
       The in-guest report emitter follows the kernel interface and has not yet
       been run inside a guest by the implementation.</t>
       <t>The library, vectors, and checkers are exercised on every release; the
-      application is distributed as a signed build. An end-user application over
-      this same format distinguishes this work from the libraries, brokers, and
-      proxies surveyed in <xref target="related-work"/>, none of which reports
-      one.</t>
+      application is distributed as a signed build.</t>
     </section>
 
     <section anchor="versioning" numbered="true">
       <name>Versioning</name>
-      <t>The envelope version is the integer "version" field and the
-      vaara.receipt/vN schema id. Additive, backward-compatible changes (new
-      optional fields, new anchor methods, new profiles) do not bump N. A change to
-      the signed-payload field set, the canonicalization, or the signature
-      construction bumps N.</t>
+      <t>The envelope version is the integer "version" member and the
+      vaara.receipt/vN schema identifier. A change to the signed-payload
+      member set, the canonicalization, or the signature construction bumps
+      N.</t>
+      <t>A new <bcp14>OPTIONAL</bcp14> member of a block defined in <xref target="envelope"/>
+      or <xref target="evidence"/> is added only by a revision of this
+      document and does not bump N. Because those blocks are closed
+      (<xref target="envelope"/>), a consumer built to an earlier revision
+      rejects a receipt that carries the new member. That is intended: it fails
+      closed rather than verifying bytes it does not understand. A producer
+      that needs receipts accepted by such consumers omits the new member. New
+      anchor methods and new profiles do not change how the envelope is
+      parsed.</t>
     </section>
 
     <section anchor="security" numbered="true">
       <name>Security Considerations</name>
       <t>The integrity of a receipt rests on the <xref target="signed-payload"/>
       signature over the JCS-canonical signed payload, not on any timestamp anchor
-      or trust root. A consumer MUST verify that signature against the public key
+      or trust root. A consumer <bcp14>MUST</bcp14> verify that signature against the public key
       named under "alg" before relying on any field. Because the signed payload
       excludes "signature" and "timestampAnchors", anchors added after signing
-      cannot alter the signed content; a consumer MUST recompute each
+      cannot alter the signed content; a consumer <bcp14>MUST</bcp14> recompute each
       anchoredDigest from the signed payload rather than trusting the anchor's
       stated value.</t>
       <t>Verifying that signature establishes that the key named under "alg"
@@ -879,25 +1117,25 @@ execution receipt:
       says nothing about the state of that key now. Offline verification is a
       computation over the parameters the consumer holds, while revocation is a
       property of the present, and this document defines no revocation mechanism
-      and places no freshness requirement on key material. A consumer MUST NOT
+      and places no freshness requirement on key material. A consumer <bcp14>MUST NOT</bcp14>
       treat a signature that verifies as evidence that the signing key is still
       valid. Where a decision depends on revocation state, the key resolution
       path and the staleness a deployment accepts are operational parameters of
-      that deployment and MUST be stated by it; the receipt does not carry
+      that deployment and <bcp14>MUST</bcp14> be stated by it; the receipt does not carry
       them.</t>
       <t>Recomputability depends entirely on canonicalization. A producer and a
       consumer that disagree on JCS output for the same JSON value will compute
-      different digests; implementations MUST use a conformant JCS
-      (<xref target="RFC8785"/>) implementation and MUST treat any of the three
+      different digests; implementations <bcp14>MUST</bcp14> use a conformant JCS
+      (<xref target="RFC8785"/>) implementation and <bcp14>MUST</bcp14> treat any of the three
       accepted labels as the same algorithm.</t>
       <t>The argument commitment in the authorization profile
       (<xref target="profile-authz"/>) lets a receipt be published while the raw
       arguments stay private, but a low-entropy argument set is open to a
-      dictionary attack against the commitment. Producers SHOULD ensure the
+      dictionary attack against the commitment. Producers <bcp14>SHOULD</bcp14> ensure the
       committed object carries sufficient entropy (for example a per-call nonce)
       where argument confidentiality matters.</t>
       <t>An absent refusal is evidence only within a declared coverage boundary
-      (<xref target="profile-authz"/>). A reader MUST NOT read a missing receipt as
+      (<xref target="profile-authz"/>). A reader <bcp14>MUST NOT</bcp14> read a missing receipt as
       "the action did not happen"; without a coverage block it means only "not
       observed", and with one it means "not refused within this boundary". The
       completeness block makes a dropped receipt inside the boundary detectable,
@@ -906,24 +1144,24 @@ execution receipt:
       <t>A decision receipt records what was decided. It does not record what
       followed. A decision receipt carrying the verdict "allow", with no execution
       receipt bound to it by backLink, establishes that the action was permitted
-      and establishes nothing about whether it ran. A consumer MUST NOT read a
+      and establishes nothing about whether it ran. A consumer <bcp14>MUST NOT</bcp14> read a
       decision receipt as evidence that the action took effect: the executed status
       lives in the execution receipt's outcomeDerived and is signed there
       (<xref target="exec-receipt"/>). Only the pair establishes that an
       action was permitted and then took effect, which is why backLink is a
       required member.</t>
       <t>A recipient that consumes a sealed maxClass to gate its own next action
-      (<xref target="profile-authz"/>) MUST bind the class to the signature before
+      (<xref target="profile-authz"/>) <bcp14>MUST</bcp14> bind the class to the signature before
       acting on it. maxClass sits in the unsigned evidence block and is covered by
       the signature only through the seal's decisionDerived.evidenceRef.digest =
-      "sha256:" + JCS(evidence). A recipient MUST verify each receipt's signature and
+      "sha256:" + JCS(evidence). A recipient <bcp14>MUST</bcp14> verify each receipt's signature and
       that its evidence recomputes to that signed digest; a seal whose binding fails
       contributes no class and the gate fails closed. A recipient that reads maxClass
       raw, without recomputing the binding, can be made to permit an irreversible
       action whose class an agent relabeled into a permitted one while the record
       signature, which never covered the evidence, still verifies. The gate is also
       a membership test over class labels, not an ordering; this document defines no
-      ordering over classes, and a recipient MUST NOT infer one.</t>
+      ordering over classes, and a recipient <bcp14>MUST NOT</bcp14> infer one.</t>
       <t>The cage block (<xref target="cage-block"/>) is an assertion by the
       issuer, bound by the issuer's signature. confirmed true is not an
       attestation by the cage, the kernel, or the hardware: a compromised issuer
@@ -936,6 +1174,35 @@ execution receipt:
       label shows that a profile is attached and not what the profile allows.
       configDigest names the declared configuration; it does not show that the
       declared configuration is the one in force.</t>
+    </section>
+
+    <section anchor="privacy" numbered="true">
+      <name>Privacy Considerations</name>
+      <t>A receipt is built to be handed to parties outside the issuer, so
+      whatever it carries in clear travels with it. The signed blocks carry
+      identifiers (iss, sub, aud, taskId), times, a decision, and an optional
+      free-text reason. Evidence records defined by profiles carry more: the
+      engine decision profile (<xref target="profile-engine"/>) carries the
+      agent identifier, the tool name, the tenant, and the reason. A producer
+      <bcp14>SHOULD</bcp14> treat sub, agent and tenant identifiers, and reason text as
+      potentially personal data where the subject or the operator is a
+      natural person, and <bcp14>SHOULD</bcp14> keep personal data out of reason.</t>
+      <t>The format keeps the action's inputs and results out of the receipt
+      by design. Arguments and results enter only as commitments
+      (<xref target="exec-receipt"/>, <xref target="profile-authz"/>), and the
+      evidence record is bound by digest, so a receipt can be shared while the
+      evidence stays with the operator. A commitment over a small or
+      predictable value can be reversed by guessing; the dictionary-attack
+      paragraph in <xref target="security"/> applies to every commitment in
+      this document, not only to arguments.</t>
+      <t>Receipts are durable and have no expiry. A receipt that has left the
+      issuer cannot be withdrawn, and its signature keeps verifying. Producers
+      subject to erasure obligations should keep erasable data in evidence
+      records held by the operator, where deleting the record leaves the
+      receipt verifiable and the evidence unrecoverable from it. Timestamp
+      anchors disclose to the time-stamping authority that a receipt existed
+      at a time; the blinded methods (<xref target="anchors"/>) keep the
+      authority's log from being matched to published receipts.</t>
     </section>
 
     <section anchor="regulatory" numbered="true">
@@ -1000,13 +1267,10 @@ execution receipt:
       deployments. Uchibeke <xref target="Uchibeke2026"/> examines pre-execution
       attestation and the case for binding authorization evidence before a tool
       call is dispatched.</t>
-      <t>All four independently adopt per-action signed records with
-      content-addressed evidence. None defines the held-set completeness
-      mechanism specified in <xref target="profile-authz"/>: the monotonic
-      sequence with running count, the optional sealing record, and the
-      gap-detection property that lets a third party prove a receipt is missing
-      from a set without issuer access. None ships a recomputable conformance
-      suite independent of any library. This document specifies both.</t>
+      <t>All four adopt per-action signed records with content-addressed
+      evidence. This document adds a held-set completeness mechanism
+      (<xref target="profile-authz"/>) and publishes conformance vectors with
+      checkers that import no issuer code.</t>
 
       <t>A parallel line of work in the IETF community addresses signed
       receipts for agent actions taken over the Model Context Protocol (MCP).
@@ -1037,36 +1301,28 @@ execution receipt:
       non-integer numbers from the signed set.</t>
 
       <t>This document shares the per-action, content-addressed, recomputable
-      approach of these efforts and differs in three properties none of them
-      combine. First, the held-set completeness mechanism of
+      approach of these efforts. Three of its properties are worth naming next
+      to them. First, the held-set completeness mechanism of
       <xref target="profile-authz"/>: a monotonic sequence with a running count
       and an optional sealing record lets a third party prove a receipt is
       missing from a set, and a sealed worst-case class lets a chain recipient
       gate its own next action on the held set alone, with no issuer access.
-      The receipts above are per-decision records without a held-set gap proof.
       Second, one profile-neutral envelope carries authorization, settlement,
       checkout, and external-execution evidence through the same binding
-      (<xref target="profiles"/>), where the efforts above each define a single
-      receipt shape. Third, the envelope's backLink binds a decision to its
+      (<xref target="profiles"/>). Third, the envelope's backLink binds a decision to its
       predecessor attestation, so a pre-execution authorization and its
       post-execution record form one recomputable pair rather than a single
       post-hoc entry; <xref target="AGENTROA"/> records the authorization
       decision and states that it carries no paired post-execution receipt.</t>
 
-      <t>The evidence surface is also broader. A receipt is re-expressible as a
+      <t>A receipt is re-expressible as a
       RATS Entity Attestation Result (<xref target="I-D.ietf-rats-ear"/>), and
       its timestamp anchors admit an eIDAS-qualified timestamp
-      (<xref target="anchors"/>) as a swappable method for legal weight. The
-      format is shipped, and its receipts are independently recomputable from
-      the public conformance vectors that accompany this specification. This
+      (<xref target="anchors"/>) as a swappable method for legal weight. This
       work references the formats above rather than profiling any of them,
       because the held-set completeness mechanism and the profile-neutral
       envelope are properties of the format that a field-level profile could
-      not add. The efforts above are libraries, brokers, or proxies; a reference
-      end-user application over this same format (<xref target="impl-status"/>)
-      applies the decision and emits the receipt over arbitrary actions a
-      non-technical operator selects, a deployment surface none of them
-      reports.</t>
+      not add.</t>
 
       <t><xref target="AUDIT-ARCH"/> describes an architecture for auditing AI
       agent delegation and interactions. It specifies roles, four classes of
@@ -1099,6 +1355,16 @@ execution receipt:
     <references>
       <name>Normative References</name>
 
+      <reference anchor="RFC3339" target="https://www.rfc-editor.org/info/rfc3339">
+        <front>
+          <title>Date and Time on the Internet: Timestamps</title>
+          <author initials="G." surname="Klyne" fullname="G. Klyne"/>
+          <author initials="C." surname="Newman" fullname="C. Newman"/>
+          <date year="2002" month="July"/>
+        </front>
+        <seriesInfo name="RFC" value="3339"/>
+        <seriesInfo name="DOI" value="10.17487/RFC3339"/>
+      </reference>
       <reference anchor="RFC2119" target="https://www.rfc-editor.org/info/rfc2119">
         <front>
           <title>Key words for use in RFCs to Indicate Requirement Levels</title>
@@ -1121,6 +1387,17 @@ execution receipt:
         <seriesInfo name="DOI" value="10.17487/RFC8174"/>
       </reference>
 
+      <reference anchor="RFC6962" target="https://www.rfc-editor.org/info/rfc6962">
+        <front>
+          <title>Certificate Transparency</title>
+          <author initials="B." surname="Laurie" fullname="B. Laurie"/>
+          <author initials="A." surname="Langley" fullname="A. Langley"/>
+          <author initials="E." surname="Kasper" fullname="E. Kasper"/>
+          <date year="2013" month="June"/>
+        </front>
+        <seriesInfo name="RFC" value="6962"/>
+        <seriesInfo name="DOI" value="10.17487/RFC6962"/>
+      </reference>
       <reference anchor="RFC3161" target="https://www.rfc-editor.org/info/rfc3161">
         <front>
           <title>Internet X.509 Public Key Infrastructure Time-Stamp Protocol (TSP)</title>
@@ -1134,6 +1411,17 @@ execution receipt:
         <seriesInfo name="DOI" value="10.17487/RFC3161"/>
       </reference>
 
+      <reference anchor="RFC8610" target="https://www.rfc-editor.org/info/rfc8610">
+        <front>
+          <title>Concise Data Definition Language (CDDL): A Notational Convention to Express Concise Binary Object Representation (CBOR) and JSON Data Structures</title>
+          <author initials="H." surname="Birkholz" fullname="H. Birkholz"/>
+          <author initials="C." surname="Vigano" fullname="C. Vigano"/>
+          <author initials="C." surname="Bormann" fullname="C. Bormann"/>
+          <date year="2019" month="June"/>
+        </front>
+        <seriesInfo name="RFC" value="8610"/>
+        <seriesInfo name="DOI" value="10.17487/RFC8610"/>
+      </reference>
       <reference anchor="RFC8785" target="https://www.rfc-editor.org/info/rfc8785">
         <front>
           <title>JSON Canonicalization Scheme (JCS)</title>
@@ -1160,6 +1448,18 @@ execution receipt:
 
     <references>
       <name>Informative References</name>
+
+      <reference anchor="RFC9162" target="https://www.rfc-editor.org/info/rfc9162">
+        <front>
+          <title>Certificate Transparency Version 2.0</title>
+          <author initials="B." surname="Laurie" fullname="B. Laurie"/>
+          <author initials="E." surname="Messeri" fullname="E. Messeri"/>
+          <author initials="R." surname="Stradling" fullname="R. Stradling"/>
+          <date year="2021" month="December"/>
+        </front>
+        <seriesInfo name="RFC" value="9162"/>
+        <seriesInfo name="DOI" value="10.17487/RFC9162"/>
+      </reference>
 
       <reference anchor="RFC7518" target="https://www.rfc-editor.org/info/rfc7518">
         <front>
@@ -1418,6 +1718,194 @@ execution receipt:
         </front>
       </reference>
     </references>
+
+    <section anchor="cddl" numbered="true">
+      <name>Envelope Schema (CDDL)</name>
+      <t>This appendix is normative. It describes the JSON encoding of a
+      receipt (<xref target="envelope"/>) in CDDL. Maps are closed: a member
+      not named here is not allowed, which is the rule of
+      <xref target="envelope"/>. A reference implementation validates every
+      positive receipt in its published conformance vectors against this
+      schema.</t>
+      <sourcecode type="cddl" markers="true"><![CDATA[
+; vaara.receipt/v1 envelope, JSON encoding.
+; Maps are closed: a member not named here is not allowed.
+; Rules CDDL cannot state are in the prose: runningCount is
+; seq + 1, the issuer block alg equals the envelope alg, and
+; the classical part of sigSuite equals alg.
+
+receipt = decision-receipt / execution-receipt
+
+decision-receipt = {
+  version: 1,
+  alg: alg,
+  backLink: back-link,
+  decisionDerived: decision-derived,
+  issuerAsserted: issuer-block,
+  signature: hex,
+  ? timestampAnchors: [* anchor],
+}
+
+execution-receipt = {
+  version: 1,
+  alg: alg,
+  backLink: back-link,
+  outcomeDerived: outcome-derived,
+  receiptAsserted: issuer-block,
+  signature: hex,
+  ? pqSignature: pq-signature,
+  ? existenceProof: existence-proof,
+}
+
+alg = "ES256" / "RS256" / "HS256"
+hex = tstr .regexp "[0-9a-f]+"
+digest = tstr .regexp "sha256:[0-9a-f]{64}"
+nonempty = tstr .regexp ".+"
+date-time = tstr .regexp "[0-9-]{10}T[0-9:]{8}([.][0-9]+)?Z"
+decimal = tstr .regexp "-?[0-9]+([.][0-9]+)?"
+
+back-link = {
+  attestationDigest: digest,
+  attestationNonce: nonempty,
+  ? fallbackProjection: nonempty,
+}
+
+issuer-block = {
+  iss: tstr,
+  sub: tstr,
+  iat: date-time,
+  nonce: tstr,
+  alg: alg,
+  secretVersion: tstr,
+  ? aud: nonempty,
+  ? taskId: nonempty,
+  ? completeness: completeness,
+  ? sigSuite: "ES256+ML-DSA-65" / "RS256+ML-DSA-65",
+  ? cryptoPosture: crypto-posture,
+}
+
+completeness = {
+  boundaryId: nonempty,
+  seq: uint,
+  runningCount: uint,
+}
+
+crypto-posture = {
+  assetType: "algorithm",
+  nistQuantumSecurityLevel: 0..5,
+  algorithms: [+ crypto-algorithm],
+}
+
+crypto-algorithm = {
+  algorithm: nonempty,
+  primitive: nonempty,
+  nistQuantumSecurityLevel: 0..5,
+}
+
+decision-derived = {
+  decision: "allow" / "block" / "escalate",
+  decidedAt: date-time,
+  ? reason: tstr,
+  ? policyId: tstr,
+  ? riskScore: decimal,
+  ? thresholdAllow: decimal,
+  ? thresholdBlock: decimal,
+  ? clientTurnId: tstr,
+  ? evidenceRef: evidence-ref,
+  ? rationale: rationale,
+  ? binding: binding,
+  ? decisionProof: { * tstr => any },
+}
+
+evidence-ref = {
+  canonicalization: "jcs-rfc8785" / "JCS" / "jcs-json-v1",
+  digest: digest,
+  schema: nonempty,
+  ? ref: nonempty,
+}
+
+rationale = {
+  rule: tstr,
+  reason: tstr,
+  declaredIntent: tstr,
+  ? intentSatisfied: bool,
+}
+
+binding = {
+  policyDigest: digest,
+  intentDigest: digest,
+  inputsDigest: digest,
+  bindingDigest: digest,
+}
+
+outcome-derived = {
+  status: "executed" / "refused" / "errored",
+  completedAt: date-time,
+  ? resultCommitment: projection-commitment / reference-commitment,
+  ? decisionDigest: digest,
+}
+
+projection-commitment = {
+  projection: tstr,
+  projectionDigest: digest,
+}
+
+reference-commitment = {
+  ref: tstr,
+  digest: digest,
+  canonicalization: "jcs",
+}
+
+pq-signature = {
+  alg: "ML-DSA-65",
+  keyid: nonempty,
+  sig: hex,
+}
+
+existence-proof = {
+  backend: "rfc3161-eidas-qualified",
+  hashAlgorithm: "sha256",
+  recordDigest: digest,
+  token: nonempty,
+}
+
+anchor = rfc3161-anchor / blinded-anchor / log-anchor / other-anchor
+
+rfc3161-anchor = {
+  method: "rfc3161" / "rfc3161-eidas-qualified",
+  anchoredDigest: digest,
+  token: nonempty,
+  ? authority: tstr,
+}
+
+blinded-anchor = {
+  method: "rfc3161-blinded" / "rfc3161-eidas-qualified-blinded",
+  anchoredDigest: digest,
+  token: nonempty,
+  anchorSalt: tstr .regexp "[0-9a-f]{64}",
+  ? authority: tstr,
+}
+
+log-anchor = {
+  method: "scitt",
+  anchoredDigest: digest,
+  logId: nonempty,
+  leafIndex: uint,
+  treeSize: uint,
+  inclusionProof: [* tstr],
+  rootHash: nonempty,
+  ? authority: tstr,
+}
+
+; A method this document does not define: carried, never
+; treated as verified.
+other-anchor = {
+  method: tstr,
+  anchoredDigest: digest,
+  * tstr => any,
+}
+]]></sourcecode>
+    </section>
 
     <section anchor="cage-drivers" numbered="true">
       <name>Cage Drivers and Bases in Use</name>
