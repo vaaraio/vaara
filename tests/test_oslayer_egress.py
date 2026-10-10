@@ -277,6 +277,7 @@ def test_egress_records_land_on_the_trail(tmp_path, monkeypatch):
             "reason": "not on the egress allow list"})
     record({"method": "CONNECT", "host": "api.example.com", "port": 443, "allowed": True,
             "reason": "allowed by api.example.com"})
+    record.flush()
     trail = SQLiteAuditBackend(str(db)).load_trail()
     # A deny is filed as a blocked action, an allow as a decision.
     blocked = trail.get_records_by_type(EventType.ACTION_BLOCKED)
@@ -441,6 +442,7 @@ def test_the_recorder_files_a_transport_failure_without_a_violation(tmp_path, mo
     record({"kind": "closed", "connection": "c2", "method": "GET",
             "host": "api.example.com", "port": 80, "allowed": True,
             "reason": "allowed by api.example.com", "bytes_up": 120, "bytes_down": 4096})
+    record.close()
     trail = SQLiteAuditBackend(str(db)).load_trail()
     assert trail.get_records_by_type(EventType.ACTION_BLOCKED) == []
     decisions = trail.get_records_by_type(EventType.DECISION_MADE)

@@ -141,52 +141,86 @@ def _egress_recorder(agent: str, cage_block: dict):
     an outcome at close with the bytes. An upstream that did not answer is
     the same allow followed by an outcome that says so: a transport
     failure, not a refusal by policy.
+
+    The proxy hands events over from its connection threads and never waits
+    on the trail: one writer thread takes them in order, so a slow or busy
+    trail (the hook relay in this process writes to the same store) delays
+    the record and not the connection. ``record.flush()`` waits for what
+    has been handed over so far; ``record.close()`` flushes and ends the
+    writer.
     """
-    lock = threading.Lock()
+    import queue
+
+    events: queue.Queue = queue.Queue()
     held: dict = {}
 
-    def record(event: dict) -> None:
+    def write(event: dict) -> None:
         kind = event.get("kind") or ("opened" if event.get("allowed") else "refused")
         where = f"{event.get('method')} {event.get('host')}:{event.get('port')}"
         try:
-            with lock:
-                if "trail" not in held:
-                    from vaara.audit.sqlite_backend import SQLiteAuditBackend
+            if "trail" not in held:
+                from vaara.audit.sqlite_backend import SQLiteAuditBackend
 
-                    db = os.environ.get("VAARA_DB") or str(
-                        Path.home() / ".vaara" / "trail" / "audit.db")
-                    held["trail"] = SQLiteAuditBackend(db).load_trail()
-                trail = held["trail"]
-                action_id = str(event.get("connection") or uuid.uuid4())
-                if kind == "refused":
-                    trail.record_decision(
-                        action_id=action_id, agent_id=agent, tool_name="egress.connect",
-                        decision="deny", reason=f"{where}: {event.get('reason')}",
-                        risk_score=1.0, policy_id="os-layer.egress",
-                        violation_type="egress_not_allowed", cage=cage_block,
-                    )
-                elif kind == "opened":
-                    trail.record_decision(
-                        action_id=action_id, agent_id=agent, tool_name="egress.connect",
-                        decision="allow", reason=f"{where}: {event.get('reason')}",
-                        risk_score=0.0, policy_id="", violation_type="", cage=cage_block,
-                    )
-                elif kind == "failed":
-                    trail.record_outcome(
-                        action_id=action_id, agent_id=agent, tool_name="egress.connect",
-                        outcome_severity=0.0,
-                        description=f"{where}: {event.get('error')}",
-                    )
-                elif kind == "closed":
-                    trail.record_outcome(
-                        action_id=action_id, agent_id=agent, tool_name="egress.connect",
-                        outcome_severity=0.0,
-                        description=f"{where}: closed, {event.get('bytes_up', 0)} bytes up, "
-                                    f"{event.get('bytes_down', 0)} bytes down",
-                    )
+                db = os.environ.get("VAARA_DB") or str(
+                    Path.home() / ".vaara" / "trail" / "audit.db")
+                held["trail"] = SQLiteAuditBackend(db).load_trail()
+            trail = held["trail"]
+            action_id = str(event.get("connection") or uuid.uuid4())
+            if kind == "refused":
+                trail.record_decision(
+                    action_id=action_id, agent_id=agent, tool_name="egress.connect",
+                    decision="deny", reason=f"{where}: {event.get('reason')}",
+                    risk_score=1.0, policy_id="os-layer.egress",
+                    violation_type="egress_not_allowed", cage=cage_block,
+                )
+            elif kind == "opened":
+                trail.record_decision(
+                    action_id=action_id, agent_id=agent, tool_name="egress.connect",
+                    decision="allow", reason=f"{where}: {event.get('reason')}",
+                    risk_score=0.0, policy_id="", violation_type="", cage=cage_block,
+                )
+            elif kind == "failed":
+                trail.record_outcome(
+                    action_id=action_id, agent_id=agent, tool_name="egress.connect",
+                    outcome_severity=0.0,
+                    description=f"{where}: {event.get('error')}",
+                )
+            elif kind == "closed":
+                trail.record_outcome(
+                    action_id=action_id, agent_id=agent, tool_name="egress.connect",
+                    outcome_severity=0.0,
+                    description=f"{where}: closed, {event.get('bytes_up', 0)} bytes up, "
+                                f"{event.get('bytes_down', 0)} bytes down",
+                )
         except Exception as exc:  # noqa: BLE001 - a lost record is reported, never fatal
             print(f"vaara run: egress record not written: {exc}", file=sys.stderr)
 
+    def worker() -> None:
+        while True:
+            event = events.get()
+            try:
+                if event is not None:
+                    write(event)
+            finally:
+                events.task_done()
+            if event is None:
+                return
+
+    writer = threading.Thread(target=worker, daemon=True, name="vaara-egress-record")
+    writer.start()
+
+    def record(event: dict) -> None:
+        events.put(event)
+
+    def flush() -> None:
+        events.join()
+
+    def close() -> None:
+        events.put(None)
+        writer.join(timeout=30)
+
+    record.flush = flush  # type: ignore[attr-defined]
+    record.close = close  # type: ignore[attr-defined]
     return record
 
 
@@ -270,8 +304,8 @@ def run(name: Optional[str], agent_argv: list[str], *,
         if allow is not None:
             from vaara.oslayer.egress import EgressProxy
 
-            egress = EgressProxy(list(allow), record=_egress_recorder(
-                agent, declared.to_record()))
+            egress_record = _egress_recorder(agent, declared.to_record())
+            egress = EgressProxy(list(allow), record=egress_record)
             hardening["egress_ports"] = [egress.start()]
             # The agent's tree only: the hook this process runs unconfined
             # must not send its own requests through the agent's proxy.
@@ -281,6 +315,7 @@ def run(name: Optional[str], agent_argv: list[str], *,
         hooks.close()
         if egress is not None:
             egress.close()
+            egress_record.close()
 
     ready_r, ready_w = os.pipe()
     pid = os.fork()
