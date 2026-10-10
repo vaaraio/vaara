@@ -2618,8 +2618,8 @@ Internet-Draft                Vaara Receipt                 October 2026
    [VAARA-REPO]
               Vaara, "Vaara Receipt Specification (vaara.receipt/v1) and
               conformance vectors", 2026,
-              <https://github.com/vaaraio/vaara/tree/
-              f0b09b096a2c458519fad7aa8586c46a012e14f7>.
+              <https://github.com/vaaraio/vaara/
+              tree/35e3d6c5ae21f322a230e63c4f104adb3d3b0494>.
 
    [VCP]      Kamimura, T., "A SCITT Profile for Verifiable Audit Trails
               in Algorithmic Trading: The VeritasChain Protocol (VCP)",
@@ -2656,7 +2656,7 @@ Appendix A.  Envelope Schema (CDDL)
      alg: alg,
      backLink: back-link,
      decisionDerived: decision-derived,
-     issuerAsserted: issuer-block,
+     issuerAsserted: decision-issuer-block,
      signature: hex,
      ? timestampAnchors: [* anchor],
    }
@@ -2694,6 +2694,17 @@ Internet-Draft                Vaara Receipt                 October 2026
    }
 
    issuer-block = {
+     issuer-members,
+     ? sigSuite: "ES256+ML-DSA-65" / "RS256+ML-DSA-65",
+   }
+
+   ; A decision receipt has no pqSignature, so its issuer block
+   ; names no sigSuite (SPEC.md 2.5).
+   decision-issuer-block = {
+     issuer-members,
+   }
+
+   issuer-members = (
      iss: tstr,
      sub: tstr,
      iat: date-time,
@@ -2703,9 +2714,8 @@ Internet-Draft                Vaara Receipt                 October 2026
      ? aud: nonempty,
      ? taskId: nonempty,
      ? completeness: completeness,
-     ? sigSuite: "ES256+ML-DSA-65" / "RS256+ML-DSA-65",
      ? cryptoPosture: crypto-posture,
-   }
+   )
 
    completeness = {
      boundaryId: nonempty,
@@ -2728,6 +2738,14 @@ Internet-Draft                Vaara Receipt                 October 2026
    decision-derived = {
      decision: "allow" / "block" / "escalate",
      decidedAt: date-time,
+
+
+
+Sirkkavaara               Expires 14 April 2027                [Page 49]
+
+Internet-Draft                Vaara Receipt                 October 2026
+
+
      ? reason: tstr,
      ? policyId: tstr,
      ? riskScore: decimal,
@@ -2738,14 +2756,6 @@ Internet-Draft                Vaara Receipt                 October 2026
      ? rationale: rationale,
      ? binding: binding,
      ? decisionProof: { * tstr => any },
-
-
-
-Sirkkavaara               Expires 14 April 2027                [Page 49]
-
-Internet-Draft                Vaara Receipt                 October 2026
-
-
    }
 
    evidence-ref = {
@@ -2784,6 +2794,14 @@ Internet-Draft                Vaara Receipt                 October 2026
    reference-commitment = {
      ref: tstr,
      digest: digest,
+
+
+
+Sirkkavaara               Expires 14 April 2027                [Page 50]
+
+Internet-Draft                Vaara Receipt                 October 2026
+
+
      canonicalization: "jcs",
    }
 
@@ -2794,14 +2812,6 @@ Internet-Draft                Vaara Receipt                 October 2026
    }
 
    existence-proof = {
-
-
-
-Sirkkavaara               Expires 14 April 2027                [Page 50]
-
-Internet-Draft                Vaara Receipt                 October 2026
-
-
      backend: "rfc3161-eidas-qualified",
      hashAlgorithm: "sha256",
      recordDigest: digest,
@@ -2837,19 +2847,9 @@ Internet-Draft                Vaara Receipt                 October 2026
    }
 
    ; A method this document does not define: carried, never
-   ; treated as verified.
-   other-anchor = {
-     method: tstr,
-     anchoredDigest: digest,
-     * tstr => any,
-   }
-   <CODE ENDS>
-
-
-
-
-
-
+   ; treated as verified. CDDL cannot say "any method name but
+   ; the three above", so this alternative also admits a
+   ; registered name with members missing; the prose rule that
 
 
 
@@ -2858,21 +2858,21 @@ Sirkkavaara               Expires 14 April 2027                [Page 51]
 Internet-Draft                Vaara Receipt                 October 2026
 
 
+   ; a registered method keeps its own shape is checked by the
+   ; verifier, not by this schema.
+   other-anchor = {
+     method: tstr,
+     anchoredDigest: digest,
+     * tstr => any,
+   }
+   <CODE ENDS>
+
 Appendix B.  Cage Drivers and Bases in Use
 
    This appendix is informative.  It lists the driver and basis values a
    reference implementation emits at the time of writing.  No value here
    is normative, and either list can grow without a revision of this
    document.
-
-
-
-
-
-
-
-
-
 
 
 
