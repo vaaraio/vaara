@@ -20,6 +20,7 @@ from __future__ import annotations
 import json
 import os
 import shutil
+import signal
 import socket
 import sqlite3
 import subprocess
@@ -95,6 +96,40 @@ class _Model:
             return []
         return [str(m.get("content")) for m in self.requests[-1].get("messages", [])
                 if m.get("role") == "tool"]
+
+
+def _run_vaara(argv: list[str], cwd: Path, env: dict, timeout: float = 300) -> subprocess.CompletedProcess:
+    """``vaara run`` as a subprocess, with the whole tree ended on a timeout.
+
+    The agent runs in a cgroup under ``vaara run`` and inherits the output
+    pipes. Killing only ``vaara run`` on a timeout left the agent holding the
+    pipes, so the test hung on reading them until the job's six-hour limit.
+    The tree is its own session here; on a timeout the session is killed and
+    the captured output is returned with a marker, so the assertions that
+    follow fail with the log in hand.
+    """
+    proc = subprocess.Popen(
+        [sys.executable, "-m", "vaara.cli", "run", *argv], cwd=cwd, env=env,
+        stdin=subprocess.DEVNULL, stdout=subprocess.PIPE, stderr=subprocess.PIPE,
+        text=True, start_new_session=True)
+    try:
+        out, err = proc.communicate(timeout=timeout)
+    except subprocess.TimeoutExpired:
+        try:
+            os.killpg(proc.pid, signal.SIGKILL)
+        except OSError:
+            pass
+        out, err = proc.communicate(timeout=30)
+        err = f"[test: vaara run did not finish within {timeout:.0f} s; tree killed]\n" + (err or "")
+    return subprocess.CompletedProcess(proc.args, proc.returncode, out or "", err or "")
+
+
+def _stop_model(model: "_Model") -> None:
+    """Stop the fake model; a handler stuck mid-request must not hang the test."""
+    t = threading.Thread(target=model.server.shutdown, daemon=True)
+    t.start()
+    t.join(timeout=10)
+    model.server.server_close()
 
 
 def _sh(command: str) -> tuple:
@@ -196,14 +231,11 @@ def test_the_floor_holds_and_the_guard_decides(tmp_path):
     stop, seen = threading.Event(), []
     _deny_asks(home / ".vaara" / "approvals", stop, seen)
     try:
-        proc = subprocess.run(
-            [sys.executable, "-m", "vaara.cli", "run", "copilot", "-p", "go",
-             "--allow-all-tools", "--allow-all-paths", "--no-auto-update", "--no-ask-user"],
-            cwd=work, env=env, stdin=subprocess.DEVNULL, capture_output=True,
-            text=True, timeout=300)
+        proc = _run_vaara(["copilot", "-p", "go", "--allow-all-tools", "--allow-all-paths",
+                           "--no-auto-update", "--no-ask-user"], work, env)
     finally:
         stop.set()
-        model.server.shutdown()
+        _stop_model(model)
     log = proc.stdout[-3000:] + proc.stderr[-3000:]
 
     out = model.outputs()
@@ -286,13 +318,10 @@ def test_an_adapter_decides_under_vaara_run(tmp_path):
            "PATH": os.environ.get("PATH", ""), "NO_COLOR": "1",
            "PYTHONPATH": os.pathsep.join(sys.path)}
     try:
-        proc = subprocess.run(
-            [sys.executable, "-m", "vaara.cli", "run", "copilot", "-p", "go",
-             "--allow-all-tools", "--allow-all-paths", "--no-auto-update", "--no-ask-user"],
-            cwd=work, env=env, stdin=subprocess.DEVNULL, capture_output=True,
-            text=True, timeout=300)
+        proc = _run_vaara(["copilot", "-p", "go", "--allow-all-tools", "--allow-all-paths",
+                           "--no-auto-update", "--no-ask-user"], work, env)
     finally:
-        model.server.shutdown()
+        _stop_model(model)
     log = proc.stdout[-3000:] + proc.stderr[-3000:]
 
     out = model.outputs()
@@ -375,13 +404,10 @@ def test_hardened_launch_with_egress_locked(tmp_path):
            "PATH": os.environ.get("PATH", ""), "NO_COLOR": "1",
            "PYTHONPATH": os.pathsep.join(sys.path)}
     try:
-        proc = subprocess.run(
-            [sys.executable, "-m", "vaara.cli", "run", "copilot", "-p", "go",
-             "--allow-all-tools", "--allow-all-paths", "--no-auto-update", "--no-ask-user"],
-            cwd=work, env=env, stdin=subprocess.DEVNULL, capture_output=True,
-            text=True, timeout=300)
+        proc = _run_vaara(["copilot", "-p", "go", "--allow-all-tools", "--allow-all-paths",
+                           "--no-auto-update", "--no-ask-user"], work, env)
     finally:
-        model.server.shutdown()
+        _stop_model(model)
         manage.save(selection.Selection())
     log = proc.stdout[-3000:] + proc.stderr[-3000:]
 

@@ -27,6 +27,7 @@ import hashlib
 import os
 import re
 import sys
+import time
 from collections.abc import Iterator
 from contextlib import contextmanager
 from pathlib import Path
@@ -69,7 +70,15 @@ def _exclusive(lock_path: Path) -> Iterator[None]:
             import msvcrt
 
             fh.seek(0)
-            msvcrt.locking(fh.fileno(), msvcrt.LK_LOCK, 1)
+            # LK_LOCK gives up after ten one-second tries and raises EDEADLK
+            # ("Resource deadlock avoided"); flock on POSIX waits as long as
+            # it takes. Wait the same way here: poll the non-blocking lock.
+            while True:
+                try:
+                    msvcrt.locking(fh.fileno(), msvcrt.LK_NBLCK, 1)
+                    break
+                except OSError:
+                    time.sleep(0.005)
             try:
                 yield
             finally:
