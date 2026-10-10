@@ -230,3 +230,27 @@ html[data-theme="dark"] .feed .ic { color: #0F1820; }
 .feed .rcpt b { color: var(--ink); margin-right: 4px; }
 .feed figcaption { font-size: 13px; color: var(--muted); margin-top: 8px; }
 @media (max-width: 820px) { .feed li { grid-template-columns: 30px 1fr; } .feed .chip { grid-column: 2; justify-self: start; } }
+
+footer .tm { margin: 22px 0 0; font-size: 12px; color: var(--on-night-muted); max-width: none; }
+
+/* long pages fold their reference sections; a row of the results table opens on click */
+details.more { border: 1px solid var(--rule); border-radius: 10px; background: var(--card); margin: 14px 0; }
+details.more > summary { cursor: pointer; padding: 14px 18px; font-weight: 650; color: var(--ink); font-size: 17px; list-style: none; }
+details.more > summary::-webkit-details-marker, details.repro > summary::-webkit-details-marker { display: none; }
+details.more > summary::before, details.repro > summary::before { content: "▸"; color: var(--accent); margin-right: 10px; display: inline-block; transition: transform .15s; }
+details.more[open] > summary::before, details.repro[open] > summary::before { transform: rotate(90deg); }
+details.more > :not(summary) { margin-left: 18px; margin-right: 18px; }
+details.more[open] { padding-bottom: 8px; }
+details.repro { border: 1px solid var(--rule); border-radius: 10px; background: var(--card); margin: 8px 0; }
+details.repro > summary { cursor: pointer; list-style: none; display: flex; flex-wrap: wrap; gap: 6px 14px; align-items: baseline; padding: 12px 16px; }
+details.repro > summary .who { font-weight: 650; color: var(--ink); }
+details.repro > summary .aff { color: var(--muted); font-size: 14px; }
+details.repro > summary .result { margin-left: auto; font-family: "JetBrains Mono", monospace; font-size: 13px; color: var(--accent); }
+details.repro > dl { padding: 4px 16px 16px; }
+details.repro:target { border-color: var(--accent); }
+.fineprint { margin-top: 40px; color: var(--muted); font-size: 13px; line-height: 1.7; }
+html:root details.repro { padding: 0; margin: 8px 0; }
+html:root details.repro > summary.repro-head { margin: 0; }
+html:root details.repro > summary .result { flex-basis: 100%; margin: 2px 0 0 22px; font-family: inherit; font-size: 14px; color: var(--muted); }
+html:root main.legacy .stat b { font-family: Inter, sans-serif; color: var(--ink); font-weight: 700; }
+html:root main.legacy .stat { background: var(--card); }

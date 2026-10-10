@@ -28,7 +28,7 @@
 <meta name="robots" content="index, follow, max-image-preview:large, max-snippet:-1">
 <meta name="googlebot" content="index, follow">
 <meta name="referrer" content="strict-origin-when-cross-origin">
-<meta name="theme-color" content="#ececec">
+<meta name="theme-color" content="#14212E">
 <link rel="canonical" href="https://vaara.io/verify.html">
 <link rel="icon" type="image/svg+xml" href="/favicon.svg">
 <link rel="alternate icon" href="/favicon.ico">
@@ -158,7 +158,8 @@
       "@id": "https://vaara.io/verify.html#crumbs",
       "itemListElement": [
         {"@type": "ListItem", "position": 1, "name": "Vaara", "item": "https://vaara.io/"},
-        {"@type": "ListItem", "position": 2, "name": "Receipt explorer", "item": "https://vaara.io/verify.html"}
+        {"@type": "ListItem", "position": 2, "name": "Test it yourself", "item": "https://vaara.io/products/test-it-yourself.html"},
+        {"@type": "ListItem", "position": 3, "name": "Receipt explorer", "item": "https://vaara.io/verify.html"}
       ]
     }
   ]
@@ -351,37 +352,33 @@
   footer { margin-top:2rem; color:var(--dim); font-size:.76rem; line-height:1.7; }
   code { background:var(--panel); padding:.1rem .3rem; border-radius:3px; }
 </style>
-<script>
-  // Apply the stored theme before first paint, same as index.html. Without
-  // this the page renders in the OS colorway and then snaps to the saved
-  // choice when the body script runs.
-  (function(){ try { var t = localStorage.getItem('vaara-theme');
-    if (t === 'dark' || t === 'light') document.documentElement.setAttribute('data-theme', t);
-  } catch(e){} })();
-</script>
+<script>try{var t=localStorage.getItem("vaara-theme");if(t!=="dark"&&t!=="light")t=matchMedia("(prefers-color-scheme: dark)").matches?"dark":"light";document.documentElement.dataset.theme=t}catch(e){}</script>
+<link rel="stylesheet" href="/style.css">
+<style>
+  html:root, html:root[data-theme] {
+    --panel: var(--card); --panel-2: var(--tint); --deep: var(--tint); --line: var(--rule);
+    --faint: var(--muted); --dim: var(--muted); --tri: var(--accent); --tri-bright: var(--accent);
+    --ok: var(--accent); --no: var(--stop); --edge: 16px;
+    --sans: Inter, -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Arial, sans-serif;
+    --mono: "JetBrains Mono", ui-monospace, SFMono-Regular, Menlo, Consolas, monospace;
+  }
+  html:root body { background: var(--bg); color: var(--body); font: 17px/1.6 var(--sans); }
+  html:root main.legacy { max-width: var(--max); margin: 0 auto; padding: 40px 24px 64px; }
+  html:root main.legacy section { padding: 1rem 1.25rem; border: 1px solid var(--rule); }
+  html:root main.legacy > h2 { font-size: 24px; text-transform: none; letter-spacing: 0; color: var(--ink); margin: 44px 0 12px; }
+  html:root .bar a, html:root .band a, html:root footer.site a { border-bottom: 0; }
+  html:root footer.site { margin: 0; padding: 40px 0; border-top: 0; color: var(--on-night-soft); font-size: 14px; line-height: 1.6; }
+  html:root .band .lead { font-size: 17px; color: var(--body); max-width: 46em; margin: 0; }
+  html:root .band h1 { font: 650 30px/1.2 var(--sans); letter-spacing: 0; color: var(--ink); margin: 0 0 10px; }
+</style>
 </head>
 <body>
-<header class="topbar">
-  <a class="mark" href="/" aria-label="Vaara home"><img src="/favicon.svg" alt="Vaara" width="24" height="24"></a>
-  <nav class="nav-jump" aria-label="Sections"><a href="/verify.html" aria-current="page">Explorer</a><a href="/conformance.html">Conformance</a><a href="/surfaces.html">Published</a></nav>
-  <div class="theme-toggle">
-    <button type="button" id="themeBtn" aria-label="Switch to dark theme"><svg class="i-moon" viewBox="0 0 18 18" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M15.2 11.4A6.8 6.8 0 0 1 6.6 2.8a7 7 0 1 0 8.6 8.6z"/></svg><svg class="i-sun" viewBox="0 0 18 18" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" aria-hidden="true"><circle cx="9" cy="9" r="3.4"/><path d="M9 1.4v1.7M9 14.9v1.7M1.4 9h1.7M14.9 9h1.7M3.6 3.6l1.2 1.2M13.2 13.2l1.2 1.2M14.4 3.6l-1.2 1.2M4.8 13.2l-1.2 1.2"/></svg></button>
-  </div>
-</header>
-<main>
-  <div class="wordmark">
-    <a href="/"><img class="wm-light" src="/vaara-wordmark-light.png" alt="Vaara" width="440" height="127"></a>
-    <a href="/"><img class="wm-dark" src="/vaara-wordmark-dark.png" alt="Vaara" width="440" height="127"></a>
-  </div>
-  <p class="stance">Accountable Autonomy</p>
+<header class="bar"><div class="wrap">
+<nav class="top" aria-label="Main menu"><a class="brand" href="/"><img src="/vaara-logo-dark.svg" alt="Vaara home" width="174" height="24"></a><div class="dd"><a class="l" href="/sectors/" aria-haspopup="true">Sectors <span class="caret">▾</span></a><div class="menu"><a href="/sectors/care.html">Care and social services</a><a href="/sectors/payments.html">Payments and finance</a><a href="/sectors/public.html">Public sector</a><a href="/sectors/health.html">Healthcare</a><a href="/sectors/infrastructure.html">Energy, industry and infrastructure</a><a href="/sectors/software.html">Software teams</a></div></div><div class="dd"><a class="l" href="/products/" aria-haspopup="true">Products <span class="caret">▾</span></a><div class="menu"><a href="/products/gate.html">The gate</a><a href="/products/receipts.html">Receipts</a><a href="/products/cage.html">The cage</a><a href="/products/app.html">The desktop app</a><a href="/products/test-it-yourself.html">Test it yourself</a></div></div><div class="dd on"><a class="l" href="/products/test-it-yourself.html" aria-haspopup="true">Test it yourself <span class="caret">▾</span></a><div class="menu"><a href="/products/test-it-yourself.html">Test it yourself</a><a href="/verify.html">Receipt explorer</a><a href="/conformance.html">Conformance results</a></div></div><a class="l" href="/under-the-hood.html">Under the hood</a><span class="lang"><b>EN</b> | <a href="/fi/" hreflang="fi">FI</a></span><button class="burger" type="button" aria-label="Main menu" aria-expanded="false"></button><button class="theme" type="button" aria-label="Switch between light and dark" title="Switch between light and dark"></button><a class="get" href="https://github.com/vaaraio/vaara#readme">Get Vaara</a></nav>
+</div></header>
+<div class="band"><div class="wrap"><div class="hero"><nav class="crumbs" aria-label="Breadcrumb"><a href="/">Home</a> / <a href="/products/test-it-yourself.html">Test it yourself</a></nav><p class="kicker">Receipt explorer</p><h1>Explore the Vaara Resin</h1><p class="lead">Vaara Resin is the chain of autonomous-action receipts. Every allow, escalate and deny an agent produced, hash-chained so a removed one stops reconciling, and checkable by someone who does not trust whoever ran it. Drop a receipt below to verify it here in your tab, or look one up in the public log underneath.</p></div></div></div>
+<main class="legacy">
 
-  <h1>Explore the Vaara Resin</h1>
-  <p class="sub">
-    Vaara Resin is the chain of autonomous-action receipts. Every allow, escalate and
-    deny an agent produced, hash-chained so a removed one stops reconciling, and
-    checkable by someone who does not trust whoever ran it. Drop a receipt below to
-    verify it here in your tab, or look one up in the public log underneath.
-  </p>
 
   <section id="search">
     <h2>Search the Vaara Resin</h2>
@@ -466,7 +463,7 @@
   </section>
 
 
-  <footer>
+  <div class="fineprint">
     A passing signature proves the payload is byte-identical to what the holder
     of that key signed. It says nothing about whether the key belongs to who you
     think, or whether the statement is true. Pin the public key from a source
@@ -476,8 +473,14 @@
     <code>tests/vectors/</code>.
     <br><br>
     Vaara&trade; and Vaara Resin&trade; &copy; 2026 Henri Sirkkavaara, Helsinki. AGPL-3.0-or-later.
-  </footer>
+  </div>
 </main>
+<footer class="site"><div class="wrap"><div class="cols">
+<div><b>VAARA</b><br>Open source. Runs on your own machines. Nothing is sent to us.<br><a href="mailto:hello@vaara.io">hello@vaara.io</a></div>
+<div><a href="https://github.com/vaaraio/vaara">Code</a><br>
+<a href="https://datatracker.ietf.org/doc/draft-sirkkavaara-vaara-receipt/">Internet-Draft</a><br>
+<a href="/conformance.html">Conformance results</a><br><a href="/surfaces.html">Everything Vaara publishes</a><br><a href="/under-the-hood.html">Technical overview</a></div>
+</div><p class="tm">Vaara™ and Vaara Resin™ © 2026 Henri Sirkkavaara, Helsinki. AGPL-3.0-or-later.</p></div></footer>
 
 <script>
 "use strict";
@@ -670,32 +673,6 @@ async function run() {
   $("checks").innerHTML = checks.join("");
   if (statement) { renderStatement(statement); renderNonClaims(statement); }
 }
-
-(function(){
-  var root = document.documentElement;
-  var meta = document.querySelector('meta[name="theme-color"]');
-  var btn  = document.getElementById("themeBtn");
-  var COLORS = { light: "#ececec", dark: "#0F1417" };
-  function current(){
-    var t = root.getAttribute("data-theme");
-    if (t) return t;
-    return (window.matchMedia && window.matchMedia("(prefers-color-scheme: dark)").matches) ? "dark" : "light";
-  }
-  function label(){
-    if (btn) btn.setAttribute("aria-label", current() === "dark" ? "Switch to light theme" : "Switch to dark theme");
-  }
-  function apply(theme) {
-    root.setAttribute("data-theme", theme === "dark" ? "dark" : "light");
-    if (meta) meta.setAttribute("content", COLORS[theme] || COLORS.light);
-    try { localStorage.setItem("vaara-theme", theme); } catch(e) {}
-    label();
-  }
-  function reflectAuto(){ root.removeAttribute("data-theme"); label(); }
-  if (btn) btn.addEventListener("click", function(){ apply(current() === "dark" ? "light" : "dark"); });
-  var saved = null;
-  try { saved = localStorage.getItem("vaara-theme"); } catch(e) {}
-  if (saved === "dark" || saved === "light") apply(saved); else reflectAuto();
-})();
 
 $("go").addEventListener("click", run);
 
@@ -965,5 +942,6 @@ $("demo").addEventListener("click", () => {
 
 const DEMO = {"envelope": {"payload": "eyJfdHlwZSI6Imh0dHBzOi8vaW4tdG90by5pby9TdGF0ZW1lbnQvdjEiLCJwcmVkaWNhdGUiOnsiYWdlbnRfaWQiOiJhZ2VudDphY21lL2NoZWNrb3V0LWJvdC8xIiwiZGVjaWRlZF9hdCI6IjIwMjYtMDYtMjNUMTI6MDA6MDVaIiwiZGVjaXNpb24iOiJkZW55IiwicG9saWN5X2V2YWx1YXRpb25zIjpbeyJwb2xpY3lfaWQiOiJwb2xpY3k6c3BlbmQtY2FwL2V1ci01MDAiLCJyZXN1bHQiOiJkZW55IiwicnVsZSI6ImFtb3VudC5sZS41MDAwMCJ9XSwicHJpbmNpcGFsIjoidGVuYW50OmFjbWUtZXUiLCJ0b29sX2NhbGxzIjpbeyJhcmdzX2Nhbm9uaWNhbGl6YXRpb24iOiJKQ1MiLCJhcmdzX2hhc2giOiJzaGEyNTY6OTFjMGMyMTVjY2UzZjVlN2M0OWQyZGRmMGE1NDBlYjIyNTU1NTRlYTNlN2E4ODUwNjdkMzkxNjhiM2FjODU2NCIsImFyZ3Nfc3RhdGUiOiJwcmVzZW50IiwibmFtZSI6InBheW1lbnRzLnRyYW5zZmVyIn0seyJhcmdzX3N0YXRlIjoiYXJnc19yZWRhY3RlZCIsIm5hbWUiOiJjdXN0b21lci5sb29rdXAifV19LCJwcmVkaWNhdGVUeXBlIjoiaHR0cHM6Ly9pbi10b3RvLmlvL2F0dGVzdGF0aW9uL2FnZW50LWRlY2lzaW9uL3YwLjEiLCJzdWJqZWN0IjpbeyJkaWdlc3QiOnsic2hhMjU2IjoiYTI3MmUzMGM4NzY4NzI4NWQ3YThkY2Q2YzVlMjMyNTRjZDVkYjJjNjgyMDI1NGRmNTQyYzI5MThlMDAxMTdiZCJ9LCJuYW1lIjoidG9vbDpwYXltZW50cy50cmFuc2ZlciJ9XX0=", "payloadType": "application/vnd.in-toto+json", "signatures": [{"keyid": "vaara-agent-decision-conformance-ed25519-k1", "sig": "mW5uAfYeWoUkc7Co6ehJ21y9vnoajFvmCGj1SkXJgZOgLGH6tfquZcoZL5Z+yMhip3zFWSA5s6Rd+oqL9me2AQ=="}]}, "publicKey": "-----BEGIN PUBLIC KEY-----\nMCowBQYDK2VwAyEAvHy8tWNjdfodgkNNRmck2SN39TuYBpXdSdJtDOEiBaU=\n-----END PUBLIC KEY-----"};
 </script>
+<script>document.querySelector(".bar .theme").onclick=function(){var d=document.documentElement,t=d.dataset.theme==="dark"?"light":"dark";d.dataset.theme=t;try{localStorage.setItem("vaara-theme",t)}catch(e){}};document.querySelector(".bar .burger").onclick=function(){var n=document.querySelector("nav.top"),o=n.classList.toggle("open");this.setAttribute("aria-expanded",o)}</script>
 </body>
 </html>

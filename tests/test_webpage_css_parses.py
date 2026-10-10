@@ -58,12 +58,37 @@ def test_inline_css_braces_balance(page: str) -> None:
         )
 
 
+def _linked_definitions(html: str) -> set[str]:
+    """Custom properties defined by the site's own stylesheets the page links.
+
+    The pages share /style.css, and a page's inline block may read the colours
+    it defines. A linked file that does not exist defines nothing, so a broken
+    link still fails here."""
+    defined: set[str] = set()
+    for href in re.findall(r'<link rel="stylesheet" href="/([^"]+\.css)"', html):
+        sheet = WEBPAGE / href
+        if sheet.is_file():
+            defined |= set(re.findall(r"(--[A-Za-z0-9_-]+)\s*:", sheet.read_text(encoding="utf-8")))
+    return defined
+
+
+def test_the_shared_stylesheet_defines_what_it_reads() -> None:
+    sheet = WEBPAGE / "style.css"
+    if not sheet.is_file():
+        pytest.skip("no shared stylesheet")
+    css = sheet.read_text(encoding="utf-8")
+    missing = sorted(set(re.findall(r"var\(\s*(--[A-Za-z0-9_-]+)\s*\)", css))
+                     - set(re.findall(r"(--[A-Za-z0-9_-]+)\s*:", css)))
+    assert not missing, f"style.css reads {missing} with no definition and no fallback."
+
+
 @pytest.mark.parametrize("page", PAGES)
 def test_no_custom_property_is_used_without_being_defined(page: str) -> None:
     """A var() with no definition and no fallback resolves to nothing."""
     html = (WEBPAGE / page).read_text(encoding="utf-8")
+    linked = _linked_definitions(html)
     for index, css in enumerate(_style_blocks(html)):
-        defined = set(re.findall(r"(--[A-Za-z0-9_-]+)\s*:", css))
+        defined = set(re.findall(r"(--[A-Za-z0-9_-]+)\s*:", css)) | linked
         # A var() carrying a fallback survives a missing definition, so only
         # the bare form is a defect.
         used = set(re.findall(r"var\(\s*(--[A-Za-z0-9_-]+)\s*\)", css))
