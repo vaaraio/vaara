@@ -84,6 +84,8 @@ class LaunchHandle:
         self._closing = False
         self.launch_id = str(reply.get("launch", ""))
         self.cgroup = str(reply.get("cgroup", ""))
+        # The address rule the guard attached for locked egress, if any.
+        self.netlock = [str(x) for x in (reply.get("netlock") or [])]
 
     def wait_closed(self) -> bool:
         """Block until the connection ends. True when the guard ended it."""

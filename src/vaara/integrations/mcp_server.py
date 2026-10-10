@@ -33,7 +33,7 @@ Architecture::
         ├── ActionRegistry (classify)
         ├── AdaptiveScorer (risk score + conformal interval)
         ├── AuditTrail (hash-chained log)
-        └── ComplianceEngine (EU AI Act, DORA)
+        └── ComplianceEngine (EU AI Act, DORA, SOC 2)
 
 Protocol: JSON-RPC 2.0 over stdio (default) or SSE.
 
@@ -75,6 +75,7 @@ from typing import Any, Optional
 
 from vaara import __version__ as _VAARA_VERSION
 from vaara.audit.sqlite_backend import SQLiteAuditBackend
+from vaara.integrations._mcp_beacon import Beacon
 from vaara.pipeline import InterceptionPipeline
 
 logger = logging.getLogger(__name__)
@@ -285,7 +286,7 @@ VAARA_STATUS_RESOURCE = MCPResourceDefinition(
 VAARA_COMPLIANCE_RESOURCE = MCPResourceDefinition(
     uri="vaara://compliance",
     name="Vaara Compliance Report",
-    description="Latest EU AI Act and DORA compliance assessment against the audit trail",
+    description="Latest EU AI Act, DORA and SOC 2 compliance assessment against the audit trail",
 )
 
 
@@ -333,6 +334,8 @@ class VaaraMCPServer:
         self._required_api_key: Optional[str] = os.environ.get("VAARA_API_KEY") or None
         if self._required_api_key:
             logger.info("VaaraMCPServer: API key authentication enabled")
+        # Set by run(): only a stdio session has a parent process to name.
+        self._beacon: Optional[Beacon] = None
 
     def handle_request(self, request: Any) -> Any:
         """Handle one JSON-RPC 2.0 message: a single request or a batch.
@@ -462,6 +465,8 @@ class VaaraMCPServer:
     SUPPORTED_PROTOCOL_VERSIONS = ("2024-11-05",)
 
     def _handle_initialize(self, params: dict) -> dict:
+        if self._beacon is not None:
+            self._beacon.on_initialize(params)
         # Per MCP spec: if the server supports the requested version it
         # MUST respond with the same version, otherwise it MUST respond
         # with a version it does support. Hardcoding our own version
@@ -824,6 +829,7 @@ class VaaraMCPServer:
     def run(self) -> None:
         """Run the MCP server on stdio (JSON-RPC over stdin/stdout)."""
         logger.info("Vaara MCP server starting on stdio")
+        self._beacon = Beacon("the Vaara MCP server")
 
         for line in sys.stdin:
             line = line.strip()
@@ -855,6 +861,7 @@ class VaaraMCPServer:
             if response is not None:
                 sys.stdout.write(_strict_json_dumps(response) + "\n")
                 sys.stdout.flush()
+        self._beacon.wait()
 
     def close(self) -> None:
         """Clean up resources."""

@@ -31,6 +31,16 @@ PROV_CONTEXT = "https://www.w3.org/ns/prov-context"
 VAARA_NS = "https://vaara.io/prov/"
 AIACT_NS = "https://eur-lex.europa.eu/eli/reg/2024/1689/oj#"
 DORA_NS = "https://eur-lex.europa.eu/eli/reg/2022/2554/oj#"
+SOC2_NS = "https://www.aicpa-cima.com/resources/download/2017-trust-services-criteria-with-revised-points-of-focus-2022#"
+
+# A record's regulatory_articles carry the RegulatoryDomain value
+# ("eu_ai_act", "dora", "soc2"). Older hand-built records and third-party
+# ingests use the display label. Both spellings land on the same prefix.
+_DOMAIN_PREFIX = {
+    "eu_ai_act": "aiact", "EU AI Act": "aiact",
+    "dora": "dora", "DORA": "dora",
+    "soc2": "soc2", "SOC 2": "soc2", "SOC2": "soc2",
+}
 
 _PIPELINE_AGENT = "vaara:agent/vaara-pipeline"
 _PIPELINE_EVENTS = frozenset({
@@ -52,12 +62,16 @@ def _articles_attr(record: AuditRecord) -> dict:
         if not article:
             continue
         by_domain.setdefault(art.get("domain", ""), []).append(article)
-    out: dict[str, list[str]] = {}
-    if "EU AI Act" in by_domain:
-        out["aiact:satisfies"] = sorted(set(by_domain["EU AI Act"]))
-    if "DORA" in by_domain:
-        out["dora:satisfies"] = sorted(set(by_domain["DORA"]))
-    return out
+    merged: dict[str, set[str]] = {}
+    for domain, articles in by_domain.items():
+        prefix = _DOMAIN_PREFIX.get(domain)
+        if prefix is None:
+            continue
+        merged.setdefault(prefix, set()).update(articles)
+    return {
+        f"{prefix}:satisfies": sorted(merged[prefix])
+        for prefix in ("aiact", "dora", "soc2") if prefix in merged
+    }
 
 
 def _entity_for(rec: AuditRecord, action_id: str) -> tuple[Optional[str], dict]:
@@ -279,7 +293,7 @@ def audit_to_prov_json(
 
     doc: dict[str, Any] = {
         "@context": PROV_CONTEXT,
-        "prefix": {"vaara": VAARA_NS, "aiact": AIACT_NS, "dora": DORA_NS},
+        "prefix": {"vaara": VAARA_NS, "aiact": AIACT_NS, "dora": DORA_NS, "soc2": SOC2_NS},
     }
     if bundles:
         doc["bundle"] = bundles

@@ -43,6 +43,7 @@ from vaara import __version__ as _VAARA_VERSION
 from vaara.attestation._receipt_task import related_task_id as _related_task_id
 from vaara.audit.sqlite_backend import SQLiteAuditBackend
 from vaara.audit.trail import AuditTrail
+from vaara.integrations._mcp_beacon import Beacon
 from vaara.integrations._mcp_input_schema import (
     check_arguments,
     unchecked_keywords,
@@ -404,6 +405,8 @@ class VaaraMCPProxy:
         # carries the upstream's name. ``_notifier`` binds the name at the
         # call, avoiding the late-binding bug that would otherwise pin every
         # upstream to the last name iterated.
+        # Set by run(): only a stdio session has a parent process to name.
+        self._beacon: Optional[Beacon] = None
         self._upstreams: dict[str, UpstreamClient] = {}
         for name, command in upstream_map.items():
             self._upstreams[name] = UpstreamMCPClient(
@@ -492,6 +495,7 @@ class VaaraMCPProxy:
     def run(self) -> None:
         """Read JSON-RPC from stdin, write to stdout, route through upstream."""
         logger.info("Vaara MCP proxy starting on stdio (%s)", self.PROXY_NAME)
+        self._beacon = Beacon("vaara-mcp-proxy")
         for line in sys.stdin:
             line = line.strip()
             if not line:
@@ -517,6 +521,7 @@ class VaaraMCPProxy:
                 )
             if response is not None:
                 self._write_to_client(response)
+        self._beacon.wait()
 
     def _build_http_app(self):
         """Construct the FastAPI app that backs the Streamable HTTP transport.
@@ -1105,6 +1110,8 @@ class VaaraMCPProxy:
             return self._error_response(
                 req_id, -32600, "Invalid Request: 'method' must be a string",
             )
+        if method == "initialize" and self._beacon is not None:
+            self._beacon.on_initialize(request.get("params"))
         if method == "tools/call":
             try:
                 return self._handle_tools_call(request)

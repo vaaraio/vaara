@@ -131,7 +131,8 @@ class TestHashesDoNotMove:
         rec_a = _data(a, EventType.DECISION_MADE)
         rec_b = _data(b, EventType.DECISION_MADE)
         assert rec_a == rec_b
-        assert set(rec_a) == {"decision", "reason", "risk_score"}
+        # "cage" is on every decision since the cage layer; not a disposition key.
+        assert set(rec_a) == {"decision", "reason", "risk_score", "cage"}
 
     def test_empty_approver_adds_nothing_even_when_passed_explicitly(self):
         t = _trail()
@@ -141,7 +142,7 @@ class TestHashesDoNotMove:
             approver="", human_disposed=False,
         )
         assert set(_data(t, EventType.DECISION_MADE)) == {
-            "decision", "reason", "risk_score",
+            "decision", "reason", "risk_score", "cage",
         }
 
     def test_the_chain_still_verifies_with_dispositions_present(self):

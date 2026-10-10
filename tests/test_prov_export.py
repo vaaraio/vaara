@@ -296,3 +296,32 @@ def test_cli_rejects_malformed_jsonl(tmp_path: Path, capsys) -> None:
     err = capsys.readouterr().err
     assert "invalid trail JSONL at line 2" in err
     assert not out.exists()
+
+
+def test_real_trail_records_emit_satisfies_attributes():
+    """Records written by AuditTrail carry the domain enum value ("eu_ai_act",
+    "dora", "soc2"), not the display label. Until v2.4 the exporter only
+    matched the label, so a real export never emitted aiact:satisfies or
+    dora:satisfies. Both spellings now land on the prefix."""
+    from vaara.audit.prov_export import SOC2_NS, _articles_attr
+    from vaara.audit.trail import AuditTrail
+    from vaara.taxonomy.actions import ActionRequest, create_default_registry
+
+    registry = create_default_registry()
+    trail = AuditTrail()
+    for tool in ("tx.transfer", "data.read"):
+        at = registry.classify(tool)
+        trail.record_action_requested(
+            ActionRequest(agent_id="a", tool_name=tool, action_type=at)
+        )
+    tx, data = trail.get_records_by_type(EventType.ACTION_REQUESTED)
+    assert _articles_attr(tx) == {
+        "aiact:satisfies": ["Article 12(1)"],
+        "dora:satisfies": ["Article 10(1)"],
+    }
+    assert _articles_attr(data) == {
+        "aiact:satisfies": ["Article 12(1)"],
+        "soc2:satisfies": ["CC7.2"],
+    }
+    doc = audit_to_prov_json(trail.get_records_by_type(EventType.ACTION_REQUESTED))
+    assert doc["prefix"]["soc2"] == SOC2_NS

@@ -124,6 +124,21 @@ def build_evidence(record: AuditRecord) -> dict[str, Any]:
     if data.get("approver"):
         evidence["approver"] = str(data["approver"])
         evidence["humanDisposed"] = bool(data.get("human_disposed", False))
+    cage = data.get("cage")
+    if isinstance(cage, dict) and cage.get("driver"):
+        # The cage block as the trail recorded it: which cage the deciding
+        # process ran in and whether the kernel confirmed it at that moment.
+        # Camel-cased like the rest of the profile; a record written before
+        # the cage layer has no block and the receipt says nothing.
+        block: dict[str, Any] = {
+            "driver": str(cage["driver"]),
+            "confirmed": bool(cage.get("confirmed", False)),
+        }
+        for src, dst in (("upstream", "upstream"), ("config_digest", "configDigest"),
+                         ("basis", "basis"), ("name", "name")):
+            if cage.get(src):
+                block[dst] = str(cage[src])
+        evidence["cage"] = block
     return evidence
 
 

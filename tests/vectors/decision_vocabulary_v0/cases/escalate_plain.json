@@ -94,7 +94,11 @@
     "data": {
       "decision": "escalate",
       "reason": "vector: policy returned escalate",
-      "risk_score": 0.5
+      "risk_score": 0.5,
+      "cage": {
+        "driver": "none",
+        "confirmed": false
+      }
     },
     "regulatory_articles": [
       {
@@ -111,7 +115,7 @@
       }
     ],
     "previous_hash": "ecf649e064bfe617f3a8bcf47788226db6fb1c3d0b13582b08fd9f3bf66443bb",
-    "record_hash": "44c952136b77d31f0618d2efb4af3885b6a4523fbd8694c136d50ecacbaf96e0",
+    "record_hash": "98f351161db4b93a82a0d00e2e8eab4d547e686bc284cb2c2c68fde651a04d61",
     "system_operation": "decision_threshold",
     "data_usage": "risk_score+thresholds",
     "decision_making": "threshold_match",
@@ -137,10 +141,16 @@
         "article": "Article 14(3)(a)",
         "requirement": "Human oversight measures shall be identified and built into the high-risk AI system by the provider",
         "how_satisfied": "Borderline decisions are escalated with full context for human review"
+      },
+      {
+        "domain": "soc2",
+        "article": "CC7.3",
+        "requirement": "Security events are evaluated to determine whether they could result in a failure to meet objectives",
+        "how_satisfied": "The event is handed to a human with its context for that evaluation"
       }
     ],
-    "previous_hash": "44c952136b77d31f0618d2efb4af3885b6a4523fbd8694c136d50ecacbaf96e0",
-    "record_hash": "3cfcaa29075bb9627345a26191721f5e3bd6b48fc7d5f6fe1846b3168806fc01",
+    "previous_hash": "98f351161db4b93a82a0d00e2e8eab4d547e686bc284cb2c2c68fde651a04d61",
+    "record_hash": "3488fc4127fca5d1f414f99bf23852e6fd4b0fea6ba2a6b5ccbe45503ecb617b",
     "system_operation": "escalation",
     "data_usage": "risk_score+context",
     "decision_making": "threshold_or_classifier_upgrade",

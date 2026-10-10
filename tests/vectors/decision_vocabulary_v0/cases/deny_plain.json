@@ -96,7 +96,11 @@
       "reason": "vector: policy returned deny",
       "risk_score": 0.5,
       "policy_id": "scorer:_FixedScorer",
-      "violation_type": "risk_threshold"
+      "violation_type": "risk_threshold",
+      "cage": {
+        "driver": "none",
+        "confirmed": false
+      }
     },
     "regulatory_articles": [
       {
@@ -113,7 +117,7 @@
       }
     ],
     "previous_hash": "21cff643be6a852f43198fa9ce1436aec8c1e79f8129299ec8436995be1c2b9f",
-    "record_hash": "b7c1dbcdf24c759ca11ab2a39aceddc224ebb4b1f359d96eb88812de34ce21a2",
+    "record_hash": "901f214effb5e993dcc40eadc704972988cb039710549ef2ef0f9db2891653e1",
     "system_operation": "blocking",
     "data_usage": "risk_score+thresholds",
     "decision_making": "threshold_match",

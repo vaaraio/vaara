@@ -117,6 +117,21 @@ collapses the report to `evidence_insufficient` overall.
 | 10(1) | ICT Anomaly Detection | 10 | 720 h | 20 | 180 h | yes |
 | 13(1) | ICT Learning and Evolving | 5 | 720 h | 10 | 180 h | no |
 
+## SOC 2 per-criterion thresholds
+
+The two credential and change criteria are judged against a one-year
+window: key custodians and procedures change rarely, and a report that
+called them stale after thirty quiet days would be wrong.
+
+| Criterion | Title | Min count | Staleness window | Strong-count | Strong-freshness | Critical |
+|---|---|---|---|---|---|---|
+| CC6.1 | Logical Access Security | 10 | 720 h | 20 | 180 h | yes |
+| CC6.2 | Credential Registration and Removal | 1 | 8760 h | 2 | 2190 h | no |
+| CC6.3 | Access Authorisation by Role and Least Privilege | 5 | 720 h | 10 | 180 h | yes |
+| CC7.2 | Monitoring for Anomalies | 20 | 720 h | 40 | 180 h | yes |
+| CC7.3 | Evaluation of Security Events | 5 | 720 h | 10 | 180 h | yes |
+| CC8.1 | Change Management | 1 | 8760 h | 2 | 2190 h | no |
+
 ## What an auditor sees
 
 Every `ArticleEvidence` entry in a report carries a `verdict_inputs`

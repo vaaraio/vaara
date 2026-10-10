@@ -674,6 +674,7 @@ file holds the envelope under `receipt` and the evidence record under
 | `recordHash` | `sha256:` and the trail record's own hash. |
 | `previousHash` | `sha256:` and the hash of the record before it. An empty genesis link is written as the SHA-256 of the empty string. |
 | `decisionDetail`, `approver`, `humanDisposed` | Present only when the trail record carries them. |
+| `cage` | The cage the deciding process ran in, as the trail record carries it. `driver` names it (`vaara-cage`, `openshell`, or `none` for a run outside any cage) and `confirmed` says whether the kernel confirmed the confinement on the deciding process at decision time. A named cage adds `upstream` (the cage's own name and version), `configDigest` (`sha256:` over its effective configuration), `basis` (what was checked: `apparmor_label`, `seccomp_filter`, or `declared` when the launcher's word stood unconfirmed) and, when set, `name`. Absent on records written before the cage layer. |
 
 The envelope writes the trail's `deny` as `block`. `backLink.attestationDigest`
 is `previousHash`, `backLink.attestationNonce` is `recordId`, and

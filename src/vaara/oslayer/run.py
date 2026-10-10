@@ -14,6 +14,14 @@ agent's parent, unconfined, and holds the launch open with the guard:
 - When the guard goes away, it ends the launch.
 - When it goes away, the guard ends whatever the launch left running.
 
+When the operator's selection asks for it (``harden``, or ``egress``), the
+child also applies :mod:`vaara.oslayer.harden` before exec: no_new_privs
+and the seccomp filter, and with egress locked, Landlock rules that let the
+tree connect only to the egress proxy ``vaara run`` starts for the launch
+(:mod:`vaara.oslayer.egress`). Every connection through it, allowed or
+refused, is a decision on the operator's trail. A layer that cannot be
+applied stops the launch; the agent never starts with less than was asked.
+
 Its exit status is the agent's.
 """
 
@@ -25,10 +33,11 @@ import shutil
 import signal
 import sys
 import threading
+import uuid
 from pathlib import Path
 from typing import Optional
 
-from vaara.oslayer import cgroup, floor
+from vaara.oslayer import cgroup, floor, harden
 from vaara.oslayer.guard import SOCKET_PATH
 
 USAGE = "usage: vaara run [--name NAME] [--] <agent> [args...]"
@@ -124,7 +133,38 @@ def resolve(agent: str, path_env: Optional[str] = None) -> tuple[list[str], str]
     return [interpreter, *([rest] if rest else []), found], real
 
 
-def _child(ready_fd: int, argv: list[str]) -> None:
+def _egress_recorder(agent: str, cage_block: dict):
+    """Write each egress connection to the operator's trail as a decision."""
+    lock = threading.Lock()
+    held: dict = {}
+
+    def record(event: dict) -> None:
+        allowed = bool(event.get("allowed"))
+        try:
+            with lock:
+                if "trail" not in held:
+                    from vaara.audit.sqlite_backend import SQLiteAuditBackend
+
+                    db = os.environ.get("VAARA_DB") or str(
+                        Path.home() / ".vaara" / "trail" / "audit.db")
+                    held["trail"] = SQLiteAuditBackend(db).load_trail()
+                held["trail"].record_decision(
+                    action_id=str(uuid.uuid4()), agent_id=agent, tool_name="egress.connect",
+                    decision="allow" if allowed else "deny",
+                    reason=f"{event.get('method')} {event.get('host')}:{event.get('port')}: "
+                           f"{event.get('reason')}",
+                    risk_score=0.0 if allowed else 1.0,
+                    policy_id="" if allowed else "os-layer.egress",
+                    violation_type="" if allowed else "egress_not_allowed",
+                    cage=cage_block,
+                )
+        except Exception as exc:  # noqa: BLE001 - a lost record is reported, never fatal
+            print(f"vaara run: egress record not written: {exc}", file=sys.stderr)
+
+    return record
+
+
+def _child(ready_fd: int, argv: list[str], hardening: Optional[dict] = None) -> None:
     """In the forked child: wait for the guard's yes, then exec under the profile."""
     try:
         if os.read(ready_fd, 1) != b"g":
@@ -137,6 +177,11 @@ def _child(ready_fd: int, argv: list[str]) -> None:
             os.write(attr, f"exec {floor.PROFILE}".encode())
         finally:
             os.close(attr)
+        if hardening is not None:
+            # Set while still unconfined: AppArmor allows the exec into the
+            # profile, and the floor renders //tool as a stack on it.
+            harden.apply(egress_ports=hardening.get("egress_ports"))
+            os.environ.update(hardening.get("environ") or {})
         # Python ignores these two; an ignored signal stays ignored across
         # exec, and the agent should start with the defaults.
         signal.signal(signal.SIGPIPE, signal.SIG_DFL)
@@ -171,7 +216,7 @@ def run(name: Optional[str], agent_argv: list[str], *,
     argv = prefix + agent_argv[1:]
     agent = name or os.path.basename(agent_argv[0])
     try:
-        request({"op": "status"}, socket_path=socket_path)
+        status = request({"op": "status"}, socket_path=socket_path)
     except (GuardUnavailable, GuardRefused) as exc:
         raise RunError(str(exc)) from None
 
@@ -179,19 +224,57 @@ def run(name: Optional[str], agent_argv: list[str], *,
     # process, which stays outside the floor. See vaara.oslayer.forward.
     hooks = HookServer()
     os.environ.update(hooks.environ())
+    # The tree is told which cage it runs in and what the cage's effective
+    # configuration is; every decision made inside confirms it against the
+    # process's own AppArmor label and writes both into the record.
+    from vaara.cage import CageState, environ_for
+    from vaara.cage.vaara_cage import NAME as CAGE_NAME, apparmor_version
+
+    declared = CageState(
+        driver=CAGE_NAME, upstream=apparmor_version(),
+        config_digest=str(status.get("profile_digest") or ""), name=agent,
+    )
+    os.environ.update(environ_for(declared))
+
+    hardening: Optional[dict] = None
+    egress = None
+    if status.get("harden"):
+        hardening = {}
+        allow = status.get("egress")
+        if allow is not None:
+            from vaara.oslayer.egress import EgressProxy
+
+            egress = EgressProxy(list(allow), record=_egress_recorder(
+                agent, declared.to_record()))
+            hardening["egress_ports"] = [egress.start()]
+            # The agent's tree only: the hook this process runs unconfined
+            # must not send its own requests through the agent's proxy.
+            hardening["environ"] = egress.environ()
+
+    def _close() -> None:
+        hooks.close()
+        if egress is not None:
+            egress.close()
 
     ready_r, ready_w = os.pipe()
     pid = os.fork()
     if pid == 0:
         os.close(ready_w)
-        _child(ready_r, argv)
+        _child(ready_r, argv, hardening)
     os.close(ready_r)
 
     try:
-        launch = open_launch({"op": "launch", "pid": pid, "agent": agent, "binary": binary,
-                              "argv": argv, "cwd": os.getcwd()}, socket_path=socket_path)
+        payload = {"op": "launch", "pid": pid, "agent": agent, "binary": binary,
+                   "argv": argv, "cwd": os.getcwd()}
+        if hardening and hardening.get("egress_ports"):
+            payload["egress_ports"] = hardening["egress_ports"]
+        launch = open_launch(payload, socket_path=socket_path)
+        if payload.get("egress_ports") and not launch.netlock:
+            launch.close()
+            raise GuardRefused("the guard did not attach the egress address rule; "
+                               "update it to this version of Vaara")
     except (GuardUnavailable, GuardRefused, OSError) as exc:
-        hooks.close()
+        _close()
         os.kill(pid, signal.SIGKILL)
         os.waitpid(pid, 0)
         if isinstance(exc, OSError):
@@ -234,7 +317,7 @@ def run(name: Optional[str], agent_argv: list[str], *,
         except InterruptedError:
             continue
     launch.close()
-    hooks.close()
+    _close()
     if guard_gone.is_set():
         print("vaara run: the OS guard stopped, so the agent was ended.", file=sys.stderr)
         return EXIT_GUARD_GONE

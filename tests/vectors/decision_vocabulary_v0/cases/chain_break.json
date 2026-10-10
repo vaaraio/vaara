@@ -94,7 +94,11 @@
     "data": {
       "decision": "allow",
       "reason": "vector: edited after the fact",
-      "risk_score": 0.5
+      "risk_score": 0.5,
+      "cage": {
+        "driver": "none",
+        "confirmed": false
+      }
     },
     "regulatory_articles": [
       {
@@ -111,7 +115,7 @@
       }
     ],
     "previous_hash": "73e2bbc8a6a8f8a2ff12c8bc81533fd25de98976a84972cf1379e13a4f7e734d",
-    "record_hash": "fa937f5bd54cebf0a64415c6a393c6c47f0b8be7e7d4324acf7eda457ee6bec2",
+    "record_hash": "a0004a0f11ea596667f55bcdd72194a2b7d1d1faee5557a3ed793c2680a9bffa",
     "system_operation": "decision_threshold",
     "data_usage": "risk_score+thresholds",
     "decision_making": "threshold_match",

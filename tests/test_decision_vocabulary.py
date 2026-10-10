@@ -214,7 +214,8 @@ def test_a_plain_decision_record_gains_no_new_keys():
     result = pipeline.intercept(agent_id="a", tool_name="data.read")
 
     record = _decision_record(pipeline, result.action_id)
-    assert set(record.data) == {"decision", "reason", "risk_score"}
+    # "cage" is on every decision since the cage layer; it is not a refinement.
+    assert set(record.data) == {"decision", "reason", "risk_score", "cage"}
 
 
 def test_modify_records_what_it_proposed():
