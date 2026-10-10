@@ -6,6 +6,8 @@ and this project follows [Semantic Versioning](https://semver.org/spec/v2.0.0.ht
 
 ## [Unreleased]
 
+## [2.9.0] - 2026-10-10
+
 ### Added
 - Conformance vectors for the cage block of a decision receipt, `tests/vectors/cage_v0/`, with a standalone checker that gives each file a signature, evidence and cage verdict. The rules of the block are written out in SPEC.md section 5.10: `driver: none` carries `confirmed: false` and nothing else, any other driver carries a `basis`, `confirmed: true` needs a basis that names the fact that was read, and `configDigest` is `sha256:` and 64 lowercase hex.
 
