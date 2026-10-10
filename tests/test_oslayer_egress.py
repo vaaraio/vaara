@@ -451,3 +451,20 @@ def test_the_recorder_files_a_transport_failure_without_a_violation(tmp_path, mo
     assert [o.action_id for o in outcomes] == ["c1", "c2"]
     assert "did not answer" in outcomes[0].data["description"]
     assert "4096" in outcomes[1].data["description"]
+
+
+def test_decide_refuses_private_ranges_behind_an_allowed_name_unless_named_literally():
+    # Audit 2026-10-10 (R2): an allowed name that resolved to 10/8,
+    # 172.16/12, 192.168/16, 100.64/10 or fc00::/7 was connected to.
+    names = {"ten.example.com": "10.1.2.3", "one72.example.com": "172.16.5.6",
+             "one92.example.com": "192.168.1.1", "cgnat.example.com": "100.64.0.9",
+             "ula.example.com": "fd12:3456::1", "pub.example.com": "93.184.216.34"}
+    p = EgressProxy([*names, "10.1.2.3", "[fd12:3456::1]"],
+                    resolve=_resolver({**names, "10.1.2.3": "10.1.2.3",
+                                       "fd12:3456::1": "fd12:3456::1"}))
+    for host in ("ten", "one72", "one92", "cgnat", "ula"):
+        ok, reason, _ = p.decide(f"{host}.example.com", 443)
+        assert not ok and "private" in reason, (host, reason)
+    assert p.decide("pub.example.com", 443)[0]
+    assert p.decide("10.1.2.3", 443)[0]
+    assert p.decide("fd12:3456::1", 443)[0]

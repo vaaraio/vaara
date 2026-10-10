@@ -41,6 +41,12 @@ DEFAULT_PORTS = (443, 80)
 _REFUSED_NETS = ("loopback", "link_local", "multicast", "unspecified")
 # Instance metadata on IPv6 sits in unique-local space, not link-local: AWS.
 _METADATA_V6 = (ipaddress.ip_network("fd00:ec2::254/128"),)
+# Private ranges: an allowed public name that resolves here (a compromised
+# domain, a wildcard entry) would reach the operator's own network. Named
+# explicitly rather than through ``is_private``, which also covers the
+# documentation ranges. An entry that names the address literally passes.
+_PRIVATE_NETS = tuple(ipaddress.ip_network(n) for n in (
+    "10.0.0.0/8", "172.16.0.0/12", "192.168.0.0/16", "100.64.0.0/10", "fc00::/7"))
 
 
 @dataclass(frozen=True)
@@ -102,6 +108,8 @@ def _refused_address(addr: ipaddress._BaseAddress) -> Optional[str]:
     for kind in _REFUSED_NETS:
         if getattr(addr, f"is_{kind}"):
             return kind.replace("_", "-")
+    if any(addr in net for net in _PRIVATE_NETS):
+        return "private"
     return None
 
 

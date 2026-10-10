@@ -171,7 +171,8 @@ vaara os-layer egress --off       # unlocked
   `CONNECT` and plain HTTP and resolves names itself. A host passes when
   it matches an entry: `example.com` (ports 443 and 80), `*.example.com`
   (subdomains) or `host:port`. A name that resolves to loopback,
-  link-local (cloud metadata), multicast or the unspecified address is
+  link-local (cloud metadata), multicast, the unspecified address or a
+  private range (10/8, 172.16/12, 192.168/16, 100.64/10, fc00::/7) is
   refused unless the entry names that address literally.
 - Every connection, allowed or refused, is a decision on the operator's
   trail (`egress.connect`), with the host, port and the reason, and the
