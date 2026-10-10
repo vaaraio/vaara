@@ -313,7 +313,7 @@ def test_an_adapter_decides_under_vaara_run(tmp_path):
         marker = trail.with_name(trail.name + ".write-failure.json")
         seen = sorted(str(p) for p in (home / ".vaara").rglob("*")) if (home / ".vaara").exists() else []
         pytest.fail(f"no trail at {trail}\n~/.vaara: {seen}\n"
-                    f"marker: {marker.read_text(encoding="utf-8") if marker.exists() else 'none'}\n{log}")
+                    f"marker: {marker.read_text(encoding='utf-8') if marker.exists() else 'none'}\n{log}")
     conn = sqlite3.connect(f"file:{trail}?mode=ro", uri=True)
     try:
         rows = [d for (d,) in conn.execute("SELECT data FROM audit_records ORDER BY seq")]
