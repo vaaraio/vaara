@@ -12,6 +12,7 @@ import os
 import shutil
 import stat
 import struct
+import sys
 import tempfile
 import threading
 import time
@@ -22,6 +23,10 @@ import pytest
 
 from vaara import cage
 from vaara.cage.driver import CageError
+
+#: The fake tools below are executable scripts, which Windows does not run.
+posix_tools = pytest.mark.skipif(sys.platform == "win32",
+                                 reason="fake driver tools are executable scripts")
 
 # ── A fake tool that records its argv and answers from a script ────────
 
@@ -88,6 +93,7 @@ def _sha(data: bytes) -> str:
 
 # ── Codex ──────────────────────────────────────────────────────────────
 
+@posix_tools
 class TestCodex:
     def test_start_passes_the_sandbox_state_and_the_declaration(self, fake, tmp_path):
         binary, calls = fake("codex", [], version="codex-cli 0.49.0", sleep_on="sandbox")
@@ -136,6 +142,7 @@ class TestCodex:
 
 # ── sandbox-runtime ────────────────────────────────────────────────────
 
+@posix_tools
 class TestSandboxRuntime:
     def test_start_passes_settings(self, fake, tmp_path):
         binary, calls = fake("srt", [], version="0.0.79", sleep_on="--settings")
@@ -167,6 +174,7 @@ NONO_PS = [{"session_id": "20261009-1", "name": "rev", "status": "Running", "chi
             "profile": "opencode", "network": "proxy", "exit_code": None, "command": ["agent"]}]
 
 
+@posix_tools
 class TestNono:
     def test_start_status_events_stop(self, fake, tmp_path):
         binary, calls = fake("nono", [
@@ -221,6 +229,7 @@ INSPECT = [{"Id": "abc123", "State": {"Status": "running", "Running": True, "Exi
             "Config": {"Image": "python:3.12", "Cmd": ["python", "agent.py"]}}]
 
 
+@posix_tools
 class TestEngineDrivers:
     def test_gvisor_runs_with_runsc(self, fake, tmp_path):
         engine, calls = fake("docker", [
@@ -278,6 +287,7 @@ class TestEngineDrivers:
 
 # ── microsandbox ───────────────────────────────────────────────────────
 
+@posix_tools
 class TestMicrosandbox:
     def test_run_status_logs(self, fake, tmp_path):
         binary, calls = fake("msb", [
@@ -328,6 +338,7 @@ def _apple_inspect(status):
              "status": status}]
 
 
+@posix_tools
 class TestAppleContainer:
     def test_run_inspect_logs(self, fake):
         binary, calls = fake("container", [
@@ -381,6 +392,7 @@ class TestAppleContainer:
 
 # ── Firecracker ────────────────────────────────────────────────────────
 
+@posix_tools
 class TestFirecracker:
     def test_boot_args_carry_the_declaration(self, fake, tmp_path, monkeypatch):
         binary, calls = fake("firecracker", [], version="Firecracker v1.10.1", sleep_on="--api-sock")
@@ -473,6 +485,7 @@ SANDBOX_OBJ = {"apiVersion": "agents.x-k8s.io/v1beta1", "kind": "Sandbox",
                           "podIPs": ["10.0.0.5"]}}
 
 
+@posix_tools
 class TestAgentSandbox:
     def test_apply_and_status(self, fake, tmp_path, monkeypatch):
         monkeypatch.setenv("FAKE_READ_STDIN", "1")

@@ -190,6 +190,8 @@ sys.stderr.write("fake openshell: unknown " + " ".join(args) + "\n"); sys.exit(1
 
 @pytest.fixture
 def fake_openshell(tmp_path, monkeypatch):
+    if sys.platform == "win32":
+        pytest.skip("the fake openshell is an executable script, which Windows does not run")
     binary = tmp_path / "openshell"
     binary.write_text(FAKE_OPENSHELL)
     binary.chmod(binary.stat().st_mode | stat.S_IXUSR)
