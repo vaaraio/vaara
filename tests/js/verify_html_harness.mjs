@@ -1,14 +1,15 @@
-// Runs verify() from webpage/verify.html under Node, on envelopes built here,
+// Runs verify() from webpage/verify.js (the script verify.html loads) under Node, on envelopes built here,
 // and prints one JSON line per case: {"case": name, "allOk": bool}.
 import { readFileSync } from "node:fs";
 import { generateKeyPairSync, sign } from "node:crypto";
 
-const html = readFileSync(process.argv[2], "utf8");
-const scripts = [...html.matchAll(/<script>([\s\S]*?)<\/script>/g)].map(m => m[1]);
-const src = scripts.find(s => s.includes("async function verify("));
+const text = readFileSync(process.argv[2], "utf8");
+// a page carries the verifier inline; the site now ships it as its own file
+const src = process.argv[2].endsWith(".js") ? text
+  : [...text.matchAll(/<script>([\s\S]*?)<\/script>/g)].map(m => m[1]).find(s => s.includes("async function verify("));
 const body = src.slice(0, src.indexOf("function renderStatement"));
-const { verify } = new Function("document", body + "\nreturn { verify };")(
-  { getElementById: () => null });
+const { verify } = new Function("document", "window", body + "\nreturn { verify };")(
+  { getElementById: () => null, documentElement: { lang: "en" } }, {});
 
 const { publicKey, privateKey } = generateKeyPairSync("ed25519");
 const pem = publicKey.export({ type: "spki", format: "pem" });

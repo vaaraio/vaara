@@ -290,15 +290,27 @@
     <priority>0.8</priority>
   </url>
   <url>
-    <loc>https://vaara.io/conformance.html</loc>
-    <lastmod>2026-08-29</lastmod>
+    <loc>https://vaara.io/verify.html</loc>
+    <lastmod>2026-10-10</lastmod>
+    <xhtml:link rel="alternate" hreflang="en" href="https://vaara.io/verify.html"/>
+    <xhtml:link rel="alternate" hreflang="fi" href="https://vaara.io/fi/verify.html"/>
+    <xhtml:link rel="alternate" hreflang="x-default" href="https://vaara.io/verify.html"/>
     <changefreq>weekly</changefreq>
     <priority>0.8</priority>
   </url>
   <url>
-    <loc>https://vaara.io/verify.html</loc>
+    <loc>https://vaara.io/fi/verify.html</loc>
+    <lastmod>2026-10-10</lastmod>
+    <xhtml:link rel="alternate" hreflang="en" href="https://vaara.io/verify.html"/>
+    <xhtml:link rel="alternate" hreflang="fi" href="https://vaara.io/fi/verify.html"/>
+    <xhtml:link rel="alternate" hreflang="x-default" href="https://vaara.io/verify.html"/>
+    <changefreq>weekly</changefreq>
+    <priority>0.8</priority>
+  </url>
+  <url>
+    <loc>https://vaara.io/conformance.html</loc>
     <lastmod>2026-08-29</lastmod>
-    <changefreq>monthly</changefreq>
+    <changefreq>weekly</changefreq>
     <priority>0.8</priority>
   </url>
   <url>

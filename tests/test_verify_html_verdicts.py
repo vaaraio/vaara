@@ -1,4 +1,4 @@
-"""vaara.io/verify.html reaches the verdict its README paragraph promises.
+"""vaara.io/verify.html (its script, webpage/verify.js) reaches the verdict its README paragraph promises.
 
 The README says the page recomputes the DSSE pre-authentication encoding and
 checks the Ed25519 signature with WebCrypto. Nothing ran that code until
@@ -17,7 +17,7 @@ import pytest
 
 ROOT = Path(__file__).resolve().parents[1]
 HARNESS = ROOT / "tests" / "js" / "verify_html_harness.mjs"
-PAGE = ROOT / "webpage" / "verify.html"
+PAGE = ROOT / "webpage" / "verify.js"
 
 EXPECTED = {
     "good": True,
@@ -43,3 +43,11 @@ def verdicts() -> dict[str, bool]:
 @pytest.mark.parametrize("case", sorted(EXPECTED))
 def test_verdict(verdicts, case):
     assert verdicts[case] is EXPECTED[case]
+
+
+def test_both_language_versions_load_the_shared_verifier():
+    """One verifier for both pages, so a fix can never reach one language and miss the other."""
+    for page in ("verify.html", "fi/verify.html"):
+        text = (ROOT / "webpage" / page).read_text(encoding="utf-8")
+        assert '<script src="/verify.js"></script>' in text, page
+        assert "async function verify(" not in text, page

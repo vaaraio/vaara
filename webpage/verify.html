@@ -1,947 +1,204 @@
-<!DOCTYPE html>
-<!--
-  SPDX-FileCopyrightText: 2026 Henri Sirkkavaara
-  SPDX-License-Identifier: AGPL-3.0-or-later
-
-  Vaara receipt verifier. One file, no build step, no dependencies.
-
-  The receipt never leaves the browser. Everything below runs locally: the
-  DSSE pre-authentication encoding is recomputed, its digest taken, and the
-  Ed25519 signature checked with WebCrypto. Nothing is uploaded, so this page
-  learns nothing about you and you do not have to trust whoever served it.
-
-  Save it and open it with the network off. It still works. That is the point:
-  a verifier you have to be online to run is a service, and a service is a
-  party you trust.
-
-  It mirrors tests/vectors/*/\_check_independent.py, which imports no Vaara
-  code either. Producer and verifier share no implementation, so agreement
-  between them means the bytes stand on their own.
--->
+<!doctype html>
 <html lang="en">
 <head>
 <meta charset="utf-8">
-<meta name="viewport" content="width=device-width, initial-scale=1">
-<title>Explore the Vaara Resin: verify any autonomous-action receipt</title>
-<meta name="description" content="Vaara Resin is the chain of autonomous-action receipts. Check a receipt here in your own tab, with no upload and no account, or look one up in the public transparency log. The verifier imports no Vaara code and still works with the network off.">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<title>Receipt explorer | Vaara</title>
+<meta name="description" content="Check a Vaara receipt in your own browser, offline, or look one up in the public log. Nothing is uploaded.">
+<link rel="canonical" href="https://vaara.io/verify.html">
+<link rel="alternate" hreflang="en" href="https://vaara.io/verify.html">
+<link rel="alternate" hreflang="fi" href="https://vaara.io/fi/verify.html">
+<link rel="icon" type="image/svg+xml" href="/favicon.svg">
+<link rel="stylesheet" href="/style.css">
+<meta name="theme-color" content="#14212E">
+<meta name="color-scheme" content="light dark">
+<script>try{var t=localStorage.getItem("vaara-theme");if(t!=="dark"&&t!=="light")t=matchMedia("(prefers-color-scheme: dark)").matches?"dark":"light";document.documentElement.dataset.theme=t;var p=location.pathname;if((p==="/"||p==="/index.html")&&!localStorage.getItem("vaara-lang")&&(navigator.languages||[navigator.language]).some(function(l){return/^fi\b/i.test(l)}))location.replace("/fi/")}catch(e){}</script>
 <meta name="author" content="Henri Sirkkavaara">
 <meta name="robots" content="index, follow, max-image-preview:large, max-snippet:-1">
-<meta name="googlebot" content="index, follow">
-<meta name="referrer" content="strict-origin-when-cross-origin">
-<meta name="theme-color" content="#14212E">
-<link rel="canonical" href="https://vaara.io/verify.html">
-<link rel="icon" type="image/svg+xml" href="/favicon.svg">
+<link rel="alternate" hreflang="x-default" href="https://vaara.io/verify.html">
 <link rel="alternate icon" href="/favicon.ico">
 <link rel="apple-touch-icon" href="/favicon-180.png">
 <link rel="sitemap" type="application/xml" href="/sitemap.xml">
-<link rel="author" href="https://vaara.io/">
+<link rel="alternate" type="text/plain" href="/llms.txt" title="Vaara for language models">
+<link rel="me" href="https://github.com/vaaraio">
 <meta property="og:type" content="website">
 <meta property="og:site_name" content="Vaara">
-<meta property="og:title" content="Explore the Vaara Resin">
-<meta property="og:description" content="Check any autonomous-action receipt in your own browser. Nothing is uploaded, so the page learns nothing about you and you do not have to trust whoever served it.">
+<meta property="og:title" content="Receipt explorer | Vaara">
+<meta property="og:description" content="Check a Vaara receipt in your own browser, offline, or look one up in the public log. Nothing is uploaded.">
 <meta property="og:url" content="https://vaara.io/verify.html">
 <meta property="og:image" content="https://vaara.io/og/en-verify.png">
 <meta property="og:image:width" content="1200">
 <meta property="og:image:height" content="630">
 <meta property="og:image:alt" content="Vaara: Receipt explorer">
 <meta property="og:locale" content="en_US">
+<meta property="og:locale:alternate" content="fi_FI">
 <meta name="twitter:card" content="summary_large_image">
-<meta name="twitter:title" content="Explore the Vaara Resin">
-<meta name="twitter:description" content="Check any autonomous-action receipt in your own browser. Nothing is uploaded, so the page learns nothing about you and you do not have to trust whoever served it.">
+<meta name="twitter:title" content="Receipt explorer | Vaara">
+<meta name="twitter:description" content="Check a Vaara receipt in your own browser, offline, or look one up in the public log. Nothing is uploaded.">
 <meta name="twitter:image" content="https://vaara.io/og/en-verify.png">
 <meta name="twitter:image:alt" content="Vaara: Receipt explorer">
-<!--
-  The page restated as data. A crawler or a model arriving here sees a text box
-  and a table and has to guess what they are for, which is how a verifier that
-  runs entirely in the reader's own tab ends up indexed as a marketing page.
-  Every claim below is one this file already makes further down, and the two
-  are edited together or not at all.
--->
 <script type="application/ld+json">
 {
-  "@context": "https://schema.org",
-  "@graph": [
-    {
-      "@type": ["WebPage", "CollectionPage"],
-      "@id": "https://vaara.io/verify.html",
-      "breadcrumb": {"@id": "https://vaara.io/verify.html#crumbs"},
-      "url": "https://vaara.io/verify.html",
-      "name": "Explore the Vaara Resin",
-      "description": "Vaara Resin is the chain of autonomous-action receipts: every allow, escalate and deny an agent produced, hash-chained so a removed one stops reconciling. This page checks a receipt in the reader's own browser and looks up published heads in a public transparency log.",
-      "inLanguage": "en",
-      "isPartOf": {"@id": "https://vaara.io/#website"},
-      "mainEntity": {"@id": "https://vaara.io/verify.html#verifier"},
-      "creator": {"@id": "https://vaara.io/#henri"},
-      "publisher": {"@id": "https://vaara.io/#organization"},
-      "license": "https://www.gnu.org/licenses/agpl-3.0.html"
-    },
-    {
-      "@type": "WebSite",
-      "@id": "https://vaara.io/#website",
-      "name": "Vaara",
-      "url": "https://vaara.io/",
-      "inLanguage": "en"
-    },
-    {
-      "@type": "Organization",
-      "@id": "https://vaara.io/#organization",
-      "name": "Vaara",
-      "url": "https://vaara.io/",
-      "logo": "https://vaara.io/vaara-wordmark-light.png",
-      "founder": {"@id": "https://vaara.io/#henri"}
-    },
-    {
-      "@type": "Person",
-      "@id": "https://vaara.io/#henri",
-      "name": "Henri Sirkkavaara",
-      "url": "https://vaara.io/"
-    },
-    {
-      "@type": "WebApplication",
-      "@id": "https://vaara.io/verify.html#verifier",
-      "name": "Vaara Resin explorer and receipt verifier",
-      "url": "https://vaara.io/verify.html",
-      "applicationCategory": "SecurityApplication",
-      "applicationSubCategory": "Signature and audit-trail verification",
-      "operatingSystem": "Any",
-      "browserRequirements": "A browser with WebCrypto Ed25519. No install, no build step, no dependencies.",
-      "isAccessibleForFree": true,
-      "offers": {
-        "@type": "Offer",
-        "price": "0",
-        "priceCurrency": "EUR"
-      },
-      "license": "https://www.gnu.org/licenses/agpl-3.0.html",
-      "author": {"@id": "https://vaara.io/#henri"},
-      "publisher": {"@id": "https://vaara.io/#organization"},
-      "featureList": [
-        "Recomputes the DSSE pre-authentication encoding and takes its digest",
-        "Checks the Ed25519 signature with WebCrypto, in the reader's own tab",
-        "Uploads nothing, so the page learns nothing about the reader",
-        "Keeps working with the network off, saved as a single file",
-        "Looks up published chain heads by receipt digest, entry digest or public key",
-        "Imports no Vaara code, so producer and verifier share no implementation"
-      ],
-      "softwareHelp": "https://github.com/vaaraio/vaara",
-      "sameAs": "https://github.com/vaaraio/vaara"
-    },
-    {
-      "@type": "HowTo",
-      "@id": "https://vaara.io/verify.html#how-to-check-a-receipt",
-      "name": "Check a Vaara receipt without trusting whoever produced it",
-      "description": "The receipt never leaves the browser. Everything runs locally, so no party has to be trusted for the answer to mean something.",
-      "totalTime": "PT1M",
-      "tool": {"@id": "https://vaara.io/verify.html#verifier"},
-      "step": [
-        {
-          "@type": "HowToStep",
-          "position": 1,
-          "name": "Paste the receipt",
-          "text": "Drop the receipt into the box on this page. It is read in your tab and is not uploaded anywhere."
-        },
-        {
-          "@type": "HowToStep",
-          "position": 2,
-          "name": "The signature is checked locally",
-          "text": "The DSSE pre-authentication encoding is recomputed, its digest taken, and the Ed25519 signature checked with WebCrypto."
-        },
-        {
-          "@type": "HowToStep",
-          "position": 3,
-          "name": "Read what it does and does not establish",
-          "text": "A passing signature proves the payload is byte-identical to what the holder of that key signed. It says nothing about whether the key belongs to who you think, or whether the statement is true. Pin the public key from a source the signer does not control before treating a pass as meaningful."
-        }
-      ]
-    },
-    {
-      "@type": "BreadcrumbList",
-      "@id": "https://vaara.io/verify.html#crumbs",
-      "itemListElement": [
-        {"@type": "ListItem", "position": 1, "name": "Vaara", "item": "https://vaara.io/"},
-        {"@type": "ListItem", "position": 2, "name": "Test it yourself", "item": "https://vaara.io/products/test-it-yourself.html"},
-        {"@type": "ListItem", "position": 3, "name": "Receipt explorer", "item": "https://vaara.io/verify.html"}
-      ]
+ "@context": "https://schema.org",
+ "@graph": [
+  {
+   "@type": "WebPage",
+   "@id": "https://vaara.io/verify.html",
+   "url": "https://vaara.io/verify.html",
+   "name": "Receipt explorer | Vaara",
+   "description": "Check a Vaara receipt in your own browser, offline, or look one up in the public log. Nothing is uploaded.",
+   "inLanguage": "en",
+   "isPartOf": {
+    "@id": "https://vaara.io/#website"
+   },
+   "publisher": {
+    "@id": "https://vaara.io/#organization"
+   },
+   "primaryImageOfPage": {
+    "@type": "ImageObject",
+    "url": "https://vaara.io/og/en-verify.png",
+    "width": 1200,
+    "height": 630
+   },
+   "breadcrumb": {
+    "@id": "https://vaara.io/verify.html#crumbs"
+   },
+   "mainEntity": {
+    "@id": "https://vaara.io/verify.html#app"
+   }
+  },
+  {
+   "@type": "WebSite",
+   "@id": "https://vaara.io/#website",
+   "name": "Vaara",
+   "url": "https://vaara.io/",
+   "inLanguage": [
+    "en",
+    "fi"
+   ],
+   "publisher": {
+    "@id": "https://vaara.io/#organization"
+   }
+  },
+  {
+   "@type": "Organization",
+   "@id": "https://vaara.io/#organization",
+   "name": "Vaara",
+   "url": "https://vaara.io/",
+   "logo": "https://vaara.io/vaara-wordmark-light.png",
+   "email": "hello@vaara.io",
+   "founder": {
+    "@id": "https://vaara.io/#henri"
+   },
+   "areaServed": "EU",
+   "address": {
+    "@type": "PostalAddress",
+    "addressCountry": "FI"
+   },
+   "sameAs": [
+    "https://github.com/vaaraio/vaara",
+    "https://www.linkedin.com/in/sirkkavaara",
+    "https://pypi.org/project/vaara/",
+    "https://www.npmjs.com/package/@vaara/client",
+    "https://oecd.ai/en/catalogue/tools/vaara"
+   ]
+  },
+  {
+   "@type": "Person",
+   "@id": "https://vaara.io/#henri",
+   "name": "Henri Sirkkavaara",
+   "url": "https://vaara.io/",
+   "email": "hello@vaara.io",
+   "jobTitle": "Founder and maintainer, Vaara",
+   "nationality": {
+    "@type": "Country",
+    "name": "Finland"
+   },
+   "workLocation": {
+    "@type": "Place",
+    "address": {
+     "@type": "PostalAddress",
+     "addressCountry": "FI"
     }
-  ]
+   },
+   "sameAs": [
+    "https://github.com/vaaraio",
+    "https://datatracker.ietf.org/doc/draft-sirkkavaara-vaara-receipt/",
+    "https://pypi.org/user/vaaraio/",
+    "https://www.bestpractices.dev/projects/12612",
+    "https://github.com/marketplace/actions/vaara-policy-check",
+    "https://www.linkedin.com/in/sirkkavaara"
+   ]
+  },
+  {
+   "@type": "BreadcrumbList",
+   "@id": "https://vaara.io/verify.html#crumbs",
+   "itemListElement": [
+    {
+     "@type": "ListItem",
+     "position": 1,
+     "name": "Home",
+     "item": "https://vaara.io/"
+    },
+    {
+     "@type": "ListItem",
+     "position": 2,
+     "name": "Test it yourself",
+     "item": "https://vaara.io/products/test-it-yourself.html"
+    },
+    {
+     "@type": "ListItem",
+     "position": 3,
+     "name": "Receipt explorer",
+     "item": "https://vaara.io/verify.html"
+    }
+   ]
+  },
+  {
+   "@type": "WebApplication",
+   "@id": "https://vaara.io/verify.html#app",
+   "name": "Receipt explorer",
+   "inLanguage": "en",
+   "applicationCategory": "SecurityApplication",
+   "operatingSystem": "Any modern browser",
+   "description": "Check a Vaara receipt in your own browser, offline, or look one up in the public log. Nothing is uploaded.",
+   "isAccessibleForFree": true
+  }
+ ]
 }
 </script>
-<style>
-  /* Same tokens as vaara.io/index.html so this reads as one site. */
-  :root {
-    color-scheme: light;
-    --bg: #ececec; --panel: #FFFFFF; --panel-2: #F1F4F0;
-    --line: rgba(60,90,72,.18); --ink: #1A2226; --dim: #566159; --faint: #7C857E;
-    --tri: #3E6B54; --accent: #2C523E; --ok: #3E6B54; --no: #B4524F; --warn: #8A6100;
-    --mono: ui-monospace,'SFMono-Regular','JetBrains Mono','Fira Code',Menlo,Consolas,monospace;
-    --sans: 'Inter',-apple-system,BlinkMacSystemFont,'Segoe UI',Helvetica,Arial,sans-serif;
-  }
-  /* Light is the default across every Vaara surface; the dark grammar is
-     preserved verbatim under data-theme. Same tokens, same toggle, same
-     localStorage key as vaara.io and the local dashboard. */
-  html[data-theme="dark"] {
-    color-scheme: dark;
-    --bg: #0F1417; --panel: #1A2226; --panel-2: #151D20;
-    --line: rgba(123,156,138,.16); --ink: #DEE4E1; --dim: #8B9792; --faint: #5E6A66;
-    --tri: #78A08A; --accent: #93B8A3; --ok: #78A08A; --no: #D98B8B; --warn: #D9A441;
-  }
-  /* Default follows the OS. An explicit choice from the toggle sets
-     data-theme and wins over it, which is why this is scoped to
-     :not([data-theme]) rather than applied unconditionally. */
-  @media (prefers-color-scheme: dark) {
-    html:not([data-theme]) {
-        color-scheme: dark;
-        --bg: #0F1417; --panel: #1A2226; --panel-2: #151D20;
-        --line: rgba(123,156,138,.16); --ink: #DEE4E1; --dim: #8B9792; --faint: #5E6A66;
-        --tri: #78A08A; --accent: #93B8A3; --ok: #78A08A; --no: #D98B8B; --warn: #D9A441;
-    }
-  }
-  * { box-sizing: border-box; }
-  /* No padding on body. The sticky bar is a child of body, so padding here
-     inset it from the viewport edges and pushed it down from the top, which
-     left gaps either side of the bar with content scrolling through them.
-     The padding belongs on the column, which is how index.html already does
-     it. */
-  body { margin:0; background:var(--bg); color:var(--ink);
-         font-family:var(--sans); font-size:16px; line-height:1.65;
-         -webkit-font-smoothing:antialiased; }
-  /* Fixed controls sit against the viewport edge. The centred column is capped
-     so it leaves the control plus the same edge gap again on each side, which
-     means it can never run under them at any width or scroll position. Below
-     the breakpoint the controls return to normal flow, where the overlap
-     cannot happen at all. */
-  main { max-width:760px; margin: 0 auto; padding:20px 28px 96px; }
-  :root{--edge:16px}
-  @media (max-width:640px){
-    .topbar{gap:8px;padding:8px 12px}
-    .nav-jump a{padding:4px 8px;letter-spacing:.12em}
-  }
-
-  h1 { font-family:var(--sans); font-size:18px; font-weight:500; margin:24px 0 12px;
-       letter-spacing:-0.01em; }
-  .sub { color:var(--dim); margin:0 0 1.75rem; font-size:.85rem; }
-  /* Stat tiles, explorer-style: the shape of the log before any detail. */
-  .tiles { display:grid; grid-template-columns:repeat(3,1fr); gap:12px; margin:0 0 18px; }
-  .tile { border:1px solid var(--line); border-radius:12px; padding:14px 16px;
-          background:var(--panel); }
-  .tile .k { font-family:var(--mono); font-size:11px; letter-spacing:.2em;
-             text-transform:uppercase; color:var(--faint); font-weight:600; }
-  .tile .v { font-family:var(--mono); font-size:15px; color:var(--ink); margin-top:6px;
-             word-break:break-all; }
-  @media (max-width:560px){ .tiles{grid-template-columns:1fr} }
-  .drop { border:1px dashed var(--line); border-radius:8px; padding:1.5rem;
-          background:var(--panel); text-align:center; color:var(--dim);
-          transition:border-color .15s; }
-  .drop.over { border-color:var(--accent); color:var(--ink); }
-  textarea { width:100%; min-height:150px; margin-top:.75rem; padding:.75rem;
-             background:var(--panel); color:var(--ink); border:1px solid var(--line);
-             border-radius:6px; font:inherit; font-size:12px; resize:vertical; }
-  button { margin-top:.75rem; padding:.55rem 1.1rem; background:var(--accent);
-           color:#fff; border:0; border-radius:6px; font:inherit; cursor:pointer; }
-  button.ghost { background:transparent; color:var(--dim); border:1px solid var(--line); }
-  section { margin-top:1.75rem; background:var(--panel); border:1px solid var(--line);
-            border-radius:8px; padding:1rem 1.15rem; }
-  section h2 { font-size:.72rem; text-transform:uppercase; letter-spacing:.09em;
-               color:var(--dim); margin:0 0 .8rem; font-weight:600; }
-  .row { display:flex; gap:.7rem; padding:.32rem 0; align-items:baseline; }
-  .mark { width:1.15rem; flex:none; font-weight:700; }
-  .ok{color:var(--ok)} .no{color:var(--no)} .warn{color:var(--warn)} .dim{color:var(--dim)}
-  .what { flex:1; }
-  .detail { color:var(--dim); font-size:.79rem; word-break:break-all; }
-  dl { margin:0; display:grid; grid-template-columns:max-content 1fr; gap:.3rem .9rem; }
-  dt { color:var(--dim); font-size:.82rem; }
-  dd { margin:0; word-break:break-all; font-size:.82rem; }
-  .verdict { font-size:1.05rem; font-weight:600; padding:.15rem .5rem;
-             border-radius:4px; display:inline-block; }
-  .hide { display:none; }
-  /* Same wordmark treatment as index.html, keyed off the same data-theme
-     attribute the shared toggle sets. */
-  .wordmark { margin:8px auto 0; text-align:center; }
-  .wordmark img { width:min(60vw,440px); height:auto; display:inline-block; }
-  .wordmark .wm-dark { display:none; }
-  html[data-theme="dark"] .wordmark .wm-light { display:none; }
-  html[data-theme="dark"] .wordmark .wm-dark { display:inline-block; }
-  @media (prefers-color-scheme: dark) {
-    html:not([data-theme]) .wordmark .wm-light { display: none; }
-    html:not([data-theme]) .wordmark .wm-dark { display: inline-block; }
-  }
-  /* One glass bar. Mark on the left, links on the true centre, one sun/moon
-     on the right. grid 1fr auto 1fr so the links stay centred on the viewport
-     whatever the side cells weigh. No wordmark text: the mark is the mark. */
-  .topbar{position:sticky;top:0;z-index:20;display:grid;
-    grid-template-columns:1fr auto 1fr;align-items:center;gap:12px;padding:9px 18px;
-    background:var(--bg);
-    background:color-mix(in srgb, var(--bg) 58%, transparent);
-    backdrop-filter:saturate(1.7) blur(18px);
-    -webkit-backdrop-filter:saturate(1.7) blur(18px);
-    border-bottom:1px solid var(--line)}
-  .topbar .mark{justify-self:start;display:inline-flex;align-items:center;border:0;
-    line-height:0;padding:3px;border-radius:9px}
-  .topbar .mark img{width:24px;height:24px;display:block}
-  .topbar .mark:hover{background:var(--panel)}
-  .nav-jump{justify-self:center;display:inline-flex;background:var(--panel);
-    border:1px solid var(--line);border-radius:999px;padding:4px}
-  .nav-jump a{font-family:var(--mono);font-size:11px;letter-spacing:.18em;
-    text-transform:uppercase;color:var(--faint);padding:4px 12px;border-radius:999px;
-    text-decoration:none;white-space:nowrap;border:0}
-  .nav-jump a:hover{color:var(--tri);background:var(--panel-2,var(--panel))}
-  .nav-jump a[aria-current="page"]{color:var(--tri);background:var(--panel-2,var(--panel))}
-  .theme-toggle{justify-self:end;display:inline-flex}
-  .theme-toggle button{appearance:none;background:var(--panel);border:1px solid var(--line);
-    border-radius:999px;cursor:pointer;margin:0;width:32px;height:32px;padding:0;
-    display:inline-flex;align-items:center;justify-content:center;color:var(--faint);
-    transition:color .15s ease,background .15s ease}
-  .theme-toggle button:hover{color:var(--tri)}
-  .theme-toggle button:focus-visible{outline:2px solid var(--tri);outline-offset:2px}
-  .theme-toggle svg{width:16px;height:16px;display:block}
-  /* Icon shows the mode you are about to get. Swapped in CSS, not JS, so it is
-     correct on first paint and cannot desync from the theme. */
-  .theme-toggle .i-sun{display:none}
-  html[data-theme="dark"] .theme-toggle .i-moon{display:none}
-  html[data-theme="dark"] .theme-toggle .i-sun{display:block}
-  @media (prefers-color-scheme:dark){
-    html:not([data-theme]) .theme-toggle .i-moon{display:none}
-    html:not([data-theme]) .theme-toggle .i-sun{display:block}
-  }
-  @media (max-width:640px){
-    .topbar{padding:8px 12px;gap:8px}
-    .nav-jump a{padding:4px 9px;letter-spacing:.10em;font-size:10px}
-  }
-  .stamp-lead{font-family:var(--mono);font-size:12px;letter-spacing:.24em;
-    text-transform:uppercase;color:var(--tri);font-weight:600;margin:2rem 0 .8rem}
-  .theme-toggle{display:inline-flex;
-    gap:2px;background:var(--panel);border:1px solid var(--line);border-radius:999px;padding:4px}
-  .theme-toggle button{appearance:none;background:none;border:0;cursor:pointer;margin:0;
-    font-family:var(--mono);font-size:11px;letter-spacing:.18em;text-transform:uppercase;
-    color:var(--faint);padding:4px 11px;border-radius:999px}
-  .theme-toggle button[aria-pressed="true"]{color:var(--tri);background:var(--panel-2)}
-  .theme-toggle button:hover{color:var(--tri)}
-  .stance { font-family:var(--mono); font-size:12px; letter-spacing:.22em;
-            text-transform:uppercase; color:var(--tri); text-align:center;
-            margin:.1rem 0 2rem; }
-  input { width:100%; padding:.6rem .75rem; background:var(--panel); color:var(--ink);
-          border:1px solid var(--line); border-radius:6px; font:inherit; font-size:12px; }
-  .entry { border:1px solid var(--line); border-radius:6px; padding:.6rem .75rem;
-           margin-bottom:.5rem; font-size:.8rem; }
-  .entry a { color:var(--accent); }
-  .entry details { margin-top:.45rem; }
-  .entry summary { cursor:pointer; color:var(--accent); font-size:.79rem;
-                   list-style:none; }
-  .entry summary::-webkit-details-marker { display:none; }
-  .entry summary::before { content:"\25b8\00a0"; }
-  .entry details[open] summary::before { content:"\25be\00a0"; }
-  .entry dl { margin-top:.55rem; }
-  .keyblock { font-family:var(--mono); font-size:.71rem; background:var(--panel);
-              border:1px solid var(--line); border-radius:6px; padding:.5rem .6rem;
-              margin:.45rem 0 .4rem; white-space:pre-wrap; word-break:break-all; }
-  .entry .foot { margin-top:.55rem; display:flex; gap:.9rem; flex-wrap:wrap;
-                 align-items:center; }
-  .linkish { appearance:none; background:none; border:0; padding:0; cursor:pointer;
-             font:inherit; font-size:.79rem; color:var(--accent); }
-  /* The search is the reason most people open this page, so it gets its own
-     card at the top rather than sitting inside the explanatory section. */
-  #search h2 { font-size:.95rem; text-transform:none; letter-spacing:0;
-               color:var(--ink); margin-bottom:.25rem; }
-  .search-by { color:var(--dim); font-size:.82rem; margin:0 0 .8rem; }
-  .searchrow { display:flex; gap:.5rem; align-items:stretch; }
-  .searchrow input { flex:1 1 auto; min-width:0; font-size:13px; padding:.7rem .8rem; }
-  .searchrow button { margin-top:0; white-space:nowrap; }
-  @media (max-width:560px) {
-    .searchrow { flex-wrap:wrap; }
-    .searchrow input { flex:1 1 100%; }
-  }
-  footer { margin-top:2rem; color:var(--dim); font-size:.76rem; line-height:1.7; }
-  code { background:var(--panel); padding:.1rem .3rem; border-radius:3px; }
-</style>
-<script>try{var t=localStorage.getItem("vaara-theme");if(t!=="dark"&&t!=="light")t=matchMedia("(prefers-color-scheme: dark)").matches?"dark":"light";document.documentElement.dataset.theme=t}catch(e){}</script>
-<link rel="stylesheet" href="/style.css">
-<style>
-  html:root, html:root[data-theme] {
-    --panel: var(--card); --panel-2: var(--tint); --deep: var(--tint); --line: var(--rule);
-    --faint: var(--muted); --dim: var(--muted); --tri: var(--accent); --tri-bright: var(--accent);
-    --ok: var(--accent); --no: var(--stop); --edge: 16px;
-    --sans: Inter, -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Arial, sans-serif;
-    --mono: "JetBrains Mono", ui-monospace, SFMono-Regular, Menlo, Consolas, monospace;
-  }
-  html:root body { background: var(--bg); color: var(--body); font: 17px/1.6 var(--sans); }
-  html:root main.legacy { max-width: var(--max); margin: 0 auto; padding: 40px 24px 64px; }
-  html:root main.legacy section { padding: 1rem 1.25rem; border: 1px solid var(--rule); }
-  html:root main.legacy > h2 { font-size: 24px; text-transform: none; letter-spacing: 0; color: var(--ink); margin: 44px 0 12px; }
-  html:root .bar a, html:root .band a, html:root footer.site a { border-bottom: 0; }
-  html:root footer.site { margin: 0; padding: 40px 0; border-top: 0; color: var(--on-night-soft); font-size: 14px; line-height: 1.6; }
-  html:root .band .lead { font-size: 17px; color: var(--body); max-width: 46em; margin: 0; }
-  html:root .band h1 { font: 650 30px/1.2 var(--sans); letter-spacing: 0; color: var(--ink); margin: 0 0 10px; }
-</style>
 </head>
 <body>
 <header class="bar"><div class="wrap">
-<nav class="top" aria-label="Main menu"><a class="brand" href="/"><img src="/vaara-logo-dark.svg" alt="Vaara home" width="174" height="24"></a><div class="dd"><a class="l" href="/sectors/" aria-haspopup="true">Sectors <span class="caret">▾</span></a><div class="menu"><a href="/sectors/care.html">Care and social services</a><a href="/sectors/payments.html">Payments and finance</a><a href="/sectors/public.html">Public sector</a><a href="/sectors/health.html">Healthcare</a><a href="/sectors/infrastructure.html">Energy, industry and infrastructure</a><a href="/sectors/software.html">Software teams</a></div></div><div class="dd"><a class="l" href="/products/" aria-haspopup="true">Products <span class="caret">▾</span></a><div class="menu"><a href="/products/gate.html">The gate</a><a href="/products/receipts.html">Receipts</a><a href="/products/cage.html">The cage</a><a href="/products/app.html">The desktop app</a><a href="/products/test-it-yourself.html">Test it yourself</a></div></div><div class="dd on"><a class="l" href="/products/test-it-yourself.html" aria-haspopup="true">Test it yourself <span class="caret">▾</span></a><div class="menu"><a href="/products/test-it-yourself.html">Test it yourself</a><a href="/verify.html">Receipt explorer</a><a href="/conformance.html">Conformance results</a></div></div><a class="l" href="/under-the-hood.html">Under the hood</a><span class="lang"><b>EN</b> | <a href="/fi/" hreflang="fi">FI</a></span><button class="burger" type="button" aria-label="Main menu" aria-expanded="false"></button><button class="theme" type="button" aria-label="Switch between light and dark" title="Switch between light and dark"></button><a class="get" href="https://github.com/vaaraio/vaara#readme">Get Vaara</a></nav>
+<nav class="top" aria-label="Main menu"><a class="brand" href="/"><img src="/vaara-logo-dark.svg" alt="Vaara home" width="174" height="24"></a><div class="dd"><a class="l" href="/sectors/" aria-haspopup="true">Sectors <span class="caret">▾</span></a><div class="menu"><a href="/sectors/care.html">Care and social services</a><a href="/sectors/payments.html">Payments and finance</a><a href="/sectors/public.html">Public sector</a><a href="/sectors/health.html">Healthcare</a><a href="/sectors/infrastructure.html">Energy, industry and infrastructure</a><a href="/sectors/software.html">Software teams</a></div></div><div class="dd"><a class="l" href="/products/" aria-haspopup="true">Products <span class="caret">▾</span></a><div class="menu"><a href="/products/gate.html">The gate</a><a href="/products/receipts.html">Receipts</a><a href="/products/cage.html">The cage</a><a href="/products/app.html">The desktop app</a><a href="/products/test-it-yourself.html">Test it yourself</a></div></div><div class="dd on"><a class="l" href="/products/test-it-yourself.html" aria-haspopup="true">Test it yourself <span class="caret">▾</span></a><div class="menu"><a href="/products/test-it-yourself.html">Test it yourself</a><a href="/verify.html">Receipt explorer</a><a href="/conformance.html">Conformance results</a></div></div><a class="l" href="/under-the-hood.html">Under the hood</a><span class="lang"><b>EN</b> | <a href="/fi/verify.html" hreflang="fi">FI</a></span><button class="burger" type="button" aria-label="Main menu" aria-expanded="false"></button><button class="theme" type="button" aria-label="Switch between light and dark" title="Switch between light and dark"></button><a class="get" href="https://github.com/vaaraio/vaara#readme">Get Vaara</a></nav>
 </div></header>
-<div class="band"><div class="wrap"><div class="hero"><nav class="crumbs" aria-label="Breadcrumb"><a href="/">Home</a> / <a href="/products/test-it-yourself.html">Test it yourself</a></nav><p class="kicker">Receipt explorer</p><h1>Explore the Vaara Resin</h1><p class="lead">Vaara Resin is the chain of autonomous-action receipts. Every allow, escalate and deny an agent produced, hash-chained so a removed one stops reconciling, and checkable by someone who does not trust whoever ran it. Drop a receipt below to verify it here in your tab, or look one up in the public log underneath.</p></div></div></div>
-<main class="legacy">
-
-
-  <section id="search">
-    <h2>Search the Vaara Resin</h2>
-    <p class="search-by">by receipt digest, entry digest, or public key</p>
-    <div class="searchrow">
-      <input id="q" spellcheck="false" aria-label="Receipt digest, entry digest or public key" placeholder="sha256 digest, or paste your public key to see everything you published">
-      <button id="look">Look up</button>
-      <button id="latest" class="ghost">Latest entries</button>
-    </div>
-    <p class="sub" style="margin:.7rem 0 0">
-      Paste a public key and the log returns every head published with it. No
-      account, no sign-in: the key is the identity, and the answer comes from the
-      log rather than from us. Your private key is never involved and must never
-      be pasted anywhere.
-    </p>
-    <div id="rolls" style="margin-top:.9rem"></div>
-  </section>
-
-  <section id="explorer">
-    <h2>The Vaara Resin</h2>
-    <p class="sub" style="margin:0 0 .8rem">
-      Resin sets around what it caught and keeps it exactly as it was, checkable
-      by whoever finds it later without trusting whoever left it there. This is the
-      public log Vaara publishes heads to. Publishing is opt-in and off by default,
-      so an absence here means nothing was published, not that nothing happened.
-    </p>
-    <div class="tiles">
-      <div class="tile"><div class="k">log</div><div class="v" id="t-log">rekor.sigstore.dev</div></div>
-      <div class="tile"><div class="k">entries</div><div class="v" id="t-size">—</div></div>
-      <div class="tile"><div class="k">root</div><div class="v" id="t-root">—</div></div>
-    </div>
-    <p class="sub" style="margin:1rem 0 0">
-      <strong>Before you opt in.</strong> A digest reveals no content, no size and no
-      identity. What it does reveal is that something was published, and when.
-      <br><br>
-      Entries carry a public key that generates on your own machine, so they are
-      pseudonymous rather than anonymous: everything published with one key can be
-      grouped by anyone, and the moment you point someone at an entry, that key is
-      publicly yours. Use a separate key per context if you do not want two trails
-      sharing one pseudonym.
-      <br><br>
-      Publication is <em>permanent and irreversible</em>. It cannot be withdrawn,
-      deleted or corrected once the log integrates it, so there is no erasure to
-      request afterwards. The log is public and enumerable, which means everyone
-      rather than only whoever runs it.
-      <br><br>
-      The default log, Sigstore Rekor, is operated in the United States by the Linux
-      Foundation. That matters much less than publishing to everyone, but some buyers
-      will ask, and Vaara can publish to a self-hosted or EU-operated log instead.
-      <br><br>
-      Publishing is also the only usage signal Vaara ever receives, and it exists
-      because you switched it on, not because anything here collects it.
-    </p>
-  </section>
-
-  <p class="stamp-lead">Have a receipt? Check it here</p>
-  <p class="sub" style="margin:0 0 .8rem">Optional. The Vaara Resin above needs nothing from you.</p>
-  <div class="drop" id="drop">
-    Drop a receipt file here, or paste one below. It is read in this tab and
-    never sent anywhere, so there is nothing to upload and no account to make.
-    <textarea id="input" spellcheck="false" aria-label="Receipt to verify" placeholder='{"payload":"...","payloadType":"application/vnd.in-toto+json","signatures":[{"keyid":"...","sig":"..."}]}'></textarea>
-    <div>
-      <button id="go">Verify</button>
-      <button id="demo" class="ghost">Load an example</button>
-    </div>
-  </div>
-
-  <section id="out" class="hide">
-    <h2>Result</h2>
-    <div id="verdict"></div>
-    <div id="checks" style="margin-top:.9rem"></div>
-  </section>
-
-  <section id="content" class="hide">
-    <h2>What the receipt says</h2>
-    <dl id="fields"></dl>
-  </section>
-
-  <section id="nonclaims" class="hide">
-    <h2>What this does not establish</h2>
-    <div id="nc"></div>
-  </section>
-
-
-  <div class="fineprint">
-    A passing signature proves the payload is byte-identical to what the holder
-    of that key signed. It says nothing about whether the key belongs to who you
-    think, or whether the statement is true. Pin the public key from a source
-    the signer does not control before treating a pass as meaningful.
-    <br><br>
-    The independent Python checker this mirrors ships in the repository under
-    <code>tests/vectors/</code>.
-    <br><br>
-    Vaara&trade; and Vaara Resin&trade; &copy; 2026 Henri Sirkkavaara, Helsinki. AGPL-3.0-or-later.
-  </div>
-</main>
+<div class="band"><div class="wrap"><div class="hero"><nav class="crumbs" aria-label="Breadcrumb"><a href="/">Home</a> / <a href="/products/test-it-yourself.html">Test it yourself</a></nav><p class="kicker">Test it yourself</p><h1>Receipt explorer</h1><p class="lead">Check a receipt in your own browser, or look one up in the public log. The check runs in this tab: nothing is uploaded and there is no account.</p></div></div></div>
+<main><section class="vx"><div class="wrap">
+<h2>Check a receipt</h2>
+<div class="drop" id="drop"><p>Drop a receipt file here, or paste one below. It is read in this tab and never sent anywhere.</p>
+<textarea id="input" spellcheck="false" aria-label="Receipt to verify" placeholder='{"payload":"...","payloadType":"application/vnd.in-toto+json","signatures":[{"keyid":"...","sig":"..."}]}'></textarea>
+<div class="btns"><button id="go" class="btn primary" type="button">Verify</button><button id="demo" class="btn ghost" type="button">Load an example</button></div></div>
+<div id="out" class="hide vpanel"><h3>Result</h3><div id="verdict"></div><div id="checks"></div></div>
+<div id="content" class="hide vpanel"><h3>What the receipt says</h3><dl id="fields"></dl></div>
+<div id="nonclaims" class="hide vpanel"><h3>What this does not establish</h3><div id="nc"></div></div>
+</div></section>
+<section class="vx" id="search"><div class="wrap">
+<h2>Search the public log</h2><p>By receipt digest, entry digest, or public key.</p>
+<div class="searchrow"><input id="q" spellcheck="false" aria-label="Receipt digest, entry digest or public key" placeholder="sha256 digest, or paste your public key to see everything you published">
+<button id="look" class="btn primary" type="button">Look up</button><button id="latest" class="btn ghost" type="button">Latest entries</button></div>
+<p class="note">Paste a public key and the log returns every head published with it. No account and no sign-in: the key is the identity, and the answer comes from the log rather than from us. Your private key is never involved and must never be pasted anywhere.</p><div id="rolls"></div>
+</div></section>
+<section class="vx" id="explorer"><div class="wrap">
+<h2>The public log</h2><p>This is the public log Vaara publishes heads to. Publishing is opt-in and off by default, so an absence here means nothing was published, not that nothing happened.</p><div class="tiles"><div class="tile"><div class="k">log</div><div class="v" id="t-log">rekor.sigstore.dev</div></div><div class="tile"><div class="k">entries</div><div class="v" id="t-size">—</div></div><div class="tile"><div class="k">root</div><div class="v" id="t-root">—</div></div></div>
+<details class="more"><summary>Before you opt in</summary><p>A digest reveals no content, no size and no identity. What it does reveal is that something was published, and when.</p><p>Entries carry a public key that is generated on your own machine, so they are pseudonymous rather than anonymous: everything published with one key can be grouped by anyone, and the moment you point someone at an entry, that key is publicly yours. Use a separate key per context if you do not want two trails sharing one pseudonym.</p><p>Publication is permanent and irreversible. It cannot be withdrawn, deleted or corrected once the log integrates it, so there is no erasure to request afterwards. The log is public and enumerable, which means everyone rather than only whoever runs it.</p><p>The default log, Sigstore Rekor, is operated in the United States by the Linux Foundation. That matters much less than publishing to everyone, but some buyers will ask, and Vaara can publish to a self-hosted or EU-operated log instead.</p><p>Publishing is also the only usage signal Vaara ever receives, and it exists because you switched it on, not because anything here collects it.</p></details>
+<div class="fineprint"><p>A passing signature proves the payload is byte-identical to what the holder of that key signed. It says nothing about whether the key belongs to who you think, or whether the statement is true. Pin the public key from a source the signer does not control before treating a pass as meaningful.</p><p>The independent Python checker this page mirrors ships in the repository under tests/vectors/.</p></div>
+</div></section><script src="/verify.js"></script></main>
 <footer class="site"><div class="wrap"><div class="cols">
 <div><b>VAARA</b><br>Open source. Runs on your own machines. Nothing is sent to us.<br><a href="mailto:hello@vaara.io">hello@vaara.io</a></div>
 <div><a href="https://github.com/vaaraio/vaara">Code</a><br>
 <a href="https://datatracker.ietf.org/doc/draft-sirkkavaara-vaara-receipt/">Internet-Draft</a><br>
 <a href="/conformance.html">Conformance results</a><br><a href="/surfaces.html">Everything Vaara publishes</a><br><a href="/under-the-hood.html">Technical overview</a></div>
-</div><p class="tm">Vaara™ and Vaara Resin™ © 2026 Henri Sirkkavaara, Helsinki. AGPL-3.0-or-later.</p></div></footer>
-
-<script>
-"use strict";
-
-const $ = (id) => document.getElementById(id);
-const enc = new TextEncoder();
-
-function b64ToBytes(s) {
-  const bin = atob(s.replace(/-/g, "+").replace(/_/g, "/"));
-  const out = new Uint8Array(bin.length);
-  for (let i = 0; i < bin.length; i++) out[i] = bin.charCodeAt(i);
-  return out;
-}
-
-function hex(buf) {
-  return [...new Uint8Array(buf)].map(b => b.toString(16).padStart(2, "0")).join("");
-}
-
-// DSSE v1 pre-authentication encoding. The signature is over this, never over
-// the raw payload, so a payload cannot be lifted into a different payloadType
-// and still verify.
-function pae(payloadType, payloadBytes) {
-  const typeBytes = enc.encode(payloadType).length;
-  const head = enc.encode(`DSSEv1 ${typeBytes} ${payloadType} ${payloadBytes.length} `);
-  const out = new Uint8Array(head.length + payloadBytes.length);
-  out.set(head, 0);
-  out.set(payloadBytes, head.length);
-  return out;
-}
-
-// SubjectPublicKeyInfo for Ed25519 is a fixed 12-byte prefix then the 32-byte
-// key, so the raw key can be read out without a full ASN.1 parser.
-function pemToSpki(pem) {
-  const body = pem.replace(/-----[^-]+-----/g, "").replace(/\s+/g, "");
-  return b64ToBytes(body);
-}
-
-async function importEd25519(spki) {
-  return crypto.subtle.importKey("spki", spki, { name: "Ed25519" }, false, ["verify"]);
-}
-
-function row(state, what, detail) {
-  const marks = { ok: ["ok", "✓"], no: ["no", "✗"], warn: ["warn", "!"], dim: ["dim", "·"] };
-  const [cls, ch] = marks[state] || marks.dim;
-  const d = detail ? `<div class="detail">${detail}</div>` : "";
-  return `<div class="row"><div class="mark ${cls}">${ch}</div><div class="what">${what}${d}</div></div>`;
-}
-
-async function verify(envelope, publicKeyPem) {
-  const checks = [];
-  let allOk = true;
-
-  if (!envelope.payload || !envelope.payloadType || !Array.isArray(envelope.signatures)) {
-    return { checks: [row("no", "Not a DSSE envelope",
-      "Needs payload, payloadType and signatures.")], allOk: false, statement: null };
-  }
-
-  const payloadBytes = b64ToBytes(envelope.payload);
-  const preauth = pae(envelope.payloadType, payloadBytes);
-  const paeDigest = hex(await crypto.subtle.digest("SHA-256", preauth));
-  checks.push(row("ok", "Pre-authentication encoding recomputed",
-    `sha256 ${paeDigest}`));
-
-  let statement = null;
-  try {
-    statement = JSON.parse(new TextDecoder().decode(payloadBytes));
-    checks.push(row("ok", "Payload parses as the declared type", envelope.payloadType));
-  } catch (e) {
-    checks.push(row("no", "Payload is not valid JSON", String(e)));
-    allOk = false;
-  }
-
-  if (!publicKeyPem) {
-    checks.push(row("warn", "No public key supplied, signature not checked",
-      "Paste the signer's PEM to complete the check. Without it this page has "
-      + "confirmed the encoding only."));
-    allOk = false;
-  } else if (envelope.signatures.length === 0) {
-    checks.push(row("no", "The envelope carries no signatures",
-      "There is nothing to check the key against, so nothing is verified."));
-    allOk = false;
-  } else {
-    for (const s of envelope.signatures) {
-      try {
-        const key = await importEd25519(pemToSpki(publicKeyPem));
-        const ok = await crypto.subtle.verify("Ed25519", key, b64ToBytes(s.sig), preauth);
-        checks.push(row(ok ? "ok" : "no",
-          ok ? "Signature verifies over the pre-authentication encoding"
-             : "Signature does NOT verify",
-          `keyid ${s.keyid || "(none)"}`));
-        if (!ok) allOk = false;
-      } catch (e) {
-        if (e && e.name === "NotSupportedError") {
-          checks.push(row("warn", "This browser has no Ed25519 in WebCrypto",
-            "Chrome 137+, Safari 17+ or Firefox 129+ can complete the check."));
-        } else {
-          checks.push(row("no", "Signature could not be checked", String(e)));
-        }
-        allOk = false;
-      }
-    }
-  }
-  return { checks, allOk, statement, paeDigest };
-}
-
-function renderStatement(st) {
-  const p = (st && st.predicate) || {};
-  const pairs = [];
-  const put = (k, v) => { if (v !== undefined && v !== null && v !== "") pairs.push([k, v]); };
-  put("decision", p.decision);
-  put("agent", p.agent_id);
-  put("principal", p.principal);
-  put("decided at", p.decided_at);
-  put("predicate type", st.predicateType);
-  // The predicate sits under the in-toto namespace because Vaara proposed it
-  // there. Saying so keeps the reader from taking the URL as in-toto's
-  // endorsement of a predicate that is still an open proposal.
-  if (st.predicateType === "https://in-toto.io/attestation/agent-decision/v0.1") {
-    put("predicate status",
-      "proposed by Vaara on in-toto/attestation#554, not yet a registered in-toto predicate");
-  }
-  if (Array.isArray(p.policy_evaluations)) {
-    p.policy_evaluations.forEach(e =>
-      put(`policy ${e.policy_id || ""}`, `${e.result || "?"}${e.rule ? "  (" + e.rule + ")" : ""}`));
-  }
-  if (Array.isArray(p.tool_calls)) {
-    p.tool_calls.forEach(t =>
-      put(`tool ${t.name || "?"}`, t.args_state === "present"
-        ? `args ${t.args_hash || "(no hash)"}`
-        : `args ${t.args_state || "unknown"}`));
-  }
-  if (Array.isArray(st.subject)) {
-    st.subject.forEach(s => {
-      const dg = s.digest && (s.digest.sha256 || Object.values(s.digest)[0]);
-      put(`subject ${s.name || ""}`.trim(), dg || "(no digest)");
-    });
-  }
-  $("fields").innerHTML = pairs.map(([k, v]) =>
-    `<dt>${k}</dt><dd>${String(v)}</dd>`).join("");
-  $("content").classList.remove("hide");
-}
-
-// Stating the boundary is part of the product. A verifier that only shows
-// green invites the reader to believe things the maths never established.
-function renderNonClaims(st) {
-  const p = (st && st.predicate) || {};
-  const items = [
-    ["that the key belongs to the party you think it does",
-     "the signature binds the payload to a key, not to an organisation"],
-    ["that the statement is true",
-     "a signed claim of a deny is evidence the agent recorded a deny, not that a deny occurred"],
-    ["when this happened",
-     `decided_at is asserted by the signer${p.decided_at ? " (" + p.decided_at + ")" : ""}. `
-     + "an external timestamp authority is what makes a time independent"],
-    ["that this is the whole history",
-     "one receipt shows one decision. only a chain, and a head somebody else witnessed, "
-     + "shows nothing was removed"],
-  ];
-  $("nc").innerHTML = items.map(([a, b]) => row("dim", a, b)).join("");
-  $("nonclaims").classList.remove("hide");
-}
-
-async function run() {
-  const raw = $("input").value.trim();
-  if (!raw) return;
-  let envelope, pem = null;
-
-  // Accept either a bare envelope, or an object carrying both so a single
-  // paste can complete the whole check.
-  try {
-    const parsed = JSON.parse(raw);
-    envelope = parsed.envelope || parsed;
-    pem = parsed.publicKey || parsed.public_key || null;
-  } catch (e) {
-    $("out").classList.remove("hide");
-    $("verdict").innerHTML = `<span class="verdict no">NOT JSON</span>`;
-    $("checks").innerHTML = row("no", "Input is not valid JSON", String(e));
-    return;
-  }
-  if (!pem) {
-    const m = raw.match(/-----BEGIN PUBLIC KEY-----[\s\S]+?-----END PUBLIC KEY-----/);
-    if (m) pem = m[0];
-  }
-
-  const { checks, allOk, statement } = await verify(envelope, pem);
-  $("out").classList.remove("hide");
-  $("verdict").innerHTML = allOk
-    ? `<span class="verdict ok">SIGNATURE VERIFIES</span>`
-    : `<span class="verdict warn">INCOMPLETE</span>`;
-  $("checks").innerHTML = checks.join("");
-  if (statement) { renderStatement(statement); renderNonClaims(statement); }
-}
-
-$("go").addEventListener("click", run);
-
-// ---- explorer ----------------------------------------------------------
-// Queries the public log straight from this tab. Rekor serves
-// access-control-allow-origin: *, so no Vaara server sits in the middle and
-// there is nothing here that could log who looked something up.
-const REKOR = "https://rekor.sigstore.dev";
-
-function esc(s) {
-  return String(s).replace(/[&<>"]/g, c =>
-    ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;" }[c]));
-}
-
-async function rekorSearchByKey(pem) {
-  const b64 = btoa(pem.trim());
-  const res = await fetch(`${REKOR}/api/v1/index/retrieve`, {
-    method: "POST",
-    headers: { "Content-Type": "application/json" },
-    // format must be one of pgp/x509/minisign/ssh/tuf; a SubjectPublicKeyInfo
-    // PEM is x509 here, and the content is that PEM base64-encoded again.
-    body: JSON.stringify({ publicKey: { format: "x509", content: b64 } }),
-  });
-  if (!res.ok) throw new Error(`index/retrieve returned ${res.status}`);
-  return res.json();
-}
-
-async function rekorSearchByHash(hexDigest) {
-  const res = await fetch(`${REKOR}/api/v1/index/retrieve`, {
-    method: "POST",
-    headers: { "Content-Type": "application/json" },
-    body: JSON.stringify({ hash: `sha256:${hexDigest}` }),
-  });
-  if (!res.ok) throw new Error(`index/retrieve returned ${res.status}`);
-  return res.json();
-}
-
-// The log hands back the entry as base64 JSON. Decode the fields here, in one
-// place, so the page can lay them out itself instead of sending the reader to a
-// raw API response and asking them to read it. Both lookup paths and the latest
-// listing share this, so every route shows the same panel.
-function decodeEntry(uuid, e) {
-  let digest = null, hashAlg = null, kind = null, apiVersion = null, keyPem = null;
-  try {
-    const decoded = JSON.parse(atob(e.body));
-    kind = decoded.kind;
-    apiVersion = decoded.apiVersion;
-    const spec = decoded.spec || {};
-    const hash = (spec.data && spec.data.hash) || {};
-    digest = hash.value || null;
-    hashAlg = hash.algorithm || null;
-    const sig = spec.signature || {};
-    if (sig.publicKey && sig.publicKey.content) keyPem = atob(sig.publicKey.content).trim();
-  } catch (_) { /* an entry shape this page does not decode; fields stay null */ }
-  const verification = e.verification || {};
-  const proof = verification.inclusionProof || {};
-  return {
-    uuid, digest, hashAlg, kind, apiVersion, keyPem,
-    logIndex: e.logIndex, integratedTime: e.integratedTime, logID: e.logID,
-    treeSize: proof.treeSize, rootHash: proof.rootHash,
-    proofPath: Array.isArray(proof.hashes) ? proof.hashes.length : null,
-    hasCheckpoint: Boolean(proof.checkpoint),
-    hasSet: Boolean(verification.signedEntryTimestamp),
-  };
-}
-
-async function rekorEntry(uuid) {
-  const res = await fetch(`${REKOR}/api/v1/log/entries/${uuid}`);
-  if (!res.ok) throw new Error(`entry fetch returned ${res.status}`);
-  const body = await res.json();
-  return decodeEntry(uuid, body[uuid]);
-}
-
-function renderEntries(list, total) {
-  if (!list.length) {
-    $("rolls").innerHTML = row("dim", "Not in the log",
-      "Either it was never published, or it was published under a different digest. "
-      + "Absence is not evidence of anything.");
-    return;
-  }
-  // Never show a partial set as if it were the whole set. A digest can carry
-  // thousands of entries, and quietly rendering ten reads as "there are ten".
-  const note = total > list.length
-    ? row("warn", `Showing ${list.length} of ${total} entries`,
-        "This digest appears many times in the log. The rest are not listed here.")
-    : "";
-  SHOWN = {};
-  list.forEach(e => { SHOWN[e.uuid] = e; });
-  $("rolls").innerHTML = note + list.map(entryCard).join("");
-}
-
-// The log's own entry view is a raw API response. Everything a reader would
-// take from it is laid out here in the page's own shape instead, with the raw
-// response still one click away because that is the authority, not this render.
-function entryCard(e) {
-  const pairs = [];
-  const put = (k, v) => { if (v !== undefined && v !== null && v !== "") pairs.push([k, v]); };
-  put("log index", e.logIndex);
-  put("integrated", e.integratedTime
-    ? new Date(e.integratedTime * 1000).toISOString() : null);
-  put("entry type", [e.kind, e.apiVersion].filter(Boolean).join(" "));
-  put("data digest", e.digest ? `${e.hashAlg || "sha256"}:${e.digest}` : null);
-  put("log id", e.logID);
-  put("tree size at inclusion", e.treeSize);
-  put("root hash", e.rootHash);
-  put("inclusion proof", e.rootHash
-    ? `present, ${e.proofPath === null ? "path not returned" : e.proofPath + " hashes"}`
-    : "not returned");
-  put("checkpoint", e.hasCheckpoint ? "present" : "absent");
-  put("signed entry timestamp", e.hasSet ? "present" : "absent");
-  put("entry uuid", e.uuid);
-
-  const key = e.keyPem ? `
-      <div class="detail" style="margin-top:.7rem">public key carried on this entry</div>
-      <div class="keyblock">${esc(e.keyPem)}</div>
-      <button type="button" class="linkish" data-search-key="${esc(e.uuid)}">Search everything published under this key</button>` : "";
-
-  return `
-    <div class="entry">
-      <div>${esc(e.digest || "(not a hashedrekord)")}</div>
-      <div class="detail">
-        log index ${esc(e.logIndex)} ·
-        integrated ${e.integratedTime
-          ? esc(new Date(e.integratedTime * 1000).toISOString()) : "(unknown)"}
-      </div>
-      <details>
-        <summary>details</summary>
-        <dl>${pairs.map(([k, v]) =>
-          `<dt>${esc(k)}</dt><dd>${esc(v)}</dd>`).join("")}</dl>
-        ${key}
-        <div class="detail" style="margin-top:.7rem">
-          An entry shows this digest was in the log at that index and time. It
-          says nothing about who put it there, and nothing about whether the
-          statement behind the digest is true.
-        </div>
-        <div class="foot">
-          <a href="${REKOR}/api/v1/log/entries/${esc(e.uuid)}" rel="noopener">Raw response from the log</a>
-        </div>
-      </details>
-    </div>`;
-}
-
-// Entries currently on screen, so the key button can reach the PEM without
-// round-tripping a multi-line value through an HTML attribute.
-let SHOWN = {};
-
-$("rolls").addEventListener("click", ev => {
-  const btn = ev.target.closest("[data-search-key]");
-  if (!btn) return;
-  const entry = SHOWN[btn.getAttribute("data-search-key")];
-  if (!entry || !entry.keyPem) return;
-  $("q").value = entry.keyPem;
-  lookup(entry.keyPem);
-});
-
-async function lookup(input) {
-  const raw = (input || "").trim();
-
-  // A pasted public key means "show me everything I published". Refuse a
-  // private key outright: nobody should ever be typing one into a web page,
-  // and a tool that quietly accepts it teaches a dangerous habit.
-  if (/-----BEGIN [A-Z ]*PRIVATE KEY-----/.test(raw)) {
-    $("rolls").innerHTML = row("no", "That is a private key. Do not paste it anywhere",
-      "Only the public half is needed here, and nothing on this page ever needs "
-      + "a private key. Close this tab and treat that key as compromised.");
-    $("q").value = "";
-    return;
-  }
-  if (/-----BEGIN PUBLIC KEY-----/.test(raw)) {
-    $("rolls").innerHTML = row("dim", "Asking the public log…");
-    try {
-      const uuids = (await rekorSearchByKey(raw)) || [];
-      const entries = [];
-      for (const u of uuids.slice(0, 20)) entries.push(await rekorEntry(u));
-      entries.sort((a, b) => b.integratedTime - a.integratedTime);
-      renderEntries(entries, uuids.length);
-    } catch (e) {
-      $("rolls").innerHTML = row("warn", "Could not reach the public log", esc(e.message));
-    }
-    return;
-  }
-
-  const clean = raw.replace(/^sha256:/i, "").toLowerCase();
-  if (!/^[0-9a-f]{64}$/.test(clean)) {
-    $("rolls").innerHTML = row("no", "That is not a sha256 digest or a public key",
-      "Expecting 64 hex characters, or a PEM public key block.");
-    return;
-  }
-  $("rolls").innerHTML = row("dim", "Asking the public log…");
-  try {
-    const uuids = (await rekorSearchByHash(clean)) || [];
-    const entries = [];
-    for (const u of uuids.slice(0, 10)) entries.push(await rekorEntry(u));
-    renderEntries(entries, uuids.length);
-  } catch (e) {
-    $("rolls").innerHTML = row("warn", "Could not reach the public log", esc(e.message)
-      + ". Signature verification above is unaffected: it never needs the network.");
-  }
-}
-
-$("look").addEventListener("click", () => lookup($("q").value));
-$("q").addEventListener("keydown", ev => { if (ev.key === "Enter") lookup($("q").value); });
-
-async function logInfo() {
-  const res = await fetch(`${REKOR}/api/v1/log`);
-  if (!res.ok) throw new Error(`log returned ${res.status}`);
-  return res.json();
-}
-
-// The tiles are the shape of the log before any detail: how big it is now and
-// what root that size hashes to. Both come from the log, not from us.
-async function fillTiles() {
-  try {
-    const info = await logInfo();
-    $("t-size").textContent = Number(info.treeSize).toLocaleString("en");
-    $("t-root").textContent = String(info.rootHash).slice(0, 16) + "…";
-  } catch (e) {
-    $("t-size").textContent = "unreachable";
-    $("t-root").textContent = "—";
-  }
-}
-
-async function entryAtIndex(i) {
-  const res = await fetch(`${REKOR}/api/v1/log/entries?logIndex=${i}`);
-  if (!res.ok) throw new Error(`index ${i} returned ${res.status}`);
-  const body = await res.json();
-  const uuid = Object.keys(body)[0];
-  return decodeEntry(uuid, body[uuid]);
-}
-
-// Latest N rather than an endless list. An explorer's job is to show that the
-// thing is alive and moving, not to page through two billion rows.
-const LATEST_N = 6;
-
-$("latest").addEventListener("click", async () => {
-  $("rolls").innerHTML = row("dim", "Asking the public log…");
-  try {
-    const info = await logInfo();
-    const top = Number(info.treeSize) - 1;
-    const out = [];
-    for (let i = top; i > top - LATEST_N && i >= 0; i--) {
-      try { out.push(await entryAtIndex(i)); } catch (_) { /* skip a gap */ }
-    }
-    renderEntries(out, out.length);
-  } catch (e) {
-    $("rolls").innerHTML = row("warn", "Could not reach the public log", esc(e.message));
-  }
-});
-
-fillTiles();
-
-const drop = $("drop");
-["dragover", "dragenter"].forEach(e =>
-  drop.addEventListener(e, ev => { ev.preventDefault(); drop.classList.add("over"); }));
-["dragleave", "drop"].forEach(e =>
-  drop.addEventListener(e, () => drop.classList.remove("over")));
-drop.addEventListener("drop", async ev => {
-  ev.preventDefault();
-  const f = ev.dataTransfer.files[0];
-  if (f) { $("input").value = await f.text(); run(); }
-});
-
-$("demo").addEventListener("click", () => {
-  $("input").value = JSON.stringify(DEMO, null, 1);
-  run();
-});
-
-const DEMO = {"envelope": {"payload": "eyJfdHlwZSI6Imh0dHBzOi8vaW4tdG90by5pby9TdGF0ZW1lbnQvdjEiLCJwcmVkaWNhdGUiOnsiYWdlbnRfaWQiOiJhZ2VudDphY21lL2NoZWNrb3V0LWJvdC8xIiwiZGVjaWRlZF9hdCI6IjIwMjYtMDYtMjNUMTI6MDA6MDVaIiwiZGVjaXNpb24iOiJkZW55IiwicG9saWN5X2V2YWx1YXRpb25zIjpbeyJwb2xpY3lfaWQiOiJwb2xpY3k6c3BlbmQtY2FwL2V1ci01MDAiLCJyZXN1bHQiOiJkZW55IiwicnVsZSI6ImFtb3VudC5sZS41MDAwMCJ9XSwicHJpbmNpcGFsIjoidGVuYW50OmFjbWUtZXUiLCJ0b29sX2NhbGxzIjpbeyJhcmdzX2Nhbm9uaWNhbGl6YXRpb24iOiJKQ1MiLCJhcmdzX2hhc2giOiJzaGEyNTY6OTFjMGMyMTVjY2UzZjVlN2M0OWQyZGRmMGE1NDBlYjIyNTU1NTRlYTNlN2E4ODUwNjdkMzkxNjhiM2FjODU2NCIsImFyZ3Nfc3RhdGUiOiJwcmVzZW50IiwibmFtZSI6InBheW1lbnRzLnRyYW5zZmVyIn0seyJhcmdzX3N0YXRlIjoiYXJnc19yZWRhY3RlZCIsIm5hbWUiOiJjdXN0b21lci5sb29rdXAifV19LCJwcmVkaWNhdGVUeXBlIjoiaHR0cHM6Ly9pbi10b3RvLmlvL2F0dGVzdGF0aW9uL2FnZW50LWRlY2lzaW9uL3YwLjEiLCJzdWJqZWN0IjpbeyJkaWdlc3QiOnsic2hhMjU2IjoiYTI3MmUzMGM4NzY4NzI4NWQ3YThkY2Q2YzVlMjMyNTRjZDVkYjJjNjgyMDI1NGRmNTQyYzI5MThlMDAxMTdiZCJ9LCJuYW1lIjoidG9vbDpwYXltZW50cy50cmFuc2ZlciJ9XX0=", "payloadType": "application/vnd.in-toto+json", "signatures": [{"keyid": "vaara-agent-decision-conformance-ed25519-k1", "sig": "mW5uAfYeWoUkc7Co6ehJ21y9vnoajFvmCGj1SkXJgZOgLGH6tfquZcoZL5Z+yMhip3zFWSA5s6Rd+oqL9me2AQ=="}]}, "publicKey": "-----BEGIN PUBLIC KEY-----\nMCowBQYDK2VwAyEAvHy8tWNjdfodgkNNRmck2SN39TuYBpXdSdJtDOEiBaU=\n-----END PUBLIC KEY-----"};
-</script>
-<script>document.querySelector(".bar .theme").onclick=function(){var d=document.documentElement,t=d.dataset.theme==="dark"?"light":"dark";d.dataset.theme=t;try{localStorage.setItem("vaara-theme",t)}catch(e){}};document.querySelector(".bar .burger").onclick=function(){var n=document.querySelector("nav.top"),o=n.classList.toggle("open");this.setAttribute("aria-expanded",o)}</script>
+</div><p class="tm">Vaara™ © 2026 Henri Sirkkavaara, Helsinki. AGPL-3.0-or-later.</p></div></footer>
+<script>document.querySelector(".bar .theme").onclick=function(){var d=document.documentElement,t=d.dataset.theme==="dark"?"light":"dark";d.dataset.theme=t;try{localStorage.setItem("vaara-theme",t)}catch(e){}};document.querySelector(".bar .burger").onclick=function(){var n=document.querySelector("nav.top"),o=n.classList.toggle("open");this.setAttribute("aria-expanded",o)};document.querySelectorAll(".bar .lang a").forEach(function(a){a.onclick=function(){try{localStorage.setItem("vaara-lang",a.hreflang)}catch(e){}}})</script>
 </body>
 </html>
