@@ -53,9 +53,9 @@
       schema; they do not redefine the envelope. The format described here is
       deployed, and its receipts are independently recomputable from public
       conformance vectors that ship with standalone checkers importing no
-      issuer code. The minimal profile is a governance decision over a single
-      autonomous action, bound to the action's own intent with no external
-      rail.</t>
+      issuer code. The minimal profile is the engine decision: one receipt per
+      decision an engine records on its own audit trail, bound to the trail
+      record it decided, with no external rail.</t>
     </abstract>
   </front>
 
@@ -91,11 +91,13 @@
       library and, as its profile needs, libraries for signatures, JCS, ASN.1,
       or ML-DSA.</t>
 
-      <t>The floor of the format is a governance decision over a single agent
-      action (<xref target="profile-govern"/>): a verdict bound to the action's
-      own intent, with no payment rail, settlement artifact, or external evidence
-      record to join. It is the smallest conforming receipt, and the entry point
-      a producer reaches for first.</t>
+      <t>The floor of the format is the engine decision profile
+      (<xref target="profile-engine"/>): one receipt per decision an engine
+      records on its hash-chained audit trail, bound to that trail record, with
+      no payment rail, settlement artifact, or external evidence record to
+      join. It is the smallest conforming receipt, it is what a default install
+      of the reference implementation emits for every decision, and it is the
+      entry point a producer reaches for first.</t>
 
       <section anchor="terminology" numbered="true">
         <name>Terminology</name>
@@ -389,6 +391,121 @@ execution receipt:
         tests/vectors/execution_receipt_v0/normative/ and
         tests/vectors/decision_pairing_v0/.</t>
       </section>
+
+      <section anchor="examples" numbered="true">
+        <name>Worked Examples</name>
+        <t>Two receipts from the conformance vectors, as the library wrote
+        them. Both verify with the standalone checkers of their suites. Lines
+        longer than the page are folded with the single-backslash strategy of
+        <xref target="RFC8792"/>; the unfolded bytes are the vector files.</t>
+        <t>A decision receipt, the floor of the format
+        (<xref target="profile-engine"/>), from
+        tests/vectors/trail_decision_v0/valid/0-allow.json. The evidence
+        record it binds follows it; evidenceRef.digest is the SHA-256 of that
+        record's JCS encoding, and the back link names the previous trail
+        record's hash, here the hash of the empty string because this is the
+        first record of its trail.</t>
+        <sourcecode type="json" markers="true"><![CDATA[
+========== NOTE: '\' line wrapping per RFC 8792 ==========
+
+{
+  "alg": "ES256",
+  "backLink": {
+    "attestationDigest": "sha256:e3b0c44298fc1c149afbf4c8996fb92427a\
+  e41e4649b934ca495991b7852b855",
+    "attestationNonce": "dc8b561b-01e2-4e8e-9af2-b8b0fcb9a2ff"
+  },
+  "decisionDerived": {
+    "decidedAt": "2026-09-25T00:17:48.320Z",
+    "decision": "allow",
+    "evidenceRef": {
+      "canonicalization": "jcs-rfc8785",
+      "digest": "sha256:7663868c3f5830dba2be46d514c65451404b8cf93d75\
+  69efff1493eb3c380a4e",
+      "ref": "vaara:trail/dc8b561b-01e2-4e8e-9af2-b8b0fcb9a2ff",
+      "schema": "vaara.trail-decision/v0"
+    },
+    "policyId": "policy:vaara-engine/1",
+    "reason": "allow: risk=0.12 (threshold allow<0.55 deny>0.85)",
+    "riskScore": "0.12"
+  },
+  "issuerAsserted": {
+    "alg": "ES256",
+    "iat": "2026-09-25T00:17:48Z",
+    "iss": "vaara:engine",
+    "nonce": "RBKpasu2API112jCGYcLZ0M7",
+    "secretVersion": "es256:dfa441deb94a9c1c",
+    "sub": "vector-agent"
+  },
+  "signature": "7ebfd51b88d876a46fea986beb497ef0e122e84f3356c5244dd0\
+  a2a893a8aa7eaee95ec0c84d12a41929ea15403be85b0e9b1211ae4e6acb6dcb96\
+  c4bafc42ad",
+  "version": 1
+}
+]]></sourcecode>
+        <t>The evidence record behind evidenceRef:</t>
+        <sourcecode type="json" markers="true"><![CDATA[
+========== NOTE: '\' line wrapping per RFC 8792 ==========
+
+{
+  "actionId": "vector-action-0",
+  "agentId": "vector-agent",
+  "decidedAt": "2026-09-25T00:17:48.320Z",
+  "decision": "allow",
+  "eventType": "decision_made",
+  "previousHash": "sha256:e3b0c44298fc1c149afbf4c8996fb92427ae41e464\
+  9b934ca495991b7852b855",
+  "reason": "allow: risk=0.12 (threshold allow<0.55 deny>0.85)",
+  "recordHash": "sha256:b0b163a567a30a5396583055f4a943484958c3ad082d\
+  2d656b2b30ebf6105af4",
+  "recordId": "dc8b561b-01e2-4e8e-9af2-b8b0fcb9a2ff",
+  "riskScore": "0.12",
+  "schema": "vaara.trail-decision/v0",
+  "tenantId": "",
+  "toolName": "read_file"
+}
+]]></sourcecode>
+        <t>An execution receipt (<xref target="exec-receipt"/>) with an
+        executed status and a projection result commitment, from
+        tests/vectors/execution_receipt_v0/normative/es256_executed_projection/receipt.json.
+        Its back link carries the attestation digest and nonce of the decision
+        receipt it follows, so the outcome cannot be reattached to another
+        decision.</t>
+        <sourcecode type="json" markers="true"><![CDATA[
+========== NOTE: '\' line wrapping per RFC 8792 ==========
+
+{
+  "alg": "ES256",
+  "backLink": {
+    "attestationDigest": "sha256:79acdd4bb3c22a688b1c3321b9a26cafb5c\
+  b58c990a963874066d04b8497f70b",
+    "attestationNonce": "fixed-attestation-nonce-000"
+  },
+  "outcomeDerived": {
+    "completedAt": "2026-05-29T10:00:00Z",
+    "resultCommitment": {
+      "projection": "{\"deleted\":true,\"path\":\"/archive/2024-Q3.m\
+  d\"}",
+      "projectionDigest": "sha256:c9a4caed49b3efaa7908a29a550b8d33ff\
+  bb088c52d519242477223a83214198"
+    },
+    "status": "executed"
+  },
+  "receiptAsserted": {
+    "alg": "ES256",
+    "iat": "2026-05-29T10:00:00Z",
+    "iss": "issuer://test",
+    "nonce": "fixed-receipt-nonce-0001",
+    "secretVersion": "v1",
+    "sub": "agent:archiver"
+  },
+  "signature": "867c0439a289d77b75d489b07c42292095c947869365f1c92d98\
+  2440338bddf0bb0bf91212cf9b1e681b076315862b5458f5167e98f0fca3a03c42\
+  3b2a825f44",
+  "version": 1
+}
+]]></sourcecode>
+      </section>
     </section>
 
     <section anchor="evidence" numbered="true">
@@ -594,76 +711,56 @@ execution receipt:
             <tr><th>Profile</th><th>Evidence schema</th><th>Vectors</th></tr>
           </thead>
           <tbody>
-            <tr><td>governance decision (the floor)</td><td>vaara.governance_decision/v0</td><td>tests/vectors/governance_decision_v0/</td></tr>
             <tr><td>x402 settlement binding</td><td>x402.settlement.*/v0</td><td>tests/vectors/x402_settlement_v0/</td></tr>
             <tr><td>authorization decision</td><td>vaara.authorization/v0</td><td>tests/vectors/authorization_v0/, tests/vectors/contiguity_v0/, tests/vectors/class_gate_v0/</td></tr>
             <tr><td>AP2 checkout binding</td><td>vaara.authorization/v0 (names AP2 PEF frame_id)</td><td>tests/vectors/ap2_v0/</td></tr>
             <tr><td>TAP request binding</td><td>tap.request/v0</td><td>tests/vectors/tap_v0/</td></tr>
             <tr><td>generic external execution evidence</td><td>vaara.authorization/v0 (names an external_execution_evidence slot)</td><td>tests/vectors/external_evidence_v0/</td></tr>
-            <tr><td>credential binding</td><td>vaara.credential_binding/v0 (MCP gateway enforcement)</td><td>tests/vectors/credential_binding_v0/</td></tr>
-            <tr><td>ATLAS threat detection</td><td>vaara.atlas_threat/v0 (MITRE ATLAS AI agent threat patterns)</td><td>tests/vectors/atlas_threat_v0/</td></tr>
-            <tr><td>engine decision</td><td>vaara.trail-decision/v0</td><td>tests/vectors/trail_decision_v0/, tests/vectors/cage_v0/</td></tr>
+            <tr><td>engine decision (the floor)</td><td>vaara.trail-decision/v0</td><td>tests/vectors/trail_decision_v0/, tests/vectors/cage_v0/</td></tr>
           </tbody>
         </table>
+        <t>Three further suites in the same repository are related to this
+        format and are not profiles of it, because the artifact each one
+        verifies is not a vaara.receipt/v1 envelope: governance_decision_v0
+        (<xref target="profile-govern"/>), credential_binding_v0 (the signed
+        HS256 grant a credential broker issues, the artifact the authorization
+        profile's grantFingerprint names), and atlas_threat_v0 (a flat HMAC
+        record exercised against MITRE ATLAS agent threat patterns). Each
+        ships a standalone checker, and none defines an evidence schema for
+        evidenceRef.</t>
       </section>
 
       <section anchor="profile-govern" numbered="true">
-        <name>Profile Example: Governance Decision (the floor)</name>
-        <t>This is the floor profile, described first because it is the smallest
-        conforming receipt and the entry point a producer reaches for before any
-        rail. It turns a single decision about an agent action into a receipt with
-        no external settlement, payment frame, or third-party artifact to join:
-        the evidence record it binds is the action's own intent. It adds a
-        governance decision record (schema = vaara.governance_decision/v0) whose
-        JCS digest is the receipt's evidenceRef.digest and which commits:</t>
-        <ul>
-          <li>An intent_ref = sha256(JCS({schema, agentId, actionType,
-          normalizedScope, intentDigest})), where intentDigest binds the action
-          type, the normalized scope, and a params_hash over the call params. The
-          intent_ref carries no timestamp, so the same authorized intent
-          recomputes to the same identity on a retry; that is what lets a verifier
-          tell a re-presented authorization from a fresh one.</li>
-          <li>A target_state_digest over the asserted post-action state, and a
-          decision_context_hash = sha256(JCS({policyRefs, targetStateDigest,
-          continuationId, normalizationId})) binding the policy set and the
-          continuation the decision was made under.</li>
-          <li>A receipt_ref that carries seq, timestampMs, and an idempotencyKey,
-          so it is unique per execution attempt; a replayed outcome that reuses a
-          receipt_ref is detectable. The params and the target state never enter
-          the record in cleartext; only their committed digests do, so the receipt
-          is publishable while the inputs stay private.</li>
-        </ul>
-        <t>The verdict is recomputed, never read from a trusted field. A verifier
-        reaches the verdict by recomputing the mismatch: a candidate whose
-        intent_ref differs from the approved intent_ref is a deny; an equal
-        intent_ref with a drifted target_state_digest is a revise; an equal
-        intent_ref under a different continuation is a deny; two outcomes sharing a
-        receipt_ref and idempotencyKey are a duplicate, a deny. The decision and
-        its machine reason live in decisionDerived.decision and
-        decisionDerived.reason under the receipt signature.</t>
-        <t>The floor reuses the completeness layer of
-        <xref target="profile-authz"/> unchanged: a monotonic seq with
-        runningCount per decision and a terminal seal (a GovernanceSeal carrying
-        the boundary total) make a dropped decision a named gap. A mid-stream drop
-        is self-evident from the running count; a dropped tail is caught only
-        because the seal pins the total; an unsealed prefix is the irreducible
-        residual a timestamp anchor closes. The same layering as the authorization
-        profile applies here, on the smallest possible record.</t>
-        <t>The floor depends on canonicalization as much as every other profile. The
-        conformance vector cases/unicode_scope.json carries a normalized scope with
-        non-ASCII characters (an e with acute accent U+00E9, a U with diaeresis
-        U+00DC, an i with diaeresis U+00EF, and a euro sign U+20AC). Under RFC 8785
-        these are emitted as their raw UTF-8 bytes; a producer that instead
-        serializes sorted JSON, escaping each non-ASCII character to its
-        six-character \uXXXX form (U+00E9 becomes \uXXXX with hex digits 00e9,
-        and so on for U+00DC, U+00EF, and U+20AC),
-        canonicalizes different bytes and computes a different intent_ref, so it
-        fails the vector. This is the cheapest way to
-        catch a canonicalizer that is sorted JSON but not JCS. A third party
-        recomputes the four derived refs, the four fail-closed verdicts, the sealed
-        completeness, and this binding with no Vaara import, running only a JCS
-        library and a signature library. See
-        tests/vectors/governance_decision_v0/_check_independent.py.</t>
+        <name>Related Suite: Governance Decision Records</name>
+        <t>This section is informative. tests/vectors/governance_decision_v0/
+        holds signed governance decision and outcome records in the contract
+        shape proposed for the CrewAI framework (schemas
+        crewai.governance.decision/v1 and crewai.governance.outcome/v1), each
+        record wrapped as {"record", "signature"} with an ES256 signature over
+        the JCS encoding of the record. They are not vaara.receipt/v1
+        envelopes and define no evidence schema for evidenceRef; earlier
+        revisions of this document described them as the floor of this format,
+        which they were not.</t>
+        <t>What the suite does pin is the part a third party recomputes with a
+        JCS library and a signature library alone: an intent_ref derived from
+        the schema, agent, action type, normalized scope and an intent digest
+        over the call parameters, so a re-presented authorization recomputes
+        to the same identity on a retry; a target-state digest and a decision
+        context hash binding the policy set and the continuation; four
+        fail-closed verdicts (intent mismatch, target-state drift, continuation
+        mismatch, duplicate outcome); and a per-run completeness sequence with
+        a terminal seal, the same layering as <xref target="profile-authz"/>.
+        The member names of these preimages are those of the records
+        themselves, in snake case, and the checker is
+        tests/vectors/governance_decision_v0/_check_independent.py; a second
+        checker with no dependencies at all, _check_zerodep.py, reaches the
+        same verdicts.</t>
+        <t>The case cases/unicode_scope.json carries a normalized scope with
+        non-ASCII characters. Under RFC 8785 these are emitted as their raw
+        UTF-8 bytes; a producer that escapes them to \uXXXX form canonicalizes
+        different bytes and fails the vector, which is the cheapest way to
+        catch a canonicalizer that is sorted JSON but not JCS. That property
+        holds for every digest in this document.</t>
       </section>
 
       <section anchor="profile-x402" numbered="true">
@@ -995,6 +1092,15 @@ execution receipt:
           or that any party other than the issuer observed the fact. confirmed
           false with basis "declared" means that a launcher declared the cage and
           the issuer did not confirm it.</t>
+          <t>The block names the deciding process, not the agent the decision
+          was about. One launch can therefore produce blocks that differ by
+          the surface the decision was made on: a decision made inside the
+          caged tree names the cage and confirms it; a decision made by a
+          process outside the tree about that tree (a file-system guard, an
+          egress proxy) names that process's own confinement, which may be
+          "none" or the declared block unconfirmed. Each is true of the process
+          that signed it. A consumer collecting one launch's receipts groups
+          them by subject and name, not by the block.</t>
           <t>Each driver defines which bytes its configDigest covers. A consumer
           uses configDigest as a comparator: two receipts with the same driver and
           configDigest ran under the same declared configuration. A consumer that
@@ -1066,7 +1172,8 @@ execution receipt:
       source repository (<xref target="VAARA-REPO"/>):</t>
       <ul>
         <li>A library that emits and verifies receipts, including the floor
-        profile (<xref target="profile-govern"/>).</li>
+        profile (<xref target="profile-engine"/>): a default install signs
+        one receipt per decision it records.</li>
         <li>The public conformance vectors under tests/vectors/ with per-profile
         standalone checkers (_check_independent.py) that import no issuer code, so a
         second party recomputes every digest, signature, back link, and
@@ -1463,10 +1570,44 @@ execution receipt:
         </front>
         <seriesInfo name="FIPS" value="PUB 180-4"/>
       </reference>
+
+      <reference anchor="RFC7518" target="https://www.rfc-editor.org/info/rfc7518">
+        <front>
+          <title>JSON Web Algorithms (JWA)</title>
+          <author initials="M." surname="Jones" fullname="Michael B. Jones"/>
+          <date year="2015" month="May"/>
+        </front>
+        <seriesInfo name="RFC" value="7518"/>
+        <seriesInfo name="DOI" value="10.17487/RFC7518"/>
+      </reference>
+
+      <reference anchor="FIPS204" target="https://nvlpubs.nist.gov/nistpubs/FIPS/NIST.FIPS.204.pdf">
+        <front>
+          <title>Module-Lattice-Based Digital Signature Standard</title>
+          <author>
+            <organization>National Institute of Standards and Technology</organization>
+          </author>
+          <date year="2024" month="August"/>
+        </front>
+        <seriesInfo name="FIPS" value="PUB 204"/>
+      </reference>
     </references>
 
     <references>
       <name>Informative References</name>
+
+      <reference anchor="RFC8792" target="https://www.rfc-editor.org/info/rfc8792">
+        <front>
+          <title>Handling Long Lines in Content of Internet-Drafts and RFCs</title>
+          <author initials="K." surname="Watsen" fullname="Kent Watsen"/>
+          <author initials="E." surname="Auerswald" fullname="Erik Auerswald"/>
+          <author initials="A." surname="Farrel" fullname="Adrian Farrel"/>
+          <author initials="Q." surname="Wu" fullname="Qin Wu"/>
+          <date year="2020" month="June"/>
+        </front>
+        <seriesInfo name="RFC" value="8792"/>
+        <seriesInfo name="DOI" value="10.17487/RFC8792"/>
+      </reference>
 
       <reference anchor="RFC9162" target="https://www.rfc-editor.org/info/rfc9162">
         <front>
@@ -1478,16 +1619,6 @@ execution receipt:
         </front>
         <seriesInfo name="RFC" value="9162"/>
         <seriesInfo name="DOI" value="10.17487/RFC9162"/>
-      </reference>
-
-      <reference anchor="RFC7518" target="https://www.rfc-editor.org/info/rfc7518">
-        <front>
-          <title>JSON Web Algorithms (JWA)</title>
-          <author initials="M." surname="Jones" fullname="Michael B. Jones"/>
-          <date year="2015" month="May"/>
-        </front>
-        <seriesInfo name="RFC" value="7518"/>
-        <seriesInfo name="DOI" value="10.17487/RFC7518"/>
       </reference>
 
       <reference anchor="RFC7942" target="https://www.rfc-editor.org/info/rfc7942">
@@ -1524,17 +1655,6 @@ execution receipt:
           <date year="2026"/>
         </front>
         <seriesInfo name="Internet-Draft" value="draft-ietf-rats-ear"/>
-      </reference>
-
-      <reference anchor="FIPS204" target="https://nvlpubs.nist.gov/nistpubs/FIPS/NIST.FIPS.204.pdf">
-        <front>
-          <title>Module-Lattice-Based Digital Signature Standard</title>
-          <author>
-            <organization>National Institute of Standards and Technology</organization>
-          </author>
-          <date year="2024" month="August"/>
-        </front>
-        <seriesInfo name="FIPS" value="PUB 204"/>
       </reference>
 
       <reference anchor="eIDAS" target="https://eur-lex.europa.eu/legal-content/EN/TXT/?uri=CELEX:32014R0910">

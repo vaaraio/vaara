@@ -361,7 +361,23 @@ ships recomputable vectors, not because it is another instance of the binding.
 | release condition | `vaara.release-condition/v0` (consumes `vaara.authorization/v0`) | `vaara.receipt/v1` | `tests/vectors/release_condition_v0/` |
 | attribute attestation | `vaara.attribute-attestation/v0` | `vaara.receipt/v1` | `tests/vectors/attribute_attestation_v0/` |
 | hidden-value attribute attestation | `vaara.attribute-attestation-zk/v0` (proved by `vaara.attribute-predicate/v0`) | `vaara.receipt/v1` | `tests/vectors/attribute_attestation_zk_v0/` |
-| engine decision | `vaara.trail-decision/v0` | `vaara.receipt/v1` | `tests/vectors/trail_decision_v0/`, `tests/vectors/cage_v0/` |
+| engine decision (the floor) | `vaara.trail-decision/v0` | `vaara.receipt/v1` | `tests/vectors/trail_decision_v0/`, `tests/vectors/cage_v0/` |
+
+The floor of the format is the engine decision profile (5.10): one receipt per
+decision an engine records on its hash-chained trail, bound to that trail
+record, with no rail, settlement artifact or external evidence record to join.
+It is the smallest conforming receipt and what a default install emits for
+every decision.
+
+Three further suites in the same repository are related to this format and are
+not profiles of it, because the artifact each one verifies is not a
+`vaara.receipt/v1` envelope: `tests/vectors/governance_decision_v0/` (signed
+governance decision and outcome records in the `{record, signature}` shape
+proposed for the CrewAI framework), `tests/vectors/credential_binding_v0/` (the
+signed HS256 grant a credential broker issues, the artifact the authorization
+profile's `grantFingerprint` names), and `tests/vectors/atlas_threat_v0/` (a
+flat HMAC record of a MITRE ATLAS threat detection). Each ships a standalone
+checker, and none defines an evidence schema for `evidenceRef`.
 
 ### 5.2 Profile example: x402 settlement binding
 
