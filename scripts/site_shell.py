@@ -32,7 +32,7 @@ NAV = {
         "foot_open": "Open source. Runs on your own machines. Nothing is sent to us.",
         "foot_code": "Code", "foot_draft": "Internet-Draft", "foot_conf": "Conformance results",
         "foot_tech": "Technical overview", "foot_pub": "Everything Vaara publishes",
-        "foot_tm": "Vaara™ and Vaara Resin™ © 2026 Henri Sirkkavaara, Helsinki. AGPL-3.0-or-later.",
+        "foot_tm": "Vaara™ © 2026 Henri Sirkkavaara, Helsinki. AGPL-3.0-or-later.",
     },
     "fi": {
         "sectors": "Toimialat", "products": "Tuotteet", "test": "Testaa itse", "hood": "Konepellin alla",
@@ -47,7 +47,7 @@ NAV = {
         "foot_open": "Avointa lähdekoodia. Toimii omilla koneillanne. Mitään ei lähetetä meille.",
         "foot_code": "Lähdekoodi", "foot_draft": "IETF-luonnos", "foot_conf": "Vaatimustenmukaisuustulokset",
         "foot_tech": "Tekninen yleiskuva", "foot_pub": "Kaikki, mitä Vaara julkaisee",
-        "foot_tm": "Vaara™ ja Vaara Resin™ © 2026 Henri Sirkkavaara, Helsinki. AGPL-3.0-or-later.",
+        "foot_tm": "Vaara™ © 2026 Henri Sirkkavaara, Helsinki. AGPL-3.0-or-later.",
     },
 }
 
@@ -118,7 +118,7 @@ def footer(lang: str) -> str:
             f'<div><a href="https://github.com/vaaraio/vaara">{E(n["foot_code"])}</a><br>\n'
             f'<a href="https://datatracker.ietf.org/doc/draft-sirkkavaara-vaara-receipt/">{E(n["foot_draft"])}</a><br>\n'
             f'<a href="/conformance.html">{E(n["foot_conf"])}</a><br>'
-            f'<a href="/surfaces.html">{E(n["foot_pub"])}</a><br>'
+            f'<a href="{href(lang, "/surfaces.html")}">{E(n["foot_pub"])}</a><br>'
             f'<a href="{href(lang, "/under-the-hood.html")}">{E(n["foot_tech"])}</a></div>\n'
             f'</div><p class="tm">{E(n["foot_tm"])}</p></div></footer>')
 

@@ -272,3 +272,34 @@ The full technical detail stays where it was:
 - The code and documentation: https://github.com/vaaraio/vaara
 
 - The IETF Internet-Draft: https://datatracker.ietf.org/doc/draft-sirkkavaara-vaara-receipt/
+
+## Everything Vaara publishes | Vaara
+URL: https://vaara.io/surfaces.html
+
+Every surface in one line each, with a link to the thing itself. Nothing here asks you to take a claim on trust: each item is a record held by someone else or a file you can recompute.
+
+### Check it yourself
+- Conformance results: The register, its terms, and how to file a row of your own
+- Receipt explorer: Check a receipt in your browser, offline, without contacting Vaara
+- conformance.json: The register as machine-readable data, hash-chained row to row
+- Badge: Current row count, regenerated from the register
+
+### Specification
+- draft-sirkkavaara-vaara-receipt: The receipt format at the IETF. An active Internet-Draft, not an RFC and not an adopted standard
+- Standards used: RFC 8785 canonicalisation, COSE_Sign1, RFC 3161 timestamps, and what each one is relied on for
+
+### Code and packages
+- Source: AGPL-3.0, no SaaS, no telemetry
+- PyPI: vaara
+- npm: @vaara/client
+- GitHub Action: Vaara Policy Check
+- OpenSSF Best Practices: Passing badge, assessed by OpenSSF and not by Vaara
+
+### Documents
+- Logs versus evidence: Why a log your own system wrote does not establish what happened
+- EU AI Act Article 12: Record-keeping, and where a log stops being sufficient
+- Execution receipts: Pairing a tool call to the policy that allowed it
+- Compliance mapping: What Vaara covers, and what it does not
+- llms.txt: The same ground in one file, for machine readers
+
+Vaara produces evidence. It does not certify anyone, and a passing run establishes portability rather than correctness. Two of the defects found so far were in the claims on this site rather than in the code, and both were found by people running the tests somewhere Vaara had never run them.

@@ -300,3 +300,33 @@ body { font-size: 16px; }
 /* the footer sits at the bottom of the window on short pages */
 body { min-height: 100vh; display: flex; flex-direction: column; }
 body > main { flex: 1 0 auto; }
+
+/* everything Vaara publishes: the party list, then link groups in two columns */
+.parties { list-style: none; margin: 28px 0 0; padding: 0; border-top: 1px solid var(--rule); }
+.parties li { display: grid; grid-template-columns: 220px 1fr 230px; gap: 6px 28px; align-items: baseline;
+  padding: 16px 0; border-bottom: 1px solid var(--rule); }
+.parties .who { color: var(--ink); font-weight: 600; text-decoration: none; }
+.parties .who:hover { color: var(--accent); }
+.parties .aff { color: var(--muted); font-size: 15px; }
+.parties .res { color: var(--accent); font-size: 15px; text-align: right; }
+.lgrid { display: grid; grid-template-columns: repeat(2, 1fr); gap: 52px 72px; }
+.lgroup h2 { font-size: 20px; margin-bottom: 14px; }
+.links { list-style: none; margin: 0; padding: 0; }
+.links li { padding: 12px 0; border-bottom: 1px solid var(--rule); }
+.links li:last-child { border-bottom: 0; }
+.links a { color: var(--ink); font-weight: 600; text-decoration: none; display: block; }
+.links a:hover { color: var(--accent); }
+.links span { display: block; color: var(--muted); font-size: 15px; margin-top: 2px; }
+@media (max-width: 820px) {
+  .parties li { grid-template-columns: 1fr; gap: 2px; }
+  .lgrid { grid-template-columns: 1fr; gap: 40px; }
+}
+
+/* sector and product boxes: a light frame with the block's own colour on top, like the six on the home page */
+.card.box, a.card.box { border: 1px solid var(--rule); border-top: 3px solid var(--fa); border-radius: 10px;
+  padding: 26px 26px 28px; background: var(--card); }
+a.card.box:hover { border-color: var(--fa); }
+.card.box .ico { background: color-mix(in srgb, var(--fa) 11%, var(--card)); }
+.card.box .ico .a { stroke: var(--fa); }
+.grid:has(.box) { gap: 24px; }
+.grid.two:has(.box) { gap: 24px; }

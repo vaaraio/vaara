@@ -3,334 +3,276 @@
 <head>
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width,initial-scale=1">
-<title>What Vaara publishes | Every checkable surface in one place</title>
-<meta name="description" content="Every page, record and package Vaara publishes, each in one line: independent reproductions of the conformance vectors, the receipt Internet-Draft, the verifier, the packages and the documents. Each item links to the thing itself.">
-<meta name="author" content="Henri Sirkkavaara">
-<meta name="robots" content="index, follow, max-snippet:-1">
-<meta name="theme-color" content="#14212E">
+<title>Everything Vaara publishes | Vaara</title>
+<meta name="description" content="Every page, record and package Vaara publishes, each in one line: independent reproductions of the conformance tests, the receipt Internet-Draft, the explorer, the packages and the documents.">
 <link rel="canonical" href="https://vaara.io/surfaces.html">
+<link rel="alternate" hreflang="en" href="https://vaara.io/surfaces.html">
+<link rel="alternate" hreflang="fi" href="https://vaara.io/fi/surfaces.html">
 <link rel="icon" type="image/svg+xml" href="/favicon.svg">
+<link rel="stylesheet" href="/style.css">
+<meta name="theme-color" content="#14212E">
+<meta name="color-scheme" content="light dark">
+<script>try{var t=localStorage.getItem("vaara-theme");if(t!=="dark"&&t!=="light")t=matchMedia("(prefers-color-scheme: dark)").matches?"dark":"light";document.documentElement.dataset.theme=t;var p=location.pathname;if((p==="/"||p==="/index.html")&&!localStorage.getItem("vaara-lang")&&(navigator.languages||[navigator.language]).some(function(l){return/^fi\b/i.test(l)}))location.replace("/fi/")}catch(e){}</script>
+<meta name="author" content="Henri Sirkkavaara">
+<meta name="robots" content="index, follow, max-image-preview:large, max-snippet:-1">
+<link rel="alternate" hreflang="x-default" href="https://vaara.io/surfaces.html">
 <link rel="alternate icon" href="/favicon.ico">
 <link rel="apple-touch-icon" href="/favicon-180.png">
+<link rel="sitemap" type="application/xml" href="/sitemap.xml">
+<link rel="alternate" type="text/plain" href="/llms.txt" title="Vaara for language models">
+<link rel="me" href="https://github.com/vaaraio">
 <meta property="og:type" content="website">
 <meta property="og:site_name" content="Vaara">
-<meta property="og:title" content="What Vaara publishes">
-<meta property="og:description" content="Every page, record and package Vaara publishes, each in one line: independent reproductions of the conformance vectors, the receipt Internet-Draft, the verifier, the packages and the documents. Each item links to the thing itself.">
+<meta property="og:title" content="Everything Vaara publishes | Vaara">
+<meta property="og:description" content="Every page, record and package Vaara publishes, each in one line: independent reproductions of the conformance tests, the receipt Internet-Draft, the explorer, the packages and the documents.">
 <meta property="og:url" content="https://vaara.io/surfaces.html">
 <meta property="og:image" content="https://vaara.io/og/en-surfaces.png">
 <meta property="og:image:width" content="1200">
 <meta property="og:image:height" content="630">
-<meta property="og:image:alt" content="Vaara: What Vaara publishes">
+<meta property="og:image:alt" content="Vaara: Everything Vaara publishes">
 <meta property="og:locale" content="en_US">
+<meta property="og:locale:alternate" content="fi_FI">
 <meta name="twitter:card" content="summary_large_image">
-<meta name="twitter:title" content="What Vaara publishes">
-<meta name="twitter:description" content="Every page, record and package Vaara publishes, each in one line: independent reproductions of the conformance vectors, the receipt Internet-Draft, the verifier, the packages and the documents. Each item links to the thing itself.">
+<meta name="twitter:title" content="Everything Vaara publishes | Vaara">
+<meta name="twitter:description" content="Every page, record and package Vaara publishes, each in one line: independent reproductions of the conformance tests, the receipt Internet-Draft, the explorer, the packages and the documents.">
 <meta name="twitter:image" content="https://vaara.io/og/en-surfaces.png">
-<meta name="twitter:image:alt" content="Vaara: What Vaara publishes">
-<link rel="author" href="https://vaara.io/">
-<link rel="alternate" type="text/plain" href="/llms.txt" title="The same surfaces as plain text for machine readers">
+<meta name="twitter:image:alt" content="Vaara: Everything Vaara publishes">
 <script type="application/ld+json">
 {
-  "@context": "https://schema.org",
-  "@graph": [
-    {
-      "@type": [
-        "WebPage",
-        "CollectionPage"
-      ],
-      "@id": "https://vaara.io/surfaces.html#page",
-      "breadcrumb": {"@id": "https://vaara.io/surfaces.html#crumbs"},
-      "url": "https://vaara.io/surfaces.html",
-      "name": "What Vaara publishes",
-      "description": "Every page, record and package Vaara publishes, each in one line: independent reproductions of the conformance vectors, the receipt Internet-Draft, the verifier, the packages and the documents. Each item links to the thing itself.",
-      "inLanguage": "en",
-      "isPartOf": {
-        "@id": "https://vaara.io/#website"
-      },
-      "publisher": {
-        "@id": "https://vaara.io/#organization"
-      },
-      "author": {
-        "@id": "https://vaara.io/#henri"
-      },
-      "mainEntity": {
-        "@id": "https://vaara.io/surfaces.html#surfaces"
-      }
-    },
-    {
-      "@type": "WebSite",
-      "@id": "https://vaara.io/#website",
-      "name": "Vaara",
-      "url": "https://vaara.io/",
-      "inLanguage": "en"
-    },
-    {
-      "@type": "Organization",
-      "@id": "https://vaara.io/#organization",
-      "name": "Vaara",
-      "url": "https://vaara.io/",
-      "logo": "https://vaara.io/vaara-wordmark-light.png",
-      "founder": {
-        "@id": "https://vaara.io/#henri"
-      }
-    },
-    {
-      "@type": "Person",
-      "@id": "https://vaara.io/#henri",
-      "name": "Henri Sirkkavaara",
-      "url": "https://vaara.io/"
-    },
-    {
-      "@type": "ItemList",
-      "@id": "https://vaara.io/surfaces.html#surfaces",
-      "name": "Everything Vaara publishes that a reader can check",
-      "description": "Each entry is a surface someone outside the project can open and verify without asking the maintainer.",
-      "itemListOrder": "https://schema.org/ItemListUnordered",
-      "numberOfItems": 5,
-      "itemListElement": [
-        {
-          "@type": "ListItem",
-          "position": 1,
-          "name": "Independent reproductions",
-          "url": "https://vaara.io/conformance.html",
-          "description": "Parties other than the maintainer ran the conformance checkers and reported the result somewhere public. Each entry links to that party's own record."
-        },
-        {
-          "@type": "ListItem",
-          "position": 2,
-          "name": "Check it yourself",
-          "url": "https://vaara.io/verify.html",
-          "description": "The results register, the verifier, the register as one machine-readable file, and the badge."
-        },
-        {
-          "@type": "ListItem",
-          "position": 3,
-          "name": "Specification",
-          "url": "https://datatracker.ietf.org/doc/draft-sirkkavaara-vaara-receipt/",
-          "description": "The receipt format as an IETF Internet-Draft, and the standards it builds on."
-        },
-        {
-          "@type": "ListItem",
-          "position": 4,
-          "name": "Code and packages",
-          "url": "https://github.com/vaaraio/vaara",
-          "description": "Source, PyPI, npm, the GitHub Action, and the OpenSSF Best Practices entry."
-        },
-        {
-          "@type": "ListItem",
-          "position": 5,
-          "name": "Documents",
-          "url": "https://vaara.io/llms.txt",
-          "description": "Why logs are not evidence, the EU AI Act Article 12 reading, execution receipts, and the compliance mapping."
-        }
-      ]
-    },
-    {
-      "@type": "BreadcrumbList",
-      "@id": "https://vaara.io/surfaces.html#crumbs",
-      "itemListElement": [
-        {"@type": "ListItem", "position": 1, "name": "Vaara", "item": "https://vaara.io/"},
-        {"@type": "ListItem", "position": 2, "name": "Under the hood", "item": "https://vaara.io/under-the-hood.html"},
-        {"@type": "ListItem", "position": 3, "name": "What Vaara publishes", "item": "https://vaara.io/surfaces.html"}
-      ]
+ "@context": "https://schema.org",
+ "@graph": [
+  {
+   "@type": "CollectionPage",
+   "@id": "https://vaara.io/surfaces.html",
+   "url": "https://vaara.io/surfaces.html",
+   "name": "Everything Vaara publishes | Vaara",
+   "description": "Every page, record and package Vaara publishes, each in one line: independent reproductions of the conformance tests, the receipt Internet-Draft, the explorer, the packages and the documents.",
+   "inLanguage": "en",
+   "isPartOf": {
+    "@id": "https://vaara.io/#website"
+   },
+   "publisher": {
+    "@id": "https://vaara.io/#organization"
+   },
+   "primaryImageOfPage": {
+    "@type": "ImageObject",
+    "url": "https://vaara.io/og/en-surfaces.png",
+    "width": 1200,
+    "height": 630
+   },
+   "breadcrumb": {
+    "@id": "https://vaara.io/surfaces.html#crumbs"
+   },
+   "mainEntity": {
+    "@id": "https://vaara.io/surfaces.html#list"
+   }
+  },
+  {
+   "@type": "WebSite",
+   "@id": "https://vaara.io/#website",
+   "name": "Vaara",
+   "url": "https://vaara.io/",
+   "inLanguage": [
+    "en",
+    "fi"
+   ],
+   "publisher": {
+    "@id": "https://vaara.io/#organization"
+   }
+  },
+  {
+   "@type": "Organization",
+   "@id": "https://vaara.io/#organization",
+   "name": "Vaara",
+   "url": "https://vaara.io/",
+   "logo": "https://vaara.io/vaara-wordmark-light.png",
+   "email": "hello@vaara.io",
+   "founder": {
+    "@id": "https://vaara.io/#henri"
+   },
+   "areaServed": "EU",
+   "address": {
+    "@type": "PostalAddress",
+    "addressCountry": "FI"
+   },
+   "sameAs": [
+    "https://github.com/vaaraio/vaara",
+    "https://www.linkedin.com/in/sirkkavaara",
+    "https://pypi.org/project/vaara/",
+    "https://www.npmjs.com/package/@vaara/client",
+    "https://oecd.ai/en/catalogue/tools/vaara"
+   ]
+  },
+  {
+   "@type": "Person",
+   "@id": "https://vaara.io/#henri",
+   "name": "Henri Sirkkavaara",
+   "url": "https://vaara.io/",
+   "email": "hello@vaara.io",
+   "jobTitle": "Founder and maintainer, Vaara",
+   "nationality": {
+    "@type": "Country",
+    "name": "Finland"
+   },
+   "workLocation": {
+    "@type": "Place",
+    "address": {
+     "@type": "PostalAddress",
+     "addressCountry": "FI"
     }
-  ]
+   },
+   "sameAs": [
+    "https://github.com/vaaraio",
+    "https://datatracker.ietf.org/doc/draft-sirkkavaara-vaara-receipt/",
+    "https://pypi.org/user/vaaraio/",
+    "https://www.bestpractices.dev/projects/12612",
+    "https://github.com/marketplace/actions/vaara-policy-check",
+    "https://www.linkedin.com/in/sirkkavaara"
+   ]
+  },
+  {
+   "@type": "BreadcrumbList",
+   "@id": "https://vaara.io/surfaces.html#crumbs",
+   "itemListElement": [
+    {
+     "@type": "ListItem",
+     "position": 1,
+     "name": "Home",
+     "item": "https://vaara.io/"
+    },
+    {
+     "@type": "ListItem",
+     "position": 2,
+     "name": "Under the hood",
+     "item": "https://vaara.io/under-the-hood.html"
+    },
+    {
+     "@type": "ListItem",
+     "position": 3,
+     "name": "Everything Vaara publishes",
+     "item": "https://vaara.io/surfaces.html"
+    }
+   ]
+  },
+  {
+   "@type": "ItemList",
+   "@id": "https://vaara.io/surfaces.html#list",
+   "name": "Everything Vaara publishes",
+   "itemListElement": [
+    {
+     "@type": "ListItem",
+     "position": 1,
+     "name": "Conformance results",
+     "url": "https://vaara.io/conformance.html"
+    },
+    {
+     "@type": "ListItem",
+     "position": 2,
+     "name": "Receipt explorer",
+     "url": "https://vaara.io/verify.html"
+    },
+    {
+     "@type": "ListItem",
+     "position": 3,
+     "name": "conformance.json",
+     "url": "https://vaara.io/conformance.json"
+    },
+    {
+     "@type": "ListItem",
+     "position": 4,
+     "name": "Badge",
+     "url": "https://vaara.io/badge/conformance.svg"
+    },
+    {
+     "@type": "ListItem",
+     "position": 5,
+     "name": "draft-sirkkavaara-vaara-receipt",
+     "url": "https://datatracker.ietf.org/doc/draft-sirkkavaara-vaara-receipt/"
+    },
+    {
+     "@type": "ListItem",
+     "position": 6,
+     "name": "Standards used",
+     "url": "https://github.com/vaaraio/vaara/blob/main/docs/standards.md"
+    },
+    {
+     "@type": "ListItem",
+     "position": 7,
+     "name": "Source",
+     "url": "https://github.com/vaaraio/vaara"
+    },
+    {
+     "@type": "ListItem",
+     "position": 8,
+     "name": "PyPI",
+     "url": "https://pypi.org/project/vaara/"
+    },
+    {
+     "@type": "ListItem",
+     "position": 9,
+     "name": "npm",
+     "url": "https://www.npmjs.com/package/@vaara/client"
+    },
+    {
+     "@type": "ListItem",
+     "position": 10,
+     "name": "GitHub Action",
+     "url": "https://github.com/marketplace/actions/vaara-policy-check"
+    },
+    {
+     "@type": "ListItem",
+     "position": 11,
+     "name": "OpenSSF Best Practices",
+     "url": "https://www.bestpractices.dev/projects/12612"
+    },
+    {
+     "@type": "ListItem",
+     "position": 12,
+     "name": "Logs versus evidence",
+     "url": "https://github.com/vaaraio/vaara/blob/main/docs/logs-vs-evidence.md"
+    },
+    {
+     "@type": "ListItem",
+     "position": 13,
+     "name": "EU AI Act Article 12",
+     "url": "https://github.com/vaaraio/vaara/blob/main/docs/eu-ai-act-article-12.md"
+    },
+    {
+     "@type": "ListItem",
+     "position": 14,
+     "name": "Execution receipts",
+     "url": "https://github.com/vaaraio/vaara/blob/main/docs/execution-receipts.md"
+    },
+    {
+     "@type": "ListItem",
+     "position": 15,
+     "name": "Compliance mapping",
+     "url": "https://github.com/vaaraio/vaara/blob/main/docs/COMPLIANCE.md"
+    },
+    {
+     "@type": "ListItem",
+     "position": 16,
+     "name": "llms.txt",
+     "url": "https://vaara.io/llms.txt"
+    }
+   ]
+  }
+ ]
 }
 </script>
-<link rel="sitemap" type="application/xml" href="/sitemap.xml">
-<style>
-:root{
-  color-scheme:light;
-  --bg:#ececec; --panel:#FFFFFF; --panel-2:#F1F4F0; --deep:#ECEFEA; --ink:#1A2226;
-  --muted:#566159; --faint:#7C857E; --line:rgba(60,90,72,.18);
-  --tri:#3E6B54; --tri-bright:#2C523E; --edge:16px;
-  --sans:'Inter',-apple-system,BlinkMacSystemFont,'Segoe UI',Helvetica,Arial,sans-serif;
-  --mono:ui-monospace,'SFMono-Regular','JetBrains Mono','Fira Code',Menlo,Consolas,'Liberation Mono',monospace;
-}
-/* Same three-way scheme as the other pages: an explicit choice from the toggle
-   sets data-theme and wins; without one, follow the OS. */
-html[data-theme="dark"]{
-  color-scheme:dark;
-  --bg:#0F1417; --panel:#1A2226; --panel-2:#151D20; --deep:#0B1012; --ink:#DEE4E1;
-  --muted:#8B9792; --faint:#5E6A66; --line:rgba(123,156,138,.16);
-  --tri:#78A08A; --tri-bright:#93B8A3;
-}
-@media (prefers-color-scheme:dark){
-  html:not([data-theme]){
-    color-scheme:dark;
-    --bg:#0F1417; --panel:#1A2226; --panel-2:#151D20; --deep:#0B1012; --ink:#DEE4E1;
-    --muted:#8B9792; --faint:#5E6A66; --line:rgba(123,156,138,.16);
-    --tri:#78A08A; --tri-bright:#93B8A3;
-  }
-}
-*{box-sizing:border-box}
-body{margin:0;background:var(--bg);color:var(--ink);font-family:var(--sans);
-  line-height:1.55;-webkit-font-smoothing:antialiased}
-main{max-width:820px;margin:0 auto;padding:28px 22px 96px}
-/* Same wordmark block as the explorer and conformance pages, so the three
-   subpages open the same way. Two images swapped by theme rather than one
-   recoloured, which is how the rest of the site already does it. */
-.wordmark{margin:8px auto 0;text-align:center}
-.wordmark a{border:0}
-.wordmark img{width:min(60vw,440px);height:auto;display:inline-block}
-.wordmark .wm-dark{display:none}
-html[data-theme="dark"] .wordmark .wm-light{display:none}
-html[data-theme="dark"] .wordmark .wm-dark{display:inline-block}
-@media (prefers-color-scheme:dark){
-  html:not([data-theme]) .wordmark .wm-light{display:none}
-  html:not([data-theme]) .wordmark .wm-dark{display:inline-block}
-}
-.stance{font-family:var(--mono);font-size:12px;letter-spacing:.22em;
-  text-transform:uppercase;color:var(--tri);text-align:center;margin:10px 0 34px}
-/* One glass bar. Mark on the left, links on the true centre, one sun/moon
-   on the right. grid 1fr auto 1fr so the links stay centred on the viewport
-   whatever the side cells weigh. No wordmark text: the mark is the mark. */
-.topbar{position:sticky;top:0;z-index:20;display:grid;
-  grid-template-columns:1fr auto 1fr;align-items:center;gap:12px;padding:9px 18px;
-  background:var(--bg);
-  background:color-mix(in srgb, var(--bg) 58%, transparent);
-  backdrop-filter:saturate(1.7) blur(18px);
-  -webkit-backdrop-filter:saturate(1.7) blur(18px);
-  border-bottom:1px solid var(--line)}
-.topbar .mark{justify-self:start;display:inline-flex;align-items:center;border:0;
-  line-height:0;padding:3px;border-radius:9px}
-.topbar .mark img{width:24px;height:24px;display:block}
-.topbar .mark:hover{background:var(--panel)}
-.nav-jump{justify-self:center;display:inline-flex;background:var(--panel);
-  border:1px solid var(--line);border-radius:999px;padding:4px}
-.nav-jump a{font-family:var(--mono);font-size:11px;letter-spacing:.18em;
-  text-transform:uppercase;color:var(--faint);padding:4px 12px;border-radius:999px;
-  text-decoration:none;white-space:nowrap;border:0}
-.nav-jump a:hover{color:var(--tri);background:var(--panel-2,var(--panel))}
-.nav-jump a[aria-current="page"]{color:var(--tri);background:var(--panel-2,var(--panel))}
-.theme-toggle{justify-self:end;display:inline-flex}
-.theme-toggle button{appearance:none;background:var(--panel);border:1px solid var(--line);
-  border-radius:999px;cursor:pointer;margin:0;width:32px;height:32px;padding:0;
-  display:inline-flex;align-items:center;justify-content:center;color:var(--faint);
-  transition:color .15s ease,background .15s ease}
-.theme-toggle button:hover{color:var(--tri)}
-.theme-toggle button:focus-visible{outline:2px solid var(--tri);outline-offset:2px}
-.theme-toggle svg{width:16px;height:16px;display:block}
-/* Icon shows the mode you are about to get. Swapped in CSS, not JS, so it is
-   correct on first paint and cannot desync from the theme. */
-.theme-toggle .i-sun{display:none}
-html[data-theme="dark"] .theme-toggle .i-moon{display:none}
-html[data-theme="dark"] .theme-toggle .i-sun{display:block}
-@media (prefers-color-scheme:dark){
-  html:not([data-theme]) .theme-toggle .i-moon{display:none}
-  html:not([data-theme]) .theme-toggle .i-sun{display:block}
-}
-@media (max-width:640px){
-  .topbar{padding:8px 12px;gap:8px}
-  .nav-jump a{padding:4px 9px;letter-spacing:.10em;font-size:10px}
-}
-a{color:var(--tri-bright);text-decoration:none;border-bottom:1px solid var(--line)}
-a:hover{border-bottom-color:var(--tri)}
-h1{font-size:clamp(1.5rem,4vw,2.1rem);line-height:1.2;margin:0 0 10px;letter-spacing:-.02em}
-.lede{color:var(--muted);margin:0 0 8px;max-width:62ch}
-.stamp{font-family:var(--mono);font-size:.76rem;color:var(--faint);margin:0 0 40px}
-h2{font-size:.79rem;text-transform:uppercase;letter-spacing:.1em;color:var(--tri);
-  margin:38px 0 12px;font-weight:600}
-ul{list-style:none;margin:0;padding:0}
-li{padding:9px 0;border-bottom:1px solid var(--line);display:flex;gap:14px;
-  align-items:baseline;flex-wrap:wrap}
-li:last-child{border-bottom:none}
-.name{font-weight:600;min-width:190px;flex:0 0 auto}
-.what{color:var(--muted);font-size:.92rem;flex:1 1 260px}
-.res{font-family:var(--mono);font-size:.76rem;color:var(--faint);flex:0 0 auto}
-.note{background:var(--panel);border:1px solid var(--line);border-radius:var(--edge);
-  padding:16px 18px;margin:34px 0 0;color:var(--muted);font-size:.9rem}
-footer{margin-top:52px;padding-top:20px;border-top:1px solid var(--line);
-  color:var(--faint);font-size:.82rem;font-family:var(--mono)}
-</style>
-<script>try{var t=localStorage.getItem("vaara-theme");if(t!=="dark"&&t!=="light")t=matchMedia("(prefers-color-scheme: dark)").matches?"dark":"light";document.documentElement.dataset.theme=t}catch(e){}</script>
-<link rel="stylesheet" href="/style.css">
-<style>
-  html:root, html:root[data-theme] {
-    --panel: var(--card); --panel-2: var(--tint); --deep: var(--tint); --line: var(--rule);
-    --faint: var(--muted); --dim: var(--muted); --tri: var(--accent); --tri-bright: var(--accent);
-    --ok: var(--accent); --no: var(--stop); --edge: 16px;
-    --sans: Inter, -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Arial, sans-serif;
-    --mono: "JetBrains Mono", ui-monospace, SFMono-Regular, Menlo, Consolas, monospace;
-  }
-  html:root body { background: var(--bg); color: var(--body); font: 17px/1.6 var(--sans); }
-  html:root main.legacy { max-width: var(--max); margin: 0 auto; padding: 40px 24px 64px; }
-  html:root main.legacy section { padding: 1rem 1.25rem; border: 1px solid var(--rule); }
-  html:root main.legacy > h2 { font-size: 24px; text-transform: none; letter-spacing: 0; color: var(--ink); margin: 44px 0 12px; }
-  html:root .bar a, html:root .band a, html:root footer.site a { border-bottom: 0; }
-  html:root footer.site { margin: 0; padding: 40px 0; border-top: 0; color: var(--on-night-soft); font-size: 14px; line-height: 1.6; }
-  html:root .band .lead { font-size: 17px; color: var(--body); max-width: 46em; margin: 0; }
-  html:root .band h1 { font: 650 30px/1.2 var(--sans); letter-spacing: 0; color: var(--ink); margin: 0 0 10px; }
-</style>
 </head>
 <body>
 <header class="bar"><div class="wrap">
-<nav class="top" aria-label="Main menu"><a class="brand" href="/"><img src="/vaara-logo-dark.svg" alt="Vaara home" width="174" height="24"></a><div class="dd"><a class="l" href="/sectors/" aria-haspopup="true">Sectors <span class="caret">▾</span></a><div class="menu"><a href="/sectors/care.html">Care and social services</a><a href="/sectors/payments.html">Payments and finance</a><a href="/sectors/public.html">Public sector</a><a href="/sectors/health.html">Healthcare</a><a href="/sectors/infrastructure.html">Energy, industry and infrastructure</a><a href="/sectors/software.html">Software teams</a></div></div><div class="dd"><a class="l" href="/products/" aria-haspopup="true">Products <span class="caret">▾</span></a><div class="menu"><a href="/products/gate.html">The gate</a><a href="/products/receipts.html">Receipts</a><a href="/products/cage.html">The cage</a><a href="/products/app.html">The desktop app</a><a href="/products/test-it-yourself.html">Test it yourself</a></div></div><div class="dd"><a class="l" href="/products/test-it-yourself.html" aria-haspopup="true">Test it yourself <span class="caret">▾</span></a><div class="menu"><a href="/products/test-it-yourself.html">Test it yourself</a><a href="/verify.html">Receipt explorer</a><a href="/conformance.html">Conformance results</a></div></div><a class="l on" href="/under-the-hood.html">Under the hood</a><span class="lang"><b>EN</b> | <a href="/fi/" hreflang="fi">FI</a></span><button class="burger" type="button" aria-label="Main menu" aria-expanded="false"></button><button class="theme" type="button" aria-label="Switch between light and dark" title="Switch between light and dark"></button><a class="get" href="https://github.com/vaaraio/vaara#readme">Get Vaara</a></nav>
+<nav class="top" aria-label="Main menu"><a class="brand" href="/"><img src="/vaara-logo-dark.svg" alt="Vaara home" width="174" height="24"></a><div class="dd"><a class="l" href="/sectors/" aria-haspopup="true">Sectors <span class="caret">▾</span></a><div class="menu"><a href="/sectors/care.html">Care and social services</a><a href="/sectors/payments.html">Payments and finance</a><a href="/sectors/public.html">Public sector</a><a href="/sectors/health.html">Healthcare</a><a href="/sectors/infrastructure.html">Energy, industry and infrastructure</a><a href="/sectors/software.html">Software teams</a></div></div><div class="dd"><a class="l" href="/products/" aria-haspopup="true">Products <span class="caret">▾</span></a><div class="menu"><a href="/products/gate.html">The gate</a><a href="/products/receipts.html">Receipts</a><a href="/products/cage.html">The cage</a><a href="/products/app.html">The desktop app</a><a href="/products/test-it-yourself.html">Test it yourself</a></div></div><div class="dd"><a class="l" href="/products/test-it-yourself.html" aria-haspopup="true">Test it yourself <span class="caret">▾</span></a><div class="menu"><a href="/products/test-it-yourself.html">Test it yourself</a><a href="/verify.html">Receipt explorer</a><a href="/conformance.html">Conformance results</a></div></div><a class="l on" href="/under-the-hood.html">Under the hood</a><span class="lang"><b>EN</b> | <a href="/fi/surfaces.html" hreflang="fi">FI</a></span><button class="burger" type="button" aria-label="Main menu" aria-expanded="false"></button><button class="theme" type="button" aria-label="Switch between light and dark" title="Switch between light and dark"></button><a class="get" href="https://github.com/vaaraio/vaara#readme">Get Vaara</a></nav>
 </div></header>
-<div class="band"><div class="wrap"><div class="hero"><nav class="crumbs" aria-label="Breadcrumb"><a href="/">Home</a> / <a href="/under-the-hood.html">Under the hood</a></nav><p class="kicker">Everything Vaara publishes</p><h1>What Vaara publishes</h1><p class="lead">Every surface in one line each, with a link to the thing itself. Nothing here asks you to take a claim on trust. Each item is either a record held by someone else or a file you can recompute.</p></div></div></div>
-<main class="legacy">
-
-<p class="stamp">vaara.io &middot; last reviewed 2026-10-10</p>
-
-<h2>Independent reproductions</h2>
-<p class="lede">Parties other than the maintainer ran the conformance vectors and published their own results. Each checker imports none of Vaara's code. Rows are filed through an issue form rather than curated, and a run that disagrees is a row on the same terms.</p>
-<ul>
-  <li><span class="name"><a href="/badge/babyblueviper1-invinoveritas.html">babyblueviper1</a></span><span class="what">invinoveritas &middot; 2026-08-19</span><span class="res">40 passed, 0 failed, 3 skipped</span></li>
-  <li><span class="name"><a href="/badge/nenad-vasic-elara-protocol.html">Nenad Vasic</a></span><span class="what">Elara Protocol, AI-agent-maintained and disclosed &middot; 2026-08-21</span><span class="res">45 passed, 0 failed, 1 skipped</span></li>
-  <li><span class="name"><a href="/badge/emek-can-dogru.html">Emek Can Do&#287;ru</a></span><span class="what">Verax Teknoloji &middot; 2026-08-24</span><span class="res">45 passed, 0 failed, 1 skipped</span></li>
-  <li><span class="name"><a href="/badge/council-of-ai.html">Council of AI</a></span><span class="what">Independent AI measurement body &middot; 2026-08-25</span><span class="res">43 passed, 0 failed, 3 skipped</span></li>
-  <li><span class="name"><a href="/badge/iman-schrock.html">Iman Schrock</a></span><span class="what">EMILIA Protocol &middot; 2026-08-25</span><span class="res">41 passed, 0 failed, 3 skipped</span></li>
-  <li><span class="name"><a href="/badge/yutao-peng.html">YuTao Peng</a></span><span class="what">Insight &middot; 2026-08-26</span><span class="res">43 passed, 0 failed, 3 skipped</span></li>
-  <li><span class="name"><a href="/badge/ali-toygar-abak.html">Ali Toygar Abak</a></span><span class="what">Phionyx &middot; 2026-09-13</span><span class="res">2 suites passed, 0 failed, 0 skipped</span></li>
-</ul>
-
-<h2>Check it yourself</h2>
-<ul>
-  <li><span class="name"><a href="/conformance.html">Conformance results</a></span><span class="what">The register, its terms, and how to file a row of your own</span></li>
-  <li><span class="name"><a href="/verify.html">Verifier</a></span><span class="what">Recompute a receipt in the browser, offline, without contacting Vaara</span></li>
-  <li><span class="name"><a href="/conformance.json">conformance.json</a></span><span class="what">The register as machine-readable data, hash-chained row to row</span></li>
-  <li><span class="name"><a href="/badge/conformance.svg">Badge</a></span><span class="what">Current row count, regenerated from the register</span></li>
-</ul>
-
-<h2>Specification</h2>
-<ul>
-  <li><span class="name"><a href="https://datatracker.ietf.org/doc/draft-sirkkavaara-vaara-receipt/">draft-sirkkavaara-vaara-receipt</a></span><span class="what">The receipt format at the IETF. An active Internet-Draft, not an RFC and not an adopted standard</span></li>
-  <li><span class="name"><a href="https://github.com/vaaraio/vaara/blob/main/docs/standards.md">Standards used</a></span><span class="what">RFC 8785 canonicalisation, COSE_Sign1, RFC 3161 timestamps, and what each one is relied on for</span></li>
-</ul>
-
-<h2>Code and packages</h2>
-<ul>
-  <li><span class="name"><a href="https://github.com/vaaraio/vaara">Source</a></span><span class="what">AGPL-3.0, no SaaS, no telemetry</span></li>
-  <li><span class="name"><a href="https://pypi.org/project/vaara/">PyPI</a></span><span class="what">vaara</span></li>
-  <li><span class="name"><a href="https://www.npmjs.com/package/@vaara/client">npm</a></span><span class="what">@vaara/client</span></li>
-  <li><span class="name"><a href="https://github.com/marketplace/actions/vaara-policy-check">GitHub Action</a></span><span class="what">Vaara Policy Check</span></li>
-  <li><span class="name"><a href="https://www.bestpractices.dev/projects/12612">OpenSSF Best Practices</a></span><span class="what">Passing badge, assessed by OpenSSF and not by Vaara</span></li>
-</ul>
-
-<h2>Documents</h2>
-<ul>
-  <li><span class="name"><a href="https://github.com/vaaraio/vaara/blob/main/docs/logs-vs-evidence.md">Logs versus evidence</a></span><span class="what">Why a log your own system wrote does not establish what happened</span></li>
-  <li><span class="name"><a href="https://github.com/vaaraio/vaara/blob/main/docs/eu-ai-act-article-12.md">EU AI Act Article 12</a></span><span class="what">Record-keeping, and where a log stops being sufficient</span></li>
-  <li><span class="name"><a href="https://github.com/vaaraio/vaara/blob/main/docs/execution-receipts.md">Execution receipts</a></span><span class="what">Pairing a tool call to the policy that allowed it</span></li>
-  <li><span class="name"><a href="https://github.com/vaaraio/vaara/blob/main/docs/COMPLIANCE.md">Compliance mapping</a></span><span class="what">What Vaara covers, and what it does not</span></li>
-  <li><span class="name"><a href="/llms.txt">llms.txt</a></span><span class="what">The same ground in one file, for machine readers</span></li>
-</ul>
-
-<div class="note">
-Vaara produces evidence. It does not certify anyone, and a passing run establishes portability rather than correctness. Two of the defects found so far were in the claims on this site rather than in the code, and both were found by people running the vectors somewhere Vaara had never run them.
-</div>
-
-<div class="fineprint">
-Vaara&trade; and Vaara Resin&trade; &copy; 2026 Henri Sirkkavaara, Helsinki. AGPL-3.0-or-later.
-</div>
-
-</main>
+<div class="band"><div class="wrap"><div class="hero"><nav class="crumbs" aria-label="Breadcrumb"><a href="/">Home</a> / <a href="/under-the-hood.html">Under the hood</a></nav><p class="kicker">Under the hood</p><h1>Everything Vaara publishes</h1><p class="lead">Every surface in one line each, with a link to the thing itself. Nothing here asks you to take a claim on trust: each item is a record held by someone else or a file you can recompute.</p></div></div></div>
+<main><section><div class="wrap"><h2>Independent reproductions</h2><p>Parties other than the maintainer ran the conformance tests and published their own results. Each checker imports none of Vaara&#x27;s code. Rows are filed through an issue form rather than curated, and a run that disagrees is a row on the same terms.</p><!-- generated: parties, by scripts/stamp_site.py --><ul class="parties"><li><a class="who" href="/badge/babyblueviper1-invinoveritas.html">babyblueviper1</a><span class="aff">invinoveritas &middot; 2026-08-19</span><span class="res">40 passed, 0 failed, 3 skipped</span></li><li><a class="who" href="/badge/nenad-vasic-elara-protocol.html">Nenad Vasic</a><span class="aff">Elara Protocol, AI-agent-maintained (disclosed), independent of Vaara &middot; 2026-08-21</span><span class="res">45 passed, 0 failed, 1 skipped</span></li><li><a class="who" href="/badge/emek-can-dogru.html">Emek Can Doğru</a><span class="aff">VERAX TEKNOLOJİ LİMİTED ŞİRKETİ, independent of Vaara &middot; 2026-08-24</span><span class="res">45 passed, 0 failed, 1 skipped</span></li><li><a class="who" href="/badge/council-of-ai.html">Council of AI</a><span class="aff">Independent AI measurement body, councilof.ai (CSOAI) &middot; 2026-08-25</span><span class="res">43 passed, 0 failed, 3 skipped</span></li><li><a class="who" href="/badge/iman-schrock.html">Iman Schrock</a><span class="aff">EMILIA Protocol &middot; 2026-08-25</span><span class="res">41 passed, 0 failed, 3 skipped</span></li><li><a class="who" href="/badge/yutao-peng.html">YuTao Peng</a><span class="aff">Insight (oracleinsight.xyz) &middot; 2026-08-26</span><span class="res">43 passed, 0 failed, 3 skipped</span></li><li><a class="who" href="/badge/ali-toygar-abak.html">Ali Toygar Abak</a><span class="aff">Phionyx &middot; 2026-09-13</span><span class="res">2 suites passed, 0 failed, 0 skipped</span></li></ul><!-- end parties --></div></section><section><div class="wrap"><div class="lgrid"><div class="lgroup"><h2>Check it yourself</h2><ul class="links"><li><a href="/conformance.html">Conformance results</a><span>The register, its terms, and how to file a row of your own</span></li><li><a href="/verify.html">Receipt explorer</a><span>Check a receipt in your browser, offline, without contacting Vaara</span></li><li><a href="/conformance.json">conformance.json</a><span>The register as machine-readable data, hash-chained row to row</span></li><li><a href="/badge/conformance.svg">Badge</a><span>Current row count, regenerated from the register</span></li></ul></div><div class="lgroup"><h2>Specification</h2><ul class="links"><li><a href="https://datatracker.ietf.org/doc/draft-sirkkavaara-vaara-receipt/">draft-sirkkavaara-vaara-receipt</a><span>The receipt format at the IETF. An active Internet-Draft, not an RFC and not an adopted standard</span></li><li><a href="https://github.com/vaaraio/vaara/blob/main/docs/standards.md">Standards used</a><span>RFC 8785 canonicalisation, COSE_Sign1, RFC 3161 timestamps, and what each one is relied on for</span></li></ul></div><div class="lgroup"><h2>Code and packages</h2><ul class="links"><li><a href="https://github.com/vaaraio/vaara">Source</a><span>AGPL-3.0, no SaaS, no telemetry</span></li><li><a href="https://pypi.org/project/vaara/">PyPI</a><span>vaara</span></li><li><a href="https://www.npmjs.com/package/@vaara/client">npm</a><span>@vaara/client</span></li><li><a href="https://github.com/marketplace/actions/vaara-policy-check">GitHub Action</a><span>Vaara Policy Check</span></li><li><a href="https://www.bestpractices.dev/projects/12612">OpenSSF Best Practices</a><span>Passing badge, assessed by OpenSSF and not by Vaara</span></li></ul></div><div class="lgroup"><h2>Documents</h2><ul class="links"><li><a href="https://github.com/vaaraio/vaara/blob/main/docs/logs-vs-evidence.md">Logs versus evidence</a><span>Why a log your own system wrote does not establish what happened</span></li><li><a href="https://github.com/vaaraio/vaara/blob/main/docs/eu-ai-act-article-12.md">EU AI Act Article 12</a><span>Record-keeping, and where a log stops being sufficient</span></li><li><a href="https://github.com/vaaraio/vaara/blob/main/docs/execution-receipts.md">Execution receipts</a><span>Pairing a tool call to the policy that allowed it</span></li><li><a href="https://github.com/vaaraio/vaara/blob/main/docs/COMPLIANCE.md">Compliance mapping</a><span>What Vaara covers, and what it does not</span></li><li><a href="/llms.txt">llms.txt</a><span>The same ground in one file, for machine readers</span></li></ul></div></div><p class="fineprint">Vaara produces evidence. It does not certify anyone, and a passing run establishes portability rather than correctness. Two of the defects found so far were in the claims on this site rather than in the code, and both were found by people running the tests somewhere Vaara had never run them.</p></div></section></main>
 <footer class="site"><div class="wrap"><div class="cols">
 <div><b>VAARA</b><br>Open source. Runs on your own machines. Nothing is sent to us.<br><a href="mailto:hello@vaara.io">hello@vaara.io</a></div>
 <div><a href="https://github.com/vaaraio/vaara">Code</a><br>
 <a href="https://datatracker.ietf.org/doc/draft-sirkkavaara-vaara-receipt/">Internet-Draft</a><br>
 <a href="/conformance.html">Conformance results</a><br><a href="/surfaces.html">Everything Vaara publishes</a><br><a href="/under-the-hood.html">Technical overview</a></div>
-</div><p class="tm">Vaara™ and Vaara Resin™ © 2026 Henri Sirkkavaara, Helsinki. AGPL-3.0-or-later.</p></div></footer>
-<script>document.querySelector(".bar .theme").onclick=function(){var d=document.documentElement,t=d.dataset.theme==="dark"?"light":"dark";d.dataset.theme=t;try{localStorage.setItem("vaara-theme",t)}catch(e){}};document.querySelector(".bar .burger").onclick=function(){var n=document.querySelector("nav.top"),o=n.classList.toggle("open");this.setAttribute("aria-expanded",o)}</script>
+</div><p class="tm">Vaara™ © 2026 Henri Sirkkavaara, Helsinki. AGPL-3.0-or-later.</p></div></footer>
+<script>document.querySelector(".bar .theme").onclick=function(){var d=document.documentElement,t=d.dataset.theme==="dark"?"light":"dark";d.dataset.theme=t;try{localStorage.setItem("vaara-theme",t)}catch(e){}};document.querySelector(".bar .burger").onclick=function(){var n=document.querySelector("nav.top"),o=n.classList.toggle("open");this.setAttribute("aria-expanded",o)};document.querySelectorAll(".bar .lang a").forEach(function(a){a.onclick=function(){try{localStorage.setItem("vaara-lang",a.hreflang)}catch(e){}}})</script>
 </body>
 </html>
