@@ -16,7 +16,7 @@ from pathlib import Path
 
 import pytest
 
-for _mod in ("rfc8785", "cryptography"):
+for _mod in ("rfc8785", "cryptography", "cbor2"):
     if importlib.util.find_spec(_mod) is None:
         pytest.skip(
             "attestation extra not installed (pip install 'vaara[attestation]')",
