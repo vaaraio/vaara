@@ -738,15 +738,21 @@ jobs:
           set -o pipefail
           # The suite points HOME at a sandbox; this test needs the operator's
           # real home, which is the one the guard serves.
+          # Twenty minutes is three bounded runs with room. Past that, SIGABRT
+          # makes pytest's faulthandler print every thread's stack before it
+          # dies, so a hang names its line instead of holding the runner for
+          # six hours with an empty log.
           VAARA_TEST_USE_REAL_HOME=1 VAARA_OSLAYER_E2E=1 \
-            pytest tests/test_oslayer_e2e.py -q -rs | tee result.txt
+            timeout -s ABRT 20m pytest tests/test_oslayer_e2e.py -q -rs | tee result.txt
           if grep -qE '[0-9]+ skipped' result.txt; then
             echo "::error::The OS layer test skipped, so it did not run."
             exit 1
           fi
 
-      - name: Guard log and kernel refusals
+      - name: Guard log, guard stack and kernel refusals
         if: always()
         run: |
+          pip install -q py-spy || true
+          for p in $(pgrep -f 'vaara.cli os-guard'); do sudo "$(command -v py-spy)" dump --pid "$p" || true; done
           cat guard.log || true
           sudo dmesg | grep -E 'apparmor="DENIED"|suppressed' | tail -40 || true
