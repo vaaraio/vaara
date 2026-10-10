@@ -86,6 +86,17 @@ def detected(directory: Optional[Path] = None) -> bool:
     return (directory or config_dir()).is_dir() or shutil.which("opencode") is not None
 
 
+def render_plugin(vaara_bin: str) -> str:
+    """The plugin source with ``vaara_bin`` written into its JavaScript string.
+
+    Backslashes and quotes are escaped, so a Windows path keeps its
+    separators: unescaped, ``C:\\Users\\runner`` reached Node as ``C:Users``
+    plus a carriage return.
+    """
+    escaped = vaara_bin.replace("\\", "\\\\").replace('"', '\\"')
+    return _PLUGIN_SOURCE.read_text(encoding="utf-8").replace("__VAARA_BIN__", escaped)
+
+
 def install_plugin(vaara_bin: str, directory: Optional[Path] = None) -> bool:
     """Write the plugin, pinned to ``vaara_bin``. True when the file changed.
 
@@ -94,7 +105,7 @@ def install_plugin(vaara_bin: str, directory: Optional[Path] = None) -> bool:
     an absolute path.
     """
     target = plugin_path(directory)
-    text = _PLUGIN_SOURCE.read_text(encoding="utf-8").replace("__VAARA_BIN__", vaara_bin.replace("\\", "\\\\").replace('"', '\\"'))
+    text = render_plugin(vaara_bin)
     if target.exists() and target.read_text(encoding="utf-8") == text:
         return False
     target.parent.mkdir(parents=True, exist_ok=True)
