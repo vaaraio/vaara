@@ -18,7 +18,16 @@ The budget is not stored anywhere. It is replayed from the session's own
 records on the trail (decisions, their risk scores, human resolutions, and
 their timestamps), so a process that starts fresh on every call, such as a
 hook, sees the same budget a long-running proxy does, and a reviewer can
-recompute from the chain why a call was escalated.
+recompute from the chain why a call was escalated. The replay reads the
+whole session, never a window of recent records: a window would let a
+session outrun its own spend by making calls.
+
+One caveat across processes: a long-running proxy replays from the records
+it loaded at start plus the ones it wrote. Records another process (a hook
+in the same session) wrote to the same store after that are not in its
+replay until it reloads, while a process that starts fresh per call reads
+them all. Two processes deciding for one session can therefore see
+different budgets for a while; both are honest about the records they hold.
 
 ``VAARA_AUTHORITY_BUDGET`` sets the budget for every pipeline that is not
 given a policy explicitly; ``0`` or ``off`` turns decay off. Calls with no

@@ -1944,6 +1944,23 @@ class AuditTrail:
         records = [r for r in snapshot if r.agent_id == agent_id]
         return records[-limit:]
 
+    def get_session_records(self, agent_id: str, session_id: str) -> list[AuditRecord]:
+        """Every record of one agent's session, in trail order, with no limit.
+
+        A session is the set of actions whose ``action_requested`` record
+        carries ``data.session_id``; the records of those actions follow.
+        Authority decay replays the budget from this list, so it must be the
+        whole session: a window would let a session outrun its own spend.
+        """
+        with self._lock:
+            snapshot = list(self._records)
+        actions = {
+            r.action_id for r in snapshot
+            if r.agent_id == agent_id and r.event_type == EventType.ACTION_REQUESTED
+            and (r.data or {}).get("session_id") == session_id
+        }
+        return [r for r in snapshot if r.agent_id == agent_id and r.action_id in actions]
+
     def get_records_by_type(
         self, event_type: EventType, limit: int = 100
     ) -> list[AuditRecord]:
