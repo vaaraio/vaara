@@ -52,11 +52,16 @@ DEFAULT_ROWS = REPO / "conformance" / "reproductions.json"
 LLMS = WEBPAGE / "llms.txt"
 SITEMAP = WEBPAGE / "sitemap.xml"
 REGISTER = WEBPAGE / "conformance.json"
+SURFACES = (WEBPAGE / "surfaces.html", WEBPAGE / "fi" / "surfaces.html")
 
 #: The generated block in llms.txt sits between these. Everything outside them
 #: is written by hand and is never touched.
 BEGIN = "<!-- generated: conformance register, by scripts/stamp_site.py -->"
 END = "<!-- end generated -->"
+
+#: The party list on surfaces.html, EN and FI, sits between these.
+PARTIES_BEGIN = "<!-- generated: parties, by scripts/stamp_site.py -->"
+PARTIES_END = "<!-- end parties -->"
 
 #: Which page each sitemap entry is, so a date can be found for it. Any other
 #: vaara.io URL is read as its file under webpage/ (a trailing slash is that
@@ -202,6 +207,54 @@ def register_block(rows: dict) -> str:
     return "\n".join(lines)
 
 
+def _esc(text: str) -> str:
+    return (text.replace("&", "&amp;").replace("<", "&lt;").replace(">", "&gt;")
+            .replace('"', "&quot;"))
+
+
+def parties_html(rows: dict, lang: str = "en") -> str:
+    """The party list on surfaces.html: who, as they stated their affiliation, when, and the
+    headline of what they reported. Built from the rows, never typed, because a typed list
+    carried one party twice."""
+    entries = rows.get("reproductions", [])
+    if not entries:
+        none = ("Yhtään riippumatonta toistoa ei ole vielä kirjattu." if lang == "fi"
+                else "No independent reproduction is recorded yet.")
+        return f'<p class="none">{none}</p>'
+    items = []
+    for row in entries:
+        who = row.get("party", "")
+        affiliation = row.get("affiliation", "").replace(" \u2014 ", ", ")
+        # "babyblueviper1 (invinoveritas)" affiliated to "invinoveritas" shows the name once
+        tail = re.match(r"(.+?) (?:\((.+)\)|/ (.+))$", who)
+        if tail and affiliation.lower().startswith((tail.group(2) or tail.group(3)).lower()):
+            who = tail.group(1)
+        result = re.match(r"(.*?)(?:, \d+ cases?\b|;|\. |$)", row.get("result", "")).group(1)
+        meta = " &middot; ".join(x for x in (_esc(affiliation), _esc(row.get("date", ""))) if x)
+        items.append(f'<li><a class="who" href="/badge/{_esc(row["slug"])}.html">{_esc(who)}</a>'
+                     f'<span class="aff">{meta}</span><span class="res">{_esc(result)}</span></li>')
+    return '<ul class="parties">' + "".join(items) + "</ul>"
+
+
+def stamp_surfaces(rows: dict, paths=SURFACES) -> list[str]:
+    """Replace the party list on each surfaces page that exists. Returns the ones rewritten."""
+    moved = []
+    for path in paths:
+        if not path.exists():
+            continue
+        text = path.read_text(encoding="utf-8")
+        if PARTIES_BEGIN not in text or PARTIES_END not in text:
+            raise SystemExit(f"{path} carries no party markers; put {PARTIES_BEGIN} and {PARTIES_END} back.")
+        lang = "fi" if path.parent.name == "fi" else "en"
+        start = text.index(PARTIES_BEGIN) + len(PARTIES_BEGIN)
+        stop = text.index(PARTIES_END)
+        updated = text[:start] + parties_html(rows, lang) + text[stop:]
+        if updated != text:
+            path.write_text(updated, encoding="utf-8")
+            moved.append(str(path.relative_to(REPO)))
+    return moved
+
+
 def stamp_llms(rows: dict, path: Path = LLMS) -> bool:
     """Replace the generated block in llms.txt. Returns whether anything moved."""
     text = path.read_text(encoding="utf-8")
@@ -299,10 +352,12 @@ def main(argv: list[str]) -> int:
     rows = json.loads(args.rows.read_text(encoding="utf-8"))
     listed = publish_register(rows)
     moved = stamp_llms(rows)
+    surfaces = stamp_surfaces(rows)
     dates = stamp_sitemap(conformance_date=args.conformance_date)
 
     print(f"conformance.json: {listed} rows")
     print(f"llms.txt: {'rewritten' if moved else 'already current'}")
+    print(f"surfaces: {', '.join(surfaces) or 'already current'}")
     for url, date in dates.items():
         print(f"sitemap: {url} -> {date}")
     return 0

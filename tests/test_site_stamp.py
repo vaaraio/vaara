@@ -227,3 +227,35 @@ def test_a_date_that_is_not_a_date_is_refused(tmp_path):
     module = stamper()
     with pytest.raises(SystemExit):
         module.main(["--conformance-date", "yesterday"])
+
+
+def test_each_party_is_listed_once_with_the_name_said_once():
+    """The typed list carried one party twice and printed 'babyblueviper1 (invinoveritas)'
+    next to 'invinoveritas'. Built from the rows, neither can happen."""
+    html = stamper().parties_html(ROWS)
+    assert html.count('class="who"') == len(ROWS["reproductions"])
+    assert ">handle</a>" in html and "handle (thing)" not in html
+    assert "1 passed, 0 failed, 0 skipped" in html and "1 case" not in html
+
+
+def test_an_empty_register_says_so_in_both_languages():
+    module = stamper()
+    assert "No independent reproduction" in module.parties_html({"reproductions": []})
+    assert "riippumatonta toistoa" in module.parties_html({"reproductions": []}, "fi")
+
+
+def test_both_surfaces_pages_carry_the_party_markers():
+    module = stamper()
+    for path in module.SURFACES:
+        text = path.read_text(encoding="utf-8")
+        assert module.PARTIES_BEGIN in text and module.PARTIES_END in text, path
+
+
+def test_stamping_surfaces_writes_the_rows_and_settles(tmp_path):
+    module = stamper()
+    page = tmp_path / "surfaces.html"
+    page.write_text(f"<main>{module.PARTIES_BEGIN}<p>old</p>{module.PARTIES_END}</main>", encoding="utf-8")
+    module.REPO = tmp_path
+    assert module.stamp_surfaces(ROWS, paths=(page,)) == ["surfaces.html"]
+    assert "Named Party" in page.read_text(encoding="utf-8")
+    assert module.stamp_surfaces(ROWS, paths=(page,)) == []
