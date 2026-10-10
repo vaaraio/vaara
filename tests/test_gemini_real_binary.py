@@ -125,7 +125,7 @@ def _setup(tmp: Path, port: int) -> tuple[dict, Path, Path]:
     assert gemini.install_hooks(str(shim), settings) is True
     assert gemini.hook_status(settings) == "active"
 
-    env = {"HOME": str(home), "GEMINI_CLI_HOME": str(home), "GEMINI_API_KEY": "x",
+    env = {"HOME": str(home), "USERPROFILE": str(home), "GEMINI_CLI_HOME": str(home), "GEMINI_API_KEY": "x",
            "GOOGLE_GEMINI_BASE_URL": f"http://127.0.0.1:{port}",
            "PATH": os.environ.get("PATH", ""), "PYTHONPATH": os.pathsep.join(sys.path),
            "VAARA_PLUGIN_SHADOW": "0", "VAARA_PLUGIN_APPROVALS": "0",

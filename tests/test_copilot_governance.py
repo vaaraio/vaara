@@ -105,7 +105,7 @@ def test_copilot_names_hit_the_rule_their_claude_code_twin_hits(tool, args):
 def _run_hook(args, event: dict, home: Path):
     (home / ".vaara").mkdir(parents=True, exist_ok=True)
     (home / ".vaara" / "config.json").write_text("{}")
-    env = {"HOME": str(home), "PATH": os.environ.get("PATH", ""),
+    env = {"HOME": str(home), "USERPROFILE": str(home), "PATH": os.environ.get("PATH", ""),
            "VAARA_PLUGIN_SHADOW": "0", "PYTHONPATH": os.pathsep.join(sys.path)}
     return subprocess.run(
         [sys.executable, "-c",

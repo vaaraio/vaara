@@ -223,6 +223,8 @@ def _match_named(
             value = field_text(tool_input.get(field, ""))
             if value is not None and field in _SHELL_FIELDS:
                 value = without_inert_heredocs(value, bool(rule.get("shell_syntax")))
+            if value is not None and field in _PATH_FIELDS:
+                value = value.replace("\\", "/")
             if value is not None and regex.search(value):
                 return rule.get("id", "unknown"), rule.get("message", "deny rule matched")
     return None
@@ -347,6 +349,8 @@ def _string_leaves(value: Any, depth: int = 0, key: str = ""):
 
 #: Rule fields that hold a file path. A rule reading only these is a path
 #: rule: its pattern describes a path, not a command or written content.
+#: The patterns are written with ``/``, so a Windows path
+#: (``C:\Users\me\.ssh\id_ed25519``) is matched with its separators turned.
 _PATH_FIELDS = frozenset({"file_path", "notebook_path", "uri"})
 
 _PATH_KEY = re.compile(r"path|file|dir|dest|target|uri|location", re.I)
@@ -453,8 +457,10 @@ def match_deny_rule_any_field(
         path_rule = bool(fields) and set(fields) <= _PATH_FIELDS
         shell_rule = bool(fields) and set(fields) <= _SHELL_FIELDS
         for key, text in leaves:
-            if path_rule and not _path_shaped(key, text):
-                continue
+            if path_rule:
+                if not _path_shaped(key, text):
+                    continue
+                text = text.replace("\\", "/")
             if _COMMAND_KEY.search(key):
                 text = without_inert_heredocs(text, bool(rule.get("shell_syntax")))
             if shell_rule:

@@ -33,7 +33,7 @@ def _engine(tmp: Path, body: str) -> Path:
 def _run(command: str, tmp: Path, stdin: str = "{}", **env: str):
     home = tmp / "home"
     home.mkdir(exist_ok=True)
-    full = {"PATH": os.environ["PATH"], "HOME": str(home), **env}
+    full = {"PATH": os.environ["PATH"], "HOME": str(home), "USERPROFILE": str(home), **env}
     start = time.monotonic()
     proc = subprocess.run(["sh", "-c", command], input=stdin, env=full,
                           capture_output=True, text=True, timeout=60)

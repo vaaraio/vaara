@@ -47,9 +47,9 @@ def test_deny_rules_reads_user_and_project_settings(tmp_path):
         json.dumps({"permissions": {"deny": ["WebFetch"]}}))
     (project / ".claude" / "settings.local.json").write_text(
         json.dumps({"permissions": {"deny": ["Bash(git push *)", 3]}}))
-    env = {"HOME": str(home), "CLAUDE_PROJECT_DIR": str(project)}
+    env = {"HOME": str(home), "USERPROFILE": str(home), "CLAUDE_PROJECT_DIR": str(project)}
     assert deny_rules(env) == ["WebFetch", "Bash(git push *)"]
     # Without the project variable, the event's cwd names the project.
-    assert deny_rules({"HOME": str(home)}, cwd=str(project)) == [
+    assert deny_rules({"HOME": str(home), "USERPROFILE": str(home)}, cwd=str(project)) == [
         "WebFetch", "Bash(git push *)",
     ]

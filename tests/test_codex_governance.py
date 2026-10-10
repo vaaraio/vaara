@@ -41,6 +41,11 @@ def _payload(tool: str, tool_input, **extra) -> dict:
 # --- mapping ----------------------------------------------------------------
 
 
+def _posix(path: str) -> str:
+    """Paths resolve with the host's separator; compare them as POSIX."""
+    return path.replace("\\", "/")
+
+
 def test_shell_arrives_as_bash():
     [e] = codex.to_hook_events(_payload("Bash", {"command": "ls"}))
     assert e == {"tool_name": "Bash", "tool_input": {"command": "ls"}, "session_id": "s1"}
@@ -48,7 +53,7 @@ def test_shell_arrives_as_bash():
 
 def test_patch_becomes_one_event_per_file_resolved_against_cwd():
     events = codex.to_hook_events(_payload("apply_patch", {"command": PATCH}))
-    assert [(e["tool_name"], e["tool_input"]["file_path"]) for e in events] == [
+    assert [(e["tool_name"], _posix(e["tool_input"]["file_path"])) for e in events] == [
         ("Write", "/w/a.txt"), ("Edit", "/w/sub/b.txt")]
     assert all(e["tool_input"]["content"] == PATCH for e in events)
 
@@ -61,7 +66,7 @@ def test_patch_without_file_headers_is_still_checked_as_an_edit():
 def test_view_image_is_a_read():
     [e] = codex.to_hook_events(_payload("view_image", {"path": "../.ssh/id_ed25519"}))
     assert e["tool_name"] == "Read"
-    assert e["tool_input"]["file_path"] == "/.ssh/id_ed25519"
+    assert _posix(e["tool_input"]["file_path"]) == "/.ssh/id_ed25519"
 
 
 def test_mcp_keeps_its_name_and_other_tools_go_to_the_classifier():
@@ -123,7 +128,7 @@ def test_trust_status_follows_config_toml(tmp_path):
 def _run_hook(args, event: dict, home: Path, extra_env: dict | None = None):
     (home / ".vaara").mkdir(parents=True, exist_ok=True)
     (home / ".vaara" / "config.json").write_text("{}")
-    env = {"HOME": str(home), "PATH": os.environ.get("PATH", ""),
+    env = {"HOME": str(home), "USERPROFILE": str(home), "PATH": os.environ.get("PATH", ""),
            "VAARA_PLUGIN_SHADOW": "0", "PYTHONPATH": os.pathsep.join(sys.path),
            **(extra_env or {})}
     return subprocess.run(

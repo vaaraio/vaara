@@ -187,7 +187,7 @@ def test_the_floor_holds_and_the_guard_decides(tmp_path):
     ])
     work = tmp_path / "work"
     work.mkdir()
-    env = {"HOME": str(home), "COPILOT_HOME": str(tmp_path / "copilot-home"),
+    env = {"HOME": str(home), "USERPROFILE": str(home), "COPILOT_HOME": str(tmp_path / "copilot-home"),
            "COPILOT_PROVIDER_BASE_URL": f"http://127.0.0.1:{model.port}/v1",
            "COPILOT_MODEL": "gpt-4.1", "COPILOT_OFFLINE": "true",
            "PATH": os.environ.get("PATH", ""), "NO_COLOR": "1",
@@ -280,7 +280,7 @@ def test_an_adapter_decides_under_vaara_run(tmp_path):
     ])
     work = tmp_path / "work"
     work.mkdir()
-    env = {"HOME": str(home), "COPILOT_HOME": str(copilot_home),
+    env = {"HOME": str(home), "USERPROFILE": str(home), "COPILOT_HOME": str(copilot_home),
            "COPILOT_PROVIDER_BASE_URL": f"http://127.0.0.1:{model.port}/v1",
            "COPILOT_MODEL": "gpt-4.1", "COPILOT_OFFLINE": "true",
            "PATH": os.environ.get("PATH", ""), "NO_COLOR": "1",
@@ -369,7 +369,7 @@ def test_hardened_launch_with_egress_locked(tmp_path):
     assert status and status["profile_loaded"] and status["harden"], status
     work = tmp_path / "work"
     work.mkdir()
-    env = {"HOME": str(home), "COPILOT_HOME": str(tmp_path / "copilot-home"),
+    env = {"HOME": str(home), "USERPROFILE": str(home), "COPILOT_HOME": str(tmp_path / "copilot-home"),
            "COPILOT_PROVIDER_BASE_URL": f"http://127.0.0.1:{model.port}/v1",
            "COPILOT_MODEL": "gpt-4.1", "COPILOT_OFFLINE": "true",
            "PATH": os.environ.get("PATH", ""), "NO_COLOR": "1",

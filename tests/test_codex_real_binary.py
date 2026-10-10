@@ -175,7 +175,7 @@ env_key = "FAKE_KEY"
 {trust}""")
     assert codex.trust_status(codex_home) == "trusted"
 
-    env = {"HOME": str(home), "CODEX_HOME": str(codex_home), "FAKE_KEY": "x",
+    env = {"HOME": str(home), "USERPROFILE": str(home), "CODEX_HOME": str(codex_home), "FAKE_KEY": "x",
            "PATH": os.environ.get("PATH", ""), "PYTHONPATH": os.pathsep.join(sys.path),
            "VAARA_PLUGIN_SHADOW": "0", "VAARA_PLUGIN_APPROVALS": "0",
            "VAARA_PLUGIN_NOTIFY": "0"}

@@ -121,7 +121,7 @@ def _setup(tmp: Path, port: int) -> tuple[dict, Path, Path]:
     assert copilot.install_hooks(str(shim), home / ".copilot") is True
     assert copilot.hook_status(home / ".copilot") == "active"
 
-    env = {"HOME": str(home), "COPILOT_HOME": str(home / ".copilot"),
+    env = {"HOME": str(home), "USERPROFILE": str(home), "COPILOT_HOME": str(home / ".copilot"),
            "COPILOT_PROVIDER_BASE_URL": f"http://127.0.0.1:{port}/v1",
            "COPILOT_MODEL": "gpt-4.1", "COPILOT_OFFLINE": "true",
            "PATH": os.environ.get("PATH", ""), "PYTHONPATH": os.pathsep.join(sys.path),

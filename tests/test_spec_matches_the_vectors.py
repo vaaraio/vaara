@@ -129,7 +129,7 @@ def test_checkers_pass_without_vaara_importable(directory, tmp_path):
     done = subprocess.run(
         [sys.executable, "-I", str(checker)],
         cwd=directory, capture_output=True, text=True, timeout=300,
-        env={"PATH": "/usr/bin:/bin", "HOME": str(tmp_path)},
+        env={"PATH": "/usr/bin:/bin", "HOME": str(tmp_path), "USERPROFILE": str(tmp_path)},
     )
     if done.returncode == SKIP:
         # The reason goes to stderr, prefixed "SKIP: ", which is the convention

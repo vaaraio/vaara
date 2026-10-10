@@ -170,7 +170,7 @@ def _setup(tmp: Path, port: int) -> tuple[dict, Path, Path]:
     shim.chmod(0o755)
     assert write_claude_hooks(home / ".claude" / "settings.json", str(shim)) is True
 
-    env = {"HOME": str(home), "CLAUDE_CONFIG_DIR": str(home / ".claude"),
+    env = {"HOME": str(home), "USERPROFILE": str(home), "CLAUDE_CONFIG_DIR": str(home / ".claude"),
            "ANTHROPIC_API_KEY": "x",
            "ANTHROPIC_BASE_URL": f"http://127.0.0.1:{port}",
            # The shim first on PATH: the session-start hook re-resolves

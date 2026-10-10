@@ -94,7 +94,7 @@ def _run_hook(args, event: dict, home: Path, extra_env: dict | None = None):
     (home / ".vaara").mkdir(parents=True, exist_ok=True)
     (home / ".vaara" / "config.json").write_text("{}")
     env = {
-        "HOME": str(home),
+        "HOME": str(home), "USERPROFILE": str(home),
         "PATH": os.environ.get("PATH", ""),
         "VAARA_PLUGIN_SHADOW": "0",
         "PYTHONPATH": os.pathsep.join(sys.path),
@@ -204,7 +204,7 @@ def _call_plugin(tmp_path: Path, vaara_bin: str, home: Path | None = None) -> di
         }}
         """))
     env = {"PATH": os.environ.get("PATH", ""),
-           "HOME": str(home or tmp_path)}
+           "HOME": str(home or tmp_path), "USERPROFILE": str(home or tmp_path)}
     out = subprocess.run([node, str(driver)], capture_output=True, text=True,
                          env=env, timeout=60)
     assert out.returncode == 0, out.stderr
@@ -275,7 +275,7 @@ def test_plugin_through_the_real_engine_blocks_a_denied_call(tmp_path):
         }}
         console.log(JSON.stringify(out));
         """))
-    env = {"PATH": os.environ.get("PATH", ""), "HOME": str(home),
+    env = {"PATH": os.environ.get("PATH", ""), "HOME": str(home), "USERPROFILE": str(home),
            "VAARA_PLUGIN_SHADOW": "0",
            "PYTHONPATH": os.pathsep.join(sys.path)}
     proc = subprocess.run([node, str(driver)], capture_output=True, text=True,

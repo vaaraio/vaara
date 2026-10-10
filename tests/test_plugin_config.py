@@ -113,7 +113,7 @@ def _run_hook_without_vaara(tmp_path, config: dict, extra_env: dict):
     cfg_dir.mkdir(parents=True, exist_ok=True)
     (cfg_dir / "config.json").write_text(json.dumps(config))
     env = {
-        "HOME": str(home),
+        "HOME": str(home), "USERPROFILE": str(home),
         "PATH": os.environ.get("PATH", ""),
         "PYTHONPATH": str(blocker),
         **extra_env,
@@ -172,7 +172,7 @@ def test_session_start_records_article50_disclosure(tmp_path):
         [sys.executable, str(_HOOKS / "session_start.py")],
         input=json.dumps({"session_id": "sess-42"}),
         capture_output=True, text=True, timeout=60,
-        env={"HOME": str(home), "PATH": os.environ.get("PATH", "")},
+        env={"HOME": str(home), "USERPROFILE": str(home), "PATH": os.environ.get("PATH", "")},
     )
     assert proc.returncode == 0, proc.stderr
     assert "article50_disclosure=recorded" in proc.stderr

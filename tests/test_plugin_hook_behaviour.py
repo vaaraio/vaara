@@ -44,7 +44,7 @@ def _run(hook: str, event: dict, db: Path) -> subprocess.CompletedProcess:
         # The env vars are not enough on their own, because each reader
         # checks for "1" and otherwise falls through to config.json. In a
         # subprocess the config is found under HOME, so HOME moves too.
-        "HOME": str(db.parent),
+        "HOME": str(db.parent), "USERPROFILE": str(db.parent),
         "VAARA_PLUGIN_SHADOW": "0",
         "PYTHONPATH": str(ROOT / "src"),
     }
@@ -191,7 +191,7 @@ def test_fail_open_passes_an_mcp_call_through_a_dead_trail(db):
         "CLAUDE_PLUGIN_ROOT": str(HOOKS.parent),
         # Isolated HOME as in _run; this test keeps the explicit fail-open
         # override, which _run deliberately does not set.
-        "HOME": str(env_db.parent),
+        "HOME": str(env_db.parent), "USERPROFILE": str(env_db.parent),
         "VAARA_PLUGIN_SHADOW": "0",
         "VAARA_PLUGIN_FAIL_OPEN": "1",
         "PYTHONPATH": str(ROOT / "src"),

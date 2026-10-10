@@ -167,7 +167,7 @@ def _hook(home: Path, event: dict) -> int:
         # is held and answered by nobody, as on an unattended machine.
         cfg.write_text(json.dumps({"thresholds": {"escalate": 0.0, "deny": 0.99},
                                    "notifications": False}))
-    env = {"HOME": str(home), "PATH": f"{bindir}{os.pathsep}{os.environ.get('PATH', '')}",
+    env = {"HOME": str(home), "USERPROFILE": str(home), "PATH": f"{bindir}{os.pathsep}{os.environ.get('PATH', '')}",
            "PYTHONPATH": os.pathsep.join(sys.path), "VAARA_PLUGIN_APPROVALS": "0"}
     proc = subprocess.run(["sh", str(RUN_SH), "pre-tool-use"],
                           input=json.dumps({"session_id": "s", **event}),

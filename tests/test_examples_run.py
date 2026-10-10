@@ -36,7 +36,7 @@ def test_example_runs(path, needs, reason, tmp_path):
                 module, reason="attestation extra not installed (pip install 'vaara[attestation]')")
         else:
             pytest.importorskip(module, reason=reason)
-    env = {"HOME": str(tmp_path), "PATH": "/usr/bin:/bin"}
+    env = {"HOME": str(tmp_path), "USERPROFILE": str(tmp_path), "PATH": "/usr/bin:/bin"}
     # Run the example against the code under test, not whatever vaara the
     # interpreter has installed (a worktree run sets PYTHONPATH).
     if "PYTHONPATH" in os.environ:
