@@ -50,6 +50,9 @@ jobs:
             git --work-tree=/tmp checkout FETCH_HEAD -- vcr || true
             if [ -f /tmp/vcr/conformance.html ]; then
               cp /tmp/vcr/conformance.html webpage/conformance.html
+              if [ -f /tmp/vcr/fi/conformance.html ]; then
+                mkdir -p webpage/fi && cp /tmp/vcr/fi/conformance.html webpage/fi/conformance.html
+              fi
               # The published page's own history is on that branch, not in this
               # checkout, so its sitemap date has to come from there too.
               echo "conformance_date=$(git log -1 --format=%cs FETCH_HEAD)" >> "$GITHUB_ENV"

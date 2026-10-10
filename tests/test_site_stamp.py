@@ -195,15 +195,16 @@ def test_every_sitemap_date_comes_from_git(tmp_path):
 
 
 def test_the_published_page_takes_its_date_from_the_branch_it_publishes_from(tmp_path):
-    """conformance.html ships from `vcr`, so its history is not in this checkout."""
+    """conformance.html and its Finnish twin ship from `vcr`, so their history is not in this checkout."""
     module = stamper()
     scratch = tmp_path / "sitemap.xml"
     scratch.write_text(SITEMAP.read_text(encoding="utf-8"), encoding="utf-8")
     written = module.stamp_sitemap(path=scratch, conformance_date="2026-08-25")
-    assert written["https://vaara.io/conformance.html"] == "2026-08-25"
-    # The override reaches that one page and no other.
+    from_vcr = {"https://vaara.io/conformance.html", "https://vaara.io/fi/conformance.html"}
+    assert all(written[u] == "2026-08-25" for u in from_vcr)
+    # The override reaches those two pages and no other.
     assert set(written) == dated_urls(module)
-    assert all(d != "2026-08-25" for u, d in written.items() if u != "https://vaara.io/conformance.html")
+    assert all(d != "2026-08-25" for u, d in written.items() if u not in from_vcr)
 
 
 def test_a_url_the_stamper_does_not_know_keeps_the_date_it_had(tmp_path):

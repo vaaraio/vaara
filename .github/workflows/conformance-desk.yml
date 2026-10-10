@@ -227,6 +227,7 @@ jobs:
           mkdir -p /tmp/vcr/vcr
           cp conformance/reproductions.json /tmp/vcr/vcr/reproductions.json
           cp webpage/conformance.html /tmp/vcr/vcr/conformance.html
+          mkdir -p /tmp/vcr/vcr/fi && cp webpage/fi/conformance.html /tmp/vcr/vcr/fi/conformance.html
           cp -r webpage/badge /tmp/vcr/vcr/badge
           git config user.name "vaara-desk"
           git config user.email "hello@vaara.io"
@@ -343,6 +344,7 @@ jobs:
           mkdir -p /tmp/vcr/vcr
           cp conformance/reproductions.json /tmp/vcr/vcr/reproductions.json
           cp webpage/conformance.html /tmp/vcr/vcr/conformance.html
+          mkdir -p /tmp/vcr/vcr/fi && cp webpage/fi/conformance.html /tmp/vcr/vcr/fi/conformance.html
           cp -r webpage/badge /tmp/vcr/vcr/badge
           git config user.name "vaara-desk"
           git config user.email "hello@vaara.io"

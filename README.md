@@ -17,7 +17,7 @@
 </p>
 
 <p align="center">
-  <a href="https://pepy.tech/projects/vaara"><img src="https://static.pepy.tech/badge/vaara" alt="PyPI downloads"></a>
+  <a href="https://pepy.tech/projects/vaara"><img src="https://static.pepy.tech/personalized-badge/vaara?period=total&units=international_system&left_color=grey&right_color=green&left_text=PyPI%20downloads" alt="PyPI downloads"></a>
 </p>
 
 <p align="center"><b>Accountable Autonomy.</b></p>

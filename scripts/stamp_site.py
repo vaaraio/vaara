@@ -289,7 +289,7 @@ def stamp_sitemap(
         page = sitemap_page(url)
         if page is None:
             return match.group(0)
-        if page == "conformance.html" and conformance_date:
+        if page in ("conformance.html", "fi/conformance.html") and conformance_date:
             date = conformance_date
         else:
             date = git_date(f"webpage/{page}")
