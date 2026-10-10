@@ -54,17 +54,25 @@ NAV = {
 #: Same key the earlier pages used, so a visitor's saved choice carries over.
 THEME_KEY = "vaara-theme"
 
+#: The language a visitor picked with the EN | FI switch; it stops the home page choosing for them.
+LANG_KEY = "vaara-lang"
+
 #: In <head>, before anything paints: the saved theme, or the OS setting.
 PREPAINT = ('<script>try{var t=localStorage.getItem("' + THEME_KEY + '");'
             'if(t!=="dark"&&t!=="light")t=matchMedia("(prefers-color-scheme: dark)").matches?"dark":"light";'
-            'document.documentElement.dataset.theme=t}catch(e){}</script>')
+            'document.documentElement.dataset.theme=t;'
+            # the English home sends a browser that lists Finnish to /fi/, once, until the visitor picks a language
+            'var p=location.pathname;if((p==="/"||p==="/index.html")&&!localStorage.getItem("' + LANG_KEY + '")'
+            '&&(navigator.languages||[navigator.language]).some(function(l){return/^fi\\b/i.test(l)}))location.replace("/fi/")'
+            '}catch(e){}</script>')
 
 #: Before </body>: the theme button and the phone menu.
 BODY_SCRIPT = ('<script>document.querySelector(".bar .theme").onclick=function(){var d=document.documentElement,'
                't=d.dataset.theme==="dark"?"light":"dark";d.dataset.theme=t;try{localStorage.setItem("'
                + THEME_KEY + '",t)}catch(e){}};document.querySelector(".bar .burger").onclick=function(){'
                'var n=document.querySelector("nav.top"),o=n.classList.toggle("open");'
-               'this.setAttribute("aria-expanded",o)}</script>')
+               'this.setAttribute("aria-expanded",o)};document.querySelectorAll(".bar .lang a").forEach(function(a){'
+               'a.onclick=function(){try{localStorage.setItem("' + LANG_KEY + '",a.hreflang)}catch(e){}}})</script>')
 
 
 def href(lang: str, path: str) -> str:
