@@ -435,3 +435,14 @@ html:not([data-theme="dark"]) .card.box, html:not([data-theme="dark"]) .feat { b
   .conf details.repro > dl { grid-template-columns: 1fr; }
 }
 html:root .conf details.repro > summary .result { margin: 0; flex-basis: auto; font-family: inherit; font-size: 15px; color: var(--accent); }
+
+/* Henri 10.10: only the six blocks at the top of the home page carry colour; every other box is the
+   plain frame of the three-states boxes, with a neutral icon tile */
+.card.box, a.card.box { border: 1px solid var(--rule); border-radius: 8px; }
+html:not([data-theme="dark"]) .card.box { border-top-color: #D5DBE1; }
+a.card.box:hover { border-color: var(--accent); }
+.card.box .ico { background: var(--tint); }
+.card.box .ico .a { stroke: var(--accent); }
+.four .q { background: var(--card); border: 1px solid var(--rule); border-radius: 8px; }
+html:not([data-theme="dark"]) .four .q { border-color: #D5DBE1; box-shadow: 0 1px 2px rgba(17,24,39,.05), 0 6px 18px rgba(17,24,39,.06); }
+.four .q .ico { background: var(--tint); }
