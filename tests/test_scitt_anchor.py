@@ -103,6 +103,7 @@ def test_file_backed_log_grows_across_runs(receipt: dict, tmp_path: Path) -> Non
 def test_default_log_dir_is_not_ignored(receipt: dict, tmp_path: Path,
                                         monkeypatch: pytest.MonkeyPatch) -> None:
     monkeypatch.setenv("HOME", str(tmp_path))
+    monkeypatch.setenv("USERPROFILE", str(tmp_path))  # Path.home() on Windows
     anchorer = ScittAnchor.load_or_create()
     anchorer.anchor_receipt(receipt)
     assert anchorer.path == tmp_path / ".vaara/anchor-log/vaara-scitt-log.leaves"
