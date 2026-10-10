@@ -677,6 +677,7 @@ jobs:
         run: |
           pip install --require-hashes -r requirements-dev.txt
           pip install -e . --no-deps
+          pip install py-spy
           npm install -g @github/copilot@1.0.88
           copilot --version
 
@@ -699,6 +700,14 @@ jobs:
     # It reads back the files the model asked Copilot CLI to change and the
     # guard's own trail, then runs Copilot CLI again with Vaara's hooks, whose
     # verdicts reach it through the relay to `vaara run`.
+    #
+    # pull-requests: write is for the watchdog in the test step, which
+    # posts the process table and the Python stacks as a PR comment when the
+    # test runs past its limit. A hung step keeps its log until the job ends,
+    # and a process in an uninterruptible kernel wait never lets it end.
+    permissions:
+      contents: read
+      pull-requests: write
     steps:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1  # v7.0.1
 
@@ -734,8 +743,32 @@ jobs:
           fi
 
       - name: Run the OS layer end-to-end test, failing on any skip
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          PR_NUMBER: ${{ github.event.pull_request.number }}
         run: |
           set -o pipefail
+          # Watchdog: twenty-five minutes in, whatever the state, the process
+          # table with kernel wait channels, every Python stack (nonblocking,
+          # so a process that cannot be stopped is still read) and the tails
+          # of the test and guard logs go out as a PR comment. Nothing else
+          # gets evidence out of a step that cannot end.
+          (
+            sleep 1500
+            {
+              echo "OS layer watchdog, $(date -u +%H:%M:%S) UTC, run ${GITHUB_RUN_ID}"
+              echo '```'
+              ps -eo pid,ppid,stat,wchan:32,etime,cmd | grep -vE ' \[[^]]+\]$' | head -80
+              for p in $(pgrep -f 'pytest tests/test_oslayer_e2e' || true); do sudo "$(command -v py-spy)" dump --nonblocking --pid "$p" || true; done
+              for p in $(pgrep -f 'vaara.cli run' || true); do sudo "$(command -v py-spy)" dump --nonblocking --pid "$p" || true; done
+              for p in $(pgrep -f 'vaara.cli os-guard' || true); do sudo "$(command -v py-spy)" dump --nonblocking --pid "$p" || true; done
+              echo '--- result.txt'; tail -60 result.txt || true
+              echo '--- guard.log'; tail -40 guard.log || true
+              echo '```'
+            } > watchdog.md 2>&1
+            if [ -n "$PR_NUMBER" ]; then gh pr comment "$PR_NUMBER" --body-file watchdog.md || true; fi
+            cat watchdog.md
+          ) &
           # The suite points HOME at a sandbox; this test needs the operator's
           # real home, which is the one the guard serves.
           # Twenty minutes is three bounded runs with room. Past that, SIGABRT
