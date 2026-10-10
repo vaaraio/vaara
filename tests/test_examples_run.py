@@ -53,3 +53,38 @@ def test_example_runs(path, needs, reason, tmp_path):
     output = proc.stdout + proc.stderr
     assert proc.returncode == 0, output[-2000:]
     assert "Traceback" not in output, output[-2000:]
+
+
+def _run_prove_it(home: Path) -> str:
+    env = {"HOME": str(home), "USERPROFILE": str(home), "PATH": "/usr/bin:/bin",
+           **{k: os.environ[k] for k in ("SYSTEMROOT", "SYSTEMDRIVE") if k in os.environ}}
+    if "PYTHONPATH" in os.environ:
+        env["PYTHONPATH"] = os.pathsep.join(
+            os.path.abspath(p) for p in os.environ["PYTHONPATH"].split(os.pathsep) if p
+        )
+    proc = subprocess.run(
+        [sys.executable, str(ROOT / "examples/prove-it-yourself/prove_it.py")],
+        cwd=home, env=env, capture_output=True, text=True, timeout=180,
+    )
+    output = proc.stdout + proc.stderr
+    assert proc.returncode == 0, output[-2000:]
+    return output
+
+
+def test_prove_it_bundles_only_its_own_run_on_a_machine_that_already_has_a_trail(tmp_path):
+    """The demo ran on the machine's own trail, so where Vaara already ran, the
+    bundle carried that whole history, and a break anywhere in it failed the
+    honest bundle while the text under it said the signature checks out. Run it
+    twice in one home: the first run leaves a trail behind, as Vaara in use
+    would, and the second bundle must still hold only the second run's records."""
+    import json
+    import zipfile
+
+    bundle = ROOT / "examples/prove-it-yourself/evidence.zip"
+    counts = []
+    for _ in range(2):
+        output = _run_prove_it(tmp_path)
+        assert "evidence.zip)  ->  ok=True" in output, output[-2000:]
+        with zipfile.ZipFile(bundle) as z:
+            counts.append(json.loads(z.read("manifest.json"))["record_count"])
+    assert counts[0] == counts[1], counts

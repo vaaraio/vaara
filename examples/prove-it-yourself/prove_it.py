@@ -23,6 +23,7 @@ from cryptography.hazmat.primitives.asymmetric.ed25519 import Ed25519PrivateKey
 
 from vaara import InterceptionPipeline
 from vaara.audit.export import export_signed
+from vaara.audit.trail import AuditTrail
 from vaara.audit.verify import verify_signed
 
 HERE = Path(__file__).parent
@@ -44,7 +45,11 @@ def main() -> None:
     signer = Ed25519PrivateKey.generate()
 
     # An agent proposes tool calls. Vaara decides each one before it runs.
-    pipeline = InterceptionPipeline()
+    # The demo keeps its own trail in memory. Left to the default, the pipeline
+    # writes to the machine's trail at ~/.vaara/trail/audit.db, so on a machine
+    # where Vaara already runs the bundle would carry that whole history, and
+    # whatever state it is in, instead of the four calls below.
+    pipeline = InterceptionPipeline(trail=AuditTrail())
     calls = [
         ("read a project file", "read_file",
          {"path": "README.md"}),
@@ -77,6 +82,11 @@ def main() -> None:
 
     ok = verify_signed(BUNDLE)
     print(f"\n verify_signed({BUNDLE.name})  ->  ok={ok.ok}")
+    if not ok.ok:
+        # The rest of the demo would be describing a check that did not pass.
+        for error in ok.errors:
+            print(f"   {error}")
+        raise SystemExit(1)
     print(" The signature checks out and the hash chain re-derives from the")
     print(" bundle's own bytes. No network, no access to the machine that made it.")
 
