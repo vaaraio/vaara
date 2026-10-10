@@ -401,6 +401,12 @@ def test_hardened_launch_with_egress_locked(tmp_path):
             "SELECT tool_name, data FROM audit_records WHERE tool_name = 'egress.connect'")]
     finally:
         conn.close()
-    seen = [(r["decision"], r["reason"].split(" ")[1].rstrip(":")) for r in map(json.loads, (d for _t, d in rows))]
+    data = [json.loads(d) for _t, d in rows]
+    # A refused connection is a deny; an allowed one is a decision when it is
+    # allowed and an outcome with the bytes when it closes.
+    seen = [(r["decision"], r["reason"].split(" ")[1].rstrip(":"))
+            for r in data if "decision" in r]
     assert ("deny", "example.com:443") in seen, seen[-5:]
     assert ("allow", f"127.0.0.1:{model.port}") in seen, seen[-5:]
+    closed = [r["description"] for r in data if "description" in r]
+    assert any(f"127.0.0.1:{model.port}: closed" in c for c in closed), closed[-5:]
