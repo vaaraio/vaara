@@ -1,23 +1,26 @@
 #!/usr/bin/env python3
-"""Independent checker for fallback_projection_v0 vectors.
+"""Independent checker for fallback_projection_v0.
 
-Verifies, from the standard library alone (no Vaara import), that:
+The SEP-2828 fallback projection, version
+tools_call_params_plus_meta_authorization_binding_v1: when no SEP-2787
+attestation exists for a call, backLink.attestationDigest is the digest of
 
-1. For each projection vector, JCS-encoding the projection object
-   (RFC 8785: sorted keys, no whitespace, UTF-8) and hashing it with
-   SHA-256 reproduces the committed attestationDigest.
+    {"projection": <version>, "name": <params.name>,
+     "arguments": <params.arguments>,
+     "authorizationBinding": <params._meta.authorization_binding>}
 
-2. observer_stable_a and observer_stable_b yield identical
-   attestationDigests — the key portability property: two honest
-   observers of the same call carrying different _meta sidecars
-   (progress tokens, trace IDs) produce the same digest because
-   the fallback projection excludes those transport fields.
+canonicalized with RFC 8785 (JCS). The binding block is required and must be
+an object with a non-empty string nonce; name and arguments are required.
+Every other _meta member is left out, so two observers of one call agree.
 
-3. neg_different_tool yields a distinct attestationDigest from the
-   observer_stable pair — different toolName changes the digest.
+Imports the standard library and rfc8785 only, never Vaara. Checks per case:
+the projection bytes and digest match expected.json, or the case is refused
+where expected.json says malformed. Then: provider_view and gateway_view give
+one digest; different_tool, different_arguments and replayed_binding each give
+another.
 
-Run: python3 conformance/sep2828/fallback_projection_v0/_check_independent.py
-Exit 0 = all vectors match expected.
+Run: tests/vectors/fallback_projection_v0/_check_independent.py
+Exit 0 means every verdict matched.
 """
 from __future__ import annotations
 
@@ -26,81 +29,62 @@ import json
 import sys
 from pathlib import Path
 
+import rfc8785
+
 HERE = Path(__file__).resolve().parent
+V1 = "tools_call_params_plus_meta_authorization_binding_v1"
 
 
-def jcs(obj: object) -> bytes:
-    return json.dumps(obj, sort_keys=True, separators=(",", ":"), ensure_ascii=False).encode("utf-8")
+class Malformed(ValueError):
+    pass
 
 
-def sha256(b: bytes) -> str:
-    return "sha256:" + hashlib.sha256(b).hexdigest()
+def projection(env: dict, version: str) -> dict:
+    if version != V1:
+        raise Malformed(f"unsupported projection {version!r}")
+    meta = env.get("_meta")
+    binding = meta.get("authorization_binding") if isinstance(meta, dict) else None
+    if not isinstance(binding, dict):
+        raise Malformed("authorization_binding absent or not an object")
+    if not isinstance(binding.get("nonce"), str) or not binding["nonce"]:
+        raise Malformed("authorization_binding.nonce absent")
+    if "name" not in env or "arguments" not in env:
+        raise Malformed("name or arguments missing")
+    return {"projection": version, "name": env["name"], "arguments": env["arguments"],
+            "authorizationBinding": binding}
 
 
 def main() -> int:
-    expected = json.loads((HERE / "expected.json").read_text())
+    expected = json.loads((HERE / "expected.json").read_text(encoding="utf-8"))
+    digests: dict[str, str] = {}
     failures = 0
-
     for name, want in sorted(expected.items()):
-        proj = json.loads((HERE / "projections" / f"{name}.json").read_text())
-        canonical = jcs(proj)
-        got_bytes = canonical.decode("utf-8")
-        got_digest = sha256(canonical)
+        env = json.loads((HERE / "envelopes" / f"{name}.json").read_text(encoding="utf-8"))
+        try:
+            canon = rfc8785.dumps(projection(env, want["version"]))
+        except Malformed as exc:
+            ok = want.get("malformed") is True
+            print(f"[{'OK' if ok else 'FAIL'}] {name}: refused ({exc})")
+            failures += not ok
+            continue
+        digest = "sha256:" + hashlib.sha256(canon).hexdigest()
+        digests[name] = digest
+        ok = (not want.get("malformed") and canon.decode("utf-8") == want["projectionBytes"]
+              and digest == want["attestationDigest"])
+        print(f"[{'OK' if ok else 'FAIL'}] {name}: {digest}")
+        failures += not ok
 
-        bytes_ok = got_bytes == want["projectionBytes"]
-        digest_ok = got_digest == want["attestationDigest"]
-        ok = bytes_ok and digest_ok
+    base = digests.get("provider_view")
+    ok = base is not None and digests.get("gateway_view") == base
+    print(f"[{'OK' if ok else 'FAIL'}] provider and gateway views agree")
+    failures += not ok
+    for name in ("different_tool", "different_arguments", "replayed_binding"):
+        ok = name in digests and digests[name] != base
+        print(f"[{'OK' if ok else 'FAIL'}] {name} diverges from provider_view")
+        failures += not ok
 
-        if not ok:
-            failures += 1
-            if not bytes_ok:
-                print(f"[FAIL] {name}: projectionBytes mismatch")
-                print(f"  want: {want['projectionBytes']}")
-                print(f"  got:  {got_bytes}")
-            if not digest_ok:
-                print(f"[FAIL] {name}: attestationDigest mismatch")
-                print(f"  want: {want['attestationDigest']}")
-                print(f"  got:  {got_digest}")
-        else:
-            print(f"[OK]   {name}: {got_digest}")
-
-    # Observer stability: same projection regardless of excluded _meta sidecar
-    a = expected["observer_stable_a"]["attestationDigest"]
-    b = expected["observer_stable_b"]["attestationDigest"]
-    if a != b:
-        print(f"[FAIL] observer stability: a={a} b={b}")
-        failures += 1
-    else:
-        print(f"[OK]   observer stability: both observers → {a}")
-
-    # Negative: different toolName must produce different digest
-    neg = expected["neg_different_tool"]["attestationDigest"]
-    if neg == a:
-        print("[FAIL] neg_different_tool: digest should differ from observer_stable")
-        failures += 1
-    else:
-        print("[OK]   neg_different_tool diverges from observer_stable")
-
-    # Negative (item 2): different arguments must produce different digest
-    d_args = expected["neg_different_args"]["attestationDigest"]
-    if d_args == a:
-        print("[FAIL] neg_different_args: digest should differ from observer_stable")
-        failures += 1
-    else:
-        print("[OK]   neg_different_args diverges from observer_stable")
-
-    # Negative (item 3): different authBinding must produce different digest
-    d_auth = expected["neg_different_auth_binding"]["attestationDigest"]
-    if d_auth == a:
-        print("[FAIL] neg_different_auth_binding: digest should differ from observer_stable")
-        failures += 1
-    else:
-        print("[OK]   neg_different_auth_binding diverges from observer_stable")
-
-    total = len(expected) + 4  # +4 for cross-vector assertions
-    passed = total - failures
-    print(f"\n{passed}/{total} checks passed.")
-    return 1 if failures else 0
+    print(f"\n{'all verdicts matched expected' if not failures else f'{failures} mismatch(es)'}")
+    return 0 if failures == 0 else 1
 
 
 if __name__ == "__main__":

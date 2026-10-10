@@ -1,0 +1,37 @@
+{
+  "invalid/confirmed-after-signing.json": {
+    "cage": true,
+    "evidence": false,
+    "signature": true
+  },
+  "invalid/confirmed-on-declared-basis.json": {
+    "cage": false,
+    "evidence": true,
+    "signature": true
+  },
+  "invalid/confirmed-without-a-cage.json": {
+    "cage": false,
+    "evidence": true,
+    "signature": true
+  },
+  "invalid/malformed-config-digest.json": {
+    "cage": false,
+    "evidence": true,
+    "signature": true
+  },
+  "valid/0-unconfined.json": {
+    "cage": true,
+    "evidence": true,
+    "signature": true
+  },
+  "valid/1-declared.json": {
+    "cage": true,
+    "evidence": true,
+    "signature": true
+  },
+  "valid/2-confirmed.json": {
+    "cage": true,
+    "evidence": true,
+    "signature": true
+  }
+}

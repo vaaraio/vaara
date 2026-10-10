@@ -270,12 +270,19 @@ def _stage_command(stage: str) -> str:
     return ""
 
 
-def _heredoc_reader(line: str, at: int) -> str:
-    """Who reads the heredoc opened at ``line[at]``: ``"file"`` when only
-    ``cat`` or ``tee`` handle it, ``"interpreter"`` when a Python or Node
-    interpreter is among them, ``""`` (a shell, or anything unknown)."""
+def _heredoc_statement(line: str, at: int) -> tuple[str, str, str]:
+    """The statement that owns the heredoc opened at ``line[at]``: the text
+    before the operator back to the last statement break, the text after it
+    up to the next, and the rest of the line past that statement."""
     left = re.split(r";|&&|\|\||\(|`|\$\(", line[:at])[-1]
     right = re.split(r";|&&|\|\||\)|`", line[at:])[0]
+    return left, right, line[at + len(right):]
+
+
+def _heredoc_reader(left: str, right: str) -> str:
+    """Who reads the heredoc whose statement is ``left + right``: ``"file"``
+    when only ``cat`` or ``tee`` handle it, ``"interpreter"`` when a Python
+    or Node interpreter is among them, ``""`` (a shell, or anything unknown)."""
     pipeline = left + right
     if _LIVE_REDIRECT.search(pipeline):
         return ""
@@ -286,16 +293,76 @@ def _heredoc_reader(line: str, at: int) -> str:
     return "file" if all(n in _WRITERS for n in names) else "interpreter"
 
 
+#: Commands that run a file or a string as code. A statement after a heredoc
+#: naming one of these keeps the body: ``cat > x.sh <<EOF ... EOF; bash x.sh``
+#: writes bytes and then runs them in the same call.
+_EXECUTORS = frozenset({
+    "bash", "sh", "dash", "zsh", "ksh", "fish", "source", ".", "exec", "eval",
+    "chmod", "node",
+})
+
+#: A statement break inside the text after a heredoc's own statement.
+_STATEMENT_BREAK = re.compile(r"[;&|\n()`]|\$\(")
+
+#: A redirect prefix on a word: ``>``, ``>>``, ``2>``, ``&>``, ``<``.
+_REDIRECT_PREFIX = re.compile(r"^(?:\d*>>?|&>>?|\d*<)")
+
+
+def _heredoc_targets(left: str, right: str) -> list[str]:
+    """The words of a heredoc's statement that can name the file it writes:
+    everything that is not the operator, a redirect, a flag, a file
+    descriptor, a launcher or a reader name. ``/dev/null`` is never one."""
+    statement = _HEREDOC.sub(" ", left + right)
+    targets: list[str] = []
+    for word in statement.replace("|", " ").split():
+        word = _REDIRECT_PREFIX.sub("", word).strip("'\"")
+        if (not word or word.startswith("-") or re.fullmatch(r"&?\d*", word)
+                or word in _LAUNCHERS or word in _WRITERS
+                or _NON_SHELL_INTERPRETER.fullmatch(word)
+                or word == "/dev/null" or re.fullmatch(r"[A-Za-z_]\w*=\S*", word)):
+            continue
+        targets.append(word)
+    return targets
+
+
+def _runs_later(left: str, right: str, rest: str) -> bool:
+    """True when ``rest``, the text after the heredoc's own statement, names
+    a file the statement wrote or a command that runs code. Either keeps the
+    body: the bytes written are the bytes run, or may be."""
+    if not rest.strip():
+        return False
+    for stage in _STATEMENT_BREAK.split(rest):
+        if _HEREDOC.search(stage):
+            continue  # reads its own heredoc, judged by its own reader
+        name = _stage_command(stage)
+        if name in _EXECUTORS or _NON_SHELL_INTERPRETER.fullmatch(name):
+            return True
+    for target in _heredoc_targets(left, right):
+        if re.search(r"(?<![\w-])" + re.escape(target.lstrip("./")) + r"(?![\w.-])", rest):
+            return True
+    return False
+
+
 def without_inert_heredocs(command: str, shell_syntax: bool) -> str:
     """``command`` with the heredoc bodies no shell will run taken out.
 
     A body that ``cat`` or ``tee`` writes to a file is bytes, the same bytes
     the Write tool would carry, and no Bash rule reads the Write tool's
     content. A body a Python or Node interpreter reads is not shell, so a
-    rule marked ``shell_syntax`` does not read it. Everything else is kept: a body piped into
-    a shell, sent over ssh, or read by anything not named here. The lines
-    that open and close each heredoc are always kept, so a pipe or redirect
-    on them is still matched. An unterminated heredoc keeps the whole text.
+    rule marked ``shell_syntax`` does not read it. Everything else is kept: a
+    body piped into a shell, sent over ssh, or read by anything not named
+    here. A written body is also kept when a later statement in the same
+    command names the file it wrote or a command that runs code (``bash``,
+    ``sh``, ``source``, ``.``, ``exec``, ``eval``, ``chmod``, ``python*``,
+    ``node``): ``cat > x.sh <<EOF ... EOF; bash x.sh`` writes bytes and runs
+    them in one call, so the body is read as a command. The lines that open
+    and close each heredoc are always kept, so a pipe or redirect on them is
+    still matched. An unterminated heredoc keeps the whole text.
+
+    A Python body that calls the shell (``os.system``) is one hop away from
+    a command and is still dropped for ``shell_syntax`` rules; that is the
+    2026-10-04 trade-off below, pinned by a test, and every rule not marked
+    ``shell_syntax`` reads the body as before.
 
     On 2026-10-04 notes about netcat and rsync, written to markdown through
     ``cat > file <<EOF`` and ``python3 - <<EOF``, were refused as
@@ -321,8 +388,12 @@ def without_inert_heredocs(command: str, shell_syntax: bool) -> str:
                 end += 1
             if end == len(lines):
                 return command
-            reader = _heredoc_reader(line, op.start())
-            if not (reader == "file" or (reader == "interpreter" and shell_syntax)):
+            left, right, tail = _heredoc_statement(line, op.start())
+            reader = _heredoc_reader(left, right)
+            inert = reader == "file" or (reader == "interpreter" and shell_syntax)
+            if inert and _runs_later(left, right, tail + "\n" + "\n".join(lines[end + 1:])):
+                inert = False
+            if not inert:
                 out.extend(lines[i:end])
             out.append(lines[end])
             shell_lines.append(lines[end])

@@ -32,9 +32,12 @@ def digest_file(path: Path) -> str:
 
 
 def digest_json(obj: Any) -> str:
-    """``sha256:`` over the canonical JSON of ``obj`` (sorted keys, no spaces)."""
-    return digest_bytes(json.dumps(obj, sort_keys=True, separators=(",", ":"),
-                                   ensure_ascii=False).encode())
+    """``sha256:`` over the canonical JSON of ``obj``, the same bytes the
+    receipts digest (sorted keys, no spaces, UTF-8, no floats). A driver's
+    request holds strings and lists of strings, so a float is a defect."""
+    from vaara.audit.hcs27 import canonical_json
+
+    return digest_bytes(canonical_json(obj))
 
 
 class Tool:

@@ -1,0 +1,13 @@
+{
+  "name": "document_fetch",
+  "arguments": {
+    "file": "invoice.pdf"
+  },
+  "_meta": {
+    "progressToken": "pt-aaa",
+    "authorization_binding": {
+      "nonce": "srv-nonce-7f3a",
+      "scope": "read"
+    }
+  }
+}

@@ -1,0 +1,11 @@
+{
+  "name": "document_fetch",
+  "arguments": {
+    "file": "invoice.pdf"
+  },
+  "_meta": {
+    "authorization_binding": {
+      "scope": "read"
+    }
+  }
+}

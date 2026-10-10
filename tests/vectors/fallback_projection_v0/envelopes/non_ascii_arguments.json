@@ -1,0 +1,11 @@
+{
+  "name": "write_note",
+  "arguments": {
+    "text": "Päätös € é"
+  },
+  "_meta": {
+    "authorization_binding": {
+      "nonce": "srv-nonce-0002"
+    }
+  }
+}

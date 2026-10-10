@@ -1,0 +1,176 @@
+; vaara.receipt/v1 envelope, JSON encoding.
+; Maps are closed: a member not named here is not allowed.
+; Rules CDDL cannot state are in the prose: runningCount is
+; seq + 1, the issuer block alg equals the envelope alg, and
+; the classical part of sigSuite equals alg.
+
+receipt = decision-receipt / execution-receipt
+
+decision-receipt = {
+  version: 1,
+  alg: alg,
+  backLink: back-link,
+  decisionDerived: decision-derived,
+  issuerAsserted: issuer-block,
+  signature: hex,
+  ? timestampAnchors: [* anchor],
+}
+
+execution-receipt = {
+  version: 1,
+  alg: alg,
+  backLink: back-link,
+  outcomeDerived: outcome-derived,
+  receiptAsserted: issuer-block,
+  signature: hex,
+  ? pqSignature: pq-signature,
+  ? existenceProof: existence-proof,
+}
+
+alg = "ES256" / "RS256" / "HS256"
+hex = tstr .regexp "[0-9a-f]+"
+digest = tstr .regexp "sha256:[0-9a-f]{64}"
+nonempty = tstr .regexp ".+"
+date-time = tstr .regexp "[0-9-]{10}T[0-9:]{8}([.][0-9]+)?Z"
+decimal = tstr .regexp "-?[0-9]+([.][0-9]+)?"
+
+back-link = {
+  attestationDigest: digest,
+  attestationNonce: nonempty,
+  ? fallbackProjection: nonempty,
+}
+
+issuer-block = {
+  iss: tstr,
+  sub: tstr,
+  iat: date-time,
+  nonce: tstr,
+  alg: alg,
+  secretVersion: tstr,
+  ? aud: nonempty,
+  ? taskId: nonempty,
+  ? completeness: completeness,
+  ? sigSuite: "ES256+ML-DSA-65" / "RS256+ML-DSA-65",
+  ? cryptoPosture: crypto-posture,
+}
+
+completeness = {
+  boundaryId: nonempty,
+  seq: uint,
+  runningCount: uint,
+}
+
+crypto-posture = {
+  assetType: "algorithm",
+  nistQuantumSecurityLevel: 0..5,
+  algorithms: [+ crypto-algorithm],
+}
+
+crypto-algorithm = {
+  algorithm: nonempty,
+  primitive: nonempty,
+  nistQuantumSecurityLevel: 0..5,
+}
+
+decision-derived = {
+  decision: "allow" / "block" / "escalate",
+  decidedAt: date-time,
+  ? reason: tstr,
+  ? policyId: tstr,
+  ? riskScore: decimal,
+  ? thresholdAllow: decimal,
+  ? thresholdBlock: decimal,
+  ? clientTurnId: tstr,
+  ? evidenceRef: evidence-ref,
+  ? rationale: rationale,
+  ? binding: binding,
+  ? decisionProof: { * tstr => any },
+}
+
+evidence-ref = {
+  canonicalization: "jcs-rfc8785" / "JCS" / "jcs-json-v1",
+  digest: digest,
+  schema: nonempty,
+  ? ref: nonempty,
+}
+
+rationale = {
+  rule: tstr,
+  reason: tstr,
+  declaredIntent: tstr,
+  ? intentSatisfied: bool,
+}
+
+binding = {
+  policyDigest: digest,
+  intentDigest: digest,
+  inputsDigest: digest,
+  bindingDigest: digest,
+}
+
+outcome-derived = {
+  status: "executed" / "refused" / "errored",
+  completedAt: date-time,
+  ? resultCommitment: projection-commitment / reference-commitment,
+  ? decisionDigest: digest,
+}
+
+projection-commitment = {
+  projection: tstr,
+  projectionDigest: digest,
+}
+
+reference-commitment = {
+  ref: tstr,
+  digest: digest,
+  canonicalization: "jcs",
+}
+
+pq-signature = {
+  alg: "ML-DSA-65",
+  keyid: nonempty,
+  sig: hex,
+}
+
+existence-proof = {
+  backend: "rfc3161-eidas-qualified",
+  hashAlgorithm: "sha256",
+  recordDigest: digest,
+  token: nonempty,
+}
+
+anchor = rfc3161-anchor / blinded-anchor / log-anchor / other-anchor
+
+rfc3161-anchor = {
+  method: "rfc3161" / "rfc3161-eidas-qualified",
+  anchoredDigest: digest,
+  token: nonempty,
+  ? authority: tstr,
+}
+
+blinded-anchor = {
+  method: "rfc3161-blinded" / "rfc3161-eidas-qualified-blinded",
+  anchoredDigest: digest,
+  token: nonempty,
+  anchorSalt: tstr .regexp "[0-9a-f]{64}",
+  ? authority: tstr,
+}
+
+log-anchor = {
+  method: "scitt",
+  anchoredDigest: digest,
+  logId: nonempty,
+  leafIndex: uint,
+  treeSize: uint,
+  inclusionProof: [* tstr],
+  rootHash: nonempty,
+  ? authority: tstr,
+}
+
+; A method this document does not define: carried, never
+; treated as verified.
+other-anchor = {
+  method: tstr,
+  anchoredDigest: digest,
+  * tstr => any,
+}

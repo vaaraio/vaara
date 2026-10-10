@@ -1,75 +1,51 @@
-# SEP-2828 fallback_projection_v0 conformance vectors
+# fallback_projection_v0
 
-JCS digest vectors for the SEP-2828 fallback binding path — used when no
-SEP-2787 attestation exists for the call.
+The SEP-2828 fallback projection, version
+`tools_call_params_plus_meta_authorization_binding_v1`.
 
-## What is the fallback projection?
+When no SEP-2787 attestation exists for a call, a decision record and its
+execution receipt still have to bind to the call that caused them. Hashing the
+whole observed `tools/call` envelope does not work: a gateway and a provider
+see the same call with different `_meta` sidecars (progress tokens, trace
+context, injected ids) and would compute different digests.
 
-When a deployment does not run SEP-2787, the decision and outcome records
-must still bind to the originating call. The naive approach — hashing the
-full observed `tools/call` envelope including `_meta` — produces
-observer-local digests: a gateway and a provider both see the same call
-but carry different `_meta` values (progress tokens, trace IDs, injected
-correlation headers), so they hash to different values.
-
-The fallback projection fixes this by hashing only the portable subset:
+The projection keeps only what binds the call:
 
 ```json
 {
-  "arguments":   <JCS-normalized params.arguments>,
-  "authBinding": <params._meta["authorization_binding"] if present, else absent>,
-  "toolName":    "<params.name>"
+  "projection": "tools_call_params_plus_meta_authorization_binding_v1",
+  "name": "<params.name>",
+  "arguments": <params.arguments>,
+  "authorizationBinding": <params._meta.authorization_binding>
 }
 ```
 
-`attestationDigest` = `sha256:<hex>` over the UTF-8 JCS encoding of this
-object (RFC 8785: keys sorted, no whitespace). The server-chosen
-`attestationNonce` in `backLink` still provides instance-binding; the
-projection hash provides content-binding.
+`backLink.attestationDigest` is `sha256:` over the RFC 8785 (JCS) encoding of
+that object, and `backLink.fallbackProjection` names the version, inside the
+signed record, so a verifier rebuilds the same projection instead of guessing
+it. `authorization_binding` is required and must be an object with a non-empty
+string `nonce` (the server's per-call value); `name` and `arguments` are
+required. Anything else under `_meta` never enters the preimage. When the
+projection cannot be built, or the version is one the verifier does not know,
+the binding fails closed.
 
-`authBinding` carries only the authorization-relevant subobject from
-`_meta` — scope, policy reference, capability grant. Progress tokens and
-transport correlation artifacts are excluded.
+## Cases
 
-## Vectors
+`envelopes/` holds raw request envelopes, sidecars included.
 
-| Name | Property tested |
-|------|----------------|
-| `basic_no_auth_binding` | Unauthenticated fallback profile: authBinding absent from projection |
-| `with_auth_binding` | Projection with authBinding present |
-| `observer_stable_a` | Observer A: gateway sees `{"progressToken":"pt-aaa","traceId":"tr-001","authorization_binding":{…}}` in _meta |
-| `observer_stable_b` | Observer B: provider sees `{"progressToken":"pt-bbb","x-injected-id":"inj-999","authorization_binding":{…}}` in _meta |
-| `neg_different_tool` | Different toolName → different attestationDigest (same args + authBinding) |
-| `neg_different_args` | Different arguments → different attestationDigest (same toolName + authBinding) |
-| `neg_different_auth_binding` | Different authBinding → different attestationDigest (same toolName + args) |
+| Case | What it shows |
+|---|---|
+| `provider_view`, `gateway_view` | One call, different sidecars, one digest. |
+| `binding_with_policy` | Every member of the binding block is bound, not only the nonce. |
+| `non_ascii_arguments` | Non-ASCII arguments go through JCS as raw UTF-8. |
+| `different_tool`, `different_arguments`, `replayed_binding` | Changing any bound field changes the digest. |
+| `no_binding`, `binding_without_nonce`, `binding_not_object`, `missing_arguments` | No projection exists; refused. |
+| `unsupported_version` | A version the verifier does not implement; refused. |
 
-`observer_stable_a` and `observer_stable_b` have **identical projections**
-and therefore identical `attestationDigest` values, proving the portability
-property: honest observers with different `_meta` sidecars agree on the
-digest. The raw _meta values shown above differ in `progressToken` and
-`x-injected-id`; both are stripped. Only `authorization_binding` survives
-as `authBinding`.
+The signed receipts bound under this projection are in
+`../decision_pairing_v0/normative/fallback_envelope_binding/`.
 
-`basic_no_auth_binding` is the **explicitly defined unauthenticated fallback
-profile**: when `_meta` carries no `authorization_binding` key, `authBinding`
-is absent from the projection and the digest covers `{arguments, toolName}`
-only. Implementations that require authorization MUST reject calls with no
-`authBinding` at the policy layer; the projection itself does not fail-close
-on absent authBinding because the spec defines this as a valid profile.
+Earlier contents of this directory hashed `{arguments, authBinding, toolName}`,
+a shape no signed record used. They were replaced by these cases.
 
-**Instance separation via nonce.** The projection hash is content-binding
-only: two identical calls (same toolName, arguments, authBinding) produce the
-same `attestationDigest`. Instance separation is the responsibility of the
-receipt layer via `backLink.attestationNonce`, which the server chooses per
-call. The projection corpus does not include nonces because nonces live in the
-receipt envelope, not in the projection preimage.
-
-## Running the checker
-
-```
-python3 tests/vectors/fallback_projection_v0/_check_independent.py
-```
-
-Standard library only (`hashlib`, `json`). Exit 0 means all 7 checks pass,
-including the cross-vector observer-stability and negative-divergence
-assertions.
+    python3 tests/vectors/fallback_projection_v0/_check_independent.py

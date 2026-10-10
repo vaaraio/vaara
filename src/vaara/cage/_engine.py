@@ -7,9 +7,14 @@ podman. The driver creates the container with the runtime, the image and
 the agent command, hands the cage declaration in as ``-e`` variables, and
 reads the engine's ``inspect`` for state. The effective configuration the
 record carries is ``sha256:`` over the request the driver made: runtime,
-image, security options and the agent command, in canonical JSON. The
-engine's own view of the created container (``HostConfig`` and ``Config``)
-is digested in ``status`` beside it.
+image, security options and the agent command, in canonical JSON. It is
+handed to the container as ``VAARA_CAGE_DIGEST``, so every receipt from
+inside carries it, and ``enforcement_state`` reads it back from the
+container's environment so ``vaara cage status`` reports the same value
+a receipt does. The engine's own view of the created container
+(``HostConfig`` and ``Config``) is digested beside it as ``active_digest``,
+in ``status`` and in the state's detail; a container Vaara did not launch
+has no given digest and reports the engine's view as its own.
 """
 
 from __future__ import annotations
@@ -20,7 +25,7 @@ import time
 from pathlib import Path
 from typing import Any, Iterator, Optional
 
-from vaara.cage import BASIS_DECLARED, BASIS_ENGINE, CageState, environ_for
+from vaara.cage import BASIS_DECLARED, BASIS_ENGINE, DIGEST_ENV, CageState, environ_for
 from vaara.cage._cli import Tool, digest_json
 from vaara.cage.driver import CageError, CageLaunch
 
@@ -93,11 +98,14 @@ class ContainerEngineDriver:
         state = data.get("State") or {}
         host = data.get("HostConfig") or {}
         config = data.get("Config") or {}
+        given = next((str(e).split("=", 1)[1] for e in (config.get("Env") or ())
+                      if str(e).startswith(DIGEST_ENV + "=")), "")
         return {
             "name": name, "id": data.get("Id", ""),
             "status": state.get("Status", ""), "running": bool(state.get("Running")),
             "exit_code": state.get("ExitCode"), "runtime": host.get("Runtime", ""),
             "image": config.get("Image", ""), "cmd": config.get("Cmd"),
+            "config_digest": given,
             "active_digest": digest_json({"HostConfig": host, "Config": config}),
             "security_opt": host.get("SecurityOpt"),
         }
@@ -109,9 +117,10 @@ class ContainerEngineDriver:
         runtime_ok = (not self.runtime) or status["runtime"] == self.runtime
         return CageState(
             driver=self.name, upstream=self.upstream_version(),
-            config_digest=status["active_digest"],
+            config_digest=status["config_digest"] or status["active_digest"],
             confirmed=bool(status["running"]) and runtime_ok, basis=BASIS_ENGINE, name=name,
-            detail={k: status[k] for k in ("status", "runtime", "image", "exit_code", "id")},
+            detail={k: status[k] for k in ("status", "runtime", "image", "exit_code", "id",
+                                           "active_digest")},
         )
 
     def events(self, name: str, since: float = 0.0) -> Iterator[dict[str, Any]]:

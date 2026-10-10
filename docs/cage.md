@@ -171,11 +171,16 @@ vaara os-layer egress --off       # unlocked
   `CONNECT` and plain HTTP and resolves names itself. A host passes when
   it matches an entry: `example.com` (ports 443 and 80), `*.example.com`
   (subdomains) or `host:port`. A name that resolves to loopback,
-  link-local (cloud metadata), multicast or the unspecified address is
+  link-local (cloud metadata), multicast, the unspecified address or a
+  private range (10/8, 172.16/12, 192.168/16, 100.64/10, fc00::/7) is
   refused unless the entry names that address literally.
 - Every connection, allowed or refused, is a decision on the operator's
   trail (`egress.connect`), with the host, port and the reason, and the
-  launch's cage block.
+  launch's cage block. A refused connection is a deny. An allowed one is
+  recorded when it is decided, before the connect, and closed by an
+  outcome with the bytes moved; an upstream that does not answer closes
+  the same decision with an outcome that says so, a transport failure
+  and not a refusal.
 - A launch whose kernel cannot apply a layer that was asked for does not
   start.
 
@@ -232,6 +237,12 @@ What these layers do not do:
   submitted. The gateway may merge a global policy on top; `status`
   reports the digest of the policy the gateway holds as active beside the
   gateway's own `policy_hash`, so the two can be compared.
+- For gVisor and Kata, the record's `config_digest` is over the request
+  the driver made to the engine (runtime, image, security options, agent
+  command). The driver hands it to the container as `VAARA_CAGE_DIGEST`
+  and `status` reads it back from there, so a receipt from inside and
+  `vaara cage status` show the same value; the engine's own view of the
+  container is digested beside it as `active_digest`.
 - A process that is confined but was not started through a driver is not
   guessed at. Without a declaration the block says `none`, since a
   container's default seccomp profile looks the same from inside as a

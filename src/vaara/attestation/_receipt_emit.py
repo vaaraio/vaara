@@ -184,6 +184,11 @@ def verify_receipt_signature(
     ``verifying_material`` is either a bytes shared secret (HS256) or a
     public-key object from ``cryptography.hazmat`` (ES256 / RS256).
     """
+    # The issuer block names the algorithm too, inside the signed bytes. A
+    # record whose two names disagree is refused before any key is tried, so
+    # no verifier has to pick which one to believe.
+    if receipt.receipt_asserted.alg != receipt.alg:
+        return False
     payload = _signing_payload(
         version=receipt.version,
         alg=receipt.alg,

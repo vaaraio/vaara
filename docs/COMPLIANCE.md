@@ -145,6 +145,12 @@ Which built-in actions carry the SOC 2 tag: `data.read`, `data.write`,
 A deployer's own action classes opt in by listing `soc2` among their
 regulatory domains.
 
+The six rows are assessed in every default report and none of them is
+critical by default, so they do not move the report's overall status
+until a deployer marks them so: pass `ComplianceEngine` the rows with
+`dataclasses.replace(row, is_critical=True)` on the criteria the
+entity's own SOC 2 report has to cover.
+
 What the evidence shows is that the control operated during the period.
 Whether that matches the control as the entity described it in its
 system description is the service auditor's call, as with every other

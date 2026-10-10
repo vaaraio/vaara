@@ -653,3 +653,57 @@ def test_every_driver_has_an_inside_check_and_loads():
     for name in cage.DRIVERS:
         assert name in cage._CONFIRM, name
         assert cage.load_driver(name).name == name
+
+
+@posix_tools
+class TestEngineDigestIsTheOneTheReceiptsCarry:
+    """Audit 2026-10-10 finding 4: start() handed the agent the digest of
+    the request, so every receipt from inside carries it, while
+    enforcement_state() reported the digest of the engine's own view, so
+    comparing a receipt against ``vaara cage status`` always mismatched.
+    The state now carries the digest the container's environment holds,
+    and the engine's view beside it as ``active_digest``."""
+
+    def test_status_reports_the_digest_the_container_was_given(self, fake, tmp_path):
+        from vaara.cage._cli import digest_json
+        from vaara.cage.gvisor import GVisorDriver
+        request = {"engine": str(tmp_path / "docker"), "runtime": "runsc",
+                   "image": "python:3.12", "security_opt": [], "agent": ["python", "agent.py"]}
+        given = digest_json(request)
+        inspect = [dict(INSPECT[0], Config={"Image": "python:3.12", "Cmd": ["python", "agent.py"],
+                                            "Env": [f"{cage.DIGEST_ENV}={given}",
+                                                    f"{cage.CAGE_ENV}=gvisor"]})]
+        engine, calls = fake("docker", [[["run"], "abc123\n"], [["inspect"], inspect],
+                                        [["inspect"], inspect]])
+        runsc = tmp_path / "runsc"
+        runsc.write_text("#!/bin/sh\necho 'runsc version release-20261001.0'\n")
+        runsc.chmod(runsc.stat().st_mode | stat.S_IXUSR)
+        d = GVisorDriver(engine=engine, runsc=str(runsc))
+        launch = d.start(["python", "agent.py"], None, name="g", image="python:3.12")
+        c = _call(calls, "run")
+        envs = [c["argv"][i + 1] for i, a in enumerate(c["argv"]) if a == "-e"]
+        assert f"{cage.DIGEST_ENV}={given}" in envs
+        assert launch.state.config_digest == given
+        engine_view = d.status("g")["active_digest"]
+        assert engine_view != given
+        assert launch.state.detail["active_digest"] == engine_view
+        assert d.enforcement_state("g").config_digest == given
+
+    def test_a_container_not_launched_by_vaara_reports_the_engine_view(self, fake):
+        from vaara.cage.gvisor import GVisorDriver
+        engine, _ = fake("docker", [[["inspect"], INSPECT]])
+        state = GVisorDriver(engine=engine, runsc="/nonexistent/runsc").enforcement_state("g")
+        assert state.config_digest == state.detail["active_digest"]
+
+
+def test_digest_json_is_the_receipts_canonical_form():
+    # Audit 2026-10-10 (R3): every other digest in the tree is JCS; the cage
+    # digests were sorted JSON with floats allowed. Same bytes for a
+    # driver's request, and a float is now refused like everywhere else.
+    from vaara.audit.hcs27 import canonical_json
+    from vaara.cage._cli import digest_bytes, digest_json
+    request = {"engine": "docker", "runtime": "runsc", "image": "python:3.12",
+               "security_opt": [], "agent": ["python", "agent.py"]}
+    assert digest_json(request) == digest_bytes(canonical_json(request))
+    with pytest.raises(Exception):
+        digest_json({"timeout": 1.5})

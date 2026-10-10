@@ -32,6 +32,7 @@ import ipaddress
 import socket
 import threading
 import time
+import uuid
 from dataclasses import dataclass
 from typing import Callable, Optional
 
@@ -40,6 +41,12 @@ DEFAULT_PORTS = (443, 80)
 _REFUSED_NETS = ("loopback", "link_local", "multicast", "unspecified")
 # Instance metadata on IPv6 sits in unique-local space, not link-local: AWS.
 _METADATA_V6 = (ipaddress.ip_network("fd00:ec2::254/128"),)
+# Private ranges: an allowed public name that resolves here (a compromised
+# domain, a wildcard entry) would reach the operator's own network. Named
+# explicitly rather than through ``is_private``, which also covers the
+# documentation ranges. An entry that names the address literally passes.
+_PRIVATE_NETS = tuple(ipaddress.ip_network(n) for n in (
+    "10.0.0.0/8", "172.16.0.0/12", "192.168.0.0/16", "100.64.0.0/10", "fc00::/7"))
 
 
 @dataclass(frozen=True)
@@ -101,6 +108,8 @@ def _refused_address(addr: ipaddress._BaseAddress) -> Optional[str]:
     for kind in _REFUSED_NETS:
         if getattr(addr, f"is_{kind}"):
             return kind.replace("_", "-")
+    if any(addr in net for net in _PRIVATE_NETS):
+        return "private"
     return None
 
 
@@ -254,10 +263,18 @@ class EgressProxy:
         event = {"ts": time.time(), "host": host, "port": port, "method": method.upper(),
                  "allowed": allowed, "reason": reason}
         if not allowed or target is None:
-            self._record(event)
+            # Refused by policy: the one event kind that is a deny.
+            self._record(dict(event, kind="refused"))
             conn.sendall(b"HTTP/1.1 403 Forbidden\r\nContent-Type: text/plain\r\n"
                          b"Connection: close\r\n\r\nvaara egress: " + reason.encode() + b"\n")
             return
+        # Allowed: recorded now, before the connect, so a long stream is on
+        # the record while it runs and stays there if this process dies.
+        # What follows for the same connection id is an outcome, not a
+        # decision: closed with the bytes, or failed when the upstream did
+        # not answer. A 502 is transport, not policy.
+        event["connection"] = str(uuid.uuid4())
+        self._record(dict(event, kind="opened"))
         family, sockaddr = target
         upstream = socket.socket(family, socket.SOCK_STREAM)
         upstream.settimeout(self._timeout)
@@ -265,8 +282,7 @@ class EgressProxy:
             upstream.connect(sockaddr)
         except OSError as exc:
             upstream.close()
-            event.update(allowed=False, reason=f"upstream did not answer: {exc}")
-            self._record(event)
+            self._record(dict(event, kind="failed", error=f"upstream did not answer: {exc}"))
             conn.sendall(b"HTTP/1.1 502 Bad Gateway\r\nConnection: close\r\n\r\n")
             return
         if connect_reply:
@@ -281,8 +297,7 @@ class EgressProxy:
             upstream.close()
         else:
             up, down = _pipe(conn, upstream)
-        event.update(bytes_up=up + len(first), bytes_down=down)
-        self._record(event)
+        self._record(dict(event, kind="closed", bytes_up=up + len(first), bytes_down=down))
 
 
 def _split_hostport(target: str, default: int) -> tuple[str, int]:

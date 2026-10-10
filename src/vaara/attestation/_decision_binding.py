@@ -2,10 +2,9 @@
 # SPDX-License-Identifier: AGPL-3.0-or-later
 """Binding and rationale digests for the SEP-2828 decision record.
 
-Delegates to the canonical attestation JCS path when available (the
-``vaara[attestation]`` extra).  Falls back to a pure-stdlib approximation
-when neither the extra nor ``rfc8785`` is present, emitting a warning so
-callers know the digest is not RFC 8785-compliant across implementations.
+Object digests are over RFC 8785 JCS bytes; the intent digest is over the
+UTF-8 bytes of the declared intent, and the binding digest over the joined
+digests and verdict, as each function below states.
 
 The digests here are the commitments the zero-knowledge decisionProof opens
 against: the policy, the declared intent, the evaluation inputs, and the
@@ -15,40 +14,24 @@ resulting binding.
 from __future__ import annotations
 
 import hashlib
-import json
-import warnings
 from typing import Any
 
 
 def _canonical_bytes(obj: dict[str, Any]) -> bytes:
-    """RFC 8785 JCS bytes via ``rfc8785``, with a warned stdlib fallback.
+    """RFC 8785 JCS bytes.
 
-    Tries ``rfc8785.dumps`` directly first (the lightweight dep the keyless
-    path prefers), then falls back to the full attestation-canonical path,
-    then warns on pure-stdlib divergence.
+    ``rfc8785`` is a base dependency. A digest written over anything else
+    would not recompute in another implementation, so a missing library is
+    an error here rather than a quiet fallback to sorted JSON.
     """
     try:
         import rfc8785
-
-        return rfc8785.dumps(obj)
-    except ImportError:
-        pass
-    try:
-        from vaara.attestation._attest_canonical import canonical_json
-
-        return canonical_json(obj)
-    except (ImportError, Exception):
-        pass
-    warnings.warn(
-        "rfc8785 not available; keyless decision binding digests use stdlib "
-        "json (non-JCS-compatible number formatting) — install "
-        "'vaara[attestation]' for canonical RFC 8785 behaviour.",
-        stacklevel=2,
-    )
-    return json.dumps(
-        obj, sort_keys=True, separators=(",", ":"),
-        ensure_ascii=True, allow_nan=False,
-    ).encode("utf-8")
+    except ImportError as exc:  # pragma: no cover - a broken install
+        raise ImportError(
+            "decision binding digests need rfc8785 (RFC 8785 JCS); "
+            "reinstall vaara with its dependencies"
+        ) from exc
+    return rfc8785.dumps(obj)
 
 
 def _sha(data: bytes) -> str:

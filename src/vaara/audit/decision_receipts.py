@@ -130,16 +130,42 @@ def build_evidence(record: AuditRecord) -> dict[str, Any]:
         # process ran in and whether the kernel confirmed it at that moment.
         # Camel-cased like the rest of the profile; a record written before
         # the cage layer has no block and the receipt says nothing.
-        block: dict[str, Any] = {
-            "driver": str(cage["driver"]),
-            "confirmed": bool(cage.get("confirmed", False)),
-        }
-        for src, dst in (("upstream", "upstream"), ("config_digest", "configDigest"),
-                         ("basis", "basis"), ("name", "name")):
-            if cage.get(src):
-                block[dst] = str(cage[src])
-        evidence["cage"] = block
+        evidence["cage"] = _cage_block(cage, record.record_id)
     return evidence
+
+
+def _cage_block(cage: dict[str, Any], record_id: str) -> dict[str, Any]:
+    """The receipt's cage block, held to the rules a verifier applies.
+
+    The trail keeps what it was given; the receipt never states more than
+    that. A ``configDigest`` that is not ``sha256:`` and 64 lowercase hex is
+    left out, and ``confirmed: true`` without a basis naming the fact that
+    was read (or on ``driver: none``) is written as false. Both happen only
+    when custom code passes a hand-built block to ``record_decision``.
+    """
+    driver = str(cage["driver"])
+    confirmed = bool(cage.get("confirmed", False))
+    if driver == "none":
+        if confirmed:
+            logger.warning("cage block for record_id=%s claims confirmed with "
+                           "driver none; writing confirmed false", record_id)
+        return {"driver": driver, "confirmed": False}
+    block: dict[str, Any] = {"driver": driver, "confirmed": confirmed}
+    for src, dst in (("upstream", "upstream"), ("config_digest", "configDigest"),
+                     ("basis", "basis"), ("name", "name")):
+        if cage.get(src):
+            block[dst] = str(cage[src])
+    digest = block.get("configDigest")
+    if digest is not None and not (digest.startswith("sha256:") and _HEX64.match(digest[7:])):
+        logger.warning("cage block for record_id=%s has configDigest %r, not "
+                       "sha256 hex; leaving it out", record_id, digest)
+        del block["configDigest"]
+    block.setdefault("basis", "declared")
+    if confirmed and block["basis"] in ("none", "declared"):
+        logger.warning("cage block for record_id=%s claims confirmed on basis "
+                       "%r; writing confirmed false", record_id, block["basis"])
+        block["confirmed"] = False
+    return block
 
 
 def _load_or_create_key(key_path: Path, pub_path: Path) -> Any:

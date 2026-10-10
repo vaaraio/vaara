@@ -43,6 +43,7 @@ from vaara.attestation._receipt_types import (
     back_link_to_dict,
     receipt_asserted_from_dict,
     receipt_asserted_to_dict,
+    require_envelope_version,
 )
 from vaara.attestation._attest_types import VALID_ALGS, Algorithm, AttestationError
 
@@ -213,7 +214,20 @@ def decision_to_dict(dd: DecisionDerived) -> dict[str, Any]:
     return out
 
 
+_DECISION_DERIVED_KEYS = frozenset(
+    {"decision", "decidedAt", "reason", "riskScore", "thresholdAllow",
+     "thresholdBlock", "policyId", "clientTurnId", "evidenceRef", "rationale",
+     "binding", "decisionProof"}
+)
+# timestampAnchors rides outside the signed payload, beside the signature.
+_DECISION_RECORD_KEYS = frozenset(
+    {"version", "alg", "backLink", "decisionDerived", "issuerAsserted",
+     "signature", "timestampAnchors"}
+)
+
+
 def decision_from_dict(d: dict[str, Any]) -> DecisionDerived:
+    _reject_unknown_keys(d, _DECISION_DERIVED_KEYS, "decisionDerived")
     for required in ("decision", "decidedAt"):
         if required not in d:
             raise AttestationError(
@@ -247,14 +261,24 @@ def decision_record_from_dict(d: dict[str, Any]) -> DecisionRecord:
     only; signature verification still requires the caller's keying
     material.
     """
+    _reject_unknown_keys(d, _DECISION_RECORD_KEYS, "decision record")
     for required in (
         "version", "alg", "backLink", "decisionDerived",
         "issuerAsserted", "signature",
     ):
         if required not in d:
             raise AttestationError(f"decision record missing required field {required!r}")
+    require_envelope_version(d["version"], "decision record")
     if d["alg"] not in VALID_ALGS:
         raise AttestationError(f"unsupported alg {d['alg']!r}")
+    # The hybrid suite commitment is an execution-receipt member: a decision
+    # record carries no pqSignature for it to commit to, so a sigSuite here is
+    # a claim nothing backs and the record is refused.
+    issuer_asserted = d["issuerAsserted"]
+    if isinstance(issuer_asserted, dict) and "sigSuite" in issuer_asserted:
+        raise AttestationError(
+            "issuerAsserted.sigSuite is not permitted on a decision record"
+        )
     return DecisionRecord(
         version=d["version"],
         alg=d["alg"],

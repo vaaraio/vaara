@@ -411,10 +411,13 @@ jobs:
 
       - name: Install Vaara with the signing extras and the server extra
         # The inference proxy and console tests guard on rfc8785 AND fastapi
-        # together. The matrix job has fastapi and no rfc8785, this job had
+        # together. The matrix job had fastapi and no rfc8785, this job had
         # rfc8785 and no fastapi, so those four files skipped in every job
         # and nothing went red. This job now carries both, and the skip
         # reasons those files print are in COVERED below. Found 2026-09-22.
+        # Since 2026-10-10 rfc8785 is in requirements-dev.txt as well: it is
+        # a base dependency, decision binding digests refuse to run without
+        # it, and the matrix job was testing an install that cannot exist.
         # rich renders the standalone examples, which tests/test_examples_run.py
         # starts as subprocesses; this is the job with the attestation extra
         # the data-locality example needs, so it is the one that runs them.

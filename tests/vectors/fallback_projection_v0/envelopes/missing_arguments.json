@@ -1,0 +1,9 @@
+{
+  "name": "document_fetch",
+  "_meta": {
+    "authorization_binding": {
+      "nonce": "srv-nonce-7f3a",
+      "scope": "read"
+    }
+  }
+}
