@@ -691,8 +691,19 @@ jobs:
           fi
 
   os-layer-e2e:
-    name: Linux OS layer (kernel floor, guard, real agent)
+    name: Linux OS layer (kernel floor, guard, real agent, ${{ matrix.leg }})
     runs-on: ubuntu-24.04
+    strategy:
+      fail-fast: false
+      matrix:
+        # Two legs, each a subset of the one test file, so a hang names the
+        # test it sits in: the floor and the hooks, then the hardened launch
+        # with the egress proxy and the kernel address rule.
+        include:
+          - leg: floor and hooks
+            select: "not hardened"
+          - leg: hardened egress
+            select: "hardened"
     # The floor is an AppArmor profile and the guard a root fanotify listener,
     # so this job runs both for real. The guard starts under sudo for the
     # runner's account; the test then runs as that account and starts Copilot
@@ -753,21 +764,34 @@ jobs:
           # so a process that cannot be stopped is still read) and the tails
           # of the test and guard logs go out as a PR comment. Nothing else
           # gets evidence out of a step that cannot end.
+          # It posts from the first minute and every 90 seconds after, editing
+          # one comment, so if the runner loses its network mid-test the last
+          # edit shows the state right before it did.
           (
-            sleep 1500
-            {
-              echo "OS layer watchdog, $(date -u +%H:%M:%S) UTC, run ${GITHUB_RUN_ID}"
-              echo '```'
-              ps -eo pid,ppid,stat,wchan:32,etime,cmd | grep -vE ' \[[^]]+\]$' | head -80
-              for p in $(pgrep -f 'pytest tests/test_oslayer_e2e' || true); do sudo "$(command -v py-spy)" dump --nonblocking --pid "$p" || true; done
-              for p in $(pgrep -f 'vaara.cli run' || true); do sudo "$(command -v py-spy)" dump --nonblocking --pid "$p" || true; done
-              for p in $(pgrep -f 'vaara.cli os-guard' || true); do sudo "$(command -v py-spy)" dump --nonblocking --pid "$p" || true; done
-              echo '--- result.txt'; tail -60 result.txt || true
-              echo '--- guard.log'; tail -40 guard.log || true
-              echo '```'
-            } > watchdog.md 2>&1
-            if [ -n "$PR_NUMBER" ]; then gh pr comment "$PR_NUMBER" --body-file watchdog.md || true; fi
-            cat watchdog.md
+            comment_id=""
+            for _ in $(seq 20); do
+              sleep 60
+              {
+                echo "OS layer watchdog (${{ matrix.leg }}), $(date -u +%H:%M:%S) UTC, run ${GITHUB_RUN_ID}"
+                echo '```'
+                ps -eo pid,ppid,stat,wchan:32,etime,cmd | grep -vE ' \[[^]]+\]$' | head -80
+                for p in $(pgrep -f 'pytest tests/test_oslayer_e2e' || true); do sudo "$(command -v py-spy)" dump --nonblocking --pid "$p" || true; done
+                for p in $(pgrep -f 'vaara.cli run' || true); do sudo "$(command -v py-spy)" dump --nonblocking --pid "$p" || true; done
+                for p in $(pgrep -f 'vaara.cli os-guard' || true); do sudo "$(command -v py-spy)" dump --nonblocking --pid "$p" || true; done
+                echo '--- result.txt'; tail -40 result.txt || true
+                echo '--- guard.log'; tail -30 guard.log || true
+                echo '--- cgroups of the agent tree'; grep -rl . /sys/fs/cgroup/vaara*/cgroup.procs 2>/dev/null | head; cat /proc/self/cgroup
+                echo '```'
+              } > watchdog.md 2>&1
+              if [ -n "$PR_NUMBER" ]; then
+                if [ -z "$comment_id" ]; then
+                  comment_id=$(gh api -X POST "repos/${GITHUB_REPOSITORY}/issues/${PR_NUMBER}/comments" -F body=@watchdog.md --jq .id 2>/dev/null || true)
+                else
+                  gh api -X PATCH "repos/${GITHUB_REPOSITORY}/issues/comments/${comment_id}" -F body=@watchdog.md >/dev/null 2>&1 || true
+                fi
+              fi
+              sleep 30
+            done
           ) &
           # The suite points HOME at a sandbox; this test needs the operator's
           # real home, which is the one the guard serves.
@@ -779,7 +803,7 @@ jobs:
           # behind by a killed run would hold a pipe open and the step with it.
           set +e
           VAARA_TEST_USE_REAL_HOME=1 VAARA_OSLAYER_E2E=1 \
-            timeout -s ABRT -k 30 20m pytest tests/test_oslayer_e2e.py -q -rs > result.txt 2>&1
+            timeout -s ABRT -k 30 20m pytest tests/test_oslayer_e2e.py -q -rs -k "${{ matrix.select }}" > result.txt 2>&1
           rc=$?
           set -e
           cat result.txt
