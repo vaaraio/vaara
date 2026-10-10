@@ -21,6 +21,7 @@
 - [Under the hood, in plain words. | Vaara](https://vaara.io/under-the-hood.html): Everything technical about Vaara, translated. Each line says what the thing does for you, with the technical term underneath for your engineers.
 - [Everything Vaara publishes | Vaara](https://vaara.io/surfaces.html): Every page, record and package Vaara publishes, each in one line: independent reproductions of the conformance tests, the receipt Internet-Draft, the explorer, the packages and the documents.
 - [Receipt explorer | Vaara](https://vaara.io/verify.html): Check a Vaara receipt in your own browser, offline, or look one up in the public log. Nothing is uploaded.
+- [Conformance results | Vaara](https://vaara.io/conformance.html): Every suite, its verdict, and everyone who reproduced it in public.
 
 Every page above also exists in Finnish under https://vaara.io/fi/.
 The whole site as one plain-text file: https://vaara.io/llms-full.txt

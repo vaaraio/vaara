@@ -309,7 +309,19 @@
   </url>
   <url>
     <loc>https://vaara.io/conformance.html</loc>
-    <lastmod>2026-08-29</lastmod>
+    <lastmod>2026-10-10</lastmod>
+    <xhtml:link rel="alternate" hreflang="en" href="https://vaara.io/conformance.html"/>
+    <xhtml:link rel="alternate" hreflang="fi" href="https://vaara.io/fi/conformance.html"/>
+    <xhtml:link rel="alternate" hreflang="x-default" href="https://vaara.io/conformance.html"/>
+    <changefreq>weekly</changefreq>
+    <priority>0.8</priority>
+  </url>
+  <url>
+    <loc>https://vaara.io/fi/conformance.html</loc>
+    <lastmod>2026-10-10</lastmod>
+    <xhtml:link rel="alternate" hreflang="en" href="https://vaara.io/conformance.html"/>
+    <xhtml:link rel="alternate" hreflang="fi" href="https://vaara.io/fi/conformance.html"/>
+    <xhtml:link rel="alternate" hreflang="x-default" href="https://vaara.io/conformance.html"/>
     <changefreq>weekly</changefreq>
     <priority>0.8</priority>
   </url>

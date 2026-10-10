@@ -43,7 +43,7 @@ NAV = {
         "product_items": [("gate", "Portti"), ("receipts", "Kuitit"), ("cage", "Häkki"),
                           ("app", "Työpöytäsovellus"), ("test-it-yourself", "Testaa itse")],
         "test_items": [("/fi/products/test-it-yourself.html", "Testaa itse"),
-                       ("/fi/verify.html", "Kuittien tarkistus"), ("/conformance.html", "Vaatimustenmukaisuustulokset")],
+                       ("/fi/verify.html", "Kuittien tarkistus"), ("/fi/conformance.html", "Vaatimustenmukaisuustulokset")],
         "foot_open": "Avointa lähdekoodia. Toimii omilla koneillanne. Mitään ei lähetetä meille.",
         "foot_code": "Lähdekoodi", "foot_draft": "IETF-luonnos", "foot_conf": "Vaatimustenmukaisuustulokset",
         "foot_tech": "Tekninen yleiskuva", "foot_pub": "Kaikki, mitä Vaara julkaisee",
@@ -117,7 +117,7 @@ def footer(lang: str) -> str:
             f'<div><b>VAARA</b><br>{E(n["foot_open"])}<br><a href="mailto:hello@vaara.io">hello@vaara.io</a></div>\n'
             f'<div><a href="https://github.com/vaaraio/vaara">{E(n["foot_code"])}</a><br>\n'
             f'<a href="https://datatracker.ietf.org/doc/draft-sirkkavaara-vaara-receipt/">{E(n["foot_draft"])}</a><br>\n'
-            f'<a href="/conformance.html">{E(n["foot_conf"])}</a><br>'
+            f'<a href="{href(lang, "/conformance.html")}">{E(n["foot_conf"])}</a><br>'
             f'<a href="{href(lang, "/surfaces.html")}">{E(n["foot_pub"])}</a><br>'
             f'<a href="{href(lang, "/under-the-hood.html")}">{E(n["foot_tech"])}</a></div>\n'
             f'</div><p class="tm">{E(n["foot_tm"])}</p></div></footer>')

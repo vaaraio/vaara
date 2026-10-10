@@ -64,6 +64,11 @@ def test_the_conformance_renderer_uses_the_shared_bar() -> None:
     report = {"generated_at": "2026-10-10T00:00:00Z", "totals": {
         "suites": 0, "passed": 0, "failed": 0, "skipped": 0, "cases_passed": 0}, "suites": []}
     html = module.render(report, {"reproductions": []})
-    assert shell.bar("en", "/conformance.html", "test", fi_path="/fi/") in html
+    assert shell.bar("en", "/conformance.html", "test") in html
     assert shell.footer("en") in html
     assert 'class="topbar"' not in html
+    # the Finnish page has the same frame in Finnish, and its switch leads back to the English page
+    fi = module.render(report, {"reproductions": []}, "fi")
+    assert shell.bar("fi", "/conformance.html", "test") in fi
+    assert shell.footer("fi") in fi
+    assert '<html lang="fi">' in fi
