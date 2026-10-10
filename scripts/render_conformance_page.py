@@ -772,6 +772,7 @@ def json_ld(report: dict, repro: dict) -> str:
         {
             "@type": ["WebPage", "CollectionPage"],
             "@id": PAGE_URL,
+            "breadcrumb": {"@id": f"{PAGE_URL}#crumbs"},
             "url": PAGE_URL,
             "name": TITLE,
             "description": page_description(repro),
@@ -896,6 +897,16 @@ def json_ld(report: dict, repro: dict) -> str:
             ],
         },
     ]
+    graph.append(
+        {
+            "@type": "BreadcrumbList",
+            "@id": f"{PAGE_URL}#crumbs",
+            "itemListElement": [
+                {"@type": "ListItem", "position": 1, "name": "Vaara", "item": f"{SITE}/"},
+                {"@type": "ListItem", "position": 2, "name": "Conformance results", "item": PAGE_URL},
+            ],
+        }
+    )
     graph.extend(row_node(r) for r in rows)
     blob = json.dumps(
         {"@context": "https://schema.org", "@graph": graph},
@@ -935,16 +946,16 @@ def render(report: dict, repro: dict) -> str:
 <meta property="og:title" content="{TITLE}">
 <meta property="og:description" content="{esc(description)}">
 <meta property="og:url" content="https://vaara.io/conformance.html">
-<meta property="og:image" content="https://vaara.io/vaara-wordmark-light.png">
+<meta property="og:image" content="https://vaara.io/og/en-conformance.png">
 <meta property="og:image:width" content="1200">
-<meta property="og:image:height" content="346">
-<meta property="og:image:alt" content="Vaara">
+<meta property="og:image:height" content="630">
+<meta property="og:image:alt" content="Vaara: Conformance results">
 <meta property="og:locale" content="en_US">
 <meta name="twitter:card" content="summary_large_image">
 <meta name="twitter:title" content="{TITLE}">
 <meta name="twitter:description" content="{esc(description)}">
-<meta name="twitter:image" content="https://vaara.io/vaara-wordmark-light.png">
-<meta name="twitter:image:alt" content="Vaara">
+<meta name="twitter:image" content="https://vaara.io/og/en-conformance.png">
+<meta name="twitter:image:alt" content="Vaara: Conformance results">
 <script type="application/ld+json">
 {json_ld(report, repro)}
 </script>

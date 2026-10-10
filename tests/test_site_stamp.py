@@ -167,15 +167,28 @@ def test_the_committed_llms_file_points_at_the_register():
     assert "10.5281/zenodo.22027975" in text
 
 
+def dated_urls(module) -> set[str]:
+    """Every sitemap URL that is a file under webpage/; badges come from vcr."""
+    urls = re.findall(r"<loc>([^<]+)</loc>", SITEMAP.read_text(encoding="utf-8"))
+    return {u for u in urls if module.sitemap_page(u)}
+
+
+def test_badge_pages_are_never_dated_from_this_checkout():
+    module = stamper()
+    assert module.sitemap_page("https://vaara.io/badge/iman-schrock.html") is None
+    assert module.sitemap_page("https://example.com/") is None
+    assert module.sitemap_page("https://vaara.io/no-such-page.html") is None
+
+
 def test_every_sitemap_date_comes_from_git(tmp_path):
     """A hand-typed lastmod was ten days stale on the page that moves most."""
     module = stamper()
     scratch = tmp_path / "sitemap.xml"
     scratch.write_text(SITEMAP.read_text(encoding="utf-8"), encoding="utf-8")
     written = module.stamp_sitemap(path=scratch)
-    assert set(written) == set(module.SITEMAP_PAGES), (
-        f"no date found for {set(module.SITEMAP_PAGES) - set(written)}"
-    )
+    expected = dated_urls(module)
+    assert set(module.SITEMAP_PAGES) <= expected
+    assert set(written) == expected, f"no date found for {expected - set(written)}"
     for url, date in written.items():
         assert re.fullmatch(r"\d{4}-\d{2}-\d{2}", date), f"{url} got {date!r}"
         assert f"<lastmod>{date}</lastmod>" in scratch.read_text(encoding="utf-8")
@@ -189,7 +202,8 @@ def test_the_published_page_takes_its_date_from_the_branch_it_publishes_from(tmp
     written = module.stamp_sitemap(path=scratch, conformance_date="2026-08-25")
     assert written["https://vaara.io/conformance.html"] == "2026-08-25"
     # The override reaches that one page and no other.
-    assert set(written) == set(module.SITEMAP_PAGES)
+    assert set(written) == dated_urls(module)
+    assert all(d != "2026-08-25" for u, d in written.items() if u != "https://vaara.io/conformance.html")
 
 
 def test_a_url_the_stamper_does_not_know_keeps_the_date_it_had(tmp_path):

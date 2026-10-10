@@ -1,0 +1,274 @@
+# Vaara, the whole site in plain text (English)
+
+Generated from the same source as the pages. Finnish pages live under https://vaara.io/fi/.
+
+## Vaara: software that acts on its own, inside your rules
+URL: https://vaara.io/
+
+Software that acts on its own, inside your rules. And proof of every action that anyone can check.
+
+Vaara sits between software that acts by itself and the systems it can reach. Nothing happens outside your rules, and afterwards you can show exactly what happened.
+
+### Things already happen with no person in the moment
+
+A payment goes out. Access is granted. A door locks for the night. A file is deleted. More and more of these are decided by software, and AI agents are one example of it.
+
+Later someone asks what happened and why. Most systems answer with their own logs, which means asking to be taken at your word. Vaara answers with a receipt that holds up without trusting you, or us.
+
+### Every action ends in one of three states, and leaves a receipt
+
+- Allowed: Inside the rules: it goes through.
+
+- Needs a person: Unusual or risky: it waits until a person says yes or no.
+
+- Refused: Against the rules: it never happens.
+
+- Receipt: Every one of the three leaves a signed record of what was decided and why.
+
+Who asks later: a resident's family, an inspector, a customer, an auditor, a court, your own board.
+
+### A receipt that outlasts the system that made it
+
+Years later, on a plane with the wifi off, without Vaara installed and without trusting you or us, anyone can check that a receipt is genuine, when it was made and that nobody has changed it since.
+
+### Where it runs
+
+On your own machines. Nothing is sent to us, there is no account and no telemetry. The code is open, so your own people or your supplier can read every line.
+
+Free to download and use, with nothing to sign up for. Paid work, such as a readiness review or a pilot in your own environment, is scoped to your case and priced as a fixed amount agreed before it starts. No subscription, no per-seat fee. Write to hello@vaara.io.
+
+### Who has looked at it
+
+Listed in the OECD.AI Catalogue of Tools & Metrics for trustworthy AI.
+
+Named in the industry acknowledgements of Singapore's Model AI Governance Framework for Agentic AI, on the same page as Google, Microsoft, IBM and Amazon.
+
+AMD AI Developer Program testimonial.
+
+Its record format is an Internet-Draft at the IETF, the group that writes internet standards, and seven parties other than Vaara have reproduced its test results in public.
+
+## Care and social services | Vaara
+URL: https://vaara.io/sectors/care.html
+
+When software acts on people who cannot question it, the record has to hold up for them.
+
+Care homes and home care increasingly let systems decide: a door that locks for the night, a medication reminder, an alarm that escalates or does not, a care note drafted by software. Vaara checks each of those against your rules and keeps a receipt a family or an inspector can check.
+
+### Care and social services: What can we do with Vaara?
+Automate night locking, alarms and documentation without losing the right to say who decided what. Let a nurse approve the unusual cases in the moment, and let the routine ones run. Answer a family's question about one resident on one night in minutes, with the record itself.
+
+### Care and social services: What does Vaara save us from?
+Having only your own logs to show when a family, an inspector or a court asks. Automation that quietly drifts outside your self-monitoring plan. Arguments about whether a note was approved before it reached the record system.
+
+### Care and social services: What does Vaara cost?
+Free to download and use, with nothing to sign up for. Paid work, such as a readiness review or a pilot in your own environment, is scoped to your case and priced as a fixed amount agreed before it starts. No subscription, no per-seat fee. Write to hello@vaara.io.
+
+### Care and social services: What does Vaara save us?
+Hours of reconstruction for every complaint or inspection question. A rollout that would otherwise stall at the first supervisory question. The cost of re-auditing automation each time a supplier changes it.
+
+## Payments and finance | Vaara
+URL: https://vaara.io/sectors/payments.html
+
+Software that moves money should not be able to move more than it was allowed to.
+
+Agents now book, buy and pay on a user's behalf, and automations release payments with no clerk in the loop. Vaara checks each payment against the mandate behind it, the payee, the amount and the limit, before it is sent, and gives the bank, the user and a supervisor the same receipt.
+
+### Payments and finance: What can we do with Vaara?
+Let agents and automations initiate payments within a mandate the user set. Hold anything above the limit or to a new payee for a person to approve. Show a supervisor, for any payment, who authorised it and within what limit.
+
+### Payments and finance: What does Vaara save us from?
+Payments that leave because a prompt or a document told the software to send them. Disputes where the only record is the operator's own database. Rebuilding evidence by hand when an incident has to be reported.
+
+### Payments and finance: What does Vaara cost?
+Free to download and use, with nothing to sign up for. Paid work, such as a readiness review or a pilot in your own environment, is scoped to your case and priced as a fixed amount agreed before it starts. No subscription, no per-seat fee. Write to hello@vaara.io.
+
+### Payments and finance: What does Vaara save us?
+Investigation time per disputed or reported payment. Losses from payments to payees nobody approved. Engineering work to make each automation auditable on its own.
+
+## Public sector | Vaara
+URL: https://vaara.io/sectors/public.html
+
+A public body has to be able to show how an automated step was decided, to anyone who asks.
+
+Municipalities and agencies are adding AI assistants and automated steps to their services. The duty to explain them does not move. Vaara checks each automated step against the rules you set and keeps a record a citizen, an auditor or an ombudsman can check without access to your systems.
+
+### Public sector: What can we do with Vaara?
+Bring AI assistants and automation into services without opening a gap in accountability. Keep a person in the loop exactly where the rules say one is needed. Hand an auditor or an ombudsman the record itself, readable on their own machine.
+
+### Public sector: What does Vaara save us from?
+Being unable to show who or what made an automated decision. Lock-in to one supplier's logs for your own evidence. Re-tendering because the evidence requirement was missed the first time.
+
+### Public sector: What does Vaara cost?
+Free to download and use, with nothing to sign up for. Paid work, such as a readiness review or a pilot in your own environment, is scoped to your case and priced as a fixed amount agreed before it starts. No subscription, no per-seat fee. Write to hello@vaara.io.
+
+### Public sector: What does Vaara save us?
+Staff time spent answering information requests about automated steps. An audit trail you would otherwise commission as a separate project. Supplier changes that no longer reset your evidence.
+
+## Healthcare | Vaara
+URL: https://vaara.io/sectors/health.html
+
+In healthcare the question is not only what the system suggested, but who approved it and when.
+
+Decision support, triage tools and documentation assistants act inside clinical work. Vaara checks each automated step against your rules, routes the ones that need a clinician to a clinician, and keeps a record of who approved what, before it reached the patient record.
+
+### Healthcare: What can we do with Vaara?
+Use decision support and documentation assistants with the approval step on record. Show that a clinician approved an entry before it reached the patient record. Keep evidence that a hospital, a supplier and a supervisor can all read the same way.
+
+### Healthcare: What does Vaara save us from?
+An approval claim that rests on screenshots and goodwill. Supplier logs that you cannot read without the supplier. Rebuilding a timeline by hand after an incident.
+
+### Healthcare: What does Vaara cost?
+Free to download and use, with nothing to sign up for. Paid work, such as a readiness review or a pilot in your own environment, is scoped to your case and priced as a fixed amount agreed before it starts. No subscription, no per-seat fee. Write to hello@vaara.io.
+
+### Healthcare: What does Vaara save us?
+Clinician and quality-team time per incident review. A separate audit project for every new AI tool. Delay in rollouts that wait on the evidence question.
+
+## Energy, industry and infrastructure | Vaara
+URL: https://vaara.io/sectors/infrastructure.html
+
+When software can change a setpoint, open a valve or shed load, the change needs a gate and a record.
+
+Operators are adding AI assistants and automation to maintenance, dispatch and data-centre operations. Vaara sits in front of the actions those systems can take, holds the risky ones for an operator, and keeps a record the regulator and the insurer can read.
+
+### Energy, industry and infrastructure: What can we do with Vaara?
+Let automation handle routine operations while risky changes wait for an operator. Keep one record across vendors and control systems. Show a regulator or an insurer what was changed, by what, and under whose approval.
+
+### Energy, industry and infrastructure: What does Vaara save us from?
+Changes that nobody can attribute after an outage. Evidence split across every vendor's own logging. An AI assistant acting on a system it was never meant to reach.
+
+### Energy, industry and infrastructure: What does Vaara cost?
+Free to download and use, with nothing to sign up for. Paid work, such as a readiness review or a pilot in your own environment, is scoped to your case and priced as a fixed amount agreed before it starts. No subscription, no per-seat fee. Write to hello@vaara.io.
+
+### Energy, industry and infrastructure: What does Vaara save us?
+Root-cause time after incidents. Duplicate evidence work for each regulator and insurer. Downtime from changes that should have waited for a person.
+
+## Software teams | Vaara
+URL: https://vaara.io/sectors/software.html
+
+Your developers run coding agents with their own keys and their own shell. Give them a gate and a record.
+
+Coding agents read files, run commands and call tools on developer machines and in CI. Vaara plugs into the agent hosts' own hooks, checks every call against one policy, refuses the dangerous ones and keeps a record your security team can read. It governs Claude Code, Cursor, Codex CLI, Gemini CLI, OpenCode and Copilot CLI today.
+
+### Software teams: What can we do with Vaara?
+Allow coding agents broadly, with one policy across every agent your teams use. Put the risky commands, like deleting, pushing or reaching the network, behind a person. Give security one record of what every agent did, on every machine.
+
+### Software teams: What does Vaara save us from?
+An agent that deletes, leaks or pushes because a file told it to. A hook that crashes and lets everything through: Vaara's hooks fail closed. Finding out from a customer what an agent did.
+
+### Software teams: What does Vaara cost?
+Free to download and use, with nothing to sign up for. Paid work, such as a readiness review or a pilot in your own environment, is scoped to your case and priced as a fixed amount agreed before it starts. No subscription, no per-seat fee. Write to hello@vaara.io.
+
+### Software teams: What does Vaara save us?
+Security review time per agent rollout. Incident time when something goes wrong. Building a separate guardrail for every agent tool.
+
+## The gate | Vaara
+URL: https://vaara.io/products/gate.html
+
+The gate: every action is checked before it happens.
+
+Vaara's gate sits in front of the systems software can reach. Every action is scored against your rules: allowed, held for a person, or refused. A session whose risk keeps adding up gets less room to act until a person approves again.
+
+- Your rules, in a file: A policy file says what is allowed, what needs a person and what is never allowed. The same file works on every surface.
+
+- A person where it matters: Held actions wait for a yes or a no. The answer is recorded with who gave it.
+
+- Room that shrinks with risk: Risky actions in one session add up. Below a set level, even ordinary actions wait for a person until someone approves. New in 2.8.
+
+- Fails closed: If the gate cannot decide, the action does not run.
+
+## Receipts | Vaara
+URL: https://vaara.io/products/receipts.html
+
+Receipts: proof that holds up without trusting the one who made it.
+
+Every decision leaves a signed receipt, chained to the one before it and stamped by a clock you do not control. Anyone can check it on their own machine, without Vaara and without a key.
+
+- One per decision: What was asked, what was decided, why, and what happened after.
+
+- Chained: Removing or changing one receipt breaks the chain, so a gap shows.
+
+- Stamped by an outside clock: A trusted timestamp, including EU-qualified ones, shows the receipt existed at that time.
+
+- Checked offline: A standalone checker reads the receipt alone: no Vaara, no network, no key.
+
+## The cage | Vaara
+URL: https://vaara.io/products/cage.html
+
+The cage: the sandbox is your choice, and the receipt says which one it was.
+
+An agent can run inside a sandbox that limits what it can touch even if its reasoning goes wrong. Vaara works with twelve of them through one interface, and every receipt says which sandbox the decision was made in and whether the operating system confirmed it.
+
+- Vaara + NVIDIA OpenShell: OpenShell decides what an agent may reach. Vaara adds the decision for each action and the receipt anyone can check.
+
+- And eleven more: The OpenAI Codex sandbox, Anthropic's sandbox runtime, gVisor, Kata Containers, Firecracker, the Kubernetes agent sandbox, microsandbox, E2B, Apple's container tool, nono, and Vaara's own Linux cage.
+
+- Locked network: Optionally, an agent can only reach the hosts you list, and every connection is a decision on the record.
+
+- Honest about strength: A virtual machine, a container and an application sandbox are different strengths of wall. The receipt names which kind it was.
+
+## The desktop app | Vaara
+URL: https://vaara.io/products/app.html
+
+The desktop app: the gate, where you can see it.
+
+The Mac app shows each decision as it happens, notifies you when something waits for a person, and tells you when an agent on your machine is running without Vaara.
+
+- Live decisions: Allowed, held and refused, as they happen.
+
+- Answer from the notification: A held action waits for your yes or no.
+
+- Ungoverned agents flagged: An agent that connects without Vaara shows up.
+
+- Your machine only: Nothing leaves it.
+
+## Test it yourself | Vaara
+URL: https://vaara.io/products/test-it-yourself.html
+
+Test it yourself: don't take our word for it.
+
+Every claim about the receipt format is a test anyone can run. The tests and the expected answers are published, the checkers do not import Vaara, and seven parties other than Vaara have run them in public.
+
+- Check one receipt: Paste a receipt into the explorer, or run the checker on your own machine.
+
+- Run every suite: One command runs every published test suite and prints a pass or fail per suite.
+
+- See who else ran them: The results table lists each outside run, who ran it and when.
+
+- Know what a pass does not prove: The results page says that too.
+
+## Under the hood, in plain words. | Vaara
+URL: https://vaara.io/under-the-hood.html
+
+Everything technical about Vaara, translated. Each line says what the thing does for you, with the technical term underneath for your engineers.
+
+- Receipt: A signed record of one decision: what was asked, what was decided, why, and what happened. Technical: vaara.receipt/v1, JCS-canonicalised JSON, Ed25519 signature, Internet-Draft draft-sirkkavaara-vaara-receipt.
+
+- Chain: Each receipt carries a fingerprint of the one before it, so a removed or changed receipt shows as a break. Technical: SHA-256 hash chain, gap-evident completeness.
+
+- Outside clock: A timestamp from a service you do not control, so nobody can backdate a receipt. Technical: RFC 3161 timestamp authority, eIDAS qualified timestamp, SCITT transparency log.
+
+- Checking offline: Reading a receipt and confirming it is genuine with nothing but the receipt and a public key. Technical: vaara verify-record, vaara verify-bundle, standalone checkers with no Vaara import.
+
+- Hardware proof: Tying a record to the physical machine that made it. Technical: TPM 2.0 quote, IMA measurement, confidential-VM attestation (SEV-SNP, TDX).
+
+- Future-proof signatures: Signatures designed to stay safe against future quantum computers. Technical: ML-DSA-65 (FIPS 204) hybrid signing.
+
+- The gate on agent tools: The point where an AI agent's tool call is checked before it runs. Technical: MCP proxy, agent host pre-tool-use hooks, LLM API proxy.
+
+- Sandbox: A walled space that limits what software can touch even if it misbehaves. Technical: Cage layer: AppArmor, seccomp, Landlock, eBPF egress lock, gVisor, Kata, Firecracker, OpenShell and others.
+
+- Rules file: Plain text that says what is allowed, what needs a person and what is refused. Technical: Declarative policy (JSON/YAML), deny rules, conformal risk scorer.
+
+- Regulator package: One file with the record and the mapping to the law, for an authority to check. Technical: EU AI Act Art. 12, 14, 19, 50, 73; DORA; SOC 2; GDPR Art. 17 and Ch. V.
+
+The full technical detail stays where it was:
+
+- Receipt explorer: https://vaara.io/verify.html
+
+- Conformance results: https://vaara.io/conformance.html
+
+- Everything Vaara publishes: https://vaara.io/surfaces.html
+
+- The code and documentation: https://github.com/vaaraio/vaara
+
+- The IETF Internet-Draft: https://datatracker.ietf.org/doc/draft-sirkkavaara-vaara-receipt/

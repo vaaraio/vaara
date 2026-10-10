@@ -3,523 +3,184 @@
 <head>
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width,initial-scale=1">
-<title>Vaara: Accountable Autonomy | Tamper-evident evidence for every autonomous action</title>
-<meta name="description" content="Vaara is the open-source accountable autonomy layer: a verifiable receipt for every autonomous action — AI agents, agentic payments, supply chain, any system that acts on its own. Tamper-evident, independently verifiable, no SaaS, no telemetry, AGPL-3.0.">
-<meta name="keywords" content="accountable autonomy, AI agent audit trail, agentic payments, autonomous actions, tamper-evident evidence, EU AI Act Article 12, signed execution record, verifiable AI, TPM 2.0 attestation, RFC 3161 timestamp, eIDAS qualified timestamp, SEP-2828, MCP execution record, sovereign AI, hash-chained audit log, Ed25519, ML-DSA-65, post-quantum, SLSA, Sigstore, open source compliance">
-<meta name="author" content="Henri Sirkkavaara">
-<meta name="robots" content="index, follow, max-image-preview:large, max-snippet:-1, max-video-preview:-1">
-<meta name="googlebot" content="index, follow">
-<meta name="theme-color" content="#ececec">
-<meta name="referrer" content="strict-origin-when-cross-origin">
+<title>Vaara: software that acts on its own, inside your rules</title>
+<meta name="description" content="Vaara checks every action that software takes on its own against your rules before it happens, and leaves a receipt anyone can check later. Open source, runs on your own machines.">
 <link rel="canonical" href="https://vaara.io/">
+<link rel="alternate" hreflang="en" href="https://vaara.io/">
+<link rel="alternate" hreflang="fi" href="https://vaara.io/fi/">
 <link rel="icon" type="image/svg+xml" href="/favicon.svg">
+<link rel="stylesheet" href="/style.css">
+<meta name="theme-color" content="#14212E">
+<meta name="author" content="Henri Sirkkavaara">
+<meta name="robots" content="index, follow, max-image-preview:large, max-snippet:-1">
+<link rel="alternate" hreflang="x-default" href="https://vaara.io/">
 <link rel="alternate icon" href="/favicon.ico">
 <link rel="apple-touch-icon" href="/favicon-180.png">
 <link rel="sitemap" type="application/xml" href="/sitemap.xml">
-<link rel="preconnect" href="https://raw.githubusercontent.com" crossorigin>
-<link rel="dns-prefetch" href="https://pypi.org">
-<link rel="dns-prefetch" href="https://www.npmjs.com">
+<link rel="alternate" type="text/plain" href="/llms.txt" title="Vaara for language models">
 <link rel="me" href="https://github.com/vaaraio">
-<link rel="me" href="https://www.linkedin.com/in/sirkkavaara">
-<link rel="publisher" href="https://github.com/vaaraio">
-<meta name="google-site-verification" content="_O6ZNl1tSt0i5pigo0iZmqrHbBQRRz_J7Db9nvPEi5A">
-
-<!-- Open Graph -->
 <meta property="og:type" content="website">
 <meta property="og:site_name" content="Vaara">
-<meta property="og:title" content="Vaara — Accountable Autonomy">
-<meta property="og:description" content="A verifiable receipt for every autonomous action. AI agents, agentic payments, supply chain — any system that acts on its own. Independently verifiable, open source, AGPL-3.0.">
+<meta property="og:title" content="Vaara: software that acts on its own, inside your rules">
+<meta property="og:description" content="Vaara checks every action that software takes on its own against your rules before it happens, and leaves a receipt anyone can check later. Open source, runs on your own machines.">
 <meta property="og:url" content="https://vaara.io/">
-<meta property="og:image" content="https://vaara.io/vaara-wordmark-light.png">
+<meta property="og:image" content="https://vaara.io/og/en-home.png">
 <meta property="og:image:width" content="1200">
-<meta property="og:image:height" content="346">
-<meta property="og:image:alt" content="Vaara">
+<meta property="og:image:height" content="630">
+<meta property="og:image:alt" content="Vaara: Software that acts on its own, inside your rules. And proof of every action that anyone can check.">
 <meta property="og:locale" content="en_US">
-
-<!-- Twitter / X -->
+<meta property="og:locale:alternate" content="fi_FI">
 <meta name="twitter:card" content="summary_large_image">
-<meta name="twitter:title" content="Vaara — Accountable Autonomy">
-<meta name="twitter:description" content="A verifiable receipt for every autonomous action. AI agents, agentic payments, supply chain — any system that acts on its own. Independently verifiable, open source, AGPL-3.0.">
-<meta name="twitter:image" content="https://vaara.io/vaara-wordmark-light.png">
-<meta name="twitter:image:alt" content="Vaara">
-<style>
-  /* Derived from the vaara_book / vaara_card grammar (research/vaara_visual_style.md).
-     Light is the default theme; the original dark grammar is preserved verbatim
-     under html[data-theme="dark"]. Same identity, legible on paper: the sage green
-     is darkened for text so it passes contrast on white. */
-  :root {
-    color-scheme: light;
-    --bg: #ececec;
-    --panel: #FFFFFF;
-    --panel-2: #F1F4F0;
-    --deep: #ECEFEA;
-    --line: rgba(60,90,72,.18);
-    --ink: #1A2226;
-    --muted: #566159;
-    --faint: #7C857E;
-    --tri: #3E6B54;
-    --tri-bright: #2C523E;
-    --warn: #B4524F;
-    --mono: ui-monospace,'SFMono-Regular','JetBrains Mono','Fira Code',Menlo,Consolas,'Liberation Mono',monospace;
-    --sans: 'Inter',-apple-system,BlinkMacSystemFont,'Segoe UI',Helvetica,Arial,sans-serif;
-  }
-  html[data-theme="dark"] {
-    color-scheme: dark;
-    --bg: #0F1417;
-    --panel: #1A2226;
-    --panel-2: #151D20;
-    --deep: #0B1012;
-    --line: rgba(123,156,138,.16);
-    --ink: #DEE4E1;
-    --muted: #8B9792;
-    --faint: #5E6A66;
-    --tri: #78A08A;
-    --tri-bright: #93B8A3;
-    --warn: #D98B8B;
-  }
-  /* Default follows the OS. An explicit choice from the toggle sets
-     data-theme and wins over it, which is why this is scoped to
-     :not([data-theme]) rather than applied unconditionally. */
-  @media (prefers-color-scheme: dark) {
-    html:not([data-theme]) {
-        color-scheme: dark;
-        --bg: #0F1417;
-        --panel: #1A2226;
-        --panel-2: #151D20;
-        --deep: #0B1012;
-        --line: rgba(123,156,138,.16);
-        --ink: #DEE4E1;
-        --muted: #8B9792;
-        --faint: #5E6A66;
-        --tri: #78A08A;
-        --tri-bright: #93B8A3;
-        --warn: #D98B8B;
-    }
-  }
-  * { box-sizing: border-box; }
-  html, body {
-    margin: 0; padding: 0;
-    min-height: 100vh;
-    background: var(--bg); color: var(--ink);
-    font-family: var(--sans); font-size: 16px; line-height: 1.65;
-    -webkit-font-smoothing: antialiased;
-  }
-  /* The column is a plain cap now. It used to be narrowed by the width of the
-     floating controls so text could not run under them; the sticky bar is in
-     normal flow, so nothing overlaps and the guard is gone. */
-  main { max-width: 760px; margin: 0 auto; padding: 20px 28px 96px; }
-  :root{--edge:16px}
-  @media (max-width:640px){
-    .topbar{padding:8px 12px;gap:8px}
-    .nav-jump a{padding:4px 9px;letter-spacing:.10em;font-size:10px}
-  }
-
-  .wordmark { margin: 8px auto 0; text-align: center; }
-  .wordmark img { width: min(60vw, 440px); height: auto; display: inline-block; }
-  h1 { font-family: var(--sans); font-size: 18px; font-weight: 500; line-height: 1.6; color: var(--ink); margin: 24px 0 12px; letter-spacing: -0.01em; text-align: center; }
-  p { margin: 0 0 18px; color: var(--ink); }
-  .stance { font-family: var(--mono); font-size: 12px; letter-spacing: 0.22em; text-transform: uppercase; color: var(--tri); margin-bottom: 46px; text-align: center; }
-  .stamp { font-family: var(--mono); font-size: 12px; letter-spacing: 0.24em; text-transform: uppercase; color: var(--tri); font-weight: 600; margin: 0 0 14px; }
-  ul { margin: 0 0 40px; padding: 0; list-style: none; border-top: 1px solid var(--line); }
-  ul li { padding: 13px 0 13px 22px; border-bottom: 1px solid var(--line); color: var(--ink); position: relative; font-size: 16px; }
-  ul li::before { content: ""; position: absolute; left: 2px; top: 20px; width: 5px; height: 5px; background: var(--tri); }
-  ul li b { font-weight: 600; color: var(--ink); }
-  code, ul li code { font-family: var(--mono); font-size: 14px; background: rgba(120,160,138,0.13); color: var(--tri-bright); padding: 1px 5px; border-radius: 3px; }
-  ul li a { color: var(--tri-bright); text-decoration: none; border-bottom: 1px solid var(--line); }
-  ul li a:hover { color: var(--tri); border-bottom-color: var(--tri); }
-  .links { display: grid; grid-template-columns: repeat(2, 1fr); gap: 12px; margin-top: 8px; margin-bottom: 8px; }
-  .links a { font-family: var(--mono); color: var(--ink); text-decoration: none; border: 1px solid var(--line); border-radius: 12px; padding: 14px 16px; font-size: 14px; display: flex; flex-direction: column; gap: 6px; background: var(--panel); transition: border-color 0.15s ease, color 0.15s ease, background 0.15s ease, transform 0.06s ease; }
-  .links a:hover { border-color: var(--tri); color: var(--tri-bright); background: var(--panel-2); transform: translate(0, -1px); }
-  .links a:active { transform: translate(0, 0); }
-  .links a:focus-visible { outline: 2px solid var(--tri); outline-offset: 2px; }
-  .links .label { color: var(--faint); font-size: 12px; letter-spacing: 0.22em; text-transform: uppercase; font-weight: 600; }
-  .links a:hover .label { color: var(--tri); }
-  .links .target { font-size: 14px; color: var(--ink); word-break: break-all; }
-  .links a:hover .target { color: var(--tri-bright); }
-  @media (max-width: 520px) { .links { grid-template-columns: 1fr; } }
-  /* The one buying action on the page. Same grammar as .links, weighted. */
-  .cta { display: inline-block; font-family: var(--mono); font-size: 14px; letter-spacing: 0.18em; text-transform: uppercase; font-weight: 600; color: var(--panel); background: var(--tri-bright); border: 1px solid var(--tri-bright); border-radius: 12px; padding: 14px 28px; text-decoration: none; transition: background 0.15s ease, border-color 0.15s ease, transform 0.06s ease; }
-  .cta:hover { background: var(--tri); border-color: var(--tri); transform: translate(0, -1px); }
-  .cta:active { transform: translate(0, 0); }
-  .cta:focus-visible { outline: 2px solid var(--tri); outline-offset: 3px; }
-  html[data-theme="dark"] .cta { color: var(--deep); }
-  footer { margin-top: 64px; padding-top: 24px; border-top: 1px solid var(--line); font-family: var(--mono); font-size: 12px; color: var(--faint); letter-spacing: 0.04em; text-align: center; }
-  .evidence { background: var(--panel); color: var(--ink); border: 1px solid var(--line); border-radius: 12px; margin: 0 0 48px; font-family: var(--mono); font-size: 14px; line-height: 1.65; overflow-x: auto; }
-  .evidence-head { display: flex; justify-content: space-between; padding: 10px 18px; border-bottom: 1px solid var(--line); font-size: 12px; letter-spacing: 0.2em; text-transform: uppercase; color: var(--faint); }
-  .evidence-head .live { color: var(--tri); display: inline-flex; gap: 6px; align-items: center; }
-  .evidence-head .live::before { content: ""; width: 6px; height: 6px; background: var(--tri); border-radius: 50%; display: inline-block; }
-  .evidence pre { margin: 0; padding: 16px 18px; white-space: pre; font-family: inherit; color: var(--ink); }
-  .evidence .prompt { color: var(--tri); }
-  .evidence .ok { color: var(--tri-bright); }
-  .evidence .dim { color: var(--faint); }
-  #installs { color: var(--tri-bright); font-weight: 600; font-family: var(--mono); }
-  .ago { opacity: .55; font-size: .85em; }
-  /* One glass bar. Mark on the left, links on the true centre, one sun/moon
-     on the right. grid 1fr auto 1fr so the links stay centred on the viewport
-     whatever the side cells weigh. No wordmark text: the mark is the mark. */
-  .topbar{position:sticky;top:0;z-index:20;display:grid;
-    grid-template-columns:1fr auto 1fr;align-items:center;gap:12px;padding:9px 18px;
-    background:var(--bg);
-    background:color-mix(in srgb, var(--bg) 58%, transparent);
-    backdrop-filter:saturate(1.7) blur(18px);
-    -webkit-backdrop-filter:saturate(1.7) blur(18px);
-    border-bottom:1px solid var(--line)}
-  .topbar .mark{justify-self:start;display:inline-flex;align-items:center;border:0;
-    line-height:0;padding:3px;border-radius:9px}
-  .topbar .mark img{width:24px;height:24px;display:block}
-  .topbar .mark:hover{background:var(--panel)}
-  .nav-jump{justify-self:center;display:inline-flex;background:var(--panel);
-    border:1px solid var(--line);border-radius:999px;padding:4px}
-  .nav-jump a{font-family:var(--mono);font-size:11px;letter-spacing:.18em;
-    text-transform:uppercase;color:var(--faint);padding:4px 12px;border-radius:999px;
-    text-decoration:none;white-space:nowrap;border:0}
-  .nav-jump a:hover{color:var(--tri);background:var(--panel-2,var(--panel))}
-  .nav-jump a[aria-current="page"]{color:var(--tri);background:var(--panel-2,var(--panel))}
-  .theme-toggle{justify-self:end;display:inline-flex}
-  .theme-toggle button{appearance:none;background:var(--panel);border:1px solid var(--line);
-    border-radius:999px;cursor:pointer;margin:0;width:32px;height:32px;padding:0;
-    display:inline-flex;align-items:center;justify-content:center;color:var(--faint);
-    transition:color .15s ease,background .15s ease}
-  .theme-toggle button:hover{color:var(--tri)}
-  .theme-toggle button:focus-visible{outline:2px solid var(--tri);outline-offset:2px}
-  .theme-toggle svg{width:16px;height:16px;display:block}
-  /* Icon shows the mode you are about to get. Swapped in CSS, not JS, so it is
-     correct on first paint and cannot desync from the theme. */
-  .theme-toggle .i-sun{display:none}
-  html[data-theme="dark"] .theme-toggle .i-moon{display:none}
-  html[data-theme="dark"] .theme-toggle .i-sun{display:block}
-  @media (prefers-color-scheme:dark){
-    html:not([data-theme]) .theme-toggle .i-moon{display:none}
-    html:not([data-theme]) .theme-toggle .i-sun{display:block}
-  }
-  /* Launch video, sits under the problem paragraph. */
-  /* Wordmark swaps with the theme: light-bg mark by default, dark-bg mark in dark. */
-  .wordmark .wm-dark { display: none; }
-  html[data-theme="dark"] .wordmark .wm-light { display: none; }
-  html[data-theme="dark"] .wordmark .wm-dark { display: inline-block; }
-  @media (prefers-color-scheme: dark) {
-    html:not([data-theme]) .wordmark .wm-light { display: none; }
-    html:not([data-theme]) .wordmark .wm-dark { display: inline-block; }
-  }
-</style>
+<meta name="twitter:title" content="Vaara: software that acts on its own, inside your rules">
+<meta name="twitter:description" content="Vaara checks every action that software takes on its own against your rules before it happens, and leaves a receipt anyone can check later. Open source, runs on your own machines.">
+<meta name="twitter:image" content="https://vaara.io/og/en-home.png">
+<meta name="twitter:image:alt" content="Vaara: Software that acts on its own, inside your rules. And proof of every action that anyone can check.">
 <script type="application/ld+json">
 {
-  "@context": "https://schema.org",
-  "@graph": [
-    {
-      "@type": "Person",
-      "@id": "https://vaara.io/#henri",
-      "name": "Henri Sirkkavaara",
-      "url": "https://vaara.io/",
-      "email": "hello@vaara.io",
-      "jobTitle": "Founder and maintainer, Vaara",
-      "nationality": {
-        "@type": "Country",
-        "name": "Finland"
-      },
-      "workLocation": {
-        "@type": "Place",
-        "address": {
-          "@type": "PostalAddress",
-          "addressCountry": "FI"
-        }
-      },
-      "knowsAbout": [
-        "Accountable autonomy",
-        "Verifiable execution records for autonomous actions",
-        "Tamper-evident audit trails",
-        "Remote attestation",
-        "Transparency logs",
-        "EU AI Act Article 12 and Article 50",
-        "IETF standards development"
-      ],
-      "sameAs": [
-        "https://github.com/vaaraio",
-        "https://datatracker.ietf.org/doc/draft-sirkkavaara-vaara-receipt/",
-        "https://pypi.org/user/vaaraio/",
-        "https://www.bestpractices.dev/projects/12612",
-        "https://github.com/marketplace/actions/vaara-policy-check",
-        "https://www.linkedin.com/in/sirkkavaara"
-      ]
-    },
-    {
-      "@type": "SoftwareApplication",
-      "name": "Vaara",
-      "applicationCategory": "DeveloperApplication",
-      "applicationSubCategory": "Security and Audit",
-      "operatingSystem": "Linux, macOS, Windows",
-      "description": "Open-source accountable autonomy layer. Produces signed, hash-chained, independently verifiable execution records for every autonomous action — AI agents, agentic payments, supply chain, any system that acts on its own.",
-      "url": "https://vaara.io/",
-      "downloadUrl": "https://pypi.org/project/vaara/",
-      "softwareHelp": "https://github.com/vaaraio/vaara",
-      "license": "https://www.gnu.org/licenses/agpl-3.0.html",
-      "isAccessibleForFree": true,
-      "offers": [
-        {
-          "@type": "Offer",
-          "name": "Open source (AGPL-3.0)",
-          "price": "0",
-          "priceCurrency": "EUR"
-        },
-        {
-          "@type": "Offer",
-          "name": "Four-week paid pilot",
-          "url": "https://vaara.io/#pilots",
-          "availability": "https://schema.org/InStock"
-        },
-        {
-          "@type": "Offer",
-          "name": "Commercial license",
-          "url": "https://github.com/vaaraio/vaara/blob/main/LICENSING.md",
-          "availability": "https://schema.org/InStock"
-        }
-      ],
-      "author": {
-        "@id": "https://vaara.io/#henri"
-      },
-      "keywords": "accountable autonomy, AI agent audit trail, agentic payments, autonomous actions, tamper-evident evidence, EU AI Act Article 12, TPM 2.0, RFC 3161, SEP-2828, verifiable AI",
-      "sameAs": [
-        "https://github.com/vaaraio/vaara",
-        "https://pypi.org/project/vaara/",
-        "https://www.npmjs.com/package/@vaara/client"
-      ]
-    },
-    {
-      "@type": "Organization",
-      "@id": "https://vaara.io/#organization",
-      "name": "Vaara",
-      "url": "https://vaara.io/",
-      "logo": "https://vaara.io/vaara-wordmark-light.png",
-      "founder": {
-        "@id": "https://vaara.io/#henri"
-      },
-      "sameAs": [
-        "https://github.com/vaaraio/vaara",
-        "https://www.linkedin.com/in/sirkkavaara",
-        "https://pypi.org/project/vaara/",
-        "https://www.npmjs.com/package/@vaara/client"
-      ]
-    },
-    {
-      "@type": "WebSite",
-      "@id": "https://vaara.io/#website",
-      "name": "Vaara",
-      "url": "https://vaara.io/",
-      "inLanguage": "en"
-    },
-    {
-      "@type": "FAQPage",
-      "mainEntity": [
-        {
-          "@type": "Question",
-          "name": "What is Vaara?",
-          "acceptedAnswer": {
-            "@type": "Answer",
-            "text": "Vaara is an open-source tamper-evident runtime evidence layer for AI agents. It turns every action an agent takes into a signed, hash-chained record that an outside party can verify without trusting the operator, and binds that record to the machine's own TPM 2.0 and IMA attestation."
-          }
-        },
-        {
-          "@type": "Question",
-          "name": "Does Vaara help with EU AI Act compliance?",
-          "acceptedAnswer": {
-            "@type": "Answer",
-            "text": "Yes. Vaara produces EU AI Act Article 12 record-keeping evidence and a one-command regulator package (vaara trail export-article12) that writes the signed trail, per-article evidence, and a trusted time anchor an authority can verify offline."
-          }
-        },
-        {
-          "@type": "Question",
-          "name": "Does Vaara help with the EU Product Liability Directive 2024/2853?",
-          "acceptedAnswer": {
-            "@type": "Answer",
-            "text": "From 9 December 2026 software and AI systems placed on the EU market fall under Directive (EU) 2024/2853. A court can order disclosure of the evidence a producer holds about how the product behaved (Article 9), and a producer that cannot produce it faces a presumption of defectiveness (Article 10). A Vaara receipt is a signed, time-anchored record of each agent decision and its outcome, verifiable from the bytes alone by the other side's expert. It supplies the evidence a liability defence is built on."
-          }
-        },
-        {
-          "@type": "Question",
-          "name": "Does Vaara require a trusted execution environment or special hardware?",
-          "acceptedAnswer": {
-            "@type": "Answer",
-            "text": "No. Vaara is root-agnostic: it recomputes verification from the recorded bytes, so no trusted execution environment is required. When a TPM 2.0 or IMA root is present, Vaara binds records to it as an optional upgrade."
-          }
-        },
-        {
-          "@type": "Question",
-          "name": "Is Vaara free and open source?",
-          "acceptedAnswer": {
-            "@type": "Answer",
-            "text": "Yes. Vaara is licensed under AGPL-3.0, with no SaaS, no telemetry, and no signup. It ships on PyPI, npm, and the MCP registry, with SLSA build provenance and Sigstore-signed releases."
-          }
-        },
-        {
-          "@type": "Question",
-          "name": "Does Vaara offer paid pilots or a commercial license?",
-          "acceptedAnswer": {
-            "@type": "Answer",
-            "text": "Yes. Pilots run four weeks in your own infrastructure: shadow mode first, then a policy tuned to your real traffic, then enforcement, ending in a signed evidence bundle that stays verifiable without the vendor. A commercial license for building on Vaara without the AGPL's source-disclosure obligations is granted directly by the sole copyright holder. Scope and price are agreed before the work starts. Contact hello@vaara.io."
-          }
-        }
-      ]
+ "@context": "https://schema.org",
+ "@graph": [
+  {
+   "@type": "WebPage",
+   "@id": "https://vaara.io/",
+   "url": "https://vaara.io/",
+   "name": "Vaara: software that acts on its own, inside your rules",
+   "description": "Vaara checks every action that software takes on its own against your rules before it happens, and leaves a receipt anyone can check later. Open source, runs on your own machines.",
+   "inLanguage": "en",
+   "isPartOf": {
+    "@id": "https://vaara.io/#website"
+   },
+   "publisher": {
+    "@id": "https://vaara.io/#organization"
+   },
+   "primaryImageOfPage": {
+    "@type": "ImageObject",
+    "url": "https://vaara.io/og/en-home.png",
+    "width": 1200,
+    "height": 630
+   },
+   "mainEntity": {
+    "@id": "https://vaara.io/#software"
+   }
+  },
+  {
+   "@type": "WebSite",
+   "@id": "https://vaara.io/#website",
+   "name": "Vaara",
+   "url": "https://vaara.io/",
+   "inLanguage": [
+    "en",
+    "fi"
+   ],
+   "publisher": {
+    "@id": "https://vaara.io/#organization"
+   }
+  },
+  {
+   "@type": "Organization",
+   "@id": "https://vaara.io/#organization",
+   "name": "Vaara",
+   "url": "https://vaara.io/",
+   "logo": "https://vaara.io/vaara-wordmark-light.png",
+   "email": "hello@vaara.io",
+   "founder": {
+    "@id": "https://vaara.io/#henri"
+   },
+   "areaServed": "EU",
+   "address": {
+    "@type": "PostalAddress",
+    "addressCountry": "FI"
+   },
+   "sameAs": [
+    "https://github.com/vaaraio/vaara",
+    "https://www.linkedin.com/in/sirkkavaara",
+    "https://pypi.org/project/vaara/",
+    "https://www.npmjs.com/package/@vaara/client",
+    "https://oecd.ai/en/catalogue/tools/vaara"
+   ]
+  },
+  {
+   "@type": "Person",
+   "@id": "https://vaara.io/#henri",
+   "name": "Henri Sirkkavaara",
+   "url": "https://vaara.io/",
+   "email": "hello@vaara.io",
+   "jobTitle": "Founder and maintainer, Vaara",
+   "nationality": {
+    "@type": "Country",
+    "name": "Finland"
+   },
+   "workLocation": {
+    "@type": "Place",
+    "address": {
+     "@type": "PostalAddress",
+     "addressCountry": "FI"
     }
-  ]
+   },
+   "sameAs": [
+    "https://github.com/vaaraio",
+    "https://datatracker.ietf.org/doc/draft-sirkkavaara-vaara-receipt/",
+    "https://pypi.org/user/vaaraio/",
+    "https://www.bestpractices.dev/projects/12612",
+    "https://github.com/marketplace/actions/vaara-policy-check",
+    "https://www.linkedin.com/in/sirkkavaara"
+   ]
+  },
+  {
+   "@type": "SoftwareApplication",
+   "@id": "https://vaara.io/#software",
+   "name": "Vaara",
+   "applicationCategory": "SecurityApplication",
+   "applicationSubCategory": "Governance and audit",
+   "operatingSystem": "Linux, macOS, Windows",
+   "description": "Vaara checks every action that software takes on its own against your rules before it happens, and leaves a receipt anyone can check later. Open source, runs on your own machines.",
+   "inLanguage": "en",
+   "url": "https://vaara.io/",
+   "downloadUrl": "https://pypi.org/project/vaara/",
+   "softwareHelp": "https://github.com/vaaraio/vaara",
+   "license": "https://www.gnu.org/licenses/agpl-3.0.html",
+   "isAccessibleForFree": true,
+   "offers": {
+    "@type": "Offer",
+    "price": "0",
+    "priceCurrency": "EUR",
+    "name": "Open source (AGPL-3.0)"
+   },
+   "author": {
+    "@id": "https://vaara.io/#henri"
+   },
+   "publisher": {
+    "@id": "https://vaara.io/#organization"
+   },
+   "sameAs": [
+    "https://github.com/vaaraio/vaara",
+    "https://pypi.org/project/vaara/",
+    "https://www.npmjs.com/package/@vaara/client"
+   ]
+  }
+ ]
 }
-</script>
-<script>
-  // Apply the stored theme before first paint so there is no flash. Light is
-  // the default; only an explicit dark choice sets the attribute.
-  (function(){ try { var t = localStorage.getItem('vaara-theme');
-    if (t === 'dark' || t === 'light') document.documentElement.setAttribute('data-theme', t);
-  } catch(e){} })();
 </script>
 </head>
 <body>
-<header class="topbar">
-  <a class="mark" href="/" aria-label="Vaara home"><img src="/favicon.svg" alt="Vaara" width="24" height="24"></a>
-  <nav class="nav-jump" aria-label="Sections"><a href="/verify.html">Explorer</a><a href="/conformance.html">Conformance</a><a href="/surfaces.html">Published</a></nav>
-  <div class="theme-toggle">
-    <button type="button" id="themeBtn" aria-label="Switch to dark theme"><svg class="i-moon" viewBox="0 0 18 18" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M15.2 11.4A6.8 6.8 0 0 1 6.6 2.8a7 7 0 1 0 8.6 8.6z"/></svg><svg class="i-sun" viewBox="0 0 18 18" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" aria-hidden="true"><circle cx="9" cy="9" r="3.4"/><path d="M9 1.4v1.7M9 14.9v1.7M1.4 9h1.7M14.9 9h1.7M3.6 3.6l1.2 1.2M13.2 13.2l1.2 1.2M14.4 3.6l-1.2 1.2M4.8 13.2l-1.2 1.2"/></svg></button>
-  </div>
-</header>
+<header class="bar"><div class="wrap">
+<nav class="top" aria-label="Main menu"><a class="brand" href="/"><img src="/vaara-logo-dark.svg" alt="Vaara home" width="120" height="30"></a><div class="dd"><a class="l" href="/sectors/" aria-haspopup="true">Sectors <span class="caret">▾</span></a><div class="menu"><a href="/sectors/care.html">Care and social services</a><a href="/sectors/payments.html">Payments and finance</a><a href="/sectors/public.html">Public sector</a><a href="/sectors/health.html">Healthcare</a><a href="/sectors/infrastructure.html">Energy, industry and infrastructure</a><a href="/sectors/software.html">Software teams</a></div></div><div class="dd"><a class="l" href="/products/" aria-haspopup="true">Products <span class="caret">▾</span></a><div class="menu"><a href="/products/gate.html">The gate</a><a href="/products/receipts.html">Receipts</a><a href="/products/cage.html">The cage</a><a href="/products/app.html">The desktop app</a><a href="/products/test-it-yourself.html">Test it yourself</a></div></div><a class="l" href="/products/test-it-yourself.html">Test it yourself</a><a class="l" href="/under-the-hood.html">Under the hood</a><span class="lang"><b>EN</b> | <a href="/fi/" hreflang="fi">FI</a></span></nav>
+</div></header>
+<div class="band"><div class="wrap"><div class="hero"><p class="kicker">Accountable autonomy</p><h1>Software that acts on its own, inside your rules. And proof of every action that anyone can check.</h1><p class="lead">Vaara sits between software that acts by itself and the systems it can reach. Nothing happens outside your rules, and afterwards you can show exactly what happened.</p><div class="btns"><a class="btn primary" href="/sectors/">See it in your sector</a><a class="btn ghost" href="/products/test-it-yourself.html">Test it yourself</a></div></div></div></div>
 <main>
-<div class="wordmark">
-  <img class="wm-light" src="/vaara-wordmark-light.png" alt="Vaara" width="440" height="127" fetchpriority="high">
-  <img class="wm-dark" src="/vaara-wordmark-dark.png" alt="Vaara" width="440" height="127">
-</div>
-<p style="text-align:center;text-transform:uppercase;letter-spacing:.14em;font-weight:600;opacity:.65;margin:.1rem 0 .6rem;font-size:.95rem;">Accountable Autonomy</p>
-<h1>Stop an AI agent before it acts, and hold proof of every decision that anyone can check.</h1>
-<p style="text-align:center;max-width:60ch;margin:0 auto 1rem;opacity:.82;line-height:1.5;">Vaara sits in front of your agents and decides, on every single tool call, whether it runs: allow, block, or escalate to a human. Each of those decisions leaves a signed record. When someone who does not trust you asks what your agent did and why, you hand them the record instead of your word. Your own logs will not settle it, because you could have edited them.</p>
-<p style="text-align:center;max-width:62ch;margin:0 auto 1.6rem;font-size:15px;color:var(--muted);line-height:1.5;">From 9 December 2026 the EU Product Liability Directive treats software and AI as products under strict liability, and Article 10 lets a court presume your product defective if you cannot disclose the evidence. The burden of proof moves to you. This is the artifact that answers it.</p>
-<p class="stance">Open source. No SaaS. No telemetry. No signup.</p>
-<div class="evidence">
-  <div class="evidence-head">
-    <span>anyone can check a record</span>
-    <span class="live">keyless</span>
-  </div>
-<pre><span class="prompt">$</span> vaara verify-record someone-elses-record.json
-
-conformance: <span class="ok">CONFORMS</span>
-  [<span class="ok">pass</span>] required  alg_supported
-  [<span class="ok">pass</span>] required  signature_hex
-  [<span class="ok">pass</span>] required  result_commitment_self_consistent
-                   <span class="dim">projectionDigest == sha256 over the projection bytes</span>
-  <span class="dim">... 13 more checks, all pass</span>
-
-<span class="dim">no signing key, no access to the system that produced it</span></pre>
-</div>
-<p style="text-align:center;margin:0 0 40px"><a class="cta" href="/verify.html">Explore the Vaara Resin</a></p>
-<p class="stamp">What's shipped</p>
-<ul>
-  <li>Check any record yourself: <code>vaara verify-record</code> tests any JSON against the published vaara.receipt/v1 format, including a record Vaara never produced, with no signing key and no access to the system that made it. <code>vaara verify-bundle</code> runs the full evidence set and prints a single pass or fail, fail-closed on authenticity.</li>
-  <li>One sink for any stack's evidence: <code>vaara ingest</code> seals a record from another format, an MCP execution record or a <code>did:web</code> catalog entry, into one canonical, content-addressed envelope with an honest gap report, so a dropped record is a provable hole. The conformance corpus is reproduced by a checker that imports no Vaara.</li>
-  <li>Hash-chained, tamper-evident audit trail (SHA-256, optional Ed25519, optional post-quantum ML-DSA-65), anchored to an RFC 3161 / eIDAS qualified timestamp so a record cannot be backdated against a clock you do not control. An auditor verifies it offline with a public key.</li>
-  <li>Hardware-rooted binding: <code>vaara verify-tpm-binding</code> and <code>vaara verify-tpm-chain</code> tie an execution record to the machine's own TPM 2.0 quote and IMA measurements.</li>
-  <li>Sovereign inference: run a local model through Vaara and every answer carries a signed receipt bound to the machine's TPM. Open under AGPL-3.0.</li>
-  <li>One-command regulator package: <code>vaara trail export-article12</code> writes the signed trail, per-article EU AI Act evidence, and the time anchor as Article 19 existence-in-time, in one file an authority checks offline.</li>
-  <li>Product liability evidence: from 9 December 2026, software and AI systems placed on the EU market fall under the Product Liability Directive (EU) 2024/2853. A court can order the producer to disclose the evidence it holds about how the product behaved (Article 9), and if the producer cannot produce it, the product is presumed defective (Article 10). For an autonomous agent that means the record of what it did, and what it was refused, has to exist before anyone asks, and be readable by the claimant's expert without access to the producer's systems. A Vaara receipt is that record: signed, time-anchored, one per decision with its outcome, verifiable from the bytes alone. A liability defence is built on evidence like this, and the receipt supplies the evidence. Article mapping in <a href="https://github.com/vaaraio/vaara/blob/main/docs/COMPLIANCE.md#eu-product-liability-directive-20242853">COMPLIANCE.md</a>.</li>
-  <li>Policy gating on every tool call: allow, block, or escalate each agent action against your own policy before it runs, through a transparent MCP proxy with native hooks for LangChain, CrewAI, and the OpenAI Agents SDK. TypeScript client on npm, Claude Code plugin in the same repo.</li>
-  <li>Author of the Vaara Receipt Internet-Draft (<code>draft-sirkkavaara-vaara-receipt</code>) at the IETF, an offline-verifiable execution-record format whose conformance vectors have been reproduced by <a href="/conformance.html">seven independent parties</a>, each run recorded in public by someone other than Vaara. Releases carry SLSA build provenance and are Sigstore-signed, with continuous fuzzing on the decoder, audit, and policy loader.</li>
-</ul>
-<p class="stamp" id="pilots">Paid pilots</p>
-<ul>
-  <li>Four weeks, your environment, your traffic. Week 1: the Vaara MCP proxy goes in front of your agents in shadow mode, observing and recording without blocking anything. Weeks 2 and 3: we read the shadow report together, tune a policy and tool perimeter to your actual traffic, and flip to enforcement. Week 4: you receive a signed evidence bundle and an auditor-ready compliance report generated from your own trail.</li>
-  <li>Everything runs in your infrastructure and stays there. The trail, the policy, the reports, and the archive are yours, and they stay verifiable with the standalone checker even if you never talk to us again. The evidence does not depend on the vendor; that is the point of the design.</li>
-  <li>Building Vaara into a closed-source product, or running a modified version as a hosted service without releasing your changes, needs a commercial license instead of the AGPL, granted directly by the sole copyright holder. See <a href="https://github.com/vaaraio/vaara/blob/main/LICENSING.md">LICENSING.md</a>.</li>
-</ul>
-
-<p class="stamp">Talk to the author</p>
-<ul>
-  <li>Running Vaara in production, or evaluating it for autonomous systems? I take on pilot deployments and can adapt Vaara to the stack you already have. Nothing here is gated: the code, the verifier, and the evidence format stay open whether we ever speak or not.</li>
-  <li>Scope and price are agreed before any work starts, fixed, and exclude VAT. There is no subscription and no per-seat fee. A commercial license for building Vaara into a closed product is granted directly by the sole copyright holder, see <a href="https://github.com/vaaraio/vaara/blob/main/LICENSING.md">LICENSING.md</a>.</li>
-</ul>
-
-<p style="text-align:center;margin:28px 0 8px;">
-  <a class="cta" href="mailto:hello@vaara.io?subject=Vaara%20pilot&amp;body=Company%3A%20%0A%0AWhat%20you%20are%20using%20Vaara%20for%3A%20%0A%0AWhere%20you%20are%3A%20evaluating%20%2F%20testing%20%2F%20in%20production%0A%0AWhat%20you%20would%20like%20to%20achieve%3A%20%0A">Talk to me about a pilot</a>
-</p>
-<p style="text-align:center;font-size:14px;color:var(--muted);margin:0 0 46px;">Opens a message to hello@vaara.io. Four lines is plenty; I answer them myself.</p>
-
-<p class="stamp">Buy support now</p>
-<ul>
-  <li>If you run Vaara in production and want the maintainer reachable without a contract cycle, the sponsor tiers are live and take a card immediately: <a href="https://github.com/sponsors/vaaraio">github.com/sponsors/vaaraio</a>. Monthly, cancel whenever, no procurement, no call. Companies expensing this against an OSS budget is the normal use.</li>
-  <li>Sponsoring is not a licence. Building Vaara into a closed product still needs a commercial exception, and the paid work above is still the paid work.</li>
-</ul>
-
-<p class="stamp">Adoption (live)</p>
-<ul>
-  <li><span id="installs">-</span> live downloads, all time (PyPI and npm) <span id="installs-ago" class="ago"></span></li>
-</ul>
-
-<p class="stamp">Acknowledged by</p>
-<ul>
-  <li>Listed in the <a href="https://oecd.ai/en/catalogue/tools/vaara">OECD.AI Catalogue of Tools &amp; Metrics</a> for trustworthy AI</li>
-  <li>Listed in the industry acknowledgements of the <a href="https://www.imda.gov.sg/-/media/imda/files/about/emerging-tech-and-research/artificial-intelligence/mgf-for-agentic-ai.pdf">IMDA Model AI Governance Framework for Agentic AI v1.5</a> (Singapore, 20 May 2026)</li>
-  <li><a href="https://www.linkedin.com/posts/amd-developer_meet-henri-sirkkavaara-henri-created-vaara-activity-7459667676555132928-QFSd">AMD AI Developer Program testimonial</a> of Vaara (May 2026)</li>
-  <li><a href="https://www.bestpractices.dev/projects/12612">OpenSSF Best Practices Project 12612</a> (passing)</li>
-</ul>
-
-<p class="stamp">Where</p>
-<div class="links">
-  <a href="https://github.com/vaaraio/vaara"><span class="label">code</span><span class="target">github.com/vaaraio/vaara</span></a>
-  <a href="https://pypi.org/project/vaara/"><span class="label">pypi</span><span class="target">pypi.org/project/vaara</span></a>
-  <a href="https://www.npmjs.com/package/@vaara/client"><span class="label">npm</span><span class="target">@vaara/client</span></a>
-  <a href="https://registry.modelcontextprotocol.io/v0.1/servers?search=io.github.vaaraio/vaara"><span class="label">mcp registry</span><span class="target">io.github.vaaraio/vaara</span></a>
-  <a href="https://datatracker.ietf.org/doc/draft-sirkkavaara-vaara-receipt/"><span class="label">internet-draft</span><span class="target">draft-sirkkavaara-vaara-receipt</span></a>
-  <a href="https://github.com/vaaraio/vaara/blob/main/docs/COMPLIANCE.md"><span class="label">compliance</span><span class="target">COMPLIANCE.md</span></a>
-  <a href="https://futurium.ec.europa.eu/en/apply-ai-alliance/community-content/article-12-and-difference-between-log-and-evidence"><span class="label">Article 12</span><span class="target">Log vs evidence (EU AI Alliance)</span></a>
-  <a href="https://futurium.ec.europa.eu/en/apply-ai-alliance/community-content/article-14-runtime-why-oversight-agentic-ai-has-be-evidenced-action-not-model"><span class="label">Article 14</span><span class="target">Oversight as action (EU AI Alliance)</span></a>
-  <a href="https://github.com/sponsors/vaaraio"><span class="label">sponsor</span><span class="target">github.com/sponsors/vaaraio</span></a>
-  <a href="https://www.linkedin.com/in/sirkkavaara"><span class="label">linkedin</span><span class="target">in/sirkkavaara</span></a>
-</div>
-
-<footer>Vaara&trade; and Vaara Resin&trade; &copy; 2026 Henri Sirkkavaara, Helsinki. AGPL-3.0-or-later.</footer>
-</main>
-<script>
-(function(){
-  function setText(id, value) { var el = document.getElementById(id); if (el) el.textContent = value; }
-  function fmt(n) { return n.toLocaleString("en-US"); }
-  function ago(iso) {
-    var t = Date.parse(iso); if (isNaN(t)) return "";
-    var s = Math.max(0, Math.round((Date.now() - t) / 1000));
-    if (s < 90) return "updated just now";
-    var m = Math.round(s / 60); if (m < 90) return "updated " + m + "m ago";
-    var h = Math.round(m / 60); if (h < 36) return "updated " + h + "h ago";
-    return "updated " + Math.round(h / 24) + "d ago";
-  }
-  // Cache-bust so the browser reads the freshest badge JSON, not a CDN copy.
-  fetch("https://raw.githubusercontent.com/vaaraio/vaara/badges/installs.json?_=" + Date.now())
-    .then(function(r){ return r.ok ? r.json() : null; })
-    .then(function(d){
-      if (!d || typeof d.total !== "number") return;
-      setText("installs", fmt(d.total));
-      if (d.generated) setText("installs-ago", ago(d.generated));
-    })
-    .catch(function(){});
-})();
-</script>
-<script>
-(function(){
-  var root = document.documentElement;
-  var meta = document.querySelector('meta[name="theme-color"]');
-  var btn  = document.getElementById("themeBtn");
-  var COLORS = { light: "#ececec", dark: "#0F1417" };
-  function current(){
-    var t = root.getAttribute("data-theme");
-    if (t) return t;
-    return (window.matchMedia && window.matchMedia("(prefers-color-scheme: dark)").matches) ? "dark" : "light";
-  }
-  function label(){
-    if (btn) btn.setAttribute("aria-label", current() === "dark" ? "Switch to light theme" : "Switch to dark theme");
-  }
-  function apply(theme) {
-    root.setAttribute("data-theme", theme === "dark" ? "dark" : "light");
-    if (meta) meta.setAttribute("content", COLORS[theme] || COLORS.light);
-    try { localStorage.setItem("vaara-theme", theme); } catch(e) {}
-    label();
-  }
-  function reflectAuto(){ root.removeAttribute("data-theme"); label(); }
-  if (btn) btn.addEventListener("click", function(){ apply(current() === "dark" ? "light" : "dark"); });
-  var saved = null;
-  try { saved = localStorage.getItem("vaara-theme"); } catch(e) {}
-  if (saved === "dark" || saved === "light") apply(saved); else reflectAuto();
-})();
-</script>
+<section><div class="wrap"><h2>Things already happen with no person in the moment</h2><p>A payment goes out. Access is granted. A door locks for the night. A file is deleted. More and more of these are decided by software, and AI agents are one example of it.</p><p>Later someone asks what happened and why. Most systems answer with their own logs, which means asking to be taken at your word. Vaara answers with a receipt that holds up without trusting you, or us.</p></div></section>
+<section><div class="wrap"><h2>Every action ends in one of three states, and leaves a receipt</h2><div class="states"><div class="state go"><span class="mark" aria-hidden="true">✓</span><h3>Allowed</h3><p>Inside the rules: it goes through.</p></div><div class="state wait"><span class="mark" aria-hidden="true">‖</span><h3>Needs a person</h3><p>Unusual or risky: it waits until a person says yes or no.</p></div><div class="state no"><span class="mark" aria-hidden="true">✕</span><h3>Refused</h3><p>Against the rules: it never happens.</p></div><div class="state rec"><span class="mark" aria-hidden="true">▣</span><h3>Receipt</h3><p>Every one of the three leaves a signed record of what was decided and why.</p></div></div>
+<p class="label" style="margin-top:28px">Who asks later</p><ul class="who"><li>a resident&#x27;s family</li><li>an inspector</li><li>a customer</li><li>an auditor</li><li>a court</li><li>your own board</li></ul></div></section>
+<section class="plain"><div class="wrap"><h2>A receipt that outlasts the system that made it</h2><p>Years later, on a plane with the wifi off, without Vaara installed and without trusting you or us, anyone can check that a receipt is genuine, when it was made and that nobody has changed it since.</p></div></section>
+<section><div class="wrap"><h2>Vaara in your sector</h2><div class="grid"><a class="card" href="/sectors/care.html"><h3>Care and social services</h3><p>Locked doors, medication, alarms and records written by software, with an answer for every family that asks.</p><span class="go">Read more →</span></a><a class="card" href="/sectors/payments.html"><h3>Payments and finance</h3><p>Agents and automations that move money, with every payment checked against the mandate it came from.</p><span class="go">Read more →</span></a><a class="card" href="/sectors/public.html"><h3>Public sector</h3><p>Automated decisions and AI assistants in public services, with records that answer a citizen and an auditor alike.</p><span class="go">Read more →</span></a><a class="card" href="/sectors/health.html"><h3>Healthcare</h3><p>Clinical decision support and automation, with the approval behind each step on record.</p><span class="go">Read more →</span></a><a class="card" href="/sectors/infrastructure.html"><h3>Energy, industry and infrastructure</h3><p>Automated control and maintenance actions, checked before they reach the plant, recorded for the regulator.</p><span class="go">Read more →</span></a><a class="card" href="/sectors/software.html"><h3>Software teams</h3><p>Coding agents on developers&#x27; machines, governed in the agent&#x27;s own hooks, with one policy across all of them.</p><span class="go">Read more →</span></a></div></div></section>
+<section><div class="wrap"><h2>What Vaara is made of</h2><div class="grid"><a class="card" href="/products/gate.html"><h3>The gate</h3><p>Checks every action against your rules before it runs.</p><span class="go">Read more →</span></a><a class="card" href="/products/receipts.html"><h3>Receipts</h3><p>The proof: one signed record per decision, checkable years later without us.</p><span class="go">Read more →</span></a><a class="card" href="/products/cage.html"><h3>The cage</h3><p>Choose the sandbox your agents run in, and record which one it was.</p><span class="go">Read more →</span></a><a class="card" href="/products/app.html"><h3>The desktop app</h3><p>See decisions as they happen and answer the ones that need you.</p><span class="go">Read more →</span></a><a class="card" href="/products/test-it-yourself.html"><h3>Test it yourself</h3><p>Run the published tests on your own machine and get the same answers we do.</p><span class="go">Read more →</span></a></div></div></section>
+<section><div class="wrap grid two"><div><h2>Where it runs</h2><p>On your own machines. Nothing is sent to us, there is no account and no telemetry. The code is open, so your own people or your supplier can read every line.</p><p>Free to download and use, with nothing to sign up for. Paid work, such as a readiness review or a pilot in your own environment, is scoped to your case and priced as a fixed amount agreed before it starts. No subscription, no per-seat fee. Write to hello@vaara.io.</p>
+<p><a href="mailto:hello@vaara.io">Talk to the author →</a></p></div>
+<div><h2>Who has looked at it</h2><p>Listed in the OECD.AI Catalogue of Tools &amp; Metrics for trustworthy AI.</p><p>Named in the industry acknowledgements of Singapore&#x27;s Model AI Governance Framework for Agentic AI, on the same page as Google, Microsoft, IBM and Amazon.</p><p>AMD AI Developer Program testimonial.</p><p>Its record format is an Internet-Draft at the IETF, the group that writes internet standards, and seven parties other than Vaara have reproduced its test results in public.</p></div></div></section></main>
+<footer><div class="wrap"><div class="cols">
+<div><b>VAARA</b><br>Open source. Runs on your own machines. Nothing is sent to us.<br><a href="mailto:hello@vaara.io">hello@vaara.io</a></div>
+<div><a href="https://github.com/vaaraio/vaara">Code</a><br>
+<a href="https://datatracker.ietf.org/doc/draft-sirkkavaara-vaara-receipt/">Internet-Draft</a><br>
+<a href="/conformance.html">Conformance results</a><br><a href="/under-the-hood.html">Technical overview</a></div>
+</div></div></footer>
 </body>
 </html>

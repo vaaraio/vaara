@@ -40,16 +40,16 @@
 <meta property="og:title" content="Explore the Vaara Resin">
 <meta property="og:description" content="Check any autonomous-action receipt in your own browser. Nothing is uploaded, so the page learns nothing about you and you do not have to trust whoever served it.">
 <meta property="og:url" content="https://vaara.io/verify.html">
-<meta property="og:image" content="https://vaara.io/vaara-wordmark-light.png">
+<meta property="og:image" content="https://vaara.io/og/en-verify.png">
 <meta property="og:image:width" content="1200">
-<meta property="og:image:height" content="346">
-<meta property="og:image:alt" content="Vaara">
+<meta property="og:image:height" content="630">
+<meta property="og:image:alt" content="Vaara: Receipt explorer">
 <meta property="og:locale" content="en_US">
 <meta name="twitter:card" content="summary_large_image">
 <meta name="twitter:title" content="Explore the Vaara Resin">
 <meta name="twitter:description" content="Check any autonomous-action receipt in your own browser. Nothing is uploaded, so the page learns nothing about you and you do not have to trust whoever served it.">
-<meta name="twitter:image" content="https://vaara.io/vaara-wordmark-light.png">
-<meta name="twitter:image:alt" content="Vaara">
+<meta name="twitter:image" content="https://vaara.io/og/en-verify.png">
+<meta name="twitter:image:alt" content="Vaara: Receipt explorer">
 <!--
   The page restated as data. A crawler or a model arriving here sees a text box
   and a table and has to guess what they are for, which is how a verifier that
@@ -64,6 +64,7 @@
     {
       "@type": ["WebPage", "CollectionPage"],
       "@id": "https://vaara.io/verify.html",
+      "breadcrumb": {"@id": "https://vaara.io/verify.html#crumbs"},
       "url": "https://vaara.io/verify.html",
       "name": "Explore the Vaara Resin",
       "description": "Vaara Resin is the chain of autonomous-action receipts: every allow, escalate and deny an agent produced, hash-chained so a removed one stops reconciling. This page checks a receipt in the reader's own browser and looks up published heads in a public transparency log.",
@@ -150,6 +151,14 @@
           "name": "Read what it does and does not establish",
           "text": "A passing signature proves the payload is byte-identical to what the holder of that key signed. It says nothing about whether the key belongs to who you think, or whether the statement is true. Pin the public key from a source the signer does not control before treating a pass as meaningful."
         }
+      ]
+    },
+    {
+      "@type": "BreadcrumbList",
+      "@id": "https://vaara.io/verify.html#crumbs",
+      "itemListElement": [
+        {"@type": "ListItem", "position": 1, "name": "Vaara", "item": "https://vaara.io/"},
+        {"@type": "ListItem", "position": 2, "name": "Receipt explorer", "item": "https://vaara.io/verify.html"}
       ]
     }
   ]

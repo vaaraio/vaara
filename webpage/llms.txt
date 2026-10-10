@@ -1,6 +1,27 @@
 # Vaara
 
-> Tamper-evident runtime evidence layer for AI agents. Covers EU AI Act compliance and any case where you need to prove what an agent actually did. Open source, no SaaS, no telemetry.
+> Vaara checks every action that software takes on its own against the operator's rules before it happens, holds the unusual ones for a person, refuses the rest, and leaves a signed receipt for each decision that anyone can verify later, offline, without trusting the operator or Vaara. AI agents are one case. Open source (AGPL-3.0), runs on your own machines, no telemetry. Built in Finland.
+
+## Pages
+
+- [Vaara: software that acts on its own, inside your rules](https://vaara.io/): Vaara checks every action that software takes on its own against your rules before it happens, and leaves a receipt anyone can check later. Open source, runs on your own machines.
+- [Sectors | Vaara](https://vaara.io/sectors/): Vaara by sector (Care and social services; Payments and finance; Public sector; Healthcare; Energy, industry and infrastructure; Software teams): what you can do, what you are saved from, what it costs and what it saves.
+- [Care and social services | Vaara](https://vaara.io/sectors/care.html): Locked doors, medication, alarms and records written by software, with an answer for every family that asks.
+- [Payments and finance | Vaara](https://vaara.io/sectors/payments.html): Agents and automations that move money, with every payment checked against the mandate it came from.
+- [Public sector | Vaara](https://vaara.io/sectors/public.html): Automated decisions and AI assistants in public services, with records that answer a citizen and an auditor alike.
+- [Healthcare | Vaara](https://vaara.io/sectors/health.html): Clinical decision support and automation, with the approval behind each step on record.
+- [Energy, industry and infrastructure | Vaara](https://vaara.io/sectors/infrastructure.html): Automated control and maintenance actions, checked before they reach the plant, recorded for the regulator.
+- [Software teams | Vaara](https://vaara.io/sectors/software.html): Coding agents on developers' machines, governed in the agent's own hooks, with one policy across all of them.
+- [Products | Vaara](https://vaara.io/products/): What Vaara is made of: the gate, receipts, the cage, the desktop app, and the published tests you can run yourself.
+- [The gate | Vaara](https://vaara.io/products/gate.html): Checks every action against your rules before it runs.
+- [Receipts | Vaara](https://vaara.io/products/receipts.html): The proof: one signed record per decision, checkable years later without us.
+- [The cage | Vaara](https://vaara.io/products/cage.html): Choose the sandbox your agents run in, and record which one it was.
+- [The desktop app | Vaara](https://vaara.io/products/app.html): See decisions as they happen and answer the ones that need you.
+- [Test it yourself | Vaara](https://vaara.io/products/test-it-yourself.html): Run the published tests on your own machine and get the same answers we do.
+- [Under the hood, in plain words. | Vaara](https://vaara.io/under-the-hood.html): Everything technical about Vaara, translated. Each line says what the thing does for you, with the technical term underneath for your engineers.
+
+Every page above also exists in Finnish under https://vaara.io/fi/.
+The whole site as one plain-text file: https://vaara.io/llms-full.txt
 
 Vaara intercepts agent tool calls, scores each one with a conformal risk interval, and writes a hash-chained audit record. Online learning across five expert signals via Multiplicative Weight Update. Distribution-free conformal coverage on the score. An external auditor can verify these properties without trusting your stack.
 
