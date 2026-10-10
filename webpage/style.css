@@ -209,3 +209,24 @@ nav.top .burger { display: none; }
   .release a { border-radius: 10px; }
 }
 @media (max-width: 820px) { .term pre { white-space: pre; font-size: 11px; } }
+
+/* the plain-words decision feed beside the home heading */
+.feed { margin: 0; }
+.feed .panel { background: var(--card); border: 1px solid var(--rule); border-radius: 12px; box-shadow: 0 12px 32px rgba(17,24,39,.10); overflow: hidden; }
+.feed .head { display: flex; align-items: center; gap: 10px; padding: 14px 18px; font-weight: 650; color: var(--ink); border-bottom: 1px solid var(--rule); }
+.feed .dot { width: 9px; height: 9px; border-radius: 50%; background: #6CC3A0; box-shadow: 0 0 0 4px color-mix(in srgb, #6CC3A0 25%, transparent); }
+.feed .when { margin-left: auto; font-weight: 400; font-size: 14px; color: var(--muted); }
+.feed ul { list-style: none; margin: 0; padding: 0; }
+.feed li { display: grid; grid-template-columns: 34px 1fr auto; gap: 12px; align-items: center; padding: 14px 18px; border-bottom: 1px solid var(--rule); }
+.feed .ic { width: 30px; height: 30px; border-radius: 50%; display: grid; place-items: center; color: #fff; font-weight: 700; font-size: 15px; }
+.feed .what { color: var(--ink); font-size: 15px; line-height: 1.35; }
+.feed .what small { display: block; color: var(--muted); font-size: 13px; margin-top: 2px; }
+.feed .chip { font-size: 13px; font-weight: 600; padding: 4px 10px; border-radius: 999px; white-space: nowrap; }
+.feed li.go .ic { background: var(--accent); } .feed li.go .chip { color: var(--accent); background: color-mix(in srgb, var(--accent) 12%, var(--card)); }
+.feed li.wait .ic { background: var(--warn); } .feed li.wait .chip { color: var(--warn); background: color-mix(in srgb, var(--warn) 14%, var(--card)); }
+.feed li.no .ic { background: var(--stop); } .feed li.no .chip { color: var(--stop); background: color-mix(in srgb, var(--stop) 12%, var(--card)); }
+html[data-theme="dark"] .feed .ic { color: #0F1820; }
+.feed .rcpt { display: flex; flex-wrap: wrap; gap: 8px 16px; align-items: center; padding: 14px 18px; background: var(--tint); font-size: 14px; color: var(--accent); }
+.feed .rcpt b { color: var(--ink); margin-right: 4px; }
+.feed figcaption { font-size: 13px; color: var(--muted); margin-top: 8px; }
+@media (max-width: 820px) { .feed li { grid-template-columns: 30px 1fr; } .feed .chip { grid-column: 2; justify-self: start; } }
