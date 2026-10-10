@@ -181,6 +181,8 @@ def test_hook_post_records_the_outcome_against_the_opencode_call(tmp_path):
 
 
 def _fake_vaara(tmp_path: Path, code: int, message: str = "") -> Path:
+    if sys.platform == "win32":
+        pytest.skip("the fake engine is a shell script, which Windows does not run")
     fake = tmp_path / "vaara"
     fake.write_text(
         "#!/bin/sh\ncat > /dev/null\n"
@@ -195,7 +197,7 @@ def _call_plugin(tmp_path: Path, vaara_bin: str, home: Path | None = None) -> di
     if node is None:
         pytest.skip("node is not installed")
     installed = tmp_path / "plugin.mjs"
-    installed.write_text(PLUGIN.read_text(encoding="utf-8").replace("__VAARA_BIN__", vaara_bin))
+    installed.write_text(opencode.render_plugin(vaara_bin), encoding="utf-8")
     driver = tmp_path / "driver.mjs"
     driver.write_text(textwrap.dedent(f"""\
         import {{ VaaraGovernance }} from {json.dumps(installed.as_uri())};
@@ -257,13 +259,19 @@ def test_plugin_through_the_real_engine_blocks_a_denied_call(tmp_path):
     home = tmp_path / "home"
     (home / ".vaara").mkdir(parents=True)
     (home / ".vaara" / "config.json").write_text("{}")
-    shim = tmp_path / "vaara"
-    shim.write_text(
-        f"#!/bin/sh\nexec {sys.executable} -c "
-        "'import sys; from vaara.cli import main; sys.exit(main(sys.argv[1:]))' \"$@\"\n")
-    shim.chmod(0o755)
+    if sys.platform == "win32":
+        # Windows runs the installed console script, vaara.exe, as a user's would.
+        shim = shutil.which("vaara")
+        if shim is None:
+            pytest.skip("vaara is not installed as a command")
+    else:
+        shim = tmp_path / "vaara"
+        shim.write_text(
+            f"#!/bin/sh\nexec {sys.executable} -c "
+            "'import sys; from vaara.cli import main; sys.exit(main(sys.argv[1:]))' \"$@\"\n")
+        shim.chmod(0o755)
     installed = tmp_path / "plugin.mjs"
-    installed.write_text(PLUGIN.read_text(encoding="utf-8").replace("__VAARA_BIN__", str(shim)))
+    installed.write_text(opencode.render_plugin(str(shim)), encoding="utf-8")
     driver = tmp_path / "driver.mjs"
     driver.write_text(textwrap.dedent(f"""\
         import {{ VaaraGovernance }} from {json.dumps(installed.as_uri())};
