@@ -251,6 +251,13 @@ DORA_REQUIREMENTS = [
 # effect, a score before every decision, a human on every escalation, a
 # recorded approver on every override and key change. Whether that meets
 # the entity's own control description is the auditor's call.
+#
+# None of these rows is critical by default. They are assessed in every
+# default report, and they move the overall status only when a deployer
+# whose SOC 2 report covers its agents marks them so (``ComplianceEngine``
+# with ``dataclasses.replace(row, is_critical=True)``). Shipping them
+# critical turned a trail that was clean on 2.7.1 into one with SOC 2
+# critical gaps on 2.8.0 with nothing changed on the operator's side.
 SOC2_REQUIREMENTS = [
     RegulatoryRequirement(
         RegulatoryDomain.SOC2,
@@ -259,7 +266,7 @@ SOC2_REQUIREMENTS = [
         "The entity implements logical access security software, infrastructure and architectures over protected information assets",
         (EventType.DECISION_MADE, EventType.ACTION_BLOCKED),
         min_evidence_count=10,
-        is_critical=True,
+        is_critical=False,
     ),
     RegulatoryRequirement(
         RegulatoryDomain.SOC2,
@@ -278,7 +285,7 @@ SOC2_REQUIREMENTS = [
         "Access to data, software, functions and other protected information assets is authorised, modified or removed based on roles and responsibilities, with least privilege and segregation of duties",
         (EventType.DECISION_MADE, EventType.ESCALATION_RESOLVED, EventType.POLICY_OVERRIDE),
         min_evidence_count=5,
-        is_critical=True,
+        is_critical=False,
     ),
     RegulatoryRequirement(
         RegulatoryDomain.SOC2,
@@ -287,7 +294,7 @@ SOC2_REQUIREMENTS = [
         "System components and their operation are monitored for anomalies indicative of malicious acts, natural disasters and errors, and anomalies are analysed to determine whether they are security events",
         (EventType.ACTION_REQUESTED, EventType.RISK_SCORED),
         min_evidence_count=20,
-        is_critical=True,
+        is_critical=False,
     ),
     RegulatoryRequirement(
         RegulatoryDomain.SOC2,
@@ -297,7 +304,7 @@ SOC2_REQUIREMENTS = [
         (EventType.ACTION_BLOCKED, EventType.ESCALATION_SENT,
          EventType.ESCALATION_RESOLVED, EventType.OUTCOME_RECORDED),
         min_evidence_count=5,
-        is_critical=True,
+        is_critical=False,
     ),
     RegulatoryRequirement(
         RegulatoryDomain.SOC2,

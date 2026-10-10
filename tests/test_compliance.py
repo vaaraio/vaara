@@ -538,3 +538,53 @@ class TestSOC2TrustServicesCriteria:
             assert ("soc2", "CC7.3") in {
                 (a["domain"], a["article"]) for a in rec.regulatory_articles
             }
+
+
+class TestSOC2RowsAreNotCriticalByDefault:
+    """Audit 2026-10-10 (R1): 2.8.0 added SOC 2 to the default engine with
+    four rows critical, so a trail that reported no critical gaps on 2.7.1
+    reported SOC 2 critical gaps on 2.8.0 with nothing changed on the
+    operator's side. The rows are assessed in every default report; they
+    move the overall status only when a deployer marks them critical."""
+
+    def test_soc2_rows_are_assessed_but_not_critical(self):
+        from vaara.compliance.engine import SOC2_REQUIREMENTS
+        assert not any(r.is_critical for r in SOC2_REQUIREMENTS)
+
+    def test_a_small_trail_reports_the_same_overall_status_as_before_soc2(self):
+        from vaara.audit.trail import AuditTrail
+        from vaara.compliance.engine import (
+            DORA_REQUIREMENTS, EU_AI_ACT_REQUIREMENTS, ComplianceEngine,
+        )
+        trail = AuditTrail()
+        at = ActionType(
+            "data.read", ActionCategory.DATA, Reversibility.FULLY,
+            BlastRadius.LOCAL, UrgencyClass.DEFERRABLE,
+            frozenset({RegulatoryDomain.EU_AI_ACT, RegulatoryDomain.SOC2}),
+        )
+        for n in range(5):
+            req = ActionRequest(agent_id="ag", tool_name="data.read", action_type=at,
+                                parameters={"n": n}, confidence=0.8)
+            action_id = trail.record_action_requested(req)
+            trail.record_risk_scored(
+                action_id=action_id, agent_id="ag", tool_name="data.read",
+                assessment={"risk": 0.1}, regulatory_domains=at.regulatory_domains)
+            trail.record_decision(
+                action_id=action_id, agent_id="ag", tool_name="data.read",
+                decision="allow", reason="routine", risk_score=0.1,
+                regulatory_domains=at.regulatory_domains)
+        with_soc2 = ComplianceEngine().assess(trail)
+        without = ComplianceEngine(EU_AI_ACT_REQUIREMENTS + DORA_REQUIREMENTS).assess(trail)
+        assert with_soc2.overall_status == without.overall_status
+        assert with_soc2.critical_gaps == without.critical_gaps
+        assert any(a.requirement.domain == RegulatoryDomain.SOC2 for a in with_soc2.articles)
+
+    def test_a_deployer_can_mark_a_criterion_critical(self):
+        from vaara.audit.trail import AuditTrail
+        from vaara.compliance.engine import SOC2_REQUIREMENTS, ComplianceEngine
+        import dataclasses
+        engine = ComplianceEngine(
+            [dataclasses.replace(r, is_critical=True) for r in SOC2_REQUIREMENTS])
+        report = engine.assess(AuditTrail())
+        assert report.overall_status == EvidenceStatus.EVIDENCE_INSUFFICIENT
+        assert any(g.startswith("CC7.2") for g in report.critical_gaps)
