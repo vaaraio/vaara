@@ -297,3 +297,6 @@ h3 { font-size: 18px; }
 @media (max-width: 820px) { .hero h1, .hero.home h1 { font-size: 25px; } h2 { font-size: 22px; } }
 body { font-size: 16px; }
 .hero p.lead, .hero.home p.lead { font-size: 17px; }
+/* the footer sits at the bottom of the window on short pages */
+body { min-height: 100vh; display: flex; flex-direction: column; }
+body > main { flex: 1 0 auto; }
