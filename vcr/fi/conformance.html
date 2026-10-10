@@ -1,0 +1,406 @@
+<!doctype html>
+<html lang="fi">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<title>Vaatimustenmukaisuustulokset | Vaara</title>
+<meta name="description" content="Jokainen Vaaran vaatimustenmukaisuustestisarja, sen tulos ja 7 nimettyä riippumatonta osapuolta, jotka ovat toistaneet testit julkisesti. Tuotettu ajajan omasta raportista.">
+<meta name="author" content="Henri Sirkkavaara">
+<meta name="robots" content="index, follow, max-image-preview:large, max-snippet:-1">
+<meta name="googlebot" content="index, follow">
+<meta name="referrer" content="strict-origin-when-cross-origin">
+<meta name="theme-color" content="#14212E">
+<link rel="canonical" href="https://vaara.io/fi/conformance.html">
+<link rel="icon" type="image/svg+xml" href="/favicon.svg">
+<link rel="alternate icon" href="/favicon.ico">
+<link rel="apple-touch-icon" href="/favicon-180.png">
+<link rel="sitemap" type="application/xml" href="/sitemap.xml">
+<!-- The rows as bytes, for a reader who wants the register rather than the
+     page. Same file the desk published, served next to it. -->
+<link rel="alternate" type="application/json" href="/conformance.json" title="The reproduction register as JSON">
+<link rel="author" href="https://vaara.io/">
+<meta property="og:type" content="website">
+<meta property="og:site_name" content="Vaara">
+<meta property="og:title" content="Vaatimustenmukaisuustulokset">
+<meta property="og:description" content="Jokainen Vaaran vaatimustenmukaisuustestisarja, sen tulos ja 7 nimettyä riippumatonta osapuolta, jotka ovat toistaneet testit julkisesti. Tuotettu ajajan omasta raportista.">
+<meta property="og:url" content="https://vaara.io/fi/conformance.html">
+<meta property="og:image" content="https://vaara.io/og/fi-conformance.png">
+<meta property="og:image:width" content="1200">
+<meta property="og:image:height" content="630">
+<meta property="og:image:alt" content="Vaara: Vaatimustenmukaisuustulokset">
+<meta property="og:locale" content="fi_FI">
+<meta name="twitter:card" content="summary_large_image">
+<meta name="twitter:title" content="Vaatimustenmukaisuustulokset">
+<meta name="twitter:description" content="Jokainen Vaaran vaatimustenmukaisuustestisarja, sen tulos ja 7 nimettyä riippumatonta osapuolta, jotka ovat toistaneet testit julkisesti. Tuotettu ajajan omasta raportista.">
+<meta name="twitter:image" content="https://vaara.io/og/fi-conformance.png">
+<meta name="twitter:image:alt" content="Vaara: Vaatimustenmukaisuustulokset">
+<link rel="alternate" hreflang="en" href="https://vaara.io/conformance.html">
+<link rel="alternate" hreflang="fi" href="https://vaara.io/fi/conformance.html">
+<link rel="alternate" hreflang="x-default" href="https://vaara.io/conformance.html">
+<script type="application/ld+json">
+{
+  "@context": "https://schema.org",
+  "@graph": [
+    {
+      "@type": "WebPage",
+      "@id": "https://vaara.io/fi/conformance.html",
+      "url": "https://vaara.io/fi/conformance.html",
+      "inLanguage": "fi",
+      "name": "Vaatimustenmukaisuustulokset",
+      "isPartOf": {
+        "@id": "https://vaara.io/#website"
+      },
+      "about": {
+        "@id": "https://vaara.io/conformance.html#corpus"
+      },
+      "mainEntity": {
+        "@id": "https://vaara.io/conformance.html#reproductions"
+      },
+      "translationOfWork": {
+        "@id": "https://vaara.io/conformance.html"
+      },
+      "breadcrumb": {
+        "@type": "BreadcrumbList",
+        "itemListElement": [
+          {
+            "@type": "ListItem",
+            "position": 1,
+            "name": "Etusivu",
+            "item": "https://vaara.io/fi/"
+          },
+          {
+            "@type": "ListItem",
+            "position": 2,
+            "name": "Testaa itse",
+            "item": "https://vaara.io/fi/products/test-it-yourself.html"
+          },
+          {
+            "@type": "ListItem",
+            "position": 3,
+            "name": "Vaatimustenmukaisuustulokset",
+            "item": "https://vaara.io/fi/conformance.html"
+          }
+        ]
+      }
+    }
+  ]
+}
+</script>
+<link rel="stylesheet" href="/style.css">
+<script>try{var t=localStorage.getItem("vaara-theme");if(t!=="dark"&&t!=="light")t=matchMedia("(prefers-color-scheme: dark)").matches?"dark":"light";document.documentElement.dataset.theme=t;var p=location.pathname;if((p==="/"||p==="/index.html")&&!localStorage.getItem("vaara-lang")&&(navigator.languages||[navigator.language]).some(function(l){return/^fi\b/i.test(l)}))location.replace("/fi/")}catch(e){}</script>
+</head>
+<body>
+<header class="bar"><div class="wrap">
+<nav class="top" aria-label="Päävalikko"><a class="brand" href="/fi/"><img src="/vaara-logo-dark.svg" alt="Vaara home" width="174" height="24"></a><div class="dd"><a class="l" href="/fi/sectors/" aria-haspopup="true">Toimialat <span class="caret">▾</span></a><div class="menu"><a href="/fi/sectors/care.html">Hoiva ja sosiaalipalvelut</a><a href="/fi/sectors/payments.html">Maksut ja rahoitus</a><a href="/fi/sectors/public.html">Julkinen sektori</a><a href="/fi/sectors/health.html">Terveydenhuolto</a><a href="/fi/sectors/infrastructure.html">Energia, teollisuus ja infrastruktuuri</a><a href="/fi/sectors/software.html">Ohjelmistotiimit</a></div></div><div class="dd"><a class="l" href="/fi/products/" aria-haspopup="true">Tuotteet <span class="caret">▾</span></a><div class="menu"><a href="/fi/products/gate.html">Portti</a><a href="/fi/products/receipts.html">Kuitit</a><a href="/fi/products/cage.html">Häkki</a><a href="/fi/products/app.html">Työpöytäsovellus</a><a href="/fi/products/test-it-yourself.html">Testaa itse</a></div></div><div class="dd on"><a class="l" href="/fi/products/test-it-yourself.html" aria-haspopup="true">Testaa itse <span class="caret">▾</span></a><div class="menu"><a href="/fi/products/test-it-yourself.html">Testaa itse</a><a href="/fi/verify.html">Kuittien tarkistus</a><a href="/fi/conformance.html">Vaatimustenmukaisuustulokset</a></div></div><a class="l" href="/fi/under-the-hood.html">Konepellin alla</a><span class="lang"><a href="/conformance.html" hreflang="en">EN</a> | <b>FI</b></span><button class="burger" type="button" aria-label="Päävalikko" aria-expanded="false"></button><button class="theme" type="button" aria-label="Vaihda vaalean ja tumman välillä" title="Vaihda vaalean ja tumman välillä"></button><a class="get" href="https://github.com/vaaraio/vaara#readme">Lataa Vaara</a></nav>
+</div></header>
+<div class="band"><div class="wrap"><div class="hero"><nav class="crumbs" aria-label="Breadcrumb"><a href="/fi/">Etusivu</a> / <a href="/fi/products/test-it-yourself.html">Testaa itse</a></nav><p class="kicker">Vaatimustenmukaisuustulokset</p><h1>Jokainen testisarja, jokainen tulos ja jokainen, joka tarkisti sen itse.</h1><p class="lead">Jokaisella alla olevalla testisarjalla on oma riippumaton tarkistimensa, joka ei käytä Vaaran koodia ja laskee tuloksensa uudelleen omien testitiedostojensa tavuista. Sivu tuotetaan ajajan omasta raportista, joten se kertoo, mitä tarkistimet tekivät, ei sitä, mitä jokin dokumentti väittää niiden tekevän.</p></div></div></div>
+<main class="conf">
+<section class="stats"><div class="wrap"><div class="statrow five"><div class="stat"><b>51</b><span>testisarjaa</span></div><div class="stat"><b>49</b><span>hyväksytty</span></div><div class="stat"><b>0</b><span>hylätty</span></div><div class="stat"><b>2</b><span>ohitettu</span></div><div class="stat"><b>88</b><span>tapausta</span></div></div>
+<p class="note">tuotettu 2026-10-10T10:37:11Z</p></div></section>
+<section><div class="wrap">
+<h2>Riippumattomat toistot</h2>
+<p>Muut kuin ylläpitäjä ovat ajaneet tarkistimet ja kertoneet tuloksen julkisesti. Väitteet näkyvät niin kuin kukin osapuoli ne rajasi, omalla kielellään. Jokainen täällä pyysi päästä listalle tietäen, että merkintä on pysyvä. Oman ajonne voitte lisätä <a href="https://github.com/vaaraio/vaara/issues/new?template=conformance-row.yml">rivipyynnöllä</a>. Rivinumerot ovat pysyviä, ja jokainen listattu osapuoli saa oman merkkinsä, jossa on numero, päivä ja commit. Merkki kertoo, että osapuoli ajoi tarkistimet tuossa commitissa tuona päivänä. Se ei koskaan väitä testien menevän läpi nyt, eikä se ole sertifikaatti.</p>
+
+        <details class="repro" id="row-1">
+          <summary class="repro-head">
+            <a class="num" href="#row-1">#1</a>
+            <span class="date">2026-08-19</span>
+            <span class="who">babyblueviper1 (invinoveritas)</span>
+            <span class="aff">invinoveritas</span>
+            <span class="result">40 passed, 0 failed, 3 skipped, 49 cases</span>
+          </summary>
+          <dl>
+            <dt>Ajon laji</dt><dd>Not stated. An unstated kind reads as a reproduction, the weakest of the three.</dd>
+            <dt>Testisarjat</dt><dd class="mono">acp_checkout_v0, agent_decision_v0, agent_identity_v0, ap2_v0, article12_fold_v0, atlas_threat_v0, attestation_result_v0, audit_summary_v0, authorization_v0, build_bundle_v0, bundle_doc_v0, bundle_set_v0, capability_scope_v0, class_gate_v0, conformance_statement_v0, contiguity_v0, credential_binding_v0, credential_grant_v0, crewai_enforcement_v0, cross_org_handoff_v0, cross_stack_revocation_v0, data_locality_v0, decision_pairing_v0, enforcement_attestation_v0, enforcement_set_v0, evidence_bundle_v0, evidence_ref_v0, execution_receipt_v0, external_evidence_v0, fallback_projection_v0, governance_decision_v0, handoff_set_v0, ingest_v0, key_rotation_v0, normalize_v0, pq_hybrid_v0, qualified_time_v0, record_conformance_v0, record_set_v0, sep2787_attestation_v0, tap_v0, transparency_consistency_v0, x402_settlement_v0</dd>
+            <dt>Commit</dt><dd class="mono">cc5df5d2938cb9a26e820c1b8b5ac3b7d398ab1e</dd>
+            <dt>Heidän rajauksensa</dt><dd class="scoping">Ran the independent checkers exactly as documented (git clone, pip install cryptography rfc8785, python scripts/conformance_runner.py) in an isolated venv, no Vaara install. Establishes that the checkers reproduce their own stated verdicts against the shipped case files at this commit. Does not establish interoperability between Vaara&#x27;s proofs and our own (invinoveritas) proof format.</dd>
+            <dt>Tietue</dt><dd><a href="https://github.com/crewAIInc/crewAI/issues/4877#issuecomment-5339555715" rel="noopener">tietue</a></dd>
+            <dt>Ehtojen versio</dt><dd class="mono">2026-08-15</dd>
+            <dt>Rivin tiiviste</dt><dd class="mono">sha256:2682d581d86fc18156386c716c38d9c63ea34264ecb2dc31938ae30d20a55693<br>tiedostosta <a href="/badge/babyblueviper1-invinoveritas.json">/badge/babyblueviper1-invinoveritas.json</a></dd>
+            <dt>Merkki</dt><dd><img src="/badge/babyblueviper1-invinoveritas.svg" alt="VCR row 1" height="20"><br><code class="snippet">[![Vaara Conformance Results row 1](https://vaara.io/badge/babyblueviper1-invinoveritas.svg)](https://vaara.io/conformance.html)</code></dd>
+            <dt>Todistus</dt><dd><a href="/badge/babyblueviper1-invinoveritas.html">tulostettava sivu</a></dd>
+          </dl>
+        </details>
+
+        <details class="repro" id="row-2">
+          <summary class="repro-head">
+            <a class="num" href="#row-2">#2</a>
+            <span class="date">2026-08-21</span>
+            <span class="who">Nenad Vasic / Elara Protocol</span>
+            <span class="aff">Elara Protocol — AI-agent-maintained (disclosed), independent of Vaara</span>
+            <span class="result">45 passed, 0 failed, 1 skipped, 75 cases. Runner exit 0. The skip is `article12_fold_v0` (checker wants a bundle zip argument rather than a bare case directory — structural, not environmental). An earlier same-day run at f0dbf4d8 gave 44/45, 65 cases, 0 failures, before the corpus grew.</span>
+          </summary>
+          <dl>
+            <dt>Ajon laji</dt><dd>Not stated. An unstated kind reads as a reproduction, the weakest of the three.</dd>
+            <dt>Testisarjat</dt><dd class="mono">acp_checkout_v0, agent_decision_v0, agent_identity_v0, ap2_v0, article12_fold_v0, atlas_threat_v0, attestation_result_v0, attribute_attestation_v0, attribute_attestation_zk_v0, audit_summary_v0, authorization_v0, build_bundle_v0, bundle_doc_v0, bundle_set_v0, capability_scope_v0, class_gate_v0, conformance_statement_v0, contiguity_v0, credential_binding_v0, credential_grant_v0, crewai_enforcement_v0, cross_org_handoff_v0, cross_stack_revocation_v0, data_locality_v0, decision_pairing_v0, enforcement_attestation_v0, enforcement_set_v0, evidence_bundle_v0, evidence_ref_v0, execution_receipt_v0, external_evidence_v0, fallback_projection_v0, governance_decision_v0, handoff_set_v0, ingest_v0, key_rotation_v0, normalize_v0, pq_hybrid_v0, qualified_time_v0, record_conformance_v0, record_set_v0, release_condition_v0, sep2787_attestation_v0, tap_v0, transparency_consistency_v0, x402_settlement_v0</dd>
+            <dt>Commit</dt><dd class="mono">a209864e11fc14f0ac3466dd33d668d9c156208f</dd>
+            <dt>Heidän rajauksensa</dt><dd class="scoping">This is a reproduction of the author-supplied checkers and vectors at commit a209864e. It is not an independent implementation of draft-sirkkavaara-vaara-receipt and not a validation of the specification text. The figures match row #612 at the same commit on a different machine and OS (Linux, Python 3.12, clean venv), making this an independent confirmation of that row&#x27;s byte-stability. pq_hybrid_v0 and qualified_time_v0 ran with their optional dependencies installed rather than skipped.</dd>
+            <dt>Tietue</dt><dd><a href="https://mailarchive.ietf.org/arch/msg/scitt/HOKZT8J06zB3JaNxOfAEasNty1Q/" rel="noopener">tietue</a></dd>
+            <dt>Ehtojen versio</dt><dd class="mono">2026-08-21</dd>
+            <dt>Rivin tiiviste</dt><dd class="mono">sha256:79e05e18a3214b9ada4bcf31ce25141640982b461a4fe655a14017f1f410bb33<br>tiedostosta <a href="/badge/nenad-vasic-elara-protocol.json">/badge/nenad-vasic-elara-protocol.json</a></dd>
+            <dt>Merkki</dt><dd><img src="/badge/nenad-vasic-elara-protocol.svg" alt="VCR row 2" height="20"><br><code class="snippet">[![Vaara Conformance Results row 2](https://vaara.io/badge/nenad-vasic-elara-protocol.svg)](https://vaara.io/conformance.html)</code></dd>
+            <dt>Todistus</dt><dd><a href="/badge/nenad-vasic-elara-protocol.html">tulostettava sivu</a></dd>
+          </dl>
+        </details>
+
+        <details class="repro" id="row-3">
+          <summary class="repro-head">
+            <a class="num" href="#row-3">#3</a>
+            <span class="date">2026-08-24</span>
+            <span class="who">Emek Can Doğru</span>
+            <span class="aff">VERAX TEKNOLOJİ LİMİTED ŞİRKETİ — independent of Vaara</span>
+            <span class="result">45 passed, 0 failed, 1 skipped, 75 cases. Runner exit 0. The skip is `article12_fold_v0`, whose checker validates a passed-in bundle zip rather than a bare case directory — structural, not environmental.</span>
+          </summary>
+          <dl>
+            <dt>Ajon laji</dt><dd>Reproduction: the author&#x27;s checkers over the author&#x27;s vectors</dd>
+            <dt>Testisarjat</dt><dd class="mono">acp_checkout_v0, agent_decision_v0, agent_identity_v0, ap2_v0, article12_fold_v0, atlas_threat_v0, attestation_result_v0, attribute_attestation_v0, attribute_attestation_zk_v0, audit_summary_v0, authorization_v0, build_bundle_v0, bundle_doc_v0, bundle_set_v0, capability_scope_v0, class_gate_v0, conformance_statement_v0, contiguity_v0, credential_binding_v0, credential_grant_v0, crewai_enforcement_v0, cross_org_handoff_v0, cross_stack_revocation_v0, data_locality_v0, decision_pairing_v0, enforcement_attestation_v0, enforcement_set_v0, evidence_bundle_v0, evidence_ref_v0, execution_receipt_v0, external_evidence_v0, fallback_projection_v0, governance_decision_v0, handoff_set_v0, ingest_v0, key_rotation_v0, normalize_v0, pq_hybrid_v0, qualified_time_v0, record_conformance_v0, record_set_v0, release_condition_v0, sep2787_attestation_v0, tap_v0, transparency_consistency_v0, x402_settlement_v0</dd>
+            <dt>Commit</dt><dd class="mono">a209864e11fc14f0ac3466dd33d668d9c156208f</dd>
+            <dt>Heidän rajauksensa</dt><dd class="scoping">This is a reproduction of the author-supplied checkers and vectors at commit a209864e. It is not an independent implementation of draft-sirkkavaara-vaara-receipt and it is not a validation of the specification text. The checkers importing no Vaara code is what makes the reproduction worth anything; it remains the author&#x27;s corpus grading the author&#x27;s cases. The skip is `article12_fold_v0`, whose checker validates a passed-in bundle zip rather than a bare case directory — structural, not environmental.</dd>
+            <dt>Tietue</dt><dd><a href="https://mailarchive.ietf.org/arch/msg/scitt/wZDSwS77Bb46AZNZ197XkHedNAg/" rel="noopener">tietue</a></dd>
+            <dt>Ehtojen versio</dt><dd class="mono">2026-08-21</dd>
+            <dt>Rivin tiiviste</dt><dd class="mono">sha256:d8cf95879212db9a9a230a86ff45419eeb7db7eef235ef0bac9f5f71288e0773<br>tiedostosta <a href="/badge/emek-can-dogru.json">/badge/emek-can-dogru.json</a></dd>
+            <dt>Merkki</dt><dd><img src="/badge/emek-can-dogru.svg" alt="VCR row 3" height="20"><br><code class="snippet">[![Vaara Conformance Results row 3](https://vaara.io/badge/emek-can-dogru.svg)](https://vaara.io/conformance.html)</code></dd>
+            <dt>Todistus</dt><dd><a href="/badge/emek-can-dogru.html">tulostettava sivu</a></dd>
+          </dl>
+        </details>
+
+        <details class="repro" id="row-4">
+          <summary class="repro-head">
+            <a class="num" href="#row-4">#4</a>
+            <span class="date">2026-08-25</span>
+            <span class="who">Council of AI</span>
+            <span class="aff">Independent AI measurement body — councilof.ai (CSOAI)</span>
+            <span class="result">43 passed, 0 failed, 3 skipped, 75 cases</span>
+          </summary>
+          <dl>
+            <dt>Ajon laji</dt><dd>Reproduction: the author&#x27;s checkers over the author&#x27;s vectors</dd>
+            <dt>Testisarjat</dt><dd class="mono">acp_checkout_v0, agent_decision_v0, agent_identity_v0, ap2_v0, article12_fold_v0, atlas_threat_v0, attestation_result_v0, attribute_attestation_v0, attribute_attestation_zk_v0, audit_summary_v0, authorization_v0, build_bundle_v0, bundle_doc_v0, bundle_set_v0, capability_scope_v0, class_gate_v0, conformance_statement_v0, contiguity_v0, credential_binding_v0, credential_grant_v0, crewai_enforcement_v0, cross_org_handoff_v0, cross_stack_revocation_v0, data_locality_v0, decision_pairing_v0, enforcement_attestation_v0, enforcement_set_v0, evidence_bundle_v0, evidence_ref_v0, execution_receipt_v0, external_evidence_v0, fallback_projection_v0, governance_decision_v0, handoff_set_v0, ingest_v0, key_rotation_v0, normalize_v0, pq_hybrid_v0, qualified_time_v0, record_conformance_v0, record_set_v0, release_condition_v0, sep2787_attestation_v0, tap_v0, transparency_consistency_v0, x402_settlement_v0</dd>
+            <dt>Commit</dt><dd class="mono">9fefe51a61f16dc13cd64ca8ca4b8792e48fb64b</dd>
+            <dt>Heidän rajauksensa</dt><dd class="scoping">Reproduction of author-supplied checkers at the pinned commit, macOS arm64 / Python 3.14.6, clean venv. Validates the pinned independent vector lanes. Does not establish hosted-service interoperability, official SCITT conformance, or an independent implementation.</dd>
+            <dt>Tietue</dt><dd><a href="https://github.com/CSOAI-ORG/councilof-ai/blob/conformance-runs/docs/conformance-runs/vaara-sep2828-2026-08-25.md" rel="noopener">tietue</a></dd>
+            <dt>Ehtojen versio</dt><dd class="mono">2026-08-21</dd>
+            <dt>Rivin tiiviste</dt><dd class="mono">sha256:a28173bb93fd61540ec2ef0f73a39e6ada107f7bc23b561b2d6992eddffa41c6<br>tiedostosta <a href="/badge/council-of-ai.json">/badge/council-of-ai.json</a></dd>
+            <dt>Merkki</dt><dd><img src="/badge/council-of-ai.svg" alt="VCR row 4" height="20"><br><code class="snippet">[![Vaara Conformance Results row 4](https://vaara.io/badge/council-of-ai.svg)](https://vaara.io/conformance.html)</code></dd>
+            <dt>Todistus</dt><dd><a href="/badge/council-of-ai.html">tulostettava sivu</a></dd>
+          </dl>
+        </details>
+
+        <details class="repro" id="row-5">
+          <summary class="repro-head">
+            <a class="num" href="#row-5">#5</a>
+            <span class="date">2026-08-25</span>
+            <span class="who">Iman Schrock</span>
+            <span class="aff">EMILIA Protocol</span>
+            <span class="result">41 passed, 0 failed, 3 skipped, 57 cases. Skips: `article12_fold_v0` (bundle zip required), `pq_hybrid_v0` (optional `dilithium_py` missing), and `qualified_time_v0` (optional `asn1crypto` missing). `release_condition_v0` passed 8/8.</span>
+          </summary>
+          <dl>
+            <dt>Ajon laji</dt><dd>Reproduction: the author&#x27;s checkers over the author&#x27;s vectors</dd>
+            <dt>Testisarjat</dt><dd class="mono">acp_checkout_v0, agent_decision_v0, agent_identity_v0, ap2_v0, article12_fold_v0, atlas_threat_v0, attestation_result_v0, audit_summary_v0, authorization_v0, build_bundle_v0, bundle_doc_v0, bundle_set_v0, capability_scope_v0, class_gate_v0, conformance_statement_v0, contiguity_v0, credential_binding_v0, credential_grant_v0, crewai_enforcement_v0, cross_org_handoff_v0, cross_stack_revocation_v0, data_locality_v0, decision_pairing_v0, enforcement_attestation_v0, enforcement_set_v0, evidence_bundle_v0, evidence_ref_v0, execution_receipt_v0, external_evidence_v0, fallback_projection_v0, governance_decision_v0, handoff_set_v0, ingest_v0, key_rotation_v0, normalize_v0, pq_hybrid_v0, qualified_time_v0, record_conformance_v0, record_set_v0, release_condition_v0, sep2787_attestation_v0, tap_v0, transparency_consistency_v0, x402_settlement_v0</dd>
+            <dt>Commit</dt><dd class="mono">62a7080b7c854173c7d6b8ee51ce4dd724d59227</dd>
+            <dt>Heidän rajauksensa</dt><dd class="scoping">This is a reproduction of the author-supplied checkers and vectors, not an independent implementation or validation of the specification text.</dd>
+            <dt>Tietue</dt><dd><a href="https://mailarchive.ietf.org/arch/msg/scitt/I5mdtYRinS-wjrnbwCnyXwwvrjU/" rel="noopener">tietue</a></dd>
+            <dt>Ehtojen versio</dt><dd class="mono">2026-08-21</dd>
+            <dt>Rivin tiiviste</dt><dd class="mono">sha256:34d77df3e24ddb6d9aba843c27f4635a4cfbd859dd89f263f8dd69dc8b5849db<br>tiedostosta <a href="/badge/iman-schrock.json">/badge/iman-schrock.json</a></dd>
+            <dt>Merkki</dt><dd><img src="/badge/iman-schrock.svg" alt="VCR row 5" height="20"><br><code class="snippet">[![Vaara Conformance Results row 5](https://vaara.io/badge/iman-schrock.svg)](https://vaara.io/conformance.html)</code></dd>
+            <dt>Todistus</dt><dd><a href="/badge/iman-schrock.html">tulostettava sivu</a></dd>
+          </dl>
+        </details>
+
+        <details class="repro" id="row-6">
+          <summary class="repro-head">
+            <a class="num" href="#row-6">#6</a>
+            <span class="date">2026-08-26</span>
+            <span class="who">YuTao Peng</span>
+            <span class="aff">Insight (oracleinsight.xyz)</span>
+            <span class="result">43 passed, 0 failed, 3 skipped, 75 cases</span>
+          </summary>
+          <dl>
+            <dt>Ajon laji</dt><dd>Reproduction: the author&#x27;s checkers over the author&#x27;s vectors</dd>
+            <dt>Testisarjat</dt><dd class="mono">acp_checkout_v0, agent_decision_v0, agent_identity_v0, ap2_v0, article12_fold_v0, atlas_threat_v0, attestation_result_v0, attribute_attestation_v0, attribute_attestation_zk_v0, audit_summary_v0, authorization_v0, build_bundle_v0, bundle_doc_v0, bundle_set_v0, capability_scope_v0, class_gate_v0, conformance_statement_v0, contiguity_v0, credential_binding_v0, credential_grant_v0, crewai_enforcement_v0, cross_org_handoff_v0, cross_stack_revocation_v0, data_locality_v0, decision_pairing_v0, enforcement_attestation_v0, enforcement_set_v0, evidence_bundle_v0, evidence_ref_v0, execution_receipt_v0, external_evidence_v0, fallback_projection_v0, governance_decision_v0, handoff_set_v0, ingest_v0, key_rotation_v0, normalize_v0, pq_hybrid_v0, qualified_time_v0, record_conformance_v0, record_set_v0, release_condition_v0, sep2787_attestation_v0, tap_v0, transparency_consistency_v0, x402_settlement_v0</dd>
+            <dt>Commit</dt><dd class="mono">54a69b38e28c3a8d3d9ced6b61b217ea5eb03334</dd>
+            <dt>Heidän rajauksensa</dt><dd class="scoping">Reproduces the published independent vector lanes at commit 54a69b3 using only standard public libraries (cryptography, rfc8785), with no Vaara code imported. 43/46 suites passed, 0 failed, 3 skipped (optional-dependency lanes). Establishes reproducibility of Vaara&#x27;s published verdicts over the pinned corpus. Does not establish integration of Insight oracle attestations into Vaara records, nor any opinion on Vaara&#x27;s compliance standing.</dd>
+            <dt>Tietue</dt><dd><a href="https://github.com/imokokok/vaara-conformance" rel="noopener">tietue</a></dd>
+            <dt>Ehtojen versio</dt><dd class="mono">2026-08-21</dd>
+            <dt>Rivin tiiviste</dt><dd class="mono">sha256:0b0c9e52d68d1a7c46199c9f0e7578991020c4e6198c7cf7d967d234eead3154<br>tiedostosta <a href="/badge/yutao-peng.json">/badge/yutao-peng.json</a></dd>
+            <dt>Merkki</dt><dd><img src="/badge/yutao-peng.svg" alt="VCR row 6" height="20"><br><code class="snippet">[![Vaara Conformance Results row 6](https://vaara.io/badge/yutao-peng.svg)](https://vaara.io/conformance.html)</code></dd>
+            <dt>Todistus</dt><dd><a href="/badge/yutao-peng.html">tulostettava sivu</a></dd>
+          </dl>
+        </details>
+
+        <details class="repro" id="row-7">
+          <summary class="repro-head">
+            <a class="num" href="#row-7">#7</a>
+            <span class="date">2026-09-13</span>
+            <span class="who">Ali Toygar Abak</span>
+            <span class="aff">Phionyx</span>
+            <span class="result">2 suites passed, 0 failed, 0 skipped; both selected suites matched their published expected verdicts. No declared case count is exposed by this pinned corpus layout; see record.</span>
+          </summary>
+          <dl>
+            <dt>Ajon laji</dt><dd>Reproduction: the author&#x27;s checkers over the author&#x27;s vectors</dd>
+            <dt>Testisarjat</dt><dd class="mono">record_conformance_v0, record_set_v0</dd>
+            <dt>Commit</dt><dd class="mono">d44b8b0de4f5f3e4e5c0248ad1e6fbbc3972b317</dd>
+            <dt>Heidän rajauksensa</dt><dd class="scoping">Ali Toygar Abak / Phionyx executed Vaara&#x27;s published record_conformance_v0 and record_set_v0 checkers over the pinned SEP-2828 1.0.0 vectors at commit d44b8b0de4f5f3e4e5c0248ad1e6fbbc3972b317. This is a reproduction of the author&#x27;s checkers over the author&#x27;s vectors. It does not establish an independent implementation, independently constructed vectors, specification correctness, complete Vaara product conformance, hosted-service interoperability, Vaara-AIREP interoperability, certification, or endorsement.</dd>
+            <dt>Tietue</dt><dd><a href="https://github.com/halvrenofviryel/ai-runtime-evidence-protocol/blob/9114f4f365369cab133e857e08bb59ff6fb5e24d/interop/vaara/2026-09-13/conformance-reproduction/README.md" rel="noopener">tietue</a></dd>
+            <dt>Ehtojen versio</dt><dd class="mono">2026-08-22</dd>
+            <dt>Rivin tiiviste</dt><dd class="mono">sha256:ea8dc88d80ecd7209cd9a1ea417f18c6183b5399a9b3ece89a55c81cee76f0df<br>tiedostosta <a href="/badge/ali-toygar-abak.json">/badge/ali-toygar-abak.json</a></dd>
+            <dt>Merkki</dt><dd><img src="/badge/ali-toygar-abak.svg" alt="VCR row 7" height="20"><br><code class="snippet">[![Vaara Conformance Results row 7](https://vaara.io/badge/ali-toygar-abak.svg)](https://vaara.io/conformance.html)</code></dd>
+            <dt>Todistus</dt><dd><a href="/badge/ali-toygar-abak.html">tulostettava sivu</a></dd>
+          </dl>
+        </details>
+</div></section>
+<section><div class="wrap">
+<h2>Ajakaa itse</h2>
+<p>Mikään tässä ei vaadi Vaaran asentamista. Tarkistimet käyttävät standardikirjastoa sekä paketteja <code>cryptography</code> ja <code>rfc8785</code>.</p>
+<pre><code>git clone https://github.com/vaaraio/vaara
+cd vaara
+pip install cryptography rfc8785
+python scripts/conformance_runner.py</code></pre>
+<p>Ohjatkaa <code>--vectors-dir</code> samalla tavalla järjestettyyn hakemistoon, niin se arvioi ne tavut. Ajaja kerää, tarkistimet päättävät.</p>
+</div></section>
+<section><div class="wrap">
+<h2>Lisätietoa</h2>
+<details class="more"><summary>Kaikki 51 testisarjaa ja niiden tulokset</summary>
+<table class="suites">
+<thead><tr><th>Testisarja</th><th>Tulos</th><th>Huomio</th></tr></thead>
+<tbody>
+<tr><td class="mono">acp_checkout_v0</td><td class="ok">PASS</td><td class="why"></td></tr>
+<tr><td class="mono">agent_decision_v0</td><td class="ok">PASS</td><td class="why"></td></tr>
+<tr><td class="mono">agent_identity_v0</td><td class="ok">PASS</td><td class="why"></td></tr>
+<tr><td class="mono">ap2_v0</td><td class="ok">PASS</td><td class="why"></td></tr>
+<tr><td class="mono">article12_fold_v0</td><td class="ok">PASS</td><td class="why"></td></tr>
+<tr><td class="mono">atlas_threat_v0</td><td class="ok">PASS</td><td class="why"></td></tr>
+<tr><td class="mono">attestation_result_v0</td><td class="ok">PASS</td><td class="why"></td></tr>
+<tr><td class="mono">attribute_attestation_v0</td><td class="ok">PASS</td><td class="why"></td></tr>
+<tr><td class="mono">attribute_attestation_zk_v0</td><td class="ok">PASS</td><td class="why"></td></tr>
+<tr><td class="mono">audit_summary_v0</td><td class="ok">PASS</td><td class="why"></td></tr>
+<tr><td class="mono">authorization_v0</td><td class="ok">PASS</td><td class="why"></td></tr>
+<tr><td class="mono">build_bundle_v0</td><td class="ok">PASS</td><td class="why"></td></tr>
+<tr><td class="mono">bundle_doc_v0</td><td class="ok">PASS</td><td class="why"></td></tr>
+<tr><td class="mono">bundle_set_v0</td><td class="ok">PASS</td><td class="why"></td></tr>
+<tr><td class="mono">capability_scope_v0</td><td class="ok">PASS</td><td class="why"></td></tr>
+<tr><td class="mono">class_gate_v0</td><td class="ok">PASS</td><td class="why"></td></tr>
+<tr><td class="mono">conformance_statement_v0</td><td class="ok">PASS</td><td class="why"></td></tr>
+<tr><td class="mono">contiguity_v0</td><td class="ok">PASS</td><td class="why"></td></tr>
+<tr><td class="mono">credential_binding_v0</td><td class="ok">PASS</td><td class="why"></td></tr>
+<tr><td class="mono">credential_grant_v0</td><td class="ok">PASS</td><td class="why"></td></tr>
+<tr><td class="mono">crewai_enforcement_v0</td><td class="ok">PASS</td><td class="why"></td></tr>
+<tr><td class="mono">cross_org_handoff_v0</td><td class="ok">PASS</td><td class="why"></td></tr>
+<tr><td class="mono">cross_stack_revocation_v0</td><td class="ok">PASS</td><td class="why"></td></tr>
+<tr><td class="mono">data_locality_v0</td><td class="ok">PASS</td><td class="why"></td></tr>
+<tr><td class="mono">decision_disposition_v0</td><td class="ok">PASS</td><td class="why"></td></tr>
+<tr><td class="mono">decision_pairing_v0</td><td class="ok">PASS</td><td class="why"></td></tr>
+<tr><td class="mono">decision_vocabulary_v0</td><td class="ok">PASS</td><td class="why"></td></tr>
+<tr><td class="mono">enforcement_attestation_v0</td><td class="ok">PASS</td><td class="why"></td></tr>
+<tr><td class="mono">enforcement_set_v0</td><td class="ok">PASS</td><td class="why"></td></tr>
+<tr><td class="mono">evidence_bundle_v0</td><td class="ok">PASS</td><td class="why"></td></tr>
+<tr><td class="mono">evidence_ref_v0</td><td class="ok">PASS</td><td class="why"></td></tr>
+<tr><td class="mono">execution_receipt_v0</td><td class="ok">PASS</td><td class="why"></td></tr>
+<tr><td class="mono">external_evidence_v0</td><td class="ok">PASS</td><td class="why"></td></tr>
+<tr><td class="mono">fallback_projection_v0</td><td class="ok">PASS</td><td class="why"></td></tr>
+<tr><td class="mono">governance_decision_v0</td><td class="ok">PASS</td><td class="why"></td></tr>
+<tr><td class="mono">handoff_set_v0</td><td class="ok">PASS</td><td class="why"></td></tr>
+<tr><td class="mono">hcs27_checkpoint_v0</td><td class="ok">PASS</td><td class="why"></td></tr>
+<tr><td class="mono">ingest_v0</td><td class="ok">PASS</td><td class="why"></td></tr>
+<tr><td class="mono">key_rotation_v0</td><td class="ok">PASS</td><td class="why"></td></tr>
+<tr><td class="mono">normalize_v0</td><td class="ok">PASS</td><td class="why"></td></tr>
+<tr><td class="mono">pq_hybrid_v0</td><td class="skip">SKIP</td><td class="why">pq_hybrid_v0 needs an optional dependency not installed: dilithium_py (pip install &#x27;vaara[pq]&#x27;)</td></tr>
+<tr><td class="mono">qualified_time_v0</td><td class="skip">SKIP</td><td class="why">qualified_time_v0 needs an optional dependency not installed: asn1crypto (pip install &#x27;vaara[timeanchor]&#x27;)</td></tr>
+<tr><td class="mono">record_conformance_v0</td><td class="ok">PASS</td><td class="why"></td></tr>
+<tr><td class="mono">record_set_v0</td><td class="ok">PASS</td><td class="why"></td></tr>
+<tr><td class="mono">release_condition_v0</td><td class="ok">PASS</td><td class="why"></td></tr>
+<tr><td class="mono">revocation_freshness_v0</td><td class="ok">PASS</td><td class="why"></td></tr>
+<tr><td class="mono">sep2787_attestation_v0</td><td class="ok">PASS</td><td class="why"></td></tr>
+<tr><td class="mono">tap_v0</td><td class="ok">PASS</td><td class="why"></td></tr>
+<tr><td class="mono">trail_decision_v0</td><td class="ok">PASS</td><td class="why"></td></tr>
+<tr><td class="mono">transparency_consistency_v0</td><td class="ok">PASS</td><td class="why"></td></tr>
+<tr><td class="mono">x402_settlement_v0</td><td class="ok">PASS</td><td class="why"></td></tr>
+</tbody>
+</table>
+</details>
+<details class="more"><summary>Mitä hyväksytty tulos ei osoita</summary><p>Nämä testit ovat Vaaran omia, eikä niiden takana ole hyväksymismenettelyä. Ylläpitäjä lisää tapaukset ja päättää, mitä tulos tarkoittaa, eikä kenelläkään muulla ole ääntä. Se on todellinen raja kaikille puolueettomuusväitteille, ja se sanotaan tässä suoraan.</p><p>Testikokoelma antaa kapeamman ja tarkistettavan asian: jokainen tapaus lasketaan uudelleen talletetuista tavuista ilman Vaaran koodia, joten kuka tahansa voi kiistää odotetun tuloksen ja näyttää laskunsa. Uudelleenlaskennan voi tarkistaa kuka tahansa. Tekijyyttä ei.</p></details>
+<details class="more"><summary>Merkin tarkistaminen luottamatta tähän sivuun</summary><p>Jokaisen merkin SVG-tiedostossa on sen oman rivin tiiviste, ja rivi, johon se sitoutuu, on tarjolla sen vieressä JCS-kanonisina tavuina (RFC 8785). Tiedostossa on vain ne tavut, joten merkin tarkistaminen on yksi komento eikä vaadi jäsennintä, kanonisoijaa eikä Vaaraa.</p>
+<pre><code>curl -s https://vaara.io/badge/&lt;slug&gt;.json | sha256sum
+curl -s https://vaara.io/badge/&lt;slug&gt;.svg | grep digest
+
+python scripts/vcr_chain.py            # nothing removed from the table</code></pre>
+<p>Jos ne täsmäävät, merkki kuvaa juuri sitä riviä. Sama ominaisuus, jonka varassa koko testikokoelma toimii, sovellettuna itse merkkiin: väite, joka lasketaan uudelleen tavuista, ja jonka voi tarkistaa luottamatta osapuoleen tai Vaaraan.</p></details>
+<details class="more" lang="en"><summary>Listatun osapuolen ehdot, versio 2026-08-22 (englanniksi)</summary>
+<p class="note" lang="fi">Ehdot ovat sitovia englanniksi, ja ne näkyvät samoina molemmilla kielillä. Ne on kirjoitettu ennen kuin mitään on myytävänä, jotta listalle harkitseva voi lukea kaupallisen kannan päätöksen hetkellä eikä vasta jälkikäteen.</p>
+<ul class="terms">
+    <li><strong>A row is permanent.</strong> This records something that
+    happened. A run took place on a date at a commit, and that stays true, so
+    the entry stays. Asking will not remove it. Rows are chained, so removing
+    or reordering one changes every digest after it, and each published head is
+    recorded in a public transparency log the maintainer does not operate, so a
+    rewritten chain reaches a head that matches no witnessed entry. Both halves
+    are checkable by you rather than promised by us.</li>
+    <li><strong>What the chain gives, and what it does not.</strong> Rewriting
+    or reordering a published row changes every digest after it, and anyone
+    recomputing the chain sees the break. Removing rows from the <em>end</em> is
+    a different thing: what remains is a perfectly valid shorter chain, and a
+    reader holding only this file cannot tell. So removal is detectable relative
+    to a retained head. <code>vcr_chain.py</code> says on every run whether the
+    tail is pinned instead of leaving it to be assumed, and reports
+    <code>tailPinned</code> in its JSON so nothing downstream reads
+    <em>verified</em> as <em>verified to be complete</em>. Each published head is
+    also recorded in a public transparency log the maintainer does not operate,
+    which pins the tail for a reader who retained nothing of their own. The
+    residual is narrow and real: a row added after the last witnessing carries
+    only the chain until the next head is published.</li>
+    <li><strong>Every row names what kind of run it was.</strong> What a run
+    establishes is a property of who wrote the verifier and who wrote the
+    vectors, not of how well it went, and the four are not degrees of one
+    another. A <em>reproduction</em> is the author's checkers over the author's
+    vectors: it establishes that the artefact runs and is byte-stable somewhere
+    other than the author's machine, and nothing about the specification text.
+    A <em>construction reproduction</em> derives a published value from the
+    prose that describes it, without running the author's verifier and without
+    writing a second implementation: it establishes whether the description was
+    sufficient to get there, which is a question about the text answerable with
+    no code on either side. An <em>independent implementation from the text</em>,
+    run against the author's vectors, establishes something about the text,
+    because a second reader had to decide what the sentences meant and then
+    build to that decision. An <em>independent implementation run against
+    independently constructed vectors</em> establishes something about both. A
+    row that does not name its kind reads as the first, because that is the
+    weakest claim available. Rows listed before this field existed carry no kind
+    and are never edited to add one, so this rule covers them instead.</li>
+    <li>Nothing is edited after the fact. A correction is a new row referring
+    to the earlier one, never a rewrite of it.</li>
+    <li><strong>What an outside suggestion can change.</strong> Wording here
+    changes when it is shown to be false, and anyone may show that, including a
+    party that competes with Vaara. A case, an expected verdict or a checker
+    changes only on evidence that the current one is wrong, never on request and
+    never to make a party pass. Every such change is a commit anyone can diff.</li>
+    <li>A row and its badge are free, and stay free. There is no paid tier of
+    being listed and no version of a row that counts for more.</li>
+    <li>Vaara may sell services built on these same vectors, including a
+    countersigned result. Being listed here is never a condition of buying
+    anything, and buying something is never a condition of being listed.</li>
+    <li>No listed party's name, affiliation or badge is used to sell anything.
+    Rows are a record, not a customer list and not a reference.</li>
+    <li>Each row records the version of these terms it agreed to. Terms may
+    change for rows added later. A row already listed keeps the terms it was
+    listed under, and a change is never applied backwards.</li>
+  </ul>
+</details>
+<p class="fineprint">Tuotettu skriptillä <code>scripts/render_conformance_page.py</code> komennon <code>scripts/conformance_runner.py --json</code> raportista. Riippumattomat toistot ovat tiedostossa <code>conformance/reproductions.json</code>, ja ne lisätään pull requestilla.</p>
+</div></section>
+</main>
+<footer class="site"><div class="wrap"><div class="cols">
+<div><b>VAARA</b><br>Avointa lähdekoodia. Toimii omilla koneillanne. Mitään ei lähetetä meille.<br><a href="mailto:hello@vaara.io">hello@vaara.io</a></div>
+<div><a href="https://github.com/vaaraio/vaara">Lähdekoodi</a><br>
+<a href="https://datatracker.ietf.org/doc/draft-sirkkavaara-vaara-receipt/">IETF-luonnos</a><br>
+<a href="/fi/conformance.html">Vaatimustenmukaisuustulokset</a><br><a href="/fi/surfaces.html">Kaikki, mitä Vaara julkaisee</a><br><a href="/fi/under-the-hood.html">Tekninen yleiskuva</a></div>
+</div><p class="tm">Vaara™ © 2026 Henri Sirkkavaara, Helsinki. AGPL-3.0-or-later.</p></div></footer>
+<script>
+// A link to one row (#row-N) opens that row.
+(function(){
+  function open(){ var d = location.hash && document.getElementById(location.hash.slice(1));
+    if (d && d.tagName === "DETAILS") { d.open = true; d.scrollIntoView(); } }
+  open(); window.addEventListener("hashchange", open);
+})();
+</script>
+<script>document.querySelector(".bar .theme").onclick=function(){var d=document.documentElement,t=d.dataset.theme==="dark"?"light":"dark";d.dataset.theme=t;try{localStorage.setItem("vaara-theme",t)}catch(e){}};document.querySelector(".bar .burger").onclick=function(){var n=document.querySelector("nav.top"),o=n.classList.toggle("open");this.setAttribute("aria-expanded",o)};document.querySelectorAll(".bar .lang a").forEach(function(a){a.onclick=function(){try{localStorage.setItem("vaara-lang",a.hreflang)}catch(e){}}})</script>
+</body>
+</html>

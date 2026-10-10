@@ -34,6 +34,9 @@
 <meta name="twitter:description" content="Every Vaara conformance suite, its verdict, and the 7 named independent parties who have reproduced the vectors and said so in public. Generated from the runner&#x27;s own report.">
 <meta name="twitter:image" content="https://vaara.io/og/en-conformance.png">
 <meta name="twitter:image:alt" content="Vaara: Conformance results">
+<link rel="alternate" hreflang="en" href="https://vaara.io/conformance.html">
+<link rel="alternate" hreflang="fi" href="https://vaara.io/fi/conformance.html">
+<link rel="alternate" hreflang="x-default" href="https://vaara.io/conformance.html">
 <script type="application/ld+json">
 {
   "@context": "https://schema.org",
@@ -50,7 +53,7 @@
       "url": "https://vaara.io/conformance.html",
       "name": "Vaara Conformance Results",
       "description": "Every Vaara conformance suite, its verdict, and the 7 named independent parties who have reproduced the vectors and said so in public. Generated from the runner's own report.",
-      "dateModified": "2026-10-10T09:53:11Z",
+      "dateModified": "2026-10-10T10:37:11Z",
       "inLanguage": "en",
       "isPartOf": {
         "@id": "https://vaara.io/#website"
@@ -99,7 +102,7 @@
       "alternateName": "Vaara conformance corpus",
       "description": "Committed case files for every Vaara conformance suite. Each suite ships an independent checker that imports no Vaara code and recomputes its verdicts from the bytes of its own cases, so a stranger can disagree with an expected result and show their work. The vectors are Vaara's own and no ratification body stands behind them.",
       "url": "https://vaara.io/conformance.html",
-      "dateModified": "2026-10-10T09:53:11Z",
+      "dateModified": "2026-10-10T10:37:11Z",
       "identifier": "https://doi.org/10.5281/zenodo.22027975",
       "sameAs": [
         "https://doi.org/10.5281/zenodo.22027975",
@@ -692,203 +695,25 @@
   ]
 }
 </script>
-<style>
-  :root {
-    color-scheme: light;
-    --bg:#ececec; --panel:#FFFFFF; --panel-2:#F1F4F0; --line:rgba(60,90,72,.18);
-    --ink:#1A2226; --muted:#566159; --faint:#7C857E;
-    --tri:#3E6B54; --tri-bright:#2C523E; --warn:#B4524F;
-    --mono:ui-monospace,'SFMono-Regular','JetBrains Mono',Menlo,Consolas,monospace;
-    --sans:'Inter',-apple-system,BlinkMacSystemFont,'Segoe UI',Helvetica,Arial,sans-serif;
-  }
-  /* Light is the default across every Vaara surface. The dark grammar is the
-     same set of tokens under data-theme, the same as verify.html and
-     index.html, so the three pages cannot drift apart. */
-  html[data-theme="dark"] {
-    color-scheme: dark;
-    --bg:#0F1417; --panel:#1A2226; --panel-2:#151D20; --line:rgba(123,156,138,.16);
-    --ink:#DEE4E1; --muted:#8B9792; --faint:#5E6A66;
-    --tri:#78A08A; --tri-bright:#93B8A3; --warn:#D98B8B;
-  }
-  @media (prefers-color-scheme: dark) {
-    html:not([data-theme]) {
-      color-scheme: dark;
-      --bg:#0F1417; --panel:#1A2226; --panel-2:#151D20; --line:rgba(123,156,138,.16);
-      --ink:#DEE4E1; --muted:#8B9792; --faint:#5E6A66;
-      --tri:#78A08A; --tri-bright:#93B8A3; --warn:#D98B8B;
-    }
-  }
-  *{box-sizing:border-box}
-  body{margin:0;background:var(--bg);color:var(--ink);font-family:var(--sans);
-       line-height:1.55;-webkit-font-smoothing:antialiased}
-  /* The column is a plain cap. It used to be narrowed by the width of the
-     floating controls so text could not run under them; the sticky bar is in
-     normal flow, so the guard is gone. */
-  .wrap{max-width:940px;margin:0 auto;padding:40px 22px 96px}
-  :root{--edge:16px}
-
-  a{color:var(--tri-bright);text-decoration:none;border-bottom:1px solid var(--line)}
-  a:hover{border-bottom-color:var(--tri)}
-  .back{font-family:var(--mono);font-size:11px;letter-spacing:.18em;text-transform:uppercase;
-        color:var(--muted);border:0}
-  h1{font-size:clamp(28px,4.2vw,40px);line-height:1.12;margin:26px 0 6px;letter-spacing:-.02em}
-  .kicker{font-family:var(--mono);font-size:11px;letter-spacing:.2em;text-transform:uppercase;
-          color:var(--tri);margin:0}
-  h2{font-size:19px;margin:52px 0 10px;letter-spacing:-.01em}
-  p{margin:0 0 14px;max-width:74ch}
-  .lede{font-size:17px;color:var(--muted)}
-  .mono{font-family:var(--mono);font-size:12.5px}
-  .stats{display:flex;flex-wrap:wrap;gap:10px;margin:24px 0 8px}
-  .stat{background:var(--panel);border:1px solid var(--line);border-radius:10px;
-        padding:12px 16px;min-width:104px}
-  .stat b{display:block;font-family:var(--mono);font-size:23px;color:var(--tri-bright);
-          line-height:1.1}
-  .stat span{font-size:11px;letter-spacing:.12em;text-transform:uppercase;color:var(--faint)}
-  table{width:100%;border-collapse:collapse;margin:14px 0 8px;background:var(--panel);
-        border:1px solid var(--line);border-radius:10px;overflow:hidden}
-  th,td{text-align:left;padding:8px 14px;border-bottom:1px solid var(--line);font-size:13.5px;
-        vertical-align:top}
-  th{font-family:var(--mono);font-size:10.5px;letter-spacing:.16em;text-transform:uppercase;
-     color:var(--faint);background:var(--panel-2)}
-  tr:last-child td{border-bottom:0}
-  td.ok{color:var(--tri-bright);font-family:var(--mono);font-size:12px}
-  td.bad{color:var(--warn);font-family:var(--mono);font-size:12px;font-weight:600}
-  td.skip{color:var(--faint);font-family:var(--mono);font-size:12px}
-  td.why{color:var(--muted);font-size:12.5px}
-  .repro{background:var(--panel);border:1px solid var(--line);border-radius:10px;
-         padding:18px 20px;margin:14px 0}
-  .repro-head{display:flex;flex-wrap:wrap;gap:12px;align-items:baseline;margin-bottom:8px}
-  .repro-head .who{font-weight:600}
-  .repro-head .aff{color:var(--faint);font-size:13px}
-  /* The row number is the citable handle for a row, so it links to its own
-     anchor instead of sitting there as a label. Somebody arguing about one
-     party's run can point at that run rather than at the whole table. */
-  .repro-head .num{border:0;color:var(--tri-bright)}
-  .repro-head .num:hover{border-bottom:1px solid var(--tri)}
-  .repro:target{border-color:var(--tri)}
-  .repro .result{margin:0 0 12px}
-  dl{display:grid;grid-template-columns:auto 1fr;gap:5px 16px;margin:0;font-size:13px}
-  dt{font-family:var(--mono);font-size:10.5px;letter-spacing:.14em;text-transform:uppercase;
-     color:var(--faint);padding-top:2px}
-  dd{margin:0;overflow-wrap:anywhere}
-  .scoping{color:var(--muted);font-style:italic}
-  .none{color:var(--muted)}
-  .note{border-left:2px solid var(--line);padding-left:16px;color:var(--muted);
-        font-size:14px;margin:18px 0}
-  code{font-family:var(--mono);font-size:12.5px;background:var(--panel-2);
-       padding:1px 5px;border-radius:4px}
-  pre{background:var(--panel);border:1px solid var(--line);border-radius:10px;
-      padding:14px 16px;overflow-x:auto}
-  pre code{background:none;padding:0}
-  footer{margin-top:64px;padding-top:20px;border-top:1px solid var(--line);
-         color:var(--faint);font-size:12.5px}
-  /* Same wordmark treatment as index.html and verify.html, keyed off the same
-     data-theme. Those two handle only the explicit choice, so on an OS-dark
-     machine with nothing saved they serve the light wordmark onto a dark
-     background. The prefers-color-scheme pair below closes that. */
-  .wordmark{margin:8px auto 0;text-align:center}
-  .wordmark img{width:min(60vw,440px);height:auto;display:inline-block}
-  .wordmark a{border:0}
-  .wordmark .wm-dark{display:none}
-  html[data-theme="dark"] .wordmark .wm-light{display:none}
-  html[data-theme="dark"] .wordmark .wm-dark{display:inline-block}
-  @media (prefers-color-scheme: dark) {
-    html:not([data-theme]) .wordmark .wm-light{display:none}
-    html:not([data-theme]) .wordmark .wm-dark{display:inline-block}
-  }
-  /* One glass bar. Mark on the left, links on the true centre, one sun/moon
-     on the right. grid 1fr auto 1fr so the links stay centred on the viewport
-     whatever the side cells weigh. No wordmark text: the mark is the mark. */
-  .topbar{position:sticky;top:0;z-index:20;display:grid;
-    grid-template-columns:1fr auto 1fr;align-items:center;gap:12px;padding:9px 18px;
-    background:var(--bg);
-    background:color-mix(in srgb, var(--bg) 58%, transparent);
-    backdrop-filter:saturate(1.7) blur(18px);
-    -webkit-backdrop-filter:saturate(1.7) blur(18px);
-    border-bottom:1px solid var(--line)}
-  .topbar .mark{justify-self:start;display:inline-flex;align-items:center;border:0;
-    line-height:0;padding:3px;border-radius:9px}
-  .topbar .mark img{width:24px;height:24px;display:block}
-  .topbar .mark:hover{background:var(--panel)}
-  .nav-jump{justify-self:center;display:inline-flex;background:var(--panel);
-    border:1px solid var(--line);border-radius:999px;padding:4px}
-  .nav-jump a{font-family:var(--mono);font-size:11px;letter-spacing:.18em;
-    text-transform:uppercase;color:var(--faint);padding:4px 12px;border-radius:999px;
-    text-decoration:none;white-space:nowrap;border:0}
-  .nav-jump a:hover{color:var(--tri);background:var(--panel-2)}
-  .nav-jump a[aria-current="page"]{color:var(--tri);background:var(--panel-2)}
-  .theme-toggle{justify-self:end;display:inline-flex}
-  .theme-toggle button{appearance:none;background:var(--panel);border:1px solid var(--line);
-    border-radius:999px;cursor:pointer;margin:0;width:32px;height:32px;padding:0;
-    display:inline-flex;align-items:center;justify-content:center;color:var(--faint);
-    transition:color .15s ease,background .15s ease}
-  .theme-toggle button:hover{color:var(--tri)}
-  .theme-toggle button:focus-visible{outline:2px solid var(--tri);outline-offset:2px}
-  .theme-toggle svg{width:16px;height:16px;display:block}
-  /* Icon shows the mode you are about to get. Swapped in CSS, not JS, so it is
-     correct on first paint and cannot desync from the theme. */
-  .theme-toggle .i-sun{display:none}
-  html[data-theme="dark"] .theme-toggle .i-moon{display:none}
-  html[data-theme="dark"] .theme-toggle .i-sun{display:block}
-  @media (prefers-color-scheme:dark){
-    html:not([data-theme]) .theme-toggle .i-moon{display:none}
-    html:not([data-theme]) .theme-toggle .i-sun{display:block}
-  }
-  @media (max-width:640px){
-    .topbar{padding:8px 12px;gap:8px}
-    .nav-jump a{padding:4px 9px;letter-spacing:.10em;font-size:10px}
-  }
-</style>
-<script>try{var t=localStorage.getItem("vaara-theme");if(t!=="dark"&&t!=="light")t=matchMedia("(prefers-color-scheme: dark)").matches?"dark":"light";document.documentElement.dataset.theme=t;var p=location.pathname;if((p==="/"||p==="/index.html")&&!localStorage.getItem("vaara-lang")&&(navigator.languages||[navigator.language]).some(function(l){return/^fi\b/i.test(l)}))location.replace("/fi/")}catch(e){}</script>
 <link rel="stylesheet" href="/style.css">
-<style>
-  html:root, html:root[data-theme] {
-    --panel: var(--card); --panel-2: var(--tint); --deep: var(--tint); --line: var(--rule);
-    --faint: var(--muted); --dim: var(--muted); --tri: var(--accent); --tri-bright: var(--accent);
-    --ok: var(--accent); --no: var(--stop); --edge: 16px;
-    --sans: Inter, -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Arial, sans-serif;
-    --mono: "JetBrains Mono", ui-monospace, SFMono-Regular, Menlo, Consolas, monospace;
-  }
-  html:root body { background: var(--bg); color: var(--body); font: 17px/1.6 var(--sans); }
-  html:root main.legacy { max-width: var(--max); margin: 0 auto; padding: 40px 24px 64px; }
-  html:root main.legacy section { padding: 1rem 1.25rem; border: 1px solid var(--rule); }
-  html:root main.legacy > h2 { font-size: 24px; text-transform: none; letter-spacing: 0; color: var(--ink); margin: 44px 0 12px; }
-  html:root .bar a, html:root .band a, html:root footer.site a { border-bottom: 0; }
-  html:root footer.site { margin: 0; padding: 40px 0; border-top: 0; color: var(--on-night-soft); font-size: 14px; line-height: 1.6; }
-  html:root .band .lead { font-size: 17px; color: var(--body); max-width: 46em; margin: 0; }
-  html:root .band h1 { font: 650 30px/1.2 var(--sans); letter-spacing: 0; color: var(--ink); margin: 0 0 10px; }
-</style>
+<script>try{var t=localStorage.getItem("vaara-theme");if(t!=="dark"&&t!=="light")t=matchMedia("(prefers-color-scheme: dark)").matches?"dark":"light";document.documentElement.dataset.theme=t;var p=location.pathname;if((p==="/"||p==="/index.html")&&!localStorage.getItem("vaara-lang")&&(navigator.languages||[navigator.language]).some(function(l){return/^fi\b/i.test(l)}))location.replace("/fi/")}catch(e){}</script>
 </head>
 <body>
 <header class="bar"><div class="wrap">
-<nav class="top" aria-label="Main menu"><a class="brand" href="/"><img src="/vaara-logo-dark.svg" alt="Vaara home" width="174" height="24"></a><div class="dd"><a class="l" href="/sectors/" aria-haspopup="true">Sectors <span class="caret">▾</span></a><div class="menu"><a href="/sectors/care.html">Care and social services</a><a href="/sectors/payments.html">Payments and finance</a><a href="/sectors/public.html">Public sector</a><a href="/sectors/health.html">Healthcare</a><a href="/sectors/infrastructure.html">Energy, industry and infrastructure</a><a href="/sectors/software.html">Software teams</a></div></div><div class="dd"><a class="l" href="/products/" aria-haspopup="true">Products <span class="caret">▾</span></a><div class="menu"><a href="/products/gate.html">The gate</a><a href="/products/receipts.html">Receipts</a><a href="/products/cage.html">The cage</a><a href="/products/app.html">The desktop app</a><a href="/products/test-it-yourself.html">Test it yourself</a></div></div><div class="dd on"><a class="l" href="/products/test-it-yourself.html" aria-haspopup="true">Test it yourself <span class="caret">▾</span></a><div class="menu"><a href="/products/test-it-yourself.html">Test it yourself</a><a href="/verify.html">Receipt explorer</a><a href="/conformance.html">Conformance results</a></div></div><a class="l" href="/under-the-hood.html">Under the hood</a><span class="lang"><b>EN</b> | <a href="/fi/" hreflang="fi">FI</a></span><button class="burger" type="button" aria-label="Main menu" aria-expanded="false"></button><button class="theme" type="button" aria-label="Switch between light and dark" title="Switch between light and dark"></button><a class="get" href="https://github.com/vaaraio/vaara#readme">Get Vaara</a></nav>
+<nav class="top" aria-label="Main menu"><a class="brand" href="/"><img src="/vaara-logo-dark.svg" alt="Vaara home" width="174" height="24"></a><div class="dd"><a class="l" href="/sectors/" aria-haspopup="true">Sectors <span class="caret">▾</span></a><div class="menu"><a href="/sectors/care.html">Care and social services</a><a href="/sectors/payments.html">Payments and finance</a><a href="/sectors/public.html">Public sector</a><a href="/sectors/health.html">Healthcare</a><a href="/sectors/infrastructure.html">Energy, industry and infrastructure</a><a href="/sectors/software.html">Software teams</a></div></div><div class="dd"><a class="l" href="/products/" aria-haspopup="true">Products <span class="caret">▾</span></a><div class="menu"><a href="/products/gate.html">The gate</a><a href="/products/receipts.html">Receipts</a><a href="/products/cage.html">The cage</a><a href="/products/app.html">The desktop app</a><a href="/products/test-it-yourself.html">Test it yourself</a></div></div><div class="dd on"><a class="l" href="/products/test-it-yourself.html" aria-haspopup="true">Test it yourself <span class="caret">▾</span></a><div class="menu"><a href="/products/test-it-yourself.html">Test it yourself</a><a href="/verify.html">Receipt explorer</a><a href="/conformance.html">Conformance results</a></div></div><a class="l" href="/under-the-hood.html">Under the hood</a><span class="lang"><b>EN</b> | <a href="/fi/conformance.html" hreflang="fi">FI</a></span><button class="burger" type="button" aria-label="Main menu" aria-expanded="false"></button><button class="theme" type="button" aria-label="Switch between light and dark" title="Switch between light and dark"></button><a class="get" href="https://github.com/vaaraio/vaara#readme">Get Vaara</a></nav>
 </div></header>
-<div class="band"><div class="wrap"><div class="hero"><nav class="crumbs" aria-label="Breadcrumb"><a href="/">Home</a> / <a href="/products/test-it-yourself.html">Test it yourself</a></nav><p class="kicker">Conformance results</p><h1>Every suite, every verdict, and everyone who checked it themselves.</h1><p class="lead">Each suite below ships an independent checker that imports no Vaara code and recomputes its verdicts from the bytes of its own case files. This page is generated from the runner's report, so it says what the checkers did rather than what a document claims they do.</p></div></div></div>
-<main class="legacy">
-  <div class="stats">
-    <div class="stat"><b>51</b><span>suites</span></div>
-    <div class="stat"><b>49</b><span>passed</span></div>
-    <div class="stat"><b>0</b><span>failed</span></div>
-    <div class="stat"><b>2</b><span>skipped</span></div>
-    <div class="stat"><b>88</b><span>cases</span></div>
-  </div>
-  <p class="mono" style="color:var(--faint)">generated 2026-10-10T09:53:11Z</p>
-
-  <h2>Independent reproductions</h2>
-  <p>Parties other than the maintainer who ran the checkers and reported the
-  outcome in public. Claims are quoted as each party scoped them. Everyone here
-  asked to be listed, knowing the entry is permanent.
-  To add your own run, <a
-  href="https://github.com/vaaraio/vaara/issues/new?template=conformance-row.yml">open
-  a row request</a>. Row numbers are permanent and each listed party gets its
-  own badge, carrying that number, the date and the commit. A badge says the
-  party ran the checkers at that commit on that date. It never says currently
-  passing, and it is not a certification.</p>
+<div class="band"><div class="wrap"><div class="hero"><nav class="crumbs" aria-label="Breadcrumb"><a href="/">Home</a> / <a href="/products/test-it-yourself.html">Test it yourself</a></nav><p class="kicker">Conformance results</p><h1>Every suite, every verdict, and everyone who checked it themselves.</h1><p class="lead">Each suite below ships an independent checker that imports no Vaara code and recomputes its verdicts from the bytes of its own case files. This page is generated from the runner&#x27;s report, so it says what the checkers did rather than what a document claims they do.</p></div></div></div>
+<main class="conf">
+<section class="stats"><div class="wrap"><div class="statrow five"><div class="stat"><b>51</b><span>suites</span></div><div class="stat"><b>49</b><span>passed</span></div><div class="stat"><b>0</b><span>failed</span></div><div class="stat"><b>2</b><span>skipped</span></div><div class="stat"><b>88</b><span>cases</span></div></div>
+<p class="note">generated 2026-10-10T10:37:11Z</p></div></section>
+<section><div class="wrap">
+<h2>Independent reproductions</h2>
+<p>Parties other than the maintainer who ran the checkers and reported the outcome in public. Claims are quoted as each party scoped them. Everyone here asked to be listed, knowing the entry is permanent. To add your own run, <a href="https://github.com/vaaraio/vaara/issues/new?template=conformance-row.yml">open a row request</a>. Row numbers are permanent and each listed party gets its own badge, carrying that number, the date and the commit. A badge says the party ran the checkers at that commit on that date. It never says currently passing, and it is not a certification.</p>
 
         <details class="repro" id="row-1">
           <summary class="repro-head">
-            <a class="num mono" href="#row-1">#1</a>
-            <span class="date mono">2026-08-19</span>
+            <a class="num" href="#row-1">#1</a>
+            <span class="date">2026-08-19</span>
             <span class="who">babyblueviper1 (invinoveritas)</span>
             <span class="aff">invinoveritas</span>
             <span class="result">40 passed, 0 failed, 3 skipped, 49 cases</span>
@@ -908,8 +733,8 @@
 
         <details class="repro" id="row-2">
           <summary class="repro-head">
-            <a class="num mono" href="#row-2">#2</a>
-            <span class="date mono">2026-08-21</span>
+            <a class="num" href="#row-2">#2</a>
+            <span class="date">2026-08-21</span>
             <span class="who">Nenad Vasic / Elara Protocol</span>
             <span class="aff">Elara Protocol — AI-agent-maintained (disclosed), independent of Vaara</span>
             <span class="result">45 passed, 0 failed, 1 skipped, 75 cases. Runner exit 0. The skip is `article12_fold_v0` (checker wants a bundle zip argument rather than a bare case directory — structural, not environmental). An earlier same-day run at f0dbf4d8 gave 44/45, 65 cases, 0 failures, before the corpus grew.</span>
@@ -929,8 +754,8 @@
 
         <details class="repro" id="row-3">
           <summary class="repro-head">
-            <a class="num mono" href="#row-3">#3</a>
-            <span class="date mono">2026-08-24</span>
+            <a class="num" href="#row-3">#3</a>
+            <span class="date">2026-08-24</span>
             <span class="who">Emek Can Doğru</span>
             <span class="aff">VERAX TEKNOLOJİ LİMİTED ŞİRKETİ — independent of Vaara</span>
             <span class="result">45 passed, 0 failed, 1 skipped, 75 cases. Runner exit 0. The skip is `article12_fold_v0`, whose checker validates a passed-in bundle zip rather than a bare case directory — structural, not environmental.</span>
@@ -950,8 +775,8 @@
 
         <details class="repro" id="row-4">
           <summary class="repro-head">
-            <a class="num mono" href="#row-4">#4</a>
-            <span class="date mono">2026-08-25</span>
+            <a class="num" href="#row-4">#4</a>
+            <span class="date">2026-08-25</span>
             <span class="who">Council of AI</span>
             <span class="aff">Independent AI measurement body — councilof.ai (CSOAI)</span>
             <span class="result">43 passed, 0 failed, 3 skipped, 75 cases</span>
@@ -971,8 +796,8 @@
 
         <details class="repro" id="row-5">
           <summary class="repro-head">
-            <a class="num mono" href="#row-5">#5</a>
-            <span class="date mono">2026-08-25</span>
+            <a class="num" href="#row-5">#5</a>
+            <span class="date">2026-08-25</span>
             <span class="who">Iman Schrock</span>
             <span class="aff">EMILIA Protocol</span>
             <span class="result">41 passed, 0 failed, 3 skipped, 57 cases. Skips: `article12_fold_v0` (bundle zip required), `pq_hybrid_v0` (optional `dilithium_py` missing), and `qualified_time_v0` (optional `asn1crypto` missing). `release_condition_v0` passed 8/8.</span>
@@ -992,8 +817,8 @@
 
         <details class="repro" id="row-6">
           <summary class="repro-head">
-            <a class="num mono" href="#row-6">#6</a>
-            <span class="date mono">2026-08-26</span>
+            <a class="num" href="#row-6">#6</a>
+            <span class="date">2026-08-26</span>
             <span class="who">YuTao Peng</span>
             <span class="aff">Insight (oracleinsight.xyz)</span>
             <span class="result">43 passed, 0 failed, 3 skipped, 75 cases</span>
@@ -1013,8 +838,8 @@
 
         <details class="repro" id="row-7">
           <summary class="repro-head">
-            <a class="num mono" href="#row-7">#7</a>
-            <span class="date mono">2026-09-13</span>
+            <a class="num" href="#row-7">#7</a>
+            <span class="date">2026-09-13</span>
             <span class="who">Ali Toygar Abak</span>
             <span class="aff">Phionyx</span>
             <span class="result">2 suites passed, 0 failed, 0 skipped; both selected suites matched their published expected verdicts. No declared case count is exposed by this pinned corpus layout; see record.</span>
@@ -1031,21 +856,22 @@
             <dt>Certificate</dt><dd><a href="/badge/ali-toygar-abak.html">printable sheet</a></dd>
           </dl>
         </details>
-
-  <h2>Run it yourself</h2>
-  <p>Nothing here needs Vaara installed. The checkers use the standard library
-  plus <code>cryptography</code> and <code>rfc8785</code>.</p>
+</div></section>
+<section><div class="wrap">
+<h2>Run it yourself</h2>
+<p>Nothing here needs Vaara installed. The checkers use the standard library plus <code>cryptography</code> and <code>rfc8785</code>.</p>
 <pre><code>git clone https://github.com/vaaraio/vaara
 cd vaara
 pip install cryptography rfc8785
 python scripts/conformance_runner.py</code></pre>
-  <p>Point <code>--vectors-dir</code> at a directory laid out the same way and it
-  grades those bytes instead. The runner collects; the checkers decide.</p>
-
-  <details class="more"><summary>All {t['suites']} suites and their verdicts</summary>
-  <table>
-    <thead><tr><th>Suite</th><th>Verdict</th><th>Note</th></tr></thead>
-    <tbody>
+<p>Point <code>--vectors-dir</code> at a directory laid out the same way and it grades those bytes instead. The runner collects; the checkers decide.</p>
+</div></section>
+<section><div class="wrap">
+<h2>Reference</h2>
+<details class="more"><summary>All 51 suites and their verdicts</summary>
+<table class="suites">
+<thead><tr><th>Suite</th><th>Verdict</th><th>Note</th></tr></thead>
+<tbody>
 <tr><td class="mono">acp_checkout_v0</td><td class="ok">PASS</td><td class="why"></td></tr>
 <tr><td class="mono">agent_decision_v0</td><td class="ok">PASS</td><td class="why"></td></tr>
 <tr><td class="mono">agent_identity_v0</td><td class="ok">PASS</td><td class="why"></td></tr>
@@ -1097,41 +923,19 @@ python scripts/conformance_runner.py</code></pre>
 <tr><td class="mono">trail_decision_v0</td><td class="ok">PASS</td><td class="why"></td></tr>
 <tr><td class="mono">transparency_consistency_v0</td><td class="ok">PASS</td><td class="why"></td></tr>
 <tr><td class="mono">x402_settlement_v0</td><td class="ok">PASS</td><td class="why"></td></tr>
-    </tbody>
-  </table>
-  </details>
-
-  <details class="more"><summary>What a pass does not establish</summary>
-  <p>These vectors are Vaara's and there is no ratification process behind them.
-  The maintainer adds the cases and decides what a verdict means, and nobody else
-  has a vote. That is a real limit on any neutrality claim and it is stated here
-  rather than argued around.</p>
-  <p class="note">What the corpus does give is narrower and checkable: every case
-  recomputes from committed bytes with no Vaara import, so anyone can disagree
-  with an expected result and show their work. Recompute is checkable by
-  strangers. Authorship is not.</p>
-  </details>
-
-  <details class="more"><summary>Checking a badge without trusting this page</summary>
-  <p>Each badge carries the digest of its own row inside the SVG, and the row
-  it commits to is served as JCS-canonical bytes (RFC 8785) next to it. The
-  file holds those bytes and nothing else, so verifying a badge is one command
-  and needs no parser, no canonicaliser and no Vaara installed.</p>
+</tbody>
+</table>
+</details>
+<details class="more"><summary>What a pass does not establish</summary><p>These vectors are Vaara&#x27;s and there is no ratification process behind them. The maintainer adds the cases and decides what a verdict means, and nobody else has a vote. That is a real limit on any neutrality claim and it is stated here rather than argued around.</p><p>What the corpus does give is narrower and checkable: every case recomputes from committed bytes with no Vaara import, so anyone can disagree with an expected result and show their work. Recompute is checkable by strangers. Authorship is not.</p></details>
+<details class="more"><summary>Checking a badge without trusting this page</summary><p>Each badge carries the digest of its own row inside the SVG, and the row it commits to is served as JCS-canonical bytes (RFC 8785) next to it. The file holds those bytes and nothing else, so verifying a badge is one command and needs no parser, no canonicaliser and no Vaara installed.</p>
 <pre><code>curl -s https://vaara.io/badge/&lt;slug&gt;.json | sha256sum
 curl -s https://vaara.io/badge/&lt;slug&gt;.svg | grep digest
 
 python scripts/vcr_chain.py            # nothing removed from the table</code></pre>
-  <p class="note">The two agree or the badge is not describing that row. This
-  is the same property the corpus runs on, applied to the badge itself: a
-  claim that recomputes from bytes, checkable by someone who trusts neither
-  the party nor Vaara.</p>
-  </details>
-
-  <details class="more"><summary>Terms for a listed party, version 2026-08-22</summary>
-  <p class="note">Stated before there is anything to sell, so that anyone
-  deciding whether to be listed can read the commercial position at the moment
-  they decide rather than learn it afterwards.</p>
-  <ul class="terms">
+<p>The two agree or the badge is not describing that row. This is the same property the corpus runs on, applied to the badge itself: a claim that recomputes from bytes, checkable by someone who trusts neither the party nor Vaara.</p></details>
+<details class="more" lang="en"><summary>Terms for a listed party, version 2026-08-22</summary>
+<p class="note" lang="en">Stated before there is anything to sell, so that anyone deciding whether to be listed can read the commercial position at the moment they decide rather than learn it afterwards.</p>
+<ul class="terms">
     <li><strong>A row is permanent.</strong> This records something that
     happened. A run took place on a date at a commit, and that stays true, so
     the entry stays. Asking will not remove it. Rows are chained, so removing
@@ -1188,14 +992,9 @@ python scripts/vcr_chain.py            # nothing removed from the table</code></
     change for rows added later. A row already listed keeps the terms it was
     listed under, and a change is never applied backwards.</li>
   </ul>
-  </details>
-
-  <div class="fineprint">
-    Generated by <code>scripts/render_conformance_page.py</code> from
-    <code>scripts/conformance_runner.py --json</code>. Independent reproductions
-    are maintained in <code>conformance/reproductions.json</code> and added by
-    pull request.
-  </div>
+</details>
+<p class="fineprint">Generated by <code>scripts/render_conformance_page.py</code> from <code>scripts/conformance_runner.py --json</code>. Independent reproductions are maintained in <code>conformance/reproductions.json</code> and added by pull request.</p>
+</div></section>
 </main>
 <footer class="site"><div class="wrap"><div class="cols">
 <div><b>VAARA</b><br>Open source. Runs on your own machines. Nothing is sent to us.<br><a href="mailto:hello@vaara.io">hello@vaara.io</a></div>
