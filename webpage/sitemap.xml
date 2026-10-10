@@ -1,10 +1,275 @@
 <?xml version="1.0" encoding="UTF-8"?>
-<urlset xmlns="http://www.sitemaps.org/schemas/sitemap/0.9">
+<urlset xmlns="http://www.sitemaps.org/schemas/sitemap/0.9"
+        xmlns:xhtml="http://www.w3.org/1999/xhtml">
   <url>
     <loc>https://vaara.io/</loc>
-    <lastmod>2026-08-29</lastmod>
+    <lastmod>2026-10-10</lastmod>
+    <xhtml:link rel="alternate" hreflang="en" href="https://vaara.io/"/>
+    <xhtml:link rel="alternate" hreflang="fi" href="https://vaara.io/fi/"/>
+    <xhtml:link rel="alternate" hreflang="x-default" href="https://vaara.io/"/>
     <changefreq>weekly</changefreq>
     <priority>1.0</priority>
+  </url>
+  <url>
+    <loc>https://vaara.io/fi/</loc>
+    <lastmod>2026-10-10</lastmod>
+    <xhtml:link rel="alternate" hreflang="en" href="https://vaara.io/"/>
+    <xhtml:link rel="alternate" hreflang="fi" href="https://vaara.io/fi/"/>
+    <xhtml:link rel="alternate" hreflang="x-default" href="https://vaara.io/"/>
+    <changefreq>weekly</changefreq>
+    <priority>1.0</priority>
+  </url>
+  <url>
+    <loc>https://vaara.io/sectors/</loc>
+    <lastmod>2026-10-10</lastmod>
+    <xhtml:link rel="alternate" hreflang="en" href="https://vaara.io/sectors/"/>
+    <xhtml:link rel="alternate" hreflang="fi" href="https://vaara.io/fi/sectors/"/>
+    <xhtml:link rel="alternate" hreflang="x-default" href="https://vaara.io/sectors/"/>
+    <changefreq>weekly</changefreq>
+    <priority>0.9</priority>
+  </url>
+  <url>
+    <loc>https://vaara.io/fi/sectors/</loc>
+    <lastmod>2026-10-10</lastmod>
+    <xhtml:link rel="alternate" hreflang="en" href="https://vaara.io/sectors/"/>
+    <xhtml:link rel="alternate" hreflang="fi" href="https://vaara.io/fi/sectors/"/>
+    <xhtml:link rel="alternate" hreflang="x-default" href="https://vaara.io/sectors/"/>
+    <changefreq>weekly</changefreq>
+    <priority>0.9</priority>
+  </url>
+  <url>
+    <loc>https://vaara.io/sectors/care.html</loc>
+    <lastmod>2026-10-10</lastmod>
+    <xhtml:link rel="alternate" hreflang="en" href="https://vaara.io/sectors/care.html"/>
+    <xhtml:link rel="alternate" hreflang="fi" href="https://vaara.io/fi/sectors/care.html"/>
+    <xhtml:link rel="alternate" hreflang="x-default" href="https://vaara.io/sectors/care.html"/>
+    <changefreq>weekly</changefreq>
+    <priority>0.9</priority>
+  </url>
+  <url>
+    <loc>https://vaara.io/fi/sectors/care.html</loc>
+    <lastmod>2026-10-10</lastmod>
+    <xhtml:link rel="alternate" hreflang="en" href="https://vaara.io/sectors/care.html"/>
+    <xhtml:link rel="alternate" hreflang="fi" href="https://vaara.io/fi/sectors/care.html"/>
+    <xhtml:link rel="alternate" hreflang="x-default" href="https://vaara.io/sectors/care.html"/>
+    <changefreq>weekly</changefreq>
+    <priority>0.9</priority>
+  </url>
+  <url>
+    <loc>https://vaara.io/sectors/payments.html</loc>
+    <lastmod>2026-10-10</lastmod>
+    <xhtml:link rel="alternate" hreflang="en" href="https://vaara.io/sectors/payments.html"/>
+    <xhtml:link rel="alternate" hreflang="fi" href="https://vaara.io/fi/sectors/payments.html"/>
+    <xhtml:link rel="alternate" hreflang="x-default" href="https://vaara.io/sectors/payments.html"/>
+    <changefreq>weekly</changefreq>
+    <priority>0.9</priority>
+  </url>
+  <url>
+    <loc>https://vaara.io/fi/sectors/payments.html</loc>
+    <lastmod>2026-10-10</lastmod>
+    <xhtml:link rel="alternate" hreflang="en" href="https://vaara.io/sectors/payments.html"/>
+    <xhtml:link rel="alternate" hreflang="fi" href="https://vaara.io/fi/sectors/payments.html"/>
+    <xhtml:link rel="alternate" hreflang="x-default" href="https://vaara.io/sectors/payments.html"/>
+    <changefreq>weekly</changefreq>
+    <priority>0.9</priority>
+  </url>
+  <url>
+    <loc>https://vaara.io/sectors/public.html</loc>
+    <lastmod>2026-10-10</lastmod>
+    <xhtml:link rel="alternate" hreflang="en" href="https://vaara.io/sectors/public.html"/>
+    <xhtml:link rel="alternate" hreflang="fi" href="https://vaara.io/fi/sectors/public.html"/>
+    <xhtml:link rel="alternate" hreflang="x-default" href="https://vaara.io/sectors/public.html"/>
+    <changefreq>weekly</changefreq>
+    <priority>0.9</priority>
+  </url>
+  <url>
+    <loc>https://vaara.io/fi/sectors/public.html</loc>
+    <lastmod>2026-10-10</lastmod>
+    <xhtml:link rel="alternate" hreflang="en" href="https://vaara.io/sectors/public.html"/>
+    <xhtml:link rel="alternate" hreflang="fi" href="https://vaara.io/fi/sectors/public.html"/>
+    <xhtml:link rel="alternate" hreflang="x-default" href="https://vaara.io/sectors/public.html"/>
+    <changefreq>weekly</changefreq>
+    <priority>0.9</priority>
+  </url>
+  <url>
+    <loc>https://vaara.io/sectors/health.html</loc>
+    <lastmod>2026-10-10</lastmod>
+    <xhtml:link rel="alternate" hreflang="en" href="https://vaara.io/sectors/health.html"/>
+    <xhtml:link rel="alternate" hreflang="fi" href="https://vaara.io/fi/sectors/health.html"/>
+    <xhtml:link rel="alternate" hreflang="x-default" href="https://vaara.io/sectors/health.html"/>
+    <changefreq>weekly</changefreq>
+    <priority>0.9</priority>
+  </url>
+  <url>
+    <loc>https://vaara.io/fi/sectors/health.html</loc>
+    <lastmod>2026-10-10</lastmod>
+    <xhtml:link rel="alternate" hreflang="en" href="https://vaara.io/sectors/health.html"/>
+    <xhtml:link rel="alternate" hreflang="fi" href="https://vaara.io/fi/sectors/health.html"/>
+    <xhtml:link rel="alternate" hreflang="x-default" href="https://vaara.io/sectors/health.html"/>
+    <changefreq>weekly</changefreq>
+    <priority>0.9</priority>
+  </url>
+  <url>
+    <loc>https://vaara.io/sectors/infrastructure.html</loc>
+    <lastmod>2026-10-10</lastmod>
+    <xhtml:link rel="alternate" hreflang="en" href="https://vaara.io/sectors/infrastructure.html"/>
+    <xhtml:link rel="alternate" hreflang="fi" href="https://vaara.io/fi/sectors/infrastructure.html"/>
+    <xhtml:link rel="alternate" hreflang="x-default" href="https://vaara.io/sectors/infrastructure.html"/>
+    <changefreq>weekly</changefreq>
+    <priority>0.9</priority>
+  </url>
+  <url>
+    <loc>https://vaara.io/fi/sectors/infrastructure.html</loc>
+    <lastmod>2026-10-10</lastmod>
+    <xhtml:link rel="alternate" hreflang="en" href="https://vaara.io/sectors/infrastructure.html"/>
+    <xhtml:link rel="alternate" hreflang="fi" href="https://vaara.io/fi/sectors/infrastructure.html"/>
+    <xhtml:link rel="alternate" hreflang="x-default" href="https://vaara.io/sectors/infrastructure.html"/>
+    <changefreq>weekly</changefreq>
+    <priority>0.9</priority>
+  </url>
+  <url>
+    <loc>https://vaara.io/sectors/software.html</loc>
+    <lastmod>2026-10-10</lastmod>
+    <xhtml:link rel="alternate" hreflang="en" href="https://vaara.io/sectors/software.html"/>
+    <xhtml:link rel="alternate" hreflang="fi" href="https://vaara.io/fi/sectors/software.html"/>
+    <xhtml:link rel="alternate" hreflang="x-default" href="https://vaara.io/sectors/software.html"/>
+    <changefreq>weekly</changefreq>
+    <priority>0.9</priority>
+  </url>
+  <url>
+    <loc>https://vaara.io/fi/sectors/software.html</loc>
+    <lastmod>2026-10-10</lastmod>
+    <xhtml:link rel="alternate" hreflang="en" href="https://vaara.io/sectors/software.html"/>
+    <xhtml:link rel="alternate" hreflang="fi" href="https://vaara.io/fi/sectors/software.html"/>
+    <xhtml:link rel="alternate" hreflang="x-default" href="https://vaara.io/sectors/software.html"/>
+    <changefreq>weekly</changefreq>
+    <priority>0.9</priority>
+  </url>
+  <url>
+    <loc>https://vaara.io/products/</loc>
+    <lastmod>2026-10-10</lastmod>
+    <xhtml:link rel="alternate" hreflang="en" href="https://vaara.io/products/"/>
+    <xhtml:link rel="alternate" hreflang="fi" href="https://vaara.io/fi/products/"/>
+    <xhtml:link rel="alternate" hreflang="x-default" href="https://vaara.io/products/"/>
+    <changefreq>weekly</changefreq>
+    <priority>0.9</priority>
+  </url>
+  <url>
+    <loc>https://vaara.io/fi/products/</loc>
+    <lastmod>2026-10-10</lastmod>
+    <xhtml:link rel="alternate" hreflang="en" href="https://vaara.io/products/"/>
+    <xhtml:link rel="alternate" hreflang="fi" href="https://vaara.io/fi/products/"/>
+    <xhtml:link rel="alternate" hreflang="x-default" href="https://vaara.io/products/"/>
+    <changefreq>weekly</changefreq>
+    <priority>0.9</priority>
+  </url>
+  <url>
+    <loc>https://vaara.io/products/gate.html</loc>
+    <lastmod>2026-10-10</lastmod>
+    <xhtml:link rel="alternate" hreflang="en" href="https://vaara.io/products/gate.html"/>
+    <xhtml:link rel="alternate" hreflang="fi" href="https://vaara.io/fi/products/gate.html"/>
+    <xhtml:link rel="alternate" hreflang="x-default" href="https://vaara.io/products/gate.html"/>
+    <changefreq>weekly</changefreq>
+    <priority>0.9</priority>
+  </url>
+  <url>
+    <loc>https://vaara.io/fi/products/gate.html</loc>
+    <lastmod>2026-10-10</lastmod>
+    <xhtml:link rel="alternate" hreflang="en" href="https://vaara.io/products/gate.html"/>
+    <xhtml:link rel="alternate" hreflang="fi" href="https://vaara.io/fi/products/gate.html"/>
+    <xhtml:link rel="alternate" hreflang="x-default" href="https://vaara.io/products/gate.html"/>
+    <changefreq>weekly</changefreq>
+    <priority>0.9</priority>
+  </url>
+  <url>
+    <loc>https://vaara.io/products/receipts.html</loc>
+    <lastmod>2026-10-10</lastmod>
+    <xhtml:link rel="alternate" hreflang="en" href="https://vaara.io/products/receipts.html"/>
+    <xhtml:link rel="alternate" hreflang="fi" href="https://vaara.io/fi/products/receipts.html"/>
+    <xhtml:link rel="alternate" hreflang="x-default" href="https://vaara.io/products/receipts.html"/>
+    <changefreq>weekly</changefreq>
+    <priority>0.9</priority>
+  </url>
+  <url>
+    <loc>https://vaara.io/fi/products/receipts.html</loc>
+    <lastmod>2026-10-10</lastmod>
+    <xhtml:link rel="alternate" hreflang="en" href="https://vaara.io/products/receipts.html"/>
+    <xhtml:link rel="alternate" hreflang="fi" href="https://vaara.io/fi/products/receipts.html"/>
+    <xhtml:link rel="alternate" hreflang="x-default" href="https://vaara.io/products/receipts.html"/>
+    <changefreq>weekly</changefreq>
+    <priority>0.9</priority>
+  </url>
+  <url>
+    <loc>https://vaara.io/products/cage.html</loc>
+    <lastmod>2026-10-10</lastmod>
+    <xhtml:link rel="alternate" hreflang="en" href="https://vaara.io/products/cage.html"/>
+    <xhtml:link rel="alternate" hreflang="fi" href="https://vaara.io/fi/products/cage.html"/>
+    <xhtml:link rel="alternate" hreflang="x-default" href="https://vaara.io/products/cage.html"/>
+    <changefreq>weekly</changefreq>
+    <priority>0.9</priority>
+  </url>
+  <url>
+    <loc>https://vaara.io/fi/products/cage.html</loc>
+    <lastmod>2026-10-10</lastmod>
+    <xhtml:link rel="alternate" hreflang="en" href="https://vaara.io/products/cage.html"/>
+    <xhtml:link rel="alternate" hreflang="fi" href="https://vaara.io/fi/products/cage.html"/>
+    <xhtml:link rel="alternate" hreflang="x-default" href="https://vaara.io/products/cage.html"/>
+    <changefreq>weekly</changefreq>
+    <priority>0.9</priority>
+  </url>
+  <url>
+    <loc>https://vaara.io/products/app.html</loc>
+    <lastmod>2026-10-10</lastmod>
+    <xhtml:link rel="alternate" hreflang="en" href="https://vaara.io/products/app.html"/>
+    <xhtml:link rel="alternate" hreflang="fi" href="https://vaara.io/fi/products/app.html"/>
+    <xhtml:link rel="alternate" hreflang="x-default" href="https://vaara.io/products/app.html"/>
+    <changefreq>weekly</changefreq>
+    <priority>0.9</priority>
+  </url>
+  <url>
+    <loc>https://vaara.io/fi/products/app.html</loc>
+    <lastmod>2026-10-10</lastmod>
+    <xhtml:link rel="alternate" hreflang="en" href="https://vaara.io/products/app.html"/>
+    <xhtml:link rel="alternate" hreflang="fi" href="https://vaara.io/fi/products/app.html"/>
+    <xhtml:link rel="alternate" hreflang="x-default" href="https://vaara.io/products/app.html"/>
+    <changefreq>weekly</changefreq>
+    <priority>0.9</priority>
+  </url>
+  <url>
+    <loc>https://vaara.io/products/test-it-yourself.html</loc>
+    <lastmod>2026-10-10</lastmod>
+    <xhtml:link rel="alternate" hreflang="en" href="https://vaara.io/products/test-it-yourself.html"/>
+    <xhtml:link rel="alternate" hreflang="fi" href="https://vaara.io/fi/products/test-it-yourself.html"/>
+    <xhtml:link rel="alternate" hreflang="x-default" href="https://vaara.io/products/test-it-yourself.html"/>
+    <changefreq>weekly</changefreq>
+    <priority>0.9</priority>
+  </url>
+  <url>
+    <loc>https://vaara.io/fi/products/test-it-yourself.html</loc>
+    <lastmod>2026-10-10</lastmod>
+    <xhtml:link rel="alternate" hreflang="en" href="https://vaara.io/products/test-it-yourself.html"/>
+    <xhtml:link rel="alternate" hreflang="fi" href="https://vaara.io/fi/products/test-it-yourself.html"/>
+    <xhtml:link rel="alternate" hreflang="x-default" href="https://vaara.io/products/test-it-yourself.html"/>
+    <changefreq>weekly</changefreq>
+    <priority>0.9</priority>
+  </url>
+  <url>
+    <loc>https://vaara.io/under-the-hood.html</loc>
+    <lastmod>2026-10-10</lastmod>
+    <xhtml:link rel="alternate" hreflang="en" href="https://vaara.io/under-the-hood.html"/>
+    <xhtml:link rel="alternate" hreflang="fi" href="https://vaara.io/fi/under-the-hood.html"/>
+    <xhtml:link rel="alternate" hreflang="x-default" href="https://vaara.io/under-the-hood.html"/>
+    <changefreq>weekly</changefreq>
+    <priority>0.8</priority>
+  </url>
+  <url>
+    <loc>https://vaara.io/fi/under-the-hood.html</loc>
+    <lastmod>2026-10-10</lastmod>
+    <xhtml:link rel="alternate" hreflang="en" href="https://vaara.io/under-the-hood.html"/>
+    <xhtml:link rel="alternate" hreflang="fi" href="https://vaara.io/fi/under-the-hood.html"/>
+    <xhtml:link rel="alternate" hreflang="x-default" href="https://vaara.io/under-the-hood.html"/>
+    <changefreq>weekly</changefreq>
+    <priority>0.8</priority>
   </url>
   <url>
     <loc>https://vaara.io/surfaces.html</loc>
@@ -65,5 +330,11 @@
     <lastmod>2026-08-26</lastmod>
     <changefreq>yearly</changefreq>
     <priority>0.5</priority>
+  </url>
+  <url>
+    <loc>https://vaara.io/llms-full.txt</loc>
+    <lastmod>2026-10-10</lastmod>
+    <changefreq>weekly</changefreq>
+    <priority>0.6</priority>
   </url>
 </urlset>

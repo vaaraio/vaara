@@ -9,7 +9,7 @@
 <meta name="robots" content="index, follow, max-image-preview:large, max-snippet:-1">
 <meta name="googlebot" content="index, follow">
 <meta name="referrer" content="strict-origin-when-cross-origin">
-<meta name="theme-color" content="#ececec">
+<meta name="theme-color" content="#14212E">
 <link rel="canonical" href="https://vaara.io/conformance.html">
 <link rel="icon" type="image/svg+xml" href="/favicon.svg">
 <link rel="alternate icon" href="/favicon.ico">
@@ -24,16 +24,16 @@
 <meta property="og:title" content="Vaara Conformance Results">
 <meta property="og:description" content="Every Vaara conformance suite, its verdict, and every independent party who reproduced the vectors and said so in public. Generated from the runner&#x27;s own report.">
 <meta property="og:url" content="https://vaara.io/conformance.html">
-<meta property="og:image" content="https://vaara.io/vaara-wordmark-light.png">
+<meta property="og:image" content="https://vaara.io/og/en-conformance.png">
 <meta property="og:image:width" content="1200">
-<meta property="og:image:height" content="346">
-<meta property="og:image:alt" content="Vaara">
+<meta property="og:image:height" content="630">
+<meta property="og:image:alt" content="Vaara: Conformance results">
 <meta property="og:locale" content="en_US">
 <meta name="twitter:card" content="summary_large_image">
 <meta name="twitter:title" content="Vaara Conformance Results">
 <meta name="twitter:description" content="Every Vaara conformance suite, its verdict, and every independent party who reproduced the vectors and said so in public. Generated from the runner&#x27;s own report.">
-<meta name="twitter:image" content="https://vaara.io/vaara-wordmark-light.png">
-<meta name="twitter:image:alt" content="Vaara">
+<meta name="twitter:image" content="https://vaara.io/og/en-conformance.png">
+<meta name="twitter:image:alt" content="Vaara: Conformance results">
 <script type="application/ld+json">
 {
   "@context": "https://schema.org",
@@ -44,10 +44,13 @@
         "CollectionPage"
       ],
       "@id": "https://vaara.io/conformance.html",
+      "breadcrumb": {
+        "@id": "https://vaara.io/conformance.html#crumbs"
+      },
       "url": "https://vaara.io/conformance.html",
       "name": "Vaara Conformance Results",
       "description": "Every Vaara conformance suite, its verdict, and every independent party who reproduced the vectors and said so in public. Generated from the runner's own report.",
-      "dateModified": "2026-09-25T00:35:37Z",
+      "dateModified": "2026-10-10T08:08:38Z",
       "inLanguage": "en",
       "isPartOf": {
         "@id": "https://vaara.io/#website"
@@ -96,7 +99,7 @@
       "alternateName": "Vaara conformance corpus",
       "description": "Committed case files for every Vaara conformance suite. Each suite ships an independent checker that imports no Vaara code and recomputes its verdicts from the bytes of its own cases, so a stranger can disagree with an expected result and show their work. The vectors are Vaara's own and no ratification body stands behind them.",
       "url": "https://vaara.io/conformance.html",
-      "dateModified": "2026-09-25T00:35:37Z",
+      "dateModified": "2026-10-10T08:08:38Z",
       "identifier": "https://doi.org/10.5281/zenodo.22027975",
       "sameAs": [
         "https://doi.org/10.5281/zenodo.22027975",
@@ -177,6 +180,30 @@
       "itemListOrder": "https://schema.org/ItemListOrderAscending",
       "numberOfItems": 0,
       "itemListElement": []
+    },
+    {
+      "@type": "BreadcrumbList",
+      "@id": "https://vaara.io/conformance.html#crumbs",
+      "itemListElement": [
+        {
+          "@type": "ListItem",
+          "position": 1,
+          "name": "Vaara",
+          "item": "https://vaara.io/"
+        },
+        {
+          "@type": "ListItem",
+          "position": 2,
+          "name": "Test it yourself",
+          "item": "https://vaara.io/products/test-it-yourself.html"
+        },
+        {
+          "@type": "ListItem",
+          "position": 3,
+          "name": "Conformance results",
+          "item": "https://vaara.io/conformance.html"
+        }
+      ]
     }
   ]
 }
@@ -328,37 +355,32 @@
     .nav-jump a{padding:4px 9px;letter-spacing:.10em;font-size:10px}
   }
 </style>
-<script>
-  // Apply the stored theme before first paint, the same as index.html and
-  // verify.html. Without this the page renders in the OS colourway and snaps
-  // to the saved choice when the body script runs.
-  (function(){ try { var t = localStorage.getItem('vaara-theme');
-    if (t === 'dark' || t === 'light') document.documentElement.setAttribute('data-theme', t);
-  } catch(e){} })();
-</script>
+<script>try{var t=localStorage.getItem("vaara-theme");if(t!=="dark"&&t!=="light")t=matchMedia("(prefers-color-scheme: dark)").matches?"dark":"light";document.documentElement.dataset.theme=t}catch(e){}</script>
+<link rel="stylesheet" href="/style.css">
+<style>
+  html:root, html:root[data-theme] {
+    --panel: var(--card); --panel-2: var(--tint); --deep: var(--tint); --line: var(--rule);
+    --faint: var(--muted); --dim: var(--muted); --tri: var(--accent); --tri-bright: var(--accent);
+    --ok: var(--accent); --no: var(--stop); --edge: 16px;
+    --sans: Inter, -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Arial, sans-serif;
+    --mono: "JetBrains Mono", ui-monospace, SFMono-Regular, Menlo, Consolas, monospace;
+  }
+  html:root body { background: var(--bg); color: var(--body); font: 17px/1.6 var(--sans); }
+  html:root main.legacy { max-width: var(--max); margin: 0 auto; padding: 40px 24px 64px; }
+  html:root main.legacy section { padding: 1rem 1.25rem; border: 1px solid var(--rule); }
+  html:root main.legacy > h2 { font-size: 24px; text-transform: none; letter-spacing: 0; color: var(--ink); margin: 44px 0 12px; }
+  html:root .bar a, html:root .band a, html:root footer.site a { border-bottom: 0; }
+  html:root footer.site { margin: 0; padding: 40px 0; border-top: 0; color: var(--on-night-soft); font-size: 14px; line-height: 1.6; }
+  html:root .band .lead { font-size: 17px; color: var(--body); max-width: 46em; margin: 0; }
+  html:root .band h1 { font: 650 30px/1.2 var(--sans); letter-spacing: 0; color: var(--ink); margin: 0 0 10px; }
+</style>
 </head>
 <body>
-<header class="topbar">
-  <a class="mark" href="/" aria-label="Vaara home"><img src="/favicon.svg" alt="Vaara" width="24" height="24"></a>
-  <nav class="nav-jump" aria-label="Sections"><a href="/verify.html">Explorer</a><a href="/conformance.html" aria-current="page">Conformance</a><a href="/surfaces.html">Published</a></nav>
-  <div class="theme-toggle">
-    <button type="button" id="themeBtn" aria-label="Switch to dark theme"><svg class="i-moon" viewBox="0 0 18 18" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M15.2 11.4A6.8 6.8 0 0 1 6.6 2.8a7 7 0 1 0 8.6 8.6z"/></svg><svg class="i-sun" viewBox="0 0 18 18" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" aria-hidden="true"><circle cx="9" cy="9" r="3.4"/><path d="M9 1.4v1.7M9 14.9v1.7M1.4 9h1.7M14.9 9h1.7M3.6 3.6l1.2 1.2M13.2 13.2l1.2 1.2M14.4 3.6l-1.2 1.2M4.8 13.2l-1.2 1.2"/></svg></button>
-  </div>
-</header>
-<div class="wrap">
-  <div class="wordmark">
-    <a href="/"><img class="wm-light" src="/vaara-wordmark-light.png" alt="Vaara" width="440" height="127"></a>
-    <a href="/"><img class="wm-dark" src="/vaara-wordmark-dark.png" alt="Vaara" width="440" height="127"></a>
-  </div>
-
-  <p class="kicker">Vaara Conformance Results</p>
-  <h1>Every suite, every verdict, and everyone who checked it themselves.</h1>
-
-  <p class="lede">Each suite below ships an independent checker that imports no
-  Vaara code and recomputes its verdicts from the bytes of its own case files.
-  This page is generated from the runner's report, so it says what the checkers
-  did rather than what a document claims they do.</p>
-
+<header class="bar"><div class="wrap">
+<nav class="top" aria-label="Main menu"><a class="brand" href="/"><img src="/vaara-logo-dark.svg" alt="Vaara home" width="174" height="24"></a><div class="dd"><a class="l" href="/sectors/" aria-haspopup="true">Sectors <span class="caret">▾</span></a><div class="menu"><a href="/sectors/care.html">Care and social services</a><a href="/sectors/payments.html">Payments and finance</a><a href="/sectors/public.html">Public sector</a><a href="/sectors/health.html">Healthcare</a><a href="/sectors/infrastructure.html">Energy, industry and infrastructure</a><a href="/sectors/software.html">Software teams</a></div></div><div class="dd"><a class="l" href="/products/" aria-haspopup="true">Products <span class="caret">▾</span></a><div class="menu"><a href="/products/gate.html">The gate</a><a href="/products/receipts.html">Receipts</a><a href="/products/cage.html">The cage</a><a href="/products/app.html">The desktop app</a><a href="/products/test-it-yourself.html">Test it yourself</a></div></div><div class="dd on"><a class="l" href="/products/test-it-yourself.html" aria-haspopup="true">Test it yourself <span class="caret">▾</span></a><div class="menu"><a href="/products/test-it-yourself.html">Test it yourself</a><a href="/verify.html">Receipt explorer</a><a href="/conformance.html">Conformance results</a></div></div><a class="l" href="/under-the-hood.html">Under the hood</a><span class="lang"><b>EN</b> | <a href="/fi/" hreflang="fi">FI</a></span><button class="burger" type="button" aria-label="Main menu" aria-expanded="false"></button><button class="theme" type="button" aria-label="Switch between light and dark" title="Switch between light and dark"></button><a class="get" href="https://github.com/vaaraio/vaara#readme">Get Vaara</a></nav>
+</div></header>
+<div class="band"><div class="wrap"><div class="hero"><nav class="crumbs" aria-label="Breadcrumb"><a href="/">Home</a> / <a href="/products/test-it-yourself.html">Test it yourself</a></nav><p class="kicker">Conformance results</p><h1>Every suite, every verdict, and everyone who checked it themselves.</h1><p class="lead">Each suite below ships an independent checker that imports no Vaara code and recomputes its verdicts from the bytes of its own case files. This page is generated from the runner's report, so it says what the checkers did rather than what a document claims they do.</p></div></div></div>
+<main class="legacy">
   <div class="stats">
     <div class="stat"><b>51</b><span>suites</span></div>
     <div class="stat"><b>51</b><span>passed</span></div>
@@ -366,27 +388,7 @@
     <div class="stat"><b>0</b><span>skipped</span></div>
     <div class="stat"><b>88</b><span>cases</span></div>
   </div>
-  <p class="mono" style="color:var(--faint)">generated 2026-09-25T00:35:37Z</p>
-
-  <h2>Run it yourself</h2>
-  <p>Nothing here needs Vaara installed. The checkers use the standard library
-  plus <code>cryptography</code> and <code>rfc8785</code>.</p>
-<pre><code>git clone https://github.com/vaaraio/vaara
-cd vaara
-pip install cryptography rfc8785
-python scripts/conformance_runner.py</code></pre>
-  <p>Point <code>--vectors-dir</code> at a directory laid out the same way and it
-  grades those bytes instead. The runner collects; the checkers decide.</p>
-
-  <h2>What a pass does not establish</h2>
-  <p>These vectors are Vaara's and there is no ratification process behind them.
-  The maintainer adds the cases and decides what a verdict means, and nobody else
-  has a vote. That is a real limit on any neutrality claim and it is stated here
-  rather than argued around.</p>
-  <p class="note">What the corpus does give is narrower and checkable: every case
-  recomputes from committed bytes with no Vaara import, so anyone can disagree
-  with an expected result and show their work. Recompute is checkable by
-  strangers. Authorship is not.</p>
+  <p class="mono" style="color:var(--faint)">generated 2026-10-10T08:08:38Z</p>
 
   <h2>Independent reproductions</h2>
   <p>Parties other than the maintainer who ran the checkers and reported the
@@ -398,8 +400,89 @@ python scripts/conformance_runner.py</code></pre>
   own badge, carrying that number, the date and the commit. A badge says the
   party ran the checkers at that commit on that date. It never says currently
   passing, and it is not a certification.</p>
+<p class="none">No independent reproduction has been recorded yet. A row appears here when someone other than the maintainer runs the checkers, reports the result somewhere public, and asks to be listed.</p>
 
-  <h3>Checking a badge without trusting this page</h3>
+  <h2>Run it yourself</h2>
+  <p>Nothing here needs Vaara installed. The checkers use the standard library
+  plus <code>cryptography</code> and <code>rfc8785</code>.</p>
+<pre><code>git clone https://github.com/vaaraio/vaara
+cd vaara
+pip install cryptography rfc8785
+python scripts/conformance_runner.py</code></pre>
+  <p>Point <code>--vectors-dir</code> at a directory laid out the same way and it
+  grades those bytes instead. The runner collects; the checkers decide.</p>
+
+  <details class="more"><summary>All {t['suites']} suites and their verdicts</summary>
+  <table>
+    <thead><tr><th>Suite</th><th>Verdict</th><th>Note</th></tr></thead>
+    <tbody>
+<tr><td class="mono">acp_checkout_v0</td><td class="ok">PASS</td><td class="why"></td></tr>
+<tr><td class="mono">agent_decision_v0</td><td class="ok">PASS</td><td class="why"></td></tr>
+<tr><td class="mono">agent_identity_v0</td><td class="ok">PASS</td><td class="why"></td></tr>
+<tr><td class="mono">ap2_v0</td><td class="ok">PASS</td><td class="why"></td></tr>
+<tr><td class="mono">article12_fold_v0</td><td class="ok">PASS</td><td class="why"></td></tr>
+<tr><td class="mono">atlas_threat_v0</td><td class="ok">PASS</td><td class="why"></td></tr>
+<tr><td class="mono">attestation_result_v0</td><td class="ok">PASS</td><td class="why"></td></tr>
+<tr><td class="mono">attribute_attestation_v0</td><td class="ok">PASS</td><td class="why"></td></tr>
+<tr><td class="mono">attribute_attestation_zk_v0</td><td class="ok">PASS</td><td class="why"></td></tr>
+<tr><td class="mono">audit_summary_v0</td><td class="ok">PASS</td><td class="why"></td></tr>
+<tr><td class="mono">authorization_v0</td><td class="ok">PASS</td><td class="why"></td></tr>
+<tr><td class="mono">build_bundle_v0</td><td class="ok">PASS</td><td class="why"></td></tr>
+<tr><td class="mono">bundle_doc_v0</td><td class="ok">PASS</td><td class="why"></td></tr>
+<tr><td class="mono">bundle_set_v0</td><td class="ok">PASS</td><td class="why"></td></tr>
+<tr><td class="mono">capability_scope_v0</td><td class="ok">PASS</td><td class="why"></td></tr>
+<tr><td class="mono">class_gate_v0</td><td class="ok">PASS</td><td class="why"></td></tr>
+<tr><td class="mono">conformance_statement_v0</td><td class="ok">PASS</td><td class="why"></td></tr>
+<tr><td class="mono">contiguity_v0</td><td class="ok">PASS</td><td class="why"></td></tr>
+<tr><td class="mono">credential_binding_v0</td><td class="ok">PASS</td><td class="why"></td></tr>
+<tr><td class="mono">credential_grant_v0</td><td class="ok">PASS</td><td class="why"></td></tr>
+<tr><td class="mono">crewai_enforcement_v0</td><td class="ok">PASS</td><td class="why"></td></tr>
+<tr><td class="mono">cross_org_handoff_v0</td><td class="ok">PASS</td><td class="why"></td></tr>
+<tr><td class="mono">cross_stack_revocation_v0</td><td class="ok">PASS</td><td class="why"></td></tr>
+<tr><td class="mono">data_locality_v0</td><td class="ok">PASS</td><td class="why"></td></tr>
+<tr><td class="mono">decision_disposition_v0</td><td class="ok">PASS</td><td class="why"></td></tr>
+<tr><td class="mono">decision_pairing_v0</td><td class="ok">PASS</td><td class="why"></td></tr>
+<tr><td class="mono">decision_vocabulary_v0</td><td class="ok">PASS</td><td class="why"></td></tr>
+<tr><td class="mono">enforcement_attestation_v0</td><td class="ok">PASS</td><td class="why"></td></tr>
+<tr><td class="mono">enforcement_set_v0</td><td class="ok">PASS</td><td class="why"></td></tr>
+<tr><td class="mono">evidence_bundle_v0</td><td class="ok">PASS</td><td class="why"></td></tr>
+<tr><td class="mono">evidence_ref_v0</td><td class="ok">PASS</td><td class="why"></td></tr>
+<tr><td class="mono">execution_receipt_v0</td><td class="ok">PASS</td><td class="why"></td></tr>
+<tr><td class="mono">external_evidence_v0</td><td class="ok">PASS</td><td class="why"></td></tr>
+<tr><td class="mono">fallback_projection_v0</td><td class="ok">PASS</td><td class="why"></td></tr>
+<tr><td class="mono">governance_decision_v0</td><td class="ok">PASS</td><td class="why"></td></tr>
+<tr><td class="mono">handoff_set_v0</td><td class="ok">PASS</td><td class="why"></td></tr>
+<tr><td class="mono">hcs27_checkpoint_v0</td><td class="ok">PASS</td><td class="why"></td></tr>
+<tr><td class="mono">ingest_v0</td><td class="ok">PASS</td><td class="why"></td></tr>
+<tr><td class="mono">key_rotation_v0</td><td class="ok">PASS</td><td class="why"></td></tr>
+<tr><td class="mono">normalize_v0</td><td class="ok">PASS</td><td class="why"></td></tr>
+<tr><td class="mono">pq_hybrid_v0</td><td class="ok">PASS</td><td class="why"></td></tr>
+<tr><td class="mono">qualified_time_v0</td><td class="ok">PASS</td><td class="why"></td></tr>
+<tr><td class="mono">record_conformance_v0</td><td class="ok">PASS</td><td class="why"></td></tr>
+<tr><td class="mono">record_set_v0</td><td class="ok">PASS</td><td class="why"></td></tr>
+<tr><td class="mono">release_condition_v0</td><td class="ok">PASS</td><td class="why"></td></tr>
+<tr><td class="mono">revocation_freshness_v0</td><td class="ok">PASS</td><td class="why"></td></tr>
+<tr><td class="mono">sep2787_attestation_v0</td><td class="ok">PASS</td><td class="why"></td></tr>
+<tr><td class="mono">tap_v0</td><td class="ok">PASS</td><td class="why"></td></tr>
+<tr><td class="mono">trail_decision_v0</td><td class="ok">PASS</td><td class="why"></td></tr>
+<tr><td class="mono">transparency_consistency_v0</td><td class="ok">PASS</td><td class="why"></td></tr>
+<tr><td class="mono">x402_settlement_v0</td><td class="ok">PASS</td><td class="why"></td></tr>
+    </tbody>
+  </table>
+  </details>
+
+  <details class="more"><summary>What a pass does not establish</summary>
+  <p>These vectors are Vaara's and there is no ratification process behind them.
+  The maintainer adds the cases and decides what a verdict means, and nobody else
+  has a vote. That is a real limit on any neutrality claim and it is stated here
+  rather than argued around.</p>
+  <p class="note">What the corpus does give is narrower and checkable: every case
+  recomputes from committed bytes with no Vaara import, so anyone can disagree
+  with an expected result and show their work. Recompute is checkable by
+  strangers. Authorship is not.</p>
+  </details>
+
+  <details class="more"><summary>Checking a badge without trusting this page</summary>
   <p>Each badge carries the digest of its own row inside the SVG, and the row
   it commits to is served as JCS-canonical bytes (RFC 8785) next to it. The
   file holds those bytes and nothing else, so verifying a badge is one command
@@ -412,8 +495,9 @@ python scripts/vcr_chain.py            # nothing removed from the table</code></
   is the same property the corpus runs on, applied to the badge itself: a
   claim that recomputes from bytes, checkable by someone who trusts neither
   the party nor Vaara.</p>
+  </details>
 
-  <h3>Terms for a listed party, version 2026-08-22</h3>
+  <details class="more"><summary>Terms for a listed party, version 2026-08-22</summary>
   <p class="note">Stated before there is anything to sell, so that anyone
   deciding whether to be listed can read the commercial position at the moment
   they decide rather than learn it afterwards.</p>
@@ -474,101 +558,29 @@ python scripts/vcr_chain.py            # nothing removed from the table</code></
     change for rows added later. A row already listed keeps the terms it was
     listed under, and a change is never applied backwards.</li>
   </ul>
-<p class="none">No independent reproduction has been recorded yet. A row appears here when someone other than the maintainer runs the checkers, reports the result somewhere public, and asks to be listed.</p>
+  </details>
 
-  <h2>Suites</h2>
-  <table>
-    <thead><tr><th>Suite</th><th>Verdict</th><th>Note</th></tr></thead>
-    <tbody>
-<tr><td class="mono">acp_checkout_v0</td><td class="ok">PASS</td><td class="why"></td></tr>
-<tr><td class="mono">agent_decision_v0</td><td class="ok">PASS</td><td class="why"></td></tr>
-<tr><td class="mono">agent_identity_v0</td><td class="ok">PASS</td><td class="why"></td></tr>
-<tr><td class="mono">ap2_v0</td><td class="ok">PASS</td><td class="why"></td></tr>
-<tr><td class="mono">article12_fold_v0</td><td class="ok">PASS</td><td class="why"></td></tr>
-<tr><td class="mono">atlas_threat_v0</td><td class="ok">PASS</td><td class="why"></td></tr>
-<tr><td class="mono">attestation_result_v0</td><td class="ok">PASS</td><td class="why"></td></tr>
-<tr><td class="mono">attribute_attestation_v0</td><td class="ok">PASS</td><td class="why"></td></tr>
-<tr><td class="mono">attribute_attestation_zk_v0</td><td class="ok">PASS</td><td class="why"></td></tr>
-<tr><td class="mono">audit_summary_v0</td><td class="ok">PASS</td><td class="why"></td></tr>
-<tr><td class="mono">authorization_v0</td><td class="ok">PASS</td><td class="why"></td></tr>
-<tr><td class="mono">build_bundle_v0</td><td class="ok">PASS</td><td class="why"></td></tr>
-<tr><td class="mono">bundle_doc_v0</td><td class="ok">PASS</td><td class="why"></td></tr>
-<tr><td class="mono">bundle_set_v0</td><td class="ok">PASS</td><td class="why"></td></tr>
-<tr><td class="mono">capability_scope_v0</td><td class="ok">PASS</td><td class="why"></td></tr>
-<tr><td class="mono">class_gate_v0</td><td class="ok">PASS</td><td class="why"></td></tr>
-<tr><td class="mono">conformance_statement_v0</td><td class="ok">PASS</td><td class="why"></td></tr>
-<tr><td class="mono">contiguity_v0</td><td class="ok">PASS</td><td class="why"></td></tr>
-<tr><td class="mono">credential_binding_v0</td><td class="ok">PASS</td><td class="why"></td></tr>
-<tr><td class="mono">credential_grant_v0</td><td class="ok">PASS</td><td class="why"></td></tr>
-<tr><td class="mono">crewai_enforcement_v0</td><td class="ok">PASS</td><td class="why"></td></tr>
-<tr><td class="mono">cross_org_handoff_v0</td><td class="ok">PASS</td><td class="why"></td></tr>
-<tr><td class="mono">cross_stack_revocation_v0</td><td class="ok">PASS</td><td class="why"></td></tr>
-<tr><td class="mono">data_locality_v0</td><td class="ok">PASS</td><td class="why"></td></tr>
-<tr><td class="mono">decision_disposition_v0</td><td class="ok">PASS</td><td class="why"></td></tr>
-<tr><td class="mono">decision_pairing_v0</td><td class="ok">PASS</td><td class="why"></td></tr>
-<tr><td class="mono">decision_vocabulary_v0</td><td class="ok">PASS</td><td class="why"></td></tr>
-<tr><td class="mono">enforcement_attestation_v0</td><td class="ok">PASS</td><td class="why"></td></tr>
-<tr><td class="mono">enforcement_set_v0</td><td class="ok">PASS</td><td class="why"></td></tr>
-<tr><td class="mono">evidence_bundle_v0</td><td class="ok">PASS</td><td class="why"></td></tr>
-<tr><td class="mono">evidence_ref_v0</td><td class="ok">PASS</td><td class="why"></td></tr>
-<tr><td class="mono">execution_receipt_v0</td><td class="ok">PASS</td><td class="why"></td></tr>
-<tr><td class="mono">external_evidence_v0</td><td class="ok">PASS</td><td class="why"></td></tr>
-<tr><td class="mono">fallback_projection_v0</td><td class="ok">PASS</td><td class="why"></td></tr>
-<tr><td class="mono">governance_decision_v0</td><td class="ok">PASS</td><td class="why"></td></tr>
-<tr><td class="mono">handoff_set_v0</td><td class="ok">PASS</td><td class="why"></td></tr>
-<tr><td class="mono">hcs27_checkpoint_v0</td><td class="ok">PASS</td><td class="why"></td></tr>
-<tr><td class="mono">ingest_v0</td><td class="ok">PASS</td><td class="why"></td></tr>
-<tr><td class="mono">key_rotation_v0</td><td class="ok">PASS</td><td class="why"></td></tr>
-<tr><td class="mono">normalize_v0</td><td class="ok">PASS</td><td class="why"></td></tr>
-<tr><td class="mono">pq_hybrid_v0</td><td class="ok">PASS</td><td class="why"></td></tr>
-<tr><td class="mono">qualified_time_v0</td><td class="ok">PASS</td><td class="why"></td></tr>
-<tr><td class="mono">record_conformance_v0</td><td class="ok">PASS</td><td class="why"></td></tr>
-<tr><td class="mono">record_set_v0</td><td class="ok">PASS</td><td class="why"></td></tr>
-<tr><td class="mono">release_condition_v0</td><td class="ok">PASS</td><td class="why"></td></tr>
-<tr><td class="mono">revocation_freshness_v0</td><td class="ok">PASS</td><td class="why"></td></tr>
-<tr><td class="mono">sep2787_attestation_v0</td><td class="ok">PASS</td><td class="why"></td></tr>
-<tr><td class="mono">tap_v0</td><td class="ok">PASS</td><td class="why"></td></tr>
-<tr><td class="mono">trail_decision_v0</td><td class="ok">PASS</td><td class="why"></td></tr>
-<tr><td class="mono">transparency_consistency_v0</td><td class="ok">PASS</td><td class="why"></td></tr>
-<tr><td class="mono">x402_settlement_v0</td><td class="ok">PASS</td><td class="why"></td></tr>
-    </tbody>
-  </table>
-
-  <footer>
+  <div class="fineprint">
     Generated by <code>scripts/render_conformance_page.py</code> from
     <code>scripts/conformance_runner.py --json</code>. Independent reproductions
     are maintained in <code>conformance/reproductions.json</code> and added by
     pull request.
-    <br><br>
-    Vaara&trade; and Vaara Resin&trade; &copy; 2026 Henri Sirkkavaara, Helsinki. AGPL-3.0-or-later.
-  </footer>
-</div>
+  </div>
+</main>
+<footer class="site"><div class="wrap"><div class="cols">
+<div><b>VAARA</b><br>Open source. Runs on your own machines. Nothing is sent to us.<br><a href="mailto:hello@vaara.io">hello@vaara.io</a></div>
+<div><a href="https://github.com/vaaraio/vaara">Code</a><br>
+<a href="https://datatracker.ietf.org/doc/draft-sirkkavaara-vaara-receipt/">Internet-Draft</a><br>
+<a href="/conformance.html">Conformance results</a><br><a href="/surfaces.html">Everything Vaara publishes</a><br><a href="/under-the-hood.html">Technical overview</a></div>
+</div><p class="tm">Vaara™ and Vaara Resin™ © 2026 Henri Sirkkavaara, Helsinki. AGPL-3.0-or-later.</p></div></footer>
 <script>
+// A link to one row (#row-N) opens that row.
 (function(){
-  var root = document.documentElement;
-  var meta = document.querySelector('meta[name="theme-color"]');
-  var btn  = document.getElementById("themeBtn");
-  var COLORS = { light: "#ececec", dark: "#0F1417" };
-  function current(){
-    var t = root.getAttribute("data-theme");
-    if (t) return t;
-    return (window.matchMedia && window.matchMedia("(prefers-color-scheme: dark)").matches) ? "dark" : "light";
-  }
-  function label(){
-    if (btn) btn.setAttribute("aria-label", current() === "dark" ? "Switch to light theme" : "Switch to dark theme");
-  }
-  function apply(theme) {
-    root.setAttribute("data-theme", theme === "dark" ? "dark" : "light");
-    if (meta) meta.setAttribute("content", COLORS[theme] || COLORS.light);
-    try { localStorage.setItem("vaara-theme", theme); } catch(e) {}
-    label();
-  }
-  function reflectAuto(){ root.removeAttribute("data-theme"); label(); }
-  if (btn) btn.addEventListener("click", function(){ apply(current() === "dark" ? "light" : "dark"); });
-  var saved = null;
-  try { saved = localStorage.getItem("vaara-theme"); } catch(e) {}
-  if (saved === "dark" || saved === "light") apply(saved); else reflectAuto();
+  function open(){ var d = location.hash && document.getElementById(location.hash.slice(1));
+    if (d && d.tagName === "DETAILS") { d.open = true; d.scrollIntoView(); } }
+  open(); window.addEventListener("hashchange", open);
 })();
 </script>
+<script>document.querySelector(".bar .theme").onclick=function(){var d=document.documentElement,t=d.dataset.theme==="dark"?"light":"dark";d.dataset.theme=t;try{localStorage.setItem("vaara-theme",t)}catch(e){}};document.querySelector(".bar .burger").onclick=function(){var n=document.querySelector("nav.top"),o=n.classList.toggle("open");this.setAttribute("aria-expanded",o)}</script>
 </body>
 </html>

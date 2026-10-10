@@ -58,13 +58,29 @@ REGISTER = WEBPAGE / "conformance.json"
 BEGIN = "<!-- generated: conformance register, by scripts/stamp_site.py -->"
 END = "<!-- end generated -->"
 
-#: Which page each sitemap entry is, so a date can be found for it. A URL that
-#: is not here keeps whatever date it already had rather than being guessed at.
+#: Which page each sitemap entry is, so a date can be found for it. Any other
+#: vaara.io URL is read as its file under webpage/ (a trailing slash is that
+#: directory's index.html), except badge pages, which are published from the
+#: vcr branch and so have no history here. A URL with no file keeps whatever
+#: date it already had rather than being guessed at.
 SITEMAP_PAGES = {
     "https://vaara.io/": "index.html",
     "https://vaara.io/verify.html": "verify.html",
     "https://vaara.io/conformance.html": "conformance.html",
 }
+
+
+def sitemap_page(url: str) -> str | None:
+    """The file under webpage/ a sitemap URL is, or None."""
+    if url in SITEMAP_PAGES:
+        return SITEMAP_PAGES[url]
+    prefix = "https://vaara.io/"
+    if not url.startswith(prefix) or url.startswith(prefix + "badge/"):
+        return None
+    page = url[len(prefix):]
+    if page.endswith("/"):
+        page += "index.html"
+    return page if (WEBPAGE / page).is_file() else None
 
 
 def renderer():
@@ -217,7 +233,7 @@ def stamp_sitemap(
 
     def replace(match: re.Match[str]) -> str:
         url = match.group("url")
-        page = SITEMAP_PAGES.get(url)
+        page = sitemap_page(url)
         if page is None:
             return match.group(0)
         if page == "conformance.html" and conformance_date:

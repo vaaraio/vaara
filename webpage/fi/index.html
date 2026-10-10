@@ -1,0 +1,220 @@
+<!doctype html>
+<html lang="fi">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<title>Vaara: itsenäisesti toimiva ohjelmisto pysyy sääntöjenne sisällä</title>
+<meta name="description" content="Vaara tarkistaa sääntöjänne vasten jokaisen toimenpiteen, jonka ohjelmisto tekee itsenäisesti, ennen kuin se tapahtuu, ja jättää kuitin, jonka kuka tahansa voi tarkistaa myöhemmin. Avointa lähdekoodia, toimii omilla koneillanne.">
+<link rel="canonical" href="https://vaara.io/fi/">
+<link rel="alternate" hreflang="en" href="https://vaara.io/">
+<link rel="alternate" hreflang="fi" href="https://vaara.io/fi/">
+<link rel="icon" type="image/svg+xml" href="/favicon.svg">
+<link rel="stylesheet" href="/style.css">
+<meta name="theme-color" content="#14212E">
+<meta name="color-scheme" content="light dark">
+<script>try{var t=localStorage.getItem("vaara-theme");if(t!=="dark"&&t!=="light")t=matchMedia("(prefers-color-scheme: dark)").matches?"dark":"light";document.documentElement.dataset.theme=t}catch(e){}</script>
+<meta name="author" content="Henri Sirkkavaara">
+<meta name="robots" content="index, follow, max-image-preview:large, max-snippet:-1">
+<link rel="alternate" hreflang="x-default" href="https://vaara.io/">
+<link rel="alternate icon" href="/favicon.ico">
+<link rel="apple-touch-icon" href="/favicon-180.png">
+<link rel="sitemap" type="application/xml" href="/sitemap.xml">
+<link rel="alternate" type="text/plain" href="/llms.txt" title="Vaara for language models">
+<link rel="me" href="https://github.com/vaaraio">
+<meta property="og:type" content="website">
+<meta property="og:site_name" content="Vaara">
+<meta property="og:title" content="Vaara: itsenäisesti toimiva ohjelmisto pysyy sääntöjenne sisällä">
+<meta property="og:description" content="Vaara tarkistaa sääntöjänne vasten jokaisen toimenpiteen, jonka ohjelmisto tekee itsenäisesti, ennen kuin se tapahtuu, ja jättää kuitin, jonka kuka tahansa voi tarkistaa myöhemmin. Avointa lähdekoodia, toimii omilla koneillanne.">
+<meta property="og:url" content="https://vaara.io/fi/">
+<meta property="og:image" content="https://vaara.io/og/fi-home.png">
+<meta property="og:image:width" content="1200">
+<meta property="og:image:height" content="630">
+<meta property="og:image:alt" content="Vaara: Itsenäisesti toimiva ohjelmisto pysyy sääntöjenne sisällä. Ja jokaisesta toimenpiteestä jää todiste, jonka kuka tahansa voi tarkistaa.">
+<meta property="og:locale" content="fi_FI">
+<meta property="og:locale:alternate" content="en_US">
+<meta name="twitter:card" content="summary_large_image">
+<meta name="twitter:title" content="Vaara: itsenäisesti toimiva ohjelmisto pysyy sääntöjenne sisällä">
+<meta name="twitter:description" content="Vaara tarkistaa sääntöjänne vasten jokaisen toimenpiteen, jonka ohjelmisto tekee itsenäisesti, ennen kuin se tapahtuu, ja jättää kuitin, jonka kuka tahansa voi tarkistaa myöhemmin. Avointa lähdekoodia, toimii omilla koneillanne.">
+<meta name="twitter:image" content="https://vaara.io/og/fi-home.png">
+<meta name="twitter:image:alt" content="Vaara: Itsenäisesti toimiva ohjelmisto pysyy sääntöjenne sisällä. Ja jokaisesta toimenpiteestä jää todiste, jonka kuka tahansa voi tarkistaa.">
+<script type="application/ld+json">
+{
+ "@context": "https://schema.org",
+ "@graph": [
+  {
+   "@type": "WebPage",
+   "@id": "https://vaara.io/fi/",
+   "url": "https://vaara.io/fi/",
+   "name": "Vaara: itsenäisesti toimiva ohjelmisto pysyy sääntöjenne sisällä",
+   "description": "Vaara tarkistaa sääntöjänne vasten jokaisen toimenpiteen, jonka ohjelmisto tekee itsenäisesti, ennen kuin se tapahtuu, ja jättää kuitin, jonka kuka tahansa voi tarkistaa myöhemmin. Avointa lähdekoodia, toimii omilla koneillanne.",
+   "inLanguage": "fi",
+   "isPartOf": {
+    "@id": "https://vaara.io/#website"
+   },
+   "publisher": {
+    "@id": "https://vaara.io/#organization"
+   },
+   "primaryImageOfPage": {
+    "@type": "ImageObject",
+    "url": "https://vaara.io/og/fi-home.png",
+    "width": 1200,
+    "height": 630
+   },
+   "mainEntity": {
+    "@id": "https://vaara.io/#software"
+   }
+  },
+  {
+   "@type": "WebSite",
+   "@id": "https://vaara.io/#website",
+   "name": "Vaara",
+   "url": "https://vaara.io/",
+   "inLanguage": [
+    "en",
+    "fi"
+   ],
+   "publisher": {
+    "@id": "https://vaara.io/#organization"
+   }
+  },
+  {
+   "@type": "Organization",
+   "@id": "https://vaara.io/#organization",
+   "name": "Vaara",
+   "url": "https://vaara.io/",
+   "logo": "https://vaara.io/vaara-wordmark-light.png",
+   "email": "hello@vaara.io",
+   "founder": {
+    "@id": "https://vaara.io/#henri"
+   },
+   "areaServed": "EU",
+   "address": {
+    "@type": "PostalAddress",
+    "addressCountry": "FI"
+   },
+   "sameAs": [
+    "https://github.com/vaaraio/vaara",
+    "https://www.linkedin.com/in/sirkkavaara",
+    "https://pypi.org/project/vaara/",
+    "https://www.npmjs.com/package/@vaara/client",
+    "https://oecd.ai/en/catalogue/tools/vaara"
+   ]
+  },
+  {
+   "@type": "Person",
+   "@id": "https://vaara.io/#henri",
+   "name": "Henri Sirkkavaara",
+   "url": "https://vaara.io/",
+   "email": "hello@vaara.io",
+   "jobTitle": "Founder and maintainer, Vaara",
+   "nationality": {
+    "@type": "Country",
+    "name": "Finland"
+   },
+   "workLocation": {
+    "@type": "Place",
+    "address": {
+     "@type": "PostalAddress",
+     "addressCountry": "FI"
+    }
+   },
+   "sameAs": [
+    "https://github.com/vaaraio",
+    "https://datatracker.ietf.org/doc/draft-sirkkavaara-vaara-receipt/",
+    "https://pypi.org/user/vaaraio/",
+    "https://www.bestpractices.dev/projects/12612",
+    "https://github.com/marketplace/actions/vaara-policy-check",
+    "https://www.linkedin.com/in/sirkkavaara"
+   ]
+  },
+  {
+   "@type": "SoftwareApplication",
+   "@id": "https://vaara.io/#software",
+   "name": "Vaara",
+   "applicationCategory": "SecurityApplication",
+   "applicationSubCategory": "Governance and audit",
+   "operatingSystem": "Linux, macOS, Windows",
+   "description": "Vaara tarkistaa sääntöjänne vasten jokaisen toimenpiteen, jonka ohjelmisto tekee itsenäisesti, ennen kuin se tapahtuu, ja jättää kuitin, jonka kuka tahansa voi tarkistaa myöhemmin. Avointa lähdekoodia, toimii omilla koneillanne.",
+   "inLanguage": "fi",
+   "url": "https://vaara.io/",
+   "downloadUrl": "https://pypi.org/project/vaara/",
+   "softwareHelp": "https://github.com/vaaraio/vaara",
+   "license": "https://www.gnu.org/licenses/agpl-3.0.html",
+   "isAccessibleForFree": true,
+   "offers": {
+    "@type": "Offer",
+    "price": "0",
+    "priceCurrency": "EUR",
+    "name": "Open source (AGPL-3.0)"
+   },
+   "author": {
+    "@id": "https://vaara.io/#henri"
+   },
+   "publisher": {
+    "@id": "https://vaara.io/#organization"
+   },
+   "sameAs": [
+    "https://github.com/vaaraio/vaara",
+    "https://pypi.org/project/vaara/",
+    "https://www.npmjs.com/package/@vaara/client"
+   ]
+  }
+ ]
+}
+</script>
+</head>
+<body>
+<header class="bar"><div class="wrap">
+<nav class="top" aria-label="Päävalikko"><a class="brand" href="/fi/"><img src="/vaara-logo-dark.svg" alt="Vaara home" width="174" height="24"></a><div class="dd"><a class="l" href="/fi/sectors/" aria-haspopup="true">Toimialat <span class="caret">▾</span></a><div class="menu"><a href="/fi/sectors/care.html">Hoiva ja sosiaalipalvelut</a><a href="/fi/sectors/payments.html">Maksut ja rahoitus</a><a href="/fi/sectors/public.html">Julkinen sektori</a><a href="/fi/sectors/health.html">Terveydenhuolto</a><a href="/fi/sectors/infrastructure.html">Energia, teollisuus ja infrastruktuuri</a><a href="/fi/sectors/software.html">Ohjelmistotiimit</a></div></div><div class="dd"><a class="l" href="/fi/products/" aria-haspopup="true">Tuotteet <span class="caret">▾</span></a><div class="menu"><a href="/fi/products/gate.html">Portti</a><a href="/fi/products/receipts.html">Kuitit</a><a href="/fi/products/cage.html">Häkki</a><a href="/fi/products/app.html">Työpöytäsovellus</a><a href="/fi/products/test-it-yourself.html">Testaa itse</a></div></div><div class="dd"><a class="l" href="/fi/products/test-it-yourself.html" aria-haspopup="true">Testaa itse <span class="caret">▾</span></a><div class="menu"><a href="/fi/products/test-it-yourself.html">Testaa itse</a><a href="/verify.html">Kuittien tarkistus</a><a href="/conformance.html">Vaatimustenmukaisuustulokset</a></div></div><a class="l" href="/fi/under-the-hood.html">Konepellin alla</a><span class="lang"><a href="/" hreflang="en">EN</a> | <b>FI</b></span><button class="burger" type="button" aria-label="Päävalikko" aria-expanded="false"></button><button class="theme" type="button" aria-label="Vaihda vaalean ja tumman välillä" title="Vaihda vaalean ja tumman välillä"></button><a class="get" href="https://github.com/vaaraio/vaara#readme">Lataa Vaara</a></nav>
+</div></header>
+<div class="band"><div class="wrap"><div class="hero home"><div class="split"><div><p class="kicker">Vastuullinen autonomia</p><h1>Säännöt ja kuitit itsenäisesti toimivalle ohjelmistolle.</h1><p class="lead">Vaara on itsenäisesti toimivan ohjelmiston ja niiden järjestelmien välissä, joihin se ulottuu. Mitään ei tapahdu sääntöjenne ulkopuolella, ja jälkikäteen voitte näyttää tarkalleen, mitä tapahtui.</p><div class="btns"><a class="btn primary" href="/fi/sectors/">Valitse toimiala</a><a class="btn ghost" href="/fi/products/test-it-yourself.html">Testaa itse</a></div></div><figure class="feed"><div class="panel"><div class="head"><span class="dot"></span>Päätökset<span class="when">tänään</span></div><ul><li class="go"><span class="ic" aria-hidden="true">✓</span><span class="what">Maksa 1 240 €:n lasku tutulle toimittajalle<small>laskutusagentti</small></span><span class="chip">Sallittu</span></li><li class="wait"><span class="ic" aria-hidden="true">‖</span><span class="what">Lähetä asiakasrekisteri uuteen osoitteeseen<small>myyntiavustaja</small></span><span class="chip">Vaatii ihmisen</span></li><li class="no"><span class="ic" aria-hidden="true">✕</span><span class="what">Poista viime vuoden kirjaukset<small>siivousskripti</small></span><span class="chip">Estetty</span></li></ul><div class="rcpt"><b>▣ Kuitti</b><span>✓ Allekirjoitettu</span><span>✓ Muuttamaton</span><span>✓ Aikaleimattu</span></div></div><figcaption>Havainnekuva: jokainen toimenpide saa päätöksen ja kuitin.</figcaption></figure></div></div></div></div>
+<main>
+<section class="stats"><div class="wrap"><div class="statrow"><a class="stat" href="https://pepy.tech/projects/vaara"><b>131 000+</b><span>latausta PyPI:stä yhteensä</span></a><a class="stat" href="/conformance.html"><b>51</b><span>testisarjaa, joiden tarkistimet eivät käytä Vaaraa</span></a><a class="stat" href="/conformance.html"><b>7</b><span>riippumatonta tahoa on toistanut ne julkisesti</span></a><a class="stat" href="/fi/products/cage.html"><b>12</b><span>tuettua hiekkalaatikkoa, jokainen nimettynä kuitissa</span></a></div><p class="note">Luvut 10.10.2026. Jokainen linkittää lähteeseensä.</p></div></section>
+<section class="feats"><div class="wrap"><h2>Mitä Vaara tekee</h2><div class="featgrid"><div class="feat f-gate"><svg viewBox="0 0 260 170" role="img" aria-hidden="true" focusable="false" xmlns="http://www.w3.org/2000/svg"><path d="M20 85h70" stroke="var(--ink)" stroke-width="5" stroke-linecap="round"/>
+<path d="M82 74l12 11-12 11" fill="none" stroke="var(--ink)" stroke-width="5" stroke-linecap="round" stroke-linejoin="round"/>
+<rect x="104" y="40" width="34" height="90" rx="6" fill="var(--ink)"/>
+<path d="M138 85h28M166 85c10 0 14-38 34-38M166 85h34M166 85c10 0 14 38 34 38" fill="none" stroke="var(--rule)" stroke-width="4"/>
+<circle cx="214" cy="47" r="15" fill="var(--accent)"/><path d="M207 47l5 5 9-10" fill="none" stroke="#fff" stroke-width="3.5" stroke-linecap="round" stroke-linejoin="round"/>
+<circle cx="214" cy="85" r="15" fill="var(--warn)"/><path d="M209 79v12M219 79v12" stroke="#fff" stroke-width="3.5" stroke-linecap="round"/>
+<circle cx="214" cy="123" r="15" fill="var(--stop)"/><path d="M208 117l12 12M220 117l-12 12" stroke="#fff" stroke-width="3.5" stroke-linecap="round"/></svg><h3>Tarkistettu ennen kuin se tapahtuu</h3><p>Jokainen toimenpide kulkee ensin portin läpi: sallittu, ihmisen hyväksyttäväksi tai estetty. Mikään ei livahda läpi nopeutensa vuoksi.</p></div><div class="feat f-person"><svg viewBox="0 0 260 170" role="img" aria-hidden="true" focusable="false" xmlns="http://www.w3.org/2000/svg"><rect x="40" y="22" width="180" height="126" rx="12" fill="var(--card)" stroke="var(--rule)" stroke-width="2"/>
+<circle cx="68" cy="52" r="12" fill="var(--warn)"/><rect x="88" y="44" width="100" height="7" rx="3.5" fill="var(--ink)"/>
+<rect x="88" y="57" width="70" height="6" rx="3" fill="var(--rule)"/>
+<rect x="56" y="80" width="148" height="8" rx="4" fill="var(--tint)"/><rect x="56" y="94" width="110" height="8" rx="4" fill="var(--tint)"/>
+<rect x="56" y="114" width="68" height="22" rx="6" fill="var(--fa)"/><rect x="136" y="114" width="68" height="22" rx="6" fill="none" stroke="var(--stop)" stroke-width="2"/>
+<path d="M80 125l5 5 9-10" fill="none" stroke="#fff" stroke-width="3" stroke-linecap="round" stroke-linejoin="round"/>
+<path d="M164 119l12 12M176 119l-12 12" stroke="var(--stop)" stroke-width="3" stroke-linecap="round"/></svg><h3>Ihminen siellä, missä sitä tarvitaan</h3><p>Poikkeavat toimenpiteet odottavat kyllä- tai ei-vastausta työpöydällänne. Vastaus kirjataan antajineen.</p></div><div class="feat f-receipt"><svg viewBox="0 0 260 170" role="img" aria-hidden="true" focusable="false" xmlns="http://www.w3.org/2000/svg"><path d="M70 18h100v124l-12-8-13 8-12-8-13 8-12-8-13 8-12-8-13 8z" fill="var(--card)" stroke="var(--rule)" stroke-width="2"/>
+<rect x="84" y="36" width="60" height="7" rx="3.5" fill="var(--ink)"/>
+<rect x="84" y="54" width="72" height="6" rx="3" fill="var(--tint)"/><rect x="84" y="66" width="56" height="6" rx="3" fill="var(--tint)"/><rect x="84" y="78" width="66" height="6" rx="3" fill="var(--tint)"/>
+<circle cx="148" cy="112" r="20" fill="var(--fa)"/><path d="M139 112l6 6 12-13" fill="none" stroke="#fff" stroke-width="4" stroke-linecap="round" stroke-linejoin="round"/>
+<path d="M196 58l40-14-6 9 10 3-8 4 6 9-34-6z" fill="var(--ink)" opacity=".85"/>
+<path d="M188 92c14-6 30-6 44 0" fill="none" stroke="var(--rule)" stroke-width="3" stroke-dasharray="4 6"/></svg><h3>Todiste, joka kulkee mukana</h3><p>Jokaisesta päätöksestä jää allekirjoitettu kuitti. Vuosien päästä, ilman verkkoa, kuka tahansa voi tarkistaa, että se on aito ja muuttamaton.</p></div><div class="feat f-cage"><svg viewBox="0 0 260 170" role="img" aria-hidden="true" focusable="false" xmlns="http://www.w3.org/2000/svg"><rect x="28" y="26" width="120" height="118" rx="10" fill="none" stroke="var(--rule)" stroke-width="3"/>
+<rect x="44" y="42" width="88" height="86" rx="8" fill="none" stroke="var(--fa)" stroke-width="3"/>
+<rect x="62" y="60" width="52" height="50" rx="8" fill="var(--ink)"/>
+<circle cx="80" cy="82" r="4" fill="#fff"/><circle cx="96" cy="82" r="4" fill="#fff"/><rect x="78" y="94" width="20" height="4" rx="2" fill="#fff"/>
+<rect x="168" y="34" width="16" height="18" rx="3" fill="var(--tint)" stroke="var(--rule)"/><rect x="190" y="34" width="16" height="18" rx="3" fill="var(--tint)" stroke="var(--rule)"/><rect x="212" y="34" width="16" height="18" rx="3" fill="var(--tint)" stroke="var(--rule)"/><rect x="168" y="60" width="16" height="18" rx="3" fill="var(--tint)" stroke="var(--rule)"/><rect x="190" y="60" width="16" height="18" rx="3" fill="var(--fa)" stroke="var(--rule)"/><rect x="212" y="60" width="16" height="18" rx="3" fill="var(--tint)" stroke="var(--rule)"/><rect x="168" y="86" width="16" height="18" rx="3" fill="var(--tint)" stroke="var(--rule)"/><rect x="190" y="86" width="16" height="18" rx="3" fill="var(--tint)" stroke="var(--rule)"/><rect x="212" y="86" width="16" height="18" rx="3" fill="var(--tint)" stroke="var(--rule)"/><rect x="168" y="112" width="16" height="18" rx="3" fill="var(--tint)" stroke="var(--rule)"/><rect x="190" y="112" width="16" height="18" rx="3" fill="var(--tint)" stroke="var(--rule)"/><rect x="212" y="112" width="16" height="18" rx="3" fill="var(--tint)" stroke="var(--rule)"/></svg><h3>Valitsemanne seinä</h3><p>Ajakaa agentit hiekkalaatikossa, johon luotatte. Tuettuja on kaksitoista, ja jokainen kuitti kertoo, mikä niistä oli käytössä.</p></div><div class="feat f-rules"><svg viewBox="0 0 260 170" role="img" aria-hidden="true" focusable="false" xmlns="http://www.w3.org/2000/svg"><rect x="34" y="22" width="92" height="124" rx="8" fill="var(--card)" stroke="var(--rule)" stroke-width="2"/>
+<rect x="48" y="40" width="50" height="7" rx="3.5" fill="var(--ink)"/>
+<rect x="48" y="58" width="64" height="6" rx="3" fill="var(--tint)"/><rect x="48" y="72" width="50" height="6" rx="3" fill="var(--tint)"/><rect x="48" y="86" width="64" height="6" rx="3" fill="var(--tint)"/><rect x="48" y="100" width="50" height="6" rx="3" fill="var(--tint)"/><rect x="48" y="114" width="64" height="6" rx="3" fill="var(--tint)"/><rect x="144" y="26" width="86" height="22" rx="11" fill="var(--tint)" stroke="var(--fa)" stroke-width="1.5"/><text x="187" y="41" text-anchor="middle" font-size="11" font-weight="600" fill="var(--ink)">EU AI Act</text><rect x="144" y="56" width="86" height="22" rx="11" fill="var(--tint)" stroke="var(--fa)" stroke-width="1.5"/><text x="187" y="71" text-anchor="middle" font-size="11" font-weight="600" fill="var(--ink)">DORA</text><rect x="144" y="86" width="86" height="22" rx="11" fill="var(--tint)" stroke="var(--fa)" stroke-width="1.5"/><text x="187" y="101" text-anchor="middle" font-size="11" font-weight="600" fill="var(--ink)">GDPR</text><rect x="144" y="116" width="86" height="22" rx="11" fill="var(--tint)" stroke="var(--fa)" stroke-width="1.5"/><text x="187" y="131" text-anchor="middle" font-size="11" font-weight="600" fill="var(--ink)">SOC 2</text>
+<path d="M126 84h18" stroke="var(--fa)" stroke-width="2" stroke-dasharray="3 4"/></svg><h3>Valmiina kysymyksiin, joita teille esitetään</h3><p>Kirjaukset on kohdistettu EU:n tekoälyasetukseen, DORAan, GDPR:ään ja SOC 2 -kontrolleihin yhdessä paketissa, jonka tarkastaja voi lukea.</p></div><div class="feat f-house"><svg viewBox="0 0 260 170" role="img" aria-hidden="true" focusable="false" xmlns="http://www.w3.org/2000/svg"><path d="M40 82l60-48 60 48v62H40z" fill="var(--card)" stroke="var(--ink)" stroke-width="4" stroke-linejoin="round"/>
+<rect x="72" y="92" width="56" height="38" rx="5" fill="var(--ink)"/>
+<rect x="80" y="100" width="40" height="5" rx="2.5" fill="var(--fa)"/><rect x="80" y="111" width="28" height="5" rx="2.5" fill="var(--tint)"/>
+<path d="M190 60c-14 0-20 10-16 20-10 2-12 18 2 20h46c14 0 16-18 4-20 2-14-16-24-28-14z" fill="var(--tint)" stroke="var(--rule)" stroke-width="2"/>
+<path d="M160 104c12 0 18-4 24-12" fill="none" stroke="var(--rule)" stroke-width="3" stroke-dasharray="4 5"/>
+<circle cx="174" cy="100" r="11" fill="var(--stop)"/><path d="M169 95l10 10M179 95l-10 10" stroke="#fff" stroke-width="3" stroke-linecap="round"/></svg><h3>Pysyy talossanne</h3><p>Toimii omilla koneillanne. Ei tiliä, ei käyttötietojen keruuta, mitään ei lähetetä meille. Koodi on avoinna omille asiantuntijoillenne.</p></div></div></div></section>
+<section><div class="wrap"><h2>Itsenäisesti toimiva ohjelmisto pysyy sääntöjenne sisällä. Ja jokaisesta toimenpiteestä jää todiste, jonka kuka tahansa voi tarkistaa.</h2><h3>Asioita tapahtuu jo nyt ilman, että ihminen päättää niistä sillä hetkellä</h3><p>Maksu lähtee. Käyttöoikeus myönnetään. Ovi lukittuu yöksi. Tiedosto poistetaan. Yhä useamman näistä päättää ohjelmisto, ja tekoälyagentit ovat yksi esimerkki siitä.</p><p>Myöhemmin joku kysyy, mitä tapahtui ja miksi. Useimmat järjestelmät vastaavat omilla lokeillaan, eli pyytävät luottamaan sanaanne. Vaara vastaa kuitilla, joka kestää tarkastelun ilman, että kenenkään tarvitsee luottaa teihin tai meihin.</p></div></section>
+<section><div class="wrap"><h2>Jokainen toimenpide päätyy yhteen kolmesta tilasta ja jättää kuitin</h2><div class="states"><div class="state go"><span class="mark" aria-hidden="true">✓</span><h3>Sallittu</h3><p>Sääntöjen sisällä: menee läpi.</p></div><div class="state wait"><span class="mark" aria-hidden="true">‖</span><h3>Vaatii ihmisen</h3><p>Poikkeava tai riskialtis: odottaa, kunnes ihminen sanoo kyllä tai ei.</p></div><div class="state no"><span class="mark" aria-hidden="true">✕</span><h3>Estetty</h3><p>Sääntöjen vastainen: ei tapahdu koskaan.</p></div><div class="state rec"><span class="mark" aria-hidden="true">▣</span><h3>Kuitti</h3><p>Jokainen kolmesta jättää allekirjoitetun merkinnän siitä, mitä päätettiin ja miksi.</p></div></div>
+<p class="label" style="margin-top:28px">Kuka kysyy myöhemmin</p><ul class="who"><li>asukkaan omainen</li><li>valvova viranomainen</li><li>asiakas</li><li>tilintarkastaja</li><li>tuomioistuin</li><li>oma hallituksenne</li></ul></div></section>
+<section class="plain"><div class="wrap"><h2>Kuitti, joka kestää pidempään kuin sen tehnyt järjestelmä</h2><p>Vuosien päästä, lentokoneessa ilman verkkoyhteyttä, ilman asennettua Vaaraa ja luottamatta teihin tai meihin, kuka tahansa voi tarkistaa, että kuitti on aito, milloin se tehtiin ja ettei kukaan ole muuttanut sitä sen jälkeen.</p></div></section>
+<section><div class="wrap"><h2>Vaara toimialallanne</h2><div class="grid"><a class="card" href="/fi/sectors/care.html"><h3>Hoiva ja sosiaalipalvelut</h3><p>Lukittuvat ovet, lääkitys, hälytykset ja ohjelmiston kirjoittamat kirjaukset, ja vastaus jokaiselle kysyvälle omaiselle.</p><span class="go">Lue lisää →</span></a><a class="card" href="/fi/sectors/payments.html"><h3>Maksut ja rahoitus</h3><p>Rahaa liikuttavat agentit ja automaatiot, ja jokainen maksu tarkistettuna valtuutusta vasten.</p><span class="go">Lue lisää →</span></a><a class="card" href="/fi/sectors/public.html"><h3>Julkinen sektori</h3><p>Automaattiset päätökset ja tekoälyavustajat julkisissa palveluissa, ja kirjaukset, jotka vastaavat yhtä hyvin kuntalaiselle kuin tarkastajalle.</p><span class="go">Lue lisää →</span></a><a class="card" href="/fi/sectors/health.html"><h3>Terveydenhuolto</h3><p>Kliininen päätöksentuki ja automaatio, ja jokaisen vaiheen hyväksyntä kirjattuna.</p><span class="go">Lue lisää →</span></a><a class="card" href="/fi/sectors/infrastructure.html"><h3>Energia, teollisuus ja infrastruktuuri</h3><p>Automaattiset ohjaus- ja huoltotoimenpiteet tarkistettuina ennen kuin ne vaikuttavat laitokseen, kirjattuina valvojalle.</p><span class="go">Lue lisää →</span></a><a class="card" href="/fi/sectors/software.html"><h3>Ohjelmistotiimit</h3><p>Koodausagentit kehittäjien koneilla, hallittuna agentin omissa koukuissa, yhdellä säännöstöllä kaikille.</p><span class="go">Lue lisää →</span></a></div></div></section>
+<section><div class="wrap"><h2>Mistä Vaara koostuu</h2><div class="grid"><a class="card" href="/fi/products/gate.html"><h3>Portti</h3><p>Tarkistaa jokaisen toimenpiteen sääntöjänne vasten ennen kuin se tapahtuu.</p><span class="go">Lue lisää →</span></a><a class="card" href="/fi/products/receipts.html"><h3>Kuitit</h3><p>Todiste: yksi allekirjoitettu tietue jokaisesta päätöksestä, tarkistettavissa vuosien päästä ilman meitä.</p><span class="go">Lue lisää →</span></a><a class="card" href="/fi/products/cage.html"><h3>Häkki</h3><p>Valitkaa hiekkalaatikko, jossa agenttinne toimivat, ja kirjatkaa, mikä se oli.</p><span class="go">Lue lisää →</span></a><a class="card" href="/fi/products/app.html"><h3>Työpöytäsovellus</h3><p>Seuraa päätöksiä niiden tapahtuessa ja vastaa niihin, jotka odottavat sinua.</p><span class="go">Lue lisää →</span></a><a class="card" href="/fi/products/test-it-yourself.html"><h3>Testaa itse</h3><p>Aja julkaistut testit omalla koneellasi ja saat samat vastaukset kuin me.</p><span class="go">Lue lisää →</span></a></div></div></section>
+<section><div class="wrap grid two"><div><h2>Missä se toimii</h2><p>Omilla koneillanne. Mitään ei lähetetä meille, tiliä ei tarvita eikä käyttötietoja kerätä. Koodi on avointa, joten omat asiantuntijanne tai toimittajanne voivat lukea jokaisen rivin.</p><p>Ladattavissa ja käytettävissä maksutta, ilman rekisteröitymistä. Maksullinen työ, kuten valmiuskatselmus tai pilotti omassa ympäristössänne, mitoitetaan tapauksenne mukaan ja hinnoitellaan kiinteänä summana, joka sovitaan ennen aloitusta. Ei kuukausimaksua, ei käyttäjäkohtaisia lisenssejä. Kirjoittakaa osoitteeseen hello@vaara.io.</p>
+<p><a href="mailto:hello@vaara.io">Ota yhteyttä tekijään →</a></p></div>
+<div><h2>Ketkä ovat tutustuneet Vaaraan</h2><p>Mukana OECD.AI:n luotettavan tekoälyn työkalu- ja mittariluettelossa.</p><p>Mainittu Singaporen agenttiselle tekoälylle laaditun hallintamallin (Model AI Governance Framework for Agentic AI) kiitoksissa samalla sivulla Googlen, Microsoftin, IBM:n ja Amazonin kanssa.</p><p>Esillä AMD:n AI Developer Programin käyttäjätarinassa.</p><p>Sen tietuemuoto on IETF:n, internetin standardeja laativan järjestön, Internet-Draft, ja seitsemän Vaarasta riippumatonta tahoa on toistanut sen testitulokset julkisesti.</p></div></div></section></main>
+<footer class="site"><div class="wrap"><div class="cols">
+<div><b>VAARA</b><br>Avointa lähdekoodia. Toimii omilla koneillanne. Mitään ei lähetetä meille.<br><a href="mailto:hello@vaara.io">hello@vaara.io</a></div>
+<div><a href="https://github.com/vaaraio/vaara">Lähdekoodi</a><br>
+<a href="https://datatracker.ietf.org/doc/draft-sirkkavaara-vaara-receipt/">IETF-luonnos</a><br>
+<a href="/conformance.html">Vaatimustenmukaisuustulokset</a><br><a href="/surfaces.html">Kaikki, mitä Vaara julkaisee</a><br><a href="/fi/under-the-hood.html">Tekninen yleiskuva</a></div>
+</div><p class="tm">Vaara™ ja Vaara Resin™ © 2026 Henri Sirkkavaara, Helsinki. AGPL-3.0-or-later.</p></div></footer>
+<script>document.querySelector(".bar .theme").onclick=function(){var d=document.documentElement,t=d.dataset.theme==="dark"?"light":"dark";d.dataset.theme=t;try{localStorage.setItem("vaara-theme",t)}catch(e){}};document.querySelector(".bar .burger").onclick=function(){var n=document.querySelector("nav.top"),o=n.classList.toggle("open");this.setAttribute("aria-expanded",o)}</script>
+</body>
+</html>

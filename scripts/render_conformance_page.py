@@ -29,10 +29,16 @@ import json
 import sys
 from pathlib import Path
 
+sys.path.insert(0, str(Path(__file__).resolve().parent))
+import site_shell as shell  # noqa: E402  the bar and footer every vaara.io page shares
+
 REPO = Path(__file__).resolve().parent.parent
 REPRODUCTIONS = REPO / "conformance" / "reproductions.json"
 DEFAULT_OUT = REPO / "webpage" / "conformance.html"
 BADGE_DIR = REPO / "webpage" / "badge"
+
+#: The lead under the heading, HTML.
+LEAD = ("Each suite below ships an independent checker that imports no Vaara code and recomputes its verdicts from the bytes of its own case files. This page is generated from the runner's report, so it says what the checkers did rather than what a document claims they do.")
 
 TITLE = "Vaara Conformance Results"
 
@@ -616,14 +622,14 @@ def reproduction_blocks(data: dict) -> str:
             f"(https://vaara.io{badge})](https://vaara.io/conformance.html)"
         )
         out.append(f"""
-        <article class="repro" id="row-{esc(r['id'])}">
-          <div class="repro-head">
+        <details class="repro" id="row-{esc(r['id'])}">
+          <summary class="repro-head">
             <a class="num mono" href="#row-{esc(r['id'])}">#{esc(r['id'])}</a>
             <span class="date mono">{esc(r.get('date', ''))}</span>
             <span class="who">{esc(r.get('party', ''))}</span>
             <span class="aff">{esc(r.get('affiliation', ''))}</span>
-          </div>
-          <p class="result">{esc(r.get('result', ''))}</p>
+            <span class="result">{esc(r.get('result', ''))}</span>
+          </summary>
           <dl>
             <dt>Kind of run</dt><dd>{esc(kind_text(r))}</dd>
             <dt>Suites</dt><dd class="mono">{esc(suites)}</dd>
@@ -635,7 +641,7 @@ def reproduction_blocks(data: dict) -> str:
             <dt>Badge</dt><dd><img src="{esc(badge)}" alt="{esc('VCR row ' + str(r['id']))}" height="20"><br><code class="snippet">{esc(snippet)}</code></dd>
             <dt>Certificate</dt><dd><a href="/badge/{esc(r['slug'])}.html">printable sheet</a></dd>
           </dl>
-        </article>""")
+        </details>""")
     return "\n".join(out)
 
 
@@ -772,6 +778,7 @@ def json_ld(report: dict, repro: dict) -> str:
         {
             "@type": ["WebPage", "CollectionPage"],
             "@id": PAGE_URL,
+            "breadcrumb": {"@id": f"{PAGE_URL}#crumbs"},
             "url": PAGE_URL,
             "name": TITLE,
             "description": page_description(repro),
@@ -896,6 +903,18 @@ def json_ld(report: dict, repro: dict) -> str:
             ],
         },
     ]
+    graph.append(
+        {
+            "@type": "BreadcrumbList",
+            "@id": f"{PAGE_URL}#crumbs",
+            "itemListElement": [
+                {"@type": "ListItem", "position": 1, "name": "Vaara", "item": f"{SITE}/"},
+                {"@type": "ListItem", "position": 2, "name": "Test it yourself",
+                 "item": f"{SITE}/products/test-it-yourself.html"},
+                {"@type": "ListItem", "position": 3, "name": "Conformance results", "item": PAGE_URL},
+            ],
+        }
+    )
     graph.extend(row_node(r) for r in rows)
     blob = json.dumps(
         {"@context": "https://schema.org", "@graph": graph},
@@ -920,7 +939,7 @@ def render(report: dict, repro: dict) -> str:
 <meta name="robots" content="index, follow, max-image-preview:large, max-snippet:-1">
 <meta name="googlebot" content="index, follow">
 <meta name="referrer" content="strict-origin-when-cross-origin">
-<meta name="theme-color" content="#ececec">
+<meta name="theme-color" content="#14212E">
 <link rel="canonical" href="https://vaara.io/conformance.html">
 <link rel="icon" type="image/svg+xml" href="/favicon.svg">
 <link rel="alternate icon" href="/favicon.ico">
@@ -935,16 +954,16 @@ def render(report: dict, repro: dict) -> str:
 <meta property="og:title" content="{TITLE}">
 <meta property="og:description" content="{esc(description)}">
 <meta property="og:url" content="https://vaara.io/conformance.html">
-<meta property="og:image" content="https://vaara.io/vaara-wordmark-light.png">
+<meta property="og:image" content="https://vaara.io/og/en-conformance.png">
 <meta property="og:image:width" content="1200">
-<meta property="og:image:height" content="346">
-<meta property="og:image:alt" content="Vaara">
+<meta property="og:image:height" content="630">
+<meta property="og:image:alt" content="Vaara: Conformance results">
 <meta property="og:locale" content="en_US">
 <meta name="twitter:card" content="summary_large_image">
 <meta name="twitter:title" content="{TITLE}">
 <meta name="twitter:description" content="{esc(description)}">
-<meta name="twitter:image" content="https://vaara.io/vaara-wordmark-light.png">
-<meta name="twitter:image:alt" content="Vaara">
+<meta name="twitter:image" content="https://vaara.io/og/en-conformance.png">
+<meta name="twitter:image:alt" content="Vaara: Conformance results">
 <script type="application/ld+json">
 {json_ld(report, repro)}
 </script>
@@ -1095,37 +1114,13 @@ def render(report: dict, repro: dict) -> str:
     .nav-jump a{{padding:4px 9px;letter-spacing:.10em;font-size:10px}}
   }}
 </style>
-<script>
-  // Apply the stored theme before first paint, the same as index.html and
-  // verify.html. Without this the page renders in the OS colourway and snaps
-  // to the saved choice when the body script runs.
-  (function(){{ try {{ var t = localStorage.getItem('vaara-theme');
-    if (t === 'dark' || t === 'light') document.documentElement.setAttribute('data-theme', t);
-  }} catch(e){{}} }})();
-</script>
+{shell.PREPAINT}
+{shell.LEGACY_CSS}
 </head>
 <body>
-<header class="topbar">
-  <a class="mark" href="/" aria-label="Vaara home"><img src="/favicon.svg" alt="Vaara" width="24" height="24"></a>
-  <nav class="nav-jump" aria-label="Sections"><a href="/verify.html">Explorer</a><a href="/conformance.html" aria-current="page">Conformance</a><a href="/surfaces.html">Published</a></nav>
-  <div class="theme-toggle">
-    <button type="button" id="themeBtn" aria-label="Switch to dark theme"><svg class="i-moon" viewBox="0 0 18 18" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M15.2 11.4A6.8 6.8 0 0 1 6.6 2.8a7 7 0 1 0 8.6 8.6z"/></svg><svg class="i-sun" viewBox="0 0 18 18" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" aria-hidden="true"><circle cx="9" cy="9" r="3.4"/><path d="M9 1.4v1.7M9 14.9v1.7M1.4 9h1.7M14.9 9h1.7M3.6 3.6l1.2 1.2M13.2 13.2l1.2 1.2M14.4 3.6l-1.2 1.2M4.8 13.2l-1.2 1.2"/></svg></button>
-  </div>
-</header>
-<div class="wrap">
-  <div class="wordmark">
-    <a href="/"><img class="wm-light" src="/vaara-wordmark-light.png" alt="Vaara" width="440" height="127"></a>
-    <a href="/"><img class="wm-dark" src="/vaara-wordmark-dark.png" alt="Vaara" width="440" height="127"></a>
-  </div>
-
-  <p class="kicker">Vaara Conformance Results</p>
-  <h1>Every suite, every verdict, and everyone who checked it themselves.</h1>
-
-  <p class="lede">Each suite below ships an independent checker that imports no
-  Vaara code and recomputes its verdicts from the bytes of its own case files.
-  This page is generated from the runner's report, so it says what the checkers
-  did rather than what a document claims they do.</p>
-
+{shell.bar("en", "/conformance.html", "test", fi_path="/fi/")}
+{shell.band("Conformance results", "Every suite, every verdict, and everyone who checked it themselves.", LEAD, [("Home", "/"), ("Test it yourself", "/products/test-it-yourself.html")])}
+<main class="legacy">
   <div class="stats">
     <div class="stat"><b>{t['suites']}</b><span>suites</span></div>
     <div class="stat"><b>{t['passed']}</b><span>passed</span></div>
@@ -1134,26 +1129,6 @@ def render(report: dict, repro: dict) -> str:
     <div class="stat"><b>{t['cases_passed']}</b><span>cases</span></div>
   </div>
   <p class="mono" style="color:var(--faint)">generated {esc(generated)}</p>
-
-  <h2>Run it yourself</h2>
-  <p>Nothing here needs Vaara installed. The checkers use the standard library
-  plus <code>cryptography</code> and <code>rfc8785</code>.</p>
-<pre><code>git clone https://github.com/vaaraio/vaara
-cd vaara
-pip install cryptography rfc8785
-python scripts/conformance_runner.py</code></pre>
-  <p>Point <code>--vectors-dir</code> at a directory laid out the same way and it
-  grades those bytes instead. The runner collects; the checkers decide.</p>
-
-  <h2>What a pass does not establish</h2>
-  <p>These vectors are Vaara's and there is no ratification process behind them.
-  The maintainer adds the cases and decides what a verdict means, and nobody else
-  has a vote. That is a real limit on any neutrality claim and it is stated here
-  rather than argued around.</p>
-  <p class="note">What the corpus does give is narrower and checkable: every case
-  recomputes from committed bytes with no Vaara import, so anyone can disagree
-  with an expected result and show their work. Recompute is checkable by
-  strangers. Authorship is not.</p>
 
   <h2>Independent reproductions</h2>
   <p>Parties other than the maintainer who ran the checkers and reported the
@@ -1165,8 +1140,39 @@ python scripts/conformance_runner.py</code></pre>
   own badge, carrying that number, the date and the commit. A badge says the
   party ran the checkers at that commit on that date. It never says currently
   passing, and it is not a certification.</p>
+{reproduction_blocks(repro)}
 
-  <h3>Checking a badge without trusting this page</h3>
+  <h2>Run it yourself</h2>
+  <p>Nothing here needs Vaara installed. The checkers use the standard library
+  plus <code>cryptography</code> and <code>rfc8785</code>.</p>
+<pre><code>git clone https://github.com/vaaraio/vaara
+cd vaara
+pip install cryptography rfc8785
+python scripts/conformance_runner.py</code></pre>
+  <p>Point <code>--vectors-dir</code> at a directory laid out the same way and it
+  grades those bytes instead. The runner collects; the checkers decide.</p>
+
+  <details class="more"><summary>All {{t['suites']}} suites and their verdicts</summary>
+  <table>
+    <thead><tr><th>Suite</th><th>Verdict</th><th>Note</th></tr></thead>
+    <tbody>
+{suite_rows(report)}
+    </tbody>
+  </table>
+  </details>
+
+  <details class="more"><summary>What a pass does not establish</summary>
+  <p>These vectors are Vaara's and there is no ratification process behind them.
+  The maintainer adds the cases and decides what a verdict means, and nobody else
+  has a vote. That is a real limit on any neutrality claim and it is stated here
+  rather than argued around.</p>
+  <p class="note">What the corpus does give is narrower and checkable: every case
+  recomputes from committed bytes with no Vaara import, so anyone can disagree
+  with an expected result and show their work. Recompute is checkable by
+  strangers. Authorship is not.</p>
+  </details>
+
+  <details class="more"><summary>Checking a badge without trusting this page</summary>
   <p>Each badge carries the digest of its own row inside the SVG, and the row
   it commits to is served as JCS-canonical bytes (RFC 8785) next to it. The
   file holds those bytes and nothing else, so verifying a badge is one command
@@ -1179,8 +1185,9 @@ python scripts/vcr_chain.py            # nothing removed from the table</code></
   is the same property the corpus runs on, applied to the badge itself: a
   claim that recomputes from bytes, checkable by someone who trusts neither
   the party nor Vaara.</p>
+  </details>
 
-  <h3>Terms for a listed party, version {esc(repro.get('terms_version', FALLBACK_TERMS_VERSION))}</h3>
+  <details class="more"><summary>Terms for a listed party, version {esc(repro.get('terms_version', FALLBACK_TERMS_VERSION))}</summary>
   <p class="note">Stated before there is anything to sell, so that anyone
   deciding whether to be listed can read the commercial position at the moment
   they decide rather than learn it afterwards.</p>
@@ -1241,52 +1248,25 @@ python scripts/vcr_chain.py            # nothing removed from the table</code></
     change for rows added later. A row already listed keeps the terms it was
     listed under, and a change is never applied backwards.</li>
   </ul>
-{reproduction_blocks(repro)}
+  </details>
 
-  <h2>Suites</h2>
-  <table>
-    <thead><tr><th>Suite</th><th>Verdict</th><th>Note</th></tr></thead>
-    <tbody>
-{suite_rows(report)}
-    </tbody>
-  </table>
-
-  <footer>
+  <div class="fineprint">
     Generated by <code>scripts/render_conformance_page.py</code> from
     <code>scripts/conformance_runner.py --json</code>. Independent reproductions
     are maintained in <code>conformance/reproductions.json</code> and added by
     pull request.
-    <br><br>
-    Vaara&trade; and Vaara Resin&trade; &copy; 2026 Henri Sirkkavaara, Helsinki. AGPL-3.0-or-later.
-  </footer>
-</div>
+  </div>
+</main>
+{shell.footer("en")}
 <script>
+// A link to one row (#row-N) opens that row.
 (function(){{
-  var root = document.documentElement;
-  var meta = document.querySelector('meta[name="theme-color"]');
-  var btn  = document.getElementById("themeBtn");
-  var COLORS = {{ light: "#ececec", dark: "#0F1417" }};
-  function current(){{
-    var t = root.getAttribute("data-theme");
-    if (t) return t;
-    return (window.matchMedia && window.matchMedia("(prefers-color-scheme: dark)").matches) ? "dark" : "light";
-  }}
-  function label(){{
-    if (btn) btn.setAttribute("aria-label", current() === "dark" ? "Switch to light theme" : "Switch to dark theme");
-  }}
-  function apply(theme) {{
-    root.setAttribute("data-theme", theme === "dark" ? "dark" : "light");
-    if (meta) meta.setAttribute("content", COLORS[theme] || COLORS.light);
-    try {{ localStorage.setItem("vaara-theme", theme); }} catch(e) {{}}
-    label();
-  }}
-  function reflectAuto(){{ root.removeAttribute("data-theme"); label(); }}
-  if (btn) btn.addEventListener("click", function(){{ apply(current() === "dark" ? "light" : "dark"); }});
-  var saved = null;
-  try {{ saved = localStorage.getItem("vaara-theme"); }} catch(e) {{}}
-  if (saved === "dark" || saved === "light") apply(saved); else reflectAuto();
+  function open(){{ var d = location.hash && document.getElementById(location.hash.slice(1));
+    if (d && d.tagName === "DETAILS") {{ d.open = true; d.scrollIntoView(); }} }}
+  open(); window.addEventListener("hashchange", open);
 }})();
 </script>
+{shell.BODY_SCRIPT}
 </body>
 </html>
 """
