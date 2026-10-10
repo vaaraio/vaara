@@ -139,9 +139,13 @@ class DecisionRecord:
     decision_derived: DecisionDerived
     issuer_asserted: IssuerAsserted
     signature: str
+    # Anchors ride beside the signature, outside the signed payload, and are
+    # carried as received so a parsed receipt serialises back with its time
+    # evidence; each anchor is checked by its own verifier.
+    timestamp_anchors: Optional[list[dict[str, Any]]] = None
 
     def to_dict(self) -> dict[str, Any]:
-        return {
+        out = {
             "version": self.version,
             "alg": self.alg,
             "backLink": back_link_to_dict(self.back_link),
@@ -149,6 +153,9 @@ class DecisionRecord:
             "issuerAsserted": receipt_asserted_to_dict(self.issuer_asserted),
             "signature": self.signature,
         }
+        if self.timestamp_anchors is not None:
+            out["timestampAnchors"] = [dict(a) for a in self.timestamp_anchors]
+        return out
 
 
 _EVIDENCE_REF_KEYS = frozenset({"digest", "canonicalization", "schema", "ref"})
@@ -279,6 +286,10 @@ def decision_record_from_dict(d: dict[str, Any]) -> DecisionRecord:
         raise AttestationError(
             "issuerAsserted.sigSuite is not permitted on a decision record"
         )
+    anchors = d.get("timestampAnchors")
+    if anchors is not None and (
+            not isinstance(anchors, list) or not all(isinstance(a, dict) for a in anchors)):
+        raise AttestationError("decision record timestampAnchors must be a list of objects")
     return DecisionRecord(
         version=d["version"],
         alg=d["alg"],
@@ -286,4 +297,5 @@ def decision_record_from_dict(d: dict[str, Any]) -> DecisionRecord:
         decision_derived=decision_from_dict(d["decisionDerived"]),
         issuer_asserted=receipt_asserted_from_dict(d["issuerAsserted"]),
         signature=d["signature"],
+        timestamp_anchors=[dict(a) for a in anchors] if anchors is not None else None,
     )

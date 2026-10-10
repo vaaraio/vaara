@@ -105,8 +105,7 @@ def _run_vaara(argv: list[str], cwd: Path, env: dict, timeout: float = 300) -> s
     pipes. Killing only ``vaara run`` on a timeout left the agent holding the
     pipes, so the test hung on reading them until the job's six-hour limit.
     The tree is its own session here; on a timeout the session is killed and
-    the captured output is returned with a marker, so the assertions that
-    follow fail with the log in hand.
+    the test fails with the captured output in hand.
     """
     proc = subprocess.Popen(
         [sys.executable, "-m", "vaara.cli", "run", *argv], cwd=cwd, env=env,
@@ -120,7 +119,8 @@ def _run_vaara(argv: list[str], cwd: Path, env: dict, timeout: float = 300) -> s
         except OSError:
             pass
         out, err = proc.communicate(timeout=30)
-        err = f"[test: vaara run did not finish within {timeout:.0f} s; tree killed]\n" + (err or "")
+        pytest.fail(f"vaara run did not finish within {timeout:.0f} s; tree killed.\n"
+                    f"stdout:\n{(out or '')[-3000:]}\nstderr:\n{(err or '')[-3000:]}")
     return subprocess.CompletedProcess(proc.args, proc.returncode, out or "", err or "")
 
 

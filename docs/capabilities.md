@@ -10,7 +10,7 @@ Vaara governs every agent tool call and model call against the organisation's
 policy, and writes the decision and its outcome into a signed, hash-chained
 record that an outside party recomputes from the bytes and verifies offline,
 with none of the operator's software. The record can be anchored to up to five
-independent roots of trust, with zero-knowledge and post-quantum options. 51
+independent roots of trust, with zero-knowledge and post-quantum options. 52
 conformance suites each ship a checker that imports no Vaara code.
 
 License: AGPL-3.0-or-later.
@@ -130,7 +130,7 @@ section 5.6).
 52 conformance suites under `tests/vectors/` and `conformance/`, each with a
 `_check_independent.py` that imports no Vaara code and recomputes its verdicts
 from the bytes of its case files. `scripts/conformance_runner.py` runs them all:
-49 pass and 2 skip without optional extras (`pq_hybrid_v0` needs `vaara[pq]`,
+50 pass and 2 skip without optional extras (`pq_hybrid_v0` needs `vaara[pq]`,
 `qualified_time_v0` needs `vaara[timeanchor]`). `vaara conformance statement`
 checks an installed build against the published corpus. Results and outside
 reproductions: [vaara.io/conformance.html](https://vaara.io/conformance.html).

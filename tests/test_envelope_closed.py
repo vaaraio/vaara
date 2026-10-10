@@ -65,8 +65,17 @@ def test_a_receipt_whose_issuer_block_names_another_alg_does_not_verify():
 
 def test_the_decision_record_round_trips_with_anchors_beside_it():
     wire = _decision().to_dict()
-    wire["timestampAnchors"] = []
-    assert decision_record_from_dict(wire).decision_derived.decision == "allow"
+    wire["timestampAnchors"] = [{"method": "rfc3161", "anchoredDigest": "sha256:" + "ab" * 32,
+                                 "token": "AAAA"}]
+    parsed = decision_record_from_dict(wire)
+    assert parsed.decision_derived.decision == "allow"
+    # The anchors are carried as received: a parsed receipt serialises back
+    # with its time evidence and not without it.
+    assert parsed.to_dict() == wire
+    assert "timestampAnchors" not in _decision().to_dict()
+    wire["timestampAnchors"] = "not a list"
+    with pytest.raises(AttestationError, match="timestampAnchors"):
+        decision_record_from_dict(wire)
 
 
 @pytest.mark.parametrize("where", ["top", "decisionDerived"])
@@ -101,3 +110,11 @@ def test_a_decision_receipt_carrying_a_hybrid_suite_is_refused():
     wire["issuerAsserted"]["sigSuite"] = "ES256+ML-DSA-65"
     with pytest.raises(AttestationError, match="sigSuite"):
         decision_record_from_dict(wire)
+
+
+def test_a_float_version_is_refused_even_when_it_equals_one():
+    from vaara.attestation._receipt_types import require_envelope_version
+    require_envelope_version(1, "receipt")
+    for bad in (1.0, "1", True):
+        with pytest.raises(AttestationError):
+            require_envelope_version(bad, "receipt")

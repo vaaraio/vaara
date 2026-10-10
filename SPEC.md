@@ -973,14 +973,17 @@ An implementation conforms to `vaara.receipt/v1` if, for every receipt it emits:
    defined `decision` or `status` value, and a well-formed `completeness` block
    where one is present.
 2. The Section 2.2 signature verifies against the stated `alg` and key.
-3. `evidenceRef.digest` equals `sha256(JCS(evidence_record))` for the referenced
-   record, under one of the Section 1 canonicalization labels.
+3. For a decision receipt, `evidenceRef.digest` equals
+   `sha256(JCS(evidence_record))` for the referenced record, under one of the
+   Section 1 canonicalization labels. An execution receipt carries no
+   `evidenceRef`, so this check does not apply to it.
 4. Any `timestampAnchors[].anchoredDigest` equals the digest of the signed
    payload of the same receipt, and any `existenceProof.recordDigest` equals the
    digest of the receipt with `existenceProof` removed.
 5. For an execution receipt, `backLink` recomputes from its predecessor, and
-   when `status` is `executed` the `resultCommitment` recomputes from the
-   result.
+   a `resultCommitment`, where one is present, recomputes from the result.
+   Section 2.7 keeps the member optional, so an `executed` receipt without
+   one has nothing to recompute.
 6. Any cage block in an evidence record keeps the rules of Section 5.10.
 
 The committed vectors plus `_check_independent.py` are the reference conformance

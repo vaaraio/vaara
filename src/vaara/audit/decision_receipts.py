@@ -144,7 +144,9 @@ def _cage_block(cage: dict[str, Any], record_id: str) -> dict[str, Any]:
     when custom code passes a hand-built block to ``record_decision``.
     """
     driver = str(cage["driver"])
-    confirmed = bool(cage.get("confirmed", False))
+    # Only the boolean true confirms. A string "false", or any other value a
+    # hand-built block carries, is unconfirmed; truthiness would sign it.
+    confirmed = cage.get("confirmed", False) is True
     if driver == "none":
         if confirmed:
             logger.warning("cage block for record_id=%s claims confirmed with "

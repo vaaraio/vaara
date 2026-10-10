@@ -118,3 +118,28 @@ def test_pipeline_replays_the_whole_session_not_a_record_window():
     assert len(trail.get_agent_records("ag", limit=10**6)) > 100
     # A session that spent nothing is not touched by the first one's records.
     assert pipe.intercept("ag", "fs.read", {}, session_id="fresh").decision == "allow"
+
+
+def test_session_replay_is_scoped_to_the_tenant():
+    from vaara.audit.trail import AuditTrail
+    from vaara.pipeline import InterceptionPipeline
+
+    class Scorer:
+        def __init__(self):
+            self.next = ("allow", 0.0)
+
+        def evaluate(self, _ctx):
+            action, risk = self.next
+            return {"action": action, "raw_result": {"point_estimate": risk}}
+
+    scorer = Scorer()
+    pipe = InterceptionPipeline(scorer=scorer, trail=AuditTrail(),
+                                authority=AuthorityPolicy(budget=1.5, low=0.5,
+                                                          half_life_s=1e9))
+    scorer.next = ("deny", 0.9)
+    pipe.intercept("ag", "shell.exec", {"cmd": "x"}, session_id="s", tenant_id="t1")
+    pipe.intercept("ag", "shell.exec", {"cmd": "y"}, session_id="s", tenant_id="t1")
+    scorer.next = ("allow", 0.0)
+    assert pipe.intercept("ag", "fs.read", {}, session_id="s", tenant_id="t1").decision == "escalate"
+    # Same agent and session ids under another tenant: a fresh budget.
+    assert pipe.intercept("ag", "fs.read", {}, session_id="s", tenant_id="t2").decision == "allow"

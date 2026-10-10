@@ -26,6 +26,7 @@ import base64
 import hashlib
 import os
 import re
+import errno
 import sys
 import time
 from collections.abc import Iterator
@@ -77,7 +78,11 @@ def _exclusive(lock_path: Path) -> Iterator[None]:
                 try:
                     msvcrt.locking(fh.fileno(), msvcrt.LK_NBLCK, 1)
                     break
-                except OSError:
+                except OSError as exc:
+                    # Only contention is waited out (EACCES, or EDEADLK from
+                    # the CRT); a bad descriptor or argument is raised.
+                    if exc.errno not in (errno.EACCES, errno.EDEADLK):
+                        raise
                     time.sleep(0.005)
             try:
                 yield

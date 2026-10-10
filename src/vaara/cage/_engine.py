@@ -100,6 +100,8 @@ class ContainerEngineDriver:
         config = data.get("Config") or {}
         given = next((str(e).split("=", 1)[1] for e in (config.get("Env") or ())
                       if str(e).startswith(DIGEST_ENV + "=")), "")
+        if not re.fullmatch(r"sha256:[0-9a-f]{64}", given):
+            given = ""  # not a digest this record may carry; the engine view stands
         return {
             "name": name, "id": data.get("Id", ""),
             "status": state.get("Status", ""), "running": bool(state.get("Running")),

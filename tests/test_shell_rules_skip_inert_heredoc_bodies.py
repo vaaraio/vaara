@@ -218,3 +218,8 @@ def test_a_python_body_that_calls_the_shell_is_the_accepted_trade_off(rules):
     # it is a decision, not a drift.
     body = "import os\nos.system(\"" + SHELL_BODY + "\")"
     assert _bash(rules, _heredoc("python3 - <<'EOF'", body)) is None
+
+
+def test_a_written_file_whose_name_starts_with_a_dash_is_still_a_target(rules):
+    command = _heredoc("cat > -x.sh <<'EOF'", SHELL_BODY) + "\n./-x.sh"
+    assert _bash(rules, command) == "shell_netcat_egress"
