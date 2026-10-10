@@ -208,7 +208,7 @@ ships recomputable vectors, not because it is another instance of the binding.
 | release condition | `vaara.release-condition/v0` (consumes `vaara.authorization/v0`) | `vaara.receipt/v1` | `tests/vectors/release_condition_v0/` |
 | attribute attestation | `vaara.attribute-attestation/v0` | `vaara.receipt/v1` | `tests/vectors/attribute_attestation_v0/` |
 | hidden-value attribute attestation | `vaara.attribute-attestation-zk/v0` (proved by `vaara.attribute-predicate/v0`) | `vaara.receipt/v1` | `tests/vectors/attribute_attestation_zk_v0/` |
-| engine decision | `vaara.trail-decision/v0` | `vaara.receipt/v1` | `tests/vectors/trail_decision_v0/` |
+| engine decision | `vaara.trail-decision/v0` | `vaara.receipt/v1` | `tests/vectors/trail_decision_v0/`, `tests/vectors/cage_v0/` |
 
 ### 5.2 Profile example: x402 settlement binding
 
@@ -674,7 +674,7 @@ file holds the envelope under `receipt` and the evidence record under
 | `recordHash` | `sha256:` and the trail record's own hash. |
 | `previousHash` | `sha256:` and the hash of the record before it. An empty genesis link is written as the SHA-256 of the empty string. |
 | `decisionDetail`, `approver`, `humanDisposed` | Present only when the trail record carries them. |
-| `cage` | The cage the deciding process ran in, as the trail record carries it. `driver` names it (`vaara-cage`, `openshell`, or `none` for a run outside any cage) and `confirmed` says whether the kernel confirmed the confinement on the deciding process at decision time. A named cage adds `upstream` (the cage's own name and version), `configDigest` (`sha256:` over its effective configuration), `basis` (what was checked: `apparmor_label`, `seccomp_filter`, or `declared` when the launcher's word stood unconfirmed) and, when set, `name`. Absent on records written before the cage layer. |
+| `cage` | The cage the deciding process ran in. See "The cage block" below. Absent on records written before the cage layer. |
 
 The envelope writes the trail's `deny` as `block`. `backLink.attestationDigest`
 is `previousHash`, `backLink.attestationNonce` is `recordId`, and
@@ -693,6 +693,57 @@ Vectors are in `tests/vectors/trail_decision_v0/`: receipts written by the
 engine's own sink over a SQLite trail, tampered copies, the trail's record
 hashes, and `expected.json` with each file's verdict. The macOS app's verifier
 checks the same files.
+
+#### The cage block
+
+`cage` says which cage, if any, the process that made the decision ran in,
+and whether the issuer confirmed at decision time that the confinement held
+on that process. It is a member of the evidence record, so the evidence
+digest and the signature bind it like any other member.
+
+| Member | Type | Rule |
+|---|---|---|
+| `driver` | string | Always present, never empty. The cage's driver name, or `none` when no cage was declared to the deciding process. |
+| `confirmed` | boolean | Always present. See below. |
+| `basis` | string | Present whenever `driver` is not `none`. What the confirmation rests on: `declared` when only the launcher's declaration stands, otherwise the name of the fact that was read. |
+| `configDigest` | string | Optional. `sha256:` and 64 lowercase hex characters over the cage's effective configuration. The driver defines which bytes it covers. |
+| `upstream` | string | Optional, informative. The cage's own name and version. |
+| `name` | string | Optional, informative. This launch's name inside the cage. |
+
+`driver: none` carries `confirmed: false` and no other member.
+`confirmed: true` means exactly this: at decision time the issuer read, on
+the deciding process or the platform under it, the fact that `basis` names,
+and the fact held. It requires a `basis` other than `none` or `declared`. It
+does not mean that the cage enforced the configuration `configDigest` names,
+that the cage is free of defects, or that anyone other than the issuer
+observed the fact. A verifier ignores members it does not know.
+
+`configDigest` is a comparator, not a recomputation target. Two receipts with
+the same `driver` and `configDigest` ran under the same declared
+configuration; a verifier holding that configuration and the driver's rule
+can confirm the digest, and one without them treats it as an opaque value.
+
+The engine never writes a block that breaks these rules. A block passed in by
+custom code is held to them on the receipt: a `configDigest` that is not
+`sha256:` hex is left out, and an unsupported `confirmed: true` is written as
+`false`. The trail record keeps what it was given.
+
+Known basis values: `apparmor_label` (the process carries the cage's AppArmor
+label), `seccomp_filter` (a seccomp filter and `no_new_privs` are on),
+`no_new_privs`, `bwrap_init` (pid 1 of the pid namespace is bubblewrap),
+`gvisor_kernel_log` (the kernel log is gVisor's), `hypervisor_present` (the
+CPU reports a hypervisor underneath). `hypervisor_present` is the weakest:
+it shows a virtual machine, not which one. Known drivers: `vaara-cage`,
+`openshell`, `codex`, `sandbox-runtime`, `gvisor`, `firecracker`, `kata`,
+`agent-sandbox`, `microsandbox`, `nono`, `e2b`, `apple-container`. Both lists
+are open.
+
+Vectors are in `tests/vectors/cage_v0/`: an unconfined run, a declared cage
+the kernel did not confirm, and a confirmed cage, written by the engine's own
+sink; a block changed after signing; and three blocks that are signed and
+digest-consistent but break a rule of the block (confirmed on `declared`,
+confirmed with `driver: none`, a malformed `configDigest`). The checker gives
+each file a `signature`, `evidence` and `cage` verdict.
 
 ## 6. The ingest envelope (`vaara.ingest/v0`)
 

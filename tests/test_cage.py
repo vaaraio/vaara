@@ -8,8 +8,10 @@ import json
 import os
 import socket
 import stat
+import subprocess
 import sys
 import threading
+from pathlib import Path
 from unittest import mock
 
 import pytest
@@ -130,15 +132,37 @@ class TestOnTheRecord:
     def test_the_receipt_lifts_the_block(self):
         trail = AuditTrail()
         block = {"driver": "vaara-cage", "confirmed": True, "upstream": "apparmor 4.0.1",
-                 "config_digest": "sha256:ff", "basis": "apparmor_label", "name": "claude"}
+                 "config_digest": "sha256:" + "ff" * 32, "basis": "apparmor_label", "name": "claude"}
         trail.record_decision(action_id="a", agent_id="x", tool_name="t",
                               decision="allow", reason="r", risk_score=0.1, cage=block)
         rec = trail.get_records_by_type(EventType.DECISION_MADE)[0]
         evidence = build_evidence(rec)
         assert evidence["cage"] == {
             "driver": "vaara-cage", "confirmed": True, "upstream": "apparmor 4.0.1",
-            "configDigest": "sha256:ff", "basis": "apparmor_label", "name": "claude",
+            "configDigest": "sha256:" + "ff" * 32, "basis": "apparmor_label", "name": "claude",
         }
+
+    @pytest.mark.parametrize("block, want", [
+        # A digest that is not sha256 hex is left out of the receipt.
+        ({"driver": "openshell", "confirmed": False, "config_digest": "sha256:ff",
+          "basis": "declared"},
+         {"driver": "openshell", "confirmed": False, "basis": "declared"}),
+        # Confirmed on the launcher's word alone is written as unconfirmed.
+        ({"driver": "openshell", "confirmed": True, "basis": "declared"},
+         {"driver": "openshell", "confirmed": False, "basis": "declared"}),
+        ({"driver": "openshell", "confirmed": True},
+         {"driver": "openshell", "confirmed": False, "basis": "declared"}),
+        # No cage cannot be a confirmed cage, and carries nothing else.
+        ({"driver": "none", "confirmed": True, "basis": "apparmor_label"},
+         {"driver": "none", "confirmed": False}),
+    ])
+    def test_the_receipt_never_overstates_a_hand_built_block(self, block, want):
+        trail = AuditTrail()
+        trail.record_decision(action_id="a", agent_id="x", tool_name="t",
+                              decision="allow", reason="r", risk_score=0.1, cage=block)
+        rec = trail.get_records_by_type(EventType.DECISION_MADE)[0]
+        assert rec.data["cage"] == block
+        assert build_evidence(rec)["cage"] == want
 
     def test_an_unconfined_receipt_says_so(self, monkeypatch):
         monkeypatch.delenv(cage.CAGE_ENV, raising=False)
@@ -503,3 +527,41 @@ def test_the_relay_hands_the_hook_the_asking_pid(monkeypatch, tmp_path):
     captured.clear()
     server.answer({"argv": ["pre-tool-use"], "stdin": ""})
     assert PEER_ENV not in captured
+
+
+# ── The public vectors ────────────────────────────────────────────────
+
+CAGE_VECTORS = Path(__file__).parent / "vectors" / "cage_v0"
+
+
+def test_the_independent_checker_matches_expected():
+    run = subprocess.run([sys.executable, str(CAGE_VECTORS / "_check_independent.py")],
+                         capture_output=True, text=True)
+    assert run.returncode == 0, run.stdout + run.stderr
+
+
+@pytest.mark.parametrize(
+    "name", sorted(json.loads((CAGE_VECTORS / "expected.json").read_text(encoding="utf-8")))
+)
+def test_the_engine_verifier_agrees_on_signature_and_evidence(name):
+    from vaara.audit import decision_receipts as dr
+
+    want = json.loads((CAGE_VECTORS / "expected.json").read_text(encoding="utf-8"))[name]
+    c = dr.verify_receipt_file(
+        CAGE_VECTORS / name, public_key_pem=(CAGE_VECTORS / dr.PUBKEY_NAME).read_bytes(),
+    )
+    assert (c.signature_ok, c.evidence_ok) == (want["signature"], want["evidence"])
+
+
+@pytest.mark.parametrize("name", sorted(p.name for p in (CAGE_VECTORS / "invalid").glob("*.json")))
+def test_the_engine_would_have_written_each_bad_block_as_a_good_one(name):
+    from vaara.audit.decision_receipts import _cage_block
+
+    sys.path.insert(0, str(CAGE_VECTORS))
+    try:
+        import _check_independent as checker
+    finally:
+        sys.path.remove(str(CAGE_VECTORS))
+    wire = json.loads((CAGE_VECTORS / "invalid" / name).read_text(encoding="utf-8"))["evidence"]["cage"]
+    trail_form = {("config_digest" if k == "configDigest" else k): v for k, v in wire.items()}
+    assert checker._cage_ok({"cage": _cage_block(trail_form, "r")})

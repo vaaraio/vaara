@@ -6,7 +6,11 @@ and this project follows [Semantic Versioning](https://semver.org/spec/v2.0.0.ht
 
 ## [Unreleased]
 
+### Added
+- Conformance vectors for the cage block of a decision receipt, `tests/vectors/cage_v0/`, with a standalone checker that gives each file a signature, evidence and cage verdict. The rules of the block are written out in SPEC.md section 5.10: `driver: none` carries `confirmed: false` and nothing else, any other driver carries a `basis`, `confirmed: true` needs a basis that names the fact that was read, and `configDigest` is `sha256:` and 64 lowercase hex.
+
 ### Fixed
+- A decision receipt never states more about its cage than the rules allow. A block passed to `record_decision` by custom code with a malformed `configDigest`, or with `confirmed: true` on `driver: none` or on a `declared` basis, was copied into the signed receipt as given. The receipt now leaves the digest out and writes `confirmed: false`; the trail record keeps what it was given.
 - Deny rules that name a file path hold on Windows. Their patterns are written with `/`, so a path a Windows harness sends, such as `C:\Users\me\.ssh\id_ed25519`, passed `secret_material_read` and every other path rule. Path arguments are now matched with their separators turned, for named tools, harness aliases and MCP arguments alike.
 - Text that Vaara reads and writes is UTF-8 with `\n` line endings on every platform. On Windows the code page decoded agent configs that carry a non-ASCII path or user name wrong, and text mode wrote `\r\n`, so the trail export, receipt files and the decision vocabulary vectors were different bytes there than on Linux and macOS.
 - The cage layer loads on Windows. The OS guard imported `fcntl` and `pwd` at module load, so every module that reads its socket path failed to import, `vaara cage drivers` included.

@@ -1,0 +1,55 @@
+{
+  "evidence": {
+    "actionId": "vector-action-1",
+    "agentId": "vector-agent",
+    "cage": {
+      "basis": "declared",
+      "configDigest": "sha256:7becdc7942d4cb5d0e63925b0a4545448901b093cb041666bd349bab84987e3b",
+      "confirmed": false,
+      "driver": "openshell",
+      "name": "vector-launch",
+      "upstream": "openshell 0.1.5"
+    },
+    "decidedAt": "2026-10-10T12:59:09.815Z",
+    "decision": "allow",
+    "eventType": "decision_made",
+    "previousHash": "sha256:8a9ec3d5311ffa66d2cbcfee496087d9f339358b32f3f97984305fbfacd6ceb8",
+    "reason": "allow: risk=0.12",
+    "recordHash": "sha256:9da81251191f53cb221861a26a6129f0074dc212072e3e0e1d307035fa718610",
+    "recordId": "8229a156-3b1f-49b1-bb39-ef898cb6adf3",
+    "riskScore": "0.12",
+    "schema": "vaara.trail-decision/v0",
+    "tenantId": "",
+    "toolName": "read_file"
+  },
+  "receipt": {
+    "alg": "ES256",
+    "backLink": {
+      "attestationDigest": "sha256:8a9ec3d5311ffa66d2cbcfee496087d9f339358b32f3f97984305fbfacd6ceb8",
+      "attestationNonce": "8229a156-3b1f-49b1-bb39-ef898cb6adf3"
+    },
+    "decisionDerived": {
+      "decidedAt": "2026-10-10T12:59:09.815Z",
+      "decision": "allow",
+      "evidenceRef": {
+        "canonicalization": "jcs-rfc8785",
+        "digest": "sha256:c9b2dbc15847cbc4ad986f2ee8b8d5d05c50333d645cf6f73ac81d2b8adca22f",
+        "ref": "vaara:trail/8229a156-3b1f-49b1-bb39-ef898cb6adf3",
+        "schema": "vaara.trail-decision/v0"
+      },
+      "policyId": "policy:vaara-engine/1",
+      "reason": "allow: risk=0.12",
+      "riskScore": "0.12"
+    },
+    "issuerAsserted": {
+      "alg": "ES256",
+      "iat": "2026-10-10T12:59:09Z",
+      "iss": "vaara:engine",
+      "nonce": "B69cXlDfHKW2pfGhPhO-NLnE",
+      "secretVersion": "es256:45e562127e132687",
+      "sub": "vector-agent"
+    },
+    "signature": "b17bccb9203e821b572df2f3cfefc7506661e1bdca17d6b8bce32b7b18464ab1973f3fc2c3dd2bab0ad896514794368f4216d773ebba0949b22a0fa0fceb4ed4",
+    "version": 1
+  }
+}
