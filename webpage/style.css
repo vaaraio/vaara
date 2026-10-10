@@ -47,15 +47,18 @@ nav.top a.l:hover, nav.top a.l.on { color: var(--on-night); }
 nav.top .lang { font-size: 14px; color: var(--on-night-muted); }
 nav.top .lang a { color: var(--on-night-soft); text-decoration: none; }
 nav.top .lang b { color: var(--on-night); font-weight: 600; }
-.hero { padding: 56px 0 72px; }
-.hero .kicker { color: var(--on-night-soft); font-size: 14px; letter-spacing: .12em; text-transform: uppercase; margin: 0 0 14px; }
-.hero h1 { font-size: 44px; line-height: 1.15; color: var(--on-night); margin: 0 0 20px; max-width: 18em; font-weight: 650; }
-.hero p.lead { font-size: 20px; color: var(--on-night-soft); max-width: 36em; margin: 0 0 32px; }
+.hero { padding: 26px 0 30px; }
+.hero.home { padding: 40px 0 44px; }
+.hero .kicker { color: var(--on-night-soft); font-size: 13px; letter-spacing: .12em; text-transform: uppercase; margin: 0 0 8px; }
+.hero h1 { font-size: 30px; line-height: 1.2; color: var(--on-night); margin: 0 0 10px; max-width: 30em; font-weight: 650; }
+.hero.home h1 { font-size: 36px; max-width: 24em; margin-bottom: 14px; }
+.hero p.lead { font-size: 17px; color: var(--on-night-soft); max-width: 46em; margin: 0; }
+.hero.home p.lead { font-size: 18px; margin-bottom: 24px; }
 .btns { display: flex; gap: 14px; flex-wrap: wrap; }
 .btn { display: inline-block; padding: 12px 22px; border-radius: 6px; text-decoration: none; font-weight: 600; font-size: 16px; }
 .btn.primary { background: var(--on-night); color: var(--night) !important; }
 .btn.ghost { border: 1px solid var(--on-night-muted); color: var(--on-night) !important; }
-.crumbs { color: var(--on-night-muted); font-size: 14px; margin: 0 0 12px; }
+.crumbs { color: var(--on-night-muted); font-size: 13px; margin: 0 0 10px; }
 .crumbs a { color: var(--on-night-soft); text-decoration: none; }
 
 /* white body */
@@ -110,7 +113,7 @@ footer a { color: var(--on-night-soft); }
 footer .cols { display: flex; gap: 48px; flex-wrap: wrap; }
 
 @media (max-width: 820px) {
-  .hero h1 { font-size: 32px; }
+  .hero h1, .hero.home h1 { font-size: 25px; }
   .states, .grid, .grid.two, .four { grid-template-columns: 1fr; }
   nav.top { gap: 14px; height: auto; padding: 12px 0; flex-wrap: wrap; }
   .dd .menu { left: 0; }
