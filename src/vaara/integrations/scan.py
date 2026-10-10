@@ -119,7 +119,7 @@ class Finding:
 
 def _json(path: Path) -> dict:
     try:
-        data = json.loads(path.read_text())
+        data = json.loads(path.read_text(encoding="utf-8"))
     except (OSError, ValueError):
         return {}
     return data if isinstance(data, dict) else {}
@@ -243,7 +243,7 @@ def _proc_connections(proc: Path = Path("/proc")) -> Optional[list[Connection]]:
     by_inode: dict[str, tuple[str, int]] = {}
     for name in ("tcp", "tcp6"):
         try:
-            lines = (proc / "net" / name).read_text().splitlines()[1:]
+            lines = (proc / "net" / name).read_text(encoding="utf-8").splitlines()[1:]
         except OSError:
             continue
         for line in lines:

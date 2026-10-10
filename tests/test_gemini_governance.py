@@ -50,7 +50,9 @@ def _payload(tool: str, tool_input, **extra) -> dict:
 def test_builtins_become_the_tools_the_rules_name(tool, args, name, field, value):
     [e] = gemini.to_hook_events(_payload(tool, args))
     assert e["tool_name"] == name
-    assert e["tool_input"][field] == value
+    got = e["tool_input"][field]
+    # Paths resolve with the host's separator; compare them as POSIX.
+    assert (got.replace("\\", "/") if field == "file_path" else got) == value
     assert e["session_id"] == "s1"
 
 

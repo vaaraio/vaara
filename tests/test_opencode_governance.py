@@ -198,7 +198,7 @@ def _call_plugin(tmp_path: Path, vaara_bin: str, home: Path | None = None) -> di
     installed.write_text(PLUGIN.read_text(encoding="utf-8").replace("__VAARA_BIN__", vaara_bin))
     driver = tmp_path / "driver.mjs"
     driver.write_text(textwrap.dedent(f"""\
-        import {{ VaaraGovernance }} from {json.dumps(str(installed))};
+        import {{ VaaraGovernance }} from {json.dumps(installed.as_uri())};
         const hooks = await VaaraGovernance({{}});
         try {{
           await hooks["tool.execute.before"](
@@ -266,7 +266,7 @@ def test_plugin_through_the_real_engine_blocks_a_denied_call(tmp_path):
     installed.write_text(PLUGIN.read_text(encoding="utf-8").replace("__VAARA_BIN__", str(shim)))
     driver = tmp_path / "driver.mjs"
     driver.write_text(textwrap.dedent(f"""\
-        import {{ VaaraGovernance }} from {json.dumps(str(installed))};
+        import {{ VaaraGovernance }} from {json.dumps(installed.as_uri())};
         const hooks = await VaaraGovernance({{}});
         const out = [];
         for (const command of ["ls -la", "cat /etc/shadow"]) {{

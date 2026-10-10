@@ -384,7 +384,7 @@ class InterceptionPipeline:
 
         Returns an InterceptionResult — check .allowed before executing.
         """
-        start = time.monotonic()
+        start = time.perf_counter()
         if policy_decision is not None and policy_decision not in _FINE_TO_COARSE:
             raise ValueError(f"policy_decision must be a decision, not {policy_decision!r}")
 
@@ -882,7 +882,7 @@ class InterceptionPipeline:
                     evicted, _ = self._pending_outcomes.popitem(last=False)
                     self._pending_in_db.pop(evicted, None)
 
-        elapsed_ms = (time.monotonic() - start) * 1000
+        elapsed_ms = (time.perf_counter() - start) * 1000
 
         with self._metrics_lock:
             self._metrics.total_intercepts += 1

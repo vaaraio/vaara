@@ -92,7 +92,8 @@ def _trust(home: Path, **state) -> None:
     hooks = json.loads((home / "hooks.json").read_text(encoding="utf-8"))["hooks"]["PreToolUse"]
     handler = hooks[0]["hooks"][0]
     key = f"{(home / 'hooks.json').resolve()}:pre_tool_use:0:0"
-    lines = [f'[hooks.state."{key}"]']
+    # A literal TOML string: a Windows path's backslashes are not escapes.
+    lines = [f"[hooks.state.'{key}']"]
     if state.get("hash", True):
         value = state.get("value") or codex.hook_hash("pre_tool_use", None, handler)
         lines.append(f'trusted_hash = "{value}"')

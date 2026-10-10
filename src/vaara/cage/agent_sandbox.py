@@ -39,7 +39,7 @@ RESOURCE = "sandboxes.agents.x-k8s.io"
 
 def load_manifest(path: Path) -> dict[str, Any]:
     try:
-        text = Path(path).read_text()
+        text = Path(path).read_text(encoding="utf-8")
     except OSError as exc:
         raise CageError(f"cannot read {path}: {exc}") from None
     try:

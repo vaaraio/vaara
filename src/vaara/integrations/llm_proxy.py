@@ -296,7 +296,7 @@ def main(args: Optional[list[str]] = None) -> int:
         if not key_path.exists():
             print(f"Error: API key file not found: {key_path}", file=sys.stderr)
             return 1
-        api_key = key_path.read_text().strip()
+        api_key = key_path.read_text(encoding="utf-8").strip()
 
     if parsed.auth_passthrough:
         # None is the signal the app layer reads as "hold nothing, forward

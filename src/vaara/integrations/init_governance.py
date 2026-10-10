@@ -305,7 +305,7 @@ def _hook_command(vaara_bin: str, subcommand: str) -> str:
 
 def _load_json(path: Path) -> dict:
     try:
-        data = json.loads(path.read_text())
+        data = json.loads(path.read_text(encoding="utf-8"))
         return data if isinstance(data, dict) else {}
     except (OSError, json.JSONDecodeError):
         # A missing, empty, or truncated settings.json (the 27-byte-reset bug)
@@ -316,7 +316,7 @@ def _load_json(path: Path) -> dict:
 def _atomic_write_json(path: Path, obj: dict) -> None:
     path.parent.mkdir(parents=True, exist_ok=True)
     tmp = path.with_suffix(path.suffix + ".vaara-tmp")
-    tmp.write_text(json.dumps(obj, indent=2, sort_keys=False) + "\n")
+    tmp.write_text(json.dumps(obj, indent=2, sort_keys=False) + "\n", encoding="utf-8", newline="\n")
     os.replace(tmp, path)
 
 
@@ -485,7 +485,7 @@ def scan_mcp_client(name: str, raw_path: str, proxy_bin: str) -> MCPClientStatus
         return MCPClientStatus(name=name, path=path, exists=False)
     has_backup = _backup_path(path).exists()
     try:
-        obj = json.loads(path.read_text())
+        obj = json.loads(path.read_text(encoding="utf-8"))
         servers = obj.get("mcpServers", {})
         if not isinstance(servers, dict):
             raise ValueError
@@ -525,7 +525,7 @@ def govern_mcp_config(
     overwrites it, so ``restore_mcp_config`` always recovers the original.
     """
     try:
-        obj = json.loads(config_path.read_text())
+        obj = json.loads(config_path.read_text(encoding="utf-8"))
         servers = obj.get("mcpServers")
         if not isinstance(servers, dict):
             return None

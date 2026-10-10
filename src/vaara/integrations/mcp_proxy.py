@@ -2024,7 +2024,7 @@ def _vaara_deciding_hook(path: Path) -> Optional[str]:
     was already decided, so it is not a second decision point.
     """
     try:
-        data = json.loads(path.read_text())
+        data = json.loads(path.read_text(encoding="utf-8"))
     except Exception:
         return None  # advisory only; see detect_stacked_governance
     if not isinstance(data, dict):

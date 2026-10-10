@@ -394,7 +394,7 @@ class _Handler(BaseHTTPRequestHandler):
             self._json({"error": f"escalate ({esc}) must be below deny ({deny})"}, 400)
             return
 
-        text = path.read_text()
+        text = path.read_text(encoding="utf-8")
         is_yaml = path.suffix in (".yaml", ".yml")
         if is_yaml:
             try:
@@ -424,8 +424,8 @@ class _Handler(BaseHTTPRequestHandler):
         new_text = (yaml.safe_dump(data, sort_keys=False) if is_yaml
                     else _json.dumps(data, indent=2) + "\n")
         backup = path.with_suffix(path.suffix + ".bak")
-        backup.write_text(text)
-        path.write_text(new_text)
+        backup.write_text(text, encoding="utf-8", newline="\n")
+        path.write_text(new_text, encoding="utf-8", newline="\n")
         self._json({"saved": {"escalate": esc, "deny": deny},
                     "path": str(path), "backup": str(backup)})
 

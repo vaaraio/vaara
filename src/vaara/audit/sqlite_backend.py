@@ -147,7 +147,7 @@ def _fstype_for(path: Path) -> Optional[str]:
     than pretending to a coverage it does not have.
     """
     try:
-        raw = _PROC_MOUNTS.read_text()
+        raw = _PROC_MOUNTS.read_text(encoding="utf-8")
     except OSError:
         return None
 

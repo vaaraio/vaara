@@ -62,7 +62,7 @@ def _approval_key(approvals_dir: Path, create: bool) -> Optional[bytes]:
             with os.fdopen(fd, "w") as fh:
                 fh.write(secrets.token_hex(32))
     try:
-        return bytes.fromhex(path.read_text().strip())
+        return bytes.fromhex(path.read_text(encoding="utf-8").strip())
     except (OSError, ValueError):
         return None
 
@@ -87,7 +87,7 @@ def write_decision(action_id: str, decision: str, *,
     approvals_dir = Path(approvals_dir)
     key = _approval_key(approvals_dir, create=False)
     try:
-        request = json.loads((approvals_dir / f"{action_id}.request.json").read_text())
+        request = json.loads((approvals_dir / f"{action_id}.request.json").read_text(encoding="utf-8"))
     except (OSError, ValueError):
         return False
     nonce = request.get("nonce")
@@ -116,7 +116,7 @@ def _write_atomic(path: Path, text: str) -> None:
     within a filesystem.
     """
     tmp = path.with_name(f".{path.name}.{os.getpid()}.tmp")
-    tmp.write_text(text)
+    tmp.write_text(text, encoding="utf-8", newline="\n")
     os.replace(tmp, path)
 
 
@@ -166,7 +166,7 @@ def request_approval(
         while time.monotonic() < deadline:
             if decision_file.exists():
                 try:
-                    answer = json.loads(decision_file.read_text())
+                    answer = json.loads(decision_file.read_text(encoding="utf-8"))
                 except (ValueError, OSError):
                     answer = {}
                 decision = answer.get("decision", "") if isinstance(answer, dict) else ""

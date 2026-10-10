@@ -160,7 +160,7 @@ def _load_or_create_key(path: Path) -> Optional[bytes]:
             with os.fdopen(fd, "w") as fh:
                 fh.write(_secrets.token_hex(32))
     try:
-        key = bytes.fromhex(path.read_text().strip())
+        key = bytes.fromhex(path.read_text(encoding="utf-8").strip())
     except (OSError, ValueError) as exc:
         logger.warning("the seal key beside the seal file is unreadable (%s)",
                        type(exc).__name__)

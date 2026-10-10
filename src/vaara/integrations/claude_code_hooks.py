@@ -35,7 +35,7 @@ CONFIG_PATH = Path.home() / ".vaara" / "claude-code" / "config.json"
 
 def load_config() -> dict:
     try:
-        data = json.loads(CONFIG_PATH.read_text())
+        data = json.loads(CONFIG_PATH.read_text(encoding="utf-8"))
         return data if isinstance(data, dict) else {}
     except Exception:
         return {}

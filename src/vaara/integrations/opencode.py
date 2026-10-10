@@ -94,12 +94,12 @@ def install_plugin(vaara_bin: str, directory: Optional[Path] = None) -> bool:
     an absolute path.
     """
     target = plugin_path(directory)
-    text = _PLUGIN_SOURCE.read_text().replace("__VAARA_BIN__", vaara_bin.replace("\\", "\\\\").replace('"', '\\"'))
-    if target.exists() and target.read_text() == text:
+    text = _PLUGIN_SOURCE.read_text(encoding="utf-8").replace("__VAARA_BIN__", vaara_bin.replace("\\", "\\\\").replace('"', '\\"'))
+    if target.exists() and target.read_text(encoding="utf-8") == text:
         return False
     target.parent.mkdir(parents=True, exist_ok=True)
     tmp = target.with_suffix(".vaara-tmp")
-    tmp.write_text(text)
+    tmp.write_text(text, encoding="utf-8", newline="\n")
     os.replace(tmp, target)
     return True
 

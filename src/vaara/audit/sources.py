@@ -64,7 +64,7 @@ def _parse(s: Any) -> Optional[datetime]:
 
 def read() -> list[dict[str, Any]]:
     try:
-        data = json.loads(sources_path().read_text())
+        data = json.loads(sources_path().read_text(encoding="utf-8"))
     except (OSError, ValueError):
         return []
     entries = data.get("sources") if isinstance(data, dict) else None

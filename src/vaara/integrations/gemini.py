@@ -108,7 +108,7 @@ def _load(path: Path) -> tuple[Optional[dict], bool]:
     overwrites a file it did not understand. A missing file is empty.
     """
     try:
-        text = path.read_text()
+        text = path.read_text(encoding="utf-8")
     except FileNotFoundError:
         return {}, False
     except OSError:
@@ -164,7 +164,7 @@ def _write(path: Path, obj: dict, commented: bool) -> None:
     if commented and not backup.exists():
         shutil.copy2(path, backup)
     tmp = path.with_name(path.name + ".vaara-tmp")
-    tmp.write_text(json.dumps(obj, indent=2) + "\n")
+    tmp.write_text(json.dumps(obj, indent=2) + "\n", encoding="utf-8", newline="\n")
     os.replace(tmp, path)
 
 

@@ -127,7 +127,7 @@ def build_pipeline(trail_path: Path) -> InterceptionPipeline:
 
 def _comm(pid: int) -> str:
     try:
-        return Path(f"/proc/{pid}/comm").read_text().strip()
+        return Path(f"/proc/{pid}/comm").read_text(encoding="utf-8").strip()
     except OSError:
         return ""
 
@@ -141,7 +141,7 @@ def _exe(pid: int) -> str:
 
 def _status_field(pid: int, name: str) -> Optional[str]:
     try:
-        for line in Path(f"/proc/{pid}/status").read_text().splitlines():
+        for line in Path(f"/proc/{pid}/status").read_text(encoding="utf-8").splitlines():
             if line.startswith(name + ":"):
                 return line.split(":", 1)[1].strip()
     except OSError:
@@ -418,7 +418,7 @@ class Guard:
         with self._profile_lock:
             text = self.render_profile()
             tmp = self.profile_file.with_name(f".{self.profile_file.name}.tmp")
-            tmp.write_text(text)
+            tmp.write_text(text, encoding="utf-8", newline="\n")
             os.chmod(tmp, 0o600)
             os.replace(tmp, self.profile_file)
             parser = parser_path()

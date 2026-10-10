@@ -252,7 +252,7 @@ class AttestPairEmitter:
 
             nonce_tag = attestation.issuer_asserted.nonce[:8]
             path = self._receipts_dir / f"{counter:010d}-{nonce_tag}-attest.json"
-            path.write_text(json.dumps(attestation.to_dict(), indent=2), encoding="utf-8")
+            path.write_text(json.dumps(attestation.to_dict(), indent=2), encoding="utf-8", newline="\n")
             logger.debug("Attestation %s tool=%r upstream=%r", path.name, tool_name, upstream_name)
             return (attestation, counter)
         except Exception:
@@ -315,7 +315,7 @@ class AttestPairEmitter:
             nonce_tag = attestation.issuer_asserted.nonce[:8]
             path = self._receipts_dir / f"{counter:010d}-{nonce_tag}-grant.json"
             path.write_text(
-                json.dumps(credential.to_dict(), indent=2), encoding="utf-8"
+                json.dumps(credential.to_dict(), indent=2), encoding="utf-8", newline="\n"
             )
             logger.debug(
                 "Grant %s tool=%r upstream=%r", path.name, tool_name, upstream_name
@@ -428,6 +428,7 @@ class AttestPairEmitter:
                     indent=2,
                 ),
                 encoding="utf-8",
+                newline="\n",
             )
             logger.debug(
                 "Authorization receipt %s verdict=%s", path.name, auth.evidence["verdict"]
@@ -500,7 +501,7 @@ class AttestPairEmitter:
 
             nonce_tag = attestation.issuer_asserted.nonce[:8]
             path = self._receipts_dir / f"{counter:010d}-{nonce_tag}-receipt.json"
-            path.write_text(json.dumps(receipt.to_dict(), indent=2), encoding="utf-8")
+            path.write_text(json.dumps(receipt.to_dict(), indent=2), encoding="utf-8", newline="\n")
             logger.debug("Receipt %s status=%s", path.name, status)
         except Exception:
             logger.exception("Execution receipt emission failed")

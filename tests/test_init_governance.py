@@ -2,7 +2,10 @@
 from __future__ import annotations
 
 import json
+import sys
 from pathlib import Path
+
+import pytest
 
 from vaara.integrations import _hook_gate
 from vaara.integrations import init_governance as ig
@@ -123,7 +126,7 @@ def test_write_hook_config_merges_audit_db(tmp_path):
     ig.write_hook_config(config, tmp_path / "trail" / "audit.db")
     data = _read(config)
     assert data["mode"] == "watch"  # preserved
-    assert data["audit_db"].endswith("trail/audit.db")
+    assert Path(data["audit_db"]).as_posix().endswith("trail/audit.db")
 
 
 # --- MCP govern / restore --------------------------------------------------
@@ -249,6 +252,7 @@ def test_run_init_warns_when_proxy_missing(tmp_path, monkeypatch):
     assert "vaara-mcp-proxy" not in mcp.read_text(encoding="utf-8")
 
 
+@pytest.mark.skipif(sys.platform == "win32", reason="a systemd unit is written on Linux only")
 def test_run_init_installs_proxy_service_when_asked(tmp_path, monkeypatch):
     from vaara.integrations import proxy_service as ps
     settings = tmp_path / "settings.json"
@@ -347,6 +351,7 @@ def test_cli_ungovern_reports_service_removed(monkeypatch, capsys):
 # --- Enforce mode threaded through init to the installed service ------------
 
 
+@pytest.mark.skipif(sys.platform == "win32", reason="a systemd unit is written on Linux only")
 def test_run_init_proxy_enforce_threads_gate_flags_into_unit(tmp_path, monkeypatch):
     from vaara.integrations import proxy_service as ps
     monkeypatch.setattr(ig, "KNOWN_MCP_CLIENTS", [])

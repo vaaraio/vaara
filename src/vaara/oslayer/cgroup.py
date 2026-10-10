@@ -52,12 +52,12 @@ def create(launch_id: str, uid: int, gid: int, root: Path = CGROUP_ROOT) -> Path
 
 
 def add(path: Path, pid: int) -> None:
-    (path / "cgroup.procs").write_text(f"{pid}\n")
+    (path / "cgroup.procs").write_text(f"{pid}\n", encoding="utf-8", newline="\n")
 
 
 def pids(path: Path) -> list[int]:
     try:
-        return [int(p) for p in (path / "cgroup.procs").read_text().split()]
+        return [int(p) for p in (path / "cgroup.procs").read_text(encoding="utf-8").split()]
     except (OSError, ValueError):
         return []
 
@@ -65,7 +65,7 @@ def pids(path: Path) -> list[int]:
 def kill(path: Path) -> None:
     """End every process in ``path``. Falls back to signals without cgroup.kill."""
     try:
-        (path / "cgroup.kill").write_text("1\n")
+        (path / "cgroup.kill").write_text("1\n", encoding="utf-8", newline="\n")
         return
     except OSError:
         pass
@@ -95,7 +95,7 @@ def remove(path: Path, timeout: float = 2.0) -> bool:
 def launch_of(pid: int) -> Optional[str]:
     """The launch id ``pid`` runs under, from ``/proc/<pid>/cgroup``."""
     try:
-        return launch_in(Path(f"/proc/{pid}/cgroup").read_text())
+        return launch_in(Path(f"/proc/{pid}/cgroup").read_text(encoding="utf-8"))
     except OSError:
         return None
 

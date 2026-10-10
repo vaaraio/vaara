@@ -94,7 +94,7 @@ class InferenceAttestEmitter:
             nonce_tag = attestation.issuer_asserted.nonce[:8]
             path = self._receipts_dir / f"{counter:010d}-{nonce_tag}-infer-attest.json"
             path.write_text(
-                json.dumps(attestation.to_dict(), indent=2), encoding="utf-8"
+                json.dumps(attestation.to_dict(), indent=2), encoding="utf-8", newline="\n"
             )
             logger.debug("InferenceAttestation %s model=%r", path.name, model_ref)
             return (attestation, counter)
@@ -135,7 +135,7 @@ class InferenceAttestEmitter:
             )
             nonce_tag = attestation.issuer_asserted.nonce[:8]
             path = self._receipts_dir / f"{counter:010d}-{nonce_tag}-infer-receipt.json"
-            path.write_text(json.dumps(receipt.to_dict(), indent=2), encoding="utf-8")
+            path.write_text(json.dumps(receipt.to_dict(), indent=2), encoding="utf-8", newline="\n")
             logger.debug("InferenceReceipt %s status=%s", path.name, status)
         except Exception:
             logger.exception("Inference receipt emission failed")
