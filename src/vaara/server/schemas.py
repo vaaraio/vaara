@@ -14,24 +14,15 @@ from typing import Any, Literal, Optional
 
 from pydantic import BaseModel, Field, ConfigDict, field_validator
 
+from vaara.audit.trail import CLIENT_EVENT_TYPES
+
 
 _Reversibility = Literal["reversible", "partially_reversible", "irreversible"]
 _BlastRadius = Literal["local", "account", "organization", "global"]
 _Decision = Literal["allow", "escalate", "deny"]
-_EventType = Literal[
-    "action_requested",
-    "risk_scored",
-    "decision_made",
-    "action_executed",
-    "action_blocked",
-    "escalation_sent",
-    "escalation_resolved",
-    "outcome_recorded",
-    "policy_override",
-    "anchor_gap",
-    "key_lifecycle",
-    "disclosure_recorded",
-]
+# Built from the trail: a type added there reaches the wire, and the trail's
+# own markers (SYSTEM_EVENT_TYPES) never do.
+_EventType = Literal[tuple(e.value for e in CLIENT_EVENT_TYPES)]  # type: ignore[valid-type]
 
 # Mirror of the trail's 64KB per-record data cap at the HTTP boundary:
 # an unbounded payload dict would otherwise reach the hash chain through

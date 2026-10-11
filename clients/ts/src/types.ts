@@ -20,6 +20,11 @@ export type Reversibility =
 
 export type BlastRadius = "local" | "account" | "organization" | "global";
 
+/**
+ * Event types a client may append. The trail's own markers (`anchor_gap`,
+ * `repair_gap`, `key_lifecycle`, `witness_configured`) are refused on append
+ * and can appear in `AuditChainEvent.event_type` when a chain is read back.
+ */
 export type EventType =
   | "action_requested"
   | "risk_scored"
@@ -29,7 +34,10 @@ export type EventType =
   | "escalation_sent"
   | "escalation_resolved"
   | "outcome_recorded"
-  | "policy_override";
+  | "policy_override"
+  | "disclosure_recorded"
+  | "access_recorded"
+  | "agent_seen";
 
 export interface ScoreRequest {
   tool_name: string;

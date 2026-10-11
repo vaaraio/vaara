@@ -482,6 +482,13 @@ components:
             - escalation_resolved
             - outcome_recorded
             - policy_override
+            - disclosure_recorded
+            - access_recorded
+            - agent_seen
+          description: >-
+            The trail's own markers (anchor_gap, repair_gap, key_lifecycle,
+            witness_configured) are written by the trail alone and refused
+            here; they can appear when a chain is read back.
         action_id: { type: string }
         agent_id: { type: string }
         tool_name: { type: string }

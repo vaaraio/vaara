@@ -82,6 +82,11 @@ record.
 | `agent_seen` | `vaara scan --watch` or the MCP beacon saw an agent process. |
 | `witness_configured` | Heads reach an outside witness at a stated cadence: `data.kind` is `publish` (a transparency log) or `anchor` (an RFC 3161 authority), `data.every_records` the cadence, `data.target` the log or authority, `data.key_fingerprint` the publishing key. Written when the cadence is switched on or changed, so the bound on the unwitnessed window is readable from the trail. |
 
+`anchor_gap`, `repair_gap`, `key_lifecycle` and `witness_configured` are
+written by the trail alone. Verification reads them back, so
+`POST /v1/audit/events` refuses them with 400 `invalid_request`; every other
+type in both tables is accepted there.
+
 ## Hash chain
 
 The chain is SHA-256 over a canonical JSON encoding of a strict subset

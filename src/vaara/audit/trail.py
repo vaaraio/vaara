@@ -68,6 +68,22 @@ class EventType(str, Enum):
     WITNESS_CONFIGURED = "witness_configured"  # Heads reach a log or a TSA at a stated cadence
 
 
+# Written only by the trail's own record_* methods, never accepted through an
+# append API. Verification reads them back: a REPAIR_GAP naming missing seqs
+# turns a broken chain into declared gaps, an ANCHOR_GAP marks an unwitnessed
+# stretch, KEY_LIFECYCLE is custodian evidence for SOC 2 CC6.2 and CC8.1.
+SYSTEM_EVENT_TYPES = frozenset({
+    EventType.ANCHOR_GAP,
+    EventType.REPAIR_GAP,
+    EventType.KEY_LIFECYCLE,
+    EventType.WITNESS_CONFIGURED,
+})
+
+# Every other type: what POST /v1/audit/events, the OpenAPI enum and the
+# TypeScript EventType accept. tests/test_event_type_vocabulary.py holds them.
+CLIENT_EVENT_TYPES = tuple(e for e in EventType if e not in SYSTEM_EVENT_TYPES)
+
+
 # ── Regulatory article mappings ───────────────────────────────────────────
 
 @dataclass(frozen=True)
