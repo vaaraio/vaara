@@ -13,6 +13,7 @@ import asyncio
 import base64
 import ipaddress
 import json
+import os
 import socket
 import threading
 import time
@@ -155,7 +156,10 @@ def test_store_keeps_only_the_token_hash(tmp_path):
     assert store.authenticate("builder", token) is not None
     assert store.authenticate("builder", token + "x") is None
     assert store.authenticate("nobody", token) is None
-    assert oct((tmp_path / "agents.json").stat().st_mode)[-3:] == "600"
+    # POSIX only: Windows has no file modes, so chmod reports 666 there and the
+    # file is protected by the ACL of the profile it sits in.
+    if os.name != "nt":
+        assert oct((tmp_path / "agents.json").stat().st_mode)[-3:] == "600"
 
 
 # Split tunnel
