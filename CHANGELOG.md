@@ -8,10 +8,34 @@ and this project follows [Semantic Versioning](https://semver.org/spec/v2.0.0.ht
 
 ### Added
 - Every deny in a decision receipt says what it rests on. The evidence record gains a `refusal` block: `basis` is `evaluated` when a check ran and the action failed it, `not_evaluated` when a check the decision needed did not complete, and `undetermined` when the trail does not record which. With `not_evaluated` the block names the input the check could not get (`unavailableInput`), and it carries the recorded ground and policy. The trail records that input as `unavailable_input` on a deny. A refusal word alone could not tell a control that held from one that was never reached. See SPEC.md section 5.10, "The refusal block".
+- `docs/library.md` covers every capability reached from Python with no CLI or HTTP door, in sixteen sections from access records to attribute attestation openings. Each has a block that runs. `tests/test_docs_library_examples_run.py` runs every Python block in it and in `adapters.md`, `northern-lights.md` and `COMPLIANCE.md` in a throwaway home with no network.
+- `vaara conformance check --all` runs every published conformance suite through `scripts/conformance_runner.py`. It reads the suites from `--vectors DIR`, `$VAARA_CONFORMANCE_TREE`, the checkout the package runs from, or the release archive for the installed version, fetched once into `$XDG_CACHE_HOME/vaara/conformance/`. `--suite N` runs one suite.
+- `VAARA_AUTO_PUBLISH_EVERY` and `VAARA_AUTO_ANCHOR_EVERY` switch on head publishing and time anchoring at a record cadence, with `VAARA_PUBLISH_KEY`, `VAARA_PUBLISH_LOG` and `VAARA_ANCHOR_TSA`. Both are off unless set, and every surface that opens a trail reads them. Publishing prints a disclosure to stderr once per process. The trail records the cadence as a `witness_configured` event, so a verifier can read the bound on the unwitnessed window.
+- `vaara policy reload --api-key`, or `VAARA_SERVER_API_KEY`, sends the key as a bearer token. Without it the command could not reload a server started with a key.
+- `vaara check` closes pending outcomes older than 24 hours as orphaned, on the trail, before it scores.
+- `vaara.attestation` exports `build_decision_basis`. `vaara.attestation.decision` exports it with `verify_decision_proof` and `to_fixed`.
+- `docs/openapi.yaml` documents `POST /v1/anchor` with its bodies and the x402 402 challenge, and the `tenant_id` that the policy reload request and response carry. The TypeScript types carry both.
+- New CI guards. Every definition under `src/vaara` must be reachable from a console script, a `python -m` module, a script, a plugin hook, a package export or an import a document shows. Every key a consumer reads off a returned dict must be written by that producer, checked one producer at a time. The served routes and models must match the OpenAPI spec, and every import a document shows must resolve. The event-type list must match across the trail, the server, the spec, the TypeScript client and `docs/audit_event_schema.md`.
+- 102 end-to-end tests run the 31 CLI commands that had none, through the real CLI or a subprocess.
+
+### Changed
+- A malformed HTTP request now answers 400 with the documented `Error` body, code `invalid_request`, and the field locations in `details.errors`. It answered FastAPI's 422 before, which the spec never documented. Every route declares the error statuses it can return.
+- `load_driver` refuses a cage driver that does not implement the five-call contract.
 
 ### Fixed
 - A deny from a scorer that never answered is no longer recorded as a risk threshold. An `ExternalScorer` that could not be reached, or returned a body it could not read, failed closed with risk 1.0 and no ground, so the pipeline recorded the deny under `risk_threshold`, the same ground as an action that was scored and found too risky. It now records `scorer_unavailable` and names the scorer's host. A scorer answer with no decision is recorded as `invalid_decision` instead of a risk threshold.
 - `ExternalScorer` and `CompositeScorer` work as the pipeline's scorer. Both answered with `decision` while the pipeline reads `action`, so every call through either was denied. Both now answer with `action` as well. A composite whose merged verdict is a deny keeps the ground of a member that never answered.
+- `ExternalScorer` carries what `/v1/score` sends: the explanation as the recorded reason, the thresholds as the operating point the receipt states, and signals, alpha, bucket and calibration size on the risk record. A bare score is decided at a stated point. A decision without thresholds is refused as `scorer_unavailable` and names the missing field. Every transport failure, including a reset or a short body, is a `scorer_unavailable` deny. `CompositeScorer` carries the deciding member's reason and thresholds.
+- `TraceGenerator.load_jsonl` returns traces, grouped by agent and archetype, so a saved corpus can be fed back into `pre_calibrate`. It returned flat steps, which calibration could not use.
+- The macOS filter reads a crash, a missing `vaara` binary, a non-JSON answer or a reply without `allowed` as the engine being unavailable. Before, such a reply could pass as allow. An escalate decision now reaches the extension as escalate.
+- Module paths in `docs/sep` and `docs/design` name the `_attest` modules the code has used since 1.35.0.
+
+### Removed
+- `vaara.auth` and the four `SQLiteAuditBackend` API key methods, which nothing called. A fresh database no longer creates `api_keys`; an existing table is left in place.
+- Unused definitions: `StreamUnsealer`, `unseal_text`, `unseal_bytes`, `ExternalScorerError`, `X402Gate.price_for`, `HttpRouter.session_count`, `ReviewItem.interval_width`, `PolicyRegistry.tenants`, `AdaptiveScorer.add_sequence_pattern` and `remove_sequence_pattern` (the policy sets sequence patterns), `AgentProfile.age_seconds`, `RecordSetReport.required_findings` and `purge_stale_pending_outcomes`.
+
+### Security
+- `POST /v1/audit/events` refuses the trail's own markers: `anchor_gap`, `repair_gap`, `key_lifecycle` and `witness_configured`. It used to accept `anchor_gap` and `key_lifecycle`, so a client holding the API key could write a custodian rotation that counted as SOC 2 CC6.2 and CC8.1 evidence and appeared in `vaara verify`. The endpoint accepts the other twelve types, now including `access_recorded` and `agent_seen`, and the spec and TypeScript client list the same twelve.
 
 ## [2.10.0] - 2026-10-11
 
