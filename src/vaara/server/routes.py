@@ -11,6 +11,7 @@ from datetime import datetime, timezone
 from typing import Any, Optional
 
 from fastapi import FastAPI, Header, HTTPException, Request, status
+from fastapi.exceptions import RequestValidationError
 from fastapi.responses import JSONResponse
 
 from vaara import __version__ as _vaara_version
@@ -30,6 +31,56 @@ def _error(code: str, message: str, http_status: int, **details) -> HTTPExceptio
     if details:
         body["error"]["details"] = details
     return HTTPException(status_code=http_status, detail=body)
+
+
+_ERROR_DESCRIPTIONS = {
+    400: "Malformed request: `invalid_request`, or a route's own code.",
+    402: "Payment required: the x402 challenge.",
+    404: "Unknown action_id.",
+    409: "Server has no policy plane; reload is disabled.",
+    422: "Policy document failed to parse or validate.",
+    502: "The upstream anchor refused or did not answer.",
+    503: "Scorer or anchor unavailable.",
+}
+
+
+def _errors(*statuses: int) -> dict[int, dict[str, Any]]:
+    """The error responses a route declares, each with the `Error` body
+    docs/openapi.yaml documents, so the generated schema says what a
+    failure looks like."""
+    return {
+        code: {"model": S.ErrorResponse, "description": _ERROR_DESCRIPTIONS[code]}
+        for code in statuses
+    }
+
+
+_MAX_VALIDATION_MESSAGE = 500
+
+
+def _validation_error_body(exc: RequestValidationError) -> dict[str, Any]:
+    """The published `Error` body for a request that failed validation.
+
+    pydantic's error list carries the offending input and context objects
+    that are not JSON; only the location, message and type are kept.
+    """
+    errors: list[dict[str, Any]] = []
+    parts: list[str] = []
+    for item in exc.errors():
+        loc = [str(x) for x in item.get("loc", ())]
+        msg = str(item.get("msg", ""))
+        errors.append({"loc": loc, "msg": msg, "type": str(item.get("type", ""))})
+        where = ".".join(loc) or "body"
+        parts.append(f"{where}: {msg}")
+    message = "; ".join(parts) or "request failed validation"
+    if len(message) > _MAX_VALIDATION_MESSAGE:
+        message = message[: _MAX_VALIDATION_MESSAGE - 3] + "..."
+    return {
+        "error": {
+            "code": "invalid_request",
+            "message": message,
+            "details": {"errors": errors},
+        }
+    }
 
 
 def _iso(ts: float) -> str:
@@ -52,6 +103,13 @@ def register(app: FastAPI, state: ServerState) -> None:
             status_code=exc.status_code,
             content={"error": {"code": "http_error", "message": str(exc.detail)}},
         )
+
+    # A malformed request answers the 400 `Error` body the spec documents,
+    # with code `invalid_request`. FastAPI's own answer is 422 with a
+    # `detail` list, which no client of this API is written for.
+    @app.exception_handler(RequestValidationError)
+    async def _validation_handler(_request, exc: RequestValidationError):
+        return JSONResponse(status_code=400, content=_validation_error_body(exc))
 
     # Bearer-key gate. When the operator configured an API key, EVERY
     # endpoint except GET /v1/health requires it: the mutating endpoints
@@ -104,7 +162,7 @@ def register(app: FastAPI, state: ServerState) -> None:
             ),
         )
 
-    @app.post("/v1/score", response_model=S.ScoreResponse)
+    @app.post("/v1/score", response_model=S.ScoreResponse, responses=_errors(400, 503))
     async def score(
         req: S.ScoreRequest,
         x_vaara_tenant: Optional[str] = Header(default=None, alias="X-Vaara-Tenant"),
@@ -158,7 +216,7 @@ def register(app: FastAPI, state: ServerState) -> None:
             explanation=decision_dict.get("reason", ""),
         )
 
-    @app.post("/v1/score/outcome", status_code=204)
+    @app.post("/v1/score/outcome", status_code=204, responses=_errors(400, 404))
     async def score_outcome(req: S.OutcomeRequest):
         info = state.lookup_action(req.action_id)
         if info is None:
@@ -189,6 +247,7 @@ def register(app: FastAPI, state: ServerState) -> None:
         "/v1/audit/events",
         response_model=S.AuditEventResponse,
         status_code=201,
+        responses=_errors(400),
     )
     async def append_audit_event(
         req: S.AuditEventRequest,
@@ -231,6 +290,7 @@ def register(app: FastAPI, state: ServerState) -> None:
     @app.get(
         "/v1/audit/actions/{action_id}/chain",
         response_model=S.AuditChain,
+        responses=_errors(404),
     )
     async def read_action_chain(
         action_id: str,
@@ -262,7 +322,7 @@ def register(app: FastAPI, state: ServerState) -> None:
             ],
         )
 
-    @app.post("/v1/audit/verify", response_model=S.VerifyResponse)
+    @app.post("/v1/audit/verify", response_model=S.VerifyResponse, responses=_errors(400))
     async def verify_audit_chain(_req: Optional[S.VerifyRequest] = None):
         # v1: full-chain verify only. Ranged verify is in the spec but
         # not yet implemented server-side.
@@ -279,6 +339,7 @@ def register(app: FastAPI, state: ServerState) -> None:
 
     @app.post(
         "/v1/detect/injection", response_model=S.DetectInjectionResponse,
+        responses=_errors(400),
     )
     async def detect_injection_endpoint(req: S.DetectInjectionRequest):
         from vaara.detect import detect_injection
@@ -286,14 +347,15 @@ def register(app: FastAPI, state: ServerState) -> None:
         result = detect_injection(req.text, threshold=req.threshold)
         return S.DetectInjectionResponse(**result.to_dict())
 
-    @app.post("/v1/detect/pii", response_model=S.DetectPIIResponse)
+    @app.post("/v1/detect/pii", response_model=S.DetectPIIResponse, responses=_errors(400))
     async def detect_pii_endpoint(req: S.DetectPIIRequest):
         from vaara.detect import detect_pii
 
         result = detect_pii(req.text)
         return S.DetectPIIResponse(**result.to_dict())
 
-    @app.post("/v1/policy/reload", response_model=S.PolicyReloadResponse)
+    @app.post("/v1/policy/reload", response_model=S.PolicyReloadResponse,
+              responses=_errors(400, 409, 422))
     async def reload_policy(
         req: S.PolicyReloadRequest,
         x_vaara_tenant: Optional[str] = Header(default=None, alias="X-Vaara-Tenant"),
@@ -350,7 +412,8 @@ def register(app: FastAPI, state: ServerState) -> None:
             tenant_id=tenant_id,
         )
 
-    @app.post("/v1/anchor")
+    @app.post("/v1/anchor", response_model=S.AnchorResponse,
+              responses=_errors(400, 402, 502, 503))
     async def anchor_receipt_endpoint(req: S.AnchorRequest, request: Request):
         # Paid coin slot: x402-gated in front of the qualified eIDAS anchor.
         # Free (no-op gate) until an operator sets VAARA_X402_ENABLED; a

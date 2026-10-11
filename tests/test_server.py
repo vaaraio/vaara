@@ -63,15 +63,17 @@ def test_score_returns_assessment(client):
 
 
 def test_score_validates_input(client):
-    # Missing required fields.
+    # Missing required fields: the 400 Error body docs/openapi.yaml documents.
     r = client.post("/v1/score", json={"tool_name": "x"})
-    assert r.status_code == 422
+    assert r.status_code == 400
+    assert r.json()["error"]["code"] == "invalid_request"
 
     # Out-of-range confidence.
     r = client.post("/v1/score", json={
         "tool_name": "x", "agent_id": "a", "agent_confidence": 1.5,
     })
-    assert r.status_code == 422
+    assert r.status_code == 400
+    assert r.json()["error"]["code"] == "invalid_request"
 
 
 def test_score_outcome_roundtrip(client):
@@ -177,9 +179,12 @@ def test_audit_event_bad_type_400(client):
         "event_type": "not_a_real_event",
         "action_id": "x",
     })
-    # Pydantic enum validation may return 422; underlying dispatcher would
-    # return 400. Either is acceptable as a "bad input" signal.
-    assert r.status_code in (400, 422)
+    # The event type is validated against the enum before the handler runs,
+    # so this is the 400 invalid_request of a malformed body, as the spec
+    # documents for a malformed event.
+    assert r.status_code == 400
+    assert r.json()["error"]["code"] == "invalid_request"
+    assert "event_type" in r.json()["error"]["message"]
 
 
 def test_audit_verify_empty_chain(client):

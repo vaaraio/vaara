@@ -132,5 +132,7 @@ def test_reload_with_extra_field_rejected(client_with_controller):
         "/v1/policy/reload",
         json={"path": "/dev/null", "stowaway_field": True},
     )
-    # pydantic config extra="forbid" to 422 at schema level
-    assert r.status_code == 422
+    # pydantic config extra="forbid": a malformed body, answered as the spec
+    # documents, 400 invalid_request.
+    assert r.status_code == 400
+    assert r.json()["error"]["code"] == "invalid_request"

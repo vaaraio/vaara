@@ -81,7 +81,8 @@ def test_free_mode_anchors_the_receipt():
 def test_extra_fields_rejected():
     client = make_client()
     r = client.post("/v1/anchor", json={"receipt": {}, "sneaky": 1})
-    assert r.status_code == 422
+    assert r.status_code == 400
+    assert r.json()["error"]["code"] == "invalid_request"
 
 
 def test_upstream_qtsp_failure_is_502():

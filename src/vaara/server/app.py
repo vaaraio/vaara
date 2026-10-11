@@ -16,6 +16,7 @@ from __future__ import annotations
 from typing import Optional
 
 from fastapi import FastAPI
+from fastapi.openapi.utils import get_openapi
 
 from vaara.audit.trail import AuditTrail
 from vaara.policy.controller import PolicyController
@@ -69,4 +70,38 @@ def create_app(
     )
     app.state.vaara = state
     register(app, state)
+    _publish_openapi(app)
     return app
+
+
+def _publish_openapi(app: FastAPI) -> None:
+    """Make the generated schema say what the server answers.
+
+    FastAPI adds a ``422`` with its own ``HTTPValidationError`` body to every
+    route that takes a body. This server answers a malformed request with
+    the ``400`` ``Error`` body the routes declare (see ``routes.register``),
+    so that automatic entry would promise a body nobody receives. Only the
+    automatic entries go: a route that declares its own ``422`` keeps it.
+    """
+
+    def openapi():
+        if app.openapi_schema:
+            return app.openapi_schema
+        schema = get_openapi(
+            title=app.title, version=app.version, description=app.description,
+            routes=app.routes,
+        )
+        for methods in schema.get("paths", {}).values():
+            for operation in methods.values():
+                response = operation.get("responses", {}).get("422")
+                ref = ((response or {}).get("content", {}).get("application/json", {})
+                       .get("schema", {}).get("$ref", ""))
+                if ref.endswith("/HTTPValidationError"):
+                    del operation["responses"]["422"]
+        components = schema.get("components", {}).get("schemas", {})
+        components.pop("HTTPValidationError", None)
+        components.pop("ValidationError", None)
+        app.openapi_schema = schema
+        return schema
+
+    app.openapi = openapi  # type: ignore[method-assign]

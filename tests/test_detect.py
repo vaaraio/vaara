@@ -162,4 +162,5 @@ def test_http_detect_rejects_extra_field(http_client):
         "/v1/detect/injection",
         json={"text": "hi", "stowaway": True},
     )
-    assert r.status_code == 422
+    assert r.status_code == 400
+    assert r.json()["error"]["code"] == "invalid_request"

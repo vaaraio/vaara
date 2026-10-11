@@ -9,7 +9,7 @@ declares, which is where the disagreements were:
 
 * ``OutcomeRequest`` declared ``description`` where the server takes
   ``notes``, and the server model is ``extra="forbid"``, so the documented
-  call was a 422;
+  call was a validation error;
 * ``reportOutcome`` was typed as returning ``{ok: true}`` from an endpoint
   that answers 204 with no body;
 * ``ScoreRequest`` had no ``tenant_id``, so a TypeScript caller could not
@@ -68,7 +68,7 @@ def test_outcome_request_field_names_match_the_server():
         S.OutcomeRequest.model_fields
     ), (
         "types.ts declares a field OutcomeRequest does not accept; the model "
-        "is extra=forbid, so sending it is a 422"
+        "is extra=forbid, so sending it is a 400 invalid_request"
     )
 
 
@@ -100,7 +100,7 @@ def test_the_documented_outcome_call_is_accepted(client):
     for optional in fields - {"action_id", "outcome_severity"}:
         payload[optional] = "it went fine"
     response = client.post("/v1/score/outcome", json=payload)
-    assert response.status_code != 422, response.text
+    assert response.status_code == 204, response.text
 
 
 def test_a_scored_request_with_a_tenant_is_accepted(client):
