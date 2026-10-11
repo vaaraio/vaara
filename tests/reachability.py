@@ -85,7 +85,7 @@ def _declared_exports(statement) -> list[str]:
             try:
                 names += [n for n in ast.literal_eval(value) if isinstance(n, str)]
             except ValueError:
-                pass
+                pass  # a computed __all__ names nothing static analysis can read
     return names
 
 
@@ -494,8 +494,6 @@ class Graph:
                     if d.id not in reached and name in attrs:
                         reach(d.id)
                         changed = True
-            if work_defs or work_modules:
-                changed = True
         return reached
 
     def unreachable(self) -> list[Definition]:

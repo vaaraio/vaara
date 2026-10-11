@@ -37,3 +37,8 @@ pq extra not installed
 # The matrix checks out a shallow clone; the one test that reads a historical
 # tree skips there and runs wherever the full history is checked out.
 ^shallow clone cannot see the tree at that commit$
+# A documented Python block that imports a third-party package (a guardrail
+# SDK, langchain_core, numpy, dilithium_py) runs in the job that installs it;
+# here it is compiled and skipped. A missing vaara module still fails.
+^docs/[\w.]+\.md under '[^']+' needs \w+, not installed here$
+^vaara(\.\w+)+ needs \w+, an extra not installed here$

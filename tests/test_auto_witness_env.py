@@ -14,6 +14,7 @@ the cadence, so a verifier reads the bound instead of guessing it.
 
 from __future__ import annotations
 
+import re
 import sqlite3
 
 import pytest
@@ -97,7 +98,8 @@ def test_publish_every_env_publishes_the_head_at_the_stated_cadence(quiet, tmp_p
     assert all(log == "https://log.example" for _, log in published)
     assert (tmp_path / "key.pem").is_file(), "a publishing key was generated at the named path"
     err = capsys.readouterr().err
-    assert "every 4 records" in err.lower() and "https://log.example" in err
+    assert "every 4 records" in err.lower()
+    assert re.search(r"(^|\s)https://log\.example(\s|$|[.,;)])", err), err
     assert "permanent" in err and "cannot be withdrawn" in err
 
 

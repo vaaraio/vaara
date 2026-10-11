@@ -68,6 +68,7 @@ def test_a_documented_import_resolves(module, name, doc):
         if exc.name and exc.name.split(".")[0] != "vaara":
             pytest.skip(f"{module} needs {exc.name}, an extra not installed here")
         pytest.fail(f"{doc} shows `from {module} import ...`; the module does not import: {exc}")
+        return
     if name is not None and not hasattr(imported, name):
         try:
             importlib.import_module(f"{module}.{name}")

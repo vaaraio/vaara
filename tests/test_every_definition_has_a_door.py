@@ -26,7 +26,7 @@ from collections import defaultdict
 
 import pytest
 
-pytest.importorskip("tomllib")
+pytest.importorskip("tomllib", reason="tomllib is Python 3.11+")
 
 from tests.reachability import Graph  # noqa: E402
 

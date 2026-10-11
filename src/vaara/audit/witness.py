@@ -104,7 +104,7 @@ def _load_or_make_signer(path: Path, stderr):
     try:
         os.chmod(path, 0o600)
     except OSError:
-        pass
+        pass  # a filesystem without POSIX modes keeps the key; the path is said below
     _say(f"vaara: generated a publishing key at {path}", stderr)
     return signer
 
