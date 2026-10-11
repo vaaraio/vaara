@@ -184,10 +184,6 @@ class ReviewItem:
             "justification": self.justification,
         }
 
-    @property
-    def interval_width(self) -> float:
-        return max(0.0, self.conformal_upper - self.conformal_lower)
-
 
 class ReviewQueueError(Exception):
     """Generic queue error."""

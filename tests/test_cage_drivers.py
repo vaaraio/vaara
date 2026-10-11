@@ -655,6 +655,42 @@ def test_every_driver_has_an_inside_check_and_loads():
         assert cage.load_driver(name).name == name
 
 
+def test_every_shipped_driver_keeps_the_five_call_contract():
+    """docs/cage.md promises five calls, the same for every cage, plus the
+    upstream version `vaara cage drivers` prints. CageDriver is that
+    contract; load_driver hands back nothing that breaks it."""
+    from vaara.cage.driver import CageDriver
+    for name in cage.DRIVERS:
+        driver = cage.load_driver(name)
+        assert isinstance(driver, CageDriver), name
+        for call in ("start", "stop", "status", "enforcement_state", "events",
+                     "upstream_version"):
+            assert callable(getattr(driver, call)), f"{name}.{call}"
+
+
+def test_load_driver_refuses_a_driver_that_breaks_the_contract(monkeypatch):
+    """A registered class missing one of the five calls is a packaging
+    defect; load_driver says so instead of handing it to `vaara cage run`
+    to fail on the call."""
+    import types
+    module = types.ModuleType("vaara.cage._broken_for_test")
+
+    class Broken:
+        name = "broken"
+
+        def start(self, agent, policy=None, *, name=None):
+            raise NotImplementedError
+
+        def stop(self, name):
+            raise NotImplementedError
+
+    module.Broken = Broken
+    monkeypatch.setitem(sys.modules, "vaara.cage._broken_for_test", module)
+    monkeypatch.setitem(cage._MODULES, "broken", ("vaara.cage._broken_for_test", "Broken"))
+    with pytest.raises(CageError, match="status, enforcement_state, events, upstream_version"):
+        cage.load_driver("broken")
+
+
 @posix_tools
 class TestEngineDigestIsTheOneTheReceiptsCarry:
     """Audit 2026-10-10 finding 4: start() handed the agent the digest of

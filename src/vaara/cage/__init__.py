@@ -310,7 +310,13 @@ _MODULES = {
 
 
 def load_driver(name: str, **kwargs: Any):
-    """The driver called ``name``. Raises ``ValueError`` for an unknown one."""
+    """The driver called ``name``. Raises ``ValueError`` for an unknown one.
+
+    The driver is checked against :class:`vaara.cage.driver.CageDriver`, the
+    five calls docs/cage.md promises for every cage plus the upstream version
+    ``vaara cage drivers`` prints. One that lacks a call is a packaging
+    defect and raises ``CageError`` here, not on the call.
+    """
     try:
         module_name, class_name = _MODULES[name]
     except KeyError:
@@ -319,8 +325,21 @@ def load_driver(name: str, **kwargs: Any):
         ) from None
     import importlib
 
+    from vaara.cage.driver import CageDriver, CageError
+
     module = importlib.import_module(module_name)
-    return getattr(module, class_name)(**kwargs)
+    driver = getattr(module, class_name)(**kwargs)
+    missing = [
+        call for call in ("start", "stop", "status", "enforcement_state", "events",
+                          "upstream_version")
+        if not callable(getattr(driver, call, None))
+    ]
+    if missing or not isinstance(driver, CageDriver):
+        raise CageError(
+            f"cage driver {name!r} ({module_name}.{class_name}) does not keep the "
+            f"driver contract; missing: {', '.join(missing) or 'name'}"
+        )
+    return driver
 
 
 __all__ = [

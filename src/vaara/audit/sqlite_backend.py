@@ -41,7 +41,6 @@ from vaara.audit.trail import (
     EventType,
     _GapLedger,
 )
-from vaara.auth import APIKey, Role, _hash_key, generate_api_key
 
 logger = logging.getLogger(__name__)
 
@@ -312,17 +311,6 @@ CREATE TABLE IF NOT EXISTS gdpr_redactions (
     redacted_at  REAL NOT NULL
 );
 
--- API key store for role-based access control.
--- Plaintext keys are never stored — only PBKDF2-SHA256 hashes.
-CREATE TABLE IF NOT EXISTS api_keys (
-    key_id       TEXT PRIMARY KEY,
-    name         TEXT NOT NULL,
-    role         TEXT NOT NULL,
-    key_hash     TEXT NOT NULL UNIQUE,
-    created_at   REAL NOT NULL,
-    last_used_at REAL
-);
-
 -- Pending outcomes for cross-process tracking (v1.57.3).
 -- Allows vaara outcome to work across separate processes.
 CREATE TABLE IF NOT EXISTS pending_outcomes (
@@ -346,14 +334,6 @@ _MIGRATIONS: dict[int, str] = {
         original_id  TEXT PRIMARY KEY,
         replacement  TEXT NOT NULL DEFAULT '[REDACTED:GDPR-Art17]',
         redacted_at  REAL NOT NULL
-    );
-    CREATE TABLE IF NOT EXISTS api_keys (
-        key_id       TEXT PRIMARY KEY,
-        name         TEXT NOT NULL,
-        role         TEXT NOT NULL,
-        key_hash     TEXT NOT NULL UNIQUE,
-        created_at   REAL NOT NULL,
-        last_used_at REAL
     );
     """,
     # v2 to v3: prEN ISO/IEC 12792 transparency taxonomy (item 1, v0.6).
@@ -467,7 +447,7 @@ _SALVAGE_CHUNK = 256
 
 #: Tables besides ``audit_records`` carried over by a salvage. ``audit_meta``
 #: is not among them: the fresh file writes its own schema version.
-_SALVAGE_SIDE_TABLES = ("gdpr_redactions", "api_keys", "pending_outcomes")
+_SALVAGE_SIDE_TABLES = ("gdpr_redactions", "pending_outcomes")
 
 
 def _integrity_problem(conn: sqlite3.Connection) -> Optional[str]:
@@ -2052,81 +2032,6 @@ class SQLiteAuditBackend:
                     and _stored_hash_at(self._conn, head["seq"]) == head["hash"]):
                 heads.append((key, head))
         return heads
-
-    # ── API Key management ────────────────────────────────────────
-
-    def create_api_key(self, name: str, role: "Role") -> str:
-        """Create a new API key with the given role. Returns the plaintext key (shown once)."""
-        import uuid as _uuid
-
-        from vaara.auth import Role as _Role
-        plaintext = generate_api_key()
-        key_id = str(_uuid.uuid4())
-        key_hash = _hash_key(plaintext)
-        role_value = role.value if isinstance(role, _Role) else str(role)
-        with self._lock:
-            self._conn.execute(
-                "INSERT INTO api_keys (key_id, name, role, key_hash, created_at) "
-                "VALUES (?, ?, ?, ?, ?)",
-                (key_id, name, role_value, key_hash, time.time()),
-            )
-        logger.info("API key created: name=%r role=%s key_id=%s", name, role_value, key_id)
-        return plaintext
-
-    def authenticate_api_key(self, plaintext_key: str) -> Optional["APIKey"]:
-        """Validate a plaintext key and return its APIKey metadata, or None."""
-        if not isinstance(plaintext_key, str) or not plaintext_key:
-            return None
-        key_hash = _hash_key(plaintext_key)
-        with self._lock:
-            row = self._conn.execute(
-                "SELECT key_id, name, role, created_at, last_used_at "
-                "FROM api_keys WHERE key_hash=?",
-                (key_hash,),
-            ).fetchone()
-            if row:
-                self._conn.execute(
-                    "UPDATE api_keys SET last_used_at=? WHERE key_hash=?",
-                    (time.time(), key_hash),
-                )
-        if not row:
-            return None
-        try:
-            role = Role(row[2])
-        except ValueError:
-            role = Role.READER
-        return APIKey(
-            key_id=row[0], name=row[1], role=role,
-            created_at=row[3], last_used_at=row[4],
-        )
-
-    def revoke_api_key(self, key_id: str) -> bool:
-        """Revoke an API key by key_id. Returns True if a key was removed."""
-        with self._lock:
-            cursor = self._conn.execute(
-                "DELETE FROM api_keys WHERE key_id=?", (key_id,)
-            )
-        if cursor.rowcount:
-            logger.info("API key revoked: key_id=%s", key_id)
-        return bool(cursor.rowcount)
-
-    def list_api_keys(self) -> list["APIKey"]:
-        """Return metadata for all active API keys (no hashes or plaintext)."""
-        with self._lock:
-            rows = self._conn.execute(
-                "SELECT key_id, name, role, created_at, last_used_at FROM api_keys"
-            ).fetchall()
-        result = []
-        for row in rows:
-            try:
-                role = Role(row[2])
-            except ValueError:
-                role = Role.READER
-            result.append(APIKey(
-                key_id=row[0], name=row[1], role=role,
-                created_at=row[3], last_used_at=row[4],
-            ))
-        return result
 
     # ── Pending outcomes for cross-process tracking ────────────────
 

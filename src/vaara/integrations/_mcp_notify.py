@@ -225,7 +225,3 @@ class HttpRouter:
                         targets = []
         for state in targets:
             state.enqueue(message)
-
-    def session_count(self) -> int:
-        with self._lock:
-            return len(self._sessions)

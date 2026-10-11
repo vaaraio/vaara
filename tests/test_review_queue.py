@@ -52,7 +52,6 @@ def test_enqueue_then_get_round_trips_all_fields() -> None:
     assert item.context == {"session": "s1"}
     assert item.signals == {"heuristic": 0.4, "classifier": 0.6}
     assert item.status == STATUS_PENDING
-    assert item.interval_width == pytest.approx(0.16)
 
 
 def test_get_unknown_raises_item_not_found() -> None:

@@ -36,13 +36,19 @@ def test_stdio_router_writes_json_line_to_stdout(monkeypatch):
 
 
 def test_http_router_register_and_unregister(monkeypatch):
+    """A registered session receives what is delivered to its id; after
+    unregister_session nothing more lands on it."""
     router = HttpRouter(replay_buffer_size=10)
     loop = _new_loop()
     try:
-        router.register_session("sess-a", upstream="alpha", tenant="t1", loop=loop)
-        assert router.session_count() == 1
+        state = router.register_session("sess-a", upstream="alpha", tenant="t1", loop=loop)
+        first = {"jsonrpc": "2.0", "method": "notifications/one"}
+        router.deliver(first, session_id="sess-a", upstream="alpha")
+        assert state.replay_since(0) == [(1, first)]
         router.unregister_session("sess-a")
-        assert router.session_count() == 0
+        router.deliver({"jsonrpc": "2.0", "method": "notifications/two"},
+                       session_id="sess-a", upstream="alpha")
+        assert state.replay_since(0) == [(1, first)], "an unregistered session still received"
     finally:
         loop.close()
 
@@ -251,15 +257,21 @@ def test_stale_unregister_does_not_drop_reconnected_session():
         new = router.register_session("sess-a", "alpha", "", loop)
         # Old stream tears down and runs its identity-checked unregister.
         router.unregister_session("sess-a", expected=old)
-        assert router.session_count() == 1, "stale teardown dropped the live session"
-        # The live session still receives a targeted notification.
+        # The live session still receives a targeted notification: the stale
+        # teardown did not drop it.
         router.deliver({"jsonrpc": "2.0", "method": "notifications/x"},
                        session_id="sess-a", upstream="alpha")
         assert new.replay_since(0) == [
             (1, {"jsonrpc": "2.0", "method": "notifications/x"}),
-        ]
-        # An unguarded unregister still works for the normal teardown path.
+        ], "stale teardown dropped the live session"
+        assert old.replay_since(0) == []
+        # An unguarded unregister still works for the normal teardown path:
+        # after it, a delivery to the id reaches nobody.
         router.unregister_session("sess-a", expected=new)
-        assert router.session_count() == 0
+        router.deliver({"jsonrpc": "2.0", "method": "notifications/y"},
+                       session_id="sess-a", upstream="alpha")
+        assert new.replay_since(0) == [
+            (1, {"jsonrpc": "2.0", "method": "notifications/x"}),
+        ]
     finally:
         loop.close()

@@ -196,9 +196,8 @@ to MCP clients.
   The HTTP surfaces (`vaara serve`, `vaara-mcp-proxy` over HTTP, the
   MCP server) authenticate a caller with one shared bearer key, which
   admits the caller and names nobody. The identity on a record is the
-  `agent_id` the client asserts. The `vaara.auth` role and key-store
-  module ships in the package but nothing in the tree calls it, so no
-  authenticated identity reaches a record through it. Delegation-chain
+  `agent_id` the client asserts. There is no per-caller key or role
+  store, so no authenticated identity reaches a record. Delegation-chain
   attestation per IDENT-1.2 is future work.
 
 ## Section 16 - Behavioural Drift Governance
