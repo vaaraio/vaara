@@ -68,6 +68,20 @@ def _substitute(parts: list[str]) -> list[str]:
     return [_PLACEHOLDERS.get(p, p) for p in parts]
 
 
+def _forwarded_parser(name: str):
+    """The parser `vaara.cli.main` hands a forwarded command's argv to.
+
+    `main` passes these commands' arguments untouched to a parser of their
+    own, before `build_parser` runs, so a recipe for one of them is only
+    checked when it reaches that parser.
+    """
+    if name == "net-gate":
+        from vaara.netgate.cli import build_parser as netgate_parser
+
+        return netgate_parser()
+    return None
+
+
 def _parse(line: str) -> str | None:
     """None if the CLI accepts the line, else the parser's complaint."""
     try:
@@ -75,9 +89,13 @@ def _parse(line: str) -> str | None:
     except ValueError as exc:  # unbalanced quotes in the doc itself
         return f"unparseable shell syntax: {exc}"
     captured = io.StringIO()
+    forwarded = _forwarded_parser(parts[1]) if len(parts) > 1 else None
     try:
         with contextlib.redirect_stderr(captured), contextlib.redirect_stdout(captured):
-            build_parser().parse_args(parts[1:])
+            if forwarded is not None:
+                forwarded.parse_args(parts[2:])
+            else:
+                build_parser().parse_args(parts[1:])
     except SystemExit:
         complaint = captured.getvalue().strip().splitlines()
         return complaint[-1] if complaint else "rejected by the parser"
