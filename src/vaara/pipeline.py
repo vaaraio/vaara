@@ -1094,6 +1094,56 @@ class InterceptionPipeline:
         with self._metrics_lock:
             self._metrics.total_outcome_reports += 1
 
+    #: Closed by the surface that opened them, not by this sweep: the LLM
+    #: proxy closes its own ``llm.prompt`` outcomes against its process start.
+    _ORPHAN_SWEEP_LEAVES = frozenset({"llm.prompt"})
+
+    def close_orphaned_outcomes(
+        self,
+        max_age_seconds: float = 86400.0,
+        *,
+        severity: float = 0.5,
+        now: Optional[float] = None,
+    ) -> list[str]:
+        """Close every pending outcome older than ``max_age_seconds`` as
+        ``orphaned``, on the trail, and return the action ids closed.
+
+        A ``vaara check`` nobody follows with ``vaara outcome`` would stay
+        pending forever. An outcome record saying ``orphaned`` tells a reader
+        the action ran and nobody reported how it went, which is the truth;
+        a silent delete would tell them nothing. Runs at ``vaara check``
+        start. Rows another surface closes for itself are left alone.
+        """
+        backend = getattr(self.trail, "_backend", None)
+        lister = getattr(backend, "list_pending_outcomes", None)
+        if lister is None:
+            return []
+        cutoff = (time.time() if now is None else now) - max_age_seconds
+        try:
+            rows = lister(created_before=cutoff)
+        except Exception:
+            logger.exception("could not list pending outcomes")
+            return []
+        closed: list[str] = []
+        for row in rows:
+            if row.get("tool_name") in self._ORPHAN_SWEEP_LEAVES:
+                continue
+            action_id = row["action_id"]
+            age_hours = max(0.0, (cutoff + max_age_seconds - float(row.get("created_at") or cutoff)) / 3600)
+            try:
+                self.report_outcome(
+                    action_id, outcome_severity=severity,
+                    description=(f"orphaned: no outcome reported in {age_hours:.0f} h; "
+                                 f"closed by the next vaara check"),
+                )
+            except Exception:
+                logger.exception("could not close orphaned outcome %s", action_id)
+                continue
+            closed.append(action_id)
+        if closed:
+            logger.info("closed %d orphaned pending outcome(s)", len(closed))
+        return closed
+
     def _claim_pending_outcome(
         self, action_id: str,
     ) -> Optional[tuple[tuple[float, dict[str, float]], Optional[tuple[str, str]]]]:

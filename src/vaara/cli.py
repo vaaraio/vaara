@@ -2672,6 +2672,10 @@ def _cmd_check(args: argparse.Namespace) -> int:
     trail = SQLiteAuditBackend(db).load_trail()
     pipeline = InterceptionPipeline(registry=registry, trail=trail)
 
+    # A check nobody followed with `vaara outcome` is closed as orphaned, on
+    # the trail, once it is a day old. Nothing is deleted silently.
+    pipeline.close_orphaned_outcomes()
+
     params = {}
     for p in args.param or []:
         if "=" in p:

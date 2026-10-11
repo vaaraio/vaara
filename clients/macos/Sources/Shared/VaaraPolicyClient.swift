@@ -82,6 +82,11 @@ public final class VaaraPolicyClient {
                 result = .allow
             } else if reason == "escalate" {
                 result = .escalate
+            } else if let reason, reason.hasPrefix(WebDecision.unavailablePrefix) {
+                // The app could not get a decision out of `vaara check`. The
+                // filter drops the flow either way; the log says the engine
+                // was unavailable, not that policy refused.
+                result = .unavailable(reason: String(reason.dropFirst(WebDecision.unavailablePrefix.count)))
             } else {
                 result = .deny(reason: reason ?? "blocked by policy")
             }

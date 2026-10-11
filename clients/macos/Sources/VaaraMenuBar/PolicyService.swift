@@ -37,7 +37,11 @@ final class PolicyServiceDelegate: NSObject, NSXPCListenerDelegate, VaaraPolicyS
 
     func evaluate(host: String, url: String, reply: @escaping (Bool, String?) -> Void) {
         // Use the `vaara check` CLI to evaluate this action.
-        // This runs the same Vaara pipeline as everywhere else.
+        // This runs the same Vaara pipeline as everywhere else. What it
+        // printed, or failed to print, is read by WebDecision, which refuses
+        // anything that is not a decision: a crash, a missing binary and a
+        // non-JSON answer are all replied as the engine being unavailable,
+        // never as allow.
         let task = Process()
         task.executableURL = URL(fileURLWithPath: "/usr/bin/env")
         task.arguments = [
@@ -53,21 +57,19 @@ final class PolicyServiceDelegate: NSObject, NSXPCListenerDelegate, VaaraPolicyS
         task.standardOutput = pipe
         task.standardError = Pipe()
 
+        let decision: WebDecision
         do {
             try task.run()
-            task.waitUntilExit()
-
+            // Read before waiting: a child that fills the pipe would otherwise
+            // block on write while this side blocks on exit.
             let data = pipe.fileHandleForReading.readDataToEndOfFile()
-            if let result = try? JSONSerialization.jsonObject(with: data) as? [String: Any] {
-                let allowed = result["allowed"] as? Bool ?? true
-                let reason = result["reason"] as? String
-                reply(allowed, reason)
-            } else {
-                reply(true, nil)
-            }
+            task.waitUntilExit()
+            decision = WebDecision.parse(output: data, terminationStatus: task.terminationStatus)
         } catch {
-            reply(true, nil)
+            decision = WebDecision.parse(output: nil, terminationStatus: nil,
+                                         launchError: error.localizedDescription)
         }
+        reply(decision.allowed, decision.reason)
     }
 
     func recordOutcome(actionId: String, severity: Double, description: String) {
