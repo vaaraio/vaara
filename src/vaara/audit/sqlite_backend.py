@@ -1546,6 +1546,14 @@ class SQLiteAuditBackend:
             "Loaded %d audit records from %s (corrupt_rows=%d)",
             len(rows), self._db_path, corrupt_rows,
         )
+        # The outside witnesses (head publishing, time anchoring) are
+        # switched on here, the one door every surface opens a trail through,
+        # so VAARA_AUTO_PUBLISH_EVERY and VAARA_AUTO_ANCHOR_EVERY mean the
+        # same thing for the CLI, the hooks and the proxies. Off unless set.
+        from vaara.audit import witness
+
+        if witness.requested():
+            witness.configure_from_env(trail)
         return trail
 
     def verify_chain_streaming(

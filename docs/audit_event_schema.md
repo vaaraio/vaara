@@ -68,6 +68,20 @@ canonical lifecycle is `action_requested` to `risk_scored`  to
 `escalation_sent` to `escalation_resolved`) to `outcome_recorded`.
 `policy_override` may appear at any point after `decision_made`.
 
+The trail also carries events about itself and its surroundings. Each has
+an `action_id` of its own and takes part in the hash chain like any other
+record.
+
+| Value | What it states |
+|---|---|
+| `anchor_gap` | A scheduled head publication or time anchor did not happen; the reason and the head it tried to witness are in `data`. |
+| `repair_gap` | A store repair could not keep every record; the declared gap is in `data`. |
+| `key_lifecycle` | A signing-key custodian was added, rotated or revoked. |
+| `disclosure_recorded` | An EU AI Act Article 50 transparency disclosure was made. |
+| `access_recorded` | Something in the store was opened, and by whom. |
+| `agent_seen` | `vaara scan --watch` or the MCP beacon saw an agent process. |
+| `witness_configured` | Heads reach an outside witness at a stated cadence: `data.kind` is `publish` (a transparency log) or `anchor` (an RFC 3161 authority), `data.every_records` the cadence, `data.target` the log or authority, `data.key_fingerprint` the publishing key. Written when the cadence is switched on or changed, so the bound on the unwitnessed window is readable from the trail. |
+
 ## Hash chain
 
 The chain is SHA-256 over a canonical JSON encoding of a strict subset
