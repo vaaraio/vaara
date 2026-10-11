@@ -19,6 +19,12 @@ A decision record carries three parts plus a signature:
   ``escalate``), the risk basis (decimal-string risk score and
   thresholds, an optional policy id), and the decision time.
 
+``build_decision_basis`` builds the ``rationale`` and ``binding`` blocks
+a ``decisionDerived`` carries, and with ``with_proof=True`` the
+zero-knowledge ``decisionProof`` over the fixed-point score and thresholds
+(``to_fixed``); ``verify_decision_proof`` checks that proof against the
+record it is bound to.
+
 A decision record verifies in two composable checks: the signature
 (``verify_decision_signature``) and the back-link to its attestation
 (``verify_decision_back_link``). ``records_paired`` then joins it to the
@@ -36,9 +42,11 @@ Install: ``pip install 'vaara[attestation]'``.
 from __future__ import annotations
 
 from vaara.attestation._decision_emit import (
+    build_decision_basis,
     emit_decision_record,
     verify_decision_signature,
 )
+from vaara.attestation._decision_proof_verify import verify_decision_proof
 from vaara.attestation._decision_types import (
     DecisionDerived,
     DecisionRecord,
@@ -69,6 +77,7 @@ from vaara.attestation._receipt_verifier import (
     attestation_digest,
     make_back_link,
 )
+from vaara.attestation.zk._circuit import to_fixed
 
 __all__ = [
     "EFFECT_ORDERED",
@@ -85,6 +94,7 @@ __all__ = [
     "IssuerAsserted",
     "MalformedFallbackBindingError",
     "attestation_digest",
+    "build_decision_basis",
     "decision_digest",
     "effect_ordering",
     "emit_decision_record",
@@ -94,7 +104,9 @@ __all__ = [
     "records_paired",
     "request_envelope_digest",
     "superseding_decision",
+    "to_fixed",
     "verify_decision_back_link",
     "verify_decision_fallback_binding",
+    "verify_decision_proof",
     "verify_decision_signature",
 ]

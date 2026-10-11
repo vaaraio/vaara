@@ -109,6 +109,7 @@ from vaara.attestation.tool_call_attestation import (
     parse_attestation as sep2787_parse_attestation,
     verify_attestation as sep2787_verify_attestation,
 )
+from vaara.attestation._decision_emit import build_decision_basis
 from vaara.attestation.receipt import (
     ENFORCEMENT_SCHEMA,
     BackLink,
@@ -220,6 +221,7 @@ __all__ = [
     "bind_overt_envelope_to_report_data",
     "bind_record_to_report_data",
     "build_bundle_document",
+    "build_decision_basis",
     "build_handoff",
     "canonical_cbor",
     "check_receipt_revocation",
