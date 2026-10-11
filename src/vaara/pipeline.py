@@ -504,6 +504,7 @@ class InterceptionPipeline:
                     regulatory_domains=action_type.regulatory_domains,
                     policy_id=self._scorer_policy_id(),
                     violation_type="scorer_failure",
+                    unavailable_input=self._scorer_policy_id(),
                 )
             except Exception:
                 logger.exception(
@@ -648,11 +649,11 @@ class InterceptionPipeline:
         # Normalise to a known vocabulary; anything unrecognised fails
         # closed to "deny" — this preserves the pipeline's fail-closed
         # invariant established on the scorer-exception path above.
-        raw_decision = scorer_result.get("action", "deny")
+        raw_decision = scorer_result.get("action")
         if isinstance(raw_decision, str):
             decision_str = raw_decision.strip().lower()
         else:
-            decision_str = "deny"
+            decision_str = ""
         # Which policy a deny came from and on what ground. The scorer's
         # thresholds are the policy unless the scorer names its own.
         deny_policy_id = scorer_result.get("policy_id")
@@ -661,8 +662,17 @@ class InterceptionPipeline:
         violation_type = scorer_result.get("violation_type")
         if not isinstance(violation_type, str) or not violation_type:
             violation_type = "risk_threshold"
+        # A scorer that failed closed names what it could not reach. Without
+        # it, a deny from a scorer that never got an answer would be recorded
+        # on the same ground as an action that was scored and found too risky.
+        unavailable_input = scorer_result.get("unavailable_input")
+        if not isinstance(unavailable_input, str):
+            unavailable_input = ""
         if decision_str not in _FINE_TO_COARSE:
+            # No decision, or one outside the vocabulary: the scorer's answer
+            # could not be read, so no check completed on this action.
             violation_type = "invalid_decision"
+            unavailable_input = f"{self._scorer_policy_id()}.action"
             logger.warning(
                 "Scorer returned unknown action=%r for action_id=%s; "
                 "failing closed to 'deny'",
@@ -837,6 +847,7 @@ class InterceptionPipeline:
             human_disposed=human_disposed,
             policy_id=deny_policy_id,
             violation_type=violation_type,
+            unavailable_input=unavailable_input,
         )
 
         if decision_str == "escalate":

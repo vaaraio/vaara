@@ -55,6 +55,20 @@ PUBKEY_NAME = "issuer-es256.pub.pem"
 # The trail's coarse decision word, as the envelope's verdict vocabulary.
 _VERDICT = {"allow": "allow", "escalate": "escalate", "deny": "block"}
 _DECISION_EVENTS = (EventType.DECISION_MADE, EventType.ACTION_BLOCKED)
+
+# What a deny rests on, read from the ground the trail recorded. "evaluated":
+# a check ran and the action failed it. "not_evaluated": a check the decision
+# needed never completed (the scorer raised or could not be reached, its
+# answer could not be read), so the action was refused without being judged.
+# A ground in neither set, or none at all, is "undetermined": the receipt
+# never claims a check ran when the trail does not say so.
+_EVALUATED_GROUNDS = frozenset({
+    "risk_threshold", "policy_rule", "privilege_attenuation",
+    "perimeter_filter", "parameter_schema", "egress_not_allowed",
+})
+_NOT_EVALUATED_GROUNDS = frozenset({
+    "scorer_failure", "scorer_unavailable", "invalid_decision",
+})
 _HEX64 = re.compile(r"^[0-9a-f]{64}$")
 _SAFE_NAME = re.compile(r"[^A-Za-z0-9._-]")
 
@@ -124,6 +138,8 @@ def build_evidence(record: AuditRecord) -> dict[str, Any]:
     if data.get("approver"):
         evidence["approver"] = str(data["approver"])
         evidence["humanDisposed"] = bool(data.get("human_disposed", False))
+    if evidence["decision"] == "deny":
+        evidence["refusal"] = _refusal_block(data)
     cage = data.get("cage")
     if isinstance(cage, dict) and cage.get("driver"):
         # The cage block as the trail recorded it: which cage the deciding
@@ -132,6 +148,30 @@ def build_evidence(record: AuditRecord) -> dict[str, Any]:
         # the cage layer has no block and the receipt says nothing.
         evidence["cage"] = _cage_block(cage, record.record_id)
     return evidence
+
+
+def _refusal_block(data: dict[str, Any]) -> dict[str, Any]:
+    """What a deny rests on: a failed check, a check that never completed, or unknown.
+
+    A refusal word alone cannot tell a control that held from a control that
+    was never reached. The block separates them, and where a check could not
+    complete it names the input that was missing, as the trail recorded it.
+    """
+    ground = str(data.get("violation_type") or "")
+    if ground in _EVALUATED_GROUNDS:
+        basis = "evaluated"
+    elif ground in _NOT_EVALUATED_GROUNDS:
+        basis = "not_evaluated"
+    else:
+        basis = "undetermined"
+    block: dict[str, Any] = {"basis": basis}
+    if ground:
+        block["violationType"] = ground
+    if data.get("policy_id"):
+        block["policyId"] = str(data["policy_id"])
+    if basis == "not_evaluated" and data.get("unavailable_input"):
+        block["unavailableInput"] = str(data["unavailable_input"])
+    return block
 
 
 def _cage_block(cage: dict[str, Any], record_id: str) -> dict[str, Any]:

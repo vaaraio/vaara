@@ -19,6 +19,7 @@ from __future__ import annotations
 
 import json
 import urllib.error
+import urllib.parse
 import urllib.request
 from typing import Any, Optional
 
@@ -73,10 +74,28 @@ class ExternalScorer:
         return _coerce_external_result(self._name, data)
 
 
+def _safe_name(name: str) -> str:
+    """The scorer's name as a record may carry it: a URL is cut to its host.
+
+    The name defaults to the endpoint URL, which can hold credentials or a
+    token in its query, and a receipt is built to leave the machine.
+    """
+    parts = urllib.parse.urlsplit(name)
+    if parts.scheme and parts.hostname:
+        return parts.hostname + (f":{parts.port}" if parts.port else "")
+    return name
+
+
 def _fail_closed(name: str, message: str) -> dict[str, Any]:
+    # The scorer never answered, so nothing was judged. The ground and the
+    # missing input say so; without them the pipeline records the deny as a
+    # risk threshold the action crossed.
     return {
         "point_estimate": 1.0,
         "decision": "deny",
+        "action": "deny",
+        "violation_type": "scorer_unavailable",
+        "unavailable_input": f"scorer:{_safe_name(name)}",
         "backend": name,
         "raw_result": {
             "point_estimate": 1.0,
@@ -107,6 +126,7 @@ def _coerce_external_result(name: str, data: Any) -> dict[str, Any]:
     return {
         "point_estimate": point,
         "decision": decision,
+        "action": decision,
         "backend": name,
         "raw_result": {
             "point_estimate": point,

@@ -847,6 +847,7 @@ file holds the envelope under `receipt` and the evidence record under
 | `decisionDetail` | The refinement behind the verdict, present only when the trail record carries one. |
 | `approver`, `humanDisposed` | Who disposed of the decision: `approver` is exactly `human` or `policy`, `humanDisposed` is true only when a human acted on this decision, and a producer MUST NOT write `humanDisposed` true with any other approver. Present together, only when the trail record carries an approver; absent means no disposition was asserted, never that a human acted. Vectors: `tests/vectors/decision_disposition_v0/`. |
 | `cage` | The cage the deciding process ran in. See "The cage block" below. Absent on records written before the cage layer. |
+| `refusal` | On a `deny` only: what the refusal rests on. See "The refusal block" below. Absent on records written before it. |
 
 The envelope writes the trail's `deny` as `block`. `backLink.attestationDigest`
 is `previousHash`, `backLink.attestationNonce` is `recordId`, and
@@ -865,6 +866,30 @@ Vectors are in `tests/vectors/trail_decision_v0/`: receipts written by the
 engine's own sink over a SQLite trail, tampered copies, the trail's record
 hashes, and `expected.json` with each file's verdict. The macOS app's verifier
 checks the same files.
+
+#### The refusal block
+
+A refusal word alone cannot tell a control that held from a control that was
+never reached. A deny from a scorer that could not be reached reads the same
+as a deny from one that judged the action too risky. `refusal` separates the
+two. It is a member of the evidence record, so the evidence digest and the
+signature bind it, and it appears on every `deny` and on nothing else.
+
+| Member | Type | Rule |
+|---|---|---|
+| `basis` | string | Always present. `evaluated`: a check ran and the action failed it. `not_evaluated`: a check the decision needed did not complete, so the action was refused without being judged. `undetermined`: the trail does not record which. |
+| `violationType` | string | Present when the trail records a ground. The ground the trail recorded, for example `risk_threshold`, `policy_rule` or `scorer_unavailable`. |
+| `policyId` | string | Present when the trail records one. The policy the deny came from. |
+| `unavailableInput` | string | Only with `not_evaluated`, when the trail names it. The input the check could not get, for example `scorer:<host>`. Never a URL path, query or credential. |
+
+The basis follows the recorded ground. `risk_threshold`, `policy_rule`,
+`privilege_attenuation`, `perimeter_filter`, `parameter_schema` and
+`egress_not_allowed` are `evaluated`. `scorer_failure`, `scorer_unavailable`
+and `invalid_decision` are `not_evaluated`. Any other ground, and a deny with
+none, is `undetermined`: the issuer never states that a check ran when its
+trail does not say so. A reader that needs the grounds of a refusal treats
+`undetermined` as grounds not established, while the refusal itself still
+stands. A verifier ignores members it does not know.
 
 #### The cage block
 

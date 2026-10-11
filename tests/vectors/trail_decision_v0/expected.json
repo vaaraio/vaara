@@ -28,5 +28,15 @@
     "evidence": true,
     "signature": true,
     "trail": true
+  },
+  "valid/4-deny.json": {
+    "evidence": true,
+    "signature": true,
+    "trail": true
+  },
+  "valid/5-deny.json": {
+    "evidence": true,
+    "signature": true,
+    "trail": true
   }
 }

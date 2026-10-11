@@ -1,0 +1,57 @@
+{
+  "evidence": {
+    "actionId": "vector-action-4",
+    "agentId": "vector-agent",
+    "cage": {
+      "confirmed": false,
+      "driver": "none"
+    },
+    "decidedAt": "2026-10-11T18:25:11.245Z",
+    "decision": "deny",
+    "eventType": "action_blocked",
+    "previousHash": "sha256:7f97098e88b440406185bb7346e2aaf43310e690e048e8503da1fd8c91cfb432",
+    "reason": "external scorer transport failure: URLError",
+    "recordHash": "sha256:15b6efcc1b932cbd24eff32af25ea38e910037730e053fcea67ed8d8ed3ae64b",
+    "recordId": "a3876207-d6ca-43b2-9cc3-3ceddab4afd9",
+    "refusal": {
+      "basis": "not_evaluated",
+      "policyId": "scorer:ExternalScorer",
+      "unavailableInput": "scorer:risk.example.net",
+      "violationType": "scorer_unavailable"
+    },
+    "riskScore": "1",
+    "schema": "vaara.trail-decision/v0",
+    "tenantId": "",
+    "toolName": "tx.transfer"
+  },
+  "receipt": {
+    "alg": "ES256",
+    "backLink": {
+      "attestationDigest": "sha256:7f97098e88b440406185bb7346e2aaf43310e690e048e8503da1fd8c91cfb432",
+      "attestationNonce": "a3876207-d6ca-43b2-9cc3-3ceddab4afd9"
+    },
+    "decisionDerived": {
+      "decidedAt": "2026-10-11T18:25:11.245Z",
+      "decision": "block",
+      "evidenceRef": {
+        "canonicalization": "jcs-rfc8785",
+        "digest": "sha256:564beb4c2a596f515100f1d1b797470ff69a6e058441143e057fa7eda45b06d6",
+        "ref": "vaara:trail/a3876207-d6ca-43b2-9cc3-3ceddab4afd9",
+        "schema": "vaara.trail-decision/v0"
+      },
+      "policyId": "policy:vaara-engine/1",
+      "reason": "external scorer transport failure: URLError",
+      "riskScore": "1"
+    },
+    "issuerAsserted": {
+      "alg": "ES256",
+      "iat": "2026-10-11T18:25:11Z",
+      "iss": "vaara:engine",
+      "nonce": "tE88me0A-xuaKkDFVABFqHBy",
+      "secretVersion": "es256:dfa441deb94a9c1c",
+      "sub": "vector-agent"
+    },
+    "signature": "936a18eeab278f75ee4a382202e05e2bde25846bfaf712977682105d74f434a861461d49fbaad30a97716700fed762de260af47edf613e4da9a6ca7e507e0435",
+    "version": 1
+  }
+}

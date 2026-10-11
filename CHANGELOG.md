@@ -6,6 +6,13 @@ and this project follows [Semantic Versioning](https://semver.org/spec/v2.0.0.ht
 
 ## [Unreleased]
 
+### Added
+- Every deny in a decision receipt says what it rests on. The evidence record gains a `refusal` block: `basis` is `evaluated` when a check ran and the action failed it, `not_evaluated` when a check the decision needed did not complete, and `undetermined` when the trail does not record which. With `not_evaluated` the block names the input the check could not get (`unavailableInput`), and it carries the recorded ground and policy. The trail records that input as `unavailable_input` on a deny. A refusal word alone could not tell a control that held from one that was never reached. See SPEC.md section 5.10, "The refusal block".
+
+### Fixed
+- A deny from a scorer that never answered is no longer recorded as a risk threshold. An `ExternalScorer` that could not be reached, or returned a body it could not read, failed closed with risk 1.0 and no ground, so the pipeline recorded the deny under `risk_threshold`, the same ground as an action that was scored and found too risky. It now records `scorer_unavailable` and names the scorer's host. A scorer answer with no decision is recorded as `invalid_decision` instead of a risk threshold.
+- `ExternalScorer` and `CompositeScorer` work as the pipeline's scorer. Both answered with `decision` while the pipeline reads `action`, so every call through either was denied. Both now answer with `action` as well. A composite whose merged verdict is a deny keeps the ground of a member that never answered.
+
 ## [2.10.0] - 2026-10-11
 
 ### Added

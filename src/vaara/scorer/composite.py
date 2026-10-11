@@ -68,6 +68,15 @@ class CompositeScorer:
         else:
             merged = combine(results)
         merged["backend"] = self._name
+        # The pipeline reads ``action``; members speak ``decision``.
+        merged["action"] = merged.get("decision", merged.get("action"))
+        # A member that never answered refused without judging. If the merged
+        # verdict is a deny, it must not read as a threshold the action crossed.
+        failed = [r for r in results if r.get("unavailable_input")]
+        if failed and merged["action"] == "deny":
+            merged["violation_type"] = failed[0].get("violation_type", "scorer_unavailable")
+            merged["unavailable_input"] = ", ".join(
+                str(r["unavailable_input"]) for r in failed)
         merged["composition"] = {
             "members": [r.get("backend", "?") for r in results],
             "mode": self._combine if isinstance(self._combine, str) else "callable",

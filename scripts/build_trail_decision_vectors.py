@@ -36,6 +36,13 @@ CASES = [
     ("allow", "read_file", "allow: risk=0.12 (threshold allow<0.55 deny>0.85)", 0.12),
     ("escalate", "send_email", "escalate: risk=0.61", 0.61),
     ("deny", "Bash", "rule: rm -rf on a home path", 0.97),
+    # The refusal block's three bases: the deny above and the one below record
+    # no ground and read "undetermined"; these two record one each.
+    ("deny", "tx.transfer", "Deny rule no-wire: amount over mandate", 1.0,
+     {"policy_id": "deny_rule:no-wire", "violation_type": "policy_rule"}),
+    ("deny", "tx.transfer", "external scorer transport failure: URLError", 1.0,
+     {"policy_id": "scorer:ExternalScorer", "violation_type": "scorer_unavailable",
+      "unavailable_input": "scorer:risk.example.net"}),
     # Escapes and non-ASCII: the case where a hand-written JCS goes wrong.
     ("deny", "mcp__fs__write_ä",
      'He said "no"\n\ttab \u0001 back\\slash / ä € \U0001F600  ', 0.5),
@@ -61,10 +68,11 @@ def main() -> int:
     trail = SQLiteAuditBackend(db).load_trail()
     assert trail._receipt_sink is not None, "signing libraries missing"
     names = []
-    for i, (decision, tool, reason, risk) in enumerate(CASES):
+    for i, (decision, tool, reason, risk, *grounds) in enumerate(CASES):
         trail.record_decision(
             action_id=f"vector-action-{i}", agent_id="vector-agent",
             tool_name=tool, decision=decision, reason=reason, risk_score=risk,
+            **(grounds[0] if grounds else {}),
         )
         names.append(f"{i}-{decision}.json")
 

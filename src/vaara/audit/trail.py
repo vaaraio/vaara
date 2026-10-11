@@ -1256,6 +1256,7 @@ class AuditTrail:
         policy_id: str = "",
         violation_type: str = "",
         cage: Optional[dict] = None,
+        unavailable_input: str = "",
     ) -> None:
         """Record the allow/deny/escalate decision.
 
@@ -1277,6 +1278,12 @@ class AuditTrail:
         action and on what ground. They are written on a deny only; the
         pipeline, the deny-rule hook and the MCP proxy supply both on every
         deny they write. Same omission rule: empty adds no keys.
+
+        ``unavailable_input`` names the input a deny could not get: the
+        scorer that raised or could not be reached, a decision that could
+        not be read. It is what separates a check that ran and failed the
+        action from a check that never completed, which a refusal word
+        alone cannot show. Written on a deny only; empty adds no keys.
 
         ``cage`` is the block :func:`vaara.cage.observe` returns: which cage
         the deciding process runs in and whether the kernel confirmed it at
@@ -1376,6 +1383,10 @@ class AuditTrail:
             if violation_type:
                 data["violation_type"] = self._cap_record_str(
                     violation_type, self._MAX_DECISION_LABEL_LEN,
+                )
+            if unavailable_input:
+                data["unavailable_input"] = self._cap_record_str(
+                    unavailable_input, self._MAX_TOOL_NAME_LEN,
                 )
         data["cage"] = self._cap_record_dict_bytes(
             {str(k): json_safe(v) for k, v in cage.items()},
