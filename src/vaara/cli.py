@@ -6524,6 +6524,16 @@ def build_parser() -> argparse.ArgumentParser:
     )
     pllp.set_defaults(func=_cmd_llm_proxy)
 
+    # Listed here so it shows in `vaara --help`; main() forwards its argv to
+    # vaara.netgate.cli before this parser runs, as for llm-proxy.
+    sub.add_parser(
+        "net-gate",
+        add_help=False,
+        help="Govern agents' network access where it leaves: each connection "
+             "attributed to one agent, checked against its mandate and the "
+             "policy, recorded, and ended the moment the agent is revoked.",
+    )
+
     # The Linux OS layer. Each command owns its parser in vaara.oslayer and
     # main() forwards argv to it untouched, as it does for llm-proxy; these
     # entries put the three in `vaara --help`.
@@ -7879,6 +7889,10 @@ def main(argv: list[str] | None = None) -> int:
     if raw and raw[0] == "llm-proxy":
         from vaara.integrations.llm_proxy import main as llm_main
         return llm_main(raw[1:])
+    # `net-gate` the same way: its parser in vaara.netgate.cli is the only one.
+    if raw and raw[0] == "net-gate":
+        from vaara.netgate.cli import main as netgate_main
+        return netgate_main(raw[1:])
     # The OS layer's commands forward the same way. `run` has to: everything
     # after the agent's name belongs to the agent. None of the three triggers
     # first-run setup; the guard runs as root and `run` only starts an agent.
