@@ -29,7 +29,6 @@ for _mod in ("rfc8785", "cryptography", "dilithium_py"):
 from cryptography.hazmat.primitives.asymmetric import ec  # noqa: E402
 from dilithium_py.ml_dsa import ML_DSA_65  # noqa: E402
 
-from vaara.attestation._receipt_pq import _b64u_encode  # noqa: E402
 from vaara.attestation.receipt import (  # noqa: E402
     BackLink,
     OutcomeDerived,
@@ -45,6 +44,9 @@ ES_KEYID = ISS + "#es256-2026"
 PQ_KEYID = ISS + "#mldsa-2026"
 IAT = "2026-06-11T12:00:00Z"
 
+
+def _b64u_encode(raw: bytes) -> str:
+    return base64.urlsafe_b64encode(raw).rstrip(b"=").decode("ascii")
 
 def _b64u_int(n: int, size: int) -> str:
     return base64.urlsafe_b64encode(n.to_bytes(size, "big")).rstrip(b"=").decode()

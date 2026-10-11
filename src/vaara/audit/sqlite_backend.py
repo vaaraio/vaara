@@ -1199,13 +1199,6 @@ class SQLiteAuditBackend:
             )
         logger.info("Audit DB schema migrated to v%d", to_version)
 
-    def _get_max_seq(self) -> int:
-        """Get the highest sequence number in the DB (diagnostic / tests)."""
-        row = self._conn.execute(
-            "SELECT COALESCE(MAX(seq), -1) FROM audit_records"
-        ).fetchone()
-        return row[0]
-
     # ── Write path ────────────────────────────────────────────────
 
     def write_record(self, record: AuditRecord) -> None:

@@ -217,6 +217,13 @@ class TestSaveLoad:
             path.unlink(missing_ok=True)
 
     def test_load_jsonl_roundtrip(self):
+        """What was saved as traces comes back as traces.
+
+        ``save_jsonl`` wrote one line per step and ``load_jsonl`` handed
+        back a flat list of steps, while ``pre_calibrate`` iterates
+        ``trace.steps``: a saved corpus could not be fed back to the one
+        method it was saved for without regrouping it by hand.
+        """
         gen = TraceGenerator(seed=42)
         traces = gen.generate(n_traces=3)
 
@@ -226,15 +233,29 @@ class TestSaveLoad:
         try:
             count = gen.save_jsonl(traces, path)
             loaded = gen.load_jsonl(path)
-            assert len(loaded) == count
-
-            # Check first step
-            first_trace_step = traces[0].steps[0]
-            assert loaded[0].action_name == first_trace_step.action_name
-            assert loaded[0].agent_id == first_trace_step.agent_id
-            assert abs(loaded[0].outcome_severity - first_trace_step.outcome_severity) < 0.001
+            assert [t.agent_id for t in loaded] == [t.agent_id for t in traces]
+            assert [t.archetype for t in loaded] == [t.archetype for t in traces]
+            assert sum(len(t.steps) for t in loaded) == count
+            for before, after in zip(traces, loaded):
+                assert [s.action_name for s in after.steps] == [s.action_name for s in before.steps]
+                assert [s.is_sequence_part for s in after.steps] == [s.is_sequence_part for s in before.steps]
+                for a, b in zip(before.steps, after.steps):
+                    assert abs(a.outcome_severity - b.outcome_severity) < 0.001
+                    assert abs(a.agent_confidence - b.agent_confidence) < 0.001
         finally:
             path.unlink(missing_ok=True)
+
+    def test_a_reloaded_corpus_calibrates_a_pipeline(self, tmp_path):
+        from vaara.pipeline import InterceptionPipeline
+        from vaara.audit.trail import AuditTrail
+
+        gen = TraceGenerator(seed=7)
+        path = tmp_path / "traces.jsonl"
+        gen.save_jsonl(gen.generate(n_traces=5), path)
+
+        stats = gen.pre_calibrate(InterceptionPipeline(trail=AuditTrail()), gen.load_jsonl(path))
+        assert stats["traces_processed"] == 5
+        assert stats["steps_processed"] > 5
 
 
 class TestSyntheticTrace:

@@ -18,6 +18,11 @@ from vaara.pipeline import InterceptionPipeline
 from vaara.scorer.adaptive import ConformalCalibrator
 
 
+def _quantile(calibrator) -> float:
+    """The default bucket's conformal quantile, read under the lock."""
+    with calibrator._lock:
+        return calibrator._get_quantile_locked(calibrator._bucket_key(None))
+
 def _pipeline(db=":memory:", enforce=True):
     backend = SQLiteAuditBackend(db)
     trail = backend.load_trail()
@@ -158,11 +163,11 @@ class TestConformalQuantile:
                 c = self._calibrated(residuals, alpha)
                 k = math.ceil((1 - alpha) * (n + 1))
                 want = residuals[min(k, n) - 1]
-                assert c._get_quantile() == want, (n, alpha)
+                assert _quantile(c) == want, (n, alpha)
 
     def test_n30_alpha10_is_the_28th_value_not_the_29th(self):
         residuals = [i / 100 for i in range(1, 31)]
-        assert self._calibrated(residuals, 0.1)._get_quantile() == 0.28
+        assert _quantile(self._calibrated(residuals, 0.1)) == 0.28
 
 
 class TestConformalOrdering:
@@ -198,7 +203,7 @@ class TestLongRunCoverage:
         miss = n = 0
         for r in seq:
             if c.is_calibrated_for(None):
-                miss += r > c._get_quantile()
+                miss += r > _quantile(c)
                 n += 1
             c.add_calibration_point(r, 0.0)
         return miss / n

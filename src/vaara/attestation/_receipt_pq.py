@@ -53,10 +53,6 @@ def _b64u_decode(value: str) -> bytes:
     return base64.urlsafe_b64decode(value + pad)
 
 
-def _b64u_encode(raw: bytes) -> str:
-    return base64.urlsafe_b64encode(raw).rstrip(b"=").decode("ascii")
-
-
 def receipt_preimage(receipt: ExecutionReceipt) -> bytes:
     """The JCS preimage both signatures cover.
 

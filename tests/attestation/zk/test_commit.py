@@ -1,5 +1,5 @@
 from vaara.attestation.zk._group import G, N, scalar_mul
-from vaara.attestation.zk._commit import commit, gens, random_scalar
+from vaara.attestation.zk._commit import commit, random_scalar
 
 
 def test_commit_homomorphic():
@@ -11,14 +11,6 @@ def test_commit_binding_generator_independent():
     # H must not be a known small multiple of G.
     h = commit(0, 1)
     assert all(h != scalar_mul(k, G) for k in range(1, 50))
-
-
-def test_gens_distinct_and_deterministic():
-    g1, h1 = gens(8)
-    g2, h2 = gens(8)
-    assert [p.to_bytes() for p in g1] == [p.to_bytes() for p in g2]
-    allpts = [p.to_bytes() for p in g1 + h1]
-    assert len(set(allpts)) == 16
 
 
 def test_random_scalar_range():

@@ -10,7 +10,68 @@ as the last one. Without that a decision log is write-only. With it the same
 structure becomes a nerve.
 
 ```python
-from vaara.northern_lights import Brain, Criterion, Decision, Mesh, Node, Verdict
+from vaara.northern_lights import Brain, Criterion, Decision, Mesh, Node, Panel, Pattern, Verdict
+
+
+def courier(name: str, threshold: int = 2, max_km: float = 5.0) -> Node:
+    """A courier gate. The operator picks n: here two of three criteria."""
+    return Node(
+        name=name,
+        attrs={"max_km": max_km, "max_min": 30},
+        criteria=[
+            Criterion("distance", lambda p, a: p["km"] <= a["max_km"]),
+            Criterion("time", lambda p, a: p["min"] <= a["max_min"]),
+            Criterion("effort", lambda p, a: p["effort"] < 0.8),
+        ],
+        threshold=threshold,
+    )
+
+
+brain = Brain()
+mesh = Mesh("deliveries", brain, [
+    courier("pickup"),
+    Panel("depot", [courier("east"), courier("west"), courier("north")], required=2),
+    courier("handoff"),
+])
+
+delivery = Decision(id="d1", payload={"km": 3.0, "min": 20, "effort": 0.5})
+print(mesh.probe(delivery))                        # asked before committing
+print(mesh.route(delivery) is Verdict.PASS, delivery.thread())
+print(mesh.relay(delivery, was_correct=False))     # the back edge: every node on the route learns
+
+far = Decision(id="d2", payload={"km": 40.0, "min": 20, "effort": 0.9})
+print(mesh.route(far) is Verdict.REFUSE, mesh.refusal_reason(far))
+print(brain.objections_against("pickup"), brain.refusals()[0].reason)
+print([signal.channel.value for signal in brain.signals_from("pickup")])
+```
+
+A broadcast is the other shape: one message, every node, and the pattern of
+who answered is the signal. Watching which nodes are elevated at the same
+time is how a conclusion nobody routed gets drawn.
+
+```python
+from vaara.northern_lights import Brain, Criterion, Decision, Mesh, Node, Pattern
+
+
+def skin(name: str, x: float) -> Node:
+    """Feels a gust when it is near. Objecting means it felt something."""
+    return Node(name=name, at=(x, 0.0), attrs={"x": x},
+                criteria=[Criterion("calm", lambda p, a: abs(a["x"] - p["gust_x"]) > 1.5)],
+                threshold=1)
+
+
+brain = Brain(patterns=[Pattern("storm", watch={"s2", "s3"}, required=2)])
+body = Mesh("body", brain, [skin(f"s{i}", float(i)) for i in range(-3, 4)])
+
+hop = body.broadcast(Decision(id="g0", payload={"gust_x": 3.0}))
+print([n.name for n in body.felt_it(hop)], body.localise(hop)[1])   # ['s2', 's3'] right
+
+for i in range(6):
+    body.broadcast(Decision(id=f"g{i + 1}", payload={"gust_x": 3.0}))
+s3 = body.all_nodes()[-1]
+print(s3.rate(), s3.elevated())                                      # firing more than its usual
+print([found.pattern for found in brain.infer(body.all_nodes())])    # ['storm']
+s3.settle()                                                          # back toward its own threshold
 ```
 
 ## The shape

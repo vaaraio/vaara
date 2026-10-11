@@ -4,7 +4,9 @@ This is the index of Vaara's capabilities, grouped by area. Each entry names the
 code or command that implements it, so every line can be checked against the
 source. Reconciled against v2.6.0. When this page and the code disagree, the
 code is right. For when each concept first shipped, see
-[PRIOR_ART.md](PRIOR_ART.md).
+[PRIOR_ART.md](PRIOR_ART.md). An entry whose "Where" names a module and no
+command is reached from Python; [library.md](library.md) shows the door to
+each of those, with a block that runs.
 
 Vaara governs every agent tool call and model call against the organisation's
 policy, and writes the decision and its outcome into a signed, hash-chained

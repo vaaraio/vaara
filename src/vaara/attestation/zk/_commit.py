@@ -25,17 +25,6 @@ def commit(value: int, blind: int) -> Point:
     return scalar_mul(value, G) + scalar_mul(blind, H)
 
 
-def gens(count: int) -> tuple[list[Point], list[Point]]:
-    """Deterministic auxiliary generator vectors (G_i, H_i).
-
-    Each generator is an independent hash-to-curve point, so the whole set is
-    recomputable by a verifier and has no known discrete-log relations. Reserved
-    for a future succinct backend; the current range proof does not use them.
-    """
-    gv = [hash_to_point(b"vaara/zk/Gv/v0/" + i.to_bytes(4, "big")) for i in range(count)]
-    hv = [hash_to_point(b"vaara/zk/Hv/v0/" + i.to_bytes(4, "big")) for i in range(count)]
-    return gv, hv
-
 
 def random_scalar() -> int:
     """A uniform scalar in [0, N), from the system CSPRNG."""

@@ -175,6 +175,45 @@ deployer's row in force for every adapter, and `remove_override`
 restores the published one. 28 rows total across the three vendors
 (10 Bedrock, 9 Azure, 9 GCP).
 
+```python
+import json
+
+from vaara.integrations._content_safety_articles import (
+    CategoryMapping,
+    all_mappings_for,
+    clear_overrides,
+    load_overrides,
+    lookup,
+    override_mapping,
+    remove_override,
+)
+
+BEDROCK = "aws-bedrock-guardrails"
+print(lookup(BEDROCK, "contentPolicy.HATE").ai_act_articles)        # the published row: ('Art. 5',)
+
+# A deployer's legal team reads the row differently: put theirs in force.
+override_mapping(CategoryMapping(
+    provider=BEDROCK, provider_category="contentPolicy.HATE",
+    vaara_category="hate", ai_act_articles=("Art. 5", "Art. 50"),
+    owasp_llm=("LLM05",), notes="counsel memo 2026-09-30",
+))
+print(lookup(BEDROCK, "contentPolicy.HATE").ai_act_articles)        # now with Art. 50
+
+# Or a JSON list of rows, kept beside the policy and loaded at start-up.
+rows = [{"provider": "azure-content-safety", "provider_category": "Hate", "vaara_category": "hate",
+         "ai_act_articles": ["Art. 5", "Art. 50"], "owasp_llm": ["LLM05"]}]
+with open("article-overrides.json", "w", encoding="utf-8") as fh:
+    json.dump(rows, fh)
+print(load_overrides("article-overrides.json"))                     # 1 row put in force
+
+# The published table itself never changes, so a dispute stays visible as one.
+published = [m for m in all_mappings_for(BEDROCK) if m.provider_category == "contentPolicy.HATE"]
+print(published[0].ai_act_articles)                                 # still ('Art. 5',)
+
+remove_override(BEDROCK, "contentPolicy.HATE")                       # the published row applies again
+clear_overrides()
+```
+
 ### Category to article mapping
 
 | Vaara category | Provider categories | AI Act article | OWASP LLM |

@@ -1,12 +1,17 @@
 import pytest
 
-from vaara.attestation.zk._circuit import to_fixed, decide, range_witnesses
+from vaara.attestation.zk._circuit import range_witnesses, to_fixed
 
 
-def test_decide_branches():
-    assert decide(to_fixed(0.9), to_fixed(0.8), to_fixed(0.5)) == "block"
-    assert decide(to_fixed(0.6), to_fixed(0.8), to_fixed(0.5)) == "escalate"
-    assert decide(to_fixed(0.2), to_fixed(0.8), to_fixed(0.5)) == "allow"
+def test_the_branch_boundaries_are_inclusive():
+    """escalate <= deny: a score at a threshold takes the branch above it."""
+    d, e = to_fixed(0.8), to_fixed(0.5)
+    assert all(w >= 0 for w in range_witnesses("block", d, d, e))
+    assert all(w >= 0 for w in range_witnesses("escalate", e, d, e))
+    with pytest.raises(ValueError):
+        range_witnesses("escalate", d, d, e)
+    with pytest.raises(ValueError):
+        range_witnesses("allow", e, d, e)
 
 
 def test_witnesses_nonneg_for_true_verdict():

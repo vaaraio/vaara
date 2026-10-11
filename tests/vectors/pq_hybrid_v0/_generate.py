@@ -23,7 +23,6 @@ from pathlib import Path
 from cryptography.hazmat.primitives.asymmetric import ec, rsa
 from dilithium_py.ml_dsa import ML_DSA_65
 
-from vaara.attestation._receipt_pq import _b64u_encode
 from vaara.attestation.receipt import (
     BackLink,
     OutcomeDerived,
@@ -45,6 +44,9 @@ PQ_KEYID = ISS + "#mldsa-2026"
 IAT = "2026-06-11T12:00:00Z"
 NONCE = "nonce-pq-0"
 
+
+def _b64u_encode(raw: bytes) -> str:
+    return base64.urlsafe_b64encode(raw).rstrip(b"=").decode("ascii")
 
 def _b64u_int(n: int, size: int) -> str:
     return base64.urlsafe_b64encode(n.to_bytes(size, "big")).rstrip(b"=").decode()

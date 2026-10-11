@@ -27,7 +27,20 @@ from collections import defaultdict
 from tests.reachability import Graph
 
 #: id -> why nothing in the tree has to name it.
-ALLOWED: dict[str, str] = {}
+ALLOWED: dict[str, str] = {
+    f"vaara.integrations.langchain:VaaraCallbackHandler.{method}": (
+        "LangChain calls it on the handler; the handler is duck-typed so the "
+        "framework stays optional, and the graph only follows callbacks on a "
+        "subclass of a framework base"
+    )
+    for method in (
+        "on_agent_action", "on_agent_finish", "on_chain_end", "on_chain_error",
+        "on_chain_start", "on_chat_model_start", "on_custom_event", "on_llm_end",
+        "on_llm_error", "on_llm_new_token", "on_llm_start", "on_retriever_end",
+        "on_retriever_error", "on_retriever_start", "on_retry", "on_stream_event",
+        "on_text", "on_tool_end", "on_tool_error", "on_tool_start",
+    )
+}
 
 
 def _unreachable() -> set[str]:

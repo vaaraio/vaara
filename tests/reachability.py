@@ -46,8 +46,48 @@ _CALLBACK = re.compile(
     r"|connection_lost|eof_received|model_post_init|validate|dispatch)$"
 )
 _MODULE_STRING = re.compile(r"^vaara(\.[A-Za-z_]\w*)+(:[A-Za-z_][\w.]*)?$")
-_DOC_IMPORT = re.compile(r"from\s+(vaara[\w.]*)\s+import\s+\(?([\w\s,]+)\)?")
+#: One import statement: a parenthesised list may span lines, a bare list
+#: ends with its line. A greedy class that crossed newlines swallowed the
+#: `from vaara` of the next statement, so every second import a document
+#: showed was not a door.
+_DOC_IMPORT = re.compile(r"from\s+(vaara[\w.]*)\s+import\s+(?:\(([^)]*)\)|([^\n]+))")
 _DOC_DOTTED = re.compile(r"\b(vaara(?:\.[A-Za-z_]\w*)+)")
+
+
+def _imported_names(clause: str) -> list[str]:
+    """The names an import clause binds: `a, b as c  # note` gives a and b."""
+    names = []
+    for part in re.sub(r"#.*", "", clause).split(","):
+        words = part.split()
+        if words:
+            names.append(words[0])
+    return names
+
+
+def _declared_exports(statement) -> list[str]:
+    """Names a statement adds to ``__all__``: the assignment, ``+=``, or
+    ``__all__.extend([...])`` under an ``if`` that guards an optional extra.
+    A package that exports a name only when its extra is installed still
+    exports it."""
+    names: list[str] = []
+    for node in ast.walk(statement):
+        value = None
+        if isinstance(node, ast.Assign) and any(
+                isinstance(t, ast.Name) and t.id == "__all__" for t in node.targets):
+            value = node.value
+        elif isinstance(node, ast.AugAssign) and isinstance(node.target, ast.Name) \
+                and node.target.id == "__all__":
+            value = node.value
+        elif isinstance(node, ast.Call) and isinstance(node.func, ast.Attribute) \
+                and node.func.attr == "extend" and isinstance(node.func.value, ast.Name) \
+                and node.func.value.id == "__all__" and node.args:
+            value = node.args[0]
+        if value is not None:
+            try:
+                names += [n for n in ast.literal_eval(value) if isinstance(n, str)]
+            except ValueError:
+                pass
+    return names
 
 
 def _chain(node):
@@ -230,12 +270,7 @@ class Graph:
                 continue
             if isinstance(statement, ast.If) and "__main__" in ast.unparse(statement.test):
                 m.runnable = True
-            if isinstance(statement, ast.Assign) and any(
-                    isinstance(t, ast.Name) and t.id == "__all__" for t in statement.targets):
-                try:
-                    m.exports = list(ast.literal_eval(statement.value))
-                except ValueError:
-                    pass
+            m.exports += _declared_exports(statement)
             collect.visit(statement)
             for node in ast.walk(statement):
                 if isinstance(node, ast.Assign):
@@ -352,10 +387,9 @@ class Graph:
         for document in self._documents():
             text = document.read_text(encoding="utf-8", errors="replace")
             for match in _DOC_IMPORT.finditer(text):
-                for name in re.split(r"[\s,]+", match.group(2).strip()):
-                    if name and name != "as":
-                        for kind, target in self.resolve_in(match.group(1), name):
-                            (defs if kind == "def" else modules).add(target)
+                for name in _imported_names(match.group(2) or match.group(3) or ""):
+                    for kind, target in self.resolve_in(match.group(1), name):
+                        (defs if kind == "def" else modules).add(target)
             for match in _DOC_DOTTED.finditer(text):
                 parts = match.group(1).split(".")
                 for i in range(len(parts), 1, -1):

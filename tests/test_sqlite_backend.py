@@ -20,7 +20,13 @@ from vaara.taxonomy.actions import (
 )
 
 
+def _max_seq(backend) -> int:
+    """The highest seq in the file, read straight off the table."""
+    return backend._conn.execute("SELECT COALESCE(MAX(seq), -1) FROM audit_records").fetchone()[0]
+
+
 @pytest.fixture
+
 def db_path():
     with tempfile.NamedTemporaryFile(suffix=".db", delete=False) as f:
         path = Path(f.name)
@@ -793,7 +799,7 @@ class TestSeqIsUnique:
         trail.record_action_requested(ActionRequest(
             agent_id="a", tool_name="tx.transfer", action_type=sample_action_type,
         ))
-        top = backend._get_max_seq()
+        top = _max_seq(backend)
         backend.close()
         with pytest.raises(sqlite3.IntegrityError):
             self._raw_insert_at(db_path, top)
@@ -813,7 +819,7 @@ class TestSeqIsUnique:
         backend.close()
 
         reopened = SQLiteAuditBackend(db_path)
-        top = reopened._get_max_seq()
+        top = _max_seq(reopened)
         indexes = {r[1]: r[2] for r in reopened._conn.execute(
             "PRAGMA index_list(audit_records)")}
         assert reopened.load_trail().verify_chain() is None
@@ -839,7 +845,7 @@ class TestSeqIsUnique:
             trail.record_action_requested(ActionRequest(
                 agent_id="b", tool_name="tx.transfer", action_type=sample_action_type,
             ))
-            assert reopened._get_max_seq() == fork_seq + 1
+            assert _max_seq(reopened) == fork_seq + 1
         finally:
             reopened.close()
         with pytest.raises(sqlite3.IntegrityError):

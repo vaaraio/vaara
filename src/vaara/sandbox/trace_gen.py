@@ -348,8 +348,13 @@ class TraceGenerator:
         return count
 
     @staticmethod
-    def load_jsonl(path: Path) -> list[TraceStep]:
-        """Load trace steps from JSONL.
+    def load_jsonl(path: Path) -> list[SyntheticTrace]:
+        """Load traces back from the JSONL ``save_jsonl`` wrote.
+
+        One line is one step; consecutive steps of one agent are one
+        trace, which is the order ``save_jsonl`` writes them in. The
+        result is what ``pre_calibrate`` takes, so a saved corpus feeds
+        every replica the same calibration.
 
         Skips blank lines and logs (then skips) malformed / incomplete
         records rather than killing the whole load — JSONL files are
@@ -391,4 +396,9 @@ class TraceGenerator:
                         path, lineno, exc,
                     )
                     continue
-        return steps
+        traces: list[SyntheticTrace] = []
+        for step in steps:
+            if not traces or (traces[-1].agent_id, traces[-1].archetype) != (step.agent_id, step.archetype):
+                traces.append(SyntheticTrace(agent_id=step.agent_id, archetype=step.archetype))
+            traces[-1].steps.append(step)
+        return traces

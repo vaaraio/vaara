@@ -245,6 +245,7 @@ The public surface is fixed: the signed envelope (`vaara.receipt/v1`), capabilit
 | [docs/vaara-vs-observability-vs-grc.md](docs/vaara-vs-observability-vs-grc.md) | Vaara vs Datadog/Splunk vs Vanta/Drata: three different questions |
 | [docs/dogfood/](docs/dogfood/README.md) | Our marketing runs under this gate; the signed trail and key to verify it |
 | [docs/capabilities.md](docs/capabilities.md) | Everything Vaara does, by area, each entry naming its code |
+| [docs/library.md](docs/library.md) | The capabilities with no command of their own, reached from Python, each with a block that runs |
 | [docs/architecture.md](docs/architecture.md) | Scoring, conformal coverage, time anchor, formal properties |
 | [SPEC.md](SPEC.md) | The canonical vaara.receipt/v1 receipt format spec |
 | [docs/standards.md](docs/standards.md) | SEP-2828, SEP-2787, OVERT, the sovereign inference harness |

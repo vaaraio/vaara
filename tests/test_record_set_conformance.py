@@ -27,6 +27,10 @@ VECTORS = Path(__file__).resolve().parent / "vectors" / "record_set_v0"
 SETS = VECTORS / "sets"
 
 
+def _required(report):
+    """The findings that gate: what ``conforms`` is computed from."""
+    return tuple(f for f in report.findings if f.severity == "required")
+
 def _expected() -> dict:
     return json.loads((VECTORS / "expected.json").read_text(encoding="utf-8"))
 
@@ -84,7 +88,7 @@ def test_public_reexport_is_wired():
 def test_duplicate_call_is_required_and_gates():
     report = check_record_set(_load_set("duplicate_call"))
     assert not report.conforms
-    ids = [f.id for f in report.required_findings]
+    ids = [f.id for f in _required(report)]
     assert "duplicate_call" in ids
 
 
@@ -93,7 +97,7 @@ def test_executed_gap_is_advisory_and_does_not_gate():
     assert report.conforms
     advisory = [f for f in report.findings if f.severity == "advisory"]
     assert [f.id for f in advisory] == ["executed_without_result_commitment"]
-    assert report.required_findings == ()
+    assert _required(report) == ()
 
 
 def test_malformed_record_gates_but_does_not_raise():
@@ -184,7 +188,7 @@ def test_proper_pair_is_not_a_duplicate():
 def test_decision_without_outcome_is_advisory_and_does_not_gate():
     report = check_record_set(_load_set("decision_without_outcome"))
     assert report.conforms
-    assert report.required_findings == ()
+    assert _required(report) == ()
     advisory = [f for f in report.findings if f.severity == "advisory"]
     assert [f.id for f in advisory] == ["decision_without_outcome"]
     assert advisory[0].records == ("decision_b.json",)
@@ -194,7 +198,7 @@ def test_decision_without_outcome_is_advisory_and_does_not_gate():
 def test_outcome_without_decision_is_advisory_and_does_not_gate():
     report = check_record_set(_load_set("outcome_without_decision"))
     assert report.conforms
-    assert report.required_findings == ()
+    assert _required(report) == ()
     advisory = [f for f in report.findings if f.severity == "advisory"]
     assert [f.id for f in advisory] == ["outcome_without_decision"]
     assert advisory[0].records == ("outcome_b.json",)

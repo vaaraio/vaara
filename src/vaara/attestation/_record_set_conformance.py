@@ -91,10 +91,6 @@ class RecordSetReport:
     status_counts: dict[str, int]
     verdict_counts: dict[str, int]
 
-    @property
-    def required_findings(self) -> tuple[SetFinding, ...]:
-        return tuple(f for f in self.findings if f.severity == REQUIRED)
-
     def to_dict(self) -> dict[str, Any]:
         return {
             "schema": SET_SCHEMA_NAME,

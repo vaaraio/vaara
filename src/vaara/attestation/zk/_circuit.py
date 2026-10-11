@@ -27,14 +27,6 @@ def to_fixed(x: float) -> int:
     return v
 
 
-def decide(score_fp: int, deny_fp: int, escalate_fp: int) -> str:
-    if score_fp >= deny_fp:
-        return "block"
-    if score_fp >= escalate_fp:
-        return "escalate"
-    return "allow"
-
-
 def range_witnesses(
     verdict: str, score_fp: int, deny_fp: int, escalate_fp: int
 ) -> list[int]:

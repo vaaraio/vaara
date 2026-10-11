@@ -565,12 +565,6 @@ class ConformalCalibrator:
         idx = min(max(k, 1), n) - 1
         return sorted_residuals[idx]
 
-    def _get_quantile(self, category: Optional[str] = None) -> float:
-        """Conformal quantile from the named bucket's residuals."""
-        key = self._bucket_key(category)
-        with self._lock:
-            return self._get_quantile_locked(key)
-
     def predict_interval(
         self,
         point_estimate: float,
@@ -626,11 +620,6 @@ class AgentProfile:
             return 0.0
         return self.bad_outcomes / self.total_actions
 
-    @property
-    def age_seconds(self) -> float:
-        if self.first_seen == 0:
-            return 0.0
-        return self.last_seen - self.first_seen
 
     def record_action(
         self, action_name: str, timestamp: float,
@@ -1487,24 +1476,6 @@ class AdaptiveScorer:
         )
 
     # ── Sequence pattern management ───────────────────────────────
-
-    def add_sequence_pattern(self, pattern: SequencePattern) -> None:
-        """Register a new dangerous sequence pattern.
-
-        A pattern with the same name replaces the existing one so repeated
-        registration (e.g. on hot reload) stays idempotent instead of
-        silently accumulating duplicates.
-        """
-        with self._lock:
-            self._sequences = [p for p in self._sequences if p.name != pattern.name]
-            self._sequences.append(pattern)
-
-    def remove_sequence_pattern(self, name: str) -> bool:
-        """Remove a sequence pattern by name."""
-        with self._lock:
-            before = len(self._sequences)
-            self._sequences = [p for p in self._sequences if p.name != name]
-            return len(self._sequences) < before
 
     # ── Introspection ─────────────────────────────────────────────
 
