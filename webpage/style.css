@@ -465,7 +465,7 @@ main section.plain + section { padding-top: 84px; }
 .feed { position: relative; }
 .feed figcaption { position: absolute; top: 100%; left: 0; right: 0; }
 @media (max-width: 820px) { .feed figcaption { position: static; } }
+/* as much air under the caption as above the panel */
+@media (min-width: 821px) { .hero.home { padding-bottom: 68px; } }
 
 /* the bar spans the whole window, logo at the left edge and the menus at the right; the page below keeps its column */
-.bar > .wrap { max-width: none; padding: 0 32px; }
-@media (max-width: 820px) { .bar > .wrap { padding: 0 16px; } }
