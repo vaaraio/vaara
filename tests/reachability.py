@@ -348,7 +348,7 @@ class Graph:
         names = set()
         for document in self._documents():
             text = document.read_text(encoding="utf-8", errors="replace")
-            blocks = [text] if document.suffix == ".py" else re.findall(r"```python\n(.*?)```", text, re.S)
+            blocks = [text] if document.suffix == ".py" else re.findall(r"```python\r?\n(.*?)```", text, re.S)
             for block in blocks:
                 try:
                     trees = [ast.parse(block)]
@@ -379,7 +379,7 @@ class Graph:
                 modules.add(name)
             # A module's __all__ is a door when a document names the module:
             # declared API nobody is told about is not a way in.
-            path = str(m.path.relative_to(self.root / "src" / "vaara")) if name.startswith("vaara") else ""
+            path = m.path.relative_to(self.root / "src" / "vaara").as_posix() if name.startswith("vaara") else ""
             if m.exports and name.startswith("vaara") and (
                     m.is_package or name in written or path in written):
                 for exported in m.exports:

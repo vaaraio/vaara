@@ -70,26 +70,41 @@ class _Process:
         )
         self._stdin = stdin
 
+    def _signal(self, hard: bool) -> None:
+        # The process group goes on POSIX so a child the command started ends
+        # too; Windows has no process groups to signal, only the process.
+        if hasattr(os, "killpg"):
+            os.killpg(self.proc.pid, signal.SIGKILL if hard else signal.SIGINT)
+        elif hard:
+            self.proc.kill()
+        else:
+            self.proc.terminate()
+
     def finish(self, timeout: float = 30.0) -> subprocess.CompletedProcess:
         try:
             out, err = self.proc.communicate(input=self._stdin, timeout=timeout)
         except subprocess.TimeoutExpired:
-            os.killpg(self.proc.pid, signal.SIGKILL)
+            self._signal(hard=True)
             out, err = self.proc.communicate(timeout=10)
             pytest.fail(f"did not finish in {timeout}s\nstdout:\n{out}\nstderr:\n{err}")
         return subprocess.CompletedProcess(self.proc.args, self.proc.returncode, out, err)
 
     def stop(self) -> subprocess.CompletedProcess:
         if self.proc.poll() is None:
-            os.killpg(self.proc.pid, signal.SIGINT)
+            self._signal(hard=False)
             try:
                 out, err = self.proc.communicate(timeout=20)
             except subprocess.TimeoutExpired:
-                os.killpg(self.proc.pid, signal.SIGKILL)
+                self._signal(hard=True)
                 out, err = self.proc.communicate(timeout=10)
         else:
             out, err = self.proc.communicate(timeout=10)
         return subprocess.CompletedProcess(self.proc.args, self.proc.returncode, out, err)
+
+
+_posix_shell = pytest.mark.skipif(sys.platform == "win32",
+                                  reason="proxy-shell runs commands through a POSIX sh")
+_linux = pytest.mark.skipif(not sys.platform.startswith("linux"), reason="the OS layer is Linux")
 
 
 def _http(port: int, method: str, path: str, body=None, headers=None):
@@ -385,6 +400,7 @@ def test_net_gate_serve_lets_a_known_agent_through_to_a_local_echo(tmp_path):
 
 # ── vaara proxy-shell ──────────────────────────────────────────────────────
 
+@_posix_shell
 def test_proxy_shell_runs_a_piped_command_through_the_pipeline(tmp_path):
     db = tmp_path / "shell.db"
     run = _Process(["proxy-shell", "--db", str(db), "--shell", "/bin/sh", "--agent-id", "ci"],
@@ -398,6 +414,7 @@ def test_proxy_shell_runs_a_piped_command_through_the_pipeline(tmp_path):
     assert any(r.tool_name == "shell.exec" and r.agent_id == "ci" for r in records)
 
 
+@_posix_shell
 def test_proxy_shell_blocks_a_metadata_read_and_leaves_a_record(tmp_path):
     db = tmp_path / "shell.db"
     run = _Process(["proxy-shell", "--db", str(db), "--shell", "/bin/sh"], tmp_path,
@@ -414,6 +431,7 @@ def test_proxy_shell_blocks_a_metadata_read_and_leaves_a_record(tmp_path):
 
 # ── vaara os-layer ─────────────────────────────────────────────────────────
 
+@_linux
 def test_os_layer_folder_and_app_write_the_selection(tmp_path):
     folder = tmp_path / "clients"
     folder.mkdir()
@@ -444,6 +462,7 @@ def test_os_layer_folder_and_app_write_the_selection(tmp_path):
     assert done.returncode == 0
 
 
+@_linux
 def test_os_layer_pending_and_approve_answer_a_waiting_request(tmp_path):
     from vaara.approvals import request_approval
 
@@ -480,6 +499,7 @@ def test_os_layer_pending_and_approve_answer_a_waiting_request(tmp_path):
     assert "nothing waiting" in nothing.stdout
 
 
+@_linux
 def test_os_layer_deny_answers_and_an_unknown_request_is_refused(tmp_path):
     from vaara.approvals import request_approval
 
