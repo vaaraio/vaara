@@ -23,7 +23,7 @@ surface.
 - `_signing_payload()` = JCS-canonical encoding of
   `{version, alg, backLink, outcomeDerived, receiptAsserted}`; the
   signature is over exactly these bytes and excludes itself.
-- `sign_es256` / `verify_es256` (and HS256 / RS256) in `_sep2787_signing`.
+- `sign_es256` / `verify_es256` (and HS256 / RS256) in `_attest_signing`.
 
 The VC layer is pure serialization over these. It adds no signing.
 

@@ -11,6 +11,10 @@ four commands in that block failed as printed.
 The check walks the real argparse tree of every installed console script, so
 it tracks whatever the CLI actually accepts rather than a second list that
 can drift the same way the docs did.
+
+The site is read too, inside its ``<pre>`` and ``<code>`` blocks: the
+test-it-yourself page told a reader to run ``vaara conformance check --all``
+for a year, and the parser had no ``--all``.
 """
 
 from __future__ import annotations
@@ -132,6 +136,13 @@ def _cited_flags() -> dict[str, str]:
     for doc in sorted(ROOT.glob("docs/**/*.md")) + [ROOT / "README.md"]:
         for flag in re.findall(r"(--[a-z][\w-]{2,})", doc.read_text(encoding="utf-8")):
             cited.setdefault(flag, str(doc.relative_to(ROOT)))
+    # A page's stylesheet is full of `--ink`-style custom properties; only
+    # what a reader is shown to type counts.
+    for page in sorted(ROOT.glob("webpage/**/*.html")):
+        text = page.read_text(encoding="utf-8")
+        for block in re.findall(r"<(?:pre|code)[^>]*>(.*?)</(?:pre|code)>", text, re.S):
+            for flag in re.findall(r"(--[a-z][\w-]{2,})", block):
+                cited.setdefault(flag, str(page.relative_to(ROOT)))
     return cited
 
 

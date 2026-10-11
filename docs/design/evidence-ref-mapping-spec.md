@@ -212,7 +212,7 @@ repository's own canonicalization:
 
 ```python
 import hashlib
-from vaara.attestation._sep2787_canonical import canonical_json
+from vaara.attestation import sep2787_canonical_json as canonical_json
 drift = { ... }  # the record from step 1
 addr = "sha256:" + hashlib.sha256(canonical_json(drift)).hexdigest()
 # sha256:8e22e733c3526ca8e7987ab2355f18e66752f29ac629dbd41c9b80650822a56b

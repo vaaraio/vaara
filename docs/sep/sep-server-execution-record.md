@@ -634,7 +634,7 @@ than broken by nonce). Relevant modules:
   receipt's back-link, the issuer-block
   layout, and the shared signing stack unchanged, so the decision record adds
   the `decisionDerived` block and no new crypto.
-- `vaara/attestation/_sep2787_types.py` and `_sep2787_canonical.py`: the shared
+- `vaara/attestation/_attest_types.py` and `_attest_canonical.py`: the shared
   commitment shapes (`ArgsRef`, `ArgsProjection`, `make_args_digest`), the
   issuer-block layout, RFC 8785 canonicalization with float rejection, and the
   signing stack (`ES256` / `RS256` / `HS256`) reused unchanged.

@@ -16,6 +16,11 @@ along with the OpenTimestamps anchor method it implemented.
 The check resolves the shorthand the docs legitimately use (`scorer/
 adaptive.py` and `vaara/compliance/engine.py` both mean the file under
 `src/`), then fails on anything left that does not exist.
+
+It reads every document under docs/, not only the top level: docs/sep/
+named `_sep2787_types.py` and `_sep2787_canonical.py` for two years after
+they were renamed `_attest_*`, because only docs/*.md was read. The site's
+pages are read too, with their `<code>` spans as the backticks.
 """
 
 from __future__ import annotations
@@ -29,8 +34,9 @@ ROOT = Path(__file__).resolve().parents[1]
 
 DOCS = [
     path
-    for path in sorted(ROOT.glob("docs/*.md"))
+    for path in sorted(ROOT.glob("docs/**/*.md"))
     + [ROOT / name for name in ("README.md", "SPEC.md", "PRIVACY.md", "LICENSING.md")]
+    + sorted(ROOT.glob("webpage/**/*.html"))
     if path.exists()
 ]
 
@@ -59,6 +65,8 @@ def _exists(reference: str) -> bool:
 
 def _references(doc: Path) -> set[str]:
     text = doc.read_text(encoding="utf-8")
+    if doc.suffix == ".html":
+        text = re.sub(r"<code>([^<]*)</code>", r"`\1`", text)
     found = set(_FILE.findall(text)) | set(_DIR.findall(text))
     return {
         reference for reference in found
