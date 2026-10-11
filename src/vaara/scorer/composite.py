@@ -84,10 +84,39 @@ class CompositeScorer:
         return merged
 
 
+#: What the trail records about the decision itself, carried from the member
+#: whose decision won: the reason and the thresholds it decided at. The
+#: pipeline reads these off the merged result; the receipt states the
+#: thresholds, and assumes an old operating point when they are absent.
+_DECIDING_KEYS = ("reason", "threshold_allow", "threshold_deny")
+
+
+def _member_decision(r: dict[str, Any]) -> str:
+    decision = r.get("decision", r.get("action", "allow"))
+    return decision if decision in _DECISION_RANK else "allow"
+
+
+def _deciding_member(results: list[dict[str, Any]]) -> dict[str, Any]:
+    """The first member with the strongest decision: its verdict is the
+    composite's, so its reason and operating point are what the trail
+    records about the decision."""
+    return max(results, key=lambda r: _DECISION_RANK[_member_decision(r)])
+
+
+def _carry_decision(merged: dict[str, Any], results: list[dict[str, Any]]) -> dict[str, Any]:
+    deciding = _deciding_member(results)
+    merged["decision"] = _member_decision(deciding)
+    for key in _DECIDING_KEYS:
+        if key in deciding:
+            merged[key] = deciding[key]
+        else:
+            merged.pop(key, None)
+    return merged
+
+
 def _combine_max(results: list[dict[str, Any]]) -> dict[str, Any]:
     top_score = -1.0
     top_idx = 0
-    top_decision_rank = 0
     for i, r in enumerate(results):
         try:
             s = float(r.get("point_estimate", 0.5))
@@ -96,12 +125,7 @@ def _combine_max(results: list[dict[str, Any]]) -> dict[str, Any]:
         if s > top_score:
             top_score = s
             top_idx = i
-        dr = _DECISION_RANK.get(r.get("decision", "allow"), 0)
-        if dr > top_decision_rank:
-            top_decision_rank = dr
-    base = dict(results[top_idx])
-    base["decision"] = _RANK_DECISION.get(top_decision_rank, "allow")
-    return base
+    return _carry_decision(dict(results[top_idx]), results)
 
 
 def _combine_mean(results: list[dict[str, Any]]) -> dict[str, Any]:
@@ -112,14 +136,10 @@ def _combine_mean(results: list[dict[str, Any]]) -> dict[str, Any]:
         except (TypeError, ValueError):
             scores.append(0.5)
     avg = sum(scores) / len(scores)
-    top_decision_rank = max(
-        _DECISION_RANK.get(r.get("decision", "allow"), 0) for r in results
-    )
-    return {
+    return _carry_decision({
         "point_estimate": avg,
-        "decision": _RANK_DECISION.get(top_decision_rank, "allow"),
         "raw_result": {
             "point_estimate": avg,
             "conformal_interval": [min(scores), max(scores)],
         },
-    }
+    }, results)

@@ -52,14 +52,35 @@ def test_coerce_external_result_decodes_vaara_score_shape():
     r = _coerce_external_result(
         "peer",
         {
-            "risk": {"point": 0.62, "lower": 0.55, "upper": 0.71},
+            "risk": {"point": 0.62, "lower": 0.55, "upper": 0.71, "alpha": 0.1},
             "decision": "escalate",
+            "thresholds": {"allow": 0.3, "deny": 0.8},
+            "explanation": "borderline",
         },
     )
     assert r["point_estimate"] == 0.62
-    assert r["decision"] == "escalate"
+    assert r["decision"] == r["action"] == "escalate"
     assert r["backend"] == "peer"
+    assert r["reason"] == "borderline"
+    assert (r["threshold_allow"], r["threshold_deny"]) == (0.3, 0.8)
     assert r["raw_result"]["conformal_interval"] == [0.55, 0.71]
+    assert r["raw_result"]["effective_alpha"] == 0.1
+
+
+def test_coerce_external_result_refuses_a_decision_without_its_thresholds():
+    r = _coerce_external_result(
+        "peer", {"risk": {"point": 0.1}, "decision": "allow"},
+    )
+    assert r["decision"] == "deny"
+    assert r["violation_type"] == "scorer_unavailable"
+    assert r["unavailable_input"] == "scorer:peer.thresholds"
+
+
+def test_coerce_external_result_decides_a_bare_score_at_a_stated_point():
+    r = _coerce_external_result("peer", {"risk": {"point": 0.75}})
+    assert r["decision"] == "deny"
+    assert (r["threshold_allow"], r["threshold_deny"]) == (0.4, 0.7)
+    assert "decided here" in r["reason"]
 
 
 def test_coerce_external_result_handles_non_object_body():
