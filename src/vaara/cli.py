@@ -5090,10 +5090,16 @@ def _cmd_policy_reload(args: argparse.Namespace) -> int:
             payload["format"] = fmt
 
     url = args.server.rstrip("/") + "/v1/policy/reload"
+    headers = {"Content-Type": "application/json"}
+    # The server refuses every endpoint but health without its key; the
+    # reload is the operator's own call and carries the same key.
+    api_key = getattr(args, "api_key", None) or os.environ.get("VAARA_SERVER_API_KEY") or None
+    if api_key:
+        headers["Authorization"] = f"Bearer {api_key}"
     req = urllib.request.Request(
         url,
         data=_json.dumps(payload).encode("utf-8"),
-        headers={"Content-Type": "application/json"},
+        headers=headers,
         method="POST",
     )
     try:
@@ -7734,6 +7740,13 @@ def build_parser() -> argparse.ArgumentParser:
     preload.add_argument(
         "--timeout", type=float, default=10.0,
         help="HTTP request timeout in seconds (default 10)",
+    )
+    preload.add_argument(
+        "--api-key", default=None,
+        help=(
+            "The server's API key, sent as a bearer token. Defaults to "
+            "VAARA_SERVER_API_KEY, the variable vaara serve reads."
+        ),
     )
     preload.set_defaults(func=_cmd_policy_reload)
 

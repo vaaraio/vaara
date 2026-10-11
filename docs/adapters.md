@@ -290,7 +290,7 @@ curl -sX POST http://localhost:8000/v1/score \
 
 Authentication matters here: with no API key the server is loopback-only by default, and `vaara serve` refuses a non-loopback bind without `--api-key` (or the `VAARA_SERVER_API_KEY` env var) unless you pass `--allow-unauthenticated`. That refusal is deliberate: an unauthenticated reachable server lets any client swap the policy to allow-all (`POST /v1/policy/reload`), append forged audit events that still verify (`POST /v1/audit/events`), and poison calibration (`POST /v1/score/outcome`). When a key is configured, every endpoint except `GET /v1/health` requires `Authorization: Bearer <key>`.
 
-Wire contract in [openapi.yaml](openapi.yaml). Operator endpoints include `POST /v1/policy/reload` (atomic hot policy swap) and named detectors `POST /v1/detect/injection` and `POST /v1/detect/pii`, with matching CLI subcommands that exit non-zero on detection for CI gating.
+Wire contract in [openapi.yaml](openapi.yaml). Operator endpoints include `POST /v1/policy/reload` (atomic hot policy swap) and named detectors `POST /v1/detect/injection` and `POST /v1/detect/pii`, with matching CLI subcommands that exit non-zero on detection for CI gating. `vaara policy reload policy.yaml --server http://host:8000` is the operator's side of the reload; it carries the server's key from `--api-key` or `VAARA_SERVER_API_KEY`, and `--inline` sends the parsed policy in the request for a server on another host.
 
 ### TypeScript client
 
