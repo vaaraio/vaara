@@ -381,6 +381,11 @@ TRANSPARENCY_DEFAULTS: dict[EventType, dict[str, str]] = {
         "data_usage": "surviving_record_seqs",
         "decision_making": "n/a",
     },
+    EventType.WITNESS_CONFIGURED: {
+        "system_operation": "witness_configuration",
+        "data_usage": "cadence+target+key_fingerprint",
+        "decision_making": "operator_configuration",
+    },
     EventType.KEY_LIFECYCLE: {
         "system_operation": "key_custodian_management",
         "data_usage": "custodian_fingerprint+quorum",
