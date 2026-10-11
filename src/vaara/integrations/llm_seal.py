@@ -348,9 +348,6 @@ class SealRegistry:
             text = self._seal_known(text)
         return text
 
-    def unseal_text(self, text: str) -> str:
-        return self.unseal_text_counted(text)[0]
-
     def unseal_text_counted(self, text: str) -> tuple[str, int]:
         """Restore placeholders and say how many were restored."""
         restored = 0
@@ -366,14 +363,6 @@ class SealRegistry:
             return raw
         try:
             return self.seal_text(raw.decode("utf-8")).encode("utf-8")
-        except (UnicodeDecodeError, UnicodeEncodeError):
-            return raw
-
-    def unseal_bytes(self, raw: bytes) -> bytes:
-        if not self._reverse:
-            return raw
-        try:
-            return self.unseal_text(raw.decode("utf-8")).encode("utf-8")
         except (UnicodeDecodeError, UnicodeEncodeError):
             return raw
 
@@ -396,65 +385,6 @@ class SealRegistry:
         except Exception:  # pragma: no cover
             return []
         return sorted(found - set(self._reverse))
-
-
-class StreamUnsealer:
-    """Restore placeholders in a streamed response.
-
-    A placeholder can be split across two SSE events, so the tail of each chunk
-    is held back until the next one arrives.  Only as many bytes are withheld
-    as a placeholder could occupy, so nothing is buffered for long.
-    """
-
-    def __init__(self, registry: SealRegistry) -> None:
-        self._registry = registry
-        self._carry = ""
-        #: How many placeholders were restored so far. For the receipt.
-        self.restored = 0
-        self._unmapped: set[str] = set()
-
-    @property
-    def unmapped(self) -> list[str]:
-        """Placeholders that passed through unrestored, sorted."""
-        return sorted(self._unmapped)
-
-    def feed(self, chunk: bytes) -> bytes:
-        if not self._registry.active:
-            return chunk
-        try:
-            text = self._carry + chunk.decode("utf-8", "replace")
-        except Exception:  # pragma: no cover
-            return chunk
-        # Restore before splitting. Unsealing only the emitted slice would let
-        # a placeholder that straddles the boundary have its head emitted raw
-        # while its tail is still in the carry, which is what the first version
-        # of this did and what the byte-at-a-time test caught.
-        text, n = self._registry.unseal_text_counted(text)
-        self.restored += n
-        keep = max(0, PLACEHOLDER_LEN - 1)
-        if len(text) > keep:
-            emit, self._carry = text[:-keep], text[-keep:]
-        else:
-            emit, self._carry = "", text
-        # A placeholder still present after unsealing is one nobody here can
-        # restore. Count a match the first time its start falls inside the
-        # emitted slice. The carry is one byte shorter than a placeholder, so
-        # a match starting in the emitted slice is complete in `text`, and a
-        # match starting in the carry is seen again next feed with the same
-        # bytes ahead of it. Each is counted exactly once.
-        for m in _PLACEHOLDER_RE.finditer(text):
-            if m.start() < len(emit):
-                self._unmapped.add(m.group(0))
-        return emit.encode("utf-8")
-
-    def flush(self) -> bytes:
-        if not self._carry:
-            return b""
-        out, n = self._registry.unseal_text_counted(self._carry)
-        self.restored += n
-        self._unmapped.update(_PLACEHOLDER_RE.findall(out))
-        self._carry = ""
-        return out.encode("utf-8")
 
 
 #: Delta fields whose text a model writes and a placeholder can appear in.
@@ -486,11 +416,11 @@ def _partial_placeholder_tail(text: str) -> int:
 class SseUnsealer:
     """Restore placeholders in a streamed SSE response, across event frames.
 
-    ``StreamUnsealer`` runs a regex over the raw bytes with a short carry, which
-    handles a placeholder split by an HTTP chunk boundary. It cannot handle a
-    placeholder split by an SSE EVENT boundary, because the two halves then
-    have event framing between them, and a client streaming tool input emits
-    many small ``input_json_delta`` events. MEASURED 2026-09-19 on the live
+    The first streaming unsealer ran a regex over the raw bytes with a short
+    carry, which handles a placeholder split by an HTTP chunk boundary. It
+    could not handle a placeholder split by an SSE EVENT boundary, because the
+    two halves then have event framing between them, and a client streaming
+    tool input emits many small ``input_json_delta`` events. MEASURED 2026-09-19 on the live
     trail: 1,881 outcomes, a placeholder restored once, an unrestored one
     reported never, while every request sealed 30 to 45 of them. The
     placeholders went back to the caller literal and the record said clean.

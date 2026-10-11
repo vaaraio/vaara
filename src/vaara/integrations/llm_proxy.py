@@ -85,9 +85,6 @@ def _build_pipeline(db: Optional[Path] = None,
     return pipeline
 
 
-def add_arguments(parser): ...
-
-
 def _timestamped_log_config():
     """uvicorn's own logging config, with a dated prefix on every line.
 

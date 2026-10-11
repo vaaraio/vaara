@@ -31,7 +31,7 @@ from pathlib import Path
 from typing import Any, Iterator, Optional
 
 from vaara.cage import BASIS_DECLARED, CageState, environ_for
-from vaara.cage._cli import ChildLaunch, ChildLaunches, Tool, digest_bytes, digest_file
+from vaara.cage._cli import ChildLaunch, ChildLaunches, Tool, digest_bytes
 from vaara.cage.driver import CageError, CageLaunch
 
 NAME = "codex"
@@ -102,5 +102,3 @@ class CodexSandboxDriver:
         return self._launches.get(name).events(since)
 
 
-def digest_policy(path: Path) -> str:
-    return digest_file(path)

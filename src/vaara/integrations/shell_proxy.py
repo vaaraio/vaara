@@ -132,9 +132,6 @@ def _run_one(
     return 1
 
 
-def add_arguments(parser): ...
-
-
 def main(args: Optional[list[str]] = None) -> int:
     """Entry point for ``vaara proxy shell``."""
     import argparse

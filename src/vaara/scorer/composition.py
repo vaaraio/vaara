@@ -24,10 +24,6 @@ import urllib.request
 from typing import Any, Optional
 
 
-class ExternalScorerError(RuntimeError):
-    """Raised when an external scorer returns an unusable response."""
-
-
 class ExternalScorer:
     """Vaara-compatible scorer that POSTs to a remote /v1/score endpoint."""
 

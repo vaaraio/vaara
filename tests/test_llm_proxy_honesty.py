@@ -34,7 +34,7 @@ from vaara.integrations._llm_proxy_app import (  # noqa: E402
 from vaara.integrations.llm_proxy import _build_pipeline  # noqa: E402
 from vaara.integrations.llm_seal import (  # noqa: E402
     SealRegistry,
-    StreamUnsealer,
+    SseUnsealer,
     placeholder_for,
 )
 
@@ -299,11 +299,11 @@ class TestSealFileReload:
         assert "two" not in seen["body"]
 
 
-class TestStreamUnsealerCounts:
+class TestStreamedReplyCounts:
 
     def test_counts_survive_a_split_placeholder(self):
         reg = SealRegistry({"c": SECRET}, key=KEY)
-        u = StreamUnsealer(reg)
+        u = SseUnsealer(reg)
         out = b""
         for ch in f"x {TOKEN} y {STRANGER} z".encode():
             out += u.feed(bytes([ch]))

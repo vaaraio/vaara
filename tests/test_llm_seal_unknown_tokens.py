@@ -17,6 +17,12 @@ from vaara.integrations.llm_seal import (
 )
 
 # Generated with secrets.token_urlsafe / token_hex; none has a known prefix.
+
+def _restore(reg: SealRegistry, raw: bytes) -> bytes:
+    """What the proxy does to a reply that is not streamed."""
+    text, _ = reg.unseal_text_counted(raw.decode("utf-8"))
+    return text.encode("utf-8")
+
 OPAQUE = "q7Rz2LmX9vKp4TnW8bYc1HdF"
 HEXTOKEN = "9f86d081884c7d659a2feaa0c55ad015a3bf4f1b"
 B64 = "dGhpcyBpcyBub3QgYSByZWFsIGtleQ3kZ9=="
@@ -41,7 +47,7 @@ def test_an_unknown_token_is_sealed_and_restored(text, value, kind):
     assert value.encode() not in out
     assert reg.placeholder(value).encode() in out
     assert reg.last_kinds == {kind: 1}
-    assert reg.unseal_bytes(out) == raw
+    assert _restore(reg, out) == raw
 
 
 def test_only_the_value_is_sealed_not_the_key():

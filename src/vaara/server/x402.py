@@ -77,16 +77,6 @@ class X402Gate:
     def __init__(self, config: Optional[X402Config] = None) -> None:
         self.config = config or X402Config.from_env()
 
-    def price_for(self, declared_amount: Optional[str]) -> str:
-        """Amount required for this call.
-
-        Flat by default (``VAARA_X402_PRICE``). ``declared_amount`` is the hook
-        for value-at-risk pricing (a share of a settled amount the caller
-        declares); the plumbing stays flat until a pricing model is chosen, so
-        no model is baked in here.
-        """
-        return self.config.price
-
     def requirements(self, resource: str, description: str, amount: str) -> dict:
         return {
             "x402Version": _X402_VERSION,

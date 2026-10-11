@@ -22,6 +22,12 @@ from vaara.integrations.llm_seal import (
     placeholder_for,
 )
 
+
+def _restore(reg: SealRegistry, raw: bytes) -> bytes:
+    """What the proxy does to a reply that is not streamed."""
+    text, _ = reg.unseal_text_counted(raw.decode("utf-8"))
+    return text.encode("utf-8")
+
 KEY_A = bytes(range(32))
 KEY_B = bytes(reversed(range(32)))
 
@@ -42,7 +48,7 @@ def test_a_registry_seals_with_its_own_key_and_restores():
     assert b"northern lights" not in sealed
     assert reg.placeholder("northern lights").encode() in sealed
     assert placeholder_for("northern lights", KEY_B).encode() not in sealed
-    assert reg.unseal_bytes(sealed) == b'{"m": "the northern lights plan"}'
+    assert _restore(reg, sealed) == b'{"m": "the northern lights plan"}'
 
 
 def test_two_registries_without_a_shared_key_do_not_agree():
@@ -73,7 +79,7 @@ def test_learned_values_use_the_same_key(tmp_path):
     key = "sk-ant-" + "a1B2c3D4" * 4
     sealed = reg.seal_bytes(key.encode())
     assert sealed == reg.placeholder(key).encode()
-    assert reg.unseal_bytes(sealed) == key.encode()
+    assert _restore(reg, sealed) == key.encode()
 
 
 def test_the_deny_rules_keep_an_agent_away_from_the_seal_key():

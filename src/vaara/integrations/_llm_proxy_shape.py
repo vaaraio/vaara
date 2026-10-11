@@ -102,20 +102,6 @@ def extract_model_name(body: dict[str, Any]) -> str:
     return body.get("model", "")
 
 
-def extract_system_prompt(body: dict[str, Any]) -> str:
-    """Extract the system prompt, provider-agnostic."""
-    if "system" in body:
-        if isinstance(body["system"], str):
-            return body["system"]
-        if isinstance(body["system"], list):
-            parts: list[str] = []
-            for b in body["system"]:
-                if isinstance(b, dict) and b.get("type") == "text":
-                    parts.append(b.get("text", ""))
-            return "".join(parts)
-    return ""
-
-
 def flatten_messages(messages: list[dict[str, Any]]) -> str:
     """Concatenate message content for scanning."""
     parts: list[str] = []

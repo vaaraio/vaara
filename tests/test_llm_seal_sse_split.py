@@ -16,7 +16,6 @@ import json
 from vaara.integrations.llm_seal import (
     SealRegistry,
     SseUnsealer,
-    StreamUnsealer,
     _partial_placeholder_tail,
 )
 
@@ -60,15 +59,6 @@ def test_split_across_two_events_is_restored():
     assert _texts(out) == "x = " + TERM + "_version"
     assert u.restored == 1
     assert u.unmapped == []
-
-
-def test_the_byte_unsealer_could_not_do_this():
-    cut = len(PH) // 2
-    stream = _delta("x = " + PH[:cut]) + _delta(PH[cut:]) + _stop()
-    u = StreamUnsealer(REG)
-    out = u.feed(stream) + u.flush()
-    assert PH[:cut] in out.decode()  # left literal, the defect this file pins
-    assert u.restored == 0
 
 
 def test_split_one_char_per_event():

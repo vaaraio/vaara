@@ -361,12 +361,6 @@ def profile_loaded(name: str = PROFILE) -> bool:
     return any(line.split(" (", 1)[0] == name for line in text.splitlines())
 
 
-def home_of(uid: int) -> str:
-    import pwd
-
-    return pwd.getpwuid(uid).pw_dir
-
-
 def exec_attr_path() -> str:
     new = "/proc/self/attr/apparmor/exec"
     return new if os.path.exists(new) else "/proc/self/attr/exec"

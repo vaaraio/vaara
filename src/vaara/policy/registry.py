@@ -51,10 +51,6 @@ class PolicyRegistry:
         with self._lock:
             return tenant_id in self._controllers
 
-    def tenants(self) -> list[str]:
-        with self._lock:
-            return sorted(self._controllers.keys())
-
     def get(self, tenant_id: str) -> Optional[PolicyController]:
         """Return the controller for ``tenant_id``, falling back to the
         default ("") slot. Returns None if neither is registered.

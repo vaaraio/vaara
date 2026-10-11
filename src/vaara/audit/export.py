@@ -33,10 +33,7 @@ from typing import TYPE_CHECKING, Optional, Union
 try:
     from cryptography.exceptions import UnsupportedAlgorithm
     from cryptography.hazmat.primitives import serialization
-    from cryptography.hazmat.primitives.asymmetric.ed25519 import (
-        Ed25519PrivateKey,
-        Ed25519PublicKey,
-    )
+    from cryptography.hazmat.primitives.asymmetric.ed25519 import Ed25519PrivateKey
     _HAS_CRYPTO = True
 except ImportError:
     _HAS_CRYPTO = False
@@ -95,19 +92,6 @@ def _load_private_key(
     if not isinstance(loaded, Ed25519PrivateKey):
         raise ValueError("signer_key must be an Ed25519 private key")
     return loaded
-
-
-def _pubkey_fingerprint(public_key: "Ed25519PublicKey") -> str:
-    """SHA-256 fingerprint (hex, first 16 bytes) of the raw public key.
-
-    Matches what ``vaara keygen`` prints so operators can cross-check which
-    key signed a given export.
-    """
-    raw = public_key.public_bytes(
-        encoding=serialization.Encoding.Raw,
-        format=serialization.PublicFormat.Raw,
-    )
-    return hashlib.sha256(raw).hexdigest()[:32]
 
 
 def _build_manifest(

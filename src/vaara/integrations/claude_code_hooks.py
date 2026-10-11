@@ -257,14 +257,9 @@ def notify(
 # deny patterns
 
 from vaara.deny_rules import (  # noqa: E402
-    deny_rules_path as _deny_rules_path,
     load_deny_rules as _load_deny_rules,
     match_deny_rule as _match_deny_rule,
 )
-
-
-def deny_patterns_path(explicit: Optional[str] = None) -> Optional[Path]:
-    return _deny_rules_path(explicit)
 
 
 def load_deny_rules(explicit: Optional[str] = None) -> list[dict]:

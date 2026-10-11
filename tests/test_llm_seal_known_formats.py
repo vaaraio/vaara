@@ -19,9 +19,15 @@ import pytest
 from vaara.integrations.llm_seal import (
     KNOWN_SECRET_FORMATS,
     SealRegistry,
-    StreamUnsealer,
+    SseUnsealer,
     placeholder_for,
 )
+
+
+def _restore(reg: SealRegistry, raw: bytes) -> bytes:
+    """What the proxy does to a reply that is not streamed."""
+    text, _ = reg.unseal_text_counted(raw.decode("utf-8"))
+    return text.encode("utf-8")
 
 SAMPLES = {
     "anthropic_key": "sk-ant-api03-" + "A" * 40,
@@ -53,7 +59,7 @@ def test_each_format_is_sealed_and_restored(kind):
     out = reg.seal_bytes(raw)
     assert SAMPLES[kind].encode() not in out
     assert reg.last_kinds == {kind: 1}
-    assert reg.unseal_bytes(out) == raw
+    assert _restore(reg, out) == raw
 
 
 @pytest.mark.parametrize("text", [
@@ -92,7 +98,7 @@ def test_a_learned_value_survives_a_seal_file_reload(tmp_path):
     import os
     os.utime(f, (1, 1))
     assert reg.refresh()
-    assert SAMPLES["github_token"].encode() in reg.unseal_bytes(sealed)
+    assert SAMPLES["github_token"].encode() in _restore(reg, sealed)
 
 
 def test_a_streamed_reply_is_restored():
@@ -100,7 +106,7 @@ def test_a_streamed_reply_is_restored():
     reg.seal_bytes(_body(SAMPLES["stripe_key"]))
     token = reg.placeholder(SAMPLES["stripe_key"]).encode()
     frame = b'data: {"delta":"your key is ' + token + b'"}\n\n'
-    un = StreamUnsealer(reg)
+    un = SseUnsealer(reg)
     out = b"".join(un.feed(frame[i:i + 3]) for i in range(0, len(frame), 3))
     out += un.flush()
     assert SAMPLES["stripe_key"].encode() in out

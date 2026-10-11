@@ -12,11 +12,17 @@ import json
 from vaara.integrations.llm_seal import (
     PLACEHOLDER_LEN,
     SealRegistry,
-    StreamUnsealer,
+    SseUnsealer,
     placeholder_for,
 )
 
 KEY = bytes(range(32))
+
+
+def _restore(reg: SealRegistry, raw: bytes) -> bytes:
+    """What the proxy does to a reply that is not streamed."""
+    text, _ = reg.unseal_text_counted(raw.decode("utf-8"))
+    return text.encode("utf-8")
 
 
 class TestPlaceholder:
@@ -40,13 +46,13 @@ class TestRoundTrip:
     def test_unseal_restores_the_original(self):
         reg = SealRegistry({"concept": "anti-note"}, key=KEY)
         raw = b'{"content":"the anti-note idea"}'
-        assert reg.unseal_bytes(reg.seal_bytes(raw)) == raw
+        assert _restore(reg, reg.seal_bytes(raw)) == raw
 
     def test_overlapping_secrets_seal_longest_first(self):
         reg = SealRegistry({"short": "mesh", "long": "lightmesh atom"}, key=KEY)
         sealed = reg.seal_bytes(b"the lightmesh atom runs")
         assert b"lightmesh atom" not in sealed
-        assert reg.unseal_bytes(sealed) == b"the lightmesh atom runs"
+        assert _restore(reg, sealed) == b"the lightmesh atom runs"
 
     def test_json_escaped_form_is_also_sealed(self):
         secret = 'he said "go"'
@@ -59,7 +65,7 @@ class TestRoundTrip:
         reg = SealRegistry(key=KEY)
         assert not reg.active
         assert reg.seal_bytes(b"anything") == b"anything"
-        assert reg.unseal_bytes(b"anything") == b"anything"
+        assert _restore(reg, b"anything") == b"anything"
 
 
 class TestFailOpen:
@@ -103,13 +109,13 @@ class TestReceiptInputs:
         assert reg.unmapped_placeholders(reg.seal_bytes(b"alpha")) == []
 
 
-class TestStreamUnsealer:
+class TestStreamedReply:
     def test_restores_a_placeholder_split_across_chunks(self):
         reg = SealRegistry({"concept": "anti-note"}, key=KEY)
         token = placeholder_for("anti-note", KEY)
         whole = f"the {token} idea".encode()
         cut = len(b"the ") + 5  # mid-placeholder
-        un = StreamUnsealer(reg)
+        un = SseUnsealer(reg)
         out = un.feed(whole[:cut]) + un.feed(whole[cut:]) + un.flush()
         assert out == b"the anti-note idea"
 
@@ -117,18 +123,18 @@ class TestStreamUnsealer:
         reg = SealRegistry({"concept": "anti-note"}, key=KEY)
         token = placeholder_for("anti-note", KEY)
         whole = f"x{token}y".encode()
-        un = StreamUnsealer(reg)
+        un = SseUnsealer(reg)
         out = b"".join(un.feed(whole[i:i + 1]) for i in range(len(whole)))
         assert out + un.flush() == b"xanti-notey"
 
     def test_inactive_registry_streams_unchanged(self):
-        un = StreamUnsealer(SealRegistry(key=KEY))
+        un = SseUnsealer(SealRegistry(key=KEY))
         assert un.feed(b"chunk") == b"chunk"
         assert un.flush() == b""
 
     def test_nothing_is_lost_when_no_placeholder_is_present(self):
         reg = SealRegistry({"concept": "anti-note"}, key=KEY)
-        un = StreamUnsealer(reg)
+        un = SseUnsealer(reg)
         parts = [b"hello ", b"there ", b"friend"]
         out = b"".join(un.feed(p) for p in parts) + un.flush()
         assert out == b"hello there friend"
