@@ -48,7 +48,7 @@ await vaara.reportOutcome({
 | `appendAuditEvent(req)` | `POST /v1/audit/events` | Append a custom audit record. |
 | `getActionChain(id)` | `GET /v1/audit/actions/{id}/chain` | All audit records bound to an action. |
 | `verifyAuditChain()` | `POST /v1/audit/verify` | Full-chain hash verification. |
-| `reloadPolicy(req)` | `POST /v1/policy/reload` | Atomic hot reload of the running policy (v0.13.0+). |
+| `reloadPolicy(req)` | `POST /v1/policy/reload` | Atomic hot reload of the running policy; `tenant_id` selects a tenant's policy on a multi-tenant server. |
 | `detectInjection(req)` | `POST /v1/detect/injection` | Score text for prompt injection. Backed by vaara-bench-v1 numbers. |
 | `detectPII(req)` | `POST /v1/detect/pii` | Email / phone / SSN / IPv4 / credit_card / IBAN. |
 | `serverInfo()` | `GET /v1/server` | Server identity and capabilities. |
@@ -79,7 +79,7 @@ try {
 
 ## Versioning
 
-`@vaara/client` tracks the Vaara server's minor version. v0.15.x covers the v1 wire contract as of Vaara v0.15.0. Breaking wire changes will move the server major; the client follows.
+`@vaara/client` is released with the Vaara server and carries the same version number: the package version is the server version whose v1 wire contract it covers. A breaking wire change moves the server major, and the client follows.
 
 ## License
 

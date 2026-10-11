@@ -37,6 +37,7 @@ servers:
 tags:
   - { name: score, description: Risk evaluation }
   - { name: audit, description: Hash-chained audit trail }
+  - { name: anchor, description: Qualified timestamp anchoring of receipts }
   - { name: server, description: Server identity and liveness }
 
 security:
@@ -262,6 +263,56 @@ paths:
               schema: { $ref: "#/components/schemas/Error" }
         "422":
           description: Policy document failed to parse or validate.
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/Error" }
+
+  /v1/anchor:
+    post:
+      tags: [anchor]
+      summary: Anchor a receipt to a qualified timestamp.
+      description: |
+        Submit a receipt and receive an RFC 3161 timestamp token over its
+        digest from the eIDAS qualified timestamp authority the operator
+        configured, with the attested time. The server ships no default
+        authority: without one configured the route answers `503
+        anchor_not_configured`. A refusal, timeout or pin mismatch at the
+        authority answers `502 anchor_failed`.
+
+        The route can be a paid resource. When the operator has enabled the
+        x402 gate (`VAARA_X402_ENABLED`), a request without a settled
+        `X-PAYMENT` header receives `402` with the x402 payment requirements
+        and no anchor is made. The gate is off by default, and then every
+        request is admitted.
+      operationId: anchorReceipt
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: { $ref: "#/components/schemas/AnchorRequest" }
+      responses:
+        "200":
+          description: Timestamp anchor and the time it attests.
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/AnchorResponse" }
+        "400":
+          description: Malformed request.
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/Error" }
+        "402":
+          description: Payment required. The body carries the x402 payment requirements.
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/X402Challenge" }
+        "502":
+          description: The timestamp authority refused, timed out or failed its pin.
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/Error" }
+        "503":
+          description: No timestamp authority is configured.
           content:
             application/json:
               schema: { $ref: "#/components/schemas/Error" }
@@ -598,6 +649,13 @@ components:
           type: string
           enum: [json, yaml]
           nullable: true
+        tenant_id:
+          type: string
+          maxLength: 256
+          description: |
+            Tenant whose policy to reload, on a server started with
+            `--policy-dir`. Empty, or absent, reloads the default policy.
+            The `X-Vaara-Tenant` header is read when the body carries none.
 
     PolicyReloadResponse:
       type: object
@@ -607,6 +665,7 @@ components:
         - sequence_count
         - action_class_count
         - escalation_route_count
+        - tenant_id
       properties:
         version:
           type: integer
@@ -621,6 +680,74 @@ components:
         sequence_count: { type: integer, minimum: 0 }
         action_class_count: { type: integer, minimum: 0 }
         escalation_route_count: { type: integer, minimum: 0 }
+        tenant_id:
+          type: string
+          description: Tenant whose policy was reloaded; empty for the default policy.
+
+    AnchorRequest:
+      type: object
+      required: [receipt]
+      additionalProperties: false
+      properties:
+        receipt:
+          type: object
+          description: The receipt to anchor, as emitted by Vaara.
+          additionalProperties: true
+
+    TimestampAnchor:
+      type: object
+      required: [method, anchoredDigest, token, authority, tsaUrl]
+      properties:
+        method:
+          type: string
+          description: The anchoring method, `rfc3161-eidas-qualified`.
+        anchoredDigest:
+          type: string
+          description: The receipt digest the token covers.
+        token:
+          type: string
+          description: The RFC 3161 timestamp token, base64.
+        authority:
+          type: string
+          description: The timestamp authority named in the token.
+        tsaUrl:
+          type: string
+          description: The authority the token was requested from.
+
+    AnchorResponse:
+      type: object
+      required: [anchor, attested, dss_hint]
+      properties:
+        anchor: { $ref: "#/components/schemas/TimestampAnchor" }
+        attested:
+          type: string
+          format: date-time
+          description: The time the token attests.
+        dss_hint:
+          type: string
+          description: How to validate the token independently.
+        settlement_evidence_digest:
+          type: string
+          nullable: true
+          description: |
+            `sha256:` digest of the x402 settlement that paid for this anchor,
+            when the gate is on. Null when the request was admitted free.
+
+    X402Challenge:
+      type: object
+      description: The x402 payment requirements answered with HTTP 402.
+      required: [x402Version, accepts, error]
+      properties:
+        x402Version: { type: integer }
+        accepts:
+          type: array
+          items:
+            type: object
+            additionalProperties: true
+            description: One accepted payment, in the x402 `accepts` shape.
+        error:
+          type: string
+          description: Why the request was not admitted.
 
     Error:
       type: object

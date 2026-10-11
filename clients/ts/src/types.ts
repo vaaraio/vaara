@@ -128,6 +128,8 @@ export interface PolicyReloadRequest {
   path?: string;
   body?: Record<string, unknown>;
   format?: "json" | "yaml";
+  /** Tenant whose policy to reload on a server started with --policy-dir; empty or absent reloads the default policy. */
+  tenant_id?: string;
 }
 
 export interface PolicyReloadResponse {
@@ -136,6 +138,34 @@ export interface PolicyReloadResponse {
   sequence_count: number;
   action_class_count: number;
   escalation_route_count: number;
+  /** Tenant whose policy was reloaded; empty for the default policy. */
+  tenant_id: string;
+}
+
+export interface AnchorRequest {
+  receipt: Record<string, unknown>;
+}
+
+export interface TimestampAnchor {
+  method: string;
+  anchoredDigest: string;
+  token: string;
+  authority: string;
+  tsaUrl: string;
+}
+
+export interface AnchorResponse {
+  anchor: TimestampAnchor;
+  attested: string;
+  dss_hint: string;
+  settlement_evidence_digest?: string | null;
+}
+
+/** The x402 payment requirements a paid route answers with HTTP 402. */
+export interface X402Challenge {
+  x402Version: number;
+  accepts: Array<Record<string, unknown>>;
+  error: string;
 }
 
 export interface DetectInjectionRequest {

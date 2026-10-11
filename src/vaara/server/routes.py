@@ -35,7 +35,6 @@ def _error(code: str, message: str, http_status: int, **details) -> HTTPExceptio
 
 _ERROR_DESCRIPTIONS = {
     400: "Malformed request: `invalid_request`, or a route's own code.",
-    402: "Payment required: the x402 challenge.",
     404: "Unknown action_id.",
     409: "Server has no policy plane; reload is disabled.",
     422: "Policy document failed to parse or validate.",
@@ -413,7 +412,9 @@ def register(app: FastAPI, state: ServerState) -> None:
         )
 
     @app.post("/v1/anchor", response_model=S.AnchorResponse,
-              responses=_errors(400, 402, 502, 503))
+              responses={**_errors(400, 502, 503),
+                         402: {"model": S.X402Challenge,
+                               "description": "Payment required: the x402 requirements."}})
     async def anchor_receipt_endpoint(req: S.AnchorRequest, request: Request):
         # Paid coin slot: x402-gated in front of the qualified eIDAS anchor.
         # Free (no-op gate) until an operator sets VAARA_X402_ENABLED; a

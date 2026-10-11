@@ -251,6 +251,14 @@ class TimestampAnchor(BaseModel):
     tsaUrl: str
 
 
+class X402Challenge(BaseModel):
+    """The x402 payment requirements a paid route answers with 402."""
+
+    x402Version: int
+    accepts: list[dict[str, Any]]
+    error: str
+
+
 class AnchorResponse(BaseModel):
     anchor: TimestampAnchor
     attested: str
