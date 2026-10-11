@@ -6,6 +6,8 @@ and this project follows [Semantic Versioning](https://semver.org/spec/v2.0.0.ht
 
 ## [Unreleased]
 
+## [2.10.0] - 2026-10-11
+
 ### Added
 - `vaara net-gate`: a gateway an agent's network traffic leaves through, for any number of agents on any OS. Each connection is attributed to one agent by its own credential (a token whose sha256 alone is stored), checked against that agent's mandate (the hosts it may reach, in the language of `vaara run`'s egress list, plus `*` for any public host) and against the policy, and recorded as `net.connect`; a `net.close` entry follows with the bytes each way, the duration and the reason it ended. An unknown or wrong credential gets no reply. `vaara net-gate revoke <agent>` ends every open connection of that agent at once, mid-transfer, and each one closes on the record with reason `revoked`. Names are resolved once and refused if they land on loopback, link-local, private or cloud-metadata addresses unless the agent is allowed private hosts, and the socket dials the address that passed. `vaara net-gate wg-config` writes a WireGuard client config that routes an agent host's traffic to the gateway, as a full tunnel or with `--direct` ranges cut out of `AllowedIPs` for split tunnelling. See `docs/net-gate.md`.
 
