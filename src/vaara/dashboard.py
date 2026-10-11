@@ -28,6 +28,7 @@ import ipaddress
 import json
 import secrets
 import socket
+import socketserver
 import threading
 import time
 import webbrowser
@@ -444,6 +445,22 @@ def _is_loopback_bind(host: str) -> bool:
         return False
 
 
+class _Server(ThreadingHTTPServer):
+    """ThreadingHTTPServer without the reverse lookup in server_bind.
+
+    HTTPServer.server_bind resolves the bound address with socket.getfqdn
+    before the dashboard can say where it is listening. On a host whose
+    resolver stalls on that lookup (seen on macOS) the dashboard sat silent
+    for over 30 seconds. The name is only used for the Server header.
+    """
+
+    def server_bind(self) -> None:
+        socketserver.TCPServer.server_bind(self)
+        host, port = self.server_address[:2]
+        self.server_name = str(host)
+        self.server_port = int(port)
+
+
 def serve(
     *,
     db: Optional[str] = None,
@@ -484,7 +501,7 @@ def serve(
     _Handler.token = secrets.token_urlsafe(24)
 
     try:
-        httpd = ThreadingHTTPServer((host, port), _Handler)
+        httpd = _Server((host, port), _Handler)
     except OSError as exc:
         print(f"cannot bind {host}:{port}: {exc}")
         return 1

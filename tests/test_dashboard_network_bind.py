@@ -35,7 +35,7 @@ class _NoServe:
 @pytest.fixture(autouse=True)
 def _no_real_server(monkeypatch):
     _NoServe.bound = []
-    monkeypatch.setattr(dashboard, "ThreadingHTTPServer", _NoServe)
+    monkeypatch.setattr(dashboard, "_Server", _NoServe)
 
 
 @pytest.mark.parametrize("host", ["0.0.0.0", "::", "192.0.2.10", "example.test"])
