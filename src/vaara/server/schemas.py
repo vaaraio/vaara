@@ -10,7 +10,7 @@ internal types.
 from __future__ import annotations
 
 import json
-from typing import Any, Literal, Optional
+from typing import TYPE_CHECKING, Any, Literal, Optional
 
 from pydantic import BaseModel, Field, ConfigDict, field_validator
 
@@ -22,7 +22,10 @@ _BlastRadius = Literal["local", "account", "organization", "global"]
 _Decision = Literal["allow", "escalate", "deny"]
 # Built from the trail: a type added there reaches the wire, and the trail's
 # own markers (SYSTEM_EVENT_TYPES) never do.
-_EventType = Literal[tuple(e.value for e in CLIENT_EVENT_TYPES)]  # type: ignore[valid-type]
+if TYPE_CHECKING:
+    _EventType = str
+else:
+    _EventType = Literal[tuple(e.value for e in CLIENT_EVENT_TYPES)]
 
 # Mirror of the trail's 64KB per-record data cap at the HTTP boundary:
 # an unbounded payload dict would otherwise reach the hash chain through

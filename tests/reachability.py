@@ -24,7 +24,6 @@ from __future__ import annotations
 
 import ast
 import re
-import tomllib
 from collections import defaultdict
 from pathlib import Path
 
@@ -367,6 +366,8 @@ class Graph:
     def doors(self):
         """(definition ids, module names) a user starts from."""
         defs, modules = set(), set()
+        import tomllib  # 3.11+; the guard that builds the graph skips on 3.10
+
         project = tomllib.loads((self.root / "pyproject.toml").read_text(encoding="utf-8"))
         for target in project["project"]["scripts"].values():
             module, function = target.split(":")

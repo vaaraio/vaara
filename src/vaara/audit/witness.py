@@ -162,7 +162,7 @@ def configure_from_env(trail: Any, *, environ: Optional[dict[str, str]] = None,
             _say(f"vaara: {ANCHOR_EVERY_ENV} is set but no authority is named; set "
                  f"{ANCHOR_TSA_ENV} or choose one with `vaara anchor-providers`. "
                  f"Anchoring stays off.", stderr)
-        elif every is not None:
+        elif every is not None and tsa_url:
             try:
                 client = _anchor_client(tsa_url)
             except Exception as exc:  # noqa: BLE001 - said, and the trail still opens

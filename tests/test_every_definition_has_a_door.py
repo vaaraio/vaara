@@ -24,7 +24,11 @@ from __future__ import annotations
 
 from collections import defaultdict
 
-from tests.reachability import Graph
+import pytest
+
+pytest.importorskip("tomllib")
+
+from tests.reachability import Graph  # noqa: E402
 
 #: id -> why nothing in the tree has to name it.
 ALLOWED: dict[str, str] = {

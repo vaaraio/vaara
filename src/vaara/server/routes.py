@@ -43,7 +43,7 @@ _ERROR_DESCRIPTIONS = {
 }
 
 
-def _errors(*statuses: int) -> dict[int, dict[str, Any]]:
+def _errors(*statuses: int) -> dict[int | str, dict[str, Any]]:
     """The error responses a route declares, each with the `Error` body
     docs/openapi.yaml documents, so the generated schema says what a
     failure looks like."""
