@@ -42,7 +42,7 @@ _CALLBACK = re.compile(
     r"^(do_[A-Z]+|on_\w+|https?_(open|request|response)|http_error_\w+|redirect_request"
     r"|emit|default|run|_run|_arun|handle|setup|finish|log_message|log_request|log_error"
     r"|flush|close|encode|iterencode|format|filter|connection_made|data_received"
-    r"|connection_lost|eof_received|model_post_init|validate|dispatch)$"
+    r"|connection_lost|eof_received|model_post_init|validate|dispatch|server_bind)$"
 )
 _MODULE_STRING = re.compile(r"^vaara(\.[A-Za-z_]\w*)+(:[A-Za-z_][\w.]*)?$")
 #: One import statement: a parenthesised list may span lines, a bare list
