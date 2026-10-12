@@ -92,7 +92,9 @@ scripts/release_merge_and_tag.sh <PR_NUMBER> <VERSION> [CO_TAG]
 
 1. `gh pr checks --watch --required` blocks until all required checks
    pass (or fails the script if a required check fails).
-2. `gh pr merge --squash --delete-branch`.
+2. `gh pr merge --squash`, then `git push origin --delete release/v<VERSION>`.
+   The script does not use `--delete-branch`, because that also switches the
+   local checkout to `main` and fails when another worktree holds `main`.
 3. `git fetch origin main` and reads the merged SHA from `origin/main`
    directly (no `git checkout main`/`git pull`, which would need a clean
    local main and risks the destructive-reset path).

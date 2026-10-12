@@ -36,7 +36,10 @@ echo "Watching CI for PR #${PR_NUM}..."
 gh pr checks "$PR_NUM" --watch --required
 
 # 2. Squash-merge (matches v0.39.1 / v0.39.2 release pattern)
-gh pr merge "$PR_NUM" --squash --delete-branch
+# --delete-branch would also switch the local checkout to main, which fails
+# when another worktree holds main, after the merge has already happened.
+gh pr merge "$PR_NUM" --squash
+git push origin --delete "release/v${VERSION}" || true
 
 # 3. Fetch the merged commit (no local main checkout, no reset)
 git fetch origin main
