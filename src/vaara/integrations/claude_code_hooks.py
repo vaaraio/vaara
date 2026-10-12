@@ -330,6 +330,39 @@ def _record_tool_name(record: object) -> str:
     return str(data.get("tool_name", ""))
 
 
+def _scorer():
+    """The hook's scorer: default thresholds, with the lineage store, so a
+    file planted by an outbound-then-persist sequence is remembered past this
+    session and a later session that touches it is labelled."""
+    from vaara.scorer.adaptive import AdaptiveScorer
+    from vaara.scorer.lineage import LineageStore
+
+    return AdaptiveScorer(lineage=LineageStore())
+
+
+def _sequence_relevant(tool_name: str, tool_input: dict) -> bool:
+    """True when this call can complete a dangerous sequence: it sends data
+    out, writes an agent-persistent file, or names a file an earlier session
+    planted. Such a call goes through the enforced pipeline, which replays
+    the session from the trail, rather than the record-only regex path, so a
+    matched sequence can hold it when the thresholds say so. At the default
+    thresholds these calls are allowed as before."""
+    try:
+        from vaara.scorer._param_signals import (
+            outbound_action, persist_paths_named, persistent_write,
+        )
+        from vaara.scorer.lineage import LineageStore
+
+        if outbound_action(tool_name, None, tool_input):
+            return True
+        if persistent_write(tool_name, None, tool_input):
+            return True
+        store = LineageStore()
+        return any(store.tainted(p) for p in persist_paths_named(tool_input))
+    except Exception:
+        return False
+
+
 def _record_call(cfg: dict, agent: str, tool_name: str, tool_input: dict,
                  context: dict, session_id: str = "") -> None:
     """Write an ACTION_REQUESTED record for a call on the regex path.
@@ -348,7 +381,8 @@ def _record_call(cfg: dict, agent: str, tool_name: str, tool_input: dict,
     try:
         from vaara.pipeline import InterceptionPipeline
 
-        pipeline = InterceptionPipeline(trail=_open_trail(cfg), enforce=False)
+        pipeline = InterceptionPipeline(trail=_open_trail(cfg), enforce=False,
+                                        scorer=_scorer())
         rule_id = context.get("rule_id")
         pipeline.intercept(
             agent_id=agent, tool_name=tool_name, parameters=tool_input,
@@ -664,7 +698,8 @@ def _decide_pre(cfg: dict, events: list[dict], agent: str,
             return 2
 
     if (policy is None and not tool_name.startswith("mcp__")
-            and not destructive_action(tool_name, tool_input)):
+            and not destructive_action(tool_name, tool_input)
+            and not _sequence_relevant(tool_name, tool_input)):
         # With a policy configured every call is the policy's to decide, so
         # this shortcut is taken only without one.
         # Passed the deny rules. Record it anyway: a trail holding only
@@ -690,7 +725,7 @@ def _decide_pre(cfg: dict, events: list[dict], agent: str,
         # an MCP call through unscored on the strength of a warning.
         _note_trail_failure(cfg, exc, stage="open")
         return _ungovernable(cfg, tool_name, "the audit trail cannot be opened")
-    pipeline = InterceptionPipeline(trail=trail, enforce=not shadow)
+    pipeline = InterceptionPipeline(trail=trail, enforce=not shadow, scorer=_scorer())
     _apply_protection(cfg, pipeline)
 
     try:

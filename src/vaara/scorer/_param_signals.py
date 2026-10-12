@@ -549,3 +549,25 @@ def persistent_write(
             if hit:
                 return hit
     return None
+
+
+def persist_paths_named(parameters: Any) -> list[str]:
+    """Every agent-persistent path a call names, read or write, in order.
+
+    A path parameter counts, and so does any word of a shell command. A path
+    that only appears inside other content (a file body, a message) does not:
+    naming a skill file in a note is not touching it.
+    """
+    found: list[str] = []
+    for key, text in _leaves(parameters):
+        if _PATH_KEYS.search(key):
+            candidates = [text]
+        elif _COMMAND_KEYS.search(key):
+            candidates = [w.lstrip("<>") for part in _segments(_strip_heredocs(text))
+                          for w in _words(part)]
+        else:
+            continue
+        for c in candidates:
+            if c and _persist_path(c) and c not in found:
+                found.append(c)
+    return found

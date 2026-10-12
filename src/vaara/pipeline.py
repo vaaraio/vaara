@@ -75,6 +75,9 @@ logger = logging.getLogger(__name__)
 # would otherwise grow the dict unboundedly across a long-running
 # agent session. Evicting the oldest entry keeps memory bounded;
 # late report_outcome calls after eviction no-op with a warning.
+# Earlier actions of a session replayed into a fresh scorer's sequence
+# window; the scorer keeps no more than this per agent.
+_REPLAY_WINDOW = 50
 _MAX_PENDING_OUTCOMES = 50_000
 
 # Cap on the action -> granted-capability map used for delegated-privilege
@@ -344,6 +347,28 @@ class InterceptionPipeline:
         self._metrics = PipelineMetrics()
         self._metrics_lock = threading.Lock()
 
+    def _replay_session(self, agent_id: str, session_id: str, tenant_id: str,
+                        action_id: str) -> None:
+        seed = getattr(self.scorer, "seed_session", None)
+        seen = getattr(self.scorer, "session_seen", None)
+        if seed is None or seen is None or seen(agent_id, session_id):
+            return
+        try:
+            entries = []
+            for r in self.trail.get_session_records(agent_id, session_id, tenant_id):
+                if r.event_type != EventType.ACTION_REQUESTED or r.action_id == action_id:
+                    continue
+                params = (r.data or {}).get("parameters") or {}
+                entries.append((r.tool_name, params))
+            entries = entries[-_REPLAY_WINDOW:]
+            seed(agent_id, session_id, [
+                (tool, self.registry.classify(tool, params).name, params)
+                for tool, params in entries
+            ])
+        except Exception:
+            logger.exception("session replay failed for %s/%s; scoring without it",
+                             agent_id, session_id)
+
     def _scorer_policy_id(self) -> str:
         return f"scorer:{type(self.scorer).__name__}"
 
@@ -475,6 +500,13 @@ class InterceptionPipeline:
         # an explicit "scorer failure" reason so the hash chain stays
         # consistent, then re-raise so the caller knows the governance
         # system broke rather than that the action is simply high-risk.
+        # 3c. A scorer that has not seen this session yet (a hook is one
+        # process per call) gets the session's earlier actions from the trail,
+        # so a sequence spanning calls can match. Same source authority decay
+        # replays from. Never fatal: without it the call is scored as before.
+        if session_id:
+            self._replay_session(agent_id, session_id, tenant_id, action_id)
+
         policy_context = request.to_policy_context()
         try:
             scorer_result = self.scorer.evaluate(policy_context)
@@ -926,6 +958,17 @@ class InterceptionPipeline:
                 if len(self._pending_outcomes) > _MAX_PENDING_OUTCOMES:
                     evicted, _ = self._pending_outcomes.popitem(last=False)
                     self._pending_in_db.pop(evicted, None)
+
+        # 9b. A write the scorer saw plant an agent-persistent file after an
+        # outbound call is remembered for later sessions, but only when it
+        # can land: not denied, unless shadow mode lets it through. A deny a
+        # rule reached is a refusal the caller enforces whatever the mode.
+        lineage_mark = scorer_result.get("lineage_mark")
+        commit = getattr(self.scorer, "commit_lineage", None)
+        if lineage_mark is not None and commit is not None and (
+                decision_str != "deny"
+                or (not self._enforce and policy_decision is None)):
+            commit(lineage_mark, agent_id, session_id)
 
         elapsed_ms = (time.perf_counter() - start) * 1000
 

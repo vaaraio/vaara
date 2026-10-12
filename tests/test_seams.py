@@ -44,6 +44,11 @@ for _p in _SCORERS:
         "scorer has no remote input to lose")
     ALLOWED[(_p, _INTERCEPT, "violation_type")] = (
         "ExternalScorer's fail-closed deny only")
+for _p in (*_SCORERS, _EXTERNAL):
+    if _p != "vaara.scorer.adaptive:AdaptiveScorer.evaluate":
+        ALLOWED[(_p, _INTERCEPT, "lineage_mark")] = (
+            "only AdaptiveScorer keeps a lineage store; absent means no file "
+            "to remember")
 for _c in (_SCORE_ROUTE, "vaara.server.routes:register"):
     ALLOWED[(_EXTERNAL, _c, "evaluation_ms")] = (
         "the remote answer carries its own timing or none; the route times the call itself")

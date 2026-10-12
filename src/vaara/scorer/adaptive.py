@@ -37,6 +37,7 @@ from typing import TYPE_CHECKING, Any, Callable, Optional
 
 if TYPE_CHECKING:
     from vaara.policy.schema import Policy
+    from vaara.scorer.lineage import LineageStore
 
 logger = logging.getLogger(__name__)
 
@@ -234,6 +235,11 @@ OUTBOUND_LABEL = "net.outbound"
 #: (see _param_signals.persistent_write).
 PERSIST_LABEL = "agent.persist_write"
 
+#: Label carried by any call that names an agent-persistent file an earlier
+#: session wrote after an outbound call (see vaara.scorer.lineage). Added only
+#: when the scorer has a lineage store.
+TAINT_LABEL = "agent.tainted_read"
+
 
 def action_labels(tool_name: str, context: dict[str, Any]) -> frozenset[str]:
     """Names a sequence step can match for this call.
@@ -288,6 +294,15 @@ BUILTIN_SEQUENCES = [
         description="Outbound call (web fetch, mail, shell network command) "
                     "then a write into a skill, memory, instruction or hook "
                     "file — fetched content can steer every later session",
+    ),
+    SequencePattern(
+        "tainted_then_outbound",
+        (TAINT_LABEL, OUTBOUND_LABEL),
+        risk_boost=0.6,
+        window_size=8,
+        description="A file an earlier session wrote after an outbound call "
+                    "is read or loaded, then an outbound call follows: the "
+                    "planted instruction acting in a new session",
     ),
     SequencePattern(
         "data_destruction",
@@ -727,6 +742,7 @@ class AdaptiveScorer:
         pre_seed_calibration: bool = True,
         mondrian_categories: bool = False,
         policy_lookup: Optional[Callable[[str], Any]] = None,
+        lineage: Optional["LineageStore"] = None,
     ) -> None:
         """
         Args:
@@ -767,6 +783,11 @@ class AdaptiveScorer:
                 state, conformal calibrator, agent profiles, and sequence
                 detector remain shared across tenants — only threshold
                 application is per-tenant in v0.40.
+            lineage: Optional ``vaara.scorer.lineage.LineageStore``. When
+                set, a write that completes a sequence ending in an
+                agent-persistent write marks the written file, and a later
+                call naming a marked file carries TAINT_LABEL. None (the
+                default) keeps the scorer free of any file state.
         """
         if threshold_allow >= threshold_deny:
             raise ValueError(
@@ -797,6 +818,12 @@ class AdaptiveScorer:
         # Sequence patterns
         self._sequences = list(sequence_patterns or BUILTIN_SEQUENCES)
         self._seq_escalate: Optional[str] = None
+        # Names of the patterns the current call matched, for the lineage mark.
+        self._seq_matched: list[str] = []
+        self._lineage = lineage
+        # (agent_id, session_id) pairs whose earlier actions are already in
+        # the agent's window, replayed or seen live; see seed_session.
+        self._seen_sessions: set[tuple[str, str]] = set()
 
         # Agent profiles (agent_id to AgentProfile). OrderedDict provides
         # LRU semantics: move_to_end on access, popitem(last=False) to
@@ -986,6 +1013,12 @@ class AdaptiveScorer:
 
         # Build risk signals from each expert
         labels = action_labels(tool_name, context)
+        tainted = self._tainted_paths(context.get("parameters"))
+        if tainted:
+            labels = labels | {TAINT_LABEL}
+        session_id = context.get("session_id")
+        if isinstance(session_id, str) and session_id:
+            self._seen_sessions.add((agent_id, session_id))
         signals = self._compute_signals(
             tool_name=tool_name,
             agent_id=agent_id,
@@ -1075,6 +1108,10 @@ class AdaptiveScorer:
             explanation += f"; destructive ({destructive}), held for a human"
         if "sequence_escalate" in signals:
             explanation += f"; sequence {held_by}, held for a human"
+        if tainted:
+            explanation += (f"; names {tainted[0]}, tainted: written after an "
+                            f"outbound call in an earlier session")
+        lineage_mark = self._lineage_mark(labels, context.get("parameters"))
 
         assessment = RiskAssessment(
             action_name=tool_name,
@@ -1101,7 +1138,10 @@ class AdaptiveScorer:
         )
 
         # Return MS-compatible dict
-        return assessment.to_backend_decision()
+        result = assessment.to_backend_decision()
+        if lineage_mark is not None:
+            result["lineage_mark"] = lineage_mark
+        return result
 
     def dry_run_evaluate(self, context: dict[str, Any]) -> Any:
         """Score without mutating agent profiles, global history, or
@@ -1260,6 +1300,7 @@ class AdaptiveScorer:
         # caller under the same lock; reset first so a call never inherits
         # the previous call's hold.
         self._seq_escalate = None
+        self._seq_matched = []
         profile = self._agents.get(agent_id)
         if profile is None:
             return 0.0
@@ -1280,6 +1321,7 @@ class AdaptiveScorer:
             was_matched = self._seq_match_state.get(key, False)
             if matched:
                 max_boost = max(max_boost, pattern.risk_boost)
+                self._seq_matched.append(pattern.name)
                 if pattern.escalate and self._seq_escalate is None:
                     self._seq_escalate = pattern.name
                 if not was_matched:
@@ -1383,6 +1425,87 @@ class AdaptiveScorer:
         # A gap where confidence is high but risk is high is suspicious
         gap = max(0.0, agent_confidence - (1.0 - base_risk))
         return min(1.0, gap)
+
+    # ── Session replay and lineage ────────────────────────────────
+
+    def session_seen(self, agent_id: str, session_id: str) -> bool:
+        """True when this scorer already holds the session's actions."""
+        with self._lock:
+            return (agent_id, session_id) in self._seen_sessions
+
+    def seed_session(
+        self, agent_id: str, session_id: str,
+        entries: list[tuple[str, Optional[str], Any]],
+    ) -> bool:
+        """Put a session's earlier actions into the agent's sequence window.
+
+        For a scorer that starts fresh per call (a host hook is one process
+        per tool call) and so has never seen the session. ``entries`` are the
+        earlier actions as ``(tool_name, action_name, parameters)``, oldest
+        first; they are labelled the way a live call is, taint included. Only
+        the window is filled: the actions are not counted again as track
+        record, burst or denials, which the trail already holds. Returns
+        False, and does nothing, when this scorer has already seen the
+        session, so a long-lived process never counts an action twice.
+        """
+        key = (agent_id, session_id)
+        with self._lock:
+            if not session_id or key in self._seen_sessions:
+                return False
+            self._seen_sessions.add(key)
+            if len(self._seen_sessions) > self._max_tracked_agents:
+                self._seen_sessions.pop()
+            profile = self._get_or_create_agent(agent_id)
+            for tool_name, action_name, parameters in entries[-profile.recent_labels.maxlen:]:
+                labels = action_labels(tool_name, {"action_name": action_name,
+                                                   "parameters": parameters})
+                if self._tainted_paths(parameters):
+                    labels = labels | {TAINT_LABEL}
+                profile.recent_actions.append((tool_name, 0.0))
+                profile.recent_labels.append(labels)
+            return True
+
+    def _tainted_paths(self, parameters: Any) -> list[str]:
+        if self._lineage is None:
+            return []
+        from vaara.scorer._param_signals import persist_paths_named
+        try:
+            return [p for p in persist_paths_named(parameters)
+                    if self._lineage.tainted(p) is not None]
+        except Exception:
+            logger.exception("lineage lookup failed; scoring without it")
+            return []
+
+    def _lineage_mark(self, labels: frozenset[str],
+                      parameters: Any) -> Optional[dict[str, str]]:
+        """The file this call would plant, as ``{"path", "pattern"}``, when it
+        is an agent-persistent write completing a sequence that ends in one.
+        Proposed, not written: whether the write can land is the caller's to
+        know (a deny rule or enforcement may stop it), so the pipeline
+        commits the mark with commit_lineage."""
+        if self._lineage is None or PERSIST_LABEL not in labels:
+            return None
+        names = {p.name: p for p in self._sequences}
+        hit = next((n for n in self._seq_matched
+                    if PERSIST_LABEL in names[n].actions), None)
+        if hit is None:
+            return None
+        from vaara.scorer._param_signals import persistent_write
+        path = persistent_write("", "data.write", parameters)
+        return {"path": path, "pattern": hit} if path else None
+
+    def commit_lineage(self, mark: Any, agent_id: str, session_id: str) -> None:
+        """Record a mark _lineage_mark proposed, once the write can land."""
+        if self._lineage is None or not isinstance(mark, dict):
+            return
+        path, pattern = mark.get("path"), mark.get("pattern")
+        if not isinstance(path, str) or not isinstance(pattern, str):
+            return
+        try:
+            self._lineage.mark(path, agent_id=agent_id, session_id=session_id,
+                               pattern=pattern)
+        except Exception:
+            logger.exception("lineage mark failed for %s", path)
 
     # ── Agent management ──────────────────────────────────────────
 
