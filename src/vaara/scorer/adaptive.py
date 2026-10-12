@@ -1456,7 +1456,8 @@ class AdaptiveScorer:
             if len(self._seen_sessions) > self._max_tracked_agents:
                 self._seen_sessions.pop()
             profile = self._get_or_create_agent(agent_id)
-            for tool_name, action_name, parameters in entries[-profile.recent_labels.maxlen:]:
+            window = profile.recent_labels.maxlen or len(entries)
+            for tool_name, action_name, parameters in entries[-window:]:
                 labels = action_labels(tool_name, {"action_name": action_name,
                                                    "parameters": parameters})
                 if self._tainted_paths(parameters):
