@@ -431,3 +431,44 @@ def test_a_side_table_column_the_new_trail_lacks_does_not_sink_the_salvage(trail
     conn.close()
     assert ids == ["subject-1"]
     assert "legacy_note" not in cols
+
+
+def _interior_child_ptrs(data: bytes, page: int) -> list[int]:
+    """Byte offsets of the child pointers in an interior table page."""
+    ps = _page_size(data)
+    base = (page - 1) * ps
+    hdr = base + (100 if page == 1 else 0)
+    assert data[hdr] == 0x05, "not an interior table page"
+    cells = struct.unpack(">H", data[hdr + 3:hdr + 5])[0]
+    ptrs = [base + struct.unpack(">H", data[hdr + 12 + 2 * i:hdr + 14 + 2 * i])[0]
+            for i in range(cells)]
+    return ptrs + [hdr + 8]  # the right-most child pointer
+
+
+def test_a_page_referenced_twice_is_salvaged_once(trail_db: Path):
+    # Seen on a live trail 2026-10-12: integrity_check said "2nd reference to
+    # page N", a scan returned those rows twice, and salvage stopped on
+    # UNIQUE record_id with the trail left broken.
+    seqs = _seqs(trail_db)
+    data = bytearray(trail_db.read_bytes())
+    root = _root(trail_db, "audit_records")
+    ptrs = _interior_child_ptrs(bytes(data), root)
+    assert len(ptrs) >= 2
+    # The first cell now points at the right-most child: that subtree is read
+    # twice and the first cell's own subtree is unreachable.
+    data[ptrs[0]:ptrs[0] + 4] = data[ptrs[-1]:ptrs[-1] + 4]
+    trail_db.write_bytes(bytes(data))
+    assert any("2nd reference" in line or "out of order" in line
+               for line in _integrity(trail_db))
+
+    report = repair_trail_file(trail_db)
+
+    assert report.method == "salvage", report.error
+    assert report.duplicate_rows > 0
+    assert report.lost_seqs, "the leaf nobody points at any more is lost"
+    assert report.records_kept == len(seqs) - len(report.lost_seqs)
+    assert _integrity(trail_db) == ["ok"]
+    conn = sqlite3.connect(trail_db)
+    ids = [r[0] for r in conn.execute("SELECT record_id FROM audit_records")]
+    conn.close()
+    assert len(ids) == len(set(ids))

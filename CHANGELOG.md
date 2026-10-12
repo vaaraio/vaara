@@ -6,6 +6,12 @@ and this project follows [Semantic Versioning](https://semver.org/spec/v2.0.0.ht
 
 ## [Unreleased]
 
+## [2.12.1] - 2026-10-12
+
+### Fixed
+- Loading, verifying or exporting a trail no longer reports a record as missing when only the `idx_seq` index has lost it. `load_trail`, `verify_chain_streaming` and `export_jsonl` read the table itself in seq order, so every stored record is walked and the chain check reports only real gaps. A damaged index still shows in `PRAGMA integrity_check`, and `vaara trail repair` rebuilds it.
+- `vaara trail repair` completes on a trail whose table b-tree points at one page twice (`2nd reference to page N` in `PRAGMA integrity_check`). A scan of such a file returns those rows twice, and salvage stopped on the unique `record_id` constraint with the trail left broken. A byte-identical repeat is now kept once and counted in the report (`duplicate_rows`). Two different rows under one `record_id` still stop the salvage.
+
 ## [2.12.0] - 2026-10-12
 
 ### Added

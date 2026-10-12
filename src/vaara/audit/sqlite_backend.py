@@ -418,6 +418,7 @@ class TrailRepair:
     lost_seqs: list[int] = field(default_factory=list)
     unreadable_rowids: int = 0
     tables_damaged: list[str] = field(default_factory=list)
+    duplicate_rows: int = 0
     damaged_copy: Optional[str] = None
     error: Optional[str] = None
     tail_named: bool = False
@@ -436,6 +437,7 @@ class TrailRepair:
             "records_kept": self.records_kept, "lost_seqs": list(self.lost_seqs),
             "unreadable_rowids": self.unreadable_rowids,
             "tables_damaged": list(self.tables_damaged),
+            "duplicate_rows": self.duplicate_rows,
             "damaged_copy": self.damaged_copy, "error": self.error,
             "tail_named": self.tail_named,
         }
@@ -677,6 +679,20 @@ def _salvage(path: Path, problem: str) -> TrailRepair:
             dst_cols = {r[1] for r in dst.execute("PRAGMA table_info(audit_records)")}
             use = [c for c in cols if c in dst_cols]
             rows, report.unreadable_rowids = _read_rows(src, "audit_records", use, 1, hi)
+            # A damaged interior page can point at a subtree another page
+            # already points at ("2nd reference to page N"), and a scan then
+            # returns those rows twice. A byte-identical repeat is the same
+            # record read again and is kept once. Two different rows under one
+            # record_id still stop the salvage on the unique constraint.
+            seen: set[tuple] = set()
+            unique: list[tuple] = []
+            for row in rows:
+                if row in seen:
+                    report.duplicate_rows += 1
+                    continue
+                seen.add(row)
+                unique.append(row)
+            rows = unique
             witness = _indexed_seqs(src)
             seq_at = use.index("seq")
             present = {int(r[seq_at]) for r in rows}
@@ -1439,8 +1455,13 @@ class SQLiteAuditBackend:
             self._conn.execute("BEGIN")
             try:
                 head_error = _head_problem(self._conn, self._head_key(), t_clause, t_params)
+                # NOT INDEXED reads the table itself. Walking idx_seq for the
+                # order would drop any row a damaged index has lost, and the
+                # chain check would then report that record as missing when
+                # only the index is wrong.
                 rows = self._conn.execute(
-                    f"SELECT * FROM audit_records WHERE {t_clause} ORDER BY seq ASC",
+                    f"SELECT * FROM audit_records NOT INDEXED WHERE {t_clause} "
+                    "ORDER BY seq ASC",
                     t_params,
                 ).fetchall()
             finally:
@@ -1633,7 +1654,9 @@ class SQLiteAuditBackend:
         prev_seq: Optional[int] = None
         seen = 0
         last_seq = start_seq - 1
-        sql = (f"SELECT * FROM audit_records WHERE {t_clause} AND seq >= ? "
+        # NOT INDEXED, as in load_trail: a row a damaged idx_seq has lost is
+        # still a stored record and must be walked, not reported missing.
+        sql = (f"SELECT * FROM audit_records NOT INDEXED WHERE {t_clause} AND seq >= ? "
                "ORDER BY seq ASC")
         params = (*t_params, start_seq)
 
@@ -1845,7 +1868,8 @@ class SQLiteAuditBackend:
         if not isinstance(limit, int) or limit < 0:
             raise ValueError(f"export_jsonl limit must be a non-negative int, got {limit!r}")
         t_clause, t_params = self._tenant_clause()
-        query = f"SELECT * FROM audit_records WHERE {t_clause} ORDER BY seq ASC"
+        # NOT INDEXED, as in load_trail: an export holds every stored record.
+        query = f"SELECT * FROM audit_records NOT INDEXED WHERE {t_clause} ORDER BY seq ASC"
         params = t_params[:]
         if limit > 0:
             query += " LIMIT ?"
