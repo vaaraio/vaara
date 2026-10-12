@@ -4,19 +4,18 @@ name: Downloads badge
 # to the unprotected `badges` branch (installs.json at its root), which the
 # README badge and the website both read. Keyless: PyPI total comes from the
 # public ClickHouse pypi dataset, npm from the registry downloads API. Runs
-# hourly and on demand so the "live downloads" count stays fresh. It commits
-# only when the number changes, so quiet hours produce no churn. It publishes
+# once a day and on demand. It commits only when the number changes. It publishes
 # to `badges` rather than `main` because the main ruleset requires a pull
 # request, which a bot push cannot satisfy.
 #
-# Hourly is the freshest reliable cadence here: PyPI's all-time source
-# (ClickHouse) sends no CORS header, so a browser cannot read it directly and
-# a true per-visit count would need a standalone proxy. This endpoint JSON is
-# the single source both the shield and the site consume, so they stay in sync.
+# PyPI's all-time source (ClickHouse) sends no CORS header, so a browser
+# cannot read it directly and a per-visit count would need a standalone proxy.
+# This endpoint JSON is the single source both the shield and the site
+# consume, so they stay in sync.
 
 on:
   schedule:
-    - cron: "0 * * * *"   # top of every hour, UTC
+    - cron: "17 3 * * *"   # once a day, 03:17 UTC
   workflow_dispatch: {}
 
 permissions:
