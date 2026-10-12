@@ -59,6 +59,15 @@ async def _echo(reader, writer):
         writer.close()
 
 
+async def _close_servers(*servers):
+    # On the loop thread: Server.close() from the test thread races a
+    # connection detaching here and wakes the waiters twice.
+    for server in servers:
+        server.close()
+    for server in servers:
+        await server.wait_closed()
+
+
 async def _http_origin(reader, writer):
     head = await reader.readuntil(b"\r\n\r\n")
     body = json.dumps({"head": head.decode("latin-1")}).encode()
@@ -88,8 +97,7 @@ def env(tmp_path):
     e.echo_port, e.origin_port, e.tmp = echo_port, origin_port, tmp_path
     yield e
     loop.run(gate.stop())
-    echo.close()
-    origin.close()
+    loop.run(_close_servers(echo, origin))
     loop.close()
 
 
