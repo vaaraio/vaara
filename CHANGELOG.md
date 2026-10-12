@@ -6,6 +6,8 @@ and this project follows [Semantic Versioning](https://semver.org/spec/v2.0.0.ht
 
 ## [Unreleased]
 
+## [2.12.0] - 2026-10-12
+
 ### Added
 - The scorer labels a write into a location an agent host loads again in a later session: skill, subagent, command, rule and hook directories, Claude Code settings, per-host config under `.codex/`, `.gemini/` and `.agents/`, Claude Code project memory, and the files `CLAUDE.md`, `AGENTS.md`, `GEMINI.md`, `SKILL.md`, `.cursorrules`, `.windsurfrules`, `copilot-instructions.md` and `.mcp.json`. A write tool counts by its path parameter. A shell command counts when it redirects, tees, copies, moves, links or edits in place into one. Content that only mentions such a path does not count. The label is `agent.persist_write`, and sequence steps match it like an action name.
 - Built-in sequence `outbound_then_persist`: an outbound call (web fetch or search, mail, a shell network command) followed within eight calls by a persistent write adds 0.5 to the risk. Content fetched in one session and written into a skill or instruction file steers every session after it, the cross-session instruction propagation measured in arXiv 2610.13227.
