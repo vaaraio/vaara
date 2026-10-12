@@ -1455,8 +1455,13 @@ class SQLiteAuditBackend:
             self._conn.execute("BEGIN")
             try:
                 head_error = _head_problem(self._conn, self._head_key(), t_clause, t_params)
+                # NOT INDEXED reads the table itself. Walking idx_seq for the
+                # order would drop any row a damaged index has lost, and the
+                # chain check would then report that record as missing when
+                # only the index is wrong.
                 rows = self._conn.execute(
-                    f"SELECT * FROM audit_records WHERE {t_clause} ORDER BY seq ASC",
+                    f"SELECT * FROM audit_records NOT INDEXED WHERE {t_clause} "
+                    "ORDER BY seq ASC",
                     t_params,
                 ).fetchall()
             finally:
@@ -1649,7 +1654,9 @@ class SQLiteAuditBackend:
         prev_seq: Optional[int] = None
         seen = 0
         last_seq = start_seq - 1
-        sql = (f"SELECT * FROM audit_records WHERE {t_clause} AND seq >= ? "
+        # NOT INDEXED, as in load_trail: a row a damaged idx_seq has lost is
+        # still a stored record and must be walked, not reported missing.
+        sql = (f"SELECT * FROM audit_records NOT INDEXED WHERE {t_clause} AND seq >= ? "
                "ORDER BY seq ASC")
         params = (*t_params, start_seq)
 
@@ -1861,7 +1868,8 @@ class SQLiteAuditBackend:
         if not isinstance(limit, int) or limit < 0:
             raise ValueError(f"export_jsonl limit must be a non-negative int, got {limit!r}")
         t_clause, t_params = self._tenant_clause()
-        query = f"SELECT * FROM audit_records WHERE {t_clause} ORDER BY seq ASC"
+        # NOT INDEXED, as in load_trail: an export holds every stored record.
+        query = f"SELECT * FROM audit_records NOT INDEXED WHERE {t_clause} ORDER BY seq ASC"
         params = t_params[:]
         if limit > 0:
             query += " LIMIT ?"
