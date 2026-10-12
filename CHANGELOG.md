@@ -6,6 +6,9 @@ and this project follows [Semantic Versioning](https://semver.org/spec/v2.0.0.ht
 
 ## [Unreleased]
 
+### Fixed
+- `vaara trail repair` completes on a trail whose table b-tree points at one page twice (`2nd reference to page N` in `PRAGMA integrity_check`). A scan of such a file returns those rows twice, and salvage stopped on the unique `record_id` constraint with the trail left broken. A byte-identical repeat is now kept once and counted in the report (`duplicate_rows`). Two different rows under one `record_id` still stop the salvage.
+
 ## [2.12.0] - 2026-10-12
 
 ### Added

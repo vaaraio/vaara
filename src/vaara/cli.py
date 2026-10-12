@@ -448,6 +448,9 @@ def _cmd_trail_repair(args: argparse.Namespace) -> int:
                   "readable one, if any, cannot be named")
         if report.unreadable_rowids:
             print(f"  {report.unreadable_rowids} row position(s) could not be read")
+        if report.duplicate_rows:
+            print(f"  {report.duplicate_rows} row(s) read twice through a damaged page "
+                  "were kept once")
         if report.tables_damaged:
             print(f"  side tables with losses: {', '.join(report.tables_damaged)}")
         print(f"  the damaged file is kept at {report.damaged_copy}")
