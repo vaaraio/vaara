@@ -6,6 +6,8 @@ and this project follows [Semantic Versioning](https://semver.org/spec/v2.0.0.ht
 
 ## [Unreleased]
 
+## [2.11.0] - 2026-10-12
+
 ### Added
 - Every deny in a decision receipt says what it rests on. The evidence record gains a `refusal` block: `basis` is `evaluated` when a check ran and the action failed it, `not_evaluated` when a check the decision needed did not complete, and `undetermined` when the trail does not record which. With `not_evaluated` the block names the input the check could not get (`unavailableInput`), and it carries the recorded ground and policy. The trail records that input as `unavailable_input` on a deny. A refusal word alone could not tell a control that held from one that was never reached. See SPEC.md section 5.10, "The refusal block".
 - `docs/library.md` covers every capability reached from Python with no CLI or HTTP door, in sixteen sections from access records to attribute attestation openings. Each has a block that runs. `tests/test_docs_library_examples_run.py` runs every Python block in it and in `adapters.md`, `northern-lights.md` and `COMPLIANCE.md` in a throwaway home with no network.
