@@ -448,3 +448,104 @@ def outbound_action(
             if hit:
                 return f"{key} runs {hit}"
     return None
+
+
+# ---------------------------------------------------------------------------
+# Writes into agent-persistent locations
+#
+# Skills, memory files, standing instruction files and hook or MCP
+# configuration are loaded by the agent host again in later sessions, so a
+# write there carries whatever the agent ingested into every session after it
+# (cross-session instruction propagation, arXiv 2610.13227). The sequence
+# detector pairs this with an earlier outbound call.
+# ---------------------------------------------------------------------------
+
+#: Parameter keys a write tool names its target file with.
+_PATH_KEYS = re.compile(
+    r"(?:^|[_\-.])(?:path|file|filename|filepath|target|dest|destination)$", re.I)
+
+#: Tool-name words that mark a call as writing to its target path.
+_WRITE_NAME_WORDS = frozenset({
+    "write", "edit", "save", "create", "append", "replace", "update", "put",
+    "patch", "multiedit",
+})
+
+#: Path fragments under which agent hosts load skills, subagents, commands,
+#: rules, hooks, settings or per-host configuration.
+_PERSIST_DIRS = (
+    ".claude/skills/", ".claude/agents/", ".claude/commands/", ".claude/hooks/",
+    ".claude/rules/", ".claude/settings", ".codex/", ".gemini/", ".agents/",
+    ".cursor/rules/", ".windsurf/rules/",
+)
+
+#: File names an agent host reads as standing instructions or tool config.
+_PERSIST_FILES = frozenset({
+    "claude.md", "claude.local.md", "agents.md", "gemini.md", "skill.md",
+    ".cursorrules", ".windsurfrules", "copilot-instructions.md", ".mcp.json",
+})
+
+#: Shell commands that write their last argument (or, for tee, any argument).
+_SHELL_WRITE_VERBS = frozenset({"tee", "cp", "mv", "install", "ln"})
+
+
+def _persist_path(path: str) -> bool:
+    p = path.replace("\\", "/")
+    if any(frag in p for frag in _PERSIST_DIRS):
+        return True
+    if ".claude/projects/" in p and "/memory/" in p:
+        return True
+    return p.rsplit("/", 1)[-1].lower() in _PERSIST_FILES
+
+
+def _command_persist(command: str, depth: int = 0) -> Optional[str]:
+    command = _strip_heredocs(command)
+    for part in _segments(command):
+        words = _strip_launchers(_words(part))
+        if not words:
+            continue
+        verb = words[0].rsplit("/", 1)[-1]
+        args = words[1:]
+        if depth < 3 and (verb in _SHELLS or verb == "eval"):
+            inner = args[args.index("-c") + 1] if "-c" in args[:-1] else (
+                " ".join(args) if verb == "eval" else "")
+            hit = _command_persist(inner, depth + 1) if inner else None
+            if hit:
+                return hit
+            continue
+        for i, w in enumerate(words):
+            if w in (">", ">>") and i + 1 < len(words) and _persist_path(words[i + 1]):
+                return words[i + 1]
+            if w.startswith(">") and w.lstrip(">") and _persist_path(w.lstrip(">")):
+                return w.lstrip(">")
+        if verb == "tee":
+            hit = next((a for a in args if not a.startswith("-") and _persist_path(a)), None)
+            if hit:
+                return hit
+        if verb in _SHELL_WRITE_VERBS and verb != "tee" and args and _persist_path(args[-1]):
+            return args[-1]
+        if verb == "sed" and any(a.startswith("-i") for a in args) and _persist_path(args[-1]):
+            return args[-1]
+    return None
+
+
+def persistent_write(
+    tool_name: str, action_name: Optional[str], parameters: Any,
+) -> Optional[str]:
+    """Name the agent-persistent file this call writes, or return None.
+
+    A write tool counts when its path parameter points into a skill, memory,
+    instruction, hook or MCP-configuration location; a shell command counts
+    when it redirects, tees, copies or edits in place into one. Reading such a
+    file is not a write, and a path that only appears inside file content is
+    not one either.
+    """
+    writes = action_name == "data.write" or bool(
+        _name_words(tool_name or "") & _WRITE_NAME_WORDS)
+    for key, text in _leaves(parameters):
+        if writes and _PATH_KEYS.search(key) and _persist_path(text):
+            return text
+        if _COMMAND_KEYS.search(key):
+            hit = _command_persist(text)
+            if hit:
+                return hit
+    return None

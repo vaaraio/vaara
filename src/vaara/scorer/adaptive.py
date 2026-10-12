@@ -229,6 +229,11 @@ class SequencePattern:
 #: _param_signals.outbound_action). Sequence steps match it like an action name.
 OUTBOUND_LABEL = "net.outbound"
 
+#: Label carried by any write into a location the agent host loads again in a
+#: later session: skills, memory, instruction files, hooks, MCP configuration
+#: (see _param_signals.persistent_write).
+PERSIST_LABEL = "agent.persist_write"
+
 
 def action_labels(tool_name: str, context: dict[str, Any]) -> frozenset[str]:
     """Names a sequence step can match for this call.
@@ -238,17 +243,22 @@ def action_labels(tool_name: str, context: dict[str, Any]) -> frozenset[str]:
     and OUTBOUND_LABEL when the call sends data out. A web fetch classifies as
     ``data.read`` by its name, but what it reads is the remote page, not the
     agent's data, so an outbound fetch does not also count as the read.
+    PERSIST_LABEL is added when the call writes into an agent-persistent
+    location.
     """
-    from vaara.scorer._param_signals import outbound_action
+    from vaara.scorer._param_signals import outbound_action, persistent_write
     labels = {tool_name}
     action_name = context.get("action_name")
-    if isinstance(action_name, str) and action_name and action_name != "unknown":
+    action_name = action_name if isinstance(action_name, str) else None
+    if action_name and action_name != "unknown":
         labels.add(action_name)
-    if outbound_action(tool_name, action_name if isinstance(action_name, str) else None,
-                       context.get("parameters")):
+    parameters = context.get("parameters")
+    if outbound_action(tool_name, action_name, parameters):
         labels.add(OUTBOUND_LABEL)
         if tool_name != "data.read":
             labels.discard("data.read")
+    if persistent_write(tool_name, action_name, parameters):
+        labels.add(PERSIST_LABEL)
     return frozenset(labels)
 
 
@@ -269,6 +279,15 @@ BUILTIN_SEQUENCES = [
         description="Read then an outbound call (mail, web fetch or search, "
                     "shell network command) — data can leave through a "
                     "different tool than the one that read it",
+    ),
+    SequencePattern(
+        "outbound_then_persist",
+        (OUTBOUND_LABEL, PERSIST_LABEL),
+        risk_boost=0.5,
+        window_size=8,
+        description="Outbound call (web fetch, mail, shell network command) "
+                    "then a write into a skill, memory, instruction or hook "
+                    "file — fetched content can steer every later session",
     ),
     SequencePattern(
         "data_destruction",
