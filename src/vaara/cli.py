@@ -564,6 +564,45 @@ def _cmd_trail_shadow_report(args: argparse.Namespace) -> int:
     return 0
 
 
+def _cmd_trail_check_grant(args: argparse.Namespace) -> int:
+    """Judge every recorded call to a granted tool against the signed grant."""
+    from vaara.credential import check_trail_against_grant, grant_from_dict
+
+    try:
+        grant = grant_from_dict(_load_json_file(args.grant, "grant"))
+    except Exception as exc:
+        print(f"vaara trail check-grant: not a usable grant: {exc}", file=sys.stderr)
+        return 2
+    material, ok = _load_jws_verifying_material(args)
+    if not ok:
+        return 2
+    mismatch = _alg_material_mismatch(grant.alg, material)
+    if mismatch:
+        print(f"vaara trail check-grant: {mismatch}", file=sys.stderr)
+        return 2
+    trail, err = _load_trail_source(args)
+    if trail is None:
+        return err
+    report = check_trail_against_grant(trail, grant, verifying_material=material)
+    if args.format == "json":
+        print(json.dumps(report.to_dict(), indent=2))
+    else:
+        print(f"grant: {grant.asserted.iss} -> {grant.asserted.sub}, tool {grant.scope.tool_name}")
+        if report.chain_problem:
+            print(f"BROKEN chain: {report.chain_problem}; no call judged")
+        elif report.grant_problem:
+            print(f"BAD grant: {report.grant_problem}; no call judged")
+        else:
+            for call in report.calls:
+                if call.state in ("within", "outside_window"):
+                    continue
+                line = f"{call.state:<13} {call.action_id}  decision={call.decision or '-'}"
+                print(line + (f"  ({call.reason})" if call.reason else ""))
+            summary = ", ".join(f"{n} {s}" for s, n in sorted(report.counts.items()))
+            print(f"{'OK' if report.ok else 'FINDINGS'}: {summary or 'no calls to this tool'}")
+    return 0 if report.ok else 1
+
+
 def _load_trail_source(args: argparse.Namespace):
     """Load an AuditTrail from --trail (JSONL) or --db (SQLite).
 
@@ -6114,6 +6153,27 @@ def build_parser() -> argparse.ArgumentParser:
         help="Output format (default text)",
     )
     psr.set_defaults(func=_cmd_trail_shadow_report)
+
+    pcg = tsub.add_parser(
+        "check-grant",
+        help="Check every recorded call to a granted tool against the signed grant",
+    )
+    _add_trail_source_args(pcg)
+    pcg.add_argument("--grant", required=True, help="Path to the grant JSON")
+    pcg_key = pcg.add_mutually_exclusive_group(required=True)
+    pcg_key.add_argument(
+        "--pubkey-file", dest="pubkey_file", default=None,
+        help="PEM public key for an ES256 / RS256 grant",
+    )
+    pcg_key.add_argument(
+        "--hs256-secret-file", dest="hs256_secret_file", default=None,
+        help="Raw shared-secret file for an HS256 grant",
+    )
+    pcg.add_argument(
+        "--format", choices=["text", "json"], default="text",
+        help="Output format (default text)",
+    )
+    pcg.set_defaults(func=_cmd_trail_check_grant)
 
     pr = sub.add_parser(
         "review",

@@ -64,6 +64,11 @@ from vaara.credential._grant_types import (
     GrantScope,
 )
 from vaara.credential._grant_verify import GrantVerdict, verify_grant
+from vaara.credential._trail_grant import (
+    GrantedCall,
+    TrailGrantReport,
+    check_trail_against_grant,
+)
 from vaara.credential.gateway import CredentialGateway
 
 __all__ = [
@@ -84,10 +89,12 @@ __all__ = [
     "GrantMandate",
     "GrantScope",
     "GrantVerdict",
+    "GrantedCall",
     "ReceiptSigner",
     "asserted_from_dict",
     "binding_from_dict",
     "build_authorization_evidence",
+    "check_trail_against_grant",
     "emit_grant",
     "encode_attestation",
     "enforce_on_sealed_class",
@@ -99,6 +106,7 @@ __all__ = [
     "mint_for_signer",
     "scope_from_dict",
     "signing_payload",
+    "TrailGrantReport",
     "verify_contiguity",
     "verify_grant",
     "verify_grant_signature",
