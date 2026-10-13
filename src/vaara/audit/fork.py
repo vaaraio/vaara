@@ -191,9 +191,9 @@ def declare_fork(check: ForkCheck, db: str | Path, source: str = "") -> None:
     db_path = Path(db).expanduser().resolve()
     branch_path = Path(check.branch).expanduser().resolve()
     try:
-        label = str(branch_path.relative_to(db_path.parent.parent))
+        label = branch_path.relative_to(db_path.parent.parent).as_posix()
     except ValueError:
-        label = str(branch_path)
+        label = branch_path.as_posix()
     backend = SQLiteAuditBackend(db_path)
     try:
         AuditTrail(on_record=backend.write_record).record_trail_forked({
