@@ -571,3 +571,131 @@ def persist_paths_named(parameters: Any) -> list[str]:
             if c and _persist_path(c) and c not in found:
                 found.append(c)
     return found
+
+
+# ---------------------------------------------------------------------------
+# Argument holds
+#
+# Three call shapes that read as ordinary by tool name and are only visible in
+# the arguments. Anthropic's report of 12 October 2026 on unintended model
+# actions found all three in real runs: a fetch length limit slipped through
+# public URL shorteners, access tokens read from a public dashboard's config
+# and replayed to skip a fee, and real government and police forms submitted
+# where a practice copy was intended. Each is held for a human, the same way a
+# destructive call is, because each has an ordinary use as well.
+
+#: Public URL-shortening services. A shortened link hides where the call goes,
+#: and redirect services let a long URL pass a length check.
+_SHORTENER_HOSTS = frozenset({
+    "bit.ly", "bitly.com", "tinyurl.com", "t.ly", "is.gd", "v.gd", "da.gd",
+    "goo.gl", "ow.ly", "buff.ly", "rebrand.ly", "cutt.ly", "shorturl.at",
+    "tiny.cc", "rb.gy", "s.id", "bl.ink", "short.io", "t2m.io", "x.gd",
+    "clck.ru", "qr.ae", "shorte.st", "adf.ly", "u.to",
+})
+
+#: Keys whose value is a destination.
+_URL_KEYS = re.compile(r"(?i)(url|uri|href|link|endpoint|target|address|location)$")
+
+_URL_IN_TEXT = re.compile(r"(?i)\bhttps?://[^\s'\"<>|;)]+")
+
+#: Literal secrets, by shape. A reference such as ``$TOKEN`` never matches.
+_CREDENTIAL_SHAPES = (
+    re.compile(r"(?i)\bbearer\s+[A-Za-z0-9._~+/-]{20,}=*"),
+    re.compile(r"\beyJ[A-Za-z0-9_-]{8,}\.[A-Za-z0-9_-]{8,}\.[A-Za-z0-9_-]{8,}"),
+    re.compile(r"\b(?:sk-[A-Za-z0-9_-]{20,}|gh[pousr]_[A-Za-z0-9]{30,}"
+               r"|xox[abposr]-[A-Za-z0-9-]{10,}|AKIA[0-9A-Z]{16})\b"),
+    re.compile(r"(?i)[?&](?:access_?token|api_?key|apikey|token|key|auth|sig)"
+               r"=[A-Za-z0-9._~%-]{16,}"),
+)
+_CREDENTIAL_HEADER = re.compile(r"(?i)^(authorization|x-api-key|api-key|x-auth-token)$")
+_CREDENTIAL_HEADER_VALUE = re.compile(r"[A-Za-z0-9._~+/=-]{16,}")
+
+_SUBMIT_WORD = re.compile(r"(?i)\bsubmit\b")
+_CLICK_TEXT_KEYS = re.compile(r"(?i)^(element|text|label|name|selector|description|target)$")
+_FORM_CONTENT_TYPE = re.compile(r"(?i)application/x-www-form-urlencoded|multipart/form-data")
+_CURL_FORM = re.compile(r"(?:^|\s)(?:-F|--form|--form-string)\s")
+_HTTP_TOOLS = re.compile(r"(?i)(fetch|http|request|curl|browse|web|navigate|get|post)")
+
+
+def _host(url: str) -> str:
+    try:
+        return (urlsplit(url.strip()).hostname or "").lower().rstrip(".")
+    except ValueError:
+        return ""
+
+
+def _destinations(tool_name: str, parameters: Any) -> list[str]:
+    """Every URL the call would reach: URL-valued arguments and URLs in a
+    command. Free text that merely mentions a URL is not a destination."""
+    urls: list[str] = []
+    for key, text in _leaves(parameters):
+        stripped = text.strip()
+        if _COMMAND_KEYS.search(key):
+            urls.extend(_URL_IN_TEXT.findall(_strip_heredocs(stripped)))
+        elif re.match(r"(?i)https?://\S+$", stripped) and (
+                _URL_KEYS.search(key) or _HTTP_TOOLS.search(tool_name or "")):
+            urls.append(stripped)
+    return urls
+
+
+def _shortener(urls: list[str]) -> Optional[str]:
+    for url in urls:
+        host = _host(url)
+        if host in _SHORTENER_HOSTS:
+            return f"URL shortener {host} hides the destination"
+    return None
+
+
+def _credential(tool_name: str, parameters: Any, urls: list[str]) -> Optional[str]:
+    outbound = bool(urls) or outbound_action(tool_name, None, parameters)
+    if not outbound:
+        return None
+    for key, text in _leaves(parameters):
+        if not (_COMMAND_KEYS.search(key) or _URL_KEYS.search(key)
+                or _CREDENTIAL_HEADER.match(key)):
+            continue
+        if _CREDENTIAL_HEADER.match(key) and _CREDENTIAL_HEADER_VALUE.search(text) \
+                and "$" not in text:
+            return f"literal credential in {key} on an outbound call"
+        if _COMMAND_KEYS.search(key):
+            text = _strip_heredocs(text)
+        for shape in _CREDENTIAL_SHAPES:
+            if shape.search(text):
+                return f"literal credential in {key} on an outbound call"
+    return None
+
+
+def _form_submission(tool_name: str, parameters: Any) -> Optional[str]:
+    words = _name_words(tool_name or "")
+    if "submit" in words:
+        return "tool name says submit (form submission)"
+    clicks = "click" in words or any(
+        k == "action" and "click" in v.lower() for k, v in _leaves(parameters))
+    for key, text in _leaves(parameters):
+        if clicks and _CLICK_TEXT_KEYS.match(key) and _SUBMIT_WORD.search(text):
+            return f"clicks {text.strip()[:40]!r} (form submission)"
+        if _COMMAND_KEYS.search(key):
+            run = _strip_heredocs(text)
+            if _CURL_FORM.search(run) and _URL_IN_TEXT.search(run):
+                return f"{key} posts a form (form submission)"
+    if isinstance(parameters, dict):
+        method = str(parameters.get("method", "")).upper()
+        headers = parameters.get("headers")
+        if method in ("POST", "PUT") and isinstance(headers, dict) and any(
+                _FORM_CONTENT_TYPE.search(str(v)) for v in headers.values()):
+            return "form-encoded POST (form submission)"
+    return None
+
+
+def argument_hold(tool_name: str, parameters: Any) -> Optional[str]:
+    """Name the argument content that holds this call for a human, or None.
+
+    A URL shortener in a destination, a literal credential on an outbound call,
+    or a form submission. Only destinations, commands and request headers are
+    read: a file whose text mentions a short link or a token is not a call to
+    it.
+    """
+    urls = _destinations(tool_name, parameters)
+    return (_shortener(urls)
+            or _credential(tool_name, parameters, urls)
+            or _form_submission(tool_name, parameters))

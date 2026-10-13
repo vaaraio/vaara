@@ -1051,6 +1051,7 @@ class AdaptiveScorer:
         # the base install (no ML extra) does not silently allow it. Benign
         # and private hosts return 0.0 and leave the score untouched.
         from vaara.scorer._param_signals import (
+            argument_hold,
             destructive_action,
             metadata_endpoint_risk,
         )
@@ -1066,6 +1067,14 @@ class AdaptiveScorer:
         if destructive and decision_score < threshold_allow:
             decision_score = threshold_allow
             signals["destructive_action"] = threshold_allow
+
+        # A short link, a literal credential on an outbound call or a form
+        # submission is held the same way. Each shows only in the arguments,
+        # and each has an ordinary use a person can approve.
+        arg_hold = argument_hold(tool_name, context.get("parameters"))
+        if arg_hold and decision_score < threshold_allow:
+            decision_score = threshold_allow
+            signals["argument_hold"] = threshold_allow
 
         # A matched sequence marked escalate holds the call the same way.
         held_by = self._seq_escalate
@@ -1106,6 +1115,8 @@ class AdaptiveScorer:
             explanation += f"; content floor {content_floor:.2f} decided"
         if "destructive_action" in signals:
             explanation += f"; destructive ({destructive}), held for a human"
+        if "argument_hold" in signals:
+            explanation += f"; {arg_hold}, held for a human"
         if "sequence_escalate" in signals:
             explanation += f"; sequence {held_by}, held for a human"
         if tainted:
@@ -1196,6 +1207,7 @@ class AdaptiveScorer:
         # as deny, otherwise vaara_check / /v1/score can say allow where
         # vaara_intercept denies — an inconsistent preview contract.
         from vaara.scorer._param_signals import (
+            argument_hold,
             destructive_action,
             metadata_endpoint_risk,
         )
@@ -1205,6 +1217,9 @@ class AdaptiveScorer:
             decision_score = content_floor
             signals["parameter_content"] = content_floor
         if (destructive_action(tool_name, context.get("parameters"))
+                and decision_score < threshold_allow):
+            decision_score = threshold_allow
+        if (argument_hold(tool_name, context.get("parameters"))
                 and decision_score < threshold_allow):
             decision_score = threshold_allow
         if self._seq_escalate and decision_score < threshold_allow:

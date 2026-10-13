@@ -681,7 +681,7 @@ def _decide_pre(cfg: dict, events: list[dict], agent: str,
         notify(cfg, "BLOCKED", tool_name, message)
         return 2
 
-    from vaara.scorer._param_signals import destructive_action
+    from vaara.scorer._param_signals import argument_hold, destructive_action
 
     policy, policy_error = load_policy(cfg)
     if policy_error is not None:
@@ -699,6 +699,7 @@ def _decide_pre(cfg: dict, events: list[dict], agent: str,
 
     if (policy is None and not tool_name.startswith("mcp__")
             and not destructive_action(tool_name, tool_input)
+            and not argument_hold(tool_name, tool_input)
             and not _sequence_relevant(tool_name, tool_input)):
         # With a policy configured every call is the policy's to decide, so
         # this shortcut is taken only without one.
@@ -706,8 +707,10 @@ def _decide_pre(cfg: dict, events: list[dict], agent: str,
         # the blocked calls cannot answer "what did the agent do", which
         # is the question it exists for, and PostToolUse needs an
         # ACTION_REQUESTED to correlate its outcome against.
-        # A call that deletes or discards state does not stop here: it goes
-        # through the enforced pipeline below, which holds it for a human.
+        # A call that deletes or discards state, or whose arguments carry a
+        # short link, a literal credential or a form submission, does not stop
+        # here: it goes through the enforced pipeline below, which holds it
+        # for a human.
         _record_call(
             cfg, agent, tool_name, tool_input,
             {"vaara_governance_layer": "regex_pass"}, session_id,
