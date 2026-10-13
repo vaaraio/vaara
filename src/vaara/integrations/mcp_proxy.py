@@ -43,7 +43,6 @@ from typing import Any, Callable, Optional
 from vaara import __version__ as _VAARA_VERSION
 from vaara.attestation._receipt_task import related_task_id as _related_task_id
 from vaara.audit.sqlite_backend import SQLiteAuditBackend
-from vaara.audit.trail import AuditTrail
 from vaara.integrations._mcp_beacon import Beacon
 from vaara.integrations._mcp_input_schema import (
     check_arguments,
@@ -286,7 +285,9 @@ class VaaraMCPProxy:
         else:
             db = db_path or Path(os.environ.get("VAARA_DB", "vaara_audit.db"))
             self._backend = SQLiteAuditBackend(db)
-            trail = AuditTrail(on_record=self._backend.write_record)
+            # load_trail wires the signed decision receipts and reloads prior
+            # approvals; a bare AuditTrail recorded decisions with no receipt.
+            trail = self._backend.load_trail()
             self._pipeline = InterceptionPipeline(trail=trail, enforce=not shadow)
         if policy is not None:
             # Same rebinding `vaara serve` does: thresholds and sequence

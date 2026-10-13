@@ -315,8 +315,10 @@ class VaaraMCPServer:
         else:
             db = db_path or Path(os.environ.get("VAARA_DB", "vaara_audit.db"))
             self._backend = SQLiteAuditBackend(db)
-            from vaara.audit.trail import AuditTrail
-            trail = AuditTrail(on_record=self._backend.write_record)
+            # load_trail, as every other entry point opens it: it wires the
+            # signed decision receipts and reloads prior approvals. A bare
+            # AuditTrail wrote decisions with no receipt beside them.
+            trail = self._backend.load_trail()
             self._pipeline = InterceptionPipeline(trail=trail)
 
         self._tools = {

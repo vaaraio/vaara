@@ -378,3 +378,56 @@ class TestReportOutcomeValidation:
             },
         })
         assert response["error"]["code"] == -32602
+
+
+class TestPersistedTrail:
+    """A server with its own database opens the trail the way every other
+    entry point does, so its decisions carry the same signed receipts."""
+
+    def _intercept(self, server, req_id, tool):
+        response = server.handle_request({
+            "jsonrpc": "2.0",
+            "id": req_id,
+            "method": "tools/call",
+            "params": {"name": "vaara_intercept", "arguments": {"tool_name": tool}},
+        })
+        return json.loads(response["result"]["content"][0]["text"])["action_id"]
+
+    def test_each_decision_leaves_a_receipt_that_verifies_against_the_trail(self, tmp_path):
+        pytest.importorskip("cryptography")
+        pytest.importorskip("rfc8785")
+        import sqlite3
+
+        from vaara.audit import decision_receipts as dr
+
+        db = tmp_path / "trail" / "audit.db"
+        db.parent.mkdir()
+        server = VaaraMCPServer(db_path=db)
+        try:
+            self._intercept(server, 1, "read_file")
+            self._intercept(server, 2, "write_file")
+        finally:
+            server.close()
+        with sqlite3.connect(db) as con:
+            hashes = dict(con.execute("SELECT record_id, record_hash FROM audit_records"))
+        receipts = sorted((db.parent / dr.RECEIPTS_DIRNAME).rglob("*.json"))
+        assert len(receipts) == 2
+        assert all(dr.verify_receipt_file(f, trail_hashes=hashes).ok for f in receipts)
+
+    def test_a_restarted_server_continues_the_same_chain(self, tmp_path):
+        from vaara.audit.sqlite_backend import SQLiteAuditBackend
+
+        db = tmp_path / "trail" / "audit.db"
+        db.parent.mkdir()
+        for req_id in (1, 2):
+            server = VaaraMCPServer(db_path=db)
+            try:
+                self._intercept(server, req_id, "read_file")
+            finally:
+                server.close()
+        backend = SQLiteAuditBackend(db)
+        try:
+            trail = backend.load_trail()
+            assert trail._load_verdict.error is None
+        finally:
+            backend.close()
