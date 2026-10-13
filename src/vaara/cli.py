@@ -643,6 +643,83 @@ def _cmd_trail_check_grant(args: argparse.Namespace) -> int:
     return 0 if report.ok else 1
 
 
+def _cmd_permission_sign(args: argparse.Namespace) -> int:
+    """Sign a standing permission from a JSON spec with the principal's key."""
+    from vaara.attestation._attest_types import AttestationError
+    from vaara.credential import Limit, sign_permission
+    from vaara.credential._grant_capability import capability_from_dict
+
+    try:
+        spec: Any = _load_json_file(args.spec, "spec")
+        if not isinstance(spec, dict):
+            raise ValueError("spec must be a JSON object")
+        material, alg, err = _resolve_ingest_signer(args)
+        if err:
+            raise ValueError(err)
+        permission = sign_permission(
+            principal=spec["principal"], key_id=spec.get("keyId", ""),
+            agent=spec["agent"], tool_name=spec["toolName"],
+            tenant_id=spec.get("tenantId", ""), not_before=spec["notBefore"],
+            not_after=spec["notAfter"], alg=alg, signing_material=material,
+            capabilities=[capability_from_dict(c) for c in spec.get("capabilities", [])],
+            limits=[Limit(kind=x.get("kind"), max=x.get("max"), arg=x.get("arg"),
+                          window_seconds=x.get("windowSeconds"))
+                    for x in spec.get("limits", [])],
+        )
+    except KeyError as exc:
+        print(f"vaara permission sign: spec is missing {exc}", file=sys.stderr)
+        return 2
+    except (ValueError, AttestationError, AttributeError) as exc:
+        print(f"vaara permission sign: {exc}", file=sys.stderr)
+        return 2
+    text = json.dumps(permission.to_dict(), indent=2)
+    if args.out:
+        Path(args.out).expanduser().write_text(text + "\n", encoding="utf-8")
+    else:
+        print(text)
+    return 0
+
+
+def _cmd_trail_check_permission(args: argparse.Namespace) -> int:
+    """Replay a trail against a principal's signed permission."""
+    from vaara.credential import check_trail_against_permission, permission_from_dict
+
+    try:
+        permission = permission_from_dict(_load_json_file(args.permission, "permission"))
+    except Exception as exc:
+        print(f"vaara trail check-permission: not a usable permission: {exc}", file=sys.stderr)
+        return 2
+    material, ok = _load_jws_verifying_material(args)
+    if not ok:
+        return 2
+    mismatch = _alg_material_mismatch(permission.alg, material)
+    if mismatch:
+        print(f"vaara trail check-permission: {mismatch}", file=sys.stderr)
+        return 2
+    trail, err = _load_trail_source(args)
+    if trail is None:
+        return err
+    report = check_trail_against_permission(trail, permission, verifying_material=material)
+    if args.format == "json":
+        print(json.dumps(report.to_dict(), indent=2))
+    else:
+        print(f"permission: {permission.principal} -> {permission.agent}, "
+              f"tool {permission.tool_name}, {permission.not_before} to {permission.not_after}")
+        if report.chain_problem:
+            print(f"BROKEN chain: {report.chain_problem}; no call judged")
+        elif report.grant_problem:
+            print(f"BAD permission: {report.grant_problem}; no call judged")
+        else:
+            for call in report.calls:
+                if call.state in ("within", "outside_window"):
+                    continue
+                line = f"{call.state:<13} {call.action_id}  decision={call.decision or '-'}"
+                print(line + (f"  ({call.reason})" if call.reason else ""))
+            summary = ", ".join(f"{n} {s}" for s, n in sorted(report.counts.items()))
+            print(f"{'OK' if report.ok else 'FINDINGS'}: {summary or 'no calls under this permission'}")
+    return 0 if report.ok else 1
+
+
 def _load_trail_source(args: argparse.Namespace):
     """Load an AuditTrail from --trail (JSONL) or --db (SQLite).
 
@@ -6211,6 +6288,27 @@ def build_parser() -> argparse.ArgumentParser:
     )
     psr.set_defaults(func=_cmd_trail_shadow_report)
 
+    pcp = tsub.add_parser(
+        "check-permission",
+        help="Replay every recorded call under a principal's signed permission",
+    )
+    _add_trail_source_args(pcp)
+    pcp.add_argument("--permission", required=True, help="Path to the permission JSON")
+    pcp_key = pcp.add_mutually_exclusive_group(required=True)
+    pcp_key.add_argument(
+        "--pubkey-file", dest="pubkey_file", default=None,
+        help="The principal's PEM public key (ES256 / RS256)",
+    )
+    pcp_key.add_argument(
+        "--hs256-secret-file", dest="hs256_secret_file", default=None,
+        help="Raw shared-secret file for an HS256 permission",
+    )
+    pcp.add_argument(
+        "--format", choices=["text", "json"], default="text",
+        help="Output format (default text)",
+    )
+    pcp.set_defaults(func=_cmd_trail_check_permission)
+
     pcg = tsub.add_parser(
         "check-grant",
         help="Check every recorded call to a granted tool against the signed grant",
@@ -7546,6 +7644,25 @@ def build_parser() -> argparse.ArgumentParser:
         help="Emit the normalized evidence mapping as JSON",
     )
     pnz.set_defaults(func=_cmd_normalize)
+
+    pperm = sub.add_parser(
+        "permission",
+        help="Standing permissions a principal signs for an agent",
+    )
+    permsub = pperm.add_subparsers(dest="permission_cmd", metavar="COMMAND")
+    pperm.set_defaults(func=_help_dispatch(pperm))
+    pps = permsub.add_parser(
+        "sign",
+        help="Sign a vaara.permission/v1 from a JSON spec with the principal's key",
+    )
+    pps.add_argument("--spec", required=True,
+                     help="JSON: principal, keyId, agent, toolName, tenantId, "
+                          "notBefore, notAfter, capabilities, limits")
+    pps.add_argument("--key", help="The principal's PEM private key (EC P-256 -> ES256, RSA -> RS256)")
+    pps.add_argument("--hs256-secret-file", dest="hs256_secret_file", default=None,
+                     help="Raw shared-secret file to sign with HS256 (alternative to --key)")
+    pps.add_argument("--out", help="Write the signed permission here (default stdout)")
+    pps.set_defaults(func=_cmd_permission_sign)
 
     ping = sub.add_parser(
         "ingest",

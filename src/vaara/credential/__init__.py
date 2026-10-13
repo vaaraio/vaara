@@ -64,6 +64,17 @@ from vaara.credential._grant_types import (
     GrantScope,
 )
 from vaara.credential._grant_verify import GrantVerdict, verify_grant
+from vaara.credential._permission import (
+    PERMISSION_TYPE,
+    Limit,
+    Permission,
+    check_trail_against_permission,
+    evaluate_call,
+    permission_digest,
+    permission_from_dict,
+    sign_permission,
+    verify_permission_signature,
+)
 from vaara.credential._trail_grant import (
     GrantedCall,
     TrailGrantReport,
@@ -72,6 +83,15 @@ from vaara.credential._trail_grant import (
 from vaara.credential.gateway import CredentialGateway
 
 __all__ = [
+    "check_trail_against_permission",
+    "verify_permission_signature",
+    "sign_permission",
+    "permission_from_dict",
+    "permission_digest",
+    "evaluate_call",
+    "Permission",
+    "PERMISSION_TYPE",
+    "Limit",
     "AUTHORIZATION_SCHEMA",
     "AttenuationReport",
     "AuthorizationReceipt",
