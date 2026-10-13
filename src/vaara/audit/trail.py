@@ -61,6 +61,7 @@ class EventType(str, Enum):
     POLICY_OVERRIDE = "policy_override"     # Manual override of policy decision
     ANCHOR_GAP = "anchor_gap"               # Auto-anchor attempt failed (fail-open marker)
     REPAIR_GAP = "repair_gap"               # Store repair could not keep every record
+    REPAIR_RECOVERED = "repair_recovered"   # Records a repair declared lost, recovered and verified
     KEY_LIFECYCLE = "key_lifecycle"         # Signing-key custodian rotated/revoked/added
     DISCLOSURE_RECORDED = "disclosure_recorded"  # EU AI Act Art 50 transparency disclosure
     ACCESS_RECORDED = "access_recorded"     # Something was opened, and by whom
@@ -75,6 +76,7 @@ class EventType(str, Enum):
 SYSTEM_EVENT_TYPES = frozenset({
     EventType.ANCHOR_GAP,
     EventType.REPAIR_GAP,
+    EventType.REPAIR_RECOVERED,
     EventType.KEY_LIFECYCLE,
     EventType.WITNESS_CONFIGURED,
 })
@@ -380,6 +382,11 @@ TRANSPARENCY_DEFAULTS: dict[EventType, dict[str, str]] = {
         "system_operation": "store_repair",
         "data_usage": "surviving_record_seqs",
         "decision_making": "n/a",
+    },
+    EventType.REPAIR_RECOVERED: {
+        "system_operation": "store_recovery",
+        "data_usage": "recovered_bundle_digest+seqs",
+        "decision_making": "operator_action",
     },
     EventType.WITNESS_CONFIGURED: {
         "system_operation": "witness_configuration",
@@ -2636,6 +2643,37 @@ class AuditTrail:
                 "tables_damaged": list(report.tables_damaged),
                 "records_kept": report.records_kept,
                 "damaged_copy": report.damaged_copy or "",
+            },
+        ))
+
+    def record_repair_recovered(self, recovery: dict) -> None:
+        """Append a REPAIR_RECOVERED record for a verified recovery bundle.
+
+        The records themselves are not written back into the chain: a
+        REPAIR_GAP already declared them lost, and rewriting history would make
+        that declaration false. This record names the bundle by digest and
+        lists the seqs it holds, so a verifier with the bundle can recompute
+        each record and see that it fills the declared gap.
+        """
+        seqs = list(recovery.get("recovered_seqs", []))
+        self._append_chained(AuditRecord(
+            record_id=str(uuid.uuid4()),
+            action_id="repair-recovered",
+            event_type=EventType.REPAIR_RECOVERED,
+            timestamp=time.time(),
+            agent_id="vaara",
+            tool_name="trail.recover",
+            data={
+                "method": str(recovery.get("method", "")),
+                "bundle_sha256": str(recovery.get("bundle_sha256", "")),
+                "bundle_path": self._cap_record_str(str(recovery.get("bundle_path", "")), 512),
+                "recovered_seq_count": len(seqs),
+                "recovered_seqs": seqs[: self._REPAIR_GAP_SEQ_LIMIT],
+                "first_seq": seqs[0] if seqs else None,
+                "last_seq": seqs[-1] if seqs else None,
+                "links_verified": int(recovery.get("links_verified", 0)),
+                "anchored_to_seq": recovery.get("anchored_to_seq"),
+                "source": self._cap_record_str(str(recovery.get("source", "")), 512),
             },
         ))
 

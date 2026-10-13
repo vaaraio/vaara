@@ -508,6 +508,45 @@ def _cmd_trail_carve(args: argparse.Namespace) -> int:
     return 0
 
 
+def _cmd_trail_recover(args: argparse.Namespace) -> int:
+    import json as _json
+
+    from vaara.audit.carve import check_recovery, declare_recovery
+
+    db_path = Path(args.db).expanduser()
+    bundle = Path(args.bundle).expanduser()
+    for label, path in (("db", db_path), ("bundle", bundle)):
+        if not path.is_file():
+            print(f"vaara trail recover: {label} is not a file: {path}", file=sys.stderr)
+            return 2
+    check = check_recovery(bundle, db_path)
+    kept = None
+    if check.ok and not args.dry_run:
+        kept = declare_recovery(check, db_path, source=args.source)
+    report = check.to_dict()
+    report["dry_run"] = bool(args.dry_run)
+    report["kept"] = str(kept) if kept else None
+    if args.format == "json":
+        print(_json.dumps(report, indent=2))
+        return 0 if check.ok else 1
+    if not check.ok:
+        print(f"vaara trail recover: {bundle} was not declared recovered:", file=sys.stderr)
+        for problem in check.problems:
+            print(f"  {problem}", file=sys.stderr)
+        return 1
+    seqs = check.seqs
+    print(f"{bundle}: {len(seqs)} record(s), seq {seqs[0]}-{seqs[-1]}, every hash recomputes, "
+          f"{check.links_verified} link(s) verified.")
+    if check.anchored_to_seq is not None:
+        print(f"  the first names the trail's seq {check.anchored_to_seq}")
+    if args.dry_run:
+        print("  dry run: nothing was appended or copied")
+    else:
+        print(f"  kept at {kept}")
+        print("  a repair_recovered record naming it was appended to the trail")
+    return 0
+
+
 def _cmd_trail_shadow_report(args: argparse.Namespace) -> int:
     import json as _json
 
@@ -6042,6 +6081,24 @@ def build_parser() -> argparse.ArgumentParser:
         help="Output format (default text)",
     )
     pcarve.set_defaults(func=_cmd_trail_carve)
+
+    precover = tsub.add_parser(
+        "recover",
+        help="Declare records a repair lost as recovered: check a carved bundle "
+             "against the trail and append a repair_recovered record naming it",
+    )
+    precover.add_argument("--db", required=True, help="Path to the live audit SQLite DB")
+    precover.add_argument("--bundle", required=True,
+                          help="JSONL written by `vaara trail carve`")
+    precover.add_argument("--source", default="",
+                          help="Where the bundle was carved from (recorded as given)")
+    precover.add_argument("--dry-run", action="store_true",
+                          help="Run every check, append nothing, copy nothing")
+    precover.add_argument(
+        "--format", choices=["text", "json"], default="text",
+        help="Output format (default text)",
+    )
+    precover.set_defaults(func=_cmd_trail_recover)
 
     psr = tsub.add_parser(
         "shadow-report",
