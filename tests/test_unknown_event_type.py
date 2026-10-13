@@ -95,6 +95,18 @@ def test_an_exported_record_of_an_unknown_type_round_trips(tmp_path: Path):
     assert again.compute_hash() == again.record_hash
 
 
+def test_an_unknown_type_survives_copy_and_pickle():
+    import copy
+    import pickle
+
+    unknown = stored_event_type(FUTURE)
+    for again in (copy.copy(unknown), copy.deepcopy(unknown),
+                  pickle.loads(pickle.dumps(unknown))):
+        assert again.value == FUTURE
+    assert pickle.loads(pickle.dumps(EventType.DECISION_MADE)) is EventType.DECISION_MADE
+    assert copy.deepcopy(EventType.DECISION_MADE) is EventType.DECISION_MADE
+
+
 def test_input_validation_still_refuses_an_unknown_type():
     with pytest.raises(ValueError):
         EventType(FUTURE)

@@ -68,6 +68,19 @@ class EventType(str, Enum):
     AGENT_SEEN = "agent_seen"               # vaara scan --watch saw an agent start
     WITNESS_CONFIGURED = "witness_configured"  # Heads reach a log or a TSA at a stated cadence
 
+    # Copies and pickles go through the stored value, so a type this build
+    # does not know (see stored_event_type) survives them. Python 3.11+
+    # enums already copy as themselves; 3.10 rebuilt them with
+    # EventType(value), which refuses an unknown one inside asdict().
+    def __copy__(self) -> "EventType":
+        return self
+
+    def __deepcopy__(self, memo: dict) -> "EventType":
+        return self
+
+    def __reduce_ex__(self, protocol):  # type: ignore[override]
+        return stored_event_type, (self._value_,)
+
 
 def stored_event_type(value: str) -> EventType:
     """The event type a stored record names, whether this build knows it or not.
