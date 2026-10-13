@@ -1524,6 +1524,7 @@ class SQLiteAuditBackend:
             trail._last_hash = record.record_hash
             if isinstance(row[10], int):
                 trail._store_seqs[record.record_id] = row[10]
+        trail._store_seqs_whole_table = not self._tenant_id
 
         # Expose the skeleton-row count on the returned trail so callers
         # can observe reload-time corruption without parsing logs. This
@@ -1649,6 +1650,7 @@ class SQLiteAuditBackend:
         ``_HEAD_KEY``): the walk alone cannot see records missing from the end.
         """
         t_clause, t_params = self._tenant_clause()
+        whole_table = not self._tenant_id
         ledger = _GapLedger()
         prev_hash = expected_previous_hash
         prev_seq: Optional[int] = None
@@ -1692,6 +1694,14 @@ class SQLiteAuditBackend:
                     if prev_seq is None or seq <= prev_seq + 1:
                         return ChainVerdict(error=error)
                     ledger.hold(seen, tuple(range(prev_seq + 1, seq)), seq, error)
+                elif whole_table and prev_seq is not None and seq > prev_seq + 1:
+                    # Linked across missing seqs, as a salvage that lost the
+                    # tail leaves it. Seqs span every tenant, so a tenant
+                    # walk skips this check.
+                    ledger.hold(seen, tuple(range(prev_seq + 1, seq)), seq, (
+                        f"Seqs missing before seq {seq} ({record.record_id}): "
+                        f"the chain links seq {prev_seq} to seq {seq}"
+                    ))
                 expected = record.compute_hash()
                 if record.record_hash != expected:
                     return ChainVerdict(error=(
