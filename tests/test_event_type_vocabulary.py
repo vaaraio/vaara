@@ -33,7 +33,7 @@ ALL = {e.value for e in EventType}
 
 def test_the_split_covers_every_type_once():
     assert {e.value for e in SYSTEM_EVENT_TYPES} == {
-        "anchor_gap", "repair_gap", "key_lifecycle", "witness_configured",
+        "anchor_gap", "repair_gap", "repair_recovered", "key_lifecycle", "witness_configured",
     }
     assert CLIENT | {e.value for e in SYSTEM_EVENT_TYPES} == ALL
     assert not CLIENT & {e.value for e in SYSTEM_EVENT_TYPES}
