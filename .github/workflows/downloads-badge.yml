@@ -43,7 +43,9 @@ jobs:
         with:
           ref: main
           path: .renderer
-          sparse-checkout: scripts/render_conformance_page.py
+          sparse-checkout: |
+            scripts/render_conformance_page.py
+            scripts/site_shell.py
           sparse-checkout-cone-mode: false
 
       - name: Compute installs and render self-hosted badge SVGs
