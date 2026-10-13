@@ -674,7 +674,7 @@ def _cmd_permission_sign(args: argparse.Namespace) -> int:
         return 2
     text = json.dumps(permission.to_dict(), indent=2)
     if args.out:
-        Path(args.out).expanduser().write_text(text + "\n", encoding="utf-8")
+        Path(args.out).expanduser().write_text(text + "\n", encoding="utf-8", newline="\n")
     else:
         print(text)
     return 0
