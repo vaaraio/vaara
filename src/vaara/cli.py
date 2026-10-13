@@ -460,6 +460,54 @@ def _cmd_trail_repair(args: argparse.Namespace) -> int:
     return 0 if report.ok else 1
 
 
+def _cmd_trail_carve(args: argparse.Namespace) -> int:
+    import json as _json
+    import sqlite3
+
+    from vaara.audit.carve import carve_trail, write_jsonl
+
+    db_path = Path(args.db).expanduser()
+    if not db_path.is_file():
+        print(f"vaara trail carve: not a file: {db_path}", file=sys.stderr)
+        return 2
+    out = Path(args.out).expanduser()
+    if out.resolve() == db_path.resolve():
+        print("vaara trail carve: --out must not be the trail itself", file=sys.stderr)
+        return 2
+    try:
+        result = carve_trail(db_path)
+    except (OSError, ValueError, sqlite3.Error) as exc:
+        print(f"vaara trail carve: cannot read {db_path}: {exc}", file=sys.stderr)
+        return 1
+    want = None
+    if args.seq_from is not None or args.seq_to is not None:
+        lo = args.seq_from if args.seq_from is not None else 0
+        hi = args.seq_to if args.seq_to is not None else max(result.seqs(), default=lo)
+        want = range(lo, hi + 1)
+    written = write_jsonl(result, out, want)
+    summary = result.summary(want)
+    summary["written"] = written
+    summary["out"] = str(out)
+    if args.format == "json":
+        print(_json.dumps(summary, indent=2))
+        return 0
+    print(f"{db_path}: {summary['records_recovered']} record(s) verify by hash "
+          f"across {summary['pages']} page(s); {written} written to {out}.")
+    if want is not None:
+        missing = summary["wanted_missing"]
+        shown = ", ".join(str(s) for s in missing[:20]) + (" ..." if len(missing) > 20 else "")
+        print(f"  seq {want.start}-{want.stop - 1}: {summary['wanted_recovered']} recovered"
+              + (f", missing {shown}" if missing else ", none missing"))
+    if summary["unlinked_seqs"]:
+        shown = ", ".join(str(s) for s in summary["unlinked_seqs"][:20])
+        print(f"  records whose predecessor is not among those recovered: {shown}")
+    if summary["conflicting_seqs"]:
+        print("  seqs with two different verified records: "
+              + ", ".join(str(s) for s in summary["conflicting_seqs"]))
+    print("  the damaged file was only read; nothing was written to it")
+    return 0
+
+
 def _cmd_trail_shadow_report(args: argparse.Namespace) -> int:
     import json as _json
 
@@ -5979,6 +6027,21 @@ def build_parser() -> argparse.ArgumentParser:
         help="Output format (default text)",
     )
     prep.set_defaults(func=_cmd_trail_repair)
+
+    pcarve = tsub.add_parser(
+        "carve",
+        help="Read a damaged trail page by page and write out every record "
+             "whose hash still verifies, including ones repair could not reach",
+    )
+    pcarve.add_argument("--db", required=True, help="Path to the damaged SQLite file (read only)")
+    pcarve.add_argument("--out", required=True, help="JSONL file to write the recovered records to")
+    pcarve.add_argument("--seq-from", type=int, default=None, help="First seq to write (default: all)")
+    pcarve.add_argument("--seq-to", type=int, default=None, help="Last seq to write, inclusive")
+    pcarve.add_argument(
+        "--format", choices=["text", "json"], default="text",
+        help="Output format (default text)",
+    )
+    pcarve.set_defaults(func=_cmd_trail_carve)
 
     psr = tsub.add_parser(
         "shadow-report",

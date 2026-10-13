@@ -53,6 +53,7 @@ License: AGPL-3.0-or-later.
 | Audience and task binding | `attestation/_receipt_audience.py`, `attestation/_receipt_task.py` | `aud` and `taskId` inside the signed preimage. Verdicts `bound`, `conflict` or `unsupported`; a missing field never passes. |
 | Decision-before-effect ordering | `attestation/_decision_verifier.py` (`effect_ordering`) | Reports `ordered`, `effect_precedes_decision` or `not_comparable`. |
 | Trail repair with declared gaps | `vaara trail repair`, `audit/sqlite_backend.py` (`TrailRepair`) | Keeps the damaged file and appends a `repair_gap` event naming every lost sequence number. |
+| Page-level record recovery | `vaara trail carve`, `audit/carve.py` | Reads a damaged trail page by page and recovers every record whose hash still verifies, including rows the b-tree no longer reaches. Read-only. |
 | Trail registry | `~/.vaara/sources.json` | Every trail the engine writes is listed, so none goes unnoticed. |
 | Confidential-VM enforcement binding | `vaara verify-enforcement`, `attestation/_enforcement*.py` | Binds a signed record to an AMD SEV-SNP VM (`REPORT_DATA = sha512(jcs(record))`), with an optional expected measurement. |
 
