@@ -20,6 +20,7 @@ end and where a link is still missing.
 
 from __future__ import annotations
 
+import hashlib
 import json
 import sqlite3
 import struct
@@ -254,3 +255,140 @@ def write_jsonl(result: CarveResult, out: Path, want: Optional[range] = None) ->
             fh.write(json.dumps(rec, sort_keys=True) + "\n")
             n += 1
     return n
+
+
+@dataclass
+class RecoveryCheck:
+    """Whether a carved bundle may be declared recovered on a live trail."""
+
+    bundle: str
+    bundle_sha256: str
+    seqs: list[int] = field(default_factory=list)
+    links_verified: int = 0
+    anchored_to_seq: Optional[int] = None
+    problems: list[str] = field(default_factory=list)
+
+    @property
+    def ok(self) -> bool:
+        return not self.problems and bool(self.seqs)
+
+    def to_dict(self) -> dict:
+        return {
+            "bundle": self.bundle, "bundle_sha256": self.bundle_sha256,
+            "recovered_seq_count": len(self.seqs),
+            "first_seq": self.seqs[0] if self.seqs else None,
+            "last_seq": self.seqs[-1] if self.seqs else None,
+            "links_verified": self.links_verified,
+            "anchored_to_seq": self.anchored_to_seq,
+            "ok": self.ok, "problems": list(self.problems),
+        }
+
+
+def _declared_lost(con: sqlite3.Connection) -> set[int]:
+    lost: set[int] = set()
+    for (data,) in con.execute(
+        "SELECT data FROM audit_records NOT INDEXED WHERE event_type = 'repair_gap'"
+    ):
+        try:
+            lost.update(int(s) for s in json.loads(data).get("lost_seqs", []))
+        except (ValueError, TypeError, AttributeError):
+            continue
+    return lost
+
+
+def check_recovery(bundle: str | Path, db: str | Path) -> RecoveryCheck:
+    """Check a carved JSONL bundle against the live trail it would fill.
+
+    Every record must recompute its own hash, each must name the one before it,
+    every seq must be one a REPAIR_GAP on the live trail declared lost, and no
+    seq may already be on the trail. The first record is anchored when its
+    previous_hash is the live record at the seq before it.
+    """
+    path = Path(bundle).expanduser()
+    raw = path.read_bytes()
+    check = RecoveryCheck(bundle=str(path), bundle_sha256=hashlib.sha256(raw).hexdigest())
+    rows: list[dict] = []
+    for n, line in enumerate(raw.decode("utf-8").splitlines(), 1):
+        if not line.strip():
+            continue
+        try:
+            row = json.loads(line)
+        except ValueError:
+            check.problems.append(f"line {n} is not JSON")
+            continue
+        if not _record_hash_holds(row):
+            check.problems.append(f"seq {row.get('seq')} does not recompute its record_hash")
+            continue
+        rows.append(row)
+    rows.sort(key=lambda r: r["seq"])
+    check.seqs = [r["seq"] for r in rows]
+    if len(set(check.seqs)) != len(check.seqs):
+        check.problems.append("the bundle holds a seq twice")
+    for before, after in zip(rows, rows[1:]):
+        if after["seq"] == before["seq"] + 1:
+            if after["previous_hash"] == before["record_hash"]:
+                check.links_verified += 1
+            else:
+                check.problems.append(f"seq {after['seq']} does not name seq {before['seq']}")
+    con = sqlite3.connect(f"{Path(db).expanduser().resolve().as_uri()}?mode=ro", uri=True)
+    try:
+        lost = _declared_lost(con)
+        present = {s for (s,) in con.execute("SELECT seq FROM audit_records NOT INDEXED")}
+        undeclared = [s for s in check.seqs if s not in lost]
+        if undeclared:
+            check.problems.append(
+                f"{len(undeclared)} seq(s) were never declared lost on this trail, "
+                f"first {undeclared[0]}")
+        clash = [s for s in check.seqs if s in present]
+        if clash:
+            check.problems.append(f"{len(clash)} seq(s) are already on the trail, first {clash[0]}")
+        if rows:
+            prior = con.execute(
+                "SELECT record_hash FROM audit_records NOT INDEXED WHERE seq = ?",
+                (rows[0]["seq"] - 1,),
+            ).fetchone()
+            if prior is not None:
+                if prior[0] == rows[0]["previous_hash"]:
+                    check.anchored_to_seq = rows[0]["seq"] - 1
+                else:
+                    check.problems.append(
+                        f"seq {rows[0]['seq']} does not name the trail's seq {rows[0]['seq'] - 1}")
+        done = [
+            json.loads(d).get("bundle_sha256") for (d,) in con.execute(
+                "SELECT data FROM audit_records NOT INDEXED WHERE event_type = 'repair_recovered'")
+        ]
+        if check.bundle_sha256 in done:
+            check.problems.append("this bundle is already declared recovered on the trail")
+    finally:
+        con.close()
+    return check
+
+
+def declare_recovery(check: RecoveryCheck, db: str | Path, source: str = "") -> Path:
+    """Store the bundle beside the trail and append its REPAIR_RECOVERED record."""
+    from vaara.audit.sqlite_backend import SQLiteAuditBackend
+    from vaara.audit.trail import AuditTrail
+
+    if not check.ok:
+        raise ValueError("recovery check did not pass: " + "; ".join(check.problems))
+    db_path = Path(db).expanduser().resolve()
+    keep_dir = db_path.parent / "recovered"
+    keep_dir.mkdir(parents=True, exist_ok=True)
+    kept = keep_dir / f"{check.bundle_sha256}.jsonl"
+    if not kept.exists():
+        data = Path(check.bundle).read_bytes()
+        kept.write_bytes(data)
+    backend = SQLiteAuditBackend(db_path)
+    try:
+        AuditTrail(on_record=backend.write_record).record_repair_recovered({
+            "method": "page_carve",
+            "bundle_sha256": check.bundle_sha256,
+            "bundle_path": str(kept.relative_to(db_path.parent)),
+            "recovered_seqs": check.seqs,
+            "links_verified": check.links_verified,
+            "anchored_to_seq": check.anchored_to_seq,
+            "source": source,
+        })
+    finally:
+        backend.close()
+    return kept
