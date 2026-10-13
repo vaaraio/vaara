@@ -1231,13 +1231,14 @@ class VaaraMCPProxy:
             with self._tool_pages_lock:
                 pages = [] if first_page else self._tool_pages.get(upstream_name, [])
                 pages = [*pages, *tools]
+                complete: Optional[list] = None
                 if isinstance(result, dict) and result.get("nextCursor"):
                     self._tool_pages[upstream_name] = pages
-                    pages = None
                 else:
                     self._tool_pages.pop(upstream_name, None)
-            if pages is not None:
-                self._observe_tool_surface(upstream_name, pages, trigger="tools/list")
+                    complete = pages
+            if complete is not None:
+                self._observe_tool_surface(upstream_name, complete, trigger="tools/list")
         return response
 
     def _observe_tool_surface(
@@ -1315,9 +1316,9 @@ class VaaraMCPProxy:
                     req["params"] = {"cursor": cursor}
                 resp = client.request(req)
                 result = resp.get("result") if isinstance(resp, dict) else None
-                page = result.get("tools") if isinstance(result, dict) else None
-                if not isinstance(page, list):
+                if not isinstance(result, dict) or not isinstance(result.get("tools"), list):
                     return
+                page = result["tools"]
                 tools.extend(
                     t for t in page
                     if isinstance(t, dict)
