@@ -69,6 +69,29 @@ class EventType(str, Enum):
     WITNESS_CONFIGURED = "witness_configured"  # Heads reach a log or a TSA at a stated cadence
 
 
+def stored_event_type(value: str) -> EventType:
+    """The event type a stored record names, whether this build knows it or not.
+
+    A record written by a newer Vaara can carry a type added after this
+    one. ``EventType(value)`` refuses it, which made every older reader load
+    the row as a corrupt skeleton; the skeleton then failed its hash, and
+    one new event type read as a broken chain. An unknown value comes back
+    as an ``EventType`` whose ``value`` is the stored string, so the record
+    hashes as written, and which equals none of the members this build
+    knows. Only read paths use this; input validation keeps calling
+    ``EventType(value)``, which still refuses.
+    """
+    try:
+        return EventType(value)
+    except ValueError:
+        if not isinstance(value, str) or not value:
+            raise
+        unknown = str.__new__(EventType, value)
+        unknown._name_ = "UNKNOWN"
+        unknown._value_ = value
+        return unknown
+
+
 # Written only by the trail's own record_* methods, never accepted through an
 # append API. Verification reads them back: a REPAIR_GAP naming missing seqs
 # turns a broken chain into declared gaps, an ANCHOR_GAP marks an unwitnessed
@@ -540,7 +563,7 @@ class AuditRecord:
     def from_dict(d: dict) -> AuditRecord:
         """Deserialize from dict."""
         d = dict(d)
-        d["event_type"] = EventType(d["event_type"])
+        d["event_type"] = stored_event_type(d["event_type"])
         return AuditRecord(**d)
 
     @property

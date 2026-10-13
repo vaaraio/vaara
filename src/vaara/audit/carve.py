@@ -157,11 +157,11 @@ def _columns(path: Path) -> list[str]:
 
 
 def _record_hash_holds(row: dict) -> bool:
-    from vaara.audit.trail import AuditRecord, EventType
+    from vaara.audit.trail import AuditRecord, stored_event_type
     try:
         rec = AuditRecord(
             record_id=row["record_id"], action_id=row["action_id"],
-            event_type=EventType(row["event_type"]), timestamp=row["timestamp"],
+            event_type=stored_event_type(row["event_type"]), timestamp=row["timestamp"],
             agent_id=row["agent_id"], tool_name=row["tool_name"],
             data=json.loads(row["data"]),
             regulatory_articles=json.loads(row["regulatory"]),
