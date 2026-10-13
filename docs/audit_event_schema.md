@@ -77,14 +77,15 @@ record.
 | `anchor_gap` | A scheduled head publication or time anchor did not happen; the reason and the head it tried to witness are in `data`. |
 | `repair_gap` | A store repair could not keep every record; the declared gap is in `data`. |
 | `repair_recovered` | Records a repair declared lost were recovered from the damaged file and verified; `data` names the bundle by sha256 and lists the seqs. The records are not written back. |
+| `trail_forked` | Another store shares this trail's records up to `data.fork_seq` and then continues on its own; `data` names that branch by its head hash and seq, with its record count and any seqs it declared lost. Neither branch is merged into the other. |
 | `key_lifecycle` | A signing-key custodian was added, rotated or revoked. |
 | `disclosure_recorded` | An EU AI Act Article 50 transparency disclosure was made. |
 | `access_recorded` | Something in the store was opened, and by whom. |
 | `agent_seen` | `vaara scan --watch` or the MCP beacon saw an agent process. |
 | `witness_configured` | Heads reach an outside witness at a stated cadence: `data.kind` is `publish` (a transparency log) or `anchor` (an RFC 3161 authority), `data.every_records` the cadence, `data.target` the log or authority, `data.key_fingerprint` the publishing key. Written when the cadence is switched on or changed, so the bound on the unwitnessed window is readable from the trail. |
 
-`anchor_gap`, `repair_gap`, `repair_recovered`, `key_lifecycle` and `witness_configured` are
-written by the trail alone. Verification reads them back, so
+`anchor_gap`, `repair_gap`, `repair_recovered`, `trail_forked`, `key_lifecycle` and
+`witness_configured` are written by the trail alone. Verification reads them back, so
 `POST /v1/audit/events` refuses them with 400 `invalid_request`; every other
 type in both tables is accepted there.
 

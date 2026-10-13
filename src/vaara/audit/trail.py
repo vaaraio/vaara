@@ -62,6 +62,7 @@ class EventType(str, Enum):
     ANCHOR_GAP = "anchor_gap"               # Auto-anchor attempt failed (fail-open marker)
     REPAIR_GAP = "repair_gap"               # Store repair could not keep every record
     REPAIR_RECOVERED = "repair_recovered"   # Records a repair declared lost, recovered and verified
+    TRAIL_FORKED = "trail_forked"           # Another branch of this trail continues from a shared seq
     KEY_LIFECYCLE = "key_lifecycle"         # Signing-key custodian rotated/revoked/added
     DISCLOSURE_RECORDED = "disclosure_recorded"  # EU AI Act Art 50 transparency disclosure
     ACCESS_RECORDED = "access_recorded"     # Something was opened, and by whom
@@ -113,6 +114,7 @@ SYSTEM_EVENT_TYPES = frozenset({
     EventType.ANCHOR_GAP,
     EventType.REPAIR_GAP,
     EventType.REPAIR_RECOVERED,
+    EventType.TRAIL_FORKED,
     EventType.KEY_LIFECYCLE,
     EventType.WITNESS_CONFIGURED,
 })
@@ -422,6 +424,11 @@ TRANSPARENCY_DEFAULTS: dict[EventType, dict[str, str]] = {
     EventType.REPAIR_RECOVERED: {
         "system_operation": "store_recovery",
         "data_usage": "recovered_bundle_digest+seqs",
+        "decision_making": "operator_action",
+    },
+    EventType.TRAIL_FORKED: {
+        "system_operation": "store_fork",
+        "data_usage": "fork_point+branch_head_digest",
         "decision_making": "operator_action",
     },
     EventType.WITNESS_CONFIGURED: {
@@ -842,8 +849,10 @@ class _GapLedger:
     """Collects breaks at missing seqs, and the REPAIR_GAP records naming them.
 
     A break is held open until the walk ends, because the record declaring
-    it is appended by the repair and so always sits later in the chain.
-    Only declarations seen after the break count.
+    it is appended by the repair and so sits at or after it in the chain.
+    At, because a salvage that lost the tail leaves a seq floor, and the
+    repair's own REPAIR_GAP record is then the one that chains across the
+    hole. Declarations seen before the break do not count.
     """
 
     def __init__(self) -> None:
@@ -866,7 +875,7 @@ class _GapLedger:
         gaps = []
         for index, lost, resumes, error in self._pending:
             by = tuple(seq for at, seq, named in self._declared
-                       if at > index and set(lost) <= named)
+                       if at >= index and set(lost) <= named)
             if not by:
                 missing = ", ".join(str(s) for s in lost[:20])
                 return ChainVerdict(error=(
@@ -938,6 +947,11 @@ class AuditTrail:
         # tell a break at missing seqs, which a REPAIR_GAP record can declare,
         # from a break between adjacent seqs, which nothing can.
         self._store_seqs: dict[str, int] = {}
+        # True when load_trail read every row of the table. Seqs are allocated
+        # across the whole table, so only then is a seq the walk skips a
+        # record that is missing; a tenant's records skip the seqs other
+        # tenants took.
+        self._store_seqs_whole_table = False
         # The verdict load_trail reached when it opened this trail, or None
         # for a trail that was not loaded from a store.
         self._load_verdict: Optional[ChainVerdict] = None
@@ -1145,6 +1159,7 @@ class AuditTrail:
             length = len(self._records)
             anchors = dict(self._store_anchors)
             seqs = dict(self._store_seqs)
+            whole_table = self._store_seqs_whole_table
             if start_index < 0 or (start_index > length and length):
                 raise ValueError(
                     f"start_index {start_index} is outside the trail (len={length})"
@@ -1167,6 +1182,14 @@ class AuditTrail:
                     if seq is None or prev_seq is None or seq <= prev_seq + 1:
                         return ChainVerdict(error=error)
                     ledger.hold(i, tuple(range(prev_seq + 1, seq)), seq, error)
+            elif whole_table and seq is not None and prev_seq is not None \
+                    and seq > prev_seq + 1:
+                # The chain links across missing seqs: what a salvage that
+                # lost the tail leaves. A loss all the same.
+                ledger.hold(i, tuple(range(prev_seq + 1, seq)), seq, (
+                    f"Seqs missing before record {i} ({record.record_id}): "
+                    f"the chain links seq {prev_seq} to seq {seq}"
+                ))
             expected = record.compute_hash()
             if record.record_hash != expected:
                 return ChainVerdict(error=(
@@ -2710,6 +2733,39 @@ class AuditTrail:
                 "links_verified": int(recovery.get("links_verified", 0)),
                 "anchored_to_seq": recovery.get("anchored_to_seq"),
                 "source": self._cap_record_str(str(recovery.get("source", "")), 512),
+            },
+        ))
+
+    def record_trail_forked(self, fork: dict) -> None:
+        """Append a TRAIL_FORKED record naming another branch of this trail.
+
+        Two stores that share every record up to ``fork_seq`` and then go on
+        separately are both the record as written. Neither is merged into the
+        other: this record names the other branch by its head hash, which
+        commits to every record on it, so a verifier holding that branch can
+        check it continues from this trail's own record at ``fork_seq``.
+        """
+        missing = list(fork.get("branch_missing_seqs", []))
+        self._append_chained(AuditRecord(
+            record_id=str(uuid.uuid4()),
+            action_id="trail-forked",
+            event_type=EventType.TRAIL_FORKED,
+            timestamp=time.time(),
+            agent_id="vaara",
+            tool_name="trail.fork",
+            data={
+                "fork_seq": int(fork["fork_seq"]),
+                "fork_hash": str(fork["fork_hash"]),
+                "branch_head_seq": int(fork["branch_head_seq"]),
+                "branch_head_hash": str(fork["branch_head_hash"]),
+                "branch_record_count": int(fork.get("branch_record_count", 0)),
+                "branch_missing_seq_count": len(missing),
+                "branch_missing_seqs": missing[: self._REPAIR_GAP_SEQ_LIMIT],
+                "branch_first_ts": fork.get("branch_first_ts"),
+                "branch_last_ts": fork.get("branch_last_ts"),
+                "links_verified": int(fork.get("links_verified", 0)),
+                "branch_path": self._cap_record_str(str(fork.get("branch_path", "")), 512),
+                "source": self._cap_record_str(str(fork.get("source", "")), 512),
             },
         ))
 
