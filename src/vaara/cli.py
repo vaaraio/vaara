@@ -547,6 +547,46 @@ def _cmd_trail_recover(args: argparse.Namespace) -> int:
     return 0
 
 
+def _cmd_trail_declare_fork(args: argparse.Namespace) -> int:
+    import json as _json
+
+    from vaara.audit.fork import check_fork, declare_fork
+
+    db_path = Path(args.db).expanduser()
+    branch = Path(args.branch).expanduser()
+    for label, path in (("db", db_path), ("branch", branch)):
+        if not path.is_file():
+            print(f"vaara trail declare-fork: {label} is not a file: {path}", file=sys.stderr)
+            return 2
+    if db_path.resolve() == branch.resolve():
+        print("vaara trail declare-fork: --branch must not be the trail itself", file=sys.stderr)
+        return 2
+    check = check_fork(db_path, branch)
+    if check.ok and not args.dry_run:
+        declare_fork(check, db_path, source=args.source)
+    report = check.to_dict()
+    report["dry_run"] = bool(args.dry_run)
+    if args.format == "json":
+        print(_json.dumps(report, indent=2))
+        return 0 if check.ok else 1
+    if not check.ok:
+        print(f"vaara trail declare-fork: {branch} was not declared:", file=sys.stderr)
+        for problem in check.problems:
+            print(f"  {problem}", file=sys.stderr)
+        return 1
+    print(f"{branch}: shares the trail up to seq {check.fork_seq}, then runs on to seq "
+          f"{check.branch_head_seq} ({check.branch_record_count} record(s), "
+          f"{check.links_verified} link(s) verified).")
+    if check.branch_missing_seqs:
+        print(f"  {len(check.branch_missing_seqs)} seq(s) the branch declared lost")
+    print(f"  branch head {check.branch_head_hash}")
+    if args.dry_run:
+        print("  dry run: nothing was appended")
+    else:
+        print("  a trail_forked record naming it was appended to the trail")
+    return 0
+
+
 def _cmd_trail_shadow_report(args: argparse.Namespace) -> int:
     import json as _json
 
@@ -6099,6 +6139,23 @@ def build_parser() -> argparse.ArgumentParser:
         help="Output format (default text)",
     )
     precover.set_defaults(func=_cmd_trail_recover)
+    pfork = tsub.add_parser(
+        "declare-fork",
+        help="Declare another store a branch of this trail: check it shares a prefix "
+             "and chains on from it, then append a trail_forked record naming its head",
+    )
+    pfork.add_argument("--db", required=True, help="Path to the live audit SQLite DB")
+    pfork.add_argument("--branch", required=True,
+                       help="Path to the other store (opened read-only)")
+    pfork.add_argument("--source", default="",
+                       help="How the branch came about (recorded as given)")
+    pfork.add_argument("--dry-run", action="store_true",
+                       help="Run every check, append nothing")
+    pfork.add_argument(
+        "--format", choices=["text", "json"], default="text",
+        help="Output format (default text)",
+    )
+    pfork.set_defaults(func=_cmd_trail_declare_fork)
 
     psr = tsub.add_parser(
         "shadow-report",
