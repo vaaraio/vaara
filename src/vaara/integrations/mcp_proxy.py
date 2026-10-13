@@ -28,6 +28,7 @@ from __future__ import annotations
 
 import argparse
 import contextvars
+import hashlib
 import hmac
 import json
 import logging
@@ -72,6 +73,7 @@ from vaara.integrations._mcp_overt import (
 from vaara.integrations._mcp_upstream import (
     ProxyError, UpstreamClient, UpstreamMCPClient, strict_json_dumps,
 )
+from vaara.integrations._mcp_tool_surface import ToolSurfaceTracker
 from vaara.integrations._mcp_upstream_http import HttpUpstreamClient
 from vaara.pipeline import InterceptionPipeline
 from vaara.taxonomy.actions import ActionRequest
@@ -245,6 +247,9 @@ class VaaraMCPProxy:
         api_key: Optional[str] = None,
         allowed_origins: Optional[set[str]] = None,
         deny_rules: Optional[list[dict]] = None,
+        tool_surface_state: Optional[Path] = None,
+        tool_surface_hold: bool = False,
+        tool_surface_accept: bool = False,
     ) -> None:
         # Layer-1 deny rules, shared with the Claude Code hook. Loaded from
         # the bundled file unless the caller passes a list; an empty list
@@ -425,6 +430,30 @@ class VaaraMCPProxy:
             )
         if default_alias_target is not None:
             self._upstreams["default"] = self._upstreams[default_alias_target]
+        # The tool surface each upstream presents, digested on every complete
+        # tools/list. An upstream is identified across sessions by its slot
+        # name plus a hash of its command or URL, so the same slot name
+        # pointed at a different server is a different baseline.
+        identity: dict[str, str] = {
+            name: "cmd:" + hashlib.sha256(shlex.join(cmd).encode("utf-8")).hexdigest()
+            for name, cmd in upstream_map.items()
+        }
+        identity.update({
+            name: "url:" + hashlib.sha256(url.encode("utf-8")).hexdigest()
+            for name, url in url_map.items()
+        })
+        if default_alias_target is not None:
+            identity["default"] = identity[default_alias_target]
+        self._tool_surface = ToolSurfaceTracker(
+            state_path=tool_surface_state,
+            upstream_identity=identity,
+            hold=tool_surface_hold,
+            accept=tool_surface_accept,
+        )
+        # Pages of a paginated tools/list collected per upstream until the
+        # page without a nextCursor arrives. Only a complete list is digested.
+        self._tool_pages: dict[str, list] = {}
+        self._tool_pages_lock = threading.Lock()
         # ``self._upstream`` resolves to the per-request upstream via the
         # ``_REQUEST_UPSTREAM`` ContextVar. stdio transport leaves the
         # default ("default") in place, so existing single-upstream callers
@@ -1184,10 +1213,6 @@ class VaaraMCPProxy:
         response = self._handle_list(
             request, "tools", "name", self._allowlist, self._denylist,
         )
-        if self._attest is not None:
-            self._attest.update_manifest_fingerprint(
-                _REQUEST_UPSTREAM.get(), response
-            )
         result = response.get("result") if isinstance(response, dict) else None
         tools = result.get("tools") if isinstance(result, dict) else None
         if isinstance(tools, list):
@@ -1201,7 +1226,113 @@ class VaaraMCPProxy:
                             self._tool_schemas[key] = schema
                         else:
                             self._tool_schemas.pop(key, None)
+            params = request.get("params")
+            first_page = not (isinstance(params, dict) and params.get("cursor"))
+            with self._tool_pages_lock:
+                pages = [] if first_page else self._tool_pages.get(upstream_name, [])
+                pages = [*pages, *tools]
+                if isinstance(result, dict) and result.get("nextCursor"):
+                    self._tool_pages[upstream_name] = pages
+                    pages = None
+                else:
+                    self._tool_pages.pop(upstream_name, None)
+            if pages is not None:
+                self._observe_tool_surface(upstream_name, pages, trigger="tools/list")
         return response
+
+    def _observe_tool_surface(
+        self, upstream_name: str, tools: list, *, trigger: str,
+    ) -> None:
+        """Digest a complete tool list, rebind receipts to it, record a change.
+
+        Receipts written after this point name the surface just seen. A
+        surface that differs from the baseline writes a
+        ``mcp.tool_surface_changed`` record naming the tools added, removed
+        and changed (and in which fields), with the old and new manifest
+        digests, which are the values receipts carry as serverFingerprint.
+        """
+        try:
+            digest, change = self._tool_surface.observe(upstream_name, tools)
+        except Exception:
+            logger.exception("Tool-surface digest failed for upstream %r", upstream_name)
+            return
+        if self._attest is not None:
+            self._attest.set_manifest_fingerprint(upstream_name, digest)
+        if change is None:
+            return
+        record = {**change.to_record(), "trigger": trigger}
+        if change.accepted:
+            reason = "upstream tool surface changed; baseline updated"
+        else:
+            reason = (
+                "upstream tool surface changed; calls to "
+                + ", ".join(change.held) + " held until the operator accepts"
+            )
+        logger.warning(
+            "Tool surface of upstream %r changed: +%s -%s ~%s%s",
+            upstream_name, change.added, change.removed, sorted(change.changed),
+            f" (held: {change.held})" if change.held else "",
+        )
+        self._record_perimeter_audit(
+            agent_id=self._agent_id_default,
+            tool_name="mcp.tool_surface_changed",
+            parameters=record,
+            decision="allow",
+            reason=reason,
+            policy_id="tool_surface",
+            violation_type="tool_surface_changed",
+        )
+        self._overt_emit(
+            surface="mcp.tool_surface",
+            identifier=upstream_name,
+            identifier_field="upstream",
+            request_obj=record,
+            decision="CHANGED",
+            reason=reason,
+        )
+
+    def _refresh_tool_surface(self, upstream_name: str) -> None:
+        """Fetch an upstream's full tool list after it says the list changed.
+
+        Runs on its own thread: the notification arrives on the upstream
+        reader thread, and a request from there would wait on itself. The
+        client usually lists again too; that second sighting digests the same
+        surface and records nothing new.
+        """
+        client = self._upstreams.get(upstream_name)
+        if client is None:
+            return
+        tools: list = []
+        cursor: Optional[str] = None
+        try:
+            for _ in range(100):
+                req: dict = {
+                    "jsonrpc": "2.0",
+                    "id": f"vaara-tool-surface-{os.urandom(6).hex()}",
+                    "method": "tools/list",
+                }
+                if cursor:
+                    req["params"] = {"cursor": cursor}
+                resp = client.request(req)
+                result = resp.get("result") if isinstance(resp, dict) else None
+                page = result.get("tools") if isinstance(result, dict) else None
+                if not isinstance(page, list):
+                    return
+                tools.extend(
+                    t for t in page
+                    if isinstance(t, dict)
+                    and not self._is_filtered(t.get("name", ""), self._allowlist, self._denylist)
+                )
+                cursor = result.get("nextCursor")
+                if not cursor:
+                    break
+            else:
+                logger.warning("tools/list from %r paged past 100 pages; not digested", upstream_name)
+                return
+        except Exception:
+            logger.exception("Tool-surface refresh failed for upstream %r", upstream_name)
+            return
+        self._observe_tool_surface(upstream_name, tools, trigger="notifications/tools/list_changed")
 
     def _handle_list(
         self,
@@ -1349,6 +1480,51 @@ class VaaraMCPProxy:
             )
         else:
             gates.append("deny_rules:pass" if self._deny_rules else "deny_rules:off")
+        # Tool-surface hold. A tool whose definition changed, or that appeared,
+        # after the operator's accepted baseline is refused until the operator
+        # accepts the new surface. Off unless the proxy runs with the hold on;
+        # in shadow mode a held call is recorded and proceeds.
+        if not self._tool_surface.hold:
+            gates.append("tool_surface:off")
+        elif self._tool_surface.is_held(_REQUEST_UPSTREAM.get(), tool_name):
+            reason = (
+                f"Tool {tool_name!r} changed or appeared after the accepted tool "
+                "surface; held until the operator accepts it"
+            )
+            if self._pipeline._enforce:
+                gates.append("tool_surface:hold")
+                self._record_perimeter_audit(
+                    agent_id, tool_name, arguments, "deny", reason,
+                    policy_id="tool_surface",
+                    violation_type="tool_surface_hold",
+                )
+                block_payload = {
+                    "vaara_blocked": True,
+                    "reason": reason,
+                    "decision": "DENY",
+                    "tool": tool_name,
+                    "gates": list(gates),
+                }
+                self._overt_emit(
+                    surface="mcp.tool.call",
+                    identifier=tool_name,
+                    identifier_field="tool_name",
+                    request_obj={"tool": tool_name, "arguments": arguments},
+                    decision="DENY",
+                    reason=reason,
+                    extra={"agent_id": agent_id, "gates": list(gates)},
+                )
+                return {
+                    "jsonrpc": "2.0", "id": request.get("id"),
+                    "result": {
+                        "content": [{"type": "text", "text": strict_json_dumps(block_payload, indent=2)}],
+                        "isError": True,
+                    },
+                }
+            gates.append("tool_surface:shadow")
+            logger.warning("SHADOW tool-surface hold on %s", _safe_log(tool_name))
+        else:
+            gates.append("tool_surface:pass")
         # The tool's own inputSchema from tools/list. Arguments outside the
         # declared shape are refused before the call is scored or run, and
         # the record names the parameter that failed. In shadow mode the
@@ -1869,6 +2045,19 @@ class VaaraMCPProxy:
                 self._audit_progress_notification(message)
             elif method == "notifications/message":
                 self._audit_message_notification(message)
+            elif method == "notifications/tools/list_changed":
+                self._record_perimeter_audit(
+                    agent_id=self._agent_id_default,
+                    tool_name="mcp.tool_surface_list_changed",
+                    parameters={"upstream": upstream_name},
+                    decision="allow",
+                    reason="upstream announced its tool list changed; re-listing",
+                    tenant_id="",
+                )
+                threading.Thread(
+                    target=self._refresh_tool_surface, args=(upstream_name,),
+                    daemon=True, name=f"tool-surface-{upstream_name}",
+                ).start()
         except Exception:
             logger.exception("Streaming-notification audit failed for %s", method)
         # Resolve the session that originated this notification, if any. Only
@@ -2266,6 +2455,21 @@ def main(argv: Optional[list[str]] = None) -> None:
                              "(one canonical-CBOR file per envelope). Required when "
                              "--overt-signing-key is set.")
     parser.add_argument(
+        "--tool-surface-state", default=None,
+        help="File holding the last tool surface seen per upstream, so a change "
+             "made between sessions is recorded at the next tools/list. Default "
+             "$VAARA_MCP_TOOL_SURFACE_STATE or ~/.vaara/mcp-proxy/tool-surface.json; "
+             "'none' keeps it in memory for this process only.")
+    parser.add_argument(
+        "--tool-surface-hold", action="store_true",
+        help="Refuse calls to a tool whose definition changed, or that appeared, "
+             "after the accepted tool surface. The hold persists across restarts "
+             "until the operator runs once with --tool-surface-accept.")
+    parser.add_argument(
+        "--tool-surface-accept", action="store_true",
+        help="Adopt the tool surface seen in this run as the accepted baseline. "
+             "The change is still recorded.")
+    parser.add_argument(
         "--stacked", choices=("warn", "fail", "ignore"), default="warn",
         help="What to do when a second Vaara governance layer is detected in "
              "front of this proxy (the Claude Code PreToolUse hook): 'warn' "
@@ -2375,6 +2579,9 @@ def main(argv: Optional[list[str]] = None) -> None:
             shadow=args.shadow,
             api_key=args.api_key,
             allowed_origins=set(args.allow_origins) if args.allow_origins else None,
+            tool_surface_state=_tool_surface_state_path(args.tool_surface_state),
+            tool_surface_hold=args.tool_surface_hold,
+            tool_surface_accept=args.tool_surface_accept,
         )
     except (ValueError, ProxyError) as e:
         # ProxyError here means a --upstream-url target was refused by the SSRF
@@ -2392,6 +2599,15 @@ def main(argv: Optional[list[str]] = None) -> None:
             proxy.run()
     finally:
         proxy.close()
+
+
+def _tool_surface_state_path(value: Optional[str]) -> Optional[Path]:
+    raw = value or os.environ.get("VAARA_MCP_TOOL_SURFACE_STATE") or ""
+    if raw.strip().lower() == "none":
+        return None
+    if raw.strip():
+        return Path(raw).expanduser()
+    return Path.home() / ".vaara" / "mcp-proxy" / "tool-surface.json"
 
 
 # A fan-out slot name is a short alphanumeric slug. The narrow pattern

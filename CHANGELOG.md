@@ -6,6 +6,14 @@ and this project follows [Semantic Versioning](https://semver.org/spec/v2.0.0.ht
 
 ## [Unreleased]
 
+### Added
+- `vaara-mcp-proxy` records when an upstream's tool surface changes. Every complete `tools/list` it relays is digested and compared with the last surface seen for that upstream. A difference writes an `mcp.tool_surface_changed` record that names the tools added, removed and changed, and for each changed tool the fields that moved (`description`, `inputSchema`, `outputSchema`, `annotations`, `title`, or `other`), with the old and new manifest digests. The record names the change and does not copy tool text. When an upstream sends `notifications/tools/list_changed`, the proxy records it and lists the tools itself, so the change is digested even if the client never lists again. A paginated list is digested once its last page arrives.
+- The last surface per upstream persists in `~/.vaara/mcp-proxy/tool-surface.json` (`--tool-surface-state`, `VAARA_MCP_TOOL_SURFACE_STATE`, `none` for memory only), keyed by slot name and a hash of the command or URL. A change made while no session ran is recorded at the next session's first list.
+- `--tool-surface-hold` refuses calls to a tool that changed or appeared after the accepted surface, with the gate `tool_surface:hold` and `violation_type: tool_surface_hold`. The hold survives a restart. `--tool-surface-accept` adopts the surface seen in that run. In `--shadow` a held call is recorded and proceeds. Every `tools/call` gate list now carries a `tool_surface` entry after `deny_rules`: `off`, `pass`, `hold` or `shadow`.
+
+### Fixed
+- The proxy's `serverFingerprint` stayed at the digest of the first `tools/list` for the life of the process, so receipts written after a server changed its tools certified the old surface. It now follows every complete list, and equals the `new_manifest_digest` of the latest change record. A tool schema holding a float, which the JCS form refuses, used to leave the fingerprint at the command hash; it is now digested from a sorted compact form.
+
 ## [2.12.1] - 2026-10-12
 
 ### Fixed

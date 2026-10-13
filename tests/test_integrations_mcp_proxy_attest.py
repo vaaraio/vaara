@@ -306,17 +306,27 @@ def test_manifest_fingerprint_upgrades_on_tools_list(
     assert emitter.fingerprint_for("default").startswith("manifest:sha256:")
 
 
-def test_manifest_fingerprint_idempotent(monkeypatch, emitter):
+def test_manifest_fingerprint_follows_every_tools_list(monkeypatch, emitter):
+    # The same list twice keeps the fingerprint; a changed list moves it.
+    # It used to freeze at the first list, so receipts certified a surface
+    # the server might no longer present.
     p, _ = _make_proxy(monkeypatch, emitter=emitter)
-    tools_response = {
+    p._upstream.request.return_value = {
         "jsonrpc": "2.0", "id": 1,
         "result": {"tools": [{"name": "t1"}]},
     }
-    p._upstream.request.return_value = tools_response
     p._handle_tools_list({"jsonrpc": "2.0", "id": 1, "method": "tools/list"})
     first_fp = emitter.fingerprint_for("default")
     p._handle_tools_list({"jsonrpc": "2.0", "id": 1, "method": "tools/list"})
     assert emitter.fingerprint_for("default") == first_fp
+    p._upstream.request.return_value = {
+        "jsonrpc": "2.0", "id": 1,
+        "result": {"tools": [{"name": "t1", "description": "now different"}]},
+    }
+    p._handle_tools_list({"jsonrpc": "2.0", "id": 1, "method": "tools/list"})
+    second_fp = emitter.fingerprint_for("default")
+    assert second_fp.startswith("manifest:sha256:")
+    assert second_fp != first_fp
 
 
 # ---------------------------------------------------------------------------

@@ -20,10 +20,10 @@ Signing modes and key auto-detection:
 ``"{upstream_name}"``.
 
 ``serverFingerprint`` starts as ``cmd:sha256:{hex}`` (SHA-256 of the upstream
-command string, computed at construction). The first ``tools/list`` response
-per upstream upgrades it to ``manifest:sha256:{hex}`` (SHA-256 of the
-canonical JSON of the effective tools array), binding the exact capability set
-the proxy presented to the agent.
+command string, computed at construction). Every complete ``tools/list``
+response per upstream replaces it with ``manifest:sha256:{hex}`` (SHA-256 of
+the canonical JSON of the effective tools array), binding the exact capability
+set the proxy last presented to the agent.
 
 Intent defaults to ``tools/call/{tool_name}``. Operators can supply a richer
 label via the ``X-Vaara-Intent`` HTTP request header; stdio transport uses the
@@ -117,8 +117,8 @@ class AttestPairEmitter:
         # seq is a provable gap. Guarded by ``_lock``.
         self._completeness: dict[str, int] = {}
         self._lock = threading.Lock()
-        # cmd-hash fingerprints pre-computed at construction; upgraded to
-        # manifest-hash on first tools/list response per upstream.
+        # cmd-hash fingerprints pre-computed at construction; replaced by the
+        # manifest-hash on every complete tools/list per upstream.
         self._fingerprints: dict[str, str] = {
             name: _cmd_hash(cmd) for name, cmd in upstream_commands.items()
         }
@@ -164,34 +164,19 @@ class AttestPairEmitter:
     def is_constrained(self, tool_name: str) -> bool:
         return tool_name in self._tool_constraints
 
-    def update_manifest_fingerprint(
-        self, upstream_name: str, tools_list_response: dict
-    ) -> None:
-        """Upgrade from cmd-hash to manifest-hash on first tools/list response.
+    def set_manifest_fingerprint(self, upstream_name: str, digest_hex: str) -> None:
+        """Bind later receipts for this upstream to the manifest just listed.
 
-        Hashes the canonical JSON of the tools array from the response (which
-        may be post-operator-filter, binding the effective capability set the
-        proxy presents to agents). Idempotent after the first upgrade.
+        Called on every complete tools/list, not just the first: a server can
+        change its tools mid-session, and a fingerprint frozen at the first
+        list would certify a surface the server no longer presents.
         """
         with self._lock:
-            current = self._fingerprints.get(upstream_name, "")
-        if current.startswith("manifest:sha256:"):
-            return
-        try:
-            from vaara.attestation._attest_canonical import canonical_json
-            result = tools_list_response.get("result") or {}
-            tools = result.get("tools") or []
-            manifest_bytes = canonical_json({"tools": tools})
-            h = hashlib.sha256(manifest_bytes).hexdigest()
-            with self._lock:
-                self._fingerprints[upstream_name] = f"manifest:sha256:{h}"
-            logger.debug(
-                "Manifest fingerprint for upstream %r: sha256:...%s", upstream_name, h[-8:]
-            )
-        except Exception:
-            logger.exception(
-                "Failed to capture manifest fingerprint for upstream %r", upstream_name
-            )
+            self._fingerprints[upstream_name] = f"manifest:sha256:{digest_hex}"
+        logger.debug(
+            "Manifest fingerprint for upstream %r: sha256:...%s",
+            upstream_name, digest_hex[-8:],
+        )
 
     def fingerprint_for(self, upstream_name: str) -> str:
         """Best available fingerprint: manifest if captured, cmd-hash otherwise."""

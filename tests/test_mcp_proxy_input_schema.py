@@ -159,7 +159,7 @@ def test_violation_is_refused_before_scoring_or_forwarding(monkeypatch):
     assert resp["result"]["isError"] is True
     assert payload["decision"] == "DENY"
     assert "count: 50 is above the maximum 10" in payload["violations"]
-    assert gates[-1] == ["operator_filter:pass", "deny_rules:pass", "parameter_schema:deny"]
+    assert gates[-1] == ["operator_filter:pass", "deny_rules:pass", "tool_surface:off", "parameter_schema:deny"]
     upstream.request.assert_not_called()
 
 
@@ -184,7 +184,7 @@ def test_conforming_call_passes_the_gate(monkeypatch):
     resp = _call(p, upstream, {"path": "/srv/app.log", "count": 5})
 
     assert resp["result"]["content"][0]["text"] == "ok"
-    assert gates[-1][:3] == ["operator_filter:pass", "deny_rules:pass", "parameter_schema:pass"]
+    assert gates[-1][:4] == ["operator_filter:pass", "deny_rules:pass", "tool_surface:off", "parameter_schema:pass"]
 
 
 def test_a_schema_the_checker_only_partly_reads_says_so(monkeypatch):
@@ -195,7 +195,7 @@ def test_a_schema_the_checker_only_partly_reads_says_so(monkeypatch):
 
     _call(p, upstream, {"q": "x"})
 
-    assert gates[-1][2] == "parameter_schema:pass_partial:oneOf"
+    assert gates[-1][3] == "parameter_schema:pass_partial:oneOf"
 
 
 def test_shadow_mode_records_and_forwards(monkeypatch):
@@ -216,7 +216,7 @@ def test_a_tool_with_no_schema_says_the_gate_had_nothing_to_check(monkeypatch):
 
     _call(p, upstream, {"anything": 1})
 
-    assert gates[-1][2] == "parameter_schema:no_schema"
+    assert gates[-1][3] == "parameter_schema:no_schema"
 
 
 def test_a_relisted_tool_uses_its_new_schema(monkeypatch):
@@ -227,7 +227,7 @@ def test_a_relisted_tool_uses_its_new_schema(monkeypatch):
 
     _call(p, upstream, {"path": "/var/log/app.log"})
 
-    assert gates[-1][2] == "parameter_schema:pass"
+    assert gates[-1][3] == "parameter_schema:pass"
 
 
 # Fan-out: the schema belongs to the upstream that advertised it
@@ -270,13 +270,13 @@ def test_same_named_tools_on_two_upstreams_keep_their_own_schemas(monkeypatch):
     # Listed last, b's open schema must not stand in for a's strict one.
     resp = _on("a", _call, p, clients["a"], {"path": "/var/log/app.log"})
     assert resp["result"]["isError"] is True
-    assert gates[-1][2] == "parameter_schema:deny"
+    assert gates[-1][3] == "parameter_schema:deny"
     clients["a"].request.assert_not_called()
 
     # And a's strict schema must not refuse a call b's schema allows.
     resp = _on("b", _call, p, clients["b"], {"path": "/var/log/app.log"})
     assert resp["result"]["content"][0]["text"] == "ok"
-    assert gates[-1][2] == "parameter_schema:pass"
+    assert gates[-1][3] == "parameter_schema:pass"
 
 
 def test_a_tool_listed_on_one_upstream_has_no_schema_on_the_other(monkeypatch):
@@ -286,4 +286,4 @@ def test_a_tool_listed_on_one_upstream_has_no_schema_on_the_other(monkeypatch):
 
     _on("b", _call, p, clients["b"], {"path": "/var/log/app.log"})
 
-    assert gates[-1][2] == "parameter_schema:no_schema"
+    assert gates[-1][3] == "parameter_schema:no_schema"

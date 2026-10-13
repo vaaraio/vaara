@@ -113,8 +113,8 @@ def test_policy_denial_records_the_filter_it_passed_first(monkeypatch):
 
     resp = _call(p)
 
-    assert gates == [["operator_filter:pass", "deny_rules:pass", "parameter_schema:no_schema", "policy:deny"]]
-    assert _payload(resp)["gates"] == ["operator_filter:pass", "deny_rules:pass", "parameter_schema:no_schema", "policy:deny"]
+    assert gates == [["operator_filter:pass", "deny_rules:pass", "tool_surface:off", "parameter_schema:no_schema", "policy:deny"]]
+    assert _payload(resp)["gates"] == ["operator_filter:pass", "deny_rules:pass", "tool_surface:off", "parameter_schema:no_schema", "policy:deny"]
     upstream.request.assert_not_called()
 
 
@@ -131,6 +131,7 @@ def test_gateway_refusal_shows_it_ran_after_the_policy_allow(monkeypatch):
     assert trail == [
         "operator_filter:pass",
         "deny_rules:pass",
+        "tool_surface:off",
         "parameter_schema:no_schema",
         "policy:allow",
         "credential_gateway:refuse",
@@ -151,6 +152,7 @@ def test_gateway_pass_is_recorded_and_reaches_upstream(monkeypatch):
     assert gates[-1] == [
         "operator_filter:pass",
         "deny_rules:pass",
+        "tool_surface:off",
         "parameter_schema:no_schema",
         "policy:allow",
         "credential_gateway:pass",
@@ -170,6 +172,7 @@ def test_unconstrained_tool_is_not_reported_as_having_passed(monkeypatch):
     assert trail == [
         "operator_filter:pass",
         "deny_rules:pass",
+        "tool_surface:off",
         "parameter_schema:no_schema",
         "policy:allow",
         "credential_gateway:not_constrained",
@@ -195,6 +198,7 @@ def test_deployment_without_a_gateway_says_so(monkeypatch):
     assert trail == [
         "operator_filter:pass",
         "deny_rules:pass",
+        "tool_surface:off",
         "parameter_schema:no_schema",
         "policy:allow",
         "credential_gateway:not_configured",
