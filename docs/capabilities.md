@@ -150,7 +150,7 @@ reproductions: [vaara.io/conformance.html](https://vaara.io/conformance.html).
 | Adversarial classifier | `adversarial_classifier.py` | Opt-in (`vaara[ml]`) v11 bundle: 254 hand features plus 384-dimensional MiniLM embeddings. The bundle's SHA-256 is verified before it loads. Recall 85.6% at a 5.1% false-positive rate on held-out test data (README, "How it scores"). |
 | Cloud-metadata floor | `scorer/_param_signals.py` | A parameter that targets the instance-metadata address, in any encoding, scores 0.95. |
 | Argument holds | `scorer/_param_signals.py` (`argument_hold`) | A URL shortener in a destination, a literal credential on an outbound call, or a form submission holds the call for a human. Destinations, commands and request headers are read; text written through a heredoc or into a file is not. |
-| Detection primitives | `detect/injection.py`, `detect/pii.py` | Prompt injection (classifier with a pattern fallback) and PII (email, phone, SSN, IPv4, card numbers with Luhn, IBAN with mod 97) with offsets for redaction. |
+| Detection primitives | `detect/injection.py`, `detect/pii.py` | Prompt injection (classifier and pattern set, either one flags; patterns alone without the ml extra) and PII (email, phone, SSN, IPv4, card numbers with Luhn, IBAN with mod 97) with offsets for redaction. |
 | Cold-start calibration | `sandbox/trace_gen.py` | Synthetic benign, careless and adversarial traces calibrate the scorer and its interval before any real agent connects. |
 
 ## 12. Policy and multi-tenancy
