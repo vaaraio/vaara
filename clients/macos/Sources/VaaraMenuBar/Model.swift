@@ -638,12 +638,23 @@ final class GateModel: ObservableObject {
     /// query that failed came back as nil and every caller folded that into
     /// an empty result, so a corrupt trail and a quiet one rendered the same
     /// green empty feed. A gate that cannot read its evidence must say so.
+    ///
+    /// Only a WAL trail is opened read-write. A trail in rollback-journal mode
+    /// is opened read-only, because its writer may sit on another machine
+    /// whose file locks this app cannot see: an engine in a VM writing over
+    /// virtiofs uses DELETE journalling, and to this app its open journal
+    /// looks hot. A read-write connection rolls a hot journal back into the
+    /// file, query_only or not, and the writer's commit then lands on a torn
+    /// database. A second opener that cannot see the writer's locks corrupts
+    /// the file this way in a Linux repro (vfs=unix-none); read-only does not.
     private func withDB<T>(_ path: String, _ body: (OpaquePointer) -> T) -> T? {
         var db: OpaquePointer?
-        var flags: Int32 = SQLITE_OPEN_READWRITE
-        if sqlite3_open_v2(path, &db, flags, nil) != SQLITE_OK {
+        var flags: Int32 = isWALFile(path) ? SQLITE_OPEN_READWRITE : SQLITE_OPEN_READONLY
+        if flags == SQLITE_OPEN_READWRITE, sqlite3_open_v2(path, &db, flags, nil) != SQLITE_OK {
             if db != nil { sqlite3_close(db); db = nil }
             flags = SQLITE_OPEN_READONLY
+        }
+        if flags == SQLITE_OPEN_READONLY {
             guard sqlite3_open_v2(path, &db, flags, nil) == SQLITE_OK else {
                 let msg = db.map { String(cString: sqlite3_errmsg($0)) } ?? "cannot open"
                 if db != nil { sqlite3_close(db) }
@@ -662,6 +673,11 @@ final class GateModel: ObservableObject {
         // The body's prepare/step guards bail without a message; the
         // connection still remembers why. Anything past DONE is a fault.
         let rc = sqlite3_errcode(db) & 0xff
+        // Read-only meeting a journal it cannot roll back, or a held lock:
+        // a writer is mid-transaction. Not a fault; the next poll reads it.
+        if flags == SQLITE_OPEN_READONLY, rc == SQLITE_READONLY || rc == SQLITE_BUSY {
+            return nil
+        }
         if rc != SQLITE_OK, rc != SQLITE_ROW, rc != SQLITE_DONE {
             fault(path, String(cString: sqlite3_errmsg(db)))
             if rc == SQLITE_CORRUPT || rc == SQLITE_NOTADB { checkTrail(path) }
@@ -678,11 +694,25 @@ final class GateModel: ObservableObject {
         if trailFaults[path] != message { trailFaults[path] = message }
     }
 
+    /// True when the database header says WAL: bytes 18 and 19 (file format
+    /// write and read versions) are 2. Anything else, including a file too
+    /// short to have a header, counts as rollback-journal.
+    func isWALFile(_ path: String) -> Bool {
+        guard let fh = FileHandle(forReadingAtPath: path) else { return false }
+        defer { try? fh.close() }
+        guard let head = try? fh.read(upToCount: 20), head.count == 20 else { return false }
+        let bytes = [UInt8](head)
+        return bytes[18] == 2 && bytes[19] == 2
+    }
+
     /// `PRAGMA quick_check` on open and whenever a read reports corruption.
     /// A failed check gets one `REINDEX`, since every corruption seen on this
     /// trail so far was index-only (`wrong # of entries`) and the chain lives
     /// in the rows, not the indexes. If the file is still bad after that, the
     /// fault stays up and the note says what was tried. Throttled per file.
+    /// Only a WAL trail gets the REINDEX: a rollback-journal trail may have a
+    /// writer on another machine (see `withDB`), so it is checked read-only
+    /// and its repair is left to `vaara trail repair` on the writer's side.
     @discardableResult
     func checkTrail(_ path: String) -> Bool {
         guard config.db_paths.contains(path) else { return false }
@@ -690,10 +720,13 @@ final class GateModel: ObservableObject {
             return trailFaults[path] == nil
         }
         lastHeal[path] = Date()
+        let wal = isWALFile(path)
         var db: OpaquePointer?
-        guard sqlite3_open_v2(path, &db, SQLITE_OPEN_READWRITE, nil) == SQLITE_OK, let db else {
+        let flags: Int32 = wal ? SQLITE_OPEN_READWRITE : SQLITE_OPEN_READONLY
+        guard sqlite3_open_v2(path, &db, flags, nil) == SQLITE_OK, let db else {
             if db != nil { sqlite3_close(db) }
-            trailNotes[path] = "integrity check skipped: not writable"
+            trailNotes[path] = wal ? "integrity check skipped: not writable"
+                                   : "integrity check skipped: cannot open"
             return false
         }
         defer { sqlite3_close(db) }
@@ -716,6 +749,17 @@ final class GateModel: ObservableObject {
             // is what let a dead source sit in the list looking healthy.
             trailNotes[path] = staleNote(path) ?? "integrity ok"
             return true
+        }
+        if !wal {
+            let rc = sqlite3_errcode(db) & 0xff
+            if rc == SQLITE_READONLY || rc == SQLITE_BUSY {
+                // A writer is mid-transaction; check again after the interval.
+                lastHeal[path] = nil
+                return trailFaults[path] == nil
+            }
+            trailNotes[path] = "integrity: \(first); not repaired here, run `vaara trail repair` where the engine runs"
+            fault(path, "corrupt: \(first)")
+            return false
         }
         if sqlite3_exec(db, "REINDEX", nil, nil, nil) != SQLITE_OK {
             let msg = String(cString: sqlite3_errmsg(db))
