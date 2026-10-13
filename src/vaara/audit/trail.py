@@ -849,8 +849,10 @@ class _GapLedger:
     """Collects breaks at missing seqs, and the REPAIR_GAP records naming them.
 
     A break is held open until the walk ends, because the record declaring
-    it is appended by the repair and so always sits later in the chain.
-    Only declarations seen after the break count.
+    it is appended by the repair and so sits at or after it in the chain.
+    At, because a salvage that lost the tail leaves a seq floor, and the
+    repair's own REPAIR_GAP record is then the one that chains across the
+    hole. Declarations seen before the break do not count.
     """
 
     def __init__(self) -> None:
@@ -873,7 +875,7 @@ class _GapLedger:
         gaps = []
         for index, lost, resumes, error in self._pending:
             by = tuple(seq for at, seq, named in self._declared
-                       if at > index and set(lost) <= named)
+                       if at >= index and set(lost) <= named)
             if not by:
                 missing = ", ".join(str(s) for s in lost[:20])
                 return ChainVerdict(error=(
@@ -945,6 +947,11 @@ class AuditTrail:
         # tell a break at missing seqs, which a REPAIR_GAP record can declare,
         # from a break between adjacent seqs, which nothing can.
         self._store_seqs: dict[str, int] = {}
+        # True when load_trail read every row of the table. Seqs are allocated
+        # across the whole table, so only then is a seq the walk skips a
+        # record that is missing; a tenant's records skip the seqs other
+        # tenants took.
+        self._store_seqs_whole_table = False
         # The verdict load_trail reached when it opened this trail, or None
         # for a trail that was not loaded from a store.
         self._load_verdict: Optional[ChainVerdict] = None
@@ -1152,6 +1159,7 @@ class AuditTrail:
             length = len(self._records)
             anchors = dict(self._store_anchors)
             seqs = dict(self._store_seqs)
+            whole_table = self._store_seqs_whole_table
             if start_index < 0 or (start_index > length and length):
                 raise ValueError(
                     f"start_index {start_index} is outside the trail (len={length})"
@@ -1174,6 +1182,14 @@ class AuditTrail:
                     if seq is None or prev_seq is None or seq <= prev_seq + 1:
                         return ChainVerdict(error=error)
                     ledger.hold(i, tuple(range(prev_seq + 1, seq)), seq, error)
+            elif whole_table and seq is not None and prev_seq is not None \
+                    and seq > prev_seq + 1:
+                # The chain links across missing seqs: what a salvage that
+                # lost the tail leaves. A loss all the same.
+                ledger.hold(i, tuple(range(prev_seq + 1, seq)), seq, (
+                    f"Seqs missing before record {i} ({record.record_id}): "
+                    f"the chain links seq {prev_seq} to seq {seq}"
+                ))
             expected = record.compute_hash()
             if record.record_hash != expected:
                 return ChainVerdict(error=(
