@@ -12,6 +12,7 @@ the operator accepts it.
 
 import json
 import time
+from pathlib import Path
 from unittest.mock import MagicMock
 
 import pytest
@@ -265,5 +266,5 @@ def test_state_path_none_keeps_it_in_memory(value, expect):
 def test_state_path_default_is_under_home(monkeypatch, tmp_path):
     from vaara.integrations.mcp_proxy import _tool_surface_state_path
     monkeypatch.delenv("VAARA_MCP_TOOL_SURFACE_STATE", raising=False)
-    monkeypatch.setenv("HOME", str(tmp_path))
+    monkeypatch.setattr(Path, "home", lambda: tmp_path)
     assert _tool_surface_state_path(None) == tmp_path / ".vaara" / "mcp-proxy" / "tool-surface.json"

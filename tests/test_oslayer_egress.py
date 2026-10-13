@@ -410,6 +410,9 @@ def test_an_allowed_connection_is_recorded_at_open_and_at_close(upstream):
         opener = urllib.request.build_opener(urllib.request.ProxyHandler(
             {"http": f"http://127.0.0.1:{port}"}))
         opener.open(f"http://127.0.0.1:{upstream}/x", timeout=10).read()
+        # "closed" comes from the relay thread after the client has its bytes,
+        # so let it land before the refusal or the two can swap places.
+        _wait_for(seen, 2)
         with pytest.raises(urllib.error.HTTPError):
             opener.open("http://not-allowed.example/", timeout=10)
         _wait_for(seen, 3)
