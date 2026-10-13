@@ -420,19 +420,41 @@ def verify_receipt_file(
     directory the file sits under. ``trail_hashes`` maps record id to trail
     record hash; when given, the evidence's ``recordHash`` must match.
     """
-    from cryptography.hazmat.primitives import serialization
-
-    from vaara.attestation.decision import parse_decision_record, verify_decision_signature
-
     body = json.loads(Path(path).read_text(encoding="utf-8"))
-    envelope = body["receipt"]
-    evidence = body["evidence"]
     if public_key_pem is None:
         root = Path(path).resolve().parent.parent
         public_key_pem = (root / PUBKEY_NAME).read_bytes()
-    public_key = serialization.load_pem_public_key(public_key_pem)
+    return verify_receipt_body(
+        body, public_key_pem=public_key_pem, trail_hashes=trail_hashes, path=str(path),
+    )
 
-    record = parse_decision_record(envelope)
+
+def verify_receipt_body(
+    body: dict[str, Any],
+    *,
+    public_key_pem: bytes,
+    trail_hashes: Optional[dict[str, str]] = None,
+    path: str = "",
+) -> ReceiptCheck:
+    """Verify a receipt already in memory: the checks verify_receipt_file runs.
+
+    Raises ValueError, KeyError or TypeError when ``body`` is not a receipt
+    or the key is not a PEM public key.
+    """
+    from cryptography.hazmat.primitives import serialization
+
+    from vaara.attestation._attest_types import AttestationError
+    from vaara.attestation.decision import parse_decision_record, verify_decision_signature
+
+    envelope = body["receipt"]
+    evidence = body["evidence"]
+    if not isinstance(envelope, dict) or not isinstance(evidence, dict):
+        raise ValueError("receipt and evidence must be objects")
+    public_key = serialization.load_pem_public_key(public_key_pem)
+    try:
+        record = parse_decision_record(envelope)
+    except AttestationError as exc:
+        raise ValueError(f"not a decision receipt: {exc}") from None
     signature_ok = verify_decision_signature(record, verifying_material=public_key)
     ref = envelope.get("decisionDerived", {}).get("evidenceRef", {})
     evidence_ok = ref.get("digest") == _digest(evidence)

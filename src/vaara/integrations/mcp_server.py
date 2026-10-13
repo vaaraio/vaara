@@ -6,10 +6,11 @@ Exposes Vaara's interception pipeline as an MCP server so that AI agents
 (Claude, GPT, Cursor, etc.) can discover and use Vaara governance as a
 standard tool via the MCP protocol.
 
-The MCP server provides three tools:
+The MCP server provides four tools:
 1. **vaara_check** — Score an action before execution (read-only assessment)
 2. **vaara_intercept** — Full interception with audit trail (blocks/allows)
 3. **vaara_report_outcome** — Report what happened after execution
+4. **vaara_verify_receipt** — Verify a signed decision receipt against the trail
 
 And two resources:
 1. **vaara://status** — Current scorer status, calibration state
@@ -68,6 +69,7 @@ import logging
 import math
 import os
 import secrets
+import sqlite3
 import sys
 from dataclasses import dataclass, replace
 from pathlib import Path
@@ -275,6 +277,32 @@ VAARA_REPORT_TOOL = MCPToolDefinition(
 )
 
 
+VAARA_VERIFY_RECEIPT_TOOL = MCPToolDefinition(
+    name="vaara_verify_receipt",
+    description=(
+        "Verify a signed decision receipt: its signature, that the evidence "
+        "it carries is the evidence it signed, and that the record it names "
+        "is in this server's audit trail. Pass the receipt file's JSON as "
+        "'receipt'. The server's own receipt key is used unless "
+        "'public_key_pem' names another issuer's key."
+    ),
+    inputSchema={
+        "type": "object",
+        "properties": {
+            "receipt": {
+                "type": "object",
+                "description": "The receipt file's JSON: {\"receipt\": ..., \"evidence\": ...}",
+            },
+            "public_key_pem": {
+                "type": "string",
+                "description": "Issuer public key, PEM (optional; defaults to this server's key)",
+            },
+        },
+        "required": ["receipt"],
+    },
+)
+
+
 # ── Resource Definitions ────────────────────────────────────────────────
 
 VAARA_STATUS_RESOURCE = MCPResourceDefinition(
@@ -325,6 +353,7 @@ class VaaraMCPServer:
             "vaara_check": VAARA_CHECK_TOOL,
             "vaara_intercept": VAARA_INTERCEPT_TOOL,
             "vaara_report_outcome": VAARA_REPORT_TOOL,
+            "vaara_verify_receipt": VAARA_VERIFY_RECEIPT_TOOL,
         }
         self._resources = {
             "vaara://status": VAARA_STATUS_RESOURCE,
@@ -522,6 +551,8 @@ class VaaraMCPServer:
             return self._call_intercept(arguments)
         elif tool_name == "vaara_report_outcome":
             return self._call_report(arguments)
+        elif tool_name == "vaara_verify_receipt":
+            return self._call_verify_receipt(arguments)
         else:
             # Unknown tool to Invalid params (-32602), not Internal (-32603).
             # Raise a marker that handle_request translates properly.
@@ -814,6 +845,68 @@ class VaaraMCPServer:
                     "calibration_size": self._pipeline.scorer.calibration_size,
                 }, indent=2),
             }],
+        }
+
+    def _call_verify_receipt(self, args: dict) -> dict:
+        """Verify one decision receipt; reads only, records nothing."""
+        from vaara.audit import decision_receipts as dr
+
+        if not dr.signing_available():
+            raise _InvalidParams(
+                "receipt verification needs cryptography and rfc8785 installed",
+            )
+        body = args.get("receipt")
+        if not isinstance(body, dict):
+            raise _InvalidParams("receipt must be the receipt file's JSON object")
+        key = args.get("public_key_pem")
+        if key is not None and not isinstance(key, str):
+            raise _InvalidParams("public_key_pem must be a string")
+        db = Path(self._backend.db_path) if self._backend is not None else None
+        if key is None:
+            own = db.resolve().parent / dr.RECEIPTS_DIRNAME / dr.PUBKEY_NAME if db else None
+            if own is None or not own.is_file():
+                raise _InvalidParams(
+                    "this server has no receipt key of its own; pass public_key_pem",
+                )
+            key_pem = own.read_bytes()
+        else:
+            key_pem = key.encode("utf-8")
+        # Only the one record the receipt names, read from the database, which
+        # other writers may have appended to since this server started.
+        trail_hashes: Optional[dict[str, str]] = None
+        evidence = body.get("evidence")
+        if db is not None and isinstance(evidence, dict):
+            record_id = str(evidence.get("recordId", ""))
+            con = sqlite3.connect(f"file:{db}?mode=ro", uri=True)
+            try:
+                row = con.execute(
+                    "SELECT record_hash FROM audit_records WHERE record_id = ?",
+                    (record_id,),
+                ).fetchone()
+            finally:
+                con.close()
+            trail_hashes = {record_id: row[0]} if row else {}
+        try:
+            check = dr.verify_receipt_body(
+                body, public_key_pem=key_pem, trail_hashes=trail_hashes,
+            )
+        except (ValueError, KeyError, TypeError) as exc:
+            raise _InvalidParams(f"receipt not verifiable: {exc}") from None
+        return {
+            "content": [{
+                "type": "text",
+                "text": _strict_json_dumps({
+                    "ok": check.ok,
+                    "signature": check.signature_ok,
+                    "evidence": check.evidence_ok,
+                    "trail": check.trail_ok,
+                    "decision": check.decision,
+                    "tool": check.tool,
+                    "decidedAt": check.decided_at,
+                    "detail": check.detail,
+                }, indent=2),
+            }],
+            "isError": not check.ok,
         }
 
     # ── JSON-RPC helpers ─────────────────────────────────────────

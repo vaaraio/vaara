@@ -65,9 +65,11 @@ class TestMCPProtocol:
             "params": {},
         })
         tools = response["result"]["tools"]
-        assert len(tools) == 3
+        assert len(tools) == 4
         names = {t["name"] for t in tools}
-        assert names == {"vaara_check", "vaara_intercept", "vaara_report_outcome"}
+        assert names == {
+            "vaara_check", "vaara_intercept", "vaara_report_outcome", "vaara_verify_receipt",
+        }
 
     def test_resources_list(self, server):
         response = server.handle_request({
@@ -431,3 +433,97 @@ class TestPersistedTrail:
             assert trail._load_verdict.error is None
         finally:
             backend.close()
+
+
+class TestVerifyReceipt:
+    """vaara_verify_receipt checks a decision receipt where the agent is."""
+
+    @pytest.fixture
+    def persisted(self, tmp_path):
+        pytest.importorskip("cryptography")
+        pytest.importorskip("rfc8785")
+        from vaara.audit import decision_receipts as dr
+
+        db = tmp_path / "trail" / "audit.db"
+        db.parent.mkdir()
+        server = VaaraMCPServer(db_path=db)
+        TestPersistedTrail._intercept(None, server, 1, "read_file")
+        receipt = json.loads(next((db.parent / dr.RECEIPTS_DIRNAME).rglob("*.json")).read_text())
+        yield server, db, receipt
+        server.close()
+
+    def _verify(self, server, arguments):
+        return server.handle_request({
+            "jsonrpc": "2.0",
+            "id": 7,
+            "method": "tools/call",
+            "params": {"name": "vaara_verify_receipt", "arguments": arguments},
+        })
+
+    def test_is_listed(self, server):
+        response = server.handle_request({"jsonrpc": "2.0", "id": 1, "method": "tools/list"})
+        assert "vaara_verify_receipt" in {t["name"] for t in response["result"]["tools"]}
+
+    def test_a_receipt_this_server_wrote_verifies(self, persisted):
+        server, _db, receipt = persisted
+        response = self._verify(server, {"receipt": receipt})
+        body = json.loads(response["result"]["content"][0]["text"])
+        assert response["result"]["isError"] is False
+        assert body["ok"] is True
+        assert (body["signature"], body["evidence"], body["trail"]) == (True, True, True)
+        assert body["tool"] == "read_file"
+
+    def test_edited_evidence_is_caught(self, persisted):
+        server, _db, receipt = persisted
+        receipt["evidence"]["toolName"] = "delete_everything"
+        response = self._verify(server, {"receipt": receipt})
+        body = json.loads(response["result"]["content"][0]["text"])
+        assert response["result"]["isError"] is True
+        assert body["ok"] is False
+        assert body["evidence"] is False
+        assert body["detail"] == "evidence digest does not match"
+
+    def test_a_receipt_from_another_trail_says_so(self, persisted, tmp_path):
+        server, _db, _receipt = persisted
+        from vaara.audit import decision_receipts as dr
+
+        other_db = tmp_path / "other" / "audit.db"
+        other_db.parent.mkdir()
+        other = VaaraMCPServer(db_path=other_db)
+        try:
+            TestPersistedTrail._intercept(None, other, 1, "read_file")
+        finally:
+            other.close()
+        receipts = other_db.parent / dr.RECEIPTS_DIRNAME
+        foreign = json.loads(next(receipts.rglob("*.json")).read_text())
+        key = (receipts / dr.PUBKEY_NAME).read_text()
+        response = self._verify(server, {"receipt": foreign, "public_key_pem": key})
+        body = json.loads(response["result"]["content"][0]["text"])
+        assert body["signature"] is True
+        assert body["trail"] is False
+        assert body["detail"] == "record not in trail"
+
+    def test_the_wrong_key_fails_the_signature(self, persisted, tmp_path):
+        server, _db, receipt = persisted
+        from cryptography.hazmat.primitives import serialization
+        from cryptography.hazmat.primitives.asymmetric import ec
+
+        wrong = ec.generate_private_key(ec.SECP256R1()).public_key().public_bytes(
+            serialization.Encoding.PEM, serialization.PublicFormat.SubjectPublicKeyInfo,
+        ).decode()
+        response = self._verify(server, {"receipt": receipt, "public_key_pem": wrong})
+        body = json.loads(response["result"]["content"][0]["text"])
+        assert body["signature"] is False
+        assert body["ok"] is False
+
+    @pytest.mark.parametrize("arguments", [
+        {},
+        {"receipt": "not an object"},
+        {"receipt": {"evidence": {}}},
+        {"receipt": {"receipt": {}, "evidence": {}}},
+        {"receipt": {"receipt": {}, "evidence": {}}, "public_key_pem": 5},
+        {"receipt": {"receipt": {}, "evidence": {}}, "public_key_pem": "not a key"},
+    ])
+    def test_malformed_input_is_invalid_params(self, persisted, arguments):
+        server, _db, _receipt = persisted
+        assert self._verify(server, arguments)["error"]["code"] == -32602

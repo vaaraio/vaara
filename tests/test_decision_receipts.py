@@ -201,3 +201,19 @@ def test_verify_decision_leaves_the_proxys_inference_pairs_alone(tmp_path, capsy
     out = capsys.readouterr().out
     assert "1/1 verified" in out
     assert "skipped 2 inference receipt file(s)" in out
+
+
+def test_a_file_that_is_not_a_decision_receipt_raises_value_error(tmp_path):
+    # The CLI reports ValueError as an unreadable receipt and moves on; an
+    # envelope missing its fields used to escape as AttestationError and end
+    # the whole run with a traceback.
+    from cryptography.hazmat.primitives import serialization as s
+    from cryptography.hazmat.primitives.asymmetric import ec
+
+    bad = tmp_path / "r.json"
+    bad.write_text('{"receipt": {}, "evidence": {}}', encoding="utf-8")
+    key = ec.generate_private_key(ec.SECP256R1()).public_key().public_bytes(
+        s.Encoding.PEM, s.PublicFormat.SubjectPublicKeyInfo,
+    )
+    with pytest.raises(ValueError, match="not a decision receipt"):
+        dr.verify_receipt_file(bad, public_key_pem=key)
