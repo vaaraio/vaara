@@ -40,6 +40,7 @@ from vaara.audit.trail import (
     ChainVerdict,
     EventType,
     _GapLedger,
+    stored_event_type,
 )
 
 logger = logging.getLogger(__name__)
@@ -1934,7 +1935,7 @@ class SQLiteAuditBackend:
         return AuditRecord(
             record_id=row[0],
             action_id=row[1],
-            event_type=EventType(row[2]),
+            event_type=stored_event_type(row[2]),
             timestamp=row[3],
             agent_id=agent_id,
             tool_name=row[5],
