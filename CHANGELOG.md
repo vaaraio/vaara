@@ -16,6 +16,7 @@ and this project follows [Semantic Versioning](https://semver.org/spec/v2.0.0.ht
 
 ### Fixed
 - The proxy's `serverFingerprint` stayed at the digest of the first `tools/list` for the life of the process, so receipts written after a server changed its tools certified the old surface. It now follows every complete list, and equals the `new_manifest_digest` of the latest change record. A tool schema holding a float, which the JCS form refuses, used to leave the fingerprint at the command hash; it is now digested from a sorted compact form.
+- A trail record whose event type this build does not know now loads with its data and verifies. Readers used to refuse the type, load the row as a corrupt skeleton, and fail its hash, so a record appended by a newer Vaara made every older reader report the chain broken. The record keeps the type it was written with and matches none of the types this build knows. `EventType(...)` still refuses an unknown value, so input validation is unchanged.
 
 ## [2.12.1] - 2026-10-12
 

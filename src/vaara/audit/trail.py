@@ -69,6 +69,42 @@ class EventType(str, Enum):
     AGENT_SEEN = "agent_seen"               # vaara scan --watch saw an agent start
     WITNESS_CONFIGURED = "witness_configured"  # Heads reach a log or a TSA at a stated cadence
 
+    # Copies and pickles go through the stored value, so a type this build
+    # does not know (see stored_event_type) survives them. Python 3.11+
+    # enums already copy as themselves; 3.10 rebuilt them with
+    # EventType(value), which refuses an unknown one inside asdict().
+    def __copy__(self) -> "EventType":
+        return self
+
+    def __deepcopy__(self, memo: dict) -> "EventType":
+        return self
+
+    def __reduce_ex__(self, protocol):  # type: ignore[override]
+        return stored_event_type, (self._value_,)
+
+
+def stored_event_type(value: str) -> EventType:
+    """The event type a stored record names, whether this build knows it or not.
+
+    A record written by a newer Vaara can carry a type added after this
+    one. ``EventType(value)`` refuses it, which made every older reader load
+    the row as a corrupt skeleton; the skeleton then failed its hash, and
+    one new event type read as a broken chain. An unknown value comes back
+    as an ``EventType`` whose ``value`` is the stored string, so the record
+    hashes as written, and which equals none of the members this build
+    knows. Only read paths use this; input validation keeps calling
+    ``EventType(value)``, which still refuses.
+    """
+    try:
+        return EventType(value)
+    except ValueError:
+        if not isinstance(value, str) or not value:
+            raise
+        unknown = str.__new__(EventType, value)
+        unknown._name_ = "UNKNOWN"
+        unknown._value_ = value
+        return unknown
+
 
 # Written only by the trail's own record_* methods, never accepted through an
 # append API. Verification reads them back: a REPAIR_GAP naming missing seqs
@@ -547,7 +583,7 @@ class AuditRecord:
     def from_dict(d: dict) -> AuditRecord:
         """Deserialize from dict."""
         d = dict(d)
-        d["event_type"] = EventType(d["event_type"])
+        d["event_type"] = stored_event_type(d["event_type"])
         return AuditRecord(**d)
 
     @property
