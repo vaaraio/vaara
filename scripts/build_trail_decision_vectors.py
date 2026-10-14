@@ -48,6 +48,13 @@ CASES = [
      'He said "no"\n\ttab \u0001 back\\slash / ä € \U0001F600  ', 0.5),
 ]
 
+# One decision as the pipeline writes it: an action request first, so the
+# receipt carries the salted argumentsCommitment, and the engine's decision
+# state, so it carries policyDigest. Its trail record holds the state, and the
+# request record holds the arguments and salt that open the commitment.
+REQUESTED = ("allow", "read_file", {"path": "/srv/reports/q3.csv"},
+             "allow: risk=0.15 (threshold allow<0.55 deny>0.85)", 0.15)
+
 
 def main() -> int:
     sys.path.insert(0, str(ROOT / "src"))
@@ -68,6 +75,7 @@ def main() -> int:
     trail = SQLiteAuditBackend(db).load_trail()
     assert trail._receipt_sink is not None, "signing libraries missing"
     names = []
+    by_action: dict[str, str] = {}
     for i, (decision, tool, reason, risk, *grounds) in enumerate(CASES):
         trail.record_decision(
             action_id=f"vector-action-{i}", agent_id="vector-agent",
@@ -75,9 +83,30 @@ def main() -> int:
             **(grounds[0] if grounds else {}),
         )
         names.append(f"{i}-{decision}.json")
+        by_action[f"vector-action-{i}"] = names[-1]
 
-    written = sorted((work / "receipts").rglob("*.json"), key=lambda p: json.loads(
-        p.read_text())["evidence"]["actionId"])
+    from vaara.policy_state import digest, engine_state
+    from vaara.scorer.adaptive import AdaptiveScorer
+    from vaara.taxonomy.actions import ActionRegistry, ActionRequest
+
+    decision, tool, params, reason, risk = REQUESTED
+    action_id = trail.record_action_requested(ActionRequest(
+        agent_id="vector-agent", tool_name=tool, parameters=params,
+        action_type=ActionRegistry().classify(tool, params),
+    ))
+    state = engine_state(version="vectors", enforce=True,
+                         scorer=AdaptiveScorer(), authority=None)
+    trail.record_decision(
+        action_id=action_id, agent_id="vector-agent", tool_name=tool,
+        decision=decision, reason=reason, risk_score=risk,
+        policy_digest=digest(state), policy_state=state,
+    )
+    names.append(f"{len(CASES)}-{decision}.json")
+    by_action[action_id] = names[-1]
+
+    # Paired by action id: the requested case's id is a fresh uuid.
+    written = sorted((work / "receipts").rglob("*.json"), key=lambda p: names.index(
+        by_action[json.loads(p.read_text())["evidence"]["actionId"]]))
     with sqlite3.connect(db) as con:
         hashes = dict(con.execute("SELECT record_id, record_hash FROM audit_records"))
 
@@ -113,6 +142,33 @@ def main() -> int:
     trail_hashes = {k: v for k, v in hashes.items() if k != orphan_id}
     (OUT / "valid" / names[1]).unlink()
     del expected[f"valid/{names[1]}"]
+
+    # Companions of the requested case: what a trail's holder hands a third
+    # party so it can open argumentsCommitment and recompute policyDigest
+    # without the trail. Kept out of expected.json, which lists receipts only.
+    requested_name = f"valid/{names[-1]}"
+    requested = json.loads((OUT / requested_name).read_text())["evidence"]
+    if (OUT / "companions").exists():
+        shutil.rmtree(OUT / "companions")
+    (OUT / "companions").mkdir()
+    stem = names[-1].removesuffix(".json")
+    disclosure = dr.disclose_arguments(requested, db)
+    assert dr.check_disclosure(requested, disclosure)
+    changed = json.loads(json.dumps(disclosure))
+    changed["arguments"]["path"] = "/srv/reports/q4.csv"
+    assert not dr.check_disclosure(requested, changed)
+    files = {
+        f"companions/{stem}.arguments.json": (disclosure, {"opens": True}),
+        f"companions/{stem}.arguments-changed.json": (changed, {"opens": False}),
+        f"companions/{stem}.policy-state.json": (state, {"matches": True}),
+    }
+    companions: dict[str, dict] = {}
+    for name, (body, verdict) in files.items():
+        (OUT / name).write_text(json.dumps(body, indent=2, ensure_ascii=False) + "\n",
+                                encoding="utf-8")
+        companions[name] = {"receipt": requested_name, **verdict}
+    (OUT / "companions.json").write_text(
+        json.dumps(companions, indent=2, sort_keys=True) + "\n")
 
     (OUT / "trail-hashes.json").write_text(json.dumps(trail_hashes, indent=2, sort_keys=True) + "\n")
     (OUT / "expected.json").write_text(json.dumps(expected, indent=2, sort_keys=True) + "\n")

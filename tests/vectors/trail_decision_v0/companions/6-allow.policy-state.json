@@ -1,0 +1,117 @@
+{
+  "schema": "vaara.engine-policy/v0",
+  "vaara": "vectors",
+  "enforce": true,
+  "scorer": {
+    "scorer": "AdaptiveScorer",
+    "thresholds": {
+      "allow": 0.55,
+      "deny": 0.85
+    },
+    "sequences": [
+      {
+        "name": "data_exfiltration",
+        "actions": [
+          "data.read",
+          "data.export"
+        ],
+        "riskBoost": 0.4,
+        "windowSize": 5,
+        "escalate": false
+      },
+      {
+        "name": "read_then_outbound",
+        "actions": [
+          "data.read",
+          "net.outbound"
+        ],
+        "riskBoost": 0.4,
+        "windowSize": 5,
+        "escalate": false
+      },
+      {
+        "name": "outbound_then_persist",
+        "actions": [
+          "net.outbound",
+          "agent.persist_write"
+        ],
+        "riskBoost": 0.5,
+        "windowSize": 8,
+        "escalate": false
+      },
+      {
+        "name": "tainted_then_outbound",
+        "actions": [
+          "agent.tainted_read",
+          "net.outbound"
+        ],
+        "riskBoost": 0.6,
+        "windowSize": 8,
+        "escalate": false
+      },
+      {
+        "name": "data_destruction",
+        "actions": [
+          "data.read",
+          "data.delete"
+        ],
+        "riskBoost": 0.3,
+        "windowSize": 5,
+        "escalate": false
+      },
+      {
+        "name": "privilege_escalation",
+        "actions": [
+          "id.create_key",
+          "id.grant_permission"
+        ],
+        "riskBoost": 0.5,
+        "windowSize": 5,
+        "escalate": false
+      },
+      {
+        "name": "financial_drain",
+        "actions": [
+          "tx.approve",
+          "tx.swap",
+          "tx.transfer"
+        ],
+        "riskBoost": 0.6,
+        "windowSize": 8,
+        "escalate": false
+      },
+      {
+        "name": "governance_takeover",
+        "actions": [
+          "id.grant_permission",
+          "gov.vote",
+          "gov.execute_proposal"
+        ],
+        "riskBoost": 0.7,
+        "windowSize": 10,
+        "escalate": false
+      },
+      {
+        "name": "safety_override_sequence",
+        "actions": [
+          "infra.config_change",
+          "phy.safety_override"
+        ],
+        "riskBoost": 0.8,
+        "windowSize": 5,
+        "escalate": false
+      },
+      {
+        "name": "rapid_rebalance",
+        "actions": [
+          "vault.rebalance",
+          "vault.rebalance"
+        ],
+        "riskBoost": 0.3,
+        "windowSize": 4,
+        "escalate": false
+      }
+    ],
+    "perTenantPolicies": false
+  }
+}
