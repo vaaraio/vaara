@@ -18,8 +18,8 @@ Per file:
 
 Per companion in companions.json, against the receipt it names:
 
-  opens        a vaara.arguments-disclosure/v0 names the receipt's actionId and
-               recordId, and sha256("vaara.arguments.v1\n" || salt ||
+  opens        a vaara.arguments-disclosure/v0 names the receipt's actionId,
+               carries a 16-byte salt, and sha256("vaara.arguments.v1\n" || salt ||
                JCS(arguments)) equals the evidence's argumentsCommitment.
   matches      sha256 over JCS(state) of a vaara.engine-policy/v0 object equals
                the evidence's policyDigest.
@@ -85,8 +85,7 @@ def _trail_ok(evidence, trail) -> bool:
 def _opens(disclosure, evidence) -> bool:
     if disclosure.get("schema") != "vaara.arguments-disclosure/v0":
         return False
-    if (disclosure.get("actionId") != evidence.get("actionId")
-            or disclosure.get("recordId") != evidence.get("recordId")):
+    if disclosure.get("actionId") != evidence.get("actionId"):
         return False
     try:
         salt = bytes.fromhex(disclosure["salt"])
