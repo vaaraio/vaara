@@ -1358,6 +1358,8 @@ class AuditTrail:
         violation_type: str = "",
         cage: Optional[dict] = None,
         unavailable_input: str = "",
+        policy_digest: str = "",
+        policy_state: Optional[dict] = None,
     ) -> None:
         """Record the allow/deny/escalate decision.
 
@@ -1385,6 +1387,11 @@ class AuditTrail:
         not be read. It is what separates a check that ran and failed the
         action from a check that never completed, which a refusal word
         alone cannot show. Written on a deny only; empty adds no keys.
+
+        ``policy_digest`` is the digest of the engine's decision state
+        (``vaara.policy_state``) and ``policy_state`` the state itself, which
+        a caller passes on the first decision after the state changes. Same
+        omission rule: empty adds no keys.
 
         ``cage`` is the block :func:`vaara.cage.observe` returns: which cage
         the deciding process runs in and whether the kernel confirmed it at
@@ -1488,6 +1495,15 @@ class AuditTrail:
             if unavailable_input:
                 data["unavailable_input"] = self._cap_record_str(
                     unavailable_input, self._MAX_TOOL_NAME_LEN,
+                )
+        if policy_digest:
+            data["policy_digest"] = self._cap_record_str(
+                policy_digest, self._MAX_TOOL_NAME_LEN,
+            )
+            if policy_state:
+                data["policy_state"] = self._cap_record_dict_bytes(
+                    {str(k): json_safe(v) for k, v in policy_state.items()},
+                    self._MAX_ASSESSMENT_JSON_BYTES,
                 )
         data["cage"] = self._cap_record_dict_bytes(
             {str(k): json_safe(v) for k, v in cage.items()},

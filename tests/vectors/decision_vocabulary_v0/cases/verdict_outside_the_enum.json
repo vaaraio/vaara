@@ -97,6 +97,22 @@
       "decision": "step_up",
       "reason": "vector: policy returned step_up",
       "risk_score": 0.5,
+      "policy_digest": "sha256:dbb9e45494afea14faf18f61fc29821a4d011d1d980f85e8ac4d0e681b3ebcdd",
+      "policy_state": {
+        "schema": "vaara.engine-policy/v0",
+        "vaara": "0.0.0+vectors",
+        "enforce": true,
+        "scorer": {
+          "scorer": "_FixedScorer"
+        },
+        "authority": {
+          "budget": 3.0,
+          "low": 1.0,
+          "half_life_s": 3600.0,
+          "floor": 0.3,
+          "enabled": true
+        }
+      },
       "cage": {
         "driver": "none",
         "confirmed": false
@@ -117,7 +133,7 @@
       }
     ],
     "previous_hash": "054b802ad4bfe29b84232bbb7a3d625662470ed644597240bb5b926850013572",
-    "record_hash": "66aa1cb4843fdc6bdda05c422e36f531fd6e677680c3952d283c13051cce6881",
+    "record_hash": "99819b1a0a06c772e90c4dcbe841579ed9b817da69481f3039be4fe16b526dc9",
     "system_operation": "decision_threshold",
     "data_usage": "risk_score+thresholds",
     "decision_making": "threshold_match",
@@ -151,8 +167,8 @@
         "how_satisfied": "The event is handed to a human with its context for that evaluation"
       }
     ],
-    "previous_hash": "66aa1cb4843fdc6bdda05c422e36f531fd6e677680c3952d283c13051cce6881",
-    "record_hash": "dc44a05ff73c6bc8504f11ef2157a2e9e8579a717fb4812821391667833ea00c",
+    "previous_hash": "99819b1a0a06c772e90c4dcbe841579ed9b817da69481f3039be4fe16b526dc9",
+    "record_hash": "a7cd24aa14368fb2d6b127e92467681435a871d7b8461bd3f0657e6979d9c790",
     "system_operation": "escalation",
     "data_usage": "risk_score+context",
     "decision_making": "threshold_or_classifier_upgrade",
