@@ -2,6 +2,8 @@
 
 import json
 
+import sys
+
 import pytest
 
 from vaara.integrations.mcp_server import (
@@ -593,6 +595,7 @@ class TestVerifyReceiptBoundaries:
         finally:
             server.close()
 
+    @pytest.mark.skipif(sys.platform == "win32", reason="Windows cannot rename a database the server holds open")
     def test_an_unreadable_trail_is_a_named_failure(self, tmp_path):
         server, db, receipt = self._server(tmp_path)
         try:
