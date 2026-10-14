@@ -1119,6 +1119,13 @@ class AdaptiveScorer:
             explanation += f"; {arg_hold}, held for a human"
         if "sequence_escalate" in signals:
             explanation += f"; sequence {held_by}, held for a human"
+        # Every other matched sequence is named too. A match that only raised
+        # the score left a bare number in the signals, and the trail could not
+        # say which pattern had moved the decision.
+        raised_by = [n for n in self._seq_matched
+                     if not ("sequence_escalate" in signals and n == held_by)]
+        if raised_by:
+            explanation += f"; sequence {', '.join(raised_by)} matched"
         if tainted:
             explanation += (f"; names {tainted[0]}, tainted: written after an "
                             f"outbound call in an earlier session")
