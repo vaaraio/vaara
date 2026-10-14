@@ -748,9 +748,16 @@ class InterceptionPipeline:
         unavailable_input = scorer_result.get("unavailable_input")
         if not isinstance(unavailable_input, str):
             unavailable_input = ""
+        unrecognised_decision: Optional[str] = None
         if decision_str not in _FINE_TO_COARSE:
             # No decision, or one outside the vocabulary: the scorer's answer
-            # could not be read, so no check completed on this action.
+            # could not be read, so no check completed on this action. The
+            # record names the value it could not read, so a reader can tell
+            # a refusal spelled in another vocabulary from no answer at all.
+            unrecognised_decision = (
+                "no decision" if raw_decision is None
+                else f"unrecognised decision {str(raw_decision)[:64]!r}"
+            )
             violation_type = "invalid_decision"
             unavailable_input = f"{self._scorer_policy_id()}.action"
             logger.warning(
@@ -799,6 +806,11 @@ class InterceptionPipeline:
         # output as a caller-controlled ingress point like any other
         # string that lands on the hash chain (see Loop 47/50 caps).
         reason = _cap_str(reason, _MAX_DECISION_REASON_LEN, "reason")
+        if unrecognised_decision:
+            reason = _cap_str(
+                unrecognised_decision + (f"; scorer: {reason}" if reason else ""),
+                _MAX_DECISION_REASON_LEN, "reason",
+            )
 
         # 6b. Attenuation override. A child grant that broadens its parent
         # forces a fail-closed deny regardless of the scored risk — authority
