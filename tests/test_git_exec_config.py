@@ -118,3 +118,17 @@ def test_the_lift_names_one_variable(monkeypatch):
     monkeypatch.setenv("VAARA_ALLOW_GIT_EXEC_CONFIG", "1")
     assert match_deny_rule(RULES, "Bash", {"command": "git config core.fsmonitor ./x.sh"}) is None
     assert match_deny_rule(RULES, "Write", {"file_path": "/repo/.git/config", "content": "x"}) is None
+
+
+def test_codex_apply_patch_onto_git_config_is_refused():
+    # Codex reports apply_patch as one file event per path; the path rules
+    # see each one, so a patch that edits .git/config is refused like a Write.
+    from vaara.integrations import codex
+
+    patch = ("*** Begin Patch\n*** Update File: .git/config\n@@\n-x\n"
+             "+[core]\n+\tfsmonitor = ./x.sh\n*** End Patch\n")
+    payload = {"session_id": "s1", "turn_id": "t1", "transcript_path": "/x.jsonl",
+               "cwd": "/w", "hook_event_name": "PreToolUse", "model": "m",
+               "tool_name": "apply_patch", "tool_input": {"command": patch}}
+    events = codex.to_hook_events(payload)
+    assert any(match_deny_rule(RULES, e["tool_name"], e["tool_input"]) for e in events)
