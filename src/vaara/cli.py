@@ -2490,7 +2490,7 @@ def _cmd_receipt_disclose_arguments(args: argparse.Namespace) -> int:
         return 2
     text = json.dumps(disclosure, indent=2, sort_keys=True) + "\n"
     if args.out:
-        Path(args.out).expanduser().write_text(text, encoding="utf-8")
+        Path(args.out).expanduser().write_text(text, encoding="utf-8", newline="\n")
         print(f"wrote {args.out}: arguments and salt for action {disclosure['actionId']}")
     else:
         sys.stdout.write(text)
