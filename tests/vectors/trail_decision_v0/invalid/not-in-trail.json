@@ -6,13 +6,13 @@
       "confirmed": false,
       "driver": "none"
     },
-    "decidedAt": "2026-10-11T18:25:11.244Z",
+    "decidedAt": "2026-10-14T19:51:39.694Z",
     "decision": "escalate",
     "eventType": "decision_made",
-    "previousHash": "sha256:773c2651d52101059c9417ff2f623495f5c5a508ef7305646019d53d32e1127f",
+    "previousHash": "sha256:6fea1cb7c65d12af25ab91c9c4ff6e2f856cd668247e034cbb024e114a23d568",
     "reason": "escalate: risk=0.61",
-    "recordHash": "sha256:c3504484562e27810a32641fccc915e2000902682243fa704396fc5e9301a637",
-    "recordId": "de8cb91b-3372-4004-ae16-6a6fa52562ce",
+    "recordHash": "sha256:39434c7be14995fa53ac47edc9403a2a2048003d5630e6fe50acc847e0f28d5f",
+    "recordId": "376309dc-d254-4e40-b89d-1bf888cd9ac0",
     "riskScore": "0.61",
     "schema": "vaara.trail-decision/v0",
     "tenantId": "",
@@ -21,16 +21,16 @@
   "receipt": {
     "alg": "ES256",
     "backLink": {
-      "attestationDigest": "sha256:773c2651d52101059c9417ff2f623495f5c5a508ef7305646019d53d32e1127f",
-      "attestationNonce": "de8cb91b-3372-4004-ae16-6a6fa52562ce"
+      "attestationDigest": "sha256:6fea1cb7c65d12af25ab91c9c4ff6e2f856cd668247e034cbb024e114a23d568",
+      "attestationNonce": "376309dc-d254-4e40-b89d-1bf888cd9ac0"
     },
     "decisionDerived": {
-      "decidedAt": "2026-10-11T18:25:11.244Z",
+      "decidedAt": "2026-10-14T19:51:39.694Z",
       "decision": "escalate",
       "evidenceRef": {
         "canonicalization": "jcs-rfc8785",
-        "digest": "sha256:d07ff6b4010dbe53f4cebb4e7fdd1d1487b31ff3040abe1327cfd5e22c6ad57a",
-        "ref": "vaara:trail/de8cb91b-3372-4004-ae16-6a6fa52562ce",
+        "digest": "sha256:4e21c4a1c2b9a3069b1ff39a991ca4d93e873c2ce0974c94f55acfcdfc3a0f82",
+        "ref": "vaara:trail/376309dc-d254-4e40-b89d-1bf888cd9ac0",
         "schema": "vaara.trail-decision/v0"
       },
       "policyId": "policy:vaara-engine/1",
@@ -39,13 +39,13 @@
     },
     "issuerAsserted": {
       "alg": "ES256",
-      "iat": "2026-10-11T18:25:11Z",
+      "iat": "2026-10-14T19:51:39Z",
       "iss": "vaara:engine",
-      "nonce": "y2HCwXt4GEJRBfxN1cKxBZ70",
+      "nonce": "qbphk04IMCgbvZxXPYFrFbXq",
       "secretVersion": "es256:dfa441deb94a9c1c",
       "sub": "vector-agent"
     },
-    "signature": "e55380a628073a1d1b2acd7a597a796767b6f080b214f48baef4495fd6ff332c056632303506a3cbd50eb551fa948e197f38097b71967b18c5c4bc7a8c8ee87b",
+    "signature": "19e6749da1e3283cce31dc17ee77ab95b21f0685f3c37466fa85127d2a6969f7d4206ac61adf8f01187a197f854c1f8e21cc068fd259cd1b68868744527afed6",
     "version": 1
   }
 }

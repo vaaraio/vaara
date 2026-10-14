@@ -1,0 +1,53 @@
+{
+  "evidence": {
+    "actionId": "47906f4c-8561-4a9f-abbc-0a09908f0deb",
+    "agentId": "vector-agent",
+    "argumentsCommitment": "sha256:f797a47872994d422bac0906c5cf1fb9dd377d1423db2c0ca70c381b425d5772",
+    "cage": {
+      "confirmed": false,
+      "driver": "none"
+    },
+    "decidedAt": "2026-10-14T19:51:39.697Z",
+    "decision": "allow",
+    "eventType": "decision_made",
+    "policyDigest": "sha256:374b061525e97640073eae4f698f67b206e87c43f5c5be3106b6e54703b5bf00",
+    "previousHash": "sha256:543260ff28e3275b16172c9dcc768ad1e156cda1cf5db993043d19175561adbf",
+    "reason": "allow: risk=0.15 (threshold allow<0.55 deny>0.85)",
+    "recordHash": "sha256:301e25c9a78842bec688e5b8debb976ddca846f1e545ecabe4394fe3e1bf59e7",
+    "recordId": "3fc48ab1-376c-4d12-bc9a-9070292c7982",
+    "riskScore": "0.15",
+    "schema": "vaara.trail-decision/v0",
+    "tenantId": "",
+    "toolName": "read_file"
+  },
+  "receipt": {
+    "alg": "ES256",
+    "backLink": {
+      "attestationDigest": "sha256:543260ff28e3275b16172c9dcc768ad1e156cda1cf5db993043d19175561adbf",
+      "attestationNonce": "3fc48ab1-376c-4d12-bc9a-9070292c7982"
+    },
+    "decisionDerived": {
+      "decidedAt": "2026-10-14T19:51:39.697Z",
+      "decision": "allow",
+      "evidenceRef": {
+        "canonicalization": "jcs-rfc8785",
+        "digest": "sha256:8b6a46ff7173a1d07fb9697662928619cf614460853c6c6a9bc7c3e555fe5fdb",
+        "ref": "vaara:trail/3fc48ab1-376c-4d12-bc9a-9070292c7982",
+        "schema": "vaara.trail-decision/v0"
+      },
+      "policyId": "policy:vaara-engine/1",
+      "reason": "allow: risk=0.15 (threshold allow<0.55 deny>0.85)",
+      "riskScore": "0.15"
+    },
+    "issuerAsserted": {
+      "alg": "ES256",
+      "iat": "2026-10-14T19:51:39Z",
+      "iss": "vaara:engine",
+      "nonce": "z0Bm6gR1v6afgVYoo0X0Dkg4",
+      "secretVersion": "es256:dfa441deb94a9c1c",
+      "sub": "vector-agent"
+    },
+    "signature": "d466f1a6c63d1b15b62a342ec8626b24e3109e7afa25f857cbc32040d9acc626a69120cd221fb01a3da525081475f0c71043ea1bb5a8dc3a15e2ebef679d08f0",
+    "version": 1
+  }
+}
