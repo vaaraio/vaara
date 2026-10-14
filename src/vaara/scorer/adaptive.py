@@ -639,6 +639,9 @@ class AgentProfile:
     recent_actions: deque = field(default_factory=lambda: deque(maxlen=50))
     # Per entry of recent_actions, the names a sequence step can match.
     recent_labels: deque = field(default_factory=lambda: deque(maxlen=50))
+    # Per entry of recent_actions, the action id the trail knows it by ("" when
+    # the caller gave none), so a matched sequence can name its earlier steps.
+    recent_ids: deque = field(default_factory=lambda: deque(maxlen=50))
     first_seen: float = 0.0
     last_seen: float = 0.0
 
@@ -658,11 +661,13 @@ class AgentProfile:
     def record_action(
         self, action_name: str, timestamp: float,
         labels: Optional[frozenset[str]] = None,
+        action_id: str = "",
     ) -> None:
         self.total_actions += 1
         self.action_counts[action_name] = self.action_counts.get(action_name, 0) + 1
         self.recent_actions.append((action_name, timestamp))
         self.recent_labels.append(labels or frozenset({action_name}))
+        self.recent_ids.append(action_id)
         if self.first_seen == 0:
             self.first_seen = timestamp
         self.last_seen = timestamp
@@ -820,6 +825,8 @@ class AdaptiveScorer:
         self._seq_escalate: Optional[str] = None
         # Names of the patterns the current call matched, for the lineage mark.
         self._seq_matched: list[str] = []
+        # Per matched pattern, the action ids of its earlier steps.
+        self._seq_steps: dict[str, list[str]] = {}
         self._lineage = lineage
         # (agent_id, session_id) pairs whose earlier actions are already in
         # the agent's window, replayed or seen live; see seed_session.
@@ -1092,7 +1099,9 @@ class AdaptiveScorer:
         # Record this action in agent profile
         now = time.time()
         profile = self._get_or_create_agent(agent_id)
-        profile.record_action(tool_name, now, labels)
+        call_id = context.get("action_id")
+        profile.record_action(tool_name, now, labels,
+                              call_id if isinstance(call_id, str) else "")
         if decision == Decision.DENY:
             profile.denied_actions += 1
         elif decision == Decision.ESCALATE:
@@ -1157,6 +1166,11 @@ class AdaptiveScorer:
 
         # Return MS-compatible dict
         result = assessment.to_backend_decision()
+        steps = {name: ids for name, ids in self._seq_steps.items() if ids}
+        if steps:
+            # The earlier actions that completed each matched sequence, by
+            # action id, for the decision record to name.
+            result["sequence_steps"] = steps
         if lineage_mark is not None:
             result["lineage_mark"] = lineage_mark
         return result
@@ -1323,6 +1337,7 @@ class AdaptiveScorer:
         # the previous call's hold.
         self._seq_escalate = None
         self._seq_matched = []
+        self._seq_steps = {}
         profile = self._agents.get(agent_id)
         if profile is None:
             return 0.0
@@ -1333,17 +1348,23 @@ class AdaptiveScorer:
         recent_labels = list(profile.recent_labels) + [
             current_labels or frozenset({current_tool})
         ]
+        # The current call has no earlier id to name; "" never reaches a record.
+        recent_ids = list(profile.recent_ids) + [""]
 
         max_boost = 0.0
         for pattern in self._sequences:
-            matched = self._matches_subsequence(
-                recent_labels[-pattern.window_size:], pattern.actions
-            )
+            window = recent_labels[-pattern.window_size:]
+            positions = self._match_positions(window, pattern.actions)
             key = (agent_id, pattern.name)
             was_matched = self._seq_match_state.get(key, False)
-            if matched:
+            if positions is not None:
                 max_boost = max(max_boost, pattern.risk_boost)
                 self._seq_matched.append(pattern.name)
+                offset = len(recent_ids) - len(window)
+                self._seq_steps[pattern.name] = [
+                    recent_ids[offset + i] for i in positions
+                    if recent_ids[offset + i]
+                ]
                 if pattern.escalate and self._seq_escalate is None:
                     self._seq_escalate = pattern.name
                 if not was_matched:
@@ -1388,23 +1409,27 @@ class AdaptiveScorer:
         return min(1.0, max_boost)
 
     @staticmethod
-    def _matches_subsequence(history: list, pattern: tuple[str, ...]) -> bool:
-        """Check if pattern appears as an ordered subsequence in history.
+    def _match_positions(
+        history: list, pattern: tuple[str, ...],
+    ) -> Optional[list[int]]:
+        """Indices in history of the earliest ordered match of pattern, or None.
 
         A history entry is an action name or a set of names (action_labels);
         a set matches a step when it contains the step's name.
         """
         if not pattern:
-            return False
+            return None
         pi = 0
-        for action in history:
+        positions: list[int] = []
+        for index, action in enumerate(history):
             hit = (pattern[pi] in action if isinstance(action, (set, frozenset))
                    else action == pattern[pi])
             if hit:
+                positions.append(index)
                 pi += 1
                 if pi == len(pattern):
-                    return True
-        return False
+                    return positions
+        return None
 
     def _burst_signal(self, agent_id: str) -> float:
         """Detect action bursts — too many actions in a short window."""
@@ -1457,14 +1482,14 @@ class AdaptiveScorer:
 
     def seed_session(
         self, agent_id: str, session_id: str,
-        entries: list[tuple[str, Optional[str], Any]],
+        entries: list[tuple],
     ) -> bool:
         """Put a session's earlier actions into the agent's sequence window.
 
         For a scorer that starts fresh per call (a host hook is one process
         per tool call) and so has never seen the session. ``entries`` are the
-        earlier actions as ``(tool_name, action_name, parameters)``, oldest
-        first; they are labelled the way a live call is, taint included. Only
+        earlier actions as ``(tool_name, action_name, parameters)`` or
+        ``(tool_name, action_name, parameters, action_id)``, oldest first; they are labelled the way a live call is, taint included. Only
         the window is filled: the actions are not counted again as track
         record, burst or denials, which the trail already holds. Returns
         False, and does nothing, when this scorer has already seen the
@@ -1479,13 +1504,16 @@ class AdaptiveScorer:
                 self._seen_sessions.pop()
             profile = self._get_or_create_agent(agent_id)
             window = profile.recent_labels.maxlen or len(entries)
-            for tool_name, action_name, parameters in entries[-window:]:
+            for entry in entries[-window:]:
+                tool_name, action_name, parameters = entry[:3]
+                action_id = entry[3] if len(entry) > 3 else ""
                 labels = action_labels(tool_name, {"action_name": action_name,
                                                    "parameters": parameters})
                 if self._tainted_paths(parameters):
                     labels = labels | {TAINT_LABEL}
                 profile.recent_actions.append((tool_name, 0.0))
                 profile.recent_labels.append(labels)
+                profile.recent_ids.append(action_id if isinstance(action_id, str) else "")
             return True
 
     def _tainted_paths(self, parameters: Any) -> list[str]:

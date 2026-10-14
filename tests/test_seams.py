@@ -49,6 +49,9 @@ for _p in (*_SCORERS, _EXTERNAL):
         ALLOWED[(_p, _INTERCEPT, "lineage_mark")] = (
             "only AdaptiveScorer keeps a lineage store; absent means no file "
             "to remember")
+        ALLOWED[(_p, _INTERCEPT, "sequence_steps")] = (
+            "only AdaptiveScorer matches sequence patterns; absent means no "
+            "sequence completed")
 for _c in (_SCORE_ROUTE, "vaara.server.routes:register"):
     ALLOWED[(_EXTERNAL, _c, "evaluation_ms")] = (
         "the remote answer carries its own timing or none; the route times the call itself")
