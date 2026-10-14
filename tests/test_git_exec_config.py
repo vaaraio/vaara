@@ -12,15 +12,13 @@ runs the next time anyone, or any tool, reads the repository.
 from __future__ import annotations
 
 import json
-import sys
 from pathlib import Path
 
 import pytest
 
+from vaara.deny_rules import match_deny_rule
+
 ROOT = Path(__file__).resolve().parent.parent
-PLUGIN = ROOT / "plugins" / "claude-code-vaara-governance"
-sys.path.insert(0, str(PLUGIN / "hooks"))
-from _deny_patterns import match_deny_rule  # noqa: E402
 
 RULES = json.loads(
     (ROOT / "src" / "vaara" / "integrations" / "claude_code_deny.json").read_text(encoding="utf-8")
@@ -59,6 +57,8 @@ REFUSED_FILES = [
     ("Edit", "/repo/.git/hooks/post-rewrite"),
     ("Write", "/repo/.git/hooks/reference-transaction"),
     ("Write", "/repo/.git/hooks/fsmonitor-watchman"),
+    ("Write", "C:\\repo\\.git\\config"),
+    ("Edit", "C:\\Users\\u\\.gitconfig"),
 ]
 
 ORDINARY = [
@@ -123,6 +123,7 @@ def test_the_lift_names_one_variable(monkeypatch):
 def test_codex_apply_patch_onto_git_config_is_refused():
     # Codex reports apply_patch as one file event per path; the path rules
     # see each one, so a patch that edits .git/config is refused like a Write.
+    # On Windows the resolved path carries backslashes, which the matcher folds.
     from vaara.integrations import codex
 
     patch = ("*** Begin Patch\n*** Update File: .git/config\n@@\n-x\n"
