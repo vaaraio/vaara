@@ -848,6 +848,7 @@ file holds the envelope under `receipt` and the evidence record under
 | `approver`, `humanDisposed` | Who disposed of the decision: `approver` is exactly `human` or `policy`, `humanDisposed` is true only when a human acted on this decision, and a producer MUST NOT write `humanDisposed` true with any other approver. Present together, only when the trail record carries an approver; absent means no disposition was asserted, never that a human acted. Vectors: `tests/vectors/decision_disposition_v0/`. |
 | `cage` | The cage the deciding process ran in. See "The cage block" below. Absent on records written before the cage layer. |
 | `refusal` | On a `deny` only: what the refusal rests on. See "The refusal block" below. Absent on records written before it. |
+| `argumentsCommitment` | `sha256:` and 64 lowercase hex characters: a salted commitment to the arguments of the request the decision answered. See "The arguments commitment" below. Absent when the trail recorded none for that request. |
 
 The envelope writes the trail's `deny` as `block`. `backLink.attestationDigest`
 is `previousHash`, `backLink.attestationNonce` is `recordId`, and
@@ -861,6 +862,33 @@ A verifier checks the signature and the evidence digest as in Sections 2.2 and
 record hash matches `recordHash`. A receipt whose record is missing from the
 trail, or whose hash differs, fails. The evidence record carries no tool
 arguments, so a receipt can leave the machine without them.
+
+#### The arguments commitment
+
+A receipt without the arguments cannot show which arguments were decided on,
+and a plain digest of them would not help: most tool arguments are low entropy,
+so anyone holding the receipt could confirm a guess. Each action request on the
+trail therefore records a fresh 16-byte salt (`arguments_salt`, 32 lowercase hex
+characters) and the commitment it gives (`arguments_commitment`) beside the
+arguments, and the decision's receipt carries the commitment:
+
+```
+argumentsCommitment = "sha256:" || hex( SHA-256( "vaara.arguments.v1\n" || salt || JCS(arguments) ) )
+```
+
+`salt` is the 16 raw bytes, `JCS` is RFC 8785, and `arguments` is the request's
+`parameters` object as the trail recorded it. Arguments JCS cannot encode get no
+commitment, and the receipt then has no `argumentsCommitment`.
+
+To show one decision's arguments to a third party, the trail's holder discloses
+that request's arguments and salt as a `vaara.arguments-disclosure/v0` object
+(`schema`, `recordId`, `actionId`, `arguments`, `salt`). The verifier checks the
+receipt as above, checks that the disclosure's `actionId` is the receipt's, and
+recomputes the commitment. Every request has its own salt and no key is shared,
+so one disclosure opens one decision and nothing else. Two decisions over the
+same arguments carry different commitments, so receipts alone do not show that
+two decisions saw the same input. `vaara receipt disclose-arguments` writes a
+disclosure from the trail and `vaara receipt verify-arguments` checks one.
 
 Vectors are in `tests/vectors/trail_decision_v0/`: receipts written by the
 engine's own sink over a SQLite trail, tampered copies, the trail's record

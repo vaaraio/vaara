@@ -6,6 +6,9 @@ and this project follows [Semantic Versioning](https://semver.org/spec/v2.0.0.ht
 
 ## [Unreleased]
 
+### Added
+- Decision receipts name the arguments a decision was made over without carrying them. Each action request on the trail records a fresh 16-byte salt and `arguments_commitment`, the SHA-256 of a domain tag, the salt and the RFC 8785 form of the recorded arguments, and the decision's receipt carries it as `argumentsCommitment` (SPEC 5.10). `vaara receipt disclose-arguments RECEIPT [--db TRAIL] [--out FILE]` writes the arguments and salt that open one receipt, read from its trail, and `vaara receipt verify-arguments RECEIPT --disclosure FILE` checks the receipt's signature and that the disclosure opens its commitment, without the trail. Each request has its own salt, so a disclosure opens one decision and no other, and a guessed argument cannot be confirmed from a receipt alone.
+
 ### Fixed
 - `vaara trail export-incident` counted the Article 73 reporting deadline from the trigger record's time. Article 73 counts from the provider's awareness, which comes after the event once a causal link is established or reasonably likely. The incident metadata takes an optional `awareness_timestamp` (ISO 8601 with a zone, or epoch seconds), the deadline runs from it, and the report's timeline carries `awareness_timestamp` and `deadline_basis` (`awareness` or `trigger_record`). Without it the trigger time is used as before. An awareness time earlier than the trigger record is refused.
 

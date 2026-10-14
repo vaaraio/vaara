@@ -2477,6 +2477,54 @@ def _cmd_receipt_verify_transparency(args: argparse.Namespace) -> int:
     return 0 if check.ok else 1
 
 
+def _cmd_receipt_disclose_arguments(args: argparse.Namespace) -> int:
+    """Write the disclosure that opens one receipt's arguments commitment."""
+    from vaara.audit import decision_receipts as dr
+
+    db = Path(args.db or Path.home() / ".vaara" / "trail" / "audit.db").expanduser()
+    try:
+        body = json.loads(Path(args.receipt).expanduser().read_text(encoding="utf-8"))
+        disclosure = dr.disclose_arguments(body["evidence"], db)
+    except (OSError, ValueError, KeyError) as exc:
+        print(f"vaara receipt disclose-arguments: {exc}", file=sys.stderr)
+        return 2
+    text = json.dumps(disclosure, indent=2, sort_keys=True) + "\n"
+    if args.out:
+        Path(args.out).expanduser().write_text(text, encoding="utf-8")
+        print(f"wrote {args.out}: arguments and salt for action {disclosure['actionId']}")
+    else:
+        sys.stdout.write(text)
+    return 0
+
+
+def _cmd_receipt_verify_arguments(args: argparse.Namespace) -> int:
+    """Check a disclosure against a decision receipt, without the trail."""
+    from vaara.audit import decision_receipts as dr
+
+    if not dr.signing_available():
+        print("vaara receipt verify-arguments: needs cryptography and rfc8785 "
+              "(reinstall vaara with its dependencies)", file=sys.stderr)
+        return 2
+    path = Path(args.receipt).expanduser()
+    try:
+        key = Path(args.key).expanduser().read_bytes() if args.key else None
+        check = dr.verify_receipt_file(path, public_key_pem=key)
+        body = json.loads(path.read_text(encoding="utf-8"))
+        disclosure = json.loads(Path(args.disclosure).expanduser().read_text(encoding="utf-8"))
+    except (OSError, ValueError, KeyError) as exc:
+        print(f"vaara receipt verify-arguments: {exc}", file=sys.stderr)
+        return 2
+    if not (check.signature_ok and check.evidence_ok):
+        print(f"FAIL  receipt does not verify ({check.detail})")
+        return 1
+    if not dr.check_disclosure(body["evidence"], disclosure):
+        print("FAIL  the disclosed arguments do not open this receipt's commitment")
+        return 1
+    print(f"OK    {check.decided_at}  {check.decision}  {check.tool}: "
+          "the disclosed arguments are the ones this decision was made over")
+    return 0
+
+
 def _cmd_receipt_verify_decision(args: argparse.Namespace) -> int:
     """Verify engine-emitted decision receipts against their trail."""
     import sqlite3
@@ -6701,6 +6749,32 @@ def build_parser() -> argparse.ArgumentParser:
     )
     prc_dec.add_argument("--json", action="store_true", help="One JSON object per receipt")
     prc_dec.set_defaults(func=_cmd_receipt_verify_decision)
+
+    prc_disc = rcsub.add_parser(
+        "disclose-arguments",
+        help="Write the arguments and salt that open one decision receipt's "
+             "argumentsCommitment, read from its trail, for an auditor",
+    )
+    prc_disc.add_argument("receipt", help="The decision receipt file")
+    prc_disc.add_argument(
+        "--db", default=None,
+        help="Trail database the receipt belongs to (default ~/.vaara/trail/audit.db)",
+    )
+    prc_disc.add_argument("--out", default=None, help="Write here (default: stdout)")
+    prc_disc.set_defaults(func=_cmd_receipt_disclose_arguments)
+
+    prc_varg = rcsub.add_parser(
+        "verify-arguments",
+        help="Check a disclosure against a decision receipt: the receipt's signature, "
+             "then that the disclosed arguments and salt open its argumentsCommitment",
+    )
+    prc_varg.add_argument("receipt", help="The decision receipt file")
+    prc_varg.add_argument("--disclosure", required=True, help="The disclosure JSON")
+    prc_varg.add_argument(
+        "--key", default=None,
+        help="Issuer public key PEM (default: issuer-es256.pub.pem in the receipts directory)",
+    )
+    prc_varg.set_defaults(func=_cmd_receipt_verify_arguments)
 
     prc_inf = rcsub.add_parser(
         "verify-inference",

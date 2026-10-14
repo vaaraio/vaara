@@ -550,3 +550,52 @@ def check_disclosed_arguments(evidence: dict[str, Any], arguments: Any, salt: st
 
     commitment = evidence.get("argumentsCommitment")
     return isinstance(commitment, str) and verify(commitment, arguments, salt)
+
+
+DISCLOSURE_SCHEMA = "vaara.arguments-disclosure/v0"
+
+
+def disclose_arguments(evidence: dict[str, Any], db_path: Path) -> dict[str, Any]:
+    """The disclosure that opens one receipt's ``argumentsCommitment``.
+
+    Reads the action's request record from the trail database, read-only, and
+    returns its recorded arguments and salt. Raises ``ValueError`` when the
+    receipt carries no commitment, the request is not on the trail, or the
+    trail's arguments do not open the receipt's commitment.
+    """
+    import sqlite3
+
+    commitment = evidence.get("argumentsCommitment")
+    if not isinstance(commitment, str):
+        raise ValueError("the receipt carries no argumentsCommitment")
+    action_id = str(evidence.get("actionId", ""))
+    con = sqlite3.connect(f"file:{Path(db_path)}?mode=ro", uri=True)
+    try:
+        rows = con.execute(
+            "SELECT data FROM audit_records WHERE action_id = ? AND event_type = ?",
+            (action_id, EventType.ACTION_REQUESTED.value),
+        ).fetchall()
+    finally:
+        con.close()
+    for (raw,) in rows:
+        data = json.loads(raw)
+        disclosure = {
+            "schema": DISCLOSURE_SCHEMA,
+            "recordId": str(evidence.get("recordId", "")),
+            "actionId": action_id,
+            "arguments": data.get("parameters", {}),
+            "salt": str(data.get("arguments_salt", "")),
+        }
+        if check_disclosure(evidence, disclosure):
+            return disclosure
+    raise ValueError(f"no request on the trail opens the commitment for action {action_id}")
+
+
+def check_disclosure(evidence: dict[str, Any], disclosure: dict[str, Any]) -> bool:
+    """True when a disclosure names this receipt's decision and opens its commitment."""
+    if disclosure.get("schema") != DISCLOSURE_SCHEMA:
+        return False
+    if disclosure.get("actionId") != evidence.get("actionId"):
+        return False
+    return check_disclosed_arguments(
+        evidence, disclosure.get("arguments"), str(disclosure.get("salt", "")))

@@ -119,3 +119,53 @@ def test_a_malformed_commitment_never_reaches_the_receipt():
     decision = [r for r in pipe.trail._records
                 if r.event_type in (EventType.DECISION_MADE, EventType.ACTION_BLOCKED)][-1]
     assert "argumentsCommitment" not in build_evidence(decision, "md5:abc")
+
+
+def _sqlite_decision(tmp_path, params=ARGS):
+    from vaara.audit.sqlite_backend import SQLiteAuditBackend
+
+    db = tmp_path / "audit.db"
+    trail = SQLiteAuditBackend(str(db)).load_trail()
+    InterceptionPipeline(trail=trail).intercept(
+        agent_id="a", tool_name="file_write", parameters=params)
+    receipts = sorted((tmp_path / "receipts").rglob("*.json"))
+    receipts = [r for r in receipts if r.parent.name != "receipts"]
+    assert receipts, "the sink wrote no decision receipt"
+    return db, receipts[-1]
+
+
+def test_the_commands_disclose_and_verify_one_decisions_arguments(tmp_path, capsys):
+    import json
+
+    from vaara.cli import main
+
+    db, receipt = _sqlite_decision(tmp_path)
+    out = tmp_path / "disclosure.json"
+    assert main(["receipt", "disclose-arguments", str(receipt), "--db", str(db),
+                 "--out", str(out)]) == 0
+    disclosure = json.loads(out.read_text())
+    assert disclosure["arguments"] == ARGS
+    assert main(["receipt", "verify-arguments", str(receipt),
+                 "--disclosure", str(out)]) == 0
+    assert "OK" in capsys.readouterr().out
+
+    disclosure["arguments"] = {**ARGS, "amount": 99}
+    out.write_text(json.dumps(disclosure))
+    assert main(["receipt", "verify-arguments", str(receipt),
+                 "--disclosure", str(out)]) == 1
+
+
+def test_a_disclosure_for_another_action_is_refused(tmp_path):
+    import json
+
+    from vaara.cli import main
+
+    db, receipt = _sqlite_decision(tmp_path)
+    out = tmp_path / "d.json"
+    assert main(["receipt", "disclose-arguments", str(receipt), "--db", str(db),
+                 "--out", str(out)]) == 0
+    disclosure = json.loads(out.read_text())
+    disclosure["actionId"] = "some-other-action"
+    out.write_text(json.dumps(disclosure))
+    assert main(["receipt", "verify-arguments", str(receipt),
+                 "--disclosure", str(out)]) == 1
