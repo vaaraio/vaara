@@ -42,6 +42,9 @@ def load_deny_rules() -> list[dict]:
     return doc.get("rules", [])
 
 
+_PATH_FIELDS = frozenset({"file_path", "notebook_path", "uri"})
+
+
 def _rule_lifted(rule: dict) -> bool:
     """A rule names ``unless_env``; that variable set to 1 lifts it.
 
@@ -87,6 +90,10 @@ def match_deny_rule(
             value = _field_text(tool_input.get(field, ""))
             if value is None:
                 continue
+            # A Windows path arrives with backslashes and the rules are
+            # written with "/"; fold them, as vaara.deny_rules does.
+            if field in _PATH_FIELDS:
+                value = value.replace("\\", "/")
             if regex.search(value):
                 return rule.get("id", "unknown"), rule.get("message", "deny rule matched")
     return None
