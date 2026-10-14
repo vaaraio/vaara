@@ -894,7 +894,7 @@ disclosure from the trail and `vaara receipt verify-arguments` checks one.
 Vectors are in `tests/vectors/trail_decision_v0/`: receipts written by the
 engine's own sink over a SQLite trail, tampered copies, the trail's record
 hashes, and `expected.json` with each file's verdict. The macOS app's verifier
-checks the same files. `valid/6-allow.json` is a decision written after its
+checks the same files. `tests/vectors/trail_decision_v0/valid/6-allow.json` is a decision written after its
 action request under a described engine state, so it carries
 `argumentsCommitment` and `policyDigest`. Its companions, indexed in
 `companions.json`, are what the trail's holder hands a third party: the
