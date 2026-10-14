@@ -1256,6 +1256,21 @@ class AuditTrail:
             self._cap_record_str(request.parent_action_id, self._MAX_PARENT_ACTION_ID_LEN)
             if request.parent_action_id is not None else None
         )
+        parameters = self._cap_record_dict_bytes(
+            request.parameters if isinstance(request.parameters, dict) else {},
+            self._MAX_REQUEST_PARAMETERS_JSON_BYTES,
+        )
+        # A salted commitment to the arguments as recorded, so a decision
+        # receipt can name them without carrying them. The salt stays here on
+        # the trail; arguments that cannot be canonicalised get no commitment.
+        from vaara.audit._arguments_commitment import commit, new_salt
+
+        salt = new_salt()
+        commitment = commit(parameters, salt)
+        arguments_commitment = (
+            {"arguments_salt": salt, "arguments_commitment": commitment}
+            if commitment else {}
+        )
         self._append(AuditRecord(
             record_id=str(uuid.uuid4()),
             action_id=action_id,
@@ -1264,10 +1279,8 @@ class AuditTrail:
             agent_id=safe_agent_id,
             tool_name=safe_tool_name,
             data={
-                "parameters": self._cap_record_dict_bytes(
-                    request.parameters if isinstance(request.parameters, dict) else {},
-                    self._MAX_REQUEST_PARAMETERS_JSON_BYTES,
-                ),
+                "parameters": parameters,
+                **arguments_commitment,
                 "context": self._cap_record_dict_bytes(
                     request.context if isinstance(request.context, dict) else {},
                     self._MAX_REQUEST_CONTEXT_JSON_BYTES,

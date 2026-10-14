@@ -8,8 +8,9 @@ to match a checker. Every scenario is driven through
 ``InterceptionPipeline.intercept`` with a stub scorer that returns one fixed
 policy decision, and the resulting chain is exported verbatim.
 
-Record ids and timestamps are the only things this script controls: ``uuid4``
-and ``time.time`` are replaced with deterministic sequences so re-running
+Record ids, timestamps and argument salts are the only things this script
+controls: ``uuid4``, ``time.time`` and the salt source are replaced with
+deterministic sequences so re-running
 produces byte-identical fixtures. Everything else, including every record hash
 and every chain link, is computed by Vaara exactly as it is in production. That
 is what makes the committed hashes worth checking: an outside party recomputing
@@ -63,7 +64,9 @@ class _FixedScorer:
 
 
 def _deterministic_env():
-    """Patch the two sources of nondeterminism in the record path."""
+    """Patch the three sources of nondeterminism in the record path."""
+    import hashlib
+
     counter = {"n": 0}
 
     def _uuid4():
@@ -73,14 +76,17 @@ def _deterministic_env():
     def _now():
         return EPOCH + counter["n"]
 
-    return _uuid4, _now
+    def _salt():
+        return hashlib.sha256(f"vector-salt-{counter['n']}".encode()).hexdigest()[:32]
+
+    return _uuid4, _now, _salt
 
 
 def _build(out: Path) -> None:
     from vaara.audit.sqlite_backend import SQLiteAuditBackend
     from vaara.pipeline import InterceptionPipeline
 
-    _uuid4, _now = _deterministic_env()
+    _uuid4, _now, _salt = _deterministic_env()
 
     def new_pipeline(scorer):
         backend = SQLiteAuditBackend(":memory:")
@@ -90,7 +96,8 @@ def _build(out: Path) -> None:
     cases: dict[str, object] = {}
 
     with mock.patch("vaara.audit.trail.uuid.uuid4", _uuid4), \
-            mock.patch("vaara.audit.trail.time.time", _now):
+            mock.patch("vaara.audit.trail.time.time", _now), \
+            mock.patch("vaara.audit._arguments_commitment.new_salt", _salt):
 
         for name, action in (
             ("allow_plain", "allow"),

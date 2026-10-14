@@ -11,6 +11,8 @@
         "amount": 50000,
         "to": "acct:9"
       },
+      "arguments_salt": "bb6d96b49c31f2454b95186b26845fcb",
+      "arguments_commitment": "sha256:e33d85f545de2e89692809af2240aa9a47cc50845975745c7360be7751dde3e8",
       "context": {},
       "action_category": "financial",
       "reversibility": "irreversible",
@@ -37,7 +39,7 @@
       }
     ],
     "previous_hash": "",
-    "record_hash": "d4681b39e4195f93085bda113bb5fb5f4c73136592902508b082550c3a849a1f",
+    "record_hash": "f9c17cbcf03399222024c89637692ca79804db358410c405f3432c56f3949387",
     "system_operation": "logging_intake",
     "data_usage": "tool_args+context",
     "decision_making": "n/a",
@@ -75,8 +77,8 @@
         "how_satisfied": "Conformal calibration provides distribution-free coverage guarantees on risk estimates"
       }
     ],
-    "previous_hash": "d4681b39e4195f93085bda113bb5fb5f4c73136592902508b082550c3a849a1f",
-    "record_hash": "3cf551f5fb4d4f80b1ce6e8b0e47ada1d1a501e5bd7542cdf12c98820a4a1a14",
+    "previous_hash": "f9c17cbcf03399222024c89637692ca79804db358410c405f3432c56f3949387",
+    "record_hash": "706c817f2c0957d7d909cfea866b713cba9068dea3689d0a5adaca751599efb7",
     "system_operation": "scoring",
     "data_usage": "tool_args+history+policy",
     "decision_making": "heuristic_score",
@@ -121,8 +123,8 @@
         "how_satisfied": "Automated blocking of high-risk actions with full incident trail"
       }
     ],
-    "previous_hash": "3cf551f5fb4d4f80b1ce6e8b0e47ada1d1a501e5bd7542cdf12c98820a4a1a14",
-    "record_hash": "82d31777a37b7cafb61ef3614dc9f02efa05c8e4c9d5cf5143e59236030c113d",
+    "previous_hash": "706c817f2c0957d7d909cfea866b713cba9068dea3689d0a5adaca751599efb7",
+    "record_hash": "1d38790f761b01de39f51ab3e15a7ba8cbc7ada596d1b35d1ab8c702df073173",
     "system_operation": "blocking",
     "data_usage": "risk_score+thresholds",
     "decision_making": "threshold_match",
@@ -142,6 +144,8 @@
         "amount": 5000,
         "to": "acct:9"
       },
+      "arguments_salt": "d841d2c3235f94a7c386bdc355c05a0b",
+      "arguments_commitment": "sha256:619c093e548b2a1a86ee97dea08963fa4a25b9bd77656f29d14a3d8dbf59db4d",
       "context": {},
       "action_category": "financial",
       "reversibility": "irreversible",
@@ -167,8 +171,8 @@
         "how_satisfied": "All agent actions are logged as events for incident detection"
       }
     ],
-    "previous_hash": "82d31777a37b7cafb61ef3614dc9f02efa05c8e4c9d5cf5143e59236030c113d",
-    "record_hash": "098168c968b6f1c839bf01dc1fc162065eefa22aac6ec1dd439c9bf5bda65c7e",
+    "previous_hash": "1d38790f761b01de39f51ab3e15a7ba8cbc7ada596d1b35d1ab8c702df073173",
+    "record_hash": "0239bd94289ca662a065555b94930a2af4c81c3ac8ac6d3cb6dce6d8837a2717",
     "system_operation": "logging_intake",
     "data_usage": "tool_args+context",
     "decision_making": "n/a",
@@ -206,8 +210,8 @@
         "how_satisfied": "Conformal calibration provides distribution-free coverage guarantees on risk estimates"
       }
     ],
-    "previous_hash": "098168c968b6f1c839bf01dc1fc162065eefa22aac6ec1dd439c9bf5bda65c7e",
-    "record_hash": "31dbfae2939fb51ab905cb503fdc0ec94b12ec9e188badcc04f86fbfeb77c6ee",
+    "previous_hash": "0239bd94289ca662a065555b94930a2af4c81c3ac8ac6d3cb6dce6d8837a2717",
+    "record_hash": "7b6a0caee63c2630bcebd7138556efb53f790185086028f92ac0c164ba602809",
     "system_operation": "scoring",
     "data_usage": "tool_args+history+policy",
     "decision_making": "heuristic_score",
@@ -245,8 +249,8 @@
         "how_satisfied": "Decision records include risk scores, confidence intervals, and contributing signals"
       }
     ],
-    "previous_hash": "31dbfae2939fb51ab905cb503fdc0ec94b12ec9e188badcc04f86fbfeb77c6ee",
-    "record_hash": "e56490e294e6ded80706fb6ed5a6579726ab3c66bbee2fb66c4ed4edc38ac919",
+    "previous_hash": "7b6a0caee63c2630bcebd7138556efb53f790185086028f92ac0c164ba602809",
+    "record_hash": "e396fbd6684c4d94c7305f936d25eb2d92cbd79da9d1a74f01087cf0f63cb1a5",
     "system_operation": "decision_threshold",
     "data_usage": "risk_score+thresholds",
     "decision_making": "threshold_match",

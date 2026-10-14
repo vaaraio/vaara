@@ -11,6 +11,8 @@
         "amount": 50000,
         "to": "acct:9"
       },
+      "arguments_salt": "89b24cf71bfce4d177857c0dbcea4ec5",
+      "arguments_commitment": "sha256:8095cff2d0e9c478422995e74538e380739e173e9d7223c7a916fea01c0ba359",
       "context": {},
       "action_category": "financial",
       "reversibility": "irreversible",
@@ -37,7 +39,7 @@
       }
     ],
     "previous_hash": "",
-    "record_hash": "e2df57b85143a168cea041a1e3af90e2d30a0140ec27f92acb126188aa458b08",
+    "record_hash": "bea8503f0dab108bf2aebc5f0be670d70f2e723e3ed84e3724f29f9075e3052f",
     "system_operation": "logging_intake",
     "data_usage": "tool_args+context",
     "decision_making": "n/a",
@@ -75,8 +77,8 @@
         "how_satisfied": "Conformal calibration provides distribution-free coverage guarantees on risk estimates"
       }
     ],
-    "previous_hash": "e2df57b85143a168cea041a1e3af90e2d30a0140ec27f92acb126188aa458b08",
-    "record_hash": "73e2bbc8a6a8f8a2ff12c8bc81533fd25de98976a84972cf1379e13a4f7e734d",
+    "previous_hash": "bea8503f0dab108bf2aebc5f0be670d70f2e723e3ed84e3724f29f9075e3052f",
+    "record_hash": "606b928fe94c0af414a95bae1d7433e7da1016a132f0d9aa46b38a4cf0fc3489",
     "system_operation": "scoring",
     "data_usage": "tool_args+history+policy",
     "decision_making": "heuristic_score",
@@ -114,8 +116,8 @@
         "how_satisfied": "Decision records include risk scores, confidence intervals, and contributing signals"
       }
     ],
-    "previous_hash": "73e2bbc8a6a8f8a2ff12c8bc81533fd25de98976a84972cf1379e13a4f7e734d",
-    "record_hash": "a0004a0f11ea596667f55bcdd72194a2b7d1d1faee5557a3ed793c2680a9bffa",
+    "previous_hash": "606b928fe94c0af414a95bae1d7433e7da1016a132f0d9aa46b38a4cf0fc3489",
+    "record_hash": "97cf7f4ff0c98d60ffa8af7d619a26a7b88f3a1ae7bdb527ef0023e2171e19e4",
     "system_operation": "decision_threshold",
     "data_usage": "risk_score+thresholds",
     "decision_making": "threshold_match",

@@ -11,6 +11,8 @@
         "amount": 50000,
         "to": "acct:9"
       },
+      "arguments_salt": "c9582d5fdff1678b3e6ae2985c7270e1",
+      "arguments_commitment": "sha256:119eeed706e6173db1bad9d865de0e98b3cc8db68387f1f9b96a4413ac628ff8",
       "context": {},
       "action_category": "financial",
       "reversibility": "irreversible",
@@ -37,7 +39,7 @@
       }
     ],
     "previous_hash": "",
-    "record_hash": "b391df5b7ae2ac86528d5ad02b09bc35d885b12e086d93ec2ff4d65e8f23d0ce",
+    "record_hash": "e9c604bf039e9e7102b236d4362af1af2355e6831940fb36e451afbd07e6b155",
     "system_operation": "logging_intake",
     "data_usage": "tool_args+context",
     "decision_making": "n/a",
@@ -75,8 +77,8 @@
         "how_satisfied": "Conformal calibration provides distribution-free coverage guarantees on risk estimates"
       }
     ],
-    "previous_hash": "b391df5b7ae2ac86528d5ad02b09bc35d885b12e086d93ec2ff4d65e8f23d0ce",
-    "record_hash": "29254b37a1449b01203a65603b9db3b932499fcddd489a514a7eb2be86ddb46e",
+    "previous_hash": "e9c604bf039e9e7102b236d4362af1af2355e6831940fb36e451afbd07e6b155",
+    "record_hash": "0a3d3aa32cfa561ef644cd41537ff6b95aa91cf5c2eb9c29d610cbe63cc654be",
     "system_operation": "scoring",
     "data_usage": "tool_args+history+policy",
     "decision_making": "heuristic_score",
@@ -116,8 +118,8 @@
         "how_satisfied": "Automated blocking of high-risk actions with full incident trail"
       }
     ],
-    "previous_hash": "29254b37a1449b01203a65603b9db3b932499fcddd489a514a7eb2be86ddb46e",
-    "record_hash": "6196d119e8d1501e963f57b604dbec7ec56bd577dd3620115b61cd034f8defab",
+    "previous_hash": "0a3d3aa32cfa561ef644cd41537ff6b95aa91cf5c2eb9c29d610cbe63cc654be",
+    "record_hash": "5e7aa8c37bc76cdcb491c435cf4b1ba64541fd778885ba2f1a0f50bd0c0571dd",
     "system_operation": "blocking",
     "data_usage": "risk_score+thresholds",
     "decision_making": "threshold_match",

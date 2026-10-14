@@ -11,6 +11,8 @@
         "amount": 50000,
         "to": "acct:9"
       },
+      "arguments_salt": "2bfeed1e80ced32a2202e3ebec4a47e7",
+      "arguments_commitment": "sha256:129ddfc54a9b91900d4eb8410f882a75c58a9c72700d2180c42015a4cf25d6ea",
       "context": {},
       "action_category": "financial",
       "reversibility": "irreversible",
@@ -37,7 +39,7 @@
       }
     ],
     "previous_hash": "",
-    "record_hash": "f46b30a16b9d52afb619565932f13aa47c04dc23b4686aee6f53f53d835ac29e",
+    "record_hash": "f80dc3af92e2c5eb995fe83b5d2920b8816fe60a7fec4c353c13a0a822936d60",
     "system_operation": "logging_intake",
     "data_usage": "tool_args+context",
     "decision_making": "n/a",
@@ -75,8 +77,8 @@
         "how_satisfied": "Conformal calibration provides distribution-free coverage guarantees on risk estimates"
       }
     ],
-    "previous_hash": "f46b30a16b9d52afb619565932f13aa47c04dc23b4686aee6f53f53d835ac29e",
-    "record_hash": "ecf649e064bfe617f3a8bcf47788226db6fb1c3d0b13582b08fd9f3bf66443bb",
+    "previous_hash": "f80dc3af92e2c5eb995fe83b5d2920b8816fe60a7fec4c353c13a0a822936d60",
+    "record_hash": "fc8401ef9962e6934885c04a735147e0f0e5040fee25a0c95b3c544673a1ee17",
     "system_operation": "scoring",
     "data_usage": "tool_args+history+policy",
     "decision_making": "heuristic_score",
@@ -114,8 +116,8 @@
         "how_satisfied": "Decision records include risk scores, confidence intervals, and contributing signals"
       }
     ],
-    "previous_hash": "ecf649e064bfe617f3a8bcf47788226db6fb1c3d0b13582b08fd9f3bf66443bb",
-    "record_hash": "98f351161db4b93a82a0d00e2e8eab4d547e686bc284cb2c2c68fde651a04d61",
+    "previous_hash": "fc8401ef9962e6934885c04a735147e0f0e5040fee25a0c95b3c544673a1ee17",
+    "record_hash": "1b577ab4be9a2ed91c4f74a8d06cc54f2756ab59ceb292506b5d42e8f86bd437",
     "system_operation": "decision_threshold",
     "data_usage": "risk_score+thresholds",
     "decision_making": "threshold_match",
@@ -149,8 +151,8 @@
         "how_satisfied": "The event is handed to a human with its context for that evaluation"
       }
     ],
-    "previous_hash": "98f351161db4b93a82a0d00e2e8eab4d547e686bc284cb2c2c68fde651a04d61",
-    "record_hash": "3488fc4127fca5d1f414f99bf23852e6fd4b0fea6ba2a6b5ccbe45503ecb617b",
+    "previous_hash": "1b577ab4be9a2ed91c4f74a8d06cc54f2756ab59ceb292506b5d42e8f86bd437",
+    "record_hash": "a93fe3257f8068baa7bd055b538950e7c9701820f14143c68a45d076b3e76f3a",
     "system_operation": "escalation",
     "data_usage": "risk_score+context",
     "decision_making": "threshold_or_classifier_upgrade",

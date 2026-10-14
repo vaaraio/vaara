@@ -13,7 +13,10 @@ The evidence record is the ``vaara.trail-decision/v0`` profile: the decision
 as the trail recorded it, plus the trail record's own hash. A reader holding
 the trail looks the record up by ``recordId`` and confirms the hash, which
 ties the receipt to its place in the hash chain. The record carries no tool
-arguments, so a receipt can leave the machine without them.
+arguments, so a receipt can leave the machine without them. It carries
+``argumentsCommitment`` instead when the trail recorded one for the request:
+a salted digest of the arguments, which the trail's holder can open for one
+decision by handing over its arguments and salt (``_arguments_commitment``).
 
 The signing key is made on first use at ``<trail dir>/keys/receipt-es256.pem``
 (mode 0600) and its public half is written to
@@ -70,6 +73,10 @@ _NOT_EVALUATED_GROUNDS = frozenset({
     "scorer_failure", "scorer_unavailable", "invalid_decision",
 })
 _HEX64 = re.compile(r"^[0-9a-f]{64}$")
+_COMMITMENT = re.compile(r"^sha256:[0-9a-f]{64}$")
+# Requests whose decision has not been recorded yet, by action id. Bounded:
+# an action decided in another process, or never decided, must not grow it.
+_MAX_PENDING_COMMITMENTS = 4096
 _SAFE_NAME = re.compile(r"[^A-Za-z0-9._-]")
 
 # One warning per process when the signing libraries are missing.
@@ -115,8 +122,14 @@ def _chain_digest(value: str) -> str:
     return "sha256:" + hashlib.sha256((value or "").encode()).hexdigest()
 
 
-def build_evidence(record: AuditRecord) -> dict[str, Any]:
-    """The ``vaara.trail-decision/v0`` evidence record for one decision record."""
+def build_evidence(
+    record: AuditRecord, arguments_commitment: Optional[str] = None,
+) -> dict[str, Any]:
+    """The ``vaara.trail-decision/v0`` evidence record for one decision record.
+
+    ``arguments_commitment`` is the commitment the trail recorded on the
+    action's request, when the caller has it.
+    """
     data = record.data or {}
     evidence: dict[str, Any] = {
         "schema": SCHEMA,
@@ -133,6 +146,8 @@ def build_evidence(record: AuditRecord) -> dict[str, Any]:
         "recordHash": _chain_digest(record.record_hash),
         "previousHash": _chain_digest(record.previous_hash),
     }
+    if arguments_commitment and _COMMITMENT.match(arguments_commitment):
+        evidence["argumentsCommitment"] = arguments_commitment
     if data.get("decision_detail"):
         evidence["decisionDetail"] = str(data["decision_detail"])
     if data.get("approver"):
@@ -291,6 +306,7 @@ class DecisionReceiptSink:
     failures: int = 0
     _key: Any = field(default=None, repr=False)
     _lock: threading.Lock = field(default_factory=threading.Lock, repr=False)
+    _pending: dict[str, str] = field(default_factory=dict, repr=False)
 
     @property
     def receipts_dir(self) -> Path:
@@ -334,7 +350,7 @@ class DecisionReceiptSink:
             emit_decision_record,
         )
 
-        evidence = build_evidence(record)
+        evidence = build_evidence(record, self._pending.pop(record.action_id, None))
         key = self._signing_key()
         envelope = emit_decision_record(
             back_link=BackLink(
@@ -362,7 +378,20 @@ class DecisionReceiptSink:
         )
         return {"receipt": envelope.to_dict(), "evidence": evidence}
 
+    def _remember_commitment(self, record: AuditRecord) -> None:
+        commitment = (record.data or {}).get("arguments_commitment")
+        if not isinstance(commitment, str) or not record.action_id:
+            return
+        with self._lock:
+            if len(self._pending) >= _MAX_PENDING_COMMITMENTS:
+                for stale in list(self._pending)[:_MAX_PENDING_COMMITMENTS // 8]:
+                    del self._pending[stale]
+            self._pending[record.action_id] = commitment
+
     def __call__(self, record: AuditRecord) -> Optional[Path]:
+        if record.event_type == EventType.ACTION_REQUESTED:
+            self._remember_commitment(record)
+            return None
         if record.event_type not in _DECISION_EVENTS:
             return None
         try:
@@ -509,3 +538,15 @@ def verify_receipt_body(
         decided_at=str(evidence.get("decidedAt", "")),
         detail=detail,
     )
+
+
+def check_disclosed_arguments(evidence: dict[str, Any], arguments: Any, salt: str) -> bool:
+    """True when disclosed ``arguments`` and ``salt`` open the receipt's commitment.
+
+    The trail's holder discloses both from the action's request record. A
+    receipt with no ``argumentsCommitment`` opens to nothing and returns False.
+    """
+    from vaara.audit._arguments_commitment import verify
+
+    commitment = evidence.get("argumentsCommitment")
+    return isinstance(commitment, str) and verify(commitment, arguments, salt)
