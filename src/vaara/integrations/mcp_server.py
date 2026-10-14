@@ -6,10 +6,11 @@ Exposes Vaara's interception pipeline as an MCP server so that AI agents
 (Claude, GPT, Cursor, etc.) can discover and use Vaara governance as a
 standard tool via the MCP protocol.
 
-The MCP server provides three tools:
+The MCP server provides four tools:
 1. **vaara_check** — Score an action before execution (read-only assessment)
 2. **vaara_intercept** — Full interception with audit trail (blocks/allows)
 3. **vaara_report_outcome** — Report what happened after execution
+4. **vaara_verify_receipt** — Verify a signed decision receipt against the trail
 
 And two resources:
 1. **vaara://status** — Current scorer status, calibration state
@@ -68,6 +69,7 @@ import logging
 import math
 import os
 import secrets
+import sqlite3
 import sys
 from dataclasses import dataclass, replace
 from pathlib import Path
@@ -275,6 +277,33 @@ VAARA_REPORT_TOOL = MCPToolDefinition(
 )
 
 
+VAARA_VERIFY_RECEIPT_TOOL = MCPToolDefinition(
+    name="vaara_verify_receipt",
+    description=(
+        "Verify a signed decision receipt: its signature, and that the "
+        "evidence it carries is the evidence it signed. For a receipt under "
+        "this server's own key it also checks that the record it names is in "
+        "this server's audit trail. Pass the receipt file's JSON as "
+        "'receipt'. The server's key is used unless 'public_key_pem' names "
+        "another issuer's key; then the trail is not checked."
+    ),
+    inputSchema={
+        "type": "object",
+        "properties": {
+            "receipt": {
+                "type": "object",
+                "description": "The receipt file's JSON: {\"receipt\": ..., \"evidence\": ...}",
+            },
+            "public_key_pem": {
+                "type": "string",
+                "description": "Issuer public key, PEM (optional; defaults to this server's key)",
+            },
+        },
+        "required": ["receipt"],
+    },
+)
+
+
 # ── Resource Definitions ────────────────────────────────────────────────
 
 VAARA_STATUS_RESOURCE = MCPResourceDefinition(
@@ -315,14 +344,22 @@ class VaaraMCPServer:
         else:
             db = db_path or Path(os.environ.get("VAARA_DB", "vaara_audit.db"))
             self._backend = SQLiteAuditBackend(db)
+            from vaara.audit.decision_receipts import default_sink
             from vaara.audit.trail import AuditTrail
             trail = AuditTrail(on_record=self._backend.write_record)
+            # The receipt sink load_trail wires; without it decisions reached
+            # the database with no signed receipt beside them. The trail is
+            # not loaded whole: on a long trail that costs seconds and
+            # hundreds of megabytes per server, and the store chains appends
+            # from its own head.
+            trail._receipt_sink = default_sink(db)
             self._pipeline = InterceptionPipeline(trail=trail)
 
         self._tools = {
             "vaara_check": VAARA_CHECK_TOOL,
             "vaara_intercept": VAARA_INTERCEPT_TOOL,
             "vaara_report_outcome": VAARA_REPORT_TOOL,
+            "vaara_verify_receipt": VAARA_VERIFY_RECEIPT_TOOL,
         }
         self._resources = {
             "vaara://status": VAARA_STATUS_RESOURCE,
@@ -520,6 +557,8 @@ class VaaraMCPServer:
             return self._call_intercept(arguments)
         elif tool_name == "vaara_report_outcome":
             return self._call_report(arguments)
+        elif tool_name == "vaara_verify_receipt":
+            return self._call_verify_receipt(arguments)
         else:
             # Unknown tool to Invalid params (-32602), not Internal (-32603).
             # Raise a marker that handle_request translates properly.
@@ -812,6 +851,115 @@ class VaaraMCPServer:
                     "calibration_size": self._pipeline.scorer.calibration_size,
                 }, indent=2),
             }],
+        }
+
+    def _call_verify_receipt(self, args: dict) -> dict:
+        """Verify one decision receipt; reads only, records nothing.
+
+        The trail check runs only for a receipt under this server's own key.
+        A key the caller supplies proves who signed, not that this trail holds
+        the decision: anyone can sign a copy of a real record's evidence.
+        """
+        from cryptography.hazmat.primitives import serialization
+
+        from vaara.audit import decision_receipts as dr
+
+        if not dr.signing_available():
+            raise _InvalidParams(
+                "receipt verification needs cryptography and rfc8785 installed",
+            )
+        body = args.get("receipt")
+        if not isinstance(body, dict):
+            raise _InvalidParams("receipt must be the receipt file's JSON object")
+        key = args.get("public_key_pem")
+        if key is not None and not isinstance(key, str):
+            raise _InvalidParams("public_key_pem must be a string")
+
+        sink = getattr(self._pipeline.trail, "_receipt_sink", None)
+        own_path = sink.public_key_path if sink is not None else None
+        try:
+            own_pem = own_path.read_bytes() if own_path is not None and own_path.is_file() else None
+        except OSError as exc:
+            return self._verify_failure(f"this server's receipt key could not be read: {exc}")
+        if key is None:
+            if own_pem is None:
+                raise _InvalidParams(
+                    "this server has no receipt key of its own; pass public_key_pem",
+                )
+            key_pem = own_pem
+        else:
+            key_pem = key.encode("utf-8")
+
+        def _spki(pem: bytes) -> bytes:
+            return serialization.load_pem_public_key(pem).public_bytes(
+                serialization.Encoding.DER, serialization.PublicFormat.SubjectPublicKeyInfo,
+            )
+
+        try:
+            own_key = own_pem is not None and _spki(key_pem) == _spki(own_pem)
+        except (ValueError, TypeError) as exc:
+            raise _InvalidParams(f"public_key_pem is not a PEM public key: {exc}") from None
+
+        trail_hashes: Optional[dict[str, str]] = None
+        evidence = body.get("evidence")
+        if own_key and self._backend is not None and isinstance(evidence, dict):
+            # Only the one record the receipt names, read from the database,
+            # which other writers may have appended to since this server started.
+            record_id = evidence.get("recordId")
+            trail_hashes = {}
+            if isinstance(record_id, str):
+                db = Path(self._backend.db_path).resolve()
+                try:
+                    con = sqlite3.connect(f"{db.as_uri()}?mode=ro", uri=True)
+                    try:
+                        row = con.execute(
+                            "SELECT record_hash FROM audit_records WHERE record_id = ?",
+                            (record_id,),
+                        ).fetchone()
+                    finally:
+                        con.close()
+                except sqlite3.Error as exc:
+                    return self._verify_failure(f"the trail could not be read: {exc}")
+                if row:
+                    trail_hashes[record_id] = row[0]
+        try:
+            check = dr.verify_receipt_body(
+                body, public_key_pem=key_pem, trail_hashes=trail_hashes,
+            )
+        except (ValueError, KeyError, TypeError) as exc:
+            raise _InvalidParams(f"receipt not verifiable: {exc}") from None
+        detail = check.detail
+        if not own_key and not detail:
+            detail = "signed by the key given, not this server's: the trail was not checked"
+        return {
+            "content": [{
+                "type": "text",
+                "text": _strict_json_dumps({
+                    "ok": check.ok,
+                    "signature": check.signature_ok,
+                    "evidence": check.evidence_ok,
+                    "trail": check.trail_ok,
+                    "decision": check.decision,
+                    "tool": check.tool,
+                    "decidedAt": check.decided_at,
+                    "detail": detail,
+                }, indent=2),
+            }],
+            "isError": not check.ok,
+        }
+
+    @staticmethod
+    def _verify_failure(detail: str) -> dict:
+        """A verification that could not complete, named, as a tool error."""
+        return {
+            "content": [{
+                "type": "text",
+                "text": _strict_json_dumps({
+                    "ok": False, "signature": None, "evidence": None, "trail": None,
+                    "detail": detail,
+                }, indent=2),
+            }],
+            "isError": True,
         }
 
     # ── JSON-RPC helpers ─────────────────────────────────────────

@@ -42,6 +42,7 @@ from typing import Any, Callable, Optional
 
 from vaara import __version__ as _VAARA_VERSION
 from vaara.attestation._receipt_task import related_task_id as _related_task_id
+from vaara.audit.decision_receipts import default_sink
 from vaara.audit.sqlite_backend import SQLiteAuditBackend
 from vaara.audit.trail import AuditTrail
 from vaara.integrations._mcp_beacon import Beacon
@@ -287,6 +288,12 @@ class VaaraMCPProxy:
             db = db_path or Path(os.environ.get("VAARA_DB", "vaara_audit.db"))
             self._backend = SQLiteAuditBackend(db)
             trail = AuditTrail(on_record=self._backend.write_record)
+            # The receipt sink load_trail wires; without it decisions reached
+            # the database with no signed receipt beside them. The trail is
+            # not loaded whole: on a long trail that costs seconds and
+            # hundreds of megabytes per proxy, and the store chains appends
+            # from its own head.
+            trail._receipt_sink = default_sink(db)
             self._pipeline = InterceptionPipeline(trail=trail, enforce=not shadow)
         if policy is not None:
             # Same rebinding `vaara serve` does: thresholds and sequence
