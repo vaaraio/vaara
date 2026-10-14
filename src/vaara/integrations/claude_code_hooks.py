@@ -363,6 +363,88 @@ def _sequence_relevant(tool_name: str, tool_input: dict) -> bool:
         return False
 
 
+def value_origin_enabled(cfg: dict) -> bool:
+    """Value-origin holds are on when the config says ``"value_origin": true``.
+
+    Off by default. Replayed over 34,601 recorded calls (256 sessions), 92 of
+    99 mail sends would have been held, every one a send the operator meant:
+    recipients found on web pages, in local files, and echoed back by a mail
+    allowlist tool. Right for an agent that pays or mails on content it reads;
+    too many questions for one whose job is outreach."""
+    return cfg.get("value_origin") is True
+
+
+def _value_origin(cfg: dict, tool_name: str, tool_input: dict) -> Optional[dict]:
+    """The authority arguments of this call whose value came only from a tool
+    result (``vaara.scorer.value_origin``), or None. Trusted values and extra
+    authority arguments come from the config (``trusted_values``,
+    ``authority_args``). Never raises: a broken store holds nothing."""
+    if not value_origin_enabled(cfg):
+        return None
+    try:
+        from vaara.scorer.value_origin import OriginStore, authority_args, origin_hold
+
+        extra = cfg.get("authority_args")
+        extra = extra if isinstance(extra, dict) else None
+        if not authority_args(tool_name, tool_input, extra):
+            return None
+        trusted = cfg.get("trusted_values")
+        return origin_hold(
+            tool_name, tool_input, OriginStore(),
+            trusted=trusted if isinstance(trusted, list) else (),
+            extra_args=extra,
+        )
+    except Exception as exc:
+        _emit(f"vaara-governance: value origin check failed ({exc!r}); not held on origin.")
+        return None
+
+
+#: Home directories whose files are the agent's own configuration and memory,
+#: not content it was handed.
+_OWN_DIRS = (".claude", ".vaara", ".config", ".codex", ".cursor", ".gemini")
+
+
+def _external_result(tool_name: str, tool_input: dict, cwd: object) -> bool:
+    """True when this tool's result is content from outside: the web, an MCP
+    server, or a file outside the project and outside the agent's own
+    configuration."""
+    if tool_name in ("WebFetch", "WebSearch") or tool_name.startswith("mcp__"):
+        return True
+    if tool_name != "Read":
+        return False
+    path = tool_input.get("file_path")
+    if not isinstance(path, str) or not path:
+        return False
+    try:
+        target = Path(path).expanduser().resolve()
+        home = Path.home().resolve()
+        if any(target.is_relative_to(home / d) for d in _OWN_DIRS):
+            return False
+        return not (isinstance(cwd, str) and cwd
+                    and target.is_relative_to(Path(cwd).resolve()))
+    except (OSError, ValueError):
+        return False
+
+
+def _harvest_result(cfg: dict, event: dict, action_id: str) -> None:
+    """Remember the authority-shaped values in an external tool result."""
+    if not value_origin_enabled(cfg):
+        return
+    tool_name = event.get("tool_name", "")
+    tool_input = event.get("tool_input") or {}
+    if not isinstance(tool_input, dict):
+        tool_input = {}
+    try:
+        if not _external_result(tool_name, tool_input, event.get("cwd")):
+            return
+        from vaara.scorer.value_origin import OriginStore, extract_any
+
+        OriginStore().note_external(extract_any(event.get("tool_response")),
+                                    tool_name=tool_name, action_id=action_id)
+    except Exception as exc:
+        _emit(f"vaara-governance: value origin not recorded ({exc!r}).")
+
+
 def _record_call(cfg: dict, agent: str, tool_name: str, tool_input: dict,
                  context: dict, session_id: str = "") -> None:
     """Write an ACTION_REQUESTED record for a call on the regex path.
@@ -697,7 +779,9 @@ def _decide_pre(cfg: dict, events: list[dict], agent: str,
             notify(cfg, "BLOCKED", tool_name, policy_error)
             return 2
 
+    origin = _value_origin(cfg, tool_name, tool_input)
     if (policy is None and not tool_name.startswith("mcp__")
+            and origin is None
             and not destructive_action(tool_name, tool_input)
             and not argument_hold(tool_name, tool_input)
             and not _sequence_relevant(tool_name, tool_input)):
@@ -735,6 +819,7 @@ def _decide_pre(cfg: dict, events: list[dict], agent: str,
         result = pipeline.intercept(
             agent_id=agent, tool_name=tool_name,
             parameters=tool_input, session_id=session_id,
+            value_origin=origin,
         )
     except Exception as exc:
         # The trail opened and the append failed underneath the scorer: the
@@ -918,10 +1003,20 @@ def run_post_tool_use(client: Optional[str] = None) -> int:
         event["tool_response"] = module.tool_response(raw)
     tool_name = event.get("tool_name", "")
     severity = _outcome_severity(event.get("tool_response", {}))
+    target_action_id = None
+    try:
+        target_action_id = _record_outcome(cfg, agent, tool_name, severity)
+    finally:
+        _harvest_result(cfg, event, target_action_id or "")
+    return 0
 
+
+def _record_outcome(cfg: dict, agent: str, tool_name: str,
+                    severity: float) -> Optional[str]:
+    """Report the outcome against this tool's latest request; its action id."""
     db_path = audit_db_path(cfg)
     if not db_path.exists():
-        return 0
+        return None
     try:
         trail = _open_trail(cfg)
         target_action_id = None
@@ -934,7 +1029,7 @@ def run_post_tool_use(client: Optional[str] = None) -> int:
                 target_action_id = record.action_id
                 break
         if target_action_id is None:
-            return 0
+            return None
         from vaara.pipeline import InterceptionPipeline
 
         pipeline = InterceptionPipeline(trail=trail)
@@ -942,7 +1037,26 @@ def run_post_tool_use(client: Optional[str] = None) -> int:
         pipeline.report_outcome(target_action_id, outcome_severity=severity)
     except Exception as exc:
         _note_trail_failure(cfg, exc, stage="post_tool_use")
+        return None
+    return target_action_id
+
+
+def run_user_prompt_submit() -> int:
+    """UserPromptSubmit: remember the authority-shaped values the user typed,
+    so a recipient or payee the user named is never held on origin. Prints
+    nothing (this hook's output joins the model's context) and never blocks."""
+    cfg = load_config()
+    if plugin_disabled(cfg) or not value_origin_enabled(cfg):
         return 0
+    prompt = _read_event().get("prompt")
+    if not isinstance(prompt, str) or not prompt:
+        return 0
+    try:
+        from vaara.scorer.value_origin import OriginStore, extract
+
+        OriginStore().note_user(extract(prompt))
+    except Exception:
+        pass
     return 0
 
 

@@ -18,12 +18,15 @@ def _read(path: Path) -> dict:
 # --- Claude Code hooks -----------------------------------------------------
 
 
-def test_write_claude_hooks_creates_all_three_events(tmp_path):
+def test_write_claude_hooks_creates_every_event(tmp_path):
     settings = tmp_path / "settings.json"
     changed = ig.write_claude_hooks(settings, "/usr/bin/vaara")
     assert changed is True
     hooks = _read(settings)["hooks"]
-    assert set(hooks) == {"SessionStart", "PreToolUse", "PostToolUse"}
+    assert set(hooks) == {"SessionStart", "UserPromptSubmit", "PreToolUse", "PostToolUse"}
+    assert hooks["UserPromptSubmit"][0]["hooks"][0]["command"].endswith(
+        "hook user-prompt-submit")
+    assert "matcher" not in hooks["UserPromptSubmit"][0]
     cmd = hooks["PreToolUse"][0]["hooks"][0]["command"]
     assert cmd == _hook_gate.pre_command("/usr/bin/vaara")
     assert hooks["PreToolUse"][0]["hooks"][0]["timeout"] == _hook_gate.HOST_TIMEOUT

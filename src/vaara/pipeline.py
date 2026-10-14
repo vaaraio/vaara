@@ -189,6 +189,34 @@ def _sequence_steps(scorer_result: Any) -> Optional[dict[str, list[str]]]:
     return {name: ids for name, ids in kept.items() if ids} or None
 
 
+def _value_origin(raw: Any) -> Optional[dict[str, dict[str, Any]]]:
+    """A caller's ``value_origin``, kept only in its documented shape.
+
+    It goes into a hash-chained record, so only argument name to
+    ``{"seen_in": [action-id strings], "source": str}`` passes.
+    """
+    if not isinstance(raw, dict):
+        return None
+    kept: dict[str, dict[str, Any]] = {}
+    for name, info in raw.items():
+        if not isinstance(info, dict):
+            continue
+        ids = info.get("seen_in")
+        source = info.get("source")
+        kept[str(name)[:_MAX_TOOL_NAME_LEN]] = {
+            "seen_in": [i[:_MAX_TOOL_NAME_LEN] for i in ids if isinstance(i, str) and i][:5]
+            if isinstance(ids, (list, tuple)) else [],
+            "source": source[:_MAX_TOOL_NAME_LEN] if isinstance(source, str) else "",
+        }
+    return kept or None
+
+
+def _describe_origin(held: dict[str, dict[str, Any]]) -> str:
+    from vaara.scorer.value_origin import describe
+
+    return describe(held)
+
+
 def _json_safe_dict(d: Optional[dict]) -> dict:
     if not d:
         return {}
@@ -432,6 +460,7 @@ class InterceptionPipeline:
         policy_decision: Optional[str] = None,
         policy_reason: str = "",
         policy_id: str = "",
+        value_origin: Optional[dict] = None,
     ) -> InterceptionResult:
         """Intercept an agent action request.
 
@@ -458,9 +487,17 @@ class InterceptionPipeline:
         or ``scorer_failure``. A scorer may name its own by returning
         ``policy_id`` and ``violation_type`` string keys.
 
+        ``value_origin`` names the authority arguments whose value the caller
+        saw only in external tool results, as ``{arg: {"seen_in": [action
+        ids], "source": tool}}`` (:func:`vaara.scorer.value_origin.origin_hold`).
+        An allow becomes an escalate, the reason names the result the value
+        came from, and the record carries the mapping. A prior approval of the
+        same call still replays.
+
         Returns an InterceptionResult — check .allowed before executing.
         """
         start = time.perf_counter()
+        value_origin = _value_origin(value_origin)
         if policy_decision is not None and policy_decision not in _FINE_TO_COARSE:
             raise ValueError(f"policy_decision must be a decision, not {policy_decision!r}")
 
@@ -832,6 +869,20 @@ class InterceptionPipeline:
                 _MAX_DECISION_REASON_LEN, "reason",
             )
 
+        # 6c. Value origin. An authority argument (recipient, payee, endpoint)
+        # whose value the caller saw only in content the agent read is held
+        # for a human. Before the prior-approval replay, so a person who
+        # approved this exact call is not asked again.
+        if value_origin and decision_str in ("allow", "escalate"):
+            if decision_str == "allow":
+                decision_str = "escalate"
+                allowed = False
+                decision_detail = None
+                modified_parameters = None
+            reason = _cap_str(_describe_origin(value_origin)
+                              + (f"; scorer: {reason}" if reason else ""),
+                              _MAX_DECISION_REASON_LEN, "reason")
+
         # 7. Prior-approval check, BEFORE the decision hits the chain.
         #    When this tenant's agent + tool + argument shape was
         #    escalated and approved within the last 24 hours, the
@@ -928,6 +979,7 @@ class InterceptionPipeline:
         policy_digest, policy_state = self._policy_snapshot()
         self.trail.record_decision(
             sequence_steps=_sequence_steps(scorer_result),
+            value_origin=value_origin,
             action_id=action_id,
             agent_id=agent_id,
             tool_name=tool_name,

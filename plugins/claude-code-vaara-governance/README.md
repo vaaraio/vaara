@@ -93,6 +93,9 @@ The config file, hand-editable:
 | `agent_id` | string | Agent id written to the audit chain (default `claude-code`). |
 | `audit_db` | path | Audit DB path (default `~/.vaara/claude-code/audit.db`). |
 | `article50_statement` | string | When set, SessionStart records this as an EU AI Act Article 50(1) disclosure event into the audit trail with the session id, before the session's first tool call. Off when absent. |
+| `value_origin` | `false` (default), `true` | Hold a call that sends, pays or posts when its recipient, payee or endpoint (an email address, IBAN or URL host) appeared only in a tool result: a web page, an MCP tool's output, or a file read from outside the project. Values you typed in a prompt pass, and so do values never seen. The decision record names the tool result the value came from. Off by default, because an agent whose work is outreach takes its recipients from what it reads. |
+| `trusted_values` | list of strings | Recipients, payees and hosts that `value_origin` never holds, such as your own addresses and known suppliers. |
+| `authority_args` | `{"tool": ["arg", ...]}` | Arguments `value_origin` checks on top of the preset recipient, payee and endpoint names, keyed by full or bare tool name. |
 | `fail_open` | `false` (default), `true` | What happens to a tool call the hook cannot decide. That covers a hook that crashes, cannot find `vaara` or `python3`, or gives no verdict within 80 seconds, and `mcp__*` calls in protect mode that cannot be scored or recorded because the `vaara` package is not importable or the audit trail cannot be opened or written. Default: fail closed (block, and say why). `true` lets them run. The deny rules do not need the trail, so they keep enforcing whenever the hook runs. When the hook itself cannot run, the value is read with `python3`; without it, only `VAARA_PLUGIN_FAIL_OPEN=1` opts out. |
 
 Environment variables override the file (useful for CI or a single session):
@@ -161,6 +164,8 @@ PreToolUse on Bash / WebFetch / WebSearch is regex-only and sub-millisecond. Pre
 The plugin's own scripts make no network requests. Each hook calls `hooks/run.sh`, which runs the `vaara` CLI when it is on PATH and otherwise the bundled Python scripts in `hooks/`. On a block or escalation the plugin starts `osascript` (macOS) or `notify-send` (Linux) to show a desktop notification. Set `VAARA_PLUGIN_NOTIFY=0` to turn that off.
 
 Every tool call is written to a SQLite audit trail on your machine, by default `~/.vaara/claude-code/audit.db`. Each record holds the tool name, the input parameters Claude Code passed (a shell command, a file path, MCP arguments), the risk classification and the decision. Those parameters can contain personal data if the session handles any. Settings live in `~/.vaara/claude-code/config.json`.
+
+With `value_origin` on, the hook also keeps `~/.vaara/value_origin.json`: keyed digests (HMAC-SHA256) of the email addresses, IBANs and hosts seen in tool results and prompts, with the tool and action ids they were seen in. The key is `~/.vaara/value_origin.key`, readable by you only. The file holds no address or account number.
 
 The plugin does not upload the trail or any usage data. A trail leaves the machine only when you export it yourself with `vaara trail export`. Records stay until you delete the database file. The trail is append-only, and the plugin never removes records by itself.
 

@@ -12,7 +12,7 @@
 # instead. Same gate as the one `vaara init` writes, in
 # vaara/integrations/_hook_gate.py.
 #
-# Usage (from hooks.json): run.sh pre-tool-use|post-tool-use|session-start
+# Usage (from hooks.json): run.sh pre-tool-use|post-tool-use|session-start|user-prompt-submit
 set -eu
 kind="$1"
 deadline=80
@@ -97,5 +97,7 @@ fi
 case "$kind" in
   post-tool-use)  exec python3 "$dir/post_tool_use.py" ;;
   session-start)  exec python3 "$dir/session_start.py" ;;
+  # Value origin needs the package; the bundled scripts have no store.
+  user-prompt-submit) exit 0 ;;
   *) echo "vaara-governance: unknown hook kind: $kind" >&2; exit 0 ;;
 esac

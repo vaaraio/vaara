@@ -89,6 +89,7 @@ KNOWN_MCP_CLIENTS: list[tuple[str, str]] = [
 
 _HOOK_EVENTS = (
     ("SessionStart", "session-start", None),
+    ("UserPromptSubmit", "user-prompt-submit", None),
     ("PreToolUse", "pre-tool-use", HOOK_MATCHER),
     ("PostToolUse", "post-tool-use", HOOK_MATCHER),
 )

@@ -8260,6 +8260,15 @@ def build_parser() -> argparse.ArgumentParser:
         "vaara.integrations.claude_code_hooks", fromlist=["run_post_tool_use"]
     ).run_post_tool_use(client=args.client))
 
+    phups = hooksub.add_parser(
+        "user-prompt-submit",
+        help="Remember the recipients, payees and hosts the user typed, so "
+             "value-origin holds never fire on them. Prints nothing",
+    )
+    phups.set_defaults(func=lambda args: __import__(
+        "vaara.integrations.claude_code_hooks", fromlist=["run_user_prompt_submit"]
+    ).run_user_prompt_submit())
+
     phss = hooksub.add_parser(
         "session-start",
         help="Print the governance status line and record the configured "
