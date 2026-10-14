@@ -552,6 +552,7 @@ class InterceptionPipeline:
                     _MAX_DECISION_REASON_LEN,
                     "reason",
                 )
+                fail_digest, fail_state = self._policy_snapshot()
                 self.trail.record_decision(
                     action_id=action_id,
                     agent_id=agent_id,
@@ -563,7 +564,8 @@ class InterceptionPipeline:
                     policy_id=self._scorer_policy_id(),
                     violation_type="scorer_failure",
                     unavailable_input=self._scorer_policy_id(),
-                    **dict(zip(("policy_digest", "policy_state"), self._policy_snapshot())),
+                    policy_digest=fail_digest,
+                    policy_state=fail_state,
                 )
             except Exception:
                 logger.exception(
@@ -892,6 +894,7 @@ class InterceptionPipeline:
         # data-payload schema explicitly permits (consumers MUST accept
         # unknown keys). A record with no refinement gains no keys, so
         # every existing record hashes exactly as it did before.
+        policy_digest, policy_state = self._policy_snapshot()
         self.trail.record_decision(
             action_id=action_id,
             agent_id=agent_id,
@@ -907,7 +910,8 @@ class InterceptionPipeline:
             policy_id=deny_policy_id,
             violation_type=violation_type,
             unavailable_input=unavailable_input,
-            **dict(zip(("policy_digest", "policy_state"), self._policy_snapshot())),
+            policy_digest=policy_digest,
+            policy_state=policy_state,
         )
 
         if decision_str == "escalate":
