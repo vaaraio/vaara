@@ -687,15 +687,85 @@ def _form_submission(tool_name: str, parameters: Any) -> Optional[str]:
     return None
 
 
+# A certificate is a courier when it carries a URL the far side will fetch.
+# AIR showed this on 13 October 2026 against an SNI allowlist: the agent minted
+# a client certificate whose authorityInfoAccess URL held the secret, presented
+# it to an allowed host, and the allowed host fetched the URL to build the
+# chain. Nothing in the connection itself goes anywhere it should not.
+
+#: Certificate extensions whose value is a URL a verifier fetches.
+_CERT_URL_EXT = re.compile(
+    r"(?i)\b(?:authorityInfoAccess|AuthorityInformationAccess|crlDistributionPoints"
+    r"|CRLDistributionPoints|freshestCRL|caIssuers|OCSP\s*;\s*URI)\b")
+_CERT_EXT_URL = re.compile(r"(?i)\bURI\s*:\s*\S+|\bhttps?://\S+")
+#: Commands that mint a certificate, with openssl or Python's cryptography.
+_CERT_MINT = re.compile(
+    r"(?i)\bopenssl\s+(?:req|x509|ca)\b|\bpython[0-9.]*\b")
+_SEGMENT = re.compile(r"\|\|?|&&|;|\n")
+#: Keys that name a client certificate on a request tool.
+_CLIENT_CERT_KEYS = re.compile(r"(?i)^(?:cert|client_?cert(?:ificate)?|ssl_?cert)$")
+
+
+def _program(words: list[str]) -> str:
+    """The program a command segment runs, past env assignments and sudo."""
+    for word in words:
+        if "=" in word and not word.startswith("-"):
+            continue
+        if word in ("sudo", "env", "command", "exec", "time", "nohup"):
+            continue
+        return word.rsplit("/", 1)[-1].lower()
+    return ""
+
+
+def _presents_client_cert(segment: str) -> bool:
+    words = segment.split()
+    prog = _program(words)
+    if prog == "curl":
+        flag = any(w in ("-E", "--cert") or w.startswith("--cert=")
+                   or re.fullmatch(r"-[A-Za-z]*E", w) for w in words)
+        return flag and bool(_URL_IN_TEXT.search(segment))
+    if prog == "wget":
+        return (any(w.startswith("--certificate") for w in words)
+                and bool(_URL_IN_TEXT.search(segment)))
+    if prog in ("http", "https", "xh"):
+        return (any(w == "--cert" or w.startswith("--cert=") for w in words)
+                and bool(_URL_IN_TEXT.search(segment)))
+    if prog == "openssl":
+        return "s_client" in words and "-cert" in words
+    return False
+
+
+def _courier_certificate(tool_name: str, parameters: Any,
+                         urls: list[str]) -> Optional[str]:
+    if isinstance(parameters, dict) and urls and any(
+            _CLIENT_CERT_KEYS.match(str(k)) and v for k, v in parameters.items()):
+        return "presents a client certificate (certificate courier)"
+    for key, text in _leaves(parameters):
+        if not _COMMAND_KEYS.search(key):
+            continue
+        run = _strip_heredocs(text)
+        # A heredoc fed to openssl or python is part of the mint, so the
+        # extension is looked for in the whole text; the minting command
+        # itself must be outside any heredoc.
+        if (_CERT_MINT.search(run) and _CERT_URL_EXT.search(text)
+                and _CERT_EXT_URL.search(text)):
+            return f"{key} mints a certificate carrying a fetchable URL (certificate courier)"
+        if any(_presents_client_cert(s) for s in _SEGMENT.split(run)):
+            return f"{key} presents a client certificate (certificate courier)"
+    return None
+
+
 def argument_hold(tool_name: str, parameters: Any) -> Optional[str]:
     """Name the argument content that holds this call for a human, or None.
 
     A URL shortener in a destination, a literal credential on an outbound call,
-    or a form submission. Only destinations, commands and request headers are
-    read: a file whose text mentions a short link or a token is not a call to
-    it.
+    a form submission, or a certificate used as a courier (minted with an AIA,
+    CRL or OCSP URL, or presented as a client certificate). Only destinations,
+    commands and request headers are read: a file whose text mentions a short
+    link or a token is not a call to it.
     """
     urls = _destinations(tool_name, parameters)
     return (_shortener(urls)
             or _credential(tool_name, parameters, urls)
-            or _form_submission(tool_name, parameters))
+            or _form_submission(tool_name, parameters)
+            or _courier_certificate(tool_name, parameters, urls))
