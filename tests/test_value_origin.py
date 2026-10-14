@@ -99,7 +99,8 @@ class TestStore:
     def test_the_key_is_private_and_stable(self, store):
         first = store.digest("email", "a@b.example")
         key = store.path.with_name("value_origin.key")
-        assert stat.S_IMODE(key.stat().st_mode) == 0o600
+        if sys.platform != "win32":  # Windows has no POSIX mode bits to set
+            assert stat.S_IMODE(key.stat().st_mode) == 0o600
         assert OriginStore(store.path).digest("email", "a@b.example") == first
 
     def test_capped(self, tmp_path):
