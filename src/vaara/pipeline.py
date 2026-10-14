@@ -171,6 +171,24 @@ def _cap_str(value: Any, max_len: int, field_name: str) -> str:
     return value[:keep] + marker
 
 
+def _sequence_steps(scorer_result: Any) -> Optional[dict[str, list[str]]]:
+    """The scorer's ``sequence_steps``, kept only in its documented shape.
+
+    A third-party scorer can return anything here, and the value goes into a
+    hash-chained record, so only a mapping of pattern name to a list of
+    action-id strings passes; anything else is left out of the record.
+    """
+    steps = scorer_result.get("sequence_steps") if isinstance(scorer_result, dict) else None
+    if not isinstance(steps, dict):
+        return None
+    kept = {
+        str(name): [i for i in ids if isinstance(i, str) and i]
+        for name, ids in steps.items()
+        if isinstance(ids, (list, tuple))
+    }
+    return {name: ids for name, ids in kept.items() if ids} or None
+
+
 def _json_safe_dict(d: Optional[dict]) -> dict:
     if not d:
         return {}
@@ -363,11 +381,11 @@ class InterceptionPipeline:
                 if r.event_type != EventType.ACTION_REQUESTED or r.action_id == action_id:
                     continue
                 params = (r.data or {}).get("parameters") or {}
-                entries.append((r.tool_name, params))
+                entries.append((r.tool_name, params, r.action_id))
             entries = entries[-_REPLAY_WINDOW:]
             seed(agent_id, session_id, [
-                (tool, self.registry.classify(tool, params).name, params)
-                for tool, params in entries
+                (tool, self.registry.classify(tool, params).name, params, aid)
+                for tool, params, aid in entries
             ])
         except Exception:
             logger.exception("session replay failed for %s/%s; scoring without it",
@@ -534,6 +552,7 @@ class InterceptionPipeline:
             self._replay_session(agent_id, session_id, tenant_id, action_id)
 
         policy_context = request.to_policy_context()
+        policy_context["action_id"] = action_id
         try:
             scorer_result = self.scorer.evaluate(policy_context)
         except Exception as exc:
@@ -908,6 +927,7 @@ class InterceptionPipeline:
         # every existing record hashes exactly as it did before.
         policy_digest, policy_state = self._policy_snapshot()
         self.trail.record_decision(
+            sequence_steps=_sequence_steps(scorer_result),
             action_id=action_id,
             agent_id=agent_id,
             tool_name=tool_name,
