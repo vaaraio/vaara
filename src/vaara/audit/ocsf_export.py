@@ -167,10 +167,10 @@ def decision_events(
 ) -> list[dict[str, Any]]:
     """Every decision on the trail as an OCSF event, in trail order."""
     records = list(records)
-    requests = {r.action_id: r for r in records
+    requested = {r.action_id: r for r in records
                 if r.event_type == EventType.ACTION_REQUESTED}
     return [
-        decision_event(r, requests.get(r.action_id), hostname, vaara_version)
+        decision_event(r, requested.get(r.action_id), hostname, vaara_version)
         for r in records
         if r.event_type in (EventType.DECISION_MADE, EventType.ACTION_BLOCKED)
     ]
