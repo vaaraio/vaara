@@ -134,3 +134,20 @@ def test_write_without_hostname_names_an_unknown_endpoint(tmp_path: Path):
     assert n == 3
     event = json.loads((tmp_path / "o.jsonl").read_text().splitlines()[0])
     assert event["src_endpoint"] == {"name": "unknown"}
+
+
+def test_cli_exports_straight_from_a_sqlite_trail(tmp_path: Path):
+    db = tmp_path / "audit.db"
+    trail = SQLiteAuditBackend(str(db)).load_trail()
+    InterceptionPipeline(trail=trail).intercept(
+        agent_id="a1", tool_name="read_file", parameters={"path": "/repo/x"},
+        session_id="run-1")
+    out = tmp_path / "ocsf.jsonl"
+    r = subprocess.run(
+        [sys.executable, "-m", "vaara.cli", "trail", "export-ocsf",
+         "--db", str(db), "--out", str(out)],
+        capture_output=True, text=True, timeout=120,
+    )
+    assert r.returncode == 0, r.stderr
+    [line] = out.read_text().splitlines()
+    _check(json.loads(line))

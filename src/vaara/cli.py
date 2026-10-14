@@ -15,7 +15,7 @@ Subcommands:
         Verify a signed trail zip.
 
     vaara trail export-prov --trail PATH --out PATH [--action-id ID] [--no-chain]
-    vaara trail export-ocsf --trail PATH --out PATH [--hostname NAME]
+    vaara trail export-ocsf (--trail PATH | --db PATH) --out PATH [--hostname NAME]
         Export the trail (or one action's slice) as W3C PROV-JSON.
 
     vaara trail export-incident --trail PATH --incident-meta PATH --out PATH \
@@ -997,30 +997,13 @@ def _cmd_trail_export_prov(args: argparse.Namespace) -> int:
 def _cmd_trail_export_ocsf(args: argparse.Namespace) -> int:
     """Export the trail's decisions as OCSF API Activity events (JSON Lines)."""
     from vaara.audit.ocsf_export import OCSF_VERSION, write_ocsf_jsonl
-    from vaara.audit.trail import AuditRecord
 
-    trail_path = Path(args.trail).expanduser()
-    if not trail_path.exists():
-        print(f"trail JSONL not found: {trail_path}", file=sys.stderr)
-        return 2
-
-    records: list[AuditRecord] = []
-    with open(trail_path, "r", encoding="utf-8") as f:
-        for lineno, raw in enumerate(f, start=1):
-            line = raw.strip()
-            if not line:
-                continue
-            try:
-                records.append(AuditRecord.from_dict(json.loads(line)))
-            except (json.JSONDecodeError, TypeError, ValueError, KeyError) as exc:
-                print(
-                    f"invalid trail JSONL at line {lineno}: {exc}",
-                    file=sys.stderr,
-                )
-                return 2
+    trail, err = _load_trail_source(args)
+    if trail is None:
+        return err
 
     out = Path(args.out).expanduser()
-    n = write_ocsf_jsonl(records, out, hostname=args.hostname)
+    n = write_ocsf_jsonl(trail._records, out, hostname=args.hostname)
     print(f"Exported {n} decisions as OCSF {OCSF_VERSION} API Activity events: {out}")
     return 0
 
@@ -6058,7 +6041,11 @@ def build_parser() -> argparse.ArgumentParser:
         "export-ocsf",
         help="Export the trail's decisions as OCSF API Activity events (JSON Lines)",
     )
-    peo.add_argument("--trail", required=True, help="Path to trail JSONL file")
+    peo_src = peo.add_mutually_exclusive_group(required=True)
+    peo_src.add_argument("--trail", help="Path to trail JSONL file")
+    peo_src.add_argument(
+        "--db", help="Path to an audit SQLite DB (e.g. ~/.vaara/claude-code/audit.db)",
+    )
     peo.add_argument("--out", required=True, help="Path to write the OCSF JSON Lines")
     peo.add_argument(
         "--hostname", default=None,
