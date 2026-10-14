@@ -109,6 +109,7 @@ Provider, and S3P, a safety-violation-rate measurement an auditor can reproduce.
 - eIDAS 2.0 qualified electronic ledger profile: `docs/eidas-qel-profile.md`
 - prEN ISO/IEC 12792 transparency taxonomy: per-record tagging in `audit/trail.py`
 - W3C PROV-DM and PROV-JSON export: `audit/prov_export.py`, `vaara trail export-prov`
+- OCSF 1.9.0 API Activity export for SIEMs and security data lakes: `audit/ocsf_export.py`, `vaara trail export-ocsf`, [ocsf.md](ocsf.md)
 - IETF RATS EAR (AR4SI) trustworthiness claims: `vaara export-attestation-result`
 - Guardrail findings tagged to articles, with deployer overrides: `integrations/_content_safety_articles.py`
 - Threat and control mappings: OWASP Top 10 for Agentic Applications 2026 (`docs/OWASP_AGENTIC.md`), OWASP AISVS C9.2.3 and C9.2.4, MITRE ATLAS (`tests/vectors/atlas_threat_v0/`), MIT AI Risk Repository (`docs/mit_ai_risk_repository_mapping.md`), article-level EU AI Act, DORA and SOC 2 mapping (`docs/COMPLIANCE.md`)
