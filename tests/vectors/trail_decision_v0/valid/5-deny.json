@@ -6,13 +6,13 @@
       "confirmed": false,
       "driver": "none"
     },
-    "decidedAt": "2026-10-11T18:25:11.245Z",
+    "decidedAt": "2026-10-14T19:51:39.696Z",
     "decision": "deny",
     "eventType": "action_blocked",
-    "previousHash": "sha256:15b6efcc1b932cbd24eff32af25ea38e910037730e053fcea67ed8d8ed3ae64b",
+    "previousHash": "sha256:051a900a3292d62b4958caae37c3bcdc2755baac3be33919cabe99808255da50",
     "reason": "He said \"no\"\n\ttab \u0001 back\\slash / \u00e4 \u20ac \ud83d\ude00 \u2028",
-    "recordHash": "sha256:16c56b9875b3399ef36776c0e4a786be59ebf24e61072194f0dd802de64936a5",
-    "recordId": "75a83b9f-214a-4ed5-86af-728cf5732bec",
+    "recordHash": "sha256:3b9405391e0c69def15305d39b72fdc82c98981c24e0eba5dfed0cc59bc2c227",
+    "recordId": "bd387142-1845-4387-aa7c-ade8c4a43bb5",
     "refusal": {
       "basis": "undetermined"
     },
@@ -24,16 +24,16 @@
   "receipt": {
     "alg": "ES256",
     "backLink": {
-      "attestationDigest": "sha256:15b6efcc1b932cbd24eff32af25ea38e910037730e053fcea67ed8d8ed3ae64b",
-      "attestationNonce": "75a83b9f-214a-4ed5-86af-728cf5732bec"
+      "attestationDigest": "sha256:051a900a3292d62b4958caae37c3bcdc2755baac3be33919cabe99808255da50",
+      "attestationNonce": "bd387142-1845-4387-aa7c-ade8c4a43bb5"
     },
     "decisionDerived": {
-      "decidedAt": "2026-10-11T18:25:11.245Z",
+      "decidedAt": "2026-10-14T19:51:39.696Z",
       "decision": "block",
       "evidenceRef": {
         "canonicalization": "jcs-rfc8785",
-        "digest": "sha256:2d02cd9a95c7fef526459a35ce245daed3b963a11585016ad94ad47fdac84e6d",
-        "ref": "vaara:trail/75a83b9f-214a-4ed5-86af-728cf5732bec",
+        "digest": "sha256:e6fa11acbcfc11f8c890057c7f6b675566ef63f14e6c6d5df7bcec849e147208",
+        "ref": "vaara:trail/bd387142-1845-4387-aa7c-ade8c4a43bb5",
         "schema": "vaara.trail-decision/v0"
       },
       "policyId": "policy:vaara-engine/1",
@@ -42,13 +42,13 @@
     },
     "issuerAsserted": {
       "alg": "ES256",
-      "iat": "2026-10-11T18:25:11Z",
+      "iat": "2026-10-14T19:51:39Z",
       "iss": "vaara:engine",
-      "nonce": "F0vQer_L75P_Oadmq8RCSUqN",
+      "nonce": "1eYYm1Jo9VmXnPoo6LspQOD7",
       "secretVersion": "es256:dfa441deb94a9c1c",
       "sub": "vector-agent"
     },
-    "signature": "d7a1155aa16332494b1a66d90c648b0bf6d58ca2f10d2ed367e36c849a09457b073091d8d4893f6eb27b72a60af334341396dbe0ae081acd1fc3f37eb8fe721c",
+    "signature": "0796ae58b358dbd6d96df204b8d618ada13103d746c0178a2892b00c8731fa57777cfe79d422db3b1265738fd5022724b7188d0a74b5b504da666e5a053b782a",
     "version": 1
   }
 }

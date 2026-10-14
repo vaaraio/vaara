@@ -1,0 +1,9 @@
+{
+  "schema": "vaara.arguments-disclosure/v0",
+  "recordId": "3fc48ab1-376c-4d12-bc9a-9070292c7982",
+  "actionId": "47906f4c-8561-4a9f-abbc-0a09908f0deb",
+  "arguments": {
+    "path": "/srv/reports/q3.csv"
+  },
+  "salt": "0f28548883a2d1bf1ec20b0bca464a50"
+}

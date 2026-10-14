@@ -175,8 +175,33 @@
       "fields": [
         "file_path"
       ],
-      "pattern": "\\.git/hooks/(pre-commit|post-commit|pre-push|post-checkout|post-merge|prepare-commit-msg)",
+      "pattern": "\\.git/hooks/(applypatch-msg|pre-applypatch|post-applypatch|pre-commit|pre-merge-commit|prepare-commit-msg|commit-msg|post-commit|pre-rebase|post-checkout|post-merge|pre-push|pre-receive|update|proc-receive|post-receive|post-update|reference-transaction|push-to-checkout|pre-auto-gc|post-rewrite|sendemail-validate|fsmonitor-watchman|p4-changelist|p4-prepare-changelist|p4-post-changelist|p4-pre-submit|post-index-change)$",
       "message": "Write to a git hook - executes on ordinary git commands and rides the repo to other machines."
+    },
+    {
+      "id": "git_config_file_write",
+      "tools": [
+        "Write",
+        "Edit"
+      ],
+      "fields": [
+        "file_path"
+      ],
+      "pattern": "(^|/)(\\.git/config(\\.worktree)?|\\.gitconfig|\\.config/git/config)$",
+      "unless_env": "VAARA_ALLOW_GIT_EXEC_CONFIG",
+      "message": "Write to a git config file - core.fsmonitor, core.pager, diff and filter drivers set there run on ordinary git commands. Set VAARA_ALLOW_GIT_EXEC_CONFIG=1 for a deliberate edit."
+    },
+    {
+      "id": "git_exec_config_shell",
+      "tools": [
+        "Bash"
+      ],
+      "fields": [
+        "command"
+      ],
+      "pattern": "(^|[\\s;&|(])git(?:\\s+(?:-C|--git-dir|--work-tree|-c)(?:\\s+|=)\\S+)*(?:\\s+-c\\s*(?i:core\\.(?:fsmonitor|pager|editor|sshcommand|hookspath|askpass|gitproxy)|diff\\.external|sequence\\.editor|pager\\.[\\w.-]+|(?:diff|merge|filter)\\.[^\\s.=]+\\.(?:command|textconv|driver|clean|smudge|process)|uploadpack\\.packobjectshook)=(?!(?:cat|less|more|true|false|:|/dev/null)(?:[\\s\\\"';&|)]|$))|\\s+config(?:\\s+--(?:local|global|system|worktree)|\\s+(?:-f|--file)(?:\\s+|=)\\S+)*(?:\\s+(?:set|--add|--replace-all))?(?:\\s+--(?:local|global|system|worktree)|\\s+(?:-f|--file)(?:\\s+|=)\\S+)*\\s+[\\\"']?(?i:core\\.(?:fsmonitor|pager|editor|sshcommand|hookspath|askpass|gitproxy)|diff\\.external|sequence\\.editor|pager\\.[\\w.-]+|(?:diff|merge|filter)\\.[^\\s.=]+\\.(?:command|textconv|driver|clean|smudge|process)|uploadpack\\.packobjectshook)[\\\"']?\\s+(?![\\\"']?(?:cat|less|more|true|false|:|/dev/null)(?:[\\s\\\"';&|)]|$))\\S)|(>>?|\\btee(\\s+-a)?|\\bsed\\s+-i\\S*|\\bln\\s+-\\S*s\\S*)[^|;&\\n]*\\.git/(config\\b|hooks/)",
+      "unless_env": "VAARA_ALLOW_GIT_EXEC_CONFIG",
+      "message": "Sets a git config key that runs a program (core.fsmonitor, core.pager, core.editor, core.sshCommand, core.hooksPath, diff and filter drivers) or writes into .git/config or .git/hooks - it executes on ordinary git commands. Set VAARA_ALLOW_GIT_EXEC_CONFIG=1 for a deliberate change."
     },
     {
       "id": "cron_persistence_write",

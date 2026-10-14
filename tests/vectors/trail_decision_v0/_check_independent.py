@@ -16,6 +16,14 @@ Per file:
   trail        the trail holds a record with the evidence's recordId, and its
                hash, written as sha256:<hex>, equals the evidence's recordHash.
 
+Per companion in companions.json, against the receipt it names:
+
+  opens        a vaara.arguments-disclosure/v0 names the receipt's actionId,
+               carries a 16-byte salt, and sha256("vaara.arguments.v1\n" || salt ||
+               JCS(arguments)) equals the evidence's argumentsCommitment.
+  matches      sha256 over JCS(state) of a vaara.engine-policy/v0 object equals
+               the evidence's policyDigest.
+
 Run: tests/vectors/trail_decision_v0/_check_independent.py
 Exit 0 means every verdict matched expected.json.
 """
@@ -37,6 +45,7 @@ from cryptography.hazmat.primitives.serialization import load_pem_public_key
 HERE = Path(__file__).resolve().parent
 _SIGNED_KEYS = ("version", "alg", "backLink", "decisionDerived", "issuerAsserted")
 _JCS_ALIASES = ("jcs-rfc8785", "JCS", "jcs-json-v1")
+_ARGUMENTS_TAG = b"vaara.arguments.v1\n"
 
 
 def _sha256(obj) -> str:
@@ -73,6 +82,47 @@ def _trail_ok(evidence, trail) -> bool:
     return stored is not None and "sha256:" + stored == evidence.get("recordHash")
 
 
+def _opens(disclosure, evidence) -> bool:
+    if disclosure.get("schema") != "vaara.arguments-disclosure/v0":
+        return False
+    if disclosure.get("actionId") != evidence.get("actionId"):
+        return False
+    try:
+        salt = bytes.fromhex(disclosure["salt"])
+        body = _ARGUMENTS_TAG + salt + rfc8785.dumps(disclosure["arguments"])
+    except (KeyError, TypeError, ValueError):
+        return False
+    return len(salt) == 16 and (
+        "sha256:" + hashlib.sha256(body).hexdigest()
+        == evidence.get("argumentsCommitment"))
+
+
+def _matches(state, evidence) -> bool:
+    return (state.get("schema") == "vaara.engine-policy/v0"
+            and _sha256(state) == evidence.get("policyDigest"))
+
+
+def _companions() -> dict:
+    index = HERE / "companions.json"
+    if not index.exists():
+        return {}
+    want = json.loads(index.read_text(encoding="utf-8"))
+    got = {}
+    for name, spec in sorted(want.items()):
+        body = json.loads((HERE / name).read_text(encoding="utf-8"))
+        evidence = json.loads((HERE / spec["receipt"]).read_text(encoding="utf-8"))["evidence"]
+        verdict = {k: v for k, v in spec.items() if k != "receipt"}
+        if "opens" in verdict:
+            got[name] = {"opens": _opens(body, evidence)}
+        if "matches" in verdict:
+            got[name] = {"matches": _matches(body, evidence)}
+        verdict_ok = got.get(name) == verdict
+        for k, v in (got.get(name) or {}).items():
+            print(f"[{'OK' if verdict_ok else 'MISMATCH'}] {name}.{k}: {v}")
+        got[name] = verdict_ok
+    return got
+
+
 def main() -> int:
     pub = load_pem_public_key((HERE / "issuer-es256.pub.pem").read_bytes())
     expected = json.loads((HERE / "expected.json").read_text(encoding="utf-8"))
@@ -92,6 +142,7 @@ def main() -> int:
     for name, verdicts in got.items():
         for k, v in verdicts.items():
             print(f"[{'OK' if v == expected[name][k] else 'MISMATCH'}] {name}.{k}: {v}")
+    ok = all(_companions().values()) and ok
     print(f"\n{'all verdicts matched expected' if ok else 'MISMATCH vs expected'}")
     return 0 if ok else 1
 
