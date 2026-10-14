@@ -6,6 +6,9 @@ and this project follows [Semantic Versioning](https://semver.org/spec/v2.0.0.ht
 
 ## [Unreleased]
 
+### Fixed
+- `vaara trail export-incident` counted the Article 73 reporting deadline from the trigger record's time. Article 73 counts from the provider's awareness, which comes after the event once a causal link is established or reasonably likely. The incident metadata takes an optional `awareness_timestamp` (ISO 8601 with a zone, or epoch seconds), the deadline runs from it, and the report's timeline carries `awareness_timestamp` and `deadline_basis` (`awareness` or `trigger_record`). Without it the trigger time is used as before. An awareness time earlier than the trigger record is refused.
+
 ## [2.13.0] - 2026-10-14
 
 ### Added

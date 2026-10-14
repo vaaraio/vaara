@@ -156,6 +156,53 @@ def test_timeline_uses_trigger_timestamp_for_discovery_and_deadline() -> None:
     assert rep["incident_timeline"]["report_due_by"] == "2023-11-29T22:13:20Z"
 
 
+def test_without_awareness_the_deadline_runs_from_the_trigger() -> None:
+    rep = build_incident_report(**_baseline_kwargs())
+    timeline = rep["incident_timeline"]
+    assert timeline["awareness_timestamp"] == timeline["discovery_timestamp"]
+    assert timeline["deadline_basis"] == "trigger_record"
+
+
+@pytest.mark.parametrize("aware", [
+    "2023-11-16T09:00:00Z", "2023-11-16T11:00:00+02:00", 1700125200.0,
+])
+def test_the_deadline_runs_from_awareness_when_given(aware) -> None:
+    # Article 73 counts from the provider's awareness, which comes after the
+    # event once the causal link is established.
+    rep = build_incident_report(**_baseline_kwargs(), awareness_timestamp=aware)
+    timeline = rep["incident_timeline"]
+    assert timeline["discovery_timestamp"] == "2023-11-14T22:13:20Z"
+    assert timeline["awareness_timestamp"] == "2023-11-16T09:00:00Z"
+    assert timeline["deadline_basis"] == "awareness"
+    assert timeline["report_due_by"] == "2023-12-01T09:00:00Z"
+
+
+def test_the_death_deadline_counts_ten_days_from_awareness() -> None:
+    kw = _baseline_kwargs()
+    kw["severity_category"] = "death"
+    rep = build_incident_report(**kw, awareness_timestamp="2023-11-16T09:00:00Z")
+    assert rep["incident_timeline"]["report_due_by"] == "2023-11-26T09:00:00Z"
+
+
+@pytest.mark.parametrize("aware,msg", [
+    ("2023-11-13T00:00:00Z", "precedes the trigger"),
+    ("2023-11-16T09:00:00", "time zone"),
+    ("yesterday", "not an ISO 8601"),
+    (True, "ISO 8601 string or epoch"),
+])
+def test_an_awareness_before_the_event_or_unreadable_is_refused(aware, msg) -> None:
+    with pytest.raises(ValueError, match=msg):
+        build_incident_report(**_baseline_kwargs(), awareness_timestamp=aware)
+
+
+def test_build_from_trail_reads_awareness_from_the_meta() -> None:
+    meta = _trail_meta()
+    meta["awareness_timestamp"] = "2023-11-16T09:00:00Z"
+    rep = build_from_trail(
+        [_rec(EventType.OUTCOME_RECORDED, record_id="r-t")], incident_meta=meta)
+    assert rep["incident_timeline"]["deadline_basis"] == "awareness"
+
+
 def test_write_round_trips_json(tmp_path: Path) -> None:
     rep = build_incident_report(**_baseline_kwargs())
     out = tmp_path / "incident.json"

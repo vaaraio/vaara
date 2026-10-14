@@ -40,7 +40,7 @@ partial, or insufficient, see [VERDICTS.md](VERDICTS.md).
 | **26(6)** | Deployer Obligations -- Logging | `ACTION_REQUESTED`, `RISK_SCORED` and `DECISION_MADE` events are the automatically generated logs the deployer must retain. The engine treats this as critical and wants at least 10 records inside the staleness window. |
 | **50(1)** | Transparency -- AI System Disclosure | `DISCLOSURE_RECORDED` events prove a natural person was informed they were interacting with an AI system. Recorded via `vaara.audit.article50`. Critical requirement; a single record inside the window satisfies it. |
 | **72(1)** | Post-Market Monitoring | `OUTCOME_RECORDED` events form the post-market signal, tied back to the original action via `action_id`. |
-| **73(1)** | Serious-Incident Reporting | `vaara trail export-incident` builds a standalone JSON report referencing the trigger audit record by `record_id`. INTERIM format pending the Commission guidance required by Article 73(7). Reporting deadline is derived from the Article 3(49) sub-category (general 15 days, death 10 days, Article 3(49)(b) widespread or serious 2 days). |
+| **73(1)** | Serious-Incident Reporting | `vaara trail export-incident` builds a standalone JSON report referencing the trigger audit record by `record_id`. INTERIM format pending the Commission guidance required by Article 73(7). Reporting deadline is derived from the Article 3(49) sub-category (general 15 days, death 10 days, Article 3(49)(b) widespread or serious 2 days), counted from `awareness_timestamp` in the incident metadata when it is given and from the trigger record otherwise. |
 
 ### Article 14 in particular
 

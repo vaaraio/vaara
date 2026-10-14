@@ -20,6 +20,12 @@ Reporting deadlines per Article 73:
 * Paragraph 3 Article 3(49)(b):     2  days (widespread infringement / serious)
 * Paragraph 4 death of a person:    10 days
 
+Each period runs from the provider's awareness of the incident, which
+comes after the event itself once a causal link is established or
+reasonably likely. ``awareness_timestamp`` records that moment; without
+it the trigger record's time stands in, which gives an earlier, stricter
+deadline.
+
 Paragraph 5 supports an incomplete *initial* report followed by a
 *complete* one. ``report_status`` selects between them; ``previous_report_id``
 links a complete report back to its initial.
@@ -33,7 +39,8 @@ import json
 import time
 import uuid
 from pathlib import Path
-from typing import Iterable, Optional
+from datetime import datetime
+from typing import Iterable, Optional, Union
 
 from vaara.audit.trail import AuditRecord, EventType
 
@@ -61,6 +68,26 @@ _VALID_REPORTER_ROLE = ("provider", "deployer")
 def _iso(epoch: Optional[float] = None) -> str:
     return time.strftime("%Y-%m-%dT%H:%M:%SZ",
                          time.gmtime(epoch if epoch is not None else time.time()))
+
+
+def _epoch(value: Union[str, float, int]) -> float:
+    """An ISO 8601 timestamp with a zone, or epoch seconds, as epoch seconds."""
+    if isinstance(value, bool):
+        raise ValueError("awareness_timestamp must be an ISO 8601 string or epoch seconds")
+    if isinstance(value, (int, float)):
+        return float(value)
+    text = str(value).strip()
+    if text.endswith("Z"):
+        text = text[:-1] + "+00:00"
+    try:
+        moment = datetime.fromisoformat(text)
+    except ValueError:
+        raise ValueError(
+            f"awareness_timestamp is not an ISO 8601 timestamp: {value!r}") from None
+    if moment.tzinfo is None:
+        raise ValueError(
+            f"awareness_timestamp needs a time zone, got {value!r}")
+    return moment.timestamp()
 
 
 def _validate_inputs(
@@ -110,6 +137,7 @@ def build_incident_report(
     incident_id: Optional[str] = None,
     report_timestamp: Optional[str] = None,
     extensions: Optional[dict] = None,
+    awareness_timestamp: Optional[Union[str, float]] = None,
 ) -> dict:
     """Build a serialisable Article 73 incident report dict.
 
@@ -117,7 +145,9 @@ def build_incident_report(
     semantics. ``trigger_record`` is the audit event whose occurrence
     establishes the incident; ``evidence_records`` are additional records
     listed as evidence. The trigger's ``timestamp`` anchors
-    ``incident_timeline.discovery_timestamp`` and the deadline computation.
+    ``incident_timeline.discovery_timestamp``. The deadline runs from
+    ``awareness_timestamp`` (ISO 8601 with a zone, or epoch seconds), which
+    may not precede the trigger; without one it runs from the trigger.
     """
     _validate_inputs(
         trigger_record, severity_category,
@@ -127,7 +157,17 @@ def build_incident_report(
 
     deadline_days = _DEADLINE_DAYS[severity_category]
     discovery_iso = _iso(trigger_record.timestamp)
-    report_due_iso = _iso(trigger_record.timestamp + deadline_days * 86400)
+    if awareness_timestamp is None:
+        aware = trigger_record.timestamp
+        basis = "trigger_record"
+    else:
+        aware = _epoch(awareness_timestamp)
+        if aware < trigger_record.timestamp:
+            raise ValueError(
+                f"awareness_timestamp {_iso(aware)} precedes the trigger record "
+                f"at {discovery_iso}")
+        basis = "awareness"
+    report_due_iso = _iso(aware + deadline_days * 86400)
 
     record_ids = [trigger_record.record_id]
     for r in evidence_records:
@@ -164,6 +204,8 @@ def build_incident_report(
         },
         "incident_timeline": {
             "discovery_timestamp": discovery_iso,
+            "awareness_timestamp": _iso(aware),
+            "deadline_basis": basis,
             "report_due_by": report_due_iso,
         },
         "affected_persons": affected_persons
@@ -246,4 +288,5 @@ def build_from_trail(
         incident_id=incident_meta.get("incident_id"),
         report_timestamp=incident_meta.get("report_timestamp"),
         extensions=incident_meta.get("extensions"),
+        awareness_timestamp=incident_meta.get("awareness_timestamp"),
     )
