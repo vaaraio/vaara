@@ -346,6 +346,10 @@ class InterceptionPipeline:
         self._grants_lock = threading.Lock()
         self._metrics = PipelineMetrics()
         self._metrics_lock = threading.Lock()
+        # The digest of the decision state last written to the trail, so the
+        # full state rides only on the first decision after it changes.
+        self._last_policy_digest = ""
+        self._policy_digest_lock = threading.Lock()
 
     def _replay_session(self, agent_id: str, session_id: str, tenant_id: str,
                         action_id: str) -> None:
@@ -371,6 +375,28 @@ class InterceptionPipeline:
 
     def _scorer_policy_id(self) -> str:
         return f"scorer:{type(self.scorer).__name__}"
+
+    def _policy_snapshot(self) -> tuple[str, Optional[dict]]:
+        """The digest of the decision state, and the state when it changed.
+
+        Never blocks a decision: a state that cannot be described or digested
+        leaves the record without either key.
+        """
+        from vaara import __version__
+        from vaara.policy_state import digest, engine_state
+
+        try:
+            state = engine_state(version=__version__, enforce=self._enforce,
+                                 scorer=self.scorer, authority=self.authority)
+            policy_digest = digest(state)
+        except Exception:
+            logger.warning("decision state could not be digested; recording "
+                           "the decision without policy_digest", exc_info=True)
+            return "", None
+        with self._policy_digest_lock:
+            changed = policy_digest != self._last_policy_digest
+            self._last_policy_digest = policy_digest
+        return policy_digest, (state if changed else None)
 
     def intercept(
         self,
@@ -526,6 +552,7 @@ class InterceptionPipeline:
                     _MAX_DECISION_REASON_LEN,
                     "reason",
                 )
+                fail_digest, fail_state = self._policy_snapshot()
                 self.trail.record_decision(
                     action_id=action_id,
                     agent_id=agent_id,
@@ -537,6 +564,8 @@ class InterceptionPipeline:
                     policy_id=self._scorer_policy_id(),
                     violation_type="scorer_failure",
                     unavailable_input=self._scorer_policy_id(),
+                    policy_digest=fail_digest,
+                    policy_state=fail_state,
                 )
             except Exception:
                 logger.exception(
@@ -877,6 +906,7 @@ class InterceptionPipeline:
         # data-payload schema explicitly permits (consumers MUST accept
         # unknown keys). A record with no refinement gains no keys, so
         # every existing record hashes exactly as it did before.
+        policy_digest, policy_state = self._policy_snapshot()
         self.trail.record_decision(
             action_id=action_id,
             agent_id=agent_id,
@@ -892,6 +922,8 @@ class InterceptionPipeline:
             policy_id=deny_policy_id,
             violation_type=violation_type,
             unavailable_input=unavailable_input,
+            policy_digest=policy_digest,
+            policy_state=policy_state,
         )
 
         if decision_str == "escalate":

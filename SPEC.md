@@ -849,6 +849,7 @@ file holds the envelope under `receipt` and the evidence record under
 | `cage` | The cage the deciding process ran in. See "The cage block" below. Absent on records written before the cage layer. |
 | `refusal` | On a `deny` only: what the refusal rests on. See "The refusal block" below. Absent on records written before it. |
 | `argumentsCommitment` | `sha256:` and 64 lowercase hex characters: a salted commitment to the arguments of the request the decision answered. See "The arguments commitment" below. Absent when the trail recorded none for that request. |
+| `policyDigest` | `sha256:` and 64 lowercase hex characters over the engine's decision state when it decided. See "The policy digest" below. Absent on records written without one. |
 
 The envelope writes the trail's `deny` as `block`. `backLink.attestationDigest`
 is `previousHash`, `backLink.attestationNonce` is `recordId`, and
@@ -894,6 +895,24 @@ Vectors are in `tests/vectors/trail_decision_v0/`: receipts written by the
 engine's own sink over a SQLite trail, tampered copies, the trail's record
 hashes, and `expected.json` with each file's verdict. The macOS app's verifier
 checks the same files.
+
+#### The policy digest
+
+A receipt that says the policy decided cannot be checked against anything
+unless it says which policy. The engine describes the state it decides by as
+one `vaara.engine-policy/v0` object: `schema`, the Vaara version as `vaara`,
+`enforce` (false in shadow mode), the scorer's configured state as `scorer`
+(for the default scorer: its class, `thresholds`, `sequences`,
+`perTenantPolicies` and the loaded `policy`), and `authority` when session
+authority decay is configured. Learned state, such as calibration and expert
+weights, changes with every decision and is not part of it.
+
+Each decision record carries `policy_digest`, `sha256:` and the SHA-256 of the
+state's RFC 8785 form, and the receipt carries it as `policyDigest`. The first
+decision a pipeline records, and the first after its state changes, also
+carries the state as `policy_state`, so a reader holding the trail finds the
+state behind every digest and recomputes it. A per-tenant policy lookup is
+named as present; the policies behind it are not in the state.
 
 #### The refusal block
 

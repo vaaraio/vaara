@@ -42,7 +42,7 @@ License: AGPL-3.0-or-later.
 | Capability | Where | What it does |
 |---|---|---|
 | Canonical receipt | `attestation/receipt.py`, `SPEC.md` | `vaara.receipt/v1`, JCS (RFC 8785) canonical, ES256, RS256 or HS256. |
-| A receipt per decision | `pipeline.py` with `vaara[attestation]` | Every allow, escalate and deny leaves a signed decision receipt beside the trail. `vaara receipt verify-decision` checks them; over MCP, the Vaara MCP server's `vaara_verify_receipt` checks one where the agent is. Each receipt carries a salted commitment to the decision's arguments; `vaara receipt disclose-arguments` opens one for an auditor and `vaara receipt verify-arguments` checks it without the trail. |
+| A receipt per decision | `pipeline.py` with `vaara[attestation]` | Every allow, escalate and deny leaves a signed decision receipt beside the trail. `vaara receipt verify-decision` checks them; over MCP, the Vaara MCP server's `vaara_verify_receipt` checks one where the agent is. Each receipt carries a salted commitment to the decision's arguments; `vaara receipt disclose-arguments` opens one for an auditor and `vaara receipt verify-arguments` checks it without the trail. Each receipt also names the engine's decision state as `policyDigest`, and the trail keeps the state behind it. |
 | Hash-chained audit trail | `audit/trail.py`, `audit/sqlite_backend.py` | Append-only, linear SHA-256 chain, tamper-evident by recomputing from the bytes. |
 | SEP-2828 execution and decision records | `attestation/decision.py`, `attestation/tool_call_attestation.py` | Decision basis carried natively: `rationale`, `binding`, `decisionProof`. |
 | Evidence ingestion | `vaara ingest`, `attestation/_ingest_emit.py` | Foreign evidence in, one signed record out. |

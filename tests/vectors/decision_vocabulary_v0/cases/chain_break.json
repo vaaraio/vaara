@@ -97,6 +97,22 @@
       "decision": "allow",
       "reason": "vector: edited after the fact",
       "risk_score": 0.5,
+      "policy_digest": "sha256:dbb9e45494afea14faf18f61fc29821a4d011d1d980f85e8ac4d0e681b3ebcdd",
+      "policy_state": {
+        "schema": "vaara.engine-policy/v0",
+        "vaara": "0.0.0+vectors",
+        "enforce": true,
+        "scorer": {
+          "scorer": "_FixedScorer"
+        },
+        "authority": {
+          "budget": 3.0,
+          "low": 1.0,
+          "half_life_s": 3600.0,
+          "floor": 0.3,
+          "enabled": true
+        }
+      },
       "cage": {
         "driver": "none",
         "confirmed": false
@@ -117,7 +133,7 @@
       }
     ],
     "previous_hash": "606b928fe94c0af414a95bae1d7433e7da1016a132f0d9aa46b38a4cf0fc3489",
-    "record_hash": "97cf7f4ff0c98d60ffa8af7d619a26a7b88f3a1ae7bdb527ef0023e2171e19e4",
+    "record_hash": "7701dd26b70abacf9c350c8a04f43bb961e63ca3b2432c65d5f532732eb2c925",
     "system_operation": "decision_threshold",
     "data_usage": "risk_score+thresholds",
     "decision_making": "threshold_match",

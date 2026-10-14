@@ -1658,6 +1658,31 @@ class AdaptiveScorer:
     def thresholds(self) -> tuple[float, float]:
         return (self._threshold_allow, self._threshold_deny)
 
+    def policy_state(self) -> dict[str, Any]:
+        """What an operator configured this scorer to decide by, as plain JSON.
+
+        Thresholds, sequence patterns and the loaded policy. Learned state
+        (calibration, expert weights, agent profiles) moves with every
+        decision and is not part of it. A per-tenant policy lookup is named
+        as present; the policies behind it are not listed.
+        """
+        from vaara.policy_state import jsonable
+
+        with self._lock:
+            state: dict[str, Any] = {
+                "scorer": type(self).__name__,
+                "thresholds": {"allow": self._threshold_allow, "deny": self._threshold_deny},
+                "sequences": [
+                    {"name": s.name, "actions": list(s.actions), "riskBoost": s.risk_boost,
+                     "windowSize": s.window_size, "escalate": bool(s.escalate)}
+                    for s in self._sequences
+                ],
+                "perTenantPolicies": self._policy_lookup is not None,
+            }
+            if self._default_policy is not None:
+                state["policy"] = jsonable(self._default_policy)
+        return state
+
     def status(self) -> dict[str, Any]:
         """Dashboard-friendly status snapshot."""
         return {

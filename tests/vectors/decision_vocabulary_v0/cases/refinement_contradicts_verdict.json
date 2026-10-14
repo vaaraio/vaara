@@ -104,6 +104,22 @@
       },
       "policy_id": "scorer:_FixedScorer",
       "violation_type": "risk_threshold",
+      "policy_digest": "sha256:dbb9e45494afea14faf18f61fc29821a4d011d1d980f85e8ac4d0e681b3ebcdd",
+      "policy_state": {
+        "schema": "vaara.engine-policy/v0",
+        "vaara": "0.0.0+vectors",
+        "enforce": true,
+        "scorer": {
+          "scorer": "_FixedScorer"
+        },
+        "authority": {
+          "budget": 3.0,
+          "low": 1.0,
+          "half_life_s": 3600.0,
+          "floor": 0.3,
+          "enabled": true
+        }
+      },
       "cage": {
         "driver": "none",
         "confirmed": false
@@ -124,7 +140,7 @@
       }
     ],
     "previous_hash": "706c817f2c0957d7d909cfea866b713cba9068dea3689d0a5adaca751599efb7",
-    "record_hash": "2b306358a42f454568933e6d5f6a9e3cfe03028ea3a346622177da848ce517a0",
+    "record_hash": "ab571efd02fc0d9b706774025d34c3accbc3f14d350a06f764d80fe129e6b3e0",
     "system_operation": "blocking",
     "data_usage": "risk_score+thresholds",
     "decision_making": "threshold_match",
@@ -171,8 +187,8 @@
         "how_satisfied": "All agent actions are logged as events for incident detection"
       }
     ],
-    "previous_hash": "2b306358a42f454568933e6d5f6a9e3cfe03028ea3a346622177da848ce517a0",
-    "record_hash": "9d4239c7af9116e4f1b89a12c974a722b28ee9408b341af4e4493bc2b1bc38bd",
+    "previous_hash": "ab571efd02fc0d9b706774025d34c3accbc3f14d350a06f764d80fe129e6b3e0",
+    "record_hash": "2e83ac0f814ea97ab446a390a85542f426296a0821a8bc918e8a1b1e08939a5e",
     "system_operation": "logging_intake",
     "data_usage": "tool_args+context",
     "decision_making": "n/a",
@@ -210,8 +226,8 @@
         "how_satisfied": "Conformal calibration provides distribution-free coverage guarantees on risk estimates"
       }
     ],
-    "previous_hash": "9d4239c7af9116e4f1b89a12c974a722b28ee9408b341af4e4493bc2b1bc38bd",
-    "record_hash": "f991a81736c99c28f6a29e97051a94464192dcaf919acc29b87dd61c8f9f0b5d",
+    "previous_hash": "2e83ac0f814ea97ab446a390a85542f426296a0821a8bc918e8a1b1e08939a5e",
+    "record_hash": "5c70fe32854931a82a94fdf048f32c26188b3e759ac98af3add94a526ee04da7",
     "system_operation": "scoring",
     "data_usage": "tool_args+history+policy",
     "decision_making": "heuristic_score",
@@ -230,6 +246,7 @@
       "decision": "allow",
       "reason": "vector: policy returned allow",
       "risk_score": 0.5,
+      "policy_digest": "sha256:dbb9e45494afea14faf18f61fc29821a4d011d1d980f85e8ac4d0e681b3ebcdd",
       "cage": {
         "driver": "none",
         "confirmed": false
@@ -249,8 +266,8 @@
         "how_satisfied": "Decision records include risk scores, confidence intervals, and contributing signals"
       }
     ],
-    "previous_hash": "f991a81736c99c28f6a29e97051a94464192dcaf919acc29b87dd61c8f9f0b5d",
-    "record_hash": "613702cb18cfef412ca6fc8b591a1980aa02af7fe9806191d78274d0146a8560",
+    "previous_hash": "5c70fe32854931a82a94fdf048f32c26188b3e759ac98af3add94a526ee04da7",
+    "record_hash": "10427dfe375083c132244d12ed1b033d94407fc93488e77a20c27b4ffde0372c",
     "system_operation": "decision_threshold",
     "data_usage": "risk_score+thresholds",
     "decision_making": "threshold_match",

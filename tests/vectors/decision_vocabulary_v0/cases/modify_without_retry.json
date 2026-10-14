@@ -104,6 +104,22 @@
       },
       "policy_id": "scorer:_FixedScorer",
       "violation_type": "risk_threshold",
+      "policy_digest": "sha256:dbb9e45494afea14faf18f61fc29821a4d011d1d980f85e8ac4d0e681b3ebcdd",
+      "policy_state": {
+        "schema": "vaara.engine-policy/v0",
+        "vaara": "0.0.0+vectors",
+        "enforce": true,
+        "scorer": {
+          "scorer": "_FixedScorer"
+        },
+        "authority": {
+          "budget": 3.0,
+          "low": 1.0,
+          "half_life_s": 3600.0,
+          "floor": 0.3,
+          "enabled": true
+        }
+      },
       "cage": {
         "driver": "none",
         "confirmed": false
@@ -124,7 +140,7 @@
       }
     ],
     "previous_hash": "706c817f2c0957d7d909cfea866b713cba9068dea3689d0a5adaca751599efb7",
-    "record_hash": "1d38790f761b01de39f51ab3e15a7ba8cbc7ada596d1b35d1ab8c702df073173",
+    "record_hash": "2621fc2679a8099d8fba5f552c5fdc970ed116c7b47d904b67cee93038b77395",
     "system_operation": "blocking",
     "data_usage": "risk_score+thresholds",
     "decision_making": "threshold_match",

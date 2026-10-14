@@ -148,6 +148,9 @@ def build_evidence(
     }
     if arguments_commitment and _COMMITMENT.match(arguments_commitment):
         evidence["argumentsCommitment"] = arguments_commitment
+    policy_digest = data.get("policy_digest")
+    if isinstance(policy_digest, str) and _COMMITMENT.match(policy_digest):
+        evidence["policyDigest"] = policy_digest
     if data.get("decision_detail"):
         evidence["decisionDetail"] = str(data["decision_detail"])
     if data.get("approver"):

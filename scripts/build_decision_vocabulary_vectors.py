@@ -8,9 +8,10 @@ to match a checker. Every scenario is driven through
 ``InterceptionPipeline.intercept`` with a stub scorer that returns one fixed
 policy decision, and the resulting chain is exported verbatim.
 
-Record ids, timestamps and argument salts are the only things this script
-controls: ``uuid4``, ``time.time`` and the salt source are replaced with
-deterministic sequences so re-running
+Record ids, timestamps, argument salts and the version named in the decision
+state are the only things this script controls: ``uuid4``, ``time.time`` and
+the salt source are replaced with deterministic sequences, and the version is
+fixed, so re-running
 produces byte-identical fixtures. Everything else, including every record hash
 and every chain link, is computed by Vaara exactly as it is in production. That
 is what makes the committed hashes worth checking: an outside party recomputing
@@ -97,7 +98,8 @@ def _build(out: Path) -> None:
 
     with mock.patch("vaara.audit.trail.uuid.uuid4", _uuid4), \
             mock.patch("vaara.audit.trail.time.time", _now), \
-            mock.patch("vaara.audit._arguments_commitment.new_salt", _salt):
+            mock.patch("vaara.audit._arguments_commitment.new_salt", _salt), \
+            mock.patch("vaara.__version__", "0.0.0+vectors"):
 
         for name, action in (
             ("allow_plain", "allow"),
