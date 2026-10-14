@@ -1360,6 +1360,7 @@ class AuditTrail:
         unavailable_input: str = "",
         policy_digest: str = "",
         policy_state: Optional[dict] = None,
+        sequence_steps: Optional[dict] = None,
     ) -> None:
         """Record the allow/deny/escalate decision.
 
@@ -1392,6 +1393,10 @@ class AuditTrail:
         (``vaara.policy_state``) and ``policy_state`` the state itself, which
         a caller passes on the first decision after the state changes. Same
         omission rule: empty adds no keys.
+
+        ``sequence_steps`` maps each sequence pattern that matched to the
+        action ids of its earlier steps, oldest first, so the record names the
+        actions that changed the outcome. Same omission rule.
 
         ``cage`` is the block :func:`vaara.cage.observe` returns: which cage
         the deciding process runs in and whether the kernel confirmed it at
@@ -1505,6 +1510,12 @@ class AuditTrail:
                     {str(k): json_safe(v) for k, v in policy_state.items()},
                     self._MAX_ASSESSMENT_JSON_BYTES,
                 )
+        if sequence_steps:
+            data["sequence_steps"] = self._cap_record_dict_bytes(
+                {str(k): [str(i) for i in v] for k, v in sequence_steps.items()
+                 if isinstance(v, (list, tuple))},
+                self._MAX_ASSESSMENT_JSON_BYTES,
+            )
         data["cage"] = self._cap_record_dict_bytes(
             {str(k): json_safe(v) for k, v in cage.items()},
             self._MAX_ASSESSMENT_JSON_BYTES,
