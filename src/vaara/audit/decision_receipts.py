@@ -226,7 +226,7 @@ def _ignore_in_git(key_dir: Path) -> None:
             os.chmod(key_dir, 0o700)
         # Only the key file: a keys/ folder that was already there may hold
         # files its owner tracks on purpose.
-        ignore.write_text(f"{KEY_RELPATH.name}\n.gitignore\n", encoding="utf-8")
+        ignore.write_text(f"{KEY_RELPATH.name}\n.gitignore\n", encoding="utf-8", newline="\n")
     except OSError:
         logger.warning("could not write %s; keep %s out of version control", ignore, key_dir)
 
