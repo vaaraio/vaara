@@ -250,3 +250,28 @@ def test_a_json_array_is_reported_as_not_a_receipt(tmp_path):
     )
     with pytest.raises(ValueError, match="not a decision receipt"):
         dr.verify_receipt_file(bad, public_key_pem=key)
+
+
+def test_a_write_the_store_refused_leaves_no_receipt(tmp_path, monkeypatch):
+    # 13.10.2026: the trail went malformed, every insert raised, and the sink
+    # still signed a receipt per decision. 1,274 receipts named records that
+    # exist in no copy of the trail. A receipt claims a chain position, so it
+    # is minted only for a record the store kept.
+    db = tmp_path / "trail" / "audit.db"
+    db.parent.mkdir()
+    backend = SQLiteAuditBackend(db)
+    trail = backend.load_trail()
+
+    def refuse(record, stamp):
+        raise sqlite3.DatabaseError("database disk image is malformed")
+
+    monkeypatch.setattr(backend, "append_record", refuse)
+    _record(trail, "deny")
+    assert _files(db) == []
+    assert trail._receipt_sink.written == 0
+
+    monkeypatch.undo()
+    _record(trail, "allow", tool="write_file")
+    files = _files(db)
+    assert len(files) == 1
+    assert dr.verify_receipt_file(files[0], trail_hashes=_hashes(db)).ok

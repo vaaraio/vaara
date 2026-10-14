@@ -2538,13 +2538,15 @@ class AuditTrail:
         the automatic-anchor trigger so the gap marker (which appends via
         ``_append_chained`` directly) cannot recurse back into anchoring.
         """
-        self._append_chained(record)
+        kept = self._append_chained(record)
         self._maybe_auto_anchor()
         self._maybe_auto_publish()
-        # A signed receipt per decision (vaara.audit.decision_receipts). The
-        # decision is already on the chain; the sink logs its own failures.
+        # A signed receipt per decision (vaara.audit.decision_receipts). It
+        # names the record's place on the chain, so it is minted only when the
+        # store kept the record; a refused write is counted by the
+        # write-failure marker instead. The sink logs its own failures.
         sink = self._receipt_sink
-        if sink is not None:
+        if sink is not None and kept:
             sink(record)
 
     def _maybe_auto_publish(self) -> None:
@@ -2769,8 +2771,13 @@ class AuditTrail:
             },
         ))
 
-    def _append_chained(self, record: AuditRecord) -> None:
-        """Append a record to the trail with hash chaining."""
+    def _append_chained(self, record: AuditRecord) -> bool:
+        """Append a record to the trail with hash chaining.
+
+        Returns False when the store refused the write, True otherwise
+        (including a trail with no store behind it).
+        """
+        kept = True
         # Sanitize caller-supplied `data` at the single choke point so any
         # record_* method (including direct AuditTrail users bypassing the
         # pipeline) cannot land a datetime/bytes/Path/UUID in data and
@@ -2811,6 +2818,7 @@ class AuditTrail:
                     # exactly as the on_record path below does.
                     _stamp(self._last_hash)
                     self._note_persistence_failure(record, exc, "append_record")
+                    kept = False
                 else:
                     self._note_persistence_ok()
             else:
@@ -2820,11 +2828,13 @@ class AuditTrail:
                         self._on_record(record)
                     except Exception as exc:
                         self._note_persistence_failure(record, exc, "on_record")
+                        kept = False
                     else:
                         self._note_persistence_ok()
 
             self._last_hash = record.record_hash
             self._index_record(record)
+        return kept
 
     def _index_record(self, record: AuditRecord) -> None:
         """Put one record into every in-memory index.
