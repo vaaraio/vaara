@@ -6,13 +6,13 @@
       "confirmed": false,
       "driver": "none"
     },
-    "decidedAt": "2026-10-11T18:25:11.194Z",
+    "decidedAt": "2026-10-14T19:51:39.625Z",
     "decision": "allow",
     "eventType": "decision_made",
     "previousHash": "sha256:e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
     "reason": "allow: risk=0.12 (threshold allow<0.55 deny>0.85)",
-    "recordHash": "sha256:773c2651d52101059c9417ff2f623495f5c5a508ef7305646019d53d32e1127f",
-    "recordId": "b561fca7-d8a6-46ff-b8f8-5d5db0bf4583",
+    "recordHash": "sha256:6fea1cb7c65d12af25ab91c9c4ff6e2f856cd668247e034cbb024e114a23d568",
+    "recordId": "61e755ab-7934-4f04-aa5b-3966076c0017",
     "riskScore": "0.12",
     "schema": "vaara.trail-decision/v0",
     "tenantId": "",
@@ -22,15 +22,15 @@
     "alg": "ES256",
     "backLink": {
       "attestationDigest": "sha256:e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
-      "attestationNonce": "b561fca7-d8a6-46ff-b8f8-5d5db0bf4583"
+      "attestationNonce": "61e755ab-7934-4f04-aa5b-3966076c0017"
     },
     "decisionDerived": {
-      "decidedAt": "2026-10-11T18:25:11.194Z",
+      "decidedAt": "2026-10-14T19:51:39.625Z",
       "decision": "allow",
       "evidenceRef": {
         "canonicalization": "jcs-rfc8785",
-        "digest": "sha256:503ad5ec6dcaaecc5c0f996592625fad5a7790eceb73dbe053be9b4cfcd04420",
-        "ref": "vaara:trail/b561fca7-d8a6-46ff-b8f8-5d5db0bf4583",
+        "digest": "sha256:85d7a8c8a12a978c80b0feb15515b4ca2dffb8273367048c2c4b2b78a4fd508b",
+        "ref": "vaara:trail/61e755ab-7934-4f04-aa5b-3966076c0017",
         "schema": "vaara.trail-decision/v0"
       },
       "policyId": "policy:vaara-engine/1",
@@ -39,13 +39,13 @@
     },
     "issuerAsserted": {
       "alg": "ES256",
-      "iat": "2026-10-11T18:25:11Z",
+      "iat": "2026-10-14T19:51:39Z",
       "iss": "vaara:engine",
-      "nonce": "YpJ2ZVF-I9cOWtvq4aRE4zhk",
+      "nonce": "ubSib9R8WkBd17rQUqQZULwn",
       "secretVersion": "es256:dfa441deb94a9c1c",
       "sub": "vector-agent"
     },
-    "signature": "024ea1af15f9cfe1b69aa61d49cd842acadefa1f5987926cafc114a5ef332322a3595406ddb3e68d78b3eb70d0af47458edcc63520395fdc39875c7d0d6a4292",
+    "signature": "33f752ede0262658fbac111964e51b75c88695698aef8968faf9fdb4cb08070b07ec282fec0edc6b6841e4c425d37cc064e9f7ec4f2b5fd3339b5c25f73cae80",
     "version": 1
   }
 }

@@ -38,5 +38,10 @@
     "evidence": true,
     "signature": true,
     "trail": true
+  },
+  "valid/6-allow.json": {
+    "evidence": true,
+    "signature": true,
+    "trail": true
   }
 }

@@ -242,3 +242,23 @@ def test_taskstop_is_named_by_a_rule_not_only_by_the_matcher():
     assert stop is not None and stop[0] == "background_task_stop"
     drop = match_deny_rule(_rules(), "CronDelete", {"id": "1aec2581"})
     assert drop is not None and drop[0] == "schedule_removal"
+
+
+# The plugin's bundled matcher runs when no vaara binary is on PATH. A Windows
+# path arrives with backslashes; it has to hit the same rules the package
+# matcher (vaara.deny_rules) hits, which folds them.
+WINDOWS_PATHS = [
+    ("Write", {"file_path": "C:\\Users\\h\\.ssh\\authorized_keys", "content": "ssh-rsa X"}),
+    ("Edit", {"file_path": "C:\\repo\\.git\\hooks\\pre-commit", "new_string": "x"}),
+    ("Write", {"file_path": "C:\\Users\\h\\.claude\\settings.json", "content": "{}"}),
+]
+
+
+@pytest.mark.parametrize("tool,tool_input", WINDOWS_PATHS)
+def test_windows_paths_hit_the_same_rule_in_both_matchers(tool, tool_input):
+    from vaara.deny_rules import match_deny_rule as package_match
+
+    plugin = match_deny_rule(_rules(), tool, tool_input)
+    package = package_match(_rules(), tool, tool_input)
+    assert plugin is not None
+    assert plugin == package

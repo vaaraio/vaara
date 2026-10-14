@@ -1,0 +1,14 @@
+{
+  "companions/6-allow.arguments-changed.json": {
+    "opens": false,
+    "receipt": "valid/6-allow.json"
+  },
+  "companions/6-allow.arguments.json": {
+    "opens": true,
+    "receipt": "valid/6-allow.json"
+  },
+  "companions/6-allow.policy-state.json": {
+    "matches": true,
+    "receipt": "valid/6-allow.json"
+  }
+}
