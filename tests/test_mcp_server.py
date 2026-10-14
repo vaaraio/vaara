@@ -386,7 +386,8 @@ class TestPersistedTrail:
     """A server with its own database opens the trail the way every other
     entry point does, so its decisions carry the same signed receipts."""
 
-    def _intercept(self, server, req_id, tool):
+    @staticmethod
+    def _intercept(server, req_id, tool):
         response = server.handle_request({
             "jsonrpc": "2.0",
             "id": req_id,
@@ -406,8 +407,8 @@ class TestPersistedTrail:
         db.parent.mkdir()
         server = VaaraMCPServer(db_path=db)
         try:
-            self._intercept(server, 1, "read_file")
-            self._intercept(server, 2, "write_file")
+            TestPersistedTrail._intercept(server, 1, "read_file")
+            TestPersistedTrail._intercept(server, 2, "write_file")
         finally:
             server.close()
         with sqlite3.connect(db) as con:
@@ -424,7 +425,7 @@ class TestPersistedTrail:
         for req_id in (1, 2):
             server = VaaraMCPServer(db_path=db)
             try:
-                self._intercept(server, req_id, "read_file")
+                TestPersistedTrail._intercept(server, req_id, "read_file")
             finally:
                 server.close()
         backend = SQLiteAuditBackend(db)
@@ -447,7 +448,7 @@ class TestVerifyReceipt:
         db = tmp_path / "trail" / "audit.db"
         db.parent.mkdir()
         server = VaaraMCPServer(db_path=db)
-        TestPersistedTrail._intercept(None, server, 1, "read_file")
+        TestPersistedTrail._intercept(server, 1, "read_file")
         receipt = json.loads(next((db.parent / dr.RECEIPTS_DIRNAME).rglob("*.json")).read_text())
         yield server, db, receipt
         server.close()
@@ -483,7 +484,7 @@ class TestVerifyReceipt:
         assert body["evidence"] is False
         assert body["detail"] == "evidence digest does not match"
 
-    def test_a_receipt_from_another_trail_says_so(self, persisted, tmp_path):
+    def test_a_receipt_from_another_issuer_verifies_without_a_trail_claim(self, persisted, tmp_path):
         server, _db, _receipt = persisted
         from vaara.audit import decision_receipts as dr
 
@@ -491,7 +492,7 @@ class TestVerifyReceipt:
         other_db.parent.mkdir()
         other = VaaraMCPServer(db_path=other_db)
         try:
-            TestPersistedTrail._intercept(None, other, 1, "read_file")
+            TestPersistedTrail._intercept(other, 1, "read_file")
         finally:
             other.close()
         receipts = other_db.parent / dr.RECEIPTS_DIRNAME
@@ -500,8 +501,9 @@ class TestVerifyReceipt:
         response = self._verify(server, {"receipt": foreign, "public_key_pem": key})
         body = json.loads(response["result"]["content"][0]["text"])
         assert body["signature"] is True
-        assert body["trail"] is False
-        assert body["detail"] == "record not in trail"
+        assert body["ok"] is True
+        assert body["trail"] is None
+        assert "not this server's" in body["detail"]
 
     def test_the_wrong_key_fails_the_signature(self, persisted, tmp_path):
         server, _db, receipt = persisted
@@ -527,3 +529,76 @@ class TestVerifyReceipt:
     def test_malformed_input_is_invalid_params(self, persisted, arguments):
         server, _db, _receipt = persisted
         assert self._verify(server, arguments)["error"]["code"] == -32602
+
+
+class TestVerifyReceiptBoundaries:
+    """What vaara_verify_receipt may and may not vouch for."""
+
+    def _verify(self, server, arguments):
+        return TestVerifyReceipt._verify(None, server, arguments)
+
+    @staticmethod
+    def _body(response):
+        return json.loads(response["result"]["content"][0]["text"])
+
+    def _server(self, tmp_path, name="trail"):
+        pytest.importorskip("cryptography")
+        pytest.importorskip("rfc8785")
+        from vaara.audit import decision_receipts as dr
+
+        db = tmp_path / name / "audit.db"
+        db.parent.mkdir(parents=True)
+        server = VaaraMCPServer(db_path=db)
+        TestPersistedTrail._intercept(server, 1, "read_file")
+        receipt = json.loads(next((db.parent / dr.RECEIPTS_DIRNAME).rglob("*.json")).read_text())
+        return server, db, receipt
+
+    def test_a_receipt_reminted_under_another_key_is_not_vouched_for_by_this_trail(self, tmp_path):
+        from vaara.audit import decision_receipts as dr
+        from vaara.audit.sqlite_backend import SQLiteAuditBackend
+
+        server, db, receipt = self._server(tmp_path)
+        try:
+            backend = SQLiteAuditBackend(db)
+            try:
+                trail = backend.load_trail()
+            finally:
+                backend.close()
+            record = next(r for r in trail._records if r.record_id == receipt["evidence"]["recordId"])
+            attacker = dr.DecisionReceiptSink(trail_dir=tmp_path / "attacker")
+            forged = attacker.mint(record)
+            pem = attacker.public_key_path.read_text()
+            body = self._body(self._verify(server, {"receipt": forged, "public_key_pem": pem}))
+            assert body["signature"] is True
+            assert body["trail"] is None
+            assert "not this server's" in body["detail"]
+        finally:
+            server.close()
+
+    def test_a_non_string_record_id_is_not_found_rather_than_misread(self, tmp_path):
+        server, _db, receipt = self._server(tmp_path)
+        try:
+            receipt["evidence"]["recordId"] = [1]
+            body = self._body(self._verify(server, {"receipt": receipt}))
+            assert body["ok"] is False
+            assert body["trail"] is False
+        finally:
+            server.close()
+
+    def test_a_path_with_a_hash_sign_still_reads_the_trail(self, tmp_path):
+        server, _db, receipt = self._server(tmp_path, name="run#2")
+        try:
+            body = self._body(self._verify(server, {"receipt": receipt}))
+            assert body["trail"] is True
+        finally:
+            server.close()
+
+    def test_an_unreadable_trail_is_a_named_failure(self, tmp_path):
+        server, db, receipt = self._server(tmp_path)
+        try:
+            db.rename(db.with_suffix(".moved"))
+            response = self._verify(server, {"receipt": receipt})
+            assert response["result"]["isError"] is True
+            assert "trail could not be read" in self._body(response)["detail"]
+        finally:
+            server.close()

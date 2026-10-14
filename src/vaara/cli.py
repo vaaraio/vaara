@@ -2522,7 +2522,7 @@ def _cmd_receipt_verify_decision(args: argparse.Namespace) -> int:
     for f in files:
         try:
             c = dr.verify_receipt_file(f, public_key_pem=key, trail_hashes=hashes)
-        except (OSError, ValueError, KeyError) as exc:
+        except (OSError, ValueError, KeyError, TypeError) as exc:
             failed += 1
             print(f"FAIL  {f}: unreadable ({exc})")
             continue

@@ -210,17 +210,40 @@ def _cage_block(cage: dict[str, Any], record_id: str) -> dict[str, Any]:
     return block
 
 
+def _ignore_in_git(key_dir: Path) -> None:
+    """Keep the key directory out of git wherever the trail lives.
+
+    A trail can sit in a project folder (the MCP server and proxy default to
+    one in the working directory), and the private key beside it must not be
+    one ``git add .`` away from a commit.
+    """
+    ignore = key_dir / ".gitignore"
+    if ignore.exists():
+        return
+    try:
+        if not key_dir.exists():
+            key_dir.mkdir(parents=True)
+            os.chmod(key_dir, 0o700)
+        # Only the key file: a keys/ folder that was already there may hold
+        # files its owner tracks on purpose.
+        ignore.write_text(f"{KEY_RELPATH.name}\n.gitignore\n", encoding="utf-8")
+    except OSError:
+        logger.warning("could not write %s; keep %s out of version control", ignore, key_dir)
+
+
 def _load_or_create_key(key_path: Path, pub_path: Path) -> Any:
     from cryptography.hazmat.primitives import serialization
     from cryptography.hazmat.primitives.asymmetric import ec
 
+    _ignore_in_git(key_path.parent)
     if key_path.exists():
         key = serialization.load_pem_private_key(key_path.read_bytes(), password=None)
         if not isinstance(key, ec.EllipticCurvePrivateKey):
             raise ValueError(f"{key_path} is not an EC private key")
     else:
-        key_path.parent.mkdir(parents=True, exist_ok=True)
-        os.chmod(key_path.parent, 0o700)
+        if not key_path.parent.exists():
+            key_path.parent.mkdir(parents=True)
+            os.chmod(key_path.parent, 0o700)
         key = ec.generate_private_key(ec.SECP256R1())
         pem = key.private_bytes(
             serialization.Encoding.PEM,
@@ -446,10 +469,12 @@ def verify_receipt_body(
     from vaara.attestation._attest_types import AttestationError
     from vaara.attestation.decision import parse_decision_record, verify_decision_signature
 
+    if not isinstance(body, dict):
+        raise ValueError("not a decision receipt: the file is not a JSON object")
     envelope = body["receipt"]
     evidence = body["evidence"]
     if not isinstance(envelope, dict) or not isinstance(evidence, dict):
-        raise ValueError("receipt and evidence must be objects")
+        raise ValueError("not a decision receipt: receipt and evidence must be objects")
     public_key = serialization.load_pem_public_key(public_key_pem)
     try:
         record = parse_decision_record(envelope)
@@ -461,7 +486,8 @@ def verify_receipt_body(
     trail_ok: Optional[bool] = None
     detail = ""
     if trail_hashes is not None:
-        stored = trail_hashes.get(evidence.get("recordId", ""))
+        record_id = evidence.get("recordId")
+        stored = trail_hashes.get(record_id) if isinstance(record_id, str) else None
         if stored is None:
             trail_ok = False
             detail = "record not in trail"

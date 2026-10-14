@@ -217,3 +217,36 @@ def test_a_file_that_is_not_a_decision_receipt_raises_value_error(tmp_path):
     )
     with pytest.raises(ValueError, match="not a decision receipt"):
         dr.verify_receipt_file(bad, public_key_pem=key)
+
+
+def test_the_signing_key_is_ignored_by_git_wherever_the_trail_lives(tmp_path):
+    # The MCP server and proxy default to a trail in the working directory, so
+    # the private key would otherwise sit in a project folder, one `git add .`
+    # away from a commit.
+    import shutil
+    import subprocess
+
+    if shutil.which("git") is None:
+        pytest.skip("git not installed")
+    subprocess.run(["git", "init", "-q", str(tmp_path)], check=True)
+    db, trail = _trail(tmp_path)
+    _record(trail, "allow")
+    key = db.parent / dr.KEY_RELPATH
+    assert key.exists()
+    ignored = subprocess.run(
+        ["git", "-C", str(tmp_path), "check-ignore", "-q", str(key)],
+    )
+    assert ignored.returncode == 0
+
+
+def test_a_json_array_is_reported_as_not_a_receipt(tmp_path):
+    from cryptography.hazmat.primitives import serialization as s
+    from cryptography.hazmat.primitives.asymmetric import ec
+
+    bad = tmp_path / "r.json"
+    bad.write_text("[1]", encoding="utf-8")
+    key = ec.generate_private_key(ec.SECP256R1()).public_key().public_bytes(
+        s.Encoding.PEM, s.PublicFormat.SubjectPublicKeyInfo,
+    )
+    with pytest.raises(ValueError, match="not a decision receipt"):
+        dr.verify_receipt_file(bad, public_key_pem=key)
