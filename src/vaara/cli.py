@@ -396,18 +396,98 @@ def _cmd_trail_rotate(args: argparse.Namespace) -> int:
         retention_days=args.retention_days,
         tenant_id="" if args.all_tenants else args.tenant,
         dry_run=args.dry_run,
+        encrypt_to=Path(args.encrypt_to).expanduser() if args.encrypt_to else None,
     )
     if not result.ok:
         for err in result.errors:
             print(f"vaara trail rotate: {err}", file=sys.stderr)
         return 1
     print(f"Archived {result.exported_records} record(s) to {result.archive_path} (verified).")
+    if result.seal_path is not None:
+        print(f"Encrypted; public seal at {result.seal_path} (verified against the ciphertext).")
     if args.dry_run:
         print(f"Would purge {result.purged_records} record(s) older than {args.retention_days} day(s).")
         print("Run without --dry-run to apply.")
     else:
         print(f"Purged {result.purged_records} record(s) older than {args.retention_days} day(s).")
         print("Archive the zip externally; the live DB now has a chain seam at the boundary.")
+    return 0
+
+
+def _cmd_trail_seal_keygen(args: argparse.Namespace) -> int:
+    from vaara.audit.sealed_archive import generate_recipient_key
+
+    try:
+        fp = generate_recipient_key(Path(args.private).expanduser(),
+                                    Path(args.public).expanduser())
+    except FileExistsError:
+        print(f"vaara trail seal-keygen: {args.private} exists; not overwriting a key",
+              file=sys.stderr)
+        return 2
+    print(f"Recipient key {fp}: private {args.private} (0600), public {args.public}.")
+    print("Give the public key to whoever rotates; keep the private key with whoever may open archives.")
+    return 0
+
+
+def _cmd_trail_verify_seal(args: argparse.Namespace) -> int:
+    import json as _json
+
+    from vaara.audit.sealed_archive import verify_seal
+
+    verdict = verify_seal(
+        Path(args.seal).expanduser(),
+        Path(args.ciphertext).expanduser() if args.ciphertext else None,
+        expected_signer=Path(args.signer_pub).expanduser() if args.signer_pub else None,
+    )
+    if args.format == "json":
+        print(_json.dumps({"ok": verdict.ok, "errors": verdict.errors,
+                           "manifest": verdict.manifest}, indent=2))
+    else:
+        trail = verdict.manifest.get("trail") or {}
+        if verdict.ok:
+            print(f"Seal verifies: {trail.get('record_count')} record(s), chain "
+                  f"{trail.get('first_hash')} .. {trail.get('last_hash')}, sealed to "
+                  f"{verdict.manifest.get('recipient_fingerprint')}.")
+            if args.ciphertext is None:
+                print("Ciphertext not checked; pass --ciphertext to bind the seal to the file.")
+            if args.signer_pub is None:
+                print("Signer not pinned; pass --signer-pub to require a known key.")
+        for err in verdict.errors:
+            print(f"vaara trail verify-seal: {err}", file=sys.stderr)
+    return 0 if verdict.ok else 1
+
+
+def _cmd_trail_unseal(args: argparse.Namespace) -> int:
+    from vaara.audit.sealed_archive import SealError, unseal
+
+    if args.db is None and not args.no_access_record:
+        print("vaara trail unseal: pass --db TRAIL so the opening is recorded, or "
+              "--no-access-record to open it unrecorded", file=sys.stderr)
+        return 2
+    if args.db is not None and not (args.on_behalf_of and args.basis):
+        print("vaara trail unseal: --on-behalf-of and --basis are required with --db",
+              file=sys.stderr)
+        return 2
+    backend = trail = None
+    if args.db is not None:
+        from vaara.audit.sqlite_backend import SQLiteAuditBackend
+
+        backend = SQLiteAuditBackend(Path(args.db).expanduser())
+        trail = backend.load_trail()
+    try:
+        out = unseal(Path(args.sealed).expanduser(), Path(args.seal).expanduser(),
+                     Path(args.key).expanduser(), Path(args.out).expanduser(),
+                     trail=trail, on_behalf_of=args.on_behalf_of or "",
+                     basis=args.basis or "")
+    except (SealError, OSError) as exc:
+        print(f"vaara trail unseal: {exc}", file=sys.stderr)
+        return 1
+    finally:
+        if backend is not None:
+            backend.close()
+    print(f"Unsealed to {out}; it matches the seal and verifies as a signed export.")
+    if trail is not None:
+        print(f"The opening is recorded in {args.db}.")
     return 0
 
 
@@ -6282,6 +6362,12 @@ def build_parser() -> argparse.ArgumentParser:
         "--dry-run", action="store_true",
         help="Export and verify the archive, report the purge count, delete nothing",
     )
+    prot.add_argument(
+        "--encrypt-to", default=None, metavar="RECIPIENT_PUB_PEM",
+        help="Encrypt the verified archive to this X25519 public key (vaara trail "
+             "seal-keygen) and write a public seal signed with --key; the plaintext "
+             "zip is removed before the purge",
+    )
     rot_scope = prot.add_mutually_exclusive_group(required=True)
     rot_scope.add_argument("--tenant", help="Restrict rotation to records with this tenant_id")
     rot_scope.add_argument(
@@ -6289,6 +6375,40 @@ def build_parser() -> argparse.ArgumentParser:
         help="Rotate across all tenants in this DB",
     )
     prot.set_defaults(func=_cmd_trail_rotate)
+
+    pskg = tsub.add_parser(
+        "seal-keygen",
+        help="Create an X25519 recipient key pair for encrypted retention archives",
+    )
+    pskg.add_argument("--private", required=True, help="Where to write the private key (PEM, 0600)")
+    pskg.add_argument("--public", required=True, help="Where to write the public key (PEM)")
+    pskg.set_defaults(func=_cmd_trail_seal_keygen)
+
+    pvs = tsub.add_parser(
+        "verify-seal",
+        help="Check an encrypted archive's public seal without the decryption key",
+    )
+    pvs.add_argument("seal", help="The .seal.json file")
+    pvs.add_argument("--ciphertext", default=None, help="The .sealed file the seal names")
+    pvs.add_argument("--signer-pub", default=None,
+                     help="Require this Ed25519 public key (PEM) as the seal's signer")
+    pvs.add_argument("--format", choices=["text", "json"], default="text")
+    pvs.set_defaults(func=_cmd_trail_verify_seal)
+
+    pus = tsub.add_parser(
+        "unseal",
+        help="Decrypt an encrypted archive, recording the opening in a trail first",
+    )
+    pus.add_argument("sealed", help="The .sealed file")
+    pus.add_argument("--seal", required=True, help="Its .seal.json file")
+    pus.add_argument("--key", required=True, help="The recipient's X25519 private key (PEM)")
+    pus.add_argument("--out", required=True, help="Where to write the decrypted zip")
+    pus.add_argument("--db", default=None, help="Trail to record the opening in, before decrypting")
+    pus.add_argument("--on-behalf-of", default=None, help="Who the archive is opened for")
+    pus.add_argument("--basis", default=None, help="Why it may be opened (legal hold, DPO request)")
+    pus.add_argument("--no-access-record", action="store_true",
+                     help="Open without recording it in a trail")
+    pus.set_defaults(func=_cmd_trail_unseal)
 
     prep = tsub.add_parser(
         "repair",
