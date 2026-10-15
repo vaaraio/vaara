@@ -435,7 +435,7 @@ def seal_archive(zip_path: Union[str, Path], recipient_public_pem: KeySource,
                 "manifest": manifest_text,
                 "signature": base64.b64encode(signer.sign(manifest_text.encode("utf-8"))).decode(),
                 "signer_pubkey_pem": signer_pem,
-            }, indent=2) + "\n", encoding="utf-8")
+            }, indent=2) + "\n", encoding="utf-8", newline="\n")
             os.link(tmp, seal)
         finally:
             if tmp.exists():
