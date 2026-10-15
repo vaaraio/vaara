@@ -231,6 +231,13 @@ class TestRotate:
         assert result.archive_path == result.sealed_path
         assert sa.verify_seal(result.seal_path, result.sealed_path, expected_signer=spub).ok
         assert result.purged_records == 2
+        last_hash = sa.verify_seal(result.seal_path).manifest["trail"]["last_hash"]
+        backend = SQLiteAuditBackend(db)
+        try:
+            live = [r.record_hash for r in backend.load_trail()._records]
+        finally:
+            backend.close()
+        assert last_hash in live, "the seal's last hash is a record the purge kept"
         opened = sa.unseal(result.sealed_path, result.seal_path, rpriv, tmp_path / "o.zip")
         assert verify_signed(opened).ok
 

@@ -176,6 +176,7 @@ reproductions: [vaara.io/conformance.html](https://vaara.io/conformance.html).
 | Threshold export | `vaara trail export-threshold`, `audit/export.py` | k-of-n custodian signatures on a regulator handoff; no single key can forge it. |
 | Long-term verification | `vaara verify-retained` | Verifies a record signed under a rotated-out key through the archived DID document, key history, revocations and an optional time anchor. |
 | Retention rotation | `vaara trail rotate`, `vaara trail purge`, `audit/rotate.py` | Exports, re-verifies the export from its own bytes, then purges past retention (EU AI Act Articles 19(1) and 26(6)). `--dry-run` shows the plan. |
+| Encrypted retention archive | `vaara trail rotate --encrypt-to`, `vaara trail verify-seal`, `vaara trail unseal`, `audit/sealed_archive.py` | The verified archive is encrypted to a recipient key; a public seal signed by the trail's key names the chain's first and last hash, the record count and the ciphertext digest, so anyone checks it without the key. Opening it records an access first. |
 
 ## 14. Human oversight (EU AI Act Article 14)
 

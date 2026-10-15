@@ -6,6 +6,9 @@ and this project follows [Semantic Versioning](https://semver.org/spec/v2.0.0.ht
 
 ## [Unreleased]
 
+### Added
+- `vaara trail rotate --encrypt-to RECIPIENT.pub` encrypts the verified retention archive to an X25519 recipient key and writes a public seal beside it, signed with the key that signed the export. The seal names the record count, the chain's first and last hash, the plaintext zip and ciphertext digests and the recipient's key fingerprint. The plaintext zip is removed only after the seal verifies against the ciphertext, and the purge runs only after that. `vaara trail verify-seal SEAL [--ciphertext FILE] [--signer-pub PEM]` checks a seal without the decryption key. `vaara trail unseal SEALED --seal SEAL --key KEY --out ZIP --db TRAIL --on-behalf-of WHO --basis WHY` writes an access record into the trail before decrypting, then checks the result against the seal and as a signed export; opening without a record takes `--no-access-record`. `vaara trail seal-keygen` makes the recipient key pair. The cipher is X25519, HKDF-SHA256 and AES-256-GCM over 1 MiB chunks (STREAM), so an altered, reordered, dropped or truncated chunk fails and leaves no output.
+
 ## [2.14.0] - 2026-10-15
 
 ### Added
