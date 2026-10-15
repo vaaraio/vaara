@@ -14,6 +14,11 @@ comes here and is decided against the operator's allow list:
 - A host is allowed when it matches an entry: ``example.com`` (ports 443
   and 80), ``*.example.com`` (any subdomain, same ports) or
   ``example.com:8443`` (that port only).
+- The entry ``*`` (``vaara os-layer egress --public``) allows the public
+  internet: any name not otherwise listed, on ports 443 and 80, provided
+  every address it resolves to is public. The operator's own network
+  (private, carrier-grade NAT and unique-local ranges) stays shut, so an
+  agent that reads the open web cannot reach the router or the next machine.
 - Whatever the list says, a name that resolves to loopback, link-local
   (cloud metadata at 169.254.169.254), multicast or the unspecified
   address is refused, unless the entry names that address literally.
@@ -38,6 +43,7 @@ from typing import Callable, Optional
 
 MAX_HEAD = 64 * 1024
 DEFAULT_PORTS = (443, 80)
+PUBLIC = "*"  # the allow-list entry that opens the public internet
 _REFUSED_NETS = ("loopback", "link_local", "multicast", "unspecified")
 # Instance metadata on IPv6 sits in unique-local space, not link-local: AWS.
 _METADATA_V6 = (ipaddress.ip_network("fd00:ec2::254/128"),)
@@ -120,7 +126,8 @@ class EgressProxy:
                  record: Optional[Callable[[dict], None]] = None,
                  resolve: Callable[..., list] = socket.getaddrinfo,
                  connect_timeout: float = 15.0) -> None:
-        self.rules = [parse_rule(e) for e in allow]
+        self.public = any(e.strip() == PUBLIC for e in allow)
+        self.rules = [parse_rule(e) for e in allow if e.strip() != PUBLIC]
         self._record = record or (lambda event: None)
         self._resolve = resolve
         self._timeout = connect_timeout
@@ -168,8 +175,10 @@ class EgressProxy:
         """(allowed, reason, address to connect to)."""
         host = host.lower().rstrip(".")
         rule = next((r for r in self.rules if r.matches(host, port)), None)
-        if rule is None:
+        if rule is None and not self.public:
             return False, "not on the egress allow list", None
+        if rule is None and port not in DEFAULT_PORTS:
+            return False, f"the public internet is open on ports 443 and 80, not {port}", None
         literal = _literal(host)
         try:
             infos = self._resolve(host, port, type=socket.SOCK_STREAM)
@@ -178,9 +187,13 @@ class EgressProxy:
         for family, _t, _p, _c, sockaddr in infos:
             addr = ipaddress.ip_address(sockaddr[0])
             refused = _refused_address(addr)
-            if refused and literal != addr:
+            # Only a listed entry can name a refused address on purpose; the
+            # public entry never opens the operator's own network.
+            if refused and (rule is None or literal != addr):
                 return False, f"{host} resolves to a {refused} address ({addr})", None
         family, _t, _p, _c, sockaddr = infos[0]
+        if rule is None:
+            return True, "public internet", (family, sockaddr)
         return True, f"allowed by {'*.' if rule.wildcard else ''}{rule.host}" + (
             f":{rule.port}" if rule.port else ""), (family, sockaddr)
 

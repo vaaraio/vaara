@@ -123,12 +123,17 @@ def _cmd_harden(args: argparse.Namespace) -> int:
 
 
 def _cmd_egress(args: argparse.Namespace) -> int:
-    if args.off and args.hosts:
-        raise selection.SelectionError("give hosts or --off, not both")
-    if not args.off and not args.hosts and not args.none:
-        raise selection.SelectionError("give the hosts to allow, --none to let nothing out, "
-                                       "or --off to unlock")
-    allow = None if args.off else list(args.hosts)
+    from vaara.oslayer.egress import PUBLIC
+
+    if args.off and (args.hosts or args.public):
+        raise selection.SelectionError("give hosts or --public, or --off, not both")
+    if args.none and args.public:
+        raise selection.SelectionError("--none lets nothing out and --public lets the "
+                                       "internet out; give one")
+    if not args.off and not args.hosts and not args.none and not args.public:
+        raise selection.SelectionError("give the hosts to allow, --public for the public "
+                                       "internet, --none to let nothing out, or --off to unlock")
+    allow = None if args.off else ([PUBLIC] if args.public else []) + list(args.hosts)
     return _save(selection.set_egress(selection.load(_home()), allow))
 
 
@@ -201,6 +206,9 @@ def build_parser() -> argparse.ArgumentParser:
     pe = sub.add_parser("egress", help="Lock every launch's network to an egress proxy that "
                                        "lets out only the hosts given")
     pe.add_argument("hosts", nargs="*", help="example.com, *.example.com or host:port")
+    pe.add_argument("--public", action="store_true",
+                    help="Allow the public internet on 443 and 80; the private, "
+                         "unique-local and link-local ranges stay shut")
     pe.add_argument("--none", action="store_true", help="Lock with nothing allowed out")
     pe.add_argument("--off", action="store_true", help="Unlock the network")
     pe.set_defaults(func=_cmd_egress)

@@ -165,10 +165,13 @@ def parse(data: object) -> Selection:
         timeout = DEFAULT_ASK_TIMEOUT
     egress: Optional[list[str]] = None
     if isinstance(data.get("egress"), list):
-        from vaara.oslayer.egress import parse_rule
+        from vaara.oslayer.egress import PUBLIC, parse_rule
 
         egress = []
         for entry in data["egress"]:
+            if str(entry).strip() == PUBLIC:
+                egress.append(PUBLIC)
+                continue
             try:
                 parse_rule(str(entry))
             except ValueError as exc:
@@ -229,9 +232,11 @@ def set_egress(selection: Selection, allow: Optional[list[str]]) -> Selection:
     """``allow`` hosts out of every launch; None unlocks the network."""
     if allow is None:
         return replace(selection, egress=None)
-    from vaara.oslayer.egress import parse_rule
+    from vaara.oslayer.egress import PUBLIC, parse_rule
 
     for entry in allow:
+        if entry.strip() == PUBLIC:
+            continue
         try:
             parse_rule(entry)
         except ValueError as exc:
