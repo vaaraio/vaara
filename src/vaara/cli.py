@@ -420,10 +420,12 @@ def _cmd_trail_seal_keygen(args: argparse.Namespace) -> int:
     try:
         fp = generate_recipient_key(Path(args.private).expanduser(),
                                     Path(args.public).expanduser())
-    except FileExistsError:
-        print(f"vaara trail seal-keygen: {args.private} exists; not overwriting a key",
-              file=sys.stderr)
+    except FileExistsError as exc:
+        print(f"vaara trail seal-keygen: {exc}; not overwriting a key", file=sys.stderr)
         return 2
+    except OSError as exc:
+        print(f"vaara trail seal-keygen: {exc}", file=sys.stderr)
+        return 1
     print(f"Recipient key {fp}: private {args.private} (0600), public {args.public}.")
     print("Give the public key to whoever rotates; keep the private key with whoever may open archives.")
     return 0
@@ -480,7 +482,7 @@ def _cmd_trail_unseal(args: argparse.Namespace) -> int:
                      expected_signer=Path(args.signer_pub).expanduser(),
                      trail=trail, on_behalf_of=args.on_behalf_of or "",
                      basis=args.basis or "")
-    except (SealError, OSError) as exc:
+    except (SealError, OSError, ValueError, ImportError) as exc:
         print(f"vaara trail unseal: {exc}", file=sys.stderr)
         return 1
     finally:

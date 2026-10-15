@@ -77,6 +77,13 @@ def rotate(
         return RotateResult(ok=False, errors=[f"retention_days must be > 0, got {retention_days}"])
 
     out = Path(out_path)
+    if encrypt_to is not None:
+        for existing in (out.with_name(out.name + ".sealed"),
+                         out.with_name(out.name + ".seal.json")):
+            if existing.exists():
+                return RotateResult(ok=False, errors=[
+                    f"{existing} exists; an earlier period's sealed archive is never "
+                    "replaced. Choose a new --out."])
     backend = SQLiteAuditBackend(db_path, tenant_id=tenant_id)
     try:
         exported = backend.count()

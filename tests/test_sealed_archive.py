@@ -416,3 +416,84 @@ class TestReviewFindings:
         result = rotate(db_path=db, out_path=tmp_path / "a.zip", signer_key=spriv,
                         retention_days=7, encrypt_to=bad)
         assert not result.ok and "purge skipped" in result.errors[0]
+
+
+class TestSecondReview:
+    """Findings of the second review pass, 15.10."""
+
+    def test_a_rerun_with_the_same_out_never_replaces_last_periods_archive(self, tmp_path, monkeypatch):
+        db = tmp_path / "audit.db"
+        _seed(db, monkeypatch)
+        spriv, _ = _signer(tmp_path)
+        _, rpub = _recipient(tmp_path)
+        out = tmp_path / "a.zip"
+        first = rotate(db_path=db, out_path=out, signer_key=spriv, retention_days=7, encrypt_to=rpub)
+        assert first.ok
+        before = first.sealed_path.read_bytes()
+        again = rotate(db_path=db, out_path=out, signer_key=spriv, retention_days=7, encrypt_to=rpub)
+        assert not again.ok and "never replaced" in again.errors[0]
+        assert first.sealed_path.read_bytes() == before
+
+    def test_seal_archive_refuses_an_existing_target_and_leaves_it(self, tmp_path):
+        spriv, _ = _signer(tmp_path)
+        _, rpub = _recipient(tmp_path)
+        zip_path = _export(tmp_path, spriv)
+        sealed = zip_path.with_name(zip_path.name + ".sealed")
+        sealed.write_bytes(b"earlier period")
+        with pytest.raises(sa.SealError, match="exists"):
+            sa.seal_archive(zip_path, rpub, spriv)
+        assert sealed.read_bytes() == b"earlier period"
+
+    def test_unseal_refuses_an_existing_out_before_recording(self, tmp_path):
+        spriv, spub = _signer(tmp_path)
+        rpriv, rpub = _recipient(tmp_path)
+        sealed, seal, _ = sa.seal_archive(_export(tmp_path, spriv), rpub, spriv)
+        victim = tmp_path / "important.db"
+        victim.write_bytes(b"keep me")
+        db = tmp_path / "live.db"
+        backend = SQLiteAuditBackend(db)
+        trail = backend.load_trail()
+        with pytest.raises(sa.SealError, match="exists"):
+            sa.unseal(sealed, seal, rpriv, victim, expected_signer=spub, trail=trail,
+                      on_behalf_of="dpo", basis="test")
+        backend.close()
+        assert victim.read_bytes() == b"keep me"
+        assert _access_records(db) == []
+
+    def test_unseal_decrypts_nothing_when_the_access_record_is_not_persisted(self, tmp_path):
+        spriv, spub = _signer(tmp_path)
+        rpriv, rpub = _recipient(tmp_path)
+        sealed, seal, _ = sa.seal_archive(_export(tmp_path, spriv), rpub, spriv)
+
+        def refuse(record):
+            raise OSError("disk full")
+
+        trail = AuditTrail(on_record=refuse)
+        with pytest.raises(sa.SealError, match="could not be written"):
+            sa.unseal(sealed, seal, rpriv, tmp_path / "o.zip", expected_signer=spub,
+                      trail=trail, on_behalf_of="dpo", basis="test")
+        assert not (tmp_path / "o.zip").exists()
+
+    @pytest.mark.parametrize("patch", [
+        {"ciphertext": {"sha256": "x", "size": True}},
+        {"trail": {"record_count": "all"}},
+    ])
+    def test_odd_types_in_a_self_signed_seal_are_reported(self, tmp_path, patch):
+        spriv, _ = _signer(tmp_path)
+        _, rpub = _recipient(tmp_path)
+        sealed, seal, _ = sa.seal_archive(_export(tmp_path, spriv), rpub, spriv)
+        key = serialization.load_pem_private_key(spriv.read_bytes(), None)
+        outer = json.loads(seal.read_text())
+        manifest = json.loads(outer["manifest"])
+        manifest.update(patch)
+        text = json.dumps(manifest, sort_keys=True, indent=2)
+        outer["manifest"] = text
+        outer["signature"] = base64.b64encode(key.sign(text.encode())).decode()
+        seal.write_text(json.dumps(outer))
+        assert not sa.verify_seal(seal, sealed).ok
+
+    def test_keygen_leaves_no_orphan_private_key(self, tmp_path):
+        priv = tmp_path / "k.key"
+        with pytest.raises(OSError):
+            sa.generate_recipient_key(priv, tmp_path / "no-such-dir" / "k.pub")
+        assert not priv.exists()

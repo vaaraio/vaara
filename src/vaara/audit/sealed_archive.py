@@ -118,10 +118,16 @@ def generate_recipient_key(private_out: Union[str, Path],
         serialization.NoEncryption())
     public_pem = key.public_key().public_bytes(
         serialization.Encoding.PEM, serialization.PublicFormat.SubjectPublicKeyInfo)
+    if Path(public_out).exists():
+        raise FileExistsError(f"{public_out} exists; not overwriting a key")
     fd = os.open(private_out, os.O_WRONLY | os.O_CREAT | os.O_EXCL, 0o600)
     with os.fdopen(fd, "wb") as fh:
         fh.write(private_pem)
-    Path(public_out).write_bytes(public_pem)
+    try:
+        Path(public_out).write_bytes(public_pem)
+    except BaseException:
+        Path(private_out).unlink()
+        raise
     return fingerprint(_raw_public(key.public_key()))
 
 
@@ -236,10 +242,12 @@ def _decrypt_stream(fh: BinaryIO, header: _Header, aead, sink) -> None:
         block = nxt
 
 
-def encrypt_file(plain: Path, sealed: Path, recipient_public) -> tuple[str, str, int]:
-    """Encrypt ``plain`` to ``sealed`` for ``recipient_public``.
+def encrypt_file(plain: Path, sealed: Path, recipient_public) -> tuple[str, str, int, str, int]:
+    """Encrypt ``plain`` to ``sealed`` for ``recipient_public``; never replaces
+    an existing ``sealed``.
 
-    Returns ``(recipient_fingerprint, plaintext_sha256, plaintext_size)``.
+    Returns ``(recipient_fingerprint, plaintext_sha256, plaintext_size,
+    ciphertext_sha256, ciphertext_size)``.
     Before the file is moved into place, it is decrypted once with the same
     key and must hash to the plaintext read, so a write fault never becomes
     the only copy of an archive. The output is written whole or not at all.
@@ -290,11 +298,17 @@ def encrypt_file(plain: Path, sealed: Path, recipient_public) -> tuple[str, str,
             _decrypt_stream(fh, parsed, aead, check.update)
         if check.hexdigest() != plain_hash.hexdigest():
             raise SealError("sealed file does not decrypt back to the archive")
-        os.replace(tmp, sealed)
+        ct_sha, ct_size = _sha256_file(tmp)
+        try:
+            # A hard link fails when the name exists, so an earlier period's
+            # sealed archive is never replaced.
+            os.link(tmp, sealed)
+        except FileExistsError as exc:
+            raise SealError(f"{sealed} exists; not replacing an earlier sealed archive") from exc
     finally:
         if tmp.exists():
             tmp.unlink()
-    return rcpt_fp, plain_hash.hexdigest(), plain_size
+    return rcpt_fp, plain_hash.hexdigest(), plain_size, ct_sha, ct_size
 
 
 def decrypt_file(sealed: Path, plain: Path, recipient_private) -> None:
@@ -337,10 +351,17 @@ def _manifest_problems(manifest: Any) -> list[str]:
     for part in ("archive", "ciphertext"):
         entry = manifest.get(part)
         if not (isinstance(entry, dict) and isinstance(entry.get("sha256"), str)
-                and isinstance(entry.get("size"), int)):
+                and type(entry.get("size")) is int):
             problems.append(f"seal field {part!r} is missing its sha256 or size")
-    if not isinstance(manifest.get("trail"), dict):
+    trail = manifest.get("trail")
+    if not isinstance(trail, dict):
         problems.append("seal field 'trail' is missing")
+    else:
+        if type(trail.get("record_count")) is not int:
+            problems.append("seal field 'trail.record_count' is not an integer")
+        for key in ("first_hash", "last_hash", "trail_sha256"):
+            if not isinstance(trail.get(key), (str, type(None))):
+                problems.append(f"seal field 'trail.{key}' is not a string")
     for key in ("recipient_fingerprint", "signer_pubkey_fingerprint", "export_signer_fingerprint"):
         if not isinstance(manifest.get(key), str):
             problems.append(f"seal field {key!r} is missing")
@@ -378,9 +399,13 @@ def seal_archive(zip_path: Union[str, Path], recipient_public_pem: KeySource,
     _, serialization, *_ = _crypto()
     sealed = zip_path.with_name(zip_path.name + ".sealed")
     seal = zip_path.with_name(zip_path.name + ".seal.json")
+    for existing in (sealed, seal):
+        if existing.exists():
+            raise SealError(f"{existing} exists; not replacing an earlier sealed archive")
+    created = False
     try:
-        rcpt_fp, zip_sha, zip_size = encrypt_file(zip_path, sealed, recipient)
-        ct_sha, ct_size = _sha256_file(sealed)
+        rcpt_fp, zip_sha, zip_size, ct_sha, ct_size = encrypt_file(zip_path, sealed, recipient)
+        created = True
         manifest = {
             "format": SEAL_FORMAT,
             "cipher": CIPHER,
@@ -411,18 +436,21 @@ def seal_archive(zip_path: Union[str, Path], recipient_public_pem: KeySource,
                 "signature": base64.b64encode(signer.sign(manifest_text.encode("utf-8"))).decode(),
                 "signer_pubkey_pem": signer_pem,
             }, indent=2) + "\n", encoding="utf-8")
-            os.replace(tmp, seal)
+            os.link(tmp, seal)
         finally:
             if tmp.exists():
                 tmp.unlink()
     except BaseException:
-        discard_sealed(sealed, seal)
+        if created:
+            discard_sealed(sealed, seal)
         raise
     return sealed, seal, manifest
 
 
 def discard_sealed(sealed: Path, seal: Path) -> None:
-    """Remove a sealed file and its seal, so a failed rotation leaves no orphan."""
+    """Remove a sealed file and its seal that this run created, so a failed
+    rotation leaves no orphan. ``seal_archive`` refuses existing targets, so
+    the files at these names are always the current run's."""
     for path in (sealed, seal):
         try:
             path.unlink()
@@ -493,7 +521,8 @@ def unseal(sealed: Union[str, Path], seal_path: Union[str, Path],
     access record written, naming the archive by its ciphertext digest and
     committing to the zip digest the seal states, so opening a past period's
     records is on the record and a refused attempt does not read as an
-    opening. The decrypted zip must match the seal, be signed by the pinned
+    opening. If the trail does not persist the access record, nothing is
+    decrypted. ``out_zip`` must not exist. The decrypted zip must match the seal, be signed by the pinned
     key, and verify as a signed export, or it is removed and ``SealError`` is
     raised.
     """
@@ -516,10 +545,16 @@ def unseal(sealed: Union[str, Path], seal_path: Union[str, Path],
         raise SealError(f"sealed archive unreadable: {exc}") from exc
     if header.recipient_fingerprint != manifest["recipient_fingerprint"]:
         raise SealError("the sealed file names a different recipient than its seal")
+    out = Path(out_zip)
+    if out.exists():
+        raise SealError(f"{out} exists; unseal writes a new file only")
+    if not out.parent.is_dir():
+        raise SealError(f"{out.parent} is not a directory")
     if trail is not None:
         from vaara.audit.access import record_access
 
         count = manifest["trail"].get("record_count")
+        failures_before = getattr(trail, "persistence_failures", 0)
         record_access(
             trail,
             subject=f"sealed-archive:sha256:{manifest['ciphertext']['sha256']}",
@@ -530,7 +565,9 @@ def unseal(sealed: Union[str, Path], seal_path: Union[str, Path],
             returned_count=count if isinstance(count, int) else None,
             channel="unseal",
         )
-    out = Path(out_zip)
+        if getattr(trail, "persistence_failures", 0) != failures_before:
+            raise SealError("the access record could not be written to the trail; "
+                            "the archive was not opened")
     decrypt_file(sealed, out, key)
     try:
         got, _ = _sha256_file(out)
