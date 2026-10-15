@@ -88,11 +88,13 @@ A retention archive has two readers. Whoever holds the decryption key (a data pr
 
 ```bash
 vaara trail verify-seal archive.zip.seal.json --ciphertext archive.zip.sealed --signer-pub trail-signer.pub.pem
+vaara trail unseal archive.zip.sealed --seal archive.zip.seal.json --key dpo.key --signer-pub trail-signer.pub.pem \
+  --out archive.zip --db audit.db --on-behalf-of dpo@example.org --basis "legal hold 2026-114"
 ```
 
 The seal carries the record count, the first and last chain hash, the digest of the plaintext zip and of the ciphertext, and the recipient key's fingerprint, signed with the key that signed the export. `verify-seal` checks the signature, that the signer is the one you pinned, and that the ciphertext is the file the seal names. The archive covers the whole trail at rotation time, so its last chain hash is the live trail's head at that moment, a recent record the purge keeps: finding that hash in the live trail ties the two together without decrypting anything. Without `--signer-pub`, the seal is checked against the key it carries, which proves only that it is self-consistent; pin the signer to know whose seal it is.
 
-`vaara trail unseal` opens the archive for the key holder. With `--db`, it writes an access record into that trail first, naming the archive by its ciphertext digest, who it was opened for and on what basis, and committing to the zip digest the seal states. Then it decrypts and checks the result against the seal and as a signed export. Opening without a record takes an explicit `--no-access-record`. The cipher is X25519, HKDF-SHA256 and AES-256-GCM over 1 MiB chunks in the STREAM construction, so a chunk altered, reordered, dropped or cut off fails authentication and leaves no output.
+`vaara trail unseal` opens the archive for the key holder, and takes the trail signer's public key with `--signer-pub`, so a forged archive sealed with someone else's key is refused. It checks the seal, the recipient key and the sealed file's header before anything else. With `--db`, it then writes an access record into that trail, naming the archive by its ciphertext digest, who it was opened for and on what basis, and committing to the zip digest the seal states. Then it decrypts and checks the result against the seal and as a signed export. Opening without a record takes an explicit `--no-access-record`. When rotating, the sealed file is decrypted back once before it is written into place, so a write fault cannot leave ciphertext as the only copy. The cipher is X25519, HKDF-SHA256 and AES-256-GCM over 1 MiB chunks in the STREAM construction, so a chunk altered, reordered, dropped or cut off fails authentication and leaves no output.
 
 ## hybrid PQC signing: sign against a future quantum adversary
 

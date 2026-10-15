@@ -11,7 +11,9 @@ unseal writes before it decrypts.
 
 from __future__ import annotations
 
+import base64
 import json
+import os
 import stat
 import sys
 import time
@@ -79,9 +81,9 @@ class TestCipher:
         plain = tmp_path / "p.bin"
         plain.write_bytes(bytes((i * 31) % 251 for i in range(size)))
         sealed = tmp_path / "p.sealed"
-        sa.encrypt_file(plain, sealed, sa._load_recipient_public(rpub))
+        sa.encrypt_file(plain, sealed, sa.load_recipient_public(rpub))
         back = tmp_path / "back.bin"
-        sa.decrypt_file(sealed, back, sa._load_recipient_private(rpriv))
+        sa.decrypt_file(sealed, back, sa.load_recipient_private(rpriv))
         assert back.read_bytes() == plain.read_bytes()
 
     def _sealed(self, tmp_path, size=2 * sa.CHUNK + 5):
@@ -89,8 +91,8 @@ class TestCipher:
         plain = tmp_path / "p.bin"
         plain.write_bytes(b"x" * size)
         sealed = tmp_path / "p.sealed"
-        sa.encrypt_file(plain, sealed, sa._load_recipient_public(rpub))
-        return sealed, sa._load_recipient_private(rpriv)
+        sa.encrypt_file(plain, sealed, sa.load_recipient_public(rpub))
+        return sealed, sa.load_recipient_private(rpriv)
 
     def test_a_flipped_byte_fails_and_leaves_nothing(self, tmp_path):
         sealed, key = self._sealed(tmp_path)
@@ -124,7 +126,7 @@ class TestCipher:
         sealed, _ = self._sealed(tmp_path)
         other, _ = _recipient(tmp_path, "other")
         with pytest.raises(sa.SealError, match="different recipient"):
-            sa.decrypt_file(sealed, tmp_path / "out.bin", sa._load_recipient_private(other))
+            sa.decrypt_file(sealed, tmp_path / "out.bin", sa.load_recipient_private(other))
 
     @pytest.mark.skipif(sys.platform == "win32", reason="no POSIX mode bits")
     def test_the_private_key_is_owner_only_and_never_overwritten(self, tmp_path):
@@ -187,11 +189,13 @@ class TestUnseal:
     def test_unseal_records_the_access_first_and_returns_a_verified_export(self, tmp_path):
         spriv, _ = _signer(tmp_path)
         rpriv, rpub = _recipient(tmp_path)
+        spub = tmp_path / "signer.pub.pem"
         sealed, seal, manifest = sa.seal_archive(_export(tmp_path, spriv), rpub, spriv)
         db = tmp_path / "live.db"
         backend = SQLiteAuditBackend(db)
         trail = backend.load_trail()
-        out = sa.unseal(sealed, seal, rpriv, tmp_path / "opened.zip", trail=trail,
+        out = sa.unseal(sealed, seal, rpriv, tmp_path / "opened.zip", expected_signer=spub,
+                        trail=trail,
                         on_behalf_of="dpo@example.org", basis="legal hold 2026-114")
         backend.close()
         assert verify_signed(out).ok
@@ -208,12 +212,12 @@ class TestUnseal:
         assert params["basis"] == "legal hold 2026-114"
 
     def test_a_tampered_archive_is_not_opened(self, tmp_path):
-        spriv, _ = _signer(tmp_path)
+        spriv, spub = _signer(tmp_path)
         rpriv, rpub = _recipient(tmp_path)
         sealed, seal, _ = sa.seal_archive(_export(tmp_path, spriv), rpub, spriv)
         sealed.write_bytes(sealed.read_bytes()[:-1] + b"\x00")
         with pytest.raises(sa.SealError):
-            sa.unseal(sealed, seal, rpriv, tmp_path / "opened.zip")
+            sa.unseal(sealed, seal, rpriv, tmp_path / "opened.zip", expected_signer=spub)
         assert not (tmp_path / "opened.zip").exists()
 
 
@@ -238,7 +242,8 @@ class TestRotate:
         finally:
             backend.close()
         assert last_hash in live, "the seal's last hash is a record the purge kept"
-        opened = sa.unseal(result.sealed_path, result.seal_path, rpriv, tmp_path / "o.zip")
+        opened = sa.unseal(result.sealed_path, result.seal_path, rpriv, tmp_path / "o.zip",
+                           expected_signer=spub)
         assert verify_signed(opened).ok
 
     def test_a_bad_recipient_key_skips_the_purge(self, tmp_path, monkeypatch):
@@ -271,8 +276,143 @@ class TestCli:
         assert main(["trail", "verify-seal", str(seal), "--ciphertext", str(sealed),
                      "--signer-pub", str(spub)]) == 0
         assert main(["trail", "unseal", str(sealed), "--seal", str(seal), "--key", str(rpriv),
-                     "--out", str(tmp_path / "o.zip")]) == 2
+                     "--signer-pub", str(spub), "--out", str(tmp_path / "o.zip")]) == 2
         assert main(["trail", "unseal", str(sealed), "--seal", str(seal), "--key", str(rpriv),
-                     "--out", str(tmp_path / "o.zip"), "--db", str(db),
+                     "--signer-pub", str(spub), "--out", str(tmp_path / "o.zip"), "--db", str(db),
                      "--on-behalf-of", "dpo", "--basis", "audit request"]) == 0
         assert verify_signed(tmp_path / "o.zip").ok
+
+
+def _access_records(db):
+    backend = SQLiteAuditBackend(db)
+    try:
+        return [r for r in backend.load_trail()._records
+                if r.event_type.value == "access_recorded"]
+    finally:
+        backend.close()
+
+
+class TestReviewFindings:
+    """One test per finding of the 15.10 review of this module."""
+
+    def _sealed(self, tmp_path):
+        spriv, spub = _signer(tmp_path)
+        rpriv, rpub = _recipient(tmp_path)
+        sealed, seal, manifest = sa.seal_archive(_export(tmp_path, spriv), rpub, spriv)
+        return spriv, spub, rpriv, rpub, sealed, seal, manifest
+
+    @pytest.mark.skipif(not hasattr(os, "pwrite"), reason="os.pwrite is POSIX only")
+    def test_a_write_fault_is_caught_before_the_file_is_published(self, tmp_path, monkeypatch):
+        _, rpub = _recipient(tmp_path)
+        plain = tmp_path / "p.bin"
+        plain.write_bytes(b"y" * (2 * sa.CHUNK))
+        real_fsync = sa.os.fsync
+
+        def corrupting_fsync(fd):
+            os.pwrite(fd, b"\xff", 300)
+            real_fsync(fd)
+
+        monkeypatch.setattr(sa.os, "fsync", corrupting_fsync)
+        sealed = tmp_path / "p.sealed"
+        with pytest.raises(sa.SealError):
+            sa.encrypt_file(plain, sealed, sa.load_recipient_public(rpub))
+        assert not sealed.exists()
+        assert not list(tmp_path.glob("p.sealed.*.tmp"))
+
+    def test_unseal_rejects_a_forgery_signed_with_its_own_key(self, tmp_path):
+        spriv, spub = _signer(tmp_path)
+        forger, _ = _signer(tmp_path, "forger")
+        rpriv, rpub = _recipient(tmp_path)
+        sealed, seal, _ = sa.seal_archive(_export(tmp_path, forger), rpub, forger)
+        with pytest.raises(sa.SealError, match="fingerprint"):
+            sa.unseal(sealed, seal, rpriv, tmp_path / "o.zip", expected_signer=spub)
+        assert not (tmp_path / "o.zip").exists()
+
+    def test_a_wrong_key_writes_no_access_record(self, tmp_path):
+        _, spub, _, _, sealed, seal, _ = self._sealed(tmp_path)
+        other, _ = _recipient(tmp_path, "other")
+        db = tmp_path / "live.db"
+        backend = SQLiteAuditBackend(db)
+        trail = backend.load_trail()
+        with pytest.raises(sa.SealError, match="different recipient"):
+            sa.unseal(sealed, seal, other, tmp_path / "o.zip", expected_signer=spub,
+                      trail=trail, on_behalf_of="dpo", basis="test")
+        backend.close()
+        assert _access_records(db) == []
+
+    @pytest.mark.parametrize("field,value", [
+        ("ephemeral_public", "AAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAA="),
+        ("nonce_prefix", 7),
+        ("ephemeral_public", "not base64!"),
+    ])
+    def test_a_malformed_header_is_a_seal_error_and_records_nothing(self, tmp_path, field, value):
+        _, spub, rpriv, rpub, sealed, seal, _ = self._sealed(tmp_path)
+        data = sealed.read_bytes()
+        n = int.from_bytes(data[len(sa.MAGIC):len(sa.MAGIC) + 2], "big")
+        header = json.loads(data[len(sa.MAGIC) + 2:len(sa.MAGIC) + 2 + n])
+        header[field] = value
+        raw = json.dumps(header, sort_keys=True, separators=(",", ":")).encode()
+        sealed.write_bytes(sa.MAGIC + len(raw).to_bytes(2, "big") + raw
+                           + data[len(sa.MAGIC) + 2 + n:])
+        with pytest.raises(sa.SealError):
+            sa.decrypt_file(sealed, tmp_path / "o.zip", sa.load_recipient_private(rpriv))
+
+    def test_an_all_zero_ephemeral_key_is_a_seal_error(self, tmp_path):
+        _, _, rpriv, _, sealed, _, _ = self._sealed(tmp_path)
+        data = sealed.read_bytes()
+        n = int.from_bytes(data[len(sa.MAGIC):len(sa.MAGIC) + 2], "big")
+        header = json.loads(data[len(sa.MAGIC) + 2:len(sa.MAGIC) + 2 + n])
+        header["ephemeral_public"] = base64.b64encode(bytes(32)).decode()
+        raw = json.dumps(header, sort_keys=True, separators=(",", ":")).encode()
+        sealed.write_bytes(sa.MAGIC + len(raw).to_bytes(2, "big") + raw
+                           + data[len(sa.MAGIC) + 2 + n:])
+        with pytest.raises(sa.SealError):
+            sa.decrypt_file(sealed, tmp_path / "o.zip", sa.load_recipient_private(rpriv))
+
+    def test_a_self_signed_seal_with_odd_types_is_reported_not_raised(self, tmp_path):
+        spriv, _, _, _, sealed, seal, _ = self._sealed(tmp_path)
+        key = Ed25519PrivateKey.from_private_bytes(
+            serialization.load_pem_private_key(spriv.read_bytes(), None).private_bytes_raw())
+        outer = json.loads(seal.read_text())
+        manifest = json.loads(outer["manifest"])
+        manifest["ciphertext"] = "x"
+        text = json.dumps(manifest, sort_keys=True, indent=2)
+        outer["manifest"] = text
+        outer["signature"] = base64.b64encode(key.sign(text.encode())).decode()
+        seal.write_text(json.dumps(outer))
+        verdict = sa.verify_seal(seal, sealed)
+        assert not verdict.ok and "ciphertext" in verdict.errors[0]
+
+    def test_dry_run_keeps_the_plaintext(self, tmp_path, monkeypatch):
+        db = tmp_path / "audit.db"
+        _seed(db, monkeypatch)
+        spriv, _ = _signer(tmp_path)
+        _, rpub = _recipient(tmp_path)
+        out = tmp_path / "a.zip"
+        result = rotate(db_path=db, out_path=out, signer_key=spriv, retention_days=7,
+                        encrypt_to=rpub, dry_run=True)
+        assert result.ok and out.exists() and result.archive_path == out
+        assert result.sealed_path.exists()
+
+    def test_a_failed_seal_leaves_no_orphan(self, tmp_path, monkeypatch):
+        db = tmp_path / "audit.db"
+        _seed(db, monkeypatch)
+        spriv, _ = _signer(tmp_path)
+        _, rpub = _recipient(tmp_path)
+        out = tmp_path / "a.zip"
+        monkeypatch.setattr(sa, "verify_seal", lambda *a, **k: sa.SealVerdict(False, {}, ["forced"]))
+        result = rotate(db_path=db, out_path=out, signer_key=spriv, retention_days=7,
+                        encrypt_to=rpub)
+        assert not result.ok and out.exists()
+        assert not (tmp_path / "a.zip.sealed").exists()
+        assert not (tmp_path / "a.zip.seal.json").exists()
+
+    def test_an_unsupported_key_type_skips_the_purge_cleanly(self, tmp_path, monkeypatch):
+        db = tmp_path / "audit.db"
+        _seed(db, monkeypatch)
+        spriv, _ = _signer(tmp_path)
+        bad = tmp_path / "bad.pem"
+        bad.write_bytes(b"-----BEGIN PUBLIC KEY-----\nAAAA\n-----END PUBLIC KEY-----\n")
+        result = rotate(db_path=db, out_path=tmp_path / "a.zip", signer_key=spriv,
+                        retention_days=7, encrypt_to=bad)
+        assert not result.ok and "purge skipped" in result.errors[0]

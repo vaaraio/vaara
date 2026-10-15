@@ -477,6 +477,7 @@ def _cmd_trail_unseal(args: argparse.Namespace) -> int:
     try:
         out = unseal(Path(args.sealed).expanduser(), Path(args.seal).expanduser(),
                      Path(args.key).expanduser(), Path(args.out).expanduser(),
+                     expected_signer=Path(args.signer_pub).expanduser(),
                      trail=trail, on_behalf_of=args.on_behalf_of or "",
                      basis=args.basis or "")
     except (SealError, OSError) as exc:
@@ -485,7 +486,8 @@ def _cmd_trail_unseal(args: argparse.Namespace) -> int:
     finally:
         if backend is not None:
             backend.close()
-    print(f"Unsealed to {out}; it matches the seal and verifies as a signed export.")
+    print(f"Unsealed to {out}; it matches the seal, is signed by the pinned key and "
+          "verifies as a signed export.")
     if trail is not None:
         print(f"The opening is recorded in {args.db}.")
     return 0
@@ -6402,6 +6404,8 @@ def build_parser() -> argparse.ArgumentParser:
     pus.add_argument("sealed", help="The .sealed file")
     pus.add_argument("--seal", required=True, help="Its .seal.json file")
     pus.add_argument("--key", required=True, help="The recipient's X25519 private key (PEM)")
+    pus.add_argument("--signer-pub", required=True,
+                     help="The trail signer's Ed25519 public key (PEM) the seal must be signed by")
     pus.add_argument("--out", required=True, help="Where to write the decrypted zip")
     pus.add_argument("--db", default=None, help="Trail to record the opening in, before decrypting")
     pus.add_argument("--on-behalf-of", default=None, help="Who the archive is opened for")

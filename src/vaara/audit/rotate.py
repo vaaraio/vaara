@@ -65,8 +65,10 @@ def rotate(
     With ``encrypt_to`` (an X25519 public key, PEM), the verified zip is
     encrypted to that recipient and a public seal signed with ``signer_key``
     is written beside it (``vaara.audit.sealed_archive``). The plaintext zip
-    is removed only after the seal verifies against the ciphertext, and the
-    purge runs only after that. ``archive_path`` is then the sealed file.
+    is removed only after the seal verifies against the ciphertext (the sealed
+    file was decrypted back to the zip before it was written), and the purge
+    runs only after that. ``archive_path`` is then the sealed file. In
+    ``dry_run`` the plaintext zip is kept beside the sealed file.
     """
     from vaara.audit.export import export_signed
     from vaara.audit.verify import verify_signed
@@ -109,22 +111,28 @@ def rotate(
 
         sealed_path = seal_path = None
         if encrypt_to is not None:
-            from vaara.audit.sealed_archive import SealError, seal_archive, verify_seal
+            from vaara.audit.sealed_archive import (
+                SealError, discard_sealed, seal_archive, verify_seal,
+            )
 
             try:
                 sealed_path, seal_path, _ = seal_archive(out, encrypt_to, signer_key)
-            except (SealError, OSError, ValueError) as exc:
+            except (SealError, OSError, ValueError, TypeError) as exc:
                 return RotateResult(
                     ok=False, exported_records=exported, archive_path=out,
                     errors=[f"sealing failed, purge skipped: {exc}"],
                 )
             sealed_verdict = verify_seal(seal_path, sealed_path)
             if not sealed_verdict.ok:
+                discard_sealed(sealed_path, seal_path)
                 return RotateResult(
                     ok=False, exported_records=exported, archive_path=out,
                     errors=["seal failed verification, purge skipped"] + sealed_verdict.errors,
                 )
-            out.unlink()
+            if not dry_run:
+                # The sealed file decrypted back to this zip before it was
+                # written into place, so the plaintext copy can go.
+                out.unlink()
 
         purged = backend.purge_older_than(retention_days * 86400, dry_run=dry_run)
         logger.info(
@@ -135,7 +143,7 @@ def rotate(
             ok=True,
             exported_records=exported,
             purged_records=purged,
-            archive_path=sealed_path or out,
+            archive_path=out if dry_run or sealed_path is None else sealed_path,
             sealed_path=sealed_path,
             seal_path=seal_path,
         )
