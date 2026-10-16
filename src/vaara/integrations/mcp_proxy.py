@@ -251,7 +251,23 @@ class VaaraMCPProxy:
         tool_surface_state: Optional[Path] = None,
         tool_surface_hold: bool = False,
         tool_surface_accept: bool = False,
+        value_origin: bool = False,
+        value_origin_strict: bool = False,
+        trusted_values: Optional[list[str]] = None,
+        authority_args: Optional[dict[str, list[str]]] = None,
+        value_origin_store: Optional[Any] = None,
     ) -> None:
+        # Value origin (vaara.scorer.value_origin). Off unless asked for.
+        # When on, recipient, payee and endpoint values in tools/call and
+        # resources/read results are remembered, and a later call that puts
+        # one of them into an authority argument is held for a human. The
+        # store is the one the Claude Code hook uses, so a value the user
+        # typed there is known here too. Strict passes only trusted values.
+        self._value_origin = bool(value_origin or value_origin_strict)
+        self._value_origin_strict = bool(value_origin_strict)
+        self._trusted_values: list[str] = list(trusted_values or [])
+        self._authority_args = dict(authority_args) if authority_args else None
+        self._origin_store = value_origin_store
         # Layer-1 deny rules, shared with the Claude Code hook. Loaded from
         # the bundled file unless the caller passes a list; an empty list
         # switches the layer off, and VAARA_MCP_DENY_RULES=0 does the same
@@ -1586,11 +1602,12 @@ class VaaraMCPProxy:
                 gates.append("parameter_schema:pass_partial:" + ",".join(partial))
             else:
                 gates.append("parameter_schema:pass")
+        origin = self._origin_hold(tool_name, arguments, gates)
         # Unknown upstream tool names classify as generic high-risk in the
         # registry (fail-closed). Correct default for runtime governance.
         result = self._pipeline.intercept(
             agent_id=agent_id, tool_name=tool_name, parameters=arguments,
-            tenant_id=_REQUEST_TENANT.get(),
+            tenant_id=_REQUEST_TENANT.get(), value_origin=origin,
         )
         progress_token = self._progress_token(params)
         if not result.allowed:
@@ -1760,6 +1777,8 @@ class VaaraMCPProxy:
                     tenant_id=_REQUEST_TENANT.get(),
                     task_id=_related_task_id(params),
                 )
+        self._harvest_origin(tool_name, upstream_response,
+                             str(getattr(result, "action_id", None) or ""))
         try:
             self._pipeline.report_outcome(
                 action_id=result.action_id, outcome_severity=outcome_severity,
@@ -1838,7 +1857,47 @@ class VaaraMCPProxy:
             reason="resource within operator perimeter",
             extra={"agent_id": self._agent_id_default},
         )
-        return self._upstream.request(request)
+        response = self._upstream.request(request)
+        self._harvest_origin("mcp.resource.read", response, "")
+        return response
+
+    def _store(self) -> Any:
+        if self._origin_store is None:
+            from vaara.scorer.value_origin import OriginStore
+            self._origin_store = OriginStore()
+        return self._origin_store
+
+    def _origin_hold(self, tool_name: str, arguments: dict,
+                     gates: list[str]) -> Optional[dict]:
+        """The authority arguments held on value origin, or None. A failure
+        to read the store holds nothing and is named in the gate list."""
+        if not self._value_origin:
+            gates.append("value_origin:off")
+            return None
+        try:
+            from vaara.scorer.value_origin import origin_hold
+            held = origin_hold(
+                tool_name, arguments, self._store(),
+                trusted=self._trusted_values, extra_args=self._authority_args,
+                strict=self._value_origin_strict,
+            )
+        except Exception as exc:
+            logger.warning("value origin check failed on %s: %r", _safe_log(tool_name), exc)
+            gates.append("value_origin:error")
+            return None
+        gates.append("value_origin:hold" if held else "value_origin:pass")
+        return held
+
+    def _harvest_origin(self, tool_name: str, response: Any, action_id: str) -> None:
+        """Remember the authority-shaped values in an upstream result."""
+        if not self._value_origin or not isinstance(response, dict):
+            return
+        try:
+            from vaara.scorer.value_origin import extract_any
+            self._store().note_external(extract_any(response.get("result")),
+                                        tool_name=tool_name, action_id=action_id)
+        except Exception as exc:
+            logger.warning("value origin not recorded for %s: %r", _safe_log(tool_name), exc)
 
     def _handle_prompts_get(self, request: dict) -> dict:
         params = request.get("params") or {}
@@ -2478,6 +2537,24 @@ def main(argv: Optional[list[str]] = None) -> None:
         help="Adopt the tool surface seen in this run as the accepted baseline. "
              "The change is still recorded.")
     parser.add_argument(
+        "--value-origin", action="store_true",
+        help="Hold a call whose recipient, payee or endpoint argument carries a "
+             "value seen only in an earlier tool or resource result (email, "
+             "IBAN, host, phone, wallet). Shares ~/.vaara/value_origin.json with "
+             "the Claude Code hook, so values the user typed there pass here.")
+    parser.add_argument(
+        "--value-origin-strict", action="store_true",
+        help="Pass only values on the trusted list in authority arguments. "
+             "Implies --value-origin.")
+    parser.add_argument(
+        "--trusted-value", action="append", default=[], metavar="VALUE",
+        help="A recipient, payee or endpoint that always passes the value-origin "
+             "check. Repeatable.")
+    parser.add_argument(
+        "--authority-arg", action="append", default=[], metavar="TOOL=ARG",
+        help="Declare another authority argument for a tool, on top of the preset. "
+             "Repeatable.")
+    parser.add_argument(
         "--stacked", choices=("warn", "fail", "ignore"), default="warn",
         help="What to do when a second Vaara governance layer is detected in "
              "front of this proxy (the Claude Code PreToolUse hook): 'warn' "
@@ -2590,6 +2667,10 @@ def main(argv: Optional[list[str]] = None) -> None:
             tool_surface_state=_tool_surface_state_path(args.tool_surface_state),
             tool_surface_hold=args.tool_surface_hold,
             tool_surface_accept=args.tool_surface_accept,
+            value_origin=args.value_origin,
+            value_origin_strict=args.value_origin_strict,
+            trusted_values=args.trusted_value or None,
+            authority_args=_parse_authority_args(args.authority_arg, parser),
         )
     except (ValueError, ProxyError) as e:
         # ProxyError here means a --upstream-url target was refused by the SSRF
@@ -2607,6 +2688,17 @@ def main(argv: Optional[list[str]] = None) -> None:
             proxy.run()
     finally:
         proxy.close()
+
+
+def _parse_authority_args(specs: list[str], parser: Any) -> Optional[dict[str, list[str]]]:
+    """``["pay=iban", "pay=payee"]`` -> ``{"pay": ["iban", "payee"]}``."""
+    out: dict[str, list[str]] = {}
+    for spec in specs:
+        tool, sep, arg = spec.partition("=")
+        if not sep or not tool.strip() or not arg.strip():
+            parser.error(f"--authority-arg expects TOOL=ARG, got {spec!r}")
+        out.setdefault(tool.strip(), []).append(arg.strip())
+    return out or None
 
 
 def _tool_surface_state_path(value: Optional[str]) -> Optional[Path]:
