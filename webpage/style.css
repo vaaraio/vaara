@@ -469,3 +469,23 @@ main section.plain + section { padding-top: 84px; }
 @media (min-width: 821px) { .hero.home { padding-bottom: 68px; } }
 
 /* the bar spans the whole window, logo at the left edge and the menus at the right; the page below keeps its column */
+/* Red Hat partner co-brand (partner-led: Vaara first, Red Hat logo as delivered, clear space >= the R height) */
+.partner { display: flex; align-items: center; justify-content: center; gap: 18px; flex-wrap: wrap; margin-top: 28px; padding: 24px 0 16px; border-top: 1px solid var(--rule); }
+.partner .lockup { display: inline-flex; align-items: center; gap: 18px; padding: 10px 0; }
+.partner .lockup img { display: block; height: auto; }
+.partner .divider { width: 1px; height: 30px; background: var(--muted); }
+.partner .cap { color: var(--muted); font-size: 13px; letter-spacing: .04em; }
+.partner .lockup img.on-dark { display: none; }
+html[data-theme="dark"] .partner .lockup img.on-light { display: none; }
+html[data-theme="dark"] .partner .lockup img.on-dark { display: block; }
+.partner .sep { width: 1px; height: 30px; background: var(--muted); margin: 0 10px; }
+/* one row on every screen: logos added later join the same line, and on a phone the row scrolls sideways */
+.partner { flex-wrap: nowrap; }
+.partner > * { flex: 0 0 auto; }
+@media (max-width: 700px) { .partner { justify-content: flex-start; overflow-x: auto; scrollbar-width: none; } .partner::-webkit-scrollbar { display: none; } }
+.partner a.cap { text-decoration: none; }
+.partner a.cap:hover { text-decoration: underline; }
+.partner .kss img { display: block; height: auto; }
+.partner .kss img.on-dark { display: none; }
+html[data-theme="dark"] .partner .kss img.on-light { display: none; }
+html[data-theme="dark"] .partner .kss img.on-dark { display: block; }
