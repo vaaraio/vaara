@@ -43,7 +43,7 @@ import secrets
 import time
 from contextlib import contextmanager
 from pathlib import Path
-from typing import Any, Iterable, Iterator, Optional, Union
+from typing import Any, Iterable, Iterator, Mapping, Optional, Union
 from urllib.parse import urlsplit
 
 from vaara.scorer.lineage import _exclusive
@@ -211,7 +211,7 @@ def _bare_tool(tool_name: str) -> str:
 
 
 def authority_args(tool_name: str, parameters: Any,
-                   extra: Optional[dict[str, Iterable[str]]] = None) -> dict[str, Any]:
+                   extra: Optional[Mapping[str, Iterable[str]]] = None) -> dict[str, Any]:
     """The arguments of this call that carry authority, by name.
 
     The preset covers tools whose name sends, pays or posts, and only their
@@ -334,7 +334,7 @@ class OriginStore:
 
 def origin_hold(tool_name: str, parameters: Any, store: OriginStore, *,
                 trusted: Iterable[str] = (),
-                extra_args: Optional[dict[str, Iterable[str]]] = None,
+                extra_args: Optional[Mapping[str, Iterable[str]]] = None,
                 strict: bool = False,
                 ) -> Optional[dict[str, dict[str, Any]]]:
     """The authority arguments whose value came only from external content.

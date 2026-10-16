@@ -1594,9 +1594,11 @@ class VaaraMCPProxy:
                 }
             if violations:
                 gates.append("parameter_schema:shadow")
+                # The violations quote argument values; the gate list and the
+                # record carry them, the log only counts them.
                 logger.warning(
-                    "SHADOW inputSchema violation on %s: %s",
-                    _safe_log(tool_name), "; ".join(violations),
+                    "SHADOW inputSchema violation on %s (%d)",
+                    _safe_log(tool_name), len(violations),
                 )
             elif partial:
                 gates.append("parameter_schema:pass_partial:" + ",".join(partial))
