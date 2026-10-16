@@ -87,7 +87,8 @@ jobs:
         run: |
           set -o pipefail
           python3 -m pytest -q -rs | tee result.txt
-          python3 scripts/check_skips.py result.txt tests/ci_allowed_skips.txt
+          cat tests/ci_allowed_skips.txt tests/ci_allowed_skips_rhel.txt > allowed_skips_rhel.txt
+          python3 scripts/check_skips.py result.txt allowed_skips_rhel.txt
 
   tests-other-os:
     # Until this job existed the suite ran on Ubuntu only, so nothing said
