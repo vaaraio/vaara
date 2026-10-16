@@ -67,9 +67,10 @@ jobs:
           python3 --version
 
       # The checkout belongs to another uid than the container user, so git
-      # refuses it until the directory is marked safe.
+      # refuses it until the directory is marked safe. System config, because
+      # the suite points HOME elsewhere and a --global entry would not be read.
       - name: Trust the checkout
-        run: git config --global --add safe.directory "$GITHUB_WORKSPACE"
+        run: git config --system --add safe.directory "$GITHUB_WORKSPACE"
 
       - name: Install pinned deps
         run: python3 -m pip install --require-hashes -r requirements-dev.txt
