@@ -47,6 +47,8 @@ The following are records held by other parties. Each is checkable at the link:
 - Vaara appears in the industry acknowledgements of Singapore IMDA's Model AI Governance Framework for Agentic AI v1.5 (20 May 2026).
 - Vaara is listed in the [OECD.AI Catalogue of Tools & Metrics](https://oecd.ai/en/catalogue/tools/vaara) for trustworthy AI.
 - Subject of an AMD AI Developer Program testimonial (May 2026).
+- Red Hat partner in the Sell With module of the Red Hat Partner Program since October 2026.
+- Listed in [Ratkaisuja Suomesta](https://ratkaisujasuomesta.fi/ratkaisu/vaara/), the catalogue of software made in Finland run by Koodia Suomesta ry.
 
 ## What Vaara does
 
