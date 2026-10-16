@@ -309,7 +309,9 @@ class TestReviewFindings:
         real_fsync = sa.os.fsync
 
         def corrupting_fsync(fd):
-            os.pwrite(fd, b"\xff", 300)
+            # Sixteen bytes, not one: ciphertext is random, so a single fixed byte is
+            # already 0xff one time in 256 and the write would change nothing.
+            os.pwrite(fd, b"\xff" * 16, 300)
             real_fsync(fd)
 
         monkeypatch.setattr(sa.os, "fsync", corrupting_fsync)
