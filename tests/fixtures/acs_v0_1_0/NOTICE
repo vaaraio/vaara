@@ -1,0 +1,5 @@
+These JSON Schemas are copied unchanged from the OWASP GenAI Security Project's
+Agent Control Standard, https://github.com/GenAI-Security-Project/agent-control-standard,
+specification/v0.1.0 at commit 5ee326b24a0a113907fa3aba5c2527c43b19ffe4 (release 0.1.4, 2026-10-15).
+They are licensed under the Apache License 2.0 (see LICENSE in that repository).
+Vaara's tests validate its Guardian's responses against them.

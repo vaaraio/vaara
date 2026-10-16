@@ -128,6 +128,7 @@ section 5.6).
 - Guardrail adapters: AWS Bedrock Guardrails, Azure AI Content Safety, GCP Model Armor, NVIDIA NeMo Guardrails, Guardrails AI, LLM Guard, Rebuff (`integrations/`).
 - Detection: prompt injection and PII (`detect/`).
 - HTTP scoring service: `vaara serve`, `src/vaara/server/`, `docs/openapi.yaml`.
+- Standards wire: OWASP Agent Control Standard v0.1.0 Guardian (`integrations/acs_guardian.py`, `docs/acs-guardian.md`): handshake, ping, tool request and result and the session and message steps answered with Vaara's decision, the trail record and policy digest named in each tool response, the ACS ContextEntry chain kept with `request_hash`, HMAC-SHA256 signatures under a per-session key.
 - Packages and deployment: Python (`pip install vaara`), TypeScript client (`@vaara/client` on npm), Helm chart (`deploy/helm/vaara`, policy as YAML), GitHub Action (`action.yml`, Vaara Policy Check).
 
 ## 10. Conformance

@@ -89,6 +89,7 @@ vaara = "vaara.cli:main"
 vaara-audit = "vaara.audit_cli:main"
 vaara-mcp-proxy = "vaara.integrations.mcp_proxy:main"
 vaara-mcp-server = "vaara.integrations.mcp_server:main"
+vaara-acs-guardian = "vaara.integrations.acs_guardian:main"
 vaara-infer-proxy = "vaara.integrations.infer_proxy:main"
 vaara-console = "vaara.integrations.infer_console:main"
 
