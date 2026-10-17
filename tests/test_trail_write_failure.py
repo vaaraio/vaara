@@ -188,7 +188,9 @@ class TestQuickCheck:
         _corrupt_a_later_page(db)
         problem = wf.quick_check(db)
         assert problem is not None
-        assert "page" in problem
+        # SQLite words this "Page 3: ..." on older releases (RHEL 9) and in
+        # lower case on newer ones; the damaged page is named either way.
+        assert "page" in problem.lower()
 
     def test_a_missing_file_is_not_a_failure(self, tmp_path: Path):
         assert wf.quick_check(tmp_path / "absent.db") is None
