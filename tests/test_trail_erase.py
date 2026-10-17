@@ -229,3 +229,85 @@ def test_compliance_names_an_erasure_and_not_a_compromise(tmp_path: Path):
     gaps = [g for a in report.articles for g in a.gaps]
     assert any("erased records are named by erasure records" in g for g in gaps)
     assert not any("compromised" in g for g in gaps)
+
+
+def _export(path: Path, tmp_path: Path) -> Path:
+    pytest.importorskip("cryptography")
+    from cryptography.hazmat.primitives.asymmetric.ed25519 import Ed25519PrivateKey
+
+    from vaara.audit.export import export_signed
+
+    backend = SQLiteAuditBackend(path)
+    try:
+        out = tmp_path / "trail.zip"
+        export_signed(backend.load_trail(), out_path=out, signer_key=Ed25519PrivateKey.generate())
+    finally:
+        backend.close()
+    return out
+
+
+def test_a_signed_export_of_an_erased_trail_verifies_and_names_the_slot(tmp_path: Path):
+    from vaara.audit.verify import verify_signed
+
+    path = _build(tmp_path)
+    record_id, _ = _target(path)
+    result = erase_record(path, record_id, reason="dsr")
+
+    vr = verify_signed(_export(path, tmp_path))
+
+    assert vr.ok, vr.errors
+    (slot,) = vr.erased
+    assert slot["record_id"] == record_id
+    assert slot["record_hash"] == result["erased_record_hash"]
+    assert slot["erased_by_index"] > slot["index"]
+
+
+def test_an_export_without_erasures_names_none(tmp_path: Path):
+    from vaara.audit.verify import verify_signed
+
+    vr = verify_signed(_export(_build(tmp_path), tmp_path))
+
+    assert vr.ok, vr.errors
+    assert vr.erased == []
+
+
+def _lines(path: Path, tmp_path: Path) -> list[dict]:
+    import zipfile
+
+    with zipfile.ZipFile(_export(path, tmp_path)) as z:
+        return [json.loads(ln) for ln in z.read("trail.jsonl").splitlines() if ln.strip()]
+
+
+def _jsonl(records: list[dict]) -> bytes:
+    return b"\n".join(json.dumps(r).encode() for r in records)
+
+
+def test_the_export_walk_breaks_on_a_tombstone_nothing_names(tmp_path: Path):
+    from vaara.audit.verify import _verify_chain_bytes
+
+    path = _build(tmp_path)
+    record_id, _ = _target(path)
+    erase_record(path, record_id, reason="dsr")
+    records = _lines(path, tmp_path)
+    # Cut the export just before the erasure record: every link still holds,
+    # but nothing accounts for the tombstone any more.
+    cut = next(i for i, r in enumerate(records)
+               if r["event_type"] == EventType.RECORD_ERASED.value)
+    records = records[:cut]
+
+    error, erased = _verify_chain_bytes(_jsonl(records))
+
+    assert error is not None and "no later record_erased record" in error
+    assert erased == []
+
+
+def test_the_export_walk_breaks_on_a_rewrite_that_is_no_tombstone(tmp_path: Path):
+    from vaara.audit.verify import _verify_chain_bytes
+
+    path = _build(tmp_path)
+    records = _lines(path, tmp_path)
+    records[2]["data"] = {"rewritten": True}
+
+    error, _ = _verify_chain_bytes(_jsonl(records))
+
+    assert error == "record 2: hash mismatch (record tampered)"

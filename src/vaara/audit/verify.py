@@ -59,6 +59,14 @@ class VerifyResult:
     revocations, additions), in chain order. Informational: surfaced so a
     reviewer sees the custodian set's history inline. Does not affect ``ok``.
     """
+    erased: list[dict] = field(default_factory=list)
+    """Records whose data was erased (``vaara trail erase``): the slot keeps
+    its stored hash, so the link verifies, and a later ``record_erased``
+    record names it by id and that hash. What the record held cannot be
+    checked. Each entry: ``index``, ``record_id``, ``record_hash``,
+    ``erased_by_index``. The chain is not intact, but not broken either:
+    does not affect ``ok``.
+    """
 
 
 def _require_crypto() -> None:
@@ -91,25 +99,47 @@ def _load_public_key(
     return loaded
 
 
-def _verify_chain_bytes(trail_bytes: bytes) -> Optional[str]:
+#: Mirrors vaara.audit.trail.ERASED_DATA_KEY; kept here so this module stays
+#: free of vaara imports.
+_ERASED_DATA_KEY = "_vaara_erased"
+
+
+def _erasure_pointer(rec: dict) -> Optional[str]:
+    """The erasure record id a tombstoned record points at, else None."""
+    data = rec.get("data")
+    if not isinstance(data, dict) or set(data) != {_ERASED_DATA_KEY}:
+        return None
+    inner = data[_ERASED_DATA_KEY]
+    if not isinstance(inner, dict):
+        return None
+    pointer = inner.get("erasure_record_id")
+    return pointer if isinstance(pointer, str) and pointer else None
+
+
+def _verify_chain_bytes(trail_bytes: bytes) -> tuple[Optional[str], list[dict]]:
     """Re-verify the hash chain from the exported JSONL bytes.
 
-    Returns None if intact, else a human-readable error string. Uses only
-    stdlib — mirrors :meth:`AuditTrail.verify_chain` without requiring
-    vaara imports, so the standalone verifier can run it.
+    Returns ``(error, erased)``: error is None unless the chain is broken.
+    A tombstoned record whose hash no longer recomputes is held until the
+    walk has seen every ``record_erased`` record after it; one naming its id
+    and stored hash makes it an erased slot, otherwise it is a hash mismatch.
+    Uses only stdlib — mirrors :meth:`AuditTrail.verify_chain` without
+    requiring vaara imports, so the standalone verifier can run it.
     """
+    held: list[tuple[int, dict]] = []
+    erasures: dict[tuple[str, str], int] = {}
     prev_hash = ""
     line_iter = (ln for ln in trail_bytes.splitlines() if ln.strip())
     for idx, raw in enumerate(line_iter):
         try:
             rec = json.loads(raw)
         except json.JSONDecodeError as e:
-            return f"record {idx}: malformed JSON ({e})"
+            return f"record {idx}: malformed JSON ({e})", []
         if rec.get("previous_hash", "") != prev_hash:
             return (
                 f"record {idx}: previous_hash mismatch "
                 f"(expected {prev_hash!r}, got {rec.get('previous_hash')!r})"
-            )
+            ), []
         # Recompute hash over the canonical content. Mirrors
         # AuditRecord.compute_hash — keep the two in lockstep.
         content = {
@@ -135,9 +165,24 @@ def _verify_chain_bytes(trail_bytes: bytes) -> Optional[str]:
         )
         expected = hashlib.sha256(canonical.encode()).hexdigest()
         if rec.get("record_hash") != expected:
-            return f"record {idx}: hash mismatch (record tampered)"
+            if _erasure_pointer(rec) is None or not isinstance(rec.get("record_hash"), str):
+                return f"record {idx}: hash mismatch (record tampered)", []
+            held.append((idx, rec))
+        if rec.get("event_type") == "record_erased":
+            data = rec.get("data") or {}
+            rid, rhash = data.get("erased_record_id"), data.get("erased_record_hash")
+            if isinstance(rid, str) and isinstance(rhash, str):
+                erasures.setdefault((rid, rhash), idx)
         prev_hash = rec["record_hash"]
-    return None
+    erased = []
+    for idx, rec in held:
+        by = erasures.get((rec.get("record_id"), rec["record_hash"]))
+        if by is None or by <= idx:
+            return (f"record {idx}: hash mismatch (erasure tombstone that no later "
+                    f"record_erased record accounts for)"), []
+        erased.append({"index": idx, "record_id": rec.get("record_id"),
+                       "record_hash": rec["record_hash"], "erased_by_index": by})
+    return None, erased
 
 
 def _raw_ed25519_bytes(loaded: "Ed25519PublicKey") -> bytes:
@@ -452,7 +497,7 @@ def verify_signed(
     else:
         errors.append(f"unknown signature_algorithm: {algorithm!r}")
 
-    chain_error = _verify_chain_bytes(trail_bytes)
+    chain_error, erased = _verify_chain_bytes(trail_bytes)
     if chain_error is not None:
         errors.append(f"hash chain check failed: {chain_error}")
 
@@ -480,6 +525,7 @@ def verify_signed(
         errors=errors,
         manifest=manifest,
         key_lifecycle=lifecycle,
+        erased=erased,
     )
 
 
