@@ -69,7 +69,8 @@ def erase_record(db: str | Path, record_id: str, *, reason: str) -> dict:
         seq = row[10]
         if erasure_pointer(target) is not None:
             raise ErasureRefused(f"record {record_id} is already erased")
-        if target.event_type in SYSTEM_EVENT_TYPES or target.event_type not in EventType:
+        known = target.event_type.value in {e.value for e in EventType}
+        if target.event_type in SYSTEM_EVENT_TYPES or not known:
             raise ErasureRefused(
                 f"record {record_id} is a {target.event_type.value} record: the trail's "
                 "own evidence about itself is not erasable"

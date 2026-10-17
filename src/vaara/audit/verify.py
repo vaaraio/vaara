@@ -176,7 +176,8 @@ def _verify_chain_bytes(trail_bytes: bytes) -> tuple[Optional[str], list[dict]]:
         prev_hash = rec["record_hash"]
     erased = []
     for idx, rec in held:
-        by = erasures.get((rec.get("record_id"), rec["record_hash"]))
+        rid = rec.get("record_id")
+        by = erasures.get((rid, rec["record_hash"])) if isinstance(rid, str) else None
         if by is None or by <= idx:
             return (f"record {idx}: hash mismatch (erasure tombstone that no later "
                     f"record_erased record accounts for)"), []

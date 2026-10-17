@@ -1056,9 +1056,9 @@ def _cmd_trail_verify(args: argparse.Namespace) -> int:
         print(f"  vaara:        {result.manifest.get('vaara_version')}")
     if result.ok:
         print("Verification: OK")
-        for e in result.erased:
-            print(f"  record {e['index']} ({e['record_id']}) erased: link verified, "
-                  f"content not checkable (erasure record {e['erased_by_index']})")
+        for slot in result.erased:
+            print(f"  record {slot['index']} ({slot['record_id']}) erased: link verified, "
+                  f"content not checkable (erasure record {slot['erased_by_index']})")
         if pubkey is None:
             print(
                 "  WARNING: no --pubkey given — the trail was checked against the "
