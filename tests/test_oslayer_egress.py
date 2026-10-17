@@ -486,3 +486,66 @@ def test_selection_says_which_egress_entry_it_dropped(caplog):
     dropped = [r.getMessage() for r in caplog.records]
     assert any("http://nope" in m and "dropped" in m for m in dropped)
     assert any("two words" in m for m in dropped)
+
+
+def test_public_lets_any_public_host_out_and_keeps_the_home_network_shut():
+    # Henri 15.10: an agent that fetches the open web needs the whole public
+    # internet and none of the operator's own network. "*" in the list means
+    # exactly that: any name whose every address is public, on 443 or 80.
+    table = {"news.example.org": "93.184.216.34", "router.lan": "192.168.50.1",
+             "nas.example.com": "10.0.0.5", "ll.example.com": "169.254.10.10",
+             "v6.example.org": "2606:2800:220:1::1", "ula.example.org": "fd12:3456::1",
+             "93.184.216.34": "93.184.216.34", "192.168.50.1": "192.168.50.1"}
+    p = EgressProxy(["*"], resolve=_resolver(table))
+    ok, reason, addr = p.decide("news.example.org", 443)
+    assert ok and reason == "public internet" and addr[1][0] == "93.184.216.34"
+    assert p.decide("news.example.org", 80)[0]
+    assert p.decide("v6.example.org", 443)[0]
+    assert p.decide("93.184.216.34", 443)[0]
+    for host, kind in (("router.lan", "private"), ("nas.example.com", "private"),
+                       ("ula.example.org", "private"), ("ll.example.com", "link-local"),
+                       ("192.168.50.1", "private")):
+        ok, reason, _ = p.decide(host, 443)
+        assert not ok and kind in reason, (host, reason)
+    ok, reason, _ = p.decide("news.example.org", 22)
+    assert not ok and "port" in reason
+
+
+def test_public_keeps_explicit_entries_for_other_ports_and_named_addresses():
+    table = {"git.example.org": "93.184.216.34", "printer.lan": "192.168.50.20",
+             "192.168.50.20": "192.168.50.20"}
+    p = EgressProxy(["*", "git.example.org:22", "192.168.50.20:631"],
+                    resolve=_resolver(table))
+    assert p.decide("git.example.org", 22)[0]
+    # a literal entry is the operator naming that one address on purpose
+    assert p.decide("192.168.50.20", 631)[0]
+    assert not p.decide("192.168.50.20", 443)[0]
+    assert not p.decide("printer.lan", 631)[0]
+
+
+def test_a_name_with_one_private_address_among_public_ones_is_refused():
+    def resolve(host, port, type=0):  # noqa: A002 - getaddrinfo's name
+        return [(socket.AF_INET, socket.SOCK_STREAM, 6, "", ("93.184.216.34", port)),
+                (socket.AF_INET, socket.SOCK_STREAM, 6, "", ("192.168.1.1", port))]
+    ok, reason, _ = EgressProxy(["*"], resolve=resolve).decide("mixed.example.org", 443)
+    assert not ok and "private" in reason
+
+
+def test_selection_keeps_the_public_entry():
+    from vaara.oslayer import selection
+    sel = selection.parse({"egress": ["*", "api.example.com"]})
+    assert sel.egress == ["*", "api.example.com"]
+
+
+def test_the_egress_command_writes_public_and_refuses_it_with_off(tmp_path, monkeypatch):
+    from vaara.oslayer import manage, selection
+    saved = []
+    monkeypatch.setattr(manage, "_home", lambda: tmp_path)
+    monkeypatch.setattr(manage, "_save", lambda sel: (saved.append(sel), 0)[1])
+    parser = manage.build_parser()
+    args = parser.parse_args(["egress", "--public", "api.example.com:8443"])
+    assert args.func(args) == 0
+    assert saved[-1].egress == ["*", "api.example.com:8443"]
+    args = parser.parse_args(["egress", "--public", "--off"])
+    with pytest.raises(selection.SelectionError):
+        args.func(args)
