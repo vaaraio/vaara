@@ -68,6 +68,7 @@ class EventType(str, Enum):
     ACCESS_RECORDED = "access_recorded"     # Something was opened, and by whom
     AGENT_SEEN = "agent_seen"               # vaara scan --watch saw an agent start
     WITNESS_CONFIGURED = "witness_configured"  # Heads reach a log or a TSA at a stated cadence
+    RECORD_ERASED = "record_erased"         # A record's data was erased, its hash kept
 
     # Copies and pickles go through the stored value, so a type this build
     # does not know (see stored_event_type) survives them. Python 3.11+
@@ -109,7 +110,8 @@ def stored_event_type(value: str) -> EventType:
 # Written only by the trail's own record_* methods, never accepted through an
 # append API. Verification reads them back: a REPAIR_GAP naming missing seqs
 # turns a broken chain into declared gaps, an ANCHOR_GAP marks an unwitnessed
-# stretch, KEY_LIFECYCLE is custodian evidence for SOC 2 CC6.2 and CC8.1.
+# stretch, KEY_LIFECYCLE is custodian evidence for SOC 2 CC6.2 and CC8.1,
+# RECORD_ERASED accounts for a record whose data was erased (see ERASED_DATA_KEY).
 SYSTEM_EVENT_TYPES = frozenset({
     EventType.ANCHOR_GAP,
     EventType.REPAIR_GAP,
@@ -117,7 +119,26 @@ SYSTEM_EVENT_TYPES = frozenset({
     EventType.TRAIL_FORKED,
     EventType.KEY_LIFECYCLE,
     EventType.WITNESS_CONFIGURED,
+    EventType.RECORD_ERASED,
 })
+
+# An erased record's stored data is exactly {ERASED_DATA_KEY: {"erasure_record_id": ...}}.
+# Its record_hash is the one written before the erasure, so it no longer
+# recomputes; a later RECORD_ERASED record naming its id and that hash is what
+# lets a walk report the slot as erased instead of rewritten.
+ERASED_DATA_KEY = "_vaara_erased"
+
+
+def erasure_pointer(record: "AuditRecord") -> Optional[str]:
+    """The erasure record id a tombstoned record points at, else None."""
+    data = record.data
+    if not isinstance(data, dict) or set(data) != {ERASED_DATA_KEY}:
+        return None
+    inner = data[ERASED_DATA_KEY]
+    if not isinstance(inner, dict):
+        return None
+    pointer = inner.get("erasure_record_id")
+    return pointer if isinstance(pointer, str) and pointer else None
 
 # Every other type: what POST /v1/audit/events, the OpenAPI enum and the
 # TypeScript EventType accept. tests/test_event_type_vocabulary.py holds them.
@@ -429,6 +450,11 @@ TRANSPARENCY_DEFAULTS: dict[EventType, dict[str, str]] = {
     EventType.TRAIL_FORKED: {
         "system_operation": "store_fork",
         "data_usage": "fork_point+branch_head_digest",
+        "decision_making": "operator_action",
+    },
+    EventType.RECORD_ERASED: {
+        "system_operation": "record_erasure",
+        "data_usage": "erased_record_id+hash",
         "decision_making": "operator_action",
     },
     EventType.WITNESS_CONFIGURED: {
@@ -810,6 +836,29 @@ class DeclaredGap:
 
 
 @dataclass(frozen=True)
+class ErasedRecord:
+    """A record whose data was erased, accounted for by a RECORD_ERASED record.
+
+    The slot keeps its stored ``record_hash``, and the record after it still
+    chains to that hash, so the link verifies. What the record held cannot be
+    checked any more. ``erased_by_seq`` is the RECORD_ERASED record naming it,
+    later in the same walk (None when it was written in this process).
+    """
+
+    record_index: int
+    seq: Optional[int]
+    record_id: str
+    record_hash: str
+    erased_by_seq: Optional[int]
+
+    def describe(self) -> str:
+        at = "this process" if self.seq is None else f"seq {self.seq}"
+        by = "in this process" if self.erased_by_seq is None else f"seq {self.erased_by_seq}"
+        return (f"{at} ({self.record_id}) erased: link verified, content not "
+                f"checkable (erasure record at {by})")
+
+
+@dataclass(frozen=True)
 class ChainVerdict:
     """The full answer of a chain walk, which ``verify_chain`` flattens.
 
@@ -820,29 +869,44 @@ class ChainVerdict:
     REPAIR_GAP record names each missing seq. A declared gap is never intact:
     the records in it cannot be shown to be what was written, and a
     declaration only says the hole was known and recorded, not what was in it.
+    ``erased``: every record whose hash does not recompute carries the erasure
+    tombstone, and a later RECORD_ERASED record names it by id and stored hash.
+    Never intact either: the erased content cannot be checked. ``state`` says
+    "declared_gaps" when a walk finds both; ``erased`` is still filled.
     """
 
     error: Optional[str] = None
     declared_gaps: tuple[DeclaredGap, ...] = ()
+    erased: tuple[ErasedRecord, ...] = ()
 
     @property
     def state(self) -> str:
         if self.error is not None:
             return "broken"
-        return "declared_gaps" if self.declared_gaps else "intact"
+        if self.declared_gaps:
+            return "declared_gaps"
+        return "erased" if self.erased else "intact"
 
     def summary(self) -> Optional[str]:
-        """None when intact, else one line: the error, or the declared gaps."""
+        """None when intact, else one line: the error, the gaps, the erasures."""
         if self.error is not None:
             return self.error
-        if not self.declared_gaps:
+        if not self.declared_gaps and not self.erased:
             return None
-        n = len(self.declared_gaps)
-        return (
-            f"Chain not intact: {n} declared gap{'s' if n != 1 else ''} ("
-            + "; ".join(g.describe() for g in self.declared_gaps)
-            + "). Every other record verifies"
-        )
+        parts = []
+        if self.declared_gaps:
+            n = len(self.declared_gaps)
+            parts.append(
+                f"{n} declared gap{'s' if n != 1 else ''} ("
+                + "; ".join(g.describe() for g in self.declared_gaps) + ")"
+            )
+        if self.erased:
+            n = len(self.erased)
+            parts.append(
+                f"{n} erased record{'s' if n != 1 else ''} ("
+                + "; ".join(e.describe() for e in self.erased) + ")"
+            )
+        return "Chain not intact: " + ", ".join(parts) + ". Every other record verifies"
 
 
 class _GapLedger:
@@ -858,12 +922,26 @@ class _GapLedger:
     def __init__(self) -> None:
         self._pending: list[tuple[int, tuple[int, ...], int, str]] = []
         self._declared: list[tuple[int, Optional[int], frozenset[int]]] = []
+        self._tombstones: list[tuple[int, Optional[int], "AuditRecord", str]] = []
+        self._erasures: dict[tuple[str, str], tuple[int, Optional[int]]] = {}
 
     def hold(self, index: int, lost: tuple[int, ...], resumes_at_seq: int,
              error: str) -> None:
         self._pending.append((index, lost, resumes_at_seq, error))
 
+    def hold_erased(self, index: int, seq: Optional[int], record: "AuditRecord",
+                    error: str) -> None:
+        """A tombstoned record whose hash no longer recomputes, held open
+        until the walk has seen every RECORD_ERASED record after it."""
+        self._tombstones.append((index, seq, record, error))
+
     def see(self, index: int, seq: Optional[int], record: "AuditRecord") -> None:
+        if record.event_type == EventType.RECORD_ERASED:
+            data = record.data or {}
+            rid, rhash = data.get("erased_record_id"), data.get("erased_record_hash")
+            if isinstance(rid, str) and isinstance(rhash, str):
+                self._erasures.setdefault((rid, rhash), (index, seq))
+            return
         if record.event_type != EventType.REPAIR_GAP:
             return
         named = (record.data or {}).get("lost_seqs") or []
@@ -883,7 +961,17 @@ class _GapLedger:
                     f"repair record)"
                 ))
             gaps.append(DeclaredGap(lost, resumes, index, by))
-        return ChainVerdict(declared_gaps=tuple(gaps))
+        erased = []
+        for index, seq, record, error in self._tombstones:
+            found = self._erasures.get((record.record_id, record.record_hash))
+            if found is None or found[0] <= index:
+                return ChainVerdict(error=(
+                    f"{error} (the record carries an erasure tombstone, and no "
+                    f"erasure record later in the chain names it by id and hash)"
+                ))
+            erased.append(ErasedRecord(index, seq, record.record_id,
+                                       record.record_hash, found[1]))
+        return ChainVerdict(declared_gaps=tuple(gaps), erased=tuple(erased))
 
 
 # ── Audit Trail ───────────────────────────────────────────────────────────
@@ -1192,10 +1280,13 @@ class AuditTrail:
                 ))
             expected = record.compute_hash()
             if record.record_hash != expected:
-                return ChainVerdict(error=(
+                error = (
                     f"Hash mismatch at record {i} ({record.record_id}): "
                     f"expected {expected!r}, got {record.record_hash!r}"
-                ))
+                )
+                if erasure_pointer(record) is None:
+                    return ChainVerdict(error=error)
+                ledger.hold_erased(i, seq, record, error)
             ledger.see(i, seq, record)
             prev_hash = record.record_hash
             prev_seq = seq
@@ -2821,6 +2912,33 @@ class AuditTrail:
                 "source": self._cap_record_str(str(fork.get("source", "")), 512),
             },
         ))
+
+    def record_erasure(self, target: AuditRecord, seq: Optional[int],
+                       reason: str) -> AuditRecord:
+        """Append the RECORD_ERASED record that accounts for ``target``.
+
+        Names the record by id and stored hash, which is what a walk matches
+        a tombstone against. Holds nothing from the erased content: its event
+        type and action id only, so the slot can be read in context.
+        """
+        record = AuditRecord(
+            record_id=str(uuid.uuid4()),
+            action_id="record-erased",
+            event_type=EventType.RECORD_ERASED,
+            timestamp=time.time(),
+            agent_id="vaara",
+            tool_name="trail.erase",
+            data={
+                "erased_record_id": target.record_id,
+                "erased_record_hash": target.record_hash,
+                "erased_seq": seq,
+                "erased_event_type": target.event_type.value,
+                "erased_action_id": target.action_id,
+                "reason": self._cap_record_str(reason, 512),
+            },
+        )
+        self._append_chained(record)
+        return record
 
     def _append_chained(self, record: AuditRecord) -> bool:
         """Append a record to the trail with hash chaining.

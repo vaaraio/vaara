@@ -40,6 +40,7 @@ from vaara.audit.trail import (
     ChainVerdict,
     EventType,
     _GapLedger,
+    erasure_pointer,
     stored_event_type,
 )
 
@@ -1545,7 +1546,7 @@ class SQLiteAuditBackend:
         verdict = trail.verify_chain_verdict()
         trail._load_verdict = verdict
         chain_error = verdict.error
-        if verdict.declared_gaps:
+        if verdict.declared_gaps or verdict.erased:
             # Known, declared, and reported once per session by whoever owns
             # the operator's attention (the hook's session start). Logging it
             # at ERROR on every open printed the same line on every tool call.
@@ -1705,11 +1706,14 @@ class SQLiteAuditBackend:
                     ))
                 expected = record.compute_hash()
                 if record.record_hash != expected:
-                    return ChainVerdict(error=(
+                    error = (
                         f"Hash mismatch at seq {seq} ({record.record_id}, "
                         f"agent_id={record.agent_id!r}): expected {expected!r}, "
                         f"got {record.record_hash!r}"
-                    ))
+                    )
+                    if erasure_pointer(record) is None:
+                        return ChainVerdict(error=error)
+                    ledger.hold_erased(seen, seq, record, error)
                 ledger.see(seen, seq, record)
                 prev_hash = record.record_hash
                 prev_seq = seq
@@ -2054,6 +2058,35 @@ class SQLiteAuditBackend:
                 verb, count, retention_seconds, cutoff,
             )
         return count
+
+    def erase_record_data(self, record_id: str, tombstone: dict) -> bool:
+        """Overwrite one stored record's ``data`` with ``tombstone`` and scrub it.
+
+        Only ``data`` changes. ``record_hash`` stays as written, so the next
+        record still chains to it, and the RECORD_ERASED record that
+        ``vaara.audit.erase`` appends first is what accounts for the slot.
+        ``secure_delete`` zeroes the old bytes in the page, and a TRUNCATE
+        checkpoint moves the page out of the WAL. Returns whether that
+        checkpoint completed: a reader holding an old snapshot keeps the WAL
+        frames until it lets go, and the caller reports that rather than
+        claiming the bytes are gone.
+        """
+        payload = json.dumps(tombstone, sort_keys=True)
+        t_clause, t_params = self._tenant_clause()
+        with self._lock:
+            self._conn.execute("PRAGMA secure_delete = ON")
+            self._conn.execute("BEGIN IMMEDIATE")
+            with self._rollback_on_failure():
+                cursor = self._conn.execute(
+                    f"UPDATE audit_records SET data = ? WHERE record_id = ? AND {t_clause}",
+                    [payload, record_id] + t_params,
+                )
+                if cursor.rowcount != 1:
+                    raise KeyError(record_id)
+            if self._in_memory:
+                return True
+            row = self._conn.execute("PRAGMA wal_checkpoint(TRUNCATE)").fetchone()
+        return bool(row) and row[0] == 0
 
     def _heads_on_chain_locked(self) -> list[tuple[str, dict]]:
         """Every recorded head, any tenant, whose record is stored right now."""

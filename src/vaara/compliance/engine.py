@@ -781,7 +781,26 @@ class ComplianceEngine:
         chain_error = verdict.summary()
         chain_broken = chain_error is not None
         declared = verdict.state == "declared_gaps"
-        if declared:
+        if verdict.state == "erased":
+            # An erasure the chain itself accounts for (vaara trail erase):
+            # the link verifies, the erased content cannot. Pinned like a
+            # declared gap, and named as what it is.
+            gap_text = (
+                f"Audit chain not intact: {chain_error}. The erased records "
+                f"are named by erasure records on the chain; what they held "
+                f"cannot be shown"
+            )
+            gap_fix = (
+                "Read the record_erased records for the reason and the "
+                "authority behind each erasure, and assess the period against "
+                "a signed export taken before it if one is kept"
+            )
+            reason_text = (
+                "Audit chain not intact (erased records); status pinned to "
+                "INSUFFICIENT and strength to ABSENT regardless of "
+                "per-article evidence count."
+            )
+        elif declared:
             gap_text = (
                 f"Audit chain not intact: {chain_error}. The lost records "
                 f"were declared by a repair on the chain itself; what they "

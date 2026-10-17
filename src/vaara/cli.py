@@ -672,6 +672,35 @@ def _cmd_trail_declare_fork(args: argparse.Namespace) -> int:
     return 0
 
 
+def _cmd_trail_erase(args: argparse.Namespace) -> int:
+    import json as _json
+
+    from vaara.audit.erase import ErasureRefused, erase_record
+
+    db_path = Path(args.db).expanduser()
+    if not db_path.is_file():
+        print(f"vaara trail erase: db is not a file: {db_path}", file=sys.stderr)
+        return 2
+    try:
+        report = erase_record(db_path, args.record_id, reason=args.reason)
+    except ErasureRefused as exc:
+        print(f"vaara trail erase: {exc}", file=sys.stderr)
+        return 1
+    if args.format == "json":
+        print(_json.dumps(report, indent=2))
+        return 0
+    print(f"seq {report['erased_seq']} ({report['erased_record_id']}): data erased, "
+          f"record_hash {report['erased_record_hash']} kept.")
+    print(f"  erasure record {report['erasure_record_id']} names it on the chain")
+    print("  `vaara trail verify` now reports the slot as erased: link verified, "
+          "content not checkable")
+    if not report["wal_scrubbed"]:
+        print("  the WAL could not be checkpointed (another process holds the trail "
+              "open): the old bytes stay in the -wal file until the next checkpoint",
+              file=sys.stderr)
+    return 0
+
+
 def _cmd_trail_shadow_report(args: argparse.Namespace) -> int:
     import json as _json
 
@@ -6477,6 +6506,20 @@ def build_parser() -> argparse.ArgumentParser:
         help="Output format (default text)",
     )
     pfork.set_defaults(func=_cmd_trail_declare_fork)
+    perase = tsub.add_parser(
+        "erase",
+        help="Erase one record's data (GDPR Art. 17): keep its hash, append a "
+             "record_erased record, and verify the slot as erased",
+    )
+    perase.add_argument("--db", required=True, help="Path to the live audit SQLite DB")
+    perase.add_argument("--record-id", required=True, help="record_id of the record to erase")
+    perase.add_argument("--reason", required=True,
+                        help="Why, recorded on the chain (keep personal data out of it)")
+    perase.add_argument(
+        "--format", choices=["text", "json"], default="text",
+        help="Output format (default text)",
+    )
+    perase.set_defaults(func=_cmd_trail_erase)
 
     psr = tsub.add_parser(
         "shadow-report",

@@ -1212,6 +1212,13 @@ def _report_trail_health(cfg: dict, db_path: Path, existed: bool,
                 "the chain as not intact. A break no repair declares is still "
                 "reported as an integrity failure on every call."
             )
+        elif verdict is not None and verdict.erased:
+            _emit(
+                f"vaara-governance: the audit trail at {db_path} is not "
+                f"intact. {verdict.summary()}. Each erasure is named by a "
+                "record_erased record on the chain, and `vaara trail export` "
+                "still reports the chain as not intact."
+            )
     except Exception:
         # Reporting on the trail's health must never break the session it is
         # reporting to. There is nowhere left to escalate to from here: the

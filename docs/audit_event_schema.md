@@ -83,9 +83,10 @@ record.
 | `access_recorded` | Something in the store was opened, and by whom. |
 | `agent_seen` | `vaara scan --watch` or the MCP beacon saw an agent process. |
 | `witness_configured` | Heads reach an outside witness at a stated cadence: `data.kind` is `publish` (a transparency log) or `anchor` (an RFC 3161 authority), `data.every_records` the cadence, `data.target` the log or authority, `data.key_fingerprint` the publishing key. Written when the cadence is switched on or changed, so the bound on the unwitnessed window is readable from the trail. |
+| `record_erased` | Another record's `data` was erased (`vaara trail erase`, GDPR Art. 17): `data.erased_record_id`, `data.erased_record_hash` and `data.erased_seq` name it, `data.erased_event_type` and `data.erased_action_id` place it, `data.reason` says why. The erased record keeps its `record_hash` and its `data` becomes `{"_vaara_erased": {"erasure_record_id": ...}}`; verification reports that slot as erased (link verified, content not checkable), never as intact. |
 
-`anchor_gap`, `repair_gap`, `repair_recovered`, `trail_forked`, `key_lifecycle` and
-`witness_configured` are written by the trail alone. Verification reads them back, so
+`anchor_gap`, `repair_gap`, `repair_recovered`, `trail_forked`, `key_lifecycle`,
+`witness_configured` and `record_erased` are written by the trail alone. Verification reads them back, so
 `POST /v1/audit/events` refuses them with 400 `invalid_request`; every other
 type in both tables is accepted there.
 
