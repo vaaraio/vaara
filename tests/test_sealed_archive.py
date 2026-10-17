@@ -172,7 +172,8 @@ class TestSeal:
         spriv, _ = _signer(tmp_path)
         _, rpub = _recipient(tmp_path)
         sealed, seal, _ = sa.seal_archive(_export(tmp_path, spriv), rpub, spriv)
-        sealed.write_bytes(sealed.read_bytes()[:-1] + b"\x00")
+        data = sealed.read_bytes()
+        sealed.write_bytes(data[:-1] + bytes([data[-1] ^ 0xFF]))
         verdict = sa.verify_seal(seal, sealed)
         assert not verdict.ok and "does not match the seal" in verdict.errors[0]
 
@@ -215,7 +216,8 @@ class TestUnseal:
         spriv, spub = _signer(tmp_path)
         rpriv, rpub = _recipient(tmp_path)
         sealed, seal, _ = sa.seal_archive(_export(tmp_path, spriv), rpub, spriv)
-        sealed.write_bytes(sealed.read_bytes()[:-1] + b"\x00")
+        data = sealed.read_bytes()
+        sealed.write_bytes(data[:-1] + bytes([data[-1] ^ 0xFF]))
         with pytest.raises(sa.SealError):
             sa.unseal(sealed, seal, rpriv, tmp_path / "opened.zip", expected_signer=spub)
         assert not (tmp_path / "opened.zip").exists()
