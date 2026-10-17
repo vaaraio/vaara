@@ -169,6 +169,15 @@ class ReceiptAsserted:
     name the task in signed bytes, or a receipt from another task is
     indistinguishable from one that belongs. Absent means the issuer bound no
     task, and a verifier asked to check one reports unsupported.
+
+    ``time_source`` is the optional declaration of where ``iat`` came from:
+    ``ntp`` (a synced network clock), ``rtc`` (a hardware real-time clock,
+    never synced to a network source), ``unsynced`` (the host knows its clock
+    is not synced) or ``tsa`` (the receipt carries an RFC 3161 token in
+    ``existenceProof`` that attests the time). It is signed, so an issuer that
+    declared ``unsynced`` cannot later be read as having claimed ``ntp``.
+    Absent means unknown. Only ``tsa`` backed by a token that checks is a
+    trusted time; see ``verify_receipt_time_source``.
     """
 
     iss: str
@@ -182,6 +191,11 @@ class ReceiptAsserted:
     completeness: Optional[dict[str, Any]] = None
     aud: Optional[str] = None
     task_id: Optional[str] = None
+    time_source: Optional[str] = None
+
+
+#: The values ``receiptAsserted.timeSource`` may take. Absent means unknown.
+TIME_SOURCES = frozenset({"ntp", "rtc", "unsynced", "tsa"})
 
 
 @dataclass(frozen=True)
@@ -489,6 +503,8 @@ def receipt_asserted_to_dict(ra: ReceiptAsserted) -> dict[str, Any]:
         out["aud"] = ra.aud
     if ra.task_id is not None:
         out["taskId"] = ra.task_id
+    if ra.time_source is not None:
+        out["timeSource"] = ra.time_source
     if ra.sig_suite is not None:
         out["sigSuite"] = ra.sig_suite
     if ra.crypto_posture is not None:
@@ -522,7 +538,7 @@ _BACK_LINK_KEYS = frozenset(
 )
 _RECEIPT_ASSERTED_KEYS = frozenset(
     {"alg", "iat", "iss", "nonce", "secretVersion", "sub", "sigSuite",
-     "cryptoPosture", "completeness", "aud", "taskId"}
+     "cryptoPosture", "completeness", "aud", "taskId", "timeSource"}
 )
 
 #: The keys a completeness block may carry, and all three are required when the
@@ -580,6 +596,16 @@ def receipt_asserted_from_dict(d: dict[str, Any]) -> ReceiptAsserted:
         raise AttestationError(
             "receiptAsserted.taskId must be a non-empty string or absent"
         )
+    # Present-but-null is refused rather than read as absent: unknown is
+    # spelled by leaving the key out, so there is one wire form per meaning.
+    time_source = d.get("timeSource")
+    if "timeSource" in d and not (
+        isinstance(time_source, str) and time_source in TIME_SOURCES
+    ):
+        raise AttestationError(
+            f"receiptAsserted.timeSource must be one of {sorted(TIME_SOURCES)} "
+            f"or absent; got {time_source!r}"
+        )
     return ReceiptAsserted(
         alg=d["alg"],
         iat=d["iat"],
@@ -592,6 +618,7 @@ def receipt_asserted_from_dict(d: dict[str, Any]) -> ReceiptAsserted:
         completeness=completeness,
         aud=aud,
         task_id=task_id,
+        time_source=time_source,
     )
 
 
