@@ -193,7 +193,8 @@ def _value_origin(raw: Any) -> Optional[dict[str, dict[str, Any]]]:
     """A caller's ``value_origin``, kept only in its documented shape.
 
     It goes into a hash-chained record, so only argument name to
-    ``{"seen_in": [action-id strings], "source": str}`` passes.
+    ``{"seen_in": [action-id strings], "source": str}`` passes, plus
+    ``"rule": "strict"`` when strict mode held the value.
     """
     if not isinstance(raw, dict):
         return None
@@ -208,6 +209,8 @@ def _value_origin(raw: Any) -> Optional[dict[str, dict[str, Any]]]:
             if isinstance(ids, (list, tuple)) else [],
             "source": source[:_MAX_TOOL_NAME_LEN] if isinstance(source, str) else "",
         }
+        if info.get("rule") == "strict":
+            kept[str(name)[:_MAX_TOOL_NAME_LEN]]["rule"] = "strict"
     return kept or None
 
 

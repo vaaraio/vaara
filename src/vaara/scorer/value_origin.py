@@ -9,7 +9,8 @@
 Each call passes on its own. What makes the payment wrong is the origin of one
 argument: the IBAN entered the session in a tool result and nowhere else. This
 module keeps that origin. Values shaped like an address of authority (email
-addresses, IBANs, hosts in URLs) are harvested from external tool results and
+addresses, IBANs, hosts in URLs, phone numbers in international form, wallet
+addresses) are harvested from external tool results and
 from the user's own prompts, and a later call that puts one of them into an
 argument naming a recipient, payee or endpoint is checked against both sets:
 
@@ -17,6 +18,9 @@ argument naming a recipient, payee or endpoint is checked against both sets:
     typed by the user ........................... passes
     seen only in an external result ............. held for a human
     never seen .................................. passes (origin unknown)
+
+Strict mode is for agents that pay: only a value on the trusted list passes,
+whoever typed it, and the record names the rule.
 
 Vaara does not see inside the model, so this is not taint tracking. It is a
 record of where each value first appeared on either side of the model, and a
@@ -39,7 +43,7 @@ import secrets
 import time
 from contextlib import contextmanager
 from pathlib import Path
-from typing import Any, Iterable, Iterator, Optional, Union
+from typing import Any, Iterable, Iterator, Mapping, Optional, Union
 from urllib.parse import urlsplit
 
 from vaara.scorer.lineage import _exclusive
@@ -57,6 +61,11 @@ _EMAIL = re.compile(r"(?<![\w.+-])[A-Za-z0-9._%+-]{1,64}@[A-Za-z0-9-]+(?:\.[A-Za
 # to four, single spaces allowed between groups (the printed form).
 _IBAN = re.compile(r"\b[A-Z]{2}[0-9]{2}(?: ?[A-Z0-9]{1,4}){3,8}\b")
 _URL = re.compile(r"\b(?:https?|wss?|ftp)://[^\s<>\"'`]+", re.IGNORECASE)
+# International form only: a leading plus, then digits with the usual
+# separators. A number without the plus is too often an order or an id.
+_PHONE = re.compile(r"(?<![\w+])\+[1-9][0-9 ().-]{5,20}[0-9]\b")
+# Ethereum-style account (0x and 40 hex digits) and a bech32 Bitcoin address.
+_WALLET = re.compile(r"\b(?:0x[0-9a-fA-F]{40}|bc1[ac-hj-np-z02-9]{11,71})\b")
 
 #: IBAN lengths by country (ISO 13616 registry), for the countries most
 #: likely to appear; others are accepted on the checksum alone.
@@ -70,7 +79,7 @@ _IBAN_LEN = {
 _SEND_VERBS = frozenset({
     "send", "reply", "forward", "pay", "transfer", "wire", "remit", "payout",
     "refund", "publish", "upload", "share", "invite", "post", "notify", "email",
-    "mail",
+    "mail", "sms",
 })
 #: ...and words that do when they create one of these.
 _MAKE_VERBS = frozenset({"create", "make", "initiate", "submit", "schedule", "new", "add"})
@@ -109,7 +118,8 @@ PRESET_AUTHORITY_ARGS = frozenset({
     "email_address", "address", "reply_to", "iban", "account",
     "account_number", "bank_account", "payee", "beneficiary", "creditor",
     "destination", "url", "webhook", "webhook_url", "endpoint",
-    "callback_url", "target_url",
+    "callback_url", "target_url", "phone", "phone_number", "mobile",
+    "wallet", "wallet_address", "to_address", "recipient_address",
 })
 
 
@@ -160,6 +170,12 @@ def extract(text: str) -> set[tuple[str, str]]:
         host = _host(m.group(0))
         if host:
             found.add(("host", host))
+    for m in _PHONE.finditer(text):
+        digits = re.sub(r"[^0-9]", "", m.group(0))
+        if 8 <= len(digits) <= 15:
+            found.add(("phone", "+" + digits))
+    for m in _WALLET.finditer(text):
+        found.add(("wallet", m.group(0).lower()))
     return found
 
 
@@ -195,7 +211,7 @@ def _bare_tool(tool_name: str) -> str:
 
 
 def authority_args(tool_name: str, parameters: Any,
-                   extra: Optional[dict[str, Iterable[str]]] = None) -> dict[str, Any]:
+                   extra: Optional[Mapping[str, Iterable[str]]] = None) -> dict[str, Any]:
     """The arguments of this call that carry authority, by name.
 
     The preset covers tools whose name sends, pays or posts, and only their
@@ -318,13 +334,17 @@ class OriginStore:
 
 def origin_hold(tool_name: str, parameters: Any, store: OriginStore, *,
                 trusted: Iterable[str] = (),
-                extra_args: Optional[dict[str, Iterable[str]]] = None,
+                extra_args: Optional[Mapping[str, Iterable[str]]] = None,
+                strict: bool = False,
                 ) -> Optional[dict[str, dict[str, Any]]]:
     """The authority arguments whose value came only from external content.
 
     Maps each such argument to ``{"seen_in": [action ids], "source": tool}``,
     or None when every value is trusted, was typed by the user, or was never
     seen. Checks only declared authority arguments (see ``authority_args``).
+
+    With ``strict`` every value not on the trusted list is held, typed or
+    never seen alike, and the entry carries ``"rule": "strict"``.
     """
     args = authority_args(tool_name, parameters, extra_args)
     if not args:
@@ -335,16 +355,28 @@ def origin_hold(tool_name: str, parameters: Any, store: OriginStore, *,
     sets = store.entries()
     held: dict[str, dict[str, Any]] = {}
     for name, value in args.items():
-        for kind, v in sorted(extract_any(value)):
+        shaped = sorted(extract_any(value))
+        if strict and not shaped and any(
+                s.strip() and s.strip().lower() not in trusted_values
+                for s in _strings(value)):
+            # An account number or handle in no shape this module reads:
+            # strict mode passes only what is on the list.
+            held.setdefault(name, {"seen_in": [], "source": "", "rule": "strict"})
+        for kind, v in shaped:
             if v in trusted_values:
                 continue
             d = store.digest(kind, v)
-            if d in sets["user"]:
-                continue
             seen = sets["external"].get(d)
+            if strict:
+                slot = held.setdefault(name, {"seen_in": [], "source": "", "rule": "strict"})
+                if seen is not None and not slot["source"]:
+                    slot["source"] = seen.get("tool", "")
+            else:
+                if d in sets["user"] or seen is None:
+                    continue
+                slot = held.setdefault(name, {"seen_in": [], "source": seen.get("tool", "")})
             if seen is None:
                 continue
-            slot = held.setdefault(name, {"seen_in": [], "source": seen.get("tool", "")})
             for i in seen.get("action_ids", []):
                 if isinstance(i, str) and i not in slot["seen_in"]:
                     slot["seen_in"].append(i)
@@ -355,9 +387,13 @@ def describe(held: dict[str, dict[str, Any]]) -> str:
     """One reason line: which argument, and the result it came from."""
     parts = []
     for name, info in held.items():
-        where = f"the result of {info.get('source') or 'an earlier tool call'}"
         ids = info.get("seen_in") or []
+        where = f"the result of {info.get('source') or 'an earlier tool call'}"
         if ids:
             where += f" (action {', '.join(ids[:3])})"
-        parts.append(f"{name} first seen in {where}")
+        if info.get("rule") == "strict":
+            line = f"{name} is not on the trusted list (strict)"
+            parts.append(line + (f", seen in {where}" if ids or info.get("source") else ""))
+        else:
+            parts.append(f"{name} first seen in {where}")
     return "value origin: " + "; ".join(parts) + ", held for a human"

@@ -49,6 +49,47 @@ jobs:
           pytest -q -rs | tee result.txt
           python scripts/check_skips.py result.txt tests/ci_allowed_skips.txt
 
+  tests-rhel:
+    # The suite inside Red Hat's Universal Base Image 9, built from Red Hat
+    # Enterprise Linux 9 packages and free to use, so the result says whether
+    # Vaara works on RHEL and not only on Ubuntu.
+    runs-on: ubuntu-latest
+    container:
+      image: registry.access.redhat.com/ubi9/python-312:latest
+      options: --user 0
+
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1  # v7.0.1
+
+      - name: Show the platform
+        run: |
+          cat /etc/redhat-release
+          python3 --version
+
+      # The checkout belongs to another uid than the container user, so git
+      # refuses it until the directory is marked safe. System config, because
+      # the suite points HOME elsewhere and a --global entry would not be read.
+      - name: Trust the checkout
+        run: git config --system --add safe.directory "$GITHUB_WORKSPACE"
+
+      - name: Install pinned deps
+        run: python3 -m pip install --require-hashes -r requirements-dev.txt
+
+      - name: Install Vaara (editable, no deps)
+        run: python3 -m pip install -e . --no-deps
+
+      - name: Install server extra (fastapi, uvicorn, httpx) for HTTP transport tests
+        run: python3 -m pip install 'fastapi>=0.110' 'uvicorn>=0.27' 'httpx>=0.27'
+
+      - name: Run tests, failing on an unreviewed skip
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: |
+          set -o pipefail
+          python3 -m pytest -q -rs | tee result.txt
+          cat tests/ci_allowed_skips.txt tests/ci_allowed_skips_rhel.txt > allowed_skips_rhel.txt
+          python3 scripts/check_skips.py result.txt allowed_skips_rhel.txt
+
   tests-other-os:
     # Until this job existed the suite ran on Ubuntu only, so nothing said
     # whether Vaara works on the macOS laptops most developers carry, or on
