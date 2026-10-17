@@ -1,0 +1,9 @@
+# Extra skip reasons the CI `tests-rhel` job may print, on top of
+# tests/ci_allowed_skips.txt. Same format: one Python regular expression per line.
+#
+# Red Hat Enterprise Linux confines processes with SELinux, not AppArmor, so the
+# AppArmor profile tests have nothing to run against here. Ubuntu runs them.
+apparmor_parser not installed
+# The UBI image ships without helm. The `helm-chart` job renders the chart with
+# helm and fails on any skip, and rendering does not depend on the host OS.
+helm is not on PATH

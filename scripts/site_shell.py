@@ -103,7 +103,7 @@ def bar(lang: str, path: str, nav_on: str = "", fi_path: str | None = None) -> s
         lang_sw = f'<a href="{path[3:] if path.startswith("/fi/") else path}" hreflang="en">EN</a> | <b>FI</b>'
     return (f'<header class="bar"><div class="wrap">\n'
             f'<nav class="top" aria-label="{E(n["menu"])}"><a class="brand" href="{href(lang, "/")}">'
-            f'<img src="/vaara-logo-dark.svg" alt="Vaara home" width="174" height="24"></a>{links}'
+            f'<img src="/vaara-logo-bar@1x.png" srcset="/vaara-logo-bar@1x.png 1x, /vaara-logo-bar@2x.png 2x, /vaara-logo-bar@3x.png 3x" alt="Vaara home" width="174" height="24"></a>{links}'
             f'<span class="lang">{lang_sw}</span>'
             f'<button class="burger" type="button" aria-label="{E(n["menu"])}" aria-expanded="false"></button>'
             f'<button class="theme" type="button" aria-label="{E(n["theme"])}" title="{E(n["theme"])}"></button>'

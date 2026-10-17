@@ -378,7 +378,8 @@ def _value_origin(cfg: dict, tool_name: str, tool_input: dict) -> Optional[dict]
     """The authority arguments of this call whose value came only from a tool
     result (``vaara.scorer.value_origin``), or None. Trusted values and extra
     authority arguments come from the config (``trusted_values``,
-    ``authority_args``). Never raises: a broken store holds nothing."""
+    ``authority_args``); ``"value_origin_strict": true`` passes only trusted
+    values. Never raises: a broken store holds nothing."""
     if not value_origin_enabled(cfg):
         return None
     try:
@@ -393,6 +394,7 @@ def _value_origin(cfg: dict, tool_name: str, tool_input: dict) -> Optional[dict]
             tool_name, tool_input, OriginStore(),
             trusted=trusted if isinstance(trusted, list) else (),
             extra_args=extra,
+            strict=cfg.get("value_origin_strict") is True,
         )
     except Exception as exc:
         _emit(f"vaara-governance: value origin check failed ({exc!r}); not held on origin.")
