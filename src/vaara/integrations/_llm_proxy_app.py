@@ -435,7 +435,7 @@ def build_app(*, upstream: str, api_key: Optional[str], api_key_header: str,
                 result.action_id, outcome_severity=0.5,
                 description=_outcome(
                     "upstream_error", error=type(exc).__name__))
-            return JSONResponse({"error": f"upstream: {exc}"}, status_code=502)
+            return JSONResponse({"error": f"upstream unreachable: {type(exc).__name__}"}, status_code=502)
 
         # Every tool call the model asks for goes through the deny rules
         # before the agent sees it, and through the policy when one is
@@ -572,7 +572,7 @@ def build_app(*, upstream: str, api_key: Optional[str], api_key_header: str,
                 result.action_id, outcome_severity=0.5,
                 description=_outcome(
                     "upstream_error", error=type(exc).__name__))
-            return JSONResponse({"error": str(exc)}, status_code=502)
+            return JSONResponse({"error": f"upstream unreachable: {type(exc).__name__}"}, status_code=502)
 
         # A reply that is not UTF-8 (a file, an image) cannot carry a
         # placeholder the caller needs back, so it passes as received.

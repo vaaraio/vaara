@@ -66,6 +66,14 @@ DESCRIPTION = (
 )
 
 
+def _without_userinfo(url: str) -> str:
+    """The URL as printed: a user:password@ part is replaced by ***@."""
+    from urllib.parse import urlsplit, urlunsplit
+    parts = urlsplit(url)
+    if "@" not in parts.netloc:
+        return url
+    return urlunsplit(parts._replace(netloc="***@" + parts.netloc.rsplit("@", 1)[1]))
+
 def _build_pipeline(db: Optional[Path] = None,
                     policy: Optional[Any] = None) -> InterceptionPipeline:
     """Create a pipeline with LLM action types registered, and the
@@ -425,7 +433,7 @@ def main(args: Optional[list[str]] = None) -> int:
     # whose quota is being spent.
     auth_note = ", auth=passthrough" if api_key is None else ""
     print(f"vaara llm-proxy: {parsed.mode} mode, audit={parsed.audit}"
-          f"{seal_note}{auth_note}, listening on {where} -> {parsed.upstream}",
+          f"{seal_note}{auth_note}, listening on {where} -> {_without_userinfo(parsed.upstream)}",
           file=sys.stderr)
 
     try:
