@@ -174,3 +174,24 @@ class TestOutcomeCarriesUsage:
         (out,) = _records(pipeline, EventType.OUTCOME_RECORDED)
         desc = json.loads(out.data["description"])
         assert "usage" not in desc
+
+
+class TestErrorSurface:
+
+    def test_upstream_error_names_only_the_type(self, monkeypatch, pipeline):
+        def handler(request: httpx.Request) -> httpx.Response:
+            raise httpx.ConnectError("connect to 10.0.0.7:8443 refused")
+
+        _mount(monkeypatch, handler)
+        resp = _post(TestClient(_app(pipeline)))
+        assert resp.status_code == 502
+        assert "10.0.0.7" not in resp.text
+        assert resp.json()["error"] == "upstream unreachable: ConnectError"
+
+    @pytest.mark.parametrize("url, shown", [
+        ("https://api.anthropic.com", "https://api.anthropic.com"),
+        ("https://user:pw@gw.internal:8443/v1", "https://***@gw.internal:8443/v1"),
+    ])
+    def test_printed_upstream_hides_userinfo(self, url, shown):
+        from vaara.integrations.llm_proxy import _without_userinfo
+        assert _without_userinfo(url) == shown
