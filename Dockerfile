@@ -14,7 +14,7 @@
 # Run:
 #   docker run -p 8788:8788 -v vaara-trail:/var/lib/vaara ghcr.io/vaaraio/vaara:dev
 
-FROM registry.suse.com/bci/python:3.12 AS build
+FROM registry.suse.com/bci/python:3.12@sha256:6e76b327fd9ddc764edca9d08194b6f6198f205e1eb1a706c6b7dd1775b57c18 AS build
 
 WORKDIR /src
 COPY pyproject.toml MANIFEST.in README.md LICENSE ./
@@ -26,7 +26,7 @@ RUN python3 -m pip install --no-cache-dir build \
     && python3 -m build --wheel --outdir /dist
 
 
-FROM registry.suse.com/bci/python:3.12
+FROM registry.suse.com/bci/python:3.12@sha256:6e76b327fd9ddc764edca9d08194b6f6198f205e1eb1a706c6b7dd1775b57c18
 
 ARG VERSION=0.0.0
 ARG VCS_REF=unknown
