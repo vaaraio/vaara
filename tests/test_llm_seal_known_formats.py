@@ -160,3 +160,20 @@ class TestThroughTheProxy:
         params = rec.data["parameters"]
         assert params["seal_kinds"] == {"github_token": 1}
         assert key not in json.dumps(rec.data)
+
+
+def test_unterminated_pem_does_not_backtrack():
+    """A BEGIN line, many newlines and no END: linear, not exponential."""
+    import time
+
+    pattern = dict(KNOWN_SECRET_FORMATS)["private_key"]
+    text = "-----BEGIN RSA PRIVATE KEY-----" + "\n" * 5000 + "!"
+    started = time.perf_counter()
+    assert pattern.search(text) is None
+    assert time.perf_counter() - started < 1.0
+
+
+def test_pem_with_raw_newlines_still_matches():
+    pem = ("-----BEGIN PRIVATE KEY-----\nMIIBOgIBAAJBAKj34GkxFhD90vcN\n"
+           "-----END PRIVATE KEY-----")
+    assert dict(KNOWN_SECRET_FORMATS)["private_key"].fullmatch(pem)
