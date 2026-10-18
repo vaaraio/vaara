@@ -109,3 +109,15 @@ def strict_json_dumps(obj: Any, **kwargs: Any) -> str:
     kwargs.setdefault("default", str)
     kwargs["allow_nan"] = False
     return _json.dumps(_scrub_nonfinite(obj), **kwargs)
+
+
+def log_safe(value: Any, max_len: int = 200) -> str:
+    """A caller-supplied value made safe to put in a log line.
+
+    CR and LF become ``?`` so a crafted agent id or tool name cannot start a
+    fake log line, other non-printable characters go the same way, and the
+    length is capped so a huge name cannot flood the log.
+    """
+    text = value if isinstance(value, str) else str(value)
+    text = text.replace("\r", "?").replace("\n", "?")
+    return "".join(c if c.isprintable() else "?" for c in text)[:max_len]
