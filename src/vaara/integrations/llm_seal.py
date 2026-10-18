@@ -63,10 +63,12 @@ _EDGE = r"(?<![A-Za-z0-9_-])"
 #: its issuer publishes, chosen so an ordinary word or identifier does not
 #: match. Order matters where one prefix contains another (``sk-ant-`` before
 #: ``sk-``). Matching runs on the JSON text as it goes out, so a PEM block is
-#: matched in its escaped form and restored in the same form.
+#: matched in its escaped form and restored in the same form. The PEM body has
+#: no ``\n`` branch of its own: ``\s`` already covers a newline, and the overlap
+#: let a BEGIN line followed by blank lines and no END backtrack exponentially.
 KNOWN_SECRET_FORMATS: tuple[tuple[str, re.Pattern[str]], ...] = (
     ("private_key", re.compile(
-        r"-----BEGIN [A-Z ]*PRIVATE KEY-----(?:\\n|\n|[A-Za-z0-9+/=\s])+?"
+        r"-----BEGIN [A-Z ]*PRIVATE KEY-----(?:\\n|[A-Za-z0-9+/=\s])+?"
         r"-----END [A-Z ]*PRIVATE KEY-----")),
     ("anthropic_key", re.compile(_EDGE + r"sk-ant-[A-Za-z0-9_-]{20,}")),
     ("openai_key", re.compile(
