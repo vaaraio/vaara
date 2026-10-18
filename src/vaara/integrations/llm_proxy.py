@@ -42,6 +42,15 @@ from pathlib import Path
 from typing import Any, Optional
 
 from vaara import __version__ as _VAARA_VERSION
+
+
+def _shown_upstream(url: str) -> str:
+    """The upstream as the startup line prints it: user and password dropped from the URL."""
+    from urllib.parse import urlsplit, urlunsplit
+    parts = urlsplit(url)
+    if "@" not in parts.netloc:
+        return url
+    return urlunsplit(parts._replace(netloc=parts.netloc.rsplit("@", 1)[1]))
 from vaara.audit.sqlite_backend import SQLiteAuditBackend
 from vaara.pipeline import InterceptionPipeline
 from vaara.taxonomy.actions import create_default_registry
@@ -425,7 +434,7 @@ def main(args: Optional[list[str]] = None) -> int:
     # whose quota is being spent.
     auth_note = ", auth=passthrough" if api_key is None else ""
     print(f"vaara llm-proxy: {parsed.mode} mode, audit={parsed.audit}"
-          f"{seal_note}{auth_note}, listening on {where} -> {parsed.upstream}",
+          f"{seal_note}{auth_note}, listening on {where} -> {_shown_upstream(parsed.upstream)}",
           file=sys.stderr)
 
     try:
