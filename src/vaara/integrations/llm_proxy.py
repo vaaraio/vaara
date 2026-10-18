@@ -42,6 +42,10 @@ from pathlib import Path
 from typing import Any, Optional
 
 from vaara import __version__ as _VAARA_VERSION
+from vaara.audit.sqlite_backend import SQLiteAuditBackend
+from vaara.pipeline import InterceptionPipeline
+from vaara.taxonomy.actions import create_default_registry
+from .llm_actions import LLM_ACTIONS
 
 
 def _shown_upstream(url: str) -> str:
@@ -51,10 +55,6 @@ def _shown_upstream(url: str) -> str:
     if "@" not in parts.netloc:
         return url
     return urlunsplit(parts._replace(netloc=parts.netloc.rsplit("@", 1)[1]))
-from vaara.audit.sqlite_backend import SQLiteAuditBackend
-from vaara.pipeline import InterceptionPipeline
-from vaara.taxonomy.actions import create_default_registry
-from .llm_actions import LLM_ACTIONS
 
 #: What the proxy does, stated to the edge of what it does. Shared by
 #: ``vaara llm-proxy --help`` and the subcommand list so the two cannot differ.
