@@ -42,6 +42,7 @@ from typing import Any, Callable, Optional
 
 from vaara import __version__ as _VAARA_VERSION
 from vaara.attestation._receipt_task import related_task_id as _related_task_id
+from vaara._sanitize import log_safe
 from vaara.audit.decision_receipts import default_sink
 from vaara.audit.sqlite_backend import SQLiteAuditBackend
 from vaara.audit.trail import AuditTrail
@@ -114,17 +115,7 @@ _REQUEST_INTENT: contextvars.ContextVar[str] = contextvars.ContextVar(
     "vaara_mcp_intent", default="",
 )
 
-def _safe_log(value: Any, max_len: int = 200) -> str:
-    """Sanitise a user-supplied string for safe logging.
-
-    Strips CR/LF and other control characters so an attacker who controls
-    a tool / resource / prompt name can't inject fake log lines, and caps
-    length so a multi-megabyte name doesn't blow the log up.
-    """
-    if not isinstance(value, str):
-        value = str(value)
-    cleaned = "".join(c if c.isprintable() and c not in ("\r", "\n") else "?" for c in value)
-    return cleaned[:max_len]
+_safe_log = log_safe
 
 
 # Largest single MCP JSON-RPC message accepted on the /mcp HTTP endpoint.
