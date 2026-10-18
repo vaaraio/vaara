@@ -171,3 +171,45 @@ def usage_fields(usage: Optional[dict[str, Any]]) -> dict[str, Any]:
     if not usage:
         return {}
     return {"usage": usage}
+
+
+#: Anthropic's plan-limit headers, as a subscription seat reports them. The
+#: utilisations are fractions of the window, the resets epoch seconds.
+_LIMIT_HEADERS = {
+    "five_hour": ("anthropic-ratelimit-unified-5h-utilization",
+                  "anthropic-ratelimit-unified-5h-reset"),
+    "seven_day": ("anthropic-ratelimit-unified-7d-utilization",
+                  "anthropic-ratelimit-unified-7d-reset"),
+}
+
+
+def plan_limit_fields(headers: Any) -> dict[str, Any]:
+    """The outcome-description fields for a reply's plan-limit headers.
+
+    Empty when the provider sent none, which is the case for API-key traffic.
+    The organisation is kept as its first eight characters: enough to tell two
+    seats apart on one box, not the full identifier in every record.
+    """
+    if headers is None:
+        return {}
+    limits: dict[str, Any] = {}
+    for window, (util_h, reset_h) in _LIMIT_HEADERS.items():
+        try:
+            util = float(headers.get(util_h))
+        except (TypeError, ValueError):
+            continue
+        entry: dict[str, Any] = {"utilization": util}
+        try:
+            entry["resets_at"] = int(float(headers.get(reset_h)))
+        except (TypeError, ValueError):
+            pass
+        limits[window] = entry
+    if not limits:
+        return {}
+    status = headers.get("anthropic-ratelimit-unified-status")
+    if isinstance(status, str) and status:
+        limits["status"] = status
+    org = headers.get("anthropic-organization-id")
+    if isinstance(org, str) and org:
+        limits["org"] = org[:8]
+    return {"plan_limits": limits}
