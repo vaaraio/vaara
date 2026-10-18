@@ -12,6 +12,7 @@ attestation extra not installed
 the attestation extra
 record digest needs the attestation extra
 qualified existence proof needs the timeanchor extra
+tsa check needs the timeanchor extra
 AdversarialClassifier requires vaara\[ml\] extras
 (trained|stacked) gate needs the ml extra
 mc dropout gate needs torch
