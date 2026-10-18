@@ -1,0 +1,90 @@
+# SPDX-FileCopyrightText: 2026 Henri Sirkkavaara
+# SPDX-License-Identifier: AGPL-3.0-or-later
+#
+# `vaara proxy` on Red Hat Universal Base Image 9, laid out for Red Hat's
+# preflight container checks. The root Dockerfile (SUSE BCI) stays the
+# published image; this one is for RHEL and OpenShift deployments.
+#
+# UBI needs no subscription to pull or redistribute. Both stages use it, and
+# the runtime stage is ubi-minimal with the distribution's own python3.12, so
+# every Red Hat file in the image comes from Red Hat packages unmodified.
+#
+# Build (from the repository root):
+#   podman build -f packaging/ubi9/Containerfile \
+#     --build-arg VERSION=2.14.0 -t vaara:2.14.0-ubi9 .
+# Run:
+#   podman run -p 8788:8788 -v vaara-trail:/var/lib/vaara vaara:2.14.0-ubi9
+
+FROM registry.access.redhat.com/ubi9/python-312:latest AS build
+
+USER 0
+WORKDIR /src
+COPY pyproject.toml MANIFEST.in README.md LICENSE ./
+COPY src/ ./src/
+RUN python3 -m pip install --no-cache-dir build \
+    && python3 -m build --wheel --outdir /dist
+
+
+FROM registry.access.redhat.com/ubi9/ubi-minimal:latest
+
+ARG VERSION=0.0.0
+ARG RELEASE=1
+ARG VCS_REF=unknown
+
+LABEL name="vaara" \
+      maintainer="Henri Sirkkavaara <hello@vaara.io>" \
+      vendor="Vaara" \
+      version="${VERSION}" \
+      release="${RELEASE}" \
+      summary="Vaara proxy: policy-gated tool calls and a verifiable audit trail for AI agents" \
+      description="Vaara sits between an AI agent and its model endpoint, gates each requested tool call against policy and records every decision into a hash-chained audit trail that a third party can verify offline." \
+      url="https://vaara.io" \
+      io.k8s.display-name="Vaara proxy" \
+      io.k8s.description="Governance and receipt layer for AI agents" \
+      io.openshift.tags="ai,agents,audit,governance" \
+      org.opencontainers.image.licenses="AGPL-3.0-or-later" \
+      org.opencontainers.image.source="https://github.com/vaaraio/vaara" \
+      org.opencontainers.image.revision="${VCS_REF}"
+
+COPY LICENSE /licenses/vaara/LICENSE
+COPY --from=build /dist/*.whl /tmp/
+
+# One layer: interpreter, the wheel with the proxy and attestation extras (see
+# the root Dockerfile for why both), the licence text of every Python package
+# the wheel pulled in, then the package manager caches are dropped.
+RUN microdnf install -y --nodocs --setopt=install_weak_deps=0 \
+        python3.12 python3.12-pip shadow-utils \
+    && python3.12 -m pip install --no-cache-dir \
+        "$(ls /tmp/vaara-*.whl)[proxy,attestation]" \
+    && rm -f /tmp/*.whl \
+    && python3.12 -c "import importlib.metadata as m, pathlib, shutil; \
+[shutil.copy(d.locate_file(f), pathlib.Path('/licenses', d.metadata['Name'])) \
+ for d in m.distributions() for f in (d.files or []) \
+ if any(k in f.name.lower() for k in ('licen', 'copying', 'notice')) \
+ and d.locate_file(f).is_file() \
+ and (pathlib.Path('/licenses', d.metadata['Name']).mkdir(parents=True, exist_ok=True) or True)]" \
+    && microdnf clean all
+
+# UID 10001 matches the root Dockerfile and the Helm chart. OpenShift's
+# restricted-v2 SCC ignores it and runs an arbitrary UID in group 0, so the
+# trail directory is owned by group 0 and group writable as well.
+RUN groupadd --gid 10001 vaara \
+    && useradd --uid 10001 --gid 10001 --groups 0 --home-dir /var/lib/vaara \
+       --no-create-home --shell /sbin/nologin vaara \
+    && mkdir -p /var/lib/vaara/receipts \
+    && chown -R 10001:0 /var/lib/vaara \
+    && chgrp -R 0 /var/lib/vaara \
+    && chmod -R g=u /var/lib/vaara
+
+USER 10001:0
+WORKDIR /var/lib/vaara
+
+VOLUME ["/var/lib/vaara"]
+
+EXPOSE 8788
+
+ENTRYPOINT ["vaara"]
+CMD ["proxy", \
+     "--listen", "0.0.0.0:8788", \
+     "--upstream", "http://ollama:11434", \
+     "--trail", "/var/lib/vaara/audit.db"]
