@@ -3263,6 +3263,9 @@ def _cmd_verify_record(args: argparse.Namespace) -> int:
     existence = _verify_single_existence_proof(
         doc, getattr(args, "trusted_issuer_cert", None)
     )
+    time_source = None if is_decision else _verify_single_time_source(
+        doc, getattr(args, "trusted_issuer_cert", None)
+    )
 
     if args.json:
         out: dict[str, Any] = {"conformance": report.to_dict()}
@@ -3272,6 +3275,8 @@ def _cmd_verify_record(args: argparse.Namespace) -> int:
             out["backLink"] = back_link
         if existence is not None:
             out["existenceProof"] = existence
+        if time_source is not None:
+            out["timeSource"] = time_source
         print(json.dumps(out, indent=2))
     else:
         print(f"conformance: {'CONFORMS' if report.conforms else 'NON-CONFORMING'}")
@@ -3301,6 +3306,9 @@ def _cmd_verify_record(args: argparse.Namespace) -> int:
             at = existence.get("attestedTime")
             suffix = f"  @ {at}" if at else ""
             print(f"  existence: {estate}{suffix}  {existence['detail']}")
+        if time_source is not None:
+            tstate = "FAIL" if time_source["finding"] else time_source["verdict"]
+            print(f"  time source: {tstate}  {time_source['reason']}")
 
     if not report.conforms:
         return 1
@@ -3309,6 +3317,8 @@ def _cmd_verify_record(args: argparse.Namespace) -> int:
     if back_link is not None and not back_link["ok"] and not back_link.get("skipped"):
         return 1
     if existence is not None and existence["ran"] and not existence["ok"]:
+        return 1
+    if time_source is not None and time_source["finding"]:
         return 1
     return 0
 
@@ -3367,6 +3377,29 @@ def _verify_single_existence_proof(
     return {"ran": True, "ok": res.ok, "qualified": res.qualified,
             "basis": res.basis, "attestedTime": res.attested_time,
             "detail": res.reason}
+
+
+def _verify_single_time_source(
+    doc: Any, trusted_issuer_cert_path: Optional[str]
+) -> Optional[dict[str, Any]]:
+    """Grade the record's ``receiptAsserted.timeSource``.
+
+    Returns ``None`` when the record has no ``receiptAsserted`` object (the
+    conformance check already fails it), else the ``TimeSourceResult`` dict.
+    Absent and ``unsynced`` are reported, never as a trusted time; only a
+    ``tsa`` claim with no checkable token, or an undefined value, is a finding.
+    """
+    if not (isinstance(doc, dict) and isinstance(doc.get("receiptAsserted"), dict)):
+        return None
+    from vaara.attestation._receipt_time_source import verify_receipt_time_source
+
+    pin = None
+    if trusted_issuer_cert_path:
+        try:
+            pin = Path(trusted_issuer_cert_path).expanduser().read_bytes()
+        except OSError:
+            pin = None  # the existence line already reports the unreadable pin
+    return verify_receipt_time_source(doc, trusted_issuer_cert=pin).to_dict()
 
 
 def _record_back_link(attestation_path: str, doc: Any) -> dict[str, Any]:

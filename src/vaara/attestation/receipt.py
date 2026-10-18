@@ -178,6 +178,11 @@ from vaara.attestation._receipt_task import (
     related_task_id,
     verify_receipt_task,
 )
+from vaara.attestation._receipt_time_source import (
+    TimeSourceResult,
+    TimeSourceVerdict,
+    verify_receipt_time_source,
+)
 from vaara.attestation._receipt_identity import (
     IdentityResult,
     did_web_to_url,
@@ -222,6 +227,7 @@ from vaara.attestation._receipt_types import (
     ReceiptAsserted,
     ReceiptStatus,
     ResultCommitment,
+    TIME_SOURCES,
     receipt_from_dict as parse_receipt,
 )
 from vaara.attestation._receipt_existence import (
@@ -406,6 +412,10 @@ __all__ = [
     "TaskVerdict",
     "related_task_id",
     "verify_receipt_task",
+    "TIME_SOURCES",
+    "TimeSourceResult",
+    "TimeSourceVerdict",
+    "verify_receipt_time_source",
     "verify_receipt_identity_live",
     "verify_receipt_retained",
     "verify_receipt_signature",
