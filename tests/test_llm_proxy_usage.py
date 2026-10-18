@@ -22,6 +22,7 @@ from vaara.integrations._llm_proxy_app import build_app  # noqa: E402
 from vaara.integrations.llm_proxy import _build_pipeline  # noqa: E402
 from vaara.integrations.llm_usage import (  # noqa: E402
     StreamUsage,
+    plan_limit_fields,
     extract_usage,
 )
 
@@ -195,3 +196,55 @@ class TestErrorSurface:
     def test_printed_upstream_hides_userinfo(self, url, shown):
         from vaara.integrations.llm_proxy import _without_userinfo
         assert _without_userinfo(url) == shown
+
+
+_LIMIT_HEADERS = {
+    "anthropic-ratelimit-unified-5h-utilization": "0.18",
+    "anthropic-ratelimit-unified-5h-reset": "1792345200",
+    "anthropic-ratelimit-unified-7d-utilization": "0.11",
+    "anthropic-ratelimit-unified-7d-reset": "1792825200",
+    "anthropic-ratelimit-unified-status": "allowed",
+    "anthropic-organization-id": "8ce38be8-0000-4000-8000-000000000000",
+}
+
+
+class TestPlanLimits:
+
+    def test_headers_become_fields(self):
+        limits = plan_limit_fields(httpx.Headers(_LIMIT_HEADERS))["plan_limits"]
+        assert limits["five_hour"] == {"utilization": 0.18, "resets_at": 1792345200}
+        assert limits["seven_day"]["utilization"] == 0.11
+        assert limits["status"] == "allowed"
+        assert limits["org"] == "8ce38be8"
+
+    @pytest.mark.parametrize("headers", [
+        None, httpx.Headers({}), httpx.Headers({"anthropic-organization-id": "x"}),
+        httpx.Headers({"anthropic-ratelimit-unified-5h-utilization": "nope"}),
+    ])
+    def test_no_limit_headers_add_nothing(self, headers):
+        assert plan_limit_fields(headers) == {}
+
+    def test_buffered_reply_records_them(self, monkeypatch, pipeline):
+        def handler(request: httpx.Request) -> httpx.Response:
+            return httpx.Response(200, json={"content": []},
+                                  headers={"content-type": "application/json",
+                                           **_LIMIT_HEADERS})
+
+        _mount(monkeypatch, handler)
+        _post(TestClient(_app(pipeline)))
+        (out,) = _records(pipeline, EventType.OUTCOME_RECORDED)
+        desc = json.loads(out.data["description"])
+        assert desc["plan_limits"]["five_hour"]["utilization"] == 0.18
+
+    def test_streamed_reply_records_them(self, monkeypatch, pipeline):
+        def handler(request: httpx.Request) -> httpx.Response:
+            return httpx.Response(
+                200, content=b'data: {"type":"message_delta","usage":{"output_tokens":4}}\n\n',
+                headers={"content-type": "text/event-stream", **_LIMIT_HEADERS})
+
+        _mount(monkeypatch, handler)
+        _post(TestClient(_app(pipeline)), stream=True)
+        (out,) = _records(pipeline, EventType.OUTCOME_RECORDED)
+        desc = json.loads(out.data["description"])
+        assert desc["plan_limits"]["seven_day"]["resets_at"] == 1792825200
+        assert desc["plan_limits"]["org"] == "8ce38be8"

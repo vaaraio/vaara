@@ -38,7 +38,7 @@ from ._llm_proxy_shape import (
 from ._llm_proxy_toolgate import SseToolGate, ToolGate, gate_json_bytes
 from .llm_compact import compact_messages
 from .llm_envelope import measure_envelope
-from .llm_usage import StreamUsage, extract_usage, usage_fields
+from .llm_usage import StreamUsage, extract_usage, plan_limit_fields, usage_fields
 
 logger = logging.getLogger("vaara.llm_proxy")
 
@@ -477,7 +477,8 @@ def build_app(*, upstream: str, api_key: Optional[str], api_key_header: str,
                 "ok" if upstream_response.is_success else "upstream_status",
                 http_status=upstream_response.status_code,
                 unseal_count=unseal_count, unmapped_placeholders=unmapped,
-                **usage_fields(extract_usage(raw_response))))
+                **usage_fields(extract_usage(raw_response)),
+                **plan_limit_fields(upstream_response.headers)))
         return Response(
             content=raw_response,
             status_code=upstream_response.status_code,
@@ -690,7 +691,8 @@ async def _forward_stream(upstream_response: Any,
                 "ok",
                 unseal_count=unsealer.restored if unsealer else 0,
                 unmapped_placeholders=unsealer.unmapped if unsealer else [],
-                **usage_fields(usage.usage)))
+                **usage_fields(usage.usage),
+                **plan_limit_fields(getattr(upstream_response, "headers", None))))
     except BaseException as exc:
         # BaseException, not Exception. A client that goes away mid-stream
         # arrives here as GeneratorExit (Starlette closing the body
