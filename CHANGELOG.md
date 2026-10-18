@@ -17,6 +17,9 @@ and this project follows [Semantic Versioning](https://semver.org/spec/v2.0.0.ht
 - `packaging/ubi9/Containerfile` builds `vaara proxy` on Red Hat Universal Base Image 9 (ubi9/python-312 to build the wheel, ubi9/ubi-minimal with python3.12 at runtime). It carries the labels Red Hat preflight requires, the licence texts of Vaara and every bundled Python package under `/licenses`, and runs as UID 10001 in group 0 with a group-writable trail directory, so OpenShift's restricted-v2 SCC can run it under an arbitrary UID. Red Hat preflight 1.21.2 passes all ten container checks against it. `tests/test_ubi9_containerfile.py` reads the same checks off the Containerfile so a change that would fail them fails in CI. The published image is unchanged.
 - Execution receipts can say where their time came from. `emit_receipt(time_source=...)` writes `receiptAsserted.timeSource`, one of `ntp`, `rtc`, `unsynced` or `tsa`, inside the signed preimage; absent means unknown, and a receipt without it is byte for byte what it was. Parsing refuses any other value, `null` included. `verify_receipt_time_source(record)` grades it: no field is `unknown` and `unsynced` is `unsynced`, neither ever a trusted time; `ntp` and `rtc` are `declared`, the issuer's word; `tsa` is `attested`, and trusted, only when the record's `existenceProof` token verifies over the record. A `tsa` claim with no token, or a token that fails, is an `unverifiable` finding, and a token present where the `timeanchor` extra is not installed is `unchecked`. `vaara verify-record` prints a `time source:` line for every execution record, adds `timeSource` to `--json`, and exits 1 on a finding.
 
+### Security
+- The pipeline's log lines replace CR, LF and other control characters in a caller's agent id, session id or tool name with `?`, so a crafted name cannot start a fake log line. The MCP proxy uses the same helper.
+
 ## [2.14.0] - 2026-10-15
 
 ### Added

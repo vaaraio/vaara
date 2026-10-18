@@ -44,7 +44,7 @@ from typing import TYPE_CHECKING, Any, Optional, Sequence
 
 from vaara import _disposition
 from vaara._decision_vocabulary import FINE_TO_COARSE
-from vaara._sanitize import json_safe
+from vaara._sanitize import json_safe, log_safe
 from pathlib import Path
 
 from vaara.audit.sqlite_backend import SQLiteAuditBackend
@@ -420,7 +420,7 @@ class InterceptionPipeline:
             ])
         except Exception:
             logger.exception("session replay failed for %s/%s; scoring without it",
-                             agent_id, session_id)
+                             log_safe(agent_id), log_safe(session_id))
 
     def _scorer_policy_id(self) -> str:
         return f"scorer:{type(self.scorer).__name__}"
@@ -1114,12 +1114,12 @@ class InterceptionPipeline:
             if not allowed:
                 logger.info(
                     "Shadow mode: %s/%s decision=%s but returning allowed=True",
-                    agent_id, tool_name, decision_str,
+                    log_safe(agent_id), log_safe(tool_name), decision_str,
                 )
 
         logger.info(
             "Intercepted %s/%s: %s (risk=%.3f [%.3f,%.3f], %.1fms)",
-            agent_id, tool_name, decision_str,
+            log_safe(agent_id), log_safe(tool_name), decision_str,
             point_estimate, interval[0], interval[1], elapsed_ms,
         )
 
