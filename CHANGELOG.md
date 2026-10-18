@@ -6,6 +6,8 @@ and this project follows [Semantic Versioning](https://semver.org/spec/v2.0.0.ht
 
 ## [Unreleased]
 
+## [2.15.0] - 2026-10-18
+
 ### Added
 - `vaara llm-proxy` records a subscription seat's plan limits on each chat outcome. When the reply carries Anthropic's `anthropic-ratelimit-unified-*` headers, the outcome gains `plan_limits` with the five-hour and seven-day utilisation (a fraction of the window), each reset time, the status and the first eight characters of the organisation id, for buffered and streamed replies alike. API-key traffic carries none of these headers and the field is left out.
 - `vaara-mcp-proxy --value-origin` brings value-origin holds to any MCP client. The proxy remembers the authority-shaped values in every `tools/call` and `resources/read` result and holds a later `tools/call` whose recipient, payee or endpoint argument carries one of them, with the same reason line and `value_origin` record as the Claude Code hook. It reads and writes the hook's store, `~/.vaara/value_origin.json`, so a value the user typed in a Claude Code prompt passes at the proxy too. `--trusted-value VALUE` and `--authority-arg TOOL=ARG` are repeatable. The gate list names the step as `value_origin:off`, `pass`, `hold` or `error`, and a store that cannot be read holds nothing.
