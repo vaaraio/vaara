@@ -1,6 +1,6 @@
 # Vaara
 
-> Vaara checks every action that software takes on its own against the operator's rules before it happens, holds the unusual ones for a person, refuses the rest, and leaves a signed receipt for each decision that anyone can verify later, offline, without trusting the operator or Vaara. AI agents are one case. Open source (AGPL-3.0), runs on your own machines, no telemetry. Built in Finland.
+> Vaara checks every action that software takes on its own against the operator's rules before it happens, holds the unusual ones for a person, refuses the rest, and leaves a signed receipt for each decision that anyone can verify later, offline, without trusting the operator or Vaara. AI agents are one case. Open source (AGPL-3.0); the public repository takes security fixes and receipt specification updates. Runs on your own machines, no telemetry. Built in Finland.
 
 ## Pages
 

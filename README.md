@@ -262,6 +262,10 @@ Vaara helps deployers assemble evidence for their own conformity work. It does n
 
 Commercial license and paid pilots available: see [vaara.io](https://vaara.io/#pilots) or contact [hello@vaara.io](mailto:hello@vaara.io). Licensing terms are in [LICENSING.md](LICENSING.md), and the commercial licence is described in [COMMERCIAL.md](COMMERCIAL.md).
 
+## Status
+
+The current open source release is 2.15.0, published on 18 October 2026. This repository takes security fixes and updates that follow the receipt specification ([draft-sirkkavaara-vaara-receipt](https://datatracker.ietf.org/doc/draft-sirkkavaara-vaara-receipt/)) and its test vectors. New feature work happens outside this repository. Published releases remain available under AGPL-3.0.
+
 ## Acknowledgements
 
 - Listed in the [OECD.AI Catalogue of Tools & Metrics](https://oecd.ai/en/catalogue/tools/vaara) for trustworthy AI.
