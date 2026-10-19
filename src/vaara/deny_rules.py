@@ -26,7 +26,8 @@ optional ``match_any`` (fire on any call to the listed tools),
 ``unless_env`` (a variable that, set to 1, lifts the rule for a deliberate
 exception), ``shell_syntax: true`` (the pattern is shell syntax, so a
 heredoc body read by Python or Node is not matched; see
-``without_inert_heredocs``) and ``any_field: false`` (the pattern reads one named field and
+``without_inert_heredocs``, and quoted text an ``echo`` or ``grep`` only prints
+is not matched; see ``without_quoted_data``) and ``any_field: false`` (the pattern reads one named field and
 must not run over arbitrary arguments). Booleans and numbers in the input match as their JSON text.
 """
 from __future__ import annotations
@@ -223,6 +224,8 @@ def _match_named(
             value = field_text(tool_input.get(field, ""))
             if value is not None and field in _SHELL_FIELDS:
                 value = without_inert_heredocs(value, bool(rule.get("shell_syntax")))
+                if rule.get("shell_syntax"):
+                    value = without_quoted_data(value)
             if value is not None and field in _PATH_FIELDS:
                 value = value.replace("\\", "/")
             if value is not None and regex.search(value):
@@ -409,6 +412,152 @@ def without_inert_heredocs(command: str, shell_syntax: bool) -> str:
     return "\n".join(out)
 
 
+#: Commands whose quoted arguments are text they print or search for.
+_DATA_COMMANDS = frozenset({"echo", "printf", "grep", "egrep", "fgrep", "rg"})
+
+#: Commands that only filter, count or store what is piped into them.
+_DATA_SINKS = _DATA_COMMANDS | frozenset({
+    "head", "tail", "wc", "sort", "uniq", "cut", "tr", "tee", "cat", "less",
+    "more", "column", "nl", "fold", "jq",
+})
+
+
+def _shell_structure(command: str):
+    """Quoted spans and pipeline stages of ``command``, or None when a quote
+    is left open. A span is ``(start, end, stage, literal)`` with ``start``
+    and ``end`` bounding the text inside the quotes; ``literal`` is False for
+    a double-quoted span holding ``$(`` or a backtick, which the shell runs.
+    A stage is ``[start, end, depth, piped_in, tainted]``: ``depth`` counts
+    the subshells, substitutions and backticks around it, ``tainted`` marks
+    a stage that opens one of those."""
+    n = len(command)
+    stages: list[list] = [[0, n, 0, False, False]]
+    stack = [0]
+    openers: list[str] = []
+    spans: list[tuple[int, int, int, bool]] = []
+
+    def new_stage(at: int, piped: bool, depth: int) -> None:
+        stages[stack[-1]][1] = at
+        stages.append([at, n, depth, piped, False])
+        stack[-1] = len(stages) - 1
+
+    i = 0
+    while i < n:
+        c, nxt = command[i], command[i + 1:i + 2]
+        if c == "\\":
+            i += 2
+        elif c == "'" or (c == "$" and nxt == "'"):
+            start = i + 1 if c == "'" else i + 2
+            j = start
+            while j < n and command[j] != "'":
+                j += 2 if c == "$" and command[j] == "\\" else 1
+            if j >= n:
+                return None
+            spans.append((start, j, stack[-1], True))
+            i = j + 1
+        elif c == '"':
+            j, runs = i + 1, False
+            while j < n and command[j] != '"':
+                if command[j] == "\\":
+                    j += 2
+                    continue
+                runs = runs or command[j] == "`" or command[j:j + 2] == "$("
+                j += 1
+            if j >= n:
+                return None
+            spans.append((i + 1, j, stack[-1], not runs))
+            i = j + 1
+        elif c == "#" and (i == 0 or command[i - 1] in " \t\n;&|("):
+            end = command.find("\n", i)
+            i = n if end < 0 else end
+        elif (c == "`" and openers[-1:] == ["`"]) or (c == ")" and openers[-1:] == ["("]):
+            stages[stack[-1]][1] = i
+            stack.pop()
+            openers.pop()
+            i += 1
+        elif c == "`" or c == "(" or (c in "$<>" and nxt == "("):
+            outer = stack[-1]
+            stages[outer][4] = True
+            stages.append([i, n, stages[outer][2] + 1, False, False])
+            stack.append(len(stages) - 1)
+            openers.append("`" if c == "`" else "(")
+            i += 1 if c in "`(" else 2
+        elif c == "|":
+            if nxt == "|":
+                new_stage(i, False, stages[stack[-1]][2])
+                i += 2
+            else:
+                new_stage(i, True, stages[stack[-1]][2])
+                i += 2 if nxt == "&" else 1
+        elif c in ";\n" or (c == "&" and nxt != ">" and command[i - 1:i] != ">"):
+            new_stage(i, False, stages[stack[-1]][2])
+            i += 2 if command[i:i + 2] in ("&&", ";;") else 1
+        else:
+            i += 1
+    return spans, stages
+
+
+def without_quoted_data(command: str) -> str:
+    """``command`` with the quoted text no shell will run emptied out.
+
+    A quoted argument of ``echo``, ``printf``, ``grep`` or ``rg`` is text
+    when the stage runs at top level and its output goes only to filters
+    (``head``, ``cut``, ``tee`` and the like), a file or the screen. It is
+    kept when the stage sits inside a subshell, substitution or backticks,
+    pipes into anything else (``sh``, ``ssh``, ``xargs``), redirects into a
+    process substitution or a bash network path, or writes a file that a
+    later statement names or follows with a command that runs code. A quoted
+    command word is never text: ``'nc' host 4444`` runs nc. A command with a
+    heredoc or an open quote is returned as it is.
+
+    On 2026-10-19 a FAILS.md append through ``echo`` and a ``grep`` over that
+    file were refused as ``shell_netcat_egress`` and ``shell_copy_egress``
+    for tool names inside their quoted arguments.
+    """
+    if "<<" in command or ("'" not in command and '"' not in command):
+        return command
+    parsed = _shell_structure(command)
+    if parsed is None:
+        return command
+    spans, stages = parsed
+
+    def bare(start: int, end: int) -> str:
+        text = command[start:end]
+        for s, e, _, _ in sorted(spans, reverse=True):
+            if start <= s and e <= end:
+                text = text[:s - start] + text[e - start:]
+        return text.lstrip(";&|\n")
+
+    strip: set[int] = set()
+    k = 0
+    while k < len(stages):
+        end = k + 1
+        while end < len(stages) and stages[end][3] and stages[end][2] == stages[k][2]:
+            end += 1
+        pipeline = range(k, end)
+        k = end
+        if any(stages[s][2] != 0 or stages[s][4] for s in pipeline):
+            continue
+        names = [_stage_command(bare(stages[s][0], stages[s][1])) for s in pipeline]
+        text = bare(stages[pipeline[0]][0], stages[pipeline[-1]][1])
+        if _LIVE_REDIRECT.search(text):
+            continue
+        writes = "tee" in names or re.search(r"(?<![&\d])>(?!&)|\d>(?!&)", text)
+        rest = command[stages[pipeline[-1]][1]:]
+        if writes and _runs_later(text, "", bare(stages[pipeline[-1]][1], len(command))
+                                  if rest else ""):
+            continue
+        for pos, name in zip(pipeline, names):
+            if name in _DATA_COMMANDS and all(m in _DATA_SINKS
+                                              for m in names[pipeline.index(pos) + 1:]):
+                strip.add(pos)
+    out = command
+    for s, e, stage, literal in sorted(spans, reverse=True):
+        if literal and stage in strip:
+            out = out[:s] + out[e:]
+    return out
+
+
 def _string_leaves(value: Any, depth: int = 0, key: str = ""):
     """Every string in a JSON-shaped value with the dict key it sits under,
     nested dicts and lists included. A list item keeps its list's key."""
@@ -541,6 +690,8 @@ def match_deny_rule_any_field(
             if _COMMAND_KEY.search(key):
                 text = without_inert_heredocs(text, bool(rule.get("shell_syntax")))
             if shell_rule:
+                if rule.get("shell_syntax"):
+                    text = without_quoted_data(text)
                 if _shell_hit(regex, key, text):
                     return rule.get("id", "unknown"), rule.get("message", "deny rule matched")
                 continue

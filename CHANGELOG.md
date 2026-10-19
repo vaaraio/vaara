@@ -6,6 +6,11 @@ and this project follows [Semantic Versioning](https://semver.org/spec/v2.0.0.ht
 
 ## [Unreleased]
 
+### Fixed
+- The shell egress rules (`shell_netcat_egress`, `shell_copy_egress`) no longer read quoted text that only gets printed or searched. A quoted argument of `echo`, `printf`, `grep` or `rg` is skipped when the command runs at top level and its output goes only to filters, a file or the screen. It is still matched when the output pipes into a shell, `ssh` or `xargs`, sits inside a subshell or substitution, or lands in a file that a later statement runs.
+- `shell_netcat_egress` no longer reads an escape such as `\n` followed by `cat` (in `printf 'id\ncat ...'`) as the tool name. An unquoted `\ncat` at the start of a command still matches, since the shell drops the backslash.
+- `interpreter_network_egress` no longer fires on `urllib.parse` or `urllib.error`, which open no connection. `urllib.request`, `urllib2` and `urllib3` still match.
+
 ## [2.15.0] - 2026-10-18
 
 ### Added
