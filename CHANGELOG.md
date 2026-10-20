@@ -6,6 +6,9 @@ and this project follows [Semantic Versioning](https://semver.org/spec/v2.0.0.ht
 
 ## [Unreleased]
 
+### Added
+- Reviewer-signed review resolutions. `vaara review resolve --sign-key PEM --audit-db AUDIT.db` (and `ReviewQueue.resolve(reviewer_key=...)`) has the reviewer sign the resolution with their own EC P-256 or RSA key over the action's decision record hash, the resolution, the reviewer and the justification (`vaara.review-resolution/v1`); the `escalation_resolved` record carries the signature under `reviewer_signature` and never a key. A signed `vaara.permission/v1` can pin reviewer keys in an optional `reviewers` list, omitted when empty, so existing permissions sign and digest unchanged. `vaara trail check-permission` and `check_review_resolutions` check each resolution of a call under the permission against the pinned key and report it as `signed`, `unsigned`, `unpinned`, `unknown_reviewer`, `bad_signature`, `decision_mismatch` or `malformed`; an allow over a denied or escalated decision is marked `override` for that action only. Unsigned resolutions are a finding only when the permission names reviewers, and unsigned rows hash as before.
+
 ## [2.15.0] - 2026-10-18
 
 ### Added

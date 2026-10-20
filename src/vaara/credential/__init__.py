@@ -72,8 +72,16 @@ from vaara.credential._permission import (
     evaluate_call,
     permission_digest,
     permission_from_dict,
+    Reviewer,
     sign_permission,
     verify_permission_signature,
+)
+from vaara.credential._review_signature import (
+    REVIEW_RESOLUTION_TYPE,
+    ReviewedResolution,
+    ReviewReport,
+    check_review_resolutions,
+    sign_resolution,
 )
 from vaara.credential._trail_grant import (
     GrantedCall,
@@ -83,6 +91,12 @@ from vaara.credential._trail_grant import (
 from vaara.credential.gateway import CredentialGateway
 
 __all__ = [
+    "check_review_resolutions",
+    "sign_resolution",
+    "REVIEW_RESOLUTION_TYPE",
+    "Reviewer",
+    "ReviewedResolution",
+    "ReviewReport",
     "check_trail_against_permission",
     "verify_permission_signature",
     "sign_permission",
