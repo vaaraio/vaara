@@ -13,12 +13,23 @@ on and, separately, what it has been run on.
 | --- | --- |
 | Python | 3.10, 3.11, 3.12, 3.13 |
 | Runtime dependencies | `cryptography`, `rfc8785`, `cbor2` |
-| Operating system | any platform CPython supports |
+| Operating system | any platform CPython supports, including Red Hat Enterprise Linux 9 (see below) |
 
 The proxy needs the `proxy` extra (fastapi, uvicorn, httpx). Signed
 attestation and receipt pairs use the same three packages the base install
 carries; `vaara[attestation]` still installs and names them. The container
 image ships the proxy extra as well.
+
+## Red Hat Enterprise Linux
+
+| | |
+| --- | --- |
+| Supported | Red Hat Enterprise Linux 9 (x86_64), Python 3.12 from Red Hat's packages |
+| Tested on every change | the full test suite runs in CI inside Red Hat's Universal Base Image 9 (`ubi9/python-312`), the `tests-rhel` job in [ci.yml](../.github/workflows/ci.yml) |
+| Tested on a RHEL 9 system | RHEL 9.8 with SELinux enforcing, installed from PyPI as a non-root user; full test suite passing |
+
+Install on RHEL 9: `sudo dnf install python3.12 python3.12-pip`, then
+`python3.12 -m venv .venv && .venv/bin/pip install vaara`.
 
 ## Container image
 
