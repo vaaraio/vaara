@@ -145,13 +145,21 @@ def cmd_verify(args) -> int:
         print(f"ERROR: trail zip not found: {zip_path}", file=sys.stderr)
         return 2
     pubkey = Path(args.pubkey) if args.pubkey else None
-    result = verify_signed(zip_path, public_key=pubkey)
+    try:
+        result = verify_signed(
+            zip_path, public_key=pubkey,
+            erasure_key=Path(args.erasure_key) if args.erasure_key else None,
+        )
+    except (OSError, ValueError) as exc:
+        print(f"ERROR: {exc}", file=sys.stderr)
+        return 2
     payload: dict[str, Any] = {
         "ok": bool(result.ok),
         "trail": str(zip_path),
         "manifest": result.manifest,
         "errors": list(result.errors),
         "erased": list(result.erased),
+        "erasures": list(result.erasures),
         # Honest labeling: with no out-of-band --pubkey, a passing result is
         # integrity/internal-consistency only, not authenticated issuer identity.
         "identity_pinned": pubkey is not None,
@@ -175,6 +183,12 @@ def cmd_verify(args) -> int:
             for e in payload["erased"]:
                 print(f"  - record {e['index']} ({e['record_id']}): link verified, "
                       f"content not checkable")
+        if payload["erasures"]:
+            print("erasures:")
+            for e in payload["erasures"]:
+                ground = f", ground: {e['legal_ground']}" if e["legal_ground"] else ""
+                by = f" by {e['erased_by']}" if e["erased_by"] else ""
+                print(f"  - record {e['index']}: {e['state']}{by}{ground}")
         if payload["ok"] and pubkey is None:
             print(
                 "  WARNING: no --pubkey given — identity NOT authenticated "
@@ -511,6 +525,8 @@ def build_parser() -> argparse.ArgumentParser:
     pv = sub.add_parser("verify", help="Verify signature + hash chain.")
     pv.add_argument("trail", help="Path to trail zip.")
     pv.add_argument("--pubkey", help="Path to Ed25519 public key (PEM).")
+    pv.add_argument("--erasure-key",
+                    help="Public key (PEM, EC P-256 or RSA) that signs erasure records.")
     pv.add_argument("--json", action="store_true", help="Emit JSON.")
     pv.set_defaults(func=cmd_verify)
 

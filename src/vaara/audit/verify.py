@@ -67,6 +67,12 @@ class VerifyResult:
     ``erased_by_index``. The chain is not intact, but not broken either:
     does not affect ``ok``.
     """
+    erasures: list[dict] = field(default_factory=list)
+    """One entry per ``record_erased`` record, from :func:`check_erasures`:
+    the legal ground, who erased, and the state of the eraser's signature.
+    ``bad_signature`` and ``malformed`` fail ``ok``; so does ``unsigned``
+    when an ``erasure_key`` was given.
+    """
 
 
 def _require_crypto() -> None:
@@ -114,6 +120,153 @@ def _erasure_pointer(rec: dict) -> Optional[str]:
         return None
     pointer = inner.get("erasure_record_id")
     return pointer if isinstance(pointer, str) and pointer else None
+
+
+ERASURE_RECORD_TYPE = "vaara.record-erasure/v1"
+_ERASURE_SIGNATURE_KEYS = frozenset({"type", "alg", "signature"})
+#: Signature states that fail verification.
+_ERASURE_FINDINGS = frozenset({"bad_signature", "malformed"})
+
+
+def _jcs_string(value: str) -> str:
+    # RFC 8785 escapes only the quote, the backslash and C0 controls, with
+    # the same short forms json uses; everything else is raw UTF-8.
+    return json.dumps(value, ensure_ascii=False)
+
+
+def erasure_payload(data: dict) -> bytes:
+    """The exact bytes an eraser's signature covers, from a ``record_erased``
+    record's ``data``.
+
+    RFC 8785 (JCS) over strings, one integer and null, written out by hand so
+    this module stays on the standard library. Field names are ASCII, so the
+    JCS key order is the plain sort order.
+    """
+    fields = {
+        "type": ERASURE_RECORD_TYPE,
+        "erasedRecordId": data.get("erased_record_id"),
+        "erasedRecordHash": data.get("erased_record_hash"),
+        "erasedSeq": data.get("erased_seq"),
+        "erasedEventType": data.get("erased_event_type"),
+        "erasedActionId": data.get("erased_action_id"),
+        "reason": data.get("reason"),
+        "legalGround": data.get("legal_ground"),
+        "erasedBy": data.get("erased_by"),
+        "erasedAt": data.get("erased_at"),
+    }
+    parts = []
+    for name in sorted(fields):
+        value = fields[name]
+        if value is None:
+            encoded = "null"
+        elif isinstance(value, bool) or not isinstance(value, (str, int)):
+            raise ValueError(f"{name} is not a string or integer")
+        elif isinstance(value, int):
+            encoded = str(value)
+        else:
+            encoded = _jcs_string(value)
+        parts.append(f"{_jcs_string(name)}:{encoded}")
+    return ("{" + ",".join(parts) + "}").encode("utf-8")
+
+
+def _load_erasure_key(key: Union[str, Path, bytes, object]) -> object:
+    """An EC P-256 or RSA public key from PEM bytes, a path, or a key object."""
+    _require_crypto()
+    from cryptography.hazmat.primitives.asymmetric import ec, rsa
+
+    if isinstance(key, (str, Path)):
+        key = Path(key).read_bytes()
+    if isinstance(key, (bytes, bytearray)):
+        try:
+            key = serialization.load_pem_public_key(bytes(key))
+        except (ValueError, UnsupportedAlgorithm) as e:
+            raise ValueError(f"erasure key could not be parsed as a PEM public key: {e}") from e
+    if isinstance(key, ec.EllipticCurvePublicKey) and isinstance(key.curve, ec.SECP256R1):
+        return key
+    if isinstance(key, rsa.RSAPublicKey):
+        return key
+    raise ValueError("erasure key must be an EC P-256 or RSA public key")
+
+
+def _verify_erasure_signature(payload: bytes, alg: str, signature_hex: str,
+                              key: object) -> bool:
+    from cryptography.hazmat.primitives import hashes
+    from cryptography.hazmat.primitives.asymmetric import ec, padding, rsa
+    from cryptography.hazmat.primitives.asymmetric.utils import encode_dss_signature
+
+    try:
+        raw = bytes.fromhex(signature_hex)
+    except ValueError:
+        return False
+    try:
+        if alg == "ES256" and isinstance(key, ec.EllipticCurvePublicKey):
+            if len(raw) != 64:
+                return False
+            der = encode_dss_signature(int.from_bytes(raw[:32], "big"),
+                                       int.from_bytes(raw[32:], "big"))
+            key.verify(der, payload, ec.ECDSA(hashes.SHA256()))
+            return True
+        if alg == "RS256" and isinstance(key, rsa.RSAPublicKey):
+            key.verify(raw, payload, padding.PKCS1v15(), hashes.SHA256())
+            return True
+    except InvalidSignature:
+        return False
+    return False
+
+
+def _erasure_state(data: dict, key: Optional[object]) -> str:
+    block = data.get("eraser_signature")
+    if block is None:
+        return "unsigned"
+    if (not isinstance(block, dict) or set(block) != _ERASURE_SIGNATURE_KEYS
+            or block.get("type") != ERASURE_RECORD_TYPE
+            or not all(isinstance(block[k], str) for k in _ERASURE_SIGNATURE_KEYS)
+            or not isinstance(data.get("erased_by"), str) or not data["erased_by"]):
+        return "malformed"
+    if key is None:
+        return "unpinned"
+    try:
+        payload = erasure_payload(data)
+    except ValueError:
+        return "malformed"
+    if not _verify_erasure_signature(payload, block["alg"], block["signature"], key):
+        return "bad_signature"
+    return "signed"
+
+
+def check_erasures(records: list[dict], public_key: Optional[object] = None) -> list[dict]:
+    """Judge the eraser's signature on every ``record_erased`` record.
+
+    ``records`` are trail records as dicts (``record_id``, ``event_type``,
+    ``data``). ``public_key`` is the eraser's EC P-256 or RSA public key, held
+    out of band; the record never carries one. Each erasure lands in one state:
+
+    * ``signed``: verifies under ``public_key`` over every signed field.
+    * ``unsigned``: no signature (every erasure written before signing existed).
+    * ``unpinned``: signed, but no key was given, so nobody can say whose.
+    * ``bad_signature``: does not verify under ``public_key``.
+    * ``malformed``: the block is not the closed ``type``/``alg``/``signature``
+      shape, or the record names no eraser.
+
+    This judges who signed. Whether the record itself was altered is the
+    chain walk's job.
+    """
+    key = _load_erasure_key(public_key) if public_key is not None else None
+    out: list[dict] = []
+    for index, rec in enumerate(records):
+        if rec.get("event_type") != "record_erased":
+            continue
+        data = rec.get("data") if isinstance(rec.get("data"), dict) else {}
+        out.append({
+            "index": index,
+            "erasure_record_id": rec.get("record_id"),
+            "erased_record_id": data.get("erased_record_id"),
+            "legal_ground": data.get("legal_ground") or "",
+            "erased_by": data.get("erased_by") or "",
+            "erased_at": data.get("erased_at") or "",
+            "state": _erasure_state(data, key),
+        })
+    return out
 
 
 def _verify_chain_bytes(trail_bytes: bytes) -> tuple[Optional[str], list[dict]]:
@@ -312,6 +465,7 @@ def _verify_threshold(
 def verify_signed(
     zip_path: Union[str, Path],
     public_key: Optional[Union[str, Path, bytes, "_PK"]] = None,
+    erasure_key: Optional[Union[str, Path, bytes, object]] = None,
 ) -> VerifyResult:
     """Verify a signed audit-trail export.
 
@@ -520,6 +674,7 @@ def verify_signed(
             errors.append("could not parse first/last trail record")
 
     lifecycle = _collect_key_lifecycle(lines)
+    erasures = _check_export_erasures(lines, erasure_key, errors)
 
     return VerifyResult(
         ok=not errors,
@@ -527,7 +682,25 @@ def verify_signed(
         manifest=manifest,
         key_lifecycle=lifecycle,
         erased=erased,
+        erasures=erasures,
     )
+
+
+def _check_export_erasures(lines: list[bytes], erasure_key: Optional[object],
+                           errors: list[str]) -> list[dict]:
+    records = []
+    for ln in lines:
+        try:
+            records.append(json.loads(ln))
+        except json.JSONDecodeError:
+            records.append({})
+    erasures = check_erasures(records, public_key=erasure_key)
+    for e in erasures:
+        if e["state"] in _ERASURE_FINDINGS or (
+                erasure_key is not None and e["state"] == "unsigned"):
+            errors.append(f"record {e['index']}: erasure of "
+                          f"{e['erased_record_id']} is {e['state']}")
+    return erasures
 
 
 def _collect_key_lifecycle(lines: list[bytes]) -> list[dict]:

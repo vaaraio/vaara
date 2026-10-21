@@ -12,6 +12,12 @@ later erasure record names is a hash mismatch, as any rewrite is.
 Only ``data`` is erased. ``agent_id``, ``tool_name``, the timestamp and the
 regulatory tags stay, because they say that something happened and when.
 
+With ``legal_ground`` and ``erased_by`` the erasure record also says on
+which ground and by whom; with ``sign_key`` the eraser signs it with their
+own EC P-256 or RSA key (``vaara.record-erasure/v1``), so a reader holding
+that public key can tell a lawful erasure from a hole without trusting the
+operator. The record never carries the key.
+
 The erasure record is appended first. A run stopped between the two steps
 leaves a declared erasure over a record that still verifies, and running the
 command again finishes the tombstone without a second declaration.
@@ -21,7 +27,7 @@ from __future__ import annotations
 import json
 import sqlite3
 from pathlib import Path
-from typing import Optional
+from typing import Any, Optional
 
 from vaara.audit.trail import (
     ERASED_DATA_KEY,
@@ -50,12 +56,45 @@ def _existing_erasure(conn: sqlite3.Connection, record_id: str) -> Optional[str]
     return None
 
 
-def erase_record(db: str | Path, record_id: str, *, reason: str) -> dict:
+def _signer(private_key: Any):
+    from cryptography.hazmat.primitives.asymmetric import ec, rsa
+
+    from vaara.attestation._attest_signing import sign_es256, sign_rs256
+    from vaara.audit.verify import ERASURE_RECORD_TYPE, erasure_payload
+
+    if isinstance(private_key, ec.EllipticCurvePrivateKey) and isinstance(
+            private_key.curve, ec.SECP256R1):
+        alg, sign = "ES256", sign_es256
+    elif isinstance(private_key, rsa.RSAPrivateKey):
+        alg, sign = "RS256", sign_rs256
+    else:
+        raise ErasureRefused("an eraser signs with an EC P-256 or RSA private key")
+
+    def _sign(data: dict) -> dict:
+        return {"type": ERASURE_RECORD_TYPE, "alg": alg,
+                "signature": sign(erasure_payload(data), private_key=private_key)}
+    return _sign
+
+
+def erase_record(
+    db: str | Path,
+    record_id: str,
+    *,
+    reason: str,
+    legal_ground: Optional[str] = None,
+    erased_by: Optional[str] = None,
+    sign_key: Any = None,
+) -> dict:
     """Erase ``record_id``'s data in the trail at ``db``. Returns a report."""
     from vaara.audit.sqlite_backend import SQLiteAuditBackend
 
     if not reason or not reason.strip():
         raise ErasureRefused("an erasure needs a reason; it is recorded on the chain")
+    legal_ground = legal_ground.strip() if legal_ground else None
+    erased_by = erased_by.strip() if erased_by else None
+    if sign_key is not None and not erased_by:
+        raise ErasureRefused("a signed erasure needs --erased-by, the person whose key signs it")
+    sign = _signer(sign_key) if sign_key is not None else None
     backend = SQLiteAuditBackend(Path(db).expanduser())
     try:
         with backend._lock:
@@ -75,9 +114,11 @@ def erase_record(db: str | Path, record_id: str, *, reason: str) -> dict:
                 f"record {record_id} is a {target.event_type.value} record: the trail's "
                 "own evidence about itself is not erasable"
             )
+        declared = existing is None
         if existing is None:
             erasure = AuditTrail(on_record=backend.write_record).record_erasure(
                 target, seq, reason.strip(),
+                legal_ground=legal_ground, erased_by=erased_by, sign=sign,
             )
             existing = erasure.record_id
         scrubbed = backend.erase_record_data(
@@ -91,4 +132,7 @@ def erase_record(db: str | Path, record_id: str, *, reason: str) -> dict:
         "erased_record_hash": target.record_hash,
         "erasure_record_id": existing,
         "wal_scrubbed": scrubbed,
+        "legal_ground": legal_ground or "",
+        "erased_by": erased_by or "",
+        "signed": sign is not None and declared,
     }

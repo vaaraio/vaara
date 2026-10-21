@@ -681,8 +681,20 @@ def _cmd_trail_erase(args: argparse.Namespace) -> int:
     if not db_path.is_file():
         print(f"vaara trail erase: db is not a file: {db_path}", file=sys.stderr)
         return 2
+    sign_key = None
+    if args.sign_key:
+        from cryptography.hazmat.primitives import serialization
+        try:
+            sign_key = serialization.load_pem_private_key(
+                Path(args.sign_key).expanduser().read_bytes(), password=None,
+            )
+        except (OSError, ValueError, TypeError) as exc:
+            print(f"vaara trail erase: --sign-key: {exc}", file=sys.stderr)
+            return 2
     try:
-        report = erase_record(db_path, args.record_id, reason=args.reason)
+        report = erase_record(db_path, args.record_id, reason=args.reason,
+                              legal_ground=args.legal_ground, erased_by=args.erased_by,
+                              sign_key=sign_key)
     except ErasureRefused as exc:
         print(f"vaara trail erase: {exc}", file=sys.stderr)
         return 1
@@ -692,6 +704,13 @@ def _cmd_trail_erase(args: argparse.Namespace) -> int:
     print(f"seq {report['erased_seq']} ({report['erased_record_id']}): data erased, "
           f"record_hash {report['erased_record_hash']} kept.")
     print(f"  erasure record {report['erasure_record_id']} names it on the chain")
+    if report["legal_ground"]:
+        print(f"  legal ground: {report['legal_ground']}")
+    if report["signed"]:
+        print(f"  signed by {report['erased_by']}; check with "
+              "`vaara trail verify --erasure-key <their public key>`")
+    elif report["erased_by"]:
+        print(f"  erased by {report['erased_by']} (unsigned)")
     print("  `vaara trail verify` now reports the slot as erased: link verified, "
           "content not checkable")
     if not report["wal_scrubbed"]:
@@ -1078,7 +1097,14 @@ def _cmd_trail_verify(args: argparse.Namespace) -> int:
               file=sys.stderr)
         return 2
     try:
-        result = verify_signed(Path(args.zip).expanduser(), public_key=pubkey)
+        erasure_key = (_verify_mod._load_erasure_key(Path(args.erasure_key).expanduser())
+                       if args.erasure_key else None)
+    except (OSError, ValueError) as exc:
+        print(f"vaara trail verify: --erasure-key: {exc}", file=sys.stderr)
+        return 2
+    try:
+        result = verify_signed(Path(args.zip).expanduser(), public_key=pubkey,
+                               erasure_key=erasure_key)
     except ImportError as exc:
         print(exc, file=sys.stderr)
         return 2
@@ -1103,6 +1129,16 @@ def _cmd_trail_verify(args: argparse.Namespace) -> int:
         for slot in result.erased:
             print(f"  record {slot['index']} ({slot['record_id']}) erased: link verified, "
                   f"content not checkable (erasure record {slot['erased_by_index']})")
+        for e in result.erasures:
+            ground = f", ground: {e['legal_ground']}" if e["legal_ground"] else ""
+            if e["state"] == "signed":
+                who = f"signed by {e['erased_by']} under the given key"
+            elif e["state"] == "unpinned":
+                who = (f"signed as {e['erased_by']}, not checked "
+                       "(pass --erasure-key to check whose key)")
+            else:
+                who = "eraser not signed"
+            print(f"  erasure record {e['index']}: {who}{ground}")
         if pubkey is None:
             print(
                 "  WARNING: no --pubkey given — the trail was checked against the "
@@ -6195,6 +6231,11 @@ def build_parser() -> argparse.ArgumentParser:
         default=None,
         help="Path to Ed25519 public key (PEM). If omitted, uses signer_pubkey.pem from inside the zip.",
     )
+    pv.add_argument(
+        "--erasure-key", default=None,
+        help="Public key (PEM, EC P-256 or RSA) of the person who signs erasures; "
+             "each record_erased record must verify under it",
+    )
     pv.set_defaults(func=_cmd_trail_verify)
 
     pph = tsub.add_parser(
@@ -6613,6 +6654,13 @@ def build_parser() -> argparse.ArgumentParser:
     perase.add_argument("--record-id", required=True, help="record_id of the record to erase")
     perase.add_argument("--reason", required=True,
                         help="Why, recorded on the chain (keep personal data out of it)")
+    perase.add_argument("--legal-ground", default=None,
+                        help="Legal ground, recorded on the chain (e.g. 'GDPR Art. 17(1)(a)')")
+    perase.add_argument("--erased-by", default=None,
+                        help="Who erases (a name or DID), recorded on the chain")
+    perase.add_argument("--sign-key", default=None,
+                        help="The eraser's private key (PEM, EC P-256 or RSA); signs the "
+                             "erasure record. Needs --erased-by")
     perase.add_argument(
         "--format", choices=["text", "json"], default="text",
         help="Output format (default text)",

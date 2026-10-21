@@ -2930,29 +2930,51 @@ class AuditTrail:
             },
         ))
 
-    def record_erasure(self, target: AuditRecord, seq: Optional[int],
-                       reason: str) -> AuditRecord:
+    def record_erasure(
+        self,
+        target: AuditRecord,
+        seq: Optional[int],
+        reason: str,
+        *,
+        legal_ground: Optional[str] = None,
+        erased_by: Optional[str] = None,
+        sign: Optional[Callable[[dict], dict]] = None,
+    ) -> AuditRecord:
         """Append the RECORD_ERASED record that accounts for ``target``.
 
         Names the record by id and stored hash, which is what a walk matches
         a tombstone against. Holds nothing from the erased content: its event
         type and action id only, so the slot can be read in context.
+
+        ``legal_ground`` and ``erased_by`` are added only when given, so an
+        erasure without them keeps the original data shape. ``sign`` gets the
+        finished data, with ``erased_at`` added, and returns the
+        ``eraser_signature`` block (see ``vaara.audit.verify.check_erasures``).
         """
+        now = time.time()
+        data: dict[str, Any] = {
+            "erased_record_id": target.record_id,
+            "erased_record_hash": target.record_hash,
+            "erased_seq": seq,
+            "erased_event_type": target.event_type.value,
+            "erased_action_id": target.action_id,
+            "reason": self._cap_record_str(reason, 512),
+        }
+        if legal_ground is not None:
+            data["legal_ground"] = self._cap_record_str(legal_ground, 512)
+        if erased_by is not None:
+            data["erased_by"] = self._cap_record_str(erased_by, 512)
+        if sign is not None:
+            data["erased_at"] = time.strftime("%Y-%m-%dT%H:%M:%SZ", time.gmtime(now))
+            data["eraser_signature"] = sign(dict(data))
         record = AuditRecord(
             record_id=str(uuid.uuid4()),
             action_id="record-erased",
             event_type=EventType.RECORD_ERASED,
-            timestamp=time.time(),
+            timestamp=now,
             agent_id="vaara",
             tool_name="trail.erase",
-            data={
-                "erased_record_id": target.record_id,
-                "erased_record_hash": target.record_hash,
-                "erased_seq": seq,
-                "erased_event_type": target.event_type.value,
-                "erased_action_id": target.action_id,
-                "reason": self._cap_record_str(reason, 512),
-            },
+            data=data,
         )
         self._append_chained(record)
         return record
