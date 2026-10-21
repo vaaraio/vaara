@@ -1362,6 +1362,15 @@ class AuditTrail:
             {"arguments_salt": salt, "arguments_commitment": commitment}
             if commitment else {}
         )
+        # Only an action that names its delegates carries the key, so a
+        # request without one hashes exactly as it did before the binding.
+        delegatees = (
+            {"delegatees": [
+                self._cap_record_str(d, self._MAX_AGENT_ID_LEN)
+                for d in request.delegatees
+            ]}
+            if request.delegatees is not None else {}
+        )
         self._append(AuditRecord(
             record_id=str(uuid.uuid4()),
             action_id=action_id,
@@ -1385,6 +1394,7 @@ class AuditTrail:
                 "session_id": safe_session_id,
                 "parent_action_id": safe_parent_action_id,
                 "sequence_position": request.sequence_position,
+                **delegatees,
             },
             regulatory_articles=articles,
             tenant_id=tenant_id,

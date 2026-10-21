@@ -47,7 +47,7 @@ License: AGPL-3.0-or-later.
 | SEP-2828 execution and decision records | `attestation/decision.py`, `attestation/tool_call_attestation.py` | Decision basis carried natively: `rationale`, `binding`, `decisionProof`. |
 | Evidence ingestion | `vaara ingest`, `attestation/_ingest_emit.py` | Foreign evidence in, one signed record out. |
 | Declarative source profiles | `attestation/profiles/*.json`, `attestation/_declarative.py` | SLSA, C2PA, in-toto agent decisions, ACP checkout, AP2 payment receipts, x402 settlement and CAEP security events, each bound by a JSON profile with no code. |
-| Delegation attribution | `audit/delegation.py`, `credential/_grant_attenuation.py` | Reconstructs delegation chains and refuses any step that broadens authority. |
+| Delegation attribution | `audit/delegation.py`, `credential/_grant_attenuation.py` | Reconstructs delegation chains and refuses any step that broadens authority, or that a parent naming its `delegatees` did not name; the graph reports such a hop as substituted and a hop under a parent that named nobody as unbound. |
 | Gap-evident completeness | `vaara verify-contiguity` | Signed sequence numbers and a running count make a dropped record a provable gap. Run sealing and a sealed class gate. |
 | Cross-organisation handoff | `vaara build-handoff`, `vaara verify-handoff`, `attestation/_handoff*.py` | A package of record, DID document, key history, revocations and anchor, with the producer identity pinned. EU AI Act Article 26(6). |
 | Access records | `audit/access.py` (`ACCESS_RECORDED`) | A read is an event: who read, on whose behalf, a digest of the returned set, and whether an outcome was recorded. |

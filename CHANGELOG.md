@@ -6,6 +6,9 @@ and this project follows [Semantic Versioning](https://semver.org/spec/v2.0.0.ht
 
 ## [Unreleased]
 
+### Added
+- A delegating action can name who may act under it. `intercept(delegatees=[...])` records the named agent ids as `delegatees` in the hash-covered request, and a child whose `parent_action_id` points at that action is denied unless its `agent_id` is one of them, with `policy_id` `delegatee_binding` and `violation_type` `delegation_binding`, whatever the scorer said and even when its grant attenuates the parent's. Knowing a parent's action id is no longer enough to act as its child. `InterceptionPipeline(require_delegatee_binding=True)` also denies a child whose parent named nobody (`parent_unbound`) or that the pipeline never saw (`parent_unknown`); it is off by default, and the policy state carries it only when on, so earlier policy digests are unchanged. A request without `delegatees` hashes as before. The delegation graph reads the binding back: `DelegationGraph.binding_of(action_id)` is `root`, `bound`, `substituted`, `unbound`, `dangling`, `cycle` or `unknown`, and `substituted` and `unbound` list the hops that are not bound. A decision receipt grades the new ground as evaluated. `tests/test_delegatee_binding.py` carries the three-hop vector with the hop-2 delegate substituted.
+
 ## [2.15.0] - 2026-10-18
 
 ### Added

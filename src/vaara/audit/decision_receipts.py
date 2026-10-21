@@ -68,6 +68,7 @@ _DECISION_EVENTS = (EventType.DECISION_MADE, EventType.ACTION_BLOCKED)
 _EVALUATED_GROUNDS = frozenset({
     "risk_threshold", "policy_rule", "privilege_attenuation",
     "perimeter_filter", "parameter_schema", "egress_not_allowed",
+    "delegation_binding",
 })
 _NOT_EVALUATED_GROUNDS = frozenset({
     "scorer_failure", "scorer_unavailable", "invalid_decision",
