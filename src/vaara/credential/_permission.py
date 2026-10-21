@@ -26,6 +26,7 @@ Vaara block::
         {"kind": "sum", "arg": "amount", "max": "2000", "windowSeconds": 604800},
         {"kind": "count", "max": "20", "windowSeconds": 86400}
       ],
+      "reviewers": [{"reviewer": "did:...", "alg": "ES256", "publicKey": "-----BEGIN..."}],
       "signature": "..."
     }
 
@@ -34,6 +35,13 @@ as a capability grant. ``limits`` bound calls taken together: ``sum`` adds one
 numeric argument across the calls, ``count`` counts them. A limit with
 ``windowSeconds`` covers a rolling window ending at the call; without it, the
 whole validity period. Amounts are decimal strings, never floats.
+
+``reviewers`` is optional and omitted when empty, so a permission without it
+signs and digests exactly as before the field existed. Each entry names a
+person the principal trusts to resolve escalations under this permission and
+pins that person's public key (PEM, ES256 or RS256). A resolution in the trail
+is checked against these keys, never against a key the row carries; see
+``_review_signature``.
 
 The signature is over the JCS encoding of every field except ``signature``,
 with the SEP-2787 signing stack the grants use. ``permission_digest`` is the
@@ -75,9 +83,12 @@ LIMIT_KINDS = frozenset({"sum", "count"})
 PERMISSION_KEYS = frozenset({
     "type", "version", "alg", "principal", "keyId", "agent", "toolName",
     "tenantId", "notBefore", "notAfter", "nonce", "capabilities", "limits",
-    "signature",
+    "reviewers", "signature",
 })
 LIMIT_KEYS = frozenset({"kind", "arg", "max", "windowSeconds"})
+REVIEWER_KEYS = frozenset({"reviewer", "alg", "publicKey"})
+#: A shared secret cannot say which person signed, so reviewers sign with a key pair.
+REVIEWER_ALGS = frozenset({"ES256", "RS256"})
 
 
 @dataclass(frozen=True)
@@ -88,6 +99,32 @@ class Limit:
     max: str
     arg: Optional[str] = None
     window_seconds: Optional[int] = None
+
+
+@dataclass(frozen=True)
+class Reviewer:
+    """A person the principal trusts to resolve escalations, with their pinned key."""
+
+    reviewer: str
+    alg: str
+    public_key: str
+
+    def to_dict(self) -> dict[str, Any]:
+        return {"reviewer": self.reviewer, "alg": self.alg, "publicKey": self.public_key}
+
+    def load_public_key(self) -> Any:
+        """The pinned key as a key object; raises AttestationError if unusable."""
+        from cryptography.hazmat.primitives import serialization
+        from cryptography.hazmat.primitives.asymmetric import ec, rsa
+
+        try:
+            key = serialization.load_pem_public_key(self.public_key.encode())
+        except (ValueError, TypeError) as exc:
+            raise AttestationError(f"reviewer.publicKey is not a PEM public key: {exc}") from exc
+        want = ec.EllipticCurvePublicKey if self.alg == "ES256" else rsa.RSAPublicKey
+        if not isinstance(key, want):
+            raise AttestationError(f"reviewer.publicKey does not match alg {self.alg}")
+        return key
 
 
 @dataclass(frozen=True)
@@ -107,6 +144,7 @@ class Permission:
     limits: tuple[Limit, ...] = ()
     signature: str = ""
     version: int = 1
+    reviewers: tuple[Reviewer, ...] = ()
 
     def to_dict(self) -> dict[str, Any]:
         d = _unsigned_dict(self)
@@ -124,7 +162,7 @@ def _limit_to_dict(lim: Limit) -> dict[str, Any]:
 
 
 def _unsigned_dict(p: Permission) -> dict[str, Any]:
-    return {
+    d = {
         "type": PERMISSION_TYPE,
         "version": p.version,
         "alg": p.alg,
@@ -139,6 +177,9 @@ def _unsigned_dict(p: Permission) -> dict[str, Any]:
         "capabilities": [capability_to_dict(c) for c in p.capabilities],
         "limits": [_limit_to_dict(lim) for lim in p.limits],
     }
+    if p.reviewers:
+        d["reviewers"] = [r.to_dict() for r in p.reviewers]
+    return d
 
 
 def _decimal(value: Any) -> Optional[Decimal]:
@@ -178,6 +219,18 @@ def _check_fields(p: Permission) -> None:
         raise AttestationError("notBefore and notAfter must be times with notBefore first")
     for lim in p.limits:
         _check_limit(lim)
+    for r in p.reviewers:
+        _check_reviewer(r)
+
+
+def _check_reviewer(r: Reviewer) -> None:
+    if not isinstance(r.reviewer, str) or not r.reviewer:
+        raise AttestationError("reviewer.reviewer must be a non-empty string")
+    if r.alg not in REVIEWER_ALGS:
+        raise AttestationError(f"reviewer.alg must be one of {sorted(REVIEWER_ALGS)!r}")
+    if not isinstance(r.public_key, str):
+        raise AttestationError("reviewer.publicKey must be a PEM string")
+    r.load_public_key()
 
 
 def signing_payload(p: Permission) -> bytes:
@@ -199,6 +252,7 @@ def sign_permission(
     capabilities: Sequence[Capability] = (),
     limits: Sequence[Limit] = (),
     nonce: Optional[str] = None,
+    reviewers: Sequence[Reviewer] = (),
 ) -> Permission:
     """Build and sign a permission. ``signing_material`` is the principal's key:
     bytes for HS256, a private-key object for ES256 / RS256."""
@@ -207,6 +261,7 @@ def sign_permission(
         tool_name=tool_name, tenant_id=tenant_id, not_before=not_before,
         not_after=not_after, nonce=nonce or new_nonce(),
         capabilities=tuple(capabilities), limits=tuple(limits),
+        reviewers=tuple(reviewers),
     )
     _check_fields(unsigned)
     payload = signing_payload(unsigned)
@@ -274,6 +329,20 @@ def permission_from_dict(d: Any) -> Permission:
             raise AttestationError(f"limit carries unrecognized field(s) {sorted(extra)!r}")
         limits.append(Limit(kind=_field(item, "kind"), max=_field(item, "max"),
                             arg=_field(item, "arg"), window_seconds=_field(item, "windowSeconds")))
+    revs = _field(d, "reviewers", [])
+    if not isinstance(revs, list) or ("reviewers" in d and not revs):
+        # An empty list is refused rather than dropped: the field is omitted
+        # when empty, so a parsed permission stays byte-exact to what was signed.
+        raise AttestationError("reviewers must be a non-empty list when present")
+    reviewers = []
+    for item in revs:
+        if not isinstance(item, dict):
+            raise AttestationError("reviewer must be an object")
+        extra = set(item) - REVIEWER_KEYS
+        if extra:
+            raise AttestationError(f"reviewer carries unrecognized field(s) {sorted(extra)!r}")
+        reviewers.append(Reviewer(reviewer=_field(item, "reviewer"), alg=_field(item, "alg"),
+                                  public_key=_field(item, "publicKey")))
     p = Permission(
         alg=_field(d, "alg"), principal=_field(d, "principal"), key_id=_field(d, "keyId", ""),
         agent=_field(d, "agent"), tool_name=_field(d, "toolName"),
@@ -281,6 +350,7 @@ def permission_from_dict(d: Any) -> Permission:
         not_after=_field(d, "notAfter"), nonce=_field(d, "nonce"),
         capabilities=tuple(capability_from_dict(c) for c in caps),
         limits=tuple(limits), signature=_field(d, "signature", ""),
+        reviewers=tuple(reviewers),
     )
     if not isinstance(p.key_id, str) or not isinstance(p.tenant_id, str) \
             or not isinstance(p.signature, str):

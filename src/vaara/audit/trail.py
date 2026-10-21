@@ -1811,6 +1811,7 @@ class AuditTrail:
         args_digest: str = "",
         approver: str = "",
         human_disposed: bool = False,
+        reviewer_signature: Optional[dict] = None,
     ) -> None:
         """Record resolution of an escalation.
 
@@ -1825,6 +1826,10 @@ class AuditTrail:
         is empty the two keys are omitted entirely, so a caller that does not
         supply a disposition produces a record that hashes exactly as it did
         before these parameters existed.
+
+        ``reviewer_signature`` is the reviewer's own signature block from
+        ``vaara.credential.sign_resolution``. It is stored as given, under its
+        own key, and only when supplied, so unsigned rows hash as before.
         """
         articles = self._get_regulatory_articles(
             EventType.ESCALATION_RESOLVED,
@@ -1865,6 +1870,8 @@ class AuditTrail:
                     args_digest, self._MAX_ARGS_DIGEST_LEN,
                 ),
                 **disposition,
+                **({"reviewer_signature": dict(reviewer_signature)}
+                   if reviewer_signature is not None else {}),
             },
             regulatory_articles=articles,
             tenant_id=self._tenant_for(action_id),

@@ -38,7 +38,7 @@ Subcommands:
 
     vaara review resolve --db PATH --queue-id ID --reviewer NAME \
                           --resolution {allow,deny,abstain} \
-                          [--justification TEXT]
+                          [--justification TEXT] [--audit-db PATH --sign-key PEM]
         Mark a pending or claimed item as resolved. The ``allow`` and
         ``deny`` resolutions are operator decisions overriding the
         pipeline's ``escalate`` verdict; ``abstain`` leaves
@@ -757,6 +757,30 @@ def _cmd_trail_check_grant(args: argparse.Namespace) -> int:
     return 0 if report.ok else 1
 
 
+def _reviewer_from_spec(entry: Any) -> Any:
+    """A spec reviewer: ``reviewer`` plus ``publicKeyFile`` (PEM) or ``publicKey``.
+
+    ``alg`` follows the key type unless the spec states it.
+    """
+    from cryptography.hazmat.primitives import serialization
+    from cryptography.hazmat.primitives.asymmetric import ec
+
+    from vaara.credential import Reviewer
+
+    if not isinstance(entry, dict):
+        raise ValueError("each reviewer in the spec must be an object")
+    pem = entry.get("publicKey")
+    if entry.get("publicKeyFile"):
+        pem = Path(entry["publicKeyFile"]).expanduser().read_text(encoding="utf-8")
+    if not isinstance(pem, str):
+        raise ValueError("a reviewer needs publicKeyFile or publicKey (PEM)")
+    alg = entry.get("alg")
+    if alg is None:
+        key = serialization.load_pem_public_key(pem.encode())
+        alg = "ES256" if isinstance(key, ec.EllipticCurvePublicKey) else "RS256"
+    return Reviewer(reviewer=entry.get("reviewer", ""), alg=alg, public_key=pem)
+
+
 def _cmd_permission_sign(args: argparse.Namespace) -> int:
     """Sign a standing permission from a JSON spec with the principal's key."""
     from vaara.attestation._attest_types import AttestationError
@@ -779,11 +803,12 @@ def _cmd_permission_sign(args: argparse.Namespace) -> int:
             limits=[Limit(kind=x.get("kind"), max=x.get("max"), arg=x.get("arg"),
                           window_seconds=x.get("windowSeconds"))
                     for x in spec.get("limits", [])],
+            reviewers=[_reviewer_from_spec(x) for x in spec.get("reviewers", [])],
         )
     except KeyError as exc:
         print(f"vaara permission sign: spec is missing {exc}", file=sys.stderr)
         return 2
-    except (ValueError, AttestationError, AttributeError) as exc:
+    except (ValueError, AttestationError, AttributeError, OSError) as exc:
         print(f"vaara permission sign: {exc}", file=sys.stderr)
         return 2
     text = json.dumps(permission.to_dict(), indent=2)
@@ -796,7 +821,11 @@ def _cmd_permission_sign(args: argparse.Namespace) -> int:
 
 def _cmd_trail_check_permission(args: argparse.Namespace) -> int:
     """Replay a trail against a principal's signed permission."""
-    from vaara.credential import check_trail_against_permission, permission_from_dict
+    from vaara.credential import (
+        check_review_resolutions,
+        check_trail_against_permission,
+        permission_from_dict,
+    )
 
     try:
         permission = permission_from_dict(_load_json_file(args.permission, "permission"))
@@ -814,8 +843,15 @@ def _cmd_trail_check_permission(args: argparse.Namespace) -> int:
     if trail is None:
         return err
     report = check_trail_against_permission(trail, permission, verifying_material=material)
+    reviews = check_review_resolutions(trail, permission, verifying_material=material)
+    show_reviews = bool(reviews.reviews) or permission.reviewers
+    ok = report.ok and (reviews.ok or not show_reviews)
     if args.format == "json":
-        print(json.dumps(report.to_dict(), indent=2))
+        out = report.to_dict()
+        if show_reviews:
+            out["reviews"] = reviews.to_dict()
+            out["ok"] = ok
+        print(json.dumps(out, indent=2))
     else:
         print(f"permission: {permission.principal} -> {permission.agent}, "
               f"tool {permission.tool_name}, {permission.not_before} to {permission.not_after}")
@@ -831,7 +867,15 @@ def _cmd_trail_check_permission(args: argparse.Namespace) -> int:
                 print(line + (f"  ({call.reason})" if call.reason else ""))
             summary = ", ".join(f"{n} {s}" for s, n in sorted(report.counts.items()))
             print(f"{'OK' if report.ok else 'FINDINGS'}: {summary or 'no calls under this permission'}")
-    return 0 if report.ok else 1
+            if show_reviews:
+                for rev in reviews.reviews:
+                    line = (f"review {rev.state:<17} {rev.action_id}  {rev.resolution} "
+                            f"by {rev.reviewer or '-'}")
+                    print(line + ("  (override)" if rev.override else ""))
+                summary = ", ".join(f"{n} {s}" for s, n in sorted(reviews.counts.items()))
+                print(f"reviews {'OK' if reviews.ok else 'FINDINGS'}: "
+                      f"{summary or 'no resolutions under this permission'}")
+    return 0 if ok else 1
 
 
 def _load_trail_source(args: argparse.Namespace):
@@ -1767,9 +1811,24 @@ def _cmd_review_claim(args: argparse.Namespace) -> int:
 
 
 def _cmd_review_resolve(args: argparse.Namespace) -> int:
+    from vaara.attestation._attest_types import AttestationError
     from vaara.audit.review_queue import (
         InvalidTransitionError, ItemNotFoundError,
     )
+    reviewer_key = None
+    if args.sign_key:
+        from cryptography.hazmat.primitives import serialization
+        if not args.audit_db:
+            print("resolve failed: --sign-key needs --audit-db, the trail the "
+                  "signature binds to", file=sys.stderr)
+            return 2
+        try:
+            reviewer_key = serialization.load_pem_private_key(
+                Path(args.sign_key).expanduser().read_bytes(), password=None,
+            )
+        except (OSError, ValueError, TypeError) as exc:
+            print(f"resolve failed: --sign-key: {exc}", file=sys.stderr)
+            return 2
     trail = None
     backend = None
     if args.audit_db:
@@ -1789,11 +1848,12 @@ def _cmd_review_resolve(args: argparse.Namespace) -> int:
                     resolution=args.resolution,
                     justification=args.justification or "",
                     trail=trail,
+                    reviewer_key=reviewer_key,
                 )
             except (InvalidTransitionError, ItemNotFoundError) as exc:
                 print(f"resolve failed: {exc}", file=sys.stderr)
                 return 2
-            except ValueError as exc:
+            except (ValueError, AttestationError) as exc:
                 print(f"resolve failed: {exc}", file=sys.stderr)
                 return 2
     finally:
@@ -1805,6 +1865,8 @@ def _cmd_review_resolve(args: argparse.Namespace) -> int:
     )
     if trail is not None:
         print("Wrote ESCALATION_RESOLVED to audit trail (Article 14(4)(d)).")
+    if reviewer_key is not None:
+        print("Signed by the reviewer over the decision record hash.")
     return 0
 
 
@@ -6663,6 +6725,12 @@ def build_parser() -> argparse.ArgumentParser:
         "--audit-db", default=None,
         help="If supplied, also write an ESCALATION_RESOLVED record to "
              "the audit DB at this path (Article 14(4)(d) evidence).",
+    )
+    rr.add_argument(
+        "--sign-key", default=None,
+        help="The reviewer's own PEM private key (EC P-256 or RSA). The "
+             "resolution row then carries the reviewer's signature over the "
+             "decision record hash; needs --audit-db.",
     )
     rr.set_defaults(func=_cmd_review_resolve)
 
