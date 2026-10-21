@@ -45,10 +45,10 @@ primitive in Section 9, MEA-2.
   type) - ✅. Every deny the pipeline, the deny-rule hook and the MCP
   proxy write lands on the hash chain as `action_blocked` with
   `policy_id` (the rule, the scorer, `capability_attenuation`,
-  `operator_perimeter` or `upstream_input_schema`) and
+  `delegatee_binding`, `operator_perimeter` or `upstream_input_schema`) and
   `violation_type` (`policy_rule`, `risk_threshold`,
-  `privilege_attenuation`, `invalid_decision`, `scorer_failure`,
-  `perimeter_filter`, `parameter_schema`)
+  `privilege_attenuation`, `delegation_binding`, `invalid_decision`,
+  `scorer_failure`, `perimeter_filter`, `parameter_schema`)
   alongside the reason. A custom scorer can name its own policy and
   violation type.
 - **TOOL-1.4** (provisional receipt before execution, upgrade to full

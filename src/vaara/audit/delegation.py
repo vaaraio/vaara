@@ -19,6 +19,11 @@ The reconstruction is deliberately defensive: a forged, pruned, or cyclic
 parent link never crashes or hangs the walk. Dangling and cyclic action_ids
 are surfaced on the graph rather than silently dropped, so an anomaly in the
 delegation structure is itself visible evidence.
+
+A parent link says who claimed to act under whom, not that the parent agreed.
+An action that names its ``delegatees`` binds its children: a child whose
+agent is not among them is ``substituted``, and a child of a parent that named
+nobody is ``unbound``. Neither is ever read as an authorized hop.
 """
 
 from __future__ import annotations
@@ -52,6 +57,9 @@ class DelegationGraph:
     cycles: set[str] = field(default_factory=set)
     agent_of: dict[str, str] = field(default_factory=dict)
     tool_of: dict[str, str] = field(default_factory=dict)
+    delegatees_of: dict[str, Optional[frozenset[str]]] = field(default_factory=dict)
+    substituted: set[str] = field(default_factory=set)
+    unbound: set[str] = field(default_factory=set)
 
     def __contains__(self, action_id: str) -> bool:
         return action_id in self.effective_parent
@@ -100,6 +108,28 @@ class DelegationGraph:
         reverse.reverse()
         return reverse
 
+    def binding_of(self, action_id: str) -> str:
+        """How the hop into ``action_id`` is bound by its parent.
+
+        ``root`` (no parent), ``bound`` (the parent named this agent),
+        ``substituted`` (the parent named others), ``unbound`` (the parent
+        named nobody), ``dangling`` or ``cycle`` (the recorded parent link
+        was cut), ``unknown`` (no such action).
+        """
+        if action_id not in self.effective_parent:
+            return "unknown"
+        if action_id in self.dangling:
+            return "dangling"
+        if action_id in self.cycles:
+            return "cycle"
+        if self.effective_parent[action_id] is None:
+            return "root"
+        if action_id in self.substituted:
+            return "substituted"
+        if action_id in self.unbound:
+            return "unbound"
+        return "bound"
+
     def descendants(self, action_id: str) -> list[str]:
         """All action_ids delegated (transitively) from ``action_id``.
 
@@ -127,6 +157,14 @@ def _parent_link(record: AuditRecord) -> Optional[str]:
     return None
 
 
+def _delegatees(record: AuditRecord) -> Optional[frozenset[str]]:
+    """The delegates an action named, or None when it named none (or garbage)."""
+    named = record.data.get("delegatees")
+    if isinstance(named, list) and all(isinstance(d, str) for d in named):
+        return frozenset(named)
+    return None
+
+
 def build_delegation_graph(records: Iterable[AuditRecord]) -> DelegationGraph:
     """Reconstruct the delegation forest from an iterable of audit records.
 
@@ -141,6 +179,7 @@ def build_delegation_graph(records: Iterable[AuditRecord]) -> DelegationGraph:
     raw_parent: dict[str, Optional[str]] = {}
     agent_of: dict[str, str] = {}
     tool_of: dict[str, str] = {}
+    delegatees_of: dict[str, Optional[frozenset[str]]] = {}
 
     for rec in records:
         aid = rec.action_id
@@ -153,6 +192,7 @@ def build_delegation_graph(records: Iterable[AuditRecord]) -> DelegationGraph:
                 raw_parent[aid] = _parent_link(rec)
                 agent_of[aid] = rec.agent_id
                 tool_of[aid] = rec.tool_name
+                delegatees_of[aid] = _delegatees(rec)
 
     dangling: set[str] = set()
     cycles: set[str] = set()
@@ -197,6 +237,18 @@ def build_delegation_graph(records: Iterable[AuditRecord]) -> DelegationGraph:
         if parent is not None:
             children[parent].append(aid)
 
+    substituted: set[str] = set()
+    unbound: set[str] = set()
+    for aid in seen:
+        parent = effective_parent.get(aid)
+        if parent is None:
+            continue
+        named = delegatees_of.get(parent)
+        if named is None:
+            unbound.add(aid)
+        elif agent_of.get(aid) not in named:
+            substituted.add(aid)
+
     return DelegationGraph(
         effective_parent=effective_parent,
         children=children,
@@ -204,6 +256,9 @@ def build_delegation_graph(records: Iterable[AuditRecord]) -> DelegationGraph:
         cycles=cycles,
         agent_of=agent_of,
         tool_of=tool_of,
+        delegatees_of=delegatees_of,
+        substituted=substituted,
+        unbound=unbound,
     )
 
 

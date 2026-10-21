@@ -39,7 +39,8 @@ def jsonable(value: Any) -> Any:
     return type(value).__name__
 
 
-def engine_state(*, version: str, enforce: bool, scorer: Any, authority: Any = None) -> dict[str, Any]:
+def engine_state(*, version: str, enforce: bool, scorer: Any, authority: Any = None,
+                 require_delegatee_binding: bool = False) -> dict[str, Any]:
     """The ``vaara.engine-policy/v0`` object for a pipeline."""
     describe = getattr(scorer, "policy_state", None)
     scorer_state = describe() if callable(describe) else {"scorer": type(scorer).__name__}
@@ -51,6 +52,9 @@ def engine_state(*, version: str, enforce: bool, scorer: Any, authority: Any = N
     }
     if authority is not None:
         state["authority"] = jsonable(authority)
+    # Present only when on, so every digest taken without it stays the same.
+    if require_delegatee_binding:
+        state["require_delegatee_binding"] = True
     return state
 
 
