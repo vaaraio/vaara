@@ -489,3 +489,4 @@ html[data-theme="dark"] .partner .lockup img.on-dark { display: block; }
 .partner .kss img.on-dark { display: none; }
 html[data-theme="dark"] .partner .kss img.on-light { display: none; }
 html[data-theme="dark"] .partner .kss img.on-dark { display: block; }
+.partner .capw { max-width: 180px; line-height: 1.35; }
