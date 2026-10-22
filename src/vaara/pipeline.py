@@ -478,6 +478,7 @@ class InterceptionPipeline:
         policy_id: str = "",
         value_origin: Optional[dict] = None,
         delegatees: Optional[Sequence[str]] = None,
+        enforcement: Optional[str] = None,
     ) -> InterceptionResult:
         """Intercept an agent action request.
 
@@ -518,10 +519,18 @@ class InterceptionPipeline:
         denied fail-closed with ``violation_type`` ``delegation_binding``:
         knowing a parent's action id is not enough to act under it.
 
+        ``enforcement`` is what the decision record says about whether this
+        verdict could stop the action: ``could_block`` when the pipeline
+        enforces, ``shadow`` when it does not. A caller whose own verdict
+        decides, or who records an action it cannot hold, names the mode
+        itself (``could_block``, ``shadow``, ``recorded_only``).
+
         Returns an InterceptionResult — check .allowed before executing.
         """
         start = time.perf_counter()
         value_origin = _value_origin(value_origin)
+        if enforcement is None:
+            enforcement = "could_block" if self._enforce else "shadow"
         if policy_decision is not None and policy_decision not in _FINE_TO_COARSE:
             raise ValueError(f"policy_decision must be a decision, not {policy_decision!r}")
 
@@ -674,6 +683,7 @@ class InterceptionPipeline:
                     unavailable_input=self._scorer_policy_id(),
                     policy_digest=fail_digest,
                     policy_state=fail_state,
+                    enforcement=enforcement,
                 )
             except Exception:
                 logger.exception(
@@ -1062,6 +1072,7 @@ class InterceptionPipeline:
             unavailable_input=unavailable_input,
             policy_digest=policy_digest,
             policy_state=policy_state,
+            enforcement=enforcement,
         )
 
         if decision_str == "escalate":

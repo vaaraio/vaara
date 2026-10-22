@@ -44,7 +44,7 @@ from datetime import datetime, timezone
 from pathlib import Path
 from typing import Any, Optional
 
-from vaara.audit.trail import AuditRecord, EventType
+from vaara.audit.trail import ENFORCEMENT_MODES, AuditRecord, EventType
 
 logger = logging.getLogger(__name__)
 
@@ -157,6 +157,11 @@ def build_evidence(
     if data.get("approver"):
         evidence["approver"] = str(data["approver"])
         evidence["humanDisposed"] = bool(data.get("human_disposed", False))
+    # Whether the producer could have stopped the action. Only the closed
+    # vocabulary is lifted: a deny must never read as a stop on a word the
+    # trail did not check.
+    if data.get("enforcement") in ENFORCEMENT_MODES:
+        evidence["enforcement"] = data["enforcement"]
     if evidence["decision"] == "deny":
         evidence["refusal"] = _refusal_block(data)
     cage = data.get("cage")
@@ -458,6 +463,8 @@ class ReceiptCheck:
     tool: str
     decided_at: str
     detail: str = ""
+    # The evidence's enforcement mode; "" when the record carries none.
+    enforcement: str = ""
 
     @property
     def ok(self) -> bool:
@@ -541,6 +548,9 @@ def verify_receipt_body(
         tool=str(evidence.get("toolName", "")),
         decided_at=str(evidence.get("decidedAt", "")),
         detail=detail,
+        # Only the closed vocabulary is a mode; any other word reads as none.
+        enforcement=(evidence["enforcement"]
+                     if evidence.get("enforcement") in ENFORCEMENT_MODES else ""),
     )
 
 

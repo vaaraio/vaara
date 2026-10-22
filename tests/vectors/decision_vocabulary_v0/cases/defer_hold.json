@@ -114,6 +114,7 @@
           "enabled": true
         }
       },
+      "enforcement": "could_block",
       "cage": {
         "driver": "none",
         "confirmed": false
@@ -134,7 +135,7 @@
       }
     ],
     "previous_hash": "2a09f6120fb23ede98d1a06ac79652371875fa223cac5a64e60c9b8c9b09d0cb",
-    "record_hash": "4e9ffe08bb6b43289362cf939e294f10f1da0f96f27d48e4d834bab52967f36a",
+    "record_hash": "43311f3826437742555199546911749261a3720d5507a0e9583036363252c22c",
     "system_operation": "decision_threshold",
     "data_usage": "risk_score+thresholds",
     "decision_making": "threshold_match",
@@ -168,8 +169,8 @@
         "how_satisfied": "The event is handed to a human with its context for that evaluation"
       }
     ],
-    "previous_hash": "4e9ffe08bb6b43289362cf939e294f10f1da0f96f27d48e4d834bab52967f36a",
-    "record_hash": "125491f46dd72a4ff8476f14272d40e35f376f56c217486f7dd4dfe4c4c32d4b",
+    "previous_hash": "43311f3826437742555199546911749261a3720d5507a0e9583036363252c22c",
+    "record_hash": "d0bbb4d8993a0e01e1273582bf16b19c1596f99bdfff73673bc53863c5790d30",
     "system_operation": "escalation",
     "data_usage": "risk_score+context",
     "decision_making": "threshold_or_classifier_upgrade",

@@ -2798,6 +2798,10 @@ def _cmd_receipt_verify_decision(args: argparse.Namespace) -> int:
             con.close()
     key = Path(args.key).expanduser().read_bytes() if args.key else None
     failed = 0
+    # Blocks on verified receipts, by whether the producer could stop the
+    # action. A shadow or recorded-only block is a deny that stopped nothing,
+    # and one with no mode says nothing either way.
+    blocks = {"could_block": 0, "shadow": 0, "recorded_only": 0, "": 0}
     for f in files:
         try:
             c = dr.verify_receipt_file(f, public_key_pem=key, trail_hashes=hashes)
@@ -2806,12 +2810,14 @@ def _cmd_receipt_verify_decision(args: argparse.Namespace) -> int:
             print(f"FAIL  {f}: unreadable ({exc})")
             continue
         failed += 0 if c.ok else 1
+        if c.ok and c.decision == "block":
+            blocks[c.enforcement if c.enforcement in blocks else ""] += 1
         if args.json:
             print(json.dumps({
                 "path": c.path, "ok": c.ok, "signature": c.signature_ok,
                 "evidence": c.evidence_ok, "trail": c.trail_ok,
                 "decision": c.decision, "tool": c.tool, "decidedAt": c.decided_at,
-                "detail": c.detail,
+                "enforcement": c.enforcement, "detail": c.detail,
             }))
         else:
             mark = "OK  " if c.ok else "FAIL"
@@ -2820,6 +2826,10 @@ def _cmd_receipt_verify_decision(args: argparse.Namespace) -> int:
     if not args.json:
         trail_note = "" if hashes is not None else " (no trail to check against)"
         print(f"{len(files) - failed}/{len(files)} verified{trail_note}")
+        if any(blocks.values()):
+            print(f"blocks: {blocks['could_block']} stopped, {blocks['shadow']} shadow, "
+                  f"{blocks['recorded_only']} recorded only, "
+                  f"{blocks['']} mode not recorded")
         if inference:
             dirs = sorted({str(f.parent) for f in inference})
             print(f"skipped {len(inference)} inference receipt file(s); check them with "

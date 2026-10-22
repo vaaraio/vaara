@@ -478,6 +478,9 @@ def _record_call(cfg: dict, agent: str, tool_name: str, tool_input: dict,
             policy_reason=(f"deny rule {rule_id}: {context.get('rule_message', '')}"
                            if rule_id else ""),
             policy_id=f"deny_rule:{rule_id}" if rule_id else "",
+            # The pipeline here only scores; the hook's exit code is what
+            # stops the call, and it stops nothing in shadow mode.
+            enforcement="shadow" if shadow_mode(cfg) else "could_block",
         )
     except Exception as exc:
         _note_trail_failure(cfg, exc, stage="record_call")

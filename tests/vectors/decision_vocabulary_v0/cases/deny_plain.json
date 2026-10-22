@@ -115,6 +115,7 @@
           "enabled": true
         }
       },
+      "enforcement": "could_block",
       "cage": {
         "driver": "none",
         "confirmed": false
@@ -135,7 +136,7 @@
       }
     ],
     "previous_hash": "4efb7ad315eb8313f527d4920529898137c884f3304adbb52c276e04bd42eb6c",
-    "record_hash": "75d1e9f8cc5337a5536cf5e1bcd48d743642f52d13b733e93869b3fa4116debc",
+    "record_hash": "99eadae9c7b44873622c9cf7ed400d367ca6eaa16539702fa952f43d6d5f2f10",
     "system_operation": "blocking",
     "data_usage": "risk_score+thresholds",
     "decision_making": "threshold_match",

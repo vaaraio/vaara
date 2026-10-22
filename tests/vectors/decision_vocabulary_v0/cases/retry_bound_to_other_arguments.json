@@ -120,6 +120,7 @@
           "enabled": true
         }
       },
+      "enforcement": "could_block",
       "cage": {
         "driver": "none",
         "confirmed": false
@@ -140,7 +141,7 @@
       }
     ],
     "previous_hash": "706c817f2c0957d7d909cfea866b713cba9068dea3689d0a5adaca751599efb7",
-    "record_hash": "2621fc2679a8099d8fba5f552c5fdc970ed116c7b47d904b67cee93038b77395",
+    "record_hash": "e9443c8548b7919ca9309445571c12eafe91410e71d51459ee89296d6f8753d3",
     "system_operation": "blocking",
     "data_usage": "risk_score+thresholds",
     "decision_making": "threshold_match",
@@ -187,8 +188,8 @@
         "how_satisfied": "All agent actions are logged as events for incident detection"
       }
     ],
-    "previous_hash": "2621fc2679a8099d8fba5f552c5fdc970ed116c7b47d904b67cee93038b77395",
-    "record_hash": "332d12744c35a59a7ed7e949f75df84f06177f9978c4130211e4bc1cafb34986",
+    "previous_hash": "e9443c8548b7919ca9309445571c12eafe91410e71d51459ee89296d6f8753d3",
+    "record_hash": "4f6fca184e58e233f13146fd8c8f82ad7d5d5dd50fd9ce3e8da2941d8752b69e",
     "system_operation": "logging_intake",
     "data_usage": "tool_args+context",
     "decision_making": "n/a",
@@ -226,8 +227,8 @@
         "how_satisfied": "Conformal calibration provides distribution-free coverage guarantees on risk estimates"
       }
     ],
-    "previous_hash": "332d12744c35a59a7ed7e949f75df84f06177f9978c4130211e4bc1cafb34986",
-    "record_hash": "2da3fccbd5bb699ff84c2e985db6e6422e91c41e3054a75855a33bf7c7956277",
+    "previous_hash": "4f6fca184e58e233f13146fd8c8f82ad7d5d5dd50fd9ce3e8da2941d8752b69e",
+    "record_hash": "a841c2c61af0521aa8484ffc3de53175b782f3e1cbdcb51cee0ef7abbbab8f39",
     "system_operation": "scoring",
     "data_usage": "tool_args+history+policy",
     "decision_making": "heuristic_score",
@@ -247,6 +248,7 @@
       "reason": "vector: policy returned allow",
       "risk_score": 0.5,
       "policy_digest": "sha256:dbb9e45494afea14faf18f61fc29821a4d011d1d980f85e8ac4d0e681b3ebcdd",
+      "enforcement": "could_block",
       "cage": {
         "driver": "none",
         "confirmed": false
@@ -266,8 +268,8 @@
         "how_satisfied": "Decision records include risk scores, confidence intervals, and contributing signals"
       }
     ],
-    "previous_hash": "2da3fccbd5bb699ff84c2e985db6e6422e91c41e3054a75855a33bf7c7956277",
-    "record_hash": "30cabc47a75f1dfa9a530ac6cd153aaf761413ac37fb3fd12a23dc3459ad0bae",
+    "previous_hash": "a841c2c61af0521aa8484ffc3de53175b782f3e1cbdcb51cee0ef7abbbab8f39",
+    "record_hash": "710a17183b848c39326be3c986723da77d19d97763a55ee112f4532ef215b59d",
     "system_operation": "decision_threshold",
     "data_usage": "risk_score+thresholds",
     "decision_making": "threshold_match",

@@ -131,6 +131,10 @@ SYSTEM_EVENT_TYPES = frozenset({
 # lets a walk report the slot as erased instead of rewritten.
 ERASED_DATA_KEY = "_vaara_erased"
 
+# Whether the party that wrote a decision could have stopped the action
+# (record_decision's ``enforcement``). Absent means not recorded.
+ENFORCEMENT_MODES = frozenset({"could_block", "shadow", "recorded_only"})
+
 
 def erasure_pointer(record: "AuditRecord") -> Optional[str]:
     """The erasure record id a tombstoned record points at, else None."""
@@ -1471,6 +1475,7 @@ class AuditTrail:
         policy_state: Optional[dict] = None,
         sequence_steps: Optional[dict] = None,
         value_origin: Optional[dict] = None,
+        enforcement: str = "",
     ) -> None:
         """Record the allow/deny/escalate decision.
 
@@ -1512,6 +1517,14 @@ class AuditTrail:
         only in external tool results to ``{"seen_in": [action ids],
         "source": tool}``, so the record names the result the value came
         from. Same omission rule.
+
+        ``enforcement`` says whether the party writing the decision could
+        have stopped the action: ``could_block`` (it stands in the path and
+        the caller honours its verdict), ``shadow`` (it could, but was set to
+        let everything through) or ``recorded_only`` (it sees the action but
+        cannot hold it). A word outside those three is left out with a
+        warning, never recorded. Same omission rule: empty adds no keys, and
+        a reader takes a missing value as unknown, not as a stop.
 
         ``cage`` is the block :func:`vaara.cage.observe` returns: which cage
         the deciding process runs in and whether the kernel confirmed it at
@@ -1636,6 +1649,15 @@ class AuditTrail:
                 {str(k): json_safe(v) for k, v in value_origin.items()},
                 self._MAX_ASSESSMENT_JSON_BYTES,
             )
+        if enforcement:
+            if enforcement in ENFORCEMENT_MODES:
+                data["enforcement"] = enforcement
+            else:
+                logger.warning(
+                    "record_decision: enforcement=%r is not one of %s for "
+                    "action_id=%s; recording the decision without it",
+                    enforcement, sorted(ENFORCEMENT_MODES), action_id,
+                )
         data["cage"] = self._cap_record_dict_bytes(
             {str(k): json_safe(v) for k, v in cage.items()},
             self._MAX_ASSESSMENT_JSON_BYTES,
