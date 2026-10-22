@@ -84,9 +84,10 @@ record.
 | `agent_seen` | `vaara scan --watch` or the MCP beacon saw an agent process. |
 | `witness_configured` | Heads reach an outside witness at a stated cadence: `data.kind` is `publish` (a transparency log) or `anchor` (an RFC 3161 authority), `data.every_records` the cadence, `data.target` the log or authority, `data.key_fingerprint` the publishing key. Written when the cadence is switched on or changed, so the bound on the unwitnessed window is readable from the trail. |
 | `record_erased` | Another record's `data` was erased (`vaara trail erase`, GDPR Art. 17): `data.erased_record_id`, `data.erased_record_hash` and `data.erased_seq` name it, `data.erased_event_type` and `data.erased_action_id` place it, `data.reason` says why. Optional, only when given: `data.legal_ground`, `data.erased_by`, and with a signing key `data.erased_at` and `data.eraser_signature` (`vaara.record-erasure/v1`, ES256 or RS256 by the eraser, checked with `vaara trail verify --erasure-key`). The erased record keeps its `record_hash` and its `data` becomes `{"_vaara_erased": {"erasure_record_id": ...}}`; verification reports that slot as erased (link verified, content not checkable), never as intact. |
+| `cage_lifecycle` | A cage launch started or stopped (`vaara cage run` / `cage stop`, `vaara run`). `data.action` is `started` or `stopped`; `data.driver`, `data.name`, `data.policy_digest` and `data.actor` say which launch, under which policy, by whom. A stop adds `data.reason` (`exited`, `operator`, `guard_gone`), and `data.processes_ended` and `data.exit_code` when known, and names the start it closes in `data.started_record_id` when that start is on the trail. Verification fails a stop that names anything other than an earlier start of the same driver and launch, and lists starts with no stop and stops whose start is outside the export. |
 
 `anchor_gap`, `repair_gap`, `repair_recovered`, `trail_forked`, `key_lifecycle`,
-`witness_configured` and `record_erased` are written by the trail alone. Verification reads them back, so
+`witness_configured`, `record_erased` and `cage_lifecycle` are written by the trail alone. Verification reads them back, so
 `POST /v1/audit/events` refuses them with 400 `invalid_request`; every other
 type in both tables is accepted there.
 
