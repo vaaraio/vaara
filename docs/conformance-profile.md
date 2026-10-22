@@ -23,7 +23,7 @@ reproduce the published verdicts under the same checker. The aggregate runner
 `scripts/conformance_runner.py` discovers every suite, runs each checker in a
 subprocess, and returns a single pass/fail.
 
-Profile v1 covers the 52 suites listed below, at the `v0` vector format. The
+Profile v1 covers the 53 suites listed below, at the `v0` vector format. The
 authoritative, always-current enumeration for any tagged release is the runner's
 own `--list` output at that tag.
 
@@ -97,8 +97,8 @@ files. One sample package per scenario is committed under its `packages/`
 directory, so its checker runs bare like every other suite. It can also be
 pointed at any package: `_check_independent.py <package.zip>`.
 
-So a clean checkout with `rfc8785` and `cryptography` alone grades 50 passed,
-0 failed, 2 skipped across the 52 suites.
+So a clean checkout with `rfc8785` and `cryptography` alone grades 51 passed,
+0 failed, 2 skipped across the 53 suites.
 
 ## What a pass means, and what it does not
 
@@ -114,10 +114,10 @@ grows; conformance is always against a named version.
 ## Suites in Profile v1
 
 ```
-acp_checkout_v0                decision_pairing_v0
-agent_decision_v0              decision_vocabulary_v0
-agent_identity_v0              enforcement_attestation_v0
-ap2_v0                         enforcement_set_v0
+acp_checkout_v0                decision_vocabulary_v0
+agent_decision_v0              enforcement_attestation_v0
+agent_identity_v0              enforcement_set_v0
+ap2_v0                         enforcement_v0
 article12_fold_v0              evidence_bundle_v0
 atlas_threat_v0                evidence_ref_v0
 attestation_result_v0          execution_receipt_v0
@@ -140,6 +140,7 @@ cross_org_handoff_v0           tap_v0
 cross_stack_revocation_v0      trail_decision_v0
 data_locality_v0               transparency_consistency_v0
 decision_disposition_v0        x402_settlement_v0
+decision_pairing_v0
 ```
 
 ## Related
