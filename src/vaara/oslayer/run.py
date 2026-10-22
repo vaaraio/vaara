@@ -172,12 +172,15 @@ def _egress_recorder(agent: str, cage_block: dict):
                     decision="deny", reason=f"{where}: {event.get('reason')}",
                     risk_score=1.0, policy_id="os-layer.egress",
                     violation_type="egress_not_allowed", cage=cage_block,
+                    # The proxy holds the connection: a refusal is a stop.
+                    enforcement="could_block",
                 )
             elif kind == "opened":
                 trail.record_decision(
                     action_id=action_id, agent_id=agent, tool_name="egress.connect",
                     decision="allow", reason=f"{where}: {event.get('reason')}",
                     risk_score=0.0, policy_id="", violation_type="", cage=cage_block,
+                    enforcement="could_block",
                 )
             elif kind == "failed":
                 trail.record_outcome(

@@ -216,9 +216,10 @@ def test_a_plain_decision_record_gains_no_new_keys():
     record = _decision_record(pipeline, result.action_id)
     # "cage" is on every decision since the cage layer, and "policy_digest"
     # since decisions name their decision state; "policy_state" rides on the
-    # first decision after that state changes. None of them is a refinement.
+    # first decision after that state changes; "enforcement" says whether the
+    # pipeline could stop the call. None of them is a refinement.
     assert set(record.data) - {"policy_state"} == {
-        "decision", "reason", "risk_score", "cage", "policy_digest"}
+        "decision", "reason", "risk_score", "cage", "policy_digest", "enforcement"}
 
 
 def test_modify_records_what_it_proposed():

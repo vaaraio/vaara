@@ -1217,6 +1217,7 @@ class VaaraMCPProxy:
                 parameters=_passthrough_params(request),
                 decision="allow",
                 reason="method not modelled by the proxy; forwarded and recorded",
+                enforcement="recorded_only",
             )
         try:
             return self._upstream.request(request)
@@ -1296,6 +1297,7 @@ class VaaraMCPProxy:
             reason=reason,
             policy_id="tool_surface",
             violation_type="tool_surface_changed",
+            enforcement="recorded_only",
         )
         self._overt_emit(
             surface="mcp.tool_surface",
@@ -1412,6 +1414,7 @@ class VaaraMCPProxy:
                 "Tool filtered by operator policy",
                 policy_id="operator_perimeter",
                 violation_type="perimeter_filter",
+                enforcement="could_block",
             )
             block_payload = {
                 "vaara_blocked": True,
@@ -1464,6 +1467,7 @@ class VaaraMCPProxy:
                     agent_id, tool_name, arguments, "deny", reason,
                     policy_id=f"deny_rule:{rule_id}",
                     violation_type="policy_rule",
+                    enforcement="could_block",
                 )
                 block_payload = {
                     "vaara_blocked": True,
@@ -1512,6 +1516,7 @@ class VaaraMCPProxy:
                     agent_id, tool_name, arguments, "deny", reason,
                     policy_id="tool_surface",
                     violation_type="tool_surface_hold",
+                    enforcement="could_block",
                 )
                 block_payload = {
                     "vaara_blocked": True,
@@ -1558,6 +1563,7 @@ class VaaraMCPProxy:
                     agent_id, tool_name, arguments, "deny", reason,
                     policy_id="upstream_input_schema",
                     violation_type="parameter_schema",
+                    enforcement="could_block",
                 )
                 block_payload = {
                     "vaara_blocked": True,
@@ -1814,6 +1820,7 @@ class VaaraMCPProxy:
                 reason="Resource filtered by operator policy",
                 policy_id="operator_perimeter",
                 violation_type="perimeter_filter",
+                enforcement="could_block",
             )
             self._overt_emit(
                 surface="mcp.resource.read",
@@ -1840,6 +1847,7 @@ class VaaraMCPProxy:
             parameters={"uri": uri},
             decision="allow",
             reason="resource within operator perimeter",
+            enforcement="could_block",
         )
         self._overt_emit(
             surface="mcp.resource.read",
@@ -1915,6 +1923,7 @@ class VaaraMCPProxy:
                 reason="Prompt filtered by operator policy",
                 policy_id="operator_perimeter",
                 violation_type="perimeter_filter",
+                enforcement="could_block",
             )
             self._overt_emit(
                 surface="mcp.prompt.get",
@@ -1941,6 +1950,7 @@ class VaaraMCPProxy:
             parameters={"name": name, "arguments": arguments},
             decision="allow",
             reason="prompt within operator perimeter",
+            enforcement="could_block",
         )
         self._overt_emit(
             surface="mcp.prompt.get",
@@ -1980,6 +1990,7 @@ class VaaraMCPProxy:
         tenant_id: Optional[str] = None,
         policy_id: str = "",
         violation_type: str = "",
+        enforcement: str = "",
     ) -> None:
         """Write a request+decision audit pair for a read-oriented MCP access.
 
@@ -1993,7 +2004,9 @@ class VaaraMCPProxy:
         upstream traffic. ``tenant_id`` is taken from the request
         ContextVar by default; async callers that run outside the
         originating request (upstream notification reader thread) pass
-        the captured tenant explicitly.
+        the captured tenant explicitly. ``enforcement`` says whether the
+        proxy could stop what it records (``could_block``) or forwards it
+        regardless (``recorded_only``); every caller names one.
         """
         import time as _time
         if tenant_id is None:
@@ -2020,6 +2033,7 @@ class VaaraMCPProxy:
                 regulatory_domains=action_type.regulatory_domains,
                 policy_id=policy_id,
                 violation_type=violation_type,
+                enforcement=enforcement,
             )
         except Exception:
             logger.exception("Failed to record perimeter audit for %s", tool_name)
@@ -2113,6 +2127,7 @@ class VaaraMCPProxy:
                     decision="allow",
                     reason="upstream announced its tool list changed; re-listing",
                     tenant_id="",
+                    enforcement="recorded_only",
                 )
                 threading.Thread(
                     target=self._refresh_tool_surface, args=(upstream_name,),
@@ -2194,6 +2209,7 @@ class VaaraMCPProxy:
             decision="observed",
             reason="upstream progress notification observed",
             tenant_id=captured_tenant,
+            enforcement="recorded_only",
         )
         self._overt_emit(
             surface="mcp.notification.progress",
@@ -2231,6 +2247,7 @@ class VaaraMCPProxy:
             decision="observed",
             reason="upstream log notification observed",
             tenant_id="",
+            enforcement="recorded_only",
         )
         self._overt_emit(
             surface="mcp.notification.message",

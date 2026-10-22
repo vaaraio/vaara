@@ -113,6 +113,7 @@
           "enabled": true
         }
       },
+      "enforcement": "could_block",
       "cage": {
         "driver": "none",
         "confirmed": false
@@ -133,7 +134,7 @@
       }
     ],
     "previous_hash": "606b928fe94c0af414a95bae1d7433e7da1016a132f0d9aa46b38a4cf0fc3489",
-    "record_hash": "7701dd26b70abacf9c350c8a04f43bb961e63ca3b2432c65d5f532732eb2c925",
+    "record_hash": "48d8e7433845f39b35a8c8182e8d32a64fdbe75ca0b3af70c93912a36a4c347c",
     "system_operation": "decision_threshold",
     "data_usage": "risk_score+thresholds",
     "decision_making": "threshold_match",
