@@ -69,6 +69,7 @@ class EventType(str, Enum):
     AGENT_SEEN = "agent_seen"               # vaara scan --watch saw an agent start
     WITNESS_CONFIGURED = "witness_configured"  # Heads reach a log or a TSA at a stated cadence
     RECORD_ERASED = "record_erased"         # A record's data was erased, its hash kept
+    CAGE_LIFECYCLE = "cage_lifecycle"       # A cage launch started or stopped
 
     # Copies and pickles go through the stored value, so a type this build
     # does not know (see stored_event_type) survives them. Python 3.11+
@@ -111,7 +112,8 @@ def stored_event_type(value: str) -> EventType:
 # append API. Verification reads them back: a REPAIR_GAP naming missing seqs
 # turns a broken chain into declared gaps, an ANCHOR_GAP marks an unwitnessed
 # stretch, KEY_LIFECYCLE is custodian evidence for SOC 2 CC6.2 and CC8.1,
-# RECORD_ERASED accounts for a record whose data was erased (see ERASED_DATA_KEY).
+# RECORD_ERASED accounts for a record whose data was erased (see ERASED_DATA_KEY),
+# CAGE_LIFECYCLE pairs a cage launch's stop with its start.
 SYSTEM_EVENT_TYPES = frozenset({
     EventType.ANCHOR_GAP,
     EventType.REPAIR_GAP,
@@ -120,6 +122,7 @@ SYSTEM_EVENT_TYPES = frozenset({
     EventType.KEY_LIFECYCLE,
     EventType.WITNESS_CONFIGURED,
     EventType.RECORD_ERASED,
+    EventType.CAGE_LIFECYCLE,
 })
 
 # An erased record's stored data is exactly {ERASED_DATA_KEY: {"erasure_record_id": ...}}.
@@ -465,6 +468,11 @@ TRANSPARENCY_DEFAULTS: dict[EventType, dict[str, str]] = {
     EventType.KEY_LIFECYCLE: {
         "system_operation": "key_custodian_management",
         "data_usage": "custodian_fingerprint+quorum",
+        "decision_making": "operator_action",
+    },
+    EventType.CAGE_LIFECYCLE: {
+        "system_operation": "cage_lifecycle",
+        "data_usage": "driver+name+policy_digest+actor",
         "decision_making": "operator_action",
     },
     EventType.DISCLOSURE_RECORDED: {
@@ -2206,6 +2214,99 @@ class AuditTrail:
             tenant_id=tenant_id,
         ))
         return record_id
+
+    _CAGE_LIFECYCLE_ACTIONS = ("started", "stopped")
+
+    def record_cage_lifecycle(
+        self,
+        action: str,
+        driver: str,
+        name: str,
+        *,
+        policy_digest: str = "",
+        actor: str = "",
+        started_record_id: str = "",
+        processes_ended: Optional[int] = None,
+        exit_code: Optional[int] = None,
+        reason: str = "",
+    ) -> str:
+        """Record that a cage launch started or stopped.
+
+        Written by ``vaara cage run`` / ``cage stop`` and by ``vaara run``.
+        A stop names the start it closes in ``started_record_id`` when that
+        start is on this trail (a launch started outside Vaara has none), and
+        says how many processes it ended, the exit code and why
+        (``exited``, ``operator``, ``guard_gone``). A stop may only name a
+        start of the same driver and launch name: the signed-export verifier
+        fails an export where it does not, so the trail refuses to write one.
+
+        Returns:
+            The new record's ``record_id``.
+        """
+        if action not in self._CAGE_LIFECYCLE_ACTIONS:
+            raise ValueError(
+                "record_cage_lifecycle: action must be one of "
+                f"{list(self._CAGE_LIFECYCLE_ACTIONS)}, got {action!r}"
+            )
+        if not driver:
+            raise ValueError("record_cage_lifecycle: driver is required")
+        data: dict = {
+            "action": action,
+            "driver": self._cap_record_str(driver, 64),
+            "name": self._cap_record_str(name or "", self._MAX_AGENT_ID_LEN),
+            "policy_digest": self._cap_record_str(policy_digest, 128),
+            "actor": self._cap_record_str(actor, self._MAX_OVERRIDER_LEN),
+        }
+        if action == "stopped":
+            if started_record_id:
+                with self._lock:
+                    start = next((r for r in self._records
+                                  if r.record_id == started_record_id), None)
+                if (start is None or start.event_type != EventType.CAGE_LIFECYCLE
+                        or (start.data or {}).get("action") != "started"
+                        or (start.data or {}).get("driver") != data["driver"]
+                        or (start.data or {}).get("name") != data["name"]):
+                    raise ValueError(
+                        f"record_cage_lifecycle: {started_record_id!r} is not the start "
+                        f"of {driver}/{name} on this trail"
+                    )
+                data["started_record_id"] = started_record_id
+            if processes_ended is not None:
+                data["processes_ended"] = int(processes_ended)
+            if exit_code is not None:
+                data["exit_code"] = int(exit_code)
+            data["reason"] = self._cap_record_str(reason, self._MAX_DECISION_LABEL_LEN)
+
+        record_id = str(uuid.uuid4())
+        action_id = str(uuid.uuid4())
+        self._append(AuditRecord(
+            record_id=record_id,
+            action_id=action_id,
+            event_type=EventType.CAGE_LIFECYCLE,
+            timestamp=time.time(),
+            agent_id=data["name"] or "vaara",
+            tool_name=f"cage:{data['driver']}",
+            data=data,
+            regulatory_articles=[],
+            tenant_id=self._tenant_for(action_id),
+        ))
+        return record_id
+
+    def open_cage_start(self, driver: str, name: str) -> Optional[str]:
+        """The newest start of ``driver``/``name`` on this trail no stop closes yet."""
+        with self._lock:
+            closed: set = set()
+            for r in reversed(self._records):
+                if r.event_type != EventType.CAGE_LIFECYCLE:
+                    continue
+                data = r.data or {}
+                if data.get("driver") != driver or data.get("name") != name:
+                    continue
+                if data.get("action") == "stopped":
+                    closed.add(data.get("started_record_id"))
+                elif data.get("action") == "started" and r.record_id not in closed:
+                    return r.record_id
+        return None
 
     # ── Querying ──────────────────────────────────────────────────
 

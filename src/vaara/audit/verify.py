@@ -67,6 +67,18 @@ class VerifyResult:
     ``erased_by_index``. The chain is not intact, but not broken either:
     does not affect ``ok``.
     """
+    cage_lifecycle: list[dict] = field(default_factory=list)
+    """Cage launch starts and stops (``vaara cage run`` / ``stop``, ``vaara
+    run``), in chain order. A stop that names a record which is not the start
+    of the same driver and launch, or a start that comes after it, is an
+    error: the trail never writes one, so it was written past the trail.
+    """
+    cage_open: list[dict] = field(default_factory=list)
+    """Starts in this export that no stop closes: still running when the
+    export was taken, or ended without a record. Does not affect ``ok``."""
+    cage_unpaired_stops: list[dict] = field(default_factory=list)
+    """Stops whose start is not in this export (an export of a later range,
+    or a launch started outside Vaara). Does not affect ``ok``."""
 
 
 def _require_crypto() -> None:
@@ -520,6 +532,8 @@ def verify_signed(
             errors.append("could not parse first/last trail record")
 
     lifecycle = _collect_key_lifecycle(lines)
+    cages, cage_open, unpaired, cage_errors = _check_cage_lifecycle(lines)
+    errors.extend(cage_errors)
 
     return VerifyResult(
         ok=not errors,
@@ -527,6 +541,9 @@ def verify_signed(
         manifest=manifest,
         key_lifecycle=lifecycle,
         erased=erased,
+        cage_lifecycle=cages,
+        cage_open=cage_open,
+        cage_unpaired_stops=unpaired,
     )
 
 
@@ -558,3 +575,102 @@ def _collect_key_lifecycle(lines: list[bytes]) -> list[dict]:
             }
         )
     return out
+
+
+def _check_cage_lifecycle(
+    lines: list[bytes],
+) -> tuple[list[dict], list[dict], list[dict], list[str]]:
+    """Pair each cage stop with the start it names.
+
+    Returns ``(records, open_starts, unpaired_stops, errors)``. Ids are read
+    across every record in the export, so a stop naming some other record
+    is told apart from a stop whose start lies outside the export.
+    """
+    index_of: dict[str, int] = {}
+    parsed: list[Optional[dict]] = []
+    for idx, ln in enumerate(lines):
+        try:
+            rec = json.loads(ln)
+        except json.JSONDecodeError:
+            rec = None
+        parsed.append(rec if isinstance(rec, dict) else None)
+        if parsed[-1] is not None and isinstance(parsed[-1].get("record_id"), str):
+            index_of.setdefault(parsed[-1]["record_id"], idx)
+
+    records: list[dict] = []
+    starts: dict[str, dict] = {}
+    closed: set[str] = set()
+    unpaired: list[dict] = []
+    errors: list[str] = []
+    for idx, rec in enumerate(parsed):
+        if rec is None or rec.get("event_type") != "cage_lifecycle":
+            continue
+        data = rec.get("data") or {}
+        entry = {
+            "index": idx,
+            "record_id": rec.get("record_id"),
+            "timestamp": rec.get("timestamp"),
+            "action": data.get("action"),
+            "driver": data.get("driver"),
+            "name": data.get("name"),
+            "policy_digest": data.get("policy_digest", ""),
+            "actor": data.get("actor", ""),
+        }
+        for key in ("started_record_id", "processes_ended", "exit_code", "reason"):
+            if key in data:
+                entry[key] = data[key]
+        records.append(entry)
+        if entry["action"] == "started":
+            starts[str(entry["record_id"])] = entry
+            continue
+        if entry["action"] != "stopped":
+            errors.append(f"cage_lifecycle record {idx}: unknown action {entry['action']!r}")
+            continue
+        sid = data.get("started_record_id")
+        if not sid:
+            unpaired.append(entry)
+            continue
+        at = index_of.get(sid) if isinstance(sid, str) else None
+        if at is None:
+            unpaired.append(entry)
+            continue
+        target = parsed[at] or {}
+        tdata = target.get("data") or {}
+        if (target.get("event_type") != "cage_lifecycle" or tdata.get("action") != "started"
+                or tdata.get("driver") != entry["driver"] or tdata.get("name") != entry["name"]):
+            errors.append(f"cage_lifecycle record {idx}: names record {at}, which is not "
+                          f"the start of {entry['driver']}/{entry['name']}")
+        elif at > idx:
+            errors.append(f"cage_lifecycle record {idx}: a stop written before its start "
+                          f"(record {at})")
+        else:
+            closed.add(sid)
+    cage_open = [e for rid, e in starts.items() if rid not in closed]
+    return records, cage_open, unpaired, errors
+
+
+def describe_cage_lifecycle(result: VerifyResult) -> list[str]:
+    """One plain line per cage start or stop, for the verify commands."""
+    open_ids = {e["record_id"] for e in result.cage_open}
+    unpaired_ids = {e["record_id"] for e in result.cage_unpaired_stops}
+    lines = []
+    for e in result.cage_lifecycle:
+        head = f"record {e['index']} cage {e['driver']}/{e['name']}: {e['action']}"
+        if e["action"] == "started":
+            extra = [f"policy {e['policy_digest']}"] if e.get("policy_digest") else []
+            if e.get("actor"):
+                extra.append(f"by {e['actor']}")
+            line = head + (f" ({', '.join(extra)})" if extra else "")
+            if e["record_id"] in open_ids:
+                line = head + ", no stop in this export" + line[len(head):]
+        else:
+            extra = [str(e.get("reason") or "no reason given")]
+            if e.get("processes_ended") is not None:
+                extra.append(f"{e['processes_ended']} processes ended")
+            if e.get("exit_code") is not None:
+                extra.append(f"exit {e['exit_code']}")
+            line = head + f" ({', '.join(extra)})"
+            if e["record_id"] in unpaired_ids:
+                line += ", start not in this export"
+        lines.append(line)
+    return lines
