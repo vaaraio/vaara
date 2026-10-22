@@ -213,6 +213,27 @@ def test_supported_platforms_names_the_image_and_the_chart_version():
     assert _values()["image"]["repository"] in page
 
 
+def test_tested_operating_systems_each_name_what_ran_and_when():
+    """SUSE Ready asks for the host versions a product was tested on. A row
+    without the code that ran and the day it ran is a support claim, not a
+    test result, so every row carries both."""
+    page = (ROOT / "docs" / "supported-platforms.md").read_text(encoding="utf-8")
+    section = page.split("## Operating systems tested", 1)[1].split("\n## ", 1)[0]
+    rows = [
+        line for line in section.splitlines()
+        if line.startswith("| ") and not line.startswith("| ---")
+    ][1:]
+    assert rows
+    for row in rows:
+        cells = [c.strip() for c in row.strip("|").split("|")]
+        assert len(cells) == 5, row
+        system, python, ran, when, result = cells
+        assert system and python and result, row
+        assert re.fullmatch(r"(\d+\.\d+\.\d+|[0-9a-f]{8})", ran), row
+        assert re.fullmatch(r"\d{4}-\d{2}-\d{2}", when), row
+    assert any(row.startswith("| SUSE Linux Enterprise Server 15 SP6 ") for row in rows)
+
+
 # --- the real thing, when helm is available --------------------------------
 
 

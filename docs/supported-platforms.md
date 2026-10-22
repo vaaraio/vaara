@@ -94,6 +94,27 @@ If the trail lives on a network or virtual filesystem, the better answer is to
 move it. In a container, put it on a named volume rather than a bind mount, so
 it sits on the container runtime's own filesystem with real POSIX locking.
 
+## Operating systems tested
+
+The full test suite has been run on these hosts, with Python and every
+system library taken from the vendor's own repositories. The CI legs on
+Ubuntu, macOS, Windows and Red Hat's UBI 9 are defined in
+`.github/workflows/ci.yml` and are not repeated here.
+
+| System | Python | Vaara | Date | Result |
+| --- | --- | --- | --- | --- |
+| SUSE Linux Enterprise Server 15 SP6 | 3.12.12 (`python312` from the SLE BCI repository) | e9de66ee | 2026-10-22 | 6157 passed, 0 failed |
+
+The SLES 15 SP6 run used SUSE's `registry.suse.com/bci/bci-base:15.6` image,
+packages from the public SLE BCI repository only (Python 3.12, SQLite 3.50.2,
+Node.js 20 for the browser verifier tests), no registration, the suite run
+as a non-root user. `pip install vaara==2.15.0` from PyPI installed and ran on
+the same system. The skipped tests need optional extras or tools that were
+not installed, and every one is on the skip list CI accepts.
+
+A row here is a test run, not an end-to-end deployment; those go in the next
+table.
+
 ## Verified releases
 
 A row here means the listed Vaara version was installed on the listed platform
