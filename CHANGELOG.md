@@ -18,6 +18,9 @@ and this project follows [Semantic Versioning](https://semver.org/spec/v2.0.0.ht
 - `shell_netcat_egress` no longer reads an escape such as `\n` followed by `cat` (in `printf 'id\ncat ...'`) as the tool name. An unquoted `\ncat` at the start of a command still matches, since the shell drops the backslash.
 - `interpreter_network_egress` no longer fires on `urllib.parse` or `urllib.error`, which open no connection. `urllib.request`, `urllib2` and `urllib3` still match.
 
+### Security
+- The `guardrails-ai` extra excludes `litellm==1.107.0`, the release published to PyPI from an attacker-controlled repository on 2026-10-21. PyPI has pulled it; the exclusion keeps mirrors and caches from installing it through Vaara.
+
 ## [2.15.0] - 2026-10-18
 
 ### Added
