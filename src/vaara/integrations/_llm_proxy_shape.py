@@ -22,6 +22,9 @@ _DEFAULT_REDACT_PATTERNS: list[re.Pattern] = [
     re.compile(r"ghp_[a-zA-Z0-9]{36}"),            # GitHub tokens
     re.compile(r"gho_[a-zA-Z0-9]{36}"),            # GitHub oauth
     re.compile(r"ghu_[a-zA-Z0-9]{36}"),            # GitHub user tokens
+    re.compile(r"ghs_[a-zA-Z0-9]{36,}"),           # GitHub app installation
+    re.compile(r"ghr_[a-zA-Z0-9]{36,}"),           # GitHub refresh tokens
+    re.compile(r"github_pat_[a-zA-Z0-9_]{22,}"),   # GitHub fine-grained PATs
     re.compile(r"AKIA[0-9A-Z]{16}"),               # AWS access keys
     re.compile(r"fw_[a-zA-Z0-9]+"),                # Fireworks keys
     re.compile(r"sk-mel-[a-zA-Z0-9]+"),            # Melious keys

@@ -21,6 +21,7 @@ and this project follows [Semantic Versioning](https://semver.org/spec/v2.0.0.ht
 
 ### Security
 - The `guardrails-ai` extra excludes `litellm==1.107.0`, the release published to PyPI from an attacker-controlled repository on 2026-10-21. PyPI has pulled it; the exclusion keeps mirrors and caches from installing it through Vaara.
+- `vaara llm-proxy` redacts GitHub app installation (`ghs_`), refresh (`ghr_`) and fine-grained personal (`github_pat_`) tokens by default, alongside the `ghp_`, `gho_` and `ghu_` shapes it already covered.
 
 ## [2.15.0] - 2026-10-18
 
