@@ -232,6 +232,22 @@ def test_tested_operating_systems_each_name_what_ran_and_when():
         assert re.fullmatch(r"(\d+\.\d+\.\d+|[0-9a-f]{8})", ran), row
         assert re.fullmatch(r"\d{4}-\d{2}-\d{2}", when), row
     assert any(row.startswith("| SUSE Linux Enterprise Server 15 SP6 ") for row in rows)
+    assert any(row.startswith("| Red Hat Enterprise Linux 9.8 ") for row in rows)
+
+
+def test_supported_platforms_lists_rhel_9_and_points_at_the_ubi_image():
+    """Red Hat Partner Validation asks that RHEL be listed as a supported
+    platform in the product's own documentation. The page names RHEL 9, the
+    UBI 9 Containerfile that goes with it, and the Node.js floor a rerun of
+    the suite needs, so a stock RHEL 9 runner does not read as a product
+    fault. OpenShift is not claimed: no cluster run is recorded."""
+    page = (ROOT / "docs" / "supported-platforms.md").read_text(encoding="utf-8")
+    assert "Red Hat Enterprise Linux 9" in page
+    assert "packaging/ubi9/README.md" in page
+    assert (ROOT / "packaging" / "ubi9" / "README.md").is_file()
+    assert "Node.js 20" in page
+    kubernetes = page.split("## Kubernetes", 1)[1].split("\n## ", 1)[0]
+    assert "OpenShift" not in kubernetes
 
 
 # --- the real thing, when helm is available --------------------------------
