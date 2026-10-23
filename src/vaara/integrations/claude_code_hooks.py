@@ -928,11 +928,18 @@ def _handle_escalation(cfg: dict, pipeline, result, tool_name: str,
             human = "timeout"
         if human in ("approve", "deny"):
             resolution = "allow" if human == "approve" else "deny"
+            justification = "human decision via ~/.vaara/approvals"
+            # A v2 decision was signed over these arguments' digest; say so,
+            # so the record shows which call the human answered. A v1
+            # decision (older surfaces) is not bound and says nothing more.
+            bound = getattr(human, "parameters_sha256", None)
+            if bound:
+                justification += f", signed over arguments sha256 {bound}"
             try:
                 pipeline.resolve_escalation(
                     result.action_id, resolution,
                     reviewer="approvals-handshake",
-                    justification="human decision via ~/.vaara/approvals",
+                    justification=justification,
                     # A person wrote the decision file. Only approve and deny
                     # reach here; timeout and an unreadable file both fall
                     # through without resolving, so this branch is the one
