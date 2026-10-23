@@ -367,6 +367,9 @@ def main(argv: list[str] | None = None) -> int:
 
     if ok:
         print("\nVerification: OK")
+        print("  covers: signatures and chain interior; a dropped tail before export "
+              "is not detected without an anchor or seal "
+              "(docs/prove-what-an-ai-agent-did.md)")
         return 0
     print("\nVerification: FAILED", file=sys.stderr)
     for e in errors:

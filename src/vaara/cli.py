@@ -1079,6 +1079,15 @@ def _cmd_trail_export_threshold(args: argparse.Namespace) -> int:
     return 0 if result.chain_intact else 1
 
 
+# What an OK proves and what it cannot: the chain catches an edit, insert or
+# deletion inside the export, not a tail cut before the export was signed.
+_TRAIL_VERIFY_SCOPE = (
+    "  covers: signatures and chain interior; a dropped tail before export "
+    "is not detected without an anchor or seal "
+    "(docs/prove-what-an-ai-agent-did.md)"
+)
+
+
 def _cmd_trail_verify(args: argparse.Namespace) -> int:
     try:
         from vaara.audit.verify import describe_cage_lifecycle, verify_signed
@@ -1126,6 +1135,7 @@ def _cmd_trail_verify(args: argparse.Namespace) -> int:
         print(f"  vaara:        {result.manifest.get('vaara_version')}")
     if result.ok:
         print("Verification: OK")
+        print(_TRAIL_VERIFY_SCOPE)
         for slot in result.erased:
             print(f"  record {slot['index']} ({slot['record_id']}) erased: link verified, "
                   f"content not checkable (erasure record {slot['erased_by_index']})")
