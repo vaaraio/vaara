@@ -188,6 +188,13 @@ eraser's EC P-256 or RSA public key received out of band, to check the
 eraser's signature on every erasure record; with the key given, an unsigned
 or wrongly signed erasure fails the run.
 
+A trail that records cage launches (`vaara cage run`, `vaara cage stop`,
+`vaara run`) is paired the same way `vaara trail verify` pairs it: each stop
+must name the start of the same driver and launch, written earlier in the
+chain, or the run fails. The script lists every start and stop; a start with no
+stop, and a stop whose start is outside the export, are listed and do not fail
+the run.
+
 ## Verifying a Vaara release
 
 This section covers Vaara's own packages. Keys for signing your trails are covered above.

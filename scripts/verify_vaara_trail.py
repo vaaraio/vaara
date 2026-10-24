@@ -17,6 +17,11 @@ A trail that honoured a GDPR Art. 17 erasure (`vaara trail erase`) verifies:
 the erased slot is reported as erased (link verified, content not checkable),
 and --erasure-key checks the eraser's signature on each erasure record.
 
+A trail with cage launches (`vaara cage run`, `vaara cage stop`, `vaara run`)
+is paired: each stop must name the start of the same driver and launch, written
+before it, or the run fails. Starts with no stop and stops whose start is not
+in the export are listed, not failed.
+
 A regulator, auditor, or internal conformity reviewer can copy this one
 file to any machine and run it — the trail zip is entirely self-describing
 (it ships its own public key so you can verify integrity offline), but you
@@ -410,6 +415,120 @@ def _collect_key_lifecycle(zip_path: Path) -> list[dict]:
     return out
 
 
+def _check_cage_lifecycle(
+    lines: list[bytes],
+) -> tuple[list[dict], list[dict], list[dict], list[str]]:
+    """Pair each cage stop with the start it names.
+
+    Returns ``(records, open_starts, unpaired_stops, errors)``. Ids are read
+    across every record in the export, so a stop naming some other record
+    is told apart from a stop whose start lies outside the export. Mirrors
+    ``vaara.audit.verify._check_cage_lifecycle``.
+    """
+    index_of: dict[str, int] = {}
+    parsed: list[dict | None] = []
+    for idx, ln in enumerate(lines):
+        try:
+            rec = json.loads(ln)
+        except json.JSONDecodeError:
+            rec = None
+        parsed.append(rec if isinstance(rec, dict) else None)
+        if parsed[-1] is not None and isinstance(parsed[-1].get("record_id"), str):
+            index_of.setdefault(parsed[-1]["record_id"], idx)
+
+    records: list[dict] = []
+    starts: dict[str, dict] = {}
+    closed: set[str] = set()
+    unpaired: list[dict] = []
+    errors: list[str] = []
+    for idx, rec in enumerate(parsed):
+        if rec is None or rec.get("event_type") != "cage_lifecycle":
+            continue
+        data = rec.get("data") or {}
+        entry = {
+            "index": idx,
+            "record_id": rec.get("record_id"),
+            "timestamp": rec.get("timestamp"),
+            "action": data.get("action"),
+            "driver": data.get("driver"),
+            "name": data.get("name"),
+            "policy_digest": data.get("policy_digest", ""),
+            "actor": data.get("actor", ""),
+        }
+        for key in ("started_record_id", "processes_ended", "exit_code", "reason"):
+            if key in data:
+                entry[key] = data[key]
+        records.append(entry)
+        if entry["action"] == "started":
+            starts[str(entry["record_id"])] = entry
+            continue
+        if entry["action"] != "stopped":
+            errors.append(f"cage_lifecycle record {idx}: unknown action {entry['action']!r}")
+            continue
+        sid = data.get("started_record_id")
+        if not sid:
+            unpaired.append(entry)
+            continue
+        at = index_of.get(sid) if isinstance(sid, str) else None
+        if at is None:
+            unpaired.append(entry)
+            continue
+        target = parsed[at] or {}
+        tdata = target.get("data") or {}
+        if (target.get("event_type") != "cage_lifecycle" or tdata.get("action") != "started"
+                or tdata.get("driver") != entry["driver"] or tdata.get("name") != entry["name"]):
+            errors.append(f"cage_lifecycle record {idx}: names record {at}, which is not "
+                          f"the start of {entry['driver']}/{entry['name']}")
+        elif at > idx:
+            errors.append(f"cage_lifecycle record {idx}: a stop written before its start "
+                          f"(record {at})")
+        else:
+            closed.add(sid)
+    cage_open = [e for rid, e in starts.items() if rid not in closed]
+    return records, cage_open, unpaired, errors
+
+
+def describe_cage_lifecycle(
+    records: list[dict], cage_open: list[dict], unpaired: list[dict],
+) -> list[str]:
+    """One plain line per cage start or stop, as ``vaara trail verify`` prints them."""
+    open_ids = {e["record_id"] for e in cage_open}
+    unpaired_ids = {e["record_id"] for e in unpaired}
+    out = []
+    for e in records:
+        head = f"record {e['index']} cage {e['driver']}/{e['name']}: {e['action']}"
+        if e["action"] == "started":
+            extra = [f"policy {e['policy_digest']}"] if e.get("policy_digest") else []
+            if e.get("actor"):
+                extra.append(f"by {e['actor']}")
+            line = head + (f" ({', '.join(extra)})" if extra else "")
+            if e["record_id"] in open_ids:
+                line = head + ", no stop in this export" + line[len(head):]
+        else:
+            extra = [str(e.get("reason") or "no reason given")]
+            if e.get("processes_ended") is not None:
+                extra.append(f"{e['processes_ended']} processes ended")
+            if e.get("exit_code") is not None:
+                extra.append(f"exit {e['exit_code']}")
+            line = head + f" ({', '.join(extra)})"
+            if e["record_id"] in unpaired_ids:
+                line += ", start not in this export"
+        out.append(line)
+    return out
+
+
+def _collect_cage_lifecycle(zip_path: Path) -> list[str]:
+    """The cage lines for the report, read after a passing verification."""
+    try:
+        with zipfile.ZipFile(zip_path, "r") as zf:
+            trail_bytes = zf.read("trail.jsonl")
+    except (zipfile.BadZipFile, KeyError, FileNotFoundError):
+        return []
+    lines = [ln for ln in trail_bytes.splitlines() if ln.strip()]
+    records, cage_open, unpaired, _ = _check_cage_lifecycle(lines)
+    return describe_cage_lifecycle(records, cage_open, unpaired)
+
+
 def verify(
     zip_path: Path, pubkey_path: Path | None, erasure_key=None,
 ) -> tuple[bool, list[str], dict | None]:
@@ -534,6 +653,8 @@ def verify(
             errors.append(f"record {e['index']}: erasure of "
                           f"{e['erased_record_id']} is {e['state']}")
 
+    errors.extend(_check_cage_lifecycle(lines)[3])
+
     return (not errors), errors, manifest
 
 
@@ -612,6 +733,8 @@ def main(argv: list[str] | None = None) -> int:
             else:
                 who = "eraser not signed"
             print(f"  erasure record {e['index']}: {who}{ground}")
+        for line in _collect_cage_lifecycle(Path(args.zip_path)):
+            print(f"  {line}")
         return 0
     print("\nVerification: FAILED", file=sys.stderr)
     for e in errors:
