@@ -22,6 +22,10 @@ is paired: each stop must name the start of the same driver and launch, written
 before it, or the run fails. Starts with no stop and stops whose start is not
 in the export are listed, not failed.
 
+A trail line or manifest that repeats a member of one object, or holds NaN,
+Infinity or a number that overflows to one, fails the run: two readers could
+read it differently, and the hash covers only one reading.
+
 A regulator, auditor, or internal conformity reviewer can copy this one
 file to any machine and run it — the trail zip is entirely self-describing
 (it ships its own public key so you can verify integrity offline), but you
@@ -36,6 +40,7 @@ from __future__ import annotations
 import argparse
 import hashlib
 import json
+import math
 import sys
 import zipfile
 from pathlib import Path
@@ -56,6 +61,46 @@ except ImportError:
 REQUIRED_FILES = {"trail.jsonl", "manifest.json", "trail.sig"}
 CORE_FILES = {"trail.jsonl", "manifest.json"}
 THRESHOLD_PREFIX = "threshold-"
+
+
+class _Refusal(ValueError):
+    """JSON that two readers could read differently, or that has no canonical form."""
+
+
+def _refuse_repeats(pairs: list[tuple[str, object]]) -> dict:
+    seen: set[str] = set()
+    for key, _ in pairs:
+        if key in seen:
+            raise _Refusal(f'duplicate member "{key}"')
+        seen.add(key)
+    return dict(pairs)
+
+
+def _refuse_constant(name: str) -> None:
+    raise _Refusal(f"non-finite number {name}")
+
+
+def _finite_float(text: str) -> float:
+    value = float(text)
+    if not math.isfinite(value):
+        raise _Refusal(f"non-finite number {text}")
+    return value
+
+
+def _loads(raw: bytes | str):
+    """``json.loads`` that refuses a repeated member and a non-finite number.
+
+    A member repeated in one object reads as its last value to Python and its
+    first to a first-wins parser, and the hash is over only one of them. NaN,
+    Infinity and a literal that overflows to one cannot be re-encoded for the
+    hash at all. Both are refused as ``_Refusal`` wherever the file is read,
+    mirroring ``vaara.audit.verify._loads``.
+    """
+    return json.loads(raw, object_pairs_hook=_refuse_repeats,
+                      parse_constant=_refuse_constant, parse_float=_finite_float)
+
+
+_UNREADABLE = (json.JSONDecodeError, _Refusal)
 
 
 def _load_pubkey(data: bytes) -> Ed25519PublicKey:
@@ -311,9 +356,11 @@ def _verify_chain(trail_bytes: bytes) -> tuple[str | None, list[dict]]:
     prev_hash = ""
     for idx, raw in enumerate(ln for ln in trail_bytes.splitlines() if ln.strip()):
         try:
-            rec = json.loads(raw)
+            rec = _loads(raw)
         except json.JSONDecodeError as e:
             return f"record {idx}: malformed JSON ({e})", []
+        except _Refusal as e:
+            return f"record {idx}: {e}", []
         if rec.get("previous_hash", "") != prev_hash:
             return f"record {idx}: previous_hash mismatch", []
         content = {
@@ -364,8 +411,8 @@ def _trail_records(trail_bytes: bytes) -> list[dict]:
     out: list[dict] = []
     for raw in (ln for ln in trail_bytes.splitlines() if ln.strip()):
         try:
-            out.append(json.loads(raw))
-        except json.JSONDecodeError:
+            out.append(_loads(raw))
+        except _UNREADABLE:
             out.append({})
     return out
 
@@ -399,8 +446,8 @@ def _collect_key_lifecycle(zip_path: Path) -> list[dict]:
         return out
     for raw in (ln for ln in trail_bytes.splitlines() if ln.strip()):
         try:
-            rec = json.loads(raw)
-        except json.JSONDecodeError:
+            rec = _loads(raw)
+        except _UNREADABLE:
             continue
         if rec.get("event_type") != "key_lifecycle":
             continue
@@ -429,8 +476,8 @@ def _check_cage_lifecycle(
     parsed: list[dict | None] = []
     for idx, ln in enumerate(lines):
         try:
-            rec = json.loads(ln)
-        except json.JSONDecodeError:
+            rec = _loads(ln)
+        except _UNREADABLE:
             rec = None
         parsed.append(rec if isinstance(rec, dict) else None)
         if parsed[-1] is not None and isinstance(parsed[-1].get("record_id"), str):
@@ -563,9 +610,11 @@ def verify(
         return False, [f"corrupt zip: {e}"], None
 
     try:
-        manifest = json.loads(manifest_bytes)
+        manifest = _loads(manifest_bytes)
     except json.JSONDecodeError as e:
         return False, [f"manifest.json invalid JSON: {e}"], None
+    except _Refusal as e:
+        return False, [f"manifest.json: {e}"], None
 
     if manifest.get("schema_version") != "1":
         errors.append(f"unsupported schema_version: {manifest.get('schema_version')!r}")
@@ -638,13 +687,13 @@ def verify(
         )
     if lines:
         try:
-            first = json.loads(lines[0]).get("record_hash", "")
-            last = json.loads(lines[-1]).get("record_hash", "")
+            first = _loads(lines[0]).get("record_hash", "")
+            last = _loads(lines[-1]).get("record_hash", "")
             if manifest.get("first_hash") != first:
                 errors.append("first_hash mismatch")
             if manifest.get("last_hash") != last:
                 errors.append("last_hash mismatch")
-        except json.JSONDecodeError:
+        except _UNREADABLE:
             errors.append("could not parse first/last record")
 
     for e in check_erasures(_trail_records(trail_bytes), erasure_key):
