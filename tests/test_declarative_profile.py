@@ -263,6 +263,73 @@ def test_ap2_payment_receipt_recognized_end_to_end():
     assert "signature" in ev["missing"]          # JWS lives in the envelope, not the claims
 
 
+def _toolhive_line(**over):
+    # The sample audit line from ToolHive's logging guide: one JSON object per
+    # line, written by the MCP proxy at its custom AUDIT level.
+    line = {
+        "time": "2024-01-01T12:00:00.123456789Z",
+        "level": "AUDIT",
+        "msg": "audit_event",
+        "audit_id": "550e8400-e29b-41d4-a716-446655440000",
+        "type": "mcp_tool_call",
+        "logged_at": "2024-01-01T12:00:00.123456Z",
+        "outcome": "success",
+        "component": "github-server",
+        "source": {"type": "network", "value": "10.0.1.5"},
+        "subjects": {"user": "john.doe@example.com", "user_id": "user-123"},
+        "target": {"endpoint": "/messages", "method": "tools/call",
+                   "name": "search_issues", "type": "tool"},
+    }
+    line.update(over)
+    return line
+
+
+def test_toolhive_audit_event_recognized_end_to_end():
+    # The line names who, what, where and when with an outcome, and signs
+    # nothing: custody starts when Vaara seals it, so the gap report keeps every
+    # signed-record field in `missing` and the profile promotes none.
+    doc = _toolhive_line()
+    assert detect_format(doc) == "toolhive-audit-event"
+    ev = normalize(doc).to_dict()
+    assert ev["recognized"] is True
+    assert ev["evidencePlane"] == "outcome"      # the proxy's record of what happened
+    assert ev["advisory"] == {
+        "auditId": "550e8400-e29b-41d4-a716-446655440000",
+        "eventType": "mcp_tool_call",
+        "loggedAt": "2024-01-01T12:00:00.123456Z",
+        "outcome": "success",
+        "component": "github-server",
+        "subjects": {"user": "john.doe@example.com", "user_id": "user-123"},
+        "target": {"endpoint": "/messages", "method": "tools/call",
+                   "name": "search_issues", "type": "tool"},
+    }
+    assert ev["sep2828"] == {}                   # nothing signed to lift
+    assert ev["missing"] == ["alg", "signature", "backLink", "receiptAsserted",
+                             "outcomeDerived"]
+    assert any("ingest" in note for note in ev["notes"])   # custody starts at ingestion
+
+
+def test_toolhive_outcome_is_advisory_not_a_derived_outcome():
+    # A denied or errored line stays the producer's word: it is lifted as
+    # advisory and never becomes outcomeDerived.
+    ev = normalize(_toolhive_line(outcome="denied")).to_dict()
+    assert ev["advisory"]["outcome"] == "denied"
+    assert "outcomeDerived" not in ev["sep2828"]
+    assert "outcomeDerived" in ev["missing"]
+
+
+def test_toolhive_does_not_claim_an_ordinary_log_line():
+    # An application log line from the same process shares the stream but is not
+    # an audit event, even if it happens to carry an audit_id.
+    assert detect_format(_toolhive_line(msg="request handled")) != "toolhive-audit-event"
+
+
+def test_toolhive_needs_an_audit_id():
+    line = _toolhive_line()
+    del line["audit_id"]
+    assert detect_format(line) != "toolhive-audit-event"
+
+
 def test_ap2_checkout_receipt_not_claimed_as_payment_receipt():
     # An AP2 checkout receipt carries reference + status but order_id, not
     # payment_id, so the payment-receipt profile must not claim it.

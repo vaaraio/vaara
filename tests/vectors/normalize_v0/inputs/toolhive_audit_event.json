@@ -1,0 +1,33 @@
+{
+  "time": "2024-01-01T12:00:00.123456789Z",
+  "level": "AUDIT",
+  "msg": "audit_event",
+  "audit_id": "550e8400-e29b-41d4-a716-446655440000",
+  "type": "mcp_tool_call",
+  "logged_at": "2024-01-01T12:00:00.123456Z",
+  "outcome": "success",
+  "component": "github-server",
+  "source": {
+    "type": "network",
+    "value": "10.0.1.5",
+    "extra": {
+      "user_agent": "node"
+    }
+  },
+  "subjects": {
+    "user": "john.doe@example.com",
+    "user_id": "user-123"
+  },
+  "target": {
+    "endpoint": "/messages",
+    "method": "tools/call",
+    "name": "search_issues",
+    "type": "tool"
+  },
+  "metadata": {
+    "extra": {
+      "duration_ms": 245,
+      "transport": "http"
+    }
+  }
+}

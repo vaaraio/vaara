@@ -16,10 +16,11 @@
     "sep2817_multiturn",
     "sep2817_single",
     "slsa_provenance",
+    "toolhive_audit_event",
     "unknown",
     "x402_settlement"
   ],
-  "corpusDigest": "sha256:a66e79b097bfae6539a5ad7b6c69cd0d9e9059c3253e970b144555fe947c94a4",
+  "corpusDigest": "sha256:d7977957ba38a9de4b6ce5da93fbb6ec2009eb36f42889c3b5090cf02a82f74b",
   "fixed": {
     "iat": "2026-06-23T00:00:00Z",
     "iss": "did:web:vaara.io",
@@ -87,6 +88,10 @@
     "slsa_provenance": {
       "evidenceDigest": "sha256:076f80f21fa99726c8d4c9aaaf86da07634d4c70c868c0e3e2a6aa3f5a5ec53d",
       "signature": "3f980f9cb80d07a44a901ca452c956cd2347c9ea33bb4f79f36f5ae52603c003"
+    },
+    "toolhive_audit_event": {
+      "evidenceDigest": "sha256:1b95271343bddcb9fc33c78b1948dd128f6cd16650a89e8e9bb3286598c19231",
+      "signature": "e2ec3ee0fc134ae31bd77507ebac18d47723e45f7c333ce2fac7daa89e4e65f0"
     },
     "unknown": {
       "evidenceDigest": "sha256:51699f76cdeb6fbedf45041ff60720aeaa3a74fe8c846b31990485897638ee69",
