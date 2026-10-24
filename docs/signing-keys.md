@@ -181,6 +181,13 @@ python scripts/verify_vaara_trail.py signed.zip --pubkey signer.pem
 The script in `scripts/verify_vaara_trail.py` depends only on the
 standard library and the `cryptography` package. Copy it to any machine.
 
+A trail that honoured an erasure request (`vaara trail erase`) verifies the
+same way. The script lists each erased slot (link verified, content not
+checkable) and each erasure record. Pass `--erasure-key eraser.pub.pem`, the
+eraser's EC P-256 or RSA public key received out of band, to check the
+eraser's signature on every erasure record; with the key given, an unsigned
+or wrongly signed erasure fails the run.
+
 ## Verifying a Vaara release
 
 This section covers Vaara's own packages. Keys for signing your trails are covered above.
