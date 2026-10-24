@@ -29,6 +29,7 @@ Each input is a verbatim or near-verbatim example from the source spec.
 | `x402_settlement.json` | x402 settlement response (declarative profile) | outcome | nothing required (advisory) |
 | `ap2_payment_receipt.json` | AP2 payment receipt (declarative profile) | outcome | nothing required (advisory) |
 | `caep_security_event.json` | OpenID CAEP Security Event Token (declarative profile) | decision-input | nothing required (advisory) |
+| `toolhive_audit_event.json` | ToolHive audit event log line, the sample from its logging guide (declarative profile) | outcome | nothing required (advisory) |
 | `attested_agent_payment.json` | attested agent payment Authorization Scope (declarative profile) | decision-input | nothing required (advisory) |
 | `attested_agent_payment_no_expiry.json` | the same scope with `expiry` dropped | n/a | nothing (not recognized) |
 | `attested_agent_payment_aggregate_no_executor.json` | an aggregate bound with no `executor` | decision-input | nothing required (advisory) |
