@@ -529,6 +529,33 @@ def _verify_threshold(
     return errors
 
 
+def _check_revocation_registry(manifest: dict,
+                               revocation_bytes: Optional[bytes]) -> list[str]:
+    """The optional revocation registry against the digest the manifest pins.
+
+    The manifest is signed, so ``revocation.json`` matching
+    ``manifest.revocation.registry_sha256`` confirms the revocation state in
+    the bundle is the one the signer attested. Same three findings, same
+    wording, as ``scripts/verify_vaara_trail.py``.
+    """
+    block = manifest.get("revocation")
+    if block is None and revocation_bytes is None:
+        return []
+    if block is not None and not isinstance(block, dict):
+        return ["manifest revocation block is not an object"]
+    if block is None:
+        return ["revocation.json present but manifest has no revocation block"]
+    if revocation_bytes is None:
+        return ["manifest declares revocation but revocation.json is missing"]
+    actual = "sha256:" + hashlib.sha256(revocation_bytes).hexdigest()
+    if block.get("registry_sha256") != actual:
+        return [
+            "revocation.json digest does not match "
+            "manifest.revocation.registry_sha256 (tampered)"
+        ]
+    return []
+
+
 def verify_signed(
     zip_path: Union[str, Path],
     public_key: Optional[Union[str, Path, bytes, "_PK"]] = None,
@@ -543,11 +570,15 @@ def verify_signed(
     2. Manifest parses as JSON and has the expected schema version.
     3. ``manifest.trail_sha256`` matches the actual SHA-256 of
        ``trail.jsonl``.
-    4. Ed25519 signature over ``sha256(trail.jsonl || manifest.json)``
+    4. ``revocation.json`` and the manifest's ``revocation`` block go
+       together, and the file's SHA-256 matches
+       ``manifest.revocation.registry_sha256`` (an export that pins no
+       registry has neither).
+    5. Ed25519 signature over ``sha256(trail.jsonl || manifest.json)``
        verifies under ``public_key`` (if given) or the embedded
        ``signer_pubkey.pem``.
-    5. The hash chain re-verifies from the exported bytes.
-    6. Manifest endpoints (``first_hash``, ``last_hash``, ``record_count``)
+    6. The hash chain re-verifies from the exported bytes.
+    7. Manifest endpoints (``first_hash``, ``last_hash``, ``record_count``)
        match the exported JSONL.
 
     Args:
@@ -596,6 +627,9 @@ def verify_signed(
                 if "signer_pubkey.bin" in names
                 else None
             )
+            revocation_bytes = (
+                zf.read("revocation.json") if "revocation.json" in names else None
+            )
             for name in names:
                 if name.startswith("sigs/") and name.endswith(".sig"):
                     threshold_sigs[name[len("sigs/"):-len(".sig")]] = zf.read(name)
@@ -624,6 +658,8 @@ def verify_signed(
             "trail.jsonl SHA-256 does not match manifest.trail_sha256 "
             "(trail was tampered after export)"
         )
+
+    errors.extend(_check_revocation_registry(manifest, revocation_bytes))
 
     algorithm = manifest.get("signature_algorithm", "Ed25519")
     to_verify = hashlib.sha256(trail_bytes + manifest_bytes).digest()
