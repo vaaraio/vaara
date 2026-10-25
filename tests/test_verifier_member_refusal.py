@@ -10,6 +10,12 @@ with no FAILED listing. `scripts/verify_vaara_trail.py` and
 `record N: duplicate member "x"` and `record N: non-finite number NaN`, so
 "an independent party reproduces every verdict offline" keeps holding for a
 file only the signer could have written.
+
+A trail line or manifest that parses but is not a JSON object (`[1]`, `7`,
+`"x"`, `null`) used to end in an AttributeError at the first `.get`, with no
+FAILED listing. Both verifiers now fail the run as `record N: not a JSON
+object` and `manifest.json: not a JSON object`, and read a special record
+whose `data` is not an object as they read empty data.
 """
 from __future__ import annotations
 
@@ -51,13 +57,16 @@ def _hash(content: dict) -> str:
     return hashlib.sha256(canonical.encode()).hexdigest()
 
 
-def _records(count: int, data: dict[int, dict] | None = None) -> list[dict]:
-    """A valid chain of `count` records; `data` sets a record's data by index."""
+def _records(count: int, data: dict[int, object] | None = None,
+             event_types: dict[int, str] | None = None) -> list[dict]:
+    """A valid chain of `count` records; `data` and `event_types` set a record's
+    data and event type by index."""
     out: list[dict] = []
     prev = ""
     for i in range(count):
         content = {
-            "record_id": f"r{i}", "action_id": f"a{i}", "event_type": "x",
+            "record_id": f"r{i}", "action_id": f"a{i}",
+            "event_type": (event_types or {}).get(i, "x"),
             "timestamp": 1760000000.0 + i, "agent_id": "ag", "tool_name": "T",
             "data": (data or {}).get(i, {}), "regulatory_articles": [],
             "previous_hash": prev,
@@ -197,6 +206,141 @@ def test_both_verifiers_refuse_a_hostile_manifest(tmp_path: Path, fn, refusal: s
     assert not result.ok and not ok
     assert result.errors == [refusal]
     assert script_errors == [refusal]
+
+
+# --- JSON that parses but is not an object ---------------------------------------
+
+_NOT_OBJECTS = {
+    "an array": "[1]",
+    "an empty array": "[]",
+    "a number": "7",
+    "a string": '"x"',
+    "null": "null",
+    "a boolean": "true",
+}
+
+
+def _not_an_object_line(tmp_path: Path, text: str, index: int) -> Path:
+    return _export(tmp_path, _records(3), mutate={index: lambda _old: text})
+
+
+@pytest.mark.parametrize("text", list(_NOT_OBJECTS.values()), ids=list(_NOT_OBJECTS))
+def test_the_script_fails_a_trail_line_that_is_not_an_object(tmp_path: Path, text: str):
+    run = _run(_not_an_object_line(tmp_path, text, 1))
+
+    assert run.returncode == 1, run.stdout
+    assert "Verification: FAILED" in run.stderr
+    assert "hash chain check failed: record 1: not a JSON object" in run.stderr
+    assert "Traceback" not in run.stderr
+    assert "Verification: OK" not in run.stdout
+
+
+@pytest.mark.parametrize("index", [0, 1, 2], ids=["first", "middle", "last"])
+@pytest.mark.parametrize("text", ["[1]", "null"], ids=["an array", "null"])
+def test_both_verifiers_fail_a_non_object_line_wherever_it_sits(
+        tmp_path: Path, text: str, index: int):
+    zp = _not_an_object_line(tmp_path, text, index)
+    refusal = f"hash chain check failed: record {index}: not a JSON object"
+
+    run = _run(zp)
+    result = lib.verify_signed(zp)
+    ok, script_errors, _ = script.verify(zp, None)
+
+    assert run.returncode == 1
+    assert "Traceback" not in run.stderr
+    assert not result.ok and not ok
+    assert refusal in result.errors
+    assert refusal in script_errors
+
+
+@pytest.mark.parametrize("text", list(_NOT_OBJECTS.values()), ids=list(_NOT_OBJECTS))
+def test_a_non_object_line_does_not_stop_the_other_readers(tmp_path: Path, text: str):
+    zp = _not_an_object_line(tmp_path, text, 1)
+
+    run = _run(zp)
+
+    assert run.returncode == 1
+    assert "Traceback" not in run.stderr
+    assert [e["index"] for e in script._collect_erasures(zp, None)[1]] == []
+    assert script._collect_key_lifecycle(zp) == []
+    assert script._collect_cage_lifecycle(zp) == []
+
+
+@pytest.mark.parametrize("text", list(_NOT_OBJECTS.values()), ids=list(_NOT_OBJECTS))
+def test_both_verifiers_refuse_a_manifest_that_is_not_an_object(tmp_path: Path, text: str):
+    refusal = "manifest.json: not a JSON object"
+    zp = _export(tmp_path, _records(3), mutate_manifest=lambda _old: text)
+
+    run = _run(zp)
+    result = lib.verify_signed(zp)
+    ok, script_errors, manifest = script.verify(zp, None)
+
+    assert run.returncode == 1
+    assert refusal in run.stderr
+    assert "Traceback" not in run.stderr
+    assert not result.ok and not ok
+    assert result.errors == [refusal]
+    assert script_errors == [refusal]
+    assert result.manifest is None and manifest is None
+
+
+@pytest.mark.parametrize("value", ["1", "[1]", "null", "true", '{"a":1}'],
+                         ids=["a number", "an array", "null", "a boolean", "an object"])
+def test_both_verifiers_fail_a_signature_algorithm_that_is_not_a_string(
+        tmp_path: Path, value: str):
+    refusal = f"unknown signature_algorithm: {json.loads(value)!r}"
+    zp = _export(tmp_path, _records(3), mutate_manifest=_swap(
+        '"signature_algorithm":"Ed25519"', f'"signature_algorithm":{value}'))
+
+    run = _run(zp)
+    result = lib.verify_signed(zp)
+    ok, script_errors, _ = script.verify(zp, None)
+
+    assert run.returncode == 1
+    assert "Traceback" not in run.stderr
+    assert not result.ok and not ok
+    assert refusal in result.errors
+    assert refusal in script_errors
+
+
+@pytest.mark.parametrize("value", ["1", '"x"', "[1]", "true"],
+                         ids=["a number", "a string", "an array", "a boolean"])
+def test_the_script_fails_a_revocation_block_that_is_not_an_object(tmp_path: Path, value: str):
+    refusal = "manifest revocation block is not an object"
+    zp = _export(tmp_path, _records(3), mutate_manifest=_swap(
+        '"signature_algorithm":"Ed25519"',
+        f'"signature_algorithm":"Ed25519","revocation":{value}'))
+    with zipfile.ZipFile(zp, "a") as zf:
+        zf.writestr("revocation.json", b"{}")
+
+    run = _run(zp)
+    ok, script_errors, _ = script.verify(zp, None)
+
+    assert run.returncode == 1
+    assert "Traceback" not in run.stderr
+    assert not ok
+    assert refusal in script_errors
+    lib.verify_signed(zp)  # must not raise
+
+
+@pytest.mark.parametrize("bad", ['"x"', "[1]", "7"], ids=["a string", "an array", "a number"])
+@pytest.mark.parametrize("event_type", ["record_erased", "key_lifecycle", "cage_lifecycle"])
+def test_a_special_record_whose_data_is_not_an_object_reads_like_empty_data(
+        tmp_path: Path, event_type: str, bad: str):
+    hostile = _export(tmp_path, _records(3, {1: json.loads(bad)}, {1: event_type}))
+    empty_dir = tmp_path / "empty"
+    empty_dir.mkdir()
+    empty = _export(empty_dir, _records(3, {1: {}}, {1: event_type}))
+
+    run = _run(hostile)
+    result = lib.verify_signed(hostile)
+    ok, script_errors, _ = script.verify(hostile, None)
+
+    assert "Traceback" not in run.stderr
+    assert run.returncode == (0 if lib.verify_signed(empty).ok else 1)
+    assert result.errors == lib.verify_signed(empty).errors
+    assert script_errors == script.verify(empty, None)[1] == result.errors
+    assert ok == result.ok
 
 
 # --- what must not change --------------------------------------------------------

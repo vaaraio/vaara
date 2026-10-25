@@ -68,20 +68,32 @@ def _finite_float(text: str) -> float:
     return value
 
 
-def _loads(raw: Union[bytes, str]):
-    """``json.loads`` that refuses a repeated member and a non-finite number.
+def _loads(raw: Union[bytes, str]) -> dict:
+    """``json.loads`` for a trail line or the manifest: a JSON object, or a refusal.
 
     A member repeated in one object reads as its last value to Python and its
     first to a first-wins parser, and the hash is over only one of them. NaN,
     Infinity and a literal that overflows to one cannot be re-encoded for the
-    hash at all. Both are refused as ``_Refusal`` wherever the export is read.
-    Mirrored in ``scripts/verify_vaara_trail.py``.
+    hash at all. A line that parses to an array, number, string, boolean or
+    null is no record: it has no members to read. All are refused as
+    ``_Refusal`` wherever the export is read. Mirrored in
+    ``scripts/verify_vaara_trail.py``.
     """
-    return json.loads(raw, object_pairs_hook=_refuse_repeats,
-                      parse_constant=_refuse_constant, parse_float=_finite_float)
+    value = json.loads(raw, object_pairs_hook=_refuse_repeats,
+                       parse_constant=_refuse_constant, parse_float=_finite_float)
+    if not isinstance(value, dict):
+        raise _Refusal("not a JSON object")
+    return value
 
 
 _UNREADABLE = (json.JSONDecodeError, _Refusal)
+
+
+def _data_of(rec: dict) -> dict:
+    """A record's ``data`` when it is an object, else empty. The hash covers
+    whatever is there, so a reader that wants fields cannot trust its shape."""
+    data = rec.get("data")
+    return data if isinstance(data, dict) else {}
 
 
 @dataclass
@@ -309,7 +321,7 @@ def check_erasures(records: list[dict], public_key: Optional[object] = None) -> 
     for index, rec in enumerate(records):
         if rec.get("event_type") != "record_erased":
             continue
-        data = rec.get("data") if isinstance(rec.get("data"), dict) else {}
+        data = _data_of(rec)
         out.append({
             "index": index,
             "erasure_record_id": rec.get("record_id"),
@@ -377,7 +389,7 @@ def _verify_chain_bytes(trail_bytes: bytes) -> tuple[Optional[str], list[dict]]:
                 return f"record {idx}: hash mismatch (record tampered)", []
             held.append((idx, rec))
         if rec.get("event_type") == "record_erased":
-            data = rec.get("data") or {}
+            data = _data_of(rec)
             rid, rhash = data.get("erased_record_id"), data.get("erased_record_hash")
             if isinstance(rid, str) and isinstance(rhash, str):
                 erasures.setdefault((rid, rhash), idx)
@@ -616,7 +628,7 @@ def verify_signed(
     algorithm = manifest.get("signature_algorithm", "Ed25519")
     to_verify = hashlib.sha256(trail_bytes + manifest_bytes).digest()
 
-    if algorithm.startswith(_THRESHOLD_PREFIX):
+    if isinstance(algorithm, str) and algorithm.startswith(_THRESHOLD_PREFIX):
         # A caller-supplied key pins authenticity: it must be one of the
         # members that signed, else the threshold set is attacker-chosen.
         pinned_fp: Optional[str] = None
@@ -780,7 +792,7 @@ def _collect_key_lifecycle(lines: list[bytes]) -> list[dict]:
             continue
         if rec.get("event_type") != "key_lifecycle":
             continue
-        data = rec.get("data", {}) or {}
+        data = _data_of(rec)
         out.append(
             {
                 "timestamp": rec.get("timestamp"),
@@ -811,9 +823,9 @@ def _check_cage_lifecycle(
             rec = _loads(ln)
         except _UNREADABLE:
             rec = None
-        parsed.append(rec if isinstance(rec, dict) else None)
-        if parsed[-1] is not None and isinstance(parsed[-1].get("record_id"), str):
-            index_of.setdefault(parsed[-1]["record_id"], idx)
+        parsed.append(rec)
+        if rec is not None and isinstance(rec.get("record_id"), str):
+            index_of.setdefault(rec["record_id"], idx)
 
     records: list[dict] = []
     starts: dict[str, dict] = {}
@@ -823,7 +835,7 @@ def _check_cage_lifecycle(
     for idx, rec in enumerate(parsed):
         if rec is None or rec.get("event_type") != "cage_lifecycle":
             continue
-        data = rec.get("data") or {}
+        data = _data_of(rec)
         entry = {
             "index": idx,
             "record_id": rec.get("record_id"),
@@ -853,7 +865,7 @@ def _check_cage_lifecycle(
             unpaired.append(entry)
             continue
         target = parsed[at] or {}
-        tdata = target.get("data") or {}
+        tdata = _data_of(target)
         if (target.get("event_type") != "cage_lifecycle" or tdata.get("action") != "started"
                 or tdata.get("driver") != entry["driver"] or tdata.get("name") != entry["name"]):
             errors.append(f"cage_lifecycle record {idx}: names record {at}, which is not "

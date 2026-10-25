@@ -202,6 +202,11 @@ first to another, and the hash covers only one of them, so the run fails with
 `record N: duplicate member "x"` or `record N: non-finite number NaN` instead of
 passing on one reading. A manifest fails as `manifest.json: ...`.
 
+A trail line or manifest that is valid JSON but not an object (`[1]`, `7`,
+`"x"`, `null`) also fails the run, as `record N: not a JSON object` or
+`manifest.json: not a JSON object`. It used to stop the verifier with a Python
+error and no verdict.
+
 ## Verifying a Vaara release
 
 This section covers Vaara's own packages. Keys for signing your trails are covered above.
