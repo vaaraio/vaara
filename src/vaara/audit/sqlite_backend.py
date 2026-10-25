@@ -306,13 +306,6 @@ CREATE INDEX IF NOT EXISTS idx_tenant_id   ON audit_records(tenant_id);
 -- so it fails the write instead (_constrain_seq).
 CREATE UNIQUE INDEX IF NOT EXISTS idx_seq  ON audit_records(seq);
 
--- GDPR Article 17 (Right to Erasure) redaction table.
-CREATE TABLE IF NOT EXISTS gdpr_redactions (
-    original_id  TEXT PRIMARY KEY,
-    replacement  TEXT NOT NULL DEFAULT '[REDACTED:GDPR-Art17]',
-    redacted_at  REAL NOT NULL
-);
-
 -- Pending outcomes for cross-process tracking (v1.57.3).
 -- Allows vaara outcome to work across separate processes.
 CREATE TABLE IF NOT EXISTS pending_outcomes (
@@ -332,11 +325,6 @@ _MIGRATIONS: dict[int, str] = {
     1: """
     ALTER TABLE audit_records ADD COLUMN tenant_id TEXT NOT NULL DEFAULT '';
     CREATE INDEX IF NOT EXISTS idx_tenant_id ON audit_records(tenant_id);
-    CREATE TABLE IF NOT EXISTS gdpr_redactions (
-        original_id  TEXT PRIMARY KEY,
-        replacement  TEXT NOT NULL DEFAULT '[REDACTED:GDPR-Art17]',
-        redacted_at  REAL NOT NULL
-    );
     """,
     # v2 to v3: prEN ISO/IEC 12792 transparency taxonomy (item 1, v0.6).
     # Nullable columns. Pre-v0.6 records get NULL — their stored
@@ -451,7 +439,7 @@ _SALVAGE_CHUNK = 256
 
 #: Tables besides ``audit_records`` carried over by a salvage. ``audit_meta``
 #: is not among them: the fresh file writes its own schema version.
-_SALVAGE_SIDE_TABLES = ("gdpr_redactions", "pending_outcomes")
+_SALVAGE_SIDE_TABLES = ("pending_outcomes",)
 
 
 def _integrity_problem(conn: sqlite3.Connection) -> Optional[str]:
@@ -876,7 +864,7 @@ class SQLiteAuditBackend:
         self._open()
 
     def _open(self) -> None:
-        """Connect, set pragmas, bring the schema current, load redactions.
+        """Connect, set pragmas, bring the schema current.
 
         Split out of ``__init__`` so ``repair`` can reopen the file it swapped
         in through exactly the path a fresh start takes.
@@ -913,7 +901,6 @@ class SQLiteAuditBackend:
                 "evidence."
             ) from exc
         self._init_schema()
-        # Load GDPR redaction map into memory for O(1) read-time substitution.
         self._inode = self._current_inode()
 
     def _current_inode(self) -> Optional[tuple[int, int]]:
@@ -1907,7 +1894,7 @@ class SQLiteAuditBackend:
     # ── Internal ──────────────────────────────────────────────────
 
     def _row_to_record(self, row: tuple) -> AuditRecord:
-        """Convert a database row to an AuditRecord, applying GDPR redactions.
+        """Convert a database row to an AuditRecord.
 
         Column layout (schema v4):
           row[0..9]  record_id, action_id, event_type, timestamp, agent_id,

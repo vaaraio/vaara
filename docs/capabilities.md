@@ -105,7 +105,7 @@ Provider, and S3P, a safety-violation-rate measurement an auditor can reproduce.
 - DORA Articles 9, 10 and 13: event-to-article mappings in `audit/trail.py`, `compliance/engine.py`
 - SOC 2 Trust Services Criteria CC6.1 to CC6.3, CC7.2, CC7.3 and CC8.1: event-to-criterion mappings in `audit/trail.py`, `compliance/engine.py`, `docs/COMPLIANCE.md`
 - GDPR Chapter V, data locality and transfers: `attestation/data_locality.py`, `data_locality_v0`
-- GDPR Article 17, erasure: read-time redaction in `audit/sqlite_backend.py`
+- GDPR Article 17, erasure: `audit/erase.py`, `vaara trail erase` (one record's data in the trail; the hash stays and a `record_erased` record names it; the eraser can sign it and `vaara trail verify --erasure-key` checks that; receipts, the review queue and earlier exports are not reached)
 - eIDAS 2.0 qualified electronic ledger profile: `docs/eidas-qel-profile.md`
 - prEN ISO/IEC 12792 transparency taxonomy: per-record tagging in `audit/trail.py`
 - W3C PROV-DM and PROV-JSON export: `audit/prov_export.py`, `vaara trail export-prov`
