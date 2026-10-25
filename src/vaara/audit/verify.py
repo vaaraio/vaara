@@ -13,6 +13,7 @@ from __future__ import annotations
 import hashlib
 import json
 import logging
+import math
 import zipfile
 from dataclasses import dataclass, field
 from pathlib import Path
@@ -41,6 +42,58 @@ _INSTALL_HINT = (
     "Install with: pip install 'vaara[export]' (or 'pip install cryptography' "
     "if using the standalone verifier script)."
 )
+
+
+class _Refusal(ValueError):
+    """JSON that two readers could read differently, or that has no canonical form."""
+
+
+def _refuse_repeats(pairs: list[tuple[str, object]]) -> dict:
+    seen: set[str] = set()
+    for key, _ in pairs:
+        if key in seen:
+            raise _Refusal(f'duplicate member "{key}"')
+        seen.add(key)
+    return dict(pairs)
+
+
+def _refuse_constant(name: str) -> None:
+    raise _Refusal(f"non-finite number {name}")
+
+
+def _finite_float(text: str) -> float:
+    value = float(text)
+    if not math.isfinite(value):
+        raise _Refusal(f"non-finite number {text}")
+    return value
+
+
+def _loads(raw: Union[bytes, str]) -> dict:
+    """``json.loads`` for a trail line or the manifest: a JSON object, or a refusal.
+
+    A member repeated in one object reads as its last value to Python and its
+    first to a first-wins parser, and the hash is over only one of them. NaN,
+    Infinity and a literal that overflows to one cannot be re-encoded for the
+    hash at all. A line that parses to an array, number, string, boolean or
+    null is no record: it has no members to read. All are refused as
+    ``_Refusal`` wherever the export is read. Mirrored in
+    ``scripts/verify_vaara_trail.py``.
+    """
+    value = json.loads(raw, object_pairs_hook=_refuse_repeats,
+                       parse_constant=_refuse_constant, parse_float=_finite_float)
+    if not isinstance(value, dict):
+        raise _Refusal("not a JSON object")
+    return value
+
+
+_UNREADABLE = (json.JSONDecodeError, _Refusal)
+
+
+def _data_of(rec: dict) -> dict:
+    """A record's ``data`` when it is an object, else empty. The hash covers
+    whatever is there, so a reader that wants fields cannot trust its shape."""
+    data = rec.get("data")
+    return data if isinstance(data, dict) else {}
 
 
 @dataclass
@@ -268,7 +321,7 @@ def check_erasures(records: list[dict], public_key: Optional[object] = None) -> 
     for index, rec in enumerate(records):
         if rec.get("event_type") != "record_erased":
             continue
-        data = rec.get("data") if isinstance(rec.get("data"), dict) else {}
+        data = _data_of(rec)
         out.append({
             "index": index,
             "erasure_record_id": rec.get("record_id"),
@@ -297,9 +350,11 @@ def _verify_chain_bytes(trail_bytes: bytes) -> tuple[Optional[str], list[dict]]:
     line_iter = (ln for ln in trail_bytes.splitlines() if ln.strip())
     for idx, raw in enumerate(line_iter):
         try:
-            rec = json.loads(raw)
+            rec = _loads(raw)
         except json.JSONDecodeError as e:
             return f"record {idx}: malformed JSON ({e})", []
+        except _Refusal as e:
+            return f"record {idx}: {e}", []
         if rec.get("previous_hash", "") != prev_hash:
             return (
                 f"record {idx}: previous_hash mismatch "
@@ -334,7 +389,7 @@ def _verify_chain_bytes(trail_bytes: bytes) -> tuple[Optional[str], list[dict]]:
                 return f"record {idx}: hash mismatch (record tampered)", []
             held.append((idx, rec))
         if rec.get("event_type") == "record_erased":
-            data = rec.get("data") or {}
+            data = _data_of(rec)
             rid, rhash = data.get("erased_record_id"), data.get("erased_record_hash")
             if isinstance(rid, str) and isinstance(rhash, str):
                 erasures.setdefault((rid, rhash), idx)
@@ -552,9 +607,11 @@ def verify_signed(
         return VerifyResult(ok=False, errors=[f"corrupt zip: {e}"])
 
     try:
-        manifest = json.loads(manifest_bytes)
+        manifest = _loads(manifest_bytes)
     except json.JSONDecodeError as e:
         return VerifyResult(ok=False, errors=[f"manifest.json is not valid JSON: {e}"])
+    except _Refusal as e:
+        return VerifyResult(ok=False, errors=[f"manifest.json: {e}"])
 
     if manifest.get("schema_version") != "1":
         errors.append(
@@ -571,7 +628,7 @@ def verify_signed(
     algorithm = manifest.get("signature_algorithm", "Ed25519")
     to_verify = hashlib.sha256(trail_bytes + manifest_bytes).digest()
 
-    if algorithm.startswith(_THRESHOLD_PREFIX):
+    if isinstance(algorithm, str) and algorithm.startswith(_THRESHOLD_PREFIX):
         # A caller-supplied key pins authenticity: it must be one of the
         # members that signed, else the threshold set is attacker-chosen.
         pinned_fp: Optional[str] = None
@@ -676,13 +733,13 @@ def verify_signed(
         )
     if lines:
         try:
-            first = json.loads(lines[0]).get("record_hash", "")
-            last = json.loads(lines[-1]).get("record_hash", "")
+            first = _loads(lines[0]).get("record_hash", "")
+            last = _loads(lines[-1]).get("record_hash", "")
             if manifest.get("first_hash") != first:
                 errors.append("first_hash in manifest does not match first record")
             if manifest.get("last_hash") != last:
                 errors.append("last_hash in manifest does not match last record")
-        except json.JSONDecodeError:
+        except _UNREADABLE:
             errors.append("could not parse first/last trail record")
 
     lifecycle = _collect_key_lifecycle(lines)
@@ -708,8 +765,8 @@ def _check_export_erasures(lines: list[bytes], erasure_key: Optional[object],
     records = []
     for ln in lines:
         try:
-            records.append(json.loads(ln))
-        except json.JSONDecodeError:
+            records.append(_loads(ln))
+        except _UNREADABLE:
             records.append({})
     erasures = check_erasures(records, public_key=erasure_key)
     for e in erasures:
@@ -730,12 +787,12 @@ def _collect_key_lifecycle(lines: list[bytes]) -> list[dict]:
     out: list[dict] = []
     for ln in lines:
         try:
-            rec = json.loads(ln)
-        except json.JSONDecodeError:
+            rec = _loads(ln)
+        except _UNREADABLE:
             continue
         if rec.get("event_type") != "key_lifecycle":
             continue
-        data = rec.get("data", {}) or {}
+        data = _data_of(rec)
         out.append(
             {
                 "timestamp": rec.get("timestamp"),
@@ -763,12 +820,12 @@ def _check_cage_lifecycle(
     parsed: list[Optional[dict]] = []
     for idx, ln in enumerate(lines):
         try:
-            rec = json.loads(ln)
-        except json.JSONDecodeError:
+            rec = _loads(ln)
+        except _UNREADABLE:
             rec = None
-        parsed.append(rec if isinstance(rec, dict) else None)
-        if parsed[-1] is not None and isinstance(parsed[-1].get("record_id"), str):
-            index_of.setdefault(parsed[-1]["record_id"], idx)
+        parsed.append(rec)
+        if rec is not None and isinstance(rec.get("record_id"), str):
+            index_of.setdefault(rec["record_id"], idx)
 
     records: list[dict] = []
     starts: dict[str, dict] = {}
@@ -778,7 +835,7 @@ def _check_cage_lifecycle(
     for idx, rec in enumerate(parsed):
         if rec is None or rec.get("event_type") != "cage_lifecycle":
             continue
-        data = rec.get("data") or {}
+        data = _data_of(rec)
         entry = {
             "index": idx,
             "record_id": rec.get("record_id"),
@@ -808,7 +865,7 @@ def _check_cage_lifecycle(
             unpaired.append(entry)
             continue
         target = parsed[at] or {}
-        tdata = target.get("data") or {}
+        tdata = _data_of(target)
         if (target.get("event_type") != "cage_lifecycle" or tdata.get("action") != "started"
                 or tdata.get("driver") != entry["driver"] or tdata.get("name") != entry["name"]):
             errors.append(f"cage_lifecycle record {idx}: names record {at}, which is not "
