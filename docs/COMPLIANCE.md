@@ -941,7 +941,13 @@ problem:
   `SQLiteAuditBackend.purge_older_than(seconds)` from Python). The
   tenant selector is required, not optional: pass `--tenant ID` to purge
   one tenant's records, `--all-tenants` to purge across the whole DB. A
-  `--dry-run` flag reports the count without modifying the DB.
+  `--dry-run` flag reports the count without modifying the DB. The
+  purge deletes with `secure_delete` on and truncates the WAL, so the
+  purged bytes leave the database file and the `-wal` file. If another
+  process holds the trail open the WAL cannot be truncated: the command
+  says so on stderr and the bytes stay in the `-wal` file until the next
+  checkpoint. The purge reaches the trail only. Decision receipt files
+  and the review queue database are separate files it does not touch.
 
   **Hash-chain seam at the retention boundary.** Surviving records
   still reference deleted predecessors via `previous_hash`, so

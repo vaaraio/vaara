@@ -33,6 +33,9 @@ class RotateResult:
     ``purged_records``: records purged, or that would be purged in dry_run.
     ``archive_path``: the written zip, when export succeeded.
     ``errors``: human-readable failure reasons (empty if ``ok``).
+    ``wal_scrubbed``: False when the purge could not truncate the WAL because
+    another reader held it open, so the purged bytes stay in the -wal file
+    until the next checkpoint. True otherwise, and for a dry run.
     """
     ok: bool
     exported_records: int = 0
@@ -41,6 +44,7 @@ class RotateResult:
     errors: list[str] = field(default_factory=list)
     sealed_path: Union[Path, None] = None
     seal_path: Union[Path, None] = None
+    wal_scrubbed: bool = True
 
 
 def rotate(
@@ -153,6 +157,7 @@ def rotate(
             archive_path=out if dry_run or sealed_path is None else sealed_path,
             sealed_path=sealed_path,
             seal_path=seal_path,
+            wal_scrubbed=backend.last_purge_scrubbed is not False,
         )
     finally:
         backend.close()

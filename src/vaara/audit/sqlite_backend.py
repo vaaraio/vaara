@@ -860,6 +860,7 @@ class SQLiteAuditBackend:
             )
         self._lock = threading.Lock()
         self._corrupt_query_rows = 0
+        self.last_purge_scrubbed: Optional[bool] = None
         self._in_memory = str(db_path) == ":memory:"
         self._open()
 
@@ -1999,6 +2000,13 @@ class SQLiteAuditBackend:
             dry_run: If True, return the count that would be deleted without
                 modifying the database.
 
+        The delete runs with ``secure_delete`` on and a TRUNCATE checkpoint
+        follows, so the purged bytes leave the page and the WAL. A reader
+        holding an old snapshot keeps the WAL frames until it lets go;
+        ``last_purge_scrubbed`` is False then, and the caller reports it
+        rather than claiming the bytes are gone. It is None for a dry run
+        and for a purge that deleted nothing.
+
         Returns:
             Number of records deleted (or that would be deleted in dry_run mode).
         """
@@ -2009,6 +2017,7 @@ class SQLiteAuditBackend:
 
         cutoff = time.time() - retention_seconds
         t_clause, t_params = self._tenant_clause()
+        scrubbed: Optional[bool] = None
 
         with self._lock:
             if dry_run:
@@ -2019,6 +2028,7 @@ class SQLiteAuditBackend:
                 ).fetchone()
                 count = row[0]
             else:
+                self._conn.execute("PRAGMA secure_delete = ON")
                 self._conn.execute("BEGIN IMMEDIATE")
                 with self._rollback_on_failure():
                     heads = self._heads_on_chain_locked()
@@ -2037,6 +2047,13 @@ class SQLiteAuditBackend:
                                 "UPDATE audit_meta SET value = ? WHERE key = ?",
                                 (json.dumps({**head, "purged": True}, sort_keys=True), key),
                             )
+                if count > 0:
+                    if self._in_memory:
+                        scrubbed = True
+                    else:
+                        row = self._conn.execute("PRAGMA wal_checkpoint(TRUNCATE)").fetchone()
+                        scrubbed = bool(row) and row[0] == 0
+            self.last_purge_scrubbed = scrubbed
 
         if count > 0:
             verb = "Would purge" if dry_run else "Purged"

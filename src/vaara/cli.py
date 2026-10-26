@@ -381,6 +381,12 @@ def _keygen_attest(out: Path, pub_out: Path) -> int:
     return 0
 
 
+_WAL_NOT_TRUNCATED = (
+    "the WAL could not be truncated (another process holds the trail open): "
+    "the purged bytes stay in the -wal file until the next checkpoint"
+)
+
+
 def _cmd_trail_rotate(args: argparse.Namespace) -> int:
     from vaara.audit.rotate import rotate
 
@@ -411,6 +417,8 @@ def _cmd_trail_rotate(args: argparse.Namespace) -> int:
     else:
         print(f"Purged {result.purged_records} record(s) older than {args.retention_days} day(s).")
         print("Archive the zip externally; the live DB now has a chain seam at the boundary.")
+        if not result.wal_scrubbed:
+            print(_WAL_NOT_TRUNCATED, file=sys.stderr)
     return 0
 
 
@@ -1779,6 +1787,7 @@ def _cmd_trail_purge(args: argparse.Namespace) -> int:
     backend = SQLiteAuditBackend(db_path, tenant_id=tenant_scope)
     try:
         count = backend.purge_older_than(retention_seconds, dry_run=args.dry_run)
+        scrubbed = backend.last_purge_scrubbed
     finally:
         backend.close()
 
@@ -1794,6 +1803,8 @@ def _cmd_trail_purge(args: argparse.Namespace) -> int:
                 "audit history in a signed zip.",
                 file=sys.stderr,
             )
+        if scrubbed is False:
+            print(_WAL_NOT_TRUNCATED, file=sys.stderr)
     return 0
 
 
