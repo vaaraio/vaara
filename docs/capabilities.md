@@ -51,7 +51,7 @@ License: AGPL-3.0-or-later.
 | Gap-evident completeness | `vaara verify-contiguity` | Signed sequence numbers and a running count make a dropped record a provable gap. Run sealing and a sealed class gate. |
 | Cross-organisation handoff | `vaara build-handoff`, `vaara verify-handoff`, `attestation/_handoff*.py` | A package of record, DID document, key history, revocations and anchor, with the producer identity pinned. EU AI Act Article 26(6). |
 | Access records | `audit/access.py` (`ACCESS_RECORDED`) | A read is an event: who read, on whose behalf, a digest of the returned set, and whether an outcome was recorded. |
-| Digest-only capture | `_capture.py`, `docs/capture-digest-only.md` | An operator declares argument fields in `~/.vaara/capture.json`. The trail row, the review queue copy and the approval request then hold each declared value as a keyed digest and a reference, and the value is not stored, through the pipeline, the hook, the MCP proxy and the shell proxy. The key is not on the trail. Reason text, tool results and reviewer free text are not masked. Off unless the file exists. |
+| Digest-only capture | `_capture.py`, `docs/capture-digest-only.md`, `capture_digest_only_v0` | An operator declares argument fields in `~/.vaara/capture.json`. The trail row, the review queue copy and the approval request then hold each declared value as a keyed digest and a reference, and the value is not stored, through the pipeline, the hook, the MCP proxy and the shell proxy. The key is not on the trail. Reason text, tool results and reviewer free text are not masked. Off unless the file exists. |
 | Audience and task binding | `attestation/_receipt_audience.py`, `attestation/_receipt_task.py` | `aud` and `taskId` inside the signed preimage. Verdicts `bound`, `conflict` or `unsupported`; a missing field never passes. |
 | Decision-before-effect ordering | `attestation/_decision_verifier.py` (`effect_ordering`) | Reports `ordered`, `effect_precedes_decision` or `not_comparable`. |
 | Trail repair with declared gaps | `vaara trail repair`, `audit/sqlite_backend.py` (`TrailRepair`) | Keeps the damaged file and appends a `repair_gap` event naming every lost sequence number. |
@@ -134,7 +134,7 @@ section 5.6).
 
 ## 10. Conformance
 
-52 conformance suites under `tests/vectors/` and `conformance/`, each with a
+54 conformance suites under `tests/vectors/` and `conformance/`, each with a
 `_check_independent.py` that imports no Vaara code and recomputes its verdicts
 from the bytes of its case files. `scripts/conformance_runner.py` runs them all:
 50 pass and 2 skip without optional extras (`pq_hybrid_v0` needs `vaara[pq]`,
@@ -193,7 +193,7 @@ reproductions: [vaara.io/conformance.html](https://vaara.io/conformance.html).
 
 ```
 pip install vaara
-scripts/conformance_runner.py                 # 52 suites, checkers import no Vaara
+scripts/conformance_runner.py                 # 54 suites, checkers import no Vaara
 vaara conformance check PATH                  # keyless SEP-2828 conformance
 vaara verify-record FILE --trusted-issuer-cert CA.pem   # qualified or self-asserted time
 vaara receipt render RECEIPT.json             # self-contained offline evidence page
