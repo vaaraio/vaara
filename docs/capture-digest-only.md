@@ -48,7 +48,8 @@ key is 32 random bytes, created on first use in `keys/capture-hmac.key` beside
 the policy file with mode 0600. It is never written to the trail. Someone who
 holds only the trail cannot test a guessed value against a digest. You hold the
 key, so you can show that a given value is the one that was passed by
-recomputing its digest.
+recomputing its digest. The vectors in `tests/vectors/capture_digest_only_v0/`
+do this with a checker that imports no Vaara code.
 
 Keep the policy file and the key where the governed agent cannot write them.
 
