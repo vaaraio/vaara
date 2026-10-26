@@ -643,6 +643,16 @@ class Guard:
         finally:
             self._open_requests.discard(result.action_id)
         if human not in ("approve", "deny"):
+            # Nobody answered: the open stays refused and the hold closes as
+            # a deny by policy, since an escalation with no resolution reads
+            # on the chain as one still waiting. The refusal is not cached,
+            # so the next open asks again.
+            with self._trail_lock:
+                self._trail.resolve_escalation(
+                    result.action_id, "deny",
+                    reviewer="approvals-timeout",
+                    justification="no human decision before the approval timeout",
+                    approver="policy")
             return False
         with self._trail_lock:
             self._trail.resolve_escalation(

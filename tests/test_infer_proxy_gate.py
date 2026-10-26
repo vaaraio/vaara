@@ -239,6 +239,50 @@ def test_escalate_without_approvals_dir_fails_closed(tmp_path):
         b.get("text", "") for b in doc["content"])
 
 
+def _closed_holds(pipeline):
+    from vaara.audit.trail import EventType
+
+    return pipeline.trail.get_records_by_type(EventType.ESCALATION_RESOLVED)
+
+
+def test_unanswered_approval_closes_the_hold_as_a_policy_deny(tmp_path):
+    # Nobody writes a decision file. The call is refused, and the trail says
+    # the hold ended as a deny by policy, not that it is still waiting.
+    pipeline = _escalate_all()
+    app = build_app(
+        emitter=None, upstream="http://up", pipeline=pipeline,
+        approvals_dir=tmp_path / "approvals", approvals_timeout=0.3,
+        client=httpx.AsyncClient(transport=httpx.MockTransport(_anthropic_upstream)),
+    )
+    status, raw = _drive(app, "/v1/messages", {
+        "model": "claude-sonnet-5", "messages": MESSAGES, "stream": False,
+    })
+    assert status == 200
+    assert "tool_use" not in [b.get("type") for b in json.loads(raw)["content"]]
+    [closed] = _closed_holds(pipeline)
+    assert closed.data["resolution"] == "deny"
+    assert closed.data["reviewer"] == "approvals-timeout"
+    assert closed.data["approver"] == "policy"
+    assert closed.data.get("human_disposed") is not True
+
+
+def test_hold_with_no_approval_channel_closes_as_a_policy_deny():
+    # No approvals directory means nobody is asked. The llm-proxy already
+    # closes such a hold; this gate left it open.
+    pipeline = _escalate_all()
+    app = build_app(
+        emitter=None, upstream="http://up", pipeline=pipeline,
+        client=httpx.AsyncClient(transport=httpx.MockTransport(_anthropic_upstream)),
+    )
+    _drive(app, "/v1/messages", {
+        "model": "claude-sonnet-5", "messages": MESSAGES, "stream": False,
+    })
+    [closed] = _closed_holds(pipeline)
+    assert closed.data["resolution"] == "deny"
+    assert closed.data["approver"] == "policy"
+    assert closed.data.get("human_disposed") is not True
+
+
 # --- allow-list bypass -------------------------------------------------------
 
 
