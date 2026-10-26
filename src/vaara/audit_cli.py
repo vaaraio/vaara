@@ -136,7 +136,11 @@ def _emit_table(rows: Iterable[list[Any]], headers: list[str], stream=None) -> N
 
 def cmd_verify(args) -> int:
     try:
-        from .audit.verify import describe_cage_lifecycle, verify_signed
+        from .audit.verify import (
+            describe_cage_lifecycle,
+            describe_unrecorded_windows,
+            verify_signed,
+        )
     except ImportError as exc:
         print(f"vaara-audit verify requires cryptography: {exc}", file=sys.stderr)
         return 2
@@ -163,6 +167,7 @@ def cmd_verify(args) -> int:
         "cage_lifecycle": list(result.cage_lifecycle),
         "cage_open": list(result.cage_open),
         "cage_unpaired_stops": list(result.cage_unpaired_stops),
+        "unrecorded_windows": list(result.unrecorded_windows),
         # Honest labeling: with no out-of-band --pubkey, a passing result is
         # integrity/internal-consistency only, not authenticated issuer identity.
         "identity_pinned": pubkey is not None,
@@ -195,6 +200,10 @@ def cmd_verify(args) -> int:
         if payload["cage_lifecycle"]:
             print("cage launches:")
             for line in describe_cage_lifecycle(result):
+                print(f"  - {line}")
+        if payload["unrecorded_windows"]:
+            print("unrecorded windows:")
+            for line in describe_unrecorded_windows(result):
                 print(f"  - {line}")
         if payload["ok"] and pubkey is None:
             print(

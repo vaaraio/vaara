@@ -195,6 +195,14 @@ chain, or the run fails. The script lists every start and stop; a start with no
 stop, and a stop whose start is outside the export, are listed and do not fail
 the run.
 
+A trail whose store refused writes and then took them again carries a
+`trail_not_recording` record. The script lists each one with the number of
+writes refused (at least) and the two adjacent records the window lies between,
+as `vaara trail verify` does; calls in that window ran with no record. A record
+whose count, times or record id are nonsense fails the run. The record cannot
+exist if the store never recovered, so a trail that ends in an outage shows
+nothing.
+
 Both verifiers refuse a trail line or a manifest that repeats a member of one
 object, and a number with no finite value (`NaN`, `Infinity`, or a literal such
 as `1e999`). A repeated member reads as its last value to one parser and its

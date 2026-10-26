@@ -22,6 +22,11 @@ is paired: each stop must name the start of the same driver and launch, written
 before it, or the run fails. Starts with no stop and stops whose start is not
 in the export are listed, not failed.
 
+A trail whose store refused writes and then took them again carries a
+`trail_not_recording` record. It is listed with the number of writes refused
+(at least) and the two adjacent records the window lies between; calls in that
+window ran with no record. A record whose fields are nonsense fails the run.
+
 A trail line or manifest that repeats a member of one object, or holds NaN,
 Infinity or a number that overflows to one, fails the run: two readers could
 read it differently, and the hash covers only one reading. A line or manifest
@@ -588,6 +593,102 @@ def _collect_cage_lifecycle(zip_path: Path) -> list[str]:
     return describe_cage_lifecycle(records, cage_open, unpaired)
 
 
+_WINDOW_TEXT_FIELDS = ("first_failure_utc", "last_failure_utc", "resumed_record_id")
+_WINDOW_CAUSE_LIMIT = 140
+
+
+def _check_unrecorded_windows(lines: list[bytes]) -> tuple[list[dict], list[str]]:
+    """Read each ``trail_not_recording`` record and place it on the chain.
+
+    Returns ``(windows, errors)``. A record the trail did not write (a count
+    that is not a whole number of at least 1, a missing time or record id, a
+    record id that is not an earlier record) is an error and is not listed.
+    A ``resumed_record_id`` outside the export is not an error: an export of a
+    later range does not hold it. Mirrors
+    ``vaara.audit.verify._check_unrecorded_windows``.
+    """
+    index_of: dict[str, int] = {}
+    parsed: list[dict | None] = []
+    for idx, ln in enumerate(lines):
+        try:
+            rec = _loads(ln)
+        except _UNREADABLE:
+            rec = None
+        parsed.append(rec)
+        if rec is not None and isinstance(rec.get("record_id"), str):
+            index_of.setdefault(rec["record_id"], idx)
+
+    windows: list[dict] = []
+    errors: list[str] = []
+    for idx, rec in enumerate(parsed):
+        if rec is None or rec.get("event_type") != "trail_not_recording":
+            continue
+        data = _data_of(rec)
+        count = data.get("unrecorded_writes")
+        if isinstance(count, bool) or not isinstance(count, int) or count < 1:
+            errors.append(f"trail_not_recording record {idx}: unrecorded_writes {count!r} "
+                          "is not a whole number of at least 1")
+            continue
+        missing = [f for f in _WINDOW_TEXT_FIELDS
+                   if not isinstance(data.get(f), str) or not data[f]]
+        if missing:
+            errors.append(f"trail_not_recording record {idx}: {missing[0]} is missing or "
+                          "not text")
+            continue
+        resumed = index_of.get(data["resumed_record_id"])
+        if resumed is not None and resumed >= idx:
+            errors.append(f"trail_not_recording record {idx}: names record {resumed}, "
+                          "which is not an earlier record")
+            continue
+        windows.append({
+            "index": idx,
+            "record_id": rec.get("record_id"),
+            "timestamp": rec.get("timestamp"),
+            "unrecorded_writes": count,
+            "first_failure_utc": data["first_failure_utc"],
+            "last_failure_utc": data["last_failure_utc"],
+            "stage": str(data.get("stage") or ""),
+            "error": str(data.get("error") or ""),
+            "resumed_record_id": data["resumed_record_id"],
+            "resumed_index": resumed,
+            "after_index": resumed - 1 if resumed else None,
+        })
+    return windows, errors
+
+
+def describe_unrecorded_windows(windows: list[dict]) -> list[str]:
+    """One plain line per unrecorded window, as ``vaara trail verify`` prints them."""
+    out = []
+    for w in windows:
+        if w["resumed_index"] is None:
+            where = "before this export"
+        elif w["after_index"] is None:
+            where = f"before record {w['resumed_index']}"
+        else:
+            where = f"between record {w['after_index']} and record {w['resumed_index']}"
+        cause = ": ".join(x for x in (w["stage"], w["error"]) if x)
+        if len(cause) > _WINDOW_CAUSE_LIMIT:
+            cause = cause[:_WINDOW_CAUSE_LIMIT].rstrip() + "..."
+        out.append(
+            f"record {w['index']} trail not recording: the store refused at least "
+            f"{w['unrecorded_writes']} write(s) {where}, {w['first_failure_utc']} to "
+            f"{w['last_failure_utc']}{f' ({cause})' if cause else ''}; calls in that "
+            "window ran with no record here"
+        )
+    return out
+
+
+def _collect_unrecorded_windows(zip_path: Path) -> list[str]:
+    """The unrecorded-window lines for the report, read after a passing verification."""
+    try:
+        with zipfile.ZipFile(zip_path, "r") as zf:
+            trail_bytes = zf.read("trail.jsonl")
+    except (zipfile.BadZipFile, KeyError, FileNotFoundError):
+        return []
+    lines = [ln for ln in trail_bytes.splitlines() if ln.strip()]
+    return describe_unrecorded_windows(_check_unrecorded_windows(lines)[0])
+
+
 def verify(
     zip_path: Path, pubkey_path: Path | None, erasure_key=None,
 ) -> tuple[bool, list[str], dict | None]:
@@ -719,6 +820,7 @@ def verify(
                           f"{e['erased_record_id']} is {e['state']}")
 
     errors.extend(_check_cage_lifecycle(lines)[3])
+    errors.extend(_check_unrecorded_windows(lines)[1])
 
     return (not errors), errors, manifest
 
@@ -799,6 +901,8 @@ def main(argv: list[str] | None = None) -> int:
                 who = "eraser not signed"
             print(f"  erasure record {e['index']}: {who}{ground}")
         for line in _collect_cage_lifecycle(Path(args.zip_path)):
+            print(f"  {line}")
+        for line in _collect_unrecorded_windows(Path(args.zip_path)):
             print(f"  {line}")
         return 0
     print("\nVerification: FAILED", file=sys.stderr)
