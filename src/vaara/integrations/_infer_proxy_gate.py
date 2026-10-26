@@ -44,6 +44,22 @@ UNREADABLE_RESPONSE_DENIAL = (
 )
 
 
+def _close_unanswered(pipeline: Any, action_id: str, reviewer: str,
+                      justification: str) -> None:
+    """Close a hold nobody answered as a deny by policy.
+
+    An escalation with no resolution reads on the chain as one still
+    waiting. Policy disposed of this one, so no human is claimed.
+    """
+    try:
+        pipeline.resolve_escalation(
+            action_id, "deny", reviewer=reviewer,
+            justification=justification, approver="policy",
+        )
+    except Exception:
+        logger.exception("could not record escalation resolution")
+
+
 async def gate_tool_calls(
     pipeline: Any,
     tool_calls: Any,
@@ -57,7 +73,8 @@ async def gate_tool_calls(
     """Decide every requested tool call; return the denial messages.
 
     Empty list means everything is allowed. Each intercept lands in the
-    audit trail; approved escalations are resolved on the trail too.
+    audit trail; escalations are resolved on the trail too, an unanswered
+    one as a deny by policy.
     """
     denials: list[str] = []
     if pipeline is None or not isinstance(tool_calls, list):
@@ -101,6 +118,15 @@ async def gate_tool_calls(
             continue
         if result.allowed:
             continue
+        if result.decision == "escalate" and approvals_dir is None:
+            # Nobody is asked, so the hold is refused. Close it on the record
+            # as a deny by policy rather than leave it reading as one still
+            # waiting; the llm-proxy does the same without an approval channel.
+            _close_unanswered(
+                pipeline, result.action_id, "infer-proxy",
+                "held for a human; the proxy has no approval channel, so the "
+                "hold is refused",
+            )
         if result.decision == "escalate" and approvals_dir is not None:
             from vaara.approvals import request_approval
 
@@ -127,6 +153,11 @@ async def gate_tool_calls(
                     )
                 except Exception:
                     logger.exception("could not record escalation resolution")
+            else:
+                _close_unanswered(
+                    pipeline, result.action_id, "approvals-timeout",
+                    "no human decision before the approval timeout",
+                )
             if human == "approve":
                 continue
         denials.append(f"{name}: {result.reason}")

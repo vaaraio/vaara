@@ -70,7 +70,7 @@ SAFR itself says it is not regulatory guidance (p. 5).
 
 | SAFR element (page) | Vaara | |
 |---|---|---|
-| Escalation timeout that defaults to block (p. 19) | An escalated call waits for a signed human answer. A timeout or a corrupt answer stays a refusal. | Yes |
+| Escalation timeout that defaults to block (p. 19) | An escalated call waits for a signed human answer. A timeout or a corrupt answer stays a refusal, and the trail closes the hold as a deny by policy. | Yes |
 | Escalation volume the institution can process (p. 19) | `vaara trail shadow-report` groups what would have been held, by tool, so the volume is measured before enforcement starts. | Yes |
 | Reviewer authority to approve, modify or decline (p. 19) | The review queue resolves to allow, deny or abstain, and the resolution is written into the chain. Modifying the action is not a resolution. | Partly |
 

@@ -183,7 +183,7 @@ reproductions: [vaara.io/conformance.html](https://vaara.io/conformance.html).
 | Capability | Where | What it does |
 |---|---|---|
 | Review queue | `vaara review list`, `claim`, `resolve`, `audit/review_queue.py` | Pending, claimed and resolved (allow, deny or abstain); the resolution is written into the chain as `ESCALATION_RESOLVED`. |
-| Signed approvals | `approvals.py`, host hooks | An escalated call waits for a human answer that is signed, which the governed agent cannot write. The request carries the call's full arguments and their SHA-256. A timeout or a corrupt answer stays a refusal. |
+| Signed approvals | `approvals.py`, host hooks | An escalated call waits for a human answer that is signed, which the governed agent cannot write. The request carries the call's full arguments and their SHA-256. A timeout or a corrupt answer stays a refusal, and the trail closes the hold as a deny by policy, so it never reads as one still waiting. |
 | Reviewer-signed resolutions | `vaara review resolve --sign-key`, `vaara trail check-permission`, `credential/_review_signature.py` | The reviewer signs the resolution with their own key, bound to the decision record it resolves. A third party checks it against a reviewer key the principal pinned in the signed permission, never a key the record carries, and an allow over a held call is named as an override for that one action. |
 | Shadow report | `vaara trail shadow-report`, `audit/shadow_report.py` | Groups what would have been denied or held, by tool, over a period. |
 

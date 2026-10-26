@@ -765,8 +765,24 @@ class VaaraMCPServer:
                 "treating as unanswered (fail-closed)",
                 exc_info=True,
             )
-            return result
+            human = "timeout"
         if human not in ("approve", "deny"):
+            # Nobody answered. The refusal stands and the trail says so: an
+            # escalation with no resolution reads the same as one still
+            # waiting. Policy disposed of it, so no human is claimed. The
+            # Claude Code hook records the same close.
+            try:
+                self._pipeline.resolve_escalation(
+                    result.action_id, "deny",
+                    reviewer="approvals-timeout",
+                    justification="no human decision before the approval timeout",
+                    approver="policy",
+                )
+            except Exception:
+                logger.warning(
+                    "vaara_intercept: could not record escalation resolution",
+                    exc_info=True,
+                )
             return result
         try:
             self._pipeline.resolve_escalation(
