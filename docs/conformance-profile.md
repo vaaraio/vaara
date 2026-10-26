@@ -97,8 +97,8 @@ files. One sample package per scenario is committed under its `packages/`
 directory, so its checker runs bare like every other suite. It can also be
 pointed at any package: `_check_independent.py <package.zip>`.
 
-So a clean checkout with `rfc8785` and `cryptography` alone grades 51 passed,
-0 failed, 2 skipped across the 53 suites.
+So a clean checkout with `rfc8785` and `cryptography` alone grades 52 passed,
+0 failed, 2 skipped across the 54 suites.
 
 ## What a pass means, and what it does not
 
