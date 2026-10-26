@@ -45,6 +45,8 @@ import time
 from pathlib import Path
 from typing import Any, Optional
 
+from vaara import _capture
+
 APPROVALS_DIR = Path.home() / ".vaara" / "approvals"
 KEY_NAME = "approval-hmac.key"
 MAC_CONTEXT = "vaara-approval/v1"
@@ -196,6 +198,9 @@ def request_approval(
     approvals_dir = Path(approvals_dir)
     approvals_dir.mkdir(parents=True, exist_ok=True)
     key = _approval_key(approvals_dir, create=True)
+    # Under a capture policy the human is shown, and signs over, the digest
+    # form of a declared field; the file never holds the clear value.
+    parameters = _capture.mask(tool_name, parameters)
     nonce = secrets.token_hex(16)
     request_file = approvals_dir / f"{action_id}.request.json"
     decision_file = approvals_dir / f"{action_id}.decision.json"
