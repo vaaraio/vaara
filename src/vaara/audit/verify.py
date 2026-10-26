@@ -138,6 +138,15 @@ class VerifyResult:
     cage_unpaired_stops: list[dict] = field(default_factory=list)
     """Stops whose start is not in this export (an export of a later range,
     or a launch started outside Vaara). Does not affect ``ok``."""
+    unrecorded_windows: list[dict] = field(default_factory=list)
+    """Stretches where the audit store refused writes (``trail_not_recording``
+    records), in chain order. Each entry: ``index``, ``unrecorded_writes`` (a
+    lower bound), ``first_failure_utc``, ``last_failure_utc``, ``stage``,
+    ``error``, ``resumed_record_id`` and, when that record is in the export,
+    ``resumed_index`` and ``after_index`` (the record before it: the window lies
+    between the two, which sit side by side on the chain). Calls in the window
+    ran with no record. The chain is whole around it, so this does not affect
+    ``ok``; a mark whose fields are nonsense does."""
 
 
 def _require_crypto() -> None:
@@ -782,6 +791,8 @@ def verify_signed(
     erasures = _check_export_erasures(lines, erasure_key, errors)
     cages, cage_open, unpaired, cage_errors = _check_cage_lifecycle(lines)
     errors.extend(cage_errors)
+    windows, window_errors = _check_unrecorded_windows(lines)
+    errors.extend(window_errors)
 
     return VerifyResult(
         ok=not errors,
@@ -793,6 +804,7 @@ def verify_signed(
         cage_lifecycle=cages,
         cage_open=cage_open,
         cage_unpaired_stops=unpaired,
+        unrecorded_windows=windows,
     )
 
 
@@ -939,4 +951,88 @@ def describe_cage_lifecycle(result: VerifyResult) -> list[str]:
             if e["record_id"] in unpaired_ids:
                 line += ", start not in this export"
         lines.append(line)
+    return lines
+
+
+_WINDOW_TEXT_FIELDS = ("first_failure_utc", "last_failure_utc", "resumed_record_id")
+_WINDOW_CAUSE_LIMIT = 140
+
+
+def _check_unrecorded_windows(lines: list[bytes]) -> tuple[list[dict], list[str]]:
+    """Read each ``trail_not_recording`` record and place it on the chain.
+
+    Returns ``(windows, errors)``. A record the trail did not write (a count
+    that is not a whole number of at least 1, a missing time or record id, a
+    record id that is not an earlier record) is an error and is not listed.
+    A ``resumed_record_id`` outside the export is not an error: an export of a
+    later range does not hold it.
+    """
+    index_of: dict[str, int] = {}
+    parsed: list[Optional[dict]] = []
+    for idx, ln in enumerate(lines):
+        try:
+            rec = _loads(ln)
+        except _UNREADABLE:
+            rec = None
+        parsed.append(rec)
+        if rec is not None and isinstance(rec.get("record_id"), str):
+            index_of.setdefault(rec["record_id"], idx)
+
+    windows: list[dict] = []
+    errors: list[str] = []
+    for idx, rec in enumerate(parsed):
+        if rec is None or rec.get("event_type") != "trail_not_recording":
+            continue
+        data = _data_of(rec)
+        count = data.get("unrecorded_writes")
+        if isinstance(count, bool) or not isinstance(count, int) or count < 1:
+            errors.append(f"trail_not_recording record {idx}: unrecorded_writes {count!r} "
+                          "is not a whole number of at least 1")
+            continue
+        missing = [f for f in _WINDOW_TEXT_FIELDS
+                   if not isinstance(data.get(f), str) or not data[f]]
+        if missing:
+            errors.append(f"trail_not_recording record {idx}: {missing[0]} is missing or "
+                          "not text")
+            continue
+        resumed = index_of.get(data["resumed_record_id"])
+        if resumed is not None and resumed >= idx:
+            errors.append(f"trail_not_recording record {idx}: names record {resumed}, "
+                          "which is not an earlier record")
+            continue
+        windows.append({
+            "index": idx,
+            "record_id": rec.get("record_id"),
+            "timestamp": rec.get("timestamp"),
+            "unrecorded_writes": count,
+            "first_failure_utc": data["first_failure_utc"],
+            "last_failure_utc": data["last_failure_utc"],
+            "stage": str(data.get("stage") or ""),
+            "error": str(data.get("error") or ""),
+            "resumed_record_id": data["resumed_record_id"],
+            "resumed_index": resumed,
+            "after_index": resumed - 1 if resumed else None,
+        })
+    return windows, errors
+
+
+def describe_unrecorded_windows(result: VerifyResult) -> list[str]:
+    """One plain line per unrecorded window, for the verify commands."""
+    lines = []
+    for w in result.unrecorded_windows:
+        if w["resumed_index"] is None:
+            where = "before this export"
+        elif w["after_index"] is None:
+            where = f"before record {w['resumed_index']}"
+        else:
+            where = f"between record {w['after_index']} and record {w['resumed_index']}"
+        cause = ": ".join(x for x in (w["stage"], w["error"]) if x)
+        if len(cause) > _WINDOW_CAUSE_LIMIT:
+            cause = cause[:_WINDOW_CAUSE_LIMIT].rstrip() + "..."
+        lines.append(
+            f"record {w['index']} trail not recording: the store refused at least "
+            f"{w['unrecorded_writes']} write(s) {where}, {w['first_failure_utc']} to "
+            f"{w['last_failure_utc']}{f' ({cause})' if cause else ''}; calls in that "
+            "window ran with no record here"
+        )
     return lines

@@ -45,6 +45,15 @@ last still carries the earliest start it read. An exact ledger of failed
 writes would need a lock on the reporting path for the sake of a number
 nobody acts on, on a machine that is already having a bad time. The trail
 itself is the ledger, and this file is the smoke alarm.
+
+**The mark on the chain.** The marker is local and unsigned, so a clean chain
+used to hide the window. The trail now copies it into a ``trail_not_recording``
+record on the first write that lands afterwards (``AuditTrail`` queues it in
+``_note_persistence_ok`` and writes it in ``_flush_unrecorded_mark``) and
+resolves the marker only once that record has landed, so a refused mark leaves
+the outage open for the next good write. The mark narrows the hole and does not
+close it: nothing is written if the store never recovers, and a process that
+ends before the first good write loses the marker.
 """
 
 from __future__ import annotations

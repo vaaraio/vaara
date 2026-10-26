@@ -1098,7 +1098,11 @@ _TRAIL_VERIFY_SCOPE = (
 
 def _cmd_trail_verify(args: argparse.Namespace) -> int:
     try:
-        from vaara.audit.verify import describe_cage_lifecycle, verify_signed
+        from vaara.audit.verify import (
+            describe_cage_lifecycle,
+            describe_unrecorded_windows,
+            verify_signed,
+        )
     except ImportError:
         print(_INSTALL_HINT, file=sys.stderr)
         return 2
@@ -1158,6 +1162,8 @@ def _cmd_trail_verify(args: argparse.Namespace) -> int:
                 who = "eraser not signed"
             print(f"  erasure record {e['index']}: {who}{ground}")
         for line in describe_cage_lifecycle(result):
+            print(f"  {line}")
+        for line in describe_unrecorded_windows(result):
             print(f"  {line}")
         if pubkey is None:
             print(

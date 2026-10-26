@@ -40,7 +40,7 @@ from typing import Any, Callable, Optional
 
 from vaara._decision_vocabulary import FINE_TO_COARSE, REFINEMENTS
 from vaara._sanitize import json_safe, strict_json_dumps
-from vaara.audit.write_failure import mark_recovered, record_failure
+from vaara.audit.write_failure import active_failure, mark_recovered, record_failure
 from vaara.taxonomy.actions import ActionRequest, RegulatoryDomain
 
 logger = logging.getLogger(__name__)
@@ -70,6 +70,7 @@ class EventType(str, Enum):
     WITNESS_CONFIGURED = "witness_configured"  # Heads reach a log or a TSA at a stated cadence
     RECORD_ERASED = "record_erased"         # A record's data was erased, its hash kept
     CAGE_LIFECYCLE = "cage_lifecycle"       # A cage launch started or stopped
+    TRAIL_NOT_RECORDING = "trail_not_recording"  # The store refused writes, then took them again
 
     # Copies and pickles go through the stored value, so a type this build
     # does not know (see stored_event_type) survives them. Python 3.11+
@@ -113,7 +114,8 @@ def stored_event_type(value: str) -> EventType:
 # turns a broken chain into declared gaps, an ANCHOR_GAP marks an unwitnessed
 # stretch, KEY_LIFECYCLE is custodian evidence for SOC 2 CC6.2 and CC8.1,
 # RECORD_ERASED accounts for a record whose data was erased (see ERASED_DATA_KEY),
-# CAGE_LIFECYCLE pairs a cage launch's stop with its start.
+# CAGE_LIFECYCLE pairs a cage launch's stop with its start,
+# TRAIL_NOT_RECORDING says the store refused writes between two adjacent records.
 SYSTEM_EVENT_TYPES = frozenset({
     EventType.ANCHOR_GAP,
     EventType.REPAIR_GAP,
@@ -123,6 +125,7 @@ SYSTEM_EVENT_TYPES = frozenset({
     EventType.WITNESS_CONFIGURED,
     EventType.RECORD_ERASED,
     EventType.CAGE_LIFECYCLE,
+    EventType.TRAIL_NOT_RECORDING,
 })
 
 # An erased record's stored data is exactly {ERASED_DATA_KEY: {"erasure_record_id": ...}}.
@@ -478,6 +481,11 @@ TRANSPARENCY_DEFAULTS: dict[EventType, dict[str, str]] = {
         "system_operation": "cage_lifecycle",
         "data_usage": "driver+name+policy_digest+actor",
         "decision_making": "operator_action",
+    },
+    EventType.TRAIL_NOT_RECORDING: {
+        "system_operation": "recording_gap",
+        "data_usage": "refused_write_count+window",
+        "decision_making": "n/a",
     },
     EventType.DISCLOSURE_RECORDED: {
         "system_operation": "transparency_disclosure",
@@ -1081,6 +1089,12 @@ class AuditTrail:
         # consulted since the last failure", so the first successful write
         # after a failure is the one that clears it.
         self._write_marker_checked = False
+        # Set under the chain lock by the first write that lands after an
+        # outage: the marker as it stood and the record that landed. The
+        # trail_not_recording record is written from it once the lock is
+        # free (see _flush_unrecorded_mark), because it has to follow that
+        # record on the chain.
+        self._unrecorded_pending: Optional[tuple[dict, str]] = None
         # Count of rows loaded as skeletons during load_trail because
         # their data/regulatory JSON columns were corrupt. Parallel
         # signal to persistence_failures but for the READ path — an ops
@@ -2330,6 +2344,41 @@ class AuditTrail:
                     return r.record_id
         return None
 
+    def _unrecorded_mark(self, state: dict, resumed_record_id: str) -> AuditRecord:
+        """The trail_not_recording record for the outage the failure marker describes.
+
+        Written by the trail itself, on the first write that lands after the
+        store refused writes (see ``_flush_unrecorded_mark``). The refused
+        records never took a place in the chain on disk, so
+        ``resumed_record_id`` (the first record that did land) and its
+        predecessor are adjacent there, and the window lies between them.
+        ``unrecorded_writes`` is a lower bound: the marker is not locked across
+        processes (see ``write_failure``). A marker edited by hand into the wrong
+        types still gives a record its verifier reads: a count of 1 and the
+        time ``unknown``.
+        """
+        count = state.get("count")
+        if isinstance(count, bool) or not isinstance(count, int) or count < 1:
+            count = 1
+        return AuditRecord(
+            record_id=str(uuid.uuid4()),
+            action_id="trail-not-recording",
+            event_type=EventType.TRAIL_NOT_RECORDING,
+            timestamp=time.time(),
+            agent_id="vaara",
+            tool_name="trail.recording",
+            data={
+                "unrecorded_writes": count,
+                "first_failure_utc": self._cap_record_str(
+                    state.get("first_failure_utc") or "unknown", 64),
+                "last_failure_utc": self._cap_record_str(
+                    state.get("last_failure_utc") or "unknown", 64),
+                "resumed_record_id": self._cap_record_str(resumed_record_id, 128),
+                "stage": self._cap_record_str(state.get("stage") or "", 64),
+                "error": self._cap_record_str(state.get("error") or "", 300),
+            },
+        )
+
     # ── Querying ──────────────────────────────────────────────────
 
     def snapshot(self) -> list[AuditRecord]:
@@ -3151,7 +3200,7 @@ class AuditTrail:
                     self._note_persistence_failure(record, exc, "append_record")
                     kept = False
                 else:
-                    self._note_persistence_ok()
+                    self._note_persistence_ok(record)
             else:
                 _stamp(self._last_hash)
                 if self._on_record:
@@ -3161,10 +3210,12 @@ class AuditTrail:
                         self._note_persistence_failure(record, exc, "on_record")
                         kept = False
                     else:
-                        self._note_persistence_ok()
+                        self._note_persistence_ok(record)
 
             self._last_hash = record.record_hash
             self._index_record(record)
+        if self._unrecorded_pending is not None:
+            self._flush_unrecorded_mark()
         return kept
 
     def _index_record(self, record: AuditRecord) -> None:
@@ -3274,22 +3325,39 @@ class AuditTrail:
                 state.get("first_failure_utc", "an unknown time") if state else "?",
             )
 
-    def _note_persistence_ok(self) -> None:
-        """Clear an outage marker once, on the first write that succeeds.
+    def _note_persistence_ok(self, record: AuditRecord) -> None:
+        """Queue the outage's mark on the first write that succeeds.
 
         Checked at most once per trail instance, and re-armed by the next
-        failure, so the steady state costs nothing.
+        failure, so the steady state costs nothing. The marker is not closed
+        here: it stays open until the trail_not_recording record has landed,
+        so a refused mark leaves the window to be written by the next good
+        write instead of losing it.
         """
         if self._write_marker_checked:
             return
         self._write_marker_checked = True
-        state = mark_recovered(self._persistence_path())
-        if state:
+        state = active_failure(self._persistence_path())
+        if state is not None:
+            self._unrecorded_pending = (state, record.record_id)
+
+    def _flush_unrecorded_mark(self) -> None:
+        """Write the queued trail_not_recording record, then close the outage."""
+        with self._lock:
+            pending, self._unrecorded_pending = self._unrecorded_pending, None
+        if pending is None:
+            return
+        state, resumed_record_id = pending
+        mark = self._unrecorded_mark(state, resumed_record_id)
+        if not self._append_chained(mark):
+            return
+        resolved = mark_recovered(self._persistence_path())
+        if resolved:
             logger.warning(
                 "the audit trail at %s is recording again after %s failed "
                 "write(s) starting %s",
-                state.get("db"), state.get("count", "?"),
-                state.get("first_failure_utc", "an unknown time"),
+                resolved.get("db"), resolved.get("count", "?"),
+                resolved.get("first_failure_utc", "an unknown time"),
             )
 
     def _get_regulatory_articles(
