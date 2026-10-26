@@ -515,7 +515,8 @@ def _note_trail_failure(cfg: dict, exc: BaseException, *, stage: str) -> None:
         pass
 
 
-def _ungovernable(cfg: dict, tool_name: str, reason: str) -> int:
+def _ungovernable(cfg: dict, tool_name: str, reason: str, *,
+                  scored: bool = False) -> int:
     """Verdict for an ``mcp__*`` call that cannot be scored or recorded.
 
     The posture is not new. A missing ``vaara`` package already fails
@@ -535,19 +536,24 @@ def _ungovernable(cfg: dict, tool_name: str, reason: str) -> int:
     without the trail, so a broken trail on the regex path costs evidence
     and not enforcement; blocking every shell call there is how the hook
     gets uninstalled, and an uninstalled hook records nothing at all.
+
+    ``scored`` is for the third route to the same place: the trail opened and
+    the pipeline scored the call, but the append behind the verdict was
+    refused. An allowed call would run with nothing on the chain to say so
+    (ran 2026-10-24), so it gets the same answer.
     """
     if shadow_mode(cfg) or fail_open(cfg):
-        _emit(
-            f"vaara-governance: {reason}; passing {tool_name} through UNSCORED "
-            f"and UNRECORDED."
-        )
+        passed = "UNRECORDED" if scored else "UNSCORED and UNRECORDED"
+        _emit(f"vaara-governance: {reason}; passing {tool_name} through {passed}.")
         return 0
+    cannot = "was not recorded" if scored else "cannot be scored or recorded"
+    through = "unrecorded" if scored else "unscored"
     _emit(
         f"vaara-governance: BLOCKED {tool_name} (fail-closed): {reason}, so "
-        f"this MCP call cannot be scored or recorded. Repair the trail "
+        f"this MCP call {cannot}. Repair the trail "
         f"(`vaara trail repair --db <db>` keeps every readable record and "
         f"declares the rest; keep the damaged file, it is the evidence), or set \"fail_open\": true in "
-        f"~/.vaara/claude-code/config.json to pass through unscored."
+        f"~/.vaara/claude-code/config.json to pass through {through}."
     )
     notify(cfg, "BLOCKED", tool_name, f"cannot govern this call: {reason}")
     return 2
@@ -806,6 +812,9 @@ def _decide_pre(cfg: dict, events: list[dict], agent: str,
         )
         return 0
 
+    from vaara.integrations._record_before_effect import (
+        UNRECORDED, trail_failures,
+    )
     from vaara.pipeline import InterceptionPipeline
 
     try:
@@ -820,6 +829,7 @@ def _decide_pre(cfg: dict, events: list[dict], agent: str,
     pipeline = InterceptionPipeline(trail=trail, enforce=not shadow, scorer=_scorer())
     _apply_protection(cfg, pipeline)
 
+    failures_before = trail_failures(pipeline)
     try:
         result = pipeline.intercept(
             agent_id=agent, tool_name=tool_name,
@@ -833,6 +843,15 @@ def _decide_pre(cfg: dict, events: list[dict], agent: str,
         # trail that never opened, so the same verdict.
         _note_trail_failure(cfg, exc, stage="intercept")
         return _ungovernable(cfg, tool_name, f"the classifier failed ({exc!r})")
+
+    if (result.allowed and tool_name.startswith("mcp__")
+            and trail_failures(pipeline) != failures_before):
+        # The append behind an allow was refused. The failure marker is
+        # already written by the trail; this is the verdict that follows it.
+        # Only the mcp__ path: a shell or file call reaches its verdict
+        # through the deny rules, and see _ungovernable for why that stays
+        # fail-open.
+        return _ungovernable(cfg, tool_name, UNRECORDED, scored=True)
 
     if result.allowed:
         return 0
