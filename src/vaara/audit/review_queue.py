@@ -36,6 +36,8 @@ from dataclasses import dataclass, field
 from pathlib import Path
 from typing import Any, Optional
 
+from vaara import _capture
+
 logger = logging.getLogger(__name__)
 
 SCHEMA_VERSION = 1
@@ -271,7 +273,9 @@ class ReviewQueue:
         """Enqueue a borderline action for human review."""
         qid = queue_id or str(uuid.uuid4())
         ts = now if now is not None else time.time()
-        params_json = _cap_json(parameters, _MAX_DATA_JSON_BYTES)
+        # The second copy of the arguments obeys the same capture policy as
+        # the trail row, so a declared field is a digest here too.
+        params_json = _cap_json(_capture.mask(tool_name, parameters), _MAX_DATA_JSON_BYTES)
         context_json = _cap_json(context, _MAX_DATA_JSON_BYTES)
         signals_json = _cap_json(signals, _MAX_DATA_JSON_BYTES)
         with self._lock:

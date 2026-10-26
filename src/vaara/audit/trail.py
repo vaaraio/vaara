@@ -38,6 +38,7 @@ from enum import Enum
 from pathlib import Path
 from typing import Any, Callable, Optional
 
+from vaara import _capture
 from vaara._decision_vocabulary import FINE_TO_COARSE, REFINEMENTS
 from vaara._sanitize import json_safe, strict_json_dumps
 from vaara.audit.write_failure import active_failure, mark_recovered, record_failure
@@ -1373,8 +1374,12 @@ class AuditTrail:
             self._cap_record_str(request.parent_action_id, self._MAX_PARENT_ACTION_ID_LEN)
             if request.parent_action_id is not None else None
         )
+        # A field the operator declared digest-only (vaara._capture) goes
+        # into the record as a keyed digest; the engine already scored the
+        # real arguments, and the commitment below covers what is recorded.
         parameters = self._cap_record_dict_bytes(
-            request.parameters if isinstance(request.parameters, dict) else {},
+            _capture.mask(request.tool_name, request.parameters)
+            if isinstance(request.parameters, dict) else {},
             self._MAX_REQUEST_PARAMETERS_JSON_BYTES,
         )
         # A salted commitment to the arguments as recorded, so a decision
@@ -1626,7 +1631,8 @@ class AuditTrail:
             )
         if modified_parameters:
             data["modified_parameters"] = self._cap_record_dict_bytes(
-                {str(k): json_safe(v) for k, v in modified_parameters.items()},
+                {str(k): json_safe(v) for k, v in
+                 _capture.mask(tool_name, modified_parameters).items()},
                 self._MAX_EXECUTION_RESULT_JSON_BYTES,
             )
         data.update(disposition)
