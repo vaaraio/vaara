@@ -47,6 +47,7 @@ from vaara.audit.decision_receipts import default_sink
 from vaara.audit.sqlite_backend import SQLiteAuditBackend
 from vaara.audit.trail import AuditTrail
 from vaara.integrations._mcp_beacon import Beacon
+from vaara.integrations._record_before_effect import RecordGate, refusal
 from vaara.integrations._mcp_input_schema import (
     check_arguments,
     unchecked_keywords,
@@ -247,7 +248,12 @@ class VaaraMCPProxy:
         trusted_values: Optional[list[str]] = None,
         authority_args: Optional[dict[str, list[str]]] = None,
         value_origin_store: Optional[Any] = None,
+        fail_open: bool = False,
     ) -> None:
+        # A call whose decision record did not reach the audit store is not
+        # forwarded, unless this is set. Shadow mode never refuses.
+        self._fail_open = bool(fail_open)
+        self._record_gate = RecordGate()
         # Value origin (vaara.scorer.value_origin). Off unless asked for.
         # When on, recipient, payee and endpoint values in tools/call and
         # resources/read results are remembered, and a later call that puts
@@ -1604,10 +1610,51 @@ class VaaraMCPProxy:
         origin = self._origin_hold(tool_name, arguments, gates)
         # Unknown upstream tool names classify as generic high-risk in the
         # registry (fail-closed). Correct default for runtime governance.
-        result = self._pipeline.intercept(
+        result, unrecorded = self._record_gate.intercept(
+            self._pipeline,
             agent_id=agent_id, tool_name=tool_name, parameters=arguments,
             tenant_id=_REQUEST_TENANT.get(), value_origin=origin,
         )
+        if unrecorded is not None and result.allowed:
+            # Record before effect: the decision did not reach the store, and
+            # an allowed call would run with nothing on the chain to say so.
+            if self._pipeline._enforce and not self._fail_open:
+                gates.append("record_before_effect:refuse")
+                reason = refusal(self._pipeline, unrecorded, who="this proxy")
+                logger.error("refusing an unrecorded call: %s", unrecorded)
+                block_payload = {
+                    "vaara_blocked": True,
+                    "type": "vaara_trail_not_recording",
+                    "reason": reason,
+                    "decision": "NOT_RECORDED",
+                    "tool": tool_name,
+                    "gates": list(gates),
+                }
+                self._overt_emit(
+                    surface="mcp.tool.call",
+                    identifier=tool_name,
+                    identifier_field="tool_name",
+                    request_obj={"tool": tool_name, "arguments": arguments},
+                    decision="DENY",
+                    reason=reason,
+                    extra={"agent_id": agent_id, "gates": list(gates)},
+                )
+                return {
+                    "jsonrpc": "2.0", "id": request.get("id"),
+                    "result": {
+                        "content": [{"type": "text", "text": strict_json_dumps(block_payload, indent=2)}],
+                        "isError": True,
+                    },
+                }
+            gates.append(
+                "record_before_effect:shadow" if not self._pipeline._enforce
+                else "record_before_effect:fail_open"
+            )
+            logger.error(
+                "forwarding UNRECORDED (%s): %s",
+                "shadow mode" if not self._pipeline._enforce else "--fail-open",
+                unrecorded,
+            )
         progress_token = self._progress_token(params)
         if not result.allowed:
             gates.append("policy:deny")
@@ -2565,6 +2612,14 @@ def main(argv: Optional[list[str]] = None) -> None:
         help="Declare another authority argument for a tool, on top of the preset. "
              "Repeatable.")
     parser.add_argument(
+        "--fail-open", action="store_true",
+        help="Forward a tool call even when its audit record could not be "
+             "written. Off by default: the proxy first repairs the trail and "
+             "retries, and if the record still cannot be written the call is "
+             "refused and the upstream never sees it. With this flag the call "
+             "goes out unrecorded and the log says so on every one. Shadow "
+             "mode never refuses.")
+    parser.add_argument(
         "--stacked", choices=("warn", "fail", "ignore"), default="warn",
         help="What to do when a second Vaara governance layer is detected in "
              "front of this proxy (the Claude Code PreToolUse hook): 'warn' "
@@ -2681,6 +2736,7 @@ def main(argv: Optional[list[str]] = None) -> None:
             value_origin_strict=args.value_origin_strict,
             trusted_values=args.trusted_value or None,
             authority_args=_parse_authority_args(args.authority_arg, parser),
+            fail_open=args.fail_open,
         )
     except (ValueError, ProxyError) as e:
         # ProxyError here means a --upstream-url target was refused by the SSRF
