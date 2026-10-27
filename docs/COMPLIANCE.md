@@ -975,7 +975,10 @@ problem:
   that the archive still exists or is complete beyond what `--archive`
   checks, and whoever holds the signing key can write a record for
   records they dropped, so pin the key with `--pubkey`. Rotation can run
-  again on the rotated trail; each run appends its own record.
+  again on the rotated trail; each run appends its own record. With
+  `--tenant ID` the record is written into that tenant's chain, so the tenant's
+  records must form a chain of their own; rotation refuses, and purges nothing,
+  when another tenant's records are interleaved in the same chain.
 
 ## Current limits
 
