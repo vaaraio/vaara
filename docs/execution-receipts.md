@@ -1,7 +1,9 @@
 # Execution receipts
 
 The execution receipt is the post-execution sibling of SEP-2787 tool
-call attestation.
+call attestation. MCP pull request 2787, which proposed that SEP, was
+closed without being merged on 2026-09-22. The receipt still links back
+to the attestation shape and reuses its canonicalization and signing.
 
 SEP-2787 attests a `tools/call` **request** before it runs: issuer,
 subject, target, intent, nonce, time, and an argument commitment. It
@@ -10,8 +12,9 @@ back. The receipt covers that deferred half. It binds the **outcome** of
 one attested request and links back to the attestation it answers.
 
 Together the pair gives end-to-end accountability for one action: the
-attestation proves the request was authorised, the receipt proves what
-happened to it.
+attestation states what was asked, and the receipt records what the
+issuer observed happen to it. The receipt is the issuer's account, signed
+by whoever saw the outcome. It is not a separate witness to the action.
 
 ## Shape
 
