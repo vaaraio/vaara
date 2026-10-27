@@ -134,7 +134,7 @@ section 5.6).
 
 ## 10. Conformance
 
-54 conformance suites under `tests/vectors/` and `conformance/`, each with a
+55 conformance suites under `tests/vectors/` and `conformance/`, each with a
 `_check_independent.py` that imports no Vaara code and recomputes its verdicts
 from the bytes of its case files. `scripts/conformance_runner.py` runs them all:
 50 pass and 2 skip without optional extras (`pq_hybrid_v0` needs `vaara[pq]`,
@@ -193,7 +193,7 @@ reproductions: [vaara.io/conformance.html](https://vaara.io/conformance.html).
 
 ```
 pip install vaara
-scripts/conformance_runner.py                 # 54 suites, checkers import no Vaara
+scripts/conformance_runner.py                 # 55 suites, checkers import no Vaara
 vaara conformance check PATH                  # keyless SEP-2828 conformance
 vaara verify-record FILE --trusted-issuer-cert CA.pem   # qualified or self-asserted time
 vaara receipt render RECEIPT.json             # self-contained offline evidence page

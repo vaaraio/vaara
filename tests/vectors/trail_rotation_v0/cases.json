@@ -1,0 +1,1421 @@
+{
+  "altered_archive_hex": "010102030405060708090a0b0c0d0e0f101112131415161718191a1b1c1d1e1f202122232425262728292a2b2c2d2e2f303132333435363738393a3b3c3d3e3f404142434445464748494a4b4c4d4e4f505152535455565758595a5b5c5d5e5f606162636465666768696a6b6c6d6e6f707172737475767778797a7b7c7d7e7f808182838485868788898a8b8c8d8e8f909192939495969798999a9b9c9d9e9fa0a1a2a3a4a5a6a7a8a9aaabacadaeafb0b1b2b3b4b5b6b7b8b9babbbcbdbebfc0c1c2c3c4c5c6c7c8c9cacbcccdcecfd0d1d2d3d4d5d6d7d8d9dadbdcdddedfe0e1e2e3e4e5e6e7e8e9eaebecedeeeff0f1f2f3f4f5f6f7f8f9fafbfcfdfeff000102030405060708090a0b0c0d0e0f101112131415161718191a1b1c1d1e1f202122232425262728292a2b2c2d2e2f303132333435363738393a3b3c3d3e3f404142434445464748494a4b4c4d4e4f505152535455565758595a5b5c5d5e5f606162636465666768696a6b6c6d6e6f707172737475767778797a7b7c7d7e7f808182838485868788898a8b8c8d8e8f909192939495969798999a9b9c9d9e9fa0a1a2a3a4a5a6a7a8a9aaabacadaeafb0b1b2b3b4b5b6b7b8b9babbbcbdbebfc0c1c2c3c4c5c6c7c8c9cacbcccdcecfd0d1d2d3d4d5d6d7d8d9dadbdcdddedfe0e1e2e3e4e5e6e7e8e9eaebecedeeeff0f1f2f3f4f5f6f7f8f9fafbfcfdfeff000102030405060708090a0b0c0d0e0f101112131415161718191a1b1c1d1e1f202122232425262728292a2b2c2d2e2f303132333435363738393a3b3c3d3e3f404142434445464748494a4b4c4d4e4f505152535455565758595a5b5c5d5e5f606162636465666768696a6b6c6d6e6f707172737475767778797a7b7c7d7e7f808182838485868788898a8b8c8d8e8f909192939495969798999a9b9c9d9e9fa0a1a2a3a4a5a6a7a8a9aaabacadaeafb0b1b2b3b4b5b6b7b8b9babbbcbdbebfc0c1c2c3c4c5c6c7c8c9cacbcccdcecfd0d1d2d3d4d5d6d7d8d9dadbdcdddedfe0e1e2e3e4e5e6e7e8e9eaebecedeeeff0f1f2f3f4f5f6f7f8f9fafbfcfdfeff000102030405060708090a0b0c0d0e0f101112131415161718191a1b1c1d1e1f202122232425262728292a2b2c2d2e2f303132333435363738393a3b3c3d3e3f404142434445464748494a4b4c4d4e4f505152535455565758595a5b5c5d5e5f606162636465666768696a6b6c6d6e6f707172737475767778797a7b7c7d7e7f808182838485868788898a8b8c8d8e8f909192939495969798999a9b9c9d9e9fa0a1a2a3a4a5a6a7a8a9aaabacadaeafb0b1b2b3b4b5b6b7b8b9babbbcbdbebfc0c1c2c3c4c5c6c7c8c9cacbcccdcecfd0d1d2d3d4d5d6d7d8d9dadbdcdddedfe0e1e2e3e4e5e6e7e8e9eaebecedeeeff0f1f2f3f4f5f6f7f8f9fafbfcfdfeff",
+  "archive_hex": "000102030405060708090a0b0c0d0e0f101112131415161718191a1b1c1d1e1f202122232425262728292a2b2c2d2e2f303132333435363738393a3b3c3d3e3f404142434445464748494a4b4c4d4e4f505152535455565758595a5b5c5d5e5f606162636465666768696a6b6c6d6e6f707172737475767778797a7b7c7d7e7f808182838485868788898a8b8c8d8e8f909192939495969798999a9b9c9d9e9fa0a1a2a3a4a5a6a7a8a9aaabacadaeafb0b1b2b3b4b5b6b7b8b9babbbcbdbebfc0c1c2c3c4c5c6c7c8c9cacbcccdcecfd0d1d2d3d4d5d6d7d8d9dadbdcdddedfe0e1e2e3e4e5e6e7e8e9eaebecedeeeff0f1f2f3f4f5f6f7f8f9fafbfcfdfeff000102030405060708090a0b0c0d0e0f101112131415161718191a1b1c1d1e1f202122232425262728292a2b2c2d2e2f303132333435363738393a3b3c3d3e3f404142434445464748494a4b4c4d4e4f505152535455565758595a5b5c5d5e5f606162636465666768696a6b6c6d6e6f707172737475767778797a7b7c7d7e7f808182838485868788898a8b8c8d8e8f909192939495969798999a9b9c9d9e9fa0a1a2a3a4a5a6a7a8a9aaabacadaeafb0b1b2b3b4b5b6b7b8b9babbbcbdbebfc0c1c2c3c4c5c6c7c8c9cacbcccdcecfd0d1d2d3d4d5d6d7d8d9dadbdcdddedfe0e1e2e3e4e5e6e7e8e9eaebecedeeeff0f1f2f3f4f5f6f7f8f9fafbfcfdfeff000102030405060708090a0b0c0d0e0f101112131415161718191a1b1c1d1e1f202122232425262728292a2b2c2d2e2f303132333435363738393a3b3c3d3e3f404142434445464748494a4b4c4d4e4f505152535455565758595a5b5c5d5e5f606162636465666768696a6b6c6d6e6f707172737475767778797a7b7c7d7e7f808182838485868788898a8b8c8d8e8f909192939495969798999a9b9c9d9e9fa0a1a2a3a4a5a6a7a8a9aaabacadaeafb0b1b2b3b4b5b6b7b8b9babbbcbdbebfc0c1c2c3c4c5c6c7c8c9cacbcccdcecfd0d1d2d3d4d5d6d7d8d9dadbdcdddedfe0e1e2e3e4e5e6e7e8e9eaebecedeeeff0f1f2f3f4f5f6f7f8f9fafbfcfdfeff000102030405060708090a0b0c0d0e0f101112131415161718191a1b1c1d1e1f202122232425262728292a2b2c2d2e2f303132333435363738393a3b3c3d3e3f404142434445464748494a4b4c4d4e4f505152535455565758595a5b5c5d5e5f606162636465666768696a6b6c6d6e6f707172737475767778797a7b7c7d7e7f808182838485868788898a8b8c8d8e8f909192939495969798999a9b9c9d9e9fa0a1a2a3a4a5a6a7a8a9aaabacadaeafb0b1b2b3b4b5b6b7b8b9babbbcbdbebfc0c1c2c3c4c5c6c7c8c9cacbcccdcecfd0d1d2d3d4d5d6d7d8d9dadbdcdddedfe0e1e2e3e4e5e6e7e8e9eaebecedeeeff0f1f2f3f4f5f6f7f8f9fafbfcfdfeff",
+  "cases": [
+    {
+      "archive": null,
+      "description": "The first record links to b, and a signed rotation record in the trail names b.",
+      "expected": {
+        "archive_check": null,
+        "begins_at_seam": true,
+        "chain": "ok",
+        "seams": [
+          {
+            "begins_here": true,
+            "index": 1,
+            "state": "signed"
+          }
+        ],
+        "verdict": "pass"
+      },
+      "name": "a_signed_seam_begins_the_trail",
+      "records": [
+        {
+          "action_id": "c",
+          "agent_id": "agent-x",
+          "chain_version": 2,
+          "data": {
+            "cage": {
+              "confirmed": false,
+              "driver": "none"
+            },
+            "decision": "allow",
+            "reason": "low risk",
+            "risk_score": 0.1
+          },
+          "data_usage": "risk_score+thresholds",
+          "decision_making": "threshold_match",
+          "event_type": "decision_made",
+          "limitations": null,
+          "previous_hash": "58e5981d98bf5adbe0fa941185f6f6c7f363fe17a87dd728db17d3ba4d5fa819",
+          "record_hash": "28a6aa7b88b2576c72146a0281f73af39fa6572cf82e4febe9da34d650a84a4d",
+          "record_id": "a11ce000-0000-0000-0000-000000000005",
+          "regulatory_articles": [
+            {
+              "article": "Article 14(1)",
+              "domain": "eu_ai_act",
+              "how_satisfied": "Three-tier decision (allow/escalate/deny) ensures humans review borderline cases",
+              "requirement": "High-risk AI systems shall be designed to be effectively overseen by natural persons"
+            },
+            {
+              "article": "Article 14(4)(a)",
+              "domain": "eu_ai_act",
+              "how_satisfied": "Decision records include risk scores, confidence intervals, and contributing signals",
+              "requirement": "The human shall be able to properly understand the relevant capacities and limitations of the system and duly monitor its operation"
+            }
+          ],
+          "system_operation": "decision_threshold",
+          "tenant_id": "",
+          "timestamp": 1792000006.0,
+          "tool_name": "read_file"
+        },
+        {
+          "action_id": "trail-rotated",
+          "agent_id": "vaara",
+          "chain_version": 2,
+          "data": {
+            "archive_kind": "sealed",
+            "archive_records": 3,
+            "archive_sha256": "785b0751fc2c53dc14a4ce3d800e69ef9ce1009eb327ccf458afe09c242c26c9",
+            "boundary_utc": "2026-10-20T00:00:00Z",
+            "last_hash": "58e5981d98bf5adbe0fa941185f6f6c7f363fe17a87dd728db17d3ba4d5fa819",
+            "purged_records": 2,
+            "rotated_at": "2026-10-14T17:46:47Z",
+            "rotation_signature": {
+              "alg": "Ed25519",
+              "signature": "93489eb837a36e334c0bce3a41653da85404d467396d0a057e57b33dd21b1701af799179fc81b0fd2139c0f0069f402e6a989b2f8064de9e305223ca6dcd0605",
+              "type": "vaara.trail-rotation/v1"
+            },
+            "signer_fingerprint": "56475aa75463474c0285df5dbf2bcab7"
+          },
+          "data_usage": "archive_digest+purged_count",
+          "decision_making": "operator_action",
+          "event_type": "trail_rotated",
+          "limitations": null,
+          "previous_hash": "28a6aa7b88b2576c72146a0281f73af39fa6572cf82e4febe9da34d650a84a4d",
+          "record_hash": "762192019501272e354346c7132127ea9bc651d4429f154a907266a2af779b82",
+          "record_id": "a11ce000-0000-0000-0000-000000000008",
+          "regulatory_articles": [],
+          "system_operation": "retention_rotation",
+          "tenant_id": "",
+          "timestamp": 1792000007.0,
+          "tool_name": "trail.rotate"
+        }
+      ],
+      "rotation_key": null
+    },
+    {
+      "archive": null,
+      "description": "No purge happened: the first record links to nothing, and there is no seam to find.",
+      "expected": {
+        "archive_check": null,
+        "begins_at_seam": false,
+        "chain": "ok",
+        "seams": [],
+        "verdict": "pass"
+      },
+      "name": "a_trail_that_begins_at_its_first_record",
+      "records": [
+        {
+          "action_id": "a",
+          "agent_id": "agent-x",
+          "chain_version": 2,
+          "data": {
+            "cage": {
+              "confirmed": false,
+              "driver": "none"
+            },
+            "decision": "allow",
+            "reason": "low risk",
+            "risk_score": 0.1
+          },
+          "data_usage": "risk_score+thresholds",
+          "decision_making": "threshold_match",
+          "event_type": "decision_made",
+          "limitations": null,
+          "previous_hash": "",
+          "record_hash": "414436269f5343556ed936ce724ba212b2ed952c608d62d88d157b0d959ea393",
+          "record_id": "a11ce000-0000-0000-0000-000000000001",
+          "regulatory_articles": [
+            {
+              "article": "Article 14(1)",
+              "domain": "eu_ai_act",
+              "how_satisfied": "Three-tier decision (allow/escalate/deny) ensures humans review borderline cases",
+              "requirement": "High-risk AI systems shall be designed to be effectively overseen by natural persons"
+            },
+            {
+              "article": "Article 14(4)(a)",
+              "domain": "eu_ai_act",
+              "how_satisfied": "Decision records include risk scores, confidence intervals, and contributing signals",
+              "requirement": "The human shall be able to properly understand the relevant capacities and limitations of the system and duly monitor its operation"
+            }
+          ],
+          "system_operation": "decision_threshold",
+          "tenant_id": "",
+          "timestamp": 1792000002.0,
+          "tool_name": "read_file"
+        },
+        {
+          "action_id": "b",
+          "agent_id": "agent-x",
+          "chain_version": 2,
+          "data": {
+            "cage": {
+              "confirmed": false,
+              "driver": "none"
+            },
+            "decision": "allow",
+            "reason": "low risk",
+            "risk_score": 0.1
+          },
+          "data_usage": "risk_score+thresholds",
+          "decision_making": "threshold_match",
+          "event_type": "decision_made",
+          "limitations": null,
+          "previous_hash": "414436269f5343556ed936ce724ba212b2ed952c608d62d88d157b0d959ea393",
+          "record_hash": "58e5981d98bf5adbe0fa941185f6f6c7f363fe17a87dd728db17d3ba4d5fa819",
+          "record_id": "a11ce000-0000-0000-0000-000000000003",
+          "regulatory_articles": [
+            {
+              "article": "Article 14(1)",
+              "domain": "eu_ai_act",
+              "how_satisfied": "Three-tier decision (allow/escalate/deny) ensures humans review borderline cases",
+              "requirement": "High-risk AI systems shall be designed to be effectively overseen by natural persons"
+            },
+            {
+              "article": "Article 14(4)(a)",
+              "domain": "eu_ai_act",
+              "how_satisfied": "Decision records include risk scores, confidence intervals, and contributing signals",
+              "requirement": "The human shall be able to properly understand the relevant capacities and limitations of the system and duly monitor its operation"
+            }
+          ],
+          "system_operation": "decision_threshold",
+          "tenant_id": "",
+          "timestamp": 1792000004.0,
+          "tool_name": "read_file"
+        },
+        {
+          "action_id": "c",
+          "agent_id": "agent-x",
+          "chain_version": 2,
+          "data": {
+            "cage": {
+              "confirmed": false,
+              "driver": "none"
+            },
+            "decision": "allow",
+            "reason": "low risk",
+            "risk_score": 0.1
+          },
+          "data_usage": "risk_score+thresholds",
+          "decision_making": "threshold_match",
+          "event_type": "decision_made",
+          "limitations": null,
+          "previous_hash": "58e5981d98bf5adbe0fa941185f6f6c7f363fe17a87dd728db17d3ba4d5fa819",
+          "record_hash": "28a6aa7b88b2576c72146a0281f73af39fa6572cf82e4febe9da34d650a84a4d",
+          "record_id": "a11ce000-0000-0000-0000-000000000005",
+          "regulatory_articles": [
+            {
+              "article": "Article 14(1)",
+              "domain": "eu_ai_act",
+              "how_satisfied": "Three-tier decision (allow/escalate/deny) ensures humans review borderline cases",
+              "requirement": "High-risk AI systems shall be designed to be effectively overseen by natural persons"
+            },
+            {
+              "article": "Article 14(4)(a)",
+              "domain": "eu_ai_act",
+              "how_satisfied": "Decision records include risk scores, confidence intervals, and contributing signals",
+              "requirement": "The human shall be able to properly understand the relevant capacities and limitations of the system and duly monitor its operation"
+            }
+          ],
+          "system_operation": "decision_threshold",
+          "tenant_id": "",
+          "timestamp": 1792000006.0,
+          "tool_name": "read_file"
+        }
+      ],
+      "rotation_key": null
+    },
+    {
+      "archive": null,
+      "description": "The trail begins at c and holds no rotation record: a chain break.",
+      "expected": {
+        "archive_check": null,
+        "begins_at_seam": false,
+        "chain": "break",
+        "seams": [],
+        "verdict": "fail"
+      },
+      "name": "a_first_record_that_links_to_nothing_held",
+      "records": [
+        {
+          "action_id": "c",
+          "agent_id": "agent-x",
+          "chain_version": 2,
+          "data": {
+            "cage": {
+              "confirmed": false,
+              "driver": "none"
+            },
+            "decision": "allow",
+            "reason": "low risk",
+            "risk_score": 0.1
+          },
+          "data_usage": "risk_score+thresholds",
+          "decision_making": "threshold_match",
+          "event_type": "decision_made",
+          "limitations": null,
+          "previous_hash": "58e5981d98bf5adbe0fa941185f6f6c7f363fe17a87dd728db17d3ba4d5fa819",
+          "record_hash": "28a6aa7b88b2576c72146a0281f73af39fa6572cf82e4febe9da34d650a84a4d",
+          "record_id": "a11ce000-0000-0000-0000-000000000005",
+          "regulatory_articles": [
+            {
+              "article": "Article 14(1)",
+              "domain": "eu_ai_act",
+              "how_satisfied": "Three-tier decision (allow/escalate/deny) ensures humans review borderline cases",
+              "requirement": "High-risk AI systems shall be designed to be effectively overseen by natural persons"
+            },
+            {
+              "article": "Article 14(4)(a)",
+              "domain": "eu_ai_act",
+              "how_satisfied": "Decision records include risk scores, confidence intervals, and contributing signals",
+              "requirement": "The human shall be able to properly understand the relevant capacities and limitations of the system and duly monitor its operation"
+            }
+          ],
+          "system_operation": "decision_threshold",
+          "tenant_id": "",
+          "timestamp": 1792000006.0,
+          "tool_name": "read_file"
+        }
+      ],
+      "rotation_key": null
+    },
+    {
+      "archive": null,
+      "description": "The rotation record is signed but names a, not b: c links to nothing held.",
+      "expected": {
+        "archive_check": null,
+        "begins_at_seam": false,
+        "chain": "break",
+        "seams": [
+          {
+            "begins_here": false,
+            "index": 1,
+            "state": "signed"
+          }
+        ],
+        "verdict": "fail"
+      },
+      "name": "a_seam_that_names_another_hash",
+      "records": [
+        {
+          "action_id": "c",
+          "agent_id": "agent-x",
+          "chain_version": 2,
+          "data": {
+            "cage": {
+              "confirmed": false,
+              "driver": "none"
+            },
+            "decision": "allow",
+            "reason": "low risk",
+            "risk_score": 0.1
+          },
+          "data_usage": "risk_score+thresholds",
+          "decision_making": "threshold_match",
+          "event_type": "decision_made",
+          "limitations": null,
+          "previous_hash": "58e5981d98bf5adbe0fa941185f6f6c7f363fe17a87dd728db17d3ba4d5fa819",
+          "record_hash": "28a6aa7b88b2576c72146a0281f73af39fa6572cf82e4febe9da34d650a84a4d",
+          "record_id": "a11ce000-0000-0000-0000-000000000005",
+          "regulatory_articles": [
+            {
+              "article": "Article 14(1)",
+              "domain": "eu_ai_act",
+              "how_satisfied": "Three-tier decision (allow/escalate/deny) ensures humans review borderline cases",
+              "requirement": "High-risk AI systems shall be designed to be effectively overseen by natural persons"
+            },
+            {
+              "article": "Article 14(4)(a)",
+              "domain": "eu_ai_act",
+              "how_satisfied": "Decision records include risk scores, confidence intervals, and contributing signals",
+              "requirement": "The human shall be able to properly understand the relevant capacities and limitations of the system and duly monitor its operation"
+            }
+          ],
+          "system_operation": "decision_threshold",
+          "tenant_id": "",
+          "timestamp": 1792000006.0,
+          "tool_name": "read_file"
+        },
+        {
+          "action_id": "trail-rotated",
+          "agent_id": "vaara",
+          "chain_version": 2,
+          "data": {
+            "archive_kind": "sealed",
+            "archive_records": 3,
+            "archive_sha256": "785b0751fc2c53dc14a4ce3d800e69ef9ce1009eb327ccf458afe09c242c26c9",
+            "boundary_utc": "2026-10-20T00:00:00Z",
+            "last_hash": "414436269f5343556ed936ce724ba212b2ed952c608d62d88d157b0d959ea393",
+            "purged_records": 2,
+            "rotated_at": "2026-10-14T17:46:47Z",
+            "rotation_signature": {
+              "alg": "Ed25519",
+              "signature": "bb3e26e8ee15726e61480ff9bfc25f4f7cfa6bd583bc17f9b0d40ee0b6bbbb4153fed38cdbcaf0365e426c0cc749fc4275499d99be016ada877fc71b64bf9e0e",
+              "type": "vaara.trail-rotation/v1"
+            },
+            "signer_fingerprint": "56475aa75463474c0285df5dbf2bcab7"
+          },
+          "data_usage": "archive_digest+purged_count",
+          "decision_making": "operator_action",
+          "event_type": "trail_rotated",
+          "limitations": null,
+          "previous_hash": "28a6aa7b88b2576c72146a0281f73af39fa6572cf82e4febe9da34d650a84a4d",
+          "record_hash": "90ca11e721b62672156b506fc4d3dd83654ace192e83fec7ab3cee64fdea6f96",
+          "record_id": "a11ce000-0000-0000-0000-000000000008",
+          "regulatory_articles": [],
+          "system_operation": "retention_rotation",
+          "tenant_id": "",
+          "timestamp": 1792000007.0,
+          "tool_name": "trail.rotate"
+        }
+      ],
+      "rotation_key": null
+    },
+    {
+      "archive": null,
+      "description": "The rotation record names b and carries no signature: it accounts for nothing.",
+      "expected": {
+        "archive_check": null,
+        "begins_at_seam": false,
+        "chain": "break",
+        "seams": [
+          {
+            "begins_here": false,
+            "index": 1,
+            "state": "unsigned"
+          }
+        ],
+        "verdict": "fail"
+      },
+      "name": "an_unsigned_seam",
+      "records": [
+        {
+          "action_id": "c",
+          "agent_id": "agent-x",
+          "chain_version": 2,
+          "data": {
+            "cage": {
+              "confirmed": false,
+              "driver": "none"
+            },
+            "decision": "allow",
+            "reason": "low risk",
+            "risk_score": 0.1
+          },
+          "data_usage": "risk_score+thresholds",
+          "decision_making": "threshold_match",
+          "event_type": "decision_made",
+          "limitations": null,
+          "previous_hash": "58e5981d98bf5adbe0fa941185f6f6c7f363fe17a87dd728db17d3ba4d5fa819",
+          "record_hash": "28a6aa7b88b2576c72146a0281f73af39fa6572cf82e4febe9da34d650a84a4d",
+          "record_id": "a11ce000-0000-0000-0000-000000000005",
+          "regulatory_articles": [
+            {
+              "article": "Article 14(1)",
+              "domain": "eu_ai_act",
+              "how_satisfied": "Three-tier decision (allow/escalate/deny) ensures humans review borderline cases",
+              "requirement": "High-risk AI systems shall be designed to be effectively overseen by natural persons"
+            },
+            {
+              "article": "Article 14(4)(a)",
+              "domain": "eu_ai_act",
+              "how_satisfied": "Decision records include risk scores, confidence intervals, and contributing signals",
+              "requirement": "The human shall be able to properly understand the relevant capacities and limitations of the system and duly monitor its operation"
+            }
+          ],
+          "system_operation": "decision_threshold",
+          "tenant_id": "",
+          "timestamp": 1792000006.0,
+          "tool_name": "read_file"
+        },
+        {
+          "action_id": "trail-rotated",
+          "agent_id": "vaara",
+          "chain_version": 2,
+          "data": {
+            "archive_kind": "sealed",
+            "archive_records": 3,
+            "archive_sha256": "785b0751fc2c53dc14a4ce3d800e69ef9ce1009eb327ccf458afe09c242c26c9",
+            "boundary_utc": "2026-10-20T00:00:00Z",
+            "last_hash": "58e5981d98bf5adbe0fa941185f6f6c7f363fe17a87dd728db17d3ba4d5fa819",
+            "purged_records": 2,
+            "rotated_at": "2026-10-14T17:46:47Z",
+            "signer_fingerprint": "56475aa75463474c0285df5dbf2bcab7"
+          },
+          "data_usage": "archive_digest+purged_count",
+          "decision_making": "operator_action",
+          "event_type": "trail_rotated",
+          "limitations": null,
+          "previous_hash": "28a6aa7b88b2576c72146a0281f73af39fa6572cf82e4febe9da34d650a84a4d",
+          "record_hash": "d8f8143cd96a74591af421b2389ba08243f877b4c8cf57655b2ef192f27172b6",
+          "record_id": "a11ce000-0000-0000-0000-000000000008",
+          "regulatory_articles": [],
+          "system_operation": "retention_rotation",
+          "tenant_id": "",
+          "timestamp": 1792000007.0,
+          "tool_name": "trail.rotate"
+        }
+      ],
+      "rotation_key": null
+    },
+    {
+      "archive": null,
+      "description": "The signature is over a purged count one higher than the record states.",
+      "expected": {
+        "archive_check": null,
+        "begins_at_seam": false,
+        "chain": "break",
+        "seams": [
+          {
+            "begins_here": false,
+            "index": 1,
+            "state": "bad_signature"
+          }
+        ],
+        "verdict": "fail"
+      },
+      "name": "a_seam_signed_over_other_fields",
+      "records": [
+        {
+          "action_id": "c",
+          "agent_id": "agent-x",
+          "chain_version": 2,
+          "data": {
+            "cage": {
+              "confirmed": false,
+              "driver": "none"
+            },
+            "decision": "allow",
+            "reason": "low risk",
+            "risk_score": 0.1
+          },
+          "data_usage": "risk_score+thresholds",
+          "decision_making": "threshold_match",
+          "event_type": "decision_made",
+          "limitations": null,
+          "previous_hash": "58e5981d98bf5adbe0fa941185f6f6c7f363fe17a87dd728db17d3ba4d5fa819",
+          "record_hash": "28a6aa7b88b2576c72146a0281f73af39fa6572cf82e4febe9da34d650a84a4d",
+          "record_id": "a11ce000-0000-0000-0000-000000000005",
+          "regulatory_articles": [
+            {
+              "article": "Article 14(1)",
+              "domain": "eu_ai_act",
+              "how_satisfied": "Three-tier decision (allow/escalate/deny) ensures humans review borderline cases",
+              "requirement": "High-risk AI systems shall be designed to be effectively overseen by natural persons"
+            },
+            {
+              "article": "Article 14(4)(a)",
+              "domain": "eu_ai_act",
+              "how_satisfied": "Decision records include risk scores, confidence intervals, and contributing signals",
+              "requirement": "The human shall be able to properly understand the relevant capacities and limitations of the system and duly monitor its operation"
+            }
+          ],
+          "system_operation": "decision_threshold",
+          "tenant_id": "",
+          "timestamp": 1792000006.0,
+          "tool_name": "read_file"
+        },
+        {
+          "action_id": "trail-rotated",
+          "agent_id": "vaara",
+          "chain_version": 2,
+          "data": {
+            "archive_kind": "sealed",
+            "archive_records": 3,
+            "archive_sha256": "785b0751fc2c53dc14a4ce3d800e69ef9ce1009eb327ccf458afe09c242c26c9",
+            "boundary_utc": "2026-10-20T00:00:00Z",
+            "last_hash": "58e5981d98bf5adbe0fa941185f6f6c7f363fe17a87dd728db17d3ba4d5fa819",
+            "purged_records": 2,
+            "rotated_at": "2026-10-14T17:46:47Z",
+            "rotation_signature": {
+              "alg": "Ed25519",
+              "signature": "51e1f73d12be2d046843083fb2ae6111719712d9f410dfa4825d879b1aff3e131ef1b4239d68d8df83605c072a890f9c073faaa8e39b02e73464b3a4b3802609",
+              "type": "vaara.trail-rotation/v1"
+            },
+            "signer_fingerprint": "56475aa75463474c0285df5dbf2bcab7"
+          },
+          "data_usage": "archive_digest+purged_count",
+          "decision_making": "operator_action",
+          "event_type": "trail_rotated",
+          "limitations": null,
+          "previous_hash": "28a6aa7b88b2576c72146a0281f73af39fa6572cf82e4febe9da34d650a84a4d",
+          "record_hash": "b7490f496a0129433d789d4da2ed2688f08c679bf0202fea0a2850441e287cd7",
+          "record_id": "a11ce000-0000-0000-0000-000000000008",
+          "regulatory_articles": [],
+          "system_operation": "retention_rotation",
+          "tenant_id": "",
+          "timestamp": 1792000007.0,
+          "tool_name": "trail.rotate"
+        }
+      ],
+      "rotation_key": null
+    },
+    {
+      "archive": null,
+      "description": "The rotation record is signed by a key that did not sign the export.",
+      "expected": {
+        "archive_check": null,
+        "begins_at_seam": false,
+        "chain": "break",
+        "seams": [
+          {
+            "begins_here": false,
+            "index": 1,
+            "state": "bad_signature"
+          }
+        ],
+        "verdict": "fail"
+      },
+      "name": "a_seam_signed_by_another_key",
+      "records": [
+        {
+          "action_id": "c",
+          "agent_id": "agent-x",
+          "chain_version": 2,
+          "data": {
+            "cage": {
+              "confirmed": false,
+              "driver": "none"
+            },
+            "decision": "allow",
+            "reason": "low risk",
+            "risk_score": 0.1
+          },
+          "data_usage": "risk_score+thresholds",
+          "decision_making": "threshold_match",
+          "event_type": "decision_made",
+          "limitations": null,
+          "previous_hash": "58e5981d98bf5adbe0fa941185f6f6c7f363fe17a87dd728db17d3ba4d5fa819",
+          "record_hash": "28a6aa7b88b2576c72146a0281f73af39fa6572cf82e4febe9da34d650a84a4d",
+          "record_id": "a11ce000-0000-0000-0000-000000000005",
+          "regulatory_articles": [
+            {
+              "article": "Article 14(1)",
+              "domain": "eu_ai_act",
+              "how_satisfied": "Three-tier decision (allow/escalate/deny) ensures humans review borderline cases",
+              "requirement": "High-risk AI systems shall be designed to be effectively overseen by natural persons"
+            },
+            {
+              "article": "Article 14(4)(a)",
+              "domain": "eu_ai_act",
+              "how_satisfied": "Decision records include risk scores, confidence intervals, and contributing signals",
+              "requirement": "The human shall be able to properly understand the relevant capacities and limitations of the system and duly monitor its operation"
+            }
+          ],
+          "system_operation": "decision_threshold",
+          "tenant_id": "",
+          "timestamp": 1792000006.0,
+          "tool_name": "read_file"
+        },
+        {
+          "action_id": "trail-rotated",
+          "agent_id": "vaara",
+          "chain_version": 2,
+          "data": {
+            "archive_kind": "sealed",
+            "archive_records": 3,
+            "archive_sha256": "785b0751fc2c53dc14a4ce3d800e69ef9ce1009eb327ccf458afe09c242c26c9",
+            "boundary_utc": "2026-10-20T00:00:00Z",
+            "last_hash": "58e5981d98bf5adbe0fa941185f6f6c7f363fe17a87dd728db17d3ba4d5fa819",
+            "purged_records": 2,
+            "rotated_at": "2026-10-14T17:46:47Z",
+            "rotation_signature": {
+              "alg": "Ed25519",
+              "signature": "deb4922214c32eb041d79667d5f19b18d8cb567030eac821263c656464d4507ea82b94e9233195c816cadee2bdfafeef547852c3125cc274ce870066a3728a02",
+              "type": "vaara.trail-rotation/v1"
+            },
+            "signer_fingerprint": "56475aa75463474c0285df5dbf2bcab7"
+          },
+          "data_usage": "archive_digest+purged_count",
+          "decision_making": "operator_action",
+          "event_type": "trail_rotated",
+          "limitations": null,
+          "previous_hash": "28a6aa7b88b2576c72146a0281f73af39fa6572cf82e4febe9da34d650a84a4d",
+          "record_hash": "d4bd113deb1dd9c67df2b06bac82f5c9beacf47173c617fb9a33488aa8c2e51e",
+          "record_id": "a11ce000-0000-0000-0000-000000000008",
+          "regulatory_articles": [],
+          "system_operation": "retention_rotation",
+          "tenant_id": "",
+          "timestamp": 1792000007.0,
+          "tool_name": "trail.rotate"
+        }
+      ],
+      "rotation_key": null
+    },
+    {
+      "archive": null,
+      "description": "The same record, with the key that signed it given as the rotation key.",
+      "expected": {
+        "archive_check": null,
+        "begins_at_seam": true,
+        "chain": "ok",
+        "seams": [
+          {
+            "begins_here": true,
+            "index": 1,
+            "state": "signed"
+          }
+        ],
+        "verdict": "pass"
+      },
+      "name": "a_seam_signed_by_another_key_that_is_named",
+      "records": [
+        {
+          "action_id": "c",
+          "agent_id": "agent-x",
+          "chain_version": 2,
+          "data": {
+            "cage": {
+              "confirmed": false,
+              "driver": "none"
+            },
+            "decision": "allow",
+            "reason": "low risk",
+            "risk_score": 0.1
+          },
+          "data_usage": "risk_score+thresholds",
+          "decision_making": "threshold_match",
+          "event_type": "decision_made",
+          "limitations": null,
+          "previous_hash": "58e5981d98bf5adbe0fa941185f6f6c7f363fe17a87dd728db17d3ba4d5fa819",
+          "record_hash": "28a6aa7b88b2576c72146a0281f73af39fa6572cf82e4febe9da34d650a84a4d",
+          "record_id": "a11ce000-0000-0000-0000-000000000005",
+          "regulatory_articles": [
+            {
+              "article": "Article 14(1)",
+              "domain": "eu_ai_act",
+              "how_satisfied": "Three-tier decision (allow/escalate/deny) ensures humans review borderline cases",
+              "requirement": "High-risk AI systems shall be designed to be effectively overseen by natural persons"
+            },
+            {
+              "article": "Article 14(4)(a)",
+              "domain": "eu_ai_act",
+              "how_satisfied": "Decision records include risk scores, confidence intervals, and contributing signals",
+              "requirement": "The human shall be able to properly understand the relevant capacities and limitations of the system and duly monitor its operation"
+            }
+          ],
+          "system_operation": "decision_threshold",
+          "tenant_id": "",
+          "timestamp": 1792000006.0,
+          "tool_name": "read_file"
+        },
+        {
+          "action_id": "trail-rotated",
+          "agent_id": "vaara",
+          "chain_version": 2,
+          "data": {
+            "archive_kind": "sealed",
+            "archive_records": 3,
+            "archive_sha256": "785b0751fc2c53dc14a4ce3d800e69ef9ce1009eb327ccf458afe09c242c26c9",
+            "boundary_utc": "2026-10-20T00:00:00Z",
+            "last_hash": "58e5981d98bf5adbe0fa941185f6f6c7f363fe17a87dd728db17d3ba4d5fa819",
+            "purged_records": 2,
+            "rotated_at": "2026-10-14T17:46:47Z",
+            "rotation_signature": {
+              "alg": "Ed25519",
+              "signature": "deb4922214c32eb041d79667d5f19b18d8cb567030eac821263c656464d4507ea82b94e9233195c816cadee2bdfafeef547852c3125cc274ce870066a3728a02",
+              "type": "vaara.trail-rotation/v1"
+            },
+            "signer_fingerprint": "56475aa75463474c0285df5dbf2bcab7"
+          },
+          "data_usage": "archive_digest+purged_count",
+          "decision_making": "operator_action",
+          "event_type": "trail_rotated",
+          "limitations": null,
+          "previous_hash": "28a6aa7b88b2576c72146a0281f73af39fa6572cf82e4febe9da34d650a84a4d",
+          "record_hash": "d4bd113deb1dd9c67df2b06bac82f5c9beacf47173c617fb9a33488aa8c2e51e",
+          "record_id": "a11ce000-0000-0000-0000-000000000008",
+          "regulatory_articles": [],
+          "system_operation": "retention_rotation",
+          "tenant_id": "",
+          "timestamp": 1792000007.0,
+          "tool_name": "trail.rotate"
+        }
+      ],
+      "rotation_key": "other_signer"
+    },
+    {
+      "archive": null,
+      "description": "The whole chain, with a rotation record at the tip whose purge never ran.",
+      "expected": {
+        "archive_check": null,
+        "begins_at_seam": false,
+        "chain": "ok",
+        "seams": [
+          {
+            "begins_here": false,
+            "index": 3,
+            "state": "signed"
+          }
+        ],
+        "verdict": "pass"
+      },
+      "name": "a_seam_that_does_not_begin_the_trail",
+      "records": [
+        {
+          "action_id": "a",
+          "agent_id": "agent-x",
+          "chain_version": 2,
+          "data": {
+            "cage": {
+              "confirmed": false,
+              "driver": "none"
+            },
+            "decision": "allow",
+            "reason": "low risk",
+            "risk_score": 0.1
+          },
+          "data_usage": "risk_score+thresholds",
+          "decision_making": "threshold_match",
+          "event_type": "decision_made",
+          "limitations": null,
+          "previous_hash": "",
+          "record_hash": "414436269f5343556ed936ce724ba212b2ed952c608d62d88d157b0d959ea393",
+          "record_id": "a11ce000-0000-0000-0000-000000000001",
+          "regulatory_articles": [
+            {
+              "article": "Article 14(1)",
+              "domain": "eu_ai_act",
+              "how_satisfied": "Three-tier decision (allow/escalate/deny) ensures humans review borderline cases",
+              "requirement": "High-risk AI systems shall be designed to be effectively overseen by natural persons"
+            },
+            {
+              "article": "Article 14(4)(a)",
+              "domain": "eu_ai_act",
+              "how_satisfied": "Decision records include risk scores, confidence intervals, and contributing signals",
+              "requirement": "The human shall be able to properly understand the relevant capacities and limitations of the system and duly monitor its operation"
+            }
+          ],
+          "system_operation": "decision_threshold",
+          "tenant_id": "",
+          "timestamp": 1792000002.0,
+          "tool_name": "read_file"
+        },
+        {
+          "action_id": "b",
+          "agent_id": "agent-x",
+          "chain_version": 2,
+          "data": {
+            "cage": {
+              "confirmed": false,
+              "driver": "none"
+            },
+            "decision": "allow",
+            "reason": "low risk",
+            "risk_score": 0.1
+          },
+          "data_usage": "risk_score+thresholds",
+          "decision_making": "threshold_match",
+          "event_type": "decision_made",
+          "limitations": null,
+          "previous_hash": "414436269f5343556ed936ce724ba212b2ed952c608d62d88d157b0d959ea393",
+          "record_hash": "58e5981d98bf5adbe0fa941185f6f6c7f363fe17a87dd728db17d3ba4d5fa819",
+          "record_id": "a11ce000-0000-0000-0000-000000000003",
+          "regulatory_articles": [
+            {
+              "article": "Article 14(1)",
+              "domain": "eu_ai_act",
+              "how_satisfied": "Three-tier decision (allow/escalate/deny) ensures humans review borderline cases",
+              "requirement": "High-risk AI systems shall be designed to be effectively overseen by natural persons"
+            },
+            {
+              "article": "Article 14(4)(a)",
+              "domain": "eu_ai_act",
+              "how_satisfied": "Decision records include risk scores, confidence intervals, and contributing signals",
+              "requirement": "The human shall be able to properly understand the relevant capacities and limitations of the system and duly monitor its operation"
+            }
+          ],
+          "system_operation": "decision_threshold",
+          "tenant_id": "",
+          "timestamp": 1792000004.0,
+          "tool_name": "read_file"
+        },
+        {
+          "action_id": "c",
+          "agent_id": "agent-x",
+          "chain_version": 2,
+          "data": {
+            "cage": {
+              "confirmed": false,
+              "driver": "none"
+            },
+            "decision": "allow",
+            "reason": "low risk",
+            "risk_score": 0.1
+          },
+          "data_usage": "risk_score+thresholds",
+          "decision_making": "threshold_match",
+          "event_type": "decision_made",
+          "limitations": null,
+          "previous_hash": "58e5981d98bf5adbe0fa941185f6f6c7f363fe17a87dd728db17d3ba4d5fa819",
+          "record_hash": "28a6aa7b88b2576c72146a0281f73af39fa6572cf82e4febe9da34d650a84a4d",
+          "record_id": "a11ce000-0000-0000-0000-000000000005",
+          "regulatory_articles": [
+            {
+              "article": "Article 14(1)",
+              "domain": "eu_ai_act",
+              "how_satisfied": "Three-tier decision (allow/escalate/deny) ensures humans review borderline cases",
+              "requirement": "High-risk AI systems shall be designed to be effectively overseen by natural persons"
+            },
+            {
+              "article": "Article 14(4)(a)",
+              "domain": "eu_ai_act",
+              "how_satisfied": "Decision records include risk scores, confidence intervals, and contributing signals",
+              "requirement": "The human shall be able to properly understand the relevant capacities and limitations of the system and duly monitor its operation"
+            }
+          ],
+          "system_operation": "decision_threshold",
+          "tenant_id": "",
+          "timestamp": 1792000006.0,
+          "tool_name": "read_file"
+        },
+        {
+          "action_id": "trail-rotated",
+          "agent_id": "vaara",
+          "chain_version": 2,
+          "data": {
+            "archive_kind": "sealed",
+            "archive_records": 3,
+            "archive_sha256": "785b0751fc2c53dc14a4ce3d800e69ef9ce1009eb327ccf458afe09c242c26c9",
+            "boundary_utc": "2026-10-20T00:00:00Z",
+            "last_hash": "58e5981d98bf5adbe0fa941185f6f6c7f363fe17a87dd728db17d3ba4d5fa819",
+            "purged_records": 2,
+            "rotated_at": "2026-10-14T17:46:47Z",
+            "rotation_signature": {
+              "alg": "Ed25519",
+              "signature": "93489eb837a36e334c0bce3a41653da85404d467396d0a057e57b33dd21b1701af799179fc81b0fd2139c0f0069f402e6a989b2f8064de9e305223ca6dcd0605",
+              "type": "vaara.trail-rotation/v1"
+            },
+            "signer_fingerprint": "56475aa75463474c0285df5dbf2bcab7"
+          },
+          "data_usage": "archive_digest+purged_count",
+          "decision_making": "operator_action",
+          "event_type": "trail_rotated",
+          "limitations": null,
+          "previous_hash": "28a6aa7b88b2576c72146a0281f73af39fa6572cf82e4febe9da34d650a84a4d",
+          "record_hash": "762192019501272e354346c7132127ea9bc651d4429f154a907266a2af779b82",
+          "record_id": "a11ce000-0000-0000-0000-000000000008",
+          "regulatory_articles": [],
+          "system_operation": "retention_rotation",
+          "tenant_id": "",
+          "timestamp": 1792000007.0,
+          "tool_name": "trail.rotate"
+        }
+      ],
+      "rotation_key": null
+    },
+    {
+      "archive": null,
+      "description": "A later rotation purged the first one's record too: the one record left names the head it links to.",
+      "expected": {
+        "archive_check": null,
+        "begins_at_seam": true,
+        "chain": "ok",
+        "seams": [
+          {
+            "begins_here": true,
+            "index": 0,
+            "state": "signed"
+          }
+        ],
+        "verdict": "pass"
+      },
+      "name": "a_second_rotation_begins_at_its_own_record",
+      "records": [
+        {
+          "action_id": "trail-rotated",
+          "agent_id": "vaara",
+          "chain_version": 2,
+          "data": {
+            "archive_kind": "sealed",
+            "archive_records": 3,
+            "archive_sha256": "785b0751fc2c53dc14a4ce3d800e69ef9ce1009eb327ccf458afe09c242c26c9",
+            "boundary_utc": "2026-10-20T00:00:00Z",
+            "last_hash": "c90a2b23d620ae030e3d57c4075546fa6c29858df1ed597ac7771f3e83f09083",
+            "purged_records": 5,
+            "rotated_at": "2026-10-14T17:46:51Z",
+            "rotation_signature": {
+              "alg": "Ed25519",
+              "signature": "7e11a344f5118f5709cb901de823849ee5fb5d3377cc6bd4f134baf8e7036a63a59243a7a7cf1cab0acf745cb9ecb0484e215e307271b60fd2eb544096fae50e",
+              "type": "vaara.trail-rotation/v1"
+            },
+            "signer_fingerprint": "56475aa75463474c0285df5dbf2bcab7"
+          },
+          "data_usage": "archive_digest+purged_count",
+          "decision_making": "operator_action",
+          "event_type": "trail_rotated",
+          "limitations": null,
+          "previous_hash": "c90a2b23d620ae030e3d57c4075546fa6c29858df1ed597ac7771f3e83f09083",
+          "record_hash": "d51a8fd9e92095f631f54ec9156a7c50ac6c9cd387a585462cf7d7cb9ae455c5",
+          "record_id": "a11ce000-0000-0000-0000-00000000000c",
+          "regulatory_articles": [],
+          "system_operation": "retention_rotation",
+          "tenant_id": "",
+          "timestamp": 1792000011.0,
+          "tool_name": "trail.rotate"
+        }
+      ],
+      "rotation_key": null
+    },
+    {
+      "archive": null,
+      "description": "The rotation record states a purged count of 0.",
+      "expected": {
+        "archive_check": null,
+        "begins_at_seam": false,
+        "chain": "break",
+        "seams": [
+          {
+            "begins_here": false,
+            "index": 1,
+            "state": "malformed"
+          }
+        ],
+        "verdict": "fail"
+      },
+      "name": "a_malformed_seam",
+      "records": [
+        {
+          "action_id": "c",
+          "agent_id": "agent-x",
+          "chain_version": 2,
+          "data": {
+            "cage": {
+              "confirmed": false,
+              "driver": "none"
+            },
+            "decision": "allow",
+            "reason": "low risk",
+            "risk_score": 0.1
+          },
+          "data_usage": "risk_score+thresholds",
+          "decision_making": "threshold_match",
+          "event_type": "decision_made",
+          "limitations": null,
+          "previous_hash": "58e5981d98bf5adbe0fa941185f6f6c7f363fe17a87dd728db17d3ba4d5fa819",
+          "record_hash": "28a6aa7b88b2576c72146a0281f73af39fa6572cf82e4febe9da34d650a84a4d",
+          "record_id": "a11ce000-0000-0000-0000-000000000005",
+          "regulatory_articles": [
+            {
+              "article": "Article 14(1)",
+              "domain": "eu_ai_act",
+              "how_satisfied": "Three-tier decision (allow/escalate/deny) ensures humans review borderline cases",
+              "requirement": "High-risk AI systems shall be designed to be effectively overseen by natural persons"
+            },
+            {
+              "article": "Article 14(4)(a)",
+              "domain": "eu_ai_act",
+              "how_satisfied": "Decision records include risk scores, confidence intervals, and contributing signals",
+              "requirement": "The human shall be able to properly understand the relevant capacities and limitations of the system and duly monitor its operation"
+            }
+          ],
+          "system_operation": "decision_threshold",
+          "tenant_id": "",
+          "timestamp": 1792000006.0,
+          "tool_name": "read_file"
+        },
+        {
+          "action_id": "trail-rotated",
+          "agent_id": "vaara",
+          "chain_version": 2,
+          "data": {
+            "archive_kind": "sealed",
+            "archive_records": 3,
+            "archive_sha256": "785b0751fc2c53dc14a4ce3d800e69ef9ce1009eb327ccf458afe09c242c26c9",
+            "boundary_utc": "2026-10-20T00:00:00Z",
+            "last_hash": "58e5981d98bf5adbe0fa941185f6f6c7f363fe17a87dd728db17d3ba4d5fa819",
+            "purged_records": 0,
+            "rotated_at": "2026-10-14T17:46:47Z",
+            "rotation_signature": {
+              "alg": "Ed25519",
+              "signature": "538d1c71ef81918ac30569b902890cda3366a0659b2ba303422eb64d583fff9d8587969772cdec25897276639985409e1e47036d58bc2f88dab112c339108501",
+              "type": "vaara.trail-rotation/v1"
+            },
+            "signer_fingerprint": "56475aa75463474c0285df5dbf2bcab7"
+          },
+          "data_usage": "archive_digest+purged_count",
+          "decision_making": "operator_action",
+          "event_type": "trail_rotated",
+          "limitations": null,
+          "previous_hash": "28a6aa7b88b2576c72146a0281f73af39fa6572cf82e4febe9da34d650a84a4d",
+          "record_hash": "6f0abfdbc0f157e28786f9dd2f1ed379e76b8bda83cbeb65238ced2f3cb86f27",
+          "record_id": "a11ce000-0000-0000-0000-000000000008",
+          "regulatory_articles": [],
+          "system_operation": "retention_rotation",
+          "tenant_id": "",
+          "timestamp": 1792000007.0,
+          "tool_name": "trail.rotate"
+        }
+      ],
+      "rotation_key": null
+    },
+    {
+      "archive": null,
+      "description": "A record written after the rotation links to it: the seam is not the last record.",
+      "expected": {
+        "archive_check": null,
+        "begins_at_seam": true,
+        "chain": "ok",
+        "seams": [
+          {
+            "begins_here": true,
+            "index": 1,
+            "state": "signed"
+          }
+        ],
+        "verdict": "pass"
+      },
+      "name": "records_written_after_the_seam_still_chain",
+      "records": [
+        {
+          "action_id": "c",
+          "agent_id": "agent-x",
+          "chain_version": 2,
+          "data": {
+            "cage": {
+              "confirmed": false,
+              "driver": "none"
+            },
+            "decision": "allow",
+            "reason": "low risk",
+            "risk_score": 0.1
+          },
+          "data_usage": "risk_score+thresholds",
+          "decision_making": "threshold_match",
+          "event_type": "decision_made",
+          "limitations": null,
+          "previous_hash": "58e5981d98bf5adbe0fa941185f6f6c7f363fe17a87dd728db17d3ba4d5fa819",
+          "record_hash": "28a6aa7b88b2576c72146a0281f73af39fa6572cf82e4febe9da34d650a84a4d",
+          "record_id": "a11ce000-0000-0000-0000-000000000005",
+          "regulatory_articles": [
+            {
+              "article": "Article 14(1)",
+              "domain": "eu_ai_act",
+              "how_satisfied": "Three-tier decision (allow/escalate/deny) ensures humans review borderline cases",
+              "requirement": "High-risk AI systems shall be designed to be effectively overseen by natural persons"
+            },
+            {
+              "article": "Article 14(4)(a)",
+              "domain": "eu_ai_act",
+              "how_satisfied": "Decision records include risk scores, confidence intervals, and contributing signals",
+              "requirement": "The human shall be able to properly understand the relevant capacities and limitations of the system and duly monitor its operation"
+            }
+          ],
+          "system_operation": "decision_threshold",
+          "tenant_id": "",
+          "timestamp": 1792000006.0,
+          "tool_name": "read_file"
+        },
+        {
+          "action_id": "trail-rotated",
+          "agent_id": "vaara",
+          "chain_version": 2,
+          "data": {
+            "archive_kind": "sealed",
+            "archive_records": 3,
+            "archive_sha256": "785b0751fc2c53dc14a4ce3d800e69ef9ce1009eb327ccf458afe09c242c26c9",
+            "boundary_utc": "2026-10-20T00:00:00Z",
+            "last_hash": "58e5981d98bf5adbe0fa941185f6f6c7f363fe17a87dd728db17d3ba4d5fa819",
+            "purged_records": 2,
+            "rotated_at": "2026-10-14T17:46:47Z",
+            "rotation_signature": {
+              "alg": "Ed25519",
+              "signature": "93489eb837a36e334c0bce3a41653da85404d467396d0a057e57b33dd21b1701af799179fc81b0fd2139c0f0069f402e6a989b2f8064de9e305223ca6dcd0605",
+              "type": "vaara.trail-rotation/v1"
+            },
+            "signer_fingerprint": "56475aa75463474c0285df5dbf2bcab7"
+          },
+          "data_usage": "archive_digest+purged_count",
+          "decision_making": "operator_action",
+          "event_type": "trail_rotated",
+          "limitations": null,
+          "previous_hash": "28a6aa7b88b2576c72146a0281f73af39fa6572cf82e4febe9da34d650a84a4d",
+          "record_hash": "762192019501272e354346c7132127ea9bc651d4429f154a907266a2af779b82",
+          "record_id": "a11ce000-0000-0000-0000-000000000008",
+          "regulatory_articles": [],
+          "system_operation": "retention_rotation",
+          "tenant_id": "",
+          "timestamp": 1792000007.0,
+          "tool_name": "trail.rotate"
+        },
+        {
+          "action_id": "d0",
+          "agent_id": "agent-x",
+          "chain_version": 2,
+          "data": {
+            "cage": {
+              "confirmed": false,
+              "driver": "none"
+            },
+            "decision": "allow",
+            "reason": "low risk",
+            "risk_score": 0.1
+          },
+          "data_usage": "risk_score+thresholds",
+          "decision_making": "threshold_match",
+          "event_type": "decision_made",
+          "limitations": null,
+          "previous_hash": "762192019501272e354346c7132127ea9bc651d4429f154a907266a2af779b82",
+          "record_hash": "918df6b8dabb42aac6d67a820a2e80bf956c6d43bcd245ddbf46e60c2633b318",
+          "record_id": "a11ce000-0000-0000-0000-000000000009",
+          "regulatory_articles": [
+            {
+              "article": "Article 14(1)",
+              "domain": "eu_ai_act",
+              "how_satisfied": "Three-tier decision (allow/escalate/deny) ensures humans review borderline cases",
+              "requirement": "High-risk AI systems shall be designed to be effectively overseen by natural persons"
+            },
+            {
+              "article": "Article 14(4)(a)",
+              "domain": "eu_ai_act",
+              "how_satisfied": "Decision records include risk scores, confidence intervals, and contributing signals",
+              "requirement": "The human shall be able to properly understand the relevant capacities and limitations of the system and duly monitor its operation"
+            }
+          ],
+          "system_operation": "decision_threshold",
+          "tenant_id": "",
+          "timestamp": 1792000010.0,
+          "tool_name": "read_file"
+        },
+        {
+          "action_id": "d1",
+          "agent_id": "agent-x",
+          "chain_version": 2,
+          "data": {
+            "cage": {
+              "confirmed": false,
+              "driver": "none"
+            },
+            "decision": "allow",
+            "reason": "low risk",
+            "risk_score": 0.1
+          },
+          "data_usage": "risk_score+thresholds",
+          "decision_making": "threshold_match",
+          "event_type": "decision_made",
+          "limitations": null,
+          "previous_hash": "918df6b8dabb42aac6d67a820a2e80bf956c6d43bcd245ddbf46e60c2633b318",
+          "record_hash": "8a1564706f1942f2eee591b99a5930c1810c1345ff79e5246202a7d952d1cc46",
+          "record_id": "a11ce000-0000-0000-0000-00000000000b",
+          "regulatory_articles": [
+            {
+              "article": "Article 14(1)",
+              "domain": "eu_ai_act",
+              "how_satisfied": "Three-tier decision (allow/escalate/deny) ensures humans review borderline cases",
+              "requirement": "High-risk AI systems shall be designed to be effectively overseen by natural persons"
+            },
+            {
+              "article": "Article 14(4)(a)",
+              "domain": "eu_ai_act",
+              "how_satisfied": "Decision records include risk scores, confidence intervals, and contributing signals",
+              "requirement": "The human shall be able to properly understand the relevant capacities and limitations of the system and duly monitor its operation"
+            }
+          ],
+          "system_operation": "decision_threshold",
+          "tenant_id": "",
+          "timestamp": 1792000012.0,
+          "tool_name": "read_file"
+        }
+      ],
+      "rotation_key": null
+    },
+    {
+      "archive": "match",
+      "description": "The sealed archive file hashes to the digest in the record. Contents are not read.",
+      "expected": {
+        "archive_check": "digest_only",
+        "begins_at_seam": true,
+        "chain": "ok",
+        "seams": [
+          {
+            "begins_here": true,
+            "index": 1,
+            "state": "signed"
+          }
+        ],
+        "verdict": "pass"
+      },
+      "name": "the_archive_is_the_one_the_record_names",
+      "records": [
+        {
+          "action_id": "c",
+          "agent_id": "agent-x",
+          "chain_version": 2,
+          "data": {
+            "cage": {
+              "confirmed": false,
+              "driver": "none"
+            },
+            "decision": "allow",
+            "reason": "low risk",
+            "risk_score": 0.1
+          },
+          "data_usage": "risk_score+thresholds",
+          "decision_making": "threshold_match",
+          "event_type": "decision_made",
+          "limitations": null,
+          "previous_hash": "58e5981d98bf5adbe0fa941185f6f6c7f363fe17a87dd728db17d3ba4d5fa819",
+          "record_hash": "28a6aa7b88b2576c72146a0281f73af39fa6572cf82e4febe9da34d650a84a4d",
+          "record_id": "a11ce000-0000-0000-0000-000000000005",
+          "regulatory_articles": [
+            {
+              "article": "Article 14(1)",
+              "domain": "eu_ai_act",
+              "how_satisfied": "Three-tier decision (allow/escalate/deny) ensures humans review borderline cases",
+              "requirement": "High-risk AI systems shall be designed to be effectively overseen by natural persons"
+            },
+            {
+              "article": "Article 14(4)(a)",
+              "domain": "eu_ai_act",
+              "how_satisfied": "Decision records include risk scores, confidence intervals, and contributing signals",
+              "requirement": "The human shall be able to properly understand the relevant capacities and limitations of the system and duly monitor its operation"
+            }
+          ],
+          "system_operation": "decision_threshold",
+          "tenant_id": "",
+          "timestamp": 1792000006.0,
+          "tool_name": "read_file"
+        },
+        {
+          "action_id": "trail-rotated",
+          "agent_id": "vaara",
+          "chain_version": 2,
+          "data": {
+            "archive_kind": "sealed",
+            "archive_records": 3,
+            "archive_sha256": "785b0751fc2c53dc14a4ce3d800e69ef9ce1009eb327ccf458afe09c242c26c9",
+            "boundary_utc": "2026-10-20T00:00:00Z",
+            "last_hash": "58e5981d98bf5adbe0fa941185f6f6c7f363fe17a87dd728db17d3ba4d5fa819",
+            "purged_records": 2,
+            "rotated_at": "2026-10-14T17:46:47Z",
+            "rotation_signature": {
+              "alg": "Ed25519",
+              "signature": "93489eb837a36e334c0bce3a41653da85404d467396d0a057e57b33dd21b1701af799179fc81b0fd2139c0f0069f402e6a989b2f8064de9e305223ca6dcd0605",
+              "type": "vaara.trail-rotation/v1"
+            },
+            "signer_fingerprint": "56475aa75463474c0285df5dbf2bcab7"
+          },
+          "data_usage": "archive_digest+purged_count",
+          "decision_making": "operator_action",
+          "event_type": "trail_rotated",
+          "limitations": null,
+          "previous_hash": "28a6aa7b88b2576c72146a0281f73af39fa6572cf82e4febe9da34d650a84a4d",
+          "record_hash": "762192019501272e354346c7132127ea9bc651d4429f154a907266a2af779b82",
+          "record_id": "a11ce000-0000-0000-0000-000000000008",
+          "regulatory_articles": [],
+          "system_operation": "retention_rotation",
+          "tenant_id": "",
+          "timestamp": 1792000007.0,
+          "tool_name": "trail.rotate"
+        }
+      ],
+      "rotation_key": null
+    },
+    {
+      "archive": "altered",
+      "description": "One byte of the archive differs from the digest the record states.",
+      "expected": {
+        "archive_check": "digest_mismatch",
+        "begins_at_seam": true,
+        "chain": "ok",
+        "seams": [
+          {
+            "begins_here": true,
+            "index": 1,
+            "state": "signed"
+          }
+        ],
+        "verdict": "fail"
+      },
+      "name": "the_archive_is_a_different_file",
+      "records": [
+        {
+          "action_id": "c",
+          "agent_id": "agent-x",
+          "chain_version": 2,
+          "data": {
+            "cage": {
+              "confirmed": false,
+              "driver": "none"
+            },
+            "decision": "allow",
+            "reason": "low risk",
+            "risk_score": 0.1
+          },
+          "data_usage": "risk_score+thresholds",
+          "decision_making": "threshold_match",
+          "event_type": "decision_made",
+          "limitations": null,
+          "previous_hash": "58e5981d98bf5adbe0fa941185f6f6c7f363fe17a87dd728db17d3ba4d5fa819",
+          "record_hash": "28a6aa7b88b2576c72146a0281f73af39fa6572cf82e4febe9da34d650a84a4d",
+          "record_id": "a11ce000-0000-0000-0000-000000000005",
+          "regulatory_articles": [
+            {
+              "article": "Article 14(1)",
+              "domain": "eu_ai_act",
+              "how_satisfied": "Three-tier decision (allow/escalate/deny) ensures humans review borderline cases",
+              "requirement": "High-risk AI systems shall be designed to be effectively overseen by natural persons"
+            },
+            {
+              "article": "Article 14(4)(a)",
+              "domain": "eu_ai_act",
+              "how_satisfied": "Decision records include risk scores, confidence intervals, and contributing signals",
+              "requirement": "The human shall be able to properly understand the relevant capacities and limitations of the system and duly monitor its operation"
+            }
+          ],
+          "system_operation": "decision_threshold",
+          "tenant_id": "",
+          "timestamp": 1792000006.0,
+          "tool_name": "read_file"
+        },
+        {
+          "action_id": "trail-rotated",
+          "agent_id": "vaara",
+          "chain_version": 2,
+          "data": {
+            "archive_kind": "sealed",
+            "archive_records": 3,
+            "archive_sha256": "785b0751fc2c53dc14a4ce3d800e69ef9ce1009eb327ccf458afe09c242c26c9",
+            "boundary_utc": "2026-10-20T00:00:00Z",
+            "last_hash": "58e5981d98bf5adbe0fa941185f6f6c7f363fe17a87dd728db17d3ba4d5fa819",
+            "purged_records": 2,
+            "rotated_at": "2026-10-14T17:46:47Z",
+            "rotation_signature": {
+              "alg": "Ed25519",
+              "signature": "93489eb837a36e334c0bce3a41653da85404d467396d0a057e57b33dd21b1701af799179fc81b0fd2139c0f0069f402e6a989b2f8064de9e305223ca6dcd0605",
+              "type": "vaara.trail-rotation/v1"
+            },
+            "signer_fingerprint": "56475aa75463474c0285df5dbf2bcab7"
+          },
+          "data_usage": "archive_digest+purged_count",
+          "decision_making": "operator_action",
+          "event_type": "trail_rotated",
+          "limitations": null,
+          "previous_hash": "28a6aa7b88b2576c72146a0281f73af39fa6572cf82e4febe9da34d650a84a4d",
+          "record_hash": "762192019501272e354346c7132127ea9bc651d4429f154a907266a2af779b82",
+          "record_id": "a11ce000-0000-0000-0000-000000000008",
+          "regulatory_articles": [],
+          "system_operation": "retention_rotation",
+          "tenant_id": "",
+          "timestamp": 1792000007.0,
+          "tool_name": "trail.rotate"
+        }
+      ],
+      "rotation_key": null
+    }
+  ],
+  "export_signer": "signer",
+  "format": "vaara.trail-rotation/v0",
+  "rule": "A trail whose first record links to a hash outside the trail is accepted only if a rotation record in the trail names that hash as last_hash and its Ed25519 signature verifies over the JCS payload; otherwise it is a chain break.",
+  "signers": {
+    "other_signer": {
+      "public_hex": "29acbae141bccaf0b22e1a94d34d0bc7361e526d0bfe12c89794bc9322966dd7",
+      "seed_hex": "202122232425262728292a2b2c2d2e2f303132333435363738393a3b3c3d3e3f"
+    },
+    "signer": {
+      "public_hex": "03a107bff3ce10be1d70dd18e74bc09967e4d6309ba50d5f1ddc8664125531b8",
+      "seed_hex": "000102030405060708090a0b0c0d0e0f101112131415161718191a1b1c1d1e1f"
+    }
+  }
+}
