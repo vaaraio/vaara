@@ -376,6 +376,10 @@ class AuditBackendUnreadable(RuntimeError):
     """
 
 
+class RotationBoundaryError(ValueError):
+    """The records a rotation would purge are not a prefix of one unbroken chain."""
+
+
 @dataclass(frozen=True)
 class RotationBoundary:
     """The prefix of the chain a retention rotation purges, fixed before it runs.
@@ -2001,6 +2005,10 @@ class SQLiteAuditBackend:
         that stepped back) stays until a later rotation. The purged records are
         then an unbroken prefix, and the hash the first survivor links to is
         known before anything is deleted. Tenant-scoped like the purge.
+
+        Raises :class:`RotationBoundaryError` when the first record kept does not
+        link to the last one that would go: purging then leaves a hole no
+        rotation record can name (records of other tenants share the chain).
         """
         if not isinstance(retention_seconds, int) or retention_seconds <= 0:
             raise ValueError(
@@ -2023,6 +2031,17 @@ class SQLiteAuditBackend:
             ).fetchone()
             if last is None:
                 return None
+            if first_kept is not None:
+                linked = self._conn.execute(
+                    "SELECT previous_hash FROM audit_records WHERE seq = ?", [first_kept],
+                ).fetchone()[0]
+                if linked != last[1]:
+                    raise RotationBoundaryError(
+                        "the records older than the cut-off are not a prefix of one "
+                        "unbroken chain: the first record kept does not link to the last "
+                        "one that would go (another tenant's records share this chain, "
+                        "or the chain is already broken there)"
+                    )
             count = self._conn.execute(
                 f"SELECT COUNT(*) FROM audit_records WHERE {t_clause} AND seq <= ?",
                 t_params + [last[0]],

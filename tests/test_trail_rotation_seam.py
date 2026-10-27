@@ -623,3 +623,78 @@ def test_a_bare_purge_points_at_rotate(tmp_path, monkeypatch, capsys):
     err = capsys.readouterr().err
     assert "vaara trail rotate" in err
     assert "fails verification" in err
+
+
+# --- tenants --------------------------------------------------------------------
+
+
+def _tenant_write(db: Path, tenant: str, name: str, age_days: float, *, scoped: bool, monkeypatch):
+    """One decision for ``tenant``, ``age_days`` old, on a chain of its own
+    (``scoped``) or on the one chain every tenant shares."""
+    import uuid
+
+    from vaara.audit.trail import AuditRecord, EventType
+
+    backend = SQLiteAuditBackend(db, tenant_id=tenant if scoped else "")
+    trail = AuditTrail(on_record=backend.write_record)
+    real = time.time
+    monkeypatch.setattr("vaara.audit.trail.time.time", lambda: real() - age_days * DAY)
+    trail._append_chained(AuditRecord(
+        record_id=str(uuid.uuid4()), action_id=name, event_type=EventType.DECISION_MADE,
+        timestamp=real() - age_days * DAY, agent_id="agent-x", tool_name="t", data={},
+        tenant_id=tenant))
+    monkeypatch.setattr("vaara.audit.trail.time.time", real)
+    backend.close()
+
+
+def _tenant_view(db: Path, tenant: str) -> list:
+    backend = SQLiteAuditBackend(db, tenant_id=tenant)
+    try:
+        return list(backend.load_trail()._records)
+    finally:
+        backend.close()
+
+
+def test_a_tenant_rotation_leaves_the_seam_in_that_tenants_chain(tmp_path, monkeypatch):
+    _, priv, _ = _key(tmp_path)
+    db = tmp_path / "audit.db"
+    for tenant in ("a", "b"):
+        _tenant_write(db, tenant, f"{tenant}-old1", 10, scoped=True, monkeypatch=monkeypatch)
+        _tenant_write(db, tenant, f"{tenant}-old2", 10, scoped=True, monkeypatch=monkeypatch)
+        _tenant_write(db, tenant, f"{tenant}-new1", 0, scoped=True, monkeypatch=monkeypatch)
+
+    result = rotate(db, tmp_path / "a.zip", priv, 7, tenant_id="a")
+
+    assert result.ok and result.purged_records == 2, result.errors
+    a = _tenant_view(db, "a")
+    assert [r.action_id for r in a] == ["a-new1", "trail-rotated"]
+    assert a[-1].tenant_id == "a"
+    backend = SQLiteAuditBackend(db, tenant_id="a")
+    try:
+        assert backend.verify_chain_streaming() is None
+        assert backend.load_trail().verify_chain_verdict().state == "intact"
+        out = tmp_path / "live-a.zip"
+        assert export_signed(backend.load_trail(), out, signer_key=priv).chain_intact
+    finally:
+        backend.close()
+    assert verify_signed(out).ok
+    # The other tenant's chain was not touched.
+    assert [r.action_id for r in _tenant_view(db, "b")] == ["b-old1", "b-old2", "b-new1"]
+
+
+def test_a_tenant_rotation_refuses_when_other_tenants_share_the_chain(tmp_path, monkeypatch):
+    """On one shared chain a tenant's old records are not a prefix of it: purging
+    them would leave a hole in the middle that no rotation record can name."""
+    _, priv, _ = _key(tmp_path)
+    db, out = tmp_path / "audit.db", tmp_path / "archive.zip"
+    _tenant_write(db, "a", "a-old1", 10, scoped=False, monkeypatch=monkeypatch)
+    _tenant_write(db, "b", "b-old1", 10, scoped=False, monkeypatch=monkeypatch)
+    _tenant_write(db, "a", "a-new1", 0, scoped=False, monkeypatch=monkeypatch)
+
+    result = rotate(db, out, priv, 7, tenant_id="a")
+
+    assert not result.ok and result.purged_records == 0
+    assert any("not a prefix of one unbroken chain" in e and "purge skipped" in e
+               for e in result.errors), result.errors
+    assert not out.exists()  # refused before anything was archived
+    assert len(_tenant_view(db, "")) == 3

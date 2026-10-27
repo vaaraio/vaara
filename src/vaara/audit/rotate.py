@@ -28,7 +28,7 @@ from dataclasses import dataclass, field
 from pathlib import Path
 from typing import Optional, Union
 
-from vaara.audit.sqlite_backend import SQLiteAuditBackend
+from vaara.audit.sqlite_backend import RotationBoundaryError, SQLiteAuditBackend
 from vaara.audit.trail import AuditTrail
 
 logger = logging.getLogger("vaara.audit.rotate")
@@ -134,6 +134,11 @@ def rotate(
                     "replaced. Choose a new --out."])
     backend = SQLiteAuditBackend(db_path, tenant_id=tenant_id)
     try:
+        retention_seconds = retention_days * 86400
+        try:
+            boundary = backend.rotation_boundary(retention_seconds)
+        except RotationBoundaryError as exc:
+            return RotateResult(ok=False, errors=[f"{exc}; purge skipped"])
         exported = backend.count()
 
         try:
@@ -189,8 +194,6 @@ def rotate(
                 # written into place, so the plaintext copy can go.
                 out.unlink()
 
-        retention_seconds = retention_days * 86400
-        boundary = backend.rotation_boundary(retention_seconds)
         seam_record_id: Optional[str] = None
         if boundary is not None and not dry_run:
             kept = sealed_path if sealed_path is not None else out
@@ -206,6 +209,7 @@ def rotate(
                         "%Y-%m-%dT%H:%M:%SZ", time.gmtime(boundary.cutoff)),
                     signer_fingerprint=fingerprint,
                     sign=sign,
+                    tenant_id=tenant_id,
                 )
             except Exception as exc:
                 return RotateResult(

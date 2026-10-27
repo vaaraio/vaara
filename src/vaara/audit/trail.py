@@ -3273,6 +3273,7 @@ class AuditTrail:
         boundary_utc: str,
         signer_fingerprint: str,
         sign: Optional[Callable[[dict], Optional[dict]]] = None,
+        tenant_id: str = "",
     ) -> AuditRecord:
         """Append the TRAIL_ROTATED record that accounts for a retention purge.
 
@@ -3281,7 +3282,9 @@ class AuditTrail:
         the last record the purge removes, the one the first survivor links to.
         ``sign`` gets the finished data, with ``rotated_at`` added, and returns
         the ``rotation_signature`` block (see ``vaara.audit.verify.check_rotations``);
-        a record without it is written but accounts for nothing.
+        a record without it is written but accounts for nothing. ``tenant_id``
+        is the tenant whose chain is rotated: the record is written into it, so
+        a walk of that tenant's records finds it.
 
         Raises ``RuntimeError`` when the store refuses the write, so a rotation
         never purges on the strength of a record that did not land.
@@ -3309,6 +3312,7 @@ class AuditTrail:
             agent_id="vaara",
             tool_name="trail.rotate",
             data=data,
+            tenant_id=tenant_id,
         )
         if not self._append_chained(record):
             raise RuntimeError("the store refused the rotation record")
