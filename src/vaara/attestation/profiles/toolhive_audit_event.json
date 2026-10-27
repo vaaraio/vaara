@@ -1,0 +1,30 @@
+{
+  "sourceFormat": "toolhive-audit-event",
+  "sourceTitle": "ToolHive audit event log line",
+  "priority": 47,
+  "detect": {
+    "all": [
+      {"path": "msg", "equals": "audit_event"},
+      {"path": "audit_id", "exists": true}
+    ]
+  },
+  "evidencePlane": "outcome",
+  "advisory": {
+    "auditId": "audit_id",
+    "eventType": "type",
+    "loggedAt": "logged_at",
+    "outcome": "outcome",
+    "component": "component",
+    "subjects": "subjects",
+    "target": "target"
+  },
+  "sep2828": {},
+  "missing": ["alg", "signature", "backLink", "receiptAsserted", "outcomeDerived"],
+  "notes": [
+    "a ToolHive audit event is one JSON log line written by the MCP proxy at its AUDIT level: who (subjects), what (type and target), where (component) and when (logged_at), with an outcome of success, failure, error, denied or application_error; it is the proxy's record of an operation, not a decision record",
+    "the line carries no signature, digest or chain member, so alg, signature and receiptAsserted are absent, and its outcome is the producer's word: it is lifted as advisory and never becomes outcomeDerived",
+    "custody starts at ingestion: sealing fixes these bytes from the moment they are ingested and says nothing about what happened, or what the log held, before that",
+    "the line has no link to a policy decision or a request attestation, so backLink is absent and a verifier cannot tell from it why the call was allowed or denied",
+    "subjects carries the display name taken from the caller's token claims, which can be an email address; it is lifted as it stands, so redact it before ingest where that matters"
+  ]
+}

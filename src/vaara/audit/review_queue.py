@@ -36,6 +36,8 @@ from dataclasses import dataclass, field
 from pathlib import Path
 from typing import Any, Optional
 
+from vaara import _capture
+
 logger = logging.getLogger(__name__)
 
 SCHEMA_VERSION = 1
@@ -271,7 +273,9 @@ class ReviewQueue:
         """Enqueue a borderline action for human review."""
         qid = queue_id or str(uuid.uuid4())
         ts = now if now is not None else time.time()
-        params_json = _cap_json(parameters, _MAX_DATA_JSON_BYTES)
+        # The second copy of the arguments obeys the same capture policy as
+        # the trail row, so a declared field is a digest here too.
+        params_json = _cap_json(_capture.mask(tool_name, parameters), _MAX_DATA_JSON_BYTES)
         context_json = _cap_json(context, _MAX_DATA_JSON_BYTES)
         signals_json = _cap_json(signals, _MAX_DATA_JSON_BYTES)
         with self._lock:
@@ -333,6 +337,7 @@ class ReviewQueue:
         justification: str = "",
         trail: Optional[Any] = None,
         now: Optional[float] = None,
+        reviewer_key: Optional[Any] = None,
     ) -> ReviewItem:
         """Resolve an item with ``allow``, ``deny``, or ``abstain``.
 
@@ -340,6 +345,16 @@ class ReviewQueue:
         reviewer can resolve without an explicit claim. When ``trail``
         is supplied, writes ``ESCALATION_RESOLVED`` so the Article
         14(4)(d) evidence row lands on the hash chain.
+
+        ``reviewer_key`` is the reviewer's own private key (EC P-256 or
+        RSA). With it the row carries the reviewer's signature over the
+        action's decision record hash, the resolution, the reviewer and the
+        justification, which ``vaara.credential.check_review_resolutions``
+        checks against the key the principal pinned. Signing needs the trail
+        and a recorded decision; without either it is refused before the
+        queue changes, and reviewer or justification over the caps are
+        refused rather than cut, since a cut value would not match what was
+        signed.
         """
         if resolution not in _VALID_RESOLUTIONS:
             raise ValueError(
@@ -349,6 +364,13 @@ class ReviewQueue:
         ts = now if now is not None else time.time()
         reviewer_capped = _cap_str(reviewer, _MAX_REVIEWER_LEN)
         justification_capped = _cap_str(justification, _MAX_JUSTIFICATION_LEN)
+        signature = None
+        if reviewer_key is not None:
+            signature = self._sign_resolution(
+                queue_id, reviewer=reviewer, resolution=resolution,
+                justification=justification, trail=trail,
+                reviewer_key=reviewer_key,
+            )
         with self._lock:
             cur = self._conn.execute(
                 """UPDATE review_queue
@@ -380,6 +402,7 @@ class ReviewQueue:
                     # evidence; without the keys it reads as policy.
                     approver="human",
                     human_disposed=True,
+                    reviewer_signature=signature,
                 )
             except Exception:
                 logger.exception(
@@ -388,6 +411,37 @@ class ReviewQueue:
                     queue_id, item.action_id,
                 )
         return item
+
+    def _sign_resolution(
+        self,
+        queue_id: str,
+        *,
+        reviewer: str,
+        resolution: str,
+        justification: str,
+        trail: Optional[Any],
+        reviewer_key: Any,
+    ) -> dict:
+        from vaara.credential._review_signature import (
+            decision_record_for,
+            sign_resolution,
+        )
+
+        if trail is None:
+            raise ValueError("a signed resolution needs the trail it binds to")
+        if len(reviewer) > _MAX_REVIEWER_LEN or len(justification) > _MAX_JUSTIFICATION_LEN:
+            raise ValueError("reviewer or justification is over its cap; a signed value is never cut")
+        item = self.get(queue_id)
+        decision = decision_record_for(trail.get_action_trail(item.action_id))
+        if decision is None:
+            raise ValueError(
+                f"no decision recorded for action {item.action_id!r}; nothing to sign over"
+            )
+        return sign_resolution(
+            action_id=item.action_id, decision_record_hash=decision.record_hash,
+            resolution=resolution, reviewer=reviewer, justification=justification,
+            private_key=reviewer_key,
+        )
 
     def expire_stale(
         self,

@@ -26,6 +26,7 @@ from pathlib import Path
 from typing import Optional
 
 from vaara.audit.sqlite_backend import SQLiteAuditBackend
+from vaara.integrations._record_before_effect import RecordGate, refusal
 from vaara.pipeline import InterceptionPipeline
 from vaara.taxonomy.actions import ActionCategory, ActionType, Reversibility, \
     BlastRadius, UrgencyClass, create_default_registry
@@ -61,13 +62,16 @@ def run_shell_proxy(
     pipeline: Optional[InterceptionPipeline] = None,
     shell: Optional[str] = None,
     agent_id: str = "shell",
+    fail_open: bool = False,
 ) -> int:
     """Read commands from stdin and run each through the Vaara pipeline.
 
     For every line of input:
     1. Classify as ``shell.exec`` with the full command as ``parameters``.
     2. Score and decide (allow / deny / escalate).
-    3. If allowed: execute through the real shell.
+    3. If allowed and the decision was recorded: execute through the real
+       shell. An allowed command whose record did not reach the audit store is
+       not run, unless ``fail_open``.
     4. If denied: print the block reason and optionally the receipt path.
     5. Always record to the trail.
 
@@ -75,12 +79,14 @@ def run_shell_proxy(
     """
     pipe = pipeline or _build_pipeline()
     real_shell = shell or os.environ.get("SHELL", "/bin/sh")
+    gate = RecordGate()
 
     if not sys.stdin.isatty():
         # Piped mode: read all of stdin, run once, exit.
         command = sys.stdin.read().strip()
         if command:
-            return _run_one(pipe, command, real_shell, agent_id)
+            return _run_one(pipe, command, real_shell, agent_id,
+                            fail_open=fail_open, gate=gate)
         return 0
 
     # Interactive mode: read-eval loop.
@@ -98,7 +104,7 @@ def run_shell_proxy(
             continue
         if line.lower() in ("exit", "quit"):
             return 0
-        _run_one(pipe, line, real_shell, agent_id)
+        _run_one(pipe, line, real_shell, agent_id, fail_open=fail_open, gate=gate)
 
 
 def _run_one(
@@ -106,13 +112,25 @@ def _run_one(
     command: str,
     real_shell: str,
     agent_id: str,
+    *,
+    fail_open: bool = False,
+    gate: Optional[RecordGate] = None,
 ) -> int:
     """Run a single command through the pipeline and execute if allowed."""
-    result = pipe.intercept(
+    result, unrecorded = (gate or RecordGate()).intercept(
+        pipe,
         agent_id=agent_id,
         tool_name="shell.exec",
         parameters={"command": command},
     )
+
+    if result.allowed and unrecorded is not None:
+        # Record before effect: the decision did not reach the store.
+        if not fail_open:
+            print(f"Vaara: command not run, {refusal(pipe, unrecorded, who='this shell')}",
+                  file=sys.stderr)
+            return 1
+        print(f"Vaara: running UNRECORDED (--fail-open): {unrecorded}", file=sys.stderr)
 
     if result.allowed:
         try:
@@ -142,6 +160,11 @@ def main(args: Optional[list[str]] = None) -> int:
     p.add_argument("--shell", default=None, help="Shell to wrap (default: $SHELL)")
     p.add_argument("--agent-id", default="shell",
                     help="Agent ID recorded in the trail")
+    p.add_argument("--fail-open", action="store_true",
+                    help="Run a command even when its audit record could not "
+                         "be written. Off by default: the shell first repairs "
+                         "the trail and retries, and if the record still cannot "
+                         "be written the command is not run.")
     parsed = p.parse_args(args)
     return run_shell_proxy(
         pipeline=_build_pipeline(
@@ -150,6 +173,7 @@ def main(args: Optional[list[str]] = None) -> int:
         # The shell to wrap, not subprocess shell=True.
         shell=parsed.shell,  # nosec B604
         agent_id=parsed.agent_id,
+        fail_open=parsed.fail_open,
     )
 
 

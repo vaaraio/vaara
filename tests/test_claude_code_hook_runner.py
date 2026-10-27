@@ -212,6 +212,27 @@ def test_hook_pre_escalate_approved_by_human_allows(tmp_path):
     assert json.loads(rows[0][0])["resolution"] == "allow"
 
 
+def test_hook_pre_resolution_names_the_arguments_the_human_approved(tmp_path):
+    """The decision MAC binds the arguments (vaara-approval/v2), and the
+    resolution on the trail says which: the digest of the call that ran."""
+    from vaara.approvals import parameters_digest
+
+    _escalate_config(tmp_path)
+    thread = _approval_responder(tmp_path, "approve")
+    proc = _run_hook(
+        ["hook", "pre-tool-use"],
+        {"tool_name": "mcp__files__read", "tool_input": {"path": "notes.txt"}},
+        tmp_path,
+    )
+    thread.join(timeout=1)
+    assert proc.returncode == 0, proc.stderr
+    conn = sqlite3.connect(tmp_path / ".vaara" / "claude-code" / "audit.db")
+    (data,) = conn.execute(
+        "SELECT data FROM audit_records WHERE event_type = 'escalation_resolved'"
+    ).fetchone()
+    assert parameters_digest({"path": "notes.txt"}) in json.loads(data)["justification"]
+
+
 def test_hook_pre_human_approval_is_an_allow_decision_for_claude_code(tmp_path):
     # Exit 0 with nothing on stdout is "no opinion" to Claude Code: the call
     # then went through Claude Code's own permission flow, which refused a

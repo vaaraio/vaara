@@ -214,3 +214,89 @@ def test_mac_matches_the_shared_vectors():
     assert len(doc["cases"]) >= 4
     for case in doc["cases"]:
         assert decision_mac(key, case["action_id"], case["nonce"], case["decision"]) == case["mac"]
+
+
+# ---------------------------------------------------------------------------
+# vaara-approval/v2: the decision MAC binds the call's arguments.
+# ---------------------------------------------------------------------------
+
+from vaara.approvals import parameters_digest  # noqa: E402
+
+
+def test_v2_mac_differs_from_v1_and_names_the_digest():
+    key = bytes(range(32))
+    v1 = decision_mac(key, "a", "n", "approve")
+    v2 = decision_mac(key, "a", "n", "approve", parameters_sha256="0" * 64)
+    assert v1 != v2
+    assert v2 != decision_mac(key, "a", "n", "approve", parameters_sha256="1" * 64)
+
+
+def test_approval_with_parameters_is_signed_over_their_digest(tmp_path):
+    captured: dict = {}
+    params = {"command": "make release", "cwd": "/repo"}
+    thread = _respond(tmp_path, "approve", captured)
+    result = request_approval("act-p", "Bash", "destructive", approvals_dir=tmp_path,
+                              timeout=30, parameters=params)
+    thread.join(timeout=30)
+    assert result == "approve"
+    assert result.parameters_sha256 == parameters_digest(params)
+    assert captured["parameters_sha256"] == parameters_digest(params)
+
+
+def test_approval_without_parameters_carries_no_binding(tmp_path):
+    thread = _respond(tmp_path, "approve", {})
+    result = request_approval("act-np", "t", "r", approvals_dir=tmp_path, timeout=30)
+    thread.join(timeout=30)
+    assert result == "approve"
+    assert result.parameters_sha256 is None
+
+
+def test_approval_signed_over_other_arguments_is_not_consent(tmp_path):
+    """A human who approved different arguments did not approve this call."""
+    approvals = tmp_path / "approvals"
+    request_approval("warmup", "t", "r", approvals_dir=approvals, timeout=0.05)
+    key = bytes.fromhex(approval_key_path(approvals).read_text(encoding="utf-8"))
+    other = parameters_digest({"amount": 10})
+    _answer_with(approvals, lambda a, r: {
+        "decision": "approve",
+        "mac": decision_mac(key, a, r["nonce"], "approve", parameters_sha256=other)})
+    assert request_approval("act-o", "pay", "r", approvals_dir=approvals, timeout=0.6,
+                            parameters={"amount": 10000}) == "timeout"
+
+
+def test_v1_decision_still_answers_a_request_with_parameters(tmp_path):
+    """Surfaces that sign v1 (the macOS app today) keep working, unbound."""
+    approvals = tmp_path / "approvals"
+    request_approval("warmup", "t", "r", approvals_dir=approvals, timeout=0.05)
+    key = bytes.fromhex(approval_key_path(approvals).read_text(encoding="utf-8"))
+    _answer_with(approvals, lambda a, r: {
+        "decision": "approve", "mac": decision_mac(key, a, r["nonce"], "approve")})
+    result = request_approval("act-v1", "pay", "r", approvals_dir=approvals, timeout=5,
+                              parameters={"amount": 10})
+    assert result == "approve"
+    assert result.parameters_sha256 is None
+
+
+def test_write_decision_refuses_a_request_whose_arguments_were_edited(tmp_path):
+    """The surface signs what it shows; shown arguments that no longer match
+    the recorded digest are refused rather than signed."""
+    approvals = tmp_path / "approvals"
+    request_approval("warmup", "t", "r", approvals_dir=approvals, timeout=0.05)
+    (approvals / "act-e.request.json").write_text(json.dumps({
+        "action_id": "act-e", "tool_name": "pay", "reason": "r",
+        "requested_at": time.time(), "nonce": "n1",
+        "parameters": {"amount": 10},
+        "parameters_sha256": parameters_digest({"amount": 10000}),
+    }), encoding="utf-8")
+    assert write_decision("act-e", "approve", approvals_dir=approvals) is False
+    assert not (approvals / "act-e.decision.json").exists()
+
+
+def test_v2_mac_matches_the_shared_vectors():
+    doc = json.loads((Path(__file__).parent / "fixtures" / "approval_v2" / "vectors.json").read_text(encoding="utf-8"))
+    key = bytes.fromhex(doc["key_hex"])
+    assert len(doc["cases"]) >= 3
+    for case in doc["cases"]:
+        assert parameters_digest(case["parameters"]) == case["parameters_sha256"]
+        assert decision_mac(key, case["action_id"], case["nonce"], case["decision"],
+                            parameters_sha256=case["parameters_sha256"]) == case["mac"]

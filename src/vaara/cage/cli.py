@@ -29,7 +29,7 @@ import time
 from pathlib import Path
 from typing import Any, Optional
 
-from vaara.cage import DRIVERS, load_driver, observe
+from vaara.cage import DRIVERS, lifecycle, load_driver, observe
 from vaara.cage.driver import CageError
 
 _DURATION = re.compile(r"^(\d+)([smhd]?)$")
@@ -136,9 +136,18 @@ def _dispatch(args: argparse.Namespace) -> int:
         accepted = inspect.signature(d.start).parameters
         kwargs = {k: v for k, v in offered.items() if k in accepted and v is not None}
         launch = d.start(agent, args.policy, name=args.name, **kwargs)
+        start_id = lifecycle.started(
+            args.driver, launch.name,
+            lifecycle.policy_digest(args.policy, launch.state.config_digest or ""))
         print(json.dumps({"driver": launch.driver, "name": launch.name, "pid": launch.pid,
                           "cage": launch.state.to_record()}, indent=2), flush=True)
-        return _follow(d, launch.name)
+        ended = _follow(d, launch.name)
+        if ended is None:  # the cage keeps it running; `vaara cage stop` records the end
+            return 0
+        code, interrupted = ended
+        lifecycle.stopped(args.driver, launch.name, start_id=start_id, exit_code=code,
+                          reason="operator" if interrupted else "exited")
+        return code
     if args.cmd == "status":
         state = d.enforcement_state(args.name)
         out = state.to_record()
@@ -148,6 +157,7 @@ def _dispatch(args: argparse.Namespace) -> int:
         return 0 if state.confirmed else 1
     if args.cmd == "stop":
         d.stop(args.name)
+        lifecycle.stopped(args.driver, args.name, reason="operator")
         return 0
     if args.cmd == "events":
         for event in d.events(args.name, args.since):
@@ -156,14 +166,15 @@ def _dispatch(args: argparse.Namespace) -> int:
     raise CageError(f"unknown command {args.cmd}")
 
 
-def _follow(d: Any, name: str) -> int:
+def _follow(d: Any, name: str) -> Optional[tuple[int, bool]]:
     """Stay with a launch that lives as this process's child.
 
     A process-backed cage (codex, sandbox-runtime, firecracker, the Vaara
     cage) is a child of this process, and its stderr is read here: returning
     would close that pipe under the agent and lose the launch. Wait for it,
     pass its stderr on, and exit with its status. A cage that keeps its own
-    state (a container engine, a cluster, a service) is left running.
+    state (a container engine, a cluster, a service) is left running, and
+    the answer is None. Otherwise: the exit status, and whether ^C ended it.
     """
     from vaara.cage._cli import ChildLaunches
 
@@ -175,7 +186,7 @@ def _follow(d: Any, name: str) -> int:
     elif isinstance(held, dict) and name in held:
         proc = held[name]
     else:
-        return 0
+        return None
     shown = 0.0  # the newest line passed on; the buffer is bounded, so not a count
 
     def relay() -> None:
@@ -186,15 +197,17 @@ def _follow(d: Any, name: str) -> int:
                     print(line, file=sys.stderr, flush=True)
                     shown = ts
 
+    interrupted = False
     try:
         while proc.poll() is None:
             relay()
             time.sleep(0.2)
     except KeyboardInterrupt:
+        interrupted = True
         d.stop(name)
     code = proc.wait()
     if launch is not None and launch._reader is not None:
         launch._reader.join(timeout=2)
     relay()
-    return code if code >= 0 else 128 - code
+    return (code if code >= 0 else 128 - code), interrupted
 

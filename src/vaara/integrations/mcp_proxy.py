@@ -47,6 +47,7 @@ from vaara.audit.decision_receipts import default_sink
 from vaara.audit.sqlite_backend import SQLiteAuditBackend
 from vaara.audit.trail import AuditTrail
 from vaara.integrations._mcp_beacon import Beacon
+from vaara.integrations._record_before_effect import RecordGate, refusal
 from vaara.integrations._mcp_input_schema import (
     check_arguments,
     unchecked_keywords,
@@ -116,6 +117,11 @@ _REQUEST_INTENT: contextvars.ContextVar[str] = contextvars.ContextVar(
 )
 
 _safe_log = log_safe
+
+
+def _outcome_description(status: str, **fields: Any) -> str:
+    """The outcome description: one JSON object, so a reader can parse it."""
+    return json.dumps({"status": status, **fields}, sort_keys=True)
 
 
 # Largest single MCP JSON-RPC message accepted on the /mcp HTTP endpoint.
@@ -247,7 +253,12 @@ class VaaraMCPProxy:
         trusted_values: Optional[list[str]] = None,
         authority_args: Optional[dict[str, list[str]]] = None,
         value_origin_store: Optional[Any] = None,
+        fail_open: bool = False,
     ) -> None:
+        # A call whose decision record did not reach the audit store is not
+        # forwarded, unless this is set. Shadow mode never refuses.
+        self._fail_open = bool(fail_open)
+        self._record_gate = RecordGate()
         # Value origin (vaara.scorer.value_origin). Off unless asked for.
         # When on, recipient, payee and endpoint values in tools/call and
         # resources/read results are remembered, and a later call that puts
@@ -1217,6 +1228,7 @@ class VaaraMCPProxy:
                 parameters=_passthrough_params(request),
                 decision="allow",
                 reason="method not modelled by the proxy; forwarded and recorded",
+                enforcement="recorded_only",
             )
         try:
             return self._upstream.request(request)
@@ -1296,6 +1308,7 @@ class VaaraMCPProxy:
             reason=reason,
             policy_id="tool_surface",
             violation_type="tool_surface_changed",
+            enforcement="recorded_only",
         )
         self._overt_emit(
             surface="mcp.tool_surface",
@@ -1412,6 +1425,7 @@ class VaaraMCPProxy:
                 "Tool filtered by operator policy",
                 policy_id="operator_perimeter",
                 violation_type="perimeter_filter",
+                enforcement="could_block",
             )
             block_payload = {
                 "vaara_blocked": True,
@@ -1464,6 +1478,7 @@ class VaaraMCPProxy:
                     agent_id, tool_name, arguments, "deny", reason,
                     policy_id=f"deny_rule:{rule_id}",
                     violation_type="policy_rule",
+                    enforcement="could_block",
                 )
                 block_payload = {
                     "vaara_blocked": True,
@@ -1512,6 +1527,7 @@ class VaaraMCPProxy:
                     agent_id, tool_name, arguments, "deny", reason,
                     policy_id="tool_surface",
                     violation_type="tool_surface_hold",
+                    enforcement="could_block",
                 )
                 block_payload = {
                     "vaara_blocked": True,
@@ -1558,6 +1574,7 @@ class VaaraMCPProxy:
                     agent_id, tool_name, arguments, "deny", reason,
                     policy_id="upstream_input_schema",
                     violation_type="parameter_schema",
+                    enforcement="could_block",
                 )
                 block_payload = {
                     "vaara_blocked": True,
@@ -1598,10 +1615,51 @@ class VaaraMCPProxy:
         origin = self._origin_hold(tool_name, arguments, gates)
         # Unknown upstream tool names classify as generic high-risk in the
         # registry (fail-closed). Correct default for runtime governance.
-        result = self._pipeline.intercept(
+        result, unrecorded = self._record_gate.intercept(
+            self._pipeline,
             agent_id=agent_id, tool_name=tool_name, parameters=arguments,
             tenant_id=_REQUEST_TENANT.get(), value_origin=origin,
         )
+        if unrecorded is not None and result.allowed:
+            # Record before effect: the decision did not reach the store, and
+            # an allowed call would run with nothing on the chain to say so.
+            if self._pipeline._enforce and not self._fail_open:
+                gates.append("record_before_effect:refuse")
+                reason = refusal(self._pipeline, unrecorded, who="this proxy")
+                logger.error("refusing an unrecorded call: %s", unrecorded)
+                block_payload = {
+                    "vaara_blocked": True,
+                    "type": "vaara_trail_not_recording",
+                    "reason": reason,
+                    "decision": "NOT_RECORDED",
+                    "tool": tool_name,
+                    "gates": list(gates),
+                }
+                self._overt_emit(
+                    surface="mcp.tool.call",
+                    identifier=tool_name,
+                    identifier_field="tool_name",
+                    request_obj={"tool": tool_name, "arguments": arguments},
+                    decision="DENY",
+                    reason=reason,
+                    extra={"agent_id": agent_id, "gates": list(gates)},
+                )
+                return {
+                    "jsonrpc": "2.0", "id": request.get("id"),
+                    "result": {
+                        "content": [{"type": "text", "text": strict_json_dumps(block_payload, indent=2)}],
+                        "isError": True,
+                    },
+                }
+            gates.append(
+                "record_before_effect:shadow" if not self._pipeline._enforce
+                else "record_before_effect:fail_open"
+            )
+            logger.error(
+                "forwarding UNRECORDED (%s): %s",
+                "shadow mode" if not self._pipeline._enforce else "--fail-open",
+                unrecorded,
+            )
         progress_token = self._progress_token(params)
         if not result.allowed:
             gates.append("policy:deny")
@@ -1751,9 +1809,18 @@ class VaaraMCPProxy:
         # attestation was already written above; pairing it with a receipt on
         # every path keeps the evidence trail complete with no orphans.
         outcome_severity = 1.0
+        outcome_description = ""
         try:
             upstream_response = self._upstream.request(request)
             outcome_severity = self._severity_from_response(upstream_response)
+            if outcome_severity > 0.0:
+                outcome_description = _outcome_description("failed")
+        except Exception as exc:
+            # The request raised, so no reply was read. The receipt below keeps
+            # its closed status set (errored); the trail is where the three
+            # cases are told apart.
+            self._record_unanswered(str(getattr(result, "action_id", None) or ""), exc)
+            raise
         finally:
             with self._inflight_lock:
                 if progress_token is not None:
@@ -1775,6 +1842,7 @@ class VaaraMCPProxy:
         try:
             self._pipeline.report_outcome(
                 action_id=result.action_id, outcome_severity=outcome_severity,
+                description=outcome_description,
             )
         except Exception:
             logger.exception("report_outcome failed for action_id=%s", result.action_id)
@@ -1793,6 +1861,28 @@ class VaaraMCPProxy:
             },
         )
         return upstream_response
+
+    def _record_unanswered(self, action_id: str, exc: Exception) -> None:
+        """Close an allowed call whose upstream request raised.
+
+        The trail says which of three things happened: ``not_sent`` (the
+        request provably never left the proxy), ``unobserved`` (it may have
+        reached the server and no reply was read, so the proxy cannot say
+        whether the call ran) or ``failed`` (the server answered with an error
+        status). The error class is recorded, never its message, which can
+        quote a response body. A call that did not run or may have run is
+        closed at the neutral 0.5 severity, as an aborted stream is: the
+        scorer is not told it failed. Failures here are logged and swallowed.
+        """
+        state = getattr(exc, "outcome_state", "unobserved")
+        try:
+            self._pipeline.report_outcome(
+                action_id=action_id,
+                outcome_severity=1.0 if state == "failed" else 0.5,
+                description=_outcome_description(state, error=type(exc).__name__),
+            )
+        except Exception:
+            logger.exception("report_outcome failed for action_id=%s", action_id)
 
     def _handle_resources_read(self, request: dict) -> dict:
         params = request.get("params") or {}
@@ -1814,6 +1904,7 @@ class VaaraMCPProxy:
                 reason="Resource filtered by operator policy",
                 policy_id="operator_perimeter",
                 violation_type="perimeter_filter",
+                enforcement="could_block",
             )
             self._overt_emit(
                 surface="mcp.resource.read",
@@ -1840,6 +1931,7 @@ class VaaraMCPProxy:
             parameters={"uri": uri},
             decision="allow",
             reason="resource within operator perimeter",
+            enforcement="could_block",
         )
         self._overt_emit(
             surface="mcp.resource.read",
@@ -1915,6 +2007,7 @@ class VaaraMCPProxy:
                 reason="Prompt filtered by operator policy",
                 policy_id="operator_perimeter",
                 violation_type="perimeter_filter",
+                enforcement="could_block",
             )
             self._overt_emit(
                 surface="mcp.prompt.get",
@@ -1941,6 +2034,7 @@ class VaaraMCPProxy:
             parameters={"name": name, "arguments": arguments},
             decision="allow",
             reason="prompt within operator perimeter",
+            enforcement="could_block",
         )
         self._overt_emit(
             surface="mcp.prompt.get",
@@ -1980,6 +2074,7 @@ class VaaraMCPProxy:
         tenant_id: Optional[str] = None,
         policy_id: str = "",
         violation_type: str = "",
+        enforcement: str = "",
     ) -> None:
         """Write a request+decision audit pair for a read-oriented MCP access.
 
@@ -1993,7 +2088,9 @@ class VaaraMCPProxy:
         upstream traffic. ``tenant_id`` is taken from the request
         ContextVar by default; async callers that run outside the
         originating request (upstream notification reader thread) pass
-        the captured tenant explicitly.
+        the captured tenant explicitly. ``enforcement`` says whether the
+        proxy could stop what it records (``could_block``) or forwards it
+        regardless (``recorded_only``); every caller names one.
         """
         import time as _time
         if tenant_id is None:
@@ -2020,6 +2117,7 @@ class VaaraMCPProxy:
                 regulatory_domains=action_type.regulatory_domains,
                 policy_id=policy_id,
                 violation_type=violation_type,
+                enforcement=enforcement,
             )
         except Exception:
             logger.exception("Failed to record perimeter audit for %s", tool_name)
@@ -2113,6 +2211,7 @@ class VaaraMCPProxy:
                     decision="allow",
                     reason="upstream announced its tool list changed; re-listing",
                     tenant_id="",
+                    enforcement="recorded_only",
                 )
                 threading.Thread(
                     target=self._refresh_tool_surface, args=(upstream_name,),
@@ -2194,6 +2293,7 @@ class VaaraMCPProxy:
             decision="observed",
             reason="upstream progress notification observed",
             tenant_id=captured_tenant,
+            enforcement="recorded_only",
         )
         self._overt_emit(
             surface="mcp.notification.progress",
@@ -2231,6 +2331,7 @@ class VaaraMCPProxy:
             decision="observed",
             reason="upstream log notification observed",
             tenant_id="",
+            enforcement="recorded_only",
         )
         self._overt_emit(
             surface="mcp.notification.message",
@@ -2548,6 +2649,14 @@ def main(argv: Optional[list[str]] = None) -> None:
         help="Declare another authority argument for a tool, on top of the preset. "
              "Repeatable.")
     parser.add_argument(
+        "--fail-open", action="store_true",
+        help="Forward a tool call even when its audit record could not be "
+             "written. Off by default: the proxy first repairs the trail and "
+             "retries, and if the record still cannot be written the call is "
+             "refused and the upstream never sees it. With this flag the call "
+             "goes out unrecorded and the log says so on every one. Shadow "
+             "mode never refuses.")
+    parser.add_argument(
         "--stacked", choices=("warn", "fail", "ignore"), default="warn",
         help="What to do when a second Vaara governance layer is detected in "
              "front of this proxy (the Claude Code PreToolUse hook): 'warn' "
@@ -2664,6 +2773,7 @@ def main(argv: Optional[list[str]] = None) -> None:
             value_origin_strict=args.value_origin_strict,
             trusted_values=args.trusted_value or None,
             authority_args=_parse_authority_args(args.authority_arg, parser),
+            fail_open=args.fail_open,
         )
     except (ValueError, ProxyError) as e:
         # ProxyError here means a --upstream-url target was refused by the SSRF

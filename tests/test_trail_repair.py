@@ -405,19 +405,20 @@ def test_without_a_readable_seq_index_the_tail_is_reported_unnamed(trail_db: Pat
 def test_a_side_table_column_the_new_trail_lacks_does_not_sink_the_salvage(trail_db: Path):
     """Side-table columns come from the damaged file, so they are filtered.
 
-    Salvage copies gdpr_redactions and pending_outcomes by the column names
-    the damaged file declares. A file from another version, or one written
-    by hand, can declare a column the fresh trail has no place for, or a
-    name that is not a plain identifier at all. Only the columns the fresh
-    table has are copied; the rest is left behind with the file.
+    Salvage copies pending_outcomes by the column names the damaged file
+    declares. A file from another version, or one written by hand, can
+    declare a column the fresh trail has no place for, or a name that is not
+    a plain identifier at all. Only the columns the fresh table has are
+    copied; the rest is left behind with the file.
     """
     conn = sqlite3.connect(trail_db)
     conn.execute(
-        "INSERT INTO gdpr_redactions (original_id, replacement, redacted_at) "
-        "VALUES ('subject-1', '[REDACTED:GDPR-Art17]', 1.0)"
+        "INSERT INTO pending_outcomes "
+        "(action_id, agent_id, tool_name, risk_score, signals, created_at) "
+        "VALUES ('act-1', 'repair-test', 'file.read', 0.25, '{}', 1.0)"
     )
-    conn.execute("ALTER TABLE gdpr_redactions ADD COLUMN legacy_note TEXT")
-    conn.execute('ALTER TABLE gdpr_redactions ADD COLUMN "x) VALUES (1); --" TEXT')
+    conn.execute("ALTER TABLE pending_outcomes ADD COLUMN legacy_note TEXT")
+    conn.execute('ALTER TABLE pending_outcomes ADD COLUMN "x) VALUES (1); --" TEXT')
     conn.commit()
     conn.close()
     _zero_a_middle_leaf(trail_db)
@@ -426,11 +427,47 @@ def test_a_side_table_column_the_new_trail_lacks_does_not_sink_the_salvage(trail
 
     assert report.method == "salvage", report.error
     conn = sqlite3.connect(trail_db)
-    ids = [r[0] for r in conn.execute("SELECT original_id FROM gdpr_redactions")]
-    cols = {r[1] for r in conn.execute("PRAGMA table_info(gdpr_redactions)")}
+    ids = [r[0] for r in conn.execute("SELECT action_id FROM pending_outcomes")]
+    cols = {r[1] for r in conn.execute("PRAGMA table_info(pending_outcomes)")}
     conn.close()
-    assert ids == ["subject-1"]
+    assert "act-1" in ids
     assert "legacy_note" not in cols
+
+
+def test_a_file_with_the_old_redaction_table_still_salvages(trail_db: Path):
+    """Files written before the table left the schema carry it, unread.
+
+    The fresh trail has no gdpr_redactions table, so there is nowhere to copy
+    its rows. The salvage goes through, reports nothing damaged, and the
+    damaged copy keeps the table as it was.
+    """
+    conn = sqlite3.connect(trail_db)
+    conn.execute(
+        "CREATE TABLE IF NOT EXISTS gdpr_redactions ("
+        "original_id TEXT PRIMARY KEY, replacement TEXT NOT NULL, "
+        "redacted_at REAL NOT NULL)"
+    )
+    conn.execute(
+        "INSERT INTO gdpr_redactions (original_id, replacement, redacted_at) "
+        "VALUES ('subject-1', '[REDACTED:GDPR-Art17]', 1.0)"
+    )
+    conn.commit()
+    conn.close()
+    _zero_a_middle_leaf(trail_db)
+
+    report = repair_trail_file(trail_db)
+
+    assert report.method == "salvage", report.error
+    assert "gdpr_redactions" not in report.tables_damaged
+    conn = sqlite3.connect(trail_db)
+    tables = {r[0] for r in conn.execute("SELECT name FROM sqlite_master WHERE type = 'table'")}
+    conn.close()
+    assert "gdpr_redactions" not in tables
+    assert report.damaged_copy and Path(report.damaged_copy).is_file()
+    kept = sqlite3.connect(report.damaged_copy)
+    rows = kept.execute("SELECT original_id FROM gdpr_redactions").fetchall()
+    kept.close()
+    assert rows == [("subject-1",)]
 
 
 def _interior_child_ptrs(data: bytes, page: int) -> list[int]:

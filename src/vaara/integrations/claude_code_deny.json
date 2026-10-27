@@ -561,7 +561,7 @@
       "fields": [
         "command"
       ],
-      "pattern": "\\b(ncat|netcat|socat)\\b|\\bnc\\s+(?:-[A-Za-z]+\\s+)*[A-Za-z0-9_.\\-]+\\s+\\d{1,5}\\b",
+      "pattern": "(?:(?<![\\\\\\w])|(?:^|(?<=[\\s;&|(`]))\\\\)(ncat|netcat|socat)\\b|(?:(?<![\\\\\\w])|(?:^|(?<=[\\s;&|(`]))\\\\)nc\\s+(?:-[A-Za-z]+\\s+)*[A-Za-z0-9_.\\-]+\\s+\\d{1,5}\\b",
       "shell_syntax": true,
       "unless_env": "VAARA_ALLOW_EGRESS",
       "message": "netcat or socat moves bytes to a remote host without curl or wget. Set VAARA_ALLOW_EGRESS=1."
@@ -574,7 +574,7 @@
       "fields": [
         "command"
       ],
-      "pattern": "\\b(python3?|perl|ruby|node)\\b(?=[^|\\n]*(?:urlopen|urllib|requests\\.(?:post|put|get)|http\\.client|socket\\.socket|net\\.connect|fetch\\())",
+      "pattern": "\\b(python3?|perl|ruby|node)\\b(?=[^|\\n]*(?:urlopen|urllib(?!\\.(?:parse|error)\\b)(?!\\s+import\\s+(?:parse|error)\\b(?!\\s*,))|requests\\.(?:post|put|get)|http\\.client|socket\\.socket|net\\.connect|fetch\\())",
       "unless_env": "VAARA_ALLOW_EGRESS",
       "message": "An interpreter one-liner opens an outbound connection. No shell rule reads inside a -c string. Set VAARA_ALLOW_EGRESS=1."
     },

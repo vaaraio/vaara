@@ -38,7 +38,7 @@ Subcommands:
 
     vaara review resolve --db PATH --queue-id ID --reviewer NAME \
                           --resolution {allow,deny,abstain} \
-                          [--justification TEXT]
+                          [--justification TEXT] [--audit-db PATH --sign-key PEM]
         Mark a pending or claimed item as resolved. The ``allow`` and
         ``deny`` resolutions are operator decisions overriding the
         pipeline's ``escalate`` verdict; ``abstain`` leaves
@@ -381,6 +381,12 @@ def _keygen_attest(out: Path, pub_out: Path) -> int:
     return 0
 
 
+_WAL_NOT_TRUNCATED = (
+    "the WAL could not be truncated (another process holds the trail open): "
+    "the purged bytes stay in the -wal file until the next checkpoint"
+)
+
+
 def _cmd_trail_rotate(args: argparse.Namespace) -> int:
     from vaara.audit.rotate import rotate
 
@@ -410,7 +416,14 @@ def _cmd_trail_rotate(args: argparse.Namespace) -> int:
         print("Run without --dry-run to apply.")
     else:
         print(f"Purged {result.purged_records} record(s) older than {args.retention_days} day(s).")
-        print("Archive the zip externally; the live DB now has a chain seam at the boundary.")
+        if result.seam_record_id is not None:
+            print(f"Archive the zip externally. The trail now begins at a rotation seam, "
+                  f"declared by a signed record ({result.seam_record_id}); "
+                  f"`vaara trail verify --archive` checks the archive against it.")
+        else:
+            print("Nothing was purged, so no rotation record was written.")
+        if not result.wal_scrubbed:
+            print(_WAL_NOT_TRUNCATED, file=sys.stderr)
     return 0
 
 
@@ -681,8 +694,20 @@ def _cmd_trail_erase(args: argparse.Namespace) -> int:
     if not db_path.is_file():
         print(f"vaara trail erase: db is not a file: {db_path}", file=sys.stderr)
         return 2
+    sign_key = None
+    if args.sign_key:
+        from cryptography.hazmat.primitives import serialization
+        try:
+            sign_key = serialization.load_pem_private_key(
+                Path(args.sign_key).expanduser().read_bytes(), password=None,
+            )
+        except (OSError, ValueError, TypeError) as exc:
+            print(f"vaara trail erase: --sign-key: {exc}", file=sys.stderr)
+            return 2
     try:
-        report = erase_record(db_path, args.record_id, reason=args.reason)
+        report = erase_record(db_path, args.record_id, reason=args.reason,
+                              legal_ground=args.legal_ground, erased_by=args.erased_by,
+                              sign_key=sign_key)
     except ErasureRefused as exc:
         print(f"vaara trail erase: {exc}", file=sys.stderr)
         return 1
@@ -692,6 +717,13 @@ def _cmd_trail_erase(args: argparse.Namespace) -> int:
     print(f"seq {report['erased_seq']} ({report['erased_record_id']}): data erased, "
           f"record_hash {report['erased_record_hash']} kept.")
     print(f"  erasure record {report['erasure_record_id']} names it on the chain")
+    if report["legal_ground"]:
+        print(f"  legal ground: {report['legal_ground']}")
+    if report["signed"]:
+        print(f"  signed by {report['erased_by']}; check with "
+              "`vaara trail verify --erasure-key <their public key>`")
+    elif report["erased_by"]:
+        print(f"  erased by {report['erased_by']} (unsigned)")
     print("  `vaara trail verify` now reports the slot as erased: link verified, "
           "content not checkable")
     if not report["wal_scrubbed"]:
@@ -757,6 +789,30 @@ def _cmd_trail_check_grant(args: argparse.Namespace) -> int:
     return 0 if report.ok else 1
 
 
+def _reviewer_from_spec(entry: Any) -> Any:
+    """A spec reviewer: ``reviewer`` plus ``publicKeyFile`` (PEM) or ``publicKey``.
+
+    ``alg`` follows the key type unless the spec states it.
+    """
+    from cryptography.hazmat.primitives import serialization
+    from cryptography.hazmat.primitives.asymmetric import ec
+
+    from vaara.credential import Reviewer
+
+    if not isinstance(entry, dict):
+        raise ValueError("each reviewer in the spec must be an object")
+    pem = entry.get("publicKey")
+    if entry.get("publicKeyFile"):
+        pem = Path(entry["publicKeyFile"]).expanduser().read_text(encoding="utf-8")
+    if not isinstance(pem, str):
+        raise ValueError("a reviewer needs publicKeyFile or publicKey (PEM)")
+    alg = entry.get("alg")
+    if alg is None:
+        key = serialization.load_pem_public_key(pem.encode())
+        alg = "ES256" if isinstance(key, ec.EllipticCurvePublicKey) else "RS256"
+    return Reviewer(reviewer=entry.get("reviewer", ""), alg=alg, public_key=pem)
+
+
 def _cmd_permission_sign(args: argparse.Namespace) -> int:
     """Sign a standing permission from a JSON spec with the principal's key."""
     from vaara.attestation._attest_types import AttestationError
@@ -779,11 +835,12 @@ def _cmd_permission_sign(args: argparse.Namespace) -> int:
             limits=[Limit(kind=x.get("kind"), max=x.get("max"), arg=x.get("arg"),
                           window_seconds=x.get("windowSeconds"))
                     for x in spec.get("limits", [])],
+            reviewers=[_reviewer_from_spec(x) for x in spec.get("reviewers", [])],
         )
     except KeyError as exc:
         print(f"vaara permission sign: spec is missing {exc}", file=sys.stderr)
         return 2
-    except (ValueError, AttestationError, AttributeError) as exc:
+    except (ValueError, AttestationError, AttributeError, OSError) as exc:
         print(f"vaara permission sign: {exc}", file=sys.stderr)
         return 2
     text = json.dumps(permission.to_dict(), indent=2)
@@ -796,7 +853,11 @@ def _cmd_permission_sign(args: argparse.Namespace) -> int:
 
 def _cmd_trail_check_permission(args: argparse.Namespace) -> int:
     """Replay a trail against a principal's signed permission."""
-    from vaara.credential import check_trail_against_permission, permission_from_dict
+    from vaara.credential import (
+        check_review_resolutions,
+        check_trail_against_permission,
+        permission_from_dict,
+    )
 
     try:
         permission = permission_from_dict(_load_json_file(args.permission, "permission"))
@@ -814,8 +875,15 @@ def _cmd_trail_check_permission(args: argparse.Namespace) -> int:
     if trail is None:
         return err
     report = check_trail_against_permission(trail, permission, verifying_material=material)
+    reviews = check_review_resolutions(trail, permission, verifying_material=material)
+    show_reviews = bool(reviews.reviews) or permission.reviewers
+    ok = report.ok and (reviews.ok or not show_reviews)
     if args.format == "json":
-        print(json.dumps(report.to_dict(), indent=2))
+        out = report.to_dict()
+        if show_reviews:
+            out["reviews"] = reviews.to_dict()
+            out["ok"] = ok
+        print(json.dumps(out, indent=2))
     else:
         print(f"permission: {permission.principal} -> {permission.agent}, "
               f"tool {permission.tool_name}, {permission.not_before} to {permission.not_after}")
@@ -831,7 +899,15 @@ def _cmd_trail_check_permission(args: argparse.Namespace) -> int:
                 print(line + (f"  ({call.reason})" if call.reason else ""))
             summary = ", ".join(f"{n} {s}" for s, n in sorted(report.counts.items()))
             print(f"{'OK' if report.ok else 'FINDINGS'}: {summary or 'no calls under this permission'}")
-    return 0 if report.ok else 1
+            if show_reviews:
+                for rev in reviews.reviews:
+                    line = (f"review {rev.state:<17} {rev.action_id}  {rev.resolution} "
+                            f"by {rev.reviewer or '-'}")
+                    print(line + ("  (override)" if rev.override else ""))
+                summary = ", ".join(f"{n} {s}" for s, n in sorted(reviews.counts.items()))
+                print(f"reviews {'OK' if reviews.ok else 'FINDINGS'}: "
+                      f"{summary or 'no resolutions under this permission'}")
+    return 0 if ok else 1
 
 
 def _load_trail_source(args: argparse.Namespace):
@@ -1016,9 +1092,23 @@ def _cmd_trail_export_threshold(args: argparse.Namespace) -> int:
     return 0 if result.chain_intact else 1
 
 
+# What an OK proves and what it cannot: the chain catches an edit, insert or
+# deletion inside the export, not a tail cut before the export was signed.
+_TRAIL_VERIFY_SCOPE = (
+    "  covers: signatures and chain interior; a dropped tail before export "
+    "is not detected without an anchor or seal "
+    "(docs/prove-what-an-ai-agent-did.md)"
+)
+
+
 def _cmd_trail_verify(args: argparse.Namespace) -> int:
     try:
-        from vaara.audit.verify import verify_signed
+        from vaara.audit.verify import (
+            describe_cage_lifecycle,
+            describe_rotation_seams,
+            describe_unrecorded_windows,
+            verify_signed,
+        )
     except ImportError:
         print(_INSTALL_HINT, file=sys.stderr)
         return 2
@@ -1034,7 +1124,26 @@ def _cmd_trail_verify(args: argparse.Namespace) -> int:
               file=sys.stderr)
         return 2
     try:
-        result = verify_signed(Path(args.zip).expanduser(), public_key=pubkey)
+        erasure_key = (_verify_mod._load_erasure_key(Path(args.erasure_key).expanduser())
+                       if args.erasure_key else None)
+    except (OSError, ValueError) as exc:
+        print(f"vaara trail verify: --erasure-key: {exc}", file=sys.stderr)
+        return 2
+    rotation_key = Path(args.rotation_key).expanduser() if args.rotation_key else None
+    if rotation_key is not None:
+        try:
+            _verify_mod._load_public_key(rotation_key)
+        except (OSError, ValueError) as exc:
+            print(f"vaara trail verify: --rotation-key: {exc}", file=sys.stderr)
+            return 2
+    archive = Path(args.archive).expanduser() if args.archive else None
+    if archive is not None and not archive.is_file():
+        print(f"vaara trail verify: --archive: not a file: {archive}", file=sys.stderr)
+        return 2
+    try:
+        result = verify_signed(Path(args.zip).expanduser(), public_key=pubkey,
+                               erasure_key=erasure_key, rotation_key=rotation_key,
+                               archive=archive)
     except ImportError as exc:
         print(exc, file=sys.stderr)
         return 2
@@ -1056,9 +1165,26 @@ def _cmd_trail_verify(args: argparse.Namespace) -> int:
         print(f"  vaara:        {result.manifest.get('vaara_version')}")
     if result.ok:
         print("Verification: OK")
+        print(_TRAIL_VERIFY_SCOPE)
         for slot in result.erased:
             print(f"  record {slot['index']} ({slot['record_id']}) erased: link verified, "
                   f"content not checkable (erasure record {slot['erased_by_index']})")
+        for e in result.erasures:
+            ground = f", ground: {e['legal_ground']}" if e["legal_ground"] else ""
+            if e["state"] == "signed":
+                who = f"signed by {e['erased_by']} under the given key"
+            elif e["state"] == "unpinned":
+                who = (f"signed as {e['erased_by']}, not checked "
+                       "(pass --erasure-key to check whose key)")
+            else:
+                who = "eraser not signed"
+            print(f"  erasure record {e['index']}: {who}{ground}")
+        for line in describe_cage_lifecycle(result):
+            print(f"  {line}")
+        for line in describe_unrecorded_windows(result):
+            print(f"  {line}")
+        for line in describe_rotation_seams(result):
+            print(f"  {line}")
         if pubkey is None:
             print(
                 "  WARNING: no --pubkey given — the trail was checked against the "
@@ -1687,6 +1813,7 @@ def _cmd_trail_purge(args: argparse.Namespace) -> int:
     backend = SQLiteAuditBackend(db_path, tenant_id=tenant_scope)
     try:
         count = backend.purge_older_than(retention_seconds, dry_run=args.dry_run)
+        scrubbed = backend.last_purge_scrubbed
     finally:
         backend.close()
 
@@ -1697,11 +1824,14 @@ def _cmd_trail_purge(args: argparse.Namespace) -> int:
         print(f"Purged {count} record(s) older than {args.retention_days} day(s).")
         if count > 0:
             print(
-                "Note: hash chain has a seam at the retention boundary. "
-                "Run 'vaara trail export' BEFORE future purges to preserve "
-                "audit history in a signed zip.",
+                "Note: nothing in the trail accounts for the records removed, so an "
+                "export of it fails verification at its first record. Use "
+                "'vaara trail rotate' instead: it archives the trail, appends a "
+                "signed record naming what is purged, and then purges.",
                 file=sys.stderr,
             )
+        if scrubbed is False:
+            print(_WAL_NOT_TRUNCATED, file=sys.stderr)
     return 0
 
 
@@ -1767,9 +1897,24 @@ def _cmd_review_claim(args: argparse.Namespace) -> int:
 
 
 def _cmd_review_resolve(args: argparse.Namespace) -> int:
+    from vaara.attestation._attest_types import AttestationError
     from vaara.audit.review_queue import (
         InvalidTransitionError, ItemNotFoundError,
     )
+    reviewer_key = None
+    if args.sign_key:
+        from cryptography.hazmat.primitives import serialization
+        if not args.audit_db:
+            print("resolve failed: --sign-key needs --audit-db, the trail the "
+                  "signature binds to", file=sys.stderr)
+            return 2
+        try:
+            reviewer_key = serialization.load_pem_private_key(
+                Path(args.sign_key).expanduser().read_bytes(), password=None,
+            )
+        except (OSError, ValueError, TypeError) as exc:
+            print(f"resolve failed: --sign-key: {exc}", file=sys.stderr)
+            return 2
     trail = None
     backend = None
     if args.audit_db:
@@ -1789,11 +1934,12 @@ def _cmd_review_resolve(args: argparse.Namespace) -> int:
                     resolution=args.resolution,
                     justification=args.justification or "",
                     trail=trail,
+                    reviewer_key=reviewer_key,
                 )
             except (InvalidTransitionError, ItemNotFoundError) as exc:
                 print(f"resolve failed: {exc}", file=sys.stderr)
                 return 2
-            except ValueError as exc:
+            except (ValueError, AttestationError) as exc:
                 print(f"resolve failed: {exc}", file=sys.stderr)
                 return 2
     finally:
@@ -1805,6 +1951,8 @@ def _cmd_review_resolve(args: argparse.Namespace) -> int:
     )
     if trail is not None:
         print("Wrote ESCALATION_RESOLVED to audit trail (Article 14(4)(d)).")
+    if reviewer_key is not None:
+        print("Signed by the reviewer over the decision record hash.")
     return 0
 
 
@@ -2698,6 +2846,10 @@ def _cmd_receipt_verify_decision(args: argparse.Namespace) -> int:
             con.close()
     key = Path(args.key).expanduser().read_bytes() if args.key else None
     failed = 0
+    # Blocks on verified receipts, by whether the producer could stop the
+    # action. A shadow or recorded-only block is a deny that stopped nothing,
+    # and one with no mode says nothing either way.
+    blocks = {"could_block": 0, "shadow": 0, "recorded_only": 0, "": 0}
     for f in files:
         try:
             c = dr.verify_receipt_file(f, public_key_pem=key, trail_hashes=hashes)
@@ -2706,12 +2858,14 @@ def _cmd_receipt_verify_decision(args: argparse.Namespace) -> int:
             print(f"FAIL  {f}: unreadable ({exc})")
             continue
         failed += 0 if c.ok else 1
+        if c.ok and c.decision == "block":
+            blocks[c.enforcement if c.enforcement in blocks else ""] += 1
         if args.json:
             print(json.dumps({
                 "path": c.path, "ok": c.ok, "signature": c.signature_ok,
                 "evidence": c.evidence_ok, "trail": c.trail_ok,
                 "decision": c.decision, "tool": c.tool, "decidedAt": c.decided_at,
-                "detail": c.detail,
+                "enforcement": c.enforcement, "detail": c.detail,
             }))
         else:
             mark = "OK  " if c.ok else "FAIL"
@@ -2720,6 +2874,10 @@ def _cmd_receipt_verify_decision(args: argparse.Namespace) -> int:
     if not args.json:
         trail_note = "" if hashes is not None else " (no trail to check against)"
         print(f"{len(files) - failed}/{len(files)} verified{trail_note}")
+        if any(blocks.values()):
+            print(f"blocks: {blocks['could_block']} stopped, {blocks['shadow']} shadow, "
+                  f"{blocks['recorded_only']} recorded only, "
+                  f"{blocks['']} mode not recorded")
         if inference:
             dirs = sorted({str(f.parent) for f in inference})
             print(f"skipped {len(inference)} inference receipt file(s); check them with "
@@ -6133,6 +6291,22 @@ def build_parser() -> argparse.ArgumentParser:
         default=None,
         help="Path to Ed25519 public key (PEM). If omitted, uses signer_pubkey.pem from inside the zip.",
     )
+    pv.add_argument(
+        "--erasure-key", default=None,
+        help="Public key (PEM, EC P-256 or RSA) of the person who signs erasures; "
+             "each record_erased record must verify under it",
+    )
+    pv.add_argument(
+        "--rotation-key", default=None,
+        help="Ed25519 public key (PEM) that signed the trail_rotated records, when "
+             "it is not the key that signed this zip. Defaults to the zip's own key.",
+    )
+    pv.add_argument(
+        "--archive", default=None,
+        help="The retention archive this zip begins after (the zip, or the sealed "
+             "file of an encrypted rotation): checked against the digest the "
+             "trail_rotated record states",
+    )
     pv.set_defaults(func=_cmd_trail_verify)
 
     pph = tsub.add_parser(
@@ -6551,6 +6725,13 @@ def build_parser() -> argparse.ArgumentParser:
     perase.add_argument("--record-id", required=True, help="record_id of the record to erase")
     perase.add_argument("--reason", required=True,
                         help="Why, recorded on the chain (keep personal data out of it)")
+    perase.add_argument("--legal-ground", default=None,
+                        help="Legal ground, recorded on the chain (e.g. 'GDPR Art. 17(1)(a)')")
+    perase.add_argument("--erased-by", default=None,
+                        help="Who erases (a name or DID), recorded on the chain")
+    perase.add_argument("--sign-key", default=None,
+                        help="The eraser's private key (PEM, EC P-256 or RSA); signs the "
+                             "erasure record. Needs --erased-by")
     perase.add_argument(
         "--format", choices=["text", "json"], default="text",
         help="Output format (default text)",
@@ -6663,6 +6844,12 @@ def build_parser() -> argparse.ArgumentParser:
         "--audit-db", default=None,
         help="If supplied, also write an ESCALATION_RESOLVED record to "
              "the audit DB at this path (Article 14(4)(d) evidence).",
+    )
+    rr.add_argument(
+        "--sign-key", default=None,
+        help="The reviewer's own PEM private key (EC P-256 or RSA). The "
+             "resolution row then carries the reviewer's signature over the "
+             "decision record hash; needs --audit-db.",
     )
     rr.set_defaults(func=_cmd_review_resolve)
 
@@ -8464,6 +8651,24 @@ def build_parser() -> argparse.ArgumentParser:
     phpost.set_defaults(func=lambda args: __import__(
         "vaara.integrations.claude_code_hooks", fromlist=["run_post_tool_use"]
     ).run_post_tool_use(client=args.client))
+
+    phfail = hooksub.add_parser(
+        "post-tool-use-failure",
+        help="Record that a call failed or was interrupted (state only, not "
+             "the host's error text)",
+    )
+    phfail.set_defaults(func=lambda args: __import__(
+        "vaara.integrations.claude_code_hooks", fromlist=["run_post_tool_use_failure"]
+    ).run_post_tool_use_failure())
+
+    phdeny = hooksub.add_parser(
+        "permission-denied",
+        help="Record that the host's permission step refused a call Vaara "
+             "had allowed, so it did not run",
+    )
+    phdeny.set_defaults(func=lambda args: __import__(
+        "vaara.integrations.claude_code_hooks", fromlist=["run_permission_denied"]
+    ).run_permission_denied())
 
     phups = hooksub.add_parser(
         "user-prompt-submit",

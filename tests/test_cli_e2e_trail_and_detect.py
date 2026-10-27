@@ -120,7 +120,7 @@ def test_trail_purge_deletes_past_retention_and_warns_about_the_seam(tmp_path, c
     out, err = capsys.readouterr()
     assert rc == 0
     assert "Purged 4 record(s)" in out
-    assert "seam at the retention boundary" in err
+    assert "vaara trail rotate" in err
     conn = sqlite3.connect(db)
     assert conn.execute("SELECT COUNT(*) FROM audit_records WHERE seq < 4").fetchone()[0] == 0
     conn.close()

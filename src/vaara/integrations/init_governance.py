@@ -92,6 +92,11 @@ _HOOK_EVENTS = (
     ("UserPromptSubmit", "user-prompt-submit", None),
     ("PreToolUse", "pre-tool-use", HOOK_MATCHER),
     ("PostToolUse", "post-tool-use", HOOK_MATCHER),
+    # A call that failed, and one the host's permission step refused after
+    # Vaara let it through: neither fires PostToolUse, so without these a
+    # call reads "allowed, no outcome" and nothing says why.
+    ("PostToolUseFailure", "post-tool-use-failure", HOOK_MATCHER),
+    ("PermissionDenied", "permission-denied", HOOK_MATCHER),
 )
 
 

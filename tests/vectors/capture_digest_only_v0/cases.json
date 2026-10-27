@@ -1,0 +1,161 @@
+{
+  "cases": [
+    {
+      "expected": {
+        "limit": 5,
+        "note": {
+          "captured": "digest-only",
+          "digest": "hmac-sha256:d103877bdb89462c31b642f0e2177d2a680cdfff4d85af18a93a6a425c5da392",
+          "reference": "ehr"
+        },
+        "patient": {
+          "id": {
+            "captured": "digest-only",
+            "digest": "hmac-sha256:7f013279d3c4469461ccee3fb76ed935e342cb6d7aa95e9db135095ef5174368",
+            "reference": "ehr"
+          },
+          "ward": "B2"
+        }
+      },
+      "name": "nested_field_and_reference",
+      "parameters": {
+        "limit": 5,
+        "note": "Mäkelä: chest pain since monday",
+        "patient": {
+          "id": "010170-123A",
+          "ward": "B2"
+        }
+      },
+      "tool": "mcp__ehr__lookup"
+    },
+    {
+      "expected": {
+        "rows": [
+          {
+            "n": 1,
+            "ssn": {
+              "captured": "digest-only",
+              "digest": "hmac-sha256:53da7448b342bffbdd6b064f81df8fab87cfec274a0cd86d0753c1ef096e308f"
+            }
+          },
+          {
+            "n": 2,
+            "ssn": {
+              "captured": "digest-only",
+              "digest": "hmac-sha256:75298c48afae5b18071811898b65759159ce231803e6a0e8449b5e8d2bc27d00"
+            }
+          }
+        ],
+        "unit": "mmol/l"
+      },
+      "name": "every_item_of_a_list",
+      "parameters": {
+        "rows": [
+          {
+            "n": 1,
+            "ssn": "010170-123A"
+          },
+          {
+            "n": 2,
+            "ssn": "010170-123A"
+          }
+        ],
+        "unit": "mmol/l"
+      },
+      "tool": "mcp__lab__results"
+    },
+    {
+      "expected": {
+        "command": {
+          "captured": "digest-only",
+          "digest": "hmac-sha256:ebdbae8bf9bb62731d92ea01a9ec2c6e1f35ca472524ecb2e705c3341dca4cb6",
+          "reference": "shell"
+        },
+        "flags": {
+          "captured": "digest-only",
+          "digest": "hmac-sha256:87c2f6818432b407b15e386fec2870f8ea6250708755a4536a5d5393209efa81",
+          "reference": "shell"
+        },
+        "timeout": {
+          "captured": "digest-only",
+          "digest": "hmac-sha256:2e7b191183d68d806d595ccb7c26bc8d10cc11b58ae595fb77f44f98e481f509",
+          "reference": "shell"
+        }
+      },
+      "name": "a_lone_wildcard_keeps_the_keys",
+      "parameters": {
+        "command": "grep 010170-123A /srv/records.txt",
+        "flags": {
+          "dry": true,
+          "extra": null
+        },
+        "timeout": 12.5
+      },
+      "tool": "shell.exec"
+    },
+    {
+      "expected": {
+        "note": "left as the host sent it",
+        "patient": {
+          "id": "010170-123A"
+        }
+      },
+      "name": "a_tool_no_rule_names",
+      "parameters": {
+        "note": "left as the host sent it",
+        "patient": {
+          "id": "010170-123A"
+        }
+      },
+      "tool": "mcp__other__lookup"
+    }
+  ],
+  "disclosures": [
+    {
+      "digest": "hmac-sha256:7f013279d3c4469461ccee3fb76ed935e342cb6d7aa95e9db135095ef5174368",
+      "matches": true,
+      "path": "patient.id",
+      "value": "010170-123A"
+    },
+    {
+      "digest": "hmac-sha256:7f013279d3c4469461ccee3fb76ed935e342cb6d7aa95e9db135095ef5174368",
+      "matches": false,
+      "path": "patient.id",
+      "value": "010170-123B"
+    },
+    {
+      "digest": "hmac-sha256:7f013279d3c4469461ccee3fb76ed935e342cb6d7aa95e9db135095ef5174368",
+      "matches": false,
+      "path": "note",
+      "value": "010170-123A"
+    }
+  ],
+  "format": "vaara.capture/v0",
+  "key_hex": "00112233445566778899aabbccddeeff00112233445566778899aabbccddeeff",
+  "policy": {
+    "rules": [
+      {
+        "fields": [
+          "patient.id",
+          "note"
+        ],
+        "reference": "ehr",
+        "tool": "mcp__ehr__*"
+      },
+      {
+        "fields": [
+          "rows.*.ssn"
+        ],
+        "tool": "mcp__lab__*"
+      },
+      {
+        "fields": [
+          "*"
+        ],
+        "reference": "shell",
+        "tool": "shell.exec"
+      }
+    ],
+    "version": 1
+  }
+}

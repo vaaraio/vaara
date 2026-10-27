@@ -213,6 +213,43 @@ def test_supported_platforms_names_the_image_and_the_chart_version():
     assert _values()["image"]["repository"] in page
 
 
+def test_tested_operating_systems_each_name_what_ran_and_when():
+    """SUSE Ready asks for the host versions a product was tested on. A row
+    without the code that ran and the day it ran is a support claim, not a
+    test result, so every row carries both."""
+    page = (ROOT / "docs" / "supported-platforms.md").read_text(encoding="utf-8")
+    section = page.split("## Operating systems tested", 1)[1].split("\n## ", 1)[0]
+    rows = [
+        line for line in section.splitlines()
+        if line.startswith("| ") and not line.startswith("| ---")
+    ][1:]
+    assert rows
+    for row in rows:
+        cells = [c.strip() for c in row.strip("|").split("|")]
+        assert len(cells) == 5, row
+        system, python, ran, when, result = cells
+        assert system and python and result, row
+        assert re.fullmatch(r"(\d+\.\d+\.\d+|[0-9a-f]{8})", ran), row
+        assert re.fullmatch(r"\d{4}-\d{2}-\d{2}", when), row
+    assert any(row.startswith("| SUSE Linux Enterprise Server 15 SP6 ") for row in rows)
+    assert any(row.startswith("| Red Hat Enterprise Linux 9.8 ") for row in rows)
+
+
+def test_supported_platforms_lists_rhel_9_and_points_at_the_ubi_image():
+    """Red Hat Partner Validation asks that RHEL be listed as a supported
+    platform in the product's own documentation. The page names RHEL 9, the
+    UBI 9 Containerfile that goes with it, and the Node.js floor a rerun of
+    the suite needs, so a stock RHEL 9 runner does not read as a product
+    fault. OpenShift is not claimed: no cluster run is recorded."""
+    page = (ROOT / "docs" / "supported-platforms.md").read_text(encoding="utf-8")
+    assert "Red Hat Enterprise Linux 9" in page
+    assert "packaging/ubi9/README.md" in page
+    assert (ROOT / "packaging" / "ubi9" / "README.md").is_file()
+    assert "Node.js 20" in page
+    kubernetes = page.split("## Kubernetes", 1)[1].split("\n## ", 1)[0]
+    assert "OpenShift" not in kubernetes
+
+
 # --- the real thing, when helm is available --------------------------------
 
 

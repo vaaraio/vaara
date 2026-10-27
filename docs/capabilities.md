@@ -47,13 +47,15 @@ License: AGPL-3.0-or-later.
 | SEP-2828 execution and decision records | `attestation/decision.py`, `attestation/tool_call_attestation.py` | Decision basis carried natively: `rationale`, `binding`, `decisionProof`. |
 | Evidence ingestion | `vaara ingest`, `attestation/_ingest_emit.py` | Foreign evidence in, one signed record out. |
 | Declarative source profiles | `attestation/profiles/*.json`, `attestation/_declarative.py` | SLSA, C2PA, in-toto agent decisions, ACP checkout, AP2 payment receipts, x402 settlement and CAEP security events, each bound by a JSON profile with no code. |
-| Delegation attribution | `audit/delegation.py`, `credential/_grant_attenuation.py` | Reconstructs delegation chains and refuses any step that broadens authority. |
+| Delegation attribution | `audit/delegation.py`, `credential/_grant_attenuation.py` | Reconstructs delegation chains and refuses any step that broadens authority, or that a parent naming its `delegatees` did not name; the graph reports such a hop as substituted and a hop under a parent that named nobody as unbound. |
 | Gap-evident completeness | `vaara verify-contiguity` | Signed sequence numbers and a running count make a dropped record a provable gap. Run sealing and a sealed class gate. |
 | Cross-organisation handoff | `vaara build-handoff`, `vaara verify-handoff`, `attestation/_handoff*.py` | A package of record, DID document, key history, revocations and anchor, with the producer identity pinned. EU AI Act Article 26(6). |
 | Access records | `audit/access.py` (`ACCESS_RECORDED`) | A read is an event: who read, on whose behalf, a digest of the returned set, and whether an outcome was recorded. |
+| Digest-only capture | `_capture.py`, `docs/capture-digest-only.md`, `capture_digest_only_v0` | An operator declares argument fields in `~/.vaara/capture.json`. The trail row, the review queue copy and the approval request then hold each declared value as a keyed digest and a reference, and the value is not stored, through the pipeline, the hook, the MCP proxy and the shell proxy. The key is not on the trail. Reason text, tool results and reviewer free text are not masked. Off unless the file exists. |
 | Audience and task binding | `attestation/_receipt_audience.py`, `attestation/_receipt_task.py` | `aud` and `taskId` inside the signed preimage. Verdicts `bound`, `conflict` or `unsupported`; a missing field never passes. |
 | Decision-before-effect ordering | `attestation/_decision_verifier.py` (`effect_ordering`) | Reports `ordered`, `effect_precedes_decision` or `not_comparable`. |
 | Trail repair with declared gaps | `vaara trail repair`, `audit/sqlite_backend.py` (`TrailRepair`) | Keeps the damaged file and appends a `repair_gap` event naming every lost sequence number. |
+| A trail that stopped recording says so | `audit/trail.py` (`trail_not_recording`), `audit/write_failure.py`, `vaara trail verify` | After the store refused writes, the first write that lands is followed by a `trail_not_recording` record: how many writes were refused (a lower bound), from when to when, and the record that landed first. Verification lists each window and `scripts/verify_vaara_trail.py` prints the same line. Nothing is written if the store never recovers. |
 | Page-level record recovery | `vaara trail carve`, `audit/carve.py` | Reads a damaged trail page by page and recovers every record whose hash still verifies, including rows the b-tree no longer reaches. Read-only. |
 | Trail registry | `~/.vaara/sources.json` | Every trail the engine writes is listed, so none goes unnoticed. |
 | Confidential-VM enforcement binding | `vaara verify-enforcement`, `attestation/_enforcement*.py` | Binds a signed record to an AMD SEV-SNP VM (`REPORT_DATA = sha512(jcs(record))`), with an optional expected measurement. |
@@ -105,7 +107,7 @@ Provider, and S3P, a safety-violation-rate measurement an auditor can reproduce.
 - DORA Articles 9, 10 and 13: event-to-article mappings in `audit/trail.py`, `compliance/engine.py`
 - SOC 2 Trust Services Criteria CC6.1 to CC6.3, CC7.2, CC7.3 and CC8.1: event-to-criterion mappings in `audit/trail.py`, `compliance/engine.py`, `docs/COMPLIANCE.md`
 - GDPR Chapter V, data locality and transfers: `attestation/data_locality.py`, `data_locality_v0`
-- GDPR Article 17, erasure: read-time redaction in `audit/sqlite_backend.py`
+- GDPR Article 17, erasure: `audit/erase.py`, `vaara trail erase` (one record's data in the trail; the hash stays and a `record_erased` record names it; the eraser can sign it and `vaara trail verify --erasure-key` checks that; receipts, the review queue and earlier exports are not reached)
 - eIDAS 2.0 qualified electronic ledger profile: `docs/eidas-qel-profile.md`
 - prEN ISO/IEC 12792 transparency taxonomy: per-record tagging in `audit/trail.py`
 - W3C PROV-DM and PROV-JSON export: `audit/prov_export.py`, `vaara trail export-prov`
@@ -132,10 +134,10 @@ section 5.6).
 
 ## 10. Conformance
 
-52 conformance suites under `tests/vectors/` and `conformance/`, each with a
+55 conformance suites under `tests/vectors/` and `conformance/`, each with a
 `_check_independent.py` that imports no Vaara code and recomputes its verdicts
 from the bytes of its case files. `scripts/conformance_runner.py` runs them all:
-50 pass and 2 skip without optional extras (`pq_hybrid_v0` needs `vaara[pq]`,
+53 pass and 2 skip without optional extras (`pq_hybrid_v0` needs `vaara[pq]`,
 `qualified_time_v0` needs `vaara[timeanchor]`). `vaara conformance statement`
 checks an installed build against the published corpus. Results and outside
 reproductions: [vaara.io/conformance.html](https://vaara.io/conformance.html).
@@ -175,7 +177,7 @@ reproductions: [vaara.io/conformance.html](https://vaara.io/conformance.html).
 | Key lifecycle events | `audit/trail.py` (`record_key_lifecycle`) | Rotation, revocation and addition recorded as chained, anchorable events, so a revocation can be shown to predate a compromise. |
 | Threshold export | `vaara trail export-threshold`, `audit/export.py` | k-of-n custodian signatures on a regulator handoff; no single key can forge it. |
 | Long-term verification | `vaara verify-retained` | Verifies a record signed under a rotated-out key through the archived DID document, key history, revocations and an optional time anchor. |
-| Retention rotation | `vaara trail rotate`, `vaara trail purge`, `audit/rotate.py` | Exports, re-verifies the export from its own bytes, then purges past retention (EU AI Act Articles 19(1) and 26(6)). `--dry-run` shows the plan. |
+| Retention rotation | `vaara trail rotate`, `vaara trail purge`, `audit/rotate.py` | Exports, re-verifies the export from its own bytes, appends a signed `trail_rotated` record naming the hash the first survivor links to and the archive's digest, then purges past retention (EU AI Act Articles 19(1) and 26(6)). `vaara trail verify` reads the rotated trail as beginning at a rotation seam, and `--archive` checks the archive against that record. `--dry-run` shows the plan. |
 | Encrypted retention archive | `vaara trail rotate --encrypt-to`, `vaara trail verify-seal`, `vaara trail unseal`, `audit/sealed_archive.py` | The verified archive is encrypted to a recipient key; a public seal signed by the trail's key names the chain's first and last hash, the record count and the ciphertext digest, so anyone checks it without the key. Opening it records an access first. |
 
 ## 14. Human oversight (EU AI Act Article 14)
@@ -183,14 +185,15 @@ reproductions: [vaara.io/conformance.html](https://vaara.io/conformance.html).
 | Capability | Where | What it does |
 |---|---|---|
 | Review queue | `vaara review list`, `claim`, `resolve`, `audit/review_queue.py` | Pending, claimed and resolved (allow, deny or abstain); the resolution is written into the chain as `ESCALATION_RESOLVED`. |
-| Signed approvals | `approvals.py`, host hooks | An escalated call waits for a human answer that is signed, which the governed agent cannot write. The request carries the call's full arguments and their SHA-256. A timeout or a corrupt answer stays a refusal. |
+| Signed approvals | `approvals.py`, host hooks | An escalated call waits for a human answer that is signed, which the governed agent cannot write. The request carries the call's full arguments and their SHA-256. A timeout or a corrupt answer stays a refusal, and the trail closes the hold as a deny by policy, so it never reads as one still waiting. |
+| Reviewer-signed resolutions | `vaara review resolve --sign-key`, `vaara trail check-permission`, `credential/_review_signature.py` | The reviewer signs the resolution with their own key, bound to the decision record it resolves. A third party checks it against a reviewer key the principal pinned in the signed permission, never a key the record carries, and an allow over a held call is named as an override for that one action. |
 | Shadow report | `vaara trail shadow-report`, `audit/shadow_report.py` | Groups what would have been denied or held, by tool, over a period. |
 
 ## Try it
 
 ```
 pip install vaara
-scripts/conformance_runner.py                 # 52 suites, checkers import no Vaara
+scripts/conformance_runner.py                 # 55 suites, checkers import no Vaara
 vaara conformance check PATH                  # keyless SEP-2828 conformance
 vaara verify-record FILE --trusted-issuer-cert CA.pem   # qualified or self-asserted time
 vaara receipt render RECEIPT.json             # self-contained offline evidence page

@@ -139,6 +139,8 @@ class ActionRequest:
     sequence_position: int = 0  # Position in current action sequence
     timestamp_utc: str = ""
     tenant_id: str = ""  # v0.40 multi-tenant scope; "" = single-tenant
+    # Agents this action may hand work to; None = names nobody (unbound)
+    delegatees: Optional[tuple[str, ...]] = None
 
     def to_policy_context(self) -> dict:
         """Convert to a plain dict of policy-evaluation fields.

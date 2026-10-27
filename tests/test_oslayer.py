@@ -435,7 +435,9 @@ def test_unanswered_ask_is_refused(g):
     g._selection = selection.Selection(ask_timeout=0.3)
     folder = selection.Folder("/data/clients", "ask")
     assert g.verdict(_event(), "/data/clients/x.pdf", folder, "vaara-agent") is False
-    assert g._pipeline.resolved == []
+    # The hold closes as a deny by policy: an escalation with no resolution
+    # reads on the chain as one still waiting. No human is claimed.
+    assert g._pipeline.resolved == [("act-1", "deny", "policy", None)]
     assert list(g.approvals_dir.glob("*.json")) == []
 
 

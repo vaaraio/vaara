@@ -44,6 +44,27 @@ Install on RHEL 9: `sudo dnf install python3.12 python3.12-pip`, then
 The base image is SUSE's own BCI, which needs no subscription to pull or
 redistribute.
 
+## Red Hat Enterprise Linux
+
+| Requirement | Supported |
+| --- | --- |
+| Red Hat Enterprise Linux | 9 |
+| Python | 3.12, the `python3.12` package from the RHEL 9 repositories |
+| Container base | Red Hat Universal Base Image 9 |
+| CI | the `tests-rhel` job runs the suite in `registry.access.redhat.com/ubi9/python-312` |
+
+Install from PyPI into a virtual environment made with `python3.12 -m venv`.
+For containers, [packaging/ubi9/README.md](../packaging/ubi9/README.md) builds
+`vaara proxy` on UBI 9, runs it as a non-root user in group 0, and records a
+Red Hat preflight run that passed all 10 checks. That image is built from the
+Containerfile; the published `ghcr.io/vaaraio/vaara` image stays on SUSE BCI.
+
+Rerunning the test suite on RHEL 9 needs Node.js 20 or later for the browser
+verifier tests (the `nodejs:20` module stream). RHEL 9's default Node.js 16
+has no global `crypto`, so those tests fail there for reasons that have
+nothing to do with Vaara; without Node installed at all they skip.
+OpenShift is not listed: no run on an OpenShift cluster has been recorded.
+
 ## Kubernetes
 
 | Requirement | Supported |
@@ -104,6 +125,37 @@ show.
 If the trail lives on a network or virtual filesystem, the better answer is to
 move it. In a container, put it on a named volume rather than a bind mount, so
 it sits on the container runtime's own filesystem with real POSIX locking.
+
+## Operating systems tested
+
+The full test suite has been run on these hosts, with Python and every
+system library taken from the vendor's own repositories. The CI legs on
+Ubuntu, macOS, Windows and Red Hat's UBI 9 are defined in
+`.github/workflows/ci.yml` and are not repeated here.
+
+| System | Python | Vaara | Date | Result |
+| --- | --- | --- | --- | --- |
+| SUSE Linux Enterprise Server 15 SP6 | 3.12.12 (`python312` from the SLE BCI repository) | e9de66ee | 2026-10-22 | 6157 passed, 0 failed |
+| Red Hat Enterprise Linux 9.8 | 3.12.15 (`python3.12` from Red Hat's UBI 9 repositories) | 0cdb8b66 | 2026-10-18 | 5996 passed, 0 failed |
+
+The SLES 15 SP6 run used SUSE's `registry.suse.com/bci/bci-base:15.6` image,
+packages from the public SLE BCI repository only (Python 3.12, SQLite 3.50.2,
+Node.js 20 for the browser verifier tests), no registration, the suite run
+as a non-root user. `pip install vaara==2.15.0` from PyPI installed and ran on
+the same system. The skipped tests need optional extras or tools that were
+not installed, and every one is on the skip list CI accepts.
+
+The RHEL 9.8 run used Red Hat's own KVM guest image with SELinux enforcing,
+not registered with subscription-manager, the suite run as a non-root user.
+Python 3.12 came from Red Hat's signed UBI 9 repositories and SQLite was the
+system 3.34.1. The guest had no Node.js for the main run, so the browser
+verifier tests skipped; with Node.js 20 from the `nodejs:20` module stream
+those two files then ran with 27 passed. `pip install vaara==2.14.0` from
+PyPI installed and ran on the same system. Commit 0cdb8b66 is part of
+release 2.15.0.
+
+A row here is a test run, not an end-to-end deployment; those go in the next
+table.
 
 ## Verified releases
 

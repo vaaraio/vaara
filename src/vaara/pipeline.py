@@ -326,6 +326,7 @@ class InterceptionPipeline:
         enforce: bool = True,
         review_queue: Optional[Any] = None,
         authority: Optional[AuthorityPolicy] = None,
+        require_delegatee_binding: bool = False,
     ) -> None:
         """
         Args:
@@ -353,6 +354,11 @@ class InterceptionPipeline:
             authority: Authority decay for sessions (see
                 ``vaara.authority``). Defaults to the policy
                 ``VAARA_AUTHORITY_BUDGET`` describes: on, budget 3.0.
+            require_delegatee_binding: When True, a child action is denied
+                unless its parent was recorded naming it in ``delegatees``.
+                Default False: a parent that names nobody leaves its
+                children as before, and the delegation graph reports
+                them as unbound.
         """
         self.authority = authority if authority is not None else policy_from_env()
         self.registry = registry or create_default_registry()
@@ -366,6 +372,7 @@ class InterceptionPipeline:
         self.compliance = compliance or ComplianceEngine()
         self._enforce = enforce
         self._review_queue = review_queue
+        self._require_delegatee_binding = bool(require_delegatee_binding)
 
         # Track action_id to (predicted_risk, signals) for outcome feedback.
         # When the trail has a SQLite backend, pending outcomes persist to
@@ -393,6 +400,11 @@ class InterceptionPipeline:
             str, tuple[Capability, ...]
         ] = OrderedDict()
         self._grants_lock = threading.Lock()
+        # Delegatee binding: action_id -> the agents it named as delegates,
+        # or None when it named nobody. Same lock and bound as the grants.
+        self._delegatees_for_action: OrderedDict[
+            str, Optional[frozenset[str]]
+        ] = OrderedDict()
         self._metrics = PipelineMetrics()
         self._metrics_lock = threading.Lock()
         # The digest of the decision state last written to the trail, so the
@@ -436,7 +448,8 @@ class InterceptionPipeline:
 
         try:
             state = engine_state(version=__version__, enforce=self._enforce,
-                                 scorer=self.scorer, authority=self.authority)
+                                 scorer=self.scorer, authority=self.authority,
+                                 require_delegatee_binding=self._require_delegatee_binding)
             policy_digest = digest(state)
         except Exception:
             logger.warning("decision state could not be digested; recording "
@@ -464,6 +477,8 @@ class InterceptionPipeline:
         policy_reason: str = "",
         policy_id: str = "",
         value_origin: Optional[dict] = None,
+        delegatees: Optional[Sequence[str]] = None,
+        enforcement: Optional[str] = None,
     ) -> InterceptionResult:
         """Intercept an agent action request.
 
@@ -497,10 +512,25 @@ class InterceptionPipeline:
         came from, and the record carries the mapping. A prior approval of the
         same call still replays.
 
+        ``delegatees`` names the agents this action may hand work to, as the
+        gate records their ``agent_id`` (where agents authenticate by key,
+        the key's RFC 7638 thumbprint). It lands in the hash-covered request.
+        A child whose parent named delegates must be one of them, or it is
+        denied fail-closed with ``violation_type`` ``delegation_binding``:
+        knowing a parent's action id is not enough to act under it.
+
+        ``enforcement`` is what the decision record says about whether this
+        verdict could stop the action: ``could_block`` when the pipeline
+        enforces, ``shadow`` when it does not. A caller whose own verdict
+        decides, or who records an action it cannot hold, names the mode
+        itself (``could_block``, ``shadow``, ``recorded_only``).
+
         Returns an InterceptionResult — check .allowed before executing.
         """
         start = time.perf_counter()
         value_origin = _value_origin(value_origin)
+        if enforcement is None:
+            enforcement = "could_block" if self._enforce else "shadow"
         if policy_decision is not None and policy_decision not in _FINE_TO_COARSE:
             raise ValueError(f"policy_decision must be a decision, not {policy_decision!r}")
 
@@ -514,6 +544,12 @@ class InterceptionPipeline:
             parent_action_id = _cap_str(
                 parent_action_id, _MAX_PARENT_ACTION_ID_LEN, "parent_action_id"
             )
+        if delegatees is not None:
+            if isinstance(delegatees, str):
+                raise ValueError("delegatees must be a sequence of agent ids, not a string")
+            delegatees = tuple(sorted({
+                _cap_str(str(d), _MAX_AGENT_ID_LEN, "delegatees") for d in delegatees
+            }))
 
         # 1. Classify the action
         action_type = self.registry.classify(tool_name, parameters)
@@ -543,6 +579,7 @@ class InterceptionPipeline:
             sequence_position=sequence_position,
             timestamp_utc=time.strftime("%Y-%m-%dT%H:%M:%SZ", time.gmtime()),
             tenant_id=tenant_id,
+            delegatees=delegatees,
         )
 
         # 3. Record the request in audit trail
@@ -573,6 +610,27 @@ class InterceptionPipeline:
                     ok, why = capability_subsumes(parent_caps, child_caps)
                     if not ok:
                         attenuation_reason = why
+
+        # 3b2. Delegatee binding. A parent that named its delegates admits only
+        # them; anyone else holding its action id is refused. A parent that
+        # named nobody, or one this pipeline never saw, is refused only when
+        # the deployer requires the binding. Applied at step 6b.
+        binding_reason: Optional[str] = None
+        with self._grants_lock:
+            self._delegatees_for_action[action_id] = (
+                frozenset(delegatees) if delegatees is not None else None
+            )
+            if len(self._delegatees_for_action) > _MAX_TRACKED_GRANTS:
+                self._delegatees_for_action.popitem(last=False)
+            if parent_action_id:
+                known = parent_action_id in self._delegatees_for_action
+                bound = self._delegatees_for_action.get(parent_action_id)
+        if parent_action_id:
+            if bound is not None:
+                if agent_id not in bound:
+                    binding_reason = "delegatee_not_bound"
+            elif self._require_delegatee_binding:
+                binding_reason = "parent_unbound" if known else "parent_unknown"
 
         # 4. Score the risk. If the scorer raises — corrupt model bundle,
         # feature pipeline exception, any library bug — we've already
@@ -625,6 +683,7 @@ class InterceptionPipeline:
                     unavailable_input=self._scorer_policy_id(),
                     policy_digest=fail_digest,
                     policy_state=fail_state,
+                    enforcement=enforcement,
                 )
             except Exception:
                 logger.exception(
@@ -871,6 +930,20 @@ class InterceptionPipeline:
                 + (f"; {reason}" if reason else ""),
                 _MAX_DECISION_REASON_LEN, "reason",
             )
+        # Who may act outranks how much: a child the parent never named is
+        # refused on that ground, and an attenuation reason stays in the text.
+        if binding_reason is not None:
+            decision_str = "deny"
+            allowed = False
+            decision_detail = None
+            modified_parameters = None
+            deny_policy_id = "delegatee_binding"
+            violation_type = "delegation_binding"
+            reason = _cap_str(
+                f"delegation binding violation ({binding_reason})"
+                + (f"; {reason}" if reason else ""),
+                _MAX_DECISION_REASON_LEN, "reason",
+            )
 
         # 6c. Value origin. An authority argument (recipient, payee, endpoint)
         # whose value the caller saw only in content the agent read is held
@@ -999,6 +1072,7 @@ class InterceptionPipeline:
             unavailable_input=unavailable_input,
             policy_digest=policy_digest,
             policy_state=policy_state,
+            enforcement=enforcement,
         )
 
         if decision_str == "escalate":

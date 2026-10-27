@@ -181,6 +181,40 @@ python scripts/verify_vaara_trail.py signed.zip --pubkey signer.pem
 The script in `scripts/verify_vaara_trail.py` depends only on the
 standard library and the `cryptography` package. Copy it to any machine.
 
+A trail that honoured an erasure request (`vaara trail erase`) verifies the
+same way. The script lists each erased slot (link verified, content not
+checkable) and each erasure record. Pass `--erasure-key eraser.pub.pem`, the
+eraser's EC P-256 or RSA public key received out of band, to check the
+eraser's signature on every erasure record; with the key given, an unsigned
+or wrongly signed erasure fails the run.
+
+A trail that records cage launches (`vaara cage run`, `vaara cage stop`,
+`vaara run`) is paired the same way `vaara trail verify` pairs it: each stop
+must name the start of the same driver and launch, written earlier in the
+chain, or the run fails. The script lists every start and stop; a start with no
+stop, and a stop whose start is outside the export, are listed and do not fail
+the run.
+
+A trail whose store refused writes and then took them again carries a
+`trail_not_recording` record. The script lists each one with the number of
+writes refused (at least) and the two adjacent records the window lies between,
+as `vaara trail verify` does; calls in that window ran with no record. A record
+whose count, times or record id are nonsense fails the run. The record cannot
+exist if the store never recovered, so a trail that ends in an outage shows
+nothing.
+
+Both verifiers refuse a trail line or a manifest that repeats a member of one
+object, and a number with no finite value (`NaN`, `Infinity`, or a literal such
+as `1e999`). A repeated member reads as its last value to one parser and its
+first to another, and the hash covers only one of them, so the run fails with
+`record N: duplicate member "x"` or `record N: non-finite number NaN` instead of
+passing on one reading. A manifest fails as `manifest.json: ...`.
+
+A trail line or manifest that is valid JSON but not an object (`[1]`, `7`,
+`"x"`, `null`) also fails the run, as `record N: not a JSON object` or
+`manifest.json: not a JSON object`. It used to stop the verifier with a Python
+error and no verdict.
+
 ## Verifying a Vaara release
 
 This section covers Vaara's own packages. Keys for signing your trails are covered above.

@@ -172,12 +172,15 @@ def _egress_recorder(agent: str, cage_block: dict):
                     decision="deny", reason=f"{where}: {event.get('reason')}",
                     risk_score=1.0, policy_id="os-layer.egress",
                     violation_type="egress_not_allowed", cage=cage_block,
+                    # The proxy holds the connection: a refusal is a stop.
+                    enforcement="could_block",
                 )
             elif kind == "opened":
                 trail.record_decision(
                     action_id=action_id, agent_id=agent, tool_name="egress.connect",
                     decision="allow", reason=f"{where}: {event.get('reason')}",
                     risk_score=0.0, policy_id="", violation_type="", cage=cage_block,
+                    enforcement="could_block",
                 )
             elif kind == "failed":
                 trail.record_outcome(
@@ -344,6 +347,9 @@ def run(name: Optional[str], agent_argv: list[str], *,
 
     hooks.set_cgroup(launch.cgroup)
     hooks.start()
+    from vaara.cage import lifecycle
+
+    start_id = lifecycle.started(CAGE_NAME, agent, declared.config_digest)
     guard_gone = threading.Event()
 
     def _watch() -> None:
@@ -352,7 +358,10 @@ def run(name: Optional[str], agent_argv: list[str], *,
         guard_gone.set()
         # The guard is gone, so nothing decides this launch's opens any
         # more. End it rather than let it run half-governed.
+        ended = len(cgroup.pids(Path(launch.cgroup)))
         cgroup.kill(Path(launch.cgroup))
+        lifecycle.stopped(CAGE_NAME, agent, start_id=start_id, processes_ended=ended,
+                          reason="guard_gone")
         try:
             os.kill(pid, signal.SIGKILL)
         except OSError:
@@ -379,6 +388,9 @@ def run(name: Optional[str], agent_argv: list[str], *,
             continue
     launch.close()
     _close()
+    if not guard_gone.is_set():
+        lifecycle.stopped(CAGE_NAME, agent, start_id=start_id, exit_code=_status(code),
+                          reason="exited")
     if guard_gone.is_set():
         print("vaara run: the OS guard stopped, so the agent was ended.", file=sys.stderr)
         return EXIT_GUARD_GONE

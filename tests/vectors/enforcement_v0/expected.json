@@ -1,0 +1,38 @@
+{
+  "invalid/shadow-rewritten-as-stop.json": {
+    "enforcement": true,
+    "evidence": false,
+    "signature": true,
+    "trail": true
+  },
+  "invalid/word-outside-the-vocabulary.json": {
+    "enforcement": false,
+    "evidence": true,
+    "signature": true,
+    "trail": true
+  },
+  "valid/0-could_block-deny.json": {
+    "enforcement": true,
+    "evidence": true,
+    "signature": true,
+    "trail": true
+  },
+  "valid/1-shadow-deny.json": {
+    "enforcement": true,
+    "evidence": true,
+    "signature": true,
+    "trail": true
+  },
+  "valid/2-recorded_only-allow.json": {
+    "enforcement": true,
+    "evidence": true,
+    "signature": true,
+    "trail": true
+  },
+  "valid/3-not-recorded-deny.json": {
+    "enforcement": true,
+    "evidence": true,
+    "signature": true,
+    "trail": true
+  }
+}

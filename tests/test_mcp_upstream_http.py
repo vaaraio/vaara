@@ -14,7 +14,11 @@ from http.server import BaseHTTPRequestHandler, ThreadingHTTPServer
 
 import pytest
 
-from vaara.integrations._mcp_upstream import ProxyError
+from vaara.integrations._mcp_upstream import (
+    ProxyError,
+    UpstreamFailed,
+    UpstreamNotSent,
+)
 from vaara.integrations._mcp_upstream_http import HttpUpstreamClient
 
 
@@ -61,6 +65,20 @@ class _Handler(BaseHTTPRequestHandler):
                  "result": {"protocolVersion": "2025-06-18", "serverInfo": {"name": "fake"}}},
                 session="sess-123",
             )
+            return
+        if cfg.get("hang"):  # take the request, never answer it
+            cfg["stop"].wait(cfg["hang"])
+            return
+        if cfg.get("garbage"):
+            body = b"not json at all"
+            self.send_response(200)
+            self.send_header("Content-Type", "application/json")
+            self.send_header("Content-Length", str(len(body)))
+            self.end_headers()
+            self.wfile.write(body)
+            return
+        if cfg.get("wrong_id"):
+            self._send_json({"jsonrpc": "2.0", "id": 999, "result": {}})
             return
         if cfg.get("http_error"):
             self._send_json({"error": "boom"}, status=cfg["http_error"])
@@ -225,3 +243,59 @@ def test_proxy_fronts_remote_http_upstream(server):
         pipeline.report_outcome.assert_called_once()
     finally:
         proxy.close()
+
+
+# -- what the proxy can say about a call when the request raised ------------
+
+
+def test_http_error_status_is_a_failure_the_proxy_observed(server):
+    httpd, url = server
+    httpd.cfg["http_error"] = 500
+    httpd.cfg["no_push"] = True
+    client = HttpUpstreamClient(url)
+    try:
+        _init(client)
+        with pytest.raises(UpstreamFailed):
+            client.request({"jsonrpc": "2.0", "id": 3, "method": "tools/call"})
+    finally:
+        client.close()
+
+
+def test_a_closed_client_never_sent(server):
+    httpd, url = server
+    client = HttpUpstreamClient(url)
+    client.close()
+    with pytest.raises(UpstreamNotSent):
+        _init(client)
+
+
+def test_a_refused_connection_never_sent():
+    import socket
+
+    with socket.socket() as s:
+        s.bind(("127.0.0.1", 0))
+        port = s.getsockname()[1]
+    client = HttpUpstreamClient(f"http://127.0.0.1:{port}/mcp")
+    try:
+        with pytest.raises(UpstreamNotSent):
+            client.request({"jsonrpc": "2.0", "id": 1, "method": "tools/call"})
+    finally:
+        client.close()
+
+
+@pytest.mark.parametrize("mode", ["hang", "garbage", "wrong_id"])
+def test_a_request_that_left_and_got_no_usable_reply_is_unobserved(server, mode):
+    httpd, url = server
+    httpd.cfg["no_push"] = True
+    client = HttpUpstreamClient(url)
+    try:
+        _init(client)
+        httpd.cfg[mode] = 5 if mode == "hang" else True
+        with pytest.raises(ProxyError) as raised:
+            client.request(
+                {"jsonrpc": "2.0", "id": 4, "method": "tools/call"}, timeout=0.5,
+            )
+        assert type(raised.value) is ProxyError
+        assert raised.value.outcome_state == "unobserved"
+    finally:
+        client.close()

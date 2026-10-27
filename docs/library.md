@@ -329,6 +329,38 @@ report = pipeline.run_compliance_assessment(system_name="build agent", system_ve
 print([a.status.value for a in report.articles if a.requirement.article == "CC6.8"])
 ```
 
+## Who may act under a delegation
+
+A child action names its parent with `parent_action_id`. That id alone is
+not consent: anyone who knows it could act as the child. A parent that passes
+`delegatees` names the agents it hands work to, the list lands in its hashed
+request, and a child the parent did not name is denied with
+`violation_type` `delegation_binding`. Where agents sign in with a key, use
+the key's RFC 7638 thumbprint as the `agent_id` you name.
+`require_delegatee_binding=True` also denies a child whose parent named
+nobody. The delegation graph reads the same binding back from a trail.
+
+```python
+from vaara.audit.delegation import graph_from_trail
+from vaara.audit.sqlite_backend import SQLiteAuditBackend
+from vaara.pipeline import InterceptionPipeline
+
+backend = SQLiteAuditBackend("audit.db")
+trail = backend.load_trail()
+trail._on_record = backend.write_record
+pipe = InterceptionPipeline(trail=trail)
+
+a = pipe.intercept(agent_id="planner", tool_name="plan_task", delegatees=["researcher"])
+b = pipe.intercept(agent_id="researcher", tool_name="query_db",
+                   parent_action_id=a.action_id, delegatees=["executor"])
+other = pipe.intercept(agent_id="someone-else", tool_name="write_record",
+                       parent_action_id=b.action_id)
+print(other.allowed, other.reason.split(";")[0])   # False, delegation binding violation (delegatee_not_bound)
+
+graph = graph_from_trail(trail)
+print(graph.binding_of(b.action_id), graph.binding_of(other.action_id))   # bound substituted
+```
+
 ## The credential gateway from your own code
 
 The MCP proxy builds a `CredentialGateway` for the tools it constrains.

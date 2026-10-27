@@ -2,24 +2,34 @@
 # SPDX-License-Identifier: AGPL-3.0-or-later
 """Retention rotation: export a signed archive, verify it, then purge.
 
-``purge_older_than`` leaves a documented hash-chain seam at the retention
-boundary, and the documented workflow around it (export a signed zip first,
-archive it externally, then purge) was manual. ``rotate`` is that workflow
-as one fail-closed operation: the purge never runs unless the archive was
-written AND re-verified from its own bytes. A rotation that cannot prove
-its archive is a rotation that did not happen.
+``purge_older_than`` leaves the first surviving record linked to a record that
+is gone, and the workflow around it (export a signed zip first, archive it
+externally, then purge) was manual. ``rotate`` is that workflow as one
+fail-closed operation: the purge never runs unless the archive was written AND
+re-verified from its own bytes. A rotation that cannot prove its archive is a
+rotation that did not happen.
+
+Between the archive and the purge it appends a signed ``trail_rotated`` record
+to the trail: the hash the first survivor will link to, how many records go,
+and the digest of the archive that holds them. The record is newer than the
+cut-off, so it outlives the purge, and every verifier that finds the first
+record linked to it reports the trail as beginning at a rotation seam instead
+of a chain break. A store that refuses the record skips the purge.
 
 Requires the [export] extra (cryptography) via ``export_signed``.
 """
 
 from __future__ import annotations
 
+import hashlib
 import logging
+import time
 from dataclasses import dataclass, field
 from pathlib import Path
-from typing import Union
+from typing import Optional, Union
 
-from vaara.audit.sqlite_backend import SQLiteAuditBackend
+from vaara.audit.sqlite_backend import RotationBoundaryError, SQLiteAuditBackend
+from vaara.audit.trail import AuditTrail
 
 logger = logging.getLogger("vaara.audit.rotate")
 
@@ -33,6 +43,11 @@ class RotateResult:
     ``purged_records``: records purged, or that would be purged in dry_run.
     ``archive_path``: the written zip, when export succeeded.
     ``errors``: human-readable failure reasons (empty if ``ok``).
+    ``wal_scrubbed``: False when the purge could not truncate the WAL because
+    another reader held it open, so the purged bytes stay in the -wal file
+    until the next checkpoint. True otherwise, and for a dry run.
+    ``seam_record_id``: the ``trail_rotated`` record written before the purge,
+    None when nothing was purged or in a dry run.
     """
     ok: bool
     exported_records: int = 0
@@ -41,6 +56,33 @@ class RotateResult:
     errors: list[str] = field(default_factory=list)
     sealed_path: Union[Path, None] = None
     seal_path: Union[Path, None] = None
+    wal_scrubbed: bool = True
+    seam_record_id: Optional[str] = None
+
+
+def _sha256_file(path: Path) -> str:
+    h = hashlib.sha256()
+    with open(path, "rb") as fh:
+        for block in iter(lambda: fh.read(1 << 20), b""):
+            h.update(block)
+    return h.hexdigest()
+
+
+def _rotation_signer(signer_key):
+    """``(sign, fingerprint)``: signs a ``trail_rotated`` record's data with the
+    key that signs the archive, so one key vouches for both."""
+    from vaara.audit.export import _load_private_key
+    from vaara.audit.signer import Ed25519Signer
+    from vaara.audit.verify import ROTATION_RECORD_TYPE, rotation_payload
+
+    private = _load_private_key(signer_key)
+    fingerprint = Ed25519Signer(private).public_key_fingerprint()[:32]
+
+    def sign(data: dict) -> dict:
+        return {"type": ROTATION_RECORD_TYPE, "alg": "Ed25519",
+                "signature": private.sign(rotation_payload(data)).hex()}
+
+    return sign, fingerprint
 
 
 def rotate(
@@ -69,6 +111,12 @@ def rotate(
     file was decrypted back to the zip before it was written), and the purge
     runs only after that. ``archive_path`` is then the sealed file. In
     ``dry_run`` the plaintext zip is kept beside the sealed file.
+
+    The purge takes the records older than ``retention_days`` up to the first
+    one that is not (a record written later with an old timestamp stays for the
+    next rotation), so what goes is an unbroken prefix of the chain. Before it
+    runs, a signed ``trail_rotated`` record naming that prefix and the archive's
+    digest is appended; if the store refuses it, nothing is purged.
     """
     from vaara.audit.export import export_signed
     from vaara.audit.verify import verify_signed
@@ -86,6 +134,11 @@ def rotate(
                     "replaced. Choose a new --out."])
     backend = SQLiteAuditBackend(db_path, tenant_id=tenant_id)
     try:
+        retention_seconds = retention_days * 86400
+        try:
+            boundary = backend.rotation_boundary(retention_seconds)
+        except RotationBoundaryError as exc:
+            return RotateResult(ok=False, errors=[f"{exc}; purge skipped"])
         exported = backend.count()
 
         try:
@@ -141,7 +194,33 @@ def rotate(
                 # written into place, so the plaintext copy can go.
                 out.unlink()
 
-        purged = backend.purge_older_than(retention_days * 86400, dry_run=dry_run)
+        seam_record_id: Optional[str] = None
+        if boundary is not None and not dry_run:
+            kept = sealed_path if sealed_path is not None else out
+            try:
+                sign, fingerprint = _rotation_signer(signer_key)
+                seam = AuditTrail(on_record=backend.write_record).record_rotation(
+                    last_hash=boundary.last_hash,
+                    purged_records=boundary.count,
+                    archive_sha256=_sha256_file(kept),
+                    archive_records=int(export_result.manifest["record_count"]),
+                    archive_kind="sealed" if sealed_path is not None else "zip",
+                    boundary_utc=time.strftime(
+                        "%Y-%m-%dT%H:%M:%SZ", time.gmtime(boundary.cutoff)),
+                    signer_fingerprint=fingerprint,
+                    sign=sign,
+                    tenant_id=tenant_id,
+                )
+            except Exception as exc:
+                return RotateResult(
+                    ok=False, exported_records=exported, archive_path=kept,
+                    sealed_path=sealed_path, seal_path=seal_path,
+                    errors=[f"rotation record not written, purge skipped: {exc}"],
+                )
+            seam_record_id = seam.record_id
+        purged = (backend.purge_older_than(
+            retention_seconds, dry_run=dry_run, boundary=boundary)
+            if boundary is not None else 0)
         logger.info(
             "rotate: archived %d record(s) to %s, %s %d record(s) older than %d day(s)",
             exported, out, "would purge" if dry_run else "purged", purged, retention_days,
@@ -153,6 +232,8 @@ def rotate(
             archive_path=out if dry_run or sealed_path is None else sealed_path,
             sealed_path=sealed_path,
             seal_path=seal_path,
+            wal_scrubbed=backend.last_purge_scrubbed is not False,
+            seam_record_id=seam_record_id,
         )
     finally:
         backend.close()

@@ -589,10 +589,10 @@ correspondence.
   type) - ✅. Every deny the pipeline, the deny-rule hook and the MCP
   proxy write lands on the hash chain as `action_blocked` with
   `policy_id` (the rule, the scorer, `capability_attenuation`,
-  `operator_perimeter` or `upstream_input_schema`) and
+  `delegatee_binding`, `operator_perimeter` or `upstream_input_schema`) and
   `violation_type` (`policy_rule`, `risk_threshold`,
-  `privilege_attenuation`, `invalid_decision`, `scorer_failure`,
-  `perimeter_filter`, `parameter_schema`)
+  `privilege_attenuation`, `delegation_binding`, `invalid_decision`,
+  `scorer_failure`, `perimeter_filter`, `parameter_schema`)
   alongside the reason. A custom scorer can name its own policy and
   violation type.
 - **TOOL-1.4** (provisional receipt before execution, upgrade to full
@@ -941,15 +941,44 @@ problem:
   `SQLiteAuditBackend.purge_older_than(seconds)` from Python). The
   tenant selector is required, not optional: pass `--tenant ID` to purge
   one tenant's records, `--all-tenants` to purge across the whole DB. A
-  `--dry-run` flag reports the count without modifying the DB.
+  `--dry-run` flag reports the count without modifying the DB. The
+  purge deletes with `secure_delete` on and truncates the WAL, so the
+  purged bytes leave the database file and the `-wal` file. If another
+  process holds the trail open the WAL cannot be truncated: the command
+  says so on stderr and the bytes stay in the `-wal` file until the next
+  checkpoint. The purge reaches the trail only. Decision receipt files
+  and the review queue database are separate files it does not touch.
 
-  **Hash-chain seam at the retention boundary.** Surviving records
-  still reference deleted predecessors via `previous_hash`, so
-  `vaara trail verify` will report a chain break at the boundary.
-  Intended workflow: export a signed handoff zip BEFORE purging,
-  archive the zip externally for long-tail audit history, then purge
-  the live DB. The signed zip remains self-consistent forever. The
-  live DB chain has a documented seam at the retention boundary.
+  **The retention boundary.** `vaara trail rotate --db PATH --out
+  ARCHIVE.zip --key KEY --retention-days N --all-tenants` is the
+  supported workflow. It exports the whole trail as a signed zip,
+  re-verifies the zip from its own bytes, appends a signed
+  `trail_rotated` record to the trail, and only then purges the records
+  older than the window. The purge takes the unbroken prefix of the
+  chain: a record written later with an old timestamp stays until the
+  next rotation. The `trail_rotated` record is newer than the cut-off, so
+  it outlives the purge. It names the hash the first surviving record
+  links to, how many records went, and the archive's SHA-256, record
+  count and kind (`zip` or `sealed`), and it is signed with the key that
+  signs the archive (`vaara.trail-rotation/v1`, Ed25519). If the store
+  refuses the record, nothing is purged.
+
+  `vaara trail verify` accepts an export of the rotated trail when the
+  export holds that record and its signature checks out, and prints
+  `begins at a rotation seam: N records archived as <sha256>`. Pass
+  `--archive PATH` and it also checks the archive: the digest must match,
+  a zip must verify and hold the stated number of records and the record
+  the trail links to, and a sealed archive is checked by its digest alone.
+  A first record that links to nothing the trail holds is still a chain
+  break. That is what `vaara trail purge` on its own leaves, because it
+  deletes without a record of what it removed. The seam does not prove
+  that the archive still exists or is complete beyond what `--archive`
+  checks, and whoever holds the signing key can write a record for
+  records they dropped, so pin the key with `--pubkey`. Rotation can run
+  again on the rotated trail; each run appends its own record. With
+  `--tenant ID` the record is written into that tenant's chain, so the tenant's
+  records must form a chain of their own; rotation refuses, and purges nothing,
+  when another tenant's records are interleaved in the same chain.
 
 ## Current limits
 

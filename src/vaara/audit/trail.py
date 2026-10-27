@@ -38,9 +38,10 @@ from enum import Enum
 from pathlib import Path
 from typing import Any, Callable, Optional
 
+from vaara import _capture
 from vaara._decision_vocabulary import FINE_TO_COARSE, REFINEMENTS
 from vaara._sanitize import json_safe, strict_json_dumps
-from vaara.audit.write_failure import mark_recovered, record_failure
+from vaara.audit.write_failure import active_failure, mark_recovered, record_failure
 from vaara.taxonomy.actions import ActionRequest, RegulatoryDomain
 
 logger = logging.getLogger(__name__)
@@ -69,6 +70,9 @@ class EventType(str, Enum):
     AGENT_SEEN = "agent_seen"               # vaara scan --watch saw an agent start
     WITNESS_CONFIGURED = "witness_configured"  # Heads reach a log or a TSA at a stated cadence
     RECORD_ERASED = "record_erased"         # A record's data was erased, its hash kept
+    CAGE_LIFECYCLE = "cage_lifecycle"       # A cage launch started or stopped
+    TRAIL_NOT_RECORDING = "trail_not_recording"  # The store refused writes, then took them again
+    TRAIL_ROTATED = "trail_rotated"         # A retention rotation archived the records before the trail's first one
 
     # Copies and pickles go through the stored value, so a type this build
     # does not know (see stored_event_type) survives them. Python 3.11+
@@ -111,7 +115,10 @@ def stored_event_type(value: str) -> EventType:
 # append API. Verification reads them back: a REPAIR_GAP naming missing seqs
 # turns a broken chain into declared gaps, an ANCHOR_GAP marks an unwitnessed
 # stretch, KEY_LIFECYCLE is custodian evidence for SOC 2 CC6.2 and CC8.1,
-# RECORD_ERASED accounts for a record whose data was erased (see ERASED_DATA_KEY).
+# RECORD_ERASED accounts for a record whose data was erased (see ERASED_DATA_KEY),
+# CAGE_LIFECYCLE pairs a cage launch's stop with its start,
+# TRAIL_NOT_RECORDING says the store refused writes between two adjacent records,
+# TRAIL_ROTATED accounts for the first surviving record's link after a retention purge.
 SYSTEM_EVENT_TYPES = frozenset({
     EventType.ANCHOR_GAP,
     EventType.REPAIR_GAP,
@@ -120,6 +127,9 @@ SYSTEM_EVENT_TYPES = frozenset({
     EventType.KEY_LIFECYCLE,
     EventType.WITNESS_CONFIGURED,
     EventType.RECORD_ERASED,
+    EventType.CAGE_LIFECYCLE,
+    EventType.TRAIL_NOT_RECORDING,
+    EventType.TRAIL_ROTATED,
 })
 
 # An erased record's stored data is exactly {ERASED_DATA_KEY: {"erasure_record_id": ...}}.
@@ -127,6 +137,10 @@ SYSTEM_EVENT_TYPES = frozenset({
 # recomputes; a later RECORD_ERASED record naming its id and that hash is what
 # lets a walk report the slot as erased instead of rewritten.
 ERASED_DATA_KEY = "_vaara_erased"
+
+# Whether the party that wrote a decision could have stopped the action
+# (record_decision's ``enforcement``). Absent means not recorded.
+ENFORCEMENT_MODES = frozenset({"could_block", "shadow", "recorded_only"})
 
 
 def erasure_pointer(record: "AuditRecord") -> Optional[str]:
@@ -465,6 +479,21 @@ TRANSPARENCY_DEFAULTS: dict[EventType, dict[str, str]] = {
     EventType.KEY_LIFECYCLE: {
         "system_operation": "key_custodian_management",
         "data_usage": "custodian_fingerprint+quorum",
+        "decision_making": "operator_action",
+    },
+    EventType.CAGE_LIFECYCLE: {
+        "system_operation": "cage_lifecycle",
+        "data_usage": "driver+name+policy_digest+actor",
+        "decision_making": "operator_action",
+    },
+    EventType.TRAIL_NOT_RECORDING: {
+        "system_operation": "recording_gap",
+        "data_usage": "refused_write_count+window",
+        "decision_making": "n/a",
+    },
+    EventType.TRAIL_ROTATED: {
+        "system_operation": "retention_rotation",
+        "data_usage": "archive_digest+purged_count",
         "decision_making": "operator_action",
     },
     EventType.DISCLOSURE_RECORDED: {
@@ -858,6 +887,69 @@ class ErasedRecord:
                 f"checkable (erasure record at {by})")
 
 
+#: Mirrors vaara.audit.verify.ROTATION_RECORD_TYPE; the verifier module stays
+#: free of vaara imports, so the constant is written in both places.
+ROTATION_RECORD_TYPE = "vaara.trail-rotation/v1"
+_ROTATION_ARCHIVE_KINDS = frozenset({"zip", "sealed"})
+_ROTATION_TEXT_FIELDS = ("last_hash", "archive_sha256", "boundary_utc", "rotated_at",
+                         "signer_fingerprint")
+_ROTATION_SIGNATURE_KEYS = frozenset({"type", "alg", "signature"})
+
+
+@dataclass(frozen=True)
+class RotationSeam:
+    """The retention rotation a trail begins at.
+
+    A rotation archives the whole trail, then purges the records older than
+    the retention window. The first record that survives still links to the
+    last one purged, and a TRAIL_ROTATED record written before the purge names
+    that hash (``last_hash``), how many records went (``purged_records``) and
+    the digest of the archive that holds them. A walk that finds the first
+    record linked to such a record reports it here instead of a break.
+    ``record_index`` and ``seq`` place the rotation record in the walk.
+    """
+
+    record_index: int
+    seq: Optional[int]
+    record_id: str
+    last_hash: str
+    purged_records: int
+    archive_sha256: str
+    archive_records: int
+    archive_kind: str
+
+    def describe(self) -> str:
+        n = self.purged_records
+        return (f"begins at a rotation seam: {n} record{'s' if n != 1 else ''} "
+                f"archived as {self.archive_sha256}")
+
+
+def _rotation_seam(index: int, seq: Optional[int], record: "AuditRecord") -> Optional[RotationSeam]:
+    """The seam a TRAIL_ROTATED record states, or None when it is not well formed.
+
+    Shape only. The signature needs the signer's public key, which a walk of the
+    store does not hold; the export verifiers check it
+    (``vaara.audit.verify.check_rotations``). A record without the closed
+    signature block is not a seam: an unsigned claim accounts for nothing.
+    """
+    data = record.data if isinstance(record.data, dict) else {}
+    if not all(isinstance(data.get(k), str) and data[k] for k in _ROTATION_TEXT_FIELDS):
+        return None
+    purged, archived = data.get("purged_records"), data.get("archive_records")
+    if (isinstance(purged, bool) or not isinstance(purged, int) or purged < 1
+            or isinstance(archived, bool) or not isinstance(archived, int) or archived < 0):
+        return None
+    if data.get("archive_kind") not in _ROTATION_ARCHIVE_KINDS:
+        return None
+    block = data.get("rotation_signature")
+    if (not isinstance(block, dict) or set(block) != _ROTATION_SIGNATURE_KEYS
+            or block.get("type") != ROTATION_RECORD_TYPE or block.get("alg") != "Ed25519"
+            or not isinstance(block.get("signature"), str)):
+        return None
+    return RotationSeam(index, seq, record.record_id, data["last_hash"], purged,
+                        data["archive_sha256"], archived, data["archive_kind"])
+
+
 @dataclass(frozen=True)
 class ChainVerdict:
     """The full answer of a chain walk, which ``verify_chain`` flattens.
@@ -873,11 +965,17 @@ class ChainVerdict:
     tombstone, and a later RECORD_ERASED record names it by id and stored hash.
     Never intact either: the erased content cannot be checked. ``state`` says
     "declared_gaps" when a walk finds both; ``erased`` is still filled.
+    ``seams``: the trail begins at a retention rotation, not at its first
+    record. What is in the trail chains without a break from there, and the
+    records before it are in the archive the rotation record names, so this
+    stays ``intact`` and ``seams`` carries the rotation. A first record that
+    links to nothing the trail holds is still ``broken``.
     """
 
     error: Optional[str] = None
     declared_gaps: tuple[DeclaredGap, ...] = ()
     erased: tuple[ErasedRecord, ...] = ()
+    seams: tuple[RotationSeam, ...] = ()
 
     @property
     def state(self) -> str:
@@ -924,10 +1022,18 @@ class _GapLedger:
         self._declared: list[tuple[int, Optional[int], frozenset[int]]] = []
         self._tombstones: list[tuple[int, Optional[int], "AuditRecord", str]] = []
         self._erasures: dict[tuple[str, str], tuple[int, Optional[int]]] = {}
+        self._start: Optional[tuple[str, str]] = None
+        self._rotations: list[RotationSeam] = []
 
     def hold(self, index: int, lost: tuple[int, ...], resumes_at_seq: int,
              error: str) -> None:
         self._pending.append((index, lost, resumes_at_seq, error))
+
+    def hold_start(self, link: str, error: str) -> None:
+        """The first record of the walk links to ``link``, which the walk never
+        sees. Held open until the walk has seen every TRAIL_ROTATED record, one
+        of which has to name that hash."""
+        self._start = (link, error)
 
     def hold_erased(self, index: int, seq: Optional[int], record: "AuditRecord",
                     error: str) -> None:
@@ -942,6 +1048,11 @@ class _GapLedger:
             if isinstance(rid, str) and isinstance(rhash, str):
                 self._erasures.setdefault((rid, rhash), (index, seq))
             return
+        if record.event_type == EventType.TRAIL_ROTATED:
+            seam = _rotation_seam(index, seq, record)
+            if seam is not None:
+                self._rotations.append(seam)
+            return
         if record.event_type != EventType.REPAIR_GAP:
             return
         named = (record.data or {}).get("lost_seqs") or []
@@ -950,6 +1061,15 @@ class _GapLedger:
             self._declared.append((index, seq, seqs))
 
     def verdict(self) -> ChainVerdict:
+        seams: tuple[RotationSeam, ...] = ()
+        if self._start is not None:
+            link, error = self._start
+            begun = next((s for s in self._rotations if s.last_hash == link), None)
+            if begun is None:
+                return ChainVerdict(error=(
+                    f"{error} (no signed rotation record in the trail names that hash)"
+                ))
+            seams = (begun,)
         gaps = []
         for index, lost, resumes, error in self._pending:
             by = tuple(seq for at, seq, named in self._declared
@@ -971,7 +1091,7 @@ class _GapLedger:
                 ))
             erased.append(ErasedRecord(index, seq, record.record_id,
                                        record.record_hash, found[1]))
-        return ChainVerdict(declared_gaps=tuple(gaps), erased=tuple(erased))
+        return ChainVerdict(declared_gaps=tuple(gaps), erased=tuple(erased), seams=seams)
 
 
 # ── Audit Trail ───────────────────────────────────────────────────────────
@@ -1069,6 +1189,12 @@ class AuditTrail:
         # consulted since the last failure", so the first successful write
         # after a failure is the one that clears it.
         self._write_marker_checked = False
+        # Set under the chain lock by the first write that lands after an
+        # outage: the marker as it stood and the record that landed. The
+        # trail_not_recording record is written from it once the lock is
+        # free (see _flush_unrecorded_mark), because it has to follow that
+        # record on the chain.
+        self._unrecorded_pending: Optional[tuple[dict, str]] = None
         # Count of rows loaded as skeletons during load_trail because
         # their data/regulatory JSON columns were corrupt. Parallel
         # signal to persistence_failures but for the READ path — an ops
@@ -1267,9 +1393,15 @@ class AuditTrail:
                         f"expected previous_hash={prev_hash!r}, "
                         f"got {record.previous_hash!r}"
                     )
-                    if seq is None or prev_seq is None or seq <= prev_seq + 1:
+                    if i == start_index == 0 and not prev_hash and record.previous_hash:
+                        # The walk opens on a record that links past the start
+                        # of the trail: a retention rotation, if the trail
+                        # holds the signed record that says so.
+                        ledger.hold_start(record.previous_hash, error)
+                    elif seq is None or prev_seq is None or seq <= prev_seq + 1:
                         return ChainVerdict(error=error)
-                    ledger.hold(i, tuple(range(prev_seq + 1, seq)), seq, error)
+                    else:
+                        ledger.hold(i, tuple(range(prev_seq + 1, seq)), seq, error)
             elif whole_table and seq is not None and prev_seq is not None \
                     and seq > prev_seq + 1:
                 # The chain links across missing seqs: what a salvage that
@@ -1347,8 +1479,12 @@ class AuditTrail:
             self._cap_record_str(request.parent_action_id, self._MAX_PARENT_ACTION_ID_LEN)
             if request.parent_action_id is not None else None
         )
+        # A field the operator declared digest-only (vaara._capture) goes
+        # into the record as a keyed digest; the engine already scored the
+        # real arguments, and the commitment below covers what is recorded.
         parameters = self._cap_record_dict_bytes(
-            request.parameters if isinstance(request.parameters, dict) else {},
+            _capture.mask(request.tool_name, request.parameters)
+            if isinstance(request.parameters, dict) else {},
             self._MAX_REQUEST_PARAMETERS_JSON_BYTES,
         )
         # A salted commitment to the arguments as recorded, so a decision
@@ -1361,6 +1497,15 @@ class AuditTrail:
         arguments_commitment = (
             {"arguments_salt": salt, "arguments_commitment": commitment}
             if commitment else {}
+        )
+        # Only an action that names its delegates carries the key, so a
+        # request without one hashes exactly as it did before the binding.
+        delegatees = (
+            {"delegatees": [
+                self._cap_record_str(d, self._MAX_AGENT_ID_LEN)
+                for d in request.delegatees
+            ]}
+            if request.delegatees is not None else {}
         )
         self._append(AuditRecord(
             record_id=str(uuid.uuid4()),
@@ -1385,6 +1530,7 @@ class AuditTrail:
                 "session_id": safe_session_id,
                 "parent_action_id": safe_parent_action_id,
                 "sequence_position": request.sequence_position,
+                **delegatees,
             },
             regulatory_articles=articles,
             tenant_id=tenant_id,
@@ -1453,6 +1599,7 @@ class AuditTrail:
         policy_state: Optional[dict] = None,
         sequence_steps: Optional[dict] = None,
         value_origin: Optional[dict] = None,
+        enforcement: str = "",
     ) -> None:
         """Record the allow/deny/escalate decision.
 
@@ -1494,6 +1641,14 @@ class AuditTrail:
         only in external tool results to ``{"seen_in": [action ids],
         "source": tool}``, so the record names the result the value came
         from. Same omission rule.
+
+        ``enforcement`` says whether the party writing the decision could
+        have stopped the action: ``could_block`` (it stands in the path and
+        the caller honours its verdict), ``shadow`` (it could, but was set to
+        let everything through) or ``recorded_only`` (it sees the action but
+        cannot hold it). A word outside those three is left out with a
+        warning, never recorded. Same omission rule: empty adds no keys, and
+        a reader takes a missing value as unknown, not as a stop.
 
         ``cage`` is the block :func:`vaara.cage.observe` returns: which cage
         the deciding process runs in and whether the kernel confirmed it at
@@ -1581,7 +1736,8 @@ class AuditTrail:
             )
         if modified_parameters:
             data["modified_parameters"] = self._cap_record_dict_bytes(
-                {str(k): json_safe(v) for k, v in modified_parameters.items()},
+                {str(k): json_safe(v) for k, v in
+                 _capture.mask(tool_name, modified_parameters).items()},
                 self._MAX_EXECUTION_RESULT_JSON_BYTES,
             )
         data.update(disposition)
@@ -1618,6 +1774,15 @@ class AuditTrail:
                 {str(k): json_safe(v) for k, v in value_origin.items()},
                 self._MAX_ASSESSMENT_JSON_BYTES,
             )
+        if enforcement:
+            if enforcement in ENFORCEMENT_MODES:
+                data["enforcement"] = enforcement
+            else:
+                logger.warning(
+                    "record_decision: enforcement=%r is not one of %s for "
+                    "action_id=%s; recording the decision without it",
+                    enforcement, sorted(ENFORCEMENT_MODES), action_id,
+                )
         data["cage"] = self._cap_record_dict_bytes(
             {str(k): json_safe(v) for k, v in cage.items()},
             self._MAX_ASSESSMENT_JSON_BYTES,
@@ -1811,6 +1976,7 @@ class AuditTrail:
         args_digest: str = "",
         approver: str = "",
         human_disposed: bool = False,
+        reviewer_signature: Optional[dict] = None,
     ) -> None:
         """Record resolution of an escalation.
 
@@ -1825,6 +1991,10 @@ class AuditTrail:
         is empty the two keys are omitted entirely, so a caller that does not
         supply a disposition produces a record that hashes exactly as it did
         before these parameters existed.
+
+        ``reviewer_signature`` is the reviewer's own signature block from
+        ``vaara.credential.sign_resolution``. It is stored as given, under its
+        own key, and only when supplied, so unsigned rows hash as before.
         """
         articles = self._get_regulatory_articles(
             EventType.ESCALATION_RESOLVED,
@@ -1865,6 +2035,8 @@ class AuditTrail:
                     args_digest, self._MAX_ARGS_DIGEST_LEN,
                 ),
                 **disposition,
+                **({"reviewer_signature": dict(reviewer_signature)}
+                   if reviewer_signature is not None else {}),
             },
             regulatory_articles=articles,
             tenant_id=self._tenant_for(action_id),
@@ -2189,6 +2361,134 @@ class AuditTrail:
             tenant_id=tenant_id,
         ))
         return record_id
+
+    _CAGE_LIFECYCLE_ACTIONS = ("started", "stopped")
+
+    def record_cage_lifecycle(
+        self,
+        action: str,
+        driver: str,
+        name: str,
+        *,
+        policy_digest: str = "",
+        actor: str = "",
+        started_record_id: str = "",
+        processes_ended: Optional[int] = None,
+        exit_code: Optional[int] = None,
+        reason: str = "",
+    ) -> str:
+        """Record that a cage launch started or stopped.
+
+        Written by ``vaara cage run`` / ``cage stop`` and by ``vaara run``.
+        A stop names the start it closes in ``started_record_id`` when that
+        start is on this trail (a launch started outside Vaara has none), and
+        says how many processes it ended, the exit code and why
+        (``exited``, ``operator``, ``guard_gone``). A stop may only name a
+        start of the same driver and launch name: the signed-export verifier
+        fails an export where it does not, so the trail refuses to write one.
+
+        Returns:
+            The new record's ``record_id``.
+        """
+        if action not in self._CAGE_LIFECYCLE_ACTIONS:
+            raise ValueError(
+                "record_cage_lifecycle: action must be one of "
+                f"{list(self._CAGE_LIFECYCLE_ACTIONS)}, got {action!r}"
+            )
+        if not driver:
+            raise ValueError("record_cage_lifecycle: driver is required")
+        data: dict = {
+            "action": action,
+            "driver": self._cap_record_str(driver, 64),
+            "name": self._cap_record_str(name or "", self._MAX_AGENT_ID_LEN),
+            "policy_digest": self._cap_record_str(policy_digest, 128),
+            "actor": self._cap_record_str(actor, self._MAX_OVERRIDER_LEN),
+        }
+        if action == "stopped":
+            if started_record_id:
+                with self._lock:
+                    start = next((r for r in self._records
+                                  if r.record_id == started_record_id), None)
+                if (start is None or start.event_type != EventType.CAGE_LIFECYCLE
+                        or (start.data or {}).get("action") != "started"
+                        or (start.data or {}).get("driver") != data["driver"]
+                        or (start.data or {}).get("name") != data["name"]):
+                    raise ValueError(
+                        f"record_cage_lifecycle: {started_record_id!r} is not the start "
+                        f"of {driver}/{name} on this trail"
+                    )
+                data["started_record_id"] = started_record_id
+            if processes_ended is not None:
+                data["processes_ended"] = int(processes_ended)
+            if exit_code is not None:
+                data["exit_code"] = int(exit_code)
+            data["reason"] = self._cap_record_str(reason, self._MAX_DECISION_LABEL_LEN)
+
+        record_id = str(uuid.uuid4())
+        action_id = str(uuid.uuid4())
+        self._append(AuditRecord(
+            record_id=record_id,
+            action_id=action_id,
+            event_type=EventType.CAGE_LIFECYCLE,
+            timestamp=time.time(),
+            agent_id=data["name"] or "vaara",
+            tool_name=f"cage:{data['driver']}",
+            data=data,
+            regulatory_articles=[],
+            tenant_id=self._tenant_for(action_id),
+        ))
+        return record_id
+
+    def open_cage_start(self, driver: str, name: str) -> Optional[str]:
+        """The newest start of ``driver``/``name`` on this trail no stop closes yet."""
+        with self._lock:
+            closed: set = set()
+            for r in reversed(self._records):
+                if r.event_type != EventType.CAGE_LIFECYCLE:
+                    continue
+                data = r.data or {}
+                if data.get("driver") != driver or data.get("name") != name:
+                    continue
+                if data.get("action") == "stopped":
+                    closed.add(data.get("started_record_id"))
+                elif data.get("action") == "started" and r.record_id not in closed:
+                    return r.record_id
+        return None
+
+    def _unrecorded_mark(self, state: dict, resumed_record_id: str) -> AuditRecord:
+        """The trail_not_recording record for the outage the failure marker describes.
+
+        Written by the trail itself, on the first write that lands after the
+        store refused writes (see ``_flush_unrecorded_mark``). The refused
+        records never took a place in the chain on disk, so
+        ``resumed_record_id`` (the first record that did land) and its
+        predecessor are adjacent there, and the window lies between them.
+        ``unrecorded_writes`` is a lower bound: the marker is not locked across
+        processes (see ``write_failure``). A marker edited by hand into the wrong
+        types still gives a record its verifier reads: a count of 1 and the
+        time ``unknown``.
+        """
+        count = state.get("count")
+        if isinstance(count, bool) or not isinstance(count, int) or count < 1:
+            count = 1
+        return AuditRecord(
+            record_id=str(uuid.uuid4()),
+            action_id="trail-not-recording",
+            event_type=EventType.TRAIL_NOT_RECORDING,
+            timestamp=time.time(),
+            agent_id="vaara",
+            tool_name="trail.recording",
+            data={
+                "unrecorded_writes": count,
+                "first_failure_utc": self._cap_record_str(
+                    state.get("first_failure_utc") or "unknown", 64),
+                "last_failure_utc": self._cap_record_str(
+                    state.get("last_failure_utc") or "unknown", 64),
+                "resumed_record_id": self._cap_record_str(resumed_record_id, 128),
+                "stage": self._cap_record_str(state.get("stage") or "", 64),
+                "error": self._cap_record_str(state.get("error") or "", 300),
+            },
+        )
 
     # ── Querying ──────────────────────────────────────────────────
 
@@ -2913,31 +3213,109 @@ class AuditTrail:
             },
         ))
 
-    def record_erasure(self, target: AuditRecord, seq: Optional[int],
-                       reason: str) -> AuditRecord:
+    def record_erasure(
+        self,
+        target: AuditRecord,
+        seq: Optional[int],
+        reason: str,
+        *,
+        legal_ground: Optional[str] = None,
+        erased_by: Optional[str] = None,
+        sign: Optional[Callable[[dict], dict]] = None,
+    ) -> AuditRecord:
         """Append the RECORD_ERASED record that accounts for ``target``.
 
         Names the record by id and stored hash, which is what a walk matches
         a tombstone against. Holds nothing from the erased content: its event
         type and action id only, so the slot can be read in context.
+
+        ``legal_ground`` and ``erased_by`` are added only when given, so an
+        erasure without them keeps the original data shape. ``sign`` gets the
+        finished data, with ``erased_at`` added, and returns the
+        ``eraser_signature`` block (see ``vaara.audit.verify.check_erasures``).
         """
+        now = time.time()
+        data: dict[str, Any] = {
+            "erased_record_id": target.record_id,
+            "erased_record_hash": target.record_hash,
+            "erased_seq": seq,
+            "erased_event_type": target.event_type.value,
+            "erased_action_id": target.action_id,
+            "reason": self._cap_record_str(reason, 512),
+        }
+        if legal_ground is not None:
+            data["legal_ground"] = self._cap_record_str(legal_ground, 512)
+        if erased_by is not None:
+            data["erased_by"] = self._cap_record_str(erased_by, 512)
+        if sign is not None:
+            data["erased_at"] = time.strftime("%Y-%m-%dT%H:%M:%SZ", time.gmtime(now))
+            data["eraser_signature"] = sign(dict(data))
         record = AuditRecord(
             record_id=str(uuid.uuid4()),
             action_id="record-erased",
             event_type=EventType.RECORD_ERASED,
-            timestamp=time.time(),
+            timestamp=now,
             agent_id="vaara",
             tool_name="trail.erase",
-            data={
-                "erased_record_id": target.record_id,
-                "erased_record_hash": target.record_hash,
-                "erased_seq": seq,
-                "erased_event_type": target.event_type.value,
-                "erased_action_id": target.action_id,
-                "reason": self._cap_record_str(reason, 512),
-            },
+            data=data,
         )
         self._append_chained(record)
+        return record
+
+    def record_rotation(
+        self,
+        *,
+        last_hash: str,
+        purged_records: int,
+        archive_sha256: str,
+        archive_records: int,
+        archive_kind: str,
+        boundary_utc: str,
+        signer_fingerprint: str,
+        sign: Optional[Callable[[dict], Optional[dict]]] = None,
+        tenant_id: str = "",
+    ) -> AuditRecord:
+        """Append the TRAIL_ROTATED record that accounts for a retention purge.
+
+        Written after the archive is final and before the purge, so it sits at
+        the tip and outlives the records it names. ``last_hash`` is the hash of
+        the last record the purge removes, the one the first survivor links to.
+        ``sign`` gets the finished data, with ``rotated_at`` added, and returns
+        the ``rotation_signature`` block (see ``vaara.audit.verify.check_rotations``);
+        a record without it is written but accounts for nothing. ``tenant_id``
+        is the tenant whose chain is rotated: the record is written into it, so
+        a walk of that tenant's records finds it.
+
+        Raises ``RuntimeError`` when the store refuses the write, so a rotation
+        never purges on the strength of a record that did not land.
+        """
+        now = time.time()
+        data: dict[str, Any] = {
+            "last_hash": last_hash,
+            "purged_records": purged_records,
+            "archive_sha256": archive_sha256,
+            "archive_records": archive_records,
+            "archive_kind": archive_kind,
+            "boundary_utc": boundary_utc,
+            "rotated_at": time.strftime("%Y-%m-%dT%H:%M:%SZ", time.gmtime(now)),
+            "signer_fingerprint": signer_fingerprint,
+        }
+        if sign is not None:
+            block = sign(dict(data))
+            if block is not None:
+                data["rotation_signature"] = block
+        record = AuditRecord(
+            record_id=str(uuid.uuid4()),
+            action_id="trail-rotated",
+            event_type=EventType.TRAIL_ROTATED,
+            timestamp=now,
+            agent_id="vaara",
+            tool_name="trail.rotate",
+            data=data,
+            tenant_id=tenant_id,
+        )
+        if not self._append_chained(record):
+            raise RuntimeError("the store refused the rotation record")
         return record
 
     def _append_chained(self, record: AuditRecord) -> bool:
@@ -2989,7 +3367,7 @@ class AuditTrail:
                     self._note_persistence_failure(record, exc, "append_record")
                     kept = False
                 else:
-                    self._note_persistence_ok()
+                    self._note_persistence_ok(record)
             else:
                 _stamp(self._last_hash)
                 if self._on_record:
@@ -2999,10 +3377,12 @@ class AuditTrail:
                         self._note_persistence_failure(record, exc, "on_record")
                         kept = False
                     else:
-                        self._note_persistence_ok()
+                        self._note_persistence_ok(record)
 
             self._last_hash = record.record_hash
             self._index_record(record)
+        if self._unrecorded_pending is not None:
+            self._flush_unrecorded_mark()
         return kept
 
     def _index_record(self, record: AuditRecord) -> None:
@@ -3112,22 +3492,39 @@ class AuditTrail:
                 state.get("first_failure_utc", "an unknown time") if state else "?",
             )
 
-    def _note_persistence_ok(self) -> None:
-        """Clear an outage marker once, on the first write that succeeds.
+    def _note_persistence_ok(self, record: AuditRecord) -> None:
+        """Queue the outage's mark on the first write that succeeds.
 
         Checked at most once per trail instance, and re-armed by the next
-        failure, so the steady state costs nothing.
+        failure, so the steady state costs nothing. The marker is not closed
+        here: it stays open until the trail_not_recording record has landed,
+        so a refused mark leaves the window to be written by the next good
+        write instead of losing it.
         """
         if self._write_marker_checked:
             return
         self._write_marker_checked = True
-        state = mark_recovered(self._persistence_path())
-        if state:
+        state = active_failure(self._persistence_path())
+        if state is not None:
+            self._unrecorded_pending = (state, record.record_id)
+
+    def _flush_unrecorded_mark(self) -> None:
+        """Write the queued trail_not_recording record, then close the outage."""
+        with self._lock:
+            pending, self._unrecorded_pending = self._unrecorded_pending, None
+        if pending is None:
+            return
+        state, resumed_record_id = pending
+        mark = self._unrecorded_mark(state, resumed_record_id)
+        if not self._append_chained(mark):
+            return
+        resolved = mark_recovered(self._persistence_path())
+        if resolved:
             logger.warning(
                 "the audit trail at %s is recording again after %s failed "
                 "write(s) starting %s",
-                state.get("db"), state.get("count", "?"),
-                state.get("first_failure_utc", "an unknown time"),
+                resolved.get("db"), resolved.get("count", "?"),
+                resolved.get("first_failure_utc", "an unknown time"),
             )
 
     def _get_regulatory_articles(

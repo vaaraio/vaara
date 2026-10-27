@@ -30,6 +30,7 @@ from __future__ import annotations
 
 import json
 import logging
+import socket
 import threading
 import urllib.error
 import urllib.request
@@ -40,7 +41,12 @@ from vaara.integrations._egress_guard import (
     assert_url_egress_allowed,
     build_guarded_opener,
 )
-from vaara.integrations._mcp_upstream import ProxyError, strict_json_dumps
+from vaara.integrations._mcp_upstream import (
+    ProxyError,
+    UpstreamFailed,
+    UpstreamNotSent,
+    strict_json_dumps,
+)
 
 logger = logging.getLogger(__name__)
 
@@ -75,6 +81,9 @@ _MCP_UPSTREAM_MAX_BODY_BYTES = 8 * 1024 * 1024
 # stays under the byte cap by trickling notifications forever still has to
 # terminate.
 _MCP_UPSTREAM_MAX_SSE_EVENTS = 10_000
+
+# URLError reasons that can only arise before the request is sent.
+_NOT_SENT_REASONS = (socket.gaierror, ConnectionRefusedError, EgressBlocked)
 
 
 class _ServerPushUnsupported(Exception):
@@ -136,7 +145,7 @@ class HttpUpstreamClient:
 
     def request(self, payload: dict, timeout: float = 30.0) -> dict:
         if self._closed.is_set():
-            raise ProxyError("Upstream MCP server is closed")
+            raise UpstreamNotSent("Upstream MCP server is closed")
         if "id" not in payload:
             raise ValueError(
                 "request() requires a JSON-RPC id; use notify() for notifications",
@@ -203,12 +212,24 @@ class HttpUpstreamClient:
         except EgressBlocked as e:
             # A rebind that flipped the name to a blocked address after the
             # constructor's fail-fast check is caught here at connect time.
-            raise ProxyError(f"Upstream MCP server blocked by egress floor: {e}") from e
+            raise UpstreamNotSent(
+                f"Upstream MCP server blocked by egress floor: {e}",
+            ) from e
         except urllib.error.HTTPError as e:
-            raise ProxyError(
+            raise UpstreamFailed(
                 f"Upstream MCP server returned HTTP {e.code}: {self._error_snippet(e)}",
             ) from e
         except urllib.error.URLError as e:
+            # urllib wraps any OSError raised while sending as a URLError, so
+            # the type alone does not say the request stayed home. Only a
+            # reason that can arise before a byte is sent does: the name did
+            # not resolve, the connection was refused, or the egress floor
+            # refused the address at connect time. A reset or a timeout can
+            # arrive after the server has the request, and stays unobserved.
+            if isinstance(e.reason, _NOT_SENT_REASONS):
+                raise UpstreamNotSent(
+                    f"Upstream MCP server unreachable: {e.reason}",
+                ) from e
             raise ProxyError(f"Upstream MCP server unreachable: {e.reason}") from e
         except (TimeoutError, OSError) as e:
             raise ProxyError(f"Upstream MCP server request failed: {e}") from e

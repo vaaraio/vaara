@@ -12,7 +12,7 @@ The same layer covers the file surface, because an agent that cannot run `curl |
 
 **Layer 2: Vaara classifier** (`mcp__*` only). MCP tool calls carry structured taxonomy that Vaara's adaptive scorer is trained for; the conformal risk score is meaningful there. The classifier output drives the allow / escalate / deny decision against the loaded policy thresholds.
 
-PostToolUse appends an outcome record to the audit trail, correlating it back to the PreToolUse decision and feeding the MWU online learner.
+PostToolUse appends an outcome record to the audit trail, correlating it back to the PreToolUse decision by the host's `tool_use_id` and feeding the MWU online learner. PostToolUseFailure records a call that failed or was interrupted, and PermissionDenied records a call the host's permission step refused after the hook allowed it; neither copies the host's error text or reason.
 
 Blocks and escalations also pop a native desktop notification (macOS via osascript, Linux via notify-send when present), so a decision is visible even when the terminal is buried. Notifications are fire-and-forget and can never break the hook.
 
@@ -22,6 +22,8 @@ SessionStart prints a one-line status (Vaara version, mode, protection preset, n
 |---|---|---|
 | `PreToolUse` | every tool (`.*`) | Every call is dispatched and recorded. Layer 1 regex on shell, web, reads of secret material, file mutation and the agent's meta-actions (spawn, schedule, remote run, message out, harness config writes); a tool no rule names is recorded and allowed. Layer 2 ML on MCP. Desktop notification on block/escalate. |
 | `PostToolUse` | every tool (`.*`) | Audit outcome + MWU feedback. |
+| `PostToolUseFailure` | every tool (`.*`) | Outcome for a call that failed or was interrupted. Needs the `vaara` binary on PATH. |
+| `PermissionDenied` | every tool (`.*`) | Outcome for a call the host refused after the hook allowed it; it did not run, and the scorer does not learn from it. Needs the `vaara` binary on PATH. Claude Code sends it only in auto mode. |
 | `SessionStart` | n/a | Validate install, print status. |
 
 ## Operator lifts
@@ -154,7 +156,7 @@ PreToolUse on Bash / WebFetch / WebSearch is regex-only and sub-millisecond. Pre
 ## Known limitations
 
 - Cold-start latency per MCP call (see above).
-- PostToolUse correlates to the most recent `ACTION_REQUESTED` for the same agent + tool. Parallel calls to the same MCP tool can race; outcome attribution may swap. The audit chain itself stays intact.
+- PostToolUse correlates to the `ACTION_REQUESTED` that carries the host's `tool_use_id`. A host that sends no id falls back to the latest request for the same agent + tool that has no outcome yet, and parallel calls to one tool can then swap their outcomes. The audit chain itself stays intact.
 - Outcome severity is a crude mapping from `tool_response.interrupted` / `isError` / `stderr`. Operators tune via policy once they have data.
 - This plugin does **not** wire OVERT attestation envelopes. Use `vaara-mcp-proxy` with `--overt-*` flags for envelopes.
 - The Vaara ML classifier is not run on raw Bash / WebFetch / WebSearch input. The classifier is trained on structured MCP tool patterns, not shell command strings; its output on raw bash is noise (measured 2026-05-28). Shell-surface coverage is the regex deny-list. Operators who want classifier coverage on shell can train Vaara on their own corpus and wire it in via `VAARA_PLUGIN_AGENT_ID` + a custom hook.

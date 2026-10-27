@@ -306,13 +306,6 @@ CREATE INDEX IF NOT EXISTS idx_tenant_id   ON audit_records(tenant_id);
 -- so it fails the write instead (_constrain_seq).
 CREATE UNIQUE INDEX IF NOT EXISTS idx_seq  ON audit_records(seq);
 
--- GDPR Article 17 (Right to Erasure) redaction table.
-CREATE TABLE IF NOT EXISTS gdpr_redactions (
-    original_id  TEXT PRIMARY KEY,
-    replacement  TEXT NOT NULL DEFAULT '[REDACTED:GDPR-Art17]',
-    redacted_at  REAL NOT NULL
-);
-
 -- Pending outcomes for cross-process tracking (v1.57.3).
 -- Allows vaara outcome to work across separate processes.
 CREATE TABLE IF NOT EXISTS pending_outcomes (
@@ -332,11 +325,6 @@ _MIGRATIONS: dict[int, str] = {
     1: """
     ALTER TABLE audit_records ADD COLUMN tenant_id TEXT NOT NULL DEFAULT '';
     CREATE INDEX IF NOT EXISTS idx_tenant_id ON audit_records(tenant_id);
-    CREATE TABLE IF NOT EXISTS gdpr_redactions (
-        original_id  TEXT PRIMARY KEY,
-        replacement  TEXT NOT NULL DEFAULT '[REDACTED:GDPR-Art17]',
-        redacted_at  REAL NOT NULL
-    );
     """,
     # v2 to v3: prEN ISO/IEC 12792 transparency taxonomy (item 1, v0.6).
     # Nullable columns. Pre-v0.6 records get NULL — their stored
@@ -386,6 +374,26 @@ class AuditBackendUnreadable(RuntimeError):
     Subclasses RuntimeError so existing broad handlers keep catching it, but
     carries a message that names the file and says what to do about it.
     """
+
+
+class RotationBoundaryError(ValueError):
+    """The records a rotation would purge are not a prefix of one unbroken chain."""
+
+
+@dataclass(frozen=True)
+class RotationBoundary:
+    """The prefix of the chain a retention rotation purges, fixed before it runs.
+
+    ``through_seq`` is the last record the purge removes: every record up to
+    it is older than ``cutoff``. ``last_hash`` is that record's hash, the one
+    the first survivor links to, so a rotation record can name it before the
+    purge happens. ``count`` is how many records go.
+    """
+
+    cutoff: float
+    through_seq: int
+    last_hash: str
+    count: int
 
 
 @dataclass
@@ -451,7 +459,7 @@ _SALVAGE_CHUNK = 256
 
 #: Tables besides ``audit_records`` carried over by a salvage. ``audit_meta``
 #: is not among them: the fresh file writes its own schema version.
-_SALVAGE_SIDE_TABLES = ("gdpr_redactions", "pending_outcomes")
+_SALVAGE_SIDE_TABLES = ("pending_outcomes",)
 
 
 def _integrity_problem(conn: sqlite3.Connection) -> Optional[str]:
@@ -872,11 +880,12 @@ class SQLiteAuditBackend:
             )
         self._lock = threading.Lock()
         self._corrupt_query_rows = 0
+        self.last_purge_scrubbed: Optional[bool] = None
         self._in_memory = str(db_path) == ":memory:"
         self._open()
 
     def _open(self) -> None:
-        """Connect, set pragmas, bring the schema current, load redactions.
+        """Connect, set pragmas, bring the schema current.
 
         Split out of ``__init__`` so ``repair`` can reopen the file it swapped
         in through exactly the path a fresh start takes.
@@ -913,7 +922,6 @@ class SQLiteAuditBackend:
                 "evidence."
             ) from exc
         self._init_schema()
-        # Load GDPR redaction map into memory for O(1) read-time substitution.
         self._inode = self._current_inode()
 
     def _current_inode(self) -> Optional[tuple[int, int]]:
@@ -1693,9 +1701,15 @@ class SQLiteAuditBackend:
                         f"expected previous_hash={prev_hash!r}, "
                         f"got {record.previous_hash!r}"
                     )
-                    if prev_seq is None or seq <= prev_seq + 1:
+                    if prev_seq is None and start_seq == 0 and not prev_hash and record.previous_hash:
+                        # The walk opens on a record that links past the start
+                        # of the trail: a retention rotation, if the trail
+                        # holds the signed record that says so.
+                        ledger.hold_start(record.previous_hash, error)
+                    elif prev_seq is None or seq <= prev_seq + 1:
                         return ChainVerdict(error=error)
-                    ledger.hold(seen, tuple(range(prev_seq + 1, seq)), seq, error)
+                    else:
+                        ledger.hold(seen, tuple(range(prev_seq + 1, seq)), seq, error)
                 elif whole_table and prev_seq is not None and seq > prev_seq + 1:
                     # Linked across missing seqs, as a salvage that lost the
                     # tail leaves it. Seqs span every tenant, so a tenant
@@ -1907,7 +1921,7 @@ class SQLiteAuditBackend:
     # ── Internal ──────────────────────────────────────────────────
 
     def _row_to_record(self, row: tuple) -> AuditRecord:
-        """Convert a database row to an AuditRecord, applying GDPR redactions.
+        """Convert a database row to an AuditRecord.
 
         Column layout (schema v4):
           row[0..9]  record_id, action_id, event_type, timestamp, agent_id,
@@ -1983,8 +1997,61 @@ class SQLiteAuditBackend:
             row = self._conn.execute("PRAGMA wal_checkpoint(FULL)").fetchone()
         return (row[1], row[2]) if row else (0, 0)
 
+    def rotation_boundary(self, retention_seconds: int) -> Optional[RotationBoundary]:
+        """The prefix of the chain a rotation would purge, or None when it is empty.
+
+        Records older than ``retention_seconds`` are taken only up to the first
+        one that is not: a record written later with an old timestamp (a clock
+        that stepped back) stays until a later rotation. The purged records are
+        then an unbroken prefix, and the hash the first survivor links to is
+        known before anything is deleted. Tenant-scoped like the purge.
+
+        Raises :class:`RotationBoundaryError` when the first record kept does not
+        link to the last one that would go: purging then leaves a hole no
+        rotation record can name (records of other tenants share the chain).
+        """
+        if not isinstance(retention_seconds, int) or retention_seconds <= 0:
+            raise ValueError(
+                f"retention_seconds must be a positive int, got {retention_seconds!r}"
+            )
+        cutoff = time.time() - retention_seconds
+        t_clause, t_params = self._tenant_clause()
+        with self._lock:
+            first_kept = self._conn.execute(
+                f"SELECT MIN(seq) FROM audit_records "
+                f"WHERE {t_clause} AND (timestamp IS NULL OR timestamp >= ?)",
+                t_params + [cutoff],
+            ).fetchone()[0]
+            bound = "" if first_kept is None else "AND seq < ?"
+            bound_params = [] if first_kept is None else [first_kept]
+            last = self._conn.execute(
+                f"SELECT seq, record_hash FROM audit_records "
+                f"WHERE {t_clause} {bound} ORDER BY seq DESC LIMIT 1",
+                t_params + bound_params,
+            ).fetchone()
+            if last is None:
+                return None
+            if first_kept is not None:
+                linked = self._conn.execute(
+                    "SELECT previous_hash FROM audit_records WHERE seq = ?", [first_kept],
+                ).fetchone()[0]
+                if linked != last[1]:
+                    raise RotationBoundaryError(
+                        "the records older than the cut-off are not a prefix of one "
+                        "unbroken chain: the first record kept does not link to the last "
+                        "one that would go (another tenant's records share this chain, "
+                        "or the chain is already broken there)"
+                    )
+            count = self._conn.execute(
+                f"SELECT COUNT(*) FROM audit_records WHERE {t_clause} AND seq <= ?",
+                t_params + [last[0]],
+            ).fetchone()[0]
+        return RotationBoundary(cutoff=cutoff, through_seq=last[0],
+                                last_hash=last[1] or "", count=count)
+
     def purge_older_than(
         self, retention_seconds: int, *, dry_run: bool = False,
+        boundary: Optional[RotationBoundary] = None,
     ) -> int:
         """Delete audit records older than ``retention_seconds`` from now.
 
@@ -1995,13 +2062,14 @@ class SQLiteAuditBackend:
 
         HASH-CHAIN IMPACT — surviving records still reference deleted
         predecessors via ``previous_hash``, so ``vaara trail verify`` will
-        report a chain break at the retention boundary. The intended
-        workflow is to export a signed handoff zip BEFORE purging, archive
-        the zip externally for long-tail audit history, then purge the
-        live DB. The signed zip remains self-consistent forever; the live
-        DB chain has a documented seam at the retention boundary. See
-        research/severable_bundles_sketch.md for the v0.7+ design that
-        eliminates the seam.
+        report a chain break at the retention boundary, unless the trail
+        holds a signed ``trail_rotated`` record naming the hash the first
+        survivor links to. ``vaara trail rotate`` writes that record, from
+        :meth:`rotation_boundary`, before it calls this with ``boundary``;
+        a bare purge leaves nothing that accounts for the break. The intended
+        workflow is ``trail rotate``: a signed archive, verified, then the
+        purge, with the seam declared in the trail. See
+        research/severable_bundles_sketch.md for the v0.7+ design.
 
         Tenant-scoped — when ``tenant_id`` is set on this backend instance,
         only that tenant's records are subject to purging.
@@ -2011,6 +2079,17 @@ class SQLiteAuditBackend:
                 are deleted. Must be > 0.
             dry_run: If True, return the count that would be deleted without
                 modifying the database.
+            boundary: The prefix :meth:`rotation_boundary` fixed. When given,
+                exactly the records up to ``boundary.through_seq`` are deleted
+                (and ``retention_seconds`` is only validated), so the hash the
+                rotation record named is the hash the first survivor links to.
+
+        The delete runs with ``secure_delete`` on and a TRUNCATE checkpoint
+        follows, so the purged bytes leave the page and the WAL. A reader
+        holding an old snapshot keeps the WAL frames until it lets go;
+        ``last_purge_scrubbed`` is False then, and the caller reports it
+        rather than claiming the bytes are gone. It is None for a dry run
+        and for a purge that deleted nothing.
 
         Returns:
             Number of records deleted (or that would be deleted in dry_run mode).
@@ -2020,25 +2099,27 @@ class SQLiteAuditBackend:
                 f"retention_seconds must be a positive int, got {retention_seconds!r}"
             )
 
-        cutoff = time.time() - retention_seconds
+        cutoff = time.time() - retention_seconds if boundary is None else boundary.cutoff
         t_clause, t_params = self._tenant_clause()
+        scrubbed: Optional[bool] = None
+        if boundary is None:
+            where, params = f"timestamp < ? AND {t_clause}", [cutoff] + t_params
+        else:
+            where, params = f"seq <= ? AND {t_clause}", [boundary.through_seq] + t_params
 
         with self._lock:
             if dry_run:
                 row = self._conn.execute(
-                    f"SELECT COUNT(*) FROM audit_records "
-                    f"WHERE timestamp < ? AND {t_clause}",
-                    [cutoff] + t_params,
+                    f"SELECT COUNT(*) FROM audit_records WHERE {where}", params,
                 ).fetchone()
                 count = row[0]
             else:
+                self._conn.execute("PRAGMA secure_delete = ON")
                 self._conn.execute("BEGIN IMMEDIATE")
                 with self._rollback_on_failure():
                     heads = self._heads_on_chain_locked()
                     cursor = self._conn.execute(
-                        f"DELETE FROM audit_records "
-                        f"WHERE timestamp < ? AND {t_clause}",
-                        [cutoff] + t_params,
+                        f"DELETE FROM audit_records WHERE {where}", params,
                     )
                     count = cursor.rowcount
                     # A head this purge deleted is retention, not truncation.
@@ -2050,6 +2131,13 @@ class SQLiteAuditBackend:
                                 "UPDATE audit_meta SET value = ? WHERE key = ?",
                                 (json.dumps({**head, "purged": True}, sort_keys=True), key),
                             )
+                if count > 0:
+                    if self._in_memory:
+                        scrubbed = True
+                    else:
+                        row = self._conn.execute("PRAGMA wal_checkpoint(TRUNCATE)").fetchone()
+                        scrubbed = bool(row) and row[0] == 0
+            self.last_purge_scrubbed = scrubbed
 
         if count > 0:
             verb = "Would purge" if dry_run else "Purged"

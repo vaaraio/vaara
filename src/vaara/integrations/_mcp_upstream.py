@@ -51,7 +51,30 @@ class ProxyError(Exception):
     verbatim. ProxyError is raised when the proxy-side machinery fails
     (upstream subprocess crashed, stdin write failed, response timeout)
     and the caller should surface JSON-RPC -32603 Internal error downstream.
+
+    ``outcome_state`` is what the proxy can say about the call it was serving
+    when this was raised. The base class says ``unobserved``: the request may
+    have reached the server and no outcome was seen, so the proxy cannot say
+    whether the call ran. A subclass narrows that only where the transport can
+    prove it.
     """
+
+    outcome_state = "unobserved"
+
+
+class UpstreamNotSent(ProxyError):
+    """The request provably never left the proxy: the client was closed, the
+    egress floor refused the address, or the connection was refused or the name
+    did not resolve."""
+
+    outcome_state = "not_sent"
+
+
+class UpstreamFailed(ProxyError):
+    """The server answered the request with an error status. The proxy saw the
+    failure; it did not guess at it."""
+
+    outcome_state = "failed"
 
 
 def strict_json_dumps(obj: Any, **kwargs: Any) -> str:
