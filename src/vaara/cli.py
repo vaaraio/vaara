@@ -8652,6 +8652,24 @@ def build_parser() -> argparse.ArgumentParser:
         "vaara.integrations.claude_code_hooks", fromlist=["run_post_tool_use"]
     ).run_post_tool_use(client=args.client))
 
+    phfail = hooksub.add_parser(
+        "post-tool-use-failure",
+        help="Record that a call failed or was interrupted (state only, not "
+             "the host's error text)",
+    )
+    phfail.set_defaults(func=lambda args: __import__(
+        "vaara.integrations.claude_code_hooks", fromlist=["run_post_tool_use_failure"]
+    ).run_post_tool_use_failure())
+
+    phdeny = hooksub.add_parser(
+        "permission-denied",
+        help="Record that the host's permission step refused a call Vaara "
+             "had allowed, so it did not run",
+    )
+    phdeny.set_defaults(func=lambda args: __import__(
+        "vaara.integrations.claude_code_hooks", fromlist=["run_permission_denied"]
+    ).run_permission_denied())
+
     phups = hooksub.add_parser(
         "user-prompt-submit",
         help="Remember the recipients, payees and hosts the user typed, so "

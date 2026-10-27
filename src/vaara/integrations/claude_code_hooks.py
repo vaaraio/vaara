@@ -729,6 +729,10 @@ def _decide_pre(cfg: dict, events: list[dict], agent: str,
         tool_input = {"_raw": tool_input}
     session_id = event.get("session_id", "")
     shadow = shadow_mode(cfg)
+    # The host's id for this call rides on the request, so the outcome that
+    # follows binds to it rather than to the latest call of the same tool.
+    call_id = _tool_use_id(event)
+    call_context = {"tool_use_id": call_id} if call_id else {}
 
     rules = load_deny_rules(deny_patterns)
     match = match_deny_rule(rules, tool_name, tool_input)
@@ -762,7 +766,7 @@ def _decide_pre(cfg: dict, events: list[dict], agent: str,
             {
                 "vaara_governance_layer": "deny_pattern",
                 "rule_id": rule_id, "rule_message": message,
-                "matched_by": matched_by,
+                "matched_by": matched_by, **call_context,
             },
             session_id,
         )
@@ -808,7 +812,7 @@ def _decide_pre(cfg: dict, events: list[dict], agent: str,
         # for a human.
         _record_call(
             cfg, agent, tool_name, tool_input,
-            {"vaara_governance_layer": "regex_pass"}, session_id,
+            {"vaara_governance_layer": "regex_pass", **call_context}, session_id,
         )
         return 0
 
@@ -834,7 +838,7 @@ def _decide_pre(cfg: dict, events: list[dict], agent: str,
         result = pipeline.intercept(
             agent_id=agent, tool_name=tool_name,
             parameters=tool_input, session_id=session_id,
-            value_origin=origin,
+            value_origin=origin, context=call_context or None,
         )
     except Exception as exc:
         # The trail opened and the append failed underneath the scorer: the
@@ -1036,36 +1040,139 @@ def run_post_tool_use(client: Optional[str] = None) -> int:
     severity = _outcome_severity(event.get("tool_response", {}))
     target_action_id = None
     try:
-        target_action_id = _record_outcome(cfg, agent, tool_name, severity)
+        target_action_id = _record_outcome(
+            cfg, agent, tool_name, severity, _tool_use_id(event))
     finally:
         _harvest_result(cfg, event, target_action_id or "")
     return 0
 
 
-def _record_outcome(cfg: dict, agent: str, tool_name: str,
-                    severity: float) -> Optional[str]:
-    """Report the outcome against this tool's latest request; its action id."""
+#: Outcome severity for a call that never ran. The learner is not told (see
+#: _record_outcome); this only rides on the record, at the middle of the range
+#: where the MCP proxy puts a request it never sent.
+_NOT_RUN_SEVERITY = 0.5
+
+
+def run_post_tool_use_failure() -> int:
+    """PostToolUseFailure: the call ran and failed. Never blocks.
+
+    The host's error text is not copied: it can quote file contents or a
+    credential the call touched, and the record only needs the state.
+    """
+    return _run_host_outcome(_failure_outcome)
+
+
+def run_permission_denied() -> int:
+    """PermissionDenied: the host's permission step refused a call Vaara let
+    through, so the call did not run. Never blocks and never asks for a retry.
+
+    The host's reason is not copied, for the same reason as a failure's error.
+    Claude Code sends this event only when auto mode denies; whether it does
+    while these hooks are installed has not been checked on a live session.
+    """
+    return _run_host_outcome(_denial_outcome)
+
+
+def _failure_outcome(event: dict) -> tuple[float, str, bool]:
+    if event.get("is_interrupt") is True:
+        return 1.0, "host reported the tool call was interrupted", True
+    return 0.7, "host reported the tool call failed", True
+
+
+def _denial_outcome(event: dict) -> tuple[float, str, bool]:
+    return (_NOT_RUN_SEVERITY,
+            "host permission step denied the call; it did not run", False)
+
+
+def _run_host_outcome(describe) -> int:
+    cfg = load_config()
+    if plugin_disabled(cfg):
+        return 0
+    events, agent, _, _ = _client_events(cfg, None, _read_event())
+    if not events:
+        return 0
+    event = events[0]
+    severity, description, ran = describe(event)
+    _record_outcome(cfg, agent, event.get("tool_name", ""), severity,
+                    _tool_use_id(event), description=description, ran=ran)
+    return 0
+
+
+def _tool_use_id(event: dict) -> str:
+    """The host's id for this call, or "" when it sent none or sent junk."""
+    value = event.get("tool_use_id")
+    return value.strip()[:128] if isinstance(value, str) else ""
+
+
+def _record_tool_use_id(record: object) -> str:
+    data = getattr(record, "data", None) or {}
+    context = data.get("context") if isinstance(data, dict) else None
+    value = context.get("tool_use_id") if isinstance(context, dict) else None
+    return value if isinstance(value, str) else ""
+
+
+def _outcome_target(trail, agent: str, tool_name: str,
+                    tool_use_id: str) -> Optional[str]:
+    """The action this outcome belongs to, or None.
+
+    With the host's id, exactly the request that carried it, once: a call the
+    host denied and then reports on again does not get a second outcome. A
+    request recorded without an id (a host that sends none, a call made before
+    the upgrade) is a fallback for an id nothing matches, and a request that
+    carries a different id is never one: that is another call. Without an id
+    the latest request for the tool that has no outcome yet, which is the old
+    rule less the duplicate.
+    """
+    answered = {r.action_id for r in trail._records
+                if _event_name(r.event_type) == "OUTCOME_RECORDED"}
+    unlabelled = None
+    for record in reversed(trail._records):
+        if record.agent_id != agent or _record_tool_name(record) != tool_name:
+            continue
+        if _event_name(record.event_type) != "ACTION_REQUESTED":
+            continue
+        recorded = _record_tool_use_id(record)
+        if tool_use_id and recorded == tool_use_id:
+            return None if record.action_id in answered else record.action_id
+        if record.action_id in answered:
+            continue
+        if not tool_use_id:
+            return record.action_id
+        if not recorded and unlabelled is None:
+            unlabelled = record.action_id
+    return unlabelled
+
+
+def _record_outcome(cfg: dict, agent: str, tool_name: str, severity: float,
+                    tool_use_id: str = "", *, description: str = "",
+                    ran: bool = True) -> Optional[str]:
+    """Report the outcome against the call it belongs to; its action id.
+
+    ``ran=False`` is a call the host refused after Vaara allowed it. The
+    pipeline does not learn from a call that never ran, so the pending slot is
+    cleared and the outcome goes on the chain without the scorer hearing it.
+    """
     db_path = audit_db_path(cfg)
     if not db_path.exists():
         return None
     try:
         trail = _open_trail(cfg)
-        target_action_id = None
-        for record in reversed(trail._records):
-            if record.agent_id != agent:
-                continue
-            if _record_tool_name(record) != tool_name:
-                continue
-            if _event_name(record.event_type) == "ACTION_REQUESTED":
-                target_action_id = record.action_id
-                break
+        target_action_id = _outcome_target(trail, agent, tool_name, tool_use_id)
         if target_action_id is None:
             return None
         from vaara.pipeline import InterceptionPipeline
 
         pipeline = InterceptionPipeline(trail=trail)
         pipeline._pending_outcomes[target_action_id] = (0.5, {})
-        pipeline.report_outcome(target_action_id, outcome_severity=severity)
+        if ran:
+            pipeline.report_outcome(target_action_id, outcome_severity=severity,
+                                    description=description)
+        else:
+            pipeline._claim_pending_outcome(target_action_id)
+            trail.record_outcome(
+                action_id=target_action_id, agent_id=agent, tool_name=tool_name,
+                outcome_severity=severity, description=description,
+            )
     except Exception as exc:
         _note_trail_failure(cfg, exc, stage="post_tool_use")
         return None

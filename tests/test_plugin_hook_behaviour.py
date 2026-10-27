@@ -212,3 +212,40 @@ def test_fail_open_passes_an_mcp_call_through_a_dead_trail(db):
     )
     assert result.returncode == 0, result.stderr
     assert "UNSCORED" in result.stderr
+
+
+def test_parallel_calls_of_one_tool_each_keep_their_own_outcome(db):
+    """The fallback binds by the host's tool_use_id, as the module does."""
+    for tool_use_id, name in (("toolu_A", "a"), ("toolu_B", "b")):
+        _run("pre_tool_use.py", {
+            "tool_name": "Write", "tool_use_id": tool_use_id,
+            "tool_input": {"file_path": f"/repo/src/{name}.py", "content": "x = 1"},
+            "session_id": "s1",
+        }, db)
+    # B answers first, then A with a warning: by tool name both would land on B.
+    _run("post_tool_use.py", {
+        "tool_name": "Write", "tool_use_id": "toolu_B",
+        "tool_response": {"success": True},
+    }, db)
+    _run("post_tool_use.py", {
+        "tool_name": "Write", "tool_use_id": "toolu_A",
+        "tool_response": {"stderr": "warn"},
+    }, db)
+
+    con = sqlite3.connect(db)
+    try:
+        requests = {
+            json.loads(data)["context"]["tool_use_id"]: action_id
+            for action_id, data in con.execute(
+                "select action_id, data from audit_records "
+                "where event_type = 'action_requested'")
+        }
+        severity = {
+            action_id: json.loads(data)["outcome_severity"]
+            for action_id, data in con.execute(
+                "select action_id, data from audit_records "
+                "where event_type = 'outcome_recorded'")
+        }
+    finally:
+        con.close()
+    assert severity == {requests["toolu_A"]: 0.3, requests["toolu_B"]: 0.0}

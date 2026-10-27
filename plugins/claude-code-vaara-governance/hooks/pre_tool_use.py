@@ -31,6 +31,7 @@ from __future__ import annotations
 import json
 import sys
 from pathlib import Path
+from typing import Optional
 
 sys.path.insert(0, str(Path(__file__).parent))
 import _config  # noqa: E402
@@ -134,8 +135,17 @@ def _ungovernable(tool_name: str, reason: str, shadow: bool) -> int:
     return 2
 
 
+def _call_id(event: dict) -> dict:
+    """The host's id for this call as request context, so PostToolUse binds the
+    outcome to it and not to the latest call of the same tool."""
+    value = event.get("tool_use_id")
+    value = value.strip()[:128] if isinstance(value, str) else ""
+    return {"tool_use_id": value} if value else {}
+
+
 def _classify_mcp(
-    tool_name: str, tool_input: dict, agent_id: str, session_id: str, shadow: bool
+    tool_name: str, tool_input: dict, agent_id: str, session_id: str, shadow: bool,
+    context: Optional[dict] = None,
 ) -> int:
     try:
         from vaara.audit.sqlite_backend import SQLiteAuditBackend
@@ -199,6 +209,7 @@ def _classify_mcp(
             tool_name=tool_name,
             parameters=tool_input,
             session_id=session_id,
+            context=context or None,
         )
     except Exception as exc:
         # The trail opened and the append failed underneath the scorer.
@@ -263,6 +274,7 @@ def main() -> int:
                 "vaara_governance_layer": "deny_pattern",
                 "rule_id": rule_id,
                 "rule_message": message,
+                **_call_id(event),
             },
             session_id,
         )
@@ -285,12 +297,13 @@ def main() -> int:
         # against, so the call and its result both land.
         _record_call(
             tool_name, tool_input, agent_id,
-            {"vaara_governance_layer": "regex_pass"},
+            {"vaara_governance_layer": "regex_pass", **_call_id(event)},
             session_id,
         )
         return 0
 
-    return _classify_mcp(tool_name, tool_input, agent_id, session_id, shadow)
+    return _classify_mcp(tool_name, tool_input, agent_id, session_id, shadow,
+                         _call_id(event))
 
 
 if __name__ == "__main__":

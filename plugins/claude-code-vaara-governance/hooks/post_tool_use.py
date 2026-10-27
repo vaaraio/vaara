@@ -7,11 +7,11 @@ Appends an outcome record to the persistent SQLite audit trail so the
 PreToolUse decision and the actual tool result are correlatable. Does
 not block (PostToolUse runs after the tool already executed).
 
-The hook tries to correlate to the most recent ACTION_REQUESTED record
-for the same agent + tool_name and call ``pipeline.report_outcome``,
-which feeds the MWU online learner. If correlation fails (parallel
-calls, restart in between), the hook appends a standalone outcome
-record so the chain still reflects that the call completed.
+The hook correlates to the ACTION_REQUESTED record that carries the host's
+``tool_use_id`` and calls ``pipeline.report_outcome``, which feeds the MWU
+online learner. A host that sends no id gets the latest request for the same
+agent + tool_name that has no outcome yet. If nothing matches, no outcome is
+written: an outcome on a guessed call is worse than none.
 
 Env vars match pre_tool_use.py:
 - ``VAARA_PLUGIN_DISABLE=1`` skips this hook
@@ -80,6 +80,41 @@ def _record_tool_name(record: object) -> str:
     return str(data.get("tool_name", ""))
 
 
+def _record_tool_use_id(record: object) -> str:
+    data = getattr(record, "data", None) or {}
+    context = data.get("context") if isinstance(data, dict) else None
+    value = context.get("tool_use_id") if isinstance(context, dict) else None
+    return value if isinstance(value, str) else ""
+
+
+def _outcome_target(trail, agent_id: str, tool_name: str, tool_use_id: str):
+    """The action this outcome belongs to, or None.
+
+    The request that carried the host's id, once. A request recorded without
+    an id is a fallback for an id nothing matches; one that carries another id
+    is another call and never is. Without an id, the latest request for the
+    tool that has no outcome yet. Same rule as the packaged hook.
+    """
+    answered = {r.action_id for r in trail._records
+                if _event_name(r.event_type) == "OUTCOME_RECORDED"}
+    unlabelled = None
+    for record in reversed(trail._records):
+        if record.agent_id != agent_id or _record_tool_name(record) != tool_name:
+            continue
+        if _event_name(record.event_type) != "ACTION_REQUESTED":
+            continue
+        recorded = _record_tool_use_id(record)
+        if tool_use_id and recorded == tool_use_id:
+            return None if record.action_id in answered else record.action_id
+        if record.action_id in answered:
+            continue
+        if not tool_use_id:
+            return record.action_id
+        if not recorded and unlabelled is None:
+            unlabelled = record.action_id
+    return unlabelled
+
+
 def main() -> int:
     if _config.plugin_disabled(CFG):
         return 0
@@ -111,15 +146,9 @@ def main() -> int:
         _trail_health.note_failure(db_path, exc, stage="open")
         return 0
 
-    target_action_id = None
-    for record in reversed(trail._records):
-        if record.agent_id != agent_id:
-            continue
-        if _record_tool_name(record) != tool_name:
-            continue
-        if _event_name(record.event_type) == "ACTION_REQUESTED":
-            target_action_id = record.action_id
-            break
+    tool_use_id = event.get("tool_use_id")
+    tool_use_id = tool_use_id.strip()[:128] if isinstance(tool_use_id, str) else ""
+    target_action_id = _outcome_target(trail, agent_id, tool_name, tool_use_id)
 
     if target_action_id is None:
         return 0

@@ -23,7 +23,8 @@ def test_write_claude_hooks_creates_every_event(tmp_path):
     changed = ig.write_claude_hooks(settings, "/usr/bin/vaara")
     assert changed is True
     hooks = _read(settings)["hooks"]
-    assert set(hooks) == {"SessionStart", "UserPromptSubmit", "PreToolUse", "PostToolUse"}
+    assert set(hooks) == {"SessionStart", "UserPromptSubmit", "PreToolUse", "PostToolUse",
+                          "PostToolUseFailure", "PermissionDenied"}
     assert hooks["UserPromptSubmit"][0]["hooks"][0]["command"].endswith(
         "hook user-prompt-submit")
     assert "matcher" not in hooks["UserPromptSubmit"][0]
