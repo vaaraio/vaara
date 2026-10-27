@@ -18,7 +18,7 @@ import socket
 import pytest
 
 from vaara.integrations._egress_guard import EgressBlocked, pick_egress_ip
-from vaara.integrations._mcp_upstream import ProxyError
+from vaara.integrations._mcp_upstream import ProxyError, UpstreamNotSent
 from vaara.integrations._mcp_upstream_http import HttpUpstreamClient
 
 PUBLIC = "93.184.216.34"
@@ -60,7 +60,7 @@ def test_rebind_after_preflight_is_blocked_at_connect(monkeypatch):
     monkeypatch.setattr(socket, "create_connection", _recording_connect(targets))
 
     client = HttpUpstreamClient("http://rebind.test:8765/mcp", allow_private_hosts=False)
-    with pytest.raises(ProxyError):
+    with pytest.raises(UpstreamNotSent):
         client.request({"jsonrpc": "2.0", "id": 1, "method": "ping"})
     # The floor refused the rebound address before any socket was opened.
     assert METADATA not in targets
@@ -76,7 +76,7 @@ def test_connect_dials_validated_ip_literal(monkeypatch):
     monkeypatch.setattr(socket, "create_connection", _recording_connect(targets))
 
     client = HttpUpstreamClient("http://pin.test:8765/mcp", allow_private_hosts=False)
-    with pytest.raises(ProxyError):  # ConnectionRefusedError from the recorder
+    with pytest.raises(UpstreamNotSent):  # ConnectionRefusedError from the recorder
         client.request({"jsonrpc": "2.0", "id": 1, "method": "ping"})
     # Exactly one connect, to the literal we validated, not a re-resolved name.
     assert targets == [PUBLIC]

@@ -119,6 +119,11 @@ _REQUEST_INTENT: contextvars.ContextVar[str] = contextvars.ContextVar(
 _safe_log = log_safe
 
 
+def _outcome_description(status: str, **fields: Any) -> str:
+    """The outcome description: one JSON object, so a reader can parse it."""
+    return json.dumps({"status": status, **fields}, sort_keys=True)
+
+
 # Largest single MCP JSON-RPC message accepted on the /mcp HTTP endpoint.
 # Real tool calls and responses fit comfortably; the cap stops a malicious
 # client from exhausting memory at parse time. v0.41 can promote this to
@@ -1804,9 +1809,18 @@ class VaaraMCPProxy:
         # attestation was already written above; pairing it with a receipt on
         # every path keeps the evidence trail complete with no orphans.
         outcome_severity = 1.0
+        outcome_description = ""
         try:
             upstream_response = self._upstream.request(request)
             outcome_severity = self._severity_from_response(upstream_response)
+            if outcome_severity > 0.0:
+                outcome_description = _outcome_description("failed")
+        except Exception as exc:
+            # The request raised, so no reply was read. The receipt below keeps
+            # its closed status set (errored); the trail is where the three
+            # cases are told apart.
+            self._record_unanswered(str(getattr(result, "action_id", None) or ""), exc)
+            raise
         finally:
             with self._inflight_lock:
                 if progress_token is not None:
@@ -1828,6 +1842,7 @@ class VaaraMCPProxy:
         try:
             self._pipeline.report_outcome(
                 action_id=result.action_id, outcome_severity=outcome_severity,
+                description=outcome_description,
             )
         except Exception:
             logger.exception("report_outcome failed for action_id=%s", result.action_id)
@@ -1846,6 +1861,28 @@ class VaaraMCPProxy:
             },
         )
         return upstream_response
+
+    def _record_unanswered(self, action_id: str, exc: Exception) -> None:
+        """Close an allowed call whose upstream request raised.
+
+        The trail says which of three things happened: ``not_sent`` (the
+        request provably never left the proxy), ``unobserved`` (it may have
+        reached the server and no reply was read, so the proxy cannot say
+        whether the call ran) or ``failed`` (the server answered with an error
+        status). The error class is recorded, never its message, which can
+        quote a response body. A call that did not run or may have run is
+        closed at the neutral 0.5 severity, as an aborted stream is: the
+        scorer is not told it failed. Failures here are logged and swallowed.
+        """
+        state = getattr(exc, "outcome_state", "unobserved")
+        try:
+            self._pipeline.report_outcome(
+                action_id=action_id,
+                outcome_severity=1.0 if state == "failed" else 0.5,
+                description=_outcome_description(state, error=type(exc).__name__),
+            )
+        except Exception:
+            logger.exception("report_outcome failed for action_id=%s", action_id)
 
     def _handle_resources_read(self, request: dict) -> dict:
         params = request.get("params") or {}
