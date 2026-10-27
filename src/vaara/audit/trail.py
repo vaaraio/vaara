@@ -72,6 +72,7 @@ class EventType(str, Enum):
     RECORD_ERASED = "record_erased"         # A record's data was erased, its hash kept
     CAGE_LIFECYCLE = "cage_lifecycle"       # A cage launch started or stopped
     TRAIL_NOT_RECORDING = "trail_not_recording"  # The store refused writes, then took them again
+    TRAIL_ROTATED = "trail_rotated"         # A retention rotation archived the records before the trail's first one
 
     # Copies and pickles go through the stored value, so a type this build
     # does not know (see stored_event_type) survives them. Python 3.11+
@@ -116,7 +117,8 @@ def stored_event_type(value: str) -> EventType:
 # stretch, KEY_LIFECYCLE is custodian evidence for SOC 2 CC6.2 and CC8.1,
 # RECORD_ERASED accounts for a record whose data was erased (see ERASED_DATA_KEY),
 # CAGE_LIFECYCLE pairs a cage launch's stop with its start,
-# TRAIL_NOT_RECORDING says the store refused writes between two adjacent records.
+# TRAIL_NOT_RECORDING says the store refused writes between two adjacent records,
+# TRAIL_ROTATED accounts for the first surviving record's link after a retention purge.
 SYSTEM_EVENT_TYPES = frozenset({
     EventType.ANCHOR_GAP,
     EventType.REPAIR_GAP,
@@ -127,6 +129,7 @@ SYSTEM_EVENT_TYPES = frozenset({
     EventType.RECORD_ERASED,
     EventType.CAGE_LIFECYCLE,
     EventType.TRAIL_NOT_RECORDING,
+    EventType.TRAIL_ROTATED,
 })
 
 # An erased record's stored data is exactly {ERASED_DATA_KEY: {"erasure_record_id": ...}}.
@@ -487,6 +490,11 @@ TRANSPARENCY_DEFAULTS: dict[EventType, dict[str, str]] = {
         "system_operation": "recording_gap",
         "data_usage": "refused_write_count+window",
         "decision_making": "n/a",
+    },
+    EventType.TRAIL_ROTATED: {
+        "system_operation": "retention_rotation",
+        "data_usage": "archive_digest+purged_count",
+        "decision_making": "operator_action",
     },
     EventType.DISCLOSURE_RECORDED: {
         "system_operation": "transparency_disclosure",
@@ -879,6 +887,69 @@ class ErasedRecord:
                 f"checkable (erasure record at {by})")
 
 
+#: Mirrors vaara.audit.verify.ROTATION_RECORD_TYPE; the verifier module stays
+#: free of vaara imports, so the constant is written in both places.
+ROTATION_RECORD_TYPE = "vaara.trail-rotation/v1"
+_ROTATION_ARCHIVE_KINDS = frozenset({"zip", "sealed"})
+_ROTATION_TEXT_FIELDS = ("last_hash", "archive_sha256", "boundary_utc", "rotated_at",
+                         "signer_fingerprint")
+_ROTATION_SIGNATURE_KEYS = frozenset({"type", "alg", "signature"})
+
+
+@dataclass(frozen=True)
+class RotationSeam:
+    """The retention rotation a trail begins at.
+
+    A rotation archives the whole trail, then purges the records older than
+    the retention window. The first record that survives still links to the
+    last one purged, and a TRAIL_ROTATED record written before the purge names
+    that hash (``last_hash``), how many records went (``purged_records``) and
+    the digest of the archive that holds them. A walk that finds the first
+    record linked to such a record reports it here instead of a break.
+    ``record_index`` and ``seq`` place the rotation record in the walk.
+    """
+
+    record_index: int
+    seq: Optional[int]
+    record_id: str
+    last_hash: str
+    purged_records: int
+    archive_sha256: str
+    archive_records: int
+    archive_kind: str
+
+    def describe(self) -> str:
+        n = self.purged_records
+        return (f"begins at a rotation seam: {n} record{'s' if n != 1 else ''} "
+                f"archived as {self.archive_sha256}")
+
+
+def _rotation_seam(index: int, seq: Optional[int], record: "AuditRecord") -> Optional[RotationSeam]:
+    """The seam a TRAIL_ROTATED record states, or None when it is not well formed.
+
+    Shape only. The signature needs the signer's public key, which a walk of the
+    store does not hold; the export verifiers check it
+    (``vaara.audit.verify.check_rotations``). A record without the closed
+    signature block is not a seam: an unsigned claim accounts for nothing.
+    """
+    data = record.data if isinstance(record.data, dict) else {}
+    if not all(isinstance(data.get(k), str) and data[k] for k in _ROTATION_TEXT_FIELDS):
+        return None
+    purged, archived = data.get("purged_records"), data.get("archive_records")
+    if (isinstance(purged, bool) or not isinstance(purged, int) or purged < 1
+            or isinstance(archived, bool) or not isinstance(archived, int) or archived < 0):
+        return None
+    if data.get("archive_kind") not in _ROTATION_ARCHIVE_KINDS:
+        return None
+    block = data.get("rotation_signature")
+    if (not isinstance(block, dict) or set(block) != _ROTATION_SIGNATURE_KEYS
+            or block.get("type") != ROTATION_RECORD_TYPE or block.get("alg") != "Ed25519"
+            or not isinstance(block.get("signature"), str)):
+        return None
+    return RotationSeam(index, seq, record.record_id, data["last_hash"], purged,
+                        data["archive_sha256"], archived, data["archive_kind"])
+
+
 @dataclass(frozen=True)
 class ChainVerdict:
     """The full answer of a chain walk, which ``verify_chain`` flattens.
@@ -894,11 +965,17 @@ class ChainVerdict:
     tombstone, and a later RECORD_ERASED record names it by id and stored hash.
     Never intact either: the erased content cannot be checked. ``state`` says
     "declared_gaps" when a walk finds both; ``erased`` is still filled.
+    ``seams``: the trail begins at a retention rotation, not at its first
+    record. What is in the trail chains without a break from there, and the
+    records before it are in the archive the rotation record names, so this
+    stays ``intact`` and ``seams`` carries the rotation. A first record that
+    links to nothing the trail holds is still ``broken``.
     """
 
     error: Optional[str] = None
     declared_gaps: tuple[DeclaredGap, ...] = ()
     erased: tuple[ErasedRecord, ...] = ()
+    seams: tuple[RotationSeam, ...] = ()
 
     @property
     def state(self) -> str:
@@ -945,10 +1022,18 @@ class _GapLedger:
         self._declared: list[tuple[int, Optional[int], frozenset[int]]] = []
         self._tombstones: list[tuple[int, Optional[int], "AuditRecord", str]] = []
         self._erasures: dict[tuple[str, str], tuple[int, Optional[int]]] = {}
+        self._start: Optional[tuple[str, str]] = None
+        self._rotations: list[RotationSeam] = []
 
     def hold(self, index: int, lost: tuple[int, ...], resumes_at_seq: int,
              error: str) -> None:
         self._pending.append((index, lost, resumes_at_seq, error))
+
+    def hold_start(self, link: str, error: str) -> None:
+        """The first record of the walk links to ``link``, which the walk never
+        sees. Held open until the walk has seen every TRAIL_ROTATED record, one
+        of which has to name that hash."""
+        self._start = (link, error)
 
     def hold_erased(self, index: int, seq: Optional[int], record: "AuditRecord",
                     error: str) -> None:
@@ -963,6 +1048,11 @@ class _GapLedger:
             if isinstance(rid, str) and isinstance(rhash, str):
                 self._erasures.setdefault((rid, rhash), (index, seq))
             return
+        if record.event_type == EventType.TRAIL_ROTATED:
+            seam = _rotation_seam(index, seq, record)
+            if seam is not None:
+                self._rotations.append(seam)
+            return
         if record.event_type != EventType.REPAIR_GAP:
             return
         named = (record.data or {}).get("lost_seqs") or []
@@ -971,6 +1061,15 @@ class _GapLedger:
             self._declared.append((index, seq, seqs))
 
     def verdict(self) -> ChainVerdict:
+        seams: tuple[RotationSeam, ...] = ()
+        if self._start is not None:
+            link, error = self._start
+            begun = next((s for s in self._rotations if s.last_hash == link), None)
+            if begun is None:
+                return ChainVerdict(error=(
+                    f"{error} (no signed rotation record in the trail names that hash)"
+                ))
+            seams = (begun,)
         gaps = []
         for index, lost, resumes, error in self._pending:
             by = tuple(seq for at, seq, named in self._declared
@@ -992,7 +1091,7 @@ class _GapLedger:
                 ))
             erased.append(ErasedRecord(index, seq, record.record_id,
                                        record.record_hash, found[1]))
-        return ChainVerdict(declared_gaps=tuple(gaps), erased=tuple(erased))
+        return ChainVerdict(declared_gaps=tuple(gaps), erased=tuple(erased), seams=seams)
 
 
 # ── Audit Trail ───────────────────────────────────────────────────────────
@@ -1294,9 +1393,15 @@ class AuditTrail:
                         f"expected previous_hash={prev_hash!r}, "
                         f"got {record.previous_hash!r}"
                     )
-                    if seq is None or prev_seq is None or seq <= prev_seq + 1:
+                    if i == start_index == 0 and not prev_hash and record.previous_hash:
+                        # The walk opens on a record that links past the start
+                        # of the trail: a retention rotation, if the trail
+                        # holds the signed record that says so.
+                        ledger.hold_start(record.previous_hash, error)
+                    elif seq is None or prev_seq is None or seq <= prev_seq + 1:
                         return ChainVerdict(error=error)
-                    ledger.hold(i, tuple(range(prev_seq + 1, seq)), seq, error)
+                    else:
+                        ledger.hold(i, tuple(range(prev_seq + 1, seq)), seq, error)
             elif whole_table and seq is not None and prev_seq is not None \
                     and seq > prev_seq + 1:
                 # The chain links across missing seqs: what a salvage that
@@ -3155,6 +3260,58 @@ class AuditTrail:
             data=data,
         )
         self._append_chained(record)
+        return record
+
+    def record_rotation(
+        self,
+        *,
+        last_hash: str,
+        purged_records: int,
+        archive_sha256: str,
+        archive_records: int,
+        archive_kind: str,
+        boundary_utc: str,
+        signer_fingerprint: str,
+        sign: Optional[Callable[[dict], Optional[dict]]] = None,
+    ) -> AuditRecord:
+        """Append the TRAIL_ROTATED record that accounts for a retention purge.
+
+        Written after the archive is final and before the purge, so it sits at
+        the tip and outlives the records it names. ``last_hash`` is the hash of
+        the last record the purge removes, the one the first survivor links to.
+        ``sign`` gets the finished data, with ``rotated_at`` added, and returns
+        the ``rotation_signature`` block (see ``vaara.audit.verify.check_rotations``);
+        a record without it is written but accounts for nothing.
+
+        Raises ``RuntimeError`` when the store refuses the write, so a rotation
+        never purges on the strength of a record that did not land.
+        """
+        now = time.time()
+        data: dict[str, Any] = {
+            "last_hash": last_hash,
+            "purged_records": purged_records,
+            "archive_sha256": archive_sha256,
+            "archive_records": archive_records,
+            "archive_kind": archive_kind,
+            "boundary_utc": boundary_utc,
+            "rotated_at": time.strftime("%Y-%m-%dT%H:%M:%SZ", time.gmtime(now)),
+            "signer_fingerprint": signer_fingerprint,
+        }
+        if sign is not None:
+            block = sign(dict(data))
+            if block is not None:
+                data["rotation_signature"] = block
+        record = AuditRecord(
+            record_id=str(uuid.uuid4()),
+            action_id="trail-rotated",
+            event_type=EventType.TRAIL_ROTATED,
+            timestamp=now,
+            agent_id="vaara",
+            tool_name="trail.rotate",
+            data=data,
+        )
+        if not self._append_chained(record):
+            raise RuntimeError("the store refused the rotation record")
         return record
 
     def _append_chained(self, record: AuditRecord) -> bool:

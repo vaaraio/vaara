@@ -416,7 +416,12 @@ def _cmd_trail_rotate(args: argparse.Namespace) -> int:
         print("Run without --dry-run to apply.")
     else:
         print(f"Purged {result.purged_records} record(s) older than {args.retention_days} day(s).")
-        print("Archive the zip externally; the live DB now has a chain seam at the boundary.")
+        if result.seam_record_id is not None:
+            print(f"Archive the zip externally. The trail now begins at a rotation seam, "
+                  f"declared by a signed record ({result.seam_record_id}); "
+                  f"`vaara trail verify --archive` checks the archive against it.")
+        else:
+            print("Nothing was purged, so no rotation record was written.")
         if not result.wal_scrubbed:
             print(_WAL_NOT_TRUNCATED, file=sys.stderr)
     return 0
@@ -1100,6 +1105,7 @@ def _cmd_trail_verify(args: argparse.Namespace) -> int:
     try:
         from vaara.audit.verify import (
             describe_cage_lifecycle,
+            describe_rotation_seams,
             describe_unrecorded_windows,
             verify_signed,
         )
@@ -1123,9 +1129,21 @@ def _cmd_trail_verify(args: argparse.Namespace) -> int:
     except (OSError, ValueError) as exc:
         print(f"vaara trail verify: --erasure-key: {exc}", file=sys.stderr)
         return 2
+    rotation_key = Path(args.rotation_key).expanduser() if args.rotation_key else None
+    if rotation_key is not None:
+        try:
+            _verify_mod._load_public_key(rotation_key)
+        except (OSError, ValueError) as exc:
+            print(f"vaara trail verify: --rotation-key: {exc}", file=sys.stderr)
+            return 2
+    archive = Path(args.archive).expanduser() if args.archive else None
+    if archive is not None and not archive.is_file():
+        print(f"vaara trail verify: --archive: not a file: {archive}", file=sys.stderr)
+        return 2
     try:
         result = verify_signed(Path(args.zip).expanduser(), public_key=pubkey,
-                               erasure_key=erasure_key)
+                               erasure_key=erasure_key, rotation_key=rotation_key,
+                               archive=archive)
     except ImportError as exc:
         print(exc, file=sys.stderr)
         return 2
@@ -1164,6 +1182,8 @@ def _cmd_trail_verify(args: argparse.Namespace) -> int:
         for line in describe_cage_lifecycle(result):
             print(f"  {line}")
         for line in describe_unrecorded_windows(result):
+            print(f"  {line}")
+        for line in describe_rotation_seams(result):
             print(f"  {line}")
         if pubkey is None:
             print(
@@ -1804,9 +1824,10 @@ def _cmd_trail_purge(args: argparse.Namespace) -> int:
         print(f"Purged {count} record(s) older than {args.retention_days} day(s).")
         if count > 0:
             print(
-                "Note: hash chain has a seam at the retention boundary. "
-                "Run 'vaara trail export' BEFORE future purges to preserve "
-                "audit history in a signed zip.",
+                "Note: nothing in the trail accounts for the records removed, so an "
+                "export of it fails verification at its first record. Use "
+                "'vaara trail rotate' instead: it archives the trail, appends a "
+                "signed record naming what is purged, and then purges.",
                 file=sys.stderr,
             )
         if scrubbed is False:
@@ -6274,6 +6295,17 @@ def build_parser() -> argparse.ArgumentParser:
         "--erasure-key", default=None,
         help="Public key (PEM, EC P-256 or RSA) of the person who signs erasures; "
              "each record_erased record must verify under it",
+    )
+    pv.add_argument(
+        "--rotation-key", default=None,
+        help="Ed25519 public key (PEM) that signed the trail_rotated records, when "
+             "it is not the key that signed this zip. Defaults to the zip's own key.",
+    )
+    pv.add_argument(
+        "--archive", default=None,
+        help="The retention archive this zip begins after (the zip, or the sealed "
+             "file of an encrypted rotation): checked against the digest the "
+             "trail_rotated record states",
     )
     pv.set_defaults(func=_cmd_trail_verify)
 

@@ -949,13 +949,33 @@ problem:
   checkpoint. The purge reaches the trail only. Decision receipt files
   and the review queue database are separate files it does not touch.
 
-  **Hash-chain seam at the retention boundary.** Surviving records
-  still reference deleted predecessors via `previous_hash`, so
-  `vaara trail verify` will report a chain break at the boundary.
-  Intended workflow: export a signed handoff zip BEFORE purging,
-  archive the zip externally for long-tail audit history, then purge
-  the live DB. The signed zip remains self-consistent forever. The
-  live DB chain has a documented seam at the retention boundary.
+  **The retention boundary.** `vaara trail rotate --db PATH --out
+  ARCHIVE.zip --key KEY --retention-days N --all-tenants` is the
+  supported workflow. It exports the whole trail as a signed zip,
+  re-verifies the zip from its own bytes, appends a signed
+  `trail_rotated` record to the trail, and only then purges the records
+  older than the window. The purge takes the unbroken prefix of the
+  chain: a record written later with an old timestamp stays until the
+  next rotation. The `trail_rotated` record is newer than the cut-off, so
+  it outlives the purge. It names the hash the first surviving record
+  links to, how many records went, and the archive's SHA-256, record
+  count and kind (`zip` or `sealed`), and it is signed with the key that
+  signs the archive (`vaara.trail-rotation/v1`, Ed25519). If the store
+  refuses the record, nothing is purged.
+
+  `vaara trail verify` accepts an export of the rotated trail when the
+  export holds that record and its signature checks out, and prints
+  `begins at a rotation seam: N records archived as <sha256>`. Pass
+  `--archive PATH` and it also checks the archive: the digest must match,
+  a zip must verify and hold the stated number of records and the record
+  the trail links to, and a sealed archive is checked by its digest alone.
+  A first record that links to nothing the trail holds is still a chain
+  break. That is what `vaara trail purge` on its own leaves, because it
+  deletes without a record of what it removed. The seam does not prove
+  that the archive still exists or is complete beyond what `--archive`
+  checks, and whoever holds the signing key can write a record for
+  records they dropped, so pin the key with `--pubkey`. Rotation can run
+  again on the rotated trail; each run appends its own record.
 
 ## Current limits
 

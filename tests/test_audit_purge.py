@@ -114,7 +114,7 @@ def test_purge_rejects_non_int_retention(backend: SQLiteAuditBackend) -> None:
 # ── Survival of remaining records ────────────────────────────────────────────
 
 def test_surviving_records_still_loadable(backend: SQLiteAuditBackend) -> None:
-    """Hash chain has a documented seam after purge — but records still load."""
+    """A plain purge leaves the first survivor linked to a purged record, but records still load."""
     now = time.time()
     backend.write_record(_make_record(now - 7200, action_id="old-action"))
     backend.write_record(_make_record(now - 60, action_id="new-action"))
