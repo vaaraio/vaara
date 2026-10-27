@@ -12,6 +12,16 @@ Usage:
     ./verify_vaara_trail.py path/to/trail.zip
     ./verify_vaara_trail.py path/to/trail.zip --pubkey signer.pem
     ./verify_vaara_trail.py path/to/trail.zip --erasure-key eraser.pub.pem
+    ./verify_vaara_trail.py path/to/trail.zip --archive path/to/archive.zip
+
+A trail that begins at a retention rotation (`vaara trail rotate`) carries a
+signed `trail_rotated` record naming the hash its first record links to and the
+digest of the archive that holds what was purged. The export verifies when that
+record is in it and its signature checks out (under the zip's own key, or
+--rotation-key); a first record that links to nothing the export holds fails
+the run. --archive checks an archive against the digest the record states (a
+zip must also verify, hold the stated number of records and hold the record the
+export links to; a sealed file is checked by its digest alone).
 
 A trail that honoured a GDPR Art. 17 erasure (`vaara trail erase`) verifies:
 the erased slot is reported as erased (link verified, content not checkable),
@@ -242,21 +252,8 @@ def _jcs_string(value: str) -> str:
     return json.dumps(value, ensure_ascii=False)
 
 
-def erasure_payload(data: dict) -> bytes:
-    """The exact bytes an eraser's signature covers, from a ``record_erased``
-    record's ``data``. RFC 8785 (JCS) over strings, one integer and null."""
-    fields = {
-        "type": ERASURE_RECORD_TYPE,
-        "erasedRecordId": data.get("erased_record_id"),
-        "erasedRecordHash": data.get("erased_record_hash"),
-        "erasedSeq": data.get("erased_seq"),
-        "erasedEventType": data.get("erased_event_type"),
-        "erasedActionId": data.get("erased_action_id"),
-        "reason": data.get("reason"),
-        "legalGround": data.get("legal_ground"),
-        "erasedBy": data.get("erased_by"),
-        "erasedAt": data.get("erased_at"),
-    }
+def _jcs_fields(fields: dict) -> bytes:
+    """RFC 8785 (JCS) over an object of strings, integers and null."""
     parts = []
     for name in sorted(fields):
         value = fields[name]
@@ -270,6 +267,54 @@ def erasure_payload(data: dict) -> bytes:
             encoded = _jcs_string(value)
         parts.append(f"{_jcs_string(name)}:{encoded}")
     return ("{" + ",".join(parts) + "}").encode("utf-8")
+
+
+def erasure_payload(data: dict) -> bytes:
+    """The exact bytes an eraser's signature covers, from a ``record_erased``
+    record's ``data``. RFC 8785 (JCS) over strings, one integer and null."""
+    return _jcs_fields({
+        "type": ERASURE_RECORD_TYPE,
+        "erasedRecordId": data.get("erased_record_id"),
+        "erasedRecordHash": data.get("erased_record_hash"),
+        "erasedSeq": data.get("erased_seq"),
+        "erasedEventType": data.get("erased_event_type"),
+        "erasedActionId": data.get("erased_action_id"),
+        "reason": data.get("reason"),
+        "legalGround": data.get("legal_ground"),
+        "erasedBy": data.get("erased_by"),
+        "erasedAt": data.get("erased_at"),
+    })
+
+
+# Retention rotation (`vaara trail rotate`). The purge leaves the first surviving
+# record linked to a record that is gone; a signed trail_rotated record, written
+# before the purge, names that hash and the archive that holds what went.
+# Mirrors vaara.audit.verify (rotation_payload, check_rotations).
+ROTATION_RECORD_TYPE = "vaara.trail-rotation/v1"
+_ROTATION_SIGNATURE_KEYS = frozenset({"type", "alg", "signature"})
+_ROTATION_ARCHIVE_KINDS = frozenset({"zip", "sealed"})
+_ROTATION_TEXT_FIELDS = ("last_hash", "archive_sha256", "boundary_utc", "rotated_at",
+                         "signer_fingerprint")
+#: Signature states that fail verification wherever the record sits.
+_ROTATION_FINDINGS = frozenset({"bad_signature", "malformed"})
+#: States in which a rotation record accounts for the start of the trail.
+_ROTATION_ACCEPTED = frozenset({"signed", "unpinned"})
+
+
+def rotation_payload(data: dict) -> bytes:
+    """The exact bytes a rotation signature covers, from a ``trail_rotated``
+    record's ``data``. RFC 8785 (JCS) over strings, integers and null."""
+    return _jcs_fields({
+        "type": ROTATION_RECORD_TYPE,
+        "lastHash": data.get("last_hash"),
+        "purgedRecords": data.get("purged_records"),
+        "archiveSha256": data.get("archive_sha256"),
+        "archiveRecords": data.get("archive_records"),
+        "archiveKind": data.get("archive_kind"),
+        "boundaryUtc": data.get("boundary_utc"),
+        "rotatedAt": data.get("rotated_at"),
+        "signerFingerprint": data.get("signer_fingerprint"),
+    })
 
 
 def _load_erasure_key(key):
@@ -362,15 +407,81 @@ def check_erasures(records: list[dict], public_key=None) -> list[dict]:
     return out
 
 
-def _verify_chain(trail_bytes: bytes) -> tuple[str | None, list[dict]]:
+def _rotation_fields_ok(data: dict) -> bool:
+    purged, archived = data.get("purged_records"), data.get("archive_records")
+    return (
+        all(isinstance(data.get(k), str) and data[k] for k in _ROTATION_TEXT_FIELDS)
+        and isinstance(purged, int) and not isinstance(purged, bool) and purged >= 1
+        and isinstance(archived, int) and not isinstance(archived, bool) and archived >= 0
+        and data.get("archive_kind") in _ROTATION_ARCHIVE_KINDS
+    )
+
+
+def _rotation_state(data: dict, key) -> str:
+    if not _rotation_fields_ok(data):
+        return "malformed"
+    block = data.get("rotation_signature")
+    if block is None:
+        return "unsigned"
+    if (not isinstance(block, dict) or set(block) != _ROTATION_SIGNATURE_KEYS
+            or block.get("type") != ROTATION_RECORD_TYPE or block.get("alg") != "Ed25519"
+            or not isinstance(block.get("signature"), str)):
+        return "malformed"
+    if key is None:
+        return "unpinned"
+    try:
+        signature = bytes.fromhex(block["signature"])
+        key.verify(signature, rotation_payload(data))
+    except (ValueError, InvalidSignature):
+        return "bad_signature"
+    return "signed"
+
+
+def check_rotations(records: list[dict], public_key=None) -> list[dict]:
+    """Judge every ``trail_rotated`` record: the claim and the signature on it.
+
+    ``public_key`` is the Ed25519 key that signed the rotation, the one that
+    signs the exports. Each record lands in one state: ``signed``, ``unsigned``
+    (well formed, no signature: it accounts for nothing), ``unpinned`` (signed,
+    no key to check it with), ``bad_signature`` or ``malformed``. ``begins_here``
+    and ``archive_check`` are filled by :func:`verify`, which knows where the
+    trail begins.
+    """
+    out: list[dict] = []
+    for index, rec in enumerate(records):
+        if rec.get("event_type") != "trail_rotated":
+            continue
+        data = _data_of(rec)
+        out.append({
+            "index": index,
+            "record_id": rec.get("record_id"),
+            "last_hash": data.get("last_hash"),
+            "purged_records": data.get("purged_records"),
+            "archive_sha256": data.get("archive_sha256"),
+            "archive_records": data.get("archive_records"),
+            "archive_kind": data.get("archive_kind"),
+            "boundary_utc": data.get("boundary_utc"),
+            "rotated_at": data.get("rotated_at"),
+            "signer_fingerprint": data.get("signer_fingerprint"),
+            "state": _rotation_state(data, public_key),
+            "begins_here": False,
+            "archive_check": None,
+        })
+    return out
+
+
+def _verify_chain(trail_bytes: bytes, start_hash: str = "") -> tuple[str | None, list[dict]]:
     """Walk the hash chain. Returns ``(error, erased)``: error is None unless
     the chain is broken. A tombstoned record whose hash no longer recomputes is
     held until the walk has seen every ``record_erased`` record after it; one
     naming its id and stored hash makes it an erased slot (link verified,
-    content not checkable), otherwise it is a hash mismatch."""
+    content not checkable), otherwise it is a hash mismatch. ``start_hash`` is
+    the hash the first record must link to: empty for a trail that begins at
+    its first record, a signed rotation record's ``last_hash`` for one that
+    begins at a rotation seam (the caller decides that)."""
     held: list[tuple[int, dict]] = []
     erasures: dict[tuple[str, str], int] = {}
-    prev_hash = ""
+    prev_hash = start_hash
     for idx, raw in enumerate(ln for ln in trail_bytes.splitlines() if ln.strip()):
         try:
             rec = _loads(raw)
@@ -689,8 +800,170 @@ def _collect_unrecorded_windows(zip_path: Path) -> list[str]:
     return describe_unrecorded_windows(_check_unrecorded_windows(lines)[0])
 
 
+def _rotation_candidates(lines: list[bytes]) -> list[dict]:
+    """The trail as dicts for :func:`check_rotations`, parsing only the lines that
+    name the type; the rest stay empty so indexes still match the chain."""
+    records: list[dict] = []
+    for ln in lines:
+        if b"trail_rotated" not in ln:
+            records.append({})
+            continue
+        try:
+            records.append(_loads(ln))
+        except _UNREADABLE:
+            records.append({})
+    return records
+
+
+def _first_link(lines: list[bytes]) -> str:
+    if not lines:
+        return ""
+    try:
+        link = _loads(lines[0]).get("previous_hash", "")
+    except _UNREADABLE:
+        return ""
+    return link if isinstance(link, str) else ""
+
+
+def _judge_rotations(lines: list[bytes], seam_key) -> tuple[list[dict], str, list[dict], dict | None]:
+    """``(rotations, start, begun, accounted)``: the judged rotation records, the
+    hash the first record links to, the records naming it, and the one that
+    accounts for it (named by it and signed, or unpinned), if any. Sets
+    ``begins_here`` on the one that accounts for it."""
+    rotations = check_rotations(_rotation_candidates(lines), seam_key)
+    start = _first_link(lines)
+    begun = [r for r in rotations if start and r["last_hash"] == start]
+    accounted = next((r for r in begun if r["state"] in _ROTATION_ACCEPTED), None)
+    if accounted is not None:
+        accounted["begins_here"] = True
+    return rotations, start, begun, accounted
+
+
+def _unaccounted_start(chain_error: str, start: str, begun: list[dict]) -> str:
+    """Why a first record that links outside the export was not accepted."""
+    if not start or not chain_error.startswith("record 0: previous_hash mismatch"):
+        return ""
+    if begun:
+        return (f" (rotation record {begun[0]['index']} names that hash, "
+                f"but it is {begun[0]['state']})")
+    return " (no rotation record in the trail names that hash)"
+
+
+def _file_sha256(path: Path) -> str:
+    h = hashlib.sha256()
+    with open(path, "rb") as fh:
+        for block in iter(lambda: fh.read(1 << 20), b""):
+            h.update(block)
+    return h.hexdigest()
+
+
+def _check_archive(path: Path, seam: dict | None, pubkey_path: Path | None,
+                   rotation_key) -> list[str]:
+    """Check a retention archive against the rotation record the export begins at.
+
+    Sets ``seam["archive_check"]`` and returns the errors. A zip must hash to the
+    recorded digest, verify as an export of its own, hold the recorded number of
+    records and hold the record the export links to; a sealed file is checked by
+    its digest alone, the records being encrypted.
+    """
+    if seam is None:
+        return ["an archive was given, but this export does not begin at a "
+                "signed rotation record, so there is nothing to check it against"]
+    name, at = path.name, seam["index"]
+    try:
+        actual = _file_sha256(path)
+    except OSError as exc:
+        seam["archive_check"] = "unreadable"
+        return [f"archive {name}: {exc.strerror or exc}"]
+    if actual != seam["archive_sha256"]:
+        seam["archive_check"] = "digest_mismatch"
+        return [f"archive {name} does not match rotation record {at}: "
+                f"SHA-256 {actual} != recorded {seam['archive_sha256']}"]
+    if seam["archive_kind"] == "sealed":
+        seam["archive_check"] = "digest_only"
+        return []
+    ok, inner_errors, inner_manifest = verify(path, pubkey_path, None, rotation_key, None)
+    if not ok:
+        seam["archive_check"] = "archive_invalid"
+        return [f"archive {name} does not verify: {inner_errors[0]}"]
+    held = (inner_manifest or {}).get("record_count")
+    if held != seam["archive_records"]:
+        seam["archive_check"] = "count_mismatch"
+        return [f"archive {name} does not match rotation record {at}: "
+                f"{held} records, the record says {seam['archive_records']}"]
+    with zipfile.ZipFile(path) as zf:
+        hashes = set()
+        for ln in zf.read("trail.jsonl").splitlines():
+            if ln.strip():
+                try:
+                    hashes.add(_loads(ln).get("record_hash"))
+                except _UNREADABLE:
+                    continue
+    if seam["last_hash"] not in hashes:
+        seam["archive_check"] = "link_missing"
+        return [f"archive {name} does not hold the record rotation record {at} "
+                f"names (last_hash {seam['last_hash']})"]
+    seam["archive_check"] = "verified"
+    return []
+
+
+def describe_rotation_seams(seams: list[dict]) -> list[str]:
+    """One line per rotation record, as ``vaara trail verify`` prints them."""
+    lines = []
+    for s in seams:
+        if s["state"] == "malformed":
+            lines.append(f"rotation record {s['index']}: malformed (a field or the "
+                         f"signature block does not have the expected shape)")
+            continue
+        n = s["purged_records"]
+        what = f"{n} record{'s' if n != 1 else ''} archived as {s['archive_sha256']}"
+        if s["begins_here"]:
+            line = f"begins at a rotation seam: {what}"
+            if s["state"] == "unpinned":
+                line += " (signature not checked: pass --rotation-key)"
+        else:
+            line = f"rotation record {s['index']}: {what} (this trail does not begin there)"
+        if s["archive_check"] == "verified":
+            line += (f" (archive checked: digest matches, {s['archive_records']} records "
+                     f"verify, holds the record this trail links to)")
+        elif s["archive_check"] == "digest_only":
+            line += " (archive checked: digest matches, contents not checked: sealed)"
+        lines.append(line)
+    return lines
+
+
+def _collect_rotation_seams(zip_path: Path, pubkey_path: Path | None, rotation_key,
+                            archive_path: Path | None) -> list[str]:
+    """The rotation lines for the report, read after a passing verification."""
+    try:
+        with zipfile.ZipFile(zip_path, "r") as zf:
+            trail_bytes = zf.read("trail.jsonl")
+            embedded = zf.read("signer_pubkey.pem") if "signer_pubkey.pem" in zf.namelist() else None
+    except (zipfile.BadZipFile, KeyError, FileNotFoundError):
+        return []
+    seam_key = rotation_key or _export_key(pubkey_path, embedded)
+    lines = [ln for ln in trail_bytes.splitlines() if ln.strip()]
+    rotations, _, _, accounted = _judge_rotations(lines, seam_key)
+    if archive_path is not None:
+        _check_archive(archive_path, accounted, pubkey_path, rotation_key)
+    return describe_rotation_seams(rotations)
+
+
+def _export_key(pubkey_path: Path | None, embedded: bytes | None):
+    """The key that signed the export: the pinned one, else the one inside the zip."""
+    try:
+        if pubkey_path is not None:
+            return _load_pubkey(pubkey_path.read_bytes())
+        if embedded is not None:
+            return _load_pubkey(embedded)
+    except (OSError, ValueError):
+        return None
+    return None
+
+
 def verify(
     zip_path: Path, pubkey_path: Path | None, erasure_key=None,
+    rotation_key=None, archive_path: Path | None = None,
 ) -> tuple[bool, list[str], dict | None]:
     errors: list[str] = []
     if not zip_path.exists():
@@ -759,6 +1032,7 @@ def verify(
 
     algorithm = manifest.get("signature_algorithm", "Ed25519")
     to_verify = hashlib.sha256(trail_bytes + manifest_bytes).digest()
+    export_key = None
 
     if not isinstance(algorithm, str):
         errors.append(f"unknown signature_algorithm: {algorithm!r}")
@@ -785,6 +1059,7 @@ def verify(
         else:
             return False, errors + ["no --pubkey given and no signer_pubkey.pem in zip"], manifest
         pk = _load_pubkey(pk_data)
+        export_key = pk
         if signature is None:
             errors.append("missing trail.sig in zip")
         else:
@@ -793,11 +1068,18 @@ def verify(
             except InvalidSignature:
                 errors.append("Ed25519 signature did not verify")
 
-    chain_error, _ = _verify_chain(trail_bytes)
-    if chain_error is not None:
-        errors.append(f"hash chain check failed: {chain_error}")
-
     lines = [ln for ln in trail_bytes.splitlines() if ln.strip()]
+    rotations, start, begun, accounted = _judge_rotations(lines, rotation_key or export_key)
+    chain_error, _ = _verify_chain(trail_bytes, start if accounted is not None else "")
+    if chain_error is not None:
+        errors.append(f"hash chain check failed: {chain_error}"
+                      + _unaccounted_start(chain_error, start, begun))
+    for r in rotations:
+        if r["state"] in _ROTATION_FINDINGS:
+            errors.append(f"record {r['index']}: rotation record is {r['state']}")
+    if archive_path is not None:
+        errors.extend(_check_archive(archive_path, accounted, pubkey_path, rotation_key))
+
     if manifest.get("record_count") != len(lines):
         errors.append(
             f"record_count mismatch: manifest={manifest.get('record_count')}, actual={len(lines)}"
@@ -842,7 +1124,32 @@ def main(argv: list[str] | None = None) -> int:
         "must verify under it; without it a signed erasure is reported as not "
         "checked.",
     )
+    p.add_argument(
+        "--rotation-key",
+        default=None,
+        help="Optional PEM Ed25519 public key that signed the trail_rotated records, "
+        "when it is not the key that signed the zip. Defaults to the zip's own key.",
+    )
+    p.add_argument(
+        "--archive",
+        default=None,
+        help="Optional retention archive the trail begins after (the zip, or the "
+        "sealed file of an encrypted rotation), checked against the digest the "
+        "trail_rotated record states.",
+    )
     args = p.parse_args(argv)
+
+    rotation_key = None
+    if args.rotation_key:
+        try:
+            rotation_key = _load_pubkey(Path(args.rotation_key).read_bytes())
+        except (OSError, ValueError) as exc:
+            print(f"verify_vaara_trail: --rotation-key: {exc}", file=sys.stderr)
+            return 2
+    archive_path = Path(args.archive) if args.archive else None
+    if archive_path is not None and not archive_path.is_file():
+        print(f"verify_vaara_trail: --archive: not a file: {archive_path}", file=sys.stderr)
+        return 2
 
     erasure_key = None
     if args.erasure_key:
@@ -856,6 +1163,8 @@ def main(argv: list[str] | None = None) -> int:
         Path(args.zip_path),
         Path(args.pubkey) if args.pubkey else None,
         erasure_key,
+        rotation_key,
+        archive_path,
     )
 
     if manifest:
@@ -903,6 +1212,10 @@ def main(argv: list[str] | None = None) -> int:
         for line in _collect_cage_lifecycle(Path(args.zip_path)):
             print(f"  {line}")
         for line in _collect_unrecorded_windows(Path(args.zip_path)):
+            print(f"  {line}")
+        for line in _collect_rotation_seams(
+                Path(args.zip_path), Path(args.pubkey) if args.pubkey else None,
+                rotation_key, archive_path):
             print(f"  {line}")
         return 0
     print("\nVerification: FAILED", file=sys.stderr)

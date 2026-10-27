@@ -72,7 +72,7 @@ def test_rotate_exports_verifies_and_purges(tmp_path, monkeypatch):
 
     backend = SQLiteAuditBackend(db)
     try:
-        assert backend.count() == 2
+        assert backend.count() == 3  # the two survivors and the rotation record
     finally:
         backend.close()
 

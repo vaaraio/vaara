@@ -138,6 +138,7 @@ def cmd_verify(args) -> int:
     try:
         from .audit.verify import (
             describe_cage_lifecycle,
+            describe_rotation_seams,
             describe_unrecorded_windows,
             verify_signed,
         )
@@ -153,6 +154,8 @@ def cmd_verify(args) -> int:
         result = verify_signed(
             zip_path, public_key=pubkey,
             erasure_key=Path(args.erasure_key) if args.erasure_key else None,
+            rotation_key=Path(args.rotation_key) if args.rotation_key else None,
+            archive=Path(args.archive) if args.archive else None,
         )
     except (OSError, ValueError) as exc:
         print(f"ERROR: {exc}", file=sys.stderr)
@@ -168,6 +171,7 @@ def cmd_verify(args) -> int:
         "cage_open": list(result.cage_open),
         "cage_unpaired_stops": list(result.cage_unpaired_stops),
         "unrecorded_windows": list(result.unrecorded_windows),
+        "rotation_seams": list(result.rotation_seams),
         # Honest labeling: with no out-of-band --pubkey, a passing result is
         # integrity/internal-consistency only, not authenticated issuer identity.
         "identity_pinned": pubkey is not None,
@@ -204,6 +208,10 @@ def cmd_verify(args) -> int:
         if payload["unrecorded_windows"]:
             print("unrecorded windows:")
             for line in describe_unrecorded_windows(result):
+                print(f"  - {line}")
+        if payload["rotation_seams"]:
+            print("rotation seams:")
+            for line in describe_rotation_seams(result):
                 print(f"  - {line}")
         if payload["ok"] and pubkey is None:
             print(
@@ -543,6 +551,12 @@ def build_parser() -> argparse.ArgumentParser:
     pv.add_argument("--pubkey", help="Path to Ed25519 public key (PEM).")
     pv.add_argument("--erasure-key",
                     help="Public key (PEM, EC P-256 or RSA) that signs erasure records.")
+    pv.add_argument("--rotation-key",
+                    help="Ed25519 public key (PEM) that signed the trail_rotated records, "
+                         "when it is not the key that signed the zip.")
+    pv.add_argument("--archive",
+                    help="The retention archive the trail begins after, checked against "
+                         "the digest the trail_rotated record states.")
     pv.add_argument("--json", action="store_true", help="Emit JSON.")
     pv.set_defaults(func=cmd_verify)
 
