@@ -150,7 +150,8 @@ jobs:
       - name: Install Vaara and the provider SDKs
         run: |
           pip install -e . --no-deps
-          pip install pytest boto3 azure-ai-contentsafety google-cloud-modelarmor rebuff
+          # rebuff pinned: an unpinned install resolves to 0.0.5, which predates RebuffSdk and rebuff.sdk
+          pip install pytest boto3 azure-ai-contentsafety google-cloud-modelarmor rebuff==0.1.1
 
       - name: Run contract tests, failing on any skip
         # Each contract class skips when its SDK is missing. In this job an

@@ -16,7 +16,6 @@ import hashlib
 import hmac
 import io
 import json
-import os
 import re
 import stat
 import sys
