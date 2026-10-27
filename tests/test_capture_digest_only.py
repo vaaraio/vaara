@@ -140,6 +140,7 @@ def test_another_key_gives_another_digest(policy_file, tmp_path):
     assert _capture.mask(TOOL, _args())["note"]["digest"] != first
 
 
+@pytest.mark.skipif(sys.platform == "win32", reason="Windows files have no POSIX mode bits")
 def test_the_key_is_created_once_with_mode_0600(policy_file):
     _capture.mask(TOOL, _args())
     key_file = policy_file.parent / "keys" / "capture-hmac.key"
@@ -157,6 +158,7 @@ def test_a_tool_the_policy_does_not_name_is_left_alone(policy_file):
 def test_the_default_policy_file_is_in_the_vaara_home(tmp_path, monkeypatch):
     monkeypatch.delenv("VAARA_CAPTURE_POLICY", raising=False)
     monkeypatch.setenv("HOME", str(tmp_path))
+    monkeypatch.setenv("USERPROFILE", str(tmp_path))  # Path.home() on Windows
     (tmp_path / ".vaara").mkdir()
     (tmp_path / ".vaara" / "capture.json").write_text(json.dumps(POLICY))
     assert _capture.mask(TOOL, _args())["note"]["captured"] == "digest-only"

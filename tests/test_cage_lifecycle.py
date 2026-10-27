@@ -185,6 +185,8 @@ def test_a_trail_that_cannot_be_written_does_not_stop_the_cage(tmp_path, monkeyp
 
 # ── vaara run ──────────────────────────────────────────────────────────
 
+@pytest.mark.skipif(sys.platform != "linux",
+                    reason="vaara run cages on Linux only (cgroups, AppArmor, an abstract socket)")
 def test_vaara_run_records_the_launch_and_the_guard_kill(db, tmp_path, monkeypatch):
     """The guard goes away: the launch is ended, and the stop says how many processes."""
     from vaara.oslayer import run as run_mod

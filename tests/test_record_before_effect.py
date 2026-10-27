@@ -172,12 +172,14 @@ def test_the_shell_proxy_does_not_run_a_command_it_could_not_record(
     assert "--fail-open" in (out.out + out.err)
 
 
+@pytest.mark.skipif(sys.platform == "win32", reason="the shell proxy runs /bin/sh")
 def test_the_shell_proxy_runs_a_command_it_could_record(tmp_path):
     ran = tmp_path / "ran"
     assert shell_proxy._run_one(_pipeline(tmp_path), f"touch {ran}", "/bin/sh", "t") == 0
     assert ran.exists()
 
 
+@pytest.mark.skipif(sys.platform == "win32", reason="the shell proxy runs /bin/sh")
 def test_shell_fail_open_runs_the_command_unrecorded(monkeypatch, tmp_path, capsys):
     pipeline = _pipeline(tmp_path)
     _break_store(monkeypatch, pipeline)
