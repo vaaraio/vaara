@@ -610,3 +610,16 @@ def test_vaara_audit_verify_reports_the_seam(tmp_path, monkeypatch, capsys):
     payload = json.loads(capsys.readouterr().out)
     (seam,) = payload["rotation_seams"]
     assert seam["begins_here"] is True and seam["archive_check"] == "verified"
+
+
+def test_a_bare_purge_points_at_rotate(tmp_path, monkeypatch, capsys):
+    from vaara.cli import main
+
+    db = tmp_path / "audit.db"
+    _seed(db, monkeypatch)
+
+    assert main(["trail", "purge", "--db", str(db), "--retention-days", "7",
+                 "--all-tenants"]) == 0
+    err = capsys.readouterr().err
+    assert "vaara trail rotate" in err
+    assert "fails verification" in err

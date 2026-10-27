@@ -1824,9 +1824,10 @@ def _cmd_trail_purge(args: argparse.Namespace) -> int:
         print(f"Purged {count} record(s) older than {args.retention_days} day(s).")
         if count > 0:
             print(
-                "Note: hash chain has a seam at the retention boundary. "
-                "Run 'vaara trail export' BEFORE future purges to preserve "
-                "audit history in a signed zip.",
+                "Note: nothing in the trail accounts for the records removed, so an "
+                "export of it fails verification at its first record. Use "
+                "'vaara trail rotate' instead: it archives the trail, appends a "
+                "signed record naming what is purged, and then purges.",
                 file=sys.stderr,
             )
         if scrubbed is False:
