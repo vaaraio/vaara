@@ -296,3 +296,22 @@ def test_mixing_both_streams_refuses_to_guess():
     ]
     with pytest.raises(ValueError, match="span multiple boundaries"):
         verify_contiguity(mixed)
+
+
+def test_two_execution_receipts_at_one_seq_read_as_a_fork():
+    """The projection keeps each receipt, so two different ones are told apart."""
+    from vaara.credential._contiguity import (
+        completeness_from_execution_receipts,
+        verify_contiguity,
+    )
+
+    att = _attestation()
+    held = [_emit(att, completeness=_block(i)).to_dict() for i in (0, 1, 2)]
+    held.append(_emit(att, completeness=_block(1)).to_dict())
+    report = verify_contiguity(completeness_from_execution_receipts(held))
+    assert held[1] != held[3]
+    assert report.duplicates == [{"seq": 1, "kind": "fork"}]
+
+    replayed = held[:3] + [held[1]]
+    report = verify_contiguity(completeness_from_execution_receipts(replayed))
+    assert report.duplicates == [{"seq": 1, "kind": "replay"}]

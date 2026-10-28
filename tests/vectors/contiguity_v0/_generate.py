@@ -16,6 +16,12 @@ cases:
 * ``dropped``  - the seq-2 receipt is withheld. The four held receipts still
   carry the signed running count that says five exist, so seq 2 is a provable
   gap with no issuer access and no external witness.
+* ``fork``     - all five held, plus a second, differently minted receipt at
+  seq 2. Both verify under the key; two different records at one seq fail the
+  set and the verifier names it a fork.
+* ``replay``   - all five held, plus a byte-identical copy of the seq-2 receipt
+  under another file name. It still fails the set; the verifier names it a
+  replay.
 
 The signing key is derived from a fixed scalar so the public key is stable
 across runs. ECDSA signatures still vary per run (random k) but always verify,
@@ -55,6 +61,7 @@ DECIDED_AT = "2026-06-18T12:00:05Z"
 BOUNDARY = "vaara-mcp-proxy"
 STREAM_LEN = 5
 DROPPED_SEQ = 2
+DUPLICATE_SEQ = 2
 
 CAPS = (
     Capability("amount", "le", "500"),
@@ -106,9 +113,7 @@ def main() -> int:
 
     _write(HERE / "grant.json", grant.to_dict())
 
-    # Mint the stream once; both cases share the byte-identical receipts.
-    receipts: list[dict] = []
-    for seq in range(STREAM_LEN):
+    def mint(seq: int, nonce: str) -> dict:
         auth = mint_authorization_receipt(
             credential=grant,
             runtime_args=RUNTIME_ARGS,
@@ -119,20 +124,31 @@ def main() -> int:
             alg="ES256",
             signing_material=priv,
             decided_at=DECIDED_AT,
-            nonce=f"decision-nonce-{seq}",
+            nonce=nonce,
             completeness={
                 "boundaryId": BOUNDARY,
                 "seq": seq,
                 "runningCount": seq + 1,
             },
         )
-        receipts.append({"record": auth.record.to_dict(), "evidence": auth.evidence})
+        return {"record": auth.record.to_dict(), "evidence": auth.evidence}
+
+    # Mint the stream once; every case shares the byte-identical receipts.
+    receipts = [mint(seq, f"decision-nonce-{seq}") for seq in range(STREAM_LEN)]
+    forked = mint(DUPLICATE_SEQ, f"decision-nonce-{DUPLICATE_SEQ}-fork")
 
     for seq, authz in enumerate(receipts):
         name = f"{BOUNDARY}-{seq:04d}-authz.json"
         _write(HERE / "complete" / name, authz)
+        _write(HERE / "fork" / name, authz)
+        _write(HERE / "replay" / name, authz)
         if seq != DROPPED_SEQ:
             _write(HERE / "dropped" / name, authz)
+    _write(HERE / "fork" / f"{BOUNDARY}-{DUPLICATE_SEQ:04d}-fork-authz.json", forked)
+    _write(
+        HERE / "replay" / f"{BOUNDARY}-{DUPLICATE_SEQ:04d}-replay-authz.json",
+        receipts[DUPLICATE_SEQ],
+    )
 
     expected = {
         "complete": {
@@ -143,6 +159,7 @@ def main() -> int:
                 "present": STREAM_LEN,
                 "expected": STREAM_LEN,
                 "missingSeqs": [],
+                "duplicates": [],
             },
         },
         "dropped": {
@@ -153,11 +170,34 @@ def main() -> int:
                 "present": STREAM_LEN - 1,
                 "expected": STREAM_LEN,
                 "missingSeqs": [DROPPED_SEQ],
+                "duplicates": [],
+            },
+        },
+        "fork": {
+            "all_signatures_ok": True,
+            "all_evidence_bindings_resolve": True,
+            "contiguity": {
+                "ok": False,
+                "present": STREAM_LEN + 1,
+                "expected": STREAM_LEN,
+                "missingSeqs": [],
+                "duplicates": [{"seq": DUPLICATE_SEQ, "kind": "fork"}],
+            },
+        },
+        "replay": {
+            "all_signatures_ok": True,
+            "all_evidence_bindings_resolve": True,
+            "contiguity": {
+                "ok": False,
+                "present": STREAM_LEN + 1,
+                "expected": STREAM_LEN,
+                "missingSeqs": [],
+                "duplicates": [{"seq": DUPLICATE_SEQ, "kind": "replay"}],
             },
         },
     }
     _write(HERE / "expected.json", expected)
-    print("wrote contiguity_v0 vectors: complete, dropped")
+    print("wrote contiguity_v0 vectors: complete, dropped, fork, replay")
     return 0
 
 

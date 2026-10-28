@@ -254,3 +254,56 @@ def test_a_seal_over_a_cut_tail_is_still_incomplete():
     assert not report.ok
     assert report.sealed
     assert report.gap_report().startswith(f"boundary {BOUNDARY!r}: INCOMPLETE")
+
+
+def test_two_different_records_at_one_seq_are_a_fork():
+    other = _ev(1, 2)
+    other["decision"] = "a different record at the same seq"
+    report = verify_contiguity(_stream(3) + [other])
+    assert not report.ok
+    assert report.duplicates == [{"seq": 1, "kind": "fork"}]
+    assert "duplicate seq: 1 (different records)" in report.gap_report()
+
+
+def test_a_byte_identical_copy_at_one_seq_is_a_replay_and_still_fails():
+    report = verify_contiguity(_stream(3) + [_ev(1, 2)])
+    assert not report.ok
+    assert report.duplicates == [{"seq": 1, "kind": "replay"}]
+    assert "duplicate seq: 1 (same record)" in report.gap_report()
+
+
+def test_a_replay_beside_a_fork_at_one_seq_reads_as_a_fork():
+    other = _ev(1, 2)
+    other["decision"] = "different"
+    report = verify_contiguity(_stream(3) + [_ev(1, 2), other])
+    assert report.duplicates == [{"seq": 1, "kind": "fork"}]
+
+
+def test_forks_and_replays_are_named_per_seq():
+    other = _ev(0, 1)
+    other["decision"] = "different"
+    report = verify_contiguity(_stream(4) + [other, _ev(2, 3)])
+    assert report.duplicate_seqs == [0, 2]
+    assert report.duplicates == [
+        {"seq": 0, "kind": "fork"},
+        {"seq": 2, "kind": "replay"},
+    ]
+    text = report.gap_report()
+    assert "duplicate seq: 0 (different records)" in text
+    assert "duplicate seq: 2 (same record)" in text
+
+
+def test_whole_records_decide_the_kind_when_given():
+    """Same evidence under two different signed records is a fork, not a replay."""
+    stream = _stream(3) + [_ev(1, 2)]
+    wholes = [{"record": {"sig": f"s{i}"}, "evidence": ev} for i, ev in enumerate(stream)]
+    report = verify_contiguity(stream, records=wholes)
+    assert report.duplicates == [{"seq": 1, "kind": "fork"}]
+    wholes[3] = wholes[1]
+    report = verify_contiguity(stream, records=wholes)
+    assert report.duplicates == [{"seq": 1, "kind": "replay"}]
+
+
+def test_records_must_match_the_evidence_list():
+    with pytest.raises(ValueError, match="records"):
+        verify_contiguity(_stream(2), records=[{}])

@@ -4067,6 +4067,9 @@ def _cmd_verify_contiguity(args: argparse.Namespace) -> int:
         return 2
 
     evidence: list[dict] = []
+    # The whole file each evidence record came from: two different receipts at
+    # one seq are a fork, the same receipt twice is a replay.
+    wholes: list[dict] = []
     dropped = 0
     for f in files:
         try:
@@ -4084,11 +4087,13 @@ def _cmd_verify_contiguity(args: argparse.Namespace) -> int:
                 dropped += 1
                 continue
             evidence.append(payload["evidence"])
+            wholes.append(payload)
         else:
             # Keyless/structural path: accept a full payload or a bare record.
             ev = payload.get("evidence", payload)
             if isinstance(ev, dict):
                 evidence.append(ev)
+                wholes.append(payload)
 
     if verifying_material is not None and dropped:
         print(
@@ -4104,7 +4109,9 @@ def _cmd_verify_contiguity(args: argparse.Namespace) -> int:
         )
 
     try:
-        report = verify_contiguity(evidence, boundary_id=args.boundary_id)
+        report = verify_contiguity(
+            evidence, boundary_id=args.boundary_id, records=wholes
+        )
     except ValueError as exc:
         print(f"vaara verify-contiguity: {exc}", file=sys.stderr)
         return 2
@@ -4125,6 +4132,7 @@ def _cmd_verify_contiguity(args: argparse.Namespace) -> int:
                     "expected": report.expected,
                     "missingSeqs": report.missing_seqs,
                     "duplicateSeqs": report.duplicate_seqs,
+                    "duplicates": report.duplicates,
                     "countMismatches": report.count_mismatches,
                     "dropped": dropped,
                     "sealed": report.sealed,

@@ -53,13 +53,13 @@
     },
     "issuerAsserted": {
       "alg": "ES256",
-      "iat": "2026-08-20T06:41:42Z",
+      "iat": "2026-10-28T14:30:05Z",
       "iss": "vaara-mcp-proxy",
       "nonce": "decision-nonce-0",
       "secretVersion": "key-v1",
       "sub": "tenant-a/upstream"
     },
-    "signature": "814e5255aaef42dcdcc2bfe2bbdaa79f837a22b7856dcd120b2e116a9c18518113aa41cd7685c2c43ba78ffaf1f82ca624a83655a7cbf1040520069427b39906",
+    "signature": "89f10f6f26fa0b19a7ddeb5a86f6f3b9165178f169106b0db452a2f0ef99978390628fcbbdc54499980dc2dac920b4ab8478c5047ed1d31bb65a8dfd391a037d",
     "version": 1
   }
 }

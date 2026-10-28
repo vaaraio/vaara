@@ -3,6 +3,7 @@
     "all_evidence_bindings_resolve": true,
     "all_signatures_ok": true,
     "contiguity": {
+      "duplicates": [],
       "expected": 5,
       "missingSeqs": [],
       "ok": true,
@@ -13,12 +14,45 @@
     "all_evidence_bindings_resolve": true,
     "all_signatures_ok": true,
     "contiguity": {
+      "duplicates": [],
       "expected": 5,
       "missingSeqs": [
         2
       ],
       "ok": false,
       "present": 4
+    }
+  },
+  "fork": {
+    "all_evidence_bindings_resolve": true,
+    "all_signatures_ok": true,
+    "contiguity": {
+      "duplicates": [
+        {
+          "kind": "fork",
+          "seq": 2
+        }
+      ],
+      "expected": 5,
+      "missingSeqs": [],
+      "ok": false,
+      "present": 6
+    }
+  },
+  "replay": {
+    "all_evidence_bindings_resolve": true,
+    "all_signatures_ok": true,
+    "contiguity": {
+      "duplicates": [
+        {
+          "kind": "replay",
+          "seq": 2
+        }
+      ],
+      "expected": 5,
+      "missingSeqs": [],
+      "ok": false,
+      "present": 6
     }
   }
 }

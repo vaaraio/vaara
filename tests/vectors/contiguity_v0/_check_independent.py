@@ -11,7 +11,9 @@ verdict a third party reaches with nothing but the issuer's public key:
                                decisionDerived.evidenceRef.digest, so the signed
                                receipt commits to the completeness block.
   contiguity                   re-running the gap check here, in plain Python,
-                               reproduces ok / present / expected / missingSeqs.
+                               reproduces ok / present / expected / missingSeqs,
+                               and names each seq held twice: fork (different
+                               records) or replay (the same record).
 
 The headline case is ``dropped``: with the seq-2 receipt withheld, the four held
 receipts still carry the signed running count that says five exist, so seq 2 is a
@@ -40,7 +42,7 @@ from cryptography.hazmat.primitives.serialization import load_pem_public_key
 _JCS_ALIASES = ("jcs-rfc8785", "JCS", "jcs-json-v1")
 
 HERE = Path(__file__).resolve().parent
-_CASES = ("complete", "dropped")
+_CASES = ("complete", "dropped", "fork", "replay")
 _SIGNED_KEYS = ("version", "alg", "backLink", "decisionDerived", "issuerAsserted")
 
 
@@ -96,24 +98,37 @@ def _receipt_signature_ok(authz, pub) -> bool:
 
 def _contiguity(records) -> dict:
     """Reproduce verify_contiguity over the held evidence completeness blocks."""
-    blocks = [
-        ev["completeness"]
+    held = [
+        (ev["completeness"], authz)
         for authz in records
         if isinstance((ev := authz.get("evidence")), dict)
         and isinstance(ev.get("completeness"), dict)
     ]
+    blocks = [b for b, _ in held]
     if not blocks:
-        return {"ok": True, "present": 0, "expected": 0, "missingSeqs": []}
+        return {"ok": True, "present": 0, "expected": 0, "missingSeqs": [],
+                "duplicates": []}
 
     seqs = [int(b["seq"]) for b in blocks]
     counts = [int(b["runningCount"]) for b in blocks]
     expected = max(max(seqs) + 1, max(counts))
     missing = sorted(set(range(expected)) - set(seqs))
-    duplicates = len(seqs) != len(set(seqs))
+    copies: dict[int, set[bytes]] = {}
+    counts_at: dict[int, int] = {}
+    for b, authz in held:
+        seq = int(b["seq"])
+        copies.setdefault(seq, set()).add(_jcs(authz))
+        counts_at[seq] = counts_at.get(seq, 0) + 1
+    duplicates = [
+        {"seq": seq, "kind": "replay" if len(copies[seq]) == 1 else "fork"}
+        for seq in sorted(counts_at)
+        if counts_at[seq] > 1
+    ]
     mismatch = any(int(b["runningCount"]) != int(b["seq"]) + 1 for b in blocks)
     present = len(blocks)
     ok = not missing and not duplicates and not mismatch and present == expected
-    return {"ok": ok, "present": present, "expected": expected, "missingSeqs": missing}
+    return {"ok": ok, "present": present, "expected": expected, "missingSeqs": missing,
+            "duplicates": duplicates}
 
 
 def main() -> int:

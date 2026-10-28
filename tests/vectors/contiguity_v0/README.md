@@ -16,7 +16,7 @@ non-repudiable: a short held set cannot honestly claim to be whole.
 
 ## Cases
 
-Both cases share the same five byte-identical signed receipts (seq 0..4 under
+Every case shares the same five byte-identical signed receipts (seq 0..4 under
 boundary `vaara-mcp-proxy`); the `dropped` case is the `complete` set minus one
 file, so the gap is a genuine omission rather than a re-mint.
 
@@ -27,6 +27,13 @@ file, so the gap is a genuine omission rather than a re-mint.
   the signed running count that says five exist, so contiguity is not `ok` with
   `present` 4, `expected` 5, `missingSeqs` `[2]`. Signatures and evidence
   bindings on the held four still verify.
+- `fork/`: all five, plus a second receipt at seq 2 minted with another nonce.
+  Both seq-2 receipts verify under the key. Two records at one seq fail the
+  set: contiguity is not `ok`, `present` 6, `expected` 5, and `duplicates`
+  names seq 2 as `fork` (different records).
+- `replay/`: all five, plus a byte-identical copy of the seq-2 receipt under
+  another file name. It still fails the set, and `duplicates` names seq 2 as
+  `replay` (the same record).
 - `grant.json`: the capability grant the receipts authorize against, for
   context.
 - `expected.json`: the verdict each case must produce.
@@ -55,6 +62,8 @@ consumable by the shipped CLI:
 ```
 vaara verify-contiguity tests/vectors/contiguity_v0/complete   # exit 0, contiguous
 vaara verify-contiguity tests/vectors/contiguity_v0/dropped    # exit 1, missing seq 2
+vaara verify-contiguity tests/vectors/contiguity_v0/fork       # exit 1, duplicate seq: 2 (different records)
+vaara verify-contiguity tests/vectors/contiguity_v0/replay     # exit 1, duplicate seq: 2 (same record)
 ```
 
 Regenerate the cases (ECDSA signatures are randomized, so signatures change but
