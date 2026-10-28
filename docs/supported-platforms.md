@@ -40,6 +40,18 @@ Rerunning the test suite on RHEL 9 needs Node.js 20 or later for the browser
 verifier tests (the `nodejs:20` module stream). RHEL 9's default Node.js 16
 has no global `crypto`, so those tests fail there for reasons that have
 nothing to do with Vaara; without Node installed at all they skip.
+
+The Linux OS layer does not run on RHEL 9. It confines agents with an
+AppArmor profile, and RHEL confines with SELinux and ships no AppArmor, so
+`sudo vaara os-guard` and `vaara run` refuse to start there rather than run
+an agent unconfined; the `vaara` driver of `vaara cage` reports itself not
+ready, and the AppArmor profile tests skip. Everything else runs: the MCP
+proxy (`vaara-mcp-proxy`), the LLM API proxy (`vaara llm-proxy`), the shell
+proxy (`vaara proxy-shell`), the model endpoint proxy, the agent host hooks,
+the trail and its verifiers. [cage.md](cage.md) covers the runtime-backed
+cages, which run through podman, and what gVisor needs on an
+SELinux-enforcing host.
+
 OpenShift is not listed: no run on an OpenShift cluster has been recorded.
 
 ## Container image
