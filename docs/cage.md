@@ -100,6 +100,11 @@ Each driver depends on the release of the cage the operator installed and
 shells out to it, or speaks its published API. The runtime-backed cages
 run through `docker` when it is on `PATH`, else `podman` (RHEL and SLES ship
 podman only); `VAARA_CAGE_ENGINE` picks one explicitly.
+gVisor does not take SELinux labels, so on an SELinux-enforcing host
+(RHEL, Rocky, Fedora) a launch fails until it is given
+`--security-opt label=disable`; the container then runs without an SELinux
+label and gVisor's Sentry is its boundary. The driver never adds the option
+itself.
 Every tool's path can be set with its own variable (`OPENSHELL_BIN`,
 `CODEX_BIN`, `SRT_BIN`, `NONO_BIN`, `RUNSC_BIN`, `KATA_RUNTIME_BIN`,
 `KUBECTL_BIN`, `FIRECRACKER_BIN`, `MSB_BIN`, `APPLE_CONTAINER_BIN`); E2B takes `E2B_API_URL`,

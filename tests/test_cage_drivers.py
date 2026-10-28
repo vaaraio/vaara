@@ -321,6 +321,30 @@ class TestEngineDrivers:
         d = KataDriver(engine="docker")
         assert d._kata.binary == "kata-runtime" and d.upstream_version() == "kata 3.12.0"
 
+    def test_selinux_label_refusal_names_the_option(self, tmp_path):
+        # runsc under podman on an SELinux-enforcing host (Rocky 9.8, 28.10)
+        engine = tmp_path / "podman"
+        engine.write_text("#!/bin/sh\necho 'Error: OCI runtime error: runsc: FetchSpec failed: "
+                          "reading spec: SELinux is not supported: system_u:system_r:container_t:s0' >&2\n"
+                          "exit 126\n")
+        engine.chmod(engine.stat().st_mode | stat.S_IXUSR)
+        from vaara.cage.gvisor import GVisorDriver
+        with pytest.raises(CageError) as err:
+            GVisorDriver(engine=str(engine), runsc="/nonexistent/runsc").start(["agent"], None, image="i")
+        msg = str(err.value)
+        assert "SELinux is not supported" in msg            # the runtime's own words stay
+        assert "--security-opt label=disable" in msg        # and the way out is named
+        assert "without an SELinux label" in msg            # with what it costs
+
+    def test_other_engine_errors_are_unchanged(self, tmp_path):
+        engine = tmp_path / "podman"
+        engine.write_text("#!/bin/sh\necho 'Error: image not known' >&2\nexit 125\n")
+        engine.chmod(engine.stat().st_mode | stat.S_IXUSR)
+        from vaara.cage.gvisor import GVisorDriver
+        with pytest.raises(CageError) as err:
+            GVisorDriver(engine=str(engine), runsc="/nonexistent/runsc").start(["agent"], None, image="i")
+        assert "label=disable" not in str(err.value)
+
     def test_policy_file_is_refused(self, fake, tmp_path):
         engine, _ = fake("docker", [])
         from vaara.cage.gvisor import GVisorDriver

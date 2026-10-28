@@ -55,6 +55,10 @@ class ContainerEngineDriver:
         if runtime:
             self.runtime = runtime
 
+    def explain(self, message: str) -> str:
+        """A launch error as the operator should read it; a runtime adds what it knows."""
+        return message
+
     # Subclasses say how the runtime itself reports its version.
     def upstream_version(self) -> str:  # pragma: no cover - overridden
         return self.name
@@ -83,7 +87,10 @@ class ContainerEngineDriver:
         for key, value in environ_for(state).items():
             args += ["-e", f"{key}={value}"]
         args += [image, *agent]
-        container_id = self._engine.run(*args).strip()
+        try:
+            container_id = self._engine.run(*args).strip()
+        except CageError as exc:
+            raise CageError(self.explain(str(exc))) from None
         return CageLaunch(driver=self.name, name=launch_name,
                           state=self.enforcement_state(launch_name),
                           detail={"container_id": container_id, "request": request})

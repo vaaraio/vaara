@@ -34,6 +34,16 @@ class GVisorDriver(ContainerEngineDriver):
         self._runsc = Tool("runsc", runsc or os.environ.get("RUNSC_BIN"), "RUNSC_BIN",
                            "install gVisor (gvisor.dev/docs/user_guide/install)", 30.0)
 
+    def explain(self, message: str) -> str:
+        # runsc refuses the SELinux label podman puts on a container on an
+        # SELinux-enforcing host (RHEL, Rocky, Fedora); the option is the
+        # operator's to take, never the driver's
+        if "SELinux is not supported" in message:
+            return (message + "; gVisor does not take SELinux labels: on an SELinux host pass "
+                    "--security-opt label=disable, which runs the container without an "
+                    "SELinux label and leaves gVisor's Sentry as its boundary")
+        return message
+
     def upstream_version(self) -> str:
         try:
             out = self._runsc.run("--version", timeout=30)
