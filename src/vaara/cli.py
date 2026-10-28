@@ -3001,8 +3001,15 @@ def _cmd_receipt_verify(args: argparse.Namespace) -> int:
         "back_link_valid": back_link.ok,
         "status": receipt.outcome_derived.status,
         "completed_at": receipt.outcome_derived.completed_at,
+        "outcome_observed": receipt.outcome_derived.status != "unobserved",
         "outcome_note": "status and completed_at as asserted by the issuer",
     }
+    if receipt.outcome_derived.status == "unobserved":
+        result["outcome_note"] = (
+            "unobserved: the issuer sent the request and observed no outcome, "
+            "so it cannot say whether the action ran; read as neither executed "
+            "nor errored (status and completed_at as asserted by the issuer)"
+        )
 
     commitment = receipt.outcome_derived.result_commitment
     if commitment is None:

@@ -190,3 +190,44 @@ def test_cli_back_link_mismatch_gates(tmp_path, capsys):
     out = capsys.readouterr().out
     assert rc == 1
     assert "back-link: FAIL" in out
+
+
+# ── unobserved (receipt -15, Table 4) ─────────────────────────────────────────
+
+
+def _conforming_record_without_commitment() -> dict:
+    for name in _cases():
+        want = _expected()[name]
+        rec = _record(name)
+        if want["conforms"] and not want["advisories"]:
+            rec["outcomeDerived"].pop("resultCommitment", None)
+            return rec
+    raise AssertionError("no conforming vector record")
+
+
+def test_unobserved_status_conforms():
+    rec = _conforming_record_without_commitment()
+    rec["outcomeDerived"]["status"] = "unobserved"
+    report = check_record_conformance(rec)
+    assert report.conforms, report.required_failed
+    assert not report.advisories
+
+
+def test_unobserved_with_a_result_commitment_is_an_advisory():
+    base = _record(next(
+        n for n in _cases()
+        if _expected()[n]["conforms"] and not _expected()[n]["advisories"]
+        and "resultCommitment" in _record(n)["outcomeDerived"]
+    ))
+    base["outcomeDerived"]["status"] = "unobserved"
+    report = check_record_conformance(base)
+    assert report.conforms
+    assert "unobserved_has_no_result" in report.advisories
+
+
+def test_a_status_outside_the_four_fails():
+    rec = _conforming_record_without_commitment()
+    rec["outcomeDerived"]["status"] = "unknown"
+    report = check_record_conformance(rec)
+    assert not report.conforms
+    assert "status_valid" in report.required_failed

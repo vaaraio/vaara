@@ -119,6 +119,11 @@ _REQUEST_INTENT: contextvars.ContextVar[str] = contextvars.ContextVar(
 _safe_log = log_safe
 
 
+def _outcome_state(exc: BaseException) -> str:
+    """The trail state an upstream exception names; unclassified is unobserved."""
+    return getattr(exc, "outcome_state", "unobserved")
+
+
 def _outcome_description(status: str, **fields: Any) -> str:
     """The outcome description: one JSON object, so a reader can parse it."""
     return json.dumps({"status": status, **fields}, sort_keys=True)
@@ -1810,15 +1815,17 @@ class VaaraMCPProxy:
         # every path keeps the evidence trail complete with no orphans.
         outcome_severity = 1.0
         outcome_description = ""
+        outcome_state: Optional[str] = None
         try:
             upstream_response = self._upstream.request(request)
             outcome_severity = self._severity_from_response(upstream_response)
             if outcome_severity > 0.0:
                 outcome_description = _outcome_description("failed")
         except Exception as exc:
-            # The request raised, so no reply was read. The receipt below keeps
-            # its closed status set (errored); the trail is where the three
-            # cases are told apart.
+            # The request raised, so no reply was read. The trail tells the
+            # three cases apart; the receipt below says unobserved for the one
+            # where the call may have run, and errored for not_sent and failed.
+            outcome_state = _outcome_state(exc)
             self._record_unanswered(str(getattr(result, "action_id", None) or ""), exc)
             raise
         finally:
@@ -1836,6 +1843,7 @@ class VaaraMCPProxy:
                     upstream_name=upstream_name,
                     tenant_id=_REQUEST_TENANT.get(),
                     task_id=_related_task_id(params),
+                    outcome_state=outcome_state,
                 )
         self._harvest_origin(tool_name, upstream_response,
                              str(getattr(result, "action_id", None) or ""))
@@ -1874,7 +1882,7 @@ class VaaraMCPProxy:
         closed at the neutral 0.5 severity, as an aborted stream is: the
         scorer is not told it failed. Failures here are logged and swallowed.
         """
-        state = getattr(exc, "outcome_state", "unobserved")
+        state = _outcome_state(exc)
         try:
             self._pipeline.report_outcome(
                 action_id=action_id,

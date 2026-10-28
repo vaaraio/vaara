@@ -9,7 +9,7 @@ gaps in the chain? Like the per-record check, this needs no signing key.
 
 A set is not all one shape. Each record is classified as a **decision**
 (`decisionDerived`: allow / block / escalate) or an **outcome**
-(`outcomeDerived`: executed / refused / errored) by which derived block it
+(`outcomeDerived`: executed / refused / errored / unobserved) by which derived block it
 carries, and checked against that type's schema; a record carrying neither
 (or both) is unknown and cannot conform. The shared `backLink` pairs a
 decision with its outcome.

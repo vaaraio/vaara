@@ -1,0 +1,21 @@
+{
+  "alg": "HS256",
+  "backLink": {
+    "attestationDigest": "sha256:79acdd4bb3c22a688b1c3321b9a26cafb5cb58c990a963874066d04b8497f70b",
+    "attestationNonce": "fixed-attestation-nonce-000"
+  },
+  "outcomeDerived": {
+    "completedAt": "2026-05-29T10:00:00Z",
+    "status": "unknown"
+  },
+  "receiptAsserted": {
+    "alg": "HS256",
+    "iat": "2026-05-29T10:00:00Z",
+    "iss": "issuer://test",
+    "nonce": "fixed-receipt-nonce-0001",
+    "secretVersion": "v1",
+    "sub": "agent:archiver"
+  },
+  "signature": "8d86c67248be0e58e040f4e53040c5a6d13087caeb95ce96e3b9006c9fbadeea",
+  "version": 1
+}

@@ -4,7 +4,7 @@
 
 At least one check could not be reached, so this statement does not establish the property either way. That is a different result from a check that ran and failed, and the sections below name which.
 
-Checked against corpus `sep2828-execution-record-conformance` version 1.0.0 (corpusDigest `sha256:0baa437da95d6ffb6bda3185d657385b7738c79daba77819acc0c6280ac0ed7a`).
+Checked against corpus `sep2828-execution-record-conformance` version 1.0.1 (corpusDigest `sha256:5b46b5d51a024d6c9c7d6e48889091e561bad43e66730486c6a581ed9315bd08`).
 
 ## Corpus integrity
 

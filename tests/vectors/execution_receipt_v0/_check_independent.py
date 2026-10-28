@@ -4,8 +4,8 @@
 Imports only the standard library plus ``cryptography`` and ``rfc8785``.
 It does not import Vaara. It reads the committed fixtures from disk and
 reproduces the canonical bytes, signature verification, back-link
-verification, and result-commitment verification for each case, then
-compares against ``expected.json``.
+verification, result-commitment verification and the outcome status set
+for each case, then compares against ``expected.json``.
 
 A second implementation that can run this file (or reproduce its logic)
 demonstrates that the receipt format is consumable without depending on
@@ -86,6 +86,15 @@ def verify_back_link(receipt: dict, attestation: dict) -> bool:
     return bl["attestationNonce"] == attestation["issuerAsserted"]["nonce"]
 
 
+#: The outcome statuses a consumer accepts (receipt -15, Table 4). Any other
+#: value is rejected. "unobserved" is read as neither "executed" nor "errored".
+VALID_STATUSES = {"executed", "refused", "errored", "unobserved"}
+
+
+def status_ok(receipt: dict) -> bool:
+    return receipt["outcomeDerived"].get("status") in VALID_STATUSES
+
+
 def verify_result_commitment(receipt: dict, runtime_result) -> bool:
     commitment = receipt["outcomeDerived"].get("resultCommitment")
     if commitment is None:
@@ -121,7 +130,11 @@ def main() -> int:
             runtime_result = json.loads(rr.read_text())
             got["result_commitment_ok"] = verify_result_commitment(
                 receipt, runtime_result)
-        ok = got == expected
+        if "status_ok" in expected:
+            got["status_ok"] = status_ok(receipt)
+            ok = got == expected
+        else:
+            ok = got == expected and status_ok(receipt)
         failures += 0 if ok else 1
         print(f"[{'OK' if ok else 'FAIL'}] {case.name}: {got}")
     print(f"\n{len(cases) - failures}/{len(cases)} cases matched expected.")

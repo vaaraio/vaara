@@ -76,8 +76,10 @@ def _reject_unknown_keys(d: dict[str, Any], allowed: frozenset[str], where: str)
             "the signed schema is closed"
         )
 
-ReceiptStatus = Literal["executed", "refused", "errored"]
-VALID_STATUSES: frozenset[str] = frozenset({"executed", "refused", "errored"})
+ReceiptStatus = Literal["executed", "refused", "errored", "unobserved"]
+VALID_STATUSES: frozenset[str] = frozenset(
+    {"executed", "refused", "errored", "unobserved"}
+)
 
 
 @dataclass(frozen=True)
@@ -202,11 +204,14 @@ TIME_SOURCES = frozenset({"ntp", "rtc", "unsynced", "tsa"})
 class OutcomeDerived:
     """Facts about what happened to the attested request.
 
-    ``status`` is one of ``executed`` / ``refused`` / ``errored``.
-    ``result_commitment`` is a commitment over the result payload and
-    is optional: a refused call has no result, so the commitment is
-    absent. An executed or errored call commits to the result or the
-    error object respectively.
+    ``status`` is one of ``executed`` / ``refused`` / ``errored`` /
+    ``unobserved``. ``unobserved`` means the request was sent and no outcome
+    was observed (a timeout, a cut connection, an unreadable reply), so the
+    issuer cannot say whether the action ran; a consumer reads it as neither
+    ``executed`` nor ``errored``. ``result_commitment`` is a commitment over
+    the result payload and is optional: a refused or unobserved call has no
+    result, so the commitment is absent. An executed or errored call commits
+    to the result or the error object respectively.
 
     ``decision_digest`` is the SEP-2828 Check B (outcome-to-decision)
     binding: ``sha256:<hex>`` over the full signed decision-record wire

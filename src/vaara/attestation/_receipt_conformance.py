@@ -34,7 +34,9 @@ from typing import Any, Callable, Optional
 # In lockstep with _sep2787_types.VALID_ALGS / _receipt_types.VALID_STATUSES.
 # Inlined rather than imported so conformance carries no parser dependency.
 VALID_ALGS: frozenset[str] = frozenset({"HS256", "ES256", "RS256"})
-VALID_STATUSES: frozenset[str] = frozenset({"executed", "refused", "errored"})
+VALID_STATUSES: frozenset[str] = frozenset(
+    {"executed", "refused", "errored", "unobserved"}
+)
 
 SCHEMA_NAME = "sep2828-execution-record"
 SCHEMA_VERSION = 1
@@ -265,3 +267,6 @@ def _check_result_commitment(
     if status == "refused":
         add("refused_has_no_result", False, ADVISORY,
             "a refused call SHOULD NOT carry a resultCommitment")
+    if status == "unobserved":
+        add("unobserved_has_no_result", False, ADVISORY,
+            "an unobserved call has no observed result to commit to")

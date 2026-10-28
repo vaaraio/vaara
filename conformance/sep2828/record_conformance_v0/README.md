@@ -43,7 +43,7 @@ Non-conforming (each isolates one required failure):
 - `neg_unsupported_alg`: `alg` outside HS256/ES256/RS256 (`alg_supported`).
 - `neg_digest_mismatch`: `projectionDigest` does not match the projection
   bytes (`result_commitment_self_consistent`) — the self-proving check.
-- `neg_bad_status`: `status` outside executed/refused/errored
+- `neg_bad_status`: `status` outside executed/refused/errored/unobserved
   (`status_valid`).
 - `neg_malformed_backlink_digest`: `attestationDigest` is not
   `sha256:<64 hex>` (`back_link_digest_format`).

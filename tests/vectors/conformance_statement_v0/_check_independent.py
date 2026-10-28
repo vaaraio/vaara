@@ -37,7 +37,7 @@ EMITTER = HERE / "emitter_records"
 PAGES = HERE / "pages"
 
 VALID_ALGS = {"HS256", "ES256", "RS256"}
-VALID_STATUSES = {"executed", "refused", "errored"}
+VALID_STATUSES = {"executed", "refused", "errored", "unobserved"}
 VALID_VERDICTS = {"allow", "block", "escalate"}
 DIGEST_RE = re.compile(r"^sha256:[0-9a-f]{64}$")
 HEX_RE = re.compile(r"^[0-9a-f]+$")

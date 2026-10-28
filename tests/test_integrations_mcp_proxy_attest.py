@@ -203,12 +203,14 @@ def test_upstream_error_maps_to_errored(monkeypatch, emitter, attest_receipts_di
     assert receipt["outcomeDerived"]["status"] == "errored"
 
 
-def test_upstream_raise_still_writes_paired_errored_receipt(
+def test_upstream_raise_still_writes_paired_receipt(
     monkeypatch, emitter, attest_receipts_dir
 ):
     # Transport failure: the upstream raises rather than returning an error
-    # response. The attestation is already written, so a paired errored
-    # receipt must still be emitted instead of leaving an orphan.
+    # response. The attestation is already written, so a paired receipt must
+    # still be emitted instead of leaving an orphan. A bare ProxyError may
+    # have reached the server with no reply read, so the receipt says
+    # unobserved, not errored.
     # _handle_tools_call re-raises; the proxy dispatch turns ProxyError into a
     # client error response one level up.
     from vaara.integrations._mcp_upstream import ProxyError
@@ -224,9 +226,9 @@ def test_upstream_raise_still_writes_paired_errored_receipt(
     receipt_files = sorted(attest_receipts_dir.glob("*-receipt.json"))
     assert len(attest_files) == 1
     assert len(receipt_files) == 1
-    # Pair shares the counter+nonce prefix, and the outcome is errored.
+    # Pair shares the counter+nonce prefix, and the outcome is unobserved.
     assert attest_files[0].name[:19] == receipt_files[0].name[:19]
-    assert _receipts(attest_receipts_dir)[0]["outcomeDerived"]["status"] == "errored"
+    assert _receipts(attest_receipts_dir)[0]["outcomeDerived"]["status"] == "unobserved"
 
 
 # ---------------------------------------------------------------------------

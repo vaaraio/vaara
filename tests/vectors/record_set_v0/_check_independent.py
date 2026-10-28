@@ -29,7 +29,7 @@ from pathlib import Path
 
 HERE = Path(__file__).resolve().parent
 VALID_ALGS = {"HS256", "ES256", "RS256"}
-VALID_STATUSES = {"executed", "refused", "errored"}
+VALID_STATUSES = {"executed", "refused", "errored", "unobserved"}
 VALID_VERDICTS = {"allow", "block", "escalate"}
 ACTING_VERDICTS = {"allow", "escalate"}
 DIGEST_RE = re.compile(r"^sha256:[0-9a-f]{64}$")

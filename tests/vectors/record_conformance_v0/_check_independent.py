@@ -28,7 +28,7 @@ from pathlib import Path
 
 HERE = Path(__file__).resolve().parent
 VALID_ALGS = {"HS256", "ES256", "RS256"}
-VALID_STATUSES = {"executed", "refused", "errored"}
+VALID_STATUSES = {"executed", "refused", "errored", "unobserved"}
 DIGEST_RE = re.compile(r"^sha256:[0-9a-f]{64}$")
 HEX_RE = re.compile(r"^[0-9a-f]+$")
 SIG_HEX_LEN = {"HS256": 64, "ES256": 128}
@@ -114,6 +114,8 @@ def _result_commitment(rc, status, req, advisory):
         req("result_commitment_shape", False)
     if status == "refused":
         advisory("refused_has_no_result", False)
+    if status == "unobserved":
+        advisory("unobserved_has_no_result", False)
 
 
 def main() -> int:

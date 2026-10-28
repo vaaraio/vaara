@@ -432,11 +432,15 @@ class AttestPairEmitter:
         upstream_name: str,
         tenant_id: str,
         task_id: Optional[str] = None,
+        outcome_state: Optional[str] = None,
     ) -> None:
         """Build, sign, and persist an execution receipt paired to the attestation.
 
-        ``outcome_severity == 0.0`` maps to ``executed``; anything above maps
-        to ``errored``. ``task_id`` is the MCP related-task id the call
+        ``outcome_state == "unobserved"`` (the request may have reached the
+        server and no reply was read) maps to ``unobserved``, with no result
+        commitment. Otherwise ``outcome_severity == 0.0`` maps to ``executed``
+        and anything above maps to ``errored``, which keeps ``not_sent`` and
+        ``failed`` as ``errored``. ``task_id`` is the MCP related-task id the call
         carried, if any; it is signed into the receipt so the receipt can
         later be shown to belong to that task. Failures are logged and
         swallowed.
@@ -446,8 +450,11 @@ class AttestPairEmitter:
             from vaara.attestation._receipt_types import OutcomeDerived
             from vaara.attestation._attest_canonical import now_iso8601
 
-            status: Literal["errored", "executed"] = (
-                "errored" if outcome_severity > 0.0 else "executed")
+            status: Literal["errored", "executed", "unobserved"]
+            if outcome_state == "unobserved":
+                status = "unobserved"
+            else:
+                status = "errored" if outcome_severity > 0.0 else "executed"
             back_link = make_back_link(attestation)
             outcome = OutcomeDerived(
                 status=status,

@@ -15,7 +15,7 @@ normative/<case>/
   attestation.json          the SEP-2787 attestation the receipt answers
   receipt.json              the signed execution receipt
   runtime_result.json       the result object (commitment cases only)
-  expected.json             {signature_ok, back_link_ok, result_commitment_ok}
+  expected.json             {signature_ok, back_link_ok, result_commitment_ok[, status_ok]}
 _check_independent.py        stdlib + cryptography + rfc8785, no Vaara import
 ```
 
@@ -25,6 +25,12 @@ _check_independent.py        stdlib + cryptography + rfc8785, no Vaara import
 - `es256_executed_projection`: ES256, executed, identity projection.
 - `rs256_refused_no_commitment`: RS256, refused, no result commitment
   (`result_commitment_ok` is `null`).
+- `hs256_unobserved_no_commitment`: HS256, unobserved (the request was
+  sent and no outcome was observed), no result commitment. A consumer
+  reads it as neither `executed` nor `errored`.
+- `neg_unknown_status`: signature and back-link valid, but the outcome
+  status is `unknown`, outside the four values, so the receipt is
+  rejected (`status_ok` is `false`).
 - `neg_result_mismatch`: signature and back-link valid, but the
   commitment does not bind the supplied runtime result.
 - `neg_broken_backlink`: signature valid, but the receipt pins a
@@ -45,8 +51,10 @@ python tests/vectors/execution_receipt_v0/_check_independent.py
 Exit code 0 means every case matched its expected verdict. The checker
 reproduces the canonical bytes (RFC 8785 JCS), signature verification
 across HS256 / ES256 / RS256, back-link verification (SHA-256 over the
-full attestation wire bytes plus nonce match), and result-commitment
-verification, all without importing Vaara.
+full attestation wire bytes plus nonce match), result-commitment
+verification, and the outcome status set (`executed`, `refused`,
+`errored`, `unobserved`; any other value fails), all without importing
+Vaara.
 
 HS256 and RS256 signatures are deterministic, so a second implementation
 re-signing reproduces the stored signature exactly. ES256 is randomised,

@@ -192,3 +192,34 @@ def test_emit_rejects_bad_digest_prefix():
     bl = dataclasses.replace(make_back_link(att), attestation_digest="deadbeef")
     with pytest.raises(Exception):
         _emit(att, back_link=bl)
+
+
+# -- unobserved (receipt -15, Table 4) -------------------------------------
+
+
+def test_unobserved_round_trips_with_no_result_commitment():
+    att = _attestation()
+    r = _emit(att, outcome_derived=_outcome(status="unobserved", commit_result=False))
+    d = r.to_dict()
+    assert d["outcomeDerived"]["status"] == "unobserved"
+    assert "resultCommitment" not in d["outcomeDerived"]
+    reparsed = parse_receipt(d)
+    assert reparsed == r
+    assert verify_receipt_signature(reparsed, verifying_material=HS_SECRET) is True
+
+
+def test_unobserved_is_inside_the_signature():
+    att = _attestation()
+    r = _emit(att, outcome_derived=_outcome(status="unobserved", commit_result=False))
+    forged = dataclasses.replace(
+        r, outcome_derived=_outcome(status="executed", commit_result=False))
+    assert verify_receipt_signature(forged, verifying_material=HS_SECRET) is False
+
+
+@pytest.mark.parametrize("status", ["unknown", "Unobserved", "not_sent", ""])
+def test_parse_rejects_any_status_outside_the_four(status):
+    att = _attestation()
+    d = _emit(att).to_dict()
+    d["outcomeDerived"]["status"] = status
+    with pytest.raises(Exception):
+        parse_receipt(d)

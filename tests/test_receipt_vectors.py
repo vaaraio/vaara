@@ -38,3 +38,19 @@ def test_independent_walker_passes_all_cases():
 def test_at_least_six_cases_present():
     cases = [p for p in (VECTORS / "normative").iterdir() if p.is_dir()]
     assert len(cases) >= 6
+
+
+def test_an_unobserved_case_is_present():
+    import json
+
+    statuses = {
+        json.loads((p / "receipt.json").read_text())["outcomeDerived"]["status"]
+        for p in (VECTORS / "normative").iterdir() if p.is_dir()
+    }
+    assert "unobserved" in statuses
+
+
+def test_the_walker_rejects_a_status_outside_the_four():
+    checker = _load_checker()
+    assert checker.status_ok({"outcomeDerived": {"status": "unobserved"}}) is True
+    assert checker.status_ok({"outcomeDerived": {"status": "unknown"}}) is False

@@ -7,7 +7,9 @@ three ways: the request never left the proxy, the request left and no reply
 was read, and the server answered with a failure. The execution receipt said
 ``errored`` for all three, and the trail wrote no outcome at all for any of
 them. The trail now closes the action with an outcome whose description names
-which of the three it was. The receipt keeps its closed status set.
+which of the three it was. The receipt says ``unobserved`` for the one case
+where the proxy cannot say whether the call ran (receipt -15, Table 4);
+``not_sent`` and ``failed`` stay ``errored``.
 """
 
 from __future__ import annotations
@@ -121,7 +123,7 @@ def test_a_clean_reply_records_the_outcome_as_before(monkeypatch):
     assert out.data["description"] == ""
 
 
-# -- the receipt keeps its closed status set -------------------------------
+# -- the receipt names an unobserved outcome --------------------------------
 
 pytest.importorskip("rfc8785")
 pytest.importorskip("cryptography")
@@ -147,20 +149,42 @@ def emitter(tmp_path: Path, receipts_dir: Path):
     )
 
 
-@pytest.mark.parametrize("raised", [
-    UpstreamNotSent("closed"),
-    ProxyError("reply timed out"),
-    UpstreamFailed("HTTP 500"),
-])
-def test_the_receipt_status_stays_within_the_closed_set(
-    monkeypatch, emitter, receipts_dir, raised,
-):
-    p, _ = _make_proxy(monkeypatch, attest_emitter=emitter)
-    p._upstream.request.side_effect = raised
-    with pytest.raises(ProxyError):
-        p._handle_tools_call(_CALL)
+def _only_receipt(receipts_dir: Path) -> dict:
     (receipt,) = [
         json.loads(f.read_text(encoding="utf-8"))
         for f in sorted(receipts_dir.glob("*-receipt.json"))
     ]
-    assert receipt["outcomeDerived"]["status"] == "errored"
+    return receipt
+
+
+@pytest.mark.parametrize("raised, status", [
+    (UpstreamNotSent("closed"), "errored"),
+    (ProxyError("reply timed out"), "unobserved"),
+    (RuntimeError("reader thread died"), "unobserved"),
+    (UpstreamFailed("HTTP 500"), "errored"),
+])
+def test_the_receipt_status_follows_what_the_proxy_saw(
+    monkeypatch, emitter, receipts_dir, raised, status,
+):
+    p, _ = _make_proxy(monkeypatch, attest_emitter=emitter)
+    p._upstream.request.side_effect = raised
+    with pytest.raises(type(raised)):
+        p._handle_tools_call(_CALL)
+    od = _only_receipt(receipts_dir)["outcomeDerived"]
+    assert od["status"] == status
+    assert "resultCommitment" not in od
+
+
+def test_a_clean_reply_still_reads_executed(monkeypatch, emitter, receipts_dir):
+    p, _ = _make_proxy(monkeypatch, attest_emitter=emitter)
+    p._handle_tools_call(_CALL)
+    assert _only_receipt(receipts_dir)["outcomeDerived"]["status"] == "executed"
+
+
+def test_an_error_reply_still_reads_errored(monkeypatch, emitter, receipts_dir):
+    p, _ = _make_proxy(monkeypatch, attest_emitter=emitter)
+    p._upstream.request.return_value = {
+        "jsonrpc": "2.0", "id": 1, "error": {"code": -32000, "message": "no"},
+    }
+    p._handle_tools_call(_CALL)
+    assert _only_receipt(receipts_dir)["outcomeDerived"]["status"] == "errored"

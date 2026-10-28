@@ -67,11 +67,12 @@ def _emit_attestation(key, *, alg: str = "ES256", exp_seconds: int = 300, iat=No
     )
 
 
-def _emit_receipt(key, attestation, *, alg="ES256", result_commitment=None):
+def _emit_receipt(key, attestation, *, alg="ES256", result_commitment=None,
+                  status="executed"):
     return emit_receipt(
         back_link=make_back_link(attestation),
         outcome_derived=OutcomeDerived(
-            status="executed",
+            status=status,
             completed_at="2026-05-30T00:00:00Z",
             result_commitment=result_commitment,
         ),
@@ -83,11 +84,11 @@ def _emit_receipt(key, attestation, *, alg="ES256", result_commitment=None):
     )
 
 
-def _es256_pair(tmp_path, **att_kwargs):
+def _es256_pair(tmp_path, *, status="executed", **att_kwargs):
     key = ec.generate_private_key(ec.SECP256R1())
     pub = _write_pubkey(tmp_path, key)
     att = _emit_attestation(key, **att_kwargs)
-    receipt = _emit_receipt(key, att)
+    receipt = _emit_receipt(key, att, status=status)
     att_path = tmp_path / "attest.json"
     receipt_path = tmp_path / "receipt.json"
     att_path.write_text(json.dumps(att.to_dict(), indent=2))
@@ -381,3 +382,30 @@ def test_keygen_default_still_ed25519_and_requires_dev(tmp_path, capsys):
     assert rc == 0
     key = serialization.load_pem_private_key(out.read_bytes(), password=None)
     assert isinstance(key, Ed25519PrivateKey)
+
+
+def test_receipt_verify_reads_unobserved_as_neither_executed_nor_errored(
+    tmp_path, capsys
+):
+    _, pub, _, att_path, receipt_path = _es256_pair(tmp_path, status="unobserved")
+    rc = main([
+        "receipt", "verify", str(receipt_path),
+        "--attestation", str(att_path), "--pubkey-file", str(pub),
+    ])
+    assert rc == 0
+    data = json.loads(capsys.readouterr().out)
+    assert data["status"] == "unobserved"
+    assert data["outcome_observed"] is False
+    note = data["outcome_note"]
+    assert "cannot say whether the action ran" in note
+    assert "neither executed nor errored" in note
+    assert data["result_commitment_valid"] is None
+
+
+def test_receipt_verify_marks_an_observed_outcome(tmp_path, capsys):
+    _, pub, _, att_path, receipt_path = _es256_pair(tmp_path)
+    main([
+        "receipt", "verify", str(receipt_path),
+        "--attestation", str(att_path), "--pubkey-file", str(pub),
+    ])
+    assert json.loads(capsys.readouterr().out)["outcome_observed"] is True

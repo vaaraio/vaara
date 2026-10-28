@@ -9,12 +9,18 @@ re-running regenerates keys and signatures. A second implementation
 reads the committed fixtures with ``_check_independent.py`` and must
 reproduce the same canonical bytes and verification verdicts.
 
-Usage: python scripts/generate_receipt_vectors.py
+Usage: python scripts/generate_receipt_vectors.py [--status-cases]
+
+``--status-cases`` writes only the HS256 outcome-status cases
+(``hs256_unobserved_no_commitment``, ``neg_unknown_status``) with the
+committed secret and leaves the keys and every other case as they are.
+HS256 is deterministic, so this reproduces those two cases exactly.
 """
 
 from __future__ import annotations
 
 import json
+import sys
 from pathlib import Path
 
 from cryptography.hazmat.primitives import serialization
@@ -103,12 +109,41 @@ def _case(name: str, *, attestation, receipt, expected: dict,
         _write(d / "runtime_result.json", runtime_result)
 
 
+def _status_cases(att, common: dict) -> None:
+    """HS256 cases on the outcome status set (receipt -15, Table 4)."""
+    # Positive: unobserved, the request was sent and no outcome was read.
+    # The issuer cannot say whether the action ran, so there is no result
+    # to commit to.
+    r = emit_receipt(
+        back_link=make_back_link(att),
+        outcome_derived=OutcomeDerived(status="unobserved", completed_at=IAT),
+        alg="HS256", signing_material=HS_SECRET, **common)
+    _case("hs256_unobserved_no_commitment", attestation=att, receipt=r,
+          expected={"signature_ok": True, "back_link_ok": True,
+                    "result_commitment_ok": None, "status_ok": True})
+
+    # Negative: a status outside the four, correctly signed. The signature
+    # and back-link hold; a consumer still rejects the receipt on the value.
+    r = emit_receipt(
+        back_link=make_back_link(att),
+        outcome_derived=OutcomeDerived(status="unknown",  # type: ignore[arg-type]
+                                       completed_at=IAT),
+        alg="HS256", signing_material=HS_SECRET, **common)
+    _case("neg_unknown_status", attestation=att, receipt=r,
+          expected={"signature_ok": True, "back_link_ok": True,
+                    "result_commitment_ok": None, "status_ok": False})
+
+
 def main() -> None:
-    asym = _emit_keys()
-    att = _attestation(HS_SECRET)
     common = dict(iss="issuer://test", sub="agent:archiver",
                   secret_version="v1", iat=IAT,
                   nonce="fixed-receipt-nonce-0001")
+    att = _attestation(HS_SECRET)
+    if "--status-cases" in sys.argv[1:]:
+        _status_cases(att, common)
+        print(f"wrote status cases under {OUT / 'normative'}")
+        return
+    asym = _emit_keys()
 
     # Positive: HS256, executed, hash-only result digest.
     r = emit_receipt(
@@ -189,6 +224,8 @@ def main() -> None:
     _write(d / "runtime_result.json", RESULT)
     _write(d / "expected.json", {"signature_ok": False, "back_link_ok": True,
                                  "result_commitment_ok": True})
+
+    _status_cases(att, common)
 
     print(f"wrote vectors under {OUT}")
 
