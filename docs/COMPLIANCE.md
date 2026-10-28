@@ -948,6 +948,16 @@ problem:
   says so on stderr and the bytes stay in the `-wal` file until the next
   checkpoint. The purge reaches the trail only. Decision receipt files
   and the review queue database are separate files it does not touch.
+  The review queue keeps its own copy of the call's parameters, context
+  and reason, and the reviewers' names and justification, so it has its
+  own command: `vaara review purge --db QUEUE.db --older-than-days N`
+  (or `ReviewQueue.purge_older_than(seconds)`) deletes resolved and
+  expired items whose case closed more than N days ago, with the same
+  `secure_delete` and WAL truncate. Pending and claimed items stay
+  whatever their age, because a decision is still owed on them; the
+  command counts them on stderr, and `vaara review expire` closes the
+  pending ones so a later purge can remove them. The resolution itself
+  stays in the trail as `ESCALATION_RESOLVED`.
 
   **The retention boundary.** `vaara trail rotate --db PATH --out
   ARCHIVE.zip --key KEY --retention-days N --all-tenants` is the

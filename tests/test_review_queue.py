@@ -379,3 +379,92 @@ def test_cli_expire_dry_run(tmp_path: Path, capsys) -> None:
     out = capsys.readouterr().out
     assert rc == 0
     assert "Would expire" in out
+
+
+# Retention: closed items leave the queue DB (GDPR Art. 5(1)(e), Art. 17).
+
+def test_purge_deletes_closed_items_past_the_cutoff_only() -> None:
+    q = ReviewQueue(":memory:")
+    old_resolved = _enqueue_one(q, action_id="r-old", now=100.0)
+    q.resolve(old_resolved, reviewer="alice", resolution=RESOLUTION_DENY,
+              now=200.0)
+    old_expired = _enqueue_one(q, action_id="e-old", now=100.0)
+    q.expire_stale(timeout_seconds=50, now=200.0)
+    new_resolved = _enqueue_one(q, action_id="r-new", now=100.0)
+    q.resolve(new_resolved, reviewer="alice", resolution=RESOLUTION_ALLOW,
+              now=900.0)
+    old_pending = _enqueue_one(q, action_id="p-old", now=150.0)
+    old_claimed = _enqueue_one(q, action_id="c-old", now=150.0)
+    q.claim(old_claimed, reviewer="bob", now=160.0)
+
+    n = q.purge_older_than(500, now=1000.0)
+
+    assert n == 2
+    for gone in (old_resolved, old_expired):
+        with pytest.raises(ItemNotFoundError):
+            q.get(gone)
+    assert q.get(new_resolved).status == STATUS_RESOLVED
+    assert q.get(old_pending).status == STATUS_PENDING
+    assert q.get(old_claimed).status == STATUS_CLAIMED
+    assert q.open_older_than(500, now=1000.0) == 2
+
+
+def test_purge_dry_run_counts_and_keeps_rows() -> None:
+    q = ReviewQueue(":memory:")
+    qid = _enqueue_one(q, now=100.0)
+    q.resolve(qid, reviewer="alice", resolution=RESOLUTION_DENY, now=200.0)
+    assert q.purge_older_than(500, now=1000.0, dry_run=True) == 1
+    assert q.get(qid).status == STATUS_RESOLVED
+    assert q.last_purge_scrubbed is None
+
+
+def test_purge_requires_positive_age() -> None:
+    q = ReviewQueue(":memory:")
+    with pytest.raises(ValueError):
+        q.purge_older_than(0)
+
+
+def test_purge_scrubs_the_bytes_from_db_and_wal(tmp_path: Path) -> None:
+    db = tmp_path / "queue.db"
+    marker = "patient-4711-zz"
+    q = ReviewQueue(db)
+    qid = _enqueue_one(q, now=100.0, parameters={"subject": marker})
+    q.resolve(qid, reviewer="alice", resolution=RESOLUTION_DENY,
+              justification=f"seen {marker}", now=200.0)
+    assert q.purge_older_than(500, now=1000.0) == 1
+    assert q.last_purge_scrubbed is True
+    q.close()
+    for path in (db, Path(str(db) + "-wal")):
+        if path.exists():
+            assert marker.encode() not in path.read_bytes(), path.name
+
+
+def test_cli_purge(tmp_path: Path, capsys) -> None:
+    from vaara.cli import main
+    db = tmp_path / "queue.db"
+    q = ReviewQueue(db)
+    closed = _enqueue_one(q, action_id="closed", now=1000.0)
+    q.resolve(closed, reviewer="alice", resolution=RESOLUTION_DENY,
+              now=1000.0)
+    _enqueue_one(q, action_id="open", now=1000.0)
+    q.close()
+
+    rc = main(["review", "purge", "--db", str(db),
+               "--older-than-days", "30", "--dry-run"])
+    out = capsys.readouterr()
+    assert rc == 0
+    assert "Would purge 1 closed item(s)" in out.out
+    assert "1 open item(s)" in out.err
+
+    rc = main(["review", "purge", "--db", str(db),
+               "--older-than-days", "30"])
+    out = capsys.readouterr()
+    assert rc == 0
+    assert "Purged 1 closed item(s)" in out.out
+    q = ReviewQueue(db)
+    assert q.counts()[STATUS_RESOLVED] == 0
+    assert q.counts()[STATUS_PENDING] == 1
+    q.close()
+
+    rc = main(["review", "purge", "--db", str(db), "--older-than-days", "0"])
+    assert rc == 2

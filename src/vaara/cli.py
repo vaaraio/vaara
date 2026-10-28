@@ -2005,6 +2005,40 @@ def _cmd_review_expire(args: argparse.Namespace) -> int:
     return 0
 
 
+def _cmd_review_purge(args: argparse.Namespace) -> int:
+    """Delete closed review items past retention. GDPR Art. 5(1)(e) and 17."""
+    if args.older_than_days <= 0:
+        print(f"--older-than-days must be > 0, got {args.older_than_days}",
+              file=sys.stderr)
+        return 2
+    db_path = Path(args.db).expanduser()
+    if not db_path.exists():
+        print(f"review queue DB not found: {db_path}", file=sys.stderr)
+        return 1
+    seconds = args.older_than_days * 86400
+    with _open_review_queue(args.db) as q:
+        n = q.purge_older_than(seconds, dry_run=args.dry_run)
+        scrubbed = q.last_purge_scrubbed
+        still_open = q.open_older_than(seconds)
+    if args.dry_run:
+        print(f"Would purge {n} closed item(s) older than "
+              f"{args.older_than_days} day(s).")
+        print("Run without --dry-run to apply.")
+    else:
+        print(f"Purged {n} closed item(s) older than "
+              f"{args.older_than_days} day(s).")
+        if scrubbed is False:
+            print("Note: the WAL could not be truncated (another process "
+                  "holds the queue open): the purged bytes stay in the -wal "
+                  "file until the next checkpoint", file=sys.stderr)
+    if still_open:
+        print(f"Note: {still_open} open item(s) older than the cutoff are "
+              "kept, a decision is still owed on them. 'vaara review expire' "
+              "closes pending ones; a later purge then removes them.",
+              file=sys.stderr)
+    return 0
+
+
 def _render_validation_report(report, *, source_label: str, as_json: bool) -> str:
     if as_json:
         return json.dumps(report.to_dict(), indent=2)
@@ -6933,6 +6967,23 @@ def build_parser() -> argparse.ArgumentParser:
         help="Report the count without modifying the DB",
     )
     re_.set_defaults(func=_cmd_review_expire)
+
+    rp_ = rsub.add_parser(
+        "purge",
+        help="Delete resolved and expired items past a retention age",
+    )
+    rp_.add_argument("--db", required=True, help="Path to the review queue DB")
+    rp_.add_argument(
+        "--older-than-days", required=True, type=int,
+        help="Closed items whose case closed more than this many days ago "
+             "are deleted, with secure_delete and a WAL truncate. Pending "
+             "and claimed items are kept.",
+    )
+    rp_.add_argument(
+        "--dry-run", action="store_true",
+        help="Report the count without modifying the DB",
+    )
+    rp_.set_defaults(func=_cmd_review_purge)
 
     pp_policy = sub.add_parser(
         "policy",
