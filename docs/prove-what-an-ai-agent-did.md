@@ -21,13 +21,13 @@ What they share is a trust model: the record must hold up on its own, because th
 
 **Signed.** A signature binds the record to a key, so origin is checkable against the public half. Without it, anyone with file access can rewrite history and nothing detects it.
 
-**Hash-chained.** Each entry carries a cryptographic hash of the previous entry. Editing, inserting, or deleting any record breaks every hash after it, so the whole tail fails verification. This is what turns "trust me, it's complete" into "check it yourself". A missing entry becomes a provable gap rather than a silent one.
+**Hash-chained.** Each entry carries a cryptographic hash of the previous entry. Editing or inserting a record, or deleting one that has records after it, breaks every hash after it, so everything after the change fails verification. This is what turns "trust me, it's complete" into "check it yourself" for everything inside the chain. A record cut off the end leaves a shorter chain that still verifies; the section below says what closes that.
 
 **Independently verifiable.** The other party must be able to re-derive every verdict from the bytes and a public key, offline, ideally with a checker that is not your software. If verification requires your code or your infrastructure, the trust problem has just moved, not gone away.
 
 ## What this does not prove
 
-A record like this settles four questions for a stranger: these bytes were signed by this key, they have not changed since, nothing was removed from the run, and with a timestamp anchor they existed before a given moment. All four are recomputable from the bytes with public libraries and none of the producer's software.
+A record like this settles four questions for a stranger: these bytes were signed by this key, they have not changed since, nothing inside the run was removed, and with a timestamp anchor they existed before a given moment. All four are recomputable from the bytes with public libraries and none of the producer's software.
 
 It settles a fifth question only partly. A hash chain makes a **deleted** entry provable, because the tail stops verifying. It says nothing about an action that was never written down in the first place, because the sequence is assigned by the issuer and the issuer is the party that benefits from the omission. Adding a sealing record closes the truncated-tail case. A suffix drop that also suppresses the seal is outside what any held set can detect.
 

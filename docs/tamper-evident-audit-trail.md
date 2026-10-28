@@ -8,7 +8,7 @@ For AI agents the trail records tool calls: what the agent proposed, what the po
 
 **Append-only entries.** Each agent action produces records at the decision point: action requested, risk scored, decision made, outcome recorded. Nothing is written retroactively.
 
-**Hash chain.** Every entry carries the SHA-256 hash of the previous entry. Verification recomputes each hash from the entry bytes and compares. Change one byte anywhere and every subsequent link fails, so an edit cannot be local or quiet. Deleting a record breaks the chain the same way, which turns "the log is complete" from an assertion into a checkable claim.
+**Hash chain.** Every entry carries the SHA-256 hash of the previous entry. Verification recomputes each hash from the entry bytes and compares. Change one byte anywhere and every subsequent link fails, so an edit cannot be local or quiet. Deleting a record from the middle breaks the chain the same way, so "nothing was dropped from inside the run" is a checkable claim. A record removed from the end breaks no hash: the shorter trail still verifies, and the cut shows only against a seal or an anchor that covers the removed part (see [prove-what-an-ai-agent-did.md](prove-what-an-ai-agent-did.md)).
 
 **Signed export.** The trail exports as a bundle whose manifest lists the content digests, signed with the producer's key. The signature binds origin; the digests bind content. Verification is offline: bundle plus public key, no network, no access to the producing system.
 

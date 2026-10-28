@@ -31,9 +31,11 @@ accept the rows.
 Everything else follows from living in the same trail. The record is
 hash-chained with its neighbours, so an access cannot be removed without
 breaking the chain; it is covered by ``anchor_head``, so the time is
-attested by a party outside the operator rather than asserted by the
-operator; and ``verify_segment`` proves one access record between two
-anchors without walking the trail.
+attested by the anchoring authority rather than asserted by the operator,
+and that is a party outside the operator only when the authority is not run
+by the operator (a self-hosted timestamp authority is the operator's own);
+and ``verify_segment`` proves one access record between two anchors without
+walking the trail.
 
 What it does not do, stated so nobody infers it: this proves the system
 recorded an access at that moment inside a tamper-evident chain. It does

@@ -12,7 +12,9 @@ Vaara governs every agent tool call and model call against the organisation's
 policy, and writes the decision and its outcome into a signed, hash-chained
 record that an outside party recomputes from the bytes and verifies offline,
 with none of the operator's software. The record can be anchored to up to five
-independent roots of trust, with zero-knowledge and post-quantum options. 52
+roots of trust, with zero-knowledge and post-quantum options. Two are outside
+witnesses (a qualified timestamp authority and a public transparency log); the
+others are the operator's own or the platform's (section 3). 52
 conformance suites each ship a checker that imports no Vaara code.
 
 License: AGPL-3.0-or-later.
@@ -50,7 +52,7 @@ License: AGPL-3.0-or-later.
 | Delegation attribution | `audit/delegation.py`, `credential/_grant_attenuation.py` | Reconstructs delegation chains and refuses any step that broadens authority, or that a parent naming its `delegatees` did not name; the graph reports such a hop as substituted and a hop under a parent that named nobody as unbound. |
 | Gap-evident completeness | `vaara verify-contiguity` | Signed sequence numbers and a running count make a dropped record a provable gap. Run sealing and a sealed class gate. |
 | Cross-organisation handoff | `vaara build-handoff`, `vaara verify-handoff`, `attestation/_handoff*.py` | A package of record, DID document, key history, revocations and anchor, with the producer identity pinned. EU AI Act Article 26(6). |
-| Access records | `audit/access.py` (`ACCESS_RECORDED`) | A read is an event: who read, on whose behalf, a digest of the returned set, and whether an outcome was recorded. |
+| Access records | `audit/access.py` (`ACCESS_RECORDED`) | A read is recorded when the deployer's code calls `record_access`; Vaara calls it itself only when the encrypted retention archive is opened with a trail. The record holds who read, on whose behalf, a digest of the returned set, and whether an outcome was recorded. |
 | Digest-only capture | `_capture.py`, `docs/capture-digest-only.md`, `capture_digest_only_v0` | An operator declares argument fields in `~/.vaara/capture.json`. The trail row, the review queue copy and the approval request then hold each declared value as a keyed digest and a reference, and the value is not stored, through the pipeline, the hook, the MCP proxy and the shell proxy. The key is not on the trail. Reason text, tool results and reviewer free text are not masked. Off unless the file exists. |
 | Audience and task binding | `attestation/_receipt_audience.py`, `attestation/_receipt_task.py` | `aud` and `taskId` inside the signed preimage. Verdicts `bound`, `conflict` or `unsupported`; a missing field never passes. |
 | Decision-before-effect ordering | `attestation/_decision_verifier.py` (`effect_ordering`) | Reports `ordered`, `effect_precedes_decision` or `not_comparable`. |
@@ -62,7 +64,11 @@ License: AGPL-3.0-or-later.
 
 ## 3. Witness roots
 
-The same record can be anchored to any or all of these.
+The same record can be anchored to any or all of these. A qualified timestamp
+authority and a public transparency log or SCITT service are run by someone
+else, so they witness the operator from outside. A self-hosted timestamp
+authority, or a log the operator runs itself, does not. TPM and confidential-VM
+attestation root in the platform's hardware and its vendor.
 
 | Root | Where | What it gives |
 |---|---|---|
