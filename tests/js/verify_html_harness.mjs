@@ -1,7 +1,11 @@
 // Runs verify() from webpage/verify.js (the script verify.html loads) under Node, on envelopes built here,
 // and prints one JSON line per case: {"case": name, "allOk": bool}.
 import { readFileSync } from "node:fs";
-import { generateKeyPairSync, sign } from "node:crypto";
+import { generateKeyPairSync, sign, webcrypto } from "node:crypto";
+
+// A browser always has WebCrypto as `crypto`; Node puts it there from 19 on, so Node 18
+// (Ubuntu 24.04 and Debian 13 ship it) gets it here.
+globalThis.crypto ??= webcrypto;
 
 const text = readFileSync(process.argv[2], "utf8");
 // a page carries the verifier inline; the site now ships it as its own file
