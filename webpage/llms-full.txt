@@ -7,7 +7,7 @@ URL: https://vaara.io/
 
 Software that acts on its own, inside your rules. And proof of every action that anyone can check.
 
-Vaara sits between software that acts by itself and the systems it can reach. Nothing happens outside your rules, and afterwards you can show exactly what happened.
+Vaara sits between software that acts by itself and the systems it can reach. Nothing that goes through Vaara happens outside your rules, and afterwards you can show exactly what happened.
 
 ### Things already happen with no person in the moment
 
@@ -30,6 +30,8 @@ Who asks later: a resident's family, an inspector, a customer, an auditor, a cou
 ### A receipt that outlasts the system that made it
 
 Years later, on a plane with the wifi off, without Vaara installed and without trusting you or us, anyone can check that a receipt is genuine, when it was made and that nobody has changed it since.
+
+A receipt proves the record: what was decided, under which rule, and that nobody has changed it. It does not prove the decision was right, and it covers only what went through Vaara.
 
 ### Where it runs
 

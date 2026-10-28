@@ -63,6 +63,9 @@ def test_a_plain_delete_would_leave_the_bytes(tmp_path: Path, monkeypatch):
     path = _build(tmp_path, monkeypatch)
     assert SECRET.encode() in _file_bytes(path)
     con = sqlite3.connect(path)
+    # Debian and Ubuntu build SQLite with secure_delete on by default; a plain DELETE elsewhere
+    # does not scrub, and that is what the purge cannot rely on
+    con.execute("PRAGMA secure_delete=0")
     con.execute("DELETE FROM audit_records WHERE timestamp < ?", (time.time() - DAY,))
     con.commit()
     con.close()

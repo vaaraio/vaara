@@ -10,7 +10,6 @@ every rotated trail. It now gives the same verdicts and prints the same lines.
 from __future__ import annotations
 
 import importlib.util
-import json
 import subprocess
 import sys
 import zipfile

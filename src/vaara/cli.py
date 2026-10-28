@@ -1195,8 +1195,8 @@ def _cmd_trail_verify(args: argparse.Namespace) -> int:
             )
         return 0
     print("Verification: FAILED", file=sys.stderr)
-    for e in result.errors:
-        print(f"  - {e}", file=sys.stderr)
+    for err in result.errors:
+        print(f"  - {err}", file=sys.stderr)
     return 1
 
 

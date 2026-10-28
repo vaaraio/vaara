@@ -189,7 +189,9 @@ def _judge(row: Any, decision_rec: Optional[Any], pinned: dict[str, Any]) -> str
     if not pinned:
         return "unpinned"
     reviewer = data.get("reviewer")
-    entry = pinned.get(reviewer) if isinstance(reviewer, str) else None
+    if not isinstance(reviewer, str):
+        return "unknown_reviewer"
+    entry = pinned.get(reviewer)
     if entry is None:
         return "unknown_reviewer"
     if decision_rec is None or block["decisionRecordHash"] != decision_rec.record_hash:

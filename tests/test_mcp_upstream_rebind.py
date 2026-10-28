@@ -18,7 +18,7 @@ import socket
 import pytest
 
 from vaara.integrations._egress_guard import EgressBlocked, pick_egress_ip
-from vaara.integrations._mcp_upstream import ProxyError, UpstreamNotSent
+from vaara.integrations._mcp_upstream import UpstreamNotSent
 from vaara.integrations._mcp_upstream_http import HttpUpstreamClient
 
 PUBLIC = "93.184.216.34"

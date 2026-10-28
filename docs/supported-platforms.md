@@ -1,6 +1,6 @@
 # Supported platforms
 
-Vaara 2.15.0, Helm chart 0.2.0.
+Vaara 2.16.0, Helm chart 0.2.0.
 
 Vaara is a Python package with three runtime dependencies (`cryptography`,
 `rfc8785` and `cbor2`, which sign and canonicalise receipts) and a container
@@ -13,12 +13,34 @@ on and, separately, what it has been run on.
 | --- | --- |
 | Python | 3.10, 3.11, 3.12, 3.13 |
 | Runtime dependencies | `cryptography`, `rfc8785`, `cbor2` |
-| Operating system | any platform CPython supports |
+| Operating system | any platform CPython supports, including Red Hat Enterprise Linux 9 (see below) |
 
 The proxy needs the `proxy` extra (fastapi, uvicorn, httpx). Signed
 attestation and receipt pairs use the same three packages the base install
 carries; `vaara[attestation]` still installs and names them. The container
 image ships the proxy extra as well.
+
+## Red Hat Enterprise Linux
+
+| | |
+| --- | --- |
+| Supported | Red Hat Enterprise Linux 9 (x86_64), Python 3.12 from Red Hat's packages |
+| Tested on every change | the full test suite runs in CI inside Red Hat's Universal Base Image 9 (`ubi9/python-312`), the `tests-rhel` job in [ci.yml](../.github/workflows/ci.yml) |
+| Tested on a RHEL 9 system | RHEL 9.8 with SELinux enforcing, installed from PyPI as a non-root user; full test suite passing |
+
+Install on RHEL 9: `sudo dnf install python3.12 python3.12-pip`, then
+`python3.12 -m venv .venv && .venv/bin/pip install vaara`.
+
+For containers, [packaging/ubi9/README.md](../packaging/ubi9/README.md) builds
+`vaara proxy` on UBI 9, runs it as a non-root user in group 0, and records a
+Red Hat preflight run that passed all 10 checks. That image is built from the
+Containerfile; the published `ghcr.io/vaaraio/vaara` image stays on SUSE BCI.
+
+Rerunning the test suite on RHEL 9 needs Node.js 20 or later for the browser
+verifier tests (the `nodejs:20` module stream). RHEL 9's default Node.js 16
+has no global `crypto`, so those tests fail there for reasons that have
+nothing to do with Vaara; without Node installed at all they skip.
+OpenShift is not listed: no run on an OpenShift cluster has been recorded.
 
 ## Container image
 
@@ -32,27 +54,6 @@ image ships the proxy extra as well.
 
 The base image is SUSE's own BCI, which needs no subscription to pull or
 redistribute.
-
-## Red Hat Enterprise Linux
-
-| Requirement | Supported |
-| --- | --- |
-| Red Hat Enterprise Linux | 9 |
-| Python | 3.12, the `python3.12` package from the RHEL 9 repositories |
-| Container base | Red Hat Universal Base Image 9 |
-| CI | the `tests-rhel` job runs the suite in `registry.access.redhat.com/ubi9/python-312` |
-
-Install from PyPI into a virtual environment made with `python3.12 -m venv`.
-For containers, [packaging/ubi9/README.md](../packaging/ubi9/README.md) builds
-`vaara proxy` on UBI 9, runs it as a non-root user in group 0, and records a
-Red Hat preflight run that passed all 10 checks. That image is built from the
-Containerfile; the published `ghcr.io/vaaraio/vaara` image stays on SUSE BCI.
-
-Rerunning the test suite on RHEL 9 needs Node.js 20 or later for the browser
-verifier tests (the `nodejs:20` module stream). RHEL 9's default Node.js 16
-has no global `crypto`, so those tests fail there for reasons that have
-nothing to do with Vaara; without Node installed at all they skip.
-OpenShift is not listed: no run on an OpenShift cluster has been recorded.
 
 ## Kubernetes
 

@@ -33,7 +33,11 @@ export VAARA_EXPECTED_VERSION="$WHEEL_VERSION"
 echo "[preflight] install wheel + [ml] extras in fresh venv..."
 python3 -m venv "$VDIR/test"
 "$VDIR/test/bin/pip" install --quiet --upgrade pip
-"$VDIR/test/bin/pip" install --quiet "${WHEEL}[ml]"
+# sentence-transformers pulls torch; the default Linux wheel brings several GB
+# of CUDA libraries that hit the runner's disk quota (27.10). The smoke test
+# scores on the CPU, so the CPU wheel goes in first, and pip keeps no cache.
+"$VDIR/test/bin/pip" install --quiet --no-cache-dir torch --index-url https://download.pytorch.org/whl/cpu
+"$VDIR/test/bin/pip" install --quiet --no-cache-dir "${WHEEL}[ml]"
 
 echo "[preflight] import + classifier load + smoke scoring..."
 "$VDIR/test/bin/python" - <<'PY'

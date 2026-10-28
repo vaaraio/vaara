@@ -337,6 +337,7 @@ def test_the_cli_runs_the_new_hooks(tmp_path, sub):
     assert proc.returncode == 0, proc.stderr
 
 
+@pytest.mark.skipif(sys.platform == "win32", reason="the plugin shim runs under a POSIX sh")
 @pytest.mark.parametrize("sub", sorted(NEW_EVENTS.values()))
 def test_the_shim_without_the_binary_says_nothing_and_passes(tmp_path, sub):
     # The bundled scripts cover the decision and the success outcome. These two
