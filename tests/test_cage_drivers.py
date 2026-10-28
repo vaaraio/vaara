@@ -284,6 +284,32 @@ class TestEngineDrivers:
         with pytest.raises(CageError, match="--image"):
             GVisorDriver(engine=engine).start(["agent"], tmp_path / "p.json", image="i")
 
+    def test_podman_only_host_uses_podman(self, fake, tmp_path, monkeypatch):
+        # RHEL and SLES ship podman and no docker: the default engine is the
+        # one on PATH, not a docker that is not there.
+        engine, _ = fake("podman", [])
+        monkeypatch.delenv("VAARA_CAGE_ENGINE", raising=False)
+        monkeypatch.setenv("PATH", str(tmp_path))
+        from vaara.cage.gvisor import GVisorDriver
+        from vaara.cage.kata import KataDriver
+        assert GVisorDriver()._engine.path() == engine
+        assert KataDriver()._engine.path() == engine
+
+    def test_docker_wins_when_both_are_there(self, fake, tmp_path, monkeypatch):
+        fake("podman", [])
+        docker, _ = fake("docker", [])
+        monkeypatch.delenv("VAARA_CAGE_ENGINE", raising=False)
+        monkeypatch.setenv("PATH", str(tmp_path))
+        from vaara.cage.gvisor import GVisorDriver
+        assert GVisorDriver()._engine.path() == docker
+
+    def test_neither_engine_names_both(self, tmp_path, monkeypatch):
+        monkeypatch.delenv("VAARA_CAGE_ENGINE", raising=False)
+        monkeypatch.setenv("PATH", str(tmp_path))
+        from vaara.cage.gvisor import GVisorDriver
+        with pytest.raises(CageError, match="docker: not found; install docker or podman"):
+            GVisorDriver()._engine.path()
+
 
 # ── microsandbox ───────────────────────────────────────────────────────
 

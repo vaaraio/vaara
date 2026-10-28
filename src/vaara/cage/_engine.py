@@ -21,6 +21,7 @@ from __future__ import annotations
 
 import os
 import re
+import shutil
 import time
 from pathlib import Path
 from typing import Any, Iterator, Optional
@@ -32,6 +33,14 @@ from vaara.cage.driver import CageError, CageLaunch
 _SINCE = re.compile(r"^(\d{4}-\d\d-\d\dT[^ ]+)\s(.*)$")
 
 
+def _default_engine() -> str:
+    """docker when it is on PATH, else podman when that is (RHEL and SLES ship
+    podman only), else docker, so the not-found message names the usual one."""
+    if shutil.which("docker"):
+        return "docker"
+    return "podman" if shutil.which("podman") else "docker"
+
+
 class ContainerEngineDriver:
     """Base for a runtime run through docker or podman."""
 
@@ -41,7 +50,7 @@ class ContainerEngineDriver:
 
     def __init__(self, engine: Optional[str] = None, runtime: Optional[str] = None,
                  timeout: float = 300.0) -> None:
-        self._engine = Tool("engine", engine or os.environ.get("VAARA_CAGE_ENGINE") or "docker",
+        self._engine = Tool("engine", engine or os.environ.get("VAARA_CAGE_ENGINE") or _default_engine(),
                             "VAARA_CAGE_ENGINE", "install docker or podman", timeout)
         if runtime:
             self.runtime = runtime

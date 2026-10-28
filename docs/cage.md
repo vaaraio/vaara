@@ -97,8 +97,9 @@ repository.
 | `apple-container` | Apple's `container`: each Linux container in its own lightweight VM on a Mac with Apple silicon (Apache-2.0) | `container run -d --name N -e ... IMAGE agent` | none; `--image`, `--read-only`, `--cap-drop` | a hypervisor | `container inspect N`: the container's state |
 
 Each driver depends on the release of the cage the operator installed and
-shells out to it, or speaks its published API. `docker` is the default
-engine for the runtime-backed cages; `VAARA_CAGE_ENGINE=podman` switches.
+shells out to it, or speaks its published API. The runtime-backed cages
+run through `docker` when it is on `PATH`, else `podman` (RHEL and SLES ship
+podman only); `VAARA_CAGE_ENGINE` picks one explicitly.
 Every tool's path can be set with its own variable (`OPENSHELL_BIN`,
 `CODEX_BIN`, `SRT_BIN`, `NONO_BIN`, `RUNSC_BIN`, `KATA_RUNTIME_BIN`,
 `KUBECTL_BIN`, `FIRECRACKER_BIN`, `MSB_BIN`, `APPLE_CONTAINER_BIN`); E2B takes `E2B_API_URL`,
