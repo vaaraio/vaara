@@ -11,18 +11,31 @@ The runtime name differs by install (``io.containerd.kata.v2``, ``kata``,
 
 Inside, the deciding process confirms the cage by the hypervisor the CPU
 reports underneath it: a VM-backed container shows one, a bare container
-does not. ``kata-runtime --version`` gives the upstream label.
+does not. ``kata-runtime --version`` gives the upstream label; Kata 4 ships
+no ``kata-runtime``, so where it is not on ``PATH`` the shim's own
+``containerd-shim-kata-v2 --version`` (``..., version: 4.3.1, ...``) does.
 """
 
 from __future__ import annotations
 
 import os
+import re
+import shutil
 from typing import Optional
 
 from vaara.cage._cli import Tool
 from vaara.cage._engine import ContainerEngineDriver
 
 NAME = "kata"
+_SHIM = "containerd-shim-kata-v2"
+_VERSION = re.compile(r"\bversion:\s*([0-9][^,\s]*)")
+
+
+def _default_tool() -> str:
+    """kata-runtime when it is on PATH (Kata 3), else the shim (Kata 4)."""
+    if shutil.which("kata-runtime") or not shutil.which(_SHIM):
+        return "kata-runtime"
+    return _SHIM
 
 
 class KataDriver(ContainerEngineDriver):
@@ -32,7 +45,8 @@ class KataDriver(ContainerEngineDriver):
     def __init__(self, engine: Optional[str] = None, runtime: Optional[str] = None,
                  kata_runtime: Optional[str] = None, timeout: float = 300.0) -> None:
         super().__init__(engine, runtime or os.environ.get("VAARA_CAGE_KATA_RUNTIME"), timeout)
-        self._kata = Tool("kata-runtime", kata_runtime or os.environ.get("KATA_RUNTIME_BIN"),
+        self._kata = Tool("kata-runtime",
+                          kata_runtime or os.environ.get("KATA_RUNTIME_BIN") or _default_tool(),
                           "KATA_RUNTIME_BIN",
                           "install Kata Containers (katacontainers.io)", 30.0)
 
@@ -45,4 +59,8 @@ class KataDriver(ContainerEngineDriver):
             # "kata-runtime  : 3.x.y"
             if line.startswith("kata-runtime") and ":" in line:
                 return "kata " + line.split(":", 1)[1].strip()
+            # the shim: "Kata Containers containerd shim (Rust): id: ..., version: 4.3.1, ..."
+            m = _VERSION.search(line)
+            if m:
+                return "kata " + m.group(1)
         return "kata"

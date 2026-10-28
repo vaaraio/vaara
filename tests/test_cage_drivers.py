@@ -295,6 +295,32 @@ class TestEngineDrivers:
         assert c["argv"][c["argv"].index("--security-opt") + 1] == "no-new-privileges"
         assert launch.state.upstream == "kata 3.12.0" and launch.state.confirmed
 
+    def test_kata4_shim_gives_the_version(self, tmp_path, monkeypatch):
+        # Kata 4 ships no kata-runtime; the Rust shim answers --version with
+        # this line (Kata 4.3.1, read 28.10 on Ubuntu 24.04).
+        shim = tmp_path / "containerd-shim-kata-v2"
+        shim.write_text("#!/bin/sh\necho 'Kata Containers containerd shim (Rust): id: "
+                        "io.containerd.kata.v2, version: 4.3.1, commit: 03cf2ec06a5d'\n")
+        shim.chmod(shim.stat().st_mode | stat.S_IXUSR)
+        monkeypatch.delenv("KATA_RUNTIME_BIN", raising=False)
+        monkeypatch.setenv("PATH", str(tmp_path))
+        from vaara.cage.kata import KataDriver
+        assert KataDriver(engine="docker").upstream_version() == "kata 4.3.1"
+        from vaara.cage import readiness
+        assert not any("kata" in m for m in readiness._missing("kata", KataDriver(engine=str(shim))))
+
+    def test_kata_runtime_still_wins_when_present(self, tmp_path, monkeypatch):
+        for name, line in (("kata-runtime", "kata-runtime  : 3.12.0"),
+                           ("containerd-shim-kata-v2", "shim (Golang): id: x, version: 3.12.0, commit: y")):
+            t = tmp_path / name
+            t.write_text(f"#!/bin/sh\necho '{line}'\n")
+            t.chmod(t.stat().st_mode | stat.S_IXUSR)
+        monkeypatch.delenv("KATA_RUNTIME_BIN", raising=False)
+        monkeypatch.setenv("PATH", str(tmp_path))
+        from vaara.cage.kata import KataDriver
+        d = KataDriver(engine="docker")
+        assert d._kata.binary == "kata-runtime" and d.upstream_version() == "kata 3.12.0"
+
     def test_policy_file_is_refused(self, fake, tmp_path):
         engine, _ = fake("docker", [])
         from vaara.cage.gvisor import GVisorDriver
