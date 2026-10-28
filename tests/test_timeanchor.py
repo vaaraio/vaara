@@ -23,7 +23,7 @@ from asn1crypto import x509 as asn1_x509  # noqa: E402
 from cryptography import x509  # noqa: E402
 from cryptography.hazmat.primitives import hashes, serialization  # noqa: E402
 from cryptography.hazmat.primitives.asymmetric import ec  # noqa: E402
-from cryptography.x509.oid import NameOID  # noqa: E402
+from cryptography.x509.oid import ExtendedKeyUsageOID, NameOID  # noqa: E402
 
 from vaara.audit.timeanchor import (  # noqa: E402
     RFC3161TimeAnchorClient,
@@ -49,6 +49,9 @@ def _make_tsa():
         .serial_number(x509.random_serial_number())
         .not_valid_before(datetime.datetime(2020, 1, 1))
         .not_valid_after(datetime.datetime(2035, 1, 1))
+        .add_extension(
+            x509.ExtendedKeyUsage([ExtendedKeyUsageOID.TIME_STAMPING]), critical=True
+        )
         .sign(key, hashes.SHA256())
     )
     return key, cert.public_bytes(serialization.Encoding.DER)
@@ -292,6 +295,92 @@ def test_verify_anchor_over_records_passes_both_pins_through():
         verify_anchor_over_records(anchor, hashes_, trusted_signer_cert=other_cert)
     with pytest.raises(TimeAnchorError, match="pinned trusted CA"):
         verify_anchor_over_records(anchor, hashes_, trusted_issuer_cert=other_cert)
+
+
+_NO_EKU = object()
+
+
+def _ca_and_tsa(eku=(ExtendedKeyUsageOID.TIME_STAMPING,), critical=True):
+    """Return (tsa_key, tsa_cert_der, ca_cert_der); the CA issues the TSA cert.
+
+    ``eku`` is the TSA certificate's key purposes, or ``_NO_EKU`` for none.
+    """
+    ca_key = ec.generate_private_key(ec.SECP256R1())
+    ca_name = x509.Name([x509.NameAttribute(NameOID.COMMON_NAME, "Vaara Test CA")])
+    ca_cert = (
+        x509.CertificateBuilder()
+        .subject_name(ca_name)
+        .issuer_name(ca_name)
+        .public_key(ca_key.public_key())
+        .serial_number(x509.random_serial_number())
+        .not_valid_before(datetime.datetime(2020, 1, 1))
+        .not_valid_after(datetime.datetime(2035, 1, 1))
+        .add_extension(x509.BasicConstraints(ca=True, path_length=None), critical=True)
+        .sign(ca_key, hashes.SHA256())
+    )
+    key = ec.generate_private_key(ec.SECP256R1())
+    builder = (
+        x509.CertificateBuilder()
+        .subject_name(x509.Name([x509.NameAttribute(NameOID.COMMON_NAME, "Test TSA")]))
+        .issuer_name(ca_name)
+        .public_key(key.public_key())
+        .serial_number(x509.random_serial_number())
+        .not_valid_before(datetime.datetime(2020, 1, 1))
+        .not_valid_after(datetime.datetime(2035, 1, 1))
+    )
+    if eku is not _NO_EKU:
+        builder = builder.add_extension(x509.ExtendedKeyUsage(list(eku)), critical=critical)
+    cert = builder.sign(ca_key, hashes.SHA256())
+    return (
+        key,
+        cert.public_bytes(serialization.Encoding.DER),
+        ca_cert.public_bytes(serialization.Encoding.DER),
+    )
+
+
+def test_issuer_pin_accepts_a_signer_with_the_timestamping_purpose():
+    key, cert, ca = _ca_and_tsa()
+    digest = bytes.fromhex(_head_hash())
+    token = _issue_token(digest, key, cert)
+    assert verify_timestamp_token(token, digest, trusted_issuer_cert=ca) == _GEN_TIME
+
+
+@pytest.mark.parametrize(
+    "eku,critical",
+    [
+        (_NO_EKU, True),
+        ((ExtendedKeyUsageOID.CODE_SIGNING,), True),
+        ((ExtendedKeyUsageOID.TIME_STAMPING,), False),
+        ((ExtendedKeyUsageOID.TIME_STAMPING, ExtendedKeyUsageOID.CODE_SIGNING), True),
+    ],
+    ids=["no-eku", "code-signing-only", "not-critical", "extra-purpose"],
+)
+def test_issuer_pin_refuses_a_signer_that_is_not_a_tsa_certificate(eku, critical):
+    # RFC 3161 2.3: the TSA certificate carries one critical extended key
+    # usage, id-kp-timeStamping alone. A pinned CA can issue other certificates
+    # too; none of them may mint a trusted time.
+    key, cert, ca = _ca_and_tsa(eku, critical)
+    digest = bytes.fromhex(_head_hash())
+    token = _issue_token(digest, key, cert)
+    with pytest.raises(TimeAnchorError, match="id-kp-timeStamping"):
+        verify_timestamp_token(token, digest, trusted_issuer_cert=ca)
+
+
+def test_signer_pin_refuses_a_certificate_without_the_timestamping_purpose():
+    key, cert, _ = _ca_and_tsa(_NO_EKU)
+    digest = bytes.fromhex(_head_hash())
+    token = _issue_token(digest, key, cert)
+    with pytest.raises(TimeAnchorError, match="id-kp-timeStamping"):
+        verify_timestamp_token(token, digest, trusted_signer_cert=cert)
+
+
+def test_unpinned_verify_does_not_grade_the_signer_purpose():
+    # Without a pin the time is self-asserted either way; the purpose check
+    # belongs to the trust grade, so an unpinned token verifies as before.
+    key, cert, _ = _ca_and_tsa(_NO_EKU)
+    digest = bytes.fromhex(_head_hash())
+    token = _issue_token(digest, key, cert)
+    assert verify_timestamp_token(token, digest) == _GEN_TIME
 
 
 # Live network test: anchors a real chain head against a real public RFC 3161

@@ -297,6 +297,28 @@ def _cert_der(cert_bytes: bytes) -> bytes:
     return cert.public_bytes(serialization.Encoding.DER)
 
 
+def _require_timestamping_purpose(signer_cert: Any) -> None:
+    """Refuse a signer certificate that is not an RFC 3161 TSA certificate."""
+    from cryptography import x509
+    from cryptography.x509.oid import ExtendedKeyUsageOID
+
+    try:
+        ext = signer_cert.extensions.get_extension_for_class(x509.ExtendedKeyUsage)
+    except x509.ExtensionNotFound:
+        raise TimeAnchorError(
+            "token signer certificate has no extended key usage; RFC 3161 "
+            "requires id-kp-timeStamping, so the timestamp is not trusted"
+        ) from None
+    purposes = list(ext.value)
+    if purposes != [ExtendedKeyUsageOID.TIME_STAMPING] or not ext.critical:
+        raise TimeAnchorError(
+            "token signer certificate is not a TSA certificate: RFC 3161 requires "
+            "one critical extended key usage holding id-kp-timeStamping only "
+            f"(found {[p.dotted_string for p in purposes]}, "
+            f"critical={ext.critical}); the timestamp is not trusted"
+        )
+
+
 def verify_timestamp_token(
     token_der: bytes,
     expected_digest: bytes,
@@ -325,6 +347,11 @@ def verify_timestamp_token(
     by that exact CA certificate. TSA signer certificates rotate while the
     issuing CA is the stable entry on a trusted list, so this is the pin that
     survives rotation. Both pins may be given; each is enforced.
+
+    With either pin the signer certificate must also be a TSA certificate as
+    RFC 3161 section 2.3 defines it: one critical extended key usage holding
+    id-kp-timeStamping and nothing else. A pinned CA may issue certificates for
+    other purposes, and none of those may mint a trusted time.
     """
     _require_deps()
     try:
@@ -400,6 +427,8 @@ def verify_timestamp_token(
                 "token signer certificate was not issued by the pinned trusted "
                 f"CA; the timestamp is not independently trusted ({exc})"
             ) from exc
+    if trusted_signer_cert is not None or trusted_issuer_cert is not None:
+        _require_timestamping_purpose(signer_cert)
 
     gen_time = tst_info["gen_time"].native
     if gen_time.tzinfo is None:
