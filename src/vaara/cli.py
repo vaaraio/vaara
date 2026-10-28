@@ -2967,6 +2967,7 @@ def _cmd_receipt_verify(args: argparse.Namespace) -> int:
         "back_link_valid": back_link.ok,
         "status": receipt.outcome_derived.status,
         "completed_at": receipt.outcome_derived.completed_at,
+        "outcome_note": "status and completed_at as asserted by the issuer",
     }
 
     commitment = receipt.outcome_derived.result_commitment
@@ -3992,8 +3993,10 @@ def _cmd_verify_contiguity(args: argparse.Namespace) -> int:
     """Check authorization receipts for completeness gaps under one boundary.
 
     Reads the ``evidence`` half of each ``*-authz.json`` file and checks that the
-    per-boundary sequence is contiguous. Exit 0 when complete, 1 when a gap is
-    found, 2 on a usage or input error.
+    per-boundary sequence is contiguous. Exit 0 when the held set is consistent,
+    1 when a gap is found, 2 on a usage or input error. Consistent is not
+    complete: a tail removed before the set was held shows only through a held
+    seal, and this command checks no external anchor.
     """
     from vaara.credential import evidence_binding_ok, verify_contiguity
 
@@ -4090,6 +4093,9 @@ def _cmd_verify_contiguity(args: argparse.Namespace) -> int:
                     "duplicateSeqs": report.duplicate_seqs,
                     "countMismatches": report.count_mismatches,
                     "dropped": dropped,
+                    "sealed": report.sealed,
+                    # This command takes no anchor, so none is ever checked.
+                    "anchorChecked": False,
                     "ok": ok,
                 },
                 indent=2,

@@ -69,9 +69,12 @@ class ContiguityReport:
     """The result of checking one coverage boundary for gaps.
 
     ``ok`` is true only when the held records form a contiguous ``0..expected-1``
-    run with consistent running counts and no duplicates. ``missing_seqs`` names
-    the gaps; ``expected`` is the count the latest receipt asserts exists, so a
-    short set reports the tail it is missing.
+    run with consistent running counts and no duplicates. It says the held set
+    agrees with itself, not that the run is whole: a tail removed before the set
+    was held leaves nothing to see unless a seal was held (``sealed``) or an
+    external anchor was checked, and this check reads no anchor. ``missing_seqs``
+    names the gaps; ``expected`` is the count the latest receipt asserts exists,
+    so a short set reports the tail it is missing.
 
     ``worst_case_class`` is the ``maxClass`` a sealing record carried, when one
     did: the highest action class the boundary authorized. A dropped record took
@@ -88,15 +91,18 @@ class ContiguityReport:
     count_mismatches: list[dict[str, int]]
     ok: bool
     worst_case_class: Optional[str] = None
+    sealed: bool = False
 
     def gap_report(self) -> str:
         """A short human-readable verdict naming any gaps."""
         if self.ok:
             if self.expected == 0:
                 return f"boundary {self.boundary_id!r}: no completeness asserted"
+            seal = "seal held" if self.sealed else "no seal held"
             return (
-                f"boundary {self.boundary_id!r}: complete, {self.present} receipt(s), "
-                f"seq 0..{self.expected - 1} contiguous"
+                f"boundary {self.boundary_id!r}: consistent, {self.present} receipt(s), "
+                f"seq 0..{self.expected - 1} contiguous, "
+                f"highest count held {self.expected}, {seal}, no anchor checked"
             )
         lines = [f"boundary {self.boundary_id!r}: INCOMPLETE"]
         lines.append(
@@ -210,8 +216,9 @@ def verify_contiguity(
 
     A receipt is missing when its ``seq`` does not appear and the latest
     ``runningCount`` says it should. ``runningCount`` must equal ``seq + 1`` for
-    every held record, or the count itself is inconsistent. The report is
-    self-contained evidence of completeness or of the specific receipts absent.
+    every held record, or the count itself is inconsistent. A failing report
+    names the specific receipts absent. A passing one says the held set is
+    consistent with itself; it does not say nothing was cut off the end.
 
     An optional sealing block (``{"sealed": True, "total": N}``) finalizes a run
     and lets a dropped tail be caught; without it, dropping the last record(s)
@@ -231,6 +238,7 @@ def verify_contiguity(
     # also suppresses the seal stays outside held-set-alone detection; an
     # external anchor (e.g. an rfc3161 timestamp over the run) closes that.
     seq_blocks = [b for b in blocks if not b.get("sealed")]
+    sealed = any(b.get("sealed") for b in blocks)
     sealed_total = max(
         (int(b["total"]) for b in blocks if b.get("sealed")), default=0
     )
@@ -259,6 +267,7 @@ def verify_contiguity(
             count_mismatches=[],
             ok=(sealed_total == 0),
             worst_case_class=worst_case_class,
+            sealed=sealed,
         )
 
     seqs = [int(b["seq"]) for b in seq_blocks]
@@ -295,6 +304,7 @@ def verify_contiguity(
         count_mismatches=count_mismatches,
         ok=ok,
         worst_case_class=worst_case_class,
+        sealed=sealed,
     )
 
 

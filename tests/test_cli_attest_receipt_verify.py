@@ -221,6 +221,21 @@ def test_receipt_verify_accepts_valid_pair(tmp_path, capsys):
     assert '"result_commitment_valid": null' in out
 
 
+def test_receipt_verify_labels_status_and_time_as_the_issuers_account(
+    tmp_path, capsys
+):
+    _, pub, _, att_path, receipt_path = _es256_pair(tmp_path)
+    rc = main([
+        "receipt", "verify", str(receipt_path),
+        "--attestation", str(att_path), "--pubkey-file", str(pub),
+    ])
+    assert rc == 0
+    data = json.loads(capsys.readouterr().out)
+    assert data["status"] == "executed"
+    assert data["completed_at"] == "2026-05-30T00:00:00Z"
+    assert "as asserted by the issuer" in data["outcome_note"]
+
+
 def test_receipt_verify_detects_broken_backlink(tmp_path, capsys):
     key, pub, att, att_path, receipt_path = _es256_pair(tmp_path)
     # A receipt that signs cleanly but is checked against a different

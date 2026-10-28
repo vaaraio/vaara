@@ -82,3 +82,49 @@ def test_multiple_boundaries_need_explicit_boundary(tmp_path, capsys):
     rc = main(["verify-contiguity", str(tmp_path), "--boundary", "boundary-b"])
     assert rc == 0
     assert "contiguous" in capsys.readouterr().out
+
+
+def _seal_file(d: Path, total: int, boundary: str = BOUNDARY) -> Path:
+    payload = {
+        "record": {},
+        "evidence": {
+            "schema": "vaara.authorization/v0",
+            "completeness": {
+                "boundaryId": boundary,
+                "sealed": True,
+                "total": total,
+            },
+        },
+    }
+    path = d / f"{boundary}-seal-aaaa-authz.json"
+    path.write_text(json.dumps(payload), encoding="utf-8")
+    return path
+
+
+def test_a_cut_tail_is_consistent_not_complete(tmp_path, capsys):
+    _stream(tmp_path, 5)
+    _authz(tmp_path, 3, 4).unlink()
+    _authz(tmp_path, 4, 5).unlink()  # the last two receipts are gone
+    rc = main(["verify-contiguity", str(tmp_path)])
+    assert rc == 0  # exit code unchanged: nothing held contradicts itself
+    out = capsys.readouterr().out
+    assert "consistent" in out
+    assert "no seal held" in out
+    assert "no anchor checked" in out
+    assert "complete," not in out
+
+
+def test_json_says_whether_a_seal_was_held_and_that_no_anchor_was_checked(
+    tmp_path, capsys
+):
+    _stream(tmp_path, 3)
+    assert main(["verify-contiguity", str(tmp_path), "--json"]) == 0
+    unsealed = json.loads(capsys.readouterr().out)
+    assert unsealed["sealed"] is False
+    assert unsealed["anchorChecked"] is False
+
+    _seal_file(tmp_path, 3)
+    assert main(["verify-contiguity", str(tmp_path), "--json"]) == 0
+    sealed = json.loads(capsys.readouterr().out)
+    assert sealed["sealed"] is True
+    assert sealed["anchorChecked"] is False

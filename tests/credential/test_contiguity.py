@@ -218,3 +218,39 @@ def test_gate_fails_closed_on_a_complete_run_with_no_sealed_class():
     decision = enforce_on_sealed_class(stream, PERMITTED)
     assert not decision.permit
     assert decision.reason == "unbounded_no_sealed_class"
+
+
+# --- what an ok verdict does and does not say -------------------------------
+
+
+def test_a_cut_tail_reads_consistent_never_complete():
+    # Five receipts issued, the last two removed. The held prefix 0..2 is
+    # contiguous and its running counts agree, so ok stays true, but nothing in
+    # the held set can say the run was longer: the line must not say "complete".
+    report = verify_contiguity(_stream(3))
+    text = report.gap_report()
+    assert report.ok
+    assert not report.sealed
+    assert "complete" not in text.replace("completeness", "")
+    assert "consistent" in text
+    assert "seq 0..2 contiguous" in text
+    assert "highest count held 3" in text
+    assert "no seal held" in text
+    assert "no anchor checked" in text
+
+
+def test_a_held_seal_is_named_in_an_ok_line():
+    report = verify_contiguity(_stream(3) + [_seal(3)])
+    text = report.gap_report()
+    assert report.ok
+    assert report.sealed
+    assert "no seal held" not in text
+    assert "seal held" in text
+    assert "no anchor checked" in text
+
+
+def test_a_seal_over_a_cut_tail_is_still_incomplete():
+    report = verify_contiguity(_stream(3) + [_seal(5)])
+    assert not report.ok
+    assert report.sealed
+    assert report.gap_report().startswith(f"boundary {BOUNDARY!r}: INCOMPLETE")

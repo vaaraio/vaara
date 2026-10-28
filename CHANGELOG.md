@@ -6,6 +6,10 @@ and this project follows [Semantic Versioning](https://semver.org/spec/v2.0.0.ht
 
 ## [Unreleased]
 
+### Fixed
+- `vaara verify-contiguity` no longer prints "complete" for a held set with nothing missing. It prints `consistent, N receipt(s), seq 0..N-1 contiguous, highest count held N, no seal held, no anchor checked` (or `seal held`), because a tail removed before the set was held leaves a contiguous prefix that no held record contradicts. The `--json` verdict gains `sealed` and `anchorChecked` (always false: the command takes no anchor). The exit codes and the INCOMPLETE report are unchanged. `ContiguityReport` gains `sealed`.
+- `vaara receipt verify` adds `outcome_note` to its JSON: `status` and `completed_at` are as asserted by the issuer.
+
 ## [2.16.0] - 2026-10-27
 
 ### Added
