@@ -137,7 +137,7 @@ whatever the action was.
 | **CC6.3** | Access authorised, modified or removed by role, least privilege | `DECISION_MADE`, `ESCALATION_RESOLVED` and `POLICY_OVERRIDE` records: access granted per action against the declared policy, with the approver named when a human disposed. |
 | **CC7.2** | Monitoring for anomalies, analysed for security events | `ACTION_REQUESTED` and `RISK_SCORED` records: every action recorded before it runs and scored before the decision. |
 | **CC7.3** | Security events evaluated, action taken | `ACTION_BLOCKED`, `ESCALATION_SENT`, `ESCALATION_RESOLVED` and `OUTCOME_RECORDED` records: the refusal, the hand-off to a human, the determination, the outcome. |
-| **CC8.1** | Changes authorised, tested, approved and implemented | `POLICY_OVERRIDE` and `KEY_LIFECYCLE` records: a change to a decision or to the key set names who made it and why. |
+| **CC8.1** | Changes authorised, tested, approved and implemented | `POLICY_OVERRIDE` and `KEY_LIFECYCLE` records: a change to a decision or to the key set names who made it and why. A policy change is not on the trail: a reload (`PolicyController.reload`, `POST /v1/policy/reload`, a per-tenant swap in `PolicyRegistry`) writes no record today, so policy changes are evidenced by the deployer's own change control, not by Vaara. |
 
 Which built-in actions carry the SOC 2 tag: `data.read`, `data.write`,
 `data.delete`, `data.export`, `infra.deploy`, `infra.config_change`,
