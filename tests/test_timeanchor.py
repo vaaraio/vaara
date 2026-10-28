@@ -256,6 +256,44 @@ def test_verify_anchor_over_records_rejects_rewritten_chain():
         verify_anchor_over_records(anchor, rewritten)
 
 
+def _packaged_anchor(key, cert):
+    import base64
+    head = _head_hash()
+    token = _issue_token(bytes.fromhex(head), key, cert)
+    return TimeAnchor(
+        chain_position=0,
+        chain_head_hash=head,
+        backend="rfc3161",
+        tsa_url="https://tsa.example/tsr",
+        hash_algorithm="sha256",
+        token_b64=base64.b64encode(token).decode("ascii"),
+        anchored_time=_GEN_TIME.isoformat(),
+    )
+
+
+def test_verify_anchor_passes_the_signer_pin_through():
+    key, cert = _make_tsa()
+    anchor = _packaged_anchor(key, cert)
+    assert verify_anchor(anchor, trusted_signer_cert=cert) == _GEN_TIME
+    _, other_cert = _make_tsa()
+    with pytest.raises(TimeAnchorError, match="pinned trusted TSA"):
+        verify_anchor(anchor, trusted_signer_cert=other_cert)
+
+
+def test_verify_anchor_over_records_passes_both_pins_through():
+    key, cert = _make_tsa()
+    anchor = _packaged_anchor(key, cert)
+    hashes_ = [anchor.chain_head_hash]
+    assert verify_anchor_over_records(
+        anchor, hashes_, trusted_signer_cert=cert, trusted_issuer_cert=cert,
+    ) == _GEN_TIME
+    _, other_cert = _make_tsa()
+    with pytest.raises(TimeAnchorError, match="pinned trusted TSA"):
+        verify_anchor_over_records(anchor, hashes_, trusted_signer_cert=other_cert)
+    with pytest.raises(TimeAnchorError, match="pinned trusted CA"):
+        verify_anchor_over_records(anchor, hashes_, trusted_issuer_cert=other_cert)
+
+
 # Live network test: anchors a real chain head against a real public RFC 3161
 # TSA, then verifies the returned token offline. Opt-in only (set VAARA_LIVE_TSA)
 # so CI and offline runs never depend on a third party. The in-process tests

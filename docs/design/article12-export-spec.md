@@ -127,7 +127,12 @@ cannot back.
 The regulator verifies it offline with `vaara trail verify-anchor --zip
 <package>.zip`: the anchored `chain_head_hash` must equal the last
 `record_hash` in `trail.jsonl`, and the RFC 3161 token must verify under a TSA
-the regulator trusts. This reuses `vaara/audit/timeanchor.py`
+the regulator trusts. `--tsa-cert` pins the TSA signer certificate and
+`--tsa-issuer` pins the CA that issued it (PEM or DER, held out of band); a
+token signed by anyone else is refused. With neither flag the command prints
+`UNPINNED: time as asserted by the certificate in the package`, because a
+package can carry any TSA certificate. The time it prints is a "no later
+than": the anchored head existed by then. This reuses `vaara/audit/timeanchor.py`
 (`verify_anchor_over_records`); the report's "External time anchor (Article
 19)" section and `article12_summary.json["time_anchor"]` surface the attested
 time. Versus a blockchain-anchored digest, an eIDAS-qualified RFC 3161

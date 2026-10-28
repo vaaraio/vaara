@@ -1472,6 +1472,7 @@ def _cmd_trail_verify_anchor(args: argparse.Namespace) -> int:
         from vaara.audit.timeanchor import (
             TimeAnchor,
             TimeAnchorError,
+            _cert_der,
             verify_anchor_over_records,
         )
         from vaara.audit.trail import AuditRecord
@@ -1483,6 +1484,26 @@ def _cmd_trail_verify_anchor(args: argparse.Namespace) -> int:
     if not zip_path.exists():
         print(f"package zip not found: {zip_path}", file=sys.stderr)
         return 2
+
+    pins: dict[str, bytes] = {}
+    for flag, path in (("--tsa-cert", args.tsa_cert), ("--tsa-issuer", args.tsa_issuer)):
+        if path is None:
+            continue
+        pin_path = Path(path).expanduser()
+        try:
+            pin_bytes = pin_path.read_bytes()
+        except FileNotFoundError:
+            print(f"{flag} file not found: {pin_path}", file=sys.stderr)
+            return 2
+        except OSError as exc:
+            print(f"could not read {flag} file: {exc}", file=sys.stderr)
+            return 2
+        try:
+            _cert_der(pin_bytes)
+        except ValueError:
+            print(f"{flag} is not a PEM or DER certificate: {pin_path}", file=sys.stderr)
+            return 2
+        pins[flag] = pin_bytes
 
     try:
         with zipfile.ZipFile(zip_path) as zf:
@@ -1506,7 +1527,12 @@ def _cmd_trail_verify_anchor(args: argparse.Namespace) -> int:
     ]
 
     try:
-        attested = verify_anchor_over_records(anchor, record_hashes)
+        attested = verify_anchor_over_records(
+            anchor,
+            record_hashes,
+            trusted_signer_cert=pins.get("--tsa-cert"),
+            trusted_issuer_cert=pins.get("--tsa-issuer"),
+        )
     except TimeAnchorError as exc:
         print(f"time anchor INVALID: {exc}", file=sys.stderr)
         return 1
@@ -1515,8 +1541,16 @@ def _cmd_trail_verify_anchor(args: argparse.Namespace) -> int:
     print(f"  backend:        {anchor.backend}")
     print(f"  TSA:            {anchor.tsa_url}")
     print(f"  anchored head:  {anchor.chain_head_hash}")
-    print(f"  attested (UTC): {attested.isoformat()}")
-    print("  note: pin the TSA certificate to enforce an eIDAS-qualified authority.")
+    print(
+        f"  attested (UTC): {attested.isoformat()}"
+        " (the anchored head existed no later than this)"
+    )
+    if "--tsa-cert" in pins:
+        print("  pinned:         signer certificate equals --tsa-cert")
+    if "--tsa-issuer" in pins:
+        print("  pinned:         signer issued by --tsa-issuer")
+    if not pins:
+        print("  UNPINNED: time as asserted by the certificate in the package")
     return 0
 
 
@@ -6348,6 +6382,18 @@ def build_parser() -> argparse.ArgumentParser:
         help="Verify the external time anchor in an Article 12 package",
     )
     pva.add_argument("--zip", required=True, help="Path to the package zip")
+    pva.add_argument(
+        "--tsa-cert",
+        metavar="PEM_OR_DER",
+        help="Pin the TSA signer certificate (PEM or DER) you hold out of band; "
+             "a token signed by any other certificate is refused",
+    )
+    pva.add_argument(
+        "--tsa-issuer",
+        metavar="PEM_OR_DER",
+        help="Pin the CA certificate (PEM or DER) that issued the TSA signer; "
+             "survives the signer certificate rotating",
+    )
     pva.set_defaults(func=_cmd_trail_verify_anchor)
 
     pep = tsub.add_parser(

@@ -6,7 +6,11 @@ and this project follows [Semantic Versioning](https://semver.org/spec/v2.0.0.ht
 
 ## [Unreleased]
 
+### Added
+- `vaara trail verify-anchor` takes `--tsa-cert` (pin the TSA signer certificate) and `--tsa-issuer` (pin the CA that issued it), each PEM or DER. A token signed by any other certificate is refused with exit 1; a pin file that is missing or is not a certificate exits 2. `verify_anchor` and `verify_anchor_over_records` take the same pins as `trusted_signer_cert` and `trusted_issuer_cert`.
+
 ### Fixed
+- `vaara trail verify-anchor` without a pin says so: it prints `UNPINNED: time as asserted by the certificate in the package` instead of advice to pin, and labels the time as the latest the anchored head existed by. With a pin it prints which pin held.
 - `vaara verify-contiguity` no longer prints "complete" for a held set with nothing missing. It prints `consistent, N receipt(s), seq 0..N-1 contiguous, highest count held N, no seal held, no anchor checked` (or `seal held`), because a tail removed before the set was held leaves a contiguous prefix that no held record contradicts. The `--json` verdict gains `sealed` and `anchorChecked` (always false: the command takes no anchor). The exit codes and the INCOMPLETE report are unchanged. `ContiguityReport` gains `sealed`.
 - `vaara receipt verify` adds `outcome_note` to its JSON: `status` and `completed_at` are as asserted by the issuer.
 

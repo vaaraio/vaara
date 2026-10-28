@@ -49,6 +49,6 @@ from vaara.audit.timeanchor import RFC3161TimeAnchorClient
 trail.anchor_head(RFC3161TimeAnchorClient("https://freetsa.org/tsr"))
 ```
 
-The anchor also folds into the one-command regulator package: `vaara trail export-article12 --anchor-tsa https://freetsa.org/tsr` writes the timestamp beside the signed trail as Article 19 existence-in-time evidence, and `vaara trail verify-anchor --zip <package>.zip` checks it offline.
+The anchor also folds into the one-command regulator package: `vaara trail export-article12 --anchor-tsa https://freetsa.org/tsr` writes the timestamp beside the signed trail as Article 19 existence-in-time evidence, and `vaara trail verify-anchor --zip <package>.zip` checks it offline; add `--tsa-cert` or `--tsa-issuer` to hold it to the authority you trust, otherwise it reports the time as unpinned.
 
 The same command folds cross-org handoffs and confidential-VM enforcement evidence into the package as verified sidecars (`--handoffs ./handoffs --enforcements ./enforced`); an attachment that does not verify fails the export, so the package never ships evidence it cannot back. It is a more complete pack, not a certificate. See [verifying-evidence.md](verifying-evidence.md).
