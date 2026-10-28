@@ -37,7 +37,7 @@ try:
     from cryptography import x509
     from cryptography.hazmat.primitives import hashes, serialization
     from cryptography.hazmat.primitives.asymmetric import ec
-    from cryptography.x509.oid import NameOID
+    from cryptography.x509.oid import ExtendedKeyUsageOID, NameOID
 except ImportError:  # pragma: no cover - base install
     _HAS_CRYPTO = False
 
@@ -139,6 +139,9 @@ def _tsa_issued_by(ca_key, ca_cert, cn="Vaara Test QTSA"):
         .serial_number(x509.random_serial_number())
         .not_valid_before(datetime.datetime(2020, 1, 1))
         .not_valid_after(datetime.datetime(2035, 1, 1))
+        .add_extension(
+            x509.ExtendedKeyUsage([ExtendedKeyUsageOID.TIME_STAMPING]), critical=True
+        )
         .sign(ca_key, hashes.SHA256())
     )
     return key, cert.public_bytes(serialization.Encoding.DER)

@@ -26,7 +26,7 @@ from cryptography.hazmat.primitives.asymmetric import ec  # noqa: E402
 from cryptography.hazmat.primitives.asymmetric.ed25519 import (  # noqa: E402
     Ed25519PrivateKey,
 )
-from cryptography.x509.oid import NameOID  # noqa: E402
+from cryptography.x509.oid import ExtendedKeyUsageOID, NameOID  # noqa: E402
 
 from vaara.audit.article12_export import export_article12  # noqa: E402
 from vaara.audit.timeanchor import RFC3161TimeAnchorClient  # noqa: E402
@@ -51,6 +51,9 @@ def _cert(subject, issuer, public_key, signing_key) -> x509.Certificate:
         .serial_number(x509.random_serial_number())
         .not_valid_before(datetime.datetime(2020, 1, 1))
         .not_valid_after(datetime.datetime(2035, 1, 1))
+        .add_extension(
+            x509.ExtendedKeyUsage([ExtendedKeyUsageOID.TIME_STAMPING]), critical=True
+        )
         .sign(signing_key, hashes.SHA256())
     )
 

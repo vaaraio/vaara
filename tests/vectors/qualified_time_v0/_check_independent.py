@@ -15,8 +15,9 @@ For each committed record it reproduces the verdict:
 3. **Signature.** Verify the TSA's signature over the SignedAttributes under
    the certificate the token carries.
 4. **Qualified.** The attested time is qualified only if the signer certificate
-   is directly issued by the CA pinned in ``trusted_ca.pem``; otherwise the
-   token is valid but self-asserted.
+   is directly issued by the CA pinned in ``trusted_ca.pem`` and is a TSA
+   certificate (RFC 3161 section 2.3: one critical extended key usage holding
+   id-kp-timeStamping only); otherwise the token is valid but self-asserted.
 
 Verdicts (``ok`` and ``qualified``) are compared against ``expected.json``.
 Exit 0 means every case matched. Run:
@@ -42,9 +43,11 @@ try:
     from cryptography.hazmat.primitives import hashes
     from cryptography.hazmat.primitives.asymmetric import ec
     from cryptography.x509 import (
+        ExtendedKeyUsage,
         load_der_x509_certificate,
         load_pem_x509_certificate,
     )
+    from cryptography.x509.oid import ExtendedKeyUsageOID
 except ModuleNotFoundError as exc:  # pragma: no cover - base install
     print(
         "SKIP: qualified_time_v0 needs an optional dependency not installed: "
@@ -124,6 +127,15 @@ def _match_signer_cert(signed_data):
     raise ValueError("cannot disambiguate the signer certificate")
 
 
+def _is_tsa_certificate(cert) -> bool:
+    """RFC 3161 2.3: exactly one critical EKU, id-kp-timeStamping alone."""
+    try:
+        ext = cert.extensions.get_extension_for_class(ExtendedKeyUsage)
+    except Exception:  # noqa: BLE001 - absent EKU is not a TSA certificate
+        return False
+    return ext.critical and list(ext.value) == [ExtendedKeyUsageOID.TIME_STAMPING]
+
+
 def evaluate(record: dict, trusted_ca) -> dict:
     ep = record.get("existenceProof")
     if not isinstance(ep, dict):
@@ -148,7 +160,7 @@ def evaluate(record: dict, trusted_ca) -> dict:
     qualified = False
     try:
         signer_cert.verify_directly_issued_by(trusted_ca)
-        qualified = True
+        qualified = _is_tsa_certificate(signer_cert)
     except Exception:  # noqa: BLE001 - not issued by the pinned CA
         qualified = False
     return {"ok": True, "qualified": qualified}

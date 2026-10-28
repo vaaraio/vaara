@@ -7,6 +7,14 @@
     "ok": true,
     "qualified": false
   },
+  "unqualified_signer_without_eku": {
+    "ok": true,
+    "qualified": false
+  },
+  "unqualified_signer_wrong_eku": {
+    "ok": true,
+    "qualified": false
+  },
   "neg_wrong_digest": {
     "ok": false,
     "qualified": false

@@ -30,7 +30,7 @@ from asn1crypto import x509 as asn1_x509
 from cryptography import x509
 from cryptography.hazmat.primitives import hashes, serialization
 from cryptography.hazmat.primitives.asymmetric import ec
-from cryptography.x509.oid import NameOID
+from cryptography.x509.oid import ExtendedKeyUsageOID, NameOID
 
 from vaara.attestation.receipt import (
     attach_existence_proof,
@@ -59,9 +59,10 @@ def _ca(cn: str):
     return key, cert
 
 
-def _tsa_issued_by(ca_key, ca_cert, cn: str):
+def _tsa_issued_by(ca_key, ca_cert, cn: str, eku=(ExtendedKeyUsageOID.TIME_STAMPING,)):
+    """Issue a TSA certificate; ``eku=None`` leaves out the extended key usage."""
     key = ec.generate_private_key(ec.SECP256R1())
-    cert = (
+    builder = (
         x509.CertificateBuilder()
         .subject_name(x509.Name([x509.NameAttribute(NameOID.COMMON_NAME, cn)]))
         .issuer_name(ca_cert.subject)
@@ -69,8 +70,10 @@ def _tsa_issued_by(ca_key, ca_cert, cn: str):
         .serial_number(x509.random_serial_number())
         .not_valid_before(datetime.datetime(2020, 1, 1))
         .not_valid_after(datetime.datetime(2035, 1, 1))
-        .sign(ca_key, hashes.SHA256())
     )
+    if eku is not None:
+        builder = builder.add_extension(x509.ExtendedKeyUsage(list(eku)), critical=True)
+    cert = builder.sign(ca_key, hashes.SHA256())
     return key, cert.public_bytes(serialization.Encoding.DER)
 
 
@@ -180,6 +183,31 @@ def main() -> int:
         "record": attach_existence_proof(
             _record("tool:write"), tsa_url="local",
             transport=_minter(other_tsa_key, other_tsa_der),
+        ),
+    })
+
+    # signer issued by the pinned CA but carries no extended key usage: the CA
+    # may issue other certificates, so this one cannot qualify a time.
+    no_eku_key, no_eku_der = _tsa_issued_by(
+        trusted_ca_key, trusted_ca_cert, "Pinned CA, no EKU", eku=None
+    )
+    cases.append({
+        "name": "unqualified_signer_without_eku",
+        "record": attach_existence_proof(
+            _record("tool:search"), tsa_url="local",
+            transport=_minter(no_eku_key, no_eku_der),
+        ),
+    })
+
+    # signer issued by the pinned CA for code signing, not timestamping.
+    cs_key, cs_der = _tsa_issued_by(
+        trusted_ca_key, trusted_ca_cert, "Pinned CA, code signing",
+        eku=(ExtendedKeyUsageOID.CODE_SIGNING,),
+    )
+    cases.append({
+        "name": "unqualified_signer_wrong_eku",
+        "record": attach_existence_proof(
+            _record("tool:fetch"), tsa_url="local", transport=_minter(cs_key, cs_der)
         ),
     })
 
