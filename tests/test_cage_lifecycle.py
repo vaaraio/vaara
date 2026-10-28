@@ -379,3 +379,28 @@ def test_vaara_audit_verify_text_lists_the_cage_launches(tmp_path, capsys):
     assert "cage launches:" in text
     assert "openshell/demo: started" in text
     assert "gvisor/still-running: started, no stop in this export" in text
+
+
+# ── A fresh account has no trail directory yet ─────────────────────────
+
+class TestFreshHome:
+    """The first launch on an account with no ~/.vaara writes its record
+    (28.10: root on a fresh Ubuntu guest lost every start and stop with
+    "unable to open database file")."""
+
+    def test_started_creates_the_trail_directory(self, tmp_path, monkeypatch):
+        from vaara.cage import lifecycle
+        monkeypatch.delenv("VAARA_DB", raising=False)
+        monkeypatch.setenv("HOME", str(tmp_path))
+        assert lifecycle.started("gvisor", "g", "sha256:" + "0" * 64) is not None
+        db = tmp_path / ".vaara" / "trail" / "audit.db"
+        assert len(_lifecycle(db)) == 1
+        assert (db.parent.stat().st_mode & 0o777) == 0o700
+
+    def test_vaara_db_in_a_missing_directory(self, tmp_path, monkeypatch):
+        from vaara.cage import lifecycle
+        db = tmp_path / "new" / "dir" / "audit.db"
+        monkeypatch.setenv("VAARA_DB", str(db))
+        assert lifecycle.started("kata", "k") is not None
+        assert lifecycle.stopped("kata", "k", reason="test") is not None
+        assert len(_lifecycle(db)) == 2

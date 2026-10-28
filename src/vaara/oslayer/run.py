@@ -159,11 +159,9 @@ def _egress_recorder(agent: str, cage_block: dict):
         where = f"{event.get('method')} {event.get('host')}:{event.get('port')}"
         try:
             if "trail" not in held:
-                from vaara.audit.sqlite_backend import SQLiteAuditBackend
+                from vaara.cage.lifecycle import open_trail
 
-                db = os.environ.get("VAARA_DB") or str(
-                    Path.home() / ".vaara" / "trail" / "audit.db")
-                held["trail"] = SQLiteAuditBackend(db).load_trail()
+                held["trail"] = open_trail()
             trail = held["trail"]
             action_id = str(event.get("connection") or uuid.uuid4())
             if kind == "refused":

@@ -111,10 +111,13 @@ class ContainerEngineDriver:
                       if str(e).startswith(DIGEST_ENV + "=")), "")
         if not re.fullmatch(r"sha256:[0-9a-f]{64}", given):
             given = ""  # not a digest this record may carry; the engine view stands
+        runtime = host.get("Runtime", "")
+        if runtime in ("", "oci") and data.get("OCIRuntime"):
+            runtime = data["OCIRuntime"]  # podman: HostConfig says "oci", this names the runtime
         return {
             "name": name, "id": data.get("Id", ""),
             "status": state.get("Status", ""), "running": bool(state.get("Running")),
-            "exit_code": state.get("ExitCode"), "runtime": host.get("Runtime", ""),
+            "exit_code": state.get("ExitCode"), "runtime": runtime,
             "image": config.get("Image", ""), "cmd": config.get("Cmd"),
             "config_digest": given,
             "active_digest": digest_json({"HostConfig": host, "Config": config}),

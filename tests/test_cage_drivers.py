@@ -264,6 +264,23 @@ class TestEngineDrivers:
         state = GVisorDriver(engine=engine, runsc="/nonexistent/runsc").enforcement_state("g")
         assert not state.confirmed and state.upstream == "gvisor"
 
+    def test_podman_inspect_confirms_by_oci_runtime(self, fake):
+        # podman reports HostConfig.Runtime as "oci" for every container and
+        # names the runtime it used in the top-level OCIRuntime (seen on
+        # podman 4.9 with gVisor release-20261026.0, 28.10).
+        podman = [dict(INSPECT[0], HostConfig={"Runtime": "oci"}, OCIRuntime="runsc")]
+        engine, _ = fake("podman", [[["inspect"], podman]])
+        from vaara.cage.gvisor import GVisorDriver
+        state = GVisorDriver(engine=engine, runsc="/nonexistent/runsc").enforcement_state("g")
+        assert state.confirmed and state.detail["runtime"] == "runsc"
+
+    def test_podman_with_another_runtime_is_not_confirmed(self, fake):
+        podman = [dict(INSPECT[0], HostConfig={"Runtime": "oci"}, OCIRuntime="crun")]
+        engine, _ = fake("podman", [[["inspect"], podman]])
+        from vaara.cage.gvisor import GVisorDriver
+        state = GVisorDriver(engine=engine, runsc="/nonexistent/runsc").enforcement_state("g")
+        assert not state.confirmed and state.detail["runtime"] == "crun"
+
     def test_kata_runtime_name_and_version(self, fake, tmp_path):
         engine, calls = fake("docker", [[["run"], "id\n"],
                                         [["inspect"], [dict(INSPECT[0], HostConfig={"Runtime": "kata"})]]])

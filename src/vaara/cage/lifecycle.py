@@ -23,6 +23,17 @@ def trail_path() -> str:
     return os.environ.get("VAARA_DB") or str(Path.home() / ".vaara" / "trail" / "audit.db")
 
 
+def open_trail(path: Optional[str] = None) -> Any:
+    """The trail at ``path`` (default :func:`trail_path`), creating its
+    directory (0700) first: SQLite does not, and a fresh account has no
+    ``~/.vaara`` until something writes there."""
+    from vaara.audit.sqlite_backend import SQLiteAuditBackend
+
+    db = path or trail_path()
+    Path(db).parent.mkdir(mode=0o700, parents=True, exist_ok=True)
+    return SQLiteAuditBackend(db).load_trail()
+
+
 def policy_digest(policy: Optional[Path], fallback: str = "") -> str:
     """``sha256:`` of the policy file as given, else the cage's own digest."""
     if policy is not None:
@@ -41,9 +52,7 @@ def _actor() -> str:
 
 
 def _trail() -> Any:
-    from vaara.audit.sqlite_backend import SQLiteAuditBackend
-
-    return SQLiteAuditBackend(trail_path()).load_trail()
+    return open_trail()
 
 
 def started(driver: str, name: str, digest: str = "") -> Optional[str]:
