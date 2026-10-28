@@ -499,13 +499,23 @@ class TestFirecracker:
                        cage.UPSTREAM_ENV: "firecracker_v1.10.1", cage.NAME_ENV: "vm1"}
         assert cage.declared(env).driver == "firecracker"
 
-    def test_api_status(self, tmp_path):
-        """A fake Firecracker API on a unix socket."""
+    @pytest.mark.parametrize("declared", [True, False])
+    def test_api_status(self, tmp_path, declared):
+        """A fake Firecracker API on a unix socket. The status carries the
+        digest the launch handed the guest (the one every receipt from inside
+        carries), and the API's own view of the configuration beside it; a
+        microVM Vaara did not launch has no given digest and reports the API's
+        view (28.10: status reported only the API's view, so it never matched
+        the receipts of a real Firecracker 1.17 launch)."""
         import socket as _socket
         from vaara.cage.firecracker import FirecrackerDriver
         # A short directory: macOS caps a unix socket path at 104 bytes.
         run = Path(tempfile.mkdtemp(prefix="fc", dir="/tmp" if os.name == "posix" else None))
         sock_path = run / "vm2.firecracker.sock"
+        given = "sha256:" + "ab" * 32
+        vm_config = {"boot-source": {"boot_args": "console=ttyS0 vaara.cage=firecracker "
+                                     f"vaara.cage.digest={given} vaara.cage.name=vm2"
+                                     if declared else "console=ttyS0"}, "logger": None}
         server = _socket.socket(_socket.AF_UNIX, _socket.SOCK_STREAM)
         server.bind(str(sock_path)); server.listen(2)
         stop = threading.Event()
@@ -524,7 +534,7 @@ class TestFirecracker:
                         body = json.dumps({"id": "vm2", "state": "Running",
                                            "vmm_version": "1.10.1", "app_name": "Firecracker"})
                     elif line.startswith("GET /vm/config"):
-                        body = json.dumps({"boot-source": {"boot_args": "x"}, "logger": None})
+                        body = json.dumps(vm_config)
                     else:
                         body = ""
                     conn.sendall((f"HTTP/1.1 {'204 No Content' if not body else '200 OK'}\r\n"
@@ -537,7 +547,10 @@ class TestFirecracker:
             state = d.enforcement_state("vm2")
             assert state.confirmed and state.basis == "api_status"
             assert state.upstream == "firecracker 1.10.1"
-            assert state.config_digest.startswith("sha256:")
+            from vaara.cage._cli import digest_json
+            active = digest_json(vm_config)
+            assert state.detail["active_digest"] == active
+            assert state.config_digest == (given if declared else active)
         finally:
             stop.set(); t.join(timeout=2); server.close()
             shutil.rmtree(run, ignore_errors=True)

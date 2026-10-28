@@ -39,6 +39,7 @@ from vaara.cage._cli import ChildLaunch, ChildLaunches, Tool, digest_file
 from vaara.cage.driver import CageError, CageLaunch
 
 NAME = "firecracker"
+_GIVEN = re.compile(r"(?:^|\s)vaara\.cage\.digest=(sha256:[0-9a-f]{64})(?:\s|$)")
 
 
 class _UnixHTTPConnection(http.client.HTTPConnection):
@@ -184,16 +185,23 @@ class FirecrackerDriver:
                              config_digest=state.config_digest, confirmed=False,
                              basis=BASIS_DECLARED, name=name,
                              detail={"error": str(exc), "pid": launch.proc.pid})
-        config_digest = ""
-        if isinstance(status.get("config"), dict):
+        active = given = ""
+        config = status.get("config")
+        if isinstance(config, dict):
             from vaara.cage._cli import digest_json
 
-            config_digest = digest_json(status["config"])
+            active = digest_json(config)
+            # the digest start() put on the kernel command line, the one every
+            # receipt from inside carries; a microVM Vaara did not launch has none
+            boot = config.get("boot-source") if isinstance(config.get("boot-source"), dict) else {}
+            m = _GIVEN.search(str(boot.get("boot_args") or ""))
+            given = m.group(1) if m else ""
         return CageState(
             driver=NAME, upstream=f"firecracker {status.get('vmm_version') or ''}".strip(),
-            config_digest=config_digest, confirmed=status.get("state") == "Running",
+            config_digest=given or active, confirmed=status.get("state") == "Running",
             basis=BASIS_API, name=name,
-            detail={"state": status.get("state"), "id": status.get("id")},
+            detail={"state": status.get("state"), "id": status.get("id"),
+                    "active_digest": active},
         )
 
     def events(self, name: str, since: float = 0.0) -> Iterator[dict[str, Any]]:
