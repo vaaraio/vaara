@@ -219,7 +219,7 @@ jobs:
       - name: Install Vaara and the libraries
         run: |
           pip install -e . --no-deps
-          pip install pytest guardrails-ai nemoguardrails crewai langchain-core
+          pip install pytest guardrails-ai nemoguardrails crewai langchain-core "cbor2>=5.4" "cryptography>=41.0" "rfc8785>=0.1.4"
 
       - name: Run contract tests, failing on any skip
         run: |
