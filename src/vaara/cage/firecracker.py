@@ -193,7 +193,8 @@ class FirecrackerDriver:
             active = digest_json(config)
             # the digest start() put on the kernel command line, the one every
             # receipt from inside carries; a microVM Vaara did not launch has none
-            boot = config.get("boot-source") if isinstance(config.get("boot-source"), dict) else {}
+            boot_src = config.get("boot-source")
+            boot = boot_src if isinstance(boot_src, dict) else {}
             m = _GIVEN.search(str(boot.get("boot_args") or ""))
             given = m.group(1) if m else ""
         return CageState(
