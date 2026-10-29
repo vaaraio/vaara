@@ -1507,6 +1507,18 @@ class AuditTrail:
             ]}
             if request.delegatees is not None else {}
         )
+        # Same rule for the capability grant: only an action that runs under
+        # one carries the key. Over the cap the marker lands instead, and a
+        # child checked against it is refused as unreadable, never passed.
+        capabilities = (
+            self._cap_record_dict_bytes(
+                {"capabilities": [json_safe(dict(c)) for c in request.capabilities]},
+                self._MAX_REQUEST_CONTEXT_JSON_BYTES,
+            )
+            if request.capabilities is not None else {}
+        )
+        if capabilities and "capabilities" not in capabilities:
+            capabilities = {"capabilities": capabilities}
         self._append(AuditRecord(
             record_id=str(uuid.uuid4()),
             action_id=action_id,
@@ -1531,6 +1543,7 @@ class AuditTrail:
                 "parent_action_id": safe_parent_action_id,
                 "sequence_position": request.sequence_position,
                 **delegatees,
+                **capabilities,
             },
             regulatory_articles=articles,
             tenant_id=tenant_id,
@@ -1600,6 +1613,7 @@ class AuditTrail:
         sequence_steps: Optional[dict] = None,
         value_origin: Optional[dict] = None,
         enforcement: str = "",
+        attenuation: Optional[dict] = None,
     ) -> None:
         """Record the allow/deny/escalate decision.
 
@@ -1649,6 +1663,13 @@ class AuditTrail:
         cannot hold it). A word outside those three is left out with a
         warning, never recorded. Same omission rule: empty adds no keys, and
         a reader takes a missing value as unknown, not as a stop.
+
+        ``attenuation`` says what the delegated-privilege check made of an
+        action that carries a grant and names a parent: ``{"status": "held"
+        | "violated" | "unverified", "reason": ..., "source": "memory" |
+        "trail"}``. ``unverified`` means the check could not run (parent
+        unknown, parent without a grant, parent grant unreadable), so a
+        skipped check is on the record and never silent. Same omission rule.
 
         ``cage`` is the block :func:`vaara.cage.observe` returns: which cage
         the deciding process runs in and whether the kernel confirmed it at
@@ -1783,6 +1804,11 @@ class AuditTrail:
                     "action_id=%s; recording the decision without it",
                     enforcement, sorted(ENFORCEMENT_MODES), action_id,
                 )
+        if attenuation:
+            data["attenuation"] = {
+                str(k): self._cap_record_str(str(v), self._MAX_DECISION_REASON_LEN)
+                for k, v in attenuation.items()
+            }
         data["cage"] = self._cap_record_dict_bytes(
             {str(k): json_safe(v) for k, v in cage.items()},
             self._MAX_ASSESSMENT_JSON_BYTES,

@@ -83,10 +83,14 @@ _MAX_PENDING_OUTCOMES = 50_000
 # Cap on the action -> granted-capability map used for delegated-privilege
 # attenuation. Same unbounded-growth concern as pending outcomes: an agent
 # session that threads capabilities through many intercepts would grow the
-# map one entry per action. Oldest-first eviction keeps it bounded; a child
-# whose parent grant was evicted simply cannot be attenuation-checked and is
-# handled fail-open on the lookup (the parent grant is unknown, not broadened).
+# map one entry per action. Oldest-first eviction keeps it bounded; the map
+# is only a cache: a parent grant it no longer holds is read back from the
+# parent's action_requested record on the trail.
 _MAX_TRACKED_GRANTS = 50_000
+
+# What a child carrying a grant gets when its parent's grant is in neither
+# memory nor the trail: refused (default), or let through marked unverified.
+_UNKNOWN_PARENT_MODES = ("deny", "allow")
 
 
 # Length caps on caller-supplied string fields at the pipeline ingress.
@@ -327,6 +331,7 @@ class InterceptionPipeline:
         review_queue: Optional[Any] = None,
         authority: Optional[AuthorityPolicy] = None,
         require_delegatee_binding: bool = False,
+        unknown_parent: str = "deny",
     ) -> None:
         """
         Args:
@@ -359,7 +364,21 @@ class InterceptionPipeline:
                 Default False: a parent that names nobody leaves its
                 children as before, and the delegation graph reports
                 them as unbound.
+            unknown_parent: What a child carrying a capability grant gets
+                when the parent it names has no grant on record, in memory
+                or on the trail (an invented id, another tenant's action, a
+                trail rotated past it). ``"deny"`` (default) refuses it with
+                ``violation_type`` ``privilege_attenuation``. ``"allow"``
+                lets the scorer decide, for deployments whose parents run
+                behind another gate; the decision record still says
+                ``attenuation.status`` ``unverified``.
         """
+        if unknown_parent not in _UNKNOWN_PARENT_MODES:
+            raise ValueError(
+                f"unknown_parent must be one of {_UNKNOWN_PARENT_MODES}, "
+                f"not {unknown_parent!r}"
+            )
+        self._unknown_parent = unknown_parent
         self.authority = authority if authority is not None else policy_from_env()
         self.registry = registry or create_default_registry()
         self.scorer = scorer or AdaptiveScorer()
@@ -392,12 +411,13 @@ class InterceptionPipeline:
         # write, so two concurrent resolvers cannot both pass the check.
         self._resolve_lock = threading.Lock()
 
-        # Delegated-privilege attenuation: action_id -> the capability grant
-        # under which that action ran. A child action carrying its own grant
-        # plus a parent_action_id is checked so its authority never exceeds
-        # the parent grant (see capability_subsumes). Bounded FIFO eviction.
+        # Delegated-privilege attenuation: action_id -> (tenant, the capability
+        # grant under which that action ran). A child action carrying its own
+        # grant plus a parent_action_id is checked so its authority never
+        # exceeds the parent grant (see capability_subsumes). Bounded FIFO
+        # eviction; a miss falls through to the trail (_parent_grant).
         self._grants_for_action: OrderedDict[
-            str, tuple[Capability, ...]
+            str, tuple[str, tuple[Capability, ...]]
         ] = OrderedDict()
         self._grants_lock = threading.Lock()
         # Delegatee binding: action_id -> the agents it named as delegates,
@@ -434,6 +454,40 @@ class InterceptionPipeline:
             logger.exception("session replay failed for %s/%s; scoring without it",
                              log_safe(agent_id), log_safe(session_id))
 
+    def _parent_grant(self, parent_action_id: str, tenant_id: str
+                      ) -> tuple[tuple[Capability, ...] | str, str]:
+        """The parent's capability grant and where it came from.
+
+        Returns ``(grant, "memory" | "trail")``, or ``(why, "")`` when the
+        check cannot run: ``parent_unknown`` (no request with that id in this
+        tenant), ``parent_no_grant`` (the parent ran under no grant) or
+        ``parent_grant_unreadable`` (the recorded grant does not parse).
+        """
+        with self._grants_lock:
+            held = self._grants_for_action.get(parent_action_id)
+        if held is not None and held[0] == tenant_id:
+            return held[1], "memory"
+        try:
+            records = self.trail.get_action_trail(parent_action_id)
+        except Exception:
+            logger.exception("parent grant lookup failed for %s",
+                             log_safe(parent_action_id))
+            return "parent_unknown", ""
+        request = next((r for r in records if "parameters" in (r.data or {})), None)
+        if request is None or (request.tenant_id or "") != (tenant_id or ""):
+            return "parent_unknown", ""
+        if "capabilities" not in request.data:
+            return "parent_no_grant", ""
+        from vaara.attestation._attest_types import AttestationError
+        from vaara.credential._grant_capability import capability_from_dict
+        wire = request.data["capabilities"]
+        try:
+            if not isinstance(wire, list) or not wire:
+                raise AttestationError("recorded grant is not a list")
+            return tuple(capability_from_dict(d) for d in wire), "trail"
+        except AttestationError:
+            return "parent_grant_unreadable", ""
+
     def _scorer_policy_id(self) -> str:
         return f"scorer:{type(self.scorer).__name__}"
 
@@ -449,7 +503,8 @@ class InterceptionPipeline:
         try:
             state = engine_state(version=__version__, enforce=self._enforce,
                                  scorer=self.scorer, authority=self.authority,
-                                 require_delegatee_binding=self._require_delegatee_binding)
+                                 require_delegatee_binding=self._require_delegatee_binding,
+                                 unknown_parent=self._unknown_parent)
             policy_digest = digest(state)
         except Exception:
             logger.warning("decision state could not be digested; recording "
@@ -490,7 +545,12 @@ class InterceptionPipeline:
         enforces delegated-privilege attenuation: the action's grant must be a
         subset of the parent action's grant, so authority never grows down a
         delegation chain. A broadening grant is denied fail-closed regardless
-        of risk score. With no capabilities the behaviour is unchanged.
+        of risk score. The grant is recorded on the action's request, so the
+        parent grant is read back from the trail when this process does not
+        hold it; a parent with no request on record is denied unless the
+        pipeline was built with ``unknown_parent="allow"``. The decision
+        record's ``attenuation`` says whether the check held, was violated or
+        could not run. With no capabilities the behaviour is unchanged.
 
         ``policy_decision`` is a verdict a rule in front of the pipeline has
         already reached (``"deny"`` from a deny rule). The action is still
@@ -566,6 +626,14 @@ class InterceptionPipeline:
             _json_safe_dict(context), _MAX_CONTEXT_JSON_BYTES, "context"
         )
 
+        child_caps = tuple(capabilities) if capabilities else None
+        wire_caps = None
+        if child_caps is not None:
+            # Lazy import: only when a caller actually uses capability grants,
+            # which already live in the credential/attestation extra.
+            from vaara.credential._grant_capability import capability_to_dict
+            wire_caps = tuple(capability_to_dict(c) for c in child_caps)
+
         # 2. Build the request envelope
         request = ActionRequest(
             agent_id=agent_id,
@@ -580,6 +648,7 @@ class InterceptionPipeline:
             timestamp_utc=time.strftime("%Y-%m-%dT%H:%M:%SZ", time.gmtime()),
             tenant_id=tenant_id,
             delegatees=delegatees,
+            capabilities=wire_caps,
         )
 
         # 3. Record the request in audit trail
@@ -589,27 +658,37 @@ class InterceptionPipeline:
 
         # 3b. Delegated-privilege attenuation. Record this action's grant for
         # its own children to check against, then verify this action does not
-        # exceed the grant of the parent that delegated to it. Fail-closed on a
-        # broadening grant; fail-open when the parent grant is unknown (never
-        # recorded, or evicted) — absence of a parent grant is not evidence of
-        # a violation. Applied to the decision at step 6b.
-        child_caps = tuple(capabilities) if capabilities else None
+        # exceed the grant of the parent that delegated to it. The parent grant
+        # comes from memory, else from the parent's request on the trail (an
+        # evicted entry, another process). Fail-closed on a broadening grant,
+        # on an unreadable one, and on a parent in neither place unless the
+        # deployer chose unknown_parent="allow". Every outcome is written to
+        # the decision record as `attenuation`. Applied at step 6b.
         attenuation_reason: Optional[str] = None
+        attenuation: Optional[dict] = None
         if child_caps is not None:
-            # Lazy import: only when a caller actually uses capability grants,
-            # which already live in the credential/attestation extra.
             from vaara.credential._grant_attenuation import capability_subsumes
             with self._grants_lock:
-                self._grants_for_action[action_id] = child_caps
+                self._grants_for_action[action_id] = (tenant_id, child_caps)
                 if len(self._grants_for_action) > _MAX_TRACKED_GRANTS:
                     self._grants_for_action.popitem(last=False)
             if parent_action_id:
-                with self._grants_lock:
-                    parent_caps = self._grants_for_action.get(parent_action_id)
-                if parent_caps is not None:
+                parent_caps, source = self._parent_grant(parent_action_id, tenant_id)
+                if isinstance(parent_caps, tuple):
                     ok, why = capability_subsumes(parent_caps, child_caps)
+                    attenuation = {"status": "held", "source": source}
                     if not ok:
                         attenuation_reason = why
+                        attenuation = {"status": "violated", "reason": why,
+                                       "source": source}
+                else:
+                    # parent_caps names why the check could not run.
+                    attenuation = {"status": "unverified", "reason": parent_caps}
+                    if parent_caps == "parent_grant_unreadable" or (
+                        parent_caps == "parent_unknown"
+                        and self._unknown_parent == "deny"
+                    ):
+                        attenuation_reason = parent_caps
 
         # 3b2. Delegatee binding. A parent that named its delegates admits only
         # them; anyone else holding its action id is refused. A parent that
@@ -684,6 +763,7 @@ class InterceptionPipeline:
                     policy_digest=fail_digest,
                     policy_state=fail_state,
                     enforcement=enforcement,
+                    attenuation=attenuation,
                 )
             except Exception:
                 logger.exception(
@@ -925,6 +1005,9 @@ class InterceptionPipeline:
             modified_parameters = None
             deny_policy_id = "capability_attenuation"
             violation_type = "privilege_attenuation"
+            if attenuation is not None and attenuation["status"] == "unverified":
+                # The check could not run: the deny names what it lacked.
+                unavailable_input = "parent_grant"
             reason = _cap_str(
                 f"privilege attenuation violation ({attenuation_reason})"
                 + (f"; {reason}" if reason else ""),
@@ -1073,6 +1156,7 @@ class InterceptionPipeline:
             policy_digest=policy_digest,
             policy_state=policy_state,
             enforcement=enforcement,
+            attenuation=attenuation,
         )
 
         if decision_str == "escalate":

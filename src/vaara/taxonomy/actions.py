@@ -141,6 +141,10 @@ class ActionRequest:
     tenant_id: str = ""  # v0.40 multi-tenant scope; "" = single-tenant
     # Agents this action may hand work to; None = names nobody (unbound)
     delegatees: Optional[tuple[str, ...]] = None
+    # The capability grant this action runs under, as wire objects
+    # ({"arg", "op", "value"}); None = no grant. Recorded so a child can be
+    # attenuation-checked against it from the trail, in any process.
+    capabilities: Optional[tuple[dict, ...]] = None
 
     def to_policy_context(self) -> dict:
         """Convert to a plain dict of policy-evaluation fields.

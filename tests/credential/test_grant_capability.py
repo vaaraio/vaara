@@ -144,3 +144,20 @@ def test_empty_capabilities_list_rejected():
     d["capabilities"] = []
     with pytest.raises(AttestationError):
         grant_from_dict(d)
+
+
+def test_gateway_refuses_over_bound_call_the_pipeline_could_not_check():
+    # The pipeline's attenuation check needs the parent grant; the gateway
+    # does not. A child the pipeline let through as `unverified` (operator
+    # chose unknown_parent="allow", parent id invented) is still refused at
+    # the gateway, which reads only the signed grant and the runtime args.
+    from vaara import Pipeline
+
+    pipe = Pipeline(unknown_parent="allow")
+    child = pipe.intercept(
+        agent_id="worker", tool_name="pay.send", parameters={},
+        parent_action_id="invented-parent", capabilities=CAPS,
+    )
+    assert "privilege attenuation" not in child.reason
+    v = _verify(_mint(), runtime_args={**RUNTIME_OK, "amount": 501})
+    assert not v.ok and v.reason == "capability_exceeded"
