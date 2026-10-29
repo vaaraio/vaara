@@ -77,7 +77,10 @@ def _tsa_issued_by(ca_key, ca_cert, cn: str, eku=(ExtendedKeyUsageOID.TIME_STAMP
     return key, cert.public_bytes(serialization.Encoding.DER)
 
 
-def _issue_token(digest: bytes, key, cert_der: bytes) -> bytes:
+def _issue_token(
+    digest: bytes, key, cert_der: bytes, content_type_attr: str | None = "tst_info"
+) -> bytes:
+    """Sign a token; ``content_type_attr=None`` leaves out the content-type attribute."""
     cert_asn1 = asn1_x509.Certificate.load(cert_der)
     tst = tsp.TSTInfo({
         "version": 1,
@@ -90,13 +93,16 @@ def _issue_token(digest: bytes, key, cert_der: bytes) -> bytes:
         "gen_time": GEN_TIME,
     })
     tst_der = tst.dump()
-    attrs = cms.CMSAttributes([
-        cms.CMSAttribute({"type": "content_type", "values": ["tst_info"]}),
-        cms.CMSAttribute({
-            "type": "message_digest",
-            "values": [hashlib.sha256(tst_der).digest()],
-        }),
-    ])
+    attr_list = []
+    if content_type_attr is not None:
+        attr_list.append(
+            cms.CMSAttribute({"type": "content_type", "values": [content_type_attr]})
+        )
+    attr_list.append(cms.CMSAttribute({
+        "type": "message_digest",
+        "values": [hashlib.sha256(tst_der).digest()],
+    }))
+    attrs = cms.CMSAttributes(attr_list)
     signature = key.sign(attrs.dump(), ec.ECDSA(hashes.SHA256()))
     signer_info = cms.SignerInfo({
         "version": "v1",
@@ -238,6 +244,28 @@ def main() -> int:
     raw[-1] ^= 0xFF
     malformed["existenceProof"]["token"] = base64.b64encode(bytes(raw)).decode("ascii")
     cases.append({"name": "neg_malformed_token", "record": malformed})
+
+    # A token signed by the pinned TSA over the right digest, but whose signed
+    # content-type attribute names id-data, or is missing. RFC 5652 5.3 makes
+    # the attribute mandatory and RFC 3161 2.4.2 fixes it to id-ct-TSTInfo, so
+    # the signature does not cover a TSTInfo and the token is not evidence.
+    for name, sub, ct in (
+        ("neg_content_type_not_tstinfo", "tool:move", "data"),
+        ("neg_content_type_missing", "tool:copy", None),
+    ):
+        base = _record(sub)
+        digest = existence_record_digest(base)
+        token = _issue_token(
+            bytes.fromhex(digest.split(":", 1)[1]), tsa_key, tsa_der, content_type_attr=ct
+        )
+        stapled = dict(base)
+        stapled["existenceProof"] = {
+            "backend": "rfc3161-eidas-qualified",
+            "hashAlgorithm": "sha256",
+            "recordDigest": digest,
+            "token": base64.b64encode(token).decode("ascii"),
+        }
+        cases.append({"name": name, "record": stapled})
 
     # Ground truth: the reference verifier, pinning the trusted-list CA. The
     # independent checker must reproduce exactly these verdicts.

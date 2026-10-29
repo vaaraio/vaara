@@ -26,5 +26,13 @@
   "neg_malformed_token": {
     "ok": false,
     "qualified": false
+  },
+  "neg_content_type_not_tstinfo": {
+    "ok": false,
+    "qualified": false
+  },
+  "neg_content_type_missing": {
+    "ok": false,
+    "qualified": false
   }
 }
