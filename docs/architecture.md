@@ -48,7 +48,9 @@ The grant is written into the action's `action_requested` record. The pipeline k
 
 `InterceptionPipeline(unknown_parent="allow")` lets the first case through to the scorer, for a deployment whose parents run behind another gate. The setting is in the decision state the record digests.
 
-Every decision on an action that carries a grant and names a parent says what the check found, as `attenuation` on the decision record: `status` `held`, `violated` or `unverified`, with `reason` when it did not hold, and `source` (`memory` or `trail`) when the parent grant was found. A check that could not run is on the record, not silent.
+A child that presents no grant and names a parent that ran under one has no bound, so it would exceed its parent's. It is denied with `violation_type` `privilege_attenuation` and `attenuation` `{status: violated, reason: child_without_grant}`. `InterceptionPipeline(grantless_child="allow")` lets it through to the scorer, marked `unverified`, and is in the digested decision state the same way. A child with no grant under a parent with none, or under a parent not found, is decided as before and carries no `attenuation` mark; one under a parent whose recorded grant does not parse is denied as above.
+
+Every decision on an action that carries a grant and names a parent, or that carries none under a granted parent, says what the check found, as `attenuation` on the decision record: `status` `held`, `violated` or `unverified`, with `reason` when it did not hold, and `source` (`memory` or `trail`) when the parent grant was found. A check that could not run is on the record, not silent.
 
 The pipeline check depends on the trail it can read. The credential gateway does not: it verifies each call against the signed grant the call presents, so a call outside its grant is refused there whatever the pipeline decided.
 

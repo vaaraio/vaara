@@ -92,6 +92,10 @@ _MAX_TRACKED_GRANTS = 50_000
 # memory nor the trail: refused (default), or let through marked unverified.
 _UNKNOWN_PARENT_MODES = ("deny", "allow")
 
+# What a child presenting no grant gets when the parent it names ran under
+# one: refused (default), or let through marked unverified.
+_GRANTLESS_CHILD_MODES = ("deny", "allow")
+
 
 # Length caps on caller-supplied string fields at the pipeline ingress.
 # Without caps, a misconfigured / malicious / buggy agent can submit
@@ -332,6 +336,7 @@ class InterceptionPipeline:
         authority: Optional[AuthorityPolicy] = None,
         require_delegatee_binding: bool = False,
         unknown_parent: str = "deny",
+        grantless_child: str = "deny",
     ) -> None:
         """
         Args:
@@ -372,13 +377,27 @@ class InterceptionPipeline:
                 lets the scorer decide, for deployments whose parents run
                 behind another gate; the decision record still says
                 ``attenuation.status`` ``unverified``.
+            grantless_child: What a child presenting no capability grant
+                gets when the parent it names ran under one. Without a grant
+                the child has no bound, so it would exceed its parent's.
+                ``"deny"`` (default) refuses it with ``violation_type``
+                ``privilege_attenuation`` and ``attenuation.reason``
+                ``child_without_grant``. ``"allow"`` lets the scorer decide;
+                the decision record still says ``attenuation.status``
+                ``unverified``.
         """
         if unknown_parent not in _UNKNOWN_PARENT_MODES:
             raise ValueError(
                 f"unknown_parent must be one of {_UNKNOWN_PARENT_MODES}, "
                 f"not {unknown_parent!r}"
             )
+        if grantless_child not in _GRANTLESS_CHILD_MODES:
+            raise ValueError(
+                f"grantless_child must be one of {_GRANTLESS_CHILD_MODES}, "
+                f"not {grantless_child!r}"
+            )
         self._unknown_parent = unknown_parent
+        self._grantless_child = grantless_child
         self.authority = authority if authority is not None else policy_from_env()
         self.registry = registry or create_default_registry()
         self.scorer = scorer or AdaptiveScorer()
@@ -504,7 +523,8 @@ class InterceptionPipeline:
             state = engine_state(version=__version__, enforce=self._enforce,
                                  scorer=self.scorer, authority=self.authority,
                                  require_delegatee_binding=self._require_delegatee_binding,
-                                 unknown_parent=self._unknown_parent)
+                                 unknown_parent=self._unknown_parent,
+                                 grantless_child=self._grantless_child)
             policy_digest = digest(state)
         except Exception:
             logger.warning("decision state could not be digested; recording "
@@ -662,8 +682,10 @@ class InterceptionPipeline:
         # comes from memory, else from the parent's request on the trail (an
         # evicted entry, another process). Fail-closed on a broadening grant,
         # on an unreadable one, and on a parent in neither place unless the
-        # deployer chose unknown_parent="allow". Every outcome is written to
-        # the decision record as `attenuation`. Applied at step 6b.
+        # deployer chose unknown_parent="allow"; a child with no grant under a
+        # parent with one is refused unless grantless_child="allow". Every
+        # outcome is written to the decision record as `attenuation`. Applied
+        # at step 6b.
         attenuation_reason: Optional[str] = None
         attenuation: Optional[dict] = None
         if child_caps is not None:
@@ -689,6 +711,25 @@ class InterceptionPipeline:
                         and self._unknown_parent == "deny"
                     ):
                         attenuation_reason = parent_caps
+        elif parent_action_id:
+            # A child presenting no grant has no bound. Under a parent that
+            # ran under a grant it would exceed it, so it is refused unless
+            # the deployer chose grantless_child="allow". A parent with no
+            # grant, or one not found, leaves the child as before: there is
+            # no bound to exceed, or none known.
+            parent_caps, source = self._parent_grant(parent_action_id, tenant_id)
+            if isinstance(parent_caps, tuple):
+                why = "child_without_grant"
+                if self._grantless_child == "deny":
+                    attenuation_reason = why
+                    attenuation = {"status": "violated", "reason": why,
+                                   "source": source}
+                else:
+                    attenuation = {"status": "unverified", "reason": why,
+                                   "source": source}
+            elif parent_caps == "parent_grant_unreadable":
+                attenuation_reason = parent_caps
+                attenuation = {"status": "unverified", "reason": parent_caps}
 
         # 3b2. Delegatee binding. A parent that named its delegates admits only
         # them; anyone else holding its action id is refused. A parent that

@@ -285,3 +285,115 @@ def test_chain_still_verifies_with_recorded_grants(tmp_path):
     _child(pipe, "invented")
     assert pipe.trail.verify_chain() is None
     assert _sqlite_trail(db).verify_chain() is None
+
+
+# --- A child without a grant under a granted parent (v2.17.0) ---------------
+#
+# Attenuation used to run only when the child presented capabilities, so a
+# child naming a granted parent and presenting none ran unbounded under a
+# bounded parent. It is now denied unless the deployer chose
+# grantless_child="allow"; either way the decision says what was found.
+
+
+def _grantless_child(pipe, parent_id, **kw):
+    return pipe.intercept(
+        agent_id="worker", tool_name="read_document",
+        parameters={}, parent_action_id=parent_id, **kw,
+    )
+
+
+def test_grantless_child_under_granted_parent_is_denied():
+    pipe = Pipeline()
+    p = _parent(pipe)
+    child = _grantless_child(pipe, p.action_id)
+    assert child.allowed is False
+    assert child.decision == "deny"
+    assert "privilege attenuation violation (child_without_grant)" in child.reason
+    d = _decision(pipe, child.action_id).data
+    assert d["violation_type"] == "privilege_attenuation"
+    assert "unavailable_input" not in d
+    assert d["attenuation"] == {
+        "status": "violated", "reason": "child_without_grant", "source": "memory",
+    }
+
+
+def test_grantless_child_denied_after_parent_evicted(monkeypatch):
+    monkeypatch.setattr(pipeline_mod, "_MAX_TRACKED_GRANTS", 1)
+    pipe = Pipeline()
+    p = _parent(pipe)
+    _parent(pipe)
+    child = _grantless_child(pipe, p.action_id)
+    assert child.allowed is False
+    assert _decision(pipe, child.action_id).data["attenuation"] == {
+        "status": "violated", "reason": "child_without_grant", "source": "trail",
+    }
+
+
+def test_grantless_child_denied_across_two_pipelines_on_one_trail(tmp_path):
+    db = tmp_path / "audit.db"
+    p = _parent(Pipeline(trail=_sqlite_trail(db)))
+    second = Pipeline(trail=_sqlite_trail(db))
+    child = _grantless_child(second, p.action_id)
+    assert child.allowed is False
+    assert "child_without_grant" in child.reason
+
+
+def test_grantless_child_denied_in_shadow_mode_record():
+    pipe = Pipeline(enforce=False)
+    p = _parent(pipe)
+    child = _grantless_child(pipe, p.action_id)
+    assert child.allowed is True  # shadow mode never blocks
+    assert _decision(pipe, child.action_id).data["attenuation"]["status"] == "violated"
+
+
+def test_grantless_child_allowed_when_deployer_opts_in_but_marked():
+    pipe = Pipeline(grantless_child="allow")
+    p = _parent(pipe)
+    child = _grantless_child(pipe, p.action_id)
+    assert "privilege attenuation" not in child.reason
+    assert _decision(pipe, child.action_id).data["attenuation"] == {
+        "status": "unverified", "reason": "child_without_grant", "source": "memory",
+    }
+
+
+def test_grantless_child_flag_rejects_other_words():
+    with pytest.raises(ValueError):
+        Pipeline(grantless_child="maybe")
+
+
+def test_grantless_child_allow_is_in_the_policy_state():
+    pipe = Pipeline(grantless_child="allow")
+    p = pipe.intercept(agent_id="planner", tool_name="plan_task", parameters={})
+    assert _decision(pipe, p.action_id).data["policy_state"]["grantless_child"] == "allow"
+
+
+def test_default_policy_state_has_no_grantless_child_key():
+    pipe = Pipeline()
+    p = pipe.intercept(agent_id="planner", tool_name="plan_task", parameters={})
+    assert "grantless_child" not in _decision(pipe, p.action_id).data["policy_state"]
+
+
+def test_grantless_child_under_grantless_parent_carries_no_mark():
+    pipe = Pipeline()
+    p = pipe.intercept(agent_id="planner", tool_name="plan_task", parameters={})
+    child = _grantless_child(pipe, p.action_id)
+    assert "privilege attenuation" not in child.reason
+    assert "attenuation" not in _decision(pipe, child.action_id).data
+
+
+def test_grantless_child_under_unknown_parent_is_unchanged():
+    pipe = Pipeline()
+    child = _grantless_child(pipe, "00000000-0000-4000-8000-000000000000")
+    assert "privilege attenuation" not in child.reason
+    assert "attenuation" not in _decision(pipe, child.action_id).data
+
+
+def test_grantless_child_under_unreadable_parent_grant_is_denied(monkeypatch):
+    pipe = Pipeline()
+    p = _parent(pipe)
+    pipe._grants_for_action.clear()
+    req = pipe.trail.get_action_trail(p.action_id)[0]
+    monkeypatch.setitem(req.data, "capabilities", {"_truncated": True})
+    child = _grantless_child(pipe, p.action_id)
+    assert child.allowed is False
+    assert "parent_grant_unreadable" in child.reason
