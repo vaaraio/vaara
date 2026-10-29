@@ -10,8 +10,10 @@ the whole signed record. The obligation a conformant verifier discharges:
 
 1. Recompute the record digest as SHA-256 over the JCS-canonical record with
    `existenceProof` removed. The proof's `recordDigest` must equal it.
-2. Require the token's message imprint to equal that digest, and the
-   SignedAttributes message-digest to cover the TSTInfo content.
+2. Require the token's message imprint to equal that digest, the
+   SignedAttributes message-digest to cover the TSTInfo content, and exactly
+   one content-type signed attribute naming id-ct-TSTInfo (RFC 5652 5.3,
+   RFC 3161 2.4.2).
 3. Verify the TSA signature over the SignedAttributes under the certificate the
    token carries.
 4. Grade the attested time **qualified** only if the signer certificate is
@@ -36,6 +38,8 @@ the whole signed record. The obligation a conformant verifier discharges:
 | `neg_wrong_digest` | false | false | a token that timestamped a different value does not attest this record |
 | `neg_tampered_record` | false | false | a record mutated after the proof was attached no longer matches |
 | `neg_malformed_token` | false | false | a corrupt token is rejected |
+| `neg_content_type_not_tstinfo` | false | false | a token whose signed content-type attribute names id-data is not a signature over a TSTInfo |
+| `neg_content_type_missing` | false | false | a token with no content-type signed attribute is rejected |
 
 `trusted_ca.pem` is the CA the checker pins. It is an in-process test CA, not a
 real eIDAS QTSA issuer: the vectors prove the verification logic (imprint,

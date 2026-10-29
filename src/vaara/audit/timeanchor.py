@@ -57,6 +57,10 @@ _INSTALL_HINT = (
 # digest, so sha256 is the natural default.
 _DIGEST_LEN = {"sha256": 32, "sha384": 48, "sha512": 64}
 
+# id-ct-TSTInfo (RFC 3161 2.4.2): the content type a token's signed
+# content-type attribute must name.
+_ID_CT_TSTINFO = "1.2.840.113549.1.9.16.1.4"
+
 
 class TimeAnchorError(Exception):
     """Anchoring or anchor verification failed."""
@@ -392,10 +396,28 @@ def verify_timestamp_token(
     signer_info = signed_data["signer_infos"][0]
     digest_alg = signer_info["digest_algorithm"]["algorithm"].native
     md_attr = None
+    ct_attrs = []
     for attr in signer_info["signed_attrs"]:
-        if attr["type"].native == "message_digest":
+        kind = attr["type"].native
+        if kind == "message_digest" and md_attr is None:
             md_attr = attr["values"][0].native
-            break
+        elif kind == "content_type":
+            ct_attrs.append(attr)
+    # RFC 5652 5.3 and RFC 3161 2.4.2: the content-type signed attribute is
+    # mandatory, single-valued, and names the eContentType, id-ct-TSTInfo.
+    # Without it the TSA's signature does not say what kind of content it
+    # covers.
+    if len(ct_attrs) != 1 or len(ct_attrs[0]["values"]) != 1:
+        raise TimeAnchorError(
+            "token signed attributes must carry exactly one content-type "
+            f"attribute with one value (found {len(ct_attrs)})"
+        )
+    ct_oid = ct_attrs[0]["values"][0].dotted
+    if ct_oid != _ID_CT_TSTINFO:
+        raise TimeAnchorError(
+            f"token signed content-type attribute names {ct_oid}, not "
+            f"id-ct-TSTInfo ({_ID_CT_TSTINFO})"
+        )
     if md_attr is None:
         raise TimeAnchorError("token signed attributes lack a message_digest")
     h = hashes.Hash(_hash_for(digest_alg))

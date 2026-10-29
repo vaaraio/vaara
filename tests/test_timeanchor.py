@@ -57,8 +57,20 @@ def _make_tsa():
     return key, cert.public_bytes(serialization.Encoding.DER)
 
 
-def _issue_token(digest, key, cert_der, *, hash_algorithm="sha256", gen_time=_GEN_TIME):
-    """Build a valid RFC 3161 TimeStampToken over ``digest``."""
+def _issue_token(
+    digest,
+    key,
+    cert_der,
+    *,
+    hash_algorithm="sha256",
+    gen_time=_GEN_TIME,
+    content_type_attr="tst_info",
+):
+    """Build a valid RFC 3161 TimeStampToken over ``digest``.
+
+    ``content_type_attr`` sets the content-type signed attribute; ``None``
+    leaves it out, so tests can sign a token whose attributes break RFC 5652.
+    """
     cert_asn1 = asn1_x509.Certificate.load(cert_der)
     tst = tsp.TSTInfo({
         "version": 1,
@@ -71,13 +83,16 @@ def _issue_token(digest, key, cert_der, *, hash_algorithm="sha256", gen_time=_GE
         "gen_time": gen_time,
     })
     tst_der = tst.dump()
-    attrs = cms.CMSAttributes([
-        cms.CMSAttribute({"type": "content_type", "values": ["tst_info"]}),
-        cms.CMSAttribute({
-            "type": "message_digest",
-            "values": [hashlib.sha256(tst_der).digest()],
-        }),
-    ])
+    attr_list = []
+    if content_type_attr is not None:
+        attr_list.append(
+            cms.CMSAttribute({"type": "content_type", "values": [content_type_attr]})
+        )
+    attr_list.append(cms.CMSAttribute({
+        "type": "message_digest",
+        "values": [hashlib.sha256(tst_der).digest()],
+    }))
+    attrs = cms.CMSAttributes(attr_list)
     signature = key.sign(attrs.dump(), ec.ECDSA(hashes.SHA256()))
     signer_info = cms.SignerInfo({
         "version": "v1",
@@ -141,6 +156,25 @@ def test_verify_rejects_tampered_token():
     token[-1] ^= 0xFF  # flip a byte in the signature region
     with pytest.raises(TimeAnchorError):
         verify_timestamp_token(bytes(token), digest)
+
+
+def test_verify_rejects_content_type_attr_naming_other_oid():
+    # RFC 5652 5.3 and RFC 3161 2.4.2: the content-type signed attribute must
+    # name the eContentType, id-ct-TSTInfo. A TSA signature over attributes
+    # that call the content id-data is not a signature over a TSTInfo.
+    key, cert = _make_tsa()
+    digest = bytes.fromhex(_head_hash())
+    token = _issue_token(digest, key, cert, content_type_attr="data")
+    with pytest.raises(TimeAnchorError, match="content-type"):
+        verify_timestamp_token(token, digest)
+
+
+def test_verify_rejects_missing_content_type_attr():
+    key, cert = _make_tsa()
+    digest = bytes.fromhex(_head_hash())
+    token = _issue_token(digest, key, cert, content_type_attr=None)
+    with pytest.raises(TimeAnchorError, match="content-type"):
+        verify_timestamp_token(token, digest)
 
 
 def test_client_anchor_with_local_tsa():

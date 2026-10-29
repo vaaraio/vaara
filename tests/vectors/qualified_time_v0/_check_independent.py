@@ -10,8 +10,9 @@ For each committed record it reproduces the verdict:
    SHA-256, as ``sha256:<hex>``. The proof's ``recordDigest`` must equal it, so
    a proof stapled to mutated bytes fails.
 2. **Imprint.** Parse the RFC 3161 token, require its message imprint to equal
-   that digest, and require the SignedAttributes message-digest to equal the
-   hash of the TSTInfo content.
+   that digest, require the SignedAttributes message-digest to equal the
+   hash of the TSTInfo content, and require exactly one content-type signed
+   attribute naming id-ct-TSTInfo (RFC 5652 5.3, RFC 3161 2.4.2).
 3. **Signature.** Verify the TSA's signature over the SignedAttributes under
    the certificate the token carries.
 4. **Qualified.** The attested time is qualified only if the signer certificate
@@ -58,6 +59,7 @@ except ModuleNotFoundError as exc:  # pragma: no cover - base install
 
 HERE = Path(__file__).resolve().parent
 COMPARE = ("ok", "qualified")
+ID_CT_TSTINFO = "1.2.840.113549.1.9.16.1.4"
 
 
 def _record_digest(record: dict) -> str:
@@ -91,10 +93,16 @@ def _signer_cert_after_verify(token_der: bytes, expected_digest: bytes):
 
     signer_info = signed_data["signer_infos"][0]
     md_attr = None
+    content_types = []
     for attr in signer_info["signed_attrs"]:
-        if attr["type"].native == "message_digest":
+        if attr["type"].native == "message_digest" and md_attr is None:
             md_attr = attr["values"][0].native
-            break
+        elif attr["type"].native == "content_type":
+            content_types.extend(v.dotted for v in attr["values"])
+    # RFC 5652 5.3: one content-type attribute, one value, naming the
+    # eContentType; RFC 3161 2.4.2 fixes that to id-ct-TSTInfo.
+    if content_types != [ID_CT_TSTINFO]:
+        raise ValueError("signed content-type attribute is not id-ct-TSTInfo")
     if md_attr != hashlib.sha256(tst_bytes).digest():
         raise ValueError("SignedAttributes digest does not cover the TSTInfo")
 
