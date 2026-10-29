@@ -213,6 +213,7 @@ class ReviewQueue:
             check_same_thread=False,
         )
         self._lock = threading.Lock()
+        self.last_purge_scrubbed: Optional[bool] = None
         self._conn.execute("PRAGMA journal_mode=WAL")
         self._conn.execute("PRAGMA synchronous=NORMAL")
         self._conn.execute("PRAGMA foreign_keys=ON")
@@ -476,6 +477,73 @@ class ReviewQueue:
                 (STATUS_EXPIRED, ts, STATUS_PENDING, cutoff),
             )
             return cur.rowcount
+
+    def purge_older_than(
+        self,
+        older_than_seconds: float,
+        *,
+        now: Optional[float] = None,
+        dry_run: bool = False,
+    ) -> int:
+        """Delete closed items whose case closed more than ``older_than_seconds`` ago.
+
+        The queue holds a second copy of the call's parameters, context and
+        reason, and the reviewers' names and justification, so it needs its
+        own retention (GDPR Art. 5(1)(e)); the trail's purge and erase do
+        not reach this file. Only ``resolved`` and ``expired`` items go: an
+        open item is a decision still owed, so ``pending`` and ``claimed``
+        stay whatever their age (``expire_stale`` closes them first). The
+        age runs from ``resolved_at``, the time the case closed.
+
+        The delete runs with ``secure_delete`` on and a TRUNCATE checkpoint
+        follows, as the trail's purge does. ``last_purge_scrubbed`` is False
+        when another connection kept the WAL from truncating, None for a
+        dry run or a purge that deleted nothing.
+        """
+        if older_than_seconds <= 0:
+            raise ValueError(
+                f"older_than_seconds must be > 0, got {older_than_seconds}"
+            )
+        ts = now if now is not None else time.time()
+        cutoff = ts - older_than_seconds
+        where = "status IN (?, ?) AND COALESCE(resolved_at, enqueued_at) < ?"
+        params = (STATUS_RESOLVED, STATUS_EXPIRED, cutoff)
+        scrubbed: Optional[bool] = None
+        with self._lock:
+            if dry_run:
+                row = self._conn.execute(
+                    f"SELECT COUNT(*) FROM review_queue WHERE {where}", params,
+                ).fetchone()
+                count = int(row[0])
+            else:
+                self._conn.execute("PRAGMA secure_delete = ON")
+                cur = self._conn.execute(
+                    f"DELETE FROM review_queue WHERE {where}", params,
+                )
+                count = cur.rowcount
+                if count > 0:
+                    if str(self._db_path) == ":memory:":
+                        scrubbed = True
+                    else:
+                        row = self._conn.execute(
+                            "PRAGMA wal_checkpoint(TRUNCATE)"
+                        ).fetchone()
+                        scrubbed = bool(row) and row[0] == 0
+            self.last_purge_scrubbed = scrubbed
+        return count
+
+    def open_older_than(
+        self, older_than_seconds: float, *, now: Optional[float] = None,
+    ) -> int:
+        """Count ``pending`` and ``claimed`` items enqueued before the cutoff."""
+        ts = now if now is not None else time.time()
+        with self._lock:
+            row = self._conn.execute(
+                """SELECT COUNT(*) FROM review_queue
+                   WHERE status IN (?, ?) AND enqueued_at < ?""",
+                (STATUS_PENDING, STATUS_CLAIMED, ts - older_than_seconds),
+            ).fetchone()
+        return int(row[0])
 
     def get(self, queue_id: str) -> ReviewItem:
         with self._lock:

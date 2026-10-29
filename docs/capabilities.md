@@ -113,7 +113,7 @@ Provider, and S3P, a safety-violation-rate measurement an auditor can reproduce.
 - DORA Articles 9, 10 and 13: event-to-article mappings in `audit/trail.py`, `compliance/engine.py`
 - SOC 2 Trust Services Criteria CC6.1 to CC6.3, CC7.2, CC7.3 and CC8.1: event-to-criterion mappings in `audit/trail.py`, `compliance/engine.py`, `docs/COMPLIANCE.md`
 - GDPR Chapter V, data locality and transfers: `attestation/data_locality.py`, `data_locality_v0`
-- GDPR Article 17, erasure: `audit/erase.py`, `vaara trail erase` (one record's data in the trail; the hash stays and a `record_erased` record names it; the eraser can sign it and `vaara trail verify --erasure-key` checks that; receipts, the review queue and earlier exports are not reached)
+- GDPR Article 17, erasure: `audit/erase.py`, `vaara trail erase` (one record's data in the trail; the hash stays and a `record_erased` record names it; the eraser can sign it and `vaara trail verify --erasure-key` checks that; receipts, the review queue and earlier exports are not reached; `vaara review purge` deletes closed queue items by age)
 - eIDAS 2.0 qualified electronic ledger profile: `docs/eidas-qel-profile.md`
 - prEN ISO/IEC 12792 transparency taxonomy: per-record tagging in `audit/trail.py`
 - W3C PROV-DM and PROV-JSON export: `audit/prov_export.py`, `vaara trail export-prov`
@@ -190,7 +190,7 @@ reproductions: [vaara.io/conformance.html](https://vaara.io/conformance.html).
 
 | Capability | Where | What it does |
 |---|---|---|
-| Review queue | `vaara review list`, `claim`, `resolve`, `audit/review_queue.py` | Pending, claimed and resolved (allow, deny or abstain); the resolution is written into the chain as `ESCALATION_RESOLVED`. |
+| Review queue | `vaara review list`, `claim`, `resolve`, `purge`, `audit/review_queue.py` | Pending, claimed and resolved (allow, deny or abstain); the resolution is written into the chain as `ESCALATION_RESOLVED`. `vaara review purge --older-than-days N` deletes closed items past retention with `secure_delete`; open items are kept. |
 | Signed approvals | `approvals.py`, host hooks | An escalated call waits for a human answer that is signed, which the governed agent cannot write. The request carries the call's full arguments and their SHA-256. A timeout or a corrupt answer stays a refusal, and the trail closes the hold as a deny by policy, so it never reads as one still waiting. |
 | Reviewer-signed resolutions | `vaara review resolve --sign-key`, `vaara trail check-permission`, `credential/_review_signature.py` | The reviewer signs the resolution with their own key, bound to the decision record it resolves. A third party checks it against a reviewer key the principal pinned in the signed permission, never a key the record carries, and an allow over a held call is named as an override for that one action. |
 | Shadow report | `vaara trail shadow-report`, `audit/shadow_report.py` | Groups what would have been denied or held, by tool, over a period. |
