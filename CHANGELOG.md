@@ -6,6 +6,8 @@ and this project follows [Semantic Versioning](https://semver.org/spec/v2.0.0.ht
 
 ## [Unreleased]
 
+## [2.17.0] - 2026-10-29
+
 ### Added
 - `vaara review purge --db QUEUE.db --older-than-days N [--dry-run]` and `ReviewQueue.purge_older_than(seconds)`: delete resolved and expired review queue items whose case closed more than N days ago. The queue holds a second copy of the call's parameters, context and reason and the reviewers' free text, and neither `vaara trail purge` nor `vaara trail erase` reaches it. The delete runs with `secure_delete` on and truncates the WAL, as `trail purge` does; when another process holds the WAL the command says so on stderr. Pending and claimed items are kept whatever their age, and the command counts them on stderr.
 - Execution receipt outcome status `unobserved`: the request was sent and no outcome was observed, so the issuer cannot say whether the action ran. The MCP proxy writes it when an upstream call raises in the state its trail records as `unobserved` (the request may have reached the server, no reply was read), with no `resultCommitment`; `not_sent` and `failed` stay `errored`. Parsers, record conformance and every independent checker accept `executed`, `refused`, `errored` and `unobserved` and reject any other value; an `unobserved` receipt carrying a `resultCommitment` is an advisory. `vaara receipt verify` reports `outcome_observed` and, for `unobserved`, says to read it as neither executed nor errored. The `execution_receipt_v0` vectors gain `hs256_unobserved_no_commitment` and `neg_unknown_status`, and the independent checker now checks the status set; the existing cases are unchanged. The SEP-2828 conformance corpus moves to 1.0.1 (its checkers accept `unobserved`; no fixture verdict changes).
