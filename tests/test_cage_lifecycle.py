@@ -392,10 +392,12 @@ class TestFreshHome:
         from vaara.cage import lifecycle
         monkeypatch.delenv("VAARA_DB", raising=False)
         monkeypatch.setenv("HOME", str(tmp_path))
+        monkeypatch.setenv("USERPROFILE", str(tmp_path))  # Path.home() on Windows
         assert lifecycle.started("gvisor", "g", "sha256:" + "0" * 64) is not None
         db = tmp_path / ".vaara" / "trail" / "audit.db"
         assert len(_lifecycle(db)) == 1
-        assert (db.parent.stat().st_mode & 0o777) == 0o700
+        if os.name == "posix":
+            assert (db.parent.stat().st_mode & 0o777) == 0o700
 
     def test_vaara_db_in_a_missing_directory(self, tmp_path, monkeypatch):
         from vaara.cage import lifecycle
