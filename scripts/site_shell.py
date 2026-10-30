@@ -57,9 +57,9 @@ THEME_KEY = "vaara-theme"
 #: The language a visitor picked with the EN | FI switch; it stops the home page choosing for them.
 LANG_KEY = "vaara-lang"
 
-#: In <head>, before anything paints: the saved theme, or the OS setting.
+#: In <head>, before anything paints: the saved theme, or light.
 PREPAINT = ('<script>try{var t=localStorage.getItem("' + THEME_KEY + '");'
-            'if(t!=="dark"&&t!=="light")t=matchMedia("(prefers-color-scheme: dark)").matches?"dark":"light";'
+            'if(t!=="dark"&&t!=="light")t="light";'
             'document.documentElement.dataset.theme=t;'
             # the English home sends a browser that lists Finnish to /fi/, once, until the visitor picks a language
             'var p=location.pathname;if((p==="/"||p==="/index.html")&&!localStorage.getItem("' + LANG_KEY + '")'
